@@ -1,0 +1,6 @@
+interface:
+  display_name: "Consflow Diagnose"
+  short_description: "Reproduce, isolate, fix, and verify Consflow bugs."
+  brand_color: "#DC2626"
+policy:
+  allow_implicit_invocation: true

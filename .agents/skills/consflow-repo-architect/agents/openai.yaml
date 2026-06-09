@@ -1,0 +1,6 @@
+interface:
+  display_name: "Consflow Repo Architect"
+  short_description: "Routes cross-cutting Consflow work across backend, frontend, DB, and Docker."
+  brand_color: "#2563EB"
+policy:
+  allow_implicit_invocation: true

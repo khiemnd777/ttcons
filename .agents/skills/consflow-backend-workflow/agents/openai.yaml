@@ -1,0 +1,6 @@
+interface:
+  display_name: "Consflow Backend Workflow"
+  short_description: "Go/Fiber backend workflow with custom SQL migrations."
+  brand_color: "#0F766E"
+policy:
+  allow_implicit_invocation: true

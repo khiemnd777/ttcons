@@ -1,0 +1,85 @@
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, Plus } from 'lucide-react';
+import { get, post } from '../../lib/api/client';
+import { PageHeader } from '../../components/PageHeader';
+import { DataTable } from '../../components/DataTable';
+import { FormDrawer } from '../../components/FormDrawer';
+import { StatusBadge } from '../../components/StatusBadge';
+import { CurrencyText } from '../../components/CurrencyText';
+import { SimpleForm } from '../_shared/SimpleForm';
+import { ProjectSelector } from '../_shared/ProjectSelector';
+
+export function ReworkPage() {
+  const { id } = useParams();
+  const [projectId, setProjectId] = useState(id ?? '');
+  const [open, setOpen] = useState<'rework' | 'replanning' | null>(null);
+  const queryClient = useQueryClient();
+  const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Record<string, any>[]>('/projects') });
+  useEffect(() => { if (!projectId && projects.data?.[0]) setProjectId(projects.data[0].id); }, [projects.data, projectId]);
+  const reworks = useQuery({ queryKey: ['reworks', projectId], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/reworks`), enabled: Boolean(projectId) });
+  const replannings = useQuery({ queryKey: ['replannings', projectId], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/replannings`), enabled: Boolean(projectId) });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['reworks', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['replannings', projectId] });
+  };
+  const createRework = useMutation({ mutationFn: (values: Record<string, any>) => post(`/projects/${projectId}/reworks`, values), onSuccess: () => { invalidate(); setOpen(null); } });
+  const createReplanning = useMutation({ mutationFn: (values: Record<string, any>) => post(`/projects/${projectId}/replannings`, values), onSuccess: () => { invalidate(); setOpen(null); } });
+  const action = useMutation({ mutationFn: ({ path, actionName }: { path: string; actionName: string }) => post(`/${path}/${actionName}`, {}), onSuccess: invalidate });
+
+  return (
+    <>
+      <PageHeader
+        title="Rework / Replanning"
+        description="Rework khi sửa trong phạm vi hiện tại; Replanning khi ảnh hưởng thiết kế, BOQ, ngân sách hoặc timeline."
+        actions={
+          <>
+            {!id ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
+            <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100" onClick={() => setOpen('replanning')}><Plus className="h-4 w-4" />Replanning</button>
+            <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen('rework')}><Plus className="h-4 w-4" />Rework</button>
+          </>
+        }
+      />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section>
+          <h2 className="mb-3 text-base font-semibold text-ink">Rework board</h2>
+          <DataTable rows={reworks.data ?? []} columns={[
+            { key: 'title', header: 'Rework', render: (row) => <span className="font-semibold text-ink">{row.title}</span> },
+            { key: 'due_date', header: 'Deadline' },
+            { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
+            { key: 'action', header: 'Action', render: (row) => <button className="text-sm font-semibold text-blue-700" onClick={() => action.mutate({ path: `reworks/${row.id}`, actionName: 'complete' })}>Complete</button> },
+          ]} />
+        </section>
+        <section>
+          <h2 className="mb-3 text-base font-semibold text-ink">Replanning requests</h2>
+          <DataTable rows={replannings.data ?? []} columns={[
+            { key: 'reason', header: 'Lý do', render: (row) => <span className="font-semibold text-ink">{row.reason}</span> },
+            { key: 'impact_scope', header: 'Impact' },
+            { key: 'budget_impact', header: 'Ngân sách', render: (row) => <CurrencyText value={row.budget_impact} /> },
+            { key: 'timeline_impact', header: 'Ngày' },
+            { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
+            { key: 'action', header: 'Action', render: (row) => <button className="text-sm font-semibold text-blue-700" onClick={() => action.mutate({ path: `replannings/${row.id}`, actionName: 'approve' })}>Approve</button> },
+          ]} />
+        </section>
+      </div>
+      <FormDrawer open={open === 'rework'} title="Tạo rework" onClose={() => setOpen(null)}>
+        <SimpleForm fields={[
+          { name: 'title', label: 'Tiêu đề', defaultValue: 'Rework mới' },
+          { name: 'description', label: 'Mô tả', type: 'textarea' },
+          { name: 'due_date', label: 'Deadline', type: 'date' },
+          { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'draft', options: ['draft', 'approved', 'in_progress'].map((x) => ({ label: x, value: x })) },
+        ]} onSubmit={(values) => createRework.mutateAsync(values)} />
+      </FormDrawer>
+      <FormDrawer open={open === 'replanning'} title="Tạo replanning" onClose={() => setOpen(null)}>
+        <SimpleForm fields={[
+          { name: 'reason', label: 'Lý do', type: 'textarea', defaultValue: 'Issue lớn ảnh hưởng kế hoạch' },
+          { name: 'impact_scope', label: 'Impact scope', type: 'select', defaultValue: 'boq', options: ['design', 'boq', 'budget', 'timeline', 'material', 'subcontractor', 'client_requirement'].map((x) => ({ label: x, value: x })) },
+          { name: 'budget_impact', label: 'Ảnh hưởng ngân sách', type: 'number', defaultValue: 0 },
+          { name: 'timeline_impact', label: 'Ảnh hưởng timeline (ngày)', type: 'number', defaultValue: 0 },
+          { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'draft', options: ['draft', 'submitted'].map((x) => ({ label: x, value: x })) },
+        ]} onSubmit={(values) => createReplanning.mutateAsync(values)} />
+      </FormDrawer>
+    </>
+  );
+}

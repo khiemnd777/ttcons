@@ -1,0 +1,6 @@
+interface:
+  display_name: "Consflow Handoff"
+  short_description: "Compact continuation handoffs for Consflow work."
+  brand_color: "#4B5563"
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Consflow Pipeline Domain"
+  short_description: "Guards construction workflow and approval invariants."
+  brand_color: "#EA580C"
+policy:
+  allow_implicit_invocation: true

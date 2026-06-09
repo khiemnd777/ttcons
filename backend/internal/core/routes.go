@@ -1,0 +1,151 @@
+package core
+
+import (
+	"database/sql"
+
+	"consflow/backend/internal/shared/config"
+	"consflow/backend/internal/shared/middleware"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/redis/go-redis/v9"
+)
+
+func RegisterRoutes(app *fiber.App, db *sql.DB, _ *redis.Client, cfg config.Config) {
+	repo := NewRepository(db)
+	service := NewService(repo, cfg.JWTSecret)
+	h := NewHandler(service)
+
+	api := app.Group("/api")
+	api.Get("/health", h.Health)
+	api.Post("/auth/login", h.Login)
+
+	protected := api.Group("", middleware.AuthRequired(cfg.JWTSecret))
+	protected.Post("/auth/refresh", h.Refresh)
+	protected.Post("/auth/logout", h.Logout)
+	protected.Get("/auth/me", h.Me)
+
+	protected.Get("/projects", h.ListProjects)
+	protected.Post("/projects", h.CreateProject)
+	protected.Get("/projects/:id", h.GetProject)
+	protected.Put("/projects/:id", h.UpdateProject)
+	protected.Delete("/projects/:id", h.DeleteProject)
+
+	protected.Get("/pipeline-templates", h.ListTemplates)
+	protected.Post("/pipeline-templates", h.CreateTemplate)
+	protected.Get("/pipeline-templates/:id", h.GetTemplate)
+	protected.Put("/pipeline-templates/:id", h.UpdateTemplate)
+	protected.Post("/pipeline-templates/:id/publish", h.PublishTemplate)
+	protected.Post("/pipeline-templates/:id/clone", h.CloneTemplate)
+	protected.Post("/pipeline-templates/:id/nodes", h.AddTemplateNode)
+	protected.Post("/pipeline-templates/:id/edges", h.AddTemplateEdge)
+	protected.Put("/pipeline-nodes/:id", h.UpdateTemplateNode)
+	protected.Delete("/pipeline-nodes/:id", h.DeleteTemplateNode)
+	protected.Post("/pipeline-nodes/:id/steps", h.AddTemplateStep)
+	protected.Put("/pipeline-steps/:id", h.UpdateTemplateStep)
+	protected.Delete("/pipeline-steps/:id", h.DeleteTemplateStep)
+	protected.Put("/pipeline-edges/:id", h.UpdateTemplateEdge)
+	protected.Delete("/pipeline-edges/:id", h.DeleteTemplateEdge)
+
+	protected.Post("/projects/:id/start-pipeline", h.StartPipeline)
+	protected.Get("/projects/:id/pipeline-run", h.GetPipelineRun)
+	protected.Post("/pipeline-run-nodes/:id/start", h.StartRunNode)
+	protected.Post("/pipeline-run-steps/:id/submit", h.SubmitRunStep)
+	protected.Post("/pipeline-run-nodes/:id/request-approval", h.RequestNodeApproval)
+	protected.Post("/pipeline-run-nodes/:id/advance", h.AdvanceRunNode)
+	protected.Post("/pipeline-run-nodes/:id/block", h.BlockRunNode)
+
+	protected.Get("/approvals", h.ListApprovals)
+	protected.Get("/approvals/pending", h.PendingApprovals)
+	protected.Post("/approvals/:id/approve", h.Approve)
+	protected.Post("/approvals/:id/reject", h.Reject)
+	protected.Post("/approvals/:id/request-change", h.RequestChange)
+
+	protected.Get("/projects/:id/boq", h.ProjectBOQ)
+	protected.Post("/projects/:id/boq", h.CreateBOQ)
+	protected.Put("/boq-items/:id", h.UpdateBOQ)
+	protected.Post("/projects/:id/boq/submit", h.SubmitBOQ)
+	protected.Post("/projects/:id/boq/approve", h.ApproveBOQ)
+	protected.Post("/projects/:id/boq/generate-procurement", h.GenerateProcurementFromBOQ)
+
+	protected.Get("/procurement-requests", h.ListProcurement)
+	protected.Post("/procurement-requests", h.CreateProcurement)
+	protected.Get("/procurement-requests/:id", h.GetProcurement)
+	protected.Put("/procurement-requests/:id", h.UpdateProcurement)
+	protected.Post("/procurement-requests/:id/submit", h.SubmitProcurement)
+	protected.Post("/procurement-requests/:id/approve", h.ApproveProcurement)
+	protected.Post("/procurement-requests/:id/order", h.OrderProcurement)
+	protected.Post("/procurement-requests/:id/receive", h.ReceiveProcurement)
+
+	protected.Get("/materials", h.ListMaterials)
+	protected.Post("/materials", h.CreateMaterial)
+	protected.Get("/warehouses", h.ListWarehouses)
+	protected.Post("/warehouses", h.CreateWarehouse)
+	protected.Get("/stock", h.Stock)
+	protected.Post("/stock/receive", h.StockReceive)
+	protected.Post("/stock/issue", h.StockIssue)
+	protected.Post("/stock/transfer", h.StockTransfer)
+	protected.Post("/stock/return-to-warehouse", h.StockReturnWarehouse)
+	protected.Post("/stock/return-to-subcontractor", h.StockReturnSubcontractor)
+	protected.Get("/projects/:id/material-balances", h.MaterialBalances)
+
+	protected.Get("/projects/:id/daily-reports", h.ProjectDailyReports)
+	protected.Post("/projects/:id/daily-reports", h.CreateDailyReport)
+	protected.Get("/projects/:id/issues", h.ProjectIssues)
+	protected.Post("/projects/:id/issues", h.CreateIssue)
+	protected.Put("/issues/:id", h.UpdateIssue)
+
+	protected.Get("/projects/:id/acceptances", h.ProjectAcceptances)
+	protected.Post("/projects/:id/acceptances", h.CreateAcceptance)
+	protected.Get("/acceptances/:id", h.GetAcceptance)
+	protected.Post("/acceptances/:id/pass", h.PassAcceptance)
+	protected.Post("/acceptances/:id/fail", h.FailAcceptance)
+	protected.Post("/acceptances/:id/create-rework", h.CreateReworkFromAcceptance)
+
+	protected.Get("/projects/:id/reworks", h.ProjectReworks)
+	protected.Post("/projects/:id/reworks", h.CreateRework)
+	protected.Post("/reworks/:id/approve", h.ApproveRework)
+	protected.Post("/reworks/:id/complete", h.CompleteRework)
+	protected.Get("/projects/:id/replannings", h.ProjectReplannings)
+	protected.Post("/projects/:id/replannings", h.CreateReplanning)
+	protected.Post("/replannings/:id/approve", h.ApproveReplanning)
+
+	protected.Get("/projects/:id/handover", h.ProjectHandover)
+	protected.Post("/projects/:id/handover", h.CreateHandover)
+	protected.Post("/handover/:id/check", h.CheckHandover)
+	protected.Post("/handover/:id/complete", h.CompleteHandover)
+
+	protected.Get("/projects/:id/budget", h.ProjectBudget)
+	protected.Post("/projects/:id/budget", h.CreateBudget)
+	protected.Post("/budgets/:id/approve", h.ApproveBudget)
+	protected.Get("/payables", h.ListPayables)
+	protected.Post("/payables", h.CreatePayable)
+	protected.Post("/payables/:id/approve", h.ApprovePayable)
+	protected.Post("/payables/:id/pay", h.PayPayable)
+	protected.Get("/receivables", h.ListReceivables)
+	protected.Post("/receivables", h.CreateReceivable)
+	protected.Post("/receivables/:id/approve", h.ApproveReceivable)
+	protected.Post("/receivables/:id/receive", h.ReceiveReceivable)
+	protected.Get("/payments", h.ListPayments)
+	protected.Post("/payments", h.CreatePayment)
+	protected.Post("/payments/:id/approve", h.ApprovePayment)
+
+	protected.Get("/staff", h.ListStaff)
+	protected.Post("/staff", h.CreateStaff)
+	protected.Put("/staff/:id", h.UpdateStaff)
+	protected.Get("/roles", h.ListRoles)
+	protected.Post("/roles", h.CreateRole)
+	protected.Put("/roles/:id", h.UpdateRole)
+	protected.Get("/permissions", h.ListPermissions)
+	protected.Post("/roles/:id/permissions", h.AssignRolePermissions)
+	protected.Post("/users/:id/roles", h.AssignUserRoles)
+
+	protected.Get("/audit-logs", h.AuditLogs)
+	protected.Get("/projects/:id/audit-logs", h.ProjectAuditLogs)
+	protected.Get("/reports/dashboard", h.Dashboard)
+	protected.Get("/reports/projects", h.ProjectReport)
+	protected.Get("/reports/warehouse", h.WarehouseReport)
+	protected.Get("/reports/procurement", h.ProcurementReport)
+	protected.Get("/reports/accounting", h.AccountingReport)
+	protected.Get("/reports/staff", h.StaffReport)
+	protected.Get("/settings", h.Settings)
+}
