@@ -11,17 +11,18 @@ type PipelineBuilderShellProps = {
   templateStatus?: string;
   templateDescription?: string;
   selectedTemplateId: string;
-  hasSelectedNode: boolean;
+  canDeleteSelection: boolean;
+  deleteSelectionLabel: string;
   nodeCount: number;
   validationIssueCount: number;
   autoLayoutPending: boolean;
-  deleteNodePending: boolean;
+  deleteSelectionPending: boolean;
   onCreateTemplate: () => void;
   onCloneTemplate: () => void;
   onPublishTemplate: () => void;
   onAutoLayout: () => void;
   onValidatePipeline: () => void;
-  onDeleteSelectedNode: () => void;
+  onDeleteSelection: () => void;
 };
 
 export function PipelineBuilderShell({
@@ -32,17 +33,18 @@ export function PipelineBuilderShell({
   templateStatus,
   templateDescription,
   selectedTemplateId,
-  hasSelectedNode,
+  canDeleteSelection,
+  deleteSelectionLabel,
   nodeCount,
   validationIssueCount,
   autoLayoutPending,
-  deleteNodePending,
+  deleteSelectionPending,
   onCreateTemplate,
   onCloneTemplate,
   onPublishTemplate,
   onAutoLayout,
   onValidatePipeline,
-  onDeleteSelectedNode,
+  onDeleteSelection,
 }: PipelineBuilderShellProps) {
   return (
     <div className="flex h-screen overflow-hidden bg-surface">
@@ -80,9 +82,9 @@ export function PipelineBuilderShell({
                 <CheckCircle2 className="h-4 w-4" />
                 Kiểm tra
               </button>
-              <button className="inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50" onClick={onDeleteSelectedNode} disabled={!hasSelectedNode || deleteNodePending}>
+              <button className="inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50" onClick={onDeleteSelection} disabled={!canDeleteSelection || deleteSelectionPending}>
                 <Trash2 className="h-4 w-4" />
-                Xóa node
+                {deleteSelectionLabel}
               </button>
             </div>
           </div>

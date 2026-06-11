@@ -50,6 +50,7 @@ export function PipelineBuilderPage() {
   const toast = useToast();
   const [selectedTemplateId, setSelectedTemplateId] = useState(id ?? '');
   const [selectedNodeId, setSelectedNodeId] = useState('');
+  const [selectedConnectorId, setSelectedConnectorId] = useState('');
   const [detailsNodeId, setDetailsNodeId] = useState('');
   const [templatesExpanded, setTemplatesExpanded] = useState(true);
   const [newStep, setNewStep] = useState('');
@@ -72,6 +73,7 @@ export function PipelineBuilderPage() {
     if (id) {
       setSelectedTemplateId(id);
       setSelectedNodeId('');
+      setSelectedConnectorId('');
       setDetailsNodeId('');
     }
   }, [id]);
@@ -86,12 +88,17 @@ export function PipelineBuilderPage() {
   );
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const selectedNode = selectedNodeId ? nodeById.get(selectedNodeId) : undefined;
+  const selectedConnector = selectedConnectorId ? rawEdges.find((edge) => String(edge.id) === selectedConnectorId) : undefined;
   const detailsNode = detailsNodeId ? nodeById.get(detailsNodeId) : undefined;
 
   useEffect(() => {
     if (selectedNodeId && !nodeById.has(selectedNodeId)) setSelectedNodeId('');
     if (detailsNodeId && !nodeById.has(detailsNodeId)) setDetailsNodeId('');
   }, [detailsNodeId, nodeById, selectedNodeId]);
+
+  useEffect(() => {
+    if (selectedConnectorId && !rawEdges.some((edge) => String(edge.id) === selectedConnectorId)) setSelectedConnectorId('');
+  }, [rawEdges, selectedConnectorId]);
 
   useEffect(() => {
     if (!detailsNode) {
@@ -149,6 +156,7 @@ export function PipelineBuilderPage() {
       invalidate(created.id);
       setSelectedTemplateId(created.id);
       setSelectedNodeId('');
+      setSelectedConnectorId('');
       setDetailsNodeId('');
       navigate(`/pipeline-builder/${created.id}`);
       toast.success('Đã tạo template');
@@ -171,6 +179,7 @@ export function PipelineBuilderPage() {
       invalidate(created.id);
       setSelectedTemplateId(created.id);
       setSelectedNodeId('');
+      setSelectedConnectorId('');
       setDetailsNodeId('');
       navigate(`/pipeline-builder/${created.id}`);
       toast.success('Đã clone template');
@@ -285,6 +294,26 @@ export function PipelineBuilderPage() {
     onError: (error) => toast.error('Không cập nhật được connector', error),
   });
 
+  const deleteEdge = useMutation({
+    mutationFn: async (edgeId: string) => {
+      const templateId = selectedTemplateId;
+      if (!templateId) throw new Error('Chưa chọn template');
+      await del(`/pipeline-edges/${edgeId}`);
+      return { edgeId, templateId };
+    },
+    onSuccess: ({ edgeId, templateId }) => {
+      setSelectedConnectorId((current) => (current === edgeId ? '' : current));
+      queryClient.setQueryData<PipelineTemplate>(['pipeline-template', templateId], (current) => {
+        if (!current) return current;
+        const edges = Array.isArray(current.edges) ? current.edges : [];
+        return { ...current, edges: edges.filter((edge) => String(edge.id) !== edgeId) };
+      });
+      invalidate(templateId);
+      toast.success('Đã xóa connector');
+    },
+    onError: (error) => toast.error('Không xóa được connector', error),
+  });
+
   const addStep = useMutation({
     mutationFn: () => {
       if (!detailsNodeId) throw new Error('Chưa chọn node');
@@ -368,6 +397,7 @@ export function PipelineBuilderPage() {
   const selectTemplate = (item: PipelineTemplate) => {
     setSelectedTemplateId(item.id);
     setSelectedNodeId('');
+    setSelectedConnectorId('');
     setDetailsNodeId('');
     navigate(`/pipeline-builder/${item.id}`);
   };
@@ -381,6 +411,18 @@ export function PipelineBuilderPage() {
       title: 'Workflow cần kiểm tra',
       description: validationIssues.slice(0, 4).join('; ') + (validationIssues.length > 4 ? `; +${validationIssues.length - 4} lỗi khác` : ''),
     });
+  };
+
+  const connectorMutationPending = createEdge.isPending || updateEdge.isPending || deleteEdge.isPending;
+  const canDeleteSelection = Boolean(selectedConnector || selectedNode);
+  const deleteSelectionLabel = selectedConnector ? 'Xóa connector' : 'Xóa node';
+  const deleteSelectionPending = selectedConnector ? deleteEdge.isPending : deleteNode.isPending;
+  const deleteSelection = () => {
+    if (selectedConnector) {
+      deleteEdge.mutate(String(selectedConnector.id));
+      return;
+    }
+    if (selectedNodeId) deleteNode.mutate(selectedNodeId);
   };
 
   if (templates.isLoading) {
@@ -414,19 +456,18 @@ export function PipelineBuilderPage() {
       templateStatus={template.data?.status}
       templateDescription={template.data?.description}
       selectedTemplateId={selectedTemplateId}
-      hasSelectedNode={Boolean(selectedNode)}
+      canDeleteSelection={canDeleteSelection}
+      deleteSelectionLabel={deleteSelectionLabel}
       nodeCount={nodes.length}
       validationIssueCount={validationIssues.length}
       autoLayoutPending={autoLayout.isPending}
-      deleteNodePending={deleteNode.isPending}
+      deleteSelectionPending={deleteSelectionPending}
       onCreateTemplate={() => createTemplate.mutate()}
       onCloneTemplate={() => clone.mutate()}
       onPublishTemplate={() => publish.mutate()}
       onAutoLayout={() => autoLayout.mutate()}
       onValidatePipeline={validatePipeline}
-      onDeleteSelectedNode={() => {
-        if (selectedNodeId) deleteNode.mutate(selectedNodeId);
-      }}
+      onDeleteSelection={deleteSelection}
       inspector={
         detailsNode ? (
           <NodeInspectorPanel
@@ -459,15 +500,21 @@ export function PipelineBuilderPage() {
           nodes={nodes}
           edges={rawEdges}
           selectedNodeId={selectedNodeId}
-          connectorMutationPending={createEdge.isPending || updateEdge.isPending}
-          onSelectNode={setSelectedNodeId}
+          connectorMutationPending={connectorMutationPending}
+          onSelectNode={(nodeId) => {
+            setSelectedNodeId(nodeId);
+            setSelectedConnectorId('');
+          }}
+          onSelectedConnectorChange={setSelectedConnectorId}
           onToggleNodeDetails={(nodeId) => {
             setSelectedNodeId(nodeId);
+            setSelectedConnectorId('');
             setDetailsNodeId((current) => (current === nodeId ? '' : nodeId));
           }}
           onSaveNodePosition={(nodeId, position) => saveNodePosition.mutate({ nodeId, position })}
           onCreateConnector={(input) => createEdge.mutate(input)}
           onReconnectConnector={(input) => updateEdge.mutate(input)}
+          onDeleteConnector={(connectorId) => deleteEdge.mutate(connectorId)}
         />
       )}
     </PipelineBuilderShell>

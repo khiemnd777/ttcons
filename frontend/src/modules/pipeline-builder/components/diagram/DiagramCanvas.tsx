@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import clsx from 'clsx';
 import { EmptyState } from '../../../../components/EmptyState';
 import type { PipelineNode, PipelineTemplateEdge } from '../../../../lib/types/domain';
@@ -44,10 +44,12 @@ type DiagramCanvasProps = {
   selectedNodeId: string;
   connectorMutationPending: boolean;
   onSelectNode: (nodeId: string) => void;
+  onSelectedConnectorChange: (connectorId: string) => void;
   onToggleNodeDetails: (nodeId: string) => void;
   onSaveNodePosition: (nodeId: string, position: NodePosition) => void;
   onCreateConnector: (input: ConnectorCreateInput) => void;
   onReconnectConnector: (input: ConnectorReconnectInput) => void;
+  onDeleteConnector: (connectorId: string) => void;
 };
 
 export function DiagramCanvas({
@@ -56,16 +58,19 @@ export function DiagramCanvas({
   selectedNodeId,
   connectorMutationPending,
   onSelectNode,
+  onSelectedConnectorChange,
   onToggleNodeDetails,
   onSaveNodePosition,
   onCreateConnector,
   onReconnectConnector,
+  onDeleteConnector,
 }: DiagramCanvasProps) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const panRef = useRef<PanState | null>(null);
   const connectorDraftRef = useRef<ConnectorDraft | null>(null);
   const reconnectDraftRef = useRef<ConnectorReconnectDraft | null>(null);
+  const interactionRef = useRef(initialDiagramInteractionState);
   const persistedPositionsRef = useRef<Record<string, NodePosition>>({});
   const resizeObserversRef = useRef<Record<string, ResizeObserver>>({});
   const settledNodeRectsRef = useRef<DiagramNodeRect[]>([]);
@@ -100,6 +105,7 @@ export function DiagramCanvas({
   nodePositionsRef.current = nodePositions;
   nodeRectsRef.current = nodeRects;
   edgeIdsByKeyRef.current = edgeIdsByKey;
+  interactionRef.current = interaction;
   const connectorDraft = interaction.connectorDraft;
   const reconnectDraft = interaction.reconnectDraft;
   const activeTargetPort = connectorDraft?.target ?? reconnectDraft?.target ?? null;
@@ -124,10 +130,34 @@ export function DiagramCanvas({
       : null;
 
   useEffect(() => {
+    onSelectedConnectorChange(interaction.selectedConnectorId);
+  }, [interaction.selectedConnectorId, onSelectedConnectorChange]);
+
+  useEffect(() => {
     if (interaction.selectedConnectorId && !connectors.some((connector) => connector.id === interaction.selectedConnectorId)) {
       dispatchInteraction({ type: 'clear-selected-connector', connectorId: interaction.selectedConnectorId });
     }
   }, [connectors, interaction.selectedConnectorId]);
+
+  useEffect(() => {
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const connectorDraft = connectorDraftRef.current;
+    if (connectorDraft && !nodeIds.has(connectorDraft.source.nodeId)) {
+      connectorDraftRef.current = null;
+      dispatchInteraction({ type: 'cancel-connector-drag' });
+    }
+
+    const reconnectDraft = reconnectDraftRef.current;
+    if (
+      reconnectDraft &&
+      (!nodeIds.has(reconnectDraft.fixed.nodeId) ||
+        !nodeIds.has(reconnectDraft.originalSource.nodeId) ||
+        !nodeIds.has(reconnectDraft.originalTarget.nodeId))
+    ) {
+      reconnectDraftRef.current = null;
+      dispatchInteraction({ type: 'cancel-connector-reconnect' });
+    }
+  }, [nodes]);
 
   useEffect(() => {
     const previousPersisted = persistedPositionsRef.current;
@@ -237,6 +267,10 @@ export function DiagramCanvas({
     pendingNodePositionRef.current = null;
   }, []);
 
+  const focusCanvas = useCallback(() => {
+    canvasRef.current?.focus({ preventScroll: true });
+  }, []);
+
   const canvasPointFromEvent = useCallback((event: PointerEvent<Element>) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -252,6 +286,7 @@ export function DiagramCanvas({
     if (connectorDraftRef.current || reconnectDraftRef.current) return;
     if (event.button !== 0 || event.target !== event.currentTarget) return;
     event.preventDefault();
+    focusCanvas();
     event.currentTarget.setPointerCapture(event.pointerId);
     selectNode('');
     panRef.current = {
@@ -294,6 +329,7 @@ export function DiagramCanvas({
     const pointer = canvasPointFromEvent(event);
     if (!pointer) return;
 
+    focusCanvas();
     onSelectNode(port.nodeId);
     const draft: ConnectorDraft = {
       source: port,
@@ -354,9 +390,10 @@ export function DiagramCanvas({
   }, [canvasPointFromEvent]);
 
   const selectConnector = useCallback((connectorId: string) => {
+    focusCanvas();
     onSelectNode('');
     dispatchInteraction({ type: 'select-connector', connectorId });
-  }, [onSelectNode]);
+  }, [focusCanvas, onSelectNode]);
 
   const nextReconnectDraftFromEvent = useCallback((event: PointerEvent<Element>, draft: ConnectorReconnectDraft): ConnectorReconnectDraft | null => {
     const pointer = canvasPointFromEvent(event);
@@ -380,6 +417,7 @@ export function DiagramCanvas({
     const pointer = canvasPointFromEvent(event);
     if (!pointer) return;
 
+    focusCanvas();
     const originalSource = connector.source.port;
     const originalTarget = connector.target.port;
     const fixed = endpoint === 'source' ? originalTarget : originalSource;
@@ -404,7 +442,7 @@ export function DiagramCanvas({
       originalTarget,
       pointer,
     });
-  }, [canvasPointFromEvent, connectorMutationPending, onSelectNode]);
+  }, [canvasPointFromEvent, connectorMutationPending, focusCanvas, onSelectNode]);
 
   const moveConnectorReconnect = useCallback((event: PointerEvent<SVGCircleElement>) => {
     const draft = reconnectDraftRef.current;
@@ -458,6 +496,7 @@ export function DiagramCanvas({
     if (!point) return;
     event.preventDefault();
     event.stopPropagation();
+    focusCanvas();
     dispatchInteraction({ type: 'clear-selected-connector' });
     const position = nodePosition(node, index, nodePositionsRef.current);
     settledNodeRectsRef.current = nodeRectsRef.current;
@@ -474,7 +513,7 @@ export function DiagramCanvas({
       lastY: position.y,
       moved: false,
     };
-  }, [canvasPointFromEvent]);
+  }, [canvasPointFromEvent, focusCanvas]);
 
   const handleNodePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
@@ -511,10 +550,52 @@ export function DiagramCanvas({
     dispatchInteraction({ type: 'hover-node', nodeId: drag.nodeId });
   }, [applyNodePosition, cancelScheduledNodePositionUpdate, onSaveNodePosition, onSelectNode]);
 
+  const handleCanvasKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (isEditableKeyboardTarget(event.target)) return;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (connectorDraftRef.current) {
+          connectorDraftRef.current = null;
+          dispatchInteraction({ type: 'cancel-connector-drag' });
+          return;
+        }
+
+        if (reconnectDraftRef.current) {
+          reconnectDraftRef.current = null;
+          dispatchInteraction({ type: 'cancel-connector-reconnect' });
+          return;
+        }
+
+        if (interactionRef.current.selectedConnectorId) {
+          dispatchInteraction({ type: 'clear-selected-connector' });
+          return;
+        }
+
+        if (selectedNodeId) onSelectNode('');
+        return;
+      }
+
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const selectedConnectorId = interactionRef.current.selectedConnectorId;
+      if (!selectedConnectorId || connectorMutationPending || connectorDraftRef.current || reconnectDraftRef.current) return;
+      onDeleteConnector(selectedConnectorId);
+    },
+    [connectorMutationPending, onDeleteConnector, onSelectNode, selectedNodeId],
+  );
+
   return (
     <div
       ref={canvasRef}
-      className={clsx('relative min-h-0 flex-1 touch-none overflow-hidden bg-slate-50', isPanning ? 'cursor-grabbing' : 'cursor-grab')}
+      tabIndex={0}
+      aria-label="Pipeline builder canvas"
+      className={clsx('relative min-h-0 flex-1 touch-none overflow-hidden bg-slate-50 focus:outline-none', isPanning ? 'cursor-grabbing' : 'cursor-grab')}
       style={{
         backgroundImage: 'radial-gradient(circle at 1px 1px, #cbd5e1 1px, transparent 0)',
         backgroundPosition: `${gridOffset(canvasOffset.x)} ${gridOffset(canvasOffset.y)}`,
@@ -524,6 +605,7 @@ export function DiagramCanvas({
       onPointerMove={handleCanvasPointerMove}
       onPointerUp={finishCanvasPan}
       onPointerCancel={finishCanvasPan}
+      onKeyDown={handleCanvasKeyDown}
       onPointerLeave={() => {
         if (!connectorDraftRef.current && !reconnectDraftRef.current) dispatchInteraction({ type: 'clear-hover-node' });
       }}
@@ -721,6 +803,12 @@ function reconnectInputFromDraft(draft: ConnectorReconnectDraft): ConnectorRecon
 
 function samePort(left: PortRef, right: PortRef) {
   return left.nodeId === right.nodeId && left.side === right.side;
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  const tagName = target.tagName.toLowerCase();
+  return target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select';
 }
 
 function oppositePortSide(side: PortSide): PortSide {
