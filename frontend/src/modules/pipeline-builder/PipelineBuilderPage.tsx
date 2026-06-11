@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { del, get, post, put } from '../../lib/api/client';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { useToast } from '../../components/ToastProvider';
+import { Dialog } from '../../components/Dialog';
 import type { PipelineEdgeConditionDefinition, PipelineNode, PipelineTemplate, PipelineTemplateEdge } from '../../lib/types/domain';
 import { PipelineBuilderShell } from './components/PipelineBuilderShell';
 import { TemplateSidebar } from './components/TemplateSidebar';
@@ -61,6 +63,10 @@ export function PipelineBuilderPage() {
   const [selectedConnectorId, setSelectedConnectorId] = useState('');
   const [detailsNodeId, setDetailsNodeId] = useState('');
   const [templatesExpanded, setTemplatesExpanded] = useState(true);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [templateNameForm, setTemplateNameForm] = useState('');
+  const [templateNameSubmitAttempted, setTemplateNameSubmitAttempted] = useState(false);
+  const [deleteTemplateDialog, setDeleteTemplateDialog] = useState<PipelineTemplate | null>(null);
   const [stepDialog, setStepDialog] = useState<{ mode: 'add' | 'edit'; step?: Record<string, any> } | null>(null);
   const [stepForm, setStepForm] = useState({ name: '', step_type: 'task' });
   const [stepSubmitAttempted, setStepSubmitAttempted] = useState(false);
@@ -224,6 +230,48 @@ export function PipelineBuilderPage() {
       toast.success('Đã clone template');
     },
     onError: (error) => toast.error('Không clone được template', error),
+  });
+
+  const updateTemplateName = useMutation({
+    mutationFn: () => {
+      if (!selectedTemplateId) throw new Error('Chưa chọn template');
+      return put<PipelineTemplate>(`/pipeline-templates/${selectedTemplateId}`, {
+        name: templateNameForm.trim(),
+      });
+    },
+    onSuccess: () => {
+      closeRenameDialog();
+      invalidate();
+      toast.success('Đã đổi tên template');
+    },
+    onError: (error) => toast.error('Không đổi tên được template', error),
+  });
+
+  const deleteTemplate = useMutation({
+    mutationFn: async (templateToDelete: PipelineTemplate) => {
+      await del(`/pipeline-templates/${templateToDelete.id}`);
+      return templateToDelete;
+    },
+    onSuccess: (deletedTemplate) => {
+      const remainingTemplates = (templates.data ?? []).filter((item) => item.id !== deletedTemplate.id);
+      const nextTemplate = remainingTemplates[0];
+
+      setDeleteTemplateDialog(null);
+      queryClient.setQueryData<PipelineTemplate[]>(['pipeline-templates'], remainingTemplates);
+      queryClient.removeQueries({ queryKey: ['pipeline-template', deletedTemplate.id] });
+      queryClient.invalidateQueries({ queryKey: ['pipeline-templates'] });
+
+      if (selectedTemplateId === deletedTemplate.id) {
+        setSelectedNodeId('');
+        setSelectedConnectorId('');
+        setDetailsNodeId('');
+        setSelectedTemplateId(nextTemplate?.id ?? '');
+        navigate(nextTemplate ? `/pipeline-builder/${nextTemplate.id}` : '/pipeline-builder');
+      }
+
+      toast.success('Đã xóa template');
+    },
+    onError: (error) => toast.error('Không xóa được template', error),
   });
 
   const addNode = useMutation({
@@ -544,6 +592,30 @@ export function PipelineBuilderPage() {
     navigate(`/pipeline-builder/${item.id}`);
   };
 
+  const openRenameDialog = () => {
+    setTemplateNameForm(template.data?.name ?? '');
+    setTemplateNameSubmitAttempted(false);
+    setRenameDialogOpen(true);
+  };
+
+  const closeRenameDialog = () => {
+    setRenameDialogOpen(false);
+    setTemplateNameForm('');
+    setTemplateNameSubmitAttempted(false);
+  };
+
+  const submitRenameDialog = () => {
+    setTemplateNameSubmitAttempted(true);
+    if (!templateNameForm.trim()) {
+      toast.warn({
+        title: 'Thiếu tên template',
+        description: 'Vui lòng nhập tên template',
+      });
+      return;
+    }
+    updateTemplateName.mutate();
+  };
+
   const validatePipeline = () => {
     if (!validationIssues.length) {
       toast.success('Pipeline hợp lệ');
@@ -576,119 +648,200 @@ export function PipelineBuilderPage() {
   }
 
   return (
-    <PipelineBuilderShell
-      sidebar={
-        <TemplateSidebar
-          templates={templates.data ?? []}
-          selectedTemplateId={selectedTemplateId}
-          expanded={templatesExpanded}
-          onBack={() => navigate('/dashboard')}
-          onToggleExpanded={() => setTemplatesExpanded((current) => !current)}
-          onSelectTemplate={selectTemplate}
-        >
-          <NodeLibraryPanel
-            presets={nodeLibrary}
-            canAddNode={Boolean(selectedTemplateId)}
-            addNodePending={addNode.isPending}
-            onAddNode={(preset) => addNode.mutate(preset)}
+    <>
+      <PipelineBuilderShell
+        sidebar={
+          <TemplateSidebar
+            templates={templates.data ?? []}
+            selectedTemplateId={selectedTemplateId}
+            expanded={templatesExpanded}
+            createTemplatePending={createTemplate.isPending}
+            deleteTemplatePendingId={deleteTemplate.isPending ? deleteTemplateDialog?.id : undefined}
+            onBack={() => navigate('/dashboard')}
+            onCreateTemplate={() => createTemplate.mutate()}
+            onDeleteTemplate={setDeleteTemplateDialog}
+            onToggleExpanded={() => setTemplatesExpanded((current) => !current)}
+            onSelectTemplate={selectTemplate}
+          >
+            <NodeLibraryPanel
+              presets={nodeLibrary}
+              canAddNode={Boolean(selectedTemplateId)}
+              addNodePending={addNode.isPending}
+              onAddNode={(preset) => addNode.mutate(preset)}
+            />
+          </TemplateSidebar>
+        }
+        templateName={template.data?.name}
+        templateStatus={template.data?.status}
+        templateDescription={template.data?.description}
+        selectedTemplateId={selectedTemplateId}
+        canDeleteSelection={canDeleteSelection}
+        deleteSelectionLabel={deleteSelectionLabel}
+        nodeCount={nodes.length}
+        validationIssueCount={validationIssues.length}
+        autoLayoutPending={autoLayout.isPending}
+        deleteSelectionPending={deleteSelectionPending}
+        onRenameTemplate={openRenameDialog}
+        onCloneTemplate={() => clone.mutate()}
+        onPublishTemplate={() => publish.mutate()}
+        onAutoLayout={() => autoLayout.mutate()}
+        onValidatePipeline={validatePipeline}
+        onDeleteSelection={deleteSelection}
+        inspector={
+          detailsNode ? (
+            <NodeInspectorPanel
+              node={detailsNode}
+              nodeForm={nodeForm}
+              stepDialogMode={stepDialog?.mode ?? null}
+              stepForm={stepForm}
+              stepNameInvalid={stepSubmitAttempted && !stepForm.name.trim()}
+              savePending={saveNode.isPending}
+              addStepPending={addStep.isPending}
+              updateStepPending={updateStep.isPending}
+              deleteStepPending={deleteStep.isPending}
+              onChangeField={(field, value) => setNodeForm((current) => ({ ...current, [field]: value }))}
+              onChangeStepField={(field, value) => setStepForm((current) => ({ ...current, [field]: value }))}
+              onSave={() => saveNode.mutate()}
+              onClose={() => setDetailsNodeId('')}
+              onOpenAddStep={openAddStepDialog}
+              onOpenEditStep={openEditStepDialog}
+              onCloseStepDialog={closeStepDialog}
+              onSubmitStep={submitStepDialog}
+              onDeleteStep={(stepId) => deleteStep.mutate(stepId)}
+            />
+          ) : selectedConnector ? (
+            <EdgeInspectorPanel
+              edge={selectedConnector}
+              fromNode={selectedConnectorSource}
+              toNode={selectedConnectorTarget}
+              conditions={edgeConditions.data ?? []}
+              conditionsLoading={edgeConditions.isLoading}
+              conditionLoadError={edgeConditions.isError}
+              edgeForm={edgeForm}
+              conditionInvalid={edgeSubmitAttempted && (!edgeForm.condition_type || !edgeConditionTypes.has(edgeForm.condition_type))}
+              priorityInvalid={edgeSubmitAttempted && !validEdgePriority(edgeForm.priority)}
+              savePending={saveEdgeSettings.isPending}
+              onChangeField={(field, value) => setEdgeForm((current) => ({ ...current, [field]: value }))}
+              onSave={submitEdgeSettings}
+              onClose={() => setSelectedConnectorId('')}
+            />
+          ) : null
+        }
+      >
+        {!selectedTemplateId ? (
+          <div className="grid min-h-0 flex-1 place-items-center bg-slate-50 p-6">
+            <EmptyState title="Chưa có template. Tạo template mới để bắt đầu." />
+          </div>
+        ) : template.isLoading ? (
+          <div className="grid min-h-0 flex-1 place-items-center bg-slate-50 p-8">
+            <LoadingSpinner />
+          </div>
+        ) : (
+          <DiagramCanvas
+            nodes={nodes}
+            edges={rawEdges}
+            selectedNodeId={selectedNodeId}
+            connectorMutationPending={connectorMutationPending}
+            onSelectNode={(nodeId) => {
+              setSelectedNodeId(nodeId);
+              setSelectedConnectorId('');
+            }}
+            onSelectedConnectorChange={(connectorId) => {
+              setSelectedConnectorId(connectorId);
+              if (connectorId) {
+                setSelectedNodeId('');
+                setDetailsNodeId('');
+              }
+            }}
+            onToggleNodeDetails={(nodeId) => {
+              setSelectedNodeId(nodeId);
+              setSelectedConnectorId('');
+              setDetailsNodeId((current) => (current === nodeId ? '' : nodeId));
+            }}
+            onSaveNodePosition={(nodeId, position) => saveNodePosition.mutate({ nodeId, position })}
+            onCreateConnector={(input) => createEdge.mutate(input)}
+            onReconnectConnector={(input) => updateEdge.mutate(input)}
+            onDeleteConnector={(connectorId) => deleteEdge.mutate(connectorId)}
+            onDeleteNode={(nodeId) => deleteNode.mutate(nodeId)}
           />
-        </TemplateSidebar>
-      }
-      templateName={template.data?.name}
-      templateStatus={template.data?.status}
-      templateDescription={template.data?.description}
-      selectedTemplateId={selectedTemplateId}
-      canDeleteSelection={canDeleteSelection}
-      deleteSelectionLabel={deleteSelectionLabel}
-      nodeCount={nodes.length}
-      validationIssueCount={validationIssues.length}
-      autoLayoutPending={autoLayout.isPending}
-      deleteSelectionPending={deleteSelectionPending}
-      onCreateTemplate={() => createTemplate.mutate()}
-      onCloneTemplate={() => clone.mutate()}
-      onPublishTemplate={() => publish.mutate()}
-      onAutoLayout={() => autoLayout.mutate()}
-      onValidatePipeline={validatePipeline}
-      onDeleteSelection={deleteSelection}
-      inspector={
-        detailsNode ? (
-          <NodeInspectorPanel
-            node={detailsNode}
-            nodeForm={nodeForm}
-            stepDialogMode={stepDialog?.mode ?? null}
-            stepForm={stepForm}
-            stepNameInvalid={stepSubmitAttempted && !stepForm.name.trim()}
-            savePending={saveNode.isPending}
-            addStepPending={addStep.isPending}
-            updateStepPending={updateStep.isPending}
-            deleteStepPending={deleteStep.isPending}
-            onChangeField={(field, value) => setNodeForm((current) => ({ ...current, [field]: value }))}
-            onChangeStepField={(field, value) => setStepForm((current) => ({ ...current, [field]: value }))}
-            onSave={() => saveNode.mutate()}
-            onClose={() => setDetailsNodeId('')}
-            onOpenAddStep={openAddStepDialog}
-            onOpenEditStep={openEditStepDialog}
-            onCloseStepDialog={closeStepDialog}
-            onSubmitStep={submitStepDialog}
-            onDeleteStep={(stepId) => deleteStep.mutate(stepId)}
-          />
-        ) : selectedConnector ? (
-          <EdgeInspectorPanel
-            edge={selectedConnector}
-            fromNode={selectedConnectorSource}
-            toNode={selectedConnectorTarget}
-            conditions={edgeConditions.data ?? []}
-            conditionsLoading={edgeConditions.isLoading}
-            conditionLoadError={edgeConditions.isError}
-            edgeForm={edgeForm}
-            conditionInvalid={edgeSubmitAttempted && (!edgeForm.condition_type || !edgeConditionTypes.has(edgeForm.condition_type))}
-            priorityInvalid={edgeSubmitAttempted && !validEdgePriority(edgeForm.priority)}
-            savePending={saveEdgeSettings.isPending}
-            onChangeField={(field, value) => setEdgeForm((current) => ({ ...current, [field]: value }))}
-            onSave={submitEdgeSettings}
-            onClose={() => setSelectedConnectorId('')}
-          />
-        ) : null
-      }
-    >
-      {!selectedTemplateId ? (
-        <div className="grid min-h-0 flex-1 place-items-center bg-slate-50 p-6">
-          <EmptyState title="Chưa có template. Tạo template mới để bắt đầu." />
-        </div>
-      ) : template.isLoading ? (
-        <div className="grid min-h-0 flex-1 place-items-center bg-slate-50 p-8">
-          <LoadingSpinner />
-        </div>
-      ) : (
-        <DiagramCanvas
-          nodes={nodes}
-          edges={rawEdges}
-          selectedNodeId={selectedNodeId}
-          connectorMutationPending={connectorMutationPending}
-          onSelectNode={(nodeId) => {
-            setSelectedNodeId(nodeId);
-            setSelectedConnectorId('');
-          }}
-          onSelectedConnectorChange={(connectorId) => {
-            setSelectedConnectorId(connectorId);
-            if (connectorId) {
-              setSelectedNodeId('');
-              setDetailsNodeId('');
-            }
-          }}
-          onToggleNodeDetails={(nodeId) => {
-            setSelectedNodeId(nodeId);
-            setSelectedConnectorId('');
-            setDetailsNodeId((current) => (current === nodeId ? '' : nodeId));
-          }}
-          onSaveNodePosition={(nodeId, position) => saveNodePosition.mutate({ nodeId, position })}
-          onCreateConnector={(input) => createEdge.mutate(input)}
-          onReconnectConnector={(input) => updateEdge.mutate(input)}
-          onDeleteConnector={(connectorId) => deleteEdge.mutate(connectorId)}
-          onDeleteNode={(nodeId) => deleteNode.mutate(nodeId)}
+        )}
+      </PipelineBuilderShell>
+
+      <Dialog
+        open={renameDialogOpen}
+        title="Đổi tên template"
+        onClose={closeRenameDialog}
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              className="rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-white disabled:opacity-50"
+              onClick={closeRenameDialog}
+              disabled={updateTemplateName.isPending}
+            >
+              Hủy
+            </button>
+            <button
+              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              onClick={submitRenameDialog}
+              disabled={updateTemplateName.isPending}
+            >
+              Lưu
+            </button>
+          </div>
+        }
+      >
+        <label className="block text-sm font-semibold text-ink" htmlFor="template-name">
+          Tên template *
+        </label>
+        <input
+          id="template-name"
+          className={clsx(
+            'mt-2 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100',
+            templateNameSubmitAttempted && !templateNameForm.trim() ? 'border-rose-300 bg-rose-50' : 'border-line',
+          )}
+          value={templateNameForm}
+          onChange={(event) => setTemplateNameForm(event.target.value)}
+          autoFocus
         />
-      )}
-    </PipelineBuilderShell>
+        {templateNameSubmitAttempted && !templateNameForm.trim() ? (
+          <p className="mt-2 text-sm font-medium text-rose-700">Vui lòng nhập tên template.</p>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deleteTemplateDialog)}
+        title="Xóa template"
+        onClose={() => setDeleteTemplateDialog(null)}
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              className="rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-white disabled:opacity-50"
+              onClick={() => setDeleteTemplateDialog(null)}
+              disabled={deleteTemplate.isPending}
+            >
+              Hủy
+            </button>
+            <button
+              className="rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+              onClick={() => {
+                if (deleteTemplateDialog) deleteTemplate.mutate(deleteTemplateDialog);
+              }}
+              disabled={deleteTemplate.isPending}
+            >
+              Xóa
+            </button>
+          </div>
+        }
+      >
+        <p className="text-sm leading-6 text-slate-600">Bạn muốn xóa template này khỏi danh sách?</p>
+        <p className="mt-3 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-ink">
+          {deleteTemplateDialog?.name}
+        </p>
+        <p className="mt-3 text-sm leading-6 text-slate-600">Các pipeline run lịch sử vẫn được giữ lại.</p>
+      </Dialog>
+    </>
   );
 }
 

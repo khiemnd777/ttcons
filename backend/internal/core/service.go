@@ -107,6 +107,7 @@ func (s *Service) ListTemplates(ctx context.Context) ([]Record, error) {
 		SELECT t.*, COUNT(n.id) AS node_count
 		FROM pipeline_templates t
 		LEFT JOIN pipeline_template_nodes n ON n.template_id=t.id
+		WHERE t.status <> 'deleted'
 		GROUP BY t.id
 		ORDER BY t.updated_at DESC, t.created_at DESC
 	`)
@@ -125,6 +126,10 @@ func (s *Service) CreateTemplate(ctx context.Context, body Record, actorID strin
 
 func (s *Service) UpdateTemplate(ctx context.Context, id string, body Record) (Record, error) {
 	return s.repo.Update(ctx, "pipeline_templates", templateColumns(), id, body)
+}
+
+func (s *Service) DeleteTemplate(ctx context.Context, id string) error {
+	return s.repo.Exec(ctx, `UPDATE pipeline_templates SET status='deleted', updated_at=now() WHERE id=$1`, id)
 }
 
 func (s *Service) PublishTemplate(ctx context.Context, id, actorID, actorName string) (Record, error) {

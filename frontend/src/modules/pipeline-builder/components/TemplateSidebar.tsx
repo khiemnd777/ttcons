@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
-import { Archive, ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
+import { Archive, ArrowLeft, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { StatusBadge } from '../../../components/StatusBadge';
 import type { PipelineTemplate } from '../../../lib/types/domain';
 
@@ -9,7 +9,11 @@ type TemplateSidebarProps = {
   selectedTemplateId: string;
   expanded: boolean;
   children: ReactNode;
+  createTemplatePending: boolean;
+  deleteTemplatePendingId?: string;
   onBack: () => void;
+  onCreateTemplate: () => void;
+  onDeleteTemplate: (template: PipelineTemplate) => void;
   onToggleExpanded: () => void;
   onSelectTemplate: (template: PipelineTemplate) => void;
 };
@@ -19,7 +23,11 @@ export function TemplateSidebar({
   selectedTemplateId,
   expanded,
   children,
+  createTemplatePending,
+  deleteTemplatePendingId,
   onBack,
+  onCreateTemplate,
+  onDeleteTemplate,
   onToggleExpanded,
   onSelectTemplate,
 }: TemplateSidebarProps) {
@@ -37,33 +45,53 @@ export function TemplateSidebar({
 
       <div className="min-h-0 flex-1 overflow-auto px-3 py-4">
         <section className="border-b border-line pb-4">
-          <button
-            className="mb-3 flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left hover:bg-slate-100"
-            onClick={onToggleExpanded}
-          >
-            <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
+          <div className="mb-3 flex items-center gap-1">
+            <div className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-sm font-semibold text-ink">
               <Archive className="h-4 w-4 text-slate-400" />
               Templates
-            </span>
-            {expanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
-          </button>
+            </div>
+            <button
+              title="Tạo template"
+              disabled={createTemplatePending}
+              className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+              onClick={onCreateTemplate}
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+            <button
+              title={expanded ? 'Thu gọn templates' : 'Mở rộng templates'}
+              className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100"
+              onClick={onToggleExpanded}
+            >
+              {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+          </div>
           {expanded ? (
             <div className="space-y-2">
               {templates.map((template) => (
-                <button
+                <div
                   key={template.id}
                   className={clsx(
-                    'w-full rounded-md border px-3 py-3 text-left hover:border-blue-300 hover:bg-blue-50',
+                    'group flex w-full gap-2 rounded-md border px-3 py-3 hover:border-blue-300 hover:bg-blue-50',
                     selectedTemplateId === template.id ? 'border-blue-300 bg-blue-50' : 'border-line',
                   )}
-                  onClick={() => onSelectTemplate(template)}
                 >
-                  <p className="line-clamp-2 text-sm font-semibold text-ink">{template.name}</p>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <span className="text-xs text-slate-500">v{template.version} · {template.node_count ?? 0} node</span>
-                    <StatusBadge status={template.status} />
-                  </div>
-                </button>
+                  <button className="min-w-0 flex-1 text-left" onClick={() => onSelectTemplate(template)}>
+                    <p className="line-clamp-2 text-sm font-semibold text-ink">{template.name}</p>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="text-xs text-slate-500">v{template.version} · {template.node_count ?? 0} node</span>
+                      <StatusBadge status={template.status} />
+                    </div>
+                  </button>
+                  <button
+                    title="Xóa template"
+                    disabled={deleteTemplatePendingId === template.id}
+                    className="h-8 w-8 shrink-0 rounded-md p-2 text-slate-300 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+                    onClick={() => onDeleteTemplate(template)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               ))}
             </div>
           ) : null}

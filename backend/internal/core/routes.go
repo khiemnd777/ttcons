@@ -34,6 +34,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, _ *redis.Client, cfg config.Conf
 	protected.Post("/pipeline-templates", h.CreateTemplate)
 	protected.Get("/pipeline-templates/:id", h.GetTemplate)
 	protected.Put("/pipeline-templates/:id", h.UpdateTemplate)
+	protected.Delete("/pipeline-templates/:id", h.DeleteTemplate)
 	protected.Post("/pipeline-templates/:id/publish", h.PublishTemplate)
 	protected.Post("/pipeline-templates/:id/clone", h.CloneTemplate)
 	protected.Post("/pipeline-templates/:id/nodes", h.AddTemplateNode)

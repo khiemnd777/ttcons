@@ -148,6 +148,13 @@ func (h *Handler) UpdateTemplate(c *fiber.Ctx) error {
 	return response.OK(c, template)
 }
 
+func (h *Handler) DeleteTemplate(c *fiber.Ctx) error {
+	if err := h.service.DeleteTemplate(c.Context(), c.Params("id")); err != nil {
+		return err
+	}
+	return response.OK(c, Record{"deleted": true})
+}
+
 func (h *Handler) PublishTemplate(c *fiber.Ctx) error {
 	template, err := h.service.PublishTemplate(c.Context(), c.Params("id"), actorID(c), actorName(c))
 	if err != nil {
