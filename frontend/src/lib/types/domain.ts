@@ -43,6 +43,15 @@ export type PipelineTemplateEdge = AnyRecord & {
   condition_type?: string;
   condition_config?: AnyRecord;
   label?: string;
+  priority?: number;
+};
+
+export type PipelineEdgeConditionDefinition = {
+  type: string;
+  label: string;
+  description: string;
+  default_label: string;
+  category: string;
 };
 
 export type PipelineTemplate = AnyRecord & {

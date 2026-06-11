@@ -43,6 +43,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, _ *redis.Client, cfg config.Conf
 	protected.Post("/pipeline-nodes/:id/steps", h.AddTemplateStep)
 	protected.Put("/pipeline-steps/:id", h.UpdateTemplateStep)
 	protected.Delete("/pipeline-steps/:id", h.DeleteTemplateStep)
+	protected.Get("/pipeline-edge-conditions", h.PipelineEdgeConditions)
 	protected.Put("/pipeline-edges/:id", h.UpdateTemplateEdge)
 	protected.Delete("/pipeline-edges/:id", h.DeleteTemplateEdge)
 

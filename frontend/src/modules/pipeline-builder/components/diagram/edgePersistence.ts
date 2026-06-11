@@ -48,7 +48,8 @@ export function buildCreateEdgePayload(input: ConnectorCreateInput) {
         },
       },
     },
-    label: 'Hoàn tất',
+    label: '',
+    priority: 100,
   };
 }
 

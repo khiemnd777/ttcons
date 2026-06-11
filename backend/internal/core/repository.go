@@ -193,7 +193,7 @@ func (r *Repository) ListTable(ctx context.Context, table string, limit int) ([]
 func safeTable(table string) string {
 	switch table {
 	case "projects", "pipeline_templates", "pipeline_template_nodes", "pipeline_template_edges", "pipeline_template_steps",
-		"pipeline_runs", "pipeline_run_nodes", "pipeline_run_steps", "approval_requests", "approval_actions",
+		"pipeline_runs", "pipeline_run_nodes", "pipeline_run_edges", "pipeline_run_steps", "approval_requests", "approval_actions",
 		"boq_items", "procurement_requests", "procurement_request_items", "warehouses", "materials", "stock_movements",
 		"site_material_balances", "operation_daily_reports", "issues", "acceptance_records", "acceptance_checklist_items",
 		"rework_requests", "replanning_requests", "handover_records", "accounting_budgets", "payables", "receivables",
@@ -226,7 +226,7 @@ func templateStepColumns() []ColumnSpec {
 }
 
 func edgeColumns() []ColumnSpec {
-	return []ColumnSpec{col("template_id"), col("from_node_id"), col("to_node_id"), col("condition_type"), jsonCol("condition_config"), col("label")}
+	return []ColumnSpec{col("template_id"), col("from_node_id"), col("to_node_id"), col("condition_type"), jsonCol("condition_config"), col("label"), col("priority")}
 }
 
 func boqColumns() []ColumnSpec {

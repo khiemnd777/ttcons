@@ -234,6 +234,9 @@ func (h *Handler) AddTemplateEdge(c *fiber.Ctx) error {
 		return err
 	}
 	body["template_id"] = c.Params("id")
+	if err := prepareTemplateEdgeBody(body, false); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+	}
 	edge, err := h.service.repo.Insert(c.Context(), "pipeline_template_edges", edgeColumns(), body)
 	if err != nil {
 		return err
@@ -241,10 +244,17 @@ func (h *Handler) AddTemplateEdge(c *fiber.Ctx) error {
 	return response.Created(c, edge)
 }
 
+func (h *Handler) PipelineEdgeConditions(c *fiber.Ctx) error {
+	return response.OK(c, PipelineEdgeConditionCatalog())
+}
+
 func (h *Handler) UpdateTemplateEdge(c *fiber.Ctx) error {
 	body, err := bodyMap(c)
 	if err != nil {
 		return err
+	}
+	if err := prepareTemplateEdgeBody(body, true); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 	}
 	edge, err := h.service.repo.Update(c.Context(), "pipeline_template_edges", edgeColumns(), c.Params("id"), body)
 	if err != nil {

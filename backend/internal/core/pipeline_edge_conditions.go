@@ -1,0 +1,145 @@
+package core
+
+import (
+	"errors"
+	"fmt"
+	"math"
+	"strconv"
+	"strings"
+)
+
+type EdgeConditionDefinition struct {
+	Type         string `json:"type"`
+	Label        string `json:"label"`
+	Description  string `json:"description"`
+	DefaultLabel string `json:"default_label"`
+	Category     string `json:"category"`
+}
+
+var pipelineEdgeConditionCatalog = []EdgeConditionDefinition{
+	{Type: "always", Label: "Luôn chuyển", Description: "Chuyển sang node đích khi node nguồn hoàn tất.", DefaultLabel: "", Category: "core"},
+	{Type: "order_index", Label: "Theo thứ tự node", Description: "Chỉ chuyển nếu node đích đứng sau node nguồn trong thứ tự template.", DefaultLabel: "", Category: "core"},
+	{Type: "approval_approved", Label: "Approval đã duyệt", Description: "Chuyển khi approval request của node nguồn đã được duyệt.", DefaultLabel: "", Category: "approval"},
+	{Type: "approval_rejected", Label: "Approval bị từ chối", Description: "Chuyển khi approval request của node nguồn bị từ chối.", DefaultLabel: "", Category: "approval"},
+	{Type: "acceptance_passed", Label: "Nghiệm thu đạt", Description: "Chuyển khi công trình có nghiệm thu đã hoàn tất với kết quả đạt.", DefaultLabel: "", Category: "quality"},
+	{Type: "acceptance_failed", Label: "Nghiệm thu không đạt", Description: "Chuyển khi công trình có nghiệm thu không đạt.", DefaultLabel: "", Category: "quality"},
+	{Type: "rework_required", Label: "Cần rework", Description: "Chuyển khi issue hoặc nghiệm thu đang yêu cầu rework.", DefaultLabel: "", Category: "rework"},
+	{Type: "rework_completed", Label: "Rework hoàn tất", Description: "Chuyển khi rework đã hoàn tất và không còn rework đang mở.", DefaultLabel: "", Category: "rework"},
+	{Type: "replanning_required", Label: "Cần replanning", Description: "Chuyển khi issue hoặc replanning request đang yêu cầu lập lại kế hoạch.", DefaultLabel: "", Category: "planning"},
+	{Type: "materials_issued", Label: "Vật tư đã xuất đủ", Description: "Chuyển khi vật tư theo kế hoạch không còn thiếu tại công trình.", DefaultLabel: "", Category: "material"},
+	{Type: "boq_approved", Label: "BOQ đã duyệt", Description: "Chuyển khi BOQ có dữ liệu và toàn bộ item đã được duyệt.", DefaultLabel: "", Category: "commercial"},
+	{Type: "procurement_approved", Label: "Mua vật tư đã duyệt", Description: "Chuyển khi yêu cầu mua vật tư đã được duyệt hoặc đã vào các trạng thái sau duyệt.", DefaultLabel: "", Category: "material"},
+	{Type: "handover_ready", Label: "Sẵn sàng bàn giao", Description: "Chuyển khi nghiệm thu, punch list, kho, chứng từ và công nợ không còn blocker bàn giao.", DefaultLabel: "", Category: "handover"},
+	{Type: "financial_ready", Label: "Sẵn sàng đóng tài chính", Description: "Chuyển khi công nợ phải thu/phải trả không còn khoản mở.", DefaultLabel: "", Category: "finance"},
+}
+
+func PipelineEdgeConditionCatalog() []EdgeConditionDefinition {
+	return pipelineEdgeConditionCatalog
+}
+
+func edgeConditionDefinition(conditionType string) (EdgeConditionDefinition, bool) {
+	conditionType = strings.TrimSpace(conditionType)
+	for _, definition := range pipelineEdgeConditionCatalog {
+		if definition.Type == conditionType {
+			return definition, true
+		}
+	}
+	return EdgeConditionDefinition{}, false
+}
+
+func prepareTemplateEdgeBody(body Record, partial bool) error {
+	if !partial {
+		if strings.TrimSpace(fmt.Sprint(body["from_node_id"])) == "" {
+			return errors.New("from_node_id is required")
+		}
+		if strings.TrimSpace(fmt.Sprint(body["to_node_id"])) == "" {
+			return errors.New("to_node_id is required")
+		}
+	}
+
+	if value, ok := body["condition_type"]; ok {
+		conditionType := strings.TrimSpace(fmt.Sprint(value))
+		if conditionType == "" || conditionType == "<nil>" {
+			return errors.New("condition_type is required")
+		}
+		if _, exists := edgeConditionDefinition(conditionType); !exists {
+			return fmt.Errorf("unsupported condition_type %q", conditionType)
+		}
+		body["condition_type"] = conditionType
+	} else if !partial {
+		body["condition_type"] = "always"
+	}
+
+	if value, ok := body["label"]; ok {
+		label := strings.TrimSpace(fmt.Sprint(value))
+		if label == "<nil>" {
+			label = ""
+		}
+		if len([]rune(label)) > 80 {
+			return errors.New("label must be 80 characters or fewer")
+		}
+		body["label"] = label
+	}
+
+	if value, ok := body["priority"]; ok || !partial {
+		priority, err := parseEdgePriority(value)
+		if err != nil {
+			return err
+		}
+		body["priority"] = priority
+	}
+
+	if _, ok := body["condition_config"]; !ok && !partial {
+		body["condition_config"] = Record{}
+	}
+
+	if config, ok := body["condition_config"]; ok && config == nil {
+		body["condition_config"] = Record{}
+	} else if ok {
+		switch config.(type) {
+		case Record, map[string]any:
+		default:
+			return errors.New("condition_config must be an object")
+		}
+	}
+
+	return nil
+}
+
+func parseEdgePriority(value any) (int, error) {
+	if value == nil {
+		return 100, nil
+	}
+	switch v := value.(type) {
+	case int:
+		return validateEdgePriority(v)
+	case int32:
+		return validateEdgePriority(int(v))
+	case int64:
+		return validateEdgePriority(int(v))
+	case float64:
+		if math.Trunc(v) != v {
+			return 0, errors.New("priority must be an integer")
+		}
+		return validateEdgePriority(int(v))
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			return 0, errors.New("priority is required")
+		}
+		parsed, err := strconv.Atoi(trimmed)
+		if err != nil {
+			return 0, errors.New("priority must be an integer")
+		}
+		return validateEdgePriority(parsed)
+	default:
+		return 0, errors.New("priority must be an integer")
+	}
+}
+
+func validateEdgePriority(priority int) (int, error) {
+	if priority < 1 || priority > 999 {
+		return 0, errors.New("priority must be between 1 and 999")
+	}
+	return priority, nil
+}

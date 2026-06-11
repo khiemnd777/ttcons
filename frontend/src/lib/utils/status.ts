@@ -146,6 +146,18 @@ export const enumLabels: Record<EnumLabelGroup, LabelMap> = {
   condition_type: {
     always: 'Luôn chuyển',
     order_index: 'Theo thứ tự node',
+    approval_approved: 'Approval đã duyệt',
+    approval_rejected: 'Approval bị từ chối',
+    acceptance_passed: 'Nghiệm thu đạt',
+    acceptance_failed: 'Nghiệm thu không đạt',
+    rework_required: 'Cần rework',
+    rework_completed: 'Rework hoàn tất',
+    replanning_required: 'Cần replanning',
+    materials_issued: 'Vật tư đã xuất đủ',
+    boq_approved: 'BOQ đã duyệt',
+    procurement_approved: 'Mua vật tư đã duyệt',
+    handover_ready: 'Sẵn sàng bàn giao',
+    financial_ready: 'Sẵn sàng đóng tài chính',
   },
   step_type: {
     task: 'Công việc',

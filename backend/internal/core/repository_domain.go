@@ -106,7 +106,7 @@ func (r *Repository) GetTemplateDetail(ctx context.Context, id string) (Record, 
 	edges, _ := r.Query(ctx, `
 		SELECT * FROM pipeline_template_edges
 		WHERE template_id=$1
-		ORDER BY created_at
+		ORDER BY priority, created_at, id
 	`, id)
 	for _, node := range nodes {
 		steps, _ := r.Query(ctx, `
@@ -250,6 +250,7 @@ func (r *Repository) CloneTemplate(ctx context.Context, id, userID string) (Reco
 			"condition_type":   edge["condition_type"],
 			"condition_config": edge["condition_config"],
 			"label":            edge["label"],
+			"priority":         edgePriority(edge),
 		})
 	}
 	return r.GetTemplateDetail(ctx, cloneID)
@@ -292,8 +293,10 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 	}
 
 	currentNodeID := ""
+	runNodeIDByTemplateNodeID := map[string]string{}
 	for index, node := range nodes {
 		runNodeID := newID()
+		runNodeIDByTemplateNodeID[fmt.Sprint(node["id"])] = runNodeID
 		status := "pending"
 		var startedAt any = nil
 		if index == 0 {
@@ -331,6 +334,29 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 			`, newID(), runNodeID, projectID, step["id"], step["name"], step["description"], step["step_type"], string(rawStepRoles), step["required_permission"], step["checklist_required"], step["document_required"], step["photo_required"], step["order_index"]); err != nil {
 				return nil, err
 			}
+		}
+	}
+	edges, err := queryTx(ctx, tx, `
+		SELECT * FROM pipeline_template_edges
+		WHERE template_id=$1
+		ORDER BY priority, created_at, id
+	`, templateID)
+	if err != nil {
+		return nil, err
+	}
+	for _, edge := range edges {
+		fromRunNodeID := runNodeIDByTemplateNodeID[fmt.Sprint(edge["from_node_id"])]
+		toRunNodeID := runNodeIDByTemplateNodeID[fmt.Sprint(edge["to_node_id"])]
+		if fromRunNodeID == "" || toRunNodeID == "" {
+			continue
+		}
+		rawConfig, _ := json.Marshal(edge["condition_config"])
+		if _, err := tx.ExecContext(ctx, `
+		INSERT INTO pipeline_run_edges
+			(id, run_id, project_id, template_edge_id, from_run_node_id, to_run_node_id, condition_type, condition_config, label, priority)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10)
+	`, newID(), runID, projectID, edge["id"], fromRunNodeID, toRunNodeID, edgeConditionType(edge), string(rawConfig), edge["label"], edgePriority(edge)); err != nil {
+			return nil, err
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE pipeline_runs SET current_node_id=$1 WHERE id=$2`, currentNodeID, runID); err != nil {
@@ -442,20 +468,34 @@ func (r *Repository) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorN
 		return nil, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `UPDATE pipeline_run_nodes SET status='completed', completed_at=now(), block_reason=NULL WHERE id=$1`, nodeID); err != nil {
-		return nil, err
-	}
-	nextRows, err := queryTx(ctx, tx, `
-		SELECT * FROM pipeline_run_nodes
-		WHERE run_id=$1 AND order_index > $2
-		ORDER BY order_index
-		LIMIT 1
-	`, node["run_id"], node["order_index"])
+	nextNode, transition, transitionBlockers, err := r.nextRunNode(ctx, tx, node)
 	if err != nil {
 		return nil, err
 	}
-	if len(nextRows) > 0 {
-		nextID := fmt.Sprint(nextRows[0]["id"])
+	if len(transitionBlockers) > 0 {
+		reason := stringsJoin(transitionBlockers)
+		blockedRows, err := queryTx(ctx, tx, `UPDATE pipeline_run_nodes SET status='blocked', block_reason=$2 WHERE id=$1 RETURNING *`, nodeID, reason)
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		metadata := Record{"blockers": transitionBlockers}
+		if transition != nil {
+			metadata["transition"] = transition
+		}
+		_ = r.AddAudit(ctx, fmt.Sprint(node["project_id"]), actorID, actorName, "node_blocked", "pipeline_run_node", nodeID, reason, metadata)
+		if len(blockedRows) > 0 {
+			return blockedRows[0], nil
+		}
+		return node, nil
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE pipeline_run_nodes SET status='completed', completed_at=now(), block_reason=NULL WHERE id=$1`, nodeID); err != nil {
+		return nil, err
+	}
+	if nextNode != nil {
+		nextID := fmt.Sprint(nextNode["id"])
 		if _, err := tx.ExecContext(ctx, `UPDATE pipeline_run_nodes SET status='in_progress', started_at=COALESCE(started_at, now()) WHERE id=$1`, nextID); err != nil {
 			return nil, err
 		}
@@ -472,19 +512,316 @@ func (r *Repository) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorN
 		SET progress_percent = COALESCE((
 			SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE status='completed') / NULLIF(COUNT(*),0))::int
 			FROM pipeline_run_nodes rn
-			WHERE rn.project_id=p.id
+			WHERE rn.run_id=$2
 		),0),
-		status = CASE WHEN NOT EXISTS (SELECT 1 FROM pipeline_run_nodes rn WHERE rn.project_id=p.id AND rn.status <> 'completed') THEN 'financial_closure' ELSE p.status END,
+		status = CASE WHEN EXISTS (SELECT 1 FROM pipeline_runs pr WHERE pr.id=$2 AND pr.status='completed') THEN 'financial_closure' ELSE p.status END,
 		updated_at=now()
 		WHERE p.id=$1
-	`, node["project_id"]); err != nil {
+	`, node["project_id"], node["run_id"]); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	_ = r.AddAudit(ctx, fmt.Sprint(node["project_id"]), actorID, actorName, "node_completed", "pipeline_run_node", nodeID, fmt.Sprintf("Hoàn tất node %s", node["name"]), Record{"node": node["name"]})
+	metadata := Record{"node": node["name"]}
+	description := fmt.Sprintf("Hoàn tất node %s", node["name"])
+	if transition != nil {
+		metadata["transition"] = transition
+		if targetName := fmt.Sprint(transition["to_node_name"]); targetName != "" {
+			description = fmt.Sprintf("Hoàn tất node %s -> %s", node["name"], targetName)
+		}
+	}
+	_ = r.AddAudit(ctx, fmt.Sprint(node["project_id"]), actorID, actorName, "node_completed", "pipeline_run_node", nodeID, description, metadata)
 	return r.GetPipelineRun(ctx, fmt.Sprint(node["project_id"]))
+}
+
+func (r *Repository) nextRunNode(ctx context.Context, tx *sql.Tx, node Record) (Record, Record, []string, error) {
+	edges, err := queryTx(ctx, tx, `
+		SELECT e.*, rn.name AS to_node_name, rn.order_index AS to_order_index, rn.status AS to_status
+		FROM pipeline_run_edges e
+		JOIN pipeline_run_nodes rn ON rn.id=e.to_run_node_id
+		WHERE e.run_id=$1 AND e.from_run_node_id=$2
+		ORDER BY e.priority, e.created_at, e.id
+	`, node["run_id"], node["id"])
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	evaluations := []Record{}
+	blockers := []string{}
+	for _, edge := range edges {
+		matched, reason, err := r.runEdgeConditionMet(ctx, tx, edge, node)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		evaluations = append(evaluations, Record{
+			"edge_id":        edge["id"],
+			"label":          edge["label"],
+			"condition_type": edgeConditionType(edge),
+			"matched":        matched,
+			"reason":         reason,
+		})
+		if !matched {
+			blockers = append(blockers, fmt.Sprintf("%s: %s", edgeDisplayLabel(edge), reason))
+			continue
+		}
+		nextRows, err := queryTx(ctx, tx, `SELECT * FROM pipeline_run_nodes WHERE id=$1 LIMIT 1`, edge["to_run_node_id"])
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if len(nextRows) == 0 {
+			continue
+		}
+		transition := Record{
+			"mode":             "edge",
+			"edge_id":          edge["id"],
+			"template_edge_id": edge["template_edge_id"],
+			"condition_type":   edgeConditionType(edge),
+			"label":            edge["label"],
+			"priority":         edgePriority(edge),
+			"reason":           reason,
+			"to_node_id":       edge["to_run_node_id"],
+			"to_node_name":     edge["to_node_name"],
+		}
+		return nextRows[0], transition, nil, nil
+	}
+	if len(edges) > 0 {
+		return nil, Record{"mode": "edge", "evaluations": evaluations}, blockers, nil
+	}
+	return r.nextRunNodeByOrder(ctx, tx, node)
+}
+
+func (r *Repository) nextRunNodeByOrder(ctx context.Context, tx *sql.Tx, node Record) (Record, Record, []string, error) {
+	nextRows, err := queryTx(ctx, tx, `
+		SELECT * FROM pipeline_run_nodes
+		WHERE run_id=$1 AND order_index > $2
+		ORDER BY order_index
+		LIMIT 1
+	`, node["run_id"], node["order_index"])
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if len(nextRows) == 0 {
+		return nil, Record{"mode": "completed"}, nil, nil
+	}
+	return nextRows[0], Record{
+		"mode":         "fallback_order_index",
+		"to_node_id":   nextRows[0]["id"],
+		"to_node_name": nextRows[0]["name"],
+	}, nil, nil
+}
+
+func (r *Repository) runEdgeConditionMet(ctx context.Context, tx *sql.Tx, edge, fromNode Record) (bool, string, error) {
+	projectID := fmt.Sprint(fromNode["project_id"])
+	nodeID := fmt.Sprint(fromNode["id"])
+
+	switch edgeConditionType(edge) {
+	case "", "always":
+		return true, "condition always matched", nil
+	case "order_index":
+		matched := number(edge["to_order_index"]) > number(fromNode["order_index"])
+		return matched, boolReason(matched, "target node is after source node", "target node is not after source node"), nil
+	case "approval_approved":
+		return r.edgeExists(ctx, tx, "node approval has been approved", "node approval is not approved", `
+			SELECT COUNT(*) AS total
+			FROM approval_requests
+			WHERE project_id=$1 AND target_type='pipeline_run_node' AND target_id=$2 AND status='approved'
+		`, projectID, nodeID)
+	case "approval_rejected":
+		return r.edgeExists(ctx, tx, "node approval has been rejected", "node approval is not rejected", `
+			SELECT COUNT(*) AS total
+			FROM approval_requests
+			WHERE project_id=$1 AND target_type='pipeline_run_node' AND target_id=$2 AND status='rejected'
+		`, projectID, nodeID)
+	case "acceptance_passed":
+		return r.edgeExists(ctx, tx, "acceptance passed", "no completed passed acceptance", `
+			SELECT COUNT(*) AS total
+			FROM acceptance_records
+			WHERE project_id=$1 AND result='pass' AND status='completed'
+		`, projectID)
+	case "acceptance_failed":
+		return r.edgeExists(ctx, tx, "acceptance failed", "no failed acceptance", `
+			SELECT COUNT(*) AS total
+			FROM acceptance_records
+			WHERE project_id=$1 AND result='fail'
+		`, projectID)
+	case "rework_required":
+		return r.edgeExists(ctx, tx, "rework is required", "no open rework requirement", `
+			SELECT COUNT(*) AS total
+			FROM (
+				SELECT id FROM rework_requests WHERE project_id=$1 AND status IN ('draft','approved','in_progress')
+				UNION ALL
+				SELECT id FROM issues WHERE project_id=$1 AND requires_rework AND status IN ('open','in_progress')
+			) required_rework
+		`, projectID)
+	case "rework_completed":
+		total, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM rework_requests WHERE project_id=$1`, projectID)
+		if err != nil {
+			return false, "", err
+		}
+		open, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM rework_requests WHERE project_id=$1 AND status IN ('draft','approved','in_progress')`, projectID)
+		if err != nil {
+			return false, "", err
+		}
+		matched := total > 0 && open == 0
+		return matched, boolReason(matched, "all rework requests are done", "rework requests are still open or do not exist"), nil
+	case "replanning_required":
+		return r.edgeExists(ctx, tx, "replanning is required", "no open replanning requirement", `
+			SELECT COUNT(*) AS total
+			FROM (
+				SELECT id FROM replanning_requests WHERE project_id=$1 AND status IN ('draft','submitted')
+				UNION ALL
+				SELECT id FROM issues WHERE project_id=$1 AND requires_replanning AND status IN ('open','in_progress')
+			) required_replanning
+		`, projectID)
+	case "materials_issued":
+		missing, err := r.scalarNumberTx(ctx, tx, `
+			SELECT COUNT(*) AS total
+			FROM site_material_balances
+			WHERE project_id=$1 AND issued_quantity < planned_quantity
+		`, projectID)
+		if err != nil {
+			return false, "", err
+		}
+		matched := missing == 0
+		return matched, boolReason(matched, "all planned materials have been issued", "planned materials are still missing"), nil
+	case "boq_approved":
+		total, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM boq_items WHERE project_id=$1 AND status <> 'deleted'`, projectID)
+		if err != nil {
+			return false, "", err
+		}
+		notApproved, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM boq_items WHERE project_id=$1 AND status <> 'deleted' AND status <> 'approved'`, projectID)
+		if err != nil {
+			return false, "", err
+		}
+		matched := total > 0 && notApproved == 0
+		return matched, boolReason(matched, "all BOQ items are approved", "BOQ is missing or has unapproved items"), nil
+	case "procurement_approved":
+		total, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM procurement_requests WHERE project_id=$1 AND status <> 'cancelled'`, projectID)
+		if err != nil {
+			return false, "", err
+		}
+		notApproved, err := r.scalarNumberTx(ctx, tx, `
+			SELECT COUNT(*) AS total
+			FROM procurement_requests
+			WHERE project_id=$1 AND status <> 'cancelled' AND status NOT IN ('approved','ordered','partially_received','received')
+		`, projectID)
+		if err != nil {
+			return false, "", err
+		}
+		matched := total > 0 && notApproved == 0
+		return matched, boolReason(matched, "procurement requests are approved", "procurement is missing or has unapproved requests"), nil
+	case "handover_ready":
+		return r.handoverReadyCondition(ctx, tx, projectID)
+	case "financial_ready":
+		openDebt, err := r.scalarNumberTx(ctx, tx, `
+			SELECT COUNT(*) AS total
+			FROM (
+				SELECT id FROM payables WHERE project_id=$1 AND status <> 'cancelled' AND remaining_amount > 0
+				UNION ALL
+				SELECT id FROM receivables WHERE project_id=$1 AND status <> 'cancelled' AND remaining_amount > 0
+			) open_debt
+		`, projectID)
+		if err != nil {
+			return false, "", err
+		}
+		matched := openDebt == 0
+		return matched, boolReason(matched, "no open payable or receivable balance", "payable or receivable balances are still open"), nil
+	default:
+		return false, fmt.Sprintf("unsupported condition_type %s", edgeConditionType(edge)), nil
+	}
+}
+
+func (r *Repository) edgeExists(ctx context.Context, tx *sql.Tx, passReason, failReason, query string, args ...any) (bool, string, error) {
+	total, err := r.scalarNumberTx(ctx, tx, query, args...)
+	if err != nil {
+		return false, "", err
+	}
+	matched := total > 0
+	return matched, boolReason(matched, passReason, failReason), nil
+}
+
+func (r *Repository) handoverReadyCondition(ctx context.Context, tx *sql.Tx, projectID string) (bool, string, error) {
+	handoverReady, err := r.scalarNumberTx(ctx, tx, `
+		SELECT COUNT(*) AS total
+		FROM handover_records
+		WHERE project_id=$1
+			AND documents_ready
+			AND warehouse_closed
+			AND payables_recorded
+			AND receivables_recorded
+			AND status <> 'blocked'
+	`, projectID)
+	if err != nil {
+		return false, "", err
+	}
+	failedAcceptance, err := r.scalarNumberTx(ctx, tx, `
+		SELECT COUNT(*) AS total
+		FROM acceptance_records
+		WHERE project_id=$1 AND result='fail' AND status <> 'cancelled'
+	`, projectID)
+	if err != nil {
+		return false, "", err
+	}
+	openIssues, err := r.scalarNumberTx(ctx, tx, `
+		SELECT COUNT(*) AS total
+		FROM issues
+		WHERE project_id=$1 AND status IN ('open','in_progress')
+	`, projectID)
+	if err != nil {
+		return false, "", err
+	}
+	pendingSurplus, err := r.scalarNumberTx(ctx, tx, `
+		SELECT COUNT(*) AS total
+		FROM site_material_balances
+		WHERE project_id=$1 AND surplus_quantity > 0 AND surplus_status <> 'handled'
+	`, projectID)
+	if err != nil {
+		return false, "", err
+	}
+	matched := handoverReady > 0 && failedAcceptance == 0 && openIssues == 0 && pendingSurplus == 0
+	return matched, boolReason(matched, "handover checklist has no blockers", "handover still has blockers"), nil
+}
+
+func (r *Repository) scalarNumberTx(ctx context.Context, tx *sql.Tx, query string, args ...any) (float64, error) {
+	rows, err := queryTx(ctx, tx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	return number(rows[0]["total"]), nil
+}
+
+func boolReason(matched bool, passReason, failReason string) string {
+	if matched {
+		return passReason
+	}
+	return failReason
+}
+
+func edgeDisplayLabel(edge Record) string {
+	label := strings.TrimSpace(fmt.Sprint(edge["label"]))
+	if label != "" && label != "<nil>" {
+		return label
+	}
+	return edgeConditionType(edge)
+}
+
+func edgeConditionType(edge Record) string {
+	conditionType := strings.TrimSpace(fmt.Sprint(edge["condition_type"]))
+	if conditionType == "" || conditionType == "<nil>" {
+		return "always"
+	}
+	return conditionType
+}
+
+func edgePriority(edge Record) int {
+	priority, err := parseEdgePriority(edge["priority"])
+	if err != nil {
+		return 100
+	}
+	return priority
 }
 
 func (r *Repository) nodeBlockers(ctx context.Context, node Record) []string {

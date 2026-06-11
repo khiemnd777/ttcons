@@ -5,11 +5,12 @@ import { del, get, post, put } from '../../lib/api/client';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { useToast } from '../../components/ToastProvider';
-import type { PipelineNode, PipelineTemplate, PipelineTemplateEdge } from '../../lib/types/domain';
+import type { PipelineEdgeConditionDefinition, PipelineNode, PipelineTemplate, PipelineTemplateEdge } from '../../lib/types/domain';
 import { PipelineBuilderShell } from './components/PipelineBuilderShell';
 import { TemplateSidebar } from './components/TemplateSidebar';
 import { NodeLibraryPanel } from './components/NodeLibraryPanel';
 import { NodeInspectorPanel } from './components/NodeInspectorPanel';
+import { EdgeInspectorPanel } from './components/EdgeInspectorPanel';
 import { DiagramCanvas } from './components/diagram/DiagramCanvas';
 import { autoLayoutPosition, nextNodePosition } from './components/diagram/diagramConstants';
 import type { NodePosition } from './components/diagram/diagramTypes';
@@ -26,6 +27,13 @@ type NodePreset = {
   description: string;
   role: string;
   approval: string;
+};
+
+type EdgeForm = {
+  label: string;
+  condition_type: string;
+  priority: string;
+  condition_config: Record<string, any>;
 };
 
 const nodeLibrary: NodePreset[] = [
@@ -57,11 +65,18 @@ export function PipelineBuilderPage() {
   const [stepForm, setStepForm] = useState({ name: '', step_type: 'task' });
   const [stepSubmitAttempted, setStepSubmitAttempted] = useState(false);
   const [nodeForm, setNodeForm] = useState<Record<string, any>>({});
+  const [edgeForm, setEdgeForm] = useState<EdgeForm>({ label: '', condition_type: 'always', priority: '100', condition_config: {} });
+  const [edgeSubmitAttempted, setEdgeSubmitAttempted] = useState(false);
 
   const templates = useQuery({ queryKey: ['pipeline-templates'], queryFn: () => get<PipelineTemplate[]>('/pipeline-templates') });
   const template = useQuery({
     queryKey: ['pipeline-template', selectedTemplateId],
     queryFn: () => get<PipelineTemplate>(`/pipeline-templates/${selectedTemplateId}`),
+    enabled: Boolean(selectedTemplateId),
+  });
+  const edgeConditions = useQuery({
+    queryKey: ['pipeline-edge-conditions'],
+    queryFn: () => get<PipelineEdgeConditionDefinition[]>('/pipeline-edge-conditions'),
     enabled: Boolean(selectedTemplateId),
   });
 
@@ -91,7 +106,13 @@ export function PipelineBuilderPage() {
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const selectedNode = selectedNodeId ? nodeById.get(selectedNodeId) : undefined;
   const selectedConnector = selectedConnectorId ? rawEdges.find((edge) => String(edge.id) === selectedConnectorId) : undefined;
+  const selectedConnectorSource = selectedConnector ? nodeById.get(String(selectedConnector.from_node_id)) : undefined;
+  const selectedConnectorTarget = selectedConnector ? nodeById.get(String(selectedConnector.to_node_id)) : undefined;
   const detailsNode = detailsNodeId ? nodeById.get(detailsNodeId) : undefined;
+  const edgeConditionTypes = useMemo(
+    () => new Set((edgeConditions.data ?? []).map((condition) => condition.type)),
+    [edgeConditions.data],
+  );
 
   useEffect(() => {
     if (selectedNodeId && !nodeById.has(selectedNodeId)) setSelectedNodeId('');
@@ -101,6 +122,22 @@ export function PipelineBuilderPage() {
   useEffect(() => {
     if (selectedConnectorId && !rawEdges.some((edge) => String(edge.id) === selectedConnectorId)) setSelectedConnectorId('');
   }, [rawEdges, selectedConnectorId]);
+
+  useEffect(() => {
+    if (!selectedConnector) {
+      setEdgeForm({ label: '', condition_type: 'always', priority: '100', condition_config: {} });
+      setEdgeSubmitAttempted(false);
+      return;
+    }
+
+    setEdgeForm({
+      label: selectedConnector.label ?? '',
+      condition_type: selectedConnector.condition_type ?? 'always',
+      priority: String(selectedConnector.priority ?? 100),
+      condition_config: isRecord(selectedConnector.condition_config) ? selectedConnector.condition_config : {},
+    });
+    setEdgeSubmitAttempted(false);
+  }, [selectedConnector?.id]);
 
   useEffect(() => {
     if (!detailsNode) {
@@ -124,7 +161,7 @@ export function PipelineBuilderPage() {
     closeStepDialog();
   }, [detailsNode?.id]);
 
-  const validationIssues = useMemo(() => buildValidationIssues(nodes, rawEdges), [nodes, rawEdges]);
+  const validationIssues = useMemo(() => buildValidationIssues(nodes, rawEdges, edgeConditionTypes), [nodes, rawEdges, edgeConditionTypes]);
 
   const invalidate = (templateId = selectedTemplateId) => {
     queryClient.invalidateQueries({ queryKey: ['pipeline-templates'] });
@@ -296,6 +333,35 @@ export function PipelineBuilderPage() {
     onError: (error) => toast.error('Không cập nhật được connector', error),
   });
 
+  const saveEdgeSettings = useMutation({
+    mutationFn: async () => {
+      const templateId = selectedTemplateId;
+      if (!templateId) throw new Error('Chưa chọn template');
+      if (!selectedConnector) throw new Error('Chưa chọn connector');
+      const edge = await put<PipelineTemplateEdge>(`/pipeline-edges/${selectedConnector.id}`, {
+        label: edgeForm.label.trim(),
+        condition_type: edgeForm.condition_type,
+        condition_config: edgeForm.condition_config,
+        priority: Number(edgeForm.priority),
+      });
+      return { edge, templateId };
+    },
+    onSuccess: ({ edge, templateId }) => {
+      queryClient.setQueryData<PipelineTemplate>(['pipeline-template', templateId], (current) => {
+        if (!current) return current;
+        const edges = Array.isArray(current.edges) ? current.edges : [];
+        return {
+          ...current,
+          edges: edges.map((currentEdge) => (String(currentEdge.id) === String(edge.id) ? edge : currentEdge)),
+        };
+      });
+      setEdgeSubmitAttempted(false);
+      invalidate(templateId);
+      toast.success('Đã lưu connector');
+    },
+    onError: (error) => toast.error('Không lưu được connector', error),
+  });
+
   const deleteEdge = useMutation({
     mutationFn: async (edgeId: string) => {
       const templateId = selectedTemplateId;
@@ -397,6 +463,26 @@ export function PipelineBuilderPage() {
     addStep.mutate();
   };
 
+  const submitEdgeSettings = () => {
+    setEdgeSubmitAttempted(true);
+    const invalidLabels: string[] = [];
+    const priority = Number(edgeForm.priority);
+    if (edgeForm.label.trim().length > 80) invalidLabels.push('Nhãn');
+    if (!edgeForm.condition_type || !edgeConditionTypes.has(edgeForm.condition_type)) invalidLabels.push('Điều kiện');
+    if (!Number.isInteger(priority) || priority < 1 || priority > 999) invalidLabels.push('Ưu tiên');
+    if (edgeConditions.isError) invalidLabels.push('Danh sách điều kiện');
+
+    if (invalidLabels.length) {
+      toast.warn({
+        title: 'Thiếu hoặc sai cấu hình connector',
+        description: invalidLabels.join(', '),
+      });
+      return;
+    }
+
+    saveEdgeSettings.mutate();
+  };
+
   const deleteNode = useMutation({
     mutationFn: (nodeId: string) => del(`/pipeline-nodes/${nodeId}`),
     onSuccess: (_, nodeId) => {
@@ -469,7 +555,7 @@ export function PipelineBuilderPage() {
     });
   };
 
-  const connectorMutationPending = createEdge.isPending || updateEdge.isPending || deleteEdge.isPending;
+  const connectorMutationPending = createEdge.isPending || updateEdge.isPending || deleteEdge.isPending || saveEdgeSettings.isPending;
   const canDeleteSelection = Boolean(selectedConnector || selectedNode);
   const deleteSelectionLabel = selectedConnector ? 'Xóa connector' : 'Xóa node';
   const deleteSelectionPending = selectedConnector ? deleteEdge.isPending : deleteNode.isPending;
@@ -546,6 +632,22 @@ export function PipelineBuilderPage() {
             onSubmitStep={submitStepDialog}
             onDeleteStep={(stepId) => deleteStep.mutate(stepId)}
           />
+        ) : selectedConnector ? (
+          <EdgeInspectorPanel
+            edge={selectedConnector}
+            fromNode={selectedConnectorSource}
+            toNode={selectedConnectorTarget}
+            conditions={edgeConditions.data ?? []}
+            conditionsLoading={edgeConditions.isLoading}
+            conditionLoadError={edgeConditions.isError}
+            edgeForm={edgeForm}
+            conditionInvalid={edgeSubmitAttempted && (!edgeForm.condition_type || !edgeConditionTypes.has(edgeForm.condition_type))}
+            priorityInvalid={edgeSubmitAttempted && !validEdgePriority(edgeForm.priority)}
+            savePending={saveEdgeSettings.isPending}
+            onChangeField={(field, value) => setEdgeForm((current) => ({ ...current, [field]: value }))}
+            onSave={submitEdgeSettings}
+            onClose={() => setSelectedConnectorId('')}
+          />
         ) : null
       }
     >
@@ -567,7 +669,13 @@ export function PipelineBuilderPage() {
             setSelectedNodeId(nodeId);
             setSelectedConnectorId('');
           }}
-          onSelectedConnectorChange={setSelectedConnectorId}
+          onSelectedConnectorChange={(connectorId) => {
+            setSelectedConnectorId(connectorId);
+            if (connectorId) {
+              setSelectedNodeId('');
+              setDetailsNodeId('');
+            }
+          }}
           onToggleNodeDetails={(nodeId) => {
             setSelectedNodeId(nodeId);
             setSelectedConnectorId('');
@@ -606,6 +714,15 @@ function parseExitConditions(value?: string) {
   return { text: trimmed };
 }
 
+function isRecord(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validEdgePriority(value: string) {
+  const priority = Number(value);
+  return Number.isInteger(priority) && priority >= 1 && priority <= 999;
+}
+
 function defaultStepsForType(type: string) {
   const stepsByType: Record<string, string[]> = {
     survey: ['Upload ảnh hiện trạng', 'Ghi nhận kích thước chính', 'Xác định rủi ro mặt bằng'],
@@ -627,7 +744,7 @@ function defaultStepTypeForNode(type?: string) {
   return 'task';
 }
 
-function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdge[]) {
+function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdge[], conditionTypes: Set<string>) {
   const issues: string[] = [];
   if (!nodes.length) issues.push('Template chưa có node');
   nodes.forEach((node) => {
@@ -641,6 +758,10 @@ function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdg
   edges.forEach((edge) => {
     if (!nodeIds.has(String(edge.from_node_id))) issues.push('Có cạnh trỏ từ node đã xóa');
     if (!nodeIds.has(String(edge.to_node_id))) issues.push('Có cạnh trỏ tới node đã xóa');
+    if (String(edge.label ?? '').trim().length > 80) issues.push(`Connector ${edge.id} có nhãn quá dài`);
+    if (!String(edge.condition_type ?? '').trim()) issues.push('Có connector thiếu condition');
+    if (conditionTypes.size && !conditionTypes.has(String(edge.condition_type ?? ''))) issues.push(`Connector ${edge.label || edge.id} dùng condition không được hỗ trợ`);
+    if (!validEdgePriority(String(edge.priority ?? 100))) issues.push(`Connector ${edge.label || edge.id} có priority không hợp lệ`);
   });
   return issues;
 }
