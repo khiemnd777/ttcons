@@ -13,6 +13,12 @@ import { NodeInspectorPanel } from './components/NodeInspectorPanel';
 import { DiagramCanvas } from './components/diagram/DiagramCanvas';
 import { autoLayoutPosition, nextNodePosition } from './components/diagram/diagramConstants';
 import type { NodePosition } from './components/diagram/diagramTypes';
+import {
+  buildCreateEdgePayload,
+  buildUpdateEdgePayload,
+  type ConnectorCreateInput,
+  type ConnectorReconnectInput,
+} from './components/diagram/edgePersistence';
 
 type NodePreset = {
   type: string;
@@ -235,6 +241,50 @@ export function PipelineBuilderPage() {
     onError: (error) => toast.error('Không lưu được vị trí node', error),
   });
 
+  const createEdge = useMutation({
+    mutationFn: async (input: ConnectorCreateInput) => {
+      const templateId = selectedTemplateId;
+      if (!templateId) throw new Error('Chưa chọn template');
+      const edge = await post<PipelineTemplateEdge>(`/pipeline-templates/${templateId}/edges`, buildCreateEdgePayload(input));
+      return { edge, templateId };
+    },
+    onSuccess: ({ edge, templateId }) => {
+      queryClient.setQueryData<PipelineTemplate>(['pipeline-template', templateId], (current) => {
+        if (!current) return current;
+        const edges = Array.isArray(current.edges) ? current.edges : [];
+        if (edges.some((currentEdge) => currentEdge.id === edge.id)) return current;
+        return { ...current, edges: [...edges, edge] };
+      });
+      invalidate(templateId);
+      toast.success('Đã tạo connector');
+    },
+    onError: (error) => toast.error('Không tạo được connector', error),
+  });
+
+  const updateEdge = useMutation({
+    mutationFn: async (input: ConnectorReconnectInput) => {
+      const templateId = selectedTemplateId;
+      if (!templateId) throw new Error('Chưa chọn template');
+      const currentEdge = rawEdges.find((edge) => edge.id === input.connectorId);
+      const edge = await put<PipelineTemplateEdge>(`/pipeline-edges/${input.connectorId}`, buildUpdateEdgePayload(currentEdge, input));
+      return { edge, templateId };
+    },
+    onSuccess: ({ edge, templateId }) => {
+      queryClient.setQueryData<PipelineTemplate>(['pipeline-template', templateId], (current) => {
+        if (!current) return current;
+        const edges = Array.isArray(current.edges) ? current.edges : [];
+        const edgeExists = edges.some((currentEdge) => currentEdge.id === edge.id);
+        return {
+          ...current,
+          edges: edgeExists ? edges.map((currentEdge) => (currentEdge.id === edge.id ? edge : currentEdge)) : [...edges, edge],
+        };
+      });
+      invalidate(templateId);
+      toast.success('Đã cập nhật connector');
+    },
+    onError: (error) => toast.error('Không cập nhật được connector', error),
+  });
+
   const addStep = useMutation({
     mutationFn: () => {
       if (!detailsNodeId) throw new Error('Chưa chọn node');
@@ -407,13 +457,17 @@ export function PipelineBuilderPage() {
       ) : (
         <DiagramCanvas
           nodes={nodes}
+          edges={rawEdges}
           selectedNodeId={selectedNodeId}
+          connectorMutationPending={createEdge.isPending || updateEdge.isPending}
           onSelectNode={setSelectedNodeId}
           onToggleNodeDetails={(nodeId) => {
             setSelectedNodeId(nodeId);
             setDetailsNodeId((current) => (current === nodeId ? '' : nodeId));
           }}
           onSaveNodePosition={(nodeId, position) => saveNodePosition.mutate({ nodeId, position })}
+          onCreateConnector={(input) => createEdge.mutate(input)}
+          onReconnectConnector={(input) => updateEdge.mutate(input)}
         />
       )}
     </PipelineBuilderShell>

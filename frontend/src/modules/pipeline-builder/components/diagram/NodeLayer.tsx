@@ -14,6 +14,7 @@ type NodeLayerProps = {
   onNodePointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onNodePointerUp: (event: PointerEvent<HTMLDivElement>) => void;
   onNodePointerCancel: (event: PointerEvent<HTMLDivElement>) => void;
+  setNodeElementRef: (nodeId: string, element: HTMLDivElement | null) => void;
 };
 
 export function NodeLayer({
@@ -26,6 +27,7 @@ export function NodeLayer({
   onNodePointerMove,
   onNodePointerUp,
   onNodePointerCancel,
+  setNodeElementRef,
 }: NodeLayerProps) {
   return (
     <>
@@ -42,6 +44,7 @@ export function NodeLayer({
           onPointerMove={onNodePointerMove}
           onPointerUp={onNodePointerUp}
           onPointerCancel={onNodePointerCancel}
+          setNodeElementRef={setNodeElementRef}
         />
       ))}
     </>

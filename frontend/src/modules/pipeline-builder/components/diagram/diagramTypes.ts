@@ -1,5 +1,7 @@
 export type NodePosition = { x: number; y: number };
 
+export type NodeSize = { width: number; height: number };
+
 export type DiagramNodeRect = {
   nodeId: string;
   x: number;
@@ -19,6 +21,8 @@ export type ConnectorEndpoint = {
   port: PortRef;
   point?: NodePosition;
 };
+
+export type ConnectorEndpointRole = 'source' | 'target';
 
 export type ConnectorModel = {
   id: string;

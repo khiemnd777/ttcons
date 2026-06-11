@@ -17,6 +17,7 @@ type NodeCardProps = {
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerUp: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerCancel: (event: PointerEvent<HTMLDivElement>) => void;
+  setNodeElementRef: (nodeId: string, element: HTMLDivElement | null) => void;
 };
 
 export function NodeCard({
@@ -30,11 +31,13 @@ export function NodeCard({
   onPointerMove,
   onPointerUp,
   onPointerCancel,
+  setNodeElementRef,
 }: NodeCardProps) {
   const roles = Array.isArray(node.responsible_role_ids) ? node.responsible_role_ids.join(', ') : 'PM';
 
   return (
     <div
+      ref={(element) => setNodeElementRef(node.id, element)}
       role="button"
       tabIndex={0}
       className={clsx(

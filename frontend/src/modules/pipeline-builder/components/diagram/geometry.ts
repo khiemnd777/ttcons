@@ -1,6 +1,6 @@
 import type { PipelineNode } from '../../../../lib/types/domain';
 import { NODE_HEIGHT, NODE_WIDTH, nodePosition } from './diagramConstants';
-import type { ConnectorEndpoint, DiagramNodeRect, NodePosition, PortRef, PortSide } from './diagramTypes';
+import type { ConnectorEndpoint, DiagramNodeRect, NodePosition, NodeSize, PortRef, PortSide } from './diagramTypes';
 
 export const PORT_SIDES: PortSide[] = ['top', 'right', 'bottom', 'left'];
 
@@ -56,12 +56,22 @@ export function nodeRect(nodeId: string, position: NodePosition, width = NODE_WI
   };
 }
 
-export function nodeRectFromNode(node: PipelineNode, index: number, positions: Record<string, NodePosition>): DiagramNodeRect {
-  return nodeRect(node.id, nodePosition(node, index, positions));
+export function nodeRectFromNode(
+  node: PipelineNode,
+  index: number,
+  positions: Record<string, NodePosition>,
+  sizes: Record<string, NodeSize> = {},
+): DiagramNodeRect {
+  const size = sizes[node.id];
+  return nodeRect(node.id, nodePosition(node, index, positions), size?.width ?? NODE_WIDTH, size?.height ?? NODE_HEIGHT);
 }
 
-export function nodeRectsFromNodes(nodes: PipelineNode[], positions: Record<string, NodePosition>): DiagramNodeRect[] {
-  return nodes.map((node, index) => nodeRectFromNode(node, index, positions));
+export function nodeRectsFromNodes(
+  nodes: PipelineNode[],
+  positions: Record<string, NodePosition>,
+  sizes: Record<string, NodeSize> = {},
+): DiagramNodeRect[] {
+  return nodes.map((node, index) => nodeRectFromNode(node, index, positions, sizes));
 }
 
 export function rectCenter(rect: DiagramNodeRect): NodePosition {
