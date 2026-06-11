@@ -1,6 +1,6 @@
 import { memo, type MouseEvent, type PointerEvent } from 'react';
 import clsx from 'clsx';
-import { MousePointer2, PanelRightOpen } from 'lucide-react';
+import { PanelRightOpen } from 'lucide-react';
 import { EnumChip } from '../../../../components/EnumChip';
 import type { PipelineNode } from '../../../../lib/types/domain';
 import { NODE_HEIGHT, NODE_WIDTH } from './diagramConstants';
@@ -65,7 +65,6 @@ export const NodeCard = memo(function NodeCard({
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-xs font-black text-slate-700">{index + 1}</div>
         <div className="flex items-center gap-1">
-          <MousePointer2 className="h-4 w-4 shrink-0 text-slate-300" />
           <button
             title="Chi tiết node"
             aria-label={`Chi tiết node ${node.name}`}
