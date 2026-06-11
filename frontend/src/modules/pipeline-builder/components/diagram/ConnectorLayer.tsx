@@ -1,14 +1,17 @@
-import type { PointerEvent } from 'react';
+import { memo, type PointerEvent } from 'react';
 import clsx from 'clsx';
-import type { ConnectorModel } from './diagramTypes';
-import type { ConnectorEndpointRole } from './diagramTypes';
-import { connectorPath, routeConnector } from './router';
+import type { ConnectorEndpointRole, ConnectorModel, DiagramNodeRect } from './diagramTypes';
+import { connectorPath } from './router';
+import { useConnectorRoutingLayout } from './useConnectorRoutingLayout';
 
 const ARROW_MARKER_ID = 'pipeline-builder-connector-arrow';
 const SELECTED_ARROW_MARKER_ID = 'pipeline-builder-connector-arrow-selected';
 
 type ConnectorLayerProps = {
   connectors: ConnectorModel[];
+  nodeRects: DiagramNodeRect[];
+  liveNodeRects?: DiagramNodeRect[];
+  draggingNodeId?: string;
   selectedConnectorId: string;
   reconnectDisabled: boolean;
   onSelectConnector: (connectorId: string) => void;
@@ -18,8 +21,11 @@ type ConnectorLayerProps = {
   onReconnectEndpointCancel: (event: PointerEvent<SVGCircleElement>) => void;
 };
 
-export function ConnectorLayer({
+export const ConnectorLayer = memo(function ConnectorLayer({
   connectors,
+  nodeRects,
+  liveNodeRects,
+  draggingNodeId,
   selectedConnectorId,
   reconnectDisabled,
   onSelectConnector,
@@ -28,9 +34,18 @@ export function ConnectorLayer({
   onReconnectEndpointEnd,
   onReconnectEndpointCancel,
 }: ConnectorLayerProps) {
+  const connectorLayouts = useConnectorRoutingLayout(connectors, nodeRects, {
+    draggingNodeId,
+    liveNodeRects,
+  });
   if (!connectors.length) return null;
 
   const selectedConnector = connectors.find((connector) => connector.id === selectedConnectorId) ?? null;
+  const selectedConnectorLayout = selectedConnector ? connectorLayouts.get(selectedConnector.id) : null;
+  const selectedConnectorWithLayout =
+    selectedConnector && selectedConnectorLayout
+      ? { ...selectedConnector, source: selectedConnectorLayout.source, target: selectedConnectorLayout.target }
+      : selectedConnector;
 
   return (
     <>
@@ -44,7 +59,8 @@ export function ConnectorLayer({
           </marker>
         </defs>
         {connectors.map((connector) => {
-          const route = connector.route ?? routeConnector(connector.source, connector.target);
+          const layout = connectorLayouts.get(connector.id);
+          const route = layout?.route ?? connector.route ?? [];
           const path = connectorPath(route);
           if (!path) return null;
 
@@ -87,15 +103,15 @@ export function ConnectorLayer({
                 strokeLinejoin="round"
                 markerEnd={`url(#${selected ? SELECTED_ARROW_MARKER_ID : ARROW_MARKER_ID})`}
               />
-              {connector.label ? <ConnectorLabel connector={connector} route={route} selected={selected} /> : null}
+              {connector.label && layout?.labelPoint ? <ConnectorLabel connector={connector} point={layout.labelPoint} selected={selected} /> : null}
             </g>
           );
         })}
       </svg>
-      {selectedConnector ? (
+      {selectedConnectorWithLayout ? (
         <svg className="pointer-events-none absolute left-0 top-0 z-30 overflow-visible" width={1} height={1} aria-hidden="true">
           <EndpointHandle
-            connector={selectedConnector}
+            connector={selectedConnectorWithLayout}
             endpoint="source"
             disabled={reconnectDisabled}
             onReconnectEndpointStart={onReconnectEndpointStart}
@@ -104,7 +120,7 @@ export function ConnectorLayer({
             onReconnectEndpointCancel={onReconnectEndpointCancel}
           />
           <EndpointHandle
-            connector={selectedConnector}
+            connector={selectedConnectorWithLayout}
             endpoint="target"
             disabled={reconnectDisabled}
             onReconnectEndpointStart={onReconnectEndpointStart}
@@ -116,16 +132,13 @@ export function ConnectorLayer({
       ) : null}
     </>
   );
-}
+});
 
-function ConnectorLabel({ connector, route, selected }: { connector: ConnectorModel; route: { x: number; y: number }[]; selected: boolean }) {
-  const point = route[Math.floor(route.length / 2)];
-  if (!point) return null;
-
+function ConnectorLabel({ connector, point, selected }: { connector: ConnectorModel; point: { x: number; y: number }; selected: boolean }) {
   return (
     <text
       x={point.x}
-      y={point.y - 8}
+      y={point.y}
       className={clsx('text-[11px] font-semibold', selected ? 'fill-blue-700' : 'fill-slate-500')}
       textAnchor="middle"
       dominantBaseline="central"

@@ -1,4 +1,4 @@
-import type { PointerEvent } from 'react';
+import { memo, type PointerEvent } from 'react';
 import clsx from 'clsx';
 import { MousePointer2, PanelRightOpen } from 'lucide-react';
 import { EnumChip } from '../../../../components/EnumChip';
@@ -20,7 +20,7 @@ type NodeCardProps = {
   setNodeElementRef: (nodeId: string, element: HTMLDivElement | null) => void;
 };
 
-export function NodeCard({
+export const NodeCard = memo(function NodeCard({
   node,
   index,
   position,
@@ -85,5 +85,22 @@ export function NodeCard({
         <EnumChip group="node_type" value={node.type} />
       </div>
     </div>
+  );
+}, areNodeCardPropsEqual);
+
+function areNodeCardPropsEqual(previous: NodeCardProps, next: NodeCardProps) {
+  return (
+    previous.node === next.node &&
+    previous.index === next.index &&
+    previous.selected === next.selected &&
+    previous.position.x === next.position.x &&
+    previous.position.y === next.position.y &&
+    previous.onSelectNode === next.onSelectNode &&
+    previous.onToggleDetails === next.onToggleDetails &&
+    previous.onPointerDown === next.onPointerDown &&
+    previous.onPointerMove === next.onPointerMove &&
+    previous.onPointerUp === next.onPointerUp &&
+    previous.onPointerCancel === next.onPointerCancel &&
+    previous.setNodeElementRef === next.setNodeElementRef
   );
 }

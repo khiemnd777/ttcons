@@ -1,19 +1,21 @@
-import type { ConnectorEndpoint } from './diagramTypes';
-import { connectorPath, routeConnector } from './router';
+import type { ConnectorEndpoint, DiagramNodeRect } from './diagramTypes';
+import { connectorPath } from './router';
+import { routePreviewConnector } from './routingEngine';
 
 const PREVIEW_MARKER_ID = 'pipeline-builder-drag-preview-arrow';
 
 type DragPreviewLayerProps = {
   source: ConnectorEndpoint | null;
   target: ConnectorEndpoint | null;
+  nodeRects: DiagramNodeRect[];
   snapped: boolean;
   validTarget: boolean;
 };
 
-export function DragPreviewLayer({ source, target, snapped, validTarget }: DragPreviewLayerProps) {
+export function DragPreviewLayer({ source, target, nodeRects, snapped, validTarget }: DragPreviewLayerProps) {
   if (!source || !target) return null;
 
-  const route = routeConnector(source, target);
+  const route = routePreviewConnector(source, target, nodeRects);
   const path = connectorPath(route);
   if (!path) return null;
 

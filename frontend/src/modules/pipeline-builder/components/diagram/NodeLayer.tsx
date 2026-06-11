@@ -1,4 +1,4 @@
-import type { PointerEvent } from 'react';
+import { memo, type PointerEvent } from 'react';
 import type { PipelineNode } from '../../../../lib/types/domain';
 import { nodePosition } from './diagramConstants';
 import type { NodePosition } from './diagramTypes';
@@ -17,7 +17,7 @@ type NodeLayerProps = {
   setNodeElementRef: (nodeId: string, element: HTMLDivElement | null) => void;
 };
 
-export function NodeLayer({
+export const NodeLayer = memo(function NodeLayer({
   nodes,
   positions,
   selectedNodeId,
@@ -49,4 +49,4 @@ export function NodeLayer({
       ))}
     </>
   );
-}
+});

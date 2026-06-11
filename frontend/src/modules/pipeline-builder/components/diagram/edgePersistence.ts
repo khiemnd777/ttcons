@@ -1,6 +1,6 @@
 import type { PipelineTemplateEdge } from '../../../../lib/types/domain';
-import type { ConnectorModel, DiagramNodeRect, NodePosition, PortRef, PortSide } from './diagramTypes';
-import { connectorEndpoint } from './geometry';
+import type { ConnectorModel, DiagramNodeRect, DiagramPortMode, NodePosition, PortRef, PortSide } from './diagramTypes';
+import { preferredPortPair, visibleConnectorEndpoint } from './geometry';
 
 type DiagramEdgeEndpointMetadata = {
   nodeId?: string;
@@ -10,6 +10,7 @@ type DiagramEdgeEndpointMetadata = {
 type DiagramEdgeMetadata = {
   source?: DiagramEdgeEndpointMetadata;
   target?: DiagramEdgeEndpointMetadata;
+  portMode?: DiagramPortMode;
   route?: NodePosition[];
 };
 
@@ -36,6 +37,7 @@ export function buildCreateEdgePayload(input: ConnectorCreateInput) {
     condition_config: {
       diagram: {
         version: 1,
+        portMode: 'auto',
         source: {
           nodeId: input.source.nodeId,
           side: input.source.side,
@@ -60,6 +62,7 @@ export function buildUpdateEdgePayload(edge: PipelineTemplateEdge | undefined, i
       ...conditionConfig,
       diagram: {
         version: 1,
+        portMode: 'manual',
         source: {
           nodeId: input.source.nodeId,
           side: input.source.side,
@@ -92,8 +95,9 @@ export function edgeToConnector(edge: PipelineTemplateEdge, rectById: Map<string
   const targetRect = rectById.get(resolveNodeId(metadata?.target?.nodeId, targetNodeId, rectById));
   if (!sourceRect || !targetRect) return null;
 
-  const source = connectorEndpoint(sourceRect, metadata?.source?.side ?? 'right');
-  const target = connectorEndpoint(targetRect, metadata?.target?.side ?? 'left');
+  const portPair = connectorPortPair(sourceRect, targetRect, metadata);
+  const source = visibleConnectorEndpoint(sourceRect, portPair.sourceSide);
+  const target = visibleConnectorEndpoint(targetRect, portPair.targetSide);
   const route = metadata?.route && source.point && target.point ? [source.point, ...metadata.route.slice(1, -1), target.point] : undefined;
 
   return {
@@ -102,7 +106,19 @@ export function edgeToConnector(edge: PipelineTemplateEdge, rectById: Map<string
     target,
     route,
     label: typeof edge.label === 'string' && edge.label.trim() ? edge.label : undefined,
+    portMode: metadata?.portMode ?? 'auto',
   };
+}
+
+function connectorPortPair(sourceRect: DiagramNodeRect, targetRect: DiagramNodeRect, metadata: DiagramEdgeMetadata | null) {
+  if (metadata?.portMode === 'manual') {
+    return {
+      sourceSide: metadata.source?.side ?? 'right',
+      targetSide: metadata.target?.side ?? 'left',
+    };
+  }
+
+  return preferredPortPair(sourceRect, targetRect);
 }
 
 function resolveNodeId(candidate: string | undefined, fallback: string, rectById: Map<string, DiagramNodeRect>) {
@@ -119,6 +135,7 @@ function readDiagramMetadata(edge: PipelineTemplateEdge): DiagramEdgeMetadata | 
   return {
     source: readEndpointMetadata(diagram.source ?? diagram.sourcePort),
     target: readEndpointMetadata(diagram.target ?? diagram.targetPort),
+    portMode: readPortMode(diagram.portMode ?? diagram.port_mode),
     route: readRouteMetadata(diagram.route ?? diagram.points),
   };
 }
@@ -148,6 +165,10 @@ function readRouteMetadata(value: unknown): NodePosition[] | undefined {
 
 function readPortSide(value: unknown): PortSide | undefined {
   return typeof value === 'string' && PORT_SIDES.has(value as PortSide) ? (value as PortSide) : undefined;
+}
+
+function readPortMode(value: unknown): DiagramPortMode | undefined {
+  return value === 'manual' || value === 'auto' ? value : undefined;
 }
 
 function readString(value: unknown) {

@@ -17,6 +17,8 @@ export type PortRef = {
   side: PortSide;
 };
 
+export type DiagramPortMode = 'auto' | 'manual';
+
 export type ConnectorEndpoint = {
   port: PortRef;
   point?: NodePosition;
@@ -30,6 +32,7 @@ export type ConnectorModel = {
   target: ConnectorEndpoint;
   route?: NodePosition[];
   label?: string;
+  portMode?: DiagramPortMode;
   selected?: boolean;
 };
 
