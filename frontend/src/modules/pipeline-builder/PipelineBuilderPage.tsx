@@ -515,6 +515,7 @@ export function PipelineBuilderPage() {
           onCreateConnector={(input) => createEdge.mutate(input)}
           onReconnectConnector={(input) => updateEdge.mutate(input)}
           onDeleteConnector={(connectorId) => deleteEdge.mutate(connectorId)}
+          onDeleteNode={(nodeId) => deleteNode.mutate(nodeId)}
         />
       )}
     </PipelineBuilderShell>

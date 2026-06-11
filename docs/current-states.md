@@ -1,8 +1,8 @@
 # Current States
 
-## Pipeline Builder Connector/Adorner Rebuild Plan
+## Pipeline Builder Connector/Adorner Rebuild Plan (Closed)
 
-Status: planning memory for future Agent implementation. Do not treat this as a general repository rule.
+Status: closed on 2026-06-11. All planned slices through Slice 10 have been implemented and validated. This section is retained as historical reference only and should not be treated as an active implementation plan or a general repository rule.
 
 ### Intent
 

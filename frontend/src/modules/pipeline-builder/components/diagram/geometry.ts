@@ -15,32 +15,33 @@ type CanvasBounds = {
   top: number;
 };
 
-export function viewportPointToWorld(point: NodePosition, offset: NodePosition): NodePosition {
+export function viewportPointToWorld(point: NodePosition, offset: NodePosition, scale = 1): NodePosition {
   return {
-    x: point.x - offset.x,
-    y: point.y - offset.y,
+    x: (point.x - offset.x) / scale,
+    y: (point.y - offset.y) / scale,
   };
 }
 
-export function worldPointToViewport(point: NodePosition, offset: NodePosition): NodePosition {
+export function worldPointToViewport(point: NodePosition, offset: NodePosition, scale = 1): NodePosition {
   return {
-    x: point.x + offset.x,
-    y: point.y + offset.y,
+    x: point.x * scale + offset.x,
+    y: point.y * scale + offset.y,
   };
 }
 
-export function clientPointToWorld(point: ClientPoint, bounds: CanvasBounds, offset: NodePosition): NodePosition {
+export function clientPointToWorld(point: ClientPoint, bounds: CanvasBounds, offset: NodePosition, scale = 1): NodePosition {
   return viewportPointToWorld(
     {
       x: point.clientX - bounds.left,
       y: point.clientY - bounds.top,
     },
     offset,
+    scale,
   );
 }
 
-export function worldPointToClient(point: NodePosition, bounds: CanvasBounds, offset: NodePosition): NodePosition {
-  const viewportPoint = worldPointToViewport(point, offset);
+export function worldPointToClient(point: NodePosition, bounds: CanvasBounds, offset: NodePosition, scale = 1): NodePosition {
+  const viewportPoint = worldPointToViewport(point, offset, scale);
   return {
     x: viewportPoint.x + bounds.left,
     y: viewportPoint.y + bounds.top,

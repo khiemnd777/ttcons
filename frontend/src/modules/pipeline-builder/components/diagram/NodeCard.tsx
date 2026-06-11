@@ -1,4 +1,4 @@
-import { memo, type PointerEvent } from 'react';
+import { memo, type MouseEvent, type PointerEvent } from 'react';
 import clsx from 'clsx';
 import { MousePointer2, PanelRightOpen } from 'lucide-react';
 import { EnumChip } from '../../../../components/EnumChip';
@@ -17,6 +17,7 @@ type NodeCardProps = {
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerUp: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerCancel: (event: PointerEvent<HTMLDivElement>) => void;
+  onContextMenu: (event: MouseEvent<HTMLDivElement>, node: PipelineNode) => void;
   setNodeElementRef: (nodeId: string, element: HTMLDivElement | null) => void;
 };
 
@@ -31,6 +32,7 @@ export const NodeCard = memo(function NodeCard({
   onPointerMove,
   onPointerUp,
   onPointerCancel,
+  onContextMenu,
   setNodeElementRef,
 }: NodeCardProps) {
   const roles = Array.isArray(node.responsible_role_ids) ? node.responsible_role_ids.join(', ') : 'PM';
@@ -52,6 +54,7 @@ export const NodeCard = memo(function NodeCard({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onContextMenu={(event) => onContextMenu(event, node)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
@@ -101,6 +104,7 @@ function areNodeCardPropsEqual(previous: NodeCardProps, next: NodeCardProps) {
     previous.onPointerMove === next.onPointerMove &&
     previous.onPointerUp === next.onPointerUp &&
     previous.onPointerCancel === next.onPointerCancel &&
+    previous.onContextMenu === next.onContextMenu &&
     previous.setNodeElementRef === next.setNodeElementRef
   );
 }

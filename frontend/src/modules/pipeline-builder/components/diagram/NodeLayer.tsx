@@ -1,4 +1,4 @@
-import { memo, type PointerEvent } from 'react';
+import { memo, type MouseEvent, type PointerEvent } from 'react';
 import type { PipelineNode } from '../../../../lib/types/domain';
 import { nodePosition } from './diagramConstants';
 import type { NodePosition } from './diagramTypes';
@@ -14,6 +14,7 @@ type NodeLayerProps = {
   onNodePointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onNodePointerUp: (event: PointerEvent<HTMLDivElement>) => void;
   onNodePointerCancel: (event: PointerEvent<HTMLDivElement>) => void;
+  onNodeContextMenu: (event: MouseEvent<HTMLDivElement>, node: PipelineNode) => void;
   setNodeElementRef: (nodeId: string, element: HTMLDivElement | null) => void;
 };
 
@@ -27,6 +28,7 @@ export const NodeLayer = memo(function NodeLayer({
   onNodePointerMove,
   onNodePointerUp,
   onNodePointerCancel,
+  onNodeContextMenu,
   setNodeElementRef,
 }: NodeLayerProps) {
   return (
@@ -44,6 +46,7 @@ export const NodeLayer = memo(function NodeLayer({
           onPointerMove={onNodePointerMove}
           onPointerUp={onNodePointerUp}
           onPointerCancel={onNodePointerCancel}
+          onContextMenu={onNodeContextMenu}
           setNodeElementRef={setNodeElementRef}
         />
       ))}

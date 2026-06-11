@@ -1,4 +1,4 @@
-import { memo, type PointerEvent } from 'react';
+import { memo, type MouseEvent, type PointerEvent } from 'react';
 import clsx from 'clsx';
 import type { ConnectorEndpointRole, ConnectorModel, DiagramNodeRect } from './diagramTypes';
 import { connectorPath } from './router';
@@ -15,6 +15,7 @@ type ConnectorLayerProps = {
   selectedConnectorId: string;
   reconnectDisabled: boolean;
   onSelectConnector: (connectorId: string) => void;
+  onConnectorContextMenu: (connectorId: string, event: MouseEvent<SVGPathElement>) => void;
   onReconnectEndpointStart: (connector: ConnectorModel, endpoint: ConnectorEndpointRole, event: PointerEvent<SVGCircleElement>) => void;
   onReconnectEndpointMove: (event: PointerEvent<SVGCircleElement>) => void;
   onReconnectEndpointEnd: (event: PointerEvent<SVGCircleElement>) => void;
@@ -29,6 +30,7 @@ export const ConnectorLayer = memo(function ConnectorLayer({
   selectedConnectorId,
   reconnectDisabled,
   onSelectConnector,
+  onConnectorContextMenu,
   onReconnectEndpointStart,
   onReconnectEndpointMove,
   onReconnectEndpointEnd,
@@ -93,6 +95,7 @@ export const ConnectorLayer = memo(function ConnectorLayer({
                   event.stopPropagation();
                   onSelectConnector(connector.id);
                 }}
+                onContextMenu={(event) => onConnectorContextMenu(connector.id, event)}
               />
               <path
                 d={path}

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "check:pipeline-builder": "npm run build && node scripts/check-pipeline-builder-diagram.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "lint": "tsc --noEmit"
   },
