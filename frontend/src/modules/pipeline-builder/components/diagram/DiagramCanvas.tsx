@@ -846,7 +846,7 @@ export function DiagramCanvas({
           </div>
         </div>
       ) : null}
-      <div className="absolute right-4 top-4 z-40 inline-flex items-center overflow-hidden rounded-md border border-line bg-white shadow-sm">
+      <div className="absolute left-4 top-4 z-40 inline-flex items-center overflow-hidden rounded-md border border-line bg-white shadow-sm">
         <button
           type="button"
           title="Thu nhỏ canvas"
