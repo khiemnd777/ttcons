@@ -5,6 +5,7 @@
 - Treat this repository as a full-stack construction workflow system: Go/Fiber API, PostgreSQL, Redis, custom SQL migrations, React/Vite admin UI, and Docker Compose.
 - Read the local code before deciding where to change behavior. Use `rg` and targeted file reads first.
 - Keep changes scoped to the requested module. Do not rewrite unrelated modules or generated artifacts.
+- Follow SOLID and DRY. Prefer shared components, helpers, and narrow abstractions when a UI, validation, toast, query, or action pattern repeats across modules.
 - For every feature request, bugfix request, or code-changing request, first present a review package and wait for explicit user confirmation before implementation.
 - For every UI or visual-interface change, first produce a "Mockup as Text" for user review and wait for explicit confirmation before implementation.
 - Never use Flyway. Database changes use the custom migration runner in `backend/internal/shared/migrations` and SQL files in `backend/migrations`.
@@ -75,6 +76,7 @@ Then wait for explicit confirmation from the user before editing UI code.
 - Keep SQL access through repository helpers unless a very small direct query is already the local pattern.
 - When adding or changing tables, add a new migration rather than editing an applied migration.
 - The migration runner records checksums in `schema_migrations`; changing an applied migration will break future runs.
+- User-visible list endpoints must return records that are not deleted. Use each table's local marker, such as `status <> 'cancelled'`, `status <> 'deleted'`, or `active = true`, and do not expose soft-deleted rows in admin lists.
 - Preserve auth and actor semantics. Protected endpoints should stay under `middleware.AuthRequired`.
 
 ## Frontend Rules
@@ -82,6 +84,9 @@ Then wait for explicit confirmation from the user before editing UI code.
 - Add route entries in `frontend/src/app/router.tsx`.
 - Put feature pages under `frontend/src/modules/<feature>`.
 - Reuse `frontend/src/components` before adding new UI primitives.
+- Create, view-detail, and edit interactions must open a shared dialog/modal component. Avoid one-off drawer or full-page implementations unless the feature is a specialized canvas/editor with explicit UX needs.
+- Save/edit flows must show toast feedback for success, warning, and error states. Toasts must include an immediate close `(x)` button.
+- Required and invalid fields must be highlighted inline, and the warning toast must summarize required/invalid fields.
 - Use the API helpers in `frontend/src/lib/api/client.ts`; do not duplicate fetch/token logic in feature modules.
 - Keep UI operational and dense. This is an admin tool, not a marketing page.
 - After frontend changes, run `cd frontend && npm run build` when feasible.

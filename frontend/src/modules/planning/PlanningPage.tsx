@@ -8,10 +8,13 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Timeline } from '../../components/Timeline';
+import { useToast } from '../../components/ToastProvider';
+import { EnumChip } from '../../components/EnumChip';
 
 export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipeline' }) {
   const { id = '' } = useParams();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [blockReason, setBlockReason] = useState('');
   const run = useQuery({
@@ -29,11 +32,46 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
     queryClient.invalidateQueries({ queryKey: ['pipeline-run', id] });
     queryClient.invalidateQueries({ queryKey: ['project-audit', id] });
   };
-  const start = useMutation({ mutationFn: () => post(`/projects/${id}/start-pipeline`, {}), onSuccess: invalidate });
-  const submitStep = useMutation({ mutationFn: (stepId: string) => post(`/pipeline-run-steps/${stepId}/submit`, {}), onSuccess: invalidate });
-  const requestApproval = useMutation({ mutationFn: (nodeId: string) => post(`/pipeline-run-nodes/${nodeId}/request-approval`, { reason: 'Yêu cầu review/approval để chuyển node' }), onSuccess: invalidate });
-  const advance = useMutation({ mutationFn: (nodeId: string) => post(`/pipeline-run-nodes/${nodeId}/advance`, {}), onSuccess: invalidate });
-  const block = useMutation({ mutationFn: (nodeId: string) => post(`/pipeline-run-nodes/${nodeId}/block`, { reason: blockReason || 'Bị chặn bởi điều kiện vận hành' }), onSuccess: invalidate });
+  const start = useMutation({
+    mutationFn: () => post(`/projects/${id}/start-pipeline`, {}),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Đã start pipeline run');
+    },
+    onError: (error) => toast.error('Không start được pipeline run', error),
+  });
+  const submitStep = useMutation({
+    mutationFn: (stepId: string) => post(`/pipeline-run-steps/${stepId}/submit`, {}),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Đã submit step');
+    },
+    onError: (error) => toast.error('Không submit được step', error),
+  });
+  const requestApproval = useMutation({
+    mutationFn: (nodeId: string) => post(`/pipeline-run-nodes/${nodeId}/request-approval`, { reason: 'Yêu cầu review/approval để chuyển node' }),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Đã gửi yêu cầu duyệt');
+    },
+    onError: (error) => toast.error('Không gửi được yêu cầu duyệt', error),
+  });
+  const advance = useMutation({
+    mutationFn: (nodeId: string) => post(`/pipeline-run-nodes/${nodeId}/advance`, {}),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Đã chuyển node');
+    },
+    onError: (error) => toast.error('Không chuyển được node', error),
+  });
+  const block = useMutation({
+    mutationFn: (nodeId: string) => post(`/pipeline-run-nodes/${nodeId}/block`, { reason: blockReason || 'Bị chặn bởi điều kiện vận hành' }),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Đã block node');
+    },
+    onError: (error) => toast.error('Không block được node', error),
+  });
 
   const nodes = run.data?.nodes ?? [];
   const selectedNode = nodes.find((node: Record<string, any>) => node.id === selectedNodeId) ?? nodes.find((node: Record<string, any>) => node.status === 'in_progress') ?? nodes[0];
@@ -103,14 +141,14 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
               <dl className="mb-4 grid gap-2 rounded-lg bg-slate-50 p-3 text-sm">
                 <div className="flex justify-between gap-3"><dt className="text-slate-500">Role</dt><dd className="font-medium text-ink">{selectedNode?.responsible_role_ids?.join?.(', ') ?? '-'}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-slate-500">Approval</dt><dd className="font-medium text-ink">{selectedNode?.approval_rule ?? '-'}</dd></div>
-                <div className="flex justify-between gap-3"><dt className="text-slate-500">Fail path</dt><dd className="font-medium text-ink">{selectedNode?.fail_path ?? '-'}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-slate-500">Fail path</dt><dd className="font-medium text-ink"><EnumChip group="fail_path" value={selectedNode?.fail_path} /></dd></div>
               </dl>
               <div className="space-y-2">
                 {(selectedNode?.steps ?? []).map((step: Record<string, any>) => (
                   <div key={step.id} className="flex items-center justify-between gap-3 rounded-md border border-line px-3 py-2">
                     <div>
                       <p className="text-sm font-medium text-ink">{step.name}</p>
-                      <p className="text-xs text-slate-500">{step.step_type}</p>
+                      <div className="mt-1"><EnumChip group="step_type" value={step.step_type} /></div>
                     </div>
                     {step.status === 'completed' ? (
                       <CheckCircle2 className="h-5 w-5 text-emerald-600" />

@@ -1,4 +1,5 @@
 import { dateText } from '../lib/utils/format';
+import { EnumChip } from './EnumChip';
 import { EmptyState } from './EmptyState';
 
 export function Timeline({ events }: { events: Record<string, any>[] }) {
@@ -9,7 +10,7 @@ export function Timeline({ events }: { events: Record<string, any>[] }) {
         {events.map((event) => (
           <div key={event.id} className="border-l-2 border-blue-200 pl-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-ink">{event.event_type}</p>
+              <EnumChip group="event_type" value={event.event_type} />
               <span className="text-xs text-slate-500">{dateText(event.created_at)}</span>
             </div>
             <p className="mt-1 text-sm text-slate-600">{event.description}</p>

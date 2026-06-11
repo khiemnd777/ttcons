@@ -22,16 +22,37 @@ export type PipelineNode = AnyRecord & {
   description?: string;
   type: string;
   order_index: number;
+  position_x?: number;
+  position_y?: number;
   responsible_role_ids?: string[];
   approval_rule?: string;
+  required_permission?: string;
+  exit_conditions?: AnyRecord;
+  fail_path?: string;
+  rework_enabled?: boolean;
+  replanning_enabled?: boolean;
   status?: string;
   steps?: AnyRecord[];
+};
+
+export type PipelineTemplateEdge = AnyRecord & {
+  id: string;
+  template_id?: string;
+  from_node_id: string;
+  to_node_id: string;
+  condition_type?: string;
+  condition_config?: AnyRecord;
+  label?: string;
 };
 
 export type PipelineTemplate = AnyRecord & {
   id: string;
   name: string;
+  description?: string;
+  project_type?: string;
   status: string;
   version: number;
+  node_count?: number;
   nodes?: PipelineNode[];
+  edges?: PipelineTemplateEdge[];
 };

@@ -28,7 +28,8 @@ Use this skill for backend API, data, auth, migration, and domain behavior chang
    - update seed data only when demo or required reference data changes
 6. Keep validation and actor extraction close to handlers; keep business transitions in services.
 7. Preserve response envelope behavior via `backend/internal/shared/response`.
-8. Run focused validation.
+8. User-visible list endpoints must filter out deleted records using the table's local marker, such as `status <> 'cancelled'`, `status <> 'deleted'`, or `active = true`.
+9. Run focused validation.
 
 ## Migration Rules
 

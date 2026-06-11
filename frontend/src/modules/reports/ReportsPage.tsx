@@ -3,6 +3,8 @@ import { get } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { CurrencyText } from '../../components/CurrencyText';
+import { StatusBadge } from '../../components/StatusBadge';
+import { EnumChip } from '../../components/EnumChip';
 
 export function ReportsPage() {
   const projects = useQuery({ queryKey: ['report', 'projects'], queryFn: () => get<Record<string, any>[]>('/reports/projects') });
@@ -19,7 +21,7 @@ export function ReportsPage() {
           <h2 className="mb-3 text-base font-semibold text-ink">Báo cáo công trình</h2>
           <DataTable rows={projects.data ?? []} columns={[
             { key: 'name', header: 'Công trình' },
-            { key: 'status', header: 'Trạng thái' },
+            { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
             { key: 'progress_percent', header: 'Tiến độ' },
             { key: 'open_issues', header: 'Issue mở' },
             { key: 'pending_approvals', header: 'Chờ duyệt' },
@@ -38,8 +40,8 @@ export function ReportsPage() {
           <div>
             <h2 className="mb-3 text-base font-semibold text-ink">Mua sắm</h2>
             <DataTable rows={procurement.data ?? []} columns={[
-              { key: 'status', header: 'Trạng thái' },
-              { key: 'budget_status', header: 'Budget' },
+              { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
+              { key: 'budget_status', header: 'Budget', render: (row) => <EnumChip group="budget_status" value={row.budget_status} /> },
               { key: 'total', header: 'Số request' },
               { key: 'amount', header: 'Giá trị', render: (row) => <CurrencyText value={row.amount} /> },
             ]} />

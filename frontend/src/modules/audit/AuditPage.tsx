@@ -4,6 +4,7 @@ import { get } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { Timeline } from '../../components/Timeline';
 import { DataTable } from '../../components/DataTable';
+import { EnumChip } from '../../components/EnumChip';
 
 export function AuditPage({ scoped = false }: { scoped?: boolean }) {
   const { id } = useParams();
@@ -16,9 +17,9 @@ export function AuditPage({ scoped = false }: { scoped?: boolean }) {
         <Timeline events={logs.data?.slice(0, 20) ?? []} />
         <DataTable rows={logs.data ?? []} columns={[
           { key: 'created_at', header: 'Thời gian' },
-          { key: 'event_type', header: 'Event' },
+          { key: 'event_type', header: 'Event', render: (row) => <EnumChip group="event_type" value={row.event_type} /> },
           { key: 'actor_name', header: 'Actor' },
-          { key: 'target_type', header: 'Target' },
+          { key: 'target_type', header: 'Target', render: (row) => <EnumChip group="target_type" value={row.target_type} /> },
           { key: 'description', header: 'Mô tả' },
         ]} />
       </div>

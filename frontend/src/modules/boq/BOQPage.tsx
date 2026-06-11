@@ -9,21 +9,70 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FormDrawer } from '../../components/FormDrawer';
 import { CurrencyText } from '../../components/CurrencyText';
+import { useToast } from '../../components/ToastProvider';
+import { RecordDetailDialog } from '../../components/RecordDetailDialog';
+import { RowActions } from '../../components/RowActions';
 import { SimpleForm } from '../_shared/SimpleForm';
+import { enumOptions } from '../../lib/utils/status';
 
 export function BOQPage() {
   const { id = '' } = useParams();
   const [open, setOpen] = useState(false);
+  const [dialog, setDialog] = useState<{ mode: 'view' | 'edit'; record: Record<string, any> } | null>(null);
   const queryClient = useQueryClient();
+  const toast = useToast();
   const boq = useQuery({ queryKey: ['boq', id], queryFn: () => get<Record<string, any>[]>(`/projects/${id}/boq`), enabled: Boolean(id) });
   const materials = useQuery({ queryKey: ['materials'], queryFn: () => get<Record<string, any>[]>('/materials') });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['boq', id] });
-  const create = useMutation({ mutationFn: (values: Record<string, any>) => post(`/projects/${id}/boq`, values), onSuccess: () => { invalidate(); setOpen(false); } });
-  const update = useMutation({ mutationFn: ({ itemId, values }: { itemId: string; values: Record<string, any> }) => put(`/boq-items/${itemId}`, values), onSuccess: invalidate });
-  const submit = useMutation({ mutationFn: () => post(`/projects/${id}/boq/submit`, {}), onSuccess: invalidate });
-  const approve = useMutation({ mutationFn: () => post(`/projects/${id}/boq/approve`, {}), onSuccess: invalidate });
-  const generate = useMutation({ mutationFn: () => post(`/projects/${id}/boq/generate-procurement`, {}) });
+  const create = useMutation({
+    mutationFn: (values: Record<string, any>) => post(`/projects/${id}/boq`, values),
+    onSuccess: () => {
+      invalidate();
+      setOpen(false);
+      toast.success('Đã thêm dòng BOQ');
+    },
+    onError: (error) => toast.error('Không thêm được dòng BOQ', error),
+  });
+  const update = useMutation({
+    mutationFn: ({ itemId, values }: { itemId: string; values: Record<string, any> }) => put(`/boq-items/${itemId}`, values),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Đã cập nhật dòng BOQ');
+    },
+    onError: (error) => toast.error('Không cập nhật được dòng BOQ', error),
+  });
+  const submit = useMutation({
+    mutationFn: () => post(`/projects/${id}/boq/submit`, {}),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Đã submit BOQ');
+    },
+    onError: (error) => toast.error('Không submit được BOQ', error),
+  });
+  const approve = useMutation({
+    mutationFn: () => post(`/projects/${id}/boq/approve`, {}),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Đã duyệt BOQ');
+    },
+    onError: (error) => toast.error('Không duyệt được BOQ', error),
+  });
+  const generate = useMutation({
+    mutationFn: () => post(`/projects/${id}/boq/generate-procurement`, {}),
+    onSuccess: () => toast.success('Đã sinh yêu cầu mua sắm'),
+    onError: (error) => toast.error('Không sinh được yêu cầu mua sắm', error),
+  });
   const total = (boq.data ?? []).reduce((sum, item) => sum + Number(item.total_amount ?? 0), 0);
+  const boqFields = (record?: Record<string, any>) => [
+    { name: 'category', label: 'Hạng mục', defaultValue: record?.category ?? 'Điện', required: true },
+    { name: 'work_item_name', label: 'Tên công việc', defaultValue: record?.work_item_name ?? 'Hạng mục mới', required: true },
+    { name: 'description', label: 'Mô tả', type: 'textarea' as const, defaultValue: record?.description ?? '' },
+    { name: 'unit', label: 'Đơn vị', defaultValue: record?.unit ?? 'm2', required: true },
+    { name: 'quantity', label: 'Khối lượng', type: 'number' as const, defaultValue: record?.quantity ?? 1, required: true, min: 0 },
+    { name: 'unit_price', label: 'Đơn giá', type: 'number' as const, defaultValue: record?.unit_price ?? 1000000, required: true, min: 0 },
+    { name: 'material_id', label: 'Vật tư liên kết', type: 'select' as const, defaultValue: record?.material_id ?? '', options: (materials.data ?? []).map((m) => ({ label: m.name, value: m.id })) },
+    { name: 'status', label: 'Trạng thái', type: 'select' as const, defaultValue: record?.status ?? 'draft', required: true, options: enumOptions('status', ['draft', 'submitted', 'approved', 'revised']) },
+  ];
 
   if (boq.isLoading) return <LoadingSpinner />;
 
@@ -55,24 +104,48 @@ export function BOQPage() {
           { key: 'unit_price', header: 'Đơn giá', render: (row) => <CurrencyText value={row.unit_price} /> },
           { key: 'total_amount', header: 'Thành tiền', render: (row) => <CurrencyText value={row.total_amount} /> },
           { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-          { key: 'action', header: 'Action', render: (row) => <button className="text-sm font-semibold text-blue-700" onClick={() => update.mutate({ itemId: row.id, values: { status: 'revised' } })}>Revised</button> },
+          {
+            key: 'action',
+            header: 'Action',
+            render: (row) => (
+              <RowActions onView={() => setDialog({ mode: 'view', record: row })} onEdit={() => setDialog({ mode: 'edit', record: row })}>
+                <button className="text-sm font-semibold text-blue-700" onClick={() => update.mutate({ itemId: row.id, values: { status: 'revised' } })}>Revised</button>
+              </RowActions>
+            ),
+          },
         ]}
       />
       <FormDrawer open={open} title="Thêm dòng BOQ" onClose={() => setOpen(false)}>
         <SimpleForm
           submitLabel="Thêm BOQ"
-          fields={[
-            { name: 'category', label: 'Hạng mục', defaultValue: 'Điện' },
-            { name: 'work_item_name', label: 'Tên công việc', defaultValue: 'Hạng mục mới' },
-            { name: 'description', label: 'Mô tả', type: 'textarea' },
-            { name: 'unit', label: 'Đơn vị', defaultValue: 'm2' },
-            { name: 'quantity', label: 'Khối lượng', type: 'number', defaultValue: 1 },
-            { name: 'unit_price', label: 'Đơn giá', type: 'number', defaultValue: 1000000 },
-            { name: 'material_id', label: 'Vật tư liên kết', type: 'select', options: (materials.data ?? []).map((m) => ({ label: m.name, value: m.id })) },
-            { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'draft', options: ['draft', 'submitted', 'approved'].map((x) => ({ label: x, value: x })) },
-          ]}
+          fields={boqFields()}
           onSubmit={(values) => create.mutateAsync(values)}
         />
+      </FormDrawer>
+      <RecordDetailDialog
+        open={dialog?.mode === 'view'}
+        title="Chi tiết dòng BOQ"
+        record={dialog?.record ?? null}
+        onClose={() => setDialog(null)}
+        fields={[
+          { key: 'category', label: 'Hạng mục' },
+          { key: 'work_item_name', label: 'Công việc' },
+          { key: 'description', label: 'Mô tả' },
+          { key: 'quantity', label: 'Khối lượng' },
+          { key: 'unit', label: 'ĐVT' },
+          { key: 'unit_price', label: 'Đơn giá', render: (row) => <CurrencyText value={row.unit_price} /> },
+          { key: 'total_amount', label: 'Thành tiền', render: (row) => <CurrencyText value={row.total_amount} /> },
+          { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
+        ]}
+      />
+      <FormDrawer open={dialog?.mode === 'edit'} title="Chỉnh sửa dòng BOQ" onClose={() => setDialog(null)}>
+        {dialog?.record ? (
+          <SimpleForm
+            submitLabel="Lưu thay đổi"
+            fields={boqFields(dialog.record)}
+            onSubmit={(values) => update.mutateAsync({ itemId: dialog.record.id, values: { ...values, material_id: values.material_id || null } })}
+          />
+        ) : null}
       </FormDrawer>
     </>
   );

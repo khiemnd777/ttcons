@@ -12,6 +12,9 @@ Review priorities:
 - Custom migration safety and schema_migrations checksum implications.
 - Frontend/backend contract drift.
 - Whether feature, bugfix, code-changing, or UI-changing work passed the required user review gate.
+- Whether repeated UI logic was extracted into shared components and whether create/view/edit actions use dialogs with dismissible toast feedback.
+- Whether required/invalid fields are highlighted inline and summarized in warning toasts.
+- Whether user-visible lists exclude deleted/cancelled/inactive records at the API/query level.
 - Pipeline, approval, BOQ, procurement, warehouse, acceptance, rework, accounting, and audit invariants.
 - Missing or weak verification for changed behavior.
 

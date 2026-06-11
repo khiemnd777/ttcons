@@ -18,7 +18,11 @@ Implementation rules:
 - Put feature pages under frontend/src/modules.
 - Add route entries in frontend/src/app/router.tsx.
 - Reuse shared components before creating new primitives.
+- Follow SOLID and DRY: reuse shared dialog, form, toast, validation, table, and row action components instead of repeating UI logic.
+- Create, view-detail, and edit actions must open shared dialogs/modals unless the feature is a specialized canvas/editor with explicit UX needs.
+- Save/edit flows must show dismissible success/warn/error toasts, and required/invalid fields must be highlighted inline with a warning toast summary.
 - Use frontend/src/lib/api/client.ts helpers for API calls.
+- Treat API-backed lists as non-deleted lists; do not rely on client-only filtering as the source of truth.
 - Keep the admin UI dense, operational, and responsive.
 - Do not revert edits you did not make.
 

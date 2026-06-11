@@ -8,6 +8,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { StatCard } from '../../components/StatCard';
 import { CurrencyText } from '../../components/CurrencyText';
 import { DataTable } from '../../components/DataTable';
+import { useToast } from '../../components/ToastProvider';
 import type { Project } from '../../lib/types/domain';
 
 const moduleLinks = [
@@ -28,6 +29,7 @@ const moduleLinks = [
 export function ProjectDetailPage() {
   const { id = '' } = useParams();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const project = useQuery({ queryKey: ['project', id], queryFn: () => get<Project>(`/projects/${id}`), enabled: Boolean(id) });
   const run = useQuery({ queryKey: ['pipeline-run', id], queryFn: () => get<Record<string, any>>(`/projects/${id}/pipeline-run`), enabled: Boolean(id), retry: false });
   const start = useMutation({
@@ -35,7 +37,9 @@ export function ProjectDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline-run', id] });
       queryClient.invalidateQueries({ queryKey: ['project', id] });
+      toast.success('Đã start pipeline');
     },
+    onError: (error) => toast.error('Không start được pipeline', error),
   });
 
   if (project.isLoading) return <LoadingSpinner />;

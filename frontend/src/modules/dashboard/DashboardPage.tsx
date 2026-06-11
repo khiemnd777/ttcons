@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { CurrencyText } from '../../components/CurrencyText';
 import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
+import { EnumChip } from '../../components/EnumChip';
 
 export function DashboardPage() {
   const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: () => get<Record<string, any>>('/reports/dashboard') });
@@ -43,7 +44,7 @@ export function DashboardPage() {
             {(charts.project_status ?? []).map((row: Record<string, any>) => (
               <div key={row.status}>
                 <div className="mb-1 flex justify-between text-xs text-slate-600">
-                  <span>{row.status}</span>
+                  <StatusBadge status={row.status} />
                   <span>{row.total}</span>
                 </div>
                 <div className="h-2 rounded-full bg-slate-100">
@@ -83,7 +84,7 @@ export function DashboardPage() {
           <DataTable
             rows={approvals.data ?? []}
             columns={[
-              { key: 'target_type', header: 'Loại' },
+              { key: 'target_type', header: 'Loại', render: (row) => <EnumChip group="target_type" value={row.target_type} /> },
               { key: 'project_name', header: 'Công trình' },
               { key: 'reason', header: 'Lý do' },
               { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },

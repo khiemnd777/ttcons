@@ -325,6 +325,7 @@ func (h *Handler) ListApprovals(c *fiber.Ctx) error {
 		FROM approval_requests ar
 		LEFT JOIN projects p ON p.id=ar.project_id
 		LEFT JOIN users u ON u.id=ar.requested_by
+		WHERE p.id IS NULL OR p.status <> 'cancelled'
 		ORDER BY ar.created_at DESC
 	`)
 	if err != nil {
@@ -338,7 +339,7 @@ func (h *Handler) PendingApprovals(c *fiber.Ctx) error {
 		SELECT ar.*, p.name AS project_name
 		FROM approval_requests ar
 		LEFT JOIN projects p ON p.id=ar.project_id
-		WHERE ar.status='pending'
+		WHERE ar.status='pending' AND (p.id IS NULL OR p.status <> 'cancelled')
 		ORDER BY ar.created_at DESC
 	`)
 	if err != nil {
@@ -365,7 +366,7 @@ func (h *Handler) ProjectBOQ(c *fiber.Ctx) error {
 		SELECT b.*, m.name AS material_name
 		FROM boq_items b
 		LEFT JOIN materials m ON m.id=b.material_id
-		WHERE b.project_id=$1
+		WHERE b.project_id=$1 AND b.status <> 'deleted'
 		ORDER BY b.category, b.created_at
 	`, c.Params("id"))
 	if err != nil {
@@ -427,6 +428,7 @@ func (h *Handler) ListProcurement(c *fiber.Ctx) error {
 		SELECT pr.*, p.name AS project_name
 		FROM procurement_requests pr
 		JOIN projects p ON p.id=pr.project_id
+		WHERE pr.status <> 'cancelled' AND p.status <> 'cancelled'
 		ORDER BY pr.created_at DESC
 	`)
 	if err != nil {
@@ -485,13 +487,13 @@ func (h *Handler) procurementAction(c *fiber.Ctx, action string) error {
 }
 
 func (h *Handler) ListMaterials(c *fiber.Ctx) error {
-	return h.list(c, `SELECT * FROM materials ORDER BY category, name`)
+	return h.list(c, `SELECT * FROM materials WHERE active ORDER BY category, name`)
 }
 func (h *Handler) CreateMaterial(c *fiber.Ctx) error {
 	return h.create(c, "materials", materialColumns())
 }
 func (h *Handler) ListWarehouses(c *fiber.Ctx) error {
-	return h.list(c, `SELECT * FROM warehouses ORDER BY type, name`)
+	return h.list(c, `SELECT * FROM warehouses WHERE active ORDER BY type, name`)
 }
 func (h *Handler) CreateWarehouse(c *fiber.Ctx) error {
 	return h.create(c, "warehouses", warehouseColumns())
@@ -503,6 +505,7 @@ func (h *Handler) Stock(c *fiber.Ctx) error {
 			COALESCE(SUM(CASE WHEN sm.movement_type='receive' THEN sm.quantity WHEN sm.movement_type IN ('issue','loss') THEN -sm.quantity ELSE 0 END),0) AS stock_quantity
 		FROM materials m
 		LEFT JOIN stock_movements sm ON sm.material_id=m.id
+		WHERE m.active
 		GROUP BY m.id
 		ORDER BY m.category, m.name
 	`)
@@ -610,7 +613,7 @@ func (h *Handler) ApproveReplanning(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ProjectHandover(c *fiber.Ctx) error {
-	rows, err := h.service.repo.Query(c.Context(), `SELECT * FROM handover_records WHERE project_id=$1 ORDER BY created_at DESC`, c.Params("id"))
+	rows, err := h.service.repo.Query(c.Context(), `SELECT * FROM handover_records WHERE project_id=$1 AND status <> 'deleted' ORDER BY created_at DESC`, c.Params("id"))
 	if err != nil {
 		return err
 	}
@@ -642,13 +645,13 @@ func (h *Handler) ApproveBudget(c *fiber.Ctx) error {
 	return h.setStatus(c, "accounting_budgets", "approved")
 }
 func (h *Handler) ListPayables(c *fiber.Ctx) error {
-	return h.list(c, `SELECT pay.*, p.name AS project_name FROM payables pay JOIN projects p ON p.id=pay.project_id ORDER BY pay.created_at DESC`)
+	return h.list(c, `SELECT pay.*, p.name AS project_name FROM payables pay JOIN projects p ON p.id=pay.project_id WHERE pay.status <> 'cancelled' AND p.status <> 'cancelled' ORDER BY pay.created_at DESC`)
 }
 func (h *Handler) CreatePayable(c *fiber.Ctx) error  { return h.create(c, "payables", payableColumns()) }
 func (h *Handler) ApprovePayable(c *fiber.Ctx) error { return h.setStatus(c, "payables", "approved") }
 func (h *Handler) PayPayable(c *fiber.Ctx) error     { return h.setStatus(c, "payables", "paid") }
 func (h *Handler) ListReceivables(c *fiber.Ctx) error {
-	return h.list(c, `SELECT rec.*, p.name AS project_name FROM receivables rec JOIN projects p ON p.id=rec.project_id ORDER BY rec.created_at DESC`)
+	return h.list(c, `SELECT rec.*, p.name AS project_name FROM receivables rec JOIN projects p ON p.id=rec.project_id WHERE rec.status <> 'cancelled' AND p.status <> 'cancelled' ORDER BY rec.created_at DESC`)
 }
 func (h *Handler) CreateReceivable(c *fiber.Ctx) error {
 	return h.create(c, "receivables", receivableColumns())
@@ -660,13 +663,13 @@ func (h *Handler) ReceiveReceivable(c *fiber.Ctx) error {
 	return h.setStatus(c, "receivables", "received")
 }
 func (h *Handler) ListPayments(c *fiber.Ctx) error {
-	return h.list(c, `SELECT pay.*, p.name AS project_name FROM payments pay JOIN projects p ON p.id=pay.project_id ORDER BY pay.created_at DESC`)
+	return h.list(c, `SELECT pay.*, p.name AS project_name FROM payments pay JOIN projects p ON p.id=pay.project_id WHERE pay.status <> 'cancelled' AND p.status <> 'cancelled' ORDER BY pay.created_at DESC`)
 }
 func (h *Handler) CreatePayment(c *fiber.Ctx) error  { return h.create(c, "payments", paymentColumns()) }
 func (h *Handler) ApprovePayment(c *fiber.Ctx) error { return h.setStatus(c, "payments", "approved") }
 
 func (h *Handler) ListStaff(c *fiber.Ctx) error {
-	return h.list(c, `SELECT * FROM staff ORDER BY full_name`)
+	return h.list(c, `SELECT * FROM staff WHERE status <> 'deleted' ORDER BY full_name`)
 }
 func (h *Handler) CreateStaff(c *fiber.Ctx) error { return h.create(c, "staff", staffColumns()) }
 func (h *Handler) UpdateStaff(c *fiber.Ctx) error { return h.update(c, "staff", staffColumns()) }
@@ -774,11 +777,23 @@ func (h *Handler) update(c *fiber.Ctx, table string, specs []ColumnSpec) error {
 }
 
 func (h *Handler) projectList(c *fiber.Ctx, table string) error {
-	rows, err := h.service.repo.Query(c.Context(), fmt.Sprintf("SELECT * FROM %s WHERE project_id=$1 ORDER BY created_at DESC", safeTable(table)), c.Params("id"))
+	tableName := safeTable(table)
+	rows, err := h.service.repo.Query(c.Context(), fmt.Sprintf("SELECT * FROM %s WHERE project_id=$1%s ORDER BY created_at DESC", tableName, projectListNotDeletedCondition(tableName)), c.Params("id"))
 	if err != nil {
 		return err
 	}
 	return response.OK(c, rows)
+}
+
+func projectListNotDeletedCondition(table string) string {
+	switch table {
+	case "issues", "acceptance_records", "rework_requests", "replanning_requests", "handover_records":
+		return " AND status <> 'deleted'"
+	case "accounting_budgets":
+		return " AND status <> 'cancelled'"
+	default:
+		return ""
+	}
 }
 
 func (h *Handler) projectCreate(c *fiber.Ctx, table string, specs []ColumnSpec) error {

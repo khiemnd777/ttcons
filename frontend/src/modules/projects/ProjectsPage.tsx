@@ -1,20 +1,25 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
-import { get, post } from '../../lib/api/client';
+import { FolderOpen, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { get, post, put } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FormDrawer } from '../../components/FormDrawer';
 import { CurrencyText } from '../../components/CurrencyText';
+import { useToast } from '../../components/ToastProvider';
+import { RecordDetailDialog } from '../../components/RecordDetailDialog';
+import { RowActions } from '../../components/RowActions';
 import { SimpleForm } from '../_shared/SimpleForm';
 import type { Project } from '../../lib/types/domain';
 
 export function ProjectsPage() {
   const [open, setOpen] = useState(false);
+  const [dialog, setDialog] = useState<{ mode: 'view' | 'edit'; record: Project } | null>(null);
   const queryClient = useQueryClient();
+  const toast = useToast();
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Project[]>('/projects') });
   const templates = useQuery({ queryKey: ['pipeline-templates'], queryFn: () => get<Record<string, any>[]>('/pipeline-templates') });
   const createProject = useMutation({
@@ -22,8 +27,37 @@ export function ProjectsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       setOpen(false);
+      toast.success('Đã tạo công trình');
     },
+    onError: (error) => toast.error('Không tạo được công trình', error),
   });
+  const updateProject = useMutation({
+    mutationFn: ({ projectId, values }: { projectId: string; values: Record<string, any> }) => put<Project>(`/projects/${projectId}`, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setDialog(null);
+      toast.success('Đã cập nhật công trình');
+    },
+    onError: (error) => toast.error('Không cập nhật được công trình', error),
+  });
+
+  const projectFields = (record?: Project) => [
+    { name: 'name', label: 'Tên công trình', defaultValue: record?.name ?? 'Công trình mới', required: true },
+    { name: 'code', label: 'Mã công trình', defaultValue: record?.code ?? `PRJ-${Date.now().toString().slice(-5)}`, required: true },
+    { name: 'client_name', label: 'Khách hàng / Chủ đầu tư', defaultValue: record?.client_name ?? 'Khách hàng mới', required: true },
+    { name: 'address', label: 'Địa chỉ', defaultValue: record?.address ?? '' },
+    { name: 'planned_start_date', label: 'Ngày bắt đầu dự kiến', type: 'date' as const, defaultValue: record?.planned_start_date?.slice?.(0, 10) ?? '' },
+    { name: 'planned_end_date', label: 'Ngày kết thúc dự kiến', type: 'date' as const, defaultValue: record?.planned_end_date?.slice?.(0, 10) ?? '' },
+    { name: 'estimated_budget', label: 'Ngân sách dự kiến', type: 'number' as const, defaultValue: record?.estimated_budget ?? 300000000, min: 0 },
+    { name: 'contract_amount', label: 'Giá trị hợp đồng', type: 'number' as const, defaultValue: record?.contract_amount ?? 450000000, min: 0 },
+    {
+      name: 'pipeline_template_id',
+      label: 'Pipeline template',
+      type: 'select' as const,
+      defaultValue: record?.pipeline_template_id ?? '',
+      options: (templates.data ?? []).map((template) => ({ label: `${template.name} v${template.version}`, value: template.id })),
+    },
+  ];
 
   if (projects.isLoading) return <LoadingSpinner />;
 
@@ -46,9 +80,9 @@ export function ProjectsPage() {
             key: 'name',
             header: 'Công trình',
             render: (row) => (
-              <Link to={`/projects/${row.id}`} className="font-semibold text-blue-700 hover:underline">
+              <button className="font-semibold text-blue-700 hover:underline" onClick={() => setDialog({ mode: 'view', record: row })}>
                 {row.name}
-              </Link>
+              </button>
             ),
           },
           { key: 'code', header: 'Mã' },
@@ -56,30 +90,54 @@ export function ProjectsPage() {
           { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
           { key: 'estimated_budget', header: 'Ngân sách', render: (row) => <CurrencyText value={row.estimated_budget} /> },
           { key: 'progress_percent', header: 'Tiến độ', render: (row) => `${row.progress_percent ?? 0}%` },
+          {
+            key: 'actions',
+            header: 'Action',
+            render: (row) => (
+              <RowActions onView={() => setDialog({ mode: 'view', record: row })} onEdit={() => setDialog({ mode: 'edit', record: row })}>
+                <Link title="Mở module công trình" aria-label="Mở module công trình" className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100" to={`/projects/${row.id}`}>
+                  <FolderOpen className="h-4 w-4" />
+                </Link>
+              </RowActions>
+            ),
+          },
         ]}
       />
 
       <FormDrawer open={open} title="Tạo công trình mới" onClose={() => setOpen(false)}>
         <SimpleForm
           submitLabel="Tạo công trình"
-          fields={[
-            { name: 'name', label: 'Tên công trình', defaultValue: 'Công trình mới' },
-            { name: 'code', label: 'Mã công trình', defaultValue: `PRJ-${Date.now().toString().slice(-5)}` },
-            { name: 'client_name', label: 'Khách hàng / Chủ đầu tư', defaultValue: 'Khách hàng mới' },
-            { name: 'address', label: 'Địa chỉ' },
-            { name: 'planned_start_date', label: 'Ngày bắt đầu dự kiến', type: 'date' },
-            { name: 'planned_end_date', label: 'Ngày kết thúc dự kiến', type: 'date' },
-            { name: 'estimated_budget', label: 'Ngân sách dự kiến', type: 'number', defaultValue: 300000000 },
-            { name: 'contract_amount', label: 'Giá trị hợp đồng', type: 'number', defaultValue: 450000000 },
-            {
-              name: 'pipeline_template_id',
-              label: 'Pipeline template',
-              type: 'select',
-              options: (templates.data ?? []).map((template) => ({ label: `${template.name} v${template.version}`, value: template.id })),
-            },
-          ]}
+          fields={projectFields()}
           onSubmit={(values) => createProject.mutateAsync(values)}
         />
+      </FormDrawer>
+      <RecordDetailDialog
+        open={dialog?.mode === 'view'}
+        title="Chi tiết công trình"
+        record={dialog?.record ?? null}
+        onClose={() => setDialog(null)}
+        fields={[
+          { key: 'name', label: 'Tên công trình' },
+          { key: 'code', label: 'Mã' },
+          { key: 'client_name', label: 'Chủ đầu tư' },
+          { key: 'address', label: 'Địa chỉ' },
+          { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
+          { key: 'estimated_budget', label: 'Ngân sách', render: (row) => <CurrencyText value={row.estimated_budget} /> },
+          { key: 'contract_amount', label: 'Hợp đồng', render: (row) => <CurrencyText value={row.contract_amount} /> },
+          { key: 'progress_percent', label: 'Tiến độ', render: (row) => `${row.progress_percent ?? 0}%` },
+        ]}
+      />
+      <FormDrawer open={dialog?.mode === 'edit'} title="Chỉnh sửa công trình" onClose={() => setDialog(null)}>
+        {dialog?.record ? (
+          <SimpleForm
+            submitLabel="Lưu thay đổi"
+            fields={projectFields(dialog.record)}
+            onSubmit={(values) => updateProject.mutateAsync({
+              projectId: dialog.record.id,
+              values: { ...values, pipeline_template_id: values.pipeline_template_id || null },
+            })}
+          />
+        ) : null}
       </FormDrawer>
     </>
   );

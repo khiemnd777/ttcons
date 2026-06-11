@@ -25,8 +25,13 @@ Use this skill for the React admin frontend.
 5. Keep feature code in `frontend/src/modules/<feature>`.
 6. Use the shared API client helpers: `get`, `post`, `put`, `del`.
 7. Do not duplicate token storage or response envelope parsing.
-8. Keep admin screens dense, scannable, and operational.
-9. Check responsive text and table behavior for small screens when changing layout.
+8. Follow SOLID and DRY: if form fields, row actions, dialogs, toast handling, validation, table empty states, or detail layouts repeat, extract or reuse a shared component.
+9. Create, view-detail, and edit interactions should open shared dialog/modal UI rather than one-off drawers or route-only flows, except for specialized canvas/editor experiences.
+10. Save/edit flows must show dismissible toast feedback for `success`, `warn`, and `error` states.
+11. Required/invalid form fields must be highlighted inline and summarized in a warning toast before submit.
+12. User-visible lists should display only non-deleted records returned by the API; avoid client-only filtering as the sole source of truth.
+13. Keep admin screens dense, scannable, and operational.
+14. Check responsive text and table behavior for small screens when changing layout.
 
 ## UI Guardrails
 

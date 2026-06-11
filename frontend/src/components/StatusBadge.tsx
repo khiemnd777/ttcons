@@ -2,21 +2,32 @@ import clsx from 'clsx';
 import { statusLabel } from '../lib/utils/status';
 
 const toneByStatus: Record<string, string> = {
+  active: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  inactive: 'bg-slate-100 text-slate-500 ring-slate-200',
   draft: 'bg-slate-100 text-slate-700 ring-slate-200',
   submitted: 'bg-sky-50 text-sky-700 ring-sky-200',
   waiting_approval: 'bg-amber-50 text-amber-800 ring-amber-200',
   pending: 'bg-amber-50 text-amber-800 ring-amber-200',
   approved: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   published: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  ordered: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
   in_progress: 'bg-blue-50 text-blue-700 ring-blue-200',
+  planning: 'bg-blue-50 text-blue-700 ring-blue-200',
+  checking: 'bg-blue-50 text-blue-700 ring-blue-200',
   blocked: 'bg-rose-50 text-rose-700 ring-rose-200',
   rejected: 'bg-rose-50 text-rose-700 ring-rose-200',
   fail: 'bg-rose-50 text-rose-700 ring-rose-200',
   completed: 'bg-teal-50 text-teal-700 ring-teal-200',
   received: 'bg-teal-50 text-teal-700 ring-teal-200',
+  partially_received: 'bg-teal-50 text-teal-700 ring-teal-200',
   paid: 'bg-teal-50 text-teal-700 ring-teal-200',
+  partially_paid: 'bg-teal-50 text-teal-700 ring-teal-200',
+  handed_over: 'bg-teal-50 text-teal-700 ring-teal-200',
+  recorded: 'bg-sky-50 text-sky-700 ring-sky-200',
+  revised: 'bg-violet-50 text-violet-700 ring-violet-200',
   overdue: 'bg-red-50 text-red-700 ring-red-200',
   cancelled: 'bg-slate-100 text-slate-500 ring-slate-200',
+  deleted: 'bg-slate-100 text-slate-500 ring-slate-200',
 };
 
 export function StatusBadge({ status, className }: { status?: string; className?: string }) {

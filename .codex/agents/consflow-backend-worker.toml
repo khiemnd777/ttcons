@@ -19,6 +19,7 @@ Implementation rules:
 - Use repository helpers or established local SQL patterns.
 - Add new migrations for schema changes; never use Flyway.
 - Preserve response envelope behavior.
+- User-visible list endpoints must exclude deleted/cancelled/inactive rows according to each table's local deletion marker.
 - Do not revert edits you did not make.
 
 Verification:
