@@ -67,12 +67,12 @@ export function EdgeInspectorPanel({
           onChange={(value) => onChangeField('label', value)}
         />
         <Select
-          label="Điều kiện"
+          label="Điều kiện chuyển tiếp"
           value={edgeForm.condition_type}
           options={conditions.map((condition) => ({ label: condition.label, value: condition.type }))}
           disabled={conditionsLoading || conditionLoadError}
           invalid={conditionInvalid}
-          invalidText={conditionLoadError ? 'Không tải được danh sách điều kiện' : 'Điều kiện không hợp lệ'}
+          invalidText={conditionLoadError ? 'Không tải được danh sách điều kiện chuyển tiếp' : 'Điều kiện chuyển tiếp không hợp lệ'}
           onChange={(value) => onChangeField('condition_type', value)}
         />
         <Field
@@ -92,7 +92,7 @@ export function EdgeInspectorPanel({
             <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">{selectedCondition?.category ?? 'condition'}</span>
           </div>
           <p className="mt-2 text-sm leading-5 text-slate-700">
-            {selectedCondition?.description ?? (conditionsLoading ? 'Đang tải danh sách điều kiện...' : 'Chọn điều kiện hợp lệ cho connector.')}
+            {selectedCondition?.description ?? (conditionsLoading ? 'Đang tải danh sách điều kiện chuyển tiếp...' : 'Chọn điều kiện chuyển tiếp hợp lệ cho connector.')}
           </p>
         </div>
 
@@ -162,7 +162,7 @@ function Select({
     <label className="block">
       <span className="text-sm font-semibold text-slate-700">{label}</span>
       <select className={fieldClass} value={value ?? ''} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Chọn condition</option>
+        <option value="">Chọn điều kiện chuyển tiếp</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}

@@ -38,6 +38,63 @@ func (r *Repository) UserRoles(ctx context.Context, userID string) ([]string, er
 	return roles, nil
 }
 
+func (r *Repository) UserPermissions(ctx context.Context, userID string) ([]string, error) {
+	rows, err := r.Query(ctx, `
+		SELECT DISTINCT p.key
+		FROM user_roles ur
+		JOIN role_permissions rp ON rp.role_id=ur.role_id
+		JOIN permissions p ON p.id=rp.permission_id
+		WHERE ur.user_id=$1
+		ORDER BY p.key
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	permissions := make([]string, 0, len(rows))
+	for _, row := range rows {
+		permissions = append(permissions, fmt.Sprint(row["key"]))
+	}
+	return permissions, nil
+}
+
+func (r *Repository) UserHasAnyPermission(ctx context.Context, userID string, required []string) (bool, error) {
+	if len(required) == 0 {
+		return true, nil
+	}
+	permissions, err := r.UserPermissions(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	granted := map[string]bool{}
+	for _, permission := range permissions {
+		granted[permission] = true
+	}
+	for _, permission := range required {
+		if granted[permission] {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *Repository) RunNodePermissionGate(ctx context.Context, userID, nodeID string) (bool, []string, error) {
+	node, err := r.GetByID(ctx, "pipeline_run_nodes", nodeID)
+	if err != nil {
+		return false, nil, err
+	}
+	permissions := nodePermissions(node)
+	allowed, err := r.UserHasAnyPermission(ctx, userID, permissions)
+	return allowed, permissions, err
+}
+
+func (r *Repository) RunStepPermissionGate(ctx context.Context, userID, stepID string) (bool, []string, error) {
+	step, err := r.GetByID(ctx, "pipeline_run_steps", stepID)
+	if err != nil {
+		return false, nil, err
+	}
+	return r.RunNodePermissionGate(ctx, userID, fmt.Sprint(step["run_node_id"]))
+}
+
 func (r *Repository) AddAudit(ctx context.Context, projectID, actorID, actorName, eventType, targetType, targetID, description string, metadata any) error {
 	raw, _ := json.Marshal(metadata)
 	var p any = nil
@@ -203,6 +260,7 @@ func (r *Repository) CloneTemplate(ctx context.Context, id, userID string) (Reco
 			"order_index":          node["order_index"],
 			"responsible_role_ids": node["responsible_role_ids"],
 			"required_permission":  node["required_permission"],
+			"permissions":          nodePermissions(node),
 			"entry_conditions":     node["entry_conditions"],
 			"exit_conditions":      node["exit_conditions"],
 			"approval_rule":        node["approval_rule"],
@@ -309,12 +367,13 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 			startedSQL = "now()"
 		}
 		rawRoles, _ := json.Marshal(node["responsible_role_ids"])
+		rawPermissions, _ := json.Marshal(nodePermissions(node))
 		rawExit, _ := json.Marshal(node["exit_conditions"])
 		if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
-			INSERT INTO pipeline_run_nodes
-				(id, run_id, project_id, template_node_id, name, description, type, order_index, responsible_role_ids, required_permission, exit_conditions, approval_rule, fail_path, status, started_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11::jsonb,$12,$13,$14,%s)
-		`, startedSQL), runNodeID, runID, projectID, node["id"], node["name"], node["description"], node["type"], node["order_index"], string(rawRoles), node["required_permission"], string(rawExit), node["approval_rule"], node["fail_path"], status); err != nil {
+				INSERT INTO pipeline_run_nodes
+					(id, run_id, project_id, template_node_id, name, description, type, order_index, responsible_role_ids, required_permission, permissions, exit_conditions, approval_rule, fail_path, status, started_at)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11::jsonb,$12::jsonb,$13,$14,$15,%s)
+			`, startedSQL), runNodeID, runID, projectID, node["id"], node["name"], node["description"], node["type"], node["order_index"], string(rawRoles), node["required_permission"], string(rawPermissions), string(rawExit), node["approval_rule"], node["fail_path"], status); err != nil {
 			return nil, err
 		}
 		steps, err := queryTx(ctx, tx, `
@@ -806,6 +865,34 @@ func edgeDisplayLabel(edge Record) string {
 		return label
 	}
 	return edgeConditionType(edge)
+}
+
+func nodePermissions(node Record) []string {
+	permissions := stringSlice(node["permissions"])
+	if len(permissions) > 0 {
+		return permissions
+	}
+	legacy := strings.TrimSpace(fmt.Sprint(node["required_permission"]))
+	if legacy != "" && legacy != "<nil>" {
+		return []string{legacy}
+	}
+	return []string{}
+}
+
+func stringSlice(value any) []string {
+	out := []string{}
+	switch v := value.(type) {
+	case []string:
+		out = append(out, v...)
+	case []any:
+		for _, item := range v {
+			text := strings.TrimSpace(fmt.Sprint(item))
+			if text != "" && text != "<nil>" {
+				out = append(out, text)
+			}
+		}
+	}
+	return out
 }
 
 func edgeConditionType(edge Record) string {

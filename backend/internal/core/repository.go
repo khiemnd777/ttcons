@@ -218,7 +218,7 @@ func templateColumns() []ColumnSpec {
 }
 
 func templateNodeColumns() []ColumnSpec {
-	return []ColumnSpec{col("template_id"), col("name"), col("description"), col("type"), col("position_x"), col("position_y"), col("order_index"), jsonCol("responsible_role_ids"), col("required_permission"), jsonCol("entry_conditions"), jsonCol("exit_conditions"), col("approval_rule"), col("rework_enabled"), col("replanning_enabled"), col("fail_path"), col("status")}
+	return []ColumnSpec{col("template_id"), col("name"), col("description"), col("type"), col("position_x"), col("position_y"), col("order_index"), jsonCol("responsible_role_ids"), col("required_permission"), jsonCol("permissions"), jsonCol("entry_conditions"), jsonCol("exit_conditions"), col("approval_rule"), col("rework_enabled"), col("replanning_enabled"), col("fail_path"), col("status")}
 }
 
 func templateStepColumns() []ColumnSpec {

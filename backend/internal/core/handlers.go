@@ -295,6 +295,9 @@ func (h *Handler) GetPipelineRun(c *fiber.Ctx) error {
 }
 
 func (h *Handler) StartRunNode(c *fiber.Ctx) error {
+	if err := h.requireRunNodePermission(c, c.Params("id")); err != nil {
+		return err
+	}
 	node, err := h.service.repo.QueryOne(c.Context(), `UPDATE pipeline_run_nodes SET status='in_progress', started_at=COALESCE(started_at, now()) WHERE id=$1 RETURNING *`, c.Params("id"))
 	if err != nil {
 		return err
@@ -303,6 +306,9 @@ func (h *Handler) StartRunNode(c *fiber.Ctx) error {
 }
 
 func (h *Handler) SubmitRunStep(c *fiber.Ctx) error {
+	if err := h.requireRunStepPermission(c, c.Params("id")); err != nil {
+		return err
+	}
 	step, err := h.service.SubmitRunStep(c.Context(), c.Params("id"), actorID(c), actorName(c))
 	if err != nil {
 		return err
@@ -311,6 +317,9 @@ func (h *Handler) SubmitRunStep(c *fiber.Ctx) error {
 }
 
 func (h *Handler) RequestNodeApproval(c *fiber.Ctx) error {
+	if err := h.requireRunNodePermission(c, c.Params("id")); err != nil {
+		return err
+	}
 	body, _ := bodyMap(c)
 	req, err := h.service.RequestNodeApproval(c.Context(), c.Params("id"), actorID(c), actorName(c), stringValue(body["reason"]))
 	if err != nil {
@@ -320,6 +329,9 @@ func (h *Handler) RequestNodeApproval(c *fiber.Ctx) error {
 }
 
 func (h *Handler) AdvanceRunNode(c *fiber.Ctx) error {
+	if err := h.requireRunNodePermission(c, c.Params("id")); err != nil {
+		return err
+	}
 	run, err := h.service.AdvanceRunNode(c.Context(), c.Params("id"), actorID(c), actorName(c))
 	if err != nil {
 		return err
@@ -328,6 +340,9 @@ func (h *Handler) AdvanceRunNode(c *fiber.Ctx) error {
 }
 
 func (h *Handler) BlockRunNode(c *fiber.Ctx) error {
+	if err := h.requireRunNodePermission(c, c.Params("id")); err != nil {
+		return err
+	}
 	body, _ := bodyMap(c)
 	node, err := h.service.BlockRunNode(c.Context(), c.Params("id"), stringValue(body["reason"]), actorID(c), actorName(c))
 	if err != nil {
@@ -846,6 +861,28 @@ func bodyMap(c *fiber.Ctx) (Record, error) {
 		return nil, response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu gửi lên không hợp lệ")
 	}
 	return body, nil
+}
+
+func (h *Handler) requireRunNodePermission(c *fiber.Ctx, nodeID string) error {
+	allowed, permissions, err := h.service.repo.RunNodePermissionGate(c.Context(), actorID(c), nodeID)
+	if err != nil {
+		return err
+	}
+	if allowed {
+		return nil
+	}
+	return response.Fail(c, fiber.StatusForbidden, "FORBIDDEN", "Bạn không có quyền thao tác node này", Record{"permissions": permissions})
+}
+
+func (h *Handler) requireRunStepPermission(c *fiber.Ctx, stepID string) error {
+	allowed, permissions, err := h.service.repo.RunStepPermissionGate(c.Context(), actorID(c), stepID)
+	if err != nil {
+		return err
+	}
+	if allowed {
+		return nil
+	}
+	return response.Fail(c, fiber.StatusForbidden, "FORBIDDEN", "Bạn không có quyền thao tác step này", Record{"permissions": permissions})
 }
 
 func actorID(c *fiber.Ctx) string {

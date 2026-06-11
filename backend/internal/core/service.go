@@ -44,12 +44,17 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	permissions, err := s.repo.UserPermissions(ctx, fmt.Sprint(user["id"]))
+	if err != nil {
+		return nil, err
+	}
 	token, err := s.signToken(fmt.Sprint(user["id"]), fmt.Sprint(user["email"]), roles)
 	if err != nil {
 		return nil, err
 	}
 	delete(user, "password_hash")
 	user["roles"] = roles
+	user["permissions"] = permissions
 	return Record{"token": token, "user": user}, nil
 }
 
@@ -59,8 +64,10 @@ func (s *Service) Me(ctx context.Context, userID string) (Record, error) {
 		return nil, err
 	}
 	roles, _ := s.repo.UserRoles(ctx, userID)
+	permissions, _ := s.repo.UserPermissions(ctx, userID)
 	delete(user, "password_hash")
 	user["roles"] = roles
+	user["permissions"] = permissions
 	return user, nil
 }
 

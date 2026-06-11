@@ -5,6 +5,7 @@ export type User = {
   email: string;
   full_name: string;
   roles: string[];
+  permissions?: string[];
 };
 
 export type Project = AnyRecord & {
@@ -27,6 +28,7 @@ export type PipelineNode = AnyRecord & {
   responsible_role_ids?: string[];
   approval_rule?: string;
   required_permission?: string;
+  permissions?: string[];
   exit_conditions?: AnyRecord;
   fail_path?: string;
   rework_enabled?: boolean;

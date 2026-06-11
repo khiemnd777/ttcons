@@ -5,8 +5,6 @@ export type NodePreset = {
   type: string;
   name: string;
   description: string;
-  role: string;
-  approval: string;
 };
 
 type NodeLibraryPanelProps = {
@@ -37,7 +35,6 @@ export function NodeLibraryPanel({ presets, canAddNode, addNodePending, onAddNod
             <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{preset.description}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <EnumChip group="node_type" value={preset.type} />
-              <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{preset.role}</span>
             </div>
           </button>
         ))}

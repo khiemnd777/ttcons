@@ -35,8 +35,6 @@ export const NodeCard = memo(function NodeCard({
   onContextMenu,
   setNodeElementRef,
 }: NodeCardProps) {
-  const roles = Array.isArray(node.responsible_role_ids) ? node.responsible_role_ids.join(', ') : 'PM';
-
   return (
     <div
       ref={(element) => setNodeElementRef(node.id, element)}
@@ -82,9 +80,8 @@ export const NodeCard = memo(function NodeCard({
       <h3 className="line-clamp-2 text-sm font-semibold text-ink">{node.name}</h3>
       <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">{node.description}</p>
       <div className="mt-3 flex flex-wrap gap-1">
-        <span className="max-w-full truncate rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{roles}</span>
-        <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{node.steps?.length ?? 0} step</span>
         <EnumChip group="node_type" value={node.type} />
+        <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{node.steps?.length ?? 0} step</span>
       </div>
     </div>
   );

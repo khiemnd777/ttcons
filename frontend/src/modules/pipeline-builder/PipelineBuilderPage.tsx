@@ -27,8 +27,6 @@ type NodePreset = {
   type: string;
   name: string;
   description: string;
-  role: string;
-  approval: string;
 };
 
 type EdgeForm = {
@@ -39,19 +37,19 @@ type EdgeForm = {
 };
 
 const nodeLibrary: NodePreset[] = [
-  { type: 'survey', name: 'Khảo sát', description: 'Ghi nhận hiện trạng, kích thước và rủi ro ban đầu.', role: 'Giám sát', approval: 'PM duyệt' },
-  { type: 'design', name: 'Thiết kế', description: 'Chuẩn bị bản vẽ, phương án thiết kế và xác nhận với khách hàng.', role: 'PM', approval: 'Chủ đầu tư xác nhận' },
-  { type: 'boq', name: 'BOQ / Dự toán', description: 'QS bóc tách khối lượng và kiểm tra ngân sách.', role: 'QS', approval: 'PM + QS + Kế toán duyệt' },
-  { type: 'budget_approval', name: 'Duyệt ngân sách', description: 'Kiểm tra ngân sách và duyệt các khoản vượt hạn mức.', role: 'Kế toán', approval: 'PM + Kế toán + Giám đốc duyệt' },
-  { type: 'procurement', name: 'Mua vật tư', description: 'Tạo yêu cầu mua, duyệt mua và đặt hàng.', role: 'Mua hàng', approval: 'PM + Kế toán duyệt' },
-  { type: 'warehouse_issue', name: 'Xuất kho', description: 'Kiểm tra tồn kho và xuất vật tư ra công trình.', role: 'Thủ kho', approval: 'PM duyệt' },
-  { type: 'construction', name: 'Thi công', description: 'Daily report, issue, vật tư sử dụng và tiến độ.', role: 'Giám sát', approval: 'PM duyệt' },
-  { type: 'acceptance', name: 'Nghiệm thu', description: 'Checklist nghiệm thu, pass/fail và punch list.', role: 'QA/QC', approval: 'QA/QC + Chủ đầu tư xác nhận' },
-  { type: 'rework', name: 'Rework', description: 'Sửa lỗi nghiệm thu, kiểm tra lại và đóng punch list.', role: 'Đội thi công', approval: 'PM duyệt' },
-  { type: 'handover', name: 'Bàn giao', description: 'Closure checker, biên bản bàn giao và chứng từ.', role: 'PM', approval: 'Chủ đầu tư xác nhận' },
+  { type: 'survey', name: 'Khảo sát', description: 'Ghi nhận hiện trạng, kích thước và rủi ro ban đầu.' },
+  { type: 'design', name: 'Thiết kế', description: 'Chuẩn bị bản vẽ, phương án thiết kế và xác nhận với khách hàng.' },
+  { type: 'boq', name: 'BOQ / Dự toán', description: 'QS bóc tách khối lượng và kiểm tra ngân sách.' },
+  { type: 'budget_approval', name: 'Duyệt ngân sách', description: 'Kiểm tra ngân sách và duyệt các khoản vượt hạn mức.' },
+  { type: 'procurement', name: 'Mua vật tư', description: 'Tạo yêu cầu mua, duyệt mua và đặt hàng.' },
+  { type: 'warehouse_issue', name: 'Xuất kho', description: 'Kiểm tra tồn kho và xuất vật tư ra công trình.' },
+  { type: 'construction', name: 'Thi công', description: 'Daily report, issue, vật tư sử dụng và tiến độ.' },
+  { type: 'acceptance', name: 'Nghiệm thu', description: 'Checklist nghiệm thu, pass/fail và punch list.' },
+  { type: 'rework', name: 'Rework', description: 'Sửa lỗi nghiệm thu, kiểm tra lại và đóng punch list.' },
+  { type: 'handover', name: 'Bàn giao', description: 'Closure checker, biên bản bàn giao và chứng từ.' },
 ];
 
-const presetNodes = nodeLibrary.slice(0, 8).map((node) => [node.name, node.type, node.role, node.approval, defaultStepsForType(node.type)] as const);
+const presetNodes = nodeLibrary.slice(0, 8).map((node) => [node.name, node.type, defaultStepsForType(node.type)] as const);
 
 export function PipelineBuilderPage() {
   const { id } = useParams();
@@ -68,7 +66,7 @@ export function PipelineBuilderPage() {
   const [templateNameSubmitAttempted, setTemplateNameSubmitAttempted] = useState(false);
   const [deleteTemplateDialog, setDeleteTemplateDialog] = useState<PipelineTemplate | null>(null);
   const [stepDialog, setStepDialog] = useState<{ mode: 'add' | 'edit'; step?: Record<string, any> } | null>(null);
-  const [stepForm, setStepForm] = useState({ name: '', step_type: 'task' });
+  const [stepForm, setStepForm] = useState({ name: '', step_type: 'task', responsible_role_id: 'PM' });
   const [stepSubmitAttempted, setStepSubmitAttempted] = useState(false);
   const [nodeForm, setNodeForm] = useState<Record<string, any>>({});
   const [edgeForm, setEdgeForm] = useState<EdgeForm>({ label: '', condition_type: 'always', priority: '100', condition_config: {} });
@@ -83,6 +81,11 @@ export function PipelineBuilderPage() {
   const edgeConditions = useQuery({
     queryKey: ['pipeline-edge-conditions'],
     queryFn: () => get<PipelineEdgeConditionDefinition[]>('/pipeline-edge-conditions'),
+    enabled: Boolean(selectedTemplateId),
+  });
+  const permissions = useQuery({
+    queryKey: ['permissions'],
+    queryFn: () => get<Record<string, any>[]>('/permissions'),
     enabled: Boolean(selectedTemplateId),
   });
 
@@ -118,6 +121,13 @@ export function PipelineBuilderPage() {
   const edgeConditionTypes = useMemo(
     () => new Set((edgeConditions.data ?? []).map((condition) => condition.type)),
     [edgeConditions.data],
+  );
+  const permissionOptions = useMemo(
+    () => (permissions.data ?? []).map((permission) => ({
+      label: `${permission.key} - ${permission.name}`,
+      value: String(permission.key),
+    })),
+    [permissions.data],
   );
 
   useEffect(() => {
@@ -156,13 +166,7 @@ export function PipelineBuilderPage() {
       name: detailsNode.name,
       description: detailsNode.description ?? '',
       type: detailsNode.type ?? 'custom',
-      responsible_role_ids: Array.isArray(detailsNode.responsible_role_ids) ? detailsNode.responsible_role_ids[0] : 'PM',
-      approval_rule: detailsNode.approval_rule ?? 'PM duyệt',
-      fail_path: detailsNode.fail_path ?? 'previous',
-      required_permission: detailsNode.required_permission ?? '',
-      exit_conditions_text: formatExitConditions(detailsNode.exit_conditions),
-      rework_enabled: Boolean(detailsNode.rework_enabled),
-      replanning_enabled: Boolean(detailsNode.replanning_enabled),
+      permissions: normalizePermissions(detailsNode),
     });
     closeStepDialog();
   }, [detailsNode?.id]);
@@ -181,20 +185,19 @@ export function PipelineBuilderPage() {
         description: 'Template tạo từ Pipeline Builder',
         project_type: 'Hoàn thiện nội thất',
         status: 'draft',
-        nodes: presetNodes.map(([name, type, role, approval, steps], index) => ({
+        nodes: presetNodes.map(([name, type, steps], index) => ({
           name,
           description: `Node ${name} trong workflow công trình.`,
           type,
           order_index: index + 1,
           position_x: autoLayoutPosition(index).x,
           position_y: autoLayoutPosition(index).y,
-          responsible_role_ids: [role],
-          approval_rule: approval,
-          fail_path: type === 'acceptance' ? 'rework' : 'previous',
-          rework_enabled: type === 'acceptance' || type === 'construction',
-          replanning_enabled: ['design', 'boq', 'construction'].includes(String(type)),
-          exit_conditions: { text: `Hoàn tất ${name}` },
-          steps: steps as string[],
+          permissions: [],
+          steps: steps.map((stepName) => ({
+            name: stepName,
+            step_type: defaultStepTypeForStep(type, stepName),
+            required_role_ids: [defaultRoleForNode(type)],
+          })),
         })),
       }),
     onSuccess: (created) => {
@@ -285,12 +288,7 @@ export function PipelineBuilderPage() {
         order_index: nodes.length + 1,
         position_x: position.x,
         position_y: position.y,
-        responsible_role_ids: [preset?.role ?? 'PM'],
-        approval_rule: preset?.approval ?? 'PM duyệt',
-        fail_path: type === 'acceptance' ? 'rework' : 'previous',
-        rework_enabled: type === 'acceptance' || type === 'construction' || type === 'rework',
-        replanning_enabled: ['design', 'boq', 'construction', 'replanning'].includes(type),
-        exit_conditions: { text: 'Hoàn tất checklist và được duyệt' },
+        permissions: [],
       });
     },
     onSuccess: (created) => {
@@ -309,13 +307,7 @@ export function PipelineBuilderPage() {
         name: nodeForm.name,
         description: nodeForm.description,
         type: nodeForm.type,
-        responsible_role_ids: [nodeForm.responsible_role_ids].filter(Boolean),
-        approval_rule: nodeForm.approval_rule,
-        fail_path: nodeForm.fail_path,
-        required_permission: nodeForm.required_permission,
-        exit_conditions: parseExitConditions(nodeForm.exit_conditions_text),
-        rework_enabled: Boolean(nodeForm.rework_enabled),
-        replanning_enabled: Boolean(nodeForm.replanning_enabled),
+        permissions: Array.isArray(nodeForm.permissions) ? nodeForm.permissions : [],
       });
     },
     onSuccess: () => {
@@ -437,6 +429,7 @@ export function PipelineBuilderPage() {
         name: stepForm.name.trim(),
         description: 'Checklist mẫu trong node',
         step_type: stepForm.step_type,
+        required_role_ids: [stepForm.responsible_role_id].filter(Boolean),
         order_index: (detailsNode?.steps?.length ?? 0) + 1,
       });
     },
@@ -455,6 +448,7 @@ export function PipelineBuilderPage() {
       return put(`/pipeline-steps/${stepId}`, {
         name: stepForm.name.trim(),
         step_type: stepForm.step_type,
+        required_role_ids: [stepForm.responsible_role_id].filter(Boolean),
       });
     },
     onSuccess: () => {
@@ -475,7 +469,7 @@ export function PipelineBuilderPage() {
   });
 
   const openAddStepDialog = () => {
-    setStepForm({ name: '', step_type: defaultStepTypeForNode(detailsNode?.type) });
+    setStepForm({ name: '', step_type: defaultStepTypeForNode(detailsNode?.type), responsible_role_id: defaultRoleForNode(detailsNode?.type) });
     setStepSubmitAttempted(false);
     setStepDialog({ mode: 'add' });
   };
@@ -484,6 +478,7 @@ export function PipelineBuilderPage() {
     setStepForm({
       name: String(step.name ?? ''),
       step_type: String(step.step_type ?? 'task'),
+      responsible_role_id: Array.isArray(step.required_role_ids) && step.required_role_ids[0] ? String(step.required_role_ids[0]) : defaultRoleForNode(detailsNode?.type),
     });
     setStepSubmitAttempted(false);
     setStepDialog({ mode: 'edit', step });
@@ -491,7 +486,7 @@ export function PipelineBuilderPage() {
 
   const closeStepDialog = () => {
     setStepDialog(null);
-    setStepForm({ name: '', step_type: 'task' });
+    setStepForm({ name: '', step_type: 'task', responsible_role_id: 'PM' });
     setStepSubmitAttempted(false);
   };
 
@@ -516,7 +511,7 @@ export function PipelineBuilderPage() {
     const invalidLabels: string[] = [];
     const priority = Number(edgeForm.priority);
     if (edgeForm.label.trim().length > 80) invalidLabels.push('Nhãn');
-    if (!edgeForm.condition_type || !edgeConditionTypes.has(edgeForm.condition_type)) invalidLabels.push('Điều kiện');
+    if (!edgeForm.condition_type || !edgeConditionTypes.has(edgeForm.condition_type)) invalidLabels.push('Điều kiện chuyển tiếp');
     if (!Number.isInteger(priority) || priority < 1 || priority > 999) invalidLabels.push('Ưu tiên');
     if (edgeConditions.isError) invalidLabels.push('Danh sách điều kiện');
 
@@ -692,6 +687,8 @@ export function PipelineBuilderPage() {
             <NodeInspectorPanel
               node={detailsNode}
               nodeForm={nodeForm}
+              permissionOptions={permissionOptions}
+              permissionsLoading={permissions.isLoading}
               stepDialogMode={stepDialog?.mode ?? null}
               stepForm={stepForm}
               stepNameInvalid={stepSubmitAttempted && !stepForm.name.trim()}
@@ -845,30 +842,14 @@ export function PipelineBuilderPage() {
   );
 }
 
-function formatExitConditions(value: unknown) {
-  if (!value || typeof value !== 'object') return '';
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record);
-  if (keys.length === 1 && typeof record.text === 'string') return record.text;
-  if (!keys.length) return '';
-  return JSON.stringify(record, null, 2);
-}
-
-function parseExitConditions(value?: string) {
-  const trimmed = value?.trim();
-  if (!trimmed) return {};
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      return { text: trimmed };
-    }
-  }
-  return { text: trimmed };
-}
-
 function isRecord(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizePermissions(node: PipelineNode) {
+  if (Array.isArray(node.permissions)) return node.permissions.map(String);
+  if (node.required_permission) return [String(node.required_permission)];
+  return [];
 }
 
 function validEdgePriority(value: string) {
@@ -897,13 +878,28 @@ function defaultStepTypeForNode(type?: string) {
   return 'task';
 }
 
+function defaultStepTypeForStep(nodeType: string, stepName: string) {
+  const normalizedName = stepName.toLocaleLowerCase('vi-VN');
+  if (normalizedName.includes('duyệt') || normalizedName.includes('xác nhận')) return 'approval';
+  return defaultStepTypeForNode(nodeType);
+}
+
+function defaultRoleForNode(type?: string) {
+  if (type === 'survey' || type === 'construction') return 'Giám sát';
+  if (type === 'boq') return 'QS';
+  if (type === 'budget_approval' || type === 'financial_closure') return 'Kế toán';
+  if (type === 'procurement') return 'Mua hàng';
+  if (type === 'warehouse_issue') return 'Thủ kho';
+  if (type === 'acceptance') return 'QA/QC';
+  if (type === 'rework') return 'Đội thi công';
+  return 'PM';
+}
+
 function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdge[], conditionTypes: Set<string>) {
   const issues: string[] = [];
   if (!nodes.length) issues.push('Template chưa có node');
   nodes.forEach((node) => {
     if (!node.name?.trim()) issues.push('Có node thiếu tên');
-    if (!Array.isArray(node.responsible_role_ids) || !node.responsible_role_ids.length) issues.push(`${node.name || 'Node'} thiếu role phụ trách`);
-    if (!node.approval_rule) issues.push(`${node.name || 'Node'} thiếu approval rule`);
   });
   if (nodes.length > 1 && !edges.length) issues.push('Chưa có cạnh được lưu; hiện chỉ có thứ tự node mặc định');
 
@@ -912,8 +908,8 @@ function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdg
     if (!nodeIds.has(String(edge.from_node_id))) issues.push('Có cạnh trỏ từ node đã xóa');
     if (!nodeIds.has(String(edge.to_node_id))) issues.push('Có cạnh trỏ tới node đã xóa');
     if (String(edge.label ?? '').trim().length > 80) issues.push(`Connector ${edge.id} có nhãn quá dài`);
-    if (!String(edge.condition_type ?? '').trim()) issues.push('Có connector thiếu condition');
-    if (conditionTypes.size && !conditionTypes.has(String(edge.condition_type ?? ''))) issues.push(`Connector ${edge.label || edge.id} dùng condition không được hỗ trợ`);
+    if (!String(edge.condition_type ?? '').trim()) issues.push('Có connector thiếu điều kiện chuyển tiếp');
+    if (conditionTypes.size && !conditionTypes.has(String(edge.condition_type ?? ''))) issues.push(`Connector ${edge.label || edge.id} dùng điều kiện chuyển tiếp không được hỗ trợ`);
     if (!validEdgePriority(String(edge.priority ?? 100))) issues.push(`Connector ${edge.label || edge.id} có priority không hợp lệ`);
   });
   return issues;
