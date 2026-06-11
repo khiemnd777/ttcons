@@ -16,7 +16,7 @@ Read `references/domain-model.md` before changing workflow behavior.
 1. Identify the source state, target state, actor, and audit consequence.
 2. Determine whether the change affects a template, a project runtime record, or both.
 3. For feature, bugfix, or code-changing requests, present a review package and wait for explicit user confirmation before implementation.
-4. For UI or interface changes, present a "Mockup as Text" and wait for explicit user confirmation before implementation.
+4. For UI or interface changes, present a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
 5. Trace downstream modules:
    - BOQ can generate procurement.
    - Procurement can affect warehouse stock.

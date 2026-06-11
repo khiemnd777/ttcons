@@ -7,7 +7,7 @@
 - Keep changes scoped to the requested module. Do not rewrite unrelated modules or generated artifacts.
 - Follow SOLID and DRY. Prefer shared components, helpers, and narrow abstractions when a UI, validation, toast, query, or action pattern repeats across modules.
 - For every feature request, bugfix request, or code-changing request, first present a review package and wait for explicit user confirmation before implementation.
-- For every UI or visual-interface change, first produce a "Mockup as Text" for user review and wait for explicit confirmation before implementation.
+- For every UI or visual-interface change, first produce a "Mockup as Text" for user review and wait for explicit confirmation before implementation. "Mockup as Text" means a visual mockup represented in text, not a prose UX specification.
 - Never use Flyway. Database changes use the custom migration runner in `backend/internal/shared/migrations` and SQL files in `backend/migrations`.
 - Do not revert user edits or run destructive git commands unless the user explicitly asks.
 - Use `apply_patch` for manual source edits.
@@ -28,7 +28,9 @@ For feature, bugfix, or code-changing requests, provide a review package with:
 
 Then wait for an explicit confirmation from the user before editing code.
 
-For UI or interface-changing requests, provide a "Mockup as Text" before implementation. It should describe:
+For UI or interface-changing requests, provide a "Mockup as Text" before implementation. It must be a textual visual mockup: use ASCII/wireframe-style blocks to show the actual screen layout, hierarchy, controls, labels, spacing, and states as the user would see them. Keep notes short and secondary. Do not replace the mockup with only bullet-point descriptions.
+
+It should show:
 
 - screen or component affected
 - layout structure

@@ -17,7 +17,7 @@ Use this skill before broad implementation or review work in Consflow.
    - Docker/Makefile operations
    - cross-contract change
 3. If the request is a feature, bugfix, or code-changing task, prepare a review package and wait for explicit user confirmation before implementation.
-4. If the request changes UI or visual interface, prepare a "Mockup as Text" and wait for explicit user confirmation before implementation.
+4. If the request changes UI or visual interface, prepare a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
 5. Identify the ownership path before editing:
    - Backend routes: `backend/internal/core/routes.go`
    - Backend handlers/service/repository: `backend/internal/core`

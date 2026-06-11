@@ -53,7 +53,9 @@ export function PipelineBuilderPage() {
   const [selectedConnectorId, setSelectedConnectorId] = useState('');
   const [detailsNodeId, setDetailsNodeId] = useState('');
   const [templatesExpanded, setTemplatesExpanded] = useState(true);
-  const [newStep, setNewStep] = useState('');
+  const [stepDialog, setStepDialog] = useState<{ mode: 'add' | 'edit'; step?: Record<string, any> } | null>(null);
+  const [stepForm, setStepForm] = useState({ name: '', step_type: 'task' });
+  const [stepSubmitAttempted, setStepSubmitAttempted] = useState(false);
   const [nodeForm, setNodeForm] = useState<Record<string, any>>({});
 
   const templates = useQuery({ queryKey: ['pipeline-templates'], queryFn: () => get<PipelineTemplate[]>('/pipeline-templates') });
@@ -103,7 +105,7 @@ export function PipelineBuilderPage() {
   useEffect(() => {
     if (!detailsNode) {
       setNodeForm({});
-      setNewStep('');
+      closeStepDialog();
       return;
     }
 
@@ -119,7 +121,7 @@ export function PipelineBuilderPage() {
       rework_enabled: Boolean(detailsNode.rework_enabled),
       replanning_enabled: Boolean(detailsNode.replanning_enabled),
     });
-    setNewStep('');
+    closeStepDialog();
   }, [detailsNode?.id]);
 
   const validationIssues = useMemo(() => buildValidationIssues(nodes, rawEdges), [nodes, rawEdges]);
@@ -318,18 +320,35 @@ export function PipelineBuilderPage() {
     mutationFn: () => {
       if (!detailsNodeId) throw new Error('Chưa chọn node');
       return post(`/pipeline-nodes/${detailsNodeId}/steps`, {
-        name: newStep || 'Checklist mới',
+        name: stepForm.name.trim(),
         description: 'Checklist mẫu trong node',
-        step_type: 'task',
+        step_type: stepForm.step_type,
         order_index: (detailsNode?.steps?.length ?? 0) + 1,
       });
     },
     onSuccess: () => {
-      setNewStep('');
+      closeStepDialog();
       invalidate();
       toast.success('Đã thêm checklist');
     },
     onError: (error) => toast.error('Không thêm được checklist', error),
+  });
+
+  const updateStep = useMutation({
+    mutationFn: () => {
+      const stepId = stepDialog?.step?.id;
+      if (!stepId) throw new Error('Chưa chọn checklist');
+      return put(`/pipeline-steps/${stepId}`, {
+        name: stepForm.name.trim(),
+        step_type: stepForm.step_type,
+      });
+    },
+    onSuccess: () => {
+      closeStepDialog();
+      invalidate();
+      toast.success('Đã lưu checklist');
+    },
+    onError: (error) => toast.error('Không lưu được checklist', error),
   });
 
   const deleteStep = useMutation({
@@ -340,6 +359,43 @@ export function PipelineBuilderPage() {
     },
     onError: (error) => toast.error('Không xóa được checklist', error),
   });
+
+  const openAddStepDialog = () => {
+    setStepForm({ name: '', step_type: defaultStepTypeForNode(detailsNode?.type) });
+    setStepSubmitAttempted(false);
+    setStepDialog({ mode: 'add' });
+  };
+
+  const openEditStepDialog = (step: Record<string, any>) => {
+    setStepForm({
+      name: String(step.name ?? ''),
+      step_type: String(step.step_type ?? 'task'),
+    });
+    setStepSubmitAttempted(false);
+    setStepDialog({ mode: 'edit', step });
+  };
+
+  const closeStepDialog = () => {
+    setStepDialog(null);
+    setStepForm({ name: '', step_type: 'task' });
+    setStepSubmitAttempted(false);
+  };
+
+  const submitStepDialog = () => {
+    setStepSubmitAttempted(true);
+    if (!stepForm.name.trim()) {
+      toast.warn({
+        title: 'Thiếu thông tin checklist',
+        description: 'Tên checklist là bắt buộc',
+      });
+      return;
+    }
+    if (stepDialog?.mode === 'edit') {
+      updateStep.mutate();
+      return;
+    }
+    addStep.mutate();
+  };
 
   const deleteNode = useMutation({
     mutationFn: (nodeId: string) => del(`/pipeline-nodes/${nodeId}`),
@@ -473,15 +529,21 @@ export function PipelineBuilderPage() {
           <NodeInspectorPanel
             node={detailsNode}
             nodeForm={nodeForm}
-            newStep={newStep}
+            stepDialogMode={stepDialog?.mode ?? null}
+            stepForm={stepForm}
+            stepNameInvalid={stepSubmitAttempted && !stepForm.name.trim()}
             savePending={saveNode.isPending}
             addStepPending={addStep.isPending}
+            updateStepPending={updateStep.isPending}
             deleteStepPending={deleteStep.isPending}
             onChangeField={(field, value) => setNodeForm((current) => ({ ...current, [field]: value }))}
-            onChangeNewStep={setNewStep}
+            onChangeStepField={(field, value) => setStepForm((current) => ({ ...current, [field]: value }))}
             onSave={() => saveNode.mutate()}
             onClose={() => setDetailsNodeId('')}
-            onAddStep={() => addStep.mutate()}
+            onOpenAddStep={openAddStepDialog}
+            onOpenEditStep={openEditStepDialog}
+            onCloseStepDialog={closeStepDialog}
+            onSubmitStep={submitStepDialog}
             onDeleteStep={(stepId) => deleteStep.mutate(stepId)}
           />
         ) : null
@@ -556,6 +618,13 @@ function defaultStepsForType(type: string) {
     acceptance: ['Checklist nghiệm thu', 'Upload ảnh minh chứng', 'Pass / Fail nghiệm thu'],
   };
   return stepsByType[type] ?? ['Checklist', 'Review', 'Approval'];
+}
+
+function defaultStepTypeForNode(type?: string) {
+  if (type === 'procurement' || type === 'warehouse_issue') return 'material_check';
+  if (type === 'acceptance') return 'acceptance_check';
+  if (type === 'boq' || type === 'budget_approval') return 'budget_check';
+  return 'task';
 }
 
 function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdge[]) {

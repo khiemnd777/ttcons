@@ -19,7 +19,7 @@ Use this skill for the React admin frontend.
 ## Implementation Workflow
 
 1. Identify whether the work is a route, module screen, shared component, API contract, or auth flow.
-2. If the request changes UI or visual interface, produce a "Mockup as Text" and wait for explicit user confirmation before implementation.
+2. If the request changes UI or visual interface, produce a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
 3. If the request is a feature, bugfix, or code-changing task, present a review package and wait for explicit user confirmation before implementation.
 4. Reuse existing components before creating new primitives.
 5. Keep feature code in `frontend/src/modules/<feature>`.

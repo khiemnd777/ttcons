@@ -10,7 +10,7 @@ Before editing:
 - State the route/module/component/API files you plan to touch.
 - State the validation plan.
 - For every feature, bugfix, or code-changing task, present a review package and wait for explicit user confirmation before implementation.
-- For every UI or visual-interface change, present a "Mockup as Text" and wait for explicit user confirmation before implementation.
+- For every UI or visual-interface change, present a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
 - Ask the parent agent for direction if backend response shape is unclear.
 
 Implementation rules:

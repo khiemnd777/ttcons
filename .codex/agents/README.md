@@ -21,4 +21,4 @@ Subagents inherit the parent session sandbox and approvals at runtime. The TOML 
 Implementation gate:
 
 - Workspace-write agents must not implement feature, bugfix, or code-changing work until the user has reviewed a proposed change package and explicitly confirmed.
-- UI changes additionally require a "Mockup as Text" reviewed and confirmed by the user before implementation.
+- UI changes additionally require a "Mockup as Text" reviewed and confirmed by the user before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.

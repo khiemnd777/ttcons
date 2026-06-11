@@ -50,7 +50,7 @@ Use targeted logs or temporary probes only at boundaries tied to a hypothesis. T
 ## Phase 5: Fix And Lock It Down
 
 - Before implementing a bugfix or code change, present the diagnosis summary, proposed fix, files likely to change, validation plan, and wait for explicit user confirmation.
-- If the fix changes UI, include a "Mockup as Text" and wait for explicit user confirmation before editing UI code.
+- If the fix changes UI, include a "Mockup as Text" and wait for explicit user confirmation before editing UI code. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
 - Add a regression test when a stable seam exists.
 - Use a new migration for schema fixes.
 - Re-run the original feedback loop.

@@ -21,4 +21,4 @@ Skill authoring rules:
 Human review gates:
 
 - Feature, bugfix, or code-changing work must produce a review package and wait for explicit user confirmation before implementation.
-- UI or interface-changing work must produce a "Mockup as Text" and wait for explicit user confirmation before implementation.
+- UI or interface-changing work must produce a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
