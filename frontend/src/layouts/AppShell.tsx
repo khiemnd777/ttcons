@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   Boxes,
@@ -67,6 +67,15 @@ const navGroups = [
 export function AppShell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  if (location.pathname.startsWith('/pipeline-builder')) {
+    return (
+      <div className="min-h-screen bg-surface">
+        <Outlet />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface">

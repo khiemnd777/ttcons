@@ -11,6 +11,7 @@
 - Never use Flyway. Database changes use the custom migration runner in `backend/internal/shared/migrations` and SQL files in `backend/migrations`.
 - Do not revert user edits or run destructive git commands unless the user explicitly asks.
 - Use `apply_patch` for manual source edits.
+- Do not launch or run Browser, browser-use, Playwright, or headless browser verification unless the user explicitly requests it in that turn. For frontend changes, use non-browser checks by default and report browser verification as skipped.
 
 ## Human Review Gates
 
