@@ -6,6 +6,8 @@ Status: active planning state as of 2026-06-12.
 
 This section is the source of truth for future agents. It replaces the earlier `/my-work`-centered framing. The `/my-work` design remains valid, but it is a subordinate personal inbox, not the operating center of Consflow.
 
+Execution batching and subagent orchestration live in `docs/project-operations-execution-plan.md`.
+
 ### Latest Objective
 
 Turn Consflow from a broad admin-module demo into a production construction workflow operating system:
@@ -76,6 +78,10 @@ Project Operations Dashboard
 - Backend has project, pipeline template, pipeline run, approval, BOQ, procurement, warehouse, operation, acceptance, rework, replanning, handover, accounting, staff, RBAC, audit, report, and settings routes.
 - Schema already has reusable template tables and runtime pipeline tables.
 - `StartPipeline` clones template nodes and steps into runtime records.
+- First-class work items, assignments, evidence records, and scoped activities exist, with runtime work items generated from pipeline run steps.
+- Work items support start, complete, block, resolve blocker, request review, request approval, approve, reject, request changes, metadata/path evidence, and scoped activity comments.
+- Required document/photo/checklist evidence is enforced before review request, approval request, approve, and completion.
+- Project operations API now returns project summary, visibility, health counts, workflow timeline, active work, blockers, approvals, evidence, activity, audit, and department surfaces with server-side scope.
 - Seed data has a construction template covering survey, design, BOQ, budget approval, procurement, warehouse issue, construction, acceptance, handover, and financial closure.
 - Frontend has pages for project detail, planning, BOQ, procurement, warehouse, operations, acceptance, rework, handover, accounting, debt, audit, reports, staff, roles, permissions, and settings.
 
@@ -85,12 +91,11 @@ Project Operations Dashboard
 - `PlanningPage` is still a generic pipeline node/step screen with simple submit/advance/block actions.
 - Sidebar currently shows all modules to all authenticated users.
 - Backend route protection is mostly login-only. Only pipeline node/step actions currently have permission checks.
-- `pipeline_run_steps` completion is too thin: no typed completion payload, evidence, start/end time, assignment, checklist result, or blocker history.
-- `documents` table exists but there is no first-class evidence upload flow tied to work items.
+- `pipeline_run_steps` legacy UI is still thin and should move behind work item detail/actions in the production UI.
+- Binary document upload/storage is still out of scope; evidence currently stores metadata/path records tied to work items.
 - Seed roles exist, but non-admin operational roles lack complete production permissions.
-- Procurement generation currently includes submitted BOQ items; production should generate only from approved BOQ items.
-- No first-class controlled activity/thread model exists.
-- No first-class cross-domain work item model exists.
+- Legacy module endpoints still need the same project/permission scope model as Project Operations.
+- Cross-domain work item generation beyond pipeline run steps is still incomplete.
 
 ## Production Operating Model
 

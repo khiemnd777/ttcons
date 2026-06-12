@@ -25,6 +25,34 @@ type ActionRequest struct {
 	Reason  string `json:"reason"`
 }
 
+type WorkItemActionRequest struct {
+	Comment           string   `json:"comment"`
+	Reason            string   `json:"reason"`
+	CompletionPayload Record   `json:"completion_payload"`
+	RequiredRoles     []string `json:"required_roles"`
+}
+
+type WorkItemEvidenceRequest struct {
+	EvidenceType string `json:"evidence_type"`
+	DocumentType string `json:"document_type"`
+	Name         string `json:"name"`
+	DocumentID   string `json:"document_id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	FileURL      string `json:"file_url"`
+	MIMEType     string `json:"mime_type"`
+	FileSize     int64  `json:"file_size"`
+	Caption      string `json:"caption"`
+	RevisionNo   string `json:"revision_no"`
+	Visibility   string `json:"visibility"`
+	Payload      Record `json:"payload"`
+}
+
+type WorkItemActivityRequest struct {
+	Comment  string `json:"comment"`
+	Metadata Record `json:"metadata"`
+}
+
 type StockActionRequest struct {
 	ProjectID     string  `json:"project_id"`
 	WarehouseID   string  `json:"warehouse_id"`

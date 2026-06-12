@@ -156,7 +156,7 @@ func hasUpdatedAt(table string) bool {
 	case "users", "staff", "projects", "pipeline_templates", "pipeline_template_nodes", "pipeline_run_nodes",
 		"procurement_requests", "boq_items", "issues", "acceptance_records", "rework_requests", "replanning_requests",
 		"handover_records", "accounting_budgets", "payables", "receivables", "payments", "advance_requests",
-		"system_settings":
+		"system_settings", "work_items", "evidence_records":
 		return true
 	default:
 		return false
@@ -198,7 +198,8 @@ func safeTable(table string) string {
 		"site_material_balances", "operation_daily_reports", "issues", "acceptance_records", "acceptance_checklist_items",
 		"rework_requests", "replanning_requests", "handover_records", "accounting_budgets", "payables", "receivables",
 		"payments", "advance_requests", "documents", "audit_logs", "system_settings", "staff", "roles", "permissions",
-		"role_permissions", "user_roles", "users":
+		"role_permissions", "user_roles", "users", "work_items", "work_item_assignments", "work_item_activities",
+		"evidence_records":
 		return table
 	default:
 		return ""
@@ -223,6 +224,16 @@ func templateNodeColumns() []ColumnSpec {
 
 func templateStepColumns() []ColumnSpec {
 	return []ColumnSpec{col("node_id"), col("name"), col("description"), col("step_type"), jsonCol("required_role_ids"), col("required_permission"), col("checklist_required"), col("document_required"), col("photo_required"), col("order_index")}
+}
+
+func workItemColumns() []ColumnSpec {
+	return []ColumnSpec{
+		col("project_id"), col("pipeline_run_id"), col("run_node_id"), col("run_step_id"), col("source_type"), col("source_id"),
+		col("title"), col("description"), col("work_type"), col("status"), col("priority"), col("department"), jsonCol("role_ids"),
+		col("assignee_staff_id"), jsonCol("watcher_staff_ids"), col("planned_start_at"), col("due_at"), col("started_at"),
+		col("completed_at"), col("blocked_at"), col("blocked_reason"), jsonCol("completion_payload_json"),
+		jsonCol("evidence_requirement_json"), col("approval_request_id"), col("created_by"), col("updated_by"),
+	}
 }
 
 func edgeColumns() []ColumnSpec {

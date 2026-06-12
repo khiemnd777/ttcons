@@ -287,11 +287,125 @@ func (h *Handler) StartPipeline(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetPipelineRun(c *fiber.Ctx) error {
-	run, err := h.service.PipelineRun(c.Context(), c.Params("id"))
+	run, err := h.service.PipelineRun(c.Context(), c.Params("id"), actorID(c))
 	if err != nil {
 		return err
 	}
 	return response.OK(c, run)
+}
+
+func (h *Handler) ProjectWorkItems(c *fiber.Ctx) error {
+	items, err := h.service.ProjectWorkItems(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, items)
+}
+
+func (h *Handler) MyWorkItems(c *fiber.Ctx) error {
+	items, err := h.service.MyWorkItems(c.Context(), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, items)
+}
+
+func (h *Handler) ProjectOperations(c *fiber.Ctx) error {
+	operations, err := h.service.ProjectOperations(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, operations)
+}
+
+func (h *Handler) GetWorkItem(c *fiber.Ctx) error {
+	item, err := h.service.WorkItemDetail(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
+}
+
+func (h *Handler) StartWorkItem(c *fiber.Ctx) error    { return h.workItemAction(c, "start") }
+func (h *Handler) CompleteWorkItem(c *fiber.Ctx) error { return h.workItemAction(c, "complete") }
+func (h *Handler) BlockWorkItem(c *fiber.Ctx) error    { return h.workItemAction(c, "block") }
+func (h *Handler) ResolveWorkItemBlocker(c *fiber.Ctx) error {
+	return h.workItemAction(c, "resolve-blocker")
+}
+func (h *Handler) RequestWorkItemReview(c *fiber.Ctx) error {
+	return h.workItemAction(c, "request-review")
+}
+func (h *Handler) RequestWorkItemApproval(c *fiber.Ctx) error {
+	return h.workItemAction(c, "request-approval")
+}
+func (h *Handler) ApproveWorkItem(c *fiber.Ctx) error { return h.workItemAction(c, "approve") }
+func (h *Handler) RejectWorkItem(c *fiber.Ctx) error  { return h.workItemAction(c, "reject") }
+func (h *Handler) RequestWorkItemChange(c *fiber.Ctx) error {
+	return h.workItemAction(c, "request-change")
+}
+
+func (h *Handler) workItemAction(c *fiber.Ctx, action string) error {
+	req := WorkItemActionRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu gửi lên không hợp lệ")
+		}
+	}
+	item, err := h.service.WorkItemAction(c.Context(), c.Params("id"), action, req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
+}
+
+func (h *Handler) AddWorkItemEvidence(c *fiber.Ctx) error {
+	req := WorkItemEvidenceRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu evidence không hợp lệ")
+		}
+	}
+	evidence, err := h.service.AddWorkItemEvidence(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, evidence)
+}
+
+func (h *Handler) AddWorkItemActivity(c *fiber.Ctx) error {
+	req := WorkItemActivityRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu activity không hợp lệ")
+		}
+	}
+	activity, err := h.service.AddWorkItemActivity(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, activity)
+}
+
+func (h *Handler) AcceptEvidence(c *fiber.Ctx) error {
+	return h.evidenceAction(c, "accept")
+}
+
+func (h *Handler) RejectEvidence(c *fiber.Ctx) error {
+	return h.evidenceAction(c, "reject")
+}
+
+func (h *Handler) evidenceAction(c *fiber.Ctx, action string) error {
+	req := ActionRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu evidence action không hợp lệ")
+		}
+	}
+	evidence, err := h.service.EvidenceAction(c.Context(), c.Params("id"), action, req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, evidence)
 }
 
 func (h *Handler) StartRunNode(c *fiber.Ctx) error {
@@ -309,7 +423,13 @@ func (h *Handler) SubmitRunStep(c *fiber.Ctx) error {
 	if err := h.requireRunStepPermission(c, c.Params("id")); err != nil {
 		return err
 	}
-	step, err := h.service.SubmitRunStep(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	req := WorkItemActionRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu gửi lên không hợp lệ")
+		}
+	}
+	step, err := h.service.SubmitRunStep(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -382,7 +502,7 @@ func (h *Handler) PendingApprovals(c *fiber.Ctx) error {
 
 func (h *Handler) Approve(c *fiber.Ctx) error       { return h.approvalAction(c, "approve") }
 func (h *Handler) Reject(c *fiber.Ctx) error        { return h.approvalAction(c, "reject") }
-func (h *Handler) RequestChange(c *fiber.Ctx) error { return h.approvalAction(c, "request_change") }
+func (h *Handler) RequestChange(c *fiber.Ctx) error { return h.approvalAction(c, "request-change") }
 
 func (h *Handler) approvalAction(c *fiber.Ctx, action string) error {
 	body, _ := bodyMap(c)
