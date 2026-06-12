@@ -1,6 +1,6 @@
 # Project Operations Execution Plan
 
-Status: active execution plan as of 2026-06-12. Batches 1, 2, 3, 4, 5, 6, and 7 have been implemented in the current working tree.
+Status: closed implementation plan as of 2026-06-12. Batches 1 through 8 have been implemented or validated in the current working tree.
 
 This document turns `docs/current-states.md` into implementation batches. It is the handoff surface for long-context runs and subagent orchestration.
 
@@ -14,6 +14,7 @@ This document turns `docs/current-states.md` into implementation batches. It is 
 - Batch 5 is implemented.
 - Batch 6 is implemented.
 - Batch 7 is implemented.
+- Batch 8 is implemented.
 - Do not edit applied migrations. Add new `V<N>__description.sql` files only.
 - Use backend contract work before frontend composition. UI should consume server-scoped operations/work-item payloads rather than filtering broad module data.
 - Use Browser, Playwright, or browser-use only when explicitly requested in that turn.
@@ -166,6 +167,8 @@ Review gate before implementation:
 
 ## Batch 8: Production QA And Handoff
 
+Status: implemented.
+
 Goal: lock regressions and hand off a production-ready operating model.
 
 Expected work:
@@ -175,3 +178,12 @@ Expected work:
 - Run Docker/migration checks when approved and environment is available.
 - Update `docs/current-states.md` to reflect implemented state.
 - Move closed implementation notes to `docs/plan-closed` when the active plan is complete.
+
+Validation snapshot:
+
+- Backend: `GOCACHE=/Users/khiemnguyen/Works/ttcons/ttcons/backend/.gocache go test ./...` passed.
+- Frontend: `cd frontend && npm run build` passed. Vite emitted the existing large chunk warning.
+- Docker static check: `docker compose config` passed.
+- Agent artifacts: `bash .agents/scripts/validate.sh` passed.
+- Migration runtime check: local Postgres container was healthy, but `go run ./cmd/migrate` could not authenticate because the local DB volume does not contain role `consflow`; no destructive DB reset was run.
+- Browser/headless verification: skipped per repo rule because it was not explicitly requested.

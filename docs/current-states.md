@@ -1,12 +1,12 @@
 # Current States
 
-## Project Operations Production Plan (Active)
+## Project Operations Production Baseline
 
-Status: active planning state as of 2026-06-12.
+Status: implemented production baseline as of 2026-06-12. The original eight-batch execution plan is closed; remaining items below are follow-up hardening, not blockers for the baseline.
 
 This section is the source of truth for future agents. It replaces the earlier `/my-work`-centered framing. The `/my-work` design remains valid, but it is a subordinate personal inbox, not the operating center of Consflow.
 
-Execution batching and subagent orchestration live in `docs/project-operations-execution-plan.md`.
+The closed batch record lives in `docs/project-operations-execution-plan.md`; the compact handoff lives in `docs/plan-closed/project-operations-production-plan.md`.
 
 ### Latest Objective
 
@@ -99,6 +99,15 @@ Project Operations Dashboard
 - `pipeline_run_steps` legacy UI is still thin and should move behind work item detail/actions in the production UI.
 - Binary document upload/storage is still out of scope; evidence currently stores metadata/path records tied to work items.
 - Cross-domain work item generation beyond pipeline run steps is still incomplete.
+
+### Batch 8 QA Snapshot
+
+- Backend tests passed: `GOCACHE=/Users/khiemnguyen/Works/ttcons/ttcons/backend/.gocache go test ./...`.
+- Frontend build passed: `cd frontend && npm run build`. Vite reported the existing large chunk warning.
+- Docker static config passed: `docker compose config`.
+- Agent artifact validation passed: `bash .agents/scripts/validate.sh`.
+- Migration runtime check reached local PostgreSQL, but the local data volume does not contain role `consflow`, so `go run ./cmd/migrate` could not authenticate. Do not reset the volume without user approval.
+- Browser/headless verification remains skipped unless explicitly requested in that turn.
 
 ## Production Operating Model
 
@@ -1116,6 +1125,8 @@ Validation:
 
 ### Slice 12: Regression Coverage And Production QA
 
+Status: implemented.
+
 Goal: prevent workflow, RBAC, and UI regressions.
 
 Tests needed:
@@ -1129,6 +1140,18 @@ Tests needed:
 - Acceptance fail creates issue/rework path.
 - Handover blockers.
 - Frontend build.
+
+Validation completed in Batch 8:
+
+- Backend test suite.
+- Frontend production build.
+- Docker Compose static config.
+- Agent artifact validation.
+
+Deferred validation:
+
+- Browser/manual UI pass.
+- Local migration runtime check after the local PostgreSQL volume is recreated or given the expected `consflow` role.
 
 Browser/headless verification remains skipped unless the user explicitly requests it in that turn.
 
