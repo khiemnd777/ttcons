@@ -1,6 +1,6 @@
 # Project Operations Execution Plan
 
-Status: closed implementation plan as of 2026-06-12. Batches 1 through 8 have been implemented or validated in the current working tree.
+Status: closed implementation plan as of 2026-06-12. Batches 1 through 8 have been implemented or validated in the current working tree. Follow-up chat work now lives in `docs/controlled-activity-chat-plan.md`.
 
 This document turns `docs/current-states.md` into implementation batches. It is the handoff surface for long-context runs and subagent orchestration.
 

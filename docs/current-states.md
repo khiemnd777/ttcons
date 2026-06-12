@@ -1,12 +1,33 @@
 # Current States
 
+## Controlled Activity / Operational Chat Plan (Active)
+
+Status: active planning state as of 2026-06-12. The detailed plan lives in `docs/controlled-activity-chat-plan.md`.
+
+This is the next product plan after `Project Operations Production Plan` was closed. Consflow currently has scoped activity records and basic work-item comments, but it does not yet have a complete operational chat UX.
+
+Current baseline:
+
+- `work_item_activities` stores scoped activity and system events.
+- Work item transitions write activity and audit records.
+- `POST /work-items/:id/activity` supports a basic work-item comment.
+- Project Operations Dashboard and `/my-work` display activity timelines.
+
+Target direction:
+
+- Add controlled composers for work-item and project activity.
+- Add typed messages: comment, status, blocker, question, decision, reminder, file note, system event.
+- Add project/domain record threads only where operationally useful.
+- Add mentions, unread state, notification queues, and optional realtime delivery after persistence/RBAC are stable.
+- Preserve anti-spam-by-design behavior: no general-purpose social chat room.
+
 ## Project Operations Production Baseline
 
 Status: implemented production baseline as of 2026-06-12. The original eight-batch execution plan is closed; remaining items below are follow-up hardening, not blockers for the baseline.
 
 This section is the source of truth for future agents. It replaces the earlier `/my-work`-centered framing. The `/my-work` design remains valid, but it is a subordinate personal inbox, not the operating center of Consflow.
 
-The closed batch record lives in `docs/project-operations-execution-plan.md`; the compact handoff lives in `docs/plan-closed/project-operations-production-plan.md`.
+The closed batch record lives in `docs/project-operations-execution-plan.md`; the compact handoff lives in `docs/plan-closed/project-operations-production-plan.md`. New chat work must use `docs/controlled-activity-chat-plan.md`.
 
 ### Latest Objective
 
