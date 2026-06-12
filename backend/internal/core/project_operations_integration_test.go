@@ -118,6 +118,39 @@ func TestWorkItemTransitionForAction(t *testing.T) {
 	}
 }
 
+func TestBatch7ProcurementTransitionsAreExplicit(t *testing.T) {
+	tests := []struct {
+		name       string
+		action     string
+		status     string
+		wantStatus string
+		wantEvent  string
+		wantErr    bool
+	}{
+		{name: "submit draft", action: "submit", status: "draft", wantStatus: "waiting_approval", wantEvent: "review_requested"},
+		{name: "approve waiting", action: "approve", status: "waiting_approval", wantStatus: "approved", wantEvent: "material_approved"},
+		{name: "order approved", action: "order", status: "approved", wantStatus: "ordered", wantEvent: "material_ordered"},
+		{name: "receive ordered", action: "receive", status: "ordered", wantStatus: "received", wantEvent: "warehouse_received"},
+		{name: "block skipped order", action: "order", status: "draft", wantErr: true},
+		{name: "block skipped receive", action: "receive", status: "approved", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotStatus, gotEvent, err := procurementTransitionForAction(tt.action, tt.status)
+			if tt.wantErr {
+				assertValidationError(t, err)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if gotStatus != tt.wantStatus || gotEvent != tt.wantEvent {
+				t.Fatalf("transition = %s/%s, want %s/%s", gotStatus, gotEvent, tt.wantStatus, tt.wantEvent)
+			}
+		})
+	}
+}
+
 func TestProjectOperationsAccessPolicy(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
@@ -541,6 +574,285 @@ func TestGenerateProcurementFromBOQUsesApprovedItemsOnly(t *testing.T) {
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND boq_item_id=$2`, 0, requestID, submittedBOQID)
 }
 
+func TestBatch7StockMovementGuardsWarehouseAndSiteBalances(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+
+	actorID := newID()
+	projectID := newID()
+	warehouseID := newID()
+	materialID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE target_type='stock_movement' AND target_id IN (SELECT id FROM stock_movements WHERE material_id=$1)`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_movements WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM site_material_balances WHERE project_id=$1 OR material_id=$2`, projectID, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM materials WHERE id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM warehouses WHERE id=$1`, warehouseID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Batch7 Actor','active')`, actorID, "batch7-stock-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Batch7 Stock',$2,'Client','planning')`, projectID, "B7S-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO warehouses (id, name, location, type, active) VALUES ($1,'Batch7 Warehouse','Test','central',true)`, warehouseID)
+	mustExec(t, db, `INSERT INTO materials (id, code, name, unit, category, active) VALUES ($1,$2,'Batch7 Material','m','Test',true)`, materialID, "B7M-"+materialID[:8])
+
+	_, err := repo.CreateStockMovement(ctx, StockActionRequest{
+		ProjectID:    projectID,
+		WarehouseID:  warehouseID,
+		MaterialID:   materialID,
+		MovementType: "issue",
+		Quantity:     10,
+		Unit:         "m",
+		Reason:       "issue before receive",
+	}, actorID, "Batch7 Actor")
+	assertValidationError(t, err)
+
+	if _, err := repo.CreateStockMovement(ctx, StockActionRequest{
+		WarehouseID:  warehouseID,
+		MaterialID:   materialID,
+		MovementType: "receive",
+		Quantity:     5,
+		Unit:         "m",
+		Reason:       "receive stock",
+	}, actorID, "Batch7 Actor"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = repo.CreateStockMovement(ctx, StockActionRequest{
+		ProjectID:    projectID,
+		WarehouseID:  warehouseID,
+		MaterialID:   materialID,
+		MovementType: "issue",
+		Quantity:     10,
+		Unit:         "m",
+		Reason:       "over issue",
+	}, actorID, "Batch7 Actor")
+	assertValidationError(t, err)
+
+	if _, err := repo.CreateStockMovement(ctx, StockActionRequest{
+		ProjectID:    projectID,
+		WarehouseID:  warehouseID,
+		MaterialID:   materialID,
+		MovementType: "issue",
+		Quantity:     3,
+		Unit:         "m",
+		Reason:       "valid issue",
+	}, actorID, "Batch7 Actor"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = repo.CreateStockMovement(ctx, StockActionRequest{
+		ProjectID:    projectID,
+		WarehouseID:  warehouseID,
+		MaterialID:   materialID,
+		MovementType: "return_to_warehouse",
+		Quantity:     4,
+		Unit:         "m",
+		Reason:       "over return",
+	}, actorID, "Batch7 Actor")
+	assertValidationError(t, err)
+
+	if _, err := repo.CreateStockMovement(ctx, StockActionRequest{
+		ProjectID:    projectID,
+		WarehouseID:  warehouseID,
+		MaterialID:   materialID,
+		MovementType: "return_to_warehouse",
+		Quantity:     2,
+		Unit:         "m",
+		Reason:       "valid return",
+	}, actorID, "Batch7 Actor"); err != nil {
+		t.Fatal(err)
+	}
+	var issued, surplus, stock float64
+	var surplusStatus string
+	if err := db.QueryRowContext(ctx, `SELECT issued_quantity::float8, surplus_quantity::float8, surplus_status FROM site_material_balances WHERE project_id=$1 AND material_id=$2`, projectID, materialID).Scan(&issued, &surplus, &surplusStatus); err != nil {
+		t.Fatal(err)
+	}
+	if issued != 1 || surplus != 1 || surplusStatus != "handled" {
+		t.Fatalf("site balance = issued %.3f surplus %.3f status %s, want 1/1/handled", issued, surplus, surplusStatus)
+	}
+	if err := db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(CASE
+			WHEN movement_type IN ('receive','return_to_warehouse') THEN quantity
+			WHEN movement_type IN ('issue','transfer','loss') THEN -quantity
+			ELSE 0
+		END),0)::float8
+		FROM stock_movements
+		WHERE warehouse_id=$1 AND material_id=$2
+	`, warehouseID, materialID).Scan(&stock); err != nil {
+		t.Fatal(err)
+	}
+	if stock != 4 {
+		t.Fatalf("warehouse stock = %.3f, want 4", stock)
+	}
+}
+
+func TestBatch7FailedAcceptanceCreatesSingleOpenRework(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+
+	actorID := newID()
+	projectID := newID()
+	acceptanceID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM rework_requests WHERE acceptance_id=$1`, acceptanceID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM issues WHERE project_id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM acceptance_records WHERE id=$1`, acceptanceID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Batch7 Actor','active')`, actorID, "batch7-acceptance-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Batch7 Acceptance',$2,'Client','acceptance')`, projectID, "B7A-"+projectID[:8])
+	mustExec(t, db, `
+		INSERT INTO acceptance_records (id, project_id, type, title, requested_by, status, notes)
+		VALUES ($1,$2,'partial','Batch7 nghiệm thu',$3,'submitted','Có lỗi cần sửa')
+	`, acceptanceID, projectID, actorID)
+
+	failed, err := repo.AcceptanceAction(ctx, acceptanceID, "fail", ActionRequest{Comment: "Không đạt"}, actorID, "Batch7 Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failed["status"] != "completed" || failed["result"] != "fail" {
+		t.Fatalf("acceptance = %v/%v, want completed/fail", failed["status"], failed["result"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM issues WHERE project_id=$1 AND requires_rework`, 1, projectID)
+
+	rework, err := repo.CreateReworkFromAcceptance(ctx, acceptanceID, actorID, "Batch7 Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rework["status"] != "approved" {
+		t.Fatalf("rework status = %v, want approved", rework["status"])
+	}
+	_, err = repo.CreateReworkFromAcceptance(ctx, acceptanceID, actorID, "Batch7 Actor")
+	assertValidationError(t, err)
+	assertCount(t, db, `SELECT COUNT(*) FROM rework_requests WHERE acceptance_id=$1 AND status NOT IN ('cancelled','done','deleted')`, 1, acceptanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('acceptance_failed','rework_requested')`, 3, projectID)
+}
+
+func TestBatch7HandoverBlockedAuditIncludesAccountingBlockers(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+
+	actorID := newID()
+	projectID := newID()
+	acceptanceID := newID()
+	handoverID := newID()
+	payableID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM payables WHERE id=$1`, payableID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM handover_records WHERE id=$1`, handoverID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM acceptance_records WHERE id=$1`, acceptanceID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Batch7 Actor','active')`, actorID, "batch7-handover-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Batch7 Handover',$2,'Client','handover')`, projectID, "B7H-"+projectID[:8])
+	mustExec(t, db, `
+		INSERT INTO acceptance_records (id, project_id, type, title, requested_by, approved_by, status, result)
+		VALUES ($1,$2,'final','Final acceptance',$3,$3,'completed','pass')
+	`, acceptanceID, projectID, actorID)
+	mustExec(t, db, `
+		INSERT INTO handover_records
+			(id, project_id, status, final_acceptance_id, documents_ready, warehouse_closed, payables_recorded, receivables_recorded, created_by)
+		VALUES ($1,$2,'draft',$3,true,true,true,true,$4)
+	`, handoverID, projectID, acceptanceID, actorID)
+	mustExec(t, db, `
+		INSERT INTO payables (id, project_id, payable_code, vendor_type, vendor_name, source_type, gross_amount, paid_amount, remaining_amount, status, created_by)
+		VALUES ($1,$2,$3,'supplier','Batch7 Supplier','manual',100,0,100,'approved',$4)
+	`, payableID, projectID, "B7P-"+payableID[:8], actorID)
+
+	blocked, err := repo.CompleteHandover(ctx, handoverID, ActionRequest{Reason: "Kiểm tra bàn giao"}, actorID, "Batch7 Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if blocked["status"] != "blocked" || blocked["ready"] != false {
+		t.Fatalf("handover = status %v ready %v, want blocked/false", blocked["status"], blocked["ready"])
+	}
+	blockers, _ := blocked["blockers"].([]string)
+	if !containsString(blockers, "Còn công nợ đầu vào chưa tất toán") {
+		t.Fatalf("blockers = %#v, want payable blocker", blockers)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='handover_blocked'`, 1, projectID)
+}
+
+func TestBatch7AccountingActionsRequireApprovalBeforeSettlement(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+
+	actorID := newID()
+	projectID := newID()
+	payableID := newID()
+	receivableID := newID()
+	paymentID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM payments WHERE id=$1`, paymentID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM receivables WHERE id=$1`, receivableID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM payables WHERE id=$1`, payableID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Batch7 Actor','active')`, actorID, "batch7-accounting-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Batch7 Accounting',$2,'Client','in_progress')`, projectID, "B7C-"+projectID[:8])
+	mustExec(t, db, `
+		INSERT INTO payables (id, project_id, payable_code, vendor_type, vendor_name, source_type, gross_amount, paid_amount, remaining_amount, status, created_by)
+		VALUES ($1,$2,$3,'supplier','Batch7 Supplier','manual',100,0,100,'draft',$4)
+	`, payableID, projectID, "B7PAY-"+payableID[:8], actorID)
+	mustExec(t, db, `
+		INSERT INTO receivables (id, project_id, receivable_code, client_name, source_type, gross_amount, received_amount, remaining_amount, status, created_by)
+		VALUES ($1,$2,$3,'Batch7 Client','manual',120,0,120,'draft',$4)
+	`, receivableID, projectID, "B7REC-"+receivableID[:8], actorID)
+	mustExec(t, db, `
+		INSERT INTO payments (id, project_id, payment_code, payment_type, target_type, target_id, amount, payment_method, status, created_by)
+		VALUES ($1,$2,$3,'outbound','payable',$4,100,'bank_transfer','draft',$5)
+	`, paymentID, projectID, "B7PMT-"+paymentID[:8], payableID, actorID)
+
+	_, err := repo.PayableAction(ctx, payableID, "pay", ActionRequest{}, actorID, "Batch7 Actor")
+	assertValidationError(t, err)
+	payable, err := repo.PayableAction(ctx, payableID, "approve", ActionRequest{Comment: "Duyệt phải trả"}, actorID, "Batch7 Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payable["status"] != "approved" {
+		t.Fatalf("payable status = %v, want approved", payable["status"])
+	}
+	payable, err = repo.PayableAction(ctx, payableID, "pay", ActionRequest{Comment: "Tất toán"}, actorID, "Batch7 Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payable["status"] != "paid" || number(payable["remaining_amount"]) != 0 || number(payable["paid_amount"]) != 100 {
+		t.Fatalf("payable settlement = status %v paid %v remaining %v, want paid/100/0", payable["status"], payable["paid_amount"], payable["remaining_amount"])
+	}
+
+	_, err = repo.ReceivableAction(ctx, receivableID, "receive", ActionRequest{}, actorID, "Batch7 Actor")
+	assertValidationError(t, err)
+	receivable, err := repo.ReceivableAction(ctx, receivableID, "approve", ActionRequest{Comment: "Duyệt phải thu"}, actorID, "Batch7 Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receivable["status"] != "approved" {
+		t.Fatalf("receivable status = %v, want approved", receivable["status"])
+	}
+	receivable, err = repo.ReceivableAction(ctx, receivableID, "receive", ActionRequest{Comment: "Đã thu"}, actorID, "Batch7 Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receivable["status"] != "received" || number(receivable["remaining_amount"]) != 0 || number(receivable["received_amount"]) != 120 {
+		t.Fatalf("receivable settlement = status %v received %v remaining %v, want received/120/0", receivable["status"], receivable["received_amount"], receivable["remaining_amount"])
+	}
+
+	payment, err := repo.PaymentAction(ctx, paymentID, "approve", ActionRequest{Comment: "Duyệt phiếu chi"}, actorID, "Batch7 Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payment["status"] != "approved" || cleanID(payment["approved_by"]) != actorID || payment["paid_at"] == nil {
+		t.Fatalf("payment = status %v approved_by %v paid_at %v, want approved actor paid_at", payment["status"], payment["approved_by"], payment["paid_at"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('payable_approved','payable_paid','receivable_approved','receivable_received','payment_approved')`, 5, projectID)
+}
+
 func TestWorkItemEvidenceRequiredBeforeReviewApprovalAndCompletion(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
@@ -799,4 +1111,24 @@ func assertCount(t *testing.T, db *sql.DB, query string, want int, args ...any) 
 	if got != want {
 		t.Fatalf("count mismatch for %q: got %d want %d", query, got, want)
 	}
+}
+
+func assertValidationError(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	var statusErr StatusError
+	if !errors.As(err, &statusErr) || statusErr.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected validation error, got %#v", err)
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

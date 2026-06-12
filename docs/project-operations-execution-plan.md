@@ -1,6 +1,6 @@
 # Project Operations Execution Plan
 
-Status: active execution plan as of 2026-06-12. Batches 1, 2, 3, 4, and 5 have been implemented in the current working tree.
+Status: active execution plan as of 2026-06-12. Batches 1, 2, 3, 4, 5, 6, and 7 have been implemented in the current working tree.
 
 This document turns `docs/current-states.md` into implementation batches. It is the handoff surface for long-context runs and subagent orchestration.
 
@@ -12,6 +12,8 @@ This document turns `docs/current-states.md` into implementation batches. It is 
 - Batch 3 is implemented.
 - Batch 4 is implemented.
 - Batch 5 is implemented.
+- Batch 6 is implemented.
+- Batch 7 is implemented.
 - Do not edit applied migrations. Add new `V<N>__description.sql` files only.
 - Use backend contract work before frontend composition. UI should consume server-scoped operations/work-item payloads rather than filtering broad module data.
 - Use Browser, Playwright, or browser-use only when explicitly requested in that turn.
@@ -127,6 +129,8 @@ Review gate before implementation:
 
 ## Batch 6: `/my-work` Inbox
 
+Status: implemented.
+
 Goal: add a personal cross-project inbox derived from the same `work_items`.
 
 Expected work:
@@ -136,6 +140,7 @@ Expected work:
 - Render mine, department, pending approval, and watching queues.
 - Add `Open project dashboard` as the primary context link.
 - Keep authenticated default route role-aware only after product confirmation.
+- Implemented with queue metadata on `/me/work-items`, shared work item card/detail/action components, project/status/deadline/work type/priority filters, and default route preserved as `/dashboard`.
 
 Review gate before implementation:
 
@@ -144,6 +149,8 @@ Review gate before implementation:
 
 ## Batch 7: Domain Transition Fixes
 
+Status: implemented.
+
 Goal: close production correctness gaps outside the work-item foundation.
 
 Expected work:
@@ -151,6 +158,7 @@ Expected work:
 - Tighten procurement, stock, acceptance/rework, handover, payables, receivables, and payment transitions.
 - Remove generic status updates where actor/comment/audit semantics are required.
 - Add domain tests for stock balance, acceptance failure history, handover blockers, and accounting approval/payment context.
+- Implemented explicit repository/service/handler actions for procurement, stock, acceptance/rework, handover, payables, receivables, and payments; no migration was required.
 
 Review gate before implementation:
 

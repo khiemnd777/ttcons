@@ -753,7 +753,11 @@ func (h *Handler) procurementAction(c *fiber.Ctx, action string) error {
 	if err := h.requireRecordProjectPermission(c, "procurement_requests", c.Params("id"), permissions); err != nil {
 		return err
 	}
-	req, err := h.service.ProcurementAction(c.Context(), c.Params("id"), action, actorID(c), actorName(c))
+	actionReq, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	req, err := h.service.ProcurementAction(c.Context(), c.Params("id"), action, actionReq, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -795,7 +799,11 @@ func (h *Handler) Stock(c *fiber.Ctx) error {
 	}
 	rows, err := h.service.repo.Query(c.Context(), fmt.Sprintf(`
 		SELECT m.id AS material_id, m.code, m.name, m.unit, m.category,
-			COALESCE(SUM(CASE WHEN sm.movement_type='receive' THEN sm.quantity WHEN sm.movement_type IN ('issue','loss') THEN -sm.quantity ELSE 0 END),0) AS stock_quantity
+			COALESCE(SUM(CASE
+				WHEN sm.movement_type IN ('receive','return_to_warehouse') THEN sm.quantity
+				WHEN sm.movement_type IN ('issue','transfer','loss') THEN -sm.quantity
+				ELSE 0
+			END),0) AS stock_quantity
 		FROM materials m
 		LEFT JOIN stock_movements sm ON sm.material_id=m.id
 			AND (
@@ -911,7 +919,11 @@ func (h *Handler) acceptanceAction(c *fiber.Ctx, result string) error {
 	if err := h.requireRecordProjectPermission(c, "acceptance_records", c.Params("id"), permissions); err != nil {
 		return err
 	}
-	acc, err := h.service.AcceptanceAction(c.Context(), c.Params("id"), result, actorID(c), actorName(c))
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	acc, err := h.service.AcceptanceAction(c.Context(), c.Params("id"), result, req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -977,7 +989,11 @@ func (h *Handler) CompleteHandover(c *fiber.Ctx) error {
 	if err := h.requireRecordProjectPermission(c, "handover_records", c.Params("id"), []string{"handover.approve"}); err != nil {
 		return err
 	}
-	done, err := h.service.CompleteHandover(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	done, err := h.service.CompleteHandover(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -1010,10 +1026,10 @@ func (h *Handler) CreatePayable(c *fiber.Ctx) error {
 	return h.create(c, "payables", payableColumns())
 }
 func (h *Handler) ApprovePayable(c *fiber.Ctx) error {
-	return h.setStatus(c, "payables", "approved", []string{"accounting.payable_approve"})
+	return h.payableAction(c, "approve")
 }
 func (h *Handler) PayPayable(c *fiber.Ctx) error {
-	return h.setStatus(c, "payables", "paid", []string{"accounting.payable_approve", "accounting.payment_approve"})
+	return h.payableAction(c, "pay")
 }
 func (h *Handler) ListReceivables(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"accounting.view", "accounting.receivable_view"}); err != nil {
@@ -1032,10 +1048,10 @@ func (h *Handler) CreateReceivable(c *fiber.Ctx) error {
 	return h.create(c, "receivables", receivableColumns())
 }
 func (h *Handler) ApproveReceivable(c *fiber.Ctx) error {
-	return h.setStatus(c, "receivables", "approved", []string{"accounting.receivable_approve"})
+	return h.receivableAction(c, "approve")
 }
 func (h *Handler) ReceiveReceivable(c *fiber.Ctx) error {
-	return h.setStatus(c, "receivables", "received", []string{"accounting.receivable_approve", "accounting.payment_approve"})
+	return h.receivableAction(c, "receive")
 }
 func (h *Handler) ListPayments(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"accounting.view", "accounting.payment_create", "accounting.payment_approve"}); err != nil {
@@ -1054,7 +1070,60 @@ func (h *Handler) CreatePayment(c *fiber.Ctx) error {
 	return h.create(c, "payments", paymentColumns())
 }
 func (h *Handler) ApprovePayment(c *fiber.Ctx) error {
-	return h.setStatus(c, "payments", "approved", []string{"accounting.payment_approve"})
+	return h.paymentAction(c, "approve")
+}
+
+func (h *Handler) payableAction(c *fiber.Ctx, action string) error {
+	permissions := []string{"accounting.payable_approve"}
+	if action == "pay" {
+		permissions = []string{"accounting.payable_approve", "accounting.payment_approve"}
+	}
+	if err := h.requireRecordProjectPermission(c, "payables", c.Params("id"), permissions); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.PayableAction(c.Context(), c.Params("id"), action, req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) receivableAction(c *fiber.Ctx, action string) error {
+	permissions := []string{"accounting.receivable_approve"}
+	if action == "receive" {
+		permissions = []string{"accounting.receivable_approve", "accounting.payment_approve"}
+	}
+	if err := h.requireRecordProjectPermission(c, "receivables", c.Params("id"), permissions); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.ReceivableAction(c.Context(), c.Params("id"), action, req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) paymentAction(c *fiber.Ctx, action string) error {
+	if err := h.requireRecordProjectPermission(c, "payments", c.Params("id"), []string{"accounting.payment_approve"}); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.PaymentAction(c.Context(), c.Params("id"), action, req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
 }
 
 func (h *Handler) ListStaff(c *fiber.Ctx) error {
@@ -1323,6 +1392,17 @@ func bodyMap(c *fiber.Ctx) (Record, error) {
 		return nil, response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu gửi lên không hợp lệ")
 	}
 	return body, nil
+}
+
+func actionRequest(c *fiber.Ctx) (ActionRequest, error) {
+	req := ActionRequest{}
+	if len(c.Body()) == 0 {
+		return req, nil
+	}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return req, response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu thao tác không hợp lệ")
+	}
+	return req, nil
 }
 
 func (h *Handler) requireRunNodePermission(c *fiber.Ctx, nodeID string) error {

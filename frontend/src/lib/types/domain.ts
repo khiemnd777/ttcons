@@ -122,6 +122,9 @@ export type WorkItem = ProjectOperationsRecord & {
   work_type?: string;
   source_type?: string;
   source_id?: string;
+  project_name?: string;
+  project_code?: string;
+  queue_scopes?: string[];
   priority?: string;
   department?: string;
   role_ids?: string[];

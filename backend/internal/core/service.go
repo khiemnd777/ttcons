@@ -677,16 +677,16 @@ func (s *Service) GenerateProcurementFromBOQ(ctx context.Context, projectID, act
 	return s.repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, actorName)
 }
 
-func (s *Service) ProcurementAction(ctx context.Context, id, action, actorID, actorName string) (Record, error) {
-	return s.repo.ProcurementAction(ctx, id, action, actorID, actorName)
+func (s *Service) ProcurementAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	return s.repo.ProcurementAction(ctx, id, action, req, actorID, actorName)
 }
 
 func (s *Service) CreateStockMovement(ctx context.Context, req StockActionRequest, actorID, actorName string) (Record, error) {
 	return s.repo.CreateStockMovement(ctx, req, actorID, actorName)
 }
 
-func (s *Service) AcceptanceAction(ctx context.Context, id, result, actorID, actorName string) (Record, error) {
-	return s.repo.AcceptanceAction(ctx, id, result, actorID, actorName)
+func (s *Service) AcceptanceAction(ctx context.Context, id, result string, req ActionRequest, actorID, actorName string) (Record, error) {
+	return s.repo.AcceptanceAction(ctx, id, result, req, actorID, actorName)
 }
 
 func (s *Service) CreateReworkFromAcceptance(ctx context.Context, acceptanceID, actorID, actorName string) (Record, error) {
@@ -697,8 +697,20 @@ func (s *Service) HandoverCheck(ctx context.Context, id string) (Record, error) 
 	return s.repo.HandoverCheck(ctx, id)
 }
 
-func (s *Service) CompleteHandover(ctx context.Context, id, actorID, actorName string) (Record, error) {
-	return s.repo.CompleteHandover(ctx, id, actorID, actorName)
+func (s *Service) CompleteHandover(ctx context.Context, id string, req ActionRequest, actorID, actorName string) (Record, error) {
+	return s.repo.CompleteHandover(ctx, id, req, actorID, actorName)
+}
+
+func (s *Service) PayableAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	return s.repo.PayableAction(ctx, id, action, req, actorID, actorName)
+}
+
+func (s *Service) ReceivableAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	return s.repo.ReceivableAction(ctx, id, action, req, actorID, actorName)
+}
+
+func (s *Service) PaymentAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	return s.repo.PaymentAction(ctx, id, action, req, actorID, actorName)
 }
 
 func (s *Service) Dashboard(ctx context.Context, actorID string) (Record, error) {

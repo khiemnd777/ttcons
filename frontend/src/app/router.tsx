@@ -6,6 +6,7 @@ import { LoginPage } from '../modules/auth/LoginPage';
 import { DashboardPage } from '../modules/dashboard/DashboardPage';
 import { ProjectsPage } from '../modules/projects/ProjectsPage';
 import { ProjectDetailPage } from '../modules/projects/ProjectDetailPage';
+import { MyWorkPage } from '../modules/my-work/MyWorkPage';
 import { PipelineBuilderPage } from '../modules/pipeline-builder/PipelineBuilderPage';
 import { PlanningPage } from '../modules/planning/PlanningPage';
 import { BOQPage } from '../modules/boq/BOQPage';
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: '/dashboard', element: <DashboardPage /> },
+      { path: '/my-work', element: <MyWorkPage /> },
       { path: '/projects', element: <ProjectsPage /> },
       { path: '/projects/:id', element: <ProjectDetailPage /> },
       { path: '/projects/:id/pipeline', element: <PlanningPage mode="pipeline" /> },

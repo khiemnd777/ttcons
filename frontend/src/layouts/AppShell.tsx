@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   Boxes,
+  BriefcaseBusiness,
   Building2,
   ClipboardCheck,
   ClipboardList,
@@ -28,6 +29,7 @@ const navGroups = [
     title: 'Tổng quan',
     items: [
       { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
       { to: '/projects', label: 'Công trình', icon: Building2 },
       { to: '/pipeline-builder', label: 'Pipeline Builder', icon: GitBranch },
     ],

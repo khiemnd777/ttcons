@@ -27,7 +27,6 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { CurrencyText } from '../../components/CurrencyText';
 import { EmptyState } from '../../components/EmptyState';
-import { Dialog } from '../../components/Dialog';
 import { DataTable } from '../../components/DataTable';
 import { useToast } from '../../components/ToastProvider';
 import { dateText, percent } from '../../lib/utils/format';
@@ -40,6 +39,17 @@ import type {
   WorkItem,
   WorkItemActivity,
 } from '../../lib/types/domain';
+import { WorkItemCard } from '../work-items/WorkItemCard';
+import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
+import {
+  activityLabel,
+  asArray,
+  compactDateTime,
+  departmentLabel,
+  evidenceLabel,
+  numberValue,
+  prioritizeWorkItems,
+} from '../work-items/workItemPresentation';
 
 type DepartmentSurface = {
   department?: string;
@@ -49,17 +59,6 @@ type DepartmentSurface = {
   waiting_approval?: number;
   work_items?: WorkItem[];
 };
-
-type WorkItemActionKey =
-  | 'start'
-  | 'complete'
-  | 'block'
-  | 'resolve-blocker'
-  | 'request-review'
-  | 'request-approval'
-  | 'approve'
-  | 'reject'
-  | 'request-change';
 
 const moduleLinks = [
   ['Pipeline', 'pipeline'],
@@ -75,155 +74,6 @@ const moduleLinks = [
   ['Công nợ', 'debt'],
   ['Audit', 'audit'],
 ];
-
-const actionLabels: Record<WorkItemActionKey, string> = {
-  start: 'Bắt đầu',
-  complete: 'Hoàn tất',
-  block: 'Báo blocker',
-  'resolve-blocker': 'Resolve blocker',
-  'request-review': 'Gửi review',
-  'request-approval': 'Gửi duyệt',
-  approve: 'Duyệt',
-  reject: 'Từ chối',
-  'request-change': 'Yêu cầu sửa',
-};
-
-const actionDescriptions: Record<WorkItemActionKey, string> = {
-  start: 'Chuyển work item sang đang xử lý.',
-  complete: 'Hoàn tất work item khi đủ evidence bắt buộc.',
-  block: 'Ghi nhận blocker và lý do dừng việc.',
-  'resolve-blocker': 'Gỡ blocker và đưa work item về trạng thái làm tiếp.',
-  'request-review': 'Gửi work item sang hàng chờ review.',
-  'request-approval': 'Tạo hoặc đồng bộ approval request cho work item.',
-  approve: 'Duyệt và hoàn tất work item.',
-  reject: 'Từ chối và trả work item về cần chỉnh sửa.',
-  'request-change': 'Yêu cầu chỉnh sửa trước khi duyệt.',
-};
-
-const departmentLabels: Record<string, string> = {
-  design: 'Thiết kế',
-  qs: 'QS',
-  procurement: 'Mua hàng',
-  warehouse: 'Kho',
-  construction: 'Thi công',
-  operations: 'Thi công',
-  qa: 'QA/QC',
-  qaqc: 'QA/QC',
-  accounting: 'Kế toán',
-  client: 'Client',
-  unassigned: 'Chưa phân công',
-};
-
-const activityLabels: Record<string, string> = {
-  created: 'Tạo work item',
-  started: 'Bắt đầu',
-  completed: 'Hoàn tất',
-  blocked: 'Báo blocker',
-  blocker_resolved: 'Resolve blocker',
-  review_requested: 'Gửi review',
-  approval_requested: 'Gửi duyệt',
-  approved: 'Đã duyệt',
-  rejected: 'Từ chối',
-  changes_requested: 'Yêu cầu sửa',
-  evidence_added: 'Thêm evidence',
-  evidence_accepted: 'Duyệt evidence',
-  evidence_rejected: 'Từ chối evidence',
-  comment: 'Ghi chú',
-};
-
-const evidenceLabels: Record<string, string> = {
-  document: 'Tài liệu',
-  photo: 'Ảnh',
-  checklist: 'Checklist',
-  link: 'Link',
-  note: 'Ghi chú',
-  other: 'Khác',
-};
-
-function asArray<T>(value: unknown): T[] {
-  return Array.isArray(value) ? value as T[] : [];
-}
-
-function numberValue(value: unknown) {
-  const number = Number(value ?? 0);
-  return Number.isFinite(number) ? number : 0;
-}
-
-function compactDateTime(value: unknown) {
-  if (!value) return '-';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
-
-function departmentLabel(value?: string) {
-  const key = String(value || 'unassigned').toLowerCase();
-  return departmentLabels[key] ?? value ?? 'Chưa phân công';
-}
-
-function activityLabel(value?: string) {
-  const key = String(value ?? '');
-  return activityLabels[key] ?? enumLabel('event_type', key);
-}
-
-function evidenceLabel(value?: string) {
-  const key = String(value ?? '');
-  return evidenceLabels[key] ?? (key || '-');
-}
-
-function isWorkOverdue(item: WorkItem) {
-  if (!item.due_at || ['completed', 'cancelled'].includes(item.status)) return false;
-  const due = new Date(item.due_at);
-  return !Number.isNaN(due.getTime()) && due.getTime() < Date.now();
-}
-
-function workItemRank(item: WorkItem) {
-  if (item.status === 'blocked') return 0;
-  if (isWorkOverdue(item)) return 1;
-  if (item.status === 'waiting_approval' || item.status === 'waiting_review') return 2;
-  if (item.status === 'waiting_evidence') return 3;
-  if (item.due_at) return 4;
-  return 5;
-}
-
-function prioritizeWorkItems(items: WorkItem[]) {
-  return [...items].sort((a, b) => {
-    const rankDiff = workItemRank(a) - workItemRank(b);
-    if (rankDiff !== 0) return rankDiff;
-    const aDue = a.due_at ? new Date(a.due_at).getTime() : Number.MAX_SAFE_INTEGER;
-    const bDue = b.due_at ? new Date(b.due_at).getTime() : Number.MAX_SAFE_INTEGER;
-    return aDue - bDue;
-  });
-}
-
-function availableActions(status?: string): WorkItemActionKey[] {
-  switch (status) {
-    case 'pending':
-      return ['start', 'block'];
-    case 'ready':
-    case 'needs_changes':
-      return ['start', 'request-review', 'request-approval', 'block'];
-    case 'in_progress':
-    case 'waiting_evidence':
-      return ['complete', 'request-review', 'request-approval', 'block'];
-    case 'waiting_review':
-    case 'waiting_approval':
-      return ['approve', 'request-change', 'reject', 'block'];
-    case 'blocked':
-      return ['resolve-blocker'];
-    default:
-      return [];
-  }
-}
-
-function actionRequiresReason(action: WorkItemActionKey) {
-  return action === 'block' || action === 'reject' || action === 'request-change';
-}
 
 function currentTimelineNode(nodes: ProjectOperationsTimelineNode[]) {
   return nodes.find((node) => node.status === 'in_progress')
@@ -248,8 +98,6 @@ export function ProjectDetailPage() {
   const { id = '' } = useParams();
   const [selectedWork, setSelectedWork] = useState<WorkItem | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState('');
-  const [actionText, setActionText] = useState('');
-  const [pendingAction, setPendingAction] = useState<WorkItemActionKey | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -259,14 +107,6 @@ export function ProjectDetailPage() {
     enabled: Boolean(id),
     retry: false,
   });
-  const selectedWorkId = selectedWork?.id ?? '';
-  const workDetail = useQuery({
-    queryKey: ['work-item', selectedWorkId],
-    queryFn: () => get<WorkItem>(`/work-items/${selectedWorkId}`),
-    enabled: Boolean(selectedWorkId),
-    retry: false,
-  });
-
   const startPipeline = useMutation({
     mutationFn: () => post(`/projects/${id}/start-pipeline`, {}),
     onSuccess: () => {
@@ -276,27 +116,12 @@ export function ProjectDetailPage() {
     onError: (error) => toast.error('Không start được pipeline', error),
   });
 
-  const workAction = useMutation({
-    mutationFn: ({ workItemId, action, comment }: { workItemId: string; action: WorkItemActionKey; comment: string }) =>
-      post<WorkItem>(`/work-items/${workItemId}/${action}`, { comment, reason: comment }),
-    onSuccess: (item, variables) => {
-      setSelectedWork(item);
-      setActionText('');
-      setPendingAction(null);
-      queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
-      queryClient.invalidateQueries({ queryKey: ['work-item', variables.workItemId] });
-      toast.success(`Đã ${actionLabels[variables.action].toLowerCase()}`);
-    },
-    onError: (error) => toast.error('Không thao tác được work item', error),
-  });
-
   const data = operations.data;
   const activeWork = useMemo(() => prioritizeWorkItems(asArray<WorkItem>(data?.active_work)), [data?.active_work]);
   const blockers = useMemo(() => prioritizeWorkItems(asArray<WorkItem>(data?.blockers)), [data?.blockers]);
   const departmentSurfaces = useMemo(() => asArray<DepartmentSurface>(data?.department_surfaces), [data?.department_surfaces]);
   const timeline = useMemo(() => asArray<ProjectOperationsTimelineNode>(data?.workflow_timeline), [data?.workflow_timeline]);
   const currentNode = useMemo(() => currentTimelineNode(timeline), [timeline]);
-  const detailItem = workDetail.data ?? selectedWork;
 
   useEffect(() => {
     if (!departmentSurfaces.length) {
@@ -309,19 +134,6 @@ export function ProjectDetailPage() {
 
   function openWorkItem(item: WorkItem) {
     setSelectedWork(item);
-    setActionText('');
-    setPendingAction(null);
-  }
-
-  function runAction(action: WorkItemActionKey) {
-    if (!detailItem?.id) return;
-    const comment = actionText.trim();
-    if (actionRequiresReason(action) && !comment) {
-      setPendingAction(action);
-      toast.warn({ title: 'Cần nhập lý do', description: actionDescriptions[action] });
-      return;
-    }
-    workAction.mutate({ workItemId: detailItem.id, action, comment });
   }
 
   if (operations.isLoading) return <ProjectOperationsSkeleton />;
@@ -391,17 +203,13 @@ export function ProjectDetailPage() {
 
       <WorkItemDetailDialog
         open={Boolean(selectedWork)}
-        item={detailItem}
-        loading={workDetail.isLoading}
-        actionText={actionText}
-        pendingAction={pendingAction}
-        actionPending={workAction.isPending}
-        onActionTextChange={setActionText}
-        onRunAction={runAction}
+        item={selectedWork}
         onClose={() => {
           setSelectedWork(null);
-          setActionText('');
-          setPendingAction(null);
+        }}
+        onChanged={(item) => {
+          setSelectedWork(item);
+          queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
         }}
       />
     </>
@@ -672,37 +480,6 @@ function ActiveWorkPanel({ rows, onOpenWork }: { rows: WorkItem[]; onOpenWork: (
   );
 }
 
-function WorkItemCard({ item, onOpen, compact = false }: { item: WorkItem; onOpen: () => void; compact?: boolean }) {
-  const overdue = isWorkOverdue(item);
-  return (
-    <article className={clsx('rounded-md border border-line bg-white p-3', overdue && 'border-red-200 bg-red-50/50')}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={overdue ? 'overdue' : item.status} />
-            {item.department ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{departmentLabel(item.department)}</span> : null}
-          </div>
-          <p className={clsx('mt-2 font-semibold text-ink', compact ? 'text-sm' : 'text-base')}>{item.title}</p>
-          {item.description && !compact ? <p className="mt-1 line-clamp-2 text-sm text-slate-600">{item.description}</p> : null}
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-            <span>{item.run_node_name ?? item.run_step_name ?? item.work_type ?? 'Runtime work'}</span>
-            <span>Owner: {item.assignee_name ?? (asArray<string>(item.role_ids).join(', ') || '-')}</span>
-            <span>Due: {dateText(item.due_at)}</span>
-            <span>Evidence: {numberValue(item.evidence_count)}</span>
-          </div>
-        </div>
-        <button
-          className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
-          onClick={onOpen}
-        >
-          Open
-        </button>
-      </div>
-      {item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{item.blocked_reason}</p> : null}
-    </article>
-  );
-}
-
 function CommandCenter({
   data,
   blockers,
@@ -914,172 +691,6 @@ function ProjectMembers({ rows }: { rows: Record<string, any>[] }) {
       />
     </section>
   );
-}
-
-function WorkItemDetailDialog({
-  open,
-  item,
-  loading,
-  actionText,
-  pendingAction,
-  actionPending,
-  onActionTextChange,
-  onRunAction,
-  onClose,
-}: {
-  open: boolean;
-  item: WorkItem | null;
-  loading: boolean;
-  actionText: string;
-  pendingAction: WorkItemActionKey | null;
-  actionPending: boolean;
-  onActionTextChange: (value: string) => void;
-  onRunAction: (action: WorkItemActionKey) => void;
-  onClose: () => void;
-}) {
-  const actions = availableActions(item?.status);
-  const evidence = asArray<EvidenceRecord>(item?.evidence);
-  const activities = asArray<WorkItemActivity>(item?.activities);
-  const requirement = item?.evidence_requirement_json ?? {};
-
-  return (
-    <Dialog
-      open={open}
-      title={item?.title ?? 'Work item'}
-      description={item ? `${departmentLabel(item.department)} · ${item.run_node_name ?? item.run_step_name ?? item.work_type ?? 'Runtime work'}` : undefined}
-      onClose={onClose}
-      size="xl"
-      footer={
-        item ? (
-          <div className="space-y-3">
-            {actions.length ? (
-              <textarea
-                className={clsx(
-                  'min-h-20 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500',
-                  pendingAction && actionRequiresReason(pendingAction) && !actionText.trim() ? 'border-amber-300 bg-amber-50' : 'border-line bg-white',
-                )}
-                value={actionText}
-                onChange={(event) => onActionTextChange(event.target.value)}
-                placeholder="Ghi chú / lý do cho thao tác"
-              />
-            ) : null}
-            <div className="flex flex-wrap justify-end gap-2">
-              <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>
-                Đóng
-              </button>
-              {actions.map((action, index) => (
-                <button
-                  key={action}
-                  className={clsx(
-                    'inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60',
-                    index === 0
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : action === 'reject' || action === 'block'
-                        ? 'border border-rose-200 text-rose-700 hover:bg-rose-50'
-                        : 'border border-line text-slate-700 hover:bg-slate-100',
-                  )}
-                  disabled={actionPending}
-                  onClick={() => onRunAction(action)}
-                  title={actionDescriptions[action]}
-                >
-                  {actionPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {actionLabels[action]}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null
-      }
-    >
-      {loading && !item ? <LoadingSpinner /> : null}
-      {item ? (
-        <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={isWorkOverdue(item) ? 'overdue' : item.status} />
-            {item.priority ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Priority: {item.priority}</span> : null}
-            {item.work_type ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{item.work_type}</span> : null}
-          </div>
-
-          <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-            <DetailMetric label="Owner" value={item.assignee_name ?? (asArray<string>(item.role_ids).join(', ') || '-')} />
-            <DetailMetric label="Department" value={departmentLabel(item.department)} />
-            <DetailMetric label="Due" value={dateText(item.due_at)} />
-            <DetailMetric label="Evidence" value={numberValue(item.evidence_count)} />
-          </div>
-
-          {item.description ? <p className="rounded-md border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-700">{item.description}</p> : null}
-          {item.blocked_reason ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-700">{item.blocked_reason}</p> : null}
-
-          <section>
-            <h3 className="mb-2 text-sm font-semibold text-ink">Required Evidence</h3>
-            <div className="flex flex-wrap gap-2">
-              {requirement.checklist_required ? <RequirementChip label="Checklist" /> : null}
-              {requirement.document_required ? <RequirementChip label="Document" /> : null}
-              {requirement.photo_required ? <RequirementChip label="Photo" /> : null}
-              {requirement.required_permission ? <RequirementChip label={`Permission: ${requirement.required_permission}`} /> : null}
-              {!requirement.checklist_required && !requirement.document_required && !requirement.photo_required && !requirement.required_permission ? (
-                <span className="text-sm text-slate-500">Không có requirement đặc biệt.</span>
-              ) : null}
-            </div>
-          </section>
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <section>
-              <h3 className="mb-2 text-sm font-semibold text-ink">Evidence</h3>
-              {evidence.length ? (
-                <div className="space-y-2">
-                  {evidence.map((record) => (
-                    <div key={record.id} className="rounded-md border border-line px-3 py-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-ink">{record.name ?? record.title ?? record.document_name}</p>
-                          <p className="mt-1 text-xs text-slate-500">{evidenceLabel(record.evidence_type)} · {record.visibility ?? 'project'} · {compactDateTime(record.created_at)}</p>
-                        </div>
-                        <StatusBadge status={record.status} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="Chưa có evidence cho work item này" />
-              )}
-            </section>
-            <section>
-              <h3 className="mb-2 text-sm font-semibold text-ink">Activity</h3>
-              {activities.length ? (
-                <div className="space-y-2">
-                  {activities.map((activity) => (
-                    <div key={activity.id} className="rounded-md border border-line px-3 py-2">
-                      <p className="text-sm font-semibold text-ink">{activityLabel(activity.activity_type)}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {activity.actor_name ?? 'System'} · {compactDateTime(activity.created_at)}
-                      </p>
-                      {activity.comment ? <p className="mt-2 text-sm text-slate-700">{activity.comment}</p> : null}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="Chưa có activity cho work item này" />
-              )}
-            </section>
-          </div>
-        </div>
-      ) : null}
-    </Dialog>
-  );
-}
-
-function DetailMetric({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-md border border-line bg-white p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="mt-1 text-sm font-semibold text-ink">{value}</div>
-    </div>
-  );
-}
-
-function RequirementChip({ label }: { label: string }) {
-  return <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">{label}</span>;
 }
 
 function ProjectOperationsSkeleton() {

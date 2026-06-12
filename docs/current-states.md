@@ -83,15 +83,17 @@ Project Operations Dashboard
 - Required document/photo/checklist evidence is enforced before review request, approval request, approve, and completion.
 - Project operations API now returns project summary, visibility, health counts, workflow timeline, active work, blockers, approvals, evidence, activity, audit, and department surfaces with server-side scope.
 - Legacy backend modules now enforce permission and project scope across project CRUD/listing, pipeline templates, approvals, BOQ, procurement, stock/material balances, operations, acceptance, rework, replanning, handover, accounting, audit, reports, settings, staff, and RBAC surfaces.
+- Domain transitions now use explicit backend actions for procurement, stock/site material balances, acceptance failure and rework creation, handover blockers, payables, receivables, and payments with actor/comment/audit context.
 - Dashboard, reports, audit logs, approvals, procurement, and accounting global lists are scoped to accessible projects for non-global users.
 - Project detail now consumes the Project Operations API as the first production dashboard pass with health, workflow timeline, active work, command center, scoped department surfaces, work item detail/actions, loading, empty, no-permission, and API error states.
+- `/my-work` now exists as a personal cross-project inbox using `GET /me/work-items`, queue metadata, shared work item card/detail/action UI, project/status/deadline/work type/priority filters, summary chips, and `Open project dashboard` context links.
 - Seed operational role permissions have been expanded for PM, director, QS, accounting, procurement, warehouse, supervisor, QA/QC, construction team, subcontractor, client, and viewer roles.
 - Seed data has a construction template covering survey, design, BOQ, budget approval, procurement, warehouse issue, construction, acceptance, handover, and financial closure.
 - Frontend has pages for project detail, planning, BOQ, procurement, warehouse, operations, acceptance, rework, handover, accounting, debt, audit, reports, staff, roles, permissions, and settings.
 
 ### What Is Not Production-Ready Yet
 
-- `ProjectDetailPage` has the first Project Operations Dashboard UI pass, but still needs browser/manual validation and richer evidence upload/comment entry flows beyond metadata display and work-item action footer.
+- `ProjectDetailPage` and `/my-work` have the first work-item UI pass, but still need browser/manual validation and richer evidence upload/comment entry flows beyond metadata display and work-item action footer.
 - `PlanningPage` is still a generic pipeline node/step screen with simple submit/advance/block actions.
 - Sidebar currently shows all modules to all authenticated users; module-wide frontend no-permission states outside the project dashboard still need a future pass.
 - `pipeline_run_steps` legacy UI is still thin and should move behind work item detail/actions in the production UI.
@@ -708,6 +710,15 @@ Required shared UI elements:
 - Project context link: `Open project dashboard`.
 - States: loading, empty, no permission, blocked, overdue, waiting approval, completed, API error.
 
+Implemented first pass:
+
+- Route: `/my-work`.
+- API: `GET /me/work-items`, enriched with `project_code` and `queue_scopes`.
+- Queues: Mine, Department, Pending approval, Watching, All visible.
+- Filters: project, status, deadline, work type, priority.
+- Shared UI: work item card, detail/action dialog, evidence/activity display, project dashboard link.
+- Default authenticated route remains `/dashboard`.
+
 ### `/my-work` Role Variants
 
 Render only variants relevant to the current user:
@@ -1039,6 +1050,8 @@ Expected work:
 
 ### Slice 8: `/my-work` Personal Inbox
 
+Status: implemented.
+
 Goal: implement `/my-work` as a personal inbox after the project work contract exists.
 
 Expected work:
@@ -1084,6 +1097,8 @@ Expected work:
 
 ### Slice 11: Domain Transition Fixes
 
+Status: implemented.
+
 Goal: close domain correctness gaps before broad production usage.
 
 Expected work:
@@ -1093,6 +1108,7 @@ Expected work:
 - Stock operations must preserve balance and traceability.
 - Handover must check acceptance, punch list, warehouse closure, payables, receivables.
 - Accounting transitions must preserve approval and payment actor context.
+- Implemented explicit procurement submit/approve/order/receive guards, stock quantity/balance guards, acceptance fail issue creation, duplicate active rework prevention, blocked handover audit, and accounting approval/settlement actions.
 
 Validation:
 

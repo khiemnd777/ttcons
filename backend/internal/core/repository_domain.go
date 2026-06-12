@@ -303,6 +303,23 @@ func (r *Repository) AddAudit(ctx context.Context, projectID, actorID, actorName
 	return err
 }
 
+func addAuditTx(ctx context.Context, tx *sql.Tx, projectID, actorID, actorName, eventType, targetType, targetID, description string, metadata any) error {
+	raw, _ := json.Marshal(metadata)
+	var p any = nil
+	var t any = nil
+	if projectID != "" {
+		p = projectID
+	}
+	if targetID != "" {
+		t = targetID
+	}
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
+		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, $8::jsonb)
+	`, p, actorID, actorName, eventType, targetType, t, description, string(raw))
+	return err
+}
+
 func (r *Repository) CanViewProjectOperations(ctx context.Context, projectID, userID string) (bool, error) {
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
 	if err != nil {
@@ -664,7 +681,7 @@ func (r *Repository) ListProjectWorkItems(ctx context.Context, projectID, userID
 	}
 	args := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
 	return r.Query(ctx, fmt.Sprintf(`
-		SELECT wi.*, p.name AS project_name, rn.name AS run_node_name, rs.name AS run_step_name,
+		SELECT wi.*, p.name AS project_name, p.code AS project_code, rn.name AS run_node_name, rs.name AS run_step_name,
 			s.full_name AS assignee_name,
 			COALESCE((SELECT COUNT(*) FROM evidence_records er WHERE er.work_item_id=wi.id AND er.status <> 'rejected'),0) AS evidence_count
 		FROM work_items wi
@@ -694,9 +711,50 @@ func (r *Repository) ListMyWorkItems(ctx context.Context, userID string) ([]Reco
 	}
 	args := workItemScopeArgs(profile, false, true)
 	return r.Query(ctx, fmt.Sprintf(`
-		SELECT wi.*, p.name AS project_name, rn.name AS run_node_name, rs.name AS run_step_name,
+		SELECT wi.*, p.name AS project_name, p.code AS project_code, rn.name AS run_node_name, rs.name AS run_step_name,
 			s.full_name AS assignee_name,
-			COALESCE((SELECT COUNT(*) FROM evidence_records er WHERE er.work_item_id=wi.id AND er.status <> 'rejected'),0) AS evidence_count
+			COALESCE((SELECT COUNT(*) FROM evidence_records er WHERE er.work_item_id=wi.id AND er.status <> 'rejected'),0) AS evidence_count,
+			COALESCE((
+				SELECT jsonb_agg(scope)
+				FROM (
+					VALUES
+						('mine', (
+							wi.assignee_staff_id=NULLIF($3,'')::uuid
+							OR EXISTS (
+								SELECT 1
+								FROM work_item_assignments wias
+								WHERE wias.work_item_id=wi.id
+								  AND wias.assignment_type <> 'watcher'
+								  AND wias.staff_id=NULLIF($3,'')::uuid
+							)
+						)),
+						('department', (
+							NULLIF($4,'') IS NOT NULL
+							AND (
+								wi.department=$4
+								OR EXISTS (
+									SELECT 1
+									FROM work_item_assignments wias
+									WHERE wias.work_item_id=wi.id
+									  AND wias.assignment_type <> 'watcher'
+									  AND wias.department=$4
+								)
+							)
+						)),
+						('pending_approval', wi.status IN ('waiting_review','waiting_approval')),
+						('watching', (
+							wi.watcher_staff_ids ? $3
+							OR EXISTS (
+								SELECT 1
+								FROM work_item_assignments wias
+								WHERE wias.work_item_id=wi.id
+								  AND wias.assignment_type='watcher'
+								  AND wias.staff_id=NULLIF($3,'')::uuid
+							)
+						))
+				) AS queue(scope, matched)
+				WHERE matched
+			), '[]'::jsonb) AS queue_scopes
 		FROM work_items wi
 		JOIN projects p ON p.id=wi.project_id
 		LEFT JOIN pipeline_run_nodes rn ON rn.id=wi.run_node_id
@@ -720,7 +778,7 @@ func (r *Repository) ListMyWorkItems(ctx context.Context, userID string) ([]Reco
 
 func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string) (Record, error) {
 	item, err := r.QueryOne(ctx, `
-		SELECT wi.*, p.name AS project_name, rn.name AS run_node_name, rs.name AS run_step_name,
+		SELECT wi.*, p.name AS project_name, p.code AS project_code, rn.name AS run_node_name, rs.name AS run_step_name,
 			s.full_name AS assignee_name
 		FROM work_items wi
 		JOIN projects p ON p.id=wi.project_id
@@ -764,7 +822,7 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string) (
 
 func (r *Repository) GetWorkItemByRunStep(ctx context.Context, stepID string) (Record, error) {
 	return r.QueryOne(ctx, `
-		SELECT wi.*, p.name AS project_name, rn.name AS run_node_name, rs.name AS run_step_name,
+		SELECT wi.*, p.name AS project_name, p.code AS project_code, rn.name AS run_node_name, rs.name AS run_step_name,
 			s.full_name AS assignee_name
 		FROM work_items wi
 		JOIN projects p ON p.id=wi.project_id
@@ -2870,7 +2928,7 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 	reqRows, err := queryTx(ctx, tx, `
 		INSERT INTO procurement_requests
 			(project_id, request_code, title, requested_by, status, total_estimated_amount, budget_status)
-		VALUES ($1,$2,'Yêu cầu mua vật tư sinh từ BOQ',NULLIF($3,'')::uuid,'submitted',$4,'within_budget')
+		VALUES ($1,$2,'Yêu cầu mua vật tư sinh từ BOQ',NULLIF($3,'')::uuid,'waiting_approval',$4,'within_budget')
 		RETURNING *
 	`, projectID, requestCode, actorID, total)
 	if err != nil {
@@ -2923,77 +2981,305 @@ func (r *Repository) GetProcurementDetail(ctx context.Context, requestID string)
 	return req, nil
 }
 
-func (r *Repository) ProcurementAction(ctx context.Context, id, action, actorID, actorName string) (Record, error) {
-	status := map[string]string{
-		"submit":  "waiting_approval",
-		"approve": "approved",
-		"order":   "ordered",
-		"receive": "received",
-	}[action]
-	if status == "" {
-		return nil, errors.New("invalid procurement action")
-	}
-	req, err := r.QueryOne(ctx, `UPDATE procurement_requests SET status=$2, updated_at=now() WHERE id=$1 RETURNING *`, id, status)
+func (r *Repository) ProcurementAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	event := map[string]string{"submit": "review_requested", "approve": "material_approved", "order": "material_ordered", "receive": "warehouse_received"}[action]
-	_ = r.AddAudit(ctx, fmt.Sprint(req["project_id"]), actorID, actorName, event, "procurement_request", id, fmt.Sprintf("Cập nhật yêu cầu mua sang trạng thái %s", status), Record{})
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM procurement_requests WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	toStatus, event, err := procurementTransitionForAction(action, fromStatus)
+	if err != nil {
+		return nil, err
+	}
+	updated, err := queryTx(ctx, tx, `
+		UPDATE procurement_requests
+		SET status=$2, updated_at=now()
+		WHERE id=$1 AND status=$3
+		RETURNING *
+	`, id, toStatus, fromStatus)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Trạng thái yêu cầu mua đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	if action == "approve" && cleanID(current["approval_request_id"]) != "" {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE approval_requests
+			SET status='approved', resolved_at=COALESCE(resolved_at, now())
+			WHERE id=$1 AND project_id=$2 AND status IN ('pending','changes_requested')
+		`, current["approval_request_id"], current["project_id"]); err != nil {
+			return nil, err
+		}
+	}
+	comment := actionComment(req)
+	metadata := Record{"action": action, "from_status": fromStatus, "to_status": toStatus}
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, event, "procurement_request", id, fmt.Sprintf("Cập nhật yêu cầu mua từ %s sang %s", fromStatus, toStatus), metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return r.GetProcurementDetail(ctx, id)
 }
 
+func procurementTransitionForAction(action, fromStatus string) (string, string, error) {
+	switch action {
+	case "submit":
+		if statusIn(fromStatus, "draft", "submitted", "changes_requested") {
+			return "waiting_approval", "review_requested", nil
+		}
+	case "approve":
+		if statusIn(fromStatus, "waiting_approval", "submitted") {
+			return "approved", "material_approved", nil
+		}
+	case "order":
+		if fromStatus == "approved" {
+			return "ordered", "material_ordered", nil
+		}
+	case "receive":
+		if fromStatus == "ordered" {
+			return "received", "warehouse_received", nil
+		}
+	default:
+		return "", "", validationError("Action yêu cầu mua không hợp lệ", Record{"action": action})
+	}
+	return "", "", validationError("Trạng thái yêu cầu mua không cho phép thao tác này", Record{"action": action, "status": fromStatus})
+}
+
+func actionComment(req ActionRequest) string {
+	comment := strings.TrimSpace(req.Comment)
+	if comment == "" {
+		comment = strings.TrimSpace(req.Reason)
+	}
+	return comment
+}
+
 func (r *Repository) CreateStockMovement(ctx context.Context, req StockActionRequest, actorID, actorName string) (Record, error) {
+	req.MovementType = strings.TrimSpace(req.MovementType)
 	if req.MovementType == "" {
 		req.MovementType = "receive"
 	}
-	code := fmt.Sprintf("SM-%s-%d", req.MovementType, timeNowUnix())
-	body := Record{
-		"movement_code":  code,
-		"project_id":     req.ProjectID,
-		"warehouse_id":   req.WarehouseID,
-		"material_id":    req.MaterialID,
-		"movement_type":  req.MovementType,
-		"quantity":       req.Quantity,
-		"unit":           req.Unit,
-		"reason":         req.Reason,
-		"reference_type": req.ReferenceType,
-		"reference_id":   req.ReferenceID,
-		"created_by":     actorID,
-		"approved_by":    actorID,
+	if !statusIn(req.MovementType, "receive", "issue", "transfer", "loss", "return_to_warehouse", "return_to_subcontractor") {
+		return nil, validationError("Loại nhập xuất kho không hợp lệ", Record{"movement_type": req.MovementType})
 	}
-	movement, err := r.Insert(ctx, "stock_movements", []ColumnSpec{
-		col("movement_code"), col("project_id"), col("warehouse_id"), col("material_id"), col("movement_type"), col("quantity"), col("unit"), col("reason"), col("reference_type"), col("reference_id"), col("created_by"), col("approved_by"),
-	}, body)
+	req.ProjectID = cleanID(req.ProjectID)
+	req.WarehouseID = cleanID(req.WarehouseID)
+	req.MaterialID = cleanID(req.MaterialID)
+	req.ReferenceID = cleanID(req.ReferenceID)
+	req.Unit = strings.TrimSpace(req.Unit)
+	req.Reason = strings.TrimSpace(req.Reason)
+	if req.WarehouseID == "" {
+		return nil, validationError("Kho là bắt buộc")
+	}
+	if req.MaterialID == "" {
+		return nil, validationError("Vật tư là bắt buộc")
+	}
+	if req.Quantity <= 0 {
+		return nil, validationError("Số lượng nhập xuất kho phải lớn hơn 0", Record{"quantity": req.Quantity})
+	}
+	if statusIn(req.MovementType, "issue", "return_to_warehouse", "return_to_subcontractor") && req.ProjectID == "" {
+		return nil, validationError("Công trình là bắt buộc cho thao tác xuất/hoàn vật tư")
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	if req.ProjectID != "" && (req.MovementType == "issue" || req.MovementType == "return_to_warehouse" || req.MovementType == "return_to_subcontractor") {
-		issuedDelta := req.Quantity
-		if req.MovementType != "issue" {
-			issuedDelta = -req.Quantity
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "stock:"+req.WarehouseID+":"+req.MaterialID); err != nil {
+		return nil, err
+	}
+	if req.ProjectID != "" {
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "site-material:"+req.ProjectID+":"+req.MaterialID); err != nil {
+			return nil, err
 		}
-		_, _ = r.db.ExecContext(ctx, `
+	}
+
+	warehouseRows, err := queryTx(ctx, tx, `SELECT id FROM warehouses WHERE id=$1 AND active`, req.WarehouseID)
+	if err != nil {
+		return nil, err
+	}
+	if len(warehouseRows) == 0 {
+		return nil, validationError("Kho không tồn tại hoặc đã ngưng hoạt động", Record{"warehouse_id": req.WarehouseID})
+	}
+	materialRows, err := queryTx(ctx, tx, `SELECT id, unit FROM materials WHERE id=$1 AND active`, req.MaterialID)
+	if err != nil {
+		return nil, err
+	}
+	if len(materialRows) == 0 {
+		return nil, validationError("Vật tư không tồn tại hoặc đã ngưng hoạt động", Record{"material_id": req.MaterialID})
+	}
+	if req.Unit == "" {
+		req.Unit = strings.TrimSpace(fmt.Sprint(materialRows[0]["unit"]))
+	}
+	if req.Unit == "" {
+		return nil, validationError("Đơn vị vật tư là bắt buộc")
+	}
+
+	if statusIn(req.MovementType, "issue", "transfer", "loss") {
+		available, err := warehouseMaterialAvailableTx(ctx, tx, req.WarehouseID, req.MaterialID)
+		if err != nil {
+			return nil, err
+		}
+		if quantityExceedsAvailable(req.Quantity, available) {
+			return nil, validationError("Tồn kho không đủ cho thao tác này", Record{"available": available, "quantity": req.Quantity})
+		}
+	}
+	if statusIn(req.MovementType, "return_to_warehouse", "return_to_subcontractor") {
+		available, err := projectMaterialAvailableTx(ctx, tx, req.ProjectID, req.MaterialID)
+		if err != nil {
+			return nil, err
+		}
+		if quantityExceedsAvailable(req.Quantity, available) {
+			return nil, validationError("Vật tư tại công trình không đủ để hoàn/trả", Record{"available": available, "quantity": req.Quantity})
+		}
+	}
+
+	code := fmt.Sprintf("SM-%s-%d-%s", req.MovementType, timeNowUnix(), newID()[:8])
+	movements, err := queryTx(ctx, tx, `
+		INSERT INTO stock_movements
+			(movement_code, project_id, warehouse_id, material_id, movement_type, quantity, unit, reason, reference_type, reference_id, created_by, approved_by)
+		VALUES ($1,NULLIF($2,'')::uuid,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,'')::uuid,NULLIF($11,'')::uuid,NULLIF($11,'')::uuid)
+		RETURNING *
+	`, code, req.ProjectID, req.WarehouseID, req.MaterialID, req.MovementType, req.Quantity, req.Unit, req.Reason, req.ReferenceType, req.ReferenceID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(movements) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	movement := movements[0]
+
+	if req.ProjectID != "" && statusIn(req.MovementType, "issue", "return_to_warehouse", "return_to_subcontractor") {
+		if req.MovementType == "issue" {
+			if _, err := tx.ExecContext(ctx, `
 			INSERT INTO site_material_balances (project_id, material_id, issued_quantity, surplus_quantity, surplus_status)
 			VALUES ($1,$2,$3,GREATEST($3,0),'pending')
 			ON CONFLICT (project_id, material_id)
 			DO UPDATE SET issued_quantity = site_material_balances.issued_quantity + EXCLUDED.issued_quantity,
 				surplus_quantity = GREATEST(site_material_balances.issued_quantity + EXCLUDED.issued_quantity - site_material_balances.used_quantity, 0),
-				surplus_status = CASE WHEN $4 IN ('return_to_warehouse','return_to_subcontractor') THEN 'handled' ELSE site_material_balances.surplus_status END,
 				updated_at=now()
-		`, req.ProjectID, req.MaterialID, issuedDelta, req.MovementType)
+		`, req.ProjectID, req.MaterialID, req.Quantity); err != nil {
+				return nil, err
+			}
+		} else {
+			updated, err := queryTx(ctx, tx, `
+				UPDATE site_material_balances
+				SET issued_quantity = GREATEST(issued_quantity - $3, 0),
+					surplus_quantity = GREATEST(GREATEST(issued_quantity - $3, 0) - used_quantity, 0),
+					surplus_status = 'handled',
+					updated_at = now()
+				WHERE project_id=$1 AND material_id=$2
+				RETURNING *
+			`, req.ProjectID, req.MaterialID, req.Quantity)
+			if err != nil {
+				return nil, err
+			}
+			if len(updated) == 0 {
+				return nil, validationError("Không tìm thấy số dư vật tư tại công trình", Record{"project_id": req.ProjectID, "material_id": req.MaterialID})
+			}
+		}
 	}
-	event := map[string]string{
-		"receive":                 "warehouse_received",
-		"issue":                   "warehouse_issued",
-		"transfer":                "warehouse_transferred",
-		"return_to_warehouse":     "surplus_stored",
-		"return_to_subcontractor": "surplus_returned_to_subcontractor",
-	}[req.MovementType]
-	if event == "" {
-		event = "stock_movement_created"
+
+	metadata := Record{
+		"movement_type": req.MovementType,
+		"quantity":      req.Quantity,
+		"material_id":   req.MaterialID,
+		"warehouse_id":  req.WarehouseID,
 	}
-	_ = r.AddAudit(ctx, req.ProjectID, actorID, actorName, event, "stock_movement", fmt.Sprint(movement["id"]), req.Reason, Record{"quantity": req.Quantity, "material_id": req.MaterialID})
+	if req.ReferenceType != "" {
+		metadata["reference_type"] = req.ReferenceType
+	}
+	if req.ReferenceID != "" {
+		metadata["reference_id"] = req.ReferenceID
+	}
+	if err := addAuditTx(ctx, tx, req.ProjectID, actorID, actorName, stockMovementEvent(req.MovementType), "stock_movement", fmt.Sprint(movement["id"]), stockMovementDescription(req), metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return movement, nil
+}
+
+func warehouseMaterialAvailableTx(ctx context.Context, tx *sql.Tx, warehouseID, materialID string) (float64, error) {
+	rows, err := queryTx(ctx, tx, `
+		SELECT COALESCE(SUM(CASE
+			WHEN movement_type IN ('receive','return_to_warehouse') THEN quantity
+			WHEN movement_type IN ('issue','transfer','loss') THEN -quantity
+			ELSE 0
+		END),0) AS available
+		FROM stock_movements
+		WHERE warehouse_id=$1 AND material_id=$2
+	`, warehouseID, materialID)
+	if err != nil {
+		return 0, err
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	return number(rows[0]["available"]), nil
+}
+
+func projectMaterialAvailableTx(ctx context.Context, tx *sql.Tx, projectID, materialID string) (float64, error) {
+	rows, err := queryTx(ctx, tx, `
+		SELECT GREATEST(issued_quantity - used_quantity, surplus_quantity, 0) AS available
+		FROM site_material_balances
+		WHERE project_id=$1 AND material_id=$2
+		FOR UPDATE
+	`, projectID, materialID)
+	if err != nil {
+		return 0, err
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	return number(rows[0]["available"]), nil
+}
+
+func quantityExceedsAvailable(quantity, available float64) bool {
+	return quantity > available+0.000001
+}
+
+func stockMovementEvent(movementType string) string {
+	switch movementType {
+	case "receive":
+		return "warehouse_received"
+	case "issue":
+		return "warehouse_issued"
+	case "transfer":
+		return "warehouse_transferred"
+	case "loss":
+		return "warehouse_loss_recorded"
+	case "return_to_warehouse":
+		return "surplus_stored"
+	case "return_to_subcontractor":
+		return "surplus_returned_to_subcontractor"
+	default:
+		return "stock_movement_created"
+	}
+}
+
+func stockMovementDescription(req StockActionRequest) string {
+	if req.Reason != "" {
+		return req.Reason
+	}
+	return fmt.Sprintf("Ghi nhận %s %.3f %s", req.MovementType, req.Quantity, req.Unit)
 }
 
 func (r *Repository) ProjectMaterialBalances(ctx context.Context, projectID string) ([]Record, error) {
@@ -3006,54 +3292,130 @@ func (r *Repository) ProjectMaterialBalances(ctx context.Context, projectID stri
 	`, projectID)
 }
 
-func (r *Repository) AcceptanceAction(ctx context.Context, id, result, actorID, actorName string) (Record, error) {
-	status := "completed"
+func (r *Repository) AcceptanceAction(ctx context.Context, id, result string, req ActionRequest, actorID, actorName string) (Record, error) {
+	result = strings.TrimSpace(result)
+	if !statusIn(result, "pass", "fail", "conditional_pass") {
+		return nil, validationError("Kết quả nghiệm thu không hợp lệ", Record{"result": result})
+	}
 	event := "acceptance_passed"
 	if result == "fail" {
 		event = "acceptance_failed"
 	}
-	acc, err := r.QueryOne(ctx, `UPDATE acceptance_records SET status=$2, result=$3, approved_by=NULLIF($4,'')::uuid, updated_at=now() WHERE id=$1 RETURNING *`, id, status, result, actorID)
+	if result == "conditional_pass" {
+		event = "acceptance_conditionally_passed"
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	projectID := fmt.Sprint(acc["project_id"])
-	if result == "fail" {
-		issue, _ := r.Insert(ctx, "issues", issueColumns(), Record{
-			"project_id":          projectID,
-			"node_id":             acc["node_id"],
-			"title":               fmt.Sprintf("Punch list từ nghiệm thu: %s", acc["title"]),
-			"description":         acc["notes"],
-			"severity":            "high",
-			"status":              "open",
-			"reported_by":         actorID,
-			"requires_rework":     true,
-			"requires_replanning": false,
-		})
-		_ = r.AddAudit(ctx, projectID, actorID, actorName, "rework_requested", "issue", fmt.Sprint(issue["id"]), "Nghiệm thu fail tạo punch list/rework", Record{"acceptance_id": id})
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM acceptance_records WHERE id=$1 AND status <> 'deleted' FOR UPDATE`, id)
+	if err != nil {
+		return nil, err
 	}
-	_ = r.AddAudit(ctx, projectID, actorID, actorName, event, "acceptance", id, fmt.Sprintf("Nghiệm thu %s: %s", result, acc["title"]), Record{})
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	if statusIn(fromStatus, "completed", "cancelled") {
+		return nil, validationError("Nghiệm thu đã được chốt hoặc không còn hợp lệ", Record{"status": fromStatus})
+	}
+	updated, err := queryTx(ctx, tx, `
+		UPDATE acceptance_records
+		SET status='completed', result=$2, approved_by=NULLIF($3,'')::uuid, updated_at=now()
+		WHERE id=$1 AND status=$4
+		RETURNING *
+	`, id, result, actorID, fromStatus)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Trạng thái nghiệm thu đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	acc := updated[0]
+	projectID := fmt.Sprint(acc["project_id"])
+	comment := actionComment(req)
+	metadata := Record{"result": result, "from_status": fromStatus, "to_status": "completed"}
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	if result == "fail" {
+		issueRows, err := queryTx(ctx, tx, `
+			INSERT INTO issues
+				(project_id, node_id, title, description, severity, status, reported_by, requires_rework, requires_replanning)
+			VALUES ($1,$2,$3,$4,'high','open',NULLIF($5,'')::uuid,true,false)
+			RETURNING *
+		`, projectID, acc["node_id"], fmt.Sprintf("Punch list từ nghiệm thu: %s", acc["title"]), acc["notes"], actorID)
+		if err != nil {
+			return nil, err
+		}
+		if len(issueRows) > 0 {
+			if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "rework_requested", "issue", fmt.Sprint(issueRows[0]["id"]), "Nghiệm thu fail tạo punch list/rework", Record{"acceptance_id": id}); err != nil {
+				return nil, err
+			}
+			metadata["issue_id"] = issueRows[0]["id"]
+		}
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, event, "acceptance", id, fmt.Sprintf("Nghiệm thu %s: %s", result, acc["title"]), metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return acc, nil
 }
 
 func (r *Repository) CreateReworkFromAcceptance(ctx context.Context, acceptanceID, actorID, actorName string) (Record, error) {
-	acc, err := r.GetByID(ctx, "acceptance_records", acceptanceID)
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	rework, err := r.Insert(ctx, "rework_requests", reworkColumns(), Record{
-		"project_id":    acc["project_id"],
-		"acceptance_id": acceptanceID,
-		"node_id":       acc["node_id"],
-		"title":         fmt.Sprintf("Rework sau nghiệm thu: %s", acc["title"]),
-		"description":   acc["notes"],
-		"status":        "approved",
-		"created_by":    actorID,
-		"approved_by":   actorID,
-	})
+	defer tx.Rollback()
+
+	accRows, err := queryTx(ctx, tx, `SELECT * FROM acceptance_records WHERE id=$1 AND status <> 'deleted' FOR UPDATE`, acceptanceID)
 	if err != nil {
 		return nil, err
 	}
-	_ = r.AddAudit(ctx, fmt.Sprint(acc["project_id"]), actorID, actorName, "rework_requested", "rework_request", fmt.Sprint(rework["id"]), "Tạo rework request từ nghiệm thu fail", Record{"acceptance_id": acceptanceID})
+	if len(accRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	acc := accRows[0]
+	if fmt.Sprint(acc["status"]) != "completed" || fmt.Sprint(acc["result"]) != "fail" {
+		return nil, validationError("Chỉ tạo rework từ nghiệm thu đã fail", Record{"status": acc["status"], "result": acc["result"]})
+	}
+	existing, err := queryTx(ctx, tx, `
+		SELECT COUNT(*) AS total
+		FROM rework_requests
+		WHERE acceptance_id=$1 AND status NOT IN ('cancelled','done','deleted')
+	`, acceptanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(existing) > 0 && number(existing[0]["total"]) > 0 {
+		return nil, validationError("Nghiệm thu này đã có rework đang mở", Record{"acceptance_id": acceptanceID})
+	}
+	reworkRows, err := queryTx(ctx, tx, `
+		INSERT INTO rework_requests
+			(project_id, acceptance_id, node_id, title, description, status, created_by, approved_by)
+		VALUES ($1,$2,$3,$4,$5,'approved',NULLIF($6,'')::uuid,NULLIF($6,'')::uuid)
+		RETURNING *
+	`, acc["project_id"], acceptanceID, acc["node_id"], fmt.Sprintf("Rework sau nghiệm thu: %s", acc["title"]), acc["notes"], actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(reworkRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	rework := reworkRows[0]
+	if err := addAuditTx(ctx, tx, fmt.Sprint(acc["project_id"]), actorID, actorName, "rework_requested", "rework_request", fmt.Sprint(rework["id"]), "Tạo rework request từ nghiệm thu fail", Record{"acceptance_id": acceptanceID}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return rework, nil
 }
 
@@ -3066,7 +3428,7 @@ func (r *Repository) HandoverCheck(ctx context.Context, id string) (Record, erro
 	blockers := []string{}
 	finalPass, _ := r.Query(ctx, `
 		SELECT COUNT(*) AS total FROM acceptance_records
-		WHERE project_id=$1 AND type='final' AND result IN ('pass','conditional_pass')
+		WHERE project_id=$1 AND type='final' AND status='completed' AND result IN ('pass','conditional_pass')
 	`, projectID)
 	if len(finalPass) == 0 || number(finalPass[0]["total"]) == 0 {
 		blockers = append(blockers, "Chưa có nghiệm thu toàn phần đạt")
@@ -3091,27 +3453,298 @@ func (r *Repository) HandoverCheck(ctx context.Context, id string) (Record, erro
 	if handover["receivables_recorded"] != true {
 		blockers = append(blockers, "Công nợ đầu ra chưa ghi nhận")
 	}
+	openPayables, _ := r.Query(ctx, `SELECT COUNT(*) AS total, COALESCE(SUM(remaining_amount),0) AS amount FROM payables WHERE project_id=$1 AND status <> 'cancelled' AND remaining_amount > 0`, projectID)
+	if len(openPayables) > 0 && number(openPayables[0]["total"]) > 0 {
+		blockers = append(blockers, "Còn công nợ đầu vào chưa tất toán")
+	}
+	openReceivables, _ := r.Query(ctx, `SELECT COUNT(*) AS total, COALESCE(SUM(remaining_amount),0) AS amount FROM receivables WHERE project_id=$1 AND status <> 'cancelled' AND remaining_amount > 0`, projectID)
+	if len(openReceivables) > 0 && number(openReceivables[0]["total"]) > 0 {
+		blockers = append(blockers, "Còn công nợ đầu ra chưa thu")
+	}
+	pendingPayments, _ := r.Query(ctx, `SELECT COUNT(*) AS total FROM payments WHERE project_id=$1 AND status NOT IN ('approved','paid','received','cancelled')`, projectID)
+	if len(pendingPayments) > 0 && number(pendingPayments[0]["total"]) > 0 {
+		blockers = append(blockers, "Còn phiếu chi/thu chưa duyệt")
+	}
 	handover["blockers"] = blockers
 	handover["ready"] = len(blockers) == 0
 	return handover, nil
 }
 
-func (r *Repository) CompleteHandover(ctx context.Context, id, actorID, actorName string) (Record, error) {
+func (r *Repository) CompleteHandover(ctx context.Context, id string, req ActionRequest, actorID, actorName string) (Record, error) {
 	check, err := r.HandoverCheck(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	blockers, _ := check["blockers"].([]string)
+	comment := actionComment(req)
 	if len(blockers) > 0 {
-		_, _ = r.QueryOne(ctx, `UPDATE handover_records SET status='blocked', updated_at=now() WHERE id=$1 RETURNING *`, id)
+		tx, err := r.db.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+		updated, err := queryTx(ctx, tx, `UPDATE handover_records SET status='blocked', updated_at=now() WHERE id=$1 RETURNING *`, id)
+		if err != nil {
+			return nil, err
+		}
+		if len(updated) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		metadata := Record{"blockers": blockers}
+		if comment != "" {
+			metadata["comment"] = comment
+		}
+		if err := addAuditTx(ctx, tx, fmt.Sprint(updated[0]["project_id"]), actorID, actorName, "handover_blocked", "handover", id, "Bàn giao bị chặn do còn điều kiện chưa đạt", metadata); err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		for key, value := range updated[0] {
+			check[key] = value
+		}
+		check["blockers"] = blockers
+		check["ready"] = false
 		return check, nil
 	}
-	done, err := r.QueryOne(ctx, `UPDATE handover_records SET status='handed_over', handover_date=COALESCE(handover_date, CURRENT_DATE), approved_by=NULLIF($2,'')::uuid, updated_at=now() WHERE id=$1 RETURNING *`, id, actorID)
+
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	_ = r.AddAudit(ctx, fmt.Sprint(done["project_id"]), actorID, actorName, "handover_completed", "handover", id, "Hoàn tất bàn giao công trình", Record{})
+	defer tx.Rollback()
+	updated, err := queryTx(ctx, tx, `
+		UPDATE handover_records
+		SET status='handed_over',
+			handover_date=COALESCE(handover_date, CURRENT_DATE),
+			approved_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1 AND status NOT IN ('handed_over','cancelled','deleted')
+		RETURNING *
+	`, id, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Bàn giao đã hoàn tất hoặc không còn hợp lệ")
+	}
+	metadata := Record{}
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	done := updated[0]
+	if err := addAuditTx(ctx, tx, fmt.Sprint(done["project_id"]), actorID, actorName, "handover_completed", "handover", id, "Hoàn tất bàn giao công trình", metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return done, nil
+}
+
+func (r *Repository) PayableAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM payables WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	toStatus := ""
+	event := ""
+	metadata := Record{"action": action, "from_status": fromStatus}
+	var updated []Record
+	switch action {
+	case "approve":
+		if !statusIn(fromStatus, "draft", "submitted", "recorded", "overdue") {
+			return nil, validationError("Trạng thái phải trả không cho phép duyệt", Record{"status": fromStatus})
+		}
+		toStatus = "approved"
+		event = "payable_approved"
+		updated, err = queryTx(ctx, tx, `
+			UPDATE payables
+			SET status='approved', approved_by=NULLIF($2,'')::uuid, updated_at=now()
+			WHERE id=$1 AND status=$3
+			RETURNING *
+		`, id, actorID, fromStatus)
+	case "pay":
+		if !statusIn(fromStatus, "approved", "partially_paid", "overdue") {
+			return nil, validationError("Phải trả cần được duyệt trước khi tất toán", Record{"status": fromStatus})
+		}
+		remaining := number(current["remaining_amount"])
+		if remaining <= 0 {
+			return nil, validationError("Phải trả không còn số tiền cần tất toán")
+		}
+		toStatus = "paid"
+		event = "payable_paid"
+		metadata["amount"] = remaining
+		updated, err = queryTx(ctx, tx, `
+			UPDATE payables
+			SET status='paid',
+				paid_amount=paid_amount + $2,
+				remaining_amount=0,
+				approved_by=COALESCE(approved_by,NULLIF($3,'')::uuid),
+				updated_at=now()
+			WHERE id=$1 AND status=$4
+			RETURNING *
+		`, id, remaining, actorID, fromStatus)
+	default:
+		return nil, validationError("Action phải trả không hợp lệ", Record{"action": action})
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Trạng thái phải trả đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	comment := actionComment(req)
+	metadata["to_status"] = toStatus
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, event, "payable", id, fmt.Sprintf("Cập nhật phải trả từ %s sang %s", fromStatus, toStatus), metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return updated[0], nil
+}
+
+func (r *Repository) ReceivableAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM receivables WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	toStatus := ""
+	event := ""
+	metadata := Record{"action": action, "from_status": fromStatus}
+	var updated []Record
+	switch action {
+	case "approve":
+		if !statusIn(fromStatus, "draft", "submitted", "recorded", "overdue") {
+			return nil, validationError("Trạng thái phải thu không cho phép duyệt", Record{"status": fromStatus})
+		}
+		toStatus = "approved"
+		event = "receivable_approved"
+		updated, err = queryTx(ctx, tx, `
+			UPDATE receivables
+			SET status='approved', approved_by=NULLIF($2,'')::uuid, updated_at=now()
+			WHERE id=$1 AND status=$3
+			RETURNING *
+		`, id, actorID, fromStatus)
+	case "receive":
+		if !statusIn(fromStatus, "approved", "partially_received", "overdue") {
+			return nil, validationError("Phải thu cần được duyệt trước khi ghi nhận thu", Record{"status": fromStatus})
+		}
+		remaining := number(current["remaining_amount"])
+		if remaining <= 0 {
+			return nil, validationError("Phải thu không còn số tiền cần ghi nhận")
+		}
+		toStatus = "received"
+		event = "receivable_received"
+		metadata["amount"] = remaining
+		updated, err = queryTx(ctx, tx, `
+			UPDATE receivables
+			SET status='received',
+				received_amount=received_amount + $2,
+				remaining_amount=0,
+				approved_by=COALESCE(approved_by,NULLIF($3,'')::uuid),
+				updated_at=now()
+			WHERE id=$1 AND status=$4
+			RETURNING *
+		`, id, remaining, actorID, fromStatus)
+	default:
+		return nil, validationError("Action phải thu không hợp lệ", Record{"action": action})
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Trạng thái phải thu đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	comment := actionComment(req)
+	metadata["to_status"] = toStatus
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, event, "receivable", id, fmt.Sprintf("Cập nhật phải thu từ %s sang %s", fromStatus, toStatus), metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return updated[0], nil
+}
+
+func (r *Repository) PaymentAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	if action != "approve" {
+		return nil, validationError("Action phiếu thanh toán không hợp lệ", Record{"action": action})
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM payments WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	if !statusIn(fromStatus, "draft", "submitted", "pending") {
+		return nil, validationError("Trạng thái phiếu thanh toán không cho phép duyệt", Record{"status": fromStatus})
+	}
+	updated, err := queryTx(ctx, tx, `
+		UPDATE payments
+		SET status='approved',
+			approved_by=NULLIF($2,'')::uuid,
+			paid_at=COALESCE(paid_at, now()),
+			updated_at=now()
+		WHERE id=$1 AND status=$3
+		RETURNING *
+	`, id, actorID, fromStatus)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Trạng thái phiếu thanh toán đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	comment := actionComment(req)
+	metadata := Record{"action": action, "from_status": fromStatus, "to_status": "approved"}
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, "payment_approved", "payment", id, "Duyệt phiếu thanh toán", metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return updated[0], nil
 }
 
 func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record, error) {
@@ -3195,7 +3828,11 @@ func (r *Repository) Report(ctx context.Context, kind, userID string) ([]Record,
 	case "warehouse":
 		return r.Query(ctx, fmt.Sprintf(`
 			SELECT m.name, m.category,
-				COALESCE(SUM(CASE WHEN sm.movement_type='receive' THEN sm.quantity WHEN sm.movement_type IN ('issue','loss') THEN -sm.quantity ELSE 0 END),0) AS stock_quantity,
+				COALESCE(SUM(CASE
+					WHEN sm.movement_type IN ('receive','return_to_warehouse') THEN sm.quantity
+					WHEN sm.movement_type IN ('issue','transfer','loss') THEN -sm.quantity
+					ELSE 0
+				END),0) AS stock_quantity,
 				COALESCE(SUM(smb.surplus_quantity),0) AS surplus_quantity
 			FROM materials m
 			LEFT JOIN stock_movements sm ON sm.material_id=m.id
