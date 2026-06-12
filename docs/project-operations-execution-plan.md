@@ -1,6 +1,6 @@
 # Project Operations Execution Plan
 
-Status: active execution plan as of 2026-06-12. Batches 1, 2, and 3 have been implemented in the current working tree.
+Status: active execution plan as of 2026-06-12. Batches 1, 2, 3, and 4 have been implemented in the current working tree.
 
 This document turns `docs/current-states.md` into implementation batches. It is the handoff surface for long-context runs and subagent orchestration.
 
@@ -10,6 +10,7 @@ This document turns `docs/current-states.md` into implementation batches. It is 
 - Batch 1 is implemented.
 - Batch 2 is implemented.
 - Batch 3 is implemented.
+- Batch 4 is implemented.
 - Do not edit applied migrations. Add new `V<N>__description.sql` files only.
 - Use backend contract work before frontend composition. UI should consume server-scoped operations/work-item payloads rather than filtering broad module data.
 - Use Browser, Playwright, or browser-use only when explicitly requested in that turn.
@@ -86,14 +87,17 @@ Review gate before implementation:
 
 ## Batch 4: RBAC And Legacy Module Scope
 
+Status: implemented.
+
 Goal: make legacy module endpoints match the Project Operations visibility model.
 
 Expected work:
 
 - Add permission/project-scope checks to approvals, BOQ, procurement, warehouse, operations, acceptance, rework, handover, accounting, reports, staff/RBAC as appropriate.
 - Update seed role permissions for operational roles.
-- Add backend denial tests for seeded demo users.
+- Add backend denial and project-scope tests for legacy lists/actions.
 - Keep user-visible lists filtered server-side.
+- Added scoped dashboard/report/audit queries so non-global users only see accessible projects.
 
 Review gate before implementation:
 

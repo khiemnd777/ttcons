@@ -82,6 +82,9 @@ Project Operations Dashboard
 - Work items support start, complete, block, resolve blocker, request review, request approval, approve, reject, request changes, metadata/path evidence, and scoped activity comments.
 - Required document/photo/checklist evidence is enforced before review request, approval request, approve, and completion.
 - Project operations API now returns project summary, visibility, health counts, workflow timeline, active work, blockers, approvals, evidence, activity, audit, and department surfaces with server-side scope.
+- Legacy backend modules now enforce permission and project scope across project CRUD/listing, pipeline templates, approvals, BOQ, procurement, stock/material balances, operations, acceptance, rework, replanning, handover, accounting, audit, reports, settings, staff, and RBAC surfaces.
+- Dashboard, reports, audit logs, approvals, procurement, and accounting global lists are scoped to accessible projects for non-global users.
+- Seed operational role permissions have been expanded for PM, director, QS, accounting, procurement, warehouse, supervisor, QA/QC, construction team, subcontractor, client, and viewer roles.
 - Seed data has a construction template covering survey, design, BOQ, budget approval, procurement, warehouse issue, construction, acceptance, handover, and financial closure.
 - Frontend has pages for project detail, planning, BOQ, procurement, warehouse, operations, acceptance, rework, handover, accounting, debt, audit, reports, staff, roles, permissions, and settings.
 
@@ -89,12 +92,9 @@ Project Operations Dashboard
 
 - `ProjectDetailPage` is still mostly stat cards plus module links.
 - `PlanningPage` is still a generic pipeline node/step screen with simple submit/advance/block actions.
-- Sidebar currently shows all modules to all authenticated users.
-- Backend route protection is mostly login-only. Only pipeline node/step actions currently have permission checks.
+- Sidebar currently shows all modules to all authenticated users; frontend no-permission states still need the Batch 5 UI pass.
 - `pipeline_run_steps` legacy UI is still thin and should move behind work item detail/actions in the production UI.
 - Binary document upload/storage is still out of scope; evidence currently stores metadata/path records tied to work items.
-- Seed roles exist, but non-admin operational roles lack complete production permissions.
-- Legacy module endpoints still need the same project/permission scope model as Project Operations.
 - Cross-domain work item generation beyond pipeline run steps is still incomplete.
 
 ## Production Operating Model

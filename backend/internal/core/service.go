@@ -83,8 +83,8 @@ func (s *Service) signToken(userID, email string, roles []string) (string, error
 	return token.SignedString([]byte(s.jwtSecret))
 }
 
-func (s *Service) ListProjects(ctx context.Context) ([]Record, error) {
-	return s.repo.ListProjects(ctx)
+func (s *Service) ListProjects(ctx context.Context, actorID string) ([]Record, error) {
+	return s.repo.ListProjects(ctx, actorID)
 }
 
 func (s *Service) CreateProject(ctx context.Context, body Record) (Record, error) {
@@ -701,15 +701,15 @@ func (s *Service) CompleteHandover(ctx context.Context, id, actorID, actorName s
 	return s.repo.CompleteHandover(ctx, id, actorID, actorName)
 }
 
-func (s *Service) Dashboard(ctx context.Context) (Record, error) {
-	return s.repo.DashboardReport(ctx)
+func (s *Service) Dashboard(ctx context.Context, actorID string) (Record, error) {
+	return s.repo.DashboardReport(ctx, actorID)
 }
 
-func (s *Service) Report(ctx context.Context, kind string) ([]Record, error) {
-	return s.repo.Report(ctx, kind)
+func (s *Service) Report(ctx context.Context, kind, actorID string) ([]Record, error) {
+	return s.repo.Report(ctx, kind, actorID)
 }
 
-func (s *Service) AuditLogs(ctx context.Context, projectID string) ([]Record, error) {
+func (s *Service) AuditLogs(ctx context.Context, projectID, actorID string) ([]Record, error) {
 	if projectID != "" {
 		return s.repo.Query(ctx, `
 			SELECT * FROM audit_logs
@@ -718,5 +718,16 @@ func (s *Service) AuditLogs(ctx context.Context, projectID string) ([]Record, er
 			LIMIT 200
 		`, projectID)
 	}
-	return s.repo.Query(ctx, `SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 300`)
+	scopeSQL, scopeArgs, err := s.repo.ProjectAccessFilter(ctx, actorID, "p", 1)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.Query(ctx, fmt.Sprintf(`
+		SELECT al.*
+		FROM audit_logs al
+		JOIN projects p ON p.id=al.project_id
+		WHERE p.status <> 'cancelled' AND %s
+		ORDER BY al.created_at DESC
+		LIMIT 300
+	`, scopeSQL), scopeArgs...)
 }

@@ -60,6 +60,85 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.key IN ('project.view','p
 WHERE r.name IN ('director','pm')
 ON CONFLICT DO NOTHING;
 
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON (
+  (r.name='director' AND p.key IN (
+    'project.view','pipeline.view','pipeline.run','pipeline.advance_node',
+    'boq.view','boq.approve',
+    'procurement.view','procurement.approve',
+    'warehouse.view','operation.view',
+    'acceptance.view','acceptance.approve','acceptance.reject',
+    'rework.view','rework.approve',
+    'replanning.view','replanning.approve',
+    'handover.view','handover.approve',
+    'accounting.view','accounting.budget_view','accounting.budget_approve',
+    'accounting.payable_view','accounting.payable_approve',
+    'accounting.receivable_view','accounting.receivable_approve',
+    'accounting.payment_approve',
+    'audit.view','report.view','report.finance.view'
+  ))
+  OR (r.name='pm' AND p.key IN (
+    'project.view','project.update',
+    'pipeline.view','pipeline.run','pipeline.advance_node',
+    'boq.view','boq.create','boq.update','boq.approve',
+    'procurement.view','procurement.create','procurement.approve','procurement.order',
+    'warehouse.view',
+    'operation.view','operation.report','operation.issue_create','operation.issue_update',
+    'acceptance.view','acceptance.create','acceptance.approve','acceptance.reject',
+    'rework.view','rework.create','rework.approve',
+    'replanning.view','replanning.create','replanning.approve',
+    'handover.view','handover.create','handover.approve',
+    'accounting.view','accounting.budget_view','accounting.payable_view','accounting.receivable_view',
+    'audit.view','report.view'
+  ))
+  OR (r.name='qs' AND p.key IN (
+    'project.view','pipeline.view','boq.view','boq.create','boq.update','boq.approve','procurement.view','accounting.budget_view','report.view'
+  ))
+  OR (r.name='accounting' AND p.key IN (
+    'project.view','pipeline.view','boq.view',
+    'procurement.view','procurement.approve',
+    'handover.view',
+    'accounting.view','accounting.budget_view','accounting.budget_approve',
+    'accounting.payable_view','accounting.payable_approve',
+    'accounting.receivable_view','accounting.receivable_approve',
+    'accounting.payment_create','accounting.payment_approve',
+    'audit.view','report.view','report.finance.view'
+  ))
+  OR (r.name='procurement' AND p.key IN (
+    'project.view','pipeline.view','procurement.view','procurement.create','procurement.approve','procurement.order','procurement.receive','warehouse.view','report.view'
+  ))
+  OR (r.name='warehouse' AND p.key IN (
+    'project.view','pipeline.view','procurement.view','procurement.receive',
+    'warehouse.view','warehouse.receive','warehouse.issue','warehouse.transfer','warehouse.adjust','warehouse.surplus_handle',
+    'report.view'
+  ))
+  OR (r.name='supervisor' AND p.key IN (
+    'project.view','pipeline.view','warehouse.view',
+    'operation.view','operation.report','operation.issue_create','operation.issue_update',
+    'acceptance.view','rework.view','rework.create','report.view'
+  ))
+  OR (r.name='qa_qc' AND p.key IN (
+    'project.view','pipeline.view','operation.view',
+    'acceptance.view','acceptance.create','acceptance.approve','acceptance.reject',
+    'rework.view','rework.create','report.view'
+  ))
+  OR (r.name='construction_team' AND p.key IN (
+    'project.view','operation.view','operation.report','operation.issue_create','warehouse.view'
+  ))
+  OR (r.name='subcontractor' AND p.key IN (
+    'project.view','operation.view','operation.report','operation.issue_create','warehouse.view'
+  ))
+  OR (r.name='client' AND p.key IN (
+    'project.view','acceptance.view','handover.view'
+  ))
+  OR (r.name='viewer' AND p.key IN (
+    'project.view','pipeline.view','operation.view','acceptance.view','handover.view','report.view'
+  ))
+)
+ON CONFLICT DO NOTHING;
+
 INSERT INTO staff (id, user_id, full_name, email, phone, department, position, status) VALUES
 ('21000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Admin hệ thống','admin@consflow.local','0900000001','Công nghệ','Admin','active'),
 ('21000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002','Nguyễn Minh PM','pm@consflow.local','0900000002','Dự án','Project Manager','active'),

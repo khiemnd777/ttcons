@@ -3,14 +3,19 @@ package core
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"consflow/backend/internal/shared/migrations"
 
+	"github.com/gofiber/fiber/v2"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -156,6 +161,139 @@ func TestProjectOperationsAccessPolicy(t *testing.T) {
 	assertCanViewProjectOperations(t, repo, ctx, cancelledProjectID, directorUserID, false)
 }
 
+func TestBatch4ProjectListIsScopedByMembership(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	fixture := setupProjectScopeFixture(t, db, []string{"project.view"})
+
+	rows, err := repo.ListProjects(ctx, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected exactly one scoped project, got %d", len(rows))
+	}
+	if rows[0]["id"] != fixture.projectID {
+		t.Fatalf("project id = %v, want %s", rows[0]["id"], fixture.projectID)
+	}
+}
+
+func TestBatch4ProjectCreateRequiresModulePermission(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	handler := NewHandler(NewService(repo, "test-secret"))
+	fixture := setupProjectScopeFixture(t, db, []string{"project.view", "boq.view"})
+	allowed, err := repo.CanAccessProjectPermission(ctx, fixture.userID, fixture.projectID, []string{"boq.create"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allowed {
+		t.Fatal("expected direct RBAC helper to deny boq.create")
+	}
+	app := batch4TestApp(fixture.userID, func(app *fiber.App, h *Handler) {
+		app.Post("/projects/:id/boq", h.CreateBOQ)
+	}, handler)
+
+	req := httptest.NewRequest(http.MethodPost, "/projects/"+fixture.projectID+"/boq", strings.NewReader(`{"category":"A","work_item_name":"Denied","unit":"m2","quantity":1,"unit_price":10}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusForbidden)
+	}
+}
+
+func TestBatch4AccountingListUsesProjectScope(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	repo := NewRepository(db)
+	handler := NewHandler(NewService(repo, "test-secret"))
+	fixture := setupProjectScopeFixture(t, db, []string{"accounting.view", "accounting.payable_view"})
+	mustExec(t, db, `
+		INSERT INTO payables (project_id, payable_code, vendor_type, vendor_name, source_type, gross_amount, remaining_amount, status, created_by)
+		VALUES ($1,$2,'supplier','Scoped Vendor','manual',100,100,'approved',$3),
+		       ($4,$5,'supplier','Other Vendor','manual',200,200,'approved',$3)
+	`, fixture.projectID, "PAY-S-"+fixture.projectID[:8], fixture.userID, fixture.otherProjectID, "PAY-O-"+fixture.otherProjectID[:8])
+	app := batch4TestApp(fixture.userID, func(app *fiber.App, h *Handler) {
+		app.Get("/payables", h.ListPayables)
+	}, handler)
+
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/payables", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	var body struct {
+		Success bool     `json:"success"`
+		Data    []Record `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if !body.Success {
+		t.Fatal("expected success response")
+	}
+	if len(body.Data) != 1 {
+		t.Fatalf("expected one scoped payable, got %d", len(body.Data))
+	}
+	if body.Data[0]["project_id"] != fixture.projectID {
+		t.Fatalf("project_id = %v, want %s", body.Data[0]["project_id"], fixture.projectID)
+	}
+}
+
+func TestBatch4StockAggregateExcludesOutOfScopeProjectMovements(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	repo := NewRepository(db)
+	handler := NewHandler(NewService(repo, "test-secret"))
+	fixture := setupProjectScopeFixture(t, db, []string{"warehouse.view", "report.view"})
+	materialID := newID()
+	warehouseID := newID()
+	mustExec(t, db, `INSERT INTO materials (id, code, name, unit, category, active) VALUES ($1,$2,'Batch4 Material','m','Test',true)`, materialID, "MAT-"+materialID[:8])
+	mustExec(t, db, `INSERT INTO warehouses (id, name, location, type, active) VALUES ($1,'Batch4 Warehouse','Test','central',true)`, warehouseID)
+	mustExec(t, db, `
+		INSERT INTO stock_movements (movement_code, project_id, warehouse_id, material_id, movement_type, quantity, unit, reason, created_by, approved_by)
+		VALUES ($1,NULL,$2,$3,'receive',100,'m','Central stock',$4,$4),
+		       ($5,$6,$2,$3,'issue',10,'m','Scoped issue',$4,$4),
+		       ($7,$8,$2,$3,'issue',70,'m','Out of scope issue',$4,$4)
+	`, "SM-C-"+materialID[:6], warehouseID, materialID, fixture.userID, "SM-S-"+materialID[:6], fixture.projectID, "SM-O-"+materialID[:6], fixture.otherProjectID)
+	app := batch4TestApp(fixture.userID, func(app *fiber.App, h *Handler) {
+		app.Get("/stock", h.Stock)
+	}, handler)
+
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/stock", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	var body struct {
+		Success bool     `json:"success"`
+		Data    []Record `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	var found Record
+	for _, row := range body.Data {
+		if row["material_id"] == materialID {
+			found = row
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("expected batch4 material in stock response")
+	}
+	if got := number(found["stock_quantity"]); got != 90 {
+		t.Fatalf("stock_quantity = %v, want 90", got)
+	}
+}
+
 func openProjectOperationsTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := os.Getenv("CONSFLOW_TEST_DATABASE_URL")
@@ -215,6 +353,55 @@ func assertCanViewProjectOperations(t *testing.T, repo *Repository, ctx context.
 	if got != want {
 		t.Fatalf("CanViewProjectOperations(%s, %s) = %v, want %v", projectID, userID, got, want)
 	}
+}
+
+type projectScopeFixture struct {
+	userID         string
+	staffID        string
+	roleID         string
+	projectID      string
+	otherProjectID string
+}
+
+func setupProjectScopeFixture(t *testing.T, db *sql.DB, permissions []string) projectScopeFixture {
+	t.Helper()
+	ctx := context.Background()
+	suffix := newID()
+	userID := newID()
+	staffID := newID()
+	roleID := ensureRole(t, db, "batch4_scope_"+suffix[:8], "Batch4 Scope")
+	projectID := newID()
+	otherProjectID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM project_members WHERE project_id IN ($1,$2)`, projectID, otherProjectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id IN ($1,$2)`, projectID, otherProjectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1`, userID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, roleID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, roleID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, staffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, userID)
+	})
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Scoped User','active')`, userID, "batch4-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id, user_id, full_name, email, department, position, status) VALUES ($1,$2,'Scoped User',$3,'Dự án','Member','active')`, staffID, userID, "batch4-staff-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Batch4 Scoped',$2,'Client','planning'),($3,'Batch4 Other',$4,'Client','planning')`, projectID, "B4S-"+suffix[:8], otherProjectID, "B4O-"+suffix[:8])
+	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["Member"]'::jsonb,true)`, projectID, staffID)
+	mustExec(t, db, `INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2)`, userID, roleID)
+	for _, permission := range permissions {
+		permissionID := ensurePermission(t, db, permission, permission, "batch4")
+		mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, roleID, permissionID)
+	}
+	return projectScopeFixture{userID: userID, staffID: staffID, roleID: roleID, projectID: projectID, otherProjectID: otherProjectID}
+}
+
+func batch4TestApp(userID string, register func(*fiber.App, *Handler), handler *Handler) *fiber.App {
+	app := fiber.New(fiber.Config{ErrorHandler: ErrorHandler})
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user_id", userID)
+		c.Locals("email", "batch4@test.local")
+		return c.Next()
+	})
+	register(app, handler)
+	return app
 }
 
 type workItemFlowFixture struct {
