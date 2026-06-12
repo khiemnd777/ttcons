@@ -9,6 +9,7 @@ type TemplateSidebarProps = {
   selectedTemplateId: string;
   expanded: boolean;
   children: ReactNode;
+  showBackButton?: boolean;
   createTemplatePending: boolean;
   deleteTemplatePendingId?: string;
   onBack: () => void;
@@ -23,6 +24,7 @@ export function TemplateSidebar({
   selectedTemplateId,
   expanded,
   children,
+  showBackButton = true,
   createTemplatePending,
   deleteTemplatePendingId,
   onBack,
@@ -33,15 +35,17 @@ export function TemplateSidebar({
 }: TemplateSidebarProps) {
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-line bg-white">
-      <div className="border-b border-line px-4 py-4">
-        <button
-          className="inline-flex w-full items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-          onClick={onBack}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </button>
-      </div>
+      {showBackButton ? (
+        <div className="border-b border-line px-4 py-4">
+          <button
+            className="inline-flex w-full items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+            onClick={onBack}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+        </div>
+      ) : null}
 
       <div className="min-h-0 flex-1 overflow-auto px-3 py-4">
         <section className="border-b border-line pb-4">
@@ -53,7 +57,7 @@ export function TemplateSidebar({
             <button
               title="Tạo template"
               disabled={createTemplatePending}
-              className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+              className="rounded-md bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:opacity-50"
               onClick={onCreateTemplate}
             >
               <Plus className="h-4 w-4" />

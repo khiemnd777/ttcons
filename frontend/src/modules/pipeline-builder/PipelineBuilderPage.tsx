@@ -181,7 +181,7 @@ export function PipelineBuilderPage() {
   const createTemplate = useMutation({
     mutationFn: () =>
       post<PipelineTemplate>('/pipeline-templates', {
-        name: 'Template hoàn thiện nội thất mới',
+        name: 'Template mới',
         description: 'Template tạo từ Pipeline Builder',
         project_type: 'Hoàn thiện nội thất',
         status: 'draft',
@@ -650,6 +650,7 @@ export function PipelineBuilderPage() {
             templates={templates.data ?? []}
             selectedTemplateId={selectedTemplateId}
             expanded={templatesExpanded}
+            showBackButton={false}
             createTemplatePending={createTemplate.isPending}
             deleteTemplatePendingId={deleteTemplate.isPending ? deleteTemplateDialog?.id : undefined}
             onBack={() => navigate('/dashboard')}

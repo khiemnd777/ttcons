@@ -55,7 +55,7 @@ export function PipelineBuilderShell({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-base font-semibold text-ink">Pipeline Builder</h1>
+                <h1 className="text-base font-semibold text-ink">Workflow</h1>
                 {templateName ? <span className="truncate text-sm font-medium text-slate-500">/ {templateName}</span> : null}
                 {templateStatus ? <StatusBadge status={templateStatus} /> : null}
                 <button
