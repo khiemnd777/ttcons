@@ -425,12 +425,13 @@ export function PipelineBuilderPage() {
   const addStep = useMutation({
     mutationFn: () => {
       if (!detailsNodeId) throw new Error('Chưa chọn node');
+      const nextOrderIndex = Math.max(0, ...(detailsNode?.steps ?? []).map((step: Record<string, any>) => Number(step.order_index ?? 0))) + 1;
       return post(`/pipeline-nodes/${detailsNodeId}/steps`, {
         name: stepForm.name.trim(),
         description: 'Checklist mẫu trong node',
         step_type: stepForm.step_type,
         required_role_ids: [stepForm.responsible_role_id].filter(Boolean),
-        order_index: (detailsNode?.steps?.length ?? 0) + 1,
+        order_index: nextOrderIndex,
       });
     },
     onSuccess: () => {
@@ -466,6 +467,47 @@ export function PipelineBuilderPage() {
       toast.success('Đã xóa checklist');
     },
     onError: (error) => toast.error('Không xóa được checklist', error),
+  });
+
+  const reorderStep = useMutation({
+    mutationFn: async ({ stepId, direction }: { stepId: string; direction: 'up' | 'down' }) => {
+      const steps = sortedStepsForNode(detailsNode);
+      const currentIndex = steps.findIndex((step) => String(step.id) === stepId);
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= steps.length) return [];
+
+      const reorderedSteps = [...steps];
+      const [currentStep] = reorderedSteps.splice(currentIndex, 1);
+      reorderedSteps.splice(targetIndex, 0, currentStep);
+      const updates = reorderedSteps
+        .map((step, index) => ({ stepId: String(step.id), orderIndex: index + 1, previousOrderIndex: Number(step.order_index ?? 0) }))
+        .filter((update) => update.orderIndex !== update.previousOrderIndex);
+
+      await Promise.all(updates.map((update) => put(`/pipeline-steps/${update.stepId}`, { order_index: update.orderIndex })));
+      return updates;
+    },
+    onSuccess: (updates) => {
+      if (!updates.length) return;
+      const updateById = new Map(updates.map((update) => [update.stepId, update.orderIndex]));
+      queryClient.setQueryData<PipelineTemplate>(['pipeline-template', selectedTemplateId], (current) => {
+        if (!current?.nodes) return current;
+        return {
+          ...current,
+          nodes: current.nodes.map((node) => ({
+            ...node,
+            steps: Array.isArray(node.steps)
+              ? node.steps.map((step: Record<string, any>) => {
+                  const orderIndex = updateById.get(String(step.id));
+                  return orderIndex === undefined ? step : { ...step, order_index: orderIndex };
+                })
+              : node.steps,
+          })),
+        };
+      });
+      invalidate();
+      toast.success('Đã sắp xếp checklist');
+    },
+    onError: (error) => toast.error('Không sắp xếp được checklist', error),
   });
 
   const openAddStepDialog = () => {
@@ -697,6 +739,7 @@ export function PipelineBuilderPage() {
               addStepPending={addStep.isPending}
               updateStepPending={updateStep.isPending}
               deleteStepPending={deleteStep.isPending}
+              reorderStepPending={reorderStep.isPending}
               onChangeField={(field, value) => setNodeForm((current) => ({ ...current, [field]: value }))}
               onChangeStepField={(field, value) => setStepForm((current) => ({ ...current, [field]: value }))}
               onSave={() => saveNode.mutate()}
@@ -706,6 +749,7 @@ export function PipelineBuilderPage() {
               onCloseStepDialog={closeStepDialog}
               onSubmitStep={submitStepDialog}
               onDeleteStep={(stepId) => deleteStep.mutate(stepId)}
+              onMoveStep={(stepId, direction) => reorderStep.mutate({ stepId, direction })}
             />
           ) : selectedConnector ? (
             <EdgeInspectorPanel
@@ -851,6 +895,15 @@ function normalizePermissions(node: PipelineNode) {
   if (Array.isArray(node.permissions)) return node.permissions.map(String);
   if (node.required_permission) return [String(node.required_permission)];
   return [];
+}
+
+function sortedStepsForNode(node?: PipelineNode) {
+  return [...(node?.steps ?? [])].sort((a: Record<string, any>, b: Record<string, any>) => {
+    const aOrder = Number(a.order_index ?? 0);
+    const bOrder = Number(b.order_index ?? 0);
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return String(a.created_at ?? a.id ?? '').localeCompare(String(b.created_at ?? b.id ?? ''), 'vi');
+  });
 }
 
 function validEdgePriority(value: string) {

@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { Dialog } from '../../../components/Dialog';
 import { EnumChip } from '../../../components/EnumChip';
 import type { PipelineNode } from '../../../lib/types/domain';
 import { enumOptions } from '../../../lib/utils/status';
 
-const roleOptions = ['PM', 'QS', 'Giám sát', 'Kế toán', 'Thủ kho', 'QA/QC', 'Giám đốc', 'Chủ đầu tư', 'Mua hàng', 'Đội thi công'];
+const roleOptions = ['PM', 'QS', 'Thiết kế', 'Giám sát', 'Kế toán', 'Thủ kho', 'QA/QC', 'Giám đốc', 'Chủ đầu tư', 'Mua hàng', 'Đội thi công'];
 const nodeTypes = ['survey', 'design', 'boq', 'budget_approval', 'procurement', 'warehouse_issue', 'construction', 'acceptance', 'rework', 'replanning', 'handover', 'financial_closure', 'custom'];
 const stepTypes = ['task', 'checklist', 'approval', 'document_upload', 'photo_upload', 'budget_check', 'material_check', 'acceptance_check', 'accounting_check'];
 
@@ -24,6 +24,7 @@ type NodeInspectorPanelProps = {
   addStepPending: boolean;
   updateStepPending: boolean;
   deleteStepPending: boolean;
+  reorderStepPending: boolean;
   onChangeField: (field: string, value: unknown) => void;
   onChangeStepField: (field: 'name' | 'step_type' | 'responsible_role_id', value: string) => void;
   onSave: () => void;
@@ -33,6 +34,7 @@ type NodeInspectorPanelProps = {
   onCloseStepDialog: () => void;
   onSubmitStep: () => void;
   onDeleteStep: (stepId: string) => void;
+  onMoveStep: (stepId: string, direction: 'up' | 'down') => void;
 };
 
 export function NodeInspectorPanel({
@@ -47,6 +49,7 @@ export function NodeInspectorPanel({
   addStepPending,
   updateStepPending,
   deleteStepPending,
+  reorderStepPending,
   onChangeField,
   onChangeStepField,
   onSave,
@@ -56,8 +59,18 @@ export function NodeInspectorPanel({
   onCloseStepDialog,
   onSubmitStep,
   onDeleteStep,
+  onMoveStep,
 }: NodeInspectorPanelProps) {
   const stepSavePending = addStepPending || updateStepPending;
+  const stepActionPending = stepSavePending || deleteStepPending || reorderStepPending;
+  const sortedSteps = useMemo(() => {
+    return [...(node.steps ?? [])].sort((a: Record<string, any>, b: Record<string, any>) => {
+      const aOrder = Number(a.order_index ?? 0);
+      const bOrder = Number(b.order_index ?? 0);
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return String(a.created_at ?? a.id ?? '').localeCompare(String(b.created_at ?? b.id ?? ''), 'vi');
+    });
+  }, [node.steps]);
 
   return (
     <>
@@ -91,7 +104,7 @@ export function NodeInspectorPanel({
           <div className="border-t border-line pt-4">
             <h3 className="text-sm font-semibold text-ink">Checklist / Step</h3>
             <div className="mt-3 space-y-2">
-              {(node.steps ?? []).map((step: Record<string, any>, index: number) => {
+              {sortedSteps.map((step: Record<string, any>, index: number) => {
                 const stepRoles = Array.isArray(step.required_role_ids) ? step.required_role_ids.join(', ') : '';
                 return (
                   <div key={step.id ?? `${node.id}-${index}`} className="flex items-start justify-between gap-2 rounded-md border border-line px-3 py-2">
@@ -104,10 +117,16 @@ export function NodeInspectorPanel({
                     </div>
                     {step.id ? (
                       <div className="flex shrink-0 gap-1">
-                        <button title="Sửa checklist" className="rounded-md p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-600" onClick={() => onOpenEditStep(step)} disabled={stepSavePending || deleteStepPending}>
+                        <button title="Đưa checklist lên" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30" onClick={() => onMoveStep(String(step.id), 'up')} disabled={stepActionPending || index === 0}>
+                          <ChevronUp className="h-4 w-4" />
+                        </button>
+                        <button title="Đưa checklist xuống" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30" onClick={() => onMoveStep(String(step.id), 'down')} disabled={stepActionPending || index === sortedSteps.length - 1}>
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                        <button title="Sửa checklist" className="rounded-md p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-600" onClick={() => onOpenEditStep(step)} disabled={stepActionPending}>
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button title="Xóa checklist" className="rounded-md p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-600" onClick={() => onDeleteStep(String(step.id))} disabled={deleteStepPending || stepSavePending}>
+                        <button title="Xóa checklist" className="rounded-md p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-600" onClick={() => onDeleteStep(String(step.id))} disabled={stepActionPending}>
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
