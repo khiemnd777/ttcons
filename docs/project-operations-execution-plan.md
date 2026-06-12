@@ -1,6 +1,6 @@
 # Project Operations Execution Plan
 
-Status: active execution plan as of 2026-06-12. Batches 1, 2, 3, and 4 have been implemented in the current working tree.
+Status: active execution plan as of 2026-06-12. Batches 1, 2, 3, 4, and 5 have been implemented in the current working tree.
 
 This document turns `docs/current-states.md` into implementation batches. It is the handoff surface for long-context runs and subagent orchestration.
 
@@ -11,6 +11,7 @@ This document turns `docs/current-states.md` into implementation batches. It is 
 - Batch 2 is implemented.
 - Batch 3 is implemented.
 - Batch 4 is implemented.
+- Batch 5 is implemented.
 - Do not edit applied migrations. Add new `V<N>__description.sql` files only.
 - Use backend contract work before frontend composition. UI should consume server-scoped operations/work-item payloads rather than filtering broad module data.
 - Use Browser, Playwright, or browser-use only when explicitly requested in that turn.
@@ -106,6 +107,8 @@ Review gate before implementation:
 
 ## Batch 5: Project Operations Dashboard UI
 
+Status: implemented.
+
 Goal: replace project detail as the main project control room.
 
 Expected work:
@@ -115,6 +118,7 @@ Expected work:
 - Keep module links secondary.
 - Reuse shared work-item detail, action footer, activity, and evidence components.
 - Add loading, empty, no-permission, blocked, overdue, waiting approval, completed, and API error states.
+- Implemented in `frontend/src/modules/projects/ProjectDetailPage.tsx` with a scoped work-item detail dialog and action footer using existing work-item endpoints.
 
 Review gate before implementation:
 
