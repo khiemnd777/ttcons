@@ -3,6 +3,7 @@ import { Loader2, Plus, Send, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useToast } from '../../components/ToastProvider';
 import type { ActivityAttachmentPayload, ActivityMentionPayload, ActivityPayload } from '../../lib/types/domain';
+import { enumLabel, statusLabel } from '../../lib/utils/status';
 
 type ComposerMode = 'project' | 'work_item';
 type ActivityType = ActivityPayload['activity_type'];
@@ -26,46 +27,46 @@ export type ActivityAttachmentOption = {
 };
 
 const baseActivityOptions: Array<{ value: ActivityType; label: string }> = [
-  { value: 'comment', label: 'Ghi chú' },
-  { value: 'status', label: 'Trạng thái' },
-  { value: 'blocker', label: 'Blocker' },
-  { value: 'question', label: 'Câu hỏi' },
-  { value: 'decision', label: 'Quyết định' },
-  { value: 'reminder', label: 'Nhắc việc' },
-  { value: 'file_note', label: 'Ghi chú file' },
+  { value: 'comment', label: enumLabel('activity_type', 'comment') },
+  { value: 'status', label: enumLabel('activity_type', 'status') },
+  { value: 'blocker', label: enumLabel('activity_type', 'blocker') },
+  { value: 'question', label: enumLabel('activity_type', 'question') },
+  { value: 'decision', label: enumLabel('activity_type', 'decision') },
+  { value: 'reminder', label: enumLabel('activity_type', 'reminder') },
+  { value: 'file_note', label: enumLabel('activity_type', 'file_note') },
 ];
 
 const workItemOnlyOptions: Array<{ value: ActivityType; label: string }> = [];
 
 const visibilityOptions: Array<{ value: Visibility; label: string }> = [
-  { value: 'project', label: 'Project' },
-  { value: 'internal', label: 'Internal' },
-  { value: 'client', label: 'Client' },
+  { value: 'project', label: enumLabel('visibility', 'project') },
+  { value: 'internal', label: enumLabel('visibility', 'internal') },
+  { value: 'client', label: enumLabel('visibility', 'client') },
 ];
 
 const targetScopeOptions = [
-  { value: 'project', label: 'Project' },
-  { value: 'work_item', label: 'Work item' },
-  { value: 'boq_item', label: 'BOQ item' },
-  { value: 'procurement_request', label: 'Procurement' },
-  { value: 'stock_movement', label: 'Stock movement' },
-  { value: 'acceptance', label: 'Acceptance' },
-  { value: 'rework', label: 'Rework' },
-  { value: 'handover', label: 'Handover' },
-  { value: 'payable', label: 'Payable' },
-  { value: 'receivable', label: 'Receivable' },
-  { value: 'payment', label: 'Payment' },
+  { value: 'project', label: enumLabel('scope_type', 'project') },
+  { value: 'work_item', label: enumLabel('scope_type', 'work_item') },
+  { value: 'boq_item', label: enumLabel('scope_type', 'boq_item') },
+  { value: 'procurement_request', label: enumLabel('scope_type', 'procurement_request') },
+  { value: 'stock_movement', label: enumLabel('scope_type', 'stock_movement') },
+  { value: 'acceptance', label: enumLabel('scope_type', 'acceptance') },
+  { value: 'rework', label: enumLabel('scope_type', 'rework') },
+  { value: 'handover', label: enumLabel('scope_type', 'handover') },
+  { value: 'payable', label: enumLabel('scope_type', 'payable') },
+  { value: 'receivable', label: enumLabel('scope_type', 'receivable') },
+  { value: 'payment', label: enumLabel('scope_type', 'payment') },
 ];
 
 const mentionTypeOptions: Array<{ value: MentionType; label: string }> = [
-  { value: 'staff', label: 'Staff' },
-  { value: 'user', label: 'User' },
-  { value: 'role', label: 'Role' },
+  { value: 'staff', label: enumLabel('mention_type', 'staff') },
+  { value: 'user', label: enumLabel('mention_type', 'user') },
+  { value: 'role', label: enumLabel('mention_type', 'role') },
 ];
 
 const attachmentTypeOptions: Array<{ value: AttachmentType; label: string }> = [
-  { value: 'evidence', label: 'Evidence' },
-  { value: 'document', label: 'Document' },
+  { value: 'evidence', label: enumLabel('attachment_type', 'evidence') },
+  { value: 'document', label: enumLabel('attachment_type', 'document') },
 ];
 
 export function ActivityComposer({
@@ -334,7 +335,7 @@ export function ActivityComposer({
                       <option value="">Chọn attachment</option>
                       {visibleAttachmentOptions.map((option) => (
                         <option key={`${option.type}:${option.id}`} value={option.id}>
-                          {option.label}{option.status ? ` · ${option.status}` : ''}{option.visibility ? ` · ${option.visibility}` : ''}
+                          {option.label}{option.status ? ` · ${statusLabel(option.status)}` : ''}{option.visibility ? ` · ${enumLabel('visibility', option.visibility)}` : ''}
                         </option>
                       ))}
                     </select>
@@ -343,7 +344,7 @@ export function ActivityComposer({
                       className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                       value={referenceId}
                       onChange={(event) => setReferenceId(event.target.value)}
-                      placeholder={`${referenceType} UUID`}
+                      placeholder={`${enumLabel('attachment_type', referenceType)} UUID`}
                     />
                   )}
                 </label>
@@ -369,7 +370,7 @@ export function ActivityComposer({
                 <div className="mt-2 flex flex-wrap gap-1">
                   {attachments.map((attachment) => (
                     <span key={`${attachment.type}:${attachment.id}`} className="inline-flex max-w-full items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-                      <span className="truncate">{attachment.type}: {attachment.label || attachment.id}</span>
+                      <span className="truncate">{enumLabel('attachment_type', attachment.type)}: {attachment.label || attachment.id}</span>
                       <button
                         type="button"
                         className="rounded p-0.5 hover:bg-emerald-100"

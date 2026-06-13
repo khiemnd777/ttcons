@@ -7,23 +7,23 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { get, post, streamSSE, type StreamStatus } from '../../lib/api/client';
 import { useToast } from '../../components/ToastProvider';
 import type { ActivityPayload, WorkItemActivity } from '../../lib/types/domain';
-import { activityLabel, compactDateTime } from './workItemPresentation';
+import { activityLabel, compactDateTime, scopeTypeLabel, visibilityLabel } from './workItemPresentation';
 import { ActivityAttachments } from './ActivityAttachments';
 import { ActivityComposer, type ActivityAttachmentOption, type ActivityTargetOption } from './ActivityComposer';
 
 const filterScopes = [
   { value: '', label: 'All scopes' },
-  { value: 'project', label: 'Project' },
-  { value: 'work_item', label: 'Work item' },
-  { value: 'boq_item', label: 'BOQ item' },
-  { value: 'procurement_request', label: 'Procurement' },
-  { value: 'stock_movement', label: 'Stock movement' },
-  { value: 'acceptance', label: 'Acceptance' },
-  { value: 'rework', label: 'Rework' },
-  { value: 'handover', label: 'Handover' },
-  { value: 'payable', label: 'Payable' },
-  { value: 'receivable', label: 'Receivable' },
-  { value: 'payment', label: 'Payment' },
+  { value: 'project', label: scopeTypeLabel('project') },
+  { value: 'work_item', label: scopeTypeLabel('work_item') },
+  { value: 'boq_item', label: scopeTypeLabel('boq_item') },
+  { value: 'procurement_request', label: scopeTypeLabel('procurement_request') },
+  { value: 'stock_movement', label: scopeTypeLabel('stock_movement') },
+  { value: 'acceptance', label: scopeTypeLabel('acceptance') },
+  { value: 'rework', label: scopeTypeLabel('rework') },
+  { value: 'handover', label: scopeTypeLabel('handover') },
+  { value: 'payable', label: scopeTypeLabel('payable') },
+  { value: 'receivable', label: scopeTypeLabel('receivable') },
+  { value: 'payment', label: scopeTypeLabel('payment') },
 ];
 
 export function ActivityThread({
@@ -163,12 +163,12 @@ export function ActivityThread({
                     <p className="text-sm font-semibold text-ink">{activityLabel(item.activity_type)}</p>
                   </div>
                   <p className="mt-1 line-clamp-1 text-xs text-slate-500">
-                    {item.actor_name ?? 'System'} · {item.target_label ?? item.work_item_title ?? item.scope_type ?? 'Project'} · {compactDateTime(item.created_at)}
+                    {item.actor_name ?? 'System'} · {item.target_label ?? item.work_item_title ?? (item.scope_type ? scopeTypeLabel(item.scope_type) : 'Công trình')} · {compactDateTime(item.created_at)}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                  {item.scope_type ? <span className="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{item.scope_type}</span> : null}
-                  {item.visibility ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{item.visibility}</span> : null}
+                  {item.scope_type ? <span className="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{scopeTypeLabel(item.scope_type)}</span> : null}
+                  {item.visibility ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{visibilityLabel(item.visibility)}</span> : null}
                   {item.is_unread ? (
                     <button
                       className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"

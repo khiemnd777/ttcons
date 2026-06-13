@@ -23,8 +23,11 @@ import {
   compactDateTime,
   departmentLabel,
   evidenceLabel,
+  priorityLabel,
   isWorkOverdue,
   numberValue,
+  visibilityLabel,
+  workTypeLabel,
   type WorkItemActionKey,
 } from './workItemPresentation';
 
@@ -101,12 +104,15 @@ export function WorkItemDetailDialog({
   const activities = asArray<WorkItemActivity>(detailItem?.activities);
   const attachmentOptions = buildActivityAttachmentOptions(evidence);
   const requirement = detailItem?.evidence_requirement_json ?? {};
+  const workContextLabel = detailItem?.run_node_name
+    ?? detailItem?.run_step_name
+    ?? (detailItem?.work_type ? workTypeLabel(detailItem.work_type) : 'Runtime work');
 
   return (
     <Dialog
       open={open}
       title={detailItem?.title ?? 'Work item'}
-      description={detailItem ? `${detailItem.project_name ?? 'Project'} · ${departmentLabel(detailItem.department)} · ${detailItem.run_node_name ?? detailItem.run_step_name ?? detailItem.work_type ?? 'Runtime work'}` : undefined}
+      description={detailItem ? `${detailItem.project_name ?? 'Project'} · ${departmentLabel(detailItem.department)} · ${workContextLabel}` : undefined}
       onClose={closeDialog}
       size="xl"
       footer={
@@ -167,8 +173,8 @@ export function WorkItemDetailDialog({
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={isWorkOverdue(detailItem) ? 'overdue' : detailItem.status} />
             {detailItem.project_code ? <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{detailItem.project_code}</span> : null}
-            {detailItem.priority ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Priority: {detailItem.priority}</span> : null}
-            {detailItem.work_type ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{detailItem.work_type}</span> : null}
+            {detailItem.priority ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Priority: {priorityLabel(detailItem.priority)}</span> : null}
+            {detailItem.work_type ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{workTypeLabel(detailItem.work_type)}</span> : null}
           </div>
 
           <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
@@ -204,7 +210,7 @@ export function WorkItemDetailDialog({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-ink">{record.name ?? record.title ?? record.document_name}</p>
-                          <p className="mt-1 text-xs text-slate-500">{evidenceLabel(record.evidence_type)} · {record.visibility ?? 'project'} · {compactDateTime(record.created_at)}</p>
+                          <p className="mt-1 text-xs text-slate-500">{evidenceLabel(record.evidence_type)} · {visibilityLabel(record.visibility ?? 'project')} · {compactDateTime(record.created_at)}</p>
                         </div>
                         <StatusBadge status={record.status} />
                       </div>
@@ -232,7 +238,7 @@ export function WorkItemDetailDialog({
                     <div key={activity.id} className="rounded-md border border-line px-3 py-2">
                       <div className="flex items-start justify-between gap-3">
                         <p className="text-sm font-semibold text-ink">{activityLabel(activity.activity_type)}</p>
-                        {activity.visibility ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{activity.visibility}</span> : null}
+                        {activity.visibility ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{visibilityLabel(activity.visibility)}</span> : null}
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
                         {activity.actor_name ?? 'System'} · {compactDateTime(activity.created_at)}

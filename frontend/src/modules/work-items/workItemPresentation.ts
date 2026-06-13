@@ -50,39 +50,6 @@ const departmentLabels: Record<string, string> = {
   unassigned: 'Chưa phân công',
 };
 
-const activityLabels: Record<string, string> = {
-  created: 'Tạo work item',
-  started: 'Bắt đầu',
-  completed: 'Hoàn tất',
-  blocked: 'Báo blocker',
-  blocker_resolved: 'Resolve blocker',
-  review_requested: 'Gửi review',
-  approval_requested: 'Gửi duyệt',
-  approved: 'Đã duyệt',
-  rejected: 'Từ chối',
-  changes_requested: 'Yêu cầu sửa',
-  evidence_added: 'Thêm evidence',
-  evidence_accepted: 'Duyệt evidence',
-  evidence_rejected: 'Từ chối evidence',
-  comment: 'Ghi chú',
-  status: 'Cập nhật trạng thái',
-  blocker: 'Blocker',
-  question: 'Câu hỏi',
-  decision: 'Quyết định',
-  reminder: 'Nhắc việc',
-  file_note: 'Ghi chú file',
-  system_event: 'Sự kiện hệ thống',
-};
-
-const evidenceLabels: Record<string, string> = {
-  document: 'Tài liệu',
-  photo: 'Ảnh',
-  checklist: 'Checklist',
-  link: 'Link',
-  note: 'Ghi chú',
-  other: 'Khác',
-};
-
 export function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? value as T[] : [];
 }
@@ -111,12 +78,32 @@ export function departmentLabel(value?: string) {
 
 export function activityLabel(value?: string) {
   const key = String(value ?? '');
-  return activityLabels[key] ?? enumLabel('event_type', key);
+  return enumLabel('activity_type', key);
 }
 
 export function evidenceLabel(value?: string) {
   const key = String(value ?? '');
-  return evidenceLabels[key] ?? (key || '-');
+  return enumLabel('evidence_type', key);
+}
+
+export function workTypeLabel(value?: string) {
+  return enumLabel('work_type', value);
+}
+
+export function priorityLabel(value?: string) {
+  return enumLabel('priority', value);
+}
+
+export function visibilityLabel(value?: string) {
+  return enumLabel('visibility', value);
+}
+
+export function scopeTypeLabel(value?: string) {
+  return enumLabel('scope_type', value);
+}
+
+export function attachmentTypeLabel(value?: string) {
+  return enumLabel('attachment_type', value);
 }
 
 export function isWorkOverdue(item: WorkItem) {

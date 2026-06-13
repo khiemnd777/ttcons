@@ -716,7 +716,7 @@ function CommandCenter({
               <div key={approval.id} className="rounded-md border border-line px-3 py-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{approval.title ?? approval.target_type ?? 'Approval request'}</p>
+                    <p className="truncate text-sm font-semibold text-ink">{approval.title ?? (approval.target_type ? enumLabel('target_type', approval.target_type) : 'Approval request')}</p>
                     <p className="mt-1 text-xs text-slate-500">{approval.requested_by_name ?? 'Requester'} · {compactDateTime(approval.created_at)}</p>
                   </div>
                   <StatusBadge status={String(approval.status ?? 'pending')} />
@@ -793,7 +793,7 @@ function ProjectFilesPanel({ evidence }: { evidence: EvidenceRecord[] }) {
           },
           { key: 'evidence_type', header: 'Loại', render: (row) => evidenceLabel(row.evidence_type) },
           { key: 'work_item_title', header: 'Work item', render: (row) => row.work_item_title ?? '-' },
-          { key: 'visibility', header: 'Visibility' },
+          { key: 'visibility', header: 'Visibility', render: (row) => enumLabel('visibility', row.visibility ?? 'project') },
           { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
         ]}
       />

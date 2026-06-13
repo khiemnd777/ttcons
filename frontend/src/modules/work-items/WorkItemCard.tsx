@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import { StatusBadge } from '../../components/StatusBadge';
 import { dateText } from '../../lib/utils/format';
 import type { WorkItem } from '../../lib/types/domain';
-import { asArray, departmentLabel, isWorkOverdue, numberValue } from './workItemPresentation';
+import { asArray, departmentLabel, isWorkOverdue, numberValue, workTypeLabel } from './workItemPresentation';
 
 export function WorkItemCard({
   item,
@@ -30,7 +30,7 @@ export function WorkItemCard({
           {item.description && !compact ? <p className="mt-1 line-clamp-2 text-sm text-slate-600">{item.description}</p> : null}
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
             <span>{item.project_name ?? 'Project'}</span>
-            <span>{item.run_node_name ?? item.run_step_name ?? item.work_type ?? 'Runtime work'}</span>
+            <span>{item.run_node_name ?? item.run_step_name ?? (item.work_type ? workTypeLabel(item.work_type) : 'Runtime work')}</span>
             <span>Owner: {item.assignee_name ?? (asArray<string>(item.role_ids).join(', ') || '-')}</span>
             <span>Due: {dateText(item.due_at)}</span>
             <span>Evidence: {numberValue(item.evidence_count)}</span>
@@ -51,7 +51,7 @@ export function WorkItemCard({
 function workItemTitle(item: WorkItem, showWorkflowPrefix: boolean) {
   if (!showWorkflowPrefix) return item.title;
 
-  const prefix = [item.run_node_name, item.run_step_name, item.work_type]
+  const prefix = [item.run_node_name, item.run_step_name, item.work_type ? workTypeLabel(item.work_type) : undefined]
     .find((value) => String(value ?? '').trim());
   const cleanPrefix = String(prefix ?? '').trim();
   const cleanTitle = item.title.trim();
