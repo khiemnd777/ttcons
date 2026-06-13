@@ -65,6 +65,9 @@ type DepartmentSurface = {
 
 type ProjectDetailTab = 'overview' | 'workflow' | 'work' | 'activity' | 'files' | 'audit' | 'members';
 
+const ALL_WORK_SURFACE = '__all__';
+const WORK_PAGE_SIZE = 10;
+
 const moduleLinks = [
   ['Pipeline', 'pipeline'],
   ['Planning', 'planning'],
@@ -106,7 +109,7 @@ function isOpenWorkItem(item: WorkItem) {
 export function ProjectDetailPage() {
   const { id = '' } = useParams();
   const [selectedWork, setSelectedWork] = useState<WorkItem | null>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState(ALL_WORK_SURFACE);
   const [selectedTimelineNodeId, setSelectedTimelineNodeId] = useState('');
   const [activeTab, setActiveTab] = useState<ProjectDetailTab>('overview');
   const queryClient = useQueryClient();
@@ -152,11 +155,12 @@ export function ProjectDetailPage() {
 
   useEffect(() => {
     if (!departmentSurfaces.length) {
-      setSelectedDepartment('');
+      if (selectedDepartment !== ALL_WORK_SURFACE) setSelectedDepartment(ALL_WORK_SURFACE);
       return;
     }
-    const exists = departmentSurfaces.some((surface) => (surface.department ?? 'unassigned') === selectedDepartment);
-    if (!exists) setSelectedDepartment(departmentSurfaces[0].department ?? 'unassigned');
+    const exists = selectedDepartment === ALL_WORK_SURFACE
+      || departmentSurfaces.some((surface) => (surface.department ?? 'unassigned') === selectedDepartment);
+    if (!exists) setSelectedDepartment(ALL_WORK_SURFACE);
   }, [departmentSurfaces, selectedDepartment]);
 
   function openWorkItem(item: WorkItem) {
@@ -183,8 +187,6 @@ export function ProjectDetailPage() {
   const attachmentOptions = buildActivityAttachmentOptions(latestEvidence);
   const latestActivity = asArray<WorkItemActivity>(data.latest_activity);
   const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
-  const activeDepartment = departmentSurfaces.find((surface) => (surface.department ?? 'unassigned') === selectedDepartment)
-    ?? departmentSurfaces[0];
   const selectedTimelineNode = timeline.find((node) => node.id === selectedTimelineNodeId) ?? currentNode ?? timeline[0];
   const nodeActiveWork = selectedTimelineNode
     ? prioritizeWorkItems(allWorkItems.filter((item) => item.run_node_id === selectedTimelineNode.id && isOpenWorkItem(item)))
@@ -230,12 +232,19 @@ export function ProjectDetailPage() {
         {activeTab === 'overview' ? (
           <div className="space-y-4">
             <ProjectSummaryBand project={project} currentNode={currentNode} visibility={data.visibility} />
+            <ModuleShortcuts projectId={id} />
             <HealthStrip data={data} />
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <NextWorkPanel rows={activeWork} onOpenWork={openWorkItem} />
+              <NextWorkPanel
+                rows={activeWork}
+                onOpenWork={openWorkItem}
+                onShowAll={() => {
+                  setSelectedDepartment(ALL_WORK_SURFACE);
+                  setActiveTab('work');
+                }}
+              />
               <CommandCenter data={data} blockers={blockers} onOpenWork={openWorkItem} />
             </div>
-            <ModuleShortcuts projectId={id} />
           </div>
         ) : null}
 
@@ -257,7 +266,7 @@ export function ProjectDetailPage() {
         {activeTab === 'work' ? (
           <DepartmentSurfaces
             surfaces={departmentSurfaces}
-            activeSurface={activeDepartment}
+            allRows={activeWork}
             selectedDepartment={selectedDepartment}
             onSelectDepartment={setSelectedDepartment}
             onOpenWork={openWorkItem}
@@ -516,7 +525,15 @@ function HealthStrip({ data }: { data: ProjectOperationsResponse }) {
   );
 }
 
-function NextWorkPanel({ rows, onOpenWork }: { rows: WorkItem[]; onOpenWork: (item: WorkItem) => void }) {
+function NextWorkPanel({
+  rows,
+  onOpenWork,
+  onShowAll,
+}: {
+  rows: WorkItem[];
+  onOpenWork: (item: WorkItem) => void;
+  onShowAll: () => void;
+}) {
   const previewRows = rows.slice(0, 6);
   return (
     <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
@@ -525,11 +542,26 @@ function NextWorkPanel({ rows, onOpenWork }: { rows: WorkItem[]; onOpenWork: (it
           <TimerReset className="h-5 w-5 shrink-0 text-blue-700" />
           <h2 className="truncate font-semibold text-ink">Next Work</h2>
         </div>
-        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{rows.length} open</span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+            {previewRows.length} / {rows.length} việc phải làm
+          </span>
+          {rows.length > previewRows.length ? (
+            <button
+              type="button"
+              className="rounded-md border border-line px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+              onClick={onShowAll}
+            >
+              Xem tất cả
+            </button>
+          ) : null}
+        </div>
       </div>
       {previewRows.length ? (
         <div className="space-y-3">
-          {previewRows.map((item) => <WorkItemCard key={item.id} item={item} compact onOpen={() => onOpenWork(item)} />)}
+          {previewRows.map((item) => (
+            <WorkItemCard key={item.id} item={item} compact showWorkflowPrefix onOpen={() => onOpenWork(item)} />
+          ))}
         </div>
       ) : (
         <EmptyState title="Không có work item đang mở" />
@@ -860,17 +892,56 @@ function CommandSection({ title, count, children }: { title: string; count: numb
 
 function DepartmentSurfaces({
   surfaces,
-  activeSurface,
+  allRows,
   selectedDepartment,
   onSelectDepartment,
   onOpenWork,
 }: {
   surfaces: DepartmentSurface[];
-  activeSurface?: DepartmentSurface;
+  allRows: WorkItem[];
   selectedDepartment: string;
   onSelectDepartment: (department: string) => void;
   onOpenWork: (item: WorkItem) => void;
 }) {
+  const [page, setPage] = useState(1);
+  const selectedSurface = selectedDepartment === ALL_WORK_SURFACE
+    ? undefined
+    : surfaces.find((surface) => (surface.department ?? 'unassigned') === selectedDepartment);
+  const activeRows = useMemo(() => {
+    if (selectedDepartment === ALL_WORK_SURFACE) return allRows;
+    return prioritizeWorkItems(asArray<WorkItem>(selectedSurface?.work_items).filter(isOpenWorkItem));
+  }, [allRows, selectedDepartment, selectedSurface?.work_items]);
+  const totalPages = Math.max(1, Math.ceil(activeRows.length / WORK_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStartIndex = (currentPage - 1) * WORK_PAGE_SIZE;
+  const pageRows = activeRows.slice(pageStartIndex, pageStartIndex + WORK_PAGE_SIZE);
+  const rangeStart = activeRows.length ? pageStartIndex + 1 : 0;
+  const rangeEnd = activeRows.length ? Math.min(pageStartIndex + pageRows.length, activeRows.length) : 0;
+  const selectedLabel = selectedDepartment === ALL_WORK_SURFACE
+    ? 'Tất cả'
+    : departmentLabel(selectedSurface?.department ?? selectedDepartment);
+  const selectedMetrics = selectedDepartment === ALL_WORK_SURFACE
+    ? {
+      total: allRows.length,
+      active: allRows.length,
+      blocked: allRows.filter((item) => item.status === 'blocked').length,
+      waiting_approval: allRows.filter((item) => item.status === 'waiting_approval' || item.status === 'waiting_review').length,
+    }
+    : {
+      total: numberValue(selectedSurface?.total),
+      active: numberValue(selectedSurface?.active),
+      blocked: numberValue(selectedSurface?.blocked),
+      waiting_approval: numberValue(selectedSurface?.waiting_approval),
+    };
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedDepartment]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
   return (
     <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -879,6 +950,15 @@ function DepartmentSurfaces({
           <p className="mt-1 text-sm text-slate-600">Các bề mặt hiển thị theo scope mà server trả về cho người dùng hiện tại.</p>
         </div>
         <div className="flex overflow-x-auto rounded-md border border-line bg-slate-50 p-1">
+          <button
+            className={clsx(
+              'whitespace-nowrap rounded px-3 py-1.5 text-sm font-semibold',
+              selectedDepartment === ALL_WORK_SURFACE ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-white/70',
+            )}
+            onClick={() => onSelectDepartment(ALL_WORK_SURFACE)}
+          >
+            Tất cả
+          </button>
           {surfaces.length ? surfaces.map((surface) => {
             const department = surface.department ?? 'unassigned';
             const selected = department === selectedDepartment;
@@ -894,29 +974,58 @@ function DepartmentSurfaces({
                 {departmentLabel(department)}
               </button>
             );
-          }) : <span className="px-3 py-1.5 text-sm text-slate-500">Không có surface</span>}
+          }) : null}
         </div>
       </div>
 
-      {activeSurface ? (
+      {selectedDepartment === ALL_WORK_SURFACE || selectedSurface ? (
         <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
           <div className="rounded-md border border-line bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{departmentLabel(activeSurface.department)}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{selectedLabel}</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <SurfaceMetric label="Total" value={numberValue(activeSurface.total)} />
-              <SurfaceMetric label="Active" value={numberValue(activeSurface.active)} />
-              <SurfaceMetric label="Blocked" value={numberValue(activeSurface.blocked)} />
-              <SurfaceMetric label="Approval" value={numberValue(activeSurface.waiting_approval)} />
+              <SurfaceMetric label="Total" value={selectedMetrics.total} />
+              <SurfaceMetric label="Active" value={selectedMetrics.active} />
+              <SurfaceMetric label="Blocked" value={selectedMetrics.blocked} />
+              <SurfaceMetric label="Approval" value={selectedMetrics.waiting_approval} />
             </div>
           </div>
-          <div className="space-y-3">
-            {asArray<WorkItem>(activeSurface.work_items).length ? (
-              prioritizeWorkItems(asArray<WorkItem>(activeSurface.work_items)).map((item) => (
-                <WorkItemCard key={item.id} item={item} compact onOpen={() => onOpenWork(item)} />
-              ))
-            ) : (
-              <EmptyState title="Department này chưa có work item trong scope hiện tại" />
-            )}
+          <div>
+            <div className="space-y-3">
+              {activeRows.length ? (
+                pageRows.map((item) => (
+                  <WorkItemCard key={item.id} item={item} compact showWorkflowPrefix onOpen={() => onOpenWork(item)} />
+                ))
+              ) : (
+                <EmptyState title="Không có work item đang mở trong scope hiện tại" />
+              )}
+            </div>
+
+            {activeRows.length > WORK_PAGE_SIZE ? (
+              <div className="mt-4 flex flex-col gap-3 border-t border-line pt-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-sm font-semibold text-slate-600">{rangeStart}-{rangeEnd} / {activeRows.length}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  >
+                    Trước
+                  </button>
+                  <span className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-600">
+                    Trang {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : (
@@ -940,7 +1049,7 @@ function ModuleShortcuts({ projectId }: { projectId: string }) {
     <section id="project-modules" className="rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="mb-3 flex items-center gap-2">
         <Layers3 className="h-5 w-5 text-blue-700" />
-        <h2 className="font-semibold text-ink">Secondary Module Shortcuts</h2>
+        <h2 className="font-semibold text-ink">Module Shortcuts</h2>
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
         {moduleLinks.map(([label, path]) => (
