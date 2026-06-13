@@ -28,6 +28,8 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { CurrencyText } from '../../components/CurrencyText';
 import { EmptyState } from '../../components/EmptyState';
 import { DataTable } from '../../components/DataTable';
+import { EnumChip } from '../../components/EnumChip';
+import { Timeline } from '../../components/Timeline';
 import { useToast } from '../../components/ToastProvider';
 import { dateText, percent } from '../../lib/utils/format';
 import { enumLabel, statusLabel } from '../../lib/utils/status';
@@ -60,6 +62,8 @@ type DepartmentSurface = {
   waiting_approval?: number;
   work_items?: WorkItem[];
 };
+
+type ProjectDetailTab = 'overview' | 'workflow' | 'work' | 'activity' | 'files' | 'audit' | 'members';
 
 const moduleLinks = [
   ['Pipeline', 'pipeline'],
@@ -104,6 +108,7 @@ export function ProjectDetailPage() {
   const [selectedWork, setSelectedWork] = useState<WorkItem | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [selectedTimelineNodeId, setSelectedTimelineNodeId] = useState('');
+  const [activeTab, setActiveTab] = useState<ProjectDetailTab>('overview');
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -174,12 +179,25 @@ export function ProjectDetailPage() {
   const project = data.project_summary ?? data.project;
   const hasPipeline = Boolean(data.pipeline_run) || timeline.length > 0;
   const visibleMembers = asArray<Record<string, any>>(data.project?.members);
+  const latestEvidence = asArray<EvidenceRecord>(data.latest_evidence);
+  const attachmentOptions = buildActivityAttachmentOptions(latestEvidence);
+  const latestActivity = asArray<WorkItemActivity>(data.latest_activity);
+  const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
   const activeDepartment = departmentSurfaces.find((surface) => (surface.department ?? 'unassigned') === selectedDepartment)
     ?? departmentSurfaces[0];
   const selectedTimelineNode = timeline.find((node) => node.id === selectedTimelineNodeId) ?? currentNode ?? timeline[0];
   const nodeActiveWork = selectedTimelineNode
     ? prioritizeWorkItems(allWorkItems.filter((item) => item.run_node_id === selectedTimelineNode.id && isOpenWorkItem(item)))
     : activeWork;
+  const tabs: Array<{ id: ProjectDetailTab; label: string; count?: number }> = [
+    { id: 'overview', label: 'Tổng quan', count: numberValue(data.health_counts?.active) },
+    { id: 'workflow', label: 'Workflow', count: timeline.length },
+    { id: 'work', label: 'Công việc', count: activeWork.length },
+    { id: 'activity', label: 'Trao đổi', count: latestActivity.length },
+    { id: 'files', label: 'Hồ sơ', count: latestEvidence.length },
+    { id: 'audit', label: 'Audit', count: auditRecent.length },
+    { id: 'members', label: 'Thành viên', count: visibleMembers.length },
+  ];
 
   return (
     <>
@@ -206,43 +224,65 @@ export function ProjectDetailPage() {
         }
       />
 
-      <ProjectSummaryBand project={project} currentNode={currentNode} visibility={data.visibility} />
-      <HealthStrip data={data} />
+      <ProjectDetailTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)_360px]">
-        <WorkflowTimeline
-          projectId={id}
-          nodes={timeline}
-          selectedNodeId={selectedTimelineNode?.id ?? ''}
-          hasPipeline={hasPipeline}
-          startPending={startPipeline.isPending}
-          onStartPipeline={() => startPipeline.mutate()}
-          onSelectNode={setSelectedTimelineNodeId}
-        />
-        <ActiveWorkPanel rows={nodeActiveWork} selectedNode={selectedTimelineNode} onOpenWork={openWorkItem} />
-        <CommandCenter
-          projectId={id}
-          data={data}
-          blockers={blockers}
-          activityTargets={activityTargets}
-          onActivityChanged={() => {
-            queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
-          }}
-          onOpenWork={openWorkItem}
-        />
+      <div className="mt-5">
+        {activeTab === 'overview' ? (
+          <div className="space-y-4">
+            <ProjectSummaryBand project={project} currentNode={currentNode} visibility={data.visibility} />
+            <HealthStrip data={data} />
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+              <NextWorkPanel rows={activeWork} onOpenWork={openWorkItem} />
+              <CommandCenter data={data} blockers={blockers} onOpenWork={openWorkItem} />
+            </div>
+            <ModuleShortcuts projectId={id} />
+          </div>
+        ) : null}
+
+        {activeTab === 'workflow' ? (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+            <WorkflowTimeline
+              projectId={id}
+              nodes={timeline}
+              selectedNodeId={selectedTimelineNode?.id ?? ''}
+              hasPipeline={hasPipeline}
+              startPending={startPipeline.isPending}
+              onStartPipeline={() => startPipeline.mutate()}
+              onSelectNode={setSelectedTimelineNodeId}
+            />
+            <ActiveWorkPanel rows={nodeActiveWork} selectedNode={selectedTimelineNode} onOpenWork={openWorkItem} />
+          </div>
+        ) : null}
+
+        {activeTab === 'work' ? (
+          <DepartmentSurfaces
+            surfaces={departmentSurfaces}
+            activeSurface={activeDepartment}
+            selectedDepartment={selectedDepartment}
+            onSelectDepartment={setSelectedDepartment}
+            onOpenWork={openWorkItem}
+          />
+        ) : null}
+
+        {activeTab === 'activity' ? (
+          <ProjectActivityPanel
+            projectId={id}
+            activityTargets={activityTargets}
+            attachmentOptions={attachmentOptions}
+            onChanged={() => {
+              queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
+            }}
+          />
+        ) : null}
+
+        {activeTab === 'files' ? <ProjectFilesPanel evidence={latestEvidence} /> : null}
+
+        {activeTab === 'audit' ? <ProjectAuditPanel projectId={id} initialRows={auditRecent} /> : null}
+
+        {activeTab === 'members' ? (
+          visibleMembers.length ? <ProjectMembers rows={visibleMembers} /> : <EmptyState title="Chưa có thành viên công trình" />
+        ) : null}
       </div>
-
-      <DepartmentSurfaces
-        surfaces={departmentSurfaces}
-        activeSurface={activeDepartment}
-        selectedDepartment={selectedDepartment}
-        onSelectDepartment={setSelectedDepartment}
-        onOpenWork={openWorkItem}
-      />
-
-      <ModuleShortcuts projectId={id} />
-
-      {visibleMembers.length ? <ProjectMembers rows={visibleMembers} /> : null}
 
       <WorkItemDetailDialog
         open={Boolean(selectedWork)}
@@ -299,13 +339,6 @@ function HeaderActions({
           {primaryWork.status === 'blocked' ? 'Mở blocker' : primaryWork.status === 'waiting_approval' ? 'Mở duyệt' : 'Mở work'}
         </button>
       ) : null}
-      <a
-        href="#project-modules"
-        className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-      >
-        <Layers3 className="h-4 w-4" />
-        Modules
-      </a>
       <Link
         to={`/projects/${projectId}/planning`}
         className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
@@ -314,6 +347,49 @@ function HeaderActions({
         Planning
       </Link>
     </>
+  );
+}
+
+function ProjectDetailTabs({
+  tabs,
+  activeTab,
+  onChange,
+}: {
+  tabs: Array<{ id: ProjectDetailTab; label: string; count?: number }>;
+  activeTab: ProjectDetailTab;
+  onChange: (tab: ProjectDetailTab) => void;
+}) {
+  return (
+    <div className="mt-5 overflow-x-auto rounded-lg border border-line bg-white p-1 shadow-panel">
+      <div className="flex min-w-max gap-1">
+        {tabs.map((tab) => {
+          const active = tab.id === activeTab;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              className={clsx(
+                'inline-flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold transition focus-ring',
+                active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-ink',
+              )}
+              aria-pressed={active}
+              onClick={() => onChange(tab.id)}
+            >
+              {tab.label}
+              {typeof tab.count === 'number' ? (
+                <span className={clsx(
+                  'rounded px-1.5 py-0.5 text-xs',
+                  active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500',
+                )}
+                >
+                  {tab.count}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -440,6 +516,28 @@ function HealthStrip({ data }: { data: ProjectOperationsResponse }) {
   );
 }
 
+function NextWorkPanel({ rows, onOpenWork }: { rows: WorkItem[]; onOpenWork: (item: WorkItem) => void }) {
+  const previewRows = rows.slice(0, 6);
+  return (
+    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <TimerReset className="h-5 w-5 shrink-0 text-blue-700" />
+          <h2 className="truncate font-semibold text-ink">Next Work</h2>
+        </div>
+        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{rows.length} open</span>
+      </div>
+      {previewRows.length ? (
+        <div className="space-y-3">
+          {previewRows.map((item) => <WorkItemCard key={item.id} item={item} compact onOpen={() => onOpenWork(item)} />)}
+        </div>
+      ) : (
+        <EmptyState title="Không có work item đang mở" />
+      )}
+    </section>
+  );
+}
+
 function WorkflowTimeline({
   projectId,
   nodes,
@@ -552,31 +650,21 @@ function ActiveWorkPanel({
 }
 
 function CommandCenter({
-  projectId,
   data,
   blockers,
-  activityTargets,
-  onActivityChanged,
   onOpenWork,
 }: {
-  projectId: string;
   data: ProjectOperationsResponse;
   blockers: WorkItem[];
-  activityTargets: Array<{ scope_type: string; scope_id: string; label: string; work_item_id?: string }>;
-  onActivityChanged: () => void;
   onOpenWork: (item: WorkItem) => void;
 }) {
   const approvals = asArray<ProjectOperationsRecord>(data.approvals);
-  const latestEvidence = asArray<EvidenceRecord>(data.latest_evidence);
-  const attachmentOptions = buildActivityAttachmentOptions(latestEvidence);
-  const latestActivity = asArray<WorkItemActivity>(data.latest_activity);
-  const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
   const workByApproval = new Map(asArray<WorkItem>(data.work_items).map((item) => [item.approval_request_id, item]));
 
   return (
     <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="mb-4 flex items-center gap-2">
-        <MessageSquare className="h-5 w-5 text-blue-700" />
+        <AlertTriangle className="h-5 w-5 text-blue-700" />
         <h2 className="font-semibold text-ink">Command Center</h2>
       </div>
       <div className="space-y-4">
@@ -611,25 +699,126 @@ function CommandCenter({
           }) : <p className="text-sm text-slate-500">Không có approval trong scope hiện tại.</p>}
         </CommandSection>
 
-        <CommandSection title="Latest Files" count={latestEvidence.length}>
-          {latestEvidence.length ? latestEvidence.slice(0, 4).map((evidence) => (
-            <div key={evidence.id} className="rounded-md border border-line px-3 py-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">{evidence.name ?? evidence.title ?? evidence.document_name}</p>
-                  <p className="mt-1 text-xs text-slate-500">{evidenceLabel(evidence.evidence_type)} · {evidence.work_item_title ?? 'Work item'}</p>
-                </div>
-                <StatusBadge status={evidence.status} />
-              </div>
-            </div>
-          )) : <p className="text-sm text-slate-500">Chưa có evidence mới.</p>}
-        </CommandSection>
-
-        <CommandSection title="Activity / Audit" count={latestActivity.length + auditRecent.length}>
-          <ActivityThread projectId={projectId} targetOptions={activityTargets} attachmentOptions={attachmentOptions} onChanged={onActivityChanged} />
+        <CommandSection title="Material risks" count={numberValue(data.health_counts?.material_risks)}>
+          {numberValue(data.health_counts?.material_risks) ? (
+            <p className="rounded-md border border-orange-100 bg-orange-50 px-3 py-2 text-sm text-orange-800">
+              Có rủi ro vật tư cần kiểm tra trong các module Kho hoặc Mua sắm.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500">Không có rủi ro vật tư đang mở.</p>
+          )}
         </CommandSection>
       </div>
     </section>
+  );
+}
+
+function ProjectActivityPanel({
+  projectId,
+  activityTargets,
+  attachmentOptions,
+  onChanged,
+}: {
+  projectId: string;
+  activityTargets: Array<{ scope_type: string; scope_id: string; label: string; work_item_id?: string }>;
+  attachmentOptions: ActivityAttachmentOption[];
+  onChanged: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="mb-4 flex items-center gap-2">
+        <MessageSquare className="h-5 w-5 text-blue-700" />
+        <h2 className="font-semibold text-ink">Trao đổi</h2>
+      </div>
+      <ActivityThread projectId={projectId} targetOptions={activityTargets} attachmentOptions={attachmentOptions} onChanged={onChanged} />
+    </div>
+  );
+}
+
+function ProjectFilesPanel({ evidence }: { evidence: EvidenceRecord[] }) {
+  return (
+    <div className="space-y-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5 text-blue-700" />
+          <h2 className="font-semibold text-ink">Hồ sơ</h2>
+        </div>
+        <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{evidence.length}</span>
+      </div>
+      <DataTable
+        rows={evidence}
+        empty="Chưa có evidence mới"
+        columns={[
+          {
+            key: 'name',
+            header: 'Hồ sơ',
+            render: (row) => (
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-ink">{row.name ?? row.title ?? row.document_name ?? '-'}</p>
+                <p className="mt-1 text-xs text-slate-500">{row.document_name ?? row.file_url ?? row.id}</p>
+              </div>
+            ),
+          },
+          { key: 'evidence_type', header: 'Loại', render: (row) => evidenceLabel(row.evidence_type) },
+          { key: 'work_item_title', header: 'Work item', render: (row) => row.work_item_title ?? '-' },
+          { key: 'visibility', header: 'Visibility' },
+          { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
+        ]}
+      />
+    </div>
+  );
+}
+
+function ProjectAuditPanel({ projectId, initialRows }: { projectId: string; initialRows: ProjectOperationsRecord[] }) {
+  const path = `/projects/${projectId}/audit-logs`;
+  const logs = useQuery({
+    queryKey: ['audit', path],
+    queryFn: () => get<ProjectOperationsRecord[]>(path),
+    enabled: Boolean(projectId),
+    retry: false,
+  });
+  const rows = logs.data ?? initialRows;
+
+  return (
+    <div className="space-y-4">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="h-5 w-5 text-blue-700" />
+          <h2 className="font-semibold text-ink">Audit Log</h2>
+        </div>
+        <Link to={`/projects/${projectId}/audit`} className="text-sm font-semibold text-blue-700 hover:underline">
+          Mở trang Audit đầy đủ
+        </Link>
+      </div>
+
+      {logs.isLoading ? <LoadingSpinner /> : null}
+      {logs.error ? (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          Không tải được audit đầy đủ. Đang hiển thị audit summary gần nhất nếu có.
+        </div>
+      ) : null}
+
+      {!logs.isLoading && !rows.length ? <EmptyState title="Chưa có sự kiện audit" /> : null}
+      {rows.length ? (
+        <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+          <Timeline events={rows.slice(0, 20)} />
+          <DataTable
+            rows={rows}
+            columns={[
+              { key: 'created_at', header: 'Thời gian', render: (row) => compactDateTime(row.created_at) },
+              { key: 'event_type', header: 'Event', render: (row) => <EnumChip group="event_type" value={row.event_type} /> },
+              { key: 'actor_name', header: 'Actor' },
+              { key: 'target_type', header: 'Target', render: (row) => <EnumChip group="target_type" value={row.target_type} /> },
+              {
+                key: 'description',
+                header: 'Mô tả',
+                render: (row) => <p className="max-w-xl text-sm leading-5 text-slate-700">{row.description ?? '-'}</p>,
+              },
+            ]}
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -683,7 +872,7 @@ function DepartmentSurfaces({
   onOpenWork: (item: WorkItem) => void;
 }) {
   return (
-    <section className="mt-5 rounded-lg border border-line bg-white p-4 shadow-panel">
+    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="font-semibold text-ink">Department Surfaces</h2>
@@ -748,7 +937,7 @@ function SurfaceMetric({ label, value }: { label: string; value: number }) {
 
 function ModuleShortcuts({ projectId }: { projectId: string }) {
   return (
-    <section id="project-modules" className="mt-5 rounded-lg border border-line bg-white p-4 shadow-panel">
+    <section id="project-modules" className="rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="mb-3 flex items-center gap-2">
         <Layers3 className="h-5 w-5 text-blue-700" />
         <h2 className="font-semibold text-ink">Secondary Module Shortcuts</h2>
@@ -770,7 +959,7 @@ function ModuleShortcuts({ projectId }: { projectId: string }) {
 
 function ProjectMembers({ rows }: { rows: Record<string, any>[] }) {
   return (
-    <section className="mt-5">
+    <section>
       <div className="mb-3 flex items-center gap-2">
         <Users className="h-5 w-5 text-blue-700" />
         <h2 className="font-semibold text-ink">Thành viên công trình</h2>
