@@ -1,6 +1,8 @@
 # Controlled Activity / Operational Chat Plan
 
-Status: active planning state as of 2026-06-12. This plan starts after `Project Operations Production Plan` was closed.
+Status: closed reference as of 2026-06-13. All six batches were implemented and handed off in `docs/plan-closed/controlled-activity-chat-implementation.md`.
+
+This file is the original planning record only. Do not treat any batch below as active implementation scope without a new review package and user confirmation.
 
 ## Intent
 

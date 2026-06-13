@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -50,6 +51,283 @@ func TestLegacyStepSubmitFillsChecklistPayload(t *testing.T) {
 	}
 	if _, ok := req.CompletionPayload["checklist"]; !ok {
 		t.Fatalf("expected checklist key in payload, got %#v", req.CompletionPayload)
+	}
+}
+
+func TestValidateActivityRequest(t *testing.T) {
+	t.Run("defaults legacy comment", func(t *testing.T) {
+		req, err := validateActivityRequest(WorkItemActivityRequest{Comment: "  cập nhật hiện trường  "})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if req.ActivityType != "comment" || req.Visibility != "project" || req.Comment != "cập nhật hiện trường" {
+			t.Fatalf("normalized request = %#v", req)
+		}
+	})
+
+	t.Run("rejects system event", func(t *testing.T) {
+		_, err := validateActivityRequest(WorkItemActivityRequest{ActivityType: "system_event", Comment: "generated"})
+		assertValidationError(t, err)
+	})
+
+	t.Run("requires reminder due date", func(t *testing.T) {
+		_, err := validateActivityRequest(WorkItemActivityRequest{ActivityType: "reminder", Comment: "nhắc kiểm tra lại"})
+		assertValidationError(t, err)
+	})
+
+	t.Run("accepts reminder due date", func(t *testing.T) {
+		req, err := validateActivityRequest(WorkItemActivityRequest{
+			ActivityType: "reminder",
+			Comment:      "nhắc kiểm tra lại",
+			Metadata:     Record{"due_at": "2026-06-30"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if req.Metadata["due_at"] != "2026-06-30" {
+			t.Fatalf("due_at = %#v", req.Metadata["due_at"])
+		}
+	})
+
+	t.Run("requires file note reference", func(t *testing.T) {
+		_, err := validateActivityRequest(WorkItemActivityRequest{ActivityType: "file_note", Comment: "ghi chú file"})
+		assertValidationError(t, err)
+	})
+
+	t.Run("accepts structured file note attachment", func(t *testing.T) {
+		evidenceID := newID()
+		req, err := validateActivityRequest(WorkItemActivityRequest{
+			ActivityType: "file_note",
+			Comment:      "ghi chú file",
+			Attachments:  []ActivityAttachmentRequest{{Type: "evidence", ID: evidenceID}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(req.Attachments) != 1 || req.Metadata["evidence_id"] != evidenceID {
+			t.Fatalf("normalized attachment request = %#v", req)
+		}
+	})
+
+	t.Run("normalizes structured mentions", func(t *testing.T) {
+		req, err := validateActivityRequest(WorkItemActivityRequest{
+			ActivityType: "question",
+			Comment:      "cần phản hồi",
+			Mentions: []ActivityMentionRequest{
+				{Type: "role", ID: "PM", Label: "PM"},
+				{Type: "role", ID: "PM", Label: "PM"},
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(req.Mentions) != 1 || req.Mentions[0].Type != "role" || req.Mentions[0].ID != "PM" {
+			t.Fatalf("mentions = %#v", req.Mentions)
+		}
+	})
+
+	t.Run("rejects invalid user mention id", func(t *testing.T) {
+		_, err := validateActivityRequest(WorkItemActivityRequest{
+			ActivityType: "question",
+			Comment:      "cần phản hồi",
+			Mentions:     []ActivityMentionRequest{{Type: "user", ID: "not-a-uuid"}},
+		})
+		assertValidationError(t, err)
+	})
+}
+
+func TestActivityStreamHubPublishesEvents(t *testing.T) {
+	hub := NewActivityStreamHub()
+	subID, events := hub.Subscribe()
+	defer hub.Unsubscribe(subID)
+
+	hub.Publish(ActivityStreamEvent{Type: "activity_changed", ProjectID: "project-1", ActivityID: "activity-1"})
+
+	select {
+	case event := <-events:
+		if event.Type != "activity_changed" || event.ProjectID != "project-1" || event.ActivityID != "activity-1" {
+			t.Fatalf("event = %#v", event)
+		}
+		if event.At == "" {
+			t.Fatal("expected published event timestamp")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected published stream event")
+	}
+}
+
+func TestActivityMentionsUnreadAndRoleScope(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	suffix := newID()
+	projectID := newID()
+	actorUserID := newID()
+	actorStaffID := newID()
+	pmUserID := newID()
+	pmStaffID := newID()
+	outsideUserID := newID()
+	outsideStaffID := newID()
+	reporterRoleID := ensureRole(t, db, "batch3_reporter_"+suffix[:8], "Batch3 Reporter")
+	pmRoleID := ensureRole(t, db, "batch3_pm_"+suffix[:8], "Batch3 PM")
+	operationViewID := ensurePermission(t, db, "operation.view", "Xem thi công", "operation")
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id IN ($1,$2,$3)`, actorStaffID, pmStaffID, outsideStaffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id IN ($1,$2,$3)`, actorUserID, pmUserID, outsideUserID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id IN ($1,$2)`, reporterRoleID, pmRoleID)
+	})
+	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$3),($2,$3) ON CONFLICT DO NOTHING`, reporterRoleID, pmRoleID, operationViewID)
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Mention Actor','active'),($3,$4,'demo:pw','Mention PM','active'),($5,$6,'demo:pw','Outside PM','active')`,
+		actorUserID, "mention-actor-"+suffix+"@test.local", pmUserID, "mention-pm-"+suffix+"@test.local", outsideUserID, "mention-outside-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id, user_id, full_name, email, department, position, status) VALUES ($1,$2,'Mention Actor',$3,'Site','Reporter','active'),($4,$5,'Mention PM',$6,'Site','PM','active'),($7,$8,'Outside PM',$9,'Site','PM','active')`,
+		actorStaffID, actorUserID, "mention-actor-staff-"+suffix+"@test.local", pmStaffID, pmUserID, "mention-pm-staff-"+suffix+"@test.local", outsideStaffID, outsideUserID, "mention-outside-staff-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Mention Project',$2,'Client','planning')`, projectID, "MEN-"+suffix[:8])
+	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["Batch3 Reporter"]'::jsonb,true),($1,$3,'["Batch3 PM"]'::jsonb,true)`, projectID, actorStaffID, pmStaffID)
+	mustExec(t, db, `INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2),($3,$4),($5,$4)`, actorUserID, reporterRoleID, pmUserID, pmRoleID, outsideUserID, pmRoleID)
+
+	activity, err := service.AddProjectActivity(ctx, projectID, WorkItemActivityRequest{
+		ActivityType: "question",
+		Comment:      "Cần PM xác nhận biện pháp thi công",
+		Mentions:     []ActivityMentionRequest{{Type: "role", ID: "Batch3 PM", Label: "Batch3 PM"}},
+	}, actorUserID, "Mention Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	activityID := fmt.Sprint(activity["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_mentions WHERE activity_id=$1 AND recipient_user_id=$2`, 1, activityID, pmUserID)
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_mentions WHERE activity_id=$1 AND recipient_user_id=$2`, 0, activityID, outsideUserID)
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_read_states WHERE activity_id=$1 AND user_id=$2 AND read_at IS NULL`, 1, activityID, pmUserID)
+
+	attention, err := service.MyActivityAttention(ctx, ActivityAttentionFilter{Queue: "mentions"}, pmUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(attention) != 1 || attention[0]["id"] != activityID || !boolValue(attention[0]["is_unread"]) || !boolValue(attention[0]["mentioned_me"]) {
+		t.Fatalf("attention = %#v", attention)
+	}
+	outsideAttention, err := service.MyActivityAttention(ctx, ActivityAttentionFilter{Queue: "mentions"}, outsideUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(outsideAttention) != 0 {
+		t.Fatalf("outside attention = %#v", outsideAttention)
+	}
+
+	if _, err := service.MarkActivityRead(ctx, activityID, pmUserID); err != nil {
+		t.Fatal(err)
+	}
+	unread, err := service.MyActivityAttention(ctx, ActivityAttentionFilter{Queue: "unread"}, pmUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unread) != 0 {
+		t.Fatalf("unread after mark read = %#v", unread)
+	}
+}
+
+func TestActivityAttachmentReferencesAreScopedAndVisible(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	otherProjectID := newID()
+	otherWorkItemID := newID()
+	otherEvidenceID := newID()
+	documentID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, otherProjectID)
+	})
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "document",
+		Name:         "Biên bản nghiệm thu",
+		FileURL:      "/evidence/bien-ban.pdf",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidenceID := fmt.Sprint(evidence["id"])
+	activity, err := service.AddWorkItemActivity(ctx, fixture.itemID, WorkItemActivityRequest{
+		ActivityType: "file_note",
+		Comment:      "Cần kiểm tra evidence",
+		Attachments:  []ActivityAttachmentRequest{{Type: "evidence", ID: evidenceID}},
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE id=$1 AND metadata_json->'attachments' @> $2::jsonb`, 1, activity["id"], fmt.Sprintf(`[{"type":"evidence","id":"%s"}]`, evidenceID))
+
+	_, err = service.AddWorkItemActivity(ctx, fixture.itemID, WorkItemActivityRequest{
+		ActivityType: "file_note",
+		Comment:      "Không được leak client",
+		Visibility:   "client",
+		Attachments:  []ActivityAttachmentRequest{{Type: "evidence", ID: evidenceID}},
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Attachment Other',$2,'Client','planning')`, otherProjectID, "ATT-"+otherProjectID[:8])
+	mustExec(t, db, `
+		INSERT INTO work_items
+			(id, project_id, source_type, source_id, title, work_type, status, evidence_requirement_json, created_by, updated_by)
+		VALUES
+			($1,$2,'issue',$3,'Other evidence source','task','ready','{}'::jsonb,$4,$4)
+	`, otherWorkItemID, otherProjectID, newID(), fixture.workerID)
+	mustExec(t, db, `
+		INSERT INTO evidence_records
+			(id, work_item_id, project_id, target_type, target_id, evidence_type, name, file_url, visibility, status, submitted_by)
+		VALUES
+			($1,$2,$3,'work_item',$2,'document','Other project evidence','/evidence/other.pdf','project','submitted',$4)
+	`, otherEvidenceID, otherWorkItemID, otherProjectID, fixture.workerID)
+	_, err = service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{
+		ActivityType: "file_note",
+		Comment:      "Sai project",
+		Attachments:  []ActivityAttachmentRequest{{Type: "evidence", ID: otherEvidenceID}},
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	mustExec(t, db, `INSERT INTO documents (id, project_id, name, file_url, document_type, status, uploaded_by) VALUES ($1,$2,'Project document','/docs/project.pdf','drawing','active',$3)`, documentID, fixture.projectID, fixture.workerID)
+	if _, err := service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{
+		ActivityType: "file_note",
+		Comment:      "Gắn document nội bộ",
+		Attachments:  []ActivityAttachmentRequest{{Type: "document", ID: documentID}},
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{
+		ActivityType: "file_note",
+		Comment:      "Document chưa có visibility nên không client-visible",
+		Visibility:   "client",
+		Attachments:  []ActivityAttachmentRequest{{Type: "document", ID: documentID}},
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+}
+
+func TestActivityTargetTableFirstPassScopes(t *testing.T) {
+	tests := []struct {
+		scope string
+		table string
+		ok    bool
+	}{
+		{scope: "boq_item", table: "boq_items", ok: true},
+		{scope: "procurement_request", table: "procurement_requests", ok: true},
+		{scope: "stock_movement", table: "stock_movements", ok: true},
+		{scope: "acceptance", table: "acceptance_records", ok: true},
+		{scope: "rework", table: "rework_requests", ok: true},
+		{scope: "handover", table: "handover_records", ok: true},
+		{scope: "payable", table: "payables", ok: true},
+		{scope: "receivable", table: "receivables", ok: true},
+		{scope: "payment", table: "payments", ok: true},
+		{scope: "daily_report", ok: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.scope, func(t *testing.T) {
+			table, _, ok := activityTargetTable(tt.scope)
+			if ok != tt.ok || table != tt.table {
+				t.Fatalf("activityTargetTable(%q) = %q/%v, want %q/%v", tt.scope, table, ok, tt.table, tt.ok)
+			}
+		})
 	}
 }
 

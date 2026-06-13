@@ -76,16 +76,62 @@ export type ProjectOperationsRecord = AnyRecord & {
 };
 
 export type WorkItemActivity = ProjectOperationsRecord & {
-  work_item_id: string;
+  work_item_id?: string;
   scope_type?: string;
   scope_id?: string;
   actor_id?: string;
   actor_name?: string;
   activity_type: string;
+  visibility?: 'internal' | 'project' | 'client' | string;
   comment?: string;
   from_status?: string;
   to_status?: string;
   metadata_json?: AnyRecord;
+  work_item_title?: string;
+  target_label?: string;
+  mentions?: AnyRecord[];
+  mentioned_me?: boolean;
+  read_at?: string;
+  is_unread?: boolean;
+  queue_types?: string[];
+  attachments?: ActivityAttachmentSummary[];
+};
+
+export type ActivityMentionPayload = {
+  type: 'user' | 'staff' | 'role';
+  id: string;
+  label?: string;
+};
+
+export type ActivityAttachmentPayload = {
+  type: 'evidence' | 'document';
+  id: string;
+  label?: string;
+};
+
+export type ActivityAttachmentSummary = ActivityAttachmentPayload & {
+  status?: string;
+  visibility?: string;
+  file_url?: string;
+  evidence_type?: string;
+  document_type?: string;
+  document_id?: string;
+};
+
+export type ActivityPayload = {
+  activity_type: 'comment' | 'status' | 'blocker' | 'question' | 'decision' | 'reminder' | 'file_note';
+  comment: string;
+  visibility: 'internal' | 'project' | 'client';
+  scope_type?: string;
+  scope_id?: string;
+  work_item_id?: string;
+  mentions?: ActivityMentionPayload[];
+  attachments?: ActivityAttachmentPayload[];
+  metadata?: AnyRecord;
+};
+
+export type ActivityAttentionItem = WorkItemActivity & {
+  queue_types?: Array<'mentions' | 'questions' | 'blockers' | 'reminders' | 'unread' | string>;
 };
 
 export type EvidenceRecord = ProjectOperationsRecord & {

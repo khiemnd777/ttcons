@@ -376,12 +376,50 @@ func (h *Handler) MyWorkItems(c *fiber.Ctx) error {
 	return response.OK(c, items)
 }
 
+func (h *Handler) MyActivityAttention(c *fiber.Ctx) error {
+	items, err := h.service.MyActivityAttention(c.Context(), ActivityAttentionFilter{
+		Queue:     c.Query("queue"),
+		ProjectID: c.Query("project_id"),
+		Limit:     c.QueryInt("limit", 80),
+	}, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, items)
+}
+
 func (h *Handler) ProjectOperations(c *fiber.Ctx) error {
 	operations, err := h.service.ProjectOperations(c.Context(), c.Params("id"), actorID(c))
 	if err != nil {
 		return err
 	}
 	return response.OK(c, operations)
+}
+
+func (h *Handler) ProjectActivity(c *fiber.Ctx) error {
+	rows, err := h.service.ProjectActivity(c.Context(), c.Params("id"), ProjectActivityFilter{
+		ScopeType: c.Query("scope_type"),
+		ScopeID:   c.Query("scope_id"),
+		Limit:     c.QueryInt("limit", 80),
+	}, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) AddProjectActivity(c *fiber.Ctx) error {
+	req := WorkItemActivityRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu activity không hợp lệ")
+		}
+	}
+	activity, err := h.service.AddProjectActivity(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, activity)
 }
 
 func (h *Handler) GetWorkItem(c *fiber.Ctx) error {
@@ -450,6 +488,14 @@ func (h *Handler) AddWorkItemActivity(c *fiber.Ctx) error {
 		return err
 	}
 	return response.Created(c, activity)
+}
+
+func (h *Handler) MarkActivityRead(c *fiber.Ctx) error {
+	item, err := h.service.MarkActivityRead(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
 }
 
 func (h *Handler) AcceptEvidence(c *fiber.Ctx) error {

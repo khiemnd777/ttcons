@@ -1,20 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, BriefcaseBusiness, CheckCircle2, Clock3, RefreshCw, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, AtSign, Bell, BriefcaseBusiness, CheckCircle2, Clock3, MessageSquare, RefreshCw, ShieldAlert, SlidersHorizontal } from 'lucide-react';
 import clsx from 'clsx';
-import { ApiError, get } from '../../lib/api/client';
+import { ApiError, get, post, streamSSE, type StreamStatus } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
-import type { WorkItem } from '../../lib/types/domain';
+import type { ActivityAttentionItem, WorkItem } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
+import { ActivityAttachments } from '../work-items/ActivityAttachments';
 import { WorkItemCard } from '../work-items/WorkItemCard';
 import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
 import {
   asArray,
+  activityLabel,
+  compactDateTime,
   departmentLabel,
   isWorkOverdue,
   numberValue,
@@ -22,6 +25,7 @@ import {
 } from '../work-items/workItemPresentation';
 
 type QueueKey = 'mine' | 'department' | 'pending_approval' | 'watching' | 'all';
+type AttentionQueueKey = 'all' | 'mentions' | 'questions' | 'blockers' | 'reminders' | 'unread';
 
 const queues: Array<{ key: QueueKey; label: string; description: string }> = [
   { key: 'mine', label: 'Mine', description: 'Công việc gắn trực tiếp với tôi' },
@@ -42,6 +46,15 @@ const statusOptions = [
   { value: 'completed', label: 'Hoàn tất' },
 ];
 
+const attentionQueues: Array<{ key: AttentionQueueKey; label: string; icon: typeof MessageSquare }> = [
+  { key: 'all', label: 'All', icon: MessageSquare },
+  { key: 'mentions', label: 'Mentions', icon: AtSign },
+  { key: 'questions', label: 'Questions', icon: MessageSquare },
+  { key: 'blockers', label: 'Blockers', icon: AlertCircle },
+  { key: 'reminders', label: 'Reminders', icon: Bell },
+  { key: 'unread', label: 'Unread', icon: CheckCircle2 },
+];
+
 export function MyWorkPage() {
   const { user } = useAuth();
   const [selectedQueue, setSelectedQueue] = useState<QueueKey>('mine');
@@ -50,12 +63,34 @@ export function MyWorkPage() {
   const [selectedDeadline, setSelectedDeadline] = useState('all');
   const [selectedWorkType, setSelectedWorkType] = useState('all');
   const [selectedPriority, setSelectedPriority] = useState('all');
+  const [selectedAttentionQueue, setSelectedAttentionQueue] = useState<AttentionQueueKey>('all');
+  const [attentionStreamStatus, setAttentionStreamStatus] = useState<StreamStatus>('reconnecting');
   const [selectedWork, setSelectedWork] = useState<WorkItem | null>(null);
   const queryClient = useQueryClient();
   const workItems = useQuery({
     queryKey: ['my-work-items'],
     queryFn: () => get<WorkItem[]>('/me/work-items'),
     retry: false,
+  });
+  const attentionPath = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('limit', '120');
+    if (selectedProject !== 'all') params.set('project_id', selectedProject);
+    return `/me/activity-attention?${params.toString()}`;
+  }, [selectedProject]);
+  const activityAttention = useQuery({
+    queryKey: ['activity-attention', selectedProject],
+    queryFn: () => get<ActivityAttentionItem[]>(attentionPath),
+    retry: false,
+  });
+  const markAttentionRead = useMutation({
+    mutationFn: (activityId: string) => post(`/activities/${activityId}/read`),
+    onSuccess: (_row, activityId) => {
+      queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
+      queryClient.invalidateQueries({ queryKey: ['project-activity'] });
+      const item = activityAttention.data?.find((row) => row.id === activityId);
+      if (item?.project_id) queryClient.invalidateQueries({ queryKey: ['project-operations', item.project_id] });
+    },
   });
 
   const rows = useMemo(() => prioritizeWorkItems(asArray<WorkItem>(workItems.data)), [workItems.data]);
@@ -90,6 +125,18 @@ export function MyWorkPage() {
 
   const selectedContext = selectedWork ?? filteredRows[0] ?? null;
   const summary = useMemo(() => buildSummary(rows), [rows]);
+  const attentionRows = useMemo(() => asArray<ActivityAttentionItem>(activityAttention.data), [activityAttention.data]);
+
+  useEffect(() => {
+    return streamSSE('/me/activity-attention/stream', {
+      onStatus: setAttentionStreamStatus,
+      onEvent: (message) => {
+        if (message.event === 'attention_changed') {
+          queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
+        }
+      },
+    });
+  }, [queryClient]);
 
   if (workItems.isLoading) return <MyWorkSkeleton />;
   if (workItems.error) {
@@ -122,6 +169,20 @@ export function MyWorkPage() {
       />
 
       <SummaryStrip summary={summary} />
+
+      <ActivityAttentionPanel
+        rows={attentionRows}
+        loading={activityAttention.isLoading}
+        error={activityAttention.error}
+        selectedQueue={selectedAttentionQueue}
+        streamStatus={attentionStreamStatus}
+        markingId={markAttentionRead.isPending ? markAttentionRead.variables : undefined}
+        onSelectQueue={setSelectedAttentionQueue}
+        onRefresh={() => {
+          void activityAttention.refetch();
+        }}
+        onMarkRead={(activityId) => markAttentionRead.mutate(activityId)}
+      />
 
       <section className="mt-5 rounded-lg border border-line bg-white p-4 shadow-panel">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -254,6 +315,145 @@ function SummaryStrip({ summary }: { summary: ReturnType<typeof buildSummary> })
       ))}
     </section>
   );
+}
+
+function ActivityAttentionPanel({
+  rows,
+  loading,
+  error,
+  selectedQueue,
+  streamStatus,
+  markingId,
+  onSelectQueue,
+  onRefresh,
+  onMarkRead,
+}: {
+  rows: ActivityAttentionItem[];
+  loading: boolean;
+  error: unknown;
+  selectedQueue: AttentionQueueKey;
+  streamStatus: StreamStatus;
+  markingId?: string;
+  onSelectQueue: (queue: AttentionQueueKey) => void;
+  onRefresh: () => void;
+  onMarkRead: (activityId: string) => void;
+}) {
+  const counts = useMemo(() => {
+    return attentionQueues.reduce<Record<AttentionQueueKey, number>>((acc, queue) => {
+      acc[queue.key] = rows.filter((item) => inAttentionQueue(item, queue.key)).length;
+      return acc;
+    }, { all: 0, mentions: 0, questions: 0, blockers: 0, reminders: 0, unread: 0 });
+  }, [rows]);
+  const visibleRows = useMemo(() => rows.filter((item) => inAttentionQueue(item, selectedQueue)), [rows, selectedQueue]);
+
+  return (
+    <section className="mt-5 rounded-lg border border-line bg-white p-4 shadow-panel">
+      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="font-semibold text-ink">Communication attention</h2>
+          <p className="mt-1 text-sm text-slate-500">Mentions, open questions, blockers, and due reminders</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <LiveStatusBadge status={streamStatus} />
+          <button
+            className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+            onClick={onRefresh}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-3 flex gap-2 overflow-x-auto">
+        {attentionQueues.map((queue) => {
+          const Icon = queue.icon;
+          const active = selectedQueue === queue.key;
+          return (
+            <button
+              key={queue.key}
+              className={clsx(
+                'inline-flex min-w-fit items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold',
+                active ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-line bg-white text-slate-700 hover:bg-slate-50',
+              )}
+              onClick={() => onSelectQueue(queue.key)}
+            >
+              <Icon className="h-4 w-4" />
+              {queue.label}
+              <span className="rounded-md bg-white px-2 py-0.5 text-xs text-slate-600">{counts[queue.key]}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {loading ? <LoadingSpinner /> : null}
+      {error ? (
+        <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+          Không tải được communication attention.
+        </div>
+      ) : null}
+      {!loading && !error && !visibleRows.length ? <EmptyState title="Không có communication attention trong queue này" /> : null}
+
+      {visibleRows.length ? (
+        <div className="grid gap-2 xl:grid-cols-2">
+          {visibleRows.slice(0, 8).map((item) => (
+            <div key={item.id} className={clsx('rounded-md border p-3', item.is_unread ? 'border-blue-200 bg-blue-50' : 'border-line bg-slate-50')}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1">
+                    {item.is_unread ? <span className="rounded-md bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">Unread</span> : null}
+                    {item.mentioned_me ? <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">@you</span> : null}
+                    {asArray<string>(item.queue_types).slice(0, 3).map((queue) => (
+                      <span key={queue} className="rounded-md bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{queue}</span>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-ink">{activityLabel(item.activity_type)}</p>
+                  <p className="mt-1 line-clamp-1 text-xs text-slate-500">
+                    {item.actor_name ?? 'System'} · {item.target_label ?? item.work_item_title ?? 'Project'} · {compactDateTime(item.created_at)}
+                  </p>
+                </div>
+                {item.is_unread ? (
+                  <button
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md border border-blue-200 bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                    disabled={markingId === item.id}
+                    onClick={() => onMarkRead(item.id)}
+                  >
+                    <CheckCircle2 className="h-3 w-3" />
+                    Read
+                  </button>
+                ) : null}
+              </div>
+              {item.comment ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-700">{item.comment}</p> : null}
+              <ActivityAttachments attachments={item.attachments} compact />
+              {item.project_id ? (
+                <Link to={`/projects/${item.project_id}`} className="mt-2 inline-flex text-xs font-semibold text-blue-700 hover:text-blue-800">
+                  Open project
+                </Link>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function LiveStatusBadge({ status }: { status: StreamStatus }) {
+  const label = status === 'connected' ? 'Live connected' : status === 'reconnecting' ? 'Reconnecting' : 'Offline';
+  const tone = status === 'connected' ? 'bg-emerald-50 text-emerald-700' : status === 'reconnecting' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600';
+  const dot = status === 'connected' ? 'bg-emerald-500' : status === 'reconnecting' ? 'bg-amber-500' : 'bg-slate-400';
+  return (
+    <span className={clsx('inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold', tone)}>
+      <span className={clsx('h-2 w-2 rounded-full', dot)} />
+      {label}
+    </span>
+  );
+}
+
+function inAttentionQueue(item: ActivityAttentionItem, queue: AttentionQueueKey) {
+  if (queue === 'all') return true;
+  if (queue === 'unread') return Boolean(item.is_unread);
+  return asArray<string>(item.queue_types).includes(queue);
 }
 
 function QueueTabs({

@@ -65,6 +65,13 @@ const activityLabels: Record<string, string> = {
   evidence_accepted: 'Duyệt evidence',
   evidence_rejected: 'Từ chối evidence',
   comment: 'Ghi chú',
+  status: 'Cập nhật trạng thái',
+  blocker: 'Blocker',
+  question: 'Câu hỏi',
+  decision: 'Quyết định',
+  reminder: 'Nhắc việc',
+  file_note: 'Ghi chú file',
+  system_event: 'Sự kiện hệ thống',
 };
 
 const evidenceLabels: Record<string, string> = {

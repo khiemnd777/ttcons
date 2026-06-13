@@ -11,6 +11,13 @@ export type ApiEnvelope<T> = {
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api';
 
+export type StreamStatus = 'connected' | 'reconnecting' | 'offline';
+
+export type SSEMessage<T = any> = {
+  event: string;
+  data: T;
+};
+
 export class ApiError extends Error {
   code: string;
   status: number;
@@ -63,4 +70,80 @@ export function put<T>(path: string, body?: unknown) {
 
 export function del<T>(path: string) {
   return api<T>(path, { method: 'DELETE' });
+}
+
+export function streamSSE<T = any>(
+  path: string,
+  handlers: {
+    onEvent: (message: SSEMessage<T>) => void;
+    onStatus?: (status: StreamStatus) => void;
+  },
+) {
+  let stopped = false;
+  const controller = new AbortController();
+
+  async function run() {
+    while (!stopped) {
+      try {
+        const token = getToken();
+        const headers = new Headers();
+        headers.set('Accept', 'text/event-stream');
+        if (token) headers.set('Authorization', `Bearer ${token}`);
+        const res = await fetch(`${API_URL}${path}`, { headers, signal: controller.signal });
+        if (!res.ok || !res.body) throw new ApiError('Không mở được realtime stream', 'STREAM_ERROR', res.status);
+        handlers.onStatus?.('connected');
+        await readSSEStream<T>(res.body, handlers.onEvent);
+      } catch (error) {
+        if (stopped || controller.signal.aborted) break;
+        handlers.onStatus?.('reconnecting');
+        await wait(2000);
+      }
+    }
+    if (!stopped) handlers.onStatus?.('offline');
+  }
+
+  void run();
+  return () => {
+    stopped = true;
+    controller.abort();
+  };
+}
+
+async function readSSEStream<T>(body: ReadableStream<Uint8Array>, onEvent: (message: SSEMessage<T>) => void) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split('\n\n');
+    buffer = frames.pop() ?? '';
+    frames.forEach((frame) => {
+      const message = parseSSEFrame<T>(frame);
+      if (message) onEvent(message);
+    });
+  }
+}
+
+function parseSSEFrame<T>(frame: string): SSEMessage<T> | null {
+  let event = 'message';
+  const dataLines: string[] = [];
+  frame.split('\n').forEach((line) => {
+    if (line.startsWith('event:')) event = line.slice(6).trim();
+    if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+  });
+  if (!dataLines.length) return null;
+  const raw = dataLines.join('\n');
+  try {
+    return { event, data: JSON.parse(raw) as T };
+  } catch {
+    return { event, data: raw as T };
+  }
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }

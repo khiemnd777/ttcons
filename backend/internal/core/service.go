@@ -9,16 +9,18 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Service struct {
 	repo      *Repository
 	jwtSecret string
+	streamHub *ActivityStreamHub
 }
 
 func NewService(repo *Repository, jwtSecret string) *Service {
-	return &Service{repo: repo, jwtSecret: jwtSecret}
+	return &Service{repo: repo, jwtSecret: jwtSecret, streamHub: NewActivityStreamHub()}
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (Record, error) {
@@ -185,6 +187,37 @@ func (s *Service) MyWorkItems(ctx context.Context, actorID string) ([]Record, er
 	return s.repo.ListMyWorkItems(ctx, actorID)
 }
 
+func (s *Service) MyActivityAttention(ctx context.Context, filter ActivityAttentionFilter, actorID string) ([]Record, error) {
+	filter.Queue = strings.TrimSpace(filter.Queue)
+	if filter.Queue == "" {
+		filter.Queue = "all"
+	}
+	if !activityAttentionQueues[filter.Queue] {
+		return nil, validationError("Queue activity không hợp lệ", Record{"queue": filter.Queue})
+	}
+	filter.ProjectID = cleanID(filter.ProjectID)
+	if filter.ProjectID != "" {
+		if !validActivityUUID(filter.ProjectID) {
+			return nil, validationError("project_id không hợp lệ", Record{"project_id": filter.ProjectID})
+		}
+		allowed, err := s.repo.CanViewProjectOperations(ctx, filter.ProjectID, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, forbiddenError("Bạn không có quyền xem activity của công trình này")
+		}
+	}
+	if filter.Limit <= 0 || filter.Limit > 200 {
+		filter.Limit = 80
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.ListMyActivityAttention(ctx, actorID, profile, filter)
+}
+
 func (s *Service) ProjectOperations(ctx context.Context, projectID, actorID string) (Record, error) {
 	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
 	if err != nil {
@@ -196,6 +229,35 @@ func (s *Service) ProjectOperations(ctx context.Context, projectID, actorID stri
 	return s.repo.ProjectOperations(ctx, projectID, actorID)
 }
 
+func (s *Service) ProjectActivity(ctx context.Context, projectID string, filter ProjectActivityFilter, actorID string) ([]Record, error) {
+	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền xem activity của công trình này")
+	}
+	filter.ScopeType = strings.TrimSpace(filter.ScopeType)
+	filter.ScopeID = cleanID(filter.ScopeID)
+	if filter.ScopeType != "" && !activityTargetScopes[filter.ScopeType] {
+		return nil, validationError("Scope activity không hợp lệ", Record{"scope_type": filter.ScopeType})
+	}
+	if filter.ScopeID != "" && filter.ScopeType == "" {
+		return nil, validationError("Cần scope_type khi lọc theo scope_id")
+	}
+	if filter.ScopeID != "" && !validActivityUUID(filter.ScopeID) {
+		return nil, validationError("scope_id không hợp lệ", Record{"scope_id": filter.ScopeID})
+	}
+	if filter.Limit <= 0 || filter.Limit > 200 {
+		filter.Limit = 80
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.ProjectActivityThread(ctx, projectID, profile, filter)
+}
+
 func (s *Service) WorkItemDetail(ctx context.Context, workItemID, actorID string) (Record, error) {
 	allowed, err := s.repo.CanViewWorkItem(ctx, workItemID, actorID)
 	if err != nil {
@@ -204,7 +266,11 @@ func (s *Service) WorkItemDetail(ctx context.Context, workItemID, actorID string
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền xem work item này")
 	}
-	return s.repo.GetWorkItemDetail(ctx, workItemID)
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetWorkItemDetail(ctx, workItemID, profileIsClient(profile) && !profile.IsManager)
 }
 
 func (s *Service) WorkItemAction(ctx context.Context, workItemID, action string, req WorkItemActionRequest, actorID, actorName string) (Record, error) {
@@ -360,19 +426,477 @@ func (s *Service) AddWorkItemActivity(ctx context.Context, workItemID string, re
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền thêm activity cho work item này")
 	}
-	comment := strings.TrimSpace(req.Comment)
-	if comment == "" {
-		return nil, validationError("Nội dung activity là bắt buộc")
+	normalized, err := validateActivityRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivityVisibility(ctx, normalized, actorID); err != nil {
+		return nil, err
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
 		return nil, err
 	}
-	if req.Metadata == nil {
-		req.Metadata = Record{}
+	normalized, err = s.validateActivityAttachments(ctx, cleanID(item["project_id"]), workItemID, normalized)
+	if err != nil {
+		return nil, err
 	}
+	activity, err := s.repo.AddWorkItemActivity(ctx, item, normalized, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishActivityEvent(activityEventFromRecord("activity_changed", activity, actorID))
+	return activity, nil
+}
+
+func (s *Service) MarkActivityRead(ctx context.Context, activityID, actorID string) (Record, error) {
+	activityID = cleanID(activityID)
+	if !validActivityUUID(activityID) {
+		return nil, validationError("activity_id không hợp lệ", Record{"activity_id": activityID})
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	visible, err := s.repo.ActivityVisibleToUser(ctx, activityID, profile)
+	if err != nil {
+		return nil, err
+	}
+	if !visible {
+		return nil, forbiddenError("Bạn không có quyền xem activity này")
+	}
+	readState, err := s.repo.MarkActivityRead(ctx, activityID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	s.publishActivityEvent(ActivityStreamEvent{
+		Type:       "activity_read",
+		ProjectID:  cleanID(readState["project_id"]),
+		ActivityID: activityID,
+		ActorID:    actorID,
+	})
+	return readState, nil
+}
+
+func (s *Service) AddProjectActivity(ctx context.Context, projectID string, req WorkItemActivityRequest, actorID, actorName string) (Record, error) {
+	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền thêm activity cho công trình này")
+	}
+	normalized, err := validateActivityRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivityVisibility(ctx, normalized, actorID); err != nil {
+		return nil, err
+	}
+	normalized, err = s.normalizeProjectActivityTarget(ctx, projectID, normalized, actorID)
+	if err != nil {
+		return nil, err
+	}
+	attachmentWorkItemID := ""
+	if normalized.ScopeType == "work_item" {
+		attachmentWorkItemID = normalized.ScopeID
+	} else if normalized.WorkItemID != "" {
+		attachmentWorkItemID = normalized.WorkItemID
+	}
+	normalized, err = s.validateActivityAttachments(ctx, projectID, attachmentWorkItemID, normalized)
+	if err != nil {
+		return nil, err
+	}
+	activity, err := s.repo.AddProjectActivity(ctx, projectID, normalized, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishActivityEvent(activityEventFromRecord("activity_changed", activity, actorID))
+	return activity, nil
+}
+
+var userActivityTypes = map[string]bool{
+	"comment":   true,
+	"status":    true,
+	"blocker":   true,
+	"question":  true,
+	"decision":  true,
+	"reminder":  true,
+	"file_note": true,
+}
+
+var activityVisibilities = map[string]bool{
+	"internal": true,
+	"project":  true,
+	"client":   true,
+}
+
+var activityTargetScopes = map[string]bool{
+	"project":             true,
+	"work_item":           true,
+	"boq_item":            true,
+	"procurement_request": true,
+	"stock_movement":      true,
+	"acceptance":          true,
+	"rework":              true,
+	"handover":            true,
+	"payable":             true,
+	"receivable":          true,
+	"payment":             true,
+}
+
+var activityAttentionQueues = map[string]bool{
+	"all":       true,
+	"mentions":  true,
+	"questions": true,
+	"blockers":  true,
+	"reminders": true,
+	"unread":    true,
+}
+
+var activityAttachmentTypes = map[string]bool{
+	"evidence": true,
+	"document": true,
+}
+
+func validateActivityRequest(req WorkItemActivityRequest) (WorkItemActivityRequest, error) {
+	activityType := strings.TrimSpace(req.ActivityType)
+	if activityType == "" {
+		activityType = "comment"
+	}
+	if activityType == "system_event" {
+		return req, validationError("System event chỉ được tạo bởi workflow")
+	}
+	if !userActivityTypes[activityType] {
+		return req, validationError("Loại activity không hợp lệ", Record{"activity_type": activityType})
+	}
+
+	comment := strings.TrimSpace(req.Comment)
+	if comment == "" {
+		return req, validationError("Nội dung activity là bắt buộc")
+	}
+
+	visibility := strings.TrimSpace(req.Visibility)
+	if visibility == "" {
+		visibility = "project"
+	}
+	if !activityVisibilities[visibility] {
+		return req, validationError("Visibility activity không hợp lệ", Record{"visibility": visibility})
+	}
+
+	metadata := req.Metadata
+	if metadata == nil {
+		metadata = Record{}
+	}
+
+	if activityType == "reminder" {
+		dueAt := activityMetadataText(metadata, "due_at")
+		if dueAt == "" {
+			return req, validationError("Reminder cần ngày nhắc lại", Record{"field": "metadata.due_at"})
+		}
+		if !validActivityDueDate(dueAt) {
+			return req, validationError("Ngày nhắc lại không hợp lệ", Record{"field": "metadata.due_at"})
+		}
+		metadata["due_at"] = dueAt
+	}
+	if activityType == "blocker" {
+		if dueAt := activityMetadataText(metadata, "due_at"); dueAt != "" && !validActivityDueDate(dueAt) {
+			return req, validationError("Hạn xử lý blocker không hợp lệ", Record{"field": "metadata.due_at"})
+		}
+	}
+	req.ActivityType = activityType
 	req.Comment = comment
-	return s.repo.AddWorkItemActivity(ctx, item, req, actorID, actorName)
+	req.Visibility = visibility
+	req.ScopeType = strings.TrimSpace(req.ScopeType)
+	req.ScopeID = cleanID(req.ScopeID)
+	req.WorkItemID = cleanID(req.WorkItemID)
+	attachments, err := normalizeActivityAttachments(req.Attachments, metadata)
+	if err != nil {
+		return req, err
+	}
+	req.Attachments = attachments
+	if len(attachments) > 0 {
+		metadata["attachments"] = attachments
+		for _, attachment := range attachments {
+			if attachment.Type == "evidence" && activityMetadataText(metadata, "evidence_id") == "" {
+				metadata["evidence_id"] = attachment.ID
+			}
+			if attachment.Type == "document" && activityMetadataText(metadata, "document_id") == "" {
+				metadata["document_id"] = attachment.ID
+			}
+		}
+	}
+	if activityType == "file_note" && len(attachments) == 0 {
+		return req, validationError("File note cần evidence hoặc document", Record{"fields": []string{"attachments", "metadata.evidence_id", "metadata.document_id"}})
+	}
+	mentions, err := normalizeActivityMentions(req.Mentions)
+	if err != nil {
+		return req, err
+	}
+	req.Mentions = mentions
+	if len(mentions) > 0 {
+		metadata["mentions"] = mentions
+	}
+	req.Metadata = metadata
+	return req, nil
+}
+
+func normalizeActivityAttachments(input []ActivityAttachmentRequest, metadata Record) ([]ActivityAttachmentRequest, error) {
+	out := make([]ActivityAttachmentRequest, 0, len(input))
+	seen := map[string]bool{}
+	add := func(attachmentType, attachmentID, label string) error {
+		attachmentType = strings.TrimSpace(strings.ToLower(attachmentType))
+		attachmentID = cleanID(attachmentID)
+		label = strings.TrimSpace(label)
+		if attachmentType == "" && attachmentID == "" {
+			return nil
+		}
+		if !activityAttachmentTypes[attachmentType] {
+			return validationError("Loại attachment không hợp lệ", Record{"attachment_type": attachmentType})
+		}
+		if attachmentID == "" || !validActivityUUID(attachmentID) {
+			return validationError("Attachment id không hợp lệ", Record{"attachment_type": attachmentType, "id": attachmentID})
+		}
+		key := attachmentType + ":" + strings.ToLower(attachmentID)
+		if seen[key] {
+			return nil
+		}
+		seen[key] = true
+		out = append(out, ActivityAttachmentRequest{Type: attachmentType, ID: attachmentID, Label: label})
+		return nil
+	}
+	for _, attachment := range input {
+		if err := add(attachment.Type, attachment.ID, attachment.Label); err != nil {
+			return nil, err
+		}
+	}
+	if rawAttachments, ok := metadata["attachments"]; ok {
+		for _, rawAttachment := range anySlice(rawAttachments) {
+			if record, ok := rawAttachment.(map[string]any); ok {
+				if err := add(fmt.Sprint(record["type"]), fmt.Sprint(record["id"]), fmt.Sprint(record["label"])); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			if record, ok := rawAttachment.(Record); ok {
+				if err := add(fmt.Sprint(record["type"]), fmt.Sprint(record["id"]), fmt.Sprint(record["label"])); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+	if evidenceID := activityMetadataText(metadata, "evidence_id"); evidenceID != "" {
+		if err := add("evidence", evidenceID, ""); err != nil {
+			return nil, err
+		}
+	}
+	if documentID := activityMetadataText(metadata, "document_id"); documentID != "" {
+		if err := add("document", documentID, ""); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func anySlice(value any) []any {
+	switch v := value.(type) {
+	case []any:
+		return v
+	case []Record:
+		out := make([]any, 0, len(v))
+		for _, item := range v {
+			out = append(out, item)
+		}
+		return out
+	case []ActivityAttachmentRequest:
+		out := make([]any, 0, len(v))
+		for _, item := range v {
+			out = append(out, Record{"type": item.Type, "id": item.ID, "label": item.Label})
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func (s *Service) validateActivityAttachments(ctx context.Context, projectID, workItemID string, req WorkItemActivityRequest) (WorkItemActivityRequest, error) {
+	if len(req.Attachments) == 0 {
+		return req, nil
+	}
+	for _, attachment := range req.Attachments {
+		switch attachment.Type {
+		case "evidence":
+			evidence, err := s.repo.GetEvidenceDetail(ctx, attachment.ID)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return req, validationError("Evidence attachment không tồn tại", Record{"evidence_id": attachment.ID})
+				}
+				return req, err
+			}
+			if cleanID(evidence["project_id"]) != projectID {
+				return req, validationError("Evidence attachment không thuộc công trình này", Record{"evidence_id": attachment.ID})
+			}
+			if workItemID != "" && cleanID(evidence["work_item_id"]) != workItemID {
+				return req, validationError("Evidence attachment không thuộc work item này", Record{"evidence_id": attachment.ID})
+			}
+			if req.Visibility == "client" && fmt.Sprint(evidence["visibility"]) != "client" {
+				return req, validationError("Client-visible activity chỉ được gắn evidence client-visible", Record{"evidence_id": attachment.ID})
+			}
+		case "document":
+			document, err := s.repo.GetDocumentAttachment(ctx, attachment.ID)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return req, validationError("Document attachment không tồn tại", Record{"document_id": attachment.ID})
+				}
+				return req, err
+			}
+			if cleanID(document["project_id"]) != projectID {
+				return req, validationError("Document attachment không thuộc công trình này", Record{"document_id": attachment.ID})
+			}
+			if req.Visibility == "client" {
+				return req, validationError("Document attachment chưa có visibility; hãy gắn evidence client-visible thay thế", Record{"document_id": attachment.ID})
+			}
+		}
+	}
+	return req, nil
+}
+
+func normalizeActivityMentions(input []ActivityMentionRequest) ([]ActivityMentionRequest, error) {
+	out := make([]ActivityMentionRequest, 0, len(input))
+	seen := map[string]bool{}
+	for _, mention := range input {
+		mentionType := strings.TrimSpace(strings.ToLower(mention.Type))
+		mentionID := cleanID(mention.ID)
+		label := strings.TrimSpace(mention.Label)
+		if mentionType == "" && mentionID == "" {
+			continue
+		}
+		if mentionType != "user" && mentionType != "staff" && mentionType != "role" {
+			return nil, validationError("Loại mention không hợp lệ", Record{"mention_type": mention.Type})
+		}
+		if mentionID == "" {
+			return nil, validationError("Mention cần id hoặc role label", Record{"mention_type": mentionType})
+		}
+		if mentionType != "role" && !validActivityUUID(mentionID) {
+			return nil, validationError("Mention user/staff không hợp lệ", Record{"mention_type": mentionType, "id": mentionID})
+		}
+		key := mentionType + ":" + strings.ToLower(mentionID)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, ActivityMentionRequest{Type: mentionType, ID: mentionID, Label: label})
+	}
+	return out, nil
+}
+
+func (s *Service) normalizeProjectActivityTarget(ctx context.Context, projectID string, req WorkItemActivityRequest, actorID string) (WorkItemActivityRequest, error) {
+	scopeType := strings.TrimSpace(req.ScopeType)
+	if scopeType == "" {
+		scopeType = "project"
+	}
+	if !activityTargetScopes[scopeType] {
+		return req, validationError("Scope activity không hợp lệ", Record{"scope_type": scopeType})
+	}
+	if scopeType == "project" {
+		req.ScopeType = "project"
+		req.ScopeID = projectID
+		req.WorkItemID = ""
+		return req, nil
+	}
+
+	scopeID := cleanID(req.ScopeID)
+	if scopeID == "" {
+		return req, validationError("Scope activity cần record đích", Record{"scope_type": scopeType})
+	}
+	if !validActivityUUID(scopeID) {
+		return req, validationError("scope_id không hợp lệ", Record{"scope_id": scopeID})
+	}
+	if scopeType == "work_item" {
+		allowed, err := s.repo.CanActOnWorkItem(ctx, scopeID, actorID)
+		if err != nil {
+			return req, err
+		}
+		if !allowed {
+			return req, forbiddenError("Bạn không có quyền thêm activity cho work item này")
+		}
+		item, err := s.repo.GetWorkItemDetail(ctx, scopeID)
+		if err != nil {
+			return req, err
+		}
+		if cleanID(item["project_id"]) != projectID {
+			return req, validationError("Work item không thuộc công trình này", Record{"work_item_id": scopeID})
+		}
+		req.ScopeType = "work_item"
+		req.ScopeID = scopeID
+		req.WorkItemID = scopeID
+		return req, nil
+	}
+
+	exists, err := s.repo.ProjectActivityTargetExists(ctx, projectID, scopeType, scopeID)
+	if err != nil {
+		return req, err
+	}
+	if !exists {
+		return req, validationError("Record activity không thuộc công trình này", Record{"scope_type": scopeType, "scope_id": scopeID})
+	}
+	if req.WorkItemID != "" {
+		if !validActivityUUID(req.WorkItemID) {
+			return req, validationError("work_item_id không hợp lệ", Record{"work_item_id": req.WorkItemID})
+		}
+		allowed, err := s.repo.CanActOnWorkItem(ctx, req.WorkItemID, actorID)
+		if err != nil {
+			return req, err
+		}
+		if !allowed {
+			return req, forbiddenError("Bạn không có quyền liên kết activity với work item này")
+		}
+		item, err := s.repo.GetWorkItemDetail(ctx, req.WorkItemID)
+		if err != nil {
+			return req, err
+		}
+		if cleanID(item["project_id"]) != projectID {
+			return req, validationError("Work item liên kết không thuộc công trình này", Record{"work_item_id": req.WorkItemID})
+		}
+	}
+	req.ScopeType = scopeType
+	req.ScopeID = scopeID
+	return req, nil
+}
+
+func validActivityUUID(value string) bool {
+	_, err := uuid.Parse(value)
+	return err == nil
+}
+
+func activityMetadataText(metadata Record, keys ...string) string {
+	for _, key := range keys {
+		text := strings.TrimSpace(fmt.Sprint(metadata[key]))
+		if text != "" && text != "<nil>" {
+			return text
+		}
+	}
+	return ""
+}
+
+func validActivityDueDate(value string) bool {
+	for _, layout := range []string{time.RFC3339, "2006-01-02"} {
+		if _, err := time.Parse(layout, value); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) requireActivityVisibility(ctx context.Context, req WorkItemActivityRequest, actorID string) error {
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return err
+	}
+	if profileIsClient(profile) && !profile.IsManager && req.Visibility != "client" {
+		return validationError("Client chỉ được tạo activity client-visible", Record{"visibility": req.Visibility})
+	}
+	return nil
 }
 
 func (s *Service) EvidenceAction(ctx context.Context, evidenceID, action string, req ActionRequest, actorID, actorName string) (Record, error) {

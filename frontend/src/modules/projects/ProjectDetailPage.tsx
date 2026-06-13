@@ -39,10 +39,11 @@ import type {
   WorkItem,
   WorkItemActivity,
 } from '../../lib/types/domain';
+import type { ActivityAttachmentOption } from '../work-items/ActivityComposer';
+import { ActivityThread } from '../work-items/ActivityThread';
 import { WorkItemCard } from '../work-items/WorkItemCard';
 import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
 import {
-  activityLabel,
   asArray,
   compactDateTime,
   departmentLabel,
@@ -121,6 +122,12 @@ export function ProjectDetailPage() {
   const blockers = useMemo(() => prioritizeWorkItems(asArray<WorkItem>(data?.blockers)), [data?.blockers]);
   const departmentSurfaces = useMemo(() => asArray<DepartmentSurface>(data?.department_surfaces), [data?.department_surfaces]);
   const timeline = useMemo(() => asArray<ProjectOperationsTimelineNode>(data?.workflow_timeline), [data?.workflow_timeline]);
+  const activityTargets = useMemo(() => asArray<WorkItem>(data?.work_items).map((item) => ({
+    scope_type: 'work_item',
+    scope_id: item.id,
+    work_item_id: item.id,
+    label: `${item.project_code ? `${item.project_code} · ` : ''}${item.title}`,
+  })), [data?.work_items]);
   const currentNode = useMemo(() => currentTimelineNode(timeline), [timeline]);
 
   useEffect(() => {
@@ -186,7 +193,16 @@ export function ProjectDetailPage() {
       <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)_360px]">
         <WorkflowTimeline projectId={id} nodes={timeline} hasPipeline={hasPipeline} startPending={startPipeline.isPending} onStartPipeline={() => startPipeline.mutate()} />
         <ActiveWorkPanel rows={activeWork} onOpenWork={openWorkItem} />
-        <CommandCenter data={data} blockers={blockers} onOpenWork={openWorkItem} />
+        <CommandCenter
+          projectId={id}
+          data={data}
+          blockers={blockers}
+          activityTargets={activityTargets}
+          onActivityChanged={() => {
+            queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
+          }}
+          onOpenWork={openWorkItem}
+        />
       </div>
 
       <DepartmentSurfaces
@@ -481,16 +497,23 @@ function ActiveWorkPanel({ rows, onOpenWork }: { rows: WorkItem[]; onOpenWork: (
 }
 
 function CommandCenter({
+  projectId,
   data,
   blockers,
+  activityTargets,
+  onActivityChanged,
   onOpenWork,
 }: {
+  projectId: string;
   data: ProjectOperationsResponse;
   blockers: WorkItem[];
+  activityTargets: Array<{ scope_type: string; scope_id: string; label: string; work_item_id?: string }>;
+  onActivityChanged: () => void;
   onOpenWork: (item: WorkItem) => void;
 }) {
   const approvals = asArray<ProjectOperationsRecord>(data.approvals);
   const latestEvidence = asArray<EvidenceRecord>(data.latest_evidence);
+  const attachmentOptions = buildActivityAttachmentOptions(latestEvidence);
   const latestActivity = asArray<WorkItemActivity>(data.latest_activity);
   const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
   const workByApproval = new Map(asArray<WorkItem>(data.work_items).map((item) => [item.approval_request_id, item]));
@@ -548,18 +571,35 @@ function CommandCenter({
         </CommandSection>
 
         <CommandSection title="Activity / Audit" count={latestActivity.length + auditRecent.length}>
-          {latestActivity.length ? latestActivity.slice(0, 5).map((activity) => (
-            <div key={activity.id} className="rounded-md border border-line px-3 py-2">
-              <p className="text-sm font-semibold text-ink">{activityLabel(activity.activity_type)}</p>
-              <p className="mt-1 line-clamp-2 text-xs text-slate-500">
-                {activity.actor_name ?? 'System'} · {activity.work_item_title ?? 'Work item'} · {compactDateTime(activity.created_at)}
-              </p>
-            </div>
-          )) : <p className="text-sm text-slate-500">Chưa có activity mới.</p>}
+          <ActivityThread projectId={projectId} targetOptions={activityTargets} attachmentOptions={attachmentOptions} onChanged={onActivityChanged} />
         </CommandSection>
       </div>
     </section>
   );
+}
+
+function buildActivityAttachmentOptions(evidence: EvidenceRecord[]): ActivityAttachmentOption[] {
+  const options: ActivityAttachmentOption[] = [];
+  evidence.forEach((record) => {
+    const label = record.name ?? record.title ?? record.document_name ?? record.id;
+    options.push({
+      type: 'evidence',
+      id: record.id,
+      label,
+      status: record.status,
+      visibility: record.visibility,
+    });
+    if (record.document_id) {
+      options.push({
+        type: 'document',
+        id: record.document_id,
+        label: record.document_name ?? label,
+        status: record.status,
+        visibility: record.visibility,
+      });
+    }
+  });
+  return options;
 }
 
 function CommandSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {

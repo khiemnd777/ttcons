@@ -10,7 +10,9 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { get, post } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
 import { useToast } from '../../components/ToastProvider';
-import type { EvidenceRecord, WorkItem, WorkItemActivity } from '../../lib/types/domain';
+import type { ActivityPayload, EvidenceRecord, WorkItem, WorkItemActivity } from '../../lib/types/domain';
+import { ActivityAttachments } from './ActivityAttachments';
+import { ActivityComposer, type ActivityAttachmentOption } from './ActivityComposer';
 import {
   actionDescriptions,
   actionLabels,
@@ -62,6 +64,20 @@ export function WorkItemDetailDialog({
     },
     onError: (error) => toast.error('Không thao tác được work item', error),
   });
+  const activityAction = useMutation({
+    mutationFn: ({ workItemId, payload }: { workItemId: string; payload: ActivityPayload }) =>
+      post<WorkItemActivity>(`/work-items/${workItemId}/activity`, payload),
+    onSuccess: (_activity, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['work-item', variables.workItemId] });
+      queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
+      queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
+      if (detailItem?.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['project-operations', detailItem.project_id] });
+      }
+      toast.success('Đã gửi activity');
+    },
+    onError: (error) => toast.error('Không gửi được activity', error),
+  });
 
   function runAction(action: WorkItemActionKey) {
     if (!detailItem?.id) return;
@@ -83,6 +99,7 @@ export function WorkItemDetailDialog({
   const actions = availableActions(detailItem?.status);
   const evidence = asArray<EvidenceRecord>(detailItem?.evidence);
   const activities = asArray<WorkItemActivity>(detailItem?.activities);
+  const attachmentOptions = buildActivityAttachmentOptions(evidence);
   const requirement = detailItem?.evidence_requirement_json ?? {};
 
   return (
@@ -200,15 +217,28 @@ export function WorkItemDetailDialog({
             </section>
             <section>
               <h3 className="mb-2 text-sm font-semibold text-ink">Activity</h3>
+              <ActivityComposer
+                mode="work_item"
+                attachmentOptions={attachmentOptions}
+                submitting={activityAction.isPending}
+                onSubmit={(payload) => {
+                  if (!detailItem.id) return Promise.resolve();
+                  return activityAction.mutateAsync({ workItemId: detailItem.id, payload }).then(() => undefined);
+                }}
+              />
               {activities.length ? (
-                <div className="space-y-2">
+                <div className="mt-3 space-y-2">
                   {activities.map((activity) => (
                     <div key={activity.id} className="rounded-md border border-line px-3 py-2">
-                      <p className="text-sm font-semibold text-ink">{activityLabel(activity.activity_type)}</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-ink">{activityLabel(activity.activity_type)}</p>
+                        {activity.visibility ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{activity.visibility}</span> : null}
+                      </div>
                       <p className="mt-1 text-xs text-slate-500">
                         {activity.actor_name ?? 'System'} · {compactDateTime(activity.created_at)}
                       </p>
                       {activity.comment ? <p className="mt-2 text-sm text-slate-700">{activity.comment}</p> : null}
+                      <ActivityAttachments attachments={activity.attachments} />
                     </div>
                   ))}
                 </div>
@@ -221,6 +251,30 @@ export function WorkItemDetailDialog({
       ) : null}
     </Dialog>
   );
+}
+
+function buildActivityAttachmentOptions(evidence: EvidenceRecord[]): ActivityAttachmentOption[] {
+  const options: ActivityAttachmentOption[] = [];
+  evidence.forEach((record) => {
+    const label = record.name ?? record.title ?? record.document_name ?? record.id;
+    options.push({
+      type: 'evidence',
+      id: record.id,
+      label,
+      status: record.status,
+      visibility: record.visibility,
+    });
+    if (record.document_id) {
+      options.push({
+        type: 'document',
+        id: record.document_id,
+        label: record.document_name ?? label,
+        status: record.status,
+        visibility: record.visibility,
+      });
+    }
+  });
+  return options;
 }
 
 function DetailMetric({ label, value }: { label: string; value: ReactNode }) {

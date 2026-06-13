@@ -49,8 +49,39 @@ type WorkItemEvidenceRequest struct {
 }
 
 type WorkItemActivityRequest struct {
-	Comment  string `json:"comment"`
-	Metadata Record `json:"metadata"`
+	ActivityType string                      `json:"activity_type"`
+	Comment      string                      `json:"comment"`
+	Visibility   string                      `json:"visibility"`
+	ScopeType    string                      `json:"scope_type"`
+	ScopeID      string                      `json:"scope_id"`
+	WorkItemID   string                      `json:"work_item_id"`
+	Mentions     []ActivityMentionRequest    `json:"mentions"`
+	Attachments  []ActivityAttachmentRequest `json:"attachments"`
+	Metadata     Record                      `json:"metadata"`
+}
+
+type ActivityMentionRequest struct {
+	Type  string `json:"type"`
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+type ActivityAttachmentRequest struct {
+	Type  string `json:"type"`
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+type ProjectActivityFilter struct {
+	ScopeType string
+	ScopeID   string
+	Limit     int
+}
+
+type ActivityAttentionFilter struct {
+	Queue     string
+	ProjectID string
+	Limit     int
 }
 
 type StockActionRequest struct {
