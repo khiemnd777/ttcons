@@ -95,10 +95,15 @@ function healthTone(value: number, alertTone: string, quietTone = 'border-line b
   return value > 0 ? alertTone : quietTone;
 }
 
+function isOpenWorkItem(item: WorkItem) {
+  return item.status !== 'completed' && item.status !== 'cancelled';
+}
+
 export function ProjectDetailPage() {
   const { id = '' } = useParams();
   const [selectedWork, setSelectedWork] = useState<WorkItem | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [selectedTimelineNodeId, setSelectedTimelineNodeId] = useState('');
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -118,17 +123,27 @@ export function ProjectDetailPage() {
   });
 
   const data = operations.data;
-  const activeWork = useMemo(() => prioritizeWorkItems(asArray<WorkItem>(data?.active_work)), [data?.active_work]);
+  const allWorkItems = useMemo(() => asArray<WorkItem>(data?.work_items), [data?.work_items]);
+  const activeWork = useMemo(() => prioritizeWorkItems(allWorkItems.filter(isOpenWorkItem)), [allWorkItems]);
   const blockers = useMemo(() => prioritizeWorkItems(asArray<WorkItem>(data?.blockers)), [data?.blockers]);
   const departmentSurfaces = useMemo(() => asArray<DepartmentSurface>(data?.department_surfaces), [data?.department_surfaces]);
   const timeline = useMemo(() => asArray<ProjectOperationsTimelineNode>(data?.workflow_timeline), [data?.workflow_timeline]);
-  const activityTargets = useMemo(() => asArray<WorkItem>(data?.work_items).map((item) => ({
+  const activityTargets = useMemo(() => allWorkItems.map((item) => ({
     scope_type: 'work_item',
     scope_id: item.id,
     work_item_id: item.id,
     label: `${item.project_code ? `${item.project_code} · ` : ''}${item.title}`,
-  })), [data?.work_items]);
+  })), [allWorkItems]);
   const currentNode = useMemo(() => currentTimelineNode(timeline), [timeline]);
+
+  useEffect(() => {
+    if (!timeline.length) {
+      if (selectedTimelineNodeId) setSelectedTimelineNodeId('');
+      return;
+    }
+    const selectionExists = timeline.some((node) => node.id === selectedTimelineNodeId);
+    if (!selectionExists) setSelectedTimelineNodeId(currentNode?.id ?? timeline[0].id);
+  }, [currentNode?.id, selectedTimelineNodeId, timeline]);
 
   useEffect(() => {
     if (!departmentSurfaces.length) {
@@ -161,6 +176,10 @@ export function ProjectDetailPage() {
   const visibleMembers = asArray<Record<string, any>>(data.project?.members);
   const activeDepartment = departmentSurfaces.find((surface) => (surface.department ?? 'unassigned') === selectedDepartment)
     ?? departmentSurfaces[0];
+  const selectedTimelineNode = timeline.find((node) => node.id === selectedTimelineNodeId) ?? currentNode ?? timeline[0];
+  const nodeActiveWork = selectedTimelineNode
+    ? prioritizeWorkItems(allWorkItems.filter((item) => item.run_node_id === selectedTimelineNode.id && isOpenWorkItem(item)))
+    : activeWork;
 
   return (
     <>
@@ -191,8 +210,16 @@ export function ProjectDetailPage() {
       <HealthStrip data={data} />
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)_360px]">
-        <WorkflowTimeline projectId={id} nodes={timeline} hasPipeline={hasPipeline} startPending={startPipeline.isPending} onStartPipeline={() => startPipeline.mutate()} />
-        <ActiveWorkPanel rows={activeWork} onOpenWork={openWorkItem} />
+        <WorkflowTimeline
+          projectId={id}
+          nodes={timeline}
+          selectedNodeId={selectedTimelineNode?.id ?? ''}
+          hasPipeline={hasPipeline}
+          startPending={startPipeline.isPending}
+          onStartPipeline={() => startPipeline.mutate()}
+          onSelectNode={setSelectedTimelineNodeId}
+        />
+        <ActiveWorkPanel rows={nodeActiveWork} selectedNode={selectedTimelineNode} onOpenWork={openWorkItem} />
         <CommandCenter
           projectId={id}
           data={data}
@@ -416,15 +443,19 @@ function HealthStrip({ data }: { data: ProjectOperationsResponse }) {
 function WorkflowTimeline({
   projectId,
   nodes,
+  selectedNodeId,
   hasPipeline,
   startPending,
   onStartPipeline,
+  onSelectNode,
 }: {
   projectId: string;
   nodes: ProjectOperationsTimelineNode[];
+  selectedNodeId: string;
   hasPipeline: boolean;
   startPending: boolean;
   onStartPipeline: () => void;
+  onSelectNode: (nodeId: string) => void;
 }) {
   return (
     <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
@@ -451,46 +482,70 @@ function WorkflowTimeline({
         />
       ) : (
         <ol className="space-y-3">
-          {nodes.map((node) => (
-            <li key={node.id} className={clsx('rounded-md border p-3', nodeTone(node.status))}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">
-                    {node.order_index ? `${node.order_index}. ` : null}{node.name}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {enumLabel('node_type', node.type)} · {numberValue(node.completed_steps)}/{numberValue(node.step_count)} steps
-                  </p>
-                </div>
-                <StatusBadge status={node.status} />
-              </div>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white">
-                <div className="h-full rounded-full bg-current" style={{ width: `${Math.min(100, Math.max(0, numberValue(node.progress_percent)))}%` }} />
-              </div>
-            </li>
-          ))}
+          {nodes.map((node) => {
+            const selected = node.id === selectedNodeId;
+            return (
+              <li key={node.id}>
+                <button
+                  type="button"
+                  className={clsx(
+                    'block w-full rounded-md border p-3 text-left transition hover:border-blue-300 hover:shadow-sm focus-ring',
+                    nodeTone(node.status),
+                    selected && 'ring-2 ring-blue-500 ring-offset-1',
+                  )}
+                  aria-pressed={selected}
+                  onClick={() => onSelectNode(node.id)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">
+                        {node.order_index ? `${node.order_index}. ` : null}{node.name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {enumLabel('node_type', node.type)} · {numberValue(node.completed_steps)}/{numberValue(node.step_count)} steps
+                      </p>
+                    </div>
+                    <StatusBadge status={node.status} />
+                  </div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white">
+                    <div className="h-full rounded-full bg-current" style={{ width: `${Math.min(100, Math.max(0, numberValue(node.progress_percent)))}%` }} />
+                  </div>
+                </button>
+              </li>
+            );
+          })}
         </ol>
       )}
     </section>
   );
 }
 
-function ActiveWorkPanel({ rows, onOpenWork }: { rows: WorkItem[]; onOpenWork: (item: WorkItem) => void }) {
+function ActiveWorkPanel({
+  rows,
+  selectedNode,
+  onOpenWork,
+}: {
+  rows: WorkItem[];
+  selectedNode?: ProjectOperationsTimelineNode;
+  onOpenWork: (item: WorkItem) => void;
+}) {
   return (
     <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <TimerReset className="h-5 w-5 text-blue-700" />
-          <h2 className="font-semibold text-ink">Active Work</h2>
+        <div className="flex min-w-0 items-center gap-2">
+          <TimerReset className="h-5 w-5 shrink-0 text-blue-700" />
+          <h2 className="truncate font-semibold text-ink">
+            Active Work{selectedNode?.name ? ` · ${selectedNode.name}` : ''}
+          </h2>
         </div>
-        <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{rows.length} open</span>
+        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{rows.length} open</span>
       </div>
       {rows.length ? (
         <div className="space-y-3">
-          {rows.slice(0, 10).map((item) => <WorkItemCard key={item.id} item={item} onOpen={() => onOpenWork(item)} />)}
+          {rows.map((item) => <WorkItemCard key={item.id} item={item} onOpen={() => onOpenWork(item)} />)}
         </div>
       ) : (
-        <EmptyState title="Không có work item đang mở" />
+        <EmptyState title={selectedNode?.name ? `Không có work item đang mở trong ${selectedNode.name}` : 'Không có work item đang mở'} />
       )}
     </section>
   );
