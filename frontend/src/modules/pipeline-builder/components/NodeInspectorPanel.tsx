@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { useMemo, useState, type DragEvent } from 'react';
+import clsx from 'clsx';
+import { ChevronDown, GripVertical, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { Dialog } from '../../../components/Dialog';
 import { EnumChip } from '../../../components/EnumChip';
 import type { PipelineNode } from '../../../lib/types/domain';
@@ -11,6 +12,7 @@ const stepTypes = ['task', 'checklist', 'approval', 'document_upload', 'photo_up
 
 type SelectOption = string | { label: string; value: string };
 type StepDialogMode = 'add' | 'edit' | null;
+type StepDropPosition = 'before' | 'after';
 
 type NodeInspectorPanelProps = {
   node: PipelineNode;
@@ -34,7 +36,7 @@ type NodeInspectorPanelProps = {
   onCloseStepDialog: () => void;
   onSubmitStep: () => void;
   onDeleteStep: (stepId: string) => void;
-  onMoveStep: (stepId: string, direction: 'up' | 'down') => void;
+  onReorderSteps: (orderedStepIds: string[]) => void;
 };
 
 export function NodeInspectorPanel({
@@ -59,10 +61,13 @@ export function NodeInspectorPanel({
   onCloseStepDialog,
   onSubmitStep,
   onDeleteStep,
-  onMoveStep,
+  onReorderSteps,
 }: NodeInspectorPanelProps) {
   const stepSavePending = addStepPending || updateStepPending;
   const stepActionPending = stepSavePending || deleteStepPending || reorderStepPending;
+  const [draggedStepId, setDraggedStepId] = useState('');
+  const [dropTargetStepId, setDropTargetStepId] = useState('');
+  const [dropPosition, setDropPosition] = useState<StepDropPosition>('before');
   const sortedSteps = useMemo(() => {
     return [...(node.steps ?? [])].sort((a: Record<string, any>, b: Record<string, any>) => {
       const aOrder = Number(a.order_index ?? 0);
@@ -71,6 +76,61 @@ export function NodeInspectorPanel({
       return String(a.created_at ?? a.id ?? '').localeCompare(String(b.created_at ?? b.id ?? ''), 'vi');
     });
   }, [node.steps]);
+  const stepIds = useMemo(() => sortedSteps.map((step: Record<string, any>) => (step.id ? String(step.id) : '')).filter(Boolean), [sortedSteps]);
+  const canReorderSteps = stepIds.length > 1 && !stepActionPending;
+
+  const resetStepDragState = () => {
+    setDraggedStepId('');
+    setDropTargetStepId('');
+    setDropPosition('before');
+  };
+
+  const stepOrderAfterDrop = (sourceStepId: string, targetStepId: string, position: StepDropPosition) => {
+    if (!sourceStepId || sourceStepId === targetStepId) return [];
+    if (!stepIds.includes(sourceStepId) || !stepIds.includes(targetStepId)) return [];
+
+    const nextStepIds = stepIds.filter((stepId) => stepId !== sourceStepId);
+    const targetIndex = nextStepIds.indexOf(targetStepId);
+    if (targetIndex < 0) return [];
+
+    nextStepIds.splice(position === 'after' ? targetIndex + 1 : targetIndex, 0, sourceStepId);
+    return sameStringArray(stepIds, nextStepIds) ? [] : nextStepIds;
+  };
+
+  const handleStepDragStart = (event: DragEvent<HTMLButtonElement>, stepId: string) => {
+    if (!canReorderSteps) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', stepId);
+    setDraggedStepId(stepId);
+  };
+
+  const handleStepDragOver = (event: DragEvent<HTMLDivElement>, targetStepId: string) => {
+    if (!canReorderSteps || !draggedStepId || draggedStepId === targetStepId) return;
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const targetRect = event.currentTarget.getBoundingClientRect();
+    const nextPosition = event.clientY - targetRect.top > targetRect.height / 2 ? 'after' : 'before';
+    setDropTargetStepId(targetStepId);
+    setDropPosition(nextPosition);
+  };
+
+  const handleStepDragLeave = (event: DragEvent<HTMLDivElement>, targetStepId: string) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (nextTarget && event.currentTarget.contains(nextTarget)) return;
+    if (dropTargetStepId === targetStepId) setDropTargetStepId('');
+  };
+
+  const handleStepDrop = (event: DragEvent<HTMLDivElement>, targetStepId: string) => {
+    event.preventDefault();
+    const sourceStepId = draggedStepId || event.dataTransfer.getData('text/plain');
+    const nextStepIds = stepOrderAfterDrop(sourceStepId, targetStepId, dropPosition);
+    resetStepDragState();
+    if (nextStepIds.length) onReorderSteps(nextStepIds);
+  };
 
   return (
     <>
@@ -102,38 +162,74 @@ export function NodeInspectorPanel({
           />
 
           <div className="border-t border-line pt-4">
-            <h3 className="text-sm font-semibold text-ink">Checklist / Step</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-ink">Checklist / Step</h3>
+              {reorderStepPending ? <span className="text-xs font-medium text-blue-600">Đang lưu...</span> : null}
+            </div>
             <div className="mt-3 space-y-2">
-              {sortedSteps.map((step: Record<string, any>, index: number) => {
+              {sortedSteps.length ? sortedSteps.map((step: Record<string, any>, index: number) => {
+                const stepId = step.id ? String(step.id) : '';
                 const stepRoles = Array.isArray(step.required_role_ids) ? step.required_role_ids.join(', ') : '';
+                const canDragStep = Boolean(stepId) && canReorderSteps;
+                const isDropTarget = Boolean(stepId) && dropTargetStepId === stepId && draggedStepId !== stepId;
                 return (
-                  <div key={step.id ?? `${node.id}-${index}`} className="flex items-start justify-between gap-2 rounded-md border border-line px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-ink">{index + 1}. {step.name}</p>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        <EnumChip group="step_type" value={step.step_type} />
-                        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{stepRoles || 'Chưa gán role'}</span>
+                  <div key={step.id ?? `${node.id}-${index}`} className="relative">
+                    {isDropTarget && dropPosition === 'before' ? <div className="absolute -top-1 left-2 right-2 z-10 h-0.5 rounded-full bg-blue-500" /> : null}
+                    <div
+                      className={clsx(
+                        'flex items-start justify-between gap-2 rounded-md border border-line px-2 py-2 transition',
+                        draggedStepId === stepId && 'border-blue-200 bg-blue-50/50 opacity-60',
+                        isDropTarget && 'border-blue-300 bg-blue-50/30',
+                      )}
+                      onDragOver={(event) => {
+                        if (stepId) handleStepDragOver(event, stepId);
+                      }}
+                      onDragLeave={(event) => {
+                        if (stepId) handleStepDragLeave(event, stepId);
+                      }}
+                      onDrop={(event) => {
+                        if (stepId) handleStepDrop(event, stepId);
+                      }}
+                    >
+                      <button
+                        type="button"
+                        title="Kéo để sắp xếp checklist"
+                        aria-label={`Kéo để sắp xếp ${step.name}`}
+                        className="mt-0.5 rounded-md p-1 text-slate-300 hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-30 enabled:cursor-grab enabled:active:cursor-grabbing"
+                        draggable={canDragStep}
+                        disabled={!canDragStep}
+                        onClick={(event) => event.preventDefault()}
+                        onDragStart={(event) => handleStepDragStart(event, stepId)}
+                        onDragEnd={resetStepDragState}
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-ink">{index + 1}. {step.name}</p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <EnumChip group="step_type" value={step.step_type} />
+                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{stepRoles || 'Chưa gán role'}</span>
+                        </div>
                       </div>
+                      {stepId ? (
+                        <div className="flex shrink-0 gap-1">
+                          <button title="Sửa checklist" className="rounded-md p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-600" onClick={() => onOpenEditStep(step)} disabled={stepActionPending}>
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button title="Xóa checklist" className="rounded-md p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-600" onClick={() => onDeleteStep(stepId)} disabled={stepActionPending}>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
-                    {step.id ? (
-                      <div className="flex shrink-0 gap-1">
-                        <button title="Đưa checklist lên" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30" onClick={() => onMoveStep(String(step.id), 'up')} disabled={stepActionPending || index === 0}>
-                          <ChevronUp className="h-4 w-4" />
-                        </button>
-                        <button title="Đưa checklist xuống" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30" onClick={() => onMoveStep(String(step.id), 'down')} disabled={stepActionPending || index === sortedSteps.length - 1}>
-                          <ChevronDown className="h-4 w-4" />
-                        </button>
-                        <button title="Sửa checklist" className="rounded-md p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-600" onClick={() => onOpenEditStep(step)} disabled={stepActionPending}>
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button title="Xóa checklist" className="rounded-md p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-600" onClick={() => onDeleteStep(String(step.id))} disabled={stepActionPending}>
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : null}
+                    {isDropTarget && dropPosition === 'after' ? <div className="absolute -bottom-1 left-2 right-2 z-10 h-0.5 rounded-full bg-blue-500" /> : null}
                   </div>
                 );
-              })}
+              }) : (
+                <div className="rounded-md border border-dashed border-line px-3 py-4 text-sm font-medium text-slate-500">
+                  Chưa có checklist/step
+                </div>
+              )}
             </div>
             <button className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:opacity-50" onClick={onOpenAddStep} disabled={stepSavePending}>
               <Plus className="h-4 w-4" />
@@ -166,6 +262,10 @@ export function NodeInspectorPanel({
       </Dialog>
     </>
   );
+}
+
+function sameStringArray(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function Field({ label, value, onChange, textarea, invalid }: { label: string; value?: string; onChange: (value: string) => void; textarea?: boolean; invalid?: boolean }) {

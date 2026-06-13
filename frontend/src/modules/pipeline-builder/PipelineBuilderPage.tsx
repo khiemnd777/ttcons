@@ -470,26 +470,26 @@ export function PipelineBuilderPage() {
   });
 
   const reorderStep = useMutation({
-    mutationFn: async ({ stepId, direction }: { stepId: string; direction: 'up' | 'down' }) => {
+    mutationFn: async ({ orderedStepIds }: { orderedStepIds: string[] }) => {
+      const templateId = selectedTemplateId;
+      if (!templateId) throw new Error('Chưa chọn template');
       const steps = sortedStepsForNode(detailsNode);
-      const currentIndex = steps.findIndex((step) => String(step.id) === stepId);
-      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= steps.length) return [];
+      const stepById = new Map(steps.map((step) => [String(step.id), step]));
+      const currentStepIds = steps.map((step) => (step.id ? String(step.id) : '')).filter(Boolean);
+      const uniqueOrderedIds = orderedStepIds.filter((stepId, index) => orderedStepIds.indexOf(stepId) === index && stepById.has(stepId));
+      if (uniqueOrderedIds.length !== currentStepIds.length) return { updates: [], templateId };
 
-      const reorderedSteps = [...steps];
-      const [currentStep] = reorderedSteps.splice(currentIndex, 1);
-      reorderedSteps.splice(targetIndex, 0, currentStep);
-      const updates = reorderedSteps
-        .map((step, index) => ({ stepId: String(step.id), orderIndex: index + 1, previousOrderIndex: Number(step.order_index ?? 0) }))
+      const updates = uniqueOrderedIds
+        .map((stepId, index) => ({ stepId, orderIndex: index + 1, previousOrderIndex: Number(stepById.get(stepId)?.order_index ?? 0) }))
         .filter((update) => update.orderIndex !== update.previousOrderIndex);
 
       await Promise.all(updates.map((update) => put(`/pipeline-steps/${update.stepId}`, { order_index: update.orderIndex })));
-      return updates;
+      return { updates, templateId };
     },
-    onSuccess: (updates) => {
+    onSuccess: ({ updates, templateId }) => {
       if (!updates.length) return;
       const updateById = new Map(updates.map((update) => [update.stepId, update.orderIndex]));
-      queryClient.setQueryData<PipelineTemplate>(['pipeline-template', selectedTemplateId], (current) => {
+      queryClient.setQueryData<PipelineTemplate>(['pipeline-template', templateId], (current) => {
         if (!current?.nodes) return current;
         return {
           ...current,
@@ -504,7 +504,7 @@ export function PipelineBuilderPage() {
           })),
         };
       });
-      invalidate();
+      invalidate(templateId);
       toast.success('Đã sắp xếp checklist');
     },
     onError: (error) => toast.error('Không sắp xếp được checklist', error),
@@ -749,7 +749,7 @@ export function PipelineBuilderPage() {
               onCloseStepDialog={closeStepDialog}
               onSubmitStep={submitStepDialog}
               onDeleteStep={(stepId) => deleteStep.mutate(stepId)}
-              onMoveStep={(stepId, direction) => reorderStep.mutate({ stepId, direction })}
+              onReorderSteps={(orderedStepIds) => reorderStep.mutate({ orderedStepIds })}
             />
           ) : selectedConnector ? (
             <EdgeInspectorPanel
