@@ -41,6 +41,13 @@ It should show:
 
 Then wait for explicit confirmation from the user before editing UI code.
 
+## Plan State Notes
+
+- When implementing a plan, create or update that plan in `docs/current-states.md`. Treat this file as the shared agent memory for follow-up work until the plan is completed.
+- Each active plan entry in `docs/current-states.md` must track both work that `will be done` and work that has already been `done`, and agents must keep those notes current as they progress.
+- Use the active plan notes to avoid duplicate work, lost context, or invented context across follow-up turns.
+- When the user says `Đóng lại plan` or `Đóng plan`, move the relevant plan into `docs/plan-closed/`, prefix the closed plan note/title with `[Closed]`, and remove that plan completely from `docs/current-states.md`.
+
 ## Repo Map
 
 - `backend/cmd/server`: API entrypoint.

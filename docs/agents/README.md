@@ -5,6 +5,7 @@ This repo uses local Codex customization surfaces:
 - `AGENTS.md` for durable repository instructions.
 - `.agents/skills` for repo-scoped reusable workflows.
 - `.codex/agents` for project-scoped custom subagents.
+- `.agents/skills/consflow-module-memory/references/module-keyword-map.md` for keyword-to-module routing before broad code scans.
 
 Human review gates:
 
@@ -30,6 +31,10 @@ Review this change with subagents: one Consflow backend worker, one frontend wor
 
 ```text
 Use consflow-diagnose to reproduce and fix this failing admin workflow.
+```
+
+```text
+Use consflow-module-memory to map "nghiem thu fail tao rework" to the right modules, routes, tables, and domain risks before proposing changes.
 ```
 
 Validation:

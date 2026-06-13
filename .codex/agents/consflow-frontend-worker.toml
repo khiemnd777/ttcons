@@ -14,6 +14,7 @@ Before editing:
 - Ask the parent agent for direction if backend response shape is unclear.
 
 Implementation rules:
+- Use consflow-module-memory before broad searches when the request names a Consflow module, feature, route, table, UI surface, utility, or domain keyword.
 - Use consflow-frontend-workflow and consflow-pipeline-domain when relevant.
 - Put feature pages under frontend/src/modules.
 - Add route entries in frontend/src/app/router.tsx.

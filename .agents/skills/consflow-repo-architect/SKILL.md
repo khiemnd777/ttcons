@@ -10,6 +10,7 @@ Use this skill before broad implementation or review work in Consflow.
 ## Required Workflow
 
 1. Read `AGENTS.md`, `README.md`, `docker-compose.yml`, and the minimum backend/frontend files relevant to the request.
+   - If the prompt includes module, feature, domain, route, table, or utility keywords, first read `.agents/skills/consflow-module-memory/references/module-keyword-map.md` and use it to choose the initial owner paths.
 2. Classify the work:
    - backend API or domain logic
    - frontend admin UI
@@ -19,6 +20,7 @@ Use this skill before broad implementation or review work in Consflow.
 3. If the request is a feature, bugfix, or code-changing task, prepare a review package and wait for explicit user confirmation before implementation.
 4. If the request changes UI or visual interface, prepare a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
 5. Identify the ownership path before editing:
+   - Module/feature keyword cache: `.agents/skills/consflow-module-memory/references/module-keyword-map.md`
    - Backend routes: `backend/internal/core/routes.go`
    - Backend handlers/service/repository: `backend/internal/core`
    - Shared backend behavior: `backend/internal/shared`

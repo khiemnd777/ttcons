@@ -1,0 +1,83 @@
+# Consflow Module Keyword Map
+
+Use this as a fast routing cache. It is not a replacement for reading code. If a mapping conflicts with code, trust code and update this file when the correction is durable.
+
+## Stable Entry Points
+
+- Repo rules: `AGENTS.md`.
+- Backend route registration: `backend/internal/core/routes.go`.
+- Backend handler/service/repository path: `backend/internal/core/handlers.go`, `backend/internal/core/service.go`, `backend/internal/core/repository.go`, `backend/internal/core/repository_domain.go`.
+- Backend auth, response, DB, migrations: `backend/internal/shared`.
+- SQL migrations: `backend/migrations/V<N>__description.sql`; add a new migration, never edit an applied migration.
+- Frontend route registration: `frontend/src/app/router.tsx`.
+- Frontend feature screens: `frontend/src/modules/<feature>`.
+- Frontend API/auth/types/utils: `frontend/src/lib/api/client.ts`, `frontend/src/lib/auth/AuthContext.tsx`, `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils`.
+- Shared frontend UI: `frontend/src/components`, `frontend/src/modules/_shared`.
+- Docker/local stack: `docker-compose.yml`, `Makefile`, frontend service/container name `admin`.
+
+## Shared Utilities And UI
+
+| Keywords | Owner files | Notes |
+|---|---|---|
+| api client, fetch, token, response envelope, request | `frontend/src/lib/api/client.ts` | Use these helpers; do not duplicate auth/fetch logic in modules. Backend returns `{ success, data, message }`. |
+| auth context, current user, permissions in UI | `frontend/src/lib/auth/AuthContext.tsx`, `frontend/src/lib/types/domain.ts` | Pair with backend middleware and repository permission helpers. |
+| status label, enum chip, badge, formatting | `frontend/src/lib/utils/status.ts`, `frontend/src/lib/utils/format.ts`, `frontend/src/components/StatusBadge.tsx`, `frontend/src/components/EnumChip.tsx`, `frontend/src/components/CurrencyText.tsx` | Update shared mappings when adding statuses or enum values. |
+| toast, success, warning, error, dismiss x | `frontend/src/components/ToastProvider.tsx` | Save/edit flows must show dismissible toasts. |
+| dialog, modal, create/edit/view detail | `frontend/src/components/Dialog.tsx`, `frontend/src/components/RecordDetailDialog.tsx`, `frontend/src/components/FormDrawer.tsx`, `frontend/src/modules/_shared/SimpleForm.tsx` | Prefer shared dialog/modal flows for create, view, and edit. |
+| table, row actions, empty/loading states | `frontend/src/components/DataTable.tsx`, `frontend/src/components/RowActions.tsx`, `frontend/src/components/EmptyState.tsx`, `frontend/src/components/LoadingSpinner.tsx`, `frontend/src/components/PageHeader.tsx`, `frontend/src/components/StatCard.tsx` | Reuse before adding primitives. |
+| project selector | `frontend/src/modules/_shared/ProjectSelector.tsx` | Used by scoped/global pages that need project context. |
+
+## Feature Routing
+
+| Prompt keywords and aliases | Feature owner | Frontend owner | Backend/API owner | Data owner | Domain checks |
+|---|---|---|---|---|---|
+| login, auth, me, refresh, logout, dang nhap, tai khoan | Auth | `frontend/src/modules/auth/LoginPage.tsx`, `frontend/src/lib/auth/AuthContext.tsx` | `/auth/login`, `/auth/me`, `/auth/refresh`, `/auth/logout`; handlers `Login`, `Me`; service `Login`, `Me`; repo `FindUserByEmail`, `UserRoles`, `UserPermissions` | `users`, `staff`, `roles`, `permissions`, `user_roles`, `role_permissions` in `V1__init.sql` | Preserve JWT, actor ID/name, protected endpoints under `AuthRequired`. |
+| dashboard, home, tong quan, KPI | Dashboard | `frontend/src/modules/dashboard/DashboardPage.tsx` | `/reports/dashboard`; handler/service `Dashboard`; repo `DashboardReport` | Aggregates across projects, approvals, warehouse, procurement, accounting | Keep scoped visibility and non-deleted list semantics. |
+| project, projects, cong trinh, du an, project member, client | Projects | `frontend/src/modules/projects/ProjectsPage.tsx`, `frontend/src/modules/projects/ProjectDetailPage.tsx` | `/projects`, `/projects/:id`, `/projects/:id/operations`; handlers `ListProjects`, `CreateProject`, `ProjectOperations`; repo `ListProjects`, `GetProjectDetail`, `ProjectOperations` | `projects`, `project_members`, `audit_logs` | Project-visible lists must respect access filters and hide deleted/cancelled rows. |
+| pipeline builder, template, workflow template, node, step, checklist, edge, connector, condition, fail path, publish, clone | Pipeline Builder | `frontend/src/modules/pipeline-builder/PipelineBuilderPage.tsx`, `frontend/src/modules/pipeline-builder/components`, `frontend/src/modules/pipeline-builder/components/diagram` | `/pipeline-templates`, `/pipeline-nodes`, `/pipeline-steps`, `/pipeline-edges`, `/pipeline-edge-conditions`; handlers `ListTemplates`, `PublishTemplate`, `CloneTemplate`, node/step/edge handlers; service `PublishTemplate`, `CloneTemplate`; repo `GetTemplateDetail`, `CreateTemplateWithNodes`, `CloneTemplate` | `pipeline_templates`, `pipeline_template_nodes`, `pipeline_template_edges`, `pipeline_template_steps`; `V1`, `V3`, `V4` | Publishing and cloning templates must not mutate historical project runs. Connector routing has specialized diagram code. |
+| diagram, canvas, drag node, adorner, routing, edge persistence, connector layout | Pipeline Builder Diagram | `frontend/src/modules/pipeline-builder/components/diagram/*` | Same pipeline template edge/node endpoints | Same pipeline template tables | UI changes require Mockup as Text. Do not use browser verification unless explicitly requested. |
+| planning, pipeline run, runtime pipeline, start pipeline, advance node, block node, submit step | Planning / Pipeline Run | `frontend/src/modules/planning/PlanningPage.tsx`, project detail pipeline actions | `/projects/:id/start-pipeline`, `/projects/:id/pipeline-run`, `/pipeline-run-steps/:id/submit`, `/pipeline-run-nodes/:id/start`, `/advance`, `/block`, `/request-approval`; service `StartPipeline`, `PipelineRun`, `SubmitRunStep`, `AdvanceRunNode`, `BlockRunNode`; repo `StartPipeline`, `GetPipelineRun`, `SubmitRunStep`, `AdvanceRunNode`, `BlockRunNode` | `pipeline_runs`, `pipeline_run_nodes`, `pipeline_run_steps`, `pipeline_run_edges`; `V1`, `V2`, `V3`, `V4` | Runtime copies are project-specific. Respect node permission gates and material/receivable blockers. |
+| my work, work item, task, assignee, blocker, evidence, activity, comment, mention, unread, attention, review, watcher | Work Items / Activity | `frontend/src/modules/my-work/MyWorkPage.tsx`, `frontend/src/modules/work-items/*`, project detail work sections | `/me/work-items`, `/work-items/:id`, `/work-items/:id/start|complete|block|resolve-blocker|request-review|request-approval|approve|reject|request-change|evidence|activity`, `/projects/:id/work-items`, `/projects/:id/activity`, `/activities/:id/read`, `/me/activity-attention`; `activity_stream.go`; service `WorkItemAction`, `AddWorkItemEvidence`, `AddWorkItemActivity`, `MyActivityAttention`; repo work item/activity helpers | `work_items`, `work_item_assignments`, `work_item_activities`, `evidence_records`, `activity_mentions`, `activity_read_states`; `V5`, `V6`, `V7`, `V8`, `V9` | Preserve actor/audit, visibility, mentions/unread, evidence requirements, and work item permission gates. |
+| approval, approve, reject, request change, phe duyet, duyet | Approvals | `frontend/src/components/ApprovalPanel.tsx`, planning/work-item/project detail surfaces | `/approvals`, `/approvals/pending`, `/approvals/:id/approve|reject|request-change`, node/work-item approval endpoints; service `ApprovalAction`, `RequestNodeApproval`, `WorkItemAction`; repo `ApprovalAction`, `RequestNodeApproval`, `RequestWorkItemApproval` | `approval_rules`, `approval_requests`, `approval_actions`, work item approval references | Approval actions must preserve actor, status, comments, and timestamps. |
+| BOQ, boq, du toan, estimate, cost item, generate procurement, sinh procurement | BOQ / Estimate | `frontend/src/modules/boq/BOQPage.tsx` | `/projects/:id/boq`, `/boq-items/:id`, `/projects/:id/boq/submit`, `/approve`, `/generate-procurement`; handlers `ProjectBOQ`, `CreateBOQ`, `UpdateBOQ`, `SubmitBOQ`, `ApproveBOQ`, `GenerateProcurementFromBOQ`; service/repo `GenerateProcurementFromBOQ` | `boq_items`, `procurement_requests`, `procurement_request_items`, `audit_logs` | BOQ approval can generate procurement. Do not bypass approval states when connecting BOQ to procurement. |
+| procurement, mua hang, yeu cau mua, purchase request, order, receive | Procurement | `frontend/src/modules/procurement/ProcurementPage.tsx` | `/procurement-requests`, `/procurement-requests/:id`, `/submit|approve|order|receive`; handlers `ListProcurement`, `CreateProcurement`, `UpdateProcurement`, `ProcurementAction`; service/repo `ProcurementAction` | `procurement_requests`, `procurement_request_items`, `stock_movements`, `materials`, `warehouses` | Procurement receive can affect warehouse stock. Keep status flow auditable. |
+| warehouse, kho, vat tu, material, stock, ton kho, xuat kho, nhap kho, transfer, return, material balance | Warehouse / Materials | `frontend/src/modules/warehouse/WarehousePage.tsx` | `/materials`, `/warehouses`, `/stock`, `/stock/receive|issue|transfer|return-to-warehouse|return-to-subcontractor`, `/projects/:id/material-balances`; handler `Stock`, `stockAction`, `MaterialBalances`; service `CreateStockMovement`; repo `CreateStockMovement`, `ProjectMaterialBalances` | `materials`, `warehouses`, `stock_movements`, `site_material_balances` | Preserve material balance and stock movement traceability. Construction nodes may block when material is insufficient. |
+| operations, daily report, site report, issue, van de, nhat ky | Operations | `frontend/src/modules/operations/OperationsPage.tsx` | `/projects/:id/daily-reports`, `/projects/:id/issues`, `/issues/:id`; handlers `ProjectDailyReports`, `CreateDailyReport`, `ProjectIssues`, `CreateIssue`, `UpdateIssue` | `operation_daily_reports`, `issues`, `audit_logs` | Project-scoped access matters. Closed/deleted issue semantics should stay consistent. |
+| acceptance, nghiem thu, checklist, pass, fail, punch list | Acceptance | `frontend/src/modules/acceptance/AcceptancePage.tsx` | `/projects/:id/acceptances`, `/acceptances/:id`, `/pass`, `/fail`, `/create-rework`; handlers `ProjectAcceptances`, `CreateAcceptance`, `GetAcceptance`, `AcceptanceAction`, `CreateReworkFromAcceptance`; service/repo `AcceptanceAction`, `CreateReworkFromAcceptance` | `acceptance_records`, `acceptance_checklist_items`, `rework_requests` | Acceptance failures can create rework. Do not silently skip acceptance history. |
+| rework, lam lai, sua loi, punch, replanning, ke hoach lai | Rework / Replanning | `frontend/src/modules/rework/ReworkPage.tsx` | `/projects/:id/reworks`, `/reworks/:id/approve|complete`, `/projects/:id/replannings`, `/replannings/:id/approve`; handlers `ProjectReworks`, `CreateRework`, `ApproveRework`, `CompleteRework`, replanning handlers | `rework_requests`, `replanning_requests`, `acceptance_records`, `pipeline_run_nodes` | Rework completion should preserve acceptance history and not skip workflow blockers. |
+| handover, ban giao, close project, closure, check handover | Handover | `frontend/src/modules/handover/HandoverPage.tsx` | `/projects/:id/handover`, `/handover/:id/check`, `/handover/:id/complete`; service/repo `HandoverCheck`, `CompleteHandover` | `handover_records`, acceptance/accounting/procurement/warehouse state | Handover readiness checks blockers. Do not complete if required conditions fail. |
+| accounting, budget, ngan sach, payment, receipt, thu chi, advance | Accounting | `frontend/src/modules/accounting/AccountingPage.tsx` | `/projects/:id/budget`, `/budgets/:id/approve`, `/payments`, `/payments/:id/approve`; handlers `ProjectBudget`, `CreateBudget`, `ApproveBudget`, `CreatePayment`, `ApprovePayment`; service/repo `PaymentAction` | `accounting_budgets`, `payments`, `advance_requests`, `audit_logs` | Preserve financial approval and actor trail. |
+| debt, cong no, payable, receivable, phai tra, phai thu | Debt / AR AP | `frontend/src/modules/debt/DebtPage.tsx` | `/payables`, `/payables/:id/approve|pay`, `/receivables`, `/receivables/:id/approve|receive`; handlers `ListPayables`, `CreatePayable`, `ApprovePayable`, `PayPayable`, receivable handlers; service/repo `PayableAction`, `ReceivableAction` | `payables`, `receivables`, `payments` | Pipeline construction can depend on receivable thresholds. Keep payable/receivable statuses and payment links consistent. |
+| staff, nhan su, employee, user, role, permission, RBAC, phan quyen | Staff / RBAC | `frontend/src/modules/staff/StaffPage.tsx`, `frontend/src/modules/rbac/RolesPage.tsx`, `frontend/src/modules/rbac/PermissionsPage.tsx` | `/staff`, `/roles`, `/permissions`, `/roles/:id/permissions`, `/users/:id/roles`; permission helpers in handlers/repository | `staff`, `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `project_members` | Preserve auth/RBAC and project-scoped permission semantics. |
+| audit, log, workflow playback, history, ai lam gi | Audit Log | `frontend/src/modules/audit/AuditPage.tsx` | `/audit-logs`, `/projects/:id/audit-logs`; handler/service `AuditLogs`; repo `AddAudit`, `AuditLogs` | `audit_logs`, many domain tables | Changes in domain actions should add/keep audit entries where local pattern already does. |
+| reports, bao cao, project report, warehouse report, procurement report, accounting report, staff report | Reports | `frontend/src/modules/reports/ReportsPage.tsx` | `/reports/projects`, `/reports/warehouse`, `/reports/procurement`, `/reports/accounting`, `/reports/staff`; handler `report`; service/repo `Report` | Aggregates across domain tables | Check scoped visibility and stale status labels. |
+| settings, cau hinh, system settings | Settings | `frontend/src/modules/settings/SettingsPage.tsx` | `/settings`; handler `Settings` | `system_settings` | Keep settings read/write behavior consistent with existing endpoint shape. |
+| migrations, schema, seed, database, bang, SQL | Database / Migrations | No single frontend owner | `backend/internal/shared/migrations`, `backend/cmd/migrate`, repository SQL in `backend/internal/core` | `backend/migrations`, `backend/seed/seed.sql` | Never use Flyway. Add a new ordered migration rather than editing applied files. |
+| docker, compose, make up, restart, admin service, ports | Docker Ops | No feature page | `docker-compose.yml`, `Makefile`, backend/frontend Dockerfiles | PostgreSQL volume, Redis, backend, admin service | Preserve `make up` and `make restart` as down -> build -> run; keep frontend service/container as `admin`. |
+
+## Backend Search Hints
+
+- Route first: `rg -n "keyword|RouteName" backend/internal/core/routes.go`.
+- Handler next: `rg -n "func \\(h \\*Handler\\).*Keyword|/route-fragment|TableName" backend/internal/core/handlers.go`.
+- Service next: `rg -n "func \\(s \\*Service\\).*Keyword|DomainAction" backend/internal/core/service.go`.
+- Repository next: `rg -n "func \\(r \\*Repository\\).*Keyword|table_name|DomainAction" backend/internal/core/repository_domain.go backend/internal/core/repository.go`.
+- Migration/table next: `rg -n "table_name|column_name|CREATE TABLE|ALTER TABLE" backend/migrations`.
+
+## Frontend Search Hints
+
+- Route/page first: `rg -n "path:|<PageName>|/api-fragment" frontend/src/app/router.tsx frontend/src/modules`.
+- API calls: `rg -n "get\\(|post\\(|put\\(|delete\\(|/api-fragment" frontend/src/modules frontend/src/lib`.
+- Shared presentation/status: `rg -n "status|label|EnumChip|StatusBadge|toast" frontend/src/components frontend/src/lib frontend/src/modules`.
+- Work-item UI is shared across `my-work`, project detail, and activity surfaces; inspect `frontend/src/modules/work-items` before duplicating components.
+
+## High-Risk Domain Invariants
+
+- Pipeline templates are reusable definitions; pipeline runs are project-specific runtime copies.
+- Publishing and cloning templates must not mutate historical project runs.
+- Approval actions must preserve actor, status, comments, and timestamps.
+- BOQ approval can generate procurement; do not bypass approval states.
+- Procurement receive, stock receive/issue/transfer/return, and site material balances must preserve material traceability.
+- Acceptance failure can create rework; rework completion must not erase acceptance history.
+- Handover completion must respect readiness blockers.
+- Accounting/payables/receivables/payments must preserve financial approval and audit trails.
+- User-visible lists must exclude deleted/cancelled/inactive records at the API/query level.

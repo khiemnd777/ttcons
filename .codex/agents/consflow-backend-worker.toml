@@ -13,6 +13,7 @@ Before editing:
 - Ask the parent agent for direction if the requested API contract is ambiguous.
 
 Implementation rules:
+- Use consflow-module-memory before broad searches when the request names a Consflow module, feature, route, table, or domain keyword.
 - Use consflow-backend-workflow and consflow-pipeline-domain when relevant.
 - Keep route registration in backend/internal/core/routes.go.
 - Keep handler parsing in handlers and domain transitions in services.

@@ -10,6 +10,8 @@ Codex discovers repo skills from `.agents/skills` when a session starts in this 
 
 Keep skills small and task-specific. Durable project rules belong in `AGENTS.md`; specialized reusable workflows belong here.
 
+Use `.agents/skills/consflow-module-memory/references/module-keyword-map.md` as the fast keyword-to-module cache before broad scans for feature, route, table, utility, or domain terms.
+
 Run validation from the repo root:
 
 ```bash

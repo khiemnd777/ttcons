@@ -18,6 +18,10 @@ Available agents:
 
 Subagents inherit the parent session sandbox and approvals at runtime. The TOML files document intended behavior and may set a narrower sandbox for read-only reviewers.
 
+Routing cache:
+
+- Subagents should use `.agents/skills/consflow-module-memory/references/module-keyword-map.md` before broad scans when prompts mention Consflow modules, features, routes, tables, utilities, or domain terms.
+
 Implementation gate:
 
 - Workspace-write agents must not implement feature, bugfix, or code-changing work until the user has reviewed a proposed change package and explicitly confirmed.
