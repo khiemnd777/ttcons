@@ -11,6 +11,7 @@ import { FormDrawer } from '../../components/FormDrawer';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
+import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { EnumChip } from '../../components/EnumChip';
@@ -74,6 +75,7 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
         description="Ngân sách, thanh toán, tạm ứng/hoàn ứng, dòng tiền và kiểm soát tài chính công trình."
         actions={
           <>
+            {!global ? <ProjectBackLink projectId={projectId} /> : null}
             {global ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
             <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100" onClick={() => setOpen('payment')}><Plus className="h-4 w-4" />Payment</button>
             <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen('budget')}><Plus className="h-4 w-4" />Budget</button>

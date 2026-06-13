@@ -12,6 +12,7 @@ import { CurrencyText } from '../../components/CurrencyText';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
+import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { enumOptions } from '../../lib/utils/status';
 
@@ -83,6 +84,7 @@ export function BOQPage() {
         description="Bóc tách khối lượng, kiểm soát đơn giá, submit/approve và sinh nhu cầu mua vật tư từ BOQ."
         actions={
           <>
+            <ProjectBackLink projectId={id} />
             <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100" onClick={() => submit.mutate()}><Send className="h-4 w-4" />Submit</button>
             <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100" onClick={() => approve.mutate()}><ThumbsUp className="h-4 w-4" />Approve</button>
             <button className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => generate.mutate()}><ShoppingCart className="h-4 w-4" />Sinh mua sắm</button>

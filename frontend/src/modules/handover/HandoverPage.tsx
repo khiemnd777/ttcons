@@ -10,6 +10,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
+import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 
@@ -58,6 +59,7 @@ export function HandoverPage() {
         description="Closure checker trước bàn giao: nghiệm thu cuối, punch list, vật tư dư, kho, công nợ và chứng từ."
         actions={
           <>
+            {id ? <ProjectBackLink projectId={projectId} /> : null}
             {!id ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
             <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />Handover</button>
           </>

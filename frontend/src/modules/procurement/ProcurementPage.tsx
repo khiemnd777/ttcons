@@ -11,6 +11,7 @@ import { FormDrawer } from '../../components/FormDrawer';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
+import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { EnumChip } from '../../components/EnumChip';
@@ -75,6 +76,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
         description="Quản lý yêu cầu mua, duyệt mua, đặt hàng, giao hàng và cảnh báo vượt ngân sách/BOQ."
         actions={
           <>
+            {scoped ? <ProjectBackLink projectId={projectId} /> : null}
             {!scoped ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
             <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />Yêu cầu mua</button>
           </>

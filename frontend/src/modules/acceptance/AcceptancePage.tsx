@@ -10,6 +10,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
+import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { EnumChip } from '../../components/EnumChip';
@@ -57,6 +58,7 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
         description="Tạo nghiệm thu, checklist, pass/fail, punch list, rework request và re-nghiệm thu."
         actions={
           <>
+            {!global ? <ProjectBackLink projectId={projectId} /> : null}
             {global ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
             <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />Nghiệm thu</button>
           </>

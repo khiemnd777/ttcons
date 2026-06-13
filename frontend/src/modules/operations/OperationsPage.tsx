@@ -10,6 +10,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
+import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { dateText } from '../../lib/utils/format';
@@ -85,6 +86,7 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
         description="Daily report, ảnh hiện trường, issue phát sinh, tiến độ theo node, vật tư đã dùng và nhân công/thầu phụ."
         actions={
           <>
+            {!global ? <ProjectBackLink projectId={projectId} /> : null}
             {global ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
             <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100" onClick={() => setOpen('issue')}><Plus className="h-4 w-4" />Issue</button>
             <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen('report')}><Plus className="h-4 w-4" />Daily report</button>

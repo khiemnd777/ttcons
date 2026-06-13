@@ -10,6 +10,7 @@ import { CurrencyText } from '../../components/CurrencyText';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
+import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { EnumChip } from '../../components/EnumChip';
@@ -52,6 +53,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
         description="Danh mục vật tư, nhập xuất tồn, tồn tại công trình và xử lý vật tư dư."
         actions={
           <>
+            {scoped ? <ProjectBackLink projectId={projectId} /> : null}
             {!scoped ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
             <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100" onClick={() => setOpen('movement')}><ArrowDownToLine className="h-4 w-4" />Nhập / xuất</button>
             <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen('material')}><Plus className="h-4 w-4" />Vật tư</button>

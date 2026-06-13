@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, CheckCircle2, ClipboardCheck, Play, Send } from 'lucide-react';
 import { get, post } from '../../lib/api/client';
@@ -10,6 +10,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { Timeline } from '../../components/Timeline';
 import { useToast } from '../../components/ToastProvider';
 import { EnumChip } from '../../components/EnumChip';
+import { ProjectBackLink } from '../../components/ProjectBackLink';
 
 export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipeline' }) {
   const { id = '' } = useParams();
@@ -87,7 +88,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
         description={run.data ? `${run.data.project_name} · Template: ${run.data.template_name}` : 'Chưa có pipeline run cho công trình này.'}
         actions={
           <>
-            <Link to={`/projects/${id}`} className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Về công trình</Link>
+            <ProjectBackLink projectId={id} />
             <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => start.mutate()}>
               <Play className="h-4 w-4" />
               Start / Reset run

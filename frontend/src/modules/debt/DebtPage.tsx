@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { get, post } from '../../lib/api/client';
@@ -10,6 +11,7 @@ import { FormDrawer } from '../../components/FormDrawer';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
+import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { enumOptions } from '../../lib/utils/status';
 
@@ -19,6 +21,7 @@ const debtActionLabels: Record<string, string> = {
 };
 
 export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }) {
+  const { id } = useParams();
   const [open, setOpen] = useState<'payable' | 'receivable' | null>(null);
   const [dialog, setDialog] = useState<{ type: 'payable' | 'receivable'; record: Record<string, any> } | null>(null);
   const queryClient = useQueryClient();
@@ -61,6 +64,7 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
         description="Theo dõi phải trả, phải thu, quá hạn, tạm ứng, giữ lại, khấu trừ và các khoản thanh toán/thu tiền."
         actions={
           <>
+            {id ? <ProjectBackLink projectId={id} /> : null}
             {kind !== 'receivables' ? <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100" onClick={() => setOpen('payable')}><Plus className="h-4 w-4" />Phải trả</button> : null}
             {kind !== 'payables' ? <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen('receivable')}><Plus className="h-4 w-4" />Phải thu</button> : null}
           </>
