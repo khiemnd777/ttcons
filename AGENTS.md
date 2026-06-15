@@ -28,6 +28,8 @@ For feature, bugfix, or code-changing requests, provide a review package with:
 
 Then wait for an explicit confirmation from the user before editing code.
 
+When asking the user to confirm review points, decisions, open questions, scope, or implementation steps, list each confirmation point as a numbered item using `1.`, `2.`, `3.`, and so on. Put each point on its own line; do not combine multiple confirmation points into one sentence, paragraph, or bullet.
+
 For UI or interface-changing requests, provide a "Mockup as Text" before implementation. It must be a textual visual mockup: use ASCII/wireframe-style blocks to show the actual screen layout, hierarchy, controls, labels, spacing, and states as the user would see them. Keep notes short and secondary. Do not replace the mockup with only bullet-point descriptions.
 
 It should show:
