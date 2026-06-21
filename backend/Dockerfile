@@ -10,6 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-migrate ./cmd/migrate
 FROM alpine:3.20
 WORKDIR /app
 RUN adduser -D -g '' appuser
+RUN mkdir -p /app/uploads && chown -R appuser:appuser /app/uploads
 COPY --from=build /bin/consflow /app/consflow
 COPY --from=build /bin/consflow-migrate /app/consflow-migrate
 COPY --from=build /src/migrations /app/migrations

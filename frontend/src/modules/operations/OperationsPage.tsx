@@ -71,12 +71,12 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   });
 
   const issueFields = (record?: Record<string, any>) => [
-    { name: 'title', label: 'Tiêu đề', defaultValue: record?.title ?? 'Issue phát sinh', required: true },
-    { name: 'description', label: 'Mô tả', type: 'textarea' as const, defaultValue: record?.description ?? '' },
-    { name: 'severity', label: 'Mức độ', type: 'select' as const, defaultValue: record?.severity ?? 'medium', required: true, options: enumOptions('severity', ['low', 'medium', 'high', 'critical']) },
-    { name: 'status', label: 'Trạng thái', type: 'select' as const, defaultValue: record?.status ?? 'open', required: true, options: enumOptions('status', ['open', 'in_progress', 'closed']) },
-    { name: 'requires_rework', label: 'Cần rework', type: 'checkbox' as const, defaultValue: Boolean(record?.requires_rework) },
-    { name: 'requires_replanning', label: 'Cần replanning', type: 'checkbox' as const, defaultValue: Boolean(record?.requires_replanning) },
+    { name: 'title', label: 'Tiêu đề', defaultValue: record?.title ?? 'Issue phát sinh', required: true, fullWidth: true, helperText: 'Tên ngắn gọn để đội thi công nhận diện vấn đề.' },
+    { name: 'description', label: 'Mô tả', type: 'textarea' as const, defaultValue: record?.description ?? '', helperText: 'Ghi rõ vị trí, ảnh hưởng và bước xử lý tạm thời nếu có.' },
+    { name: 'severity', label: 'Mức độ', type: 'select' as const, defaultValue: record?.severity ?? 'medium', required: true, options: enumOptions('severity', ['low', 'medium', 'high', 'critical']), helperText: 'Dùng Critical khi issue chặn nghiệm thu hoặc an toàn.' },
+    { name: 'status', label: 'Trạng thái', type: 'select' as const, defaultValue: record?.status ?? 'open', required: true, options: enumOptions('status', ['open', 'in_progress', 'closed']), helperText: 'Issue mới thường bắt đầu ở Open.' },
+    { name: 'requires_rework', label: 'Cần rework', type: 'checkbox' as const, defaultValue: Boolean(record?.requires_rework), helperText: 'Bật khi cần tạo luồng sửa lỗi sau nghiệm thu hoặc kiểm tra nội bộ.' },
+    { name: 'requires_replanning', label: 'Cần replanning', type: 'checkbox' as const, defaultValue: Boolean(record?.requires_replanning), helperText: 'Bật khi issue ảnh hưởng timeline hoặc thứ tự thi công.' },
   ];
 
   return (
@@ -124,18 +124,18 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
         </section>
       </div>
       <FormDrawer open={open === 'report'} title="Tạo daily report" onClose={() => setOpen(null)}>
-        <SimpleForm fields={[
+        <SimpleForm layout="two-column" fields={[
           { name: 'report_date', label: 'Ngày report', type: 'date', defaultValue: new Date().toISOString().slice(0, 10), required: true },
           { name: 'weather', label: 'Thời tiết', defaultValue: 'Nắng', required: true },
-          { name: 'work_summary', label: 'Công việc', type: 'textarea', defaultValue: 'Thi công theo kế hoạch ngày', required: true },
-          { name: 'manpower_summary', label: 'Nhân công', defaultValue: '8 công nhân' },
-          { name: 'material_usage_summary', label: 'Vật tư sử dụng', defaultValue: 'Theo phiếu xuất kho' },
-          { name: 'issues_summary', label: 'Vấn đề', defaultValue: 'Không có' },
-          { name: 'progress_percent', label: 'Tiến độ %', type: 'number', defaultValue: 50, min: 0, max: 100 },
+          { name: 'work_summary', label: 'Công việc', type: 'textarea', defaultValue: 'Thi công theo kế hoạch ngày', required: true, helperText: 'Tóm tắt phần đã làm trong ngày theo khu vực hoặc hạng mục.' },
+          { name: 'manpower_summary', label: 'Nhân công', defaultValue: '8 công nhân', helperText: 'Ghi số lượng hoặc nhóm đội có mặt tại công trình.' },
+          { name: 'material_usage_summary', label: 'Vật tư sử dụng', defaultValue: 'Theo phiếu xuất kho', helperText: 'Ghi vật tư chính đã dùng hoặc liên kết phiếu xuất kho nếu có.' },
+          { name: 'issues_summary', label: 'Vấn đề', defaultValue: 'Không có', helperText: 'Ghi Không có nếu không phát sinh issue trong ngày.' },
+          { name: 'progress_percent', label: 'Tiến độ %', type: 'number', defaultValue: 50, min: 0, max: 100, helperText: 'Giá trị từ 0 đến 100.' },
         ]} onSubmit={(values) => createReport.mutateAsync(values)} />
       </FormDrawer>
       <FormDrawer open={open === 'issue'} title="Tạo issue" onClose={() => setOpen(null)}>
-        <SimpleForm fields={issueFields()} onSubmit={(values) => createIssue.mutateAsync(values)} />
+        <SimpleForm layout="two-column" fields={issueFields()} onSubmit={(values) => createIssue.mutateAsync(values)} />
       </FormDrawer>
       <RecordDetailDialog
         open={dialog?.type === 'report' && dialog.mode === 'view'}
@@ -167,7 +167,7 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
         ]}
       />
       <FormDrawer open={dialog?.type === 'issue' && dialog.mode === 'edit'} title="Chỉnh sửa issue" onClose={() => setDialog(null)}>
-        {dialog?.record ? <SimpleForm submitLabel="Lưu thay đổi" fields={issueFields(dialog.record)} onSubmit={(values) => updateIssue.mutateAsync({ issueId: dialog.record.id, values })} /> : null}
+        {dialog?.record ? <SimpleForm layout="two-column" submitLabel="Lưu thay đổi" fields={issueFields(dialog.record)} onSubmit={(values) => updateIssue.mutateAsync({ issueId: dialog.record.id, values })} /> : null}
       </FormDrawer>
     </>
   );

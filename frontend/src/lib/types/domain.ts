@@ -68,11 +68,74 @@ export type PipelineTemplate = AnyRecord & {
   edges?: PipelineTemplateEdge[];
 };
 
+export type WorkflowFormCatalogItem = AnyRecord & {
+  template_id: string;
+  template_code: string;
+  template_name: string;
+  template_description?: string;
+  template_status: 'active' | 'archived' | string;
+  form_type: 'checklist' | 'daily_report' | 'meeting_minutes' | 'generic_submission' | string;
+  version_id: string;
+  version_no: number;
+  version_status: 'published' | string;
+  published_at?: string;
+  field_count?: number;
+  required_field_keys?: string[];
+  fields?: Array<{
+    field_key: string;
+    label: string;
+    field_type: string;
+    required: boolean;
+    order_index?: number;
+  }>;
+};
+
 export type ProjectOperationsRecord = AnyRecord & {
   id: string;
   project_id?: string;
   created_at?: string;
   updated_at?: string;
+};
+
+export type BOQUnitPriceEvent = ProjectOperationsRecord & {
+  boq_item_id: string;
+  event_type: 'expected_updated' | 'norm_locked' | 'final_locked' | string;
+  price_source: 'expected' | 'norm' | 'final' | string;
+  from_unit_price?: number;
+  to_unit_price: number;
+  revision_no: number;
+  comment?: string;
+  actor_name?: string;
+};
+
+export type BOQItem = ProjectOperationsRecord & {
+  category: string;
+  work_item_name: string;
+  description?: string;
+  unit: string;
+  quantity: number;
+  unit_price: number;
+  expected_unit_price: number;
+  norm_unit_price?: number;
+  final_unit_price?: number;
+  effective_unit_price?: number;
+  total_amount?: number;
+  effective_total_amount?: number;
+  material_id?: string;
+  material_name?: string;
+  status: string;
+  unit_price_source?: 'expected' | 'norm' | 'final' | string;
+  price_lifecycle_status?: 'expected' | 'norm_locked' | 'final_locked' | string;
+  norm_price_locked?: boolean;
+  norm_price_locked_by?: string;
+  norm_price_locked_at?: string;
+  norm_price_comment?: string;
+  final_price_locked?: boolean;
+  final_price_locked_by?: string;
+  final_price_locked_at?: string;
+  final_price_comment?: string;
+  price_revision_no?: number;
+  price_events?: BOQUnitPriceEvent[];
 };
 
 export type WorkItemActivity = ProjectOperationsRecord & {
@@ -148,6 +211,9 @@ export type EvidenceRecord = ProjectOperationsRecord & {
   file_url?: string;
   mime_type?: string;
   file_size?: number;
+  storage_provider?: 'external' | 'local' | string;
+  storage_key?: string;
+  checksum_sha256?: string;
   caption?: string;
   revision_no?: string;
   visibility?: 'internal' | 'project' | 'client' | string;
@@ -159,6 +225,91 @@ export type EvidenceRecord = ProjectOperationsRecord & {
   reviewed_by_name?: string;
   reviewed_at?: string;
   payload_json?: AnyRecord;
+};
+
+export type WorkflowFormField = ProjectOperationsRecord & {
+  form_version_id: string;
+  field_key: string;
+  label: string;
+  field_type: 'text' | 'number' | 'date' | 'textarea' | 'select' | 'multi_select' | 'checkbox' | 'evidence_reference' | 'structured_list' | string;
+  required: boolean;
+  options_json?: Array<{ value: string; label?: string }> | string[];
+  validation_json?: AnyRecord;
+  help_text?: string;
+  order_index?: number;
+  visibility_condition_json?: AnyRecord;
+};
+
+export type WorkflowFormDetail = {
+  available: boolean;
+  instance?: AnyRecord & {
+    id: string;
+    project_id: string;
+    work_item_id?: string;
+    form_type: string;
+    title: string;
+    status: 'draft' | 'submitted' | 'reopened' | 'cancelled' | string;
+    current_revision?: number;
+    submitted_at?: string;
+    updated_at?: string;
+  };
+  template?: AnyRecord & {
+    id: string;
+    code: string;
+    name: string;
+    description?: string;
+    form_type: string;
+  };
+  version?: AnyRecord & {
+    id: string;
+    version_no: number;
+    status: string;
+  };
+  fields?: WorkflowFormField[];
+  answers?: AnyRecord;
+  events?: AnyRecord[];
+  signatures?: WorkflowFormSignature[];
+  pdf_exports?: WorkflowFormPDFExport[];
+};
+
+export type WorkflowFormSignature = ProjectOperationsRecord & {
+  project_id: string;
+  work_item_id: string;
+  form_instance_id: string;
+  form_version_id: string;
+  form_revision_no: number;
+  purpose: 'internal_ack' | 'prepared_by' | 'reviewed_by' | 'approved_by' | 'received_by' | string;
+  signer_user_id: string;
+  signer_name: string;
+  signer_roles_json?: string[] | AnyRecord[];
+  comment?: string;
+  payload_json?: AnyRecord;
+  payload_hash: string;
+  visual_storage_provider?: 'none' | 'local' | string;
+  visual_storage_key?: string;
+  visual_mime_type?: string;
+  visual_file_size?: number;
+  visual_checksum_sha256?: string;
+  signed_at: string;
+};
+
+export type WorkflowFormPDFExport = ProjectOperationsRecord & {
+  work_item_id: string;
+  form_instance_id: string;
+  form_version_id: string;
+  form_revision_no: number;
+  title: string;
+  file_name: string;
+  storage_provider: 'local' | string;
+  storage_key: string;
+  mime_type: string;
+  file_size: number;
+  checksum_sha256: string;
+  payload_hash: string;
+  metadata_json?: AnyRecord;
+  generated_by?: string;
+  generated_by_name?: string;
+  generated_at: string;
 };
 
 export type WorkItem = ProjectOperationsRecord & {

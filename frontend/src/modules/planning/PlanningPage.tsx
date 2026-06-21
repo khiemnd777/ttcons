@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, CheckCircle2, ClipboardCheck, Play, Send } from 'lucide-react';
+import { Ban, CheckCircle2, ClipboardList, FileCheck2, Play, Send } from 'lucide-react';
 import { get, post } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -11,12 +11,16 @@ import { Timeline } from '../../components/Timeline';
 import { useToast } from '../../components/ToastProvider';
 import { EnumChip } from '../../components/EnumChip';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
+import type { WorkItem } from '../../lib/types/domain';
+import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
+import { numberValue } from '../work-items/workItemPresentation';
 
 export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipeline' }) {
   const { id = '' } = useParams();
   const queryClient = useQueryClient();
   const toast = useToast();
   const [selectedNodeId, setSelectedNodeId] = useState('');
+  const [selectedWorkItem, setSelectedWorkItem] = useState<WorkItem | null>(null);
   const [blockReason, setBlockReason] = useState('');
   const run = useQuery({
     queryKey: ['pipeline-run', id],
@@ -32,6 +36,8 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['pipeline-run', id] });
     queryClient.invalidateQueries({ queryKey: ['project-audit', id] });
+    queryClient.invalidateQueries({ queryKey: ['work-item', selectedWorkItem?.id ?? ''] });
+    queryClient.invalidateQueries({ queryKey: ['work-item-form', selectedWorkItem?.id ?? ''] });
   };
   const start = useMutation({
     mutationFn: () => post(`/projects/${id}/start-pipeline`, {}),
@@ -78,6 +84,15 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
   const selectedNode = nodes.find((node: Record<string, any>) => node.id === selectedNodeId) ?? nodes.find((node: Record<string, any>) => node.status === 'in_progress') ?? nodes[0];
   const completed = nodes.filter((node: Record<string, any>) => node.status === 'completed').length;
   const percent = nodes.length ? Math.round((completed / nodes.length) * 100) : 0;
+
+  function openStepWorkItem(step: Record<string, any>) {
+    const workItem = stepToWorkItem(step, run.data);
+    if (!workItem) {
+      toast.warn({ title: 'Step chưa có work item', description: 'Pipeline runtime chưa tạo work item cho step này.' });
+      return;
+    }
+    setSelectedWorkItem(workItem);
+  }
 
   if (run.isLoading) return <LoadingSpinner />;
 
@@ -145,21 +160,61 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
                 <div className="flex justify-between gap-3"><dt className="text-slate-500">Fail path</dt><dd className="font-medium text-ink"><EnumChip group="fail_path" value={selectedNode?.fail_path} /></dd></div>
               </dl>
               <div className="space-y-2">
-                {(selectedNode?.steps ?? []).map((step: Record<string, any>) => (
-                  <div key={step.id} className="flex items-center justify-between gap-3 rounded-md border border-line px-3 py-2">
-                    <div>
-                      <p className="text-sm font-medium text-ink">{step.name}</p>
-                      <div className="mt-1"><EnumChip group="step_type" value={step.step_type} /></div>
+                {(selectedNode?.steps ?? []).map((step: Record<string, any>) => {
+                  const hasForm = Boolean(step.workflow_form_instance_id);
+                  const formRequired = Boolean(step.workflow_form_required);
+                  const formSubmitted = step.workflow_form_status === 'submitted';
+                  const completedStep = step.status === 'completed';
+                  const canCompleteStep = !completedStep && (!formRequired || formSubmitted);
+                  return (
+                    <div key={step.id} className="rounded-md border border-line px-3 py-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-ink">{step.name}</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <EnumChip group="step_type" value={step.step_type} />
+                            <StatusBadge status={step.status} />
+                            {hasForm ? <StatusBadge status={step.workflow_form_status ?? 'draft'} /> : null}
+                            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Evidence: {numberValue(step.evidence_count)}</span>
+                          </div>
+                        </div>
+                        {completedStep ? <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-600" /> : null}
+                      </div>
+                      {!completedStep ? (
+                        <div className="mt-3 flex flex-wrap justify-end gap-2">
+                          {hasForm ? (
+                            <button
+                              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                              onClick={() => openStepWorkItem(step)}
+                            >
+                              <ClipboardList className="h-3.5 w-3.5" />
+                              Mở form
+                            </button>
+                          ) : null}
+                          {canCompleteStep ? (
+                            <button
+                              className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                              onClick={() => submitStep.mutate(step.id)}
+                            >
+                              <FileCheck2 className="h-3.5 w-3.5" />
+                              Hoàn tất step
+                            </button>
+                          ) : null}
+                          {formRequired && hasForm && !formSubmitted ? (
+                            <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
+                              Cần submit form
+                            </span>
+                          ) : null}
+                          {formRequired && !hasForm ? (
+                            <span className="inline-flex items-center rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">
+                              Thiếu form instance
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
-                    {step.status === 'completed' ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                    ) : (
-                      <button className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold hover:bg-slate-100" onClick={() => submitStep.mutate(step.id)}>
-                        Submit
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="mt-4 grid gap-2">
                 <button className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => advance.mutate(selectedNode.id)}>
@@ -185,6 +240,42 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
           </aside>
         </div>
       )}
+      <WorkItemDetailDialog
+        open={Boolean(selectedWorkItem)}
+        item={selectedWorkItem}
+        onClose={() => setSelectedWorkItem(null)}
+        onChanged={(item) => {
+          setSelectedWorkItem(item);
+          invalidate();
+        }}
+      />
     </>
   );
+}
+
+function stepToWorkItem(step: Record<string, any>, run?: Record<string, any>): WorkItem | null {
+  const workItemId = String(step.work_item_id ?? '').trim();
+  if (!workItemId) return null;
+  const node = (run?.nodes ?? []).find((candidate: Record<string, any>) =>
+    (candidate.steps ?? []).some((candidateStep: Record<string, any>) => candidateStep.id === step.id),
+  );
+  return {
+    id: workItemId,
+    project_id: run?.project_id,
+    project_name: run?.project_name,
+    title: step.work_item_title ?? step.name,
+    description: step.description,
+    status: step.work_item_status ?? step.status,
+    work_type: step.step_type,
+    source_type: 'pipeline_run_step',
+    source_id: step.id,
+    role_ids: Array.isArray(step.work_item_role_ids) ? step.work_item_role_ids : step.required_role_ids,
+    evidence_count: Number(step.evidence_count ?? 0),
+    evidence_requirement_json: step.evidence_requirement_json,
+    pipeline_run_id: run?.id,
+    run_node_id: step.run_node_id,
+    run_node_name: node?.name,
+    run_step_id: step.id,
+    run_step_name: step.name,
+  };
 }

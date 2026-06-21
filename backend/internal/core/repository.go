@@ -156,7 +156,8 @@ func hasUpdatedAt(table string) bool {
 	case "users", "staff", "projects", "pipeline_templates", "pipeline_template_nodes", "pipeline_run_nodes",
 		"procurement_requests", "boq_items", "issues", "acceptance_records", "rework_requests", "replanning_requests",
 		"handover_records", "accounting_budgets", "payables", "receivables", "payments", "advance_requests",
-		"system_settings", "work_items", "evidence_records":
+		"system_settings", "work_items", "evidence_records", "workflow_form_templates", "workflow_form_versions",
+		"workflow_form_instances", "workflow_form_signatures":
 		return true
 	default:
 		return false
@@ -199,7 +200,9 @@ func safeTable(table string) string {
 		"rework_requests", "replanning_requests", "handover_records", "accounting_budgets", "payables", "receivables",
 		"payments", "advance_requests", "documents", "audit_logs", "system_settings", "staff", "roles", "permissions",
 		"role_permissions", "user_roles", "users", "work_items", "work_item_assignments", "work_item_activities",
-		"evidence_records":
+		"evidence_records", "workflow_form_templates", "workflow_form_versions", "workflow_form_fields",
+		"workflow_form_instances", "workflow_form_answers", "workflow_form_events", "workflow_form_signatures",
+		"workflow_form_pdf_exports", "boq_unit_price_events":
 		return table
 	default:
 		return ""
@@ -223,7 +226,7 @@ func templateNodeColumns() []ColumnSpec {
 }
 
 func templateStepColumns() []ColumnSpec {
-	return []ColumnSpec{col("node_id"), col("name"), col("description"), col("step_type"), jsonCol("required_role_ids"), col("required_permission"), col("checklist_required"), col("document_required"), col("photo_required"), col("order_index")}
+	return []ColumnSpec{col("node_id"), col("name"), col("description"), col("step_type"), jsonCol("required_role_ids"), col("required_permission"), col("checklist_required"), col("document_required"), col("photo_required"), col("form_version_id"), col("form_required"), col("order_index")}
 }
 
 func workItemColumns() []ColumnSpec {
@@ -241,7 +244,11 @@ func edgeColumns() []ColumnSpec {
 }
 
 func boqColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("category"), col("work_item_name"), col("description"), col("unit"), col("quantity"), col("unit_price"), col("material_id"), col("node_id"), col("status"), col("created_by"), col("approved_by")}
+	return []ColumnSpec{
+		col("project_id"), col("category"), col("work_item_name"), col("description"), col("unit"), col("quantity"),
+		col("unit_price"), col("expected_unit_price"), col("material_id"), col("node_id"), col("status"), col("created_by"),
+		col("approved_by"),
+	}
 }
 
 func procurementColumns() []ColumnSpec {
@@ -249,7 +256,11 @@ func procurementColumns() []ColumnSpec {
 }
 
 func procurementItemColumns() []ColumnSpec {
-	return []ColumnSpec{col("request_id"), col("material_id"), col("boq_item_id"), col("node_id"), col("quantity_planned"), col("quantity_requested"), col("unit"), col("estimated_unit_price"), col("supplier_name"), col("delivery_status"), col("approval_status")}
+	return []ColumnSpec{
+		col("request_id"), col("material_id"), col("boq_item_id"), col("node_id"), col("quantity_planned"),
+		col("quantity_requested"), col("unit"), col("estimated_unit_price"), col("supplier_name"), col("delivery_status"),
+		col("approval_status"), col("boq_price_source"), col("boq_price_revision_no"), col("boq_price_event_id"),
+	}
 }
 
 func materialColumns() []ColumnSpec {

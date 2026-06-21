@@ -36,8 +36,12 @@ services:
       FRONTEND_ORIGIN: http://localhost:5173
       MIGRATIONS_DIR: /app/migrations
       AUTO_MIGRATE: "true"
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_BYTES: "10485760"
     ports:
       - "8080:8080"
+    volumes:
+      - consflow_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,3 +65,4 @@ services:
 
 volumes:
   consflow_postgres:
+  consflow_uploads:

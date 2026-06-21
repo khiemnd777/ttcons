@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom';
 import { get, post, put } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
-import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FormDrawer } from '../../components/FormDrawer';
 import { CurrencyText } from '../../components/CurrencyText';
@@ -59,8 +58,6 @@ export function ProjectsPage() {
     },
   ];
 
-  if (projects.isLoading) return <LoadingSpinner />;
-
   return (
     <>
       <PageHeader
@@ -75,24 +72,32 @@ export function ProjectsPage() {
       />
       <DataTable
         rows={projects.data ?? []}
+        loading={projects.isLoading}
+        error={projects.error}
+        onRetry={() => projects.refetch()}
+        searchPlaceholder="Tìm công trình, mã, chủ đầu tư"
+        pageSize={10}
+        defaultSort={{ key: 'name', direction: 'asc' }}
         columns={[
           {
             key: 'name',
             header: 'Công trình',
+            sortable: true,
             render: (row) => (
               <button className="font-semibold text-blue-700 hover:underline" onClick={() => setDialog({ mode: 'view', record: row })}>
                 {row.name}
               </button>
             ),
           },
-          { key: 'code', header: 'Mã' },
-          { key: 'client_name', header: 'Chủ đầu tư' },
-          { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-          { key: 'estimated_budget', header: 'Ngân sách', render: (row) => <CurrencyText value={row.estimated_budget} /> },
-          { key: 'progress_percent', header: 'Tiến độ', render: (row) => `${row.progress_percent ?? 0}%` },
+          { key: 'code', header: 'Mã', sortable: true },
+          { key: 'client_name', header: 'Chủ đầu tư', sortable: true },
+          { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
+          { key: 'estimated_budget', header: 'Ngân sách', align: 'right', sortable: true, sortValue: (row) => Number(row.estimated_budget ?? 0), render: (row) => <CurrencyText value={row.estimated_budget} /> },
+          { key: 'progress_percent', header: 'Tiến độ', align: 'right', sortable: true, sortValue: (row) => Number(row.progress_percent ?? 0), render: (row) => `${row.progress_percent ?? 0}%` },
           {
             key: 'actions',
             header: 'Action',
+            align: 'right',
             render: (row) => (
               <RowActions onView={() => setDialog({ mode: 'view', record: row })} onEdit={() => setDialog({ mode: 'edit', record: row })}>
                 <Link title="Mở module công trình" aria-label="Mở module công trình" className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100" to={`/projects/${row.id}`}>

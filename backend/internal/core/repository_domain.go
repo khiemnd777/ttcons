@@ -2,7 +2,9 @@ package core
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1052,6 +1054,871 @@ func (r *Repository) GetEvidenceDetail(ctx context.Context, evidenceID string) (
 	`, evidenceID)
 }
 
+func (r *Repository) GetWorkflowFormForWorkItem(ctx context.Context, workItemID string) (Record, error) {
+	instance, err := r.QueryOne(ctx, `
+		SELECT wfi.id
+		FROM workflow_form_instances wfi
+		JOIN work_items wi ON wi.id=wfi.work_item_id AND wi.project_id=wfi.project_id
+		JOIN projects p ON p.id=wfi.project_id
+		WHERE wfi.work_item_id=$1
+		  AND wfi.status <> 'cancelled'
+		  AND wi.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		ORDER BY wfi.created_at DESC
+		LIMIT 1
+	`, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	return r.GetWorkflowFormInstanceDetail(ctx, fmt.Sprint(instance["id"]))
+}
+
+func (r *Repository) GetWorkflowFormInstanceDetail(ctx context.Context, instanceID string) (Record, error) {
+	instance, err := r.QueryOne(ctx, `
+		SELECT
+			wfi.*,
+			wft.code AS form_code,
+			wft.name AS form_name,
+			wft.description AS form_description,
+			wfv.version_no AS form_version_no,
+			wfv.status AS form_version_status,
+			wi.title AS work_item_title,
+			wi.status AS work_item_status
+		FROM workflow_form_instances wfi
+		JOIN workflow_form_versions wfv ON wfv.id=wfi.form_version_id
+		JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
+		LEFT JOIN work_items wi ON wi.id=wfi.work_item_id AND wi.project_id=wfi.project_id
+		WHERE wfi.id=$1
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	fields, err := r.Query(ctx, `
+		SELECT id, form_version_id, field_key, label, field_type, required, options_json, validation_json, help_text, order_index, visibility_condition_json
+		FROM workflow_form_fields
+		WHERE form_version_id=$1
+		ORDER BY order_index, created_at, id
+	`, instance["form_version_id"])
+	if err != nil {
+		return nil, err
+	}
+	answerRows, err := r.Query(ctx, `
+		SELECT field_key, value_json, revision_no, updated_by, updated_at
+		FROM workflow_form_answers
+		WHERE instance_id=$1
+		ORDER BY field_key
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	answers := Record{}
+	for _, row := range answerRows {
+		answers[fmt.Sprint(row["field_key"])] = row["value_json"]
+	}
+	events, err := r.Query(ctx, `
+		SELECT wfe.*, u.full_name AS actor_name
+		FROM workflow_form_events wfe
+		LEFT JOIN users u ON u.id=wfe.actor_id
+		WHERE wfe.instance_id=$1
+		ORDER BY wfe.created_at DESC
+		LIMIT 30
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	signatures, err := r.Query(ctx, `
+		SELECT *
+		FROM workflow_form_signatures
+		WHERE form_instance_id=$1
+		ORDER BY signed_at DESC, created_at DESC
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	pdfExports, err := r.Query(ctx, `
+		SELECT *
+		FROM workflow_form_pdf_exports
+		WHERE form_instance_id=$1
+		ORDER BY generated_at DESC, created_at DESC
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	return Record{
+		"instance": instance,
+		"template": Record{
+			"id":          instance["form_template_id"],
+			"code":        instance["form_code"],
+			"name":        instance["form_name"],
+			"description": instance["form_description"],
+			"form_type":   instance["form_type"],
+		},
+		"version": Record{
+			"id":         instance["form_version_id"],
+			"version_no": instance["form_version_no"],
+			"status":     instance["form_version_status"],
+		},
+		"fields":      fields,
+		"answers":     answers,
+		"events":      events,
+		"signatures":  signatures,
+		"pdf_exports": pdfExports,
+	}, nil
+}
+
+func (r *Repository) HasSubmittedWorkflowFormForWorkItem(ctx context.Context, workItemID string) (bool, error) {
+	rows, err := r.Query(ctx, `
+		SELECT COUNT(*) AS total
+		FROM workflow_form_instances
+		WHERE work_item_id=$1 AND status='submitted'
+	`, workItemID)
+	if err != nil {
+		return false, err
+	}
+	return len(rows) > 0 && number(rows[0]["total"]) > 0, nil
+}
+
+func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			t.id AS template_id,
+			t.code AS template_code,
+			t.name AS template_name,
+			t.description AS template_description,
+			t.form_type,
+			t.status AS template_status,
+			v.id AS version_id,
+			v.version_no,
+			v.status AS version_status,
+			v.published_at,
+			COUNT(f.id)::int AS field_count,
+			COALESCE(
+				jsonb_agg(f.field_key ORDER BY f.order_index, f.created_at, f.id) FILTER (WHERE f.id IS NOT NULL AND f.required),
+				'[]'::jsonb
+			) AS required_field_keys,
+			COALESCE(
+				jsonb_agg(
+					jsonb_build_object(
+						'field_key', f.field_key,
+						'label', f.label,
+						'field_type', f.field_type,
+						'required', f.required,
+						'order_index', f.order_index
+					)
+					ORDER BY f.order_index, f.created_at, f.id
+				) FILTER (WHERE f.id IS NOT NULL),
+				'[]'::jsonb
+			) AS fields
+		FROM workflow_form_templates t
+		JOIN LATERAL (
+			SELECT *
+			FROM workflow_form_versions v
+			WHERE v.template_id=t.id AND v.status='published'
+			ORDER BY v.version_no DESC, v.published_at DESC NULLS LAST, v.created_at DESC
+			LIMIT 1
+		) v ON true
+		LEFT JOIN workflow_form_fields f ON f.form_version_id=v.id
+		WHERE t.status='active'
+		GROUP BY t.id, t.code, t.name, t.description, t.form_type, t.status, v.id, v.version_no, v.status, v.published_at
+		ORDER BY t.form_type, t.name
+	`)
+}
+
+func (r *Repository) DefaultWorkflowFormVersionID(ctx context.Context, stepType string, checklistRequired bool) (string, error) {
+	code := "builtin_generic_submission"
+	if stepType == "daily_report" {
+		code = "builtin_daily_report"
+	} else if stepType == "meeting_minutes" {
+		code = "builtin_meeting_minutes"
+	} else if checklistRequired || statusIn(stepType, "checklist", "acceptance_check", "handover_check") {
+		code = "builtin_checklist"
+	}
+	row, err := r.QueryOne(ctx, `
+		SELECT v.id
+		FROM workflow_form_templates t
+		JOIN workflow_form_versions v ON v.template_id=t.id
+		WHERE t.code=$1 AND t.status='active' AND v.status='published'
+		ORDER BY v.version_no DESC
+		LIMIT 1
+	`, code)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return cleanID(row["id"]), nil
+}
+
+func (r *Repository) TemplatePublishFormIssues(ctx context.Context, templateID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			n.id AS node_id,
+			n.name AS node_name,
+			pts.id AS step_id,
+			pts.name AS step_name,
+			pts.step_type,
+			pts.form_required,
+			pts.form_version_id,
+			COALESCE(wfv.status, 'missing') AS form_version_status,
+			wfv.version_no AS form_version_no,
+			wft.name AS form_name,
+			wft.status AS form_template_status
+		FROM pipeline_template_steps pts
+		JOIN pipeline_template_nodes n ON n.id=pts.node_id
+		LEFT JOIN workflow_form_versions wfv ON wfv.id=pts.form_version_id
+		LEFT JOIN workflow_form_templates wft ON wft.id=wfv.template_id
+		WHERE n.template_id=$1
+		  AND COALESCE(pts.form_required, false)
+		  AND (
+			pts.form_version_id IS NULL
+			OR wfv.id IS NULL
+			OR wfv.status <> 'published'
+			OR wft.status <> 'active'
+		  )
+		ORDER BY n.order_index, pts.order_index, pts.created_at, pts.id
+	`, templateID)
+}
+
+func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, answers Record, comment string, submit bool, actorID, actorName string) (Record, error) {
+	if answers == nil {
+		answers = Record{}
+	}
+	rawSnapshot, _ := json.Marshal(answers)
+	eventType := "draft_saved"
+	toStatus := "draft"
+	if submit {
+		eventType = "submitted"
+		toStatus = "submitted"
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `
+		SELECT *
+		FROM workflow_form_instances
+		WHERE id=$1
+		FOR UPDATE
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	instance := rows[0]
+	fromStatus := fmt.Sprint(instance["status"])
+	if statusIn(fromStatus, "cancelled") || (!submit && fromStatus == "submitted") || (submit && fromStatus == "submitted") {
+		return nil, validationError("Trạng thái workflow form đã thay đổi, vui lòng tải lại", Record{"status": fromStatus})
+	}
+	revisionNo := int(number(instance["current_revision"]))
+	if submit {
+		revisionNo++
+	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM workflow_form_answers wfa
+		WHERE wfa.instance_id=$1
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM jsonb_object_keys($2::jsonb) AS submitted(field_key)
+			WHERE submitted.field_key=wfa.field_key
+		  )
+	`, instanceID, string(rawSnapshot)); err != nil {
+		return nil, err
+	}
+	for key, value := range answers {
+		rawValue, _ := json.Marshal(value)
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO workflow_form_answers (instance_id, field_key, field_type, value_json, revision_no, updated_by)
+			SELECT $1, wff.field_key, wff.field_type, $3::jsonb, $4, NULLIF($5,'')::uuid
+			FROM workflow_form_fields wff
+			WHERE wff.form_version_id=$2 AND wff.field_key=$6
+			ON CONFLICT (instance_id, field_key)
+			DO UPDATE SET value_json=EXCLUDED.value_json, field_type=EXCLUDED.field_type, revision_no=EXCLUDED.revision_no, updated_by=EXCLUDED.updated_by, updated_at=now()
+		`, instanceID, instance["form_version_id"], string(rawValue), revisionNo, actorID, key); err != nil {
+			return nil, err
+		}
+	}
+	if submit {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE workflow_form_instances
+			SET status='submitted',
+				current_revision=$2,
+				answers_snapshot_json=$3::jsonb,
+				submitted_by=NULLIF($4,'')::uuid,
+				submitted_at=now(),
+				updated_at=now()
+			WHERE id=$1
+		`, instanceID, revisionNo, string(rawSnapshot), actorID); err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE workflow_form_instances
+			SET answers_snapshot_json=$2::jsonb,
+				updated_at=now()
+			WHERE id=$1
+		`, instanceID, string(rawSnapshot)); err != nil {
+			return nil, err
+		}
+	}
+	rawMetadata, _ := json.Marshal(Record{
+		"form_type":       instance["form_type"],
+		"form_version_id": instance["form_version_id"],
+		"revision_no":     revisionNo,
+	})
+	workItemID := cleanID(instance["work_item_id"])
+	projectID := cleanID(instance["project_id"])
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, from_status, to_status, comment, metadata_json)
+		VALUES ($1, $2, NULLIF($3,'')::uuid, NULLIF($4,'')::uuid, $5, $6, $7, NULLIF($8,''), $9::jsonb)
+	`, instanceID, projectID, workItemID, actorID, eventType, fromStatus, toStatus, comment, string(rawMetadata)); err != nil {
+		return nil, err
+	}
+	if workItemID != "" {
+		activityComment := comment
+		if activityComment == "" {
+			if submit {
+				activityComment = "Workflow form submitted"
+			} else {
+				activityComment = "Workflow form draft saved"
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, metadata_json)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, $5::jsonb)
+		`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
+			return nil, err
+		}
+		if submit {
+			generatedWorkItemIDs := []string{}
+			if fmt.Sprint(instance["form_type"]) == "meeting_minutes" {
+				var err error
+				generatedWorkItemIDs, err = createMeetingMinutesActionItemsTx(ctx, tx, instance, answers, actorID)
+				if err != nil {
+					return nil, err
+				}
+			} else if fmt.Sprint(instance["form_type"]) == "daily_report" {
+				var err error
+				generatedWorkItemIDs, err = createPlanningDailyReportNextItemsTx(ctx, tx, instance, answers, actorID)
+				if err != nil {
+					return nil, err
+				}
+			}
+			payload := Record{
+				"workflow_form_instance_id": instanceID,
+				"workflow_form_version_id":  instance["form_version_id"],
+				"workflow_form_type":        instance["form_type"],
+				"workflow_form_answers":     answers,
+			}
+			if len(generatedWorkItemIDs) > 0 {
+				payload["generated_work_item_ids"] = generatedWorkItemIDs
+			}
+			if fmt.Sprint(instance["form_type"]) == "checklist" {
+				if checklistItems, ok := answers["checklist_items"]; ok {
+					payload["checklist_items"] = checklistItems
+					payload["checklist"] = checklistItems
+				} else {
+					payload["checklist"] = []Record{{
+						"label":    "Submitted workflow form",
+						"checked":  true,
+						"source":   "workflow_form",
+						"form_id":  instanceID,
+						"revision": revisionNo,
+					}}
+				}
+			}
+			rawPayload, _ := json.Marshal(payload)
+			if _, err := tx.ExecContext(ctx, `
+				UPDATE work_items
+				SET completion_payload_json=COALESCE(completion_payload_json, '{}'::jsonb) || $2::jsonb,
+					updated_by=NULLIF($3,'')::uuid,
+					updated_at=now()
+				WHERE id=$1
+			`, workItemID, string(rawPayload), actorID); err != nil {
+				return nil, err
+			}
+		}
+		auditDescription := "Lưu nháp workflow form"
+		if submit {
+			auditDescription = "Submit workflow form"
+		}
+		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_"+eventType, "workflow_form_instance", instanceID, auditDescription, Record{"work_item_id": workItemID, "form_type": instance["form_type"], "revision_no": revisionNo}); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetWorkflowFormInstanceDetail(ctx, instanceID)
+}
+
+func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, comment string, visualFile StoredFileMetadata, strokes []WorkflowFormSignatureStroke, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `
+		SELECT
+			wfi.*,
+			wft.code AS form_code,
+			wft.name AS form_name,
+			wfv.version_no AS form_version_no
+		FROM workflow_form_instances wfi
+		JOIN workflow_form_versions wfv ON wfv.id=wfi.form_version_id
+		JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
+		WHERE wfi.id=$1
+		FOR UPDATE
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	instance := rows[0]
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return nil, validationError("Workflow form phải được submit trước khi ký nội bộ", Record{"status": instance["status"]})
+	}
+	projectID := cleanID(instance["project_id"])
+	workItemID := cleanID(instance["work_item_id"])
+	formVersionID := cleanID(instance["form_version_id"])
+	revisionNo := int(number(instance["current_revision"]))
+	if workItemID == "" || projectID == "" || formVersionID == "" {
+		return nil, validationError("Workflow form thiếu liên kết để ký", Record{"workflow_form_instance_id": instanceID})
+	}
+
+	duplicateRows, err := queryTx(ctx, tx, `
+		SELECT COUNT(*) AS total
+		FROM workflow_form_signatures
+		WHERE form_instance_id=$1 AND signer_user_id=$2 AND purpose=$3
+	`, instanceID, actorID, purpose)
+	if err != nil {
+		return nil, err
+	}
+	if len(duplicateRows) > 0 && number(duplicateRows[0]["total"]) > 0 {
+		return nil, validationError("Bạn đã ký workflow form này cho mục đích này", Record{"purpose": purpose})
+	}
+
+	roleRows, err := queryTx(ctx, tx, `
+		SELECT COALESCE(jsonb_agg(role_name ORDER BY role_name), '[]'::jsonb) AS roles
+		FROM (
+			SELECT DISTINCT r.display_name AS role_name
+			FROM user_roles ur
+			JOIN roles r ON r.id=ur.role_id
+			WHERE ur.user_id=$1
+		) signer_roles
+	`, actorID)
+	if err != nil {
+		return nil, err
+	}
+	signerRoles := any([]any{})
+	if len(roleRows) > 0 && roleRows[0]["roles"] != nil {
+		signerRoles = roleRows[0]["roles"]
+	}
+	signerName := strings.TrimSpace(actorName)
+	if signerName == "" {
+		signerName = actorID
+	}
+	payload := Record{
+		"source":                    "workflow_form_signature",
+		"workflow_form_instance_id": instanceID,
+		"workflow_form_version_id":  formVersionID,
+		"workflow_form_revision_no": revisionNo,
+		"workflow_form_type":        instance["form_type"],
+		"workflow_form_code":        instance["form_code"],
+		"workflow_form_title":       instance["title"],
+		"answers_snapshot":          instance["answers_snapshot_json"],
+		"project_id":                projectID,
+		"work_item_id":              workItemID,
+		"purpose":                   purpose,
+		"comment":                   comment,
+		"signer_user_id":            actorID,
+		"signer_name":               signerName,
+		"signer_roles":              signerRoles,
+		"visual_signature": Record{
+			"storage_provider": visualFile.StorageProvider,
+			"storage_key":      visualFile.StorageKey,
+			"mime_type":        visualFile.MIMEType,
+			"file_size":        visualFile.FileSize,
+			"checksum_sha256":  visualFile.ChecksumSHA256,
+			"strokes":          strokes,
+		},
+	}
+	rawPayload, _ := json.Marshal(payload)
+	hashBytes := sha256.Sum256(rawPayload)
+	payloadHash := hex.EncodeToString(hashBytes[:])
+	rawRoles, _ := json.Marshal(signerRoles)
+
+	signatureRows, err := queryTx(ctx, tx, `
+		INSERT INTO workflow_form_signatures
+			(project_id, work_item_id, form_instance_id, form_version_id, form_revision_no, purpose, signer_user_id, signer_name, signer_roles_json, comment, payload_json, payload_hash, visual_storage_provider, visual_storage_key, visual_mime_type, visual_file_size, visual_checksum_sha256)
+		VALUES
+			($1, $2, $3, $4, $5, $6, NULLIF($7,'')::uuid, $8, $9::jsonb, NULLIF($10,''), $11::jsonb, $12, $13, $14, $15, $16, $17)
+		RETURNING *
+	`, projectID, workItemID, instanceID, formVersionID, revisionNo, purpose, actorID, signerName, string(rawRoles), comment, string(rawPayload), payloadHash, visualFile.StorageProvider, visualFile.StorageKey, visualFile.MIMEType, visualFile.FileSize, visualFile.ChecksumSHA256)
+	if err != nil {
+		return nil, err
+	}
+	if len(signatureRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	signatureID := cleanID(signatureRows[0]["id"])
+	rawMetadata, _ := json.Marshal(Record{
+		"workflow_form_instance_id": instanceID,
+		"signature_id":              signatureID,
+		"purpose":                   purpose,
+		"payload_hash":              payloadHash,
+		"form_revision_no":          revisionNo,
+		"visual_checksum_sha256":    visualFile.ChecksumSHA256,
+	})
+	eventComment := comment
+	if eventComment == "" {
+		eventComment = "Workflow form signed"
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, from_status, to_status, comment, metadata_json)
+		VALUES ($1, $2, $3, NULLIF($4,'')::uuid, 'signed', 'submitted', 'submitted', $5, $6::jsonb)
+	`, instanceID, projectID, workItemID, actorID, eventComment, string(rawMetadata)); err != nil {
+		return nil, err
+	}
+	activityComment := fmt.Sprintf("Workflow form signed: %s", purpose)
+	if comment != "" {
+		activityComment = comment
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'internal', $5::jsonb)
+	`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_signed", "workflow_form_signature", signatureID, "Ký nội bộ workflow form", Record{
+		"work_item_id":              workItemID,
+		"workflow_form_instance_id": instanceID,
+		"purpose":                   purpose,
+		"payload_hash":              payloadHash,
+		"form_revision_no":          revisionNo,
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetWorkflowFormInstanceDetail(ctx, instanceID)
+}
+
+func (r *Repository) CreateWorkflowFormPDFExport(ctx context.Context, instanceID, fileName, title string, pdfFile StoredFileMetadata, payloadHash, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `
+		SELECT
+			wfi.*,
+			wft.code AS form_code,
+			wft.name AS form_name,
+			wfv.version_no AS form_version_no
+		FROM workflow_form_instances wfi
+		JOIN workflow_form_versions wfv ON wfv.id=wfi.form_version_id
+		JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
+		WHERE wfi.id=$1
+		FOR UPDATE
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	instance := rows[0]
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return nil, validationError("Workflow form phải được submit trước khi export PDF", Record{"status": instance["status"]})
+	}
+	projectID := cleanID(instance["project_id"])
+	workItemID := cleanID(instance["work_item_id"])
+	formVersionID := cleanID(instance["form_version_id"])
+	revisionNo := int(number(instance["current_revision"]))
+	if workItemID == "" || projectID == "" || formVersionID == "" {
+		return nil, validationError("Workflow form thiếu liên kết để export PDF", Record{"workflow_form_instance_id": instanceID})
+	}
+	if strings.TrimSpace(title) == "" {
+		title = fmt.Sprint(instance["title"])
+	}
+	if strings.TrimSpace(fileName) == "" {
+		fileName = fmt.Sprintf("workflow-form-rev-%d.pdf", revisionNo)
+	}
+	metadata := Record{
+		"workflow_form_type":       instance["form_type"],
+		"workflow_form_code":       instance["form_code"],
+		"workflow_form_title":      instance["title"],
+		"workflow_form_version_no": instance["form_version_no"],
+		"form_revision_no":         revisionNo,
+	}
+	rawMetadata, _ := json.Marshal(metadata)
+
+	exportRows, err := queryTx(ctx, tx, `
+		INSERT INTO workflow_form_pdf_exports
+			(project_id, work_item_id, form_instance_id, form_version_id, form_revision_no, title, file_name, storage_provider, storage_key, mime_type, file_size, checksum_sha256, payload_hash, metadata_json, generated_by, generated_by_name)
+		VALUES
+			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, NULLIF($15,'')::uuid, NULLIF($16,''))
+		RETURNING *
+	`, projectID, workItemID, instanceID, formVersionID, revisionNo, title, fileName, pdfFile.StorageProvider, pdfFile.StorageKey, pdfFile.MIMEType, pdfFile.FileSize, pdfFile.ChecksumSHA256, payloadHash, string(rawMetadata), actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	if len(exportRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	exportID := cleanID(exportRows[0]["id"])
+	eventMetadata := Record{
+		"workflow_form_instance_id": instanceID,
+		"pdf_export_id":             exportID,
+		"payload_hash":              payloadHash,
+		"checksum_sha256":           pdfFile.ChecksumSHA256,
+		"form_revision_no":          revisionNo,
+	}
+	rawEventMetadata, _ := json.Marshal(eventMetadata)
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, from_status, to_status, comment, metadata_json)
+		VALUES ($1, $2, $3, NULLIF($4,'')::uuid, 'pdf_exported', 'submitted', 'submitted', $5, $6::jsonb)
+	`, instanceID, projectID, workItemID, actorID, fmt.Sprintf("Export PDF workflow form: %s", fileName), string(rawEventMetadata)); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'internal', $5::jsonb)
+	`, workItemID, projectID, actorID, fmt.Sprintf("Workflow form PDF exported: %s", fileName), string(rawEventMetadata)); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_pdf_exported", "workflow_form_pdf_export", exportID, "Export PDF workflow form", eventMetadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetWorkflowFormInstanceDetail(ctx, instanceID)
+}
+
+func (r *Repository) GetWorkflowFormSignatureDetail(ctx context.Context, signatureID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT wfs.*, wi.status AS work_item_status
+		FROM workflow_form_signatures wfs
+		JOIN work_items wi ON wi.id=wfs.work_item_id AND wi.project_id=wfs.project_id
+		JOIN projects p ON p.id=wfs.project_id
+		WHERE wfs.id=$1 AND wi.status <> 'cancelled' AND p.status <> 'cancelled'
+	`, signatureID)
+}
+
+func (r *Repository) GetWorkflowFormPDFExportDetail(ctx context.Context, exportID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT wfpe.*, wi.status AS work_item_status
+		FROM workflow_form_pdf_exports wfpe
+		JOIN work_items wi ON wi.id=wfpe.work_item_id AND wi.project_id=wfpe.project_id
+		JOIN projects p ON p.id=wfpe.project_id
+		WHERE wfpe.id=$1 AND wi.status <> 'cancelled' AND p.status <> 'cancelled'
+	`, exportID)
+}
+
+func createMeetingMinutesActionItemsTx(ctx context.Context, tx *sql.Tx, instance Record, answers Record, actorID string) ([]string, error) {
+	rawActionItems, ok := answers["action_items"]
+	if !ok || workflowFormValueEmpty(Record{"field_type": "structured_list"}, rawActionItems) {
+		return []string{}, nil
+	}
+	actionItems, err := workflowRecordList(rawActionItems)
+	if err != nil {
+		return nil, err
+	}
+	projectID := cleanID(instance["project_id"])
+	instanceID := cleanID(instance["id"])
+	parentWorkItemID := cleanID(instance["work_item_id"])
+	meetingTitle := strings.TrimSpace(fmt.Sprint(answers["meeting_title"]))
+	createdIDs := make([]string, 0, len(actionItems))
+	for index, item := range actionItems {
+		title := strings.TrimSpace(fmt.Sprint(item["title"]))
+		if title == "" || title == "<nil>" {
+			continue
+		}
+		ownerRole := strings.TrimSpace(fmt.Sprint(item["owner_role"]))
+		ownerName := strings.TrimSpace(fmt.Sprint(item["owner_name"]))
+		dueDate := strings.TrimSpace(fmt.Sprint(item["due_date"]))
+		priority := strings.TrimSpace(fmt.Sprint(item["priority"]))
+		if !statusIn(priority, "low", "normal", "high", "urgent") {
+			priority = "normal"
+		}
+		descriptionParts := []string{}
+		if meetingTitle != "" && meetingTitle != "<nil>" {
+			descriptionParts = append(descriptionParts, "Biên bản họp: "+meetingTitle)
+		}
+		if ownerName != "" && ownerName != "<nil>" {
+			descriptionParts = append(descriptionParts, "Owner: "+ownerName)
+		}
+		if note := strings.TrimSpace(fmt.Sprint(item["description"])); note != "" && note != "<nil>" {
+			descriptionParts = append(descriptionParts, note)
+		}
+		description := strings.Join(descriptionParts, "\n")
+		roleIDs := []string{}
+		if ownerRole != "" && ownerRole != "<nil>" {
+			roleIDs = append(roleIDs, ownerRole)
+		}
+		rawRoles, _ := json.Marshal(roleIDs)
+		rawMetadata, _ := json.Marshal(Record{
+			"source":                    "meeting_minutes",
+			"workflow_form_instance_id": instanceID,
+			"parent_work_item_id":       parentWorkItemID,
+			"action_item_index":         index,
+			"action_item":               item,
+		})
+		workItemID := newID()
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_items
+				(id, project_id, source_type, source_id, title, description, work_type, status, priority, role_ids, due_at, evidence_requirement_json, created_by, updated_by)
+			VALUES
+				($1, $2, 'workflow_form_action_item', $3, $4, NULLIF($5,''), 'task', 'ready', $6, $7::jsonb, NULLIF($8,'')::timestamptz, '{}'::jsonb, NULLIF($9,'')::uuid, NULLIF($9,'')::uuid)
+		`, workItemID, projectID, instanceID, title, description, priority, string(rawRoles), dueDate, actorID); err != nil {
+			return nil, err
+		}
+		if ownerRole != "" && ownerRole != "<nil>" {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO work_item_assignments (work_item_id, assignment_type, role_name, created_by)
+				VALUES ($1, 'role', $2, NULLIF($3,'')::uuid)
+			`, workItemID, ownerRole, actorID); err != nil {
+				return nil, err
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, to_status, comment, metadata_json)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'created', 'ready', 'Action item generated from meeting minutes', $4::jsonb)
+		`, workItemID, projectID, actorID, string(rawMetadata)); err != nil {
+			return nil, err
+		}
+		createdIDs = append(createdIDs, workItemID)
+	}
+	if len(createdIDs) > 0 && parentWorkItemID != "" {
+		rawMetadata, _ := json.Marshal(Record{
+			"source":                    "meeting_minutes",
+			"workflow_form_instance_id": instanceID,
+			"generated_work_item_ids":   createdIDs,
+		})
+		comment := fmt.Sprintf("Meeting minutes generated %d action item work items", len(createdIDs))
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, metadata_json)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, $5::jsonb)
+		`, parentWorkItemID, projectID, actorID, comment, string(rawMetadata)); err != nil {
+			return nil, err
+		}
+	}
+	return createdIDs, nil
+}
+
+func createPlanningDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, instance Record, answers Record, actorID string) ([]string, error) {
+	rawNextItems, ok := answers["next_plan_items"]
+	if !ok || workflowFormValueEmpty(Record{"field_type": "structured_list"}, rawNextItems) {
+		return []string{}, nil
+	}
+	nextItems, err := workflowRecordList(rawNextItems)
+	if err != nil {
+		return nil, err
+	}
+	projectID := cleanID(instance["project_id"])
+	instanceID := cleanID(instance["id"])
+	parentWorkItemID := cleanID(instance["work_item_id"])
+	reportDate := strings.TrimSpace(fmt.Sprint(answers["report_date"]))
+	reportedBy := strings.TrimSpace(fmt.Sprint(answers["reported_by"]))
+	planningScope := strings.TrimSpace(fmt.Sprint(answers["planning_scope"]))
+	createdIDs := make([]string, 0, len(nextItems))
+	for index, item := range nextItems {
+		title := strings.TrimSpace(fmt.Sprint(item["title"]))
+		if title == "" || title == "<nil>" {
+			continue
+		}
+		ownerRole := strings.TrimSpace(fmt.Sprint(item["owner_role"]))
+		ownerName := strings.TrimSpace(fmt.Sprint(item["owner_name"]))
+		dueDate := strings.TrimSpace(fmt.Sprint(item["due_date"]))
+		priority := strings.TrimSpace(fmt.Sprint(item["priority"]))
+		if !statusIn(priority, "low", "normal", "high", "urgent") {
+			priority = "normal"
+		}
+		descriptionParts := []string{}
+		if reportDate != "" && reportDate != "<nil>" {
+			descriptionParts = append(descriptionParts, "Planning daily report: "+reportDate)
+		}
+		if planningScope != "" && planningScope != "<nil>" {
+			descriptionParts = append(descriptionParts, "Scope: "+planningScope)
+		}
+		if reportedBy != "" && reportedBy != "<nil>" {
+			descriptionParts = append(descriptionParts, "Reporter: "+reportedBy)
+		}
+		if ownerName != "" && ownerName != "<nil>" {
+			descriptionParts = append(descriptionParts, "Owner: "+ownerName)
+		}
+		if note := strings.TrimSpace(fmt.Sprint(item["description"])); note != "" && note != "<nil>" {
+			descriptionParts = append(descriptionParts, note)
+		}
+		description := strings.Join(descriptionParts, "\n")
+		roleIDs := []string{}
+		if ownerRole != "" && ownerRole != "<nil>" {
+			roleIDs = append(roleIDs, ownerRole)
+		}
+		rawRoles, _ := json.Marshal(roleIDs)
+		rawMetadata, _ := json.Marshal(Record{
+			"source":                    "planning_daily_report",
+			"workflow_form_instance_id": instanceID,
+			"parent_work_item_id":       parentWorkItemID,
+			"next_plan_item_index":      index,
+			"next_plan_item":            item,
+			"report_date":               reportDate,
+			"planning_scope":            planningScope,
+		})
+		workItemID := newID()
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_items
+				(id, project_id, source_type, source_id, title, description, work_type, status, priority, role_ids, due_at, evidence_requirement_json, created_by, updated_by)
+			VALUES
+				($1, $2, 'workflow_form_action_item', $3, $4, NULLIF($5,''), 'task', 'ready', $6, $7::jsonb, NULLIF($8,'')::timestamptz, '{}'::jsonb, NULLIF($9,'')::uuid, NULLIF($9,'')::uuid)
+		`, workItemID, projectID, instanceID, title, description, priority, string(rawRoles), dueDate, actorID); err != nil {
+			return nil, err
+		}
+		if ownerRole != "" && ownerRole != "<nil>" {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO work_item_assignments (work_item_id, assignment_type, role_name, created_by)
+				VALUES ($1, 'role', $2, NULLIF($3,'')::uuid)
+			`, workItemID, ownerRole, actorID); err != nil {
+				return nil, err
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, to_status, comment, metadata_json)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'created', 'ready', 'Next plan item generated from planning daily report', $4::jsonb)
+		`, workItemID, projectID, actorID, string(rawMetadata)); err != nil {
+			return nil, err
+		}
+		createdIDs = append(createdIDs, workItemID)
+	}
+	if len(createdIDs) > 0 && parentWorkItemID != "" {
+		rawMetadata, _ := json.Marshal(Record{
+			"source":                    "planning_daily_report",
+			"workflow_form_instance_id": instanceID,
+			"generated_work_item_ids":   createdIDs,
+		})
+		comment := fmt.Sprintf("Planning daily report generated %d next plan work items", len(createdIDs))
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, metadata_json)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, $5::jsonb)
+		`, parentWorkItemID, projectID, actorID, comment, string(rawMetadata)); err != nil {
+			return nil, err
+		}
+	}
+	return createdIDs, nil
+}
+
 func (r *Repository) GetDocumentAttachment(ctx context.Context, documentID string) (Record, error) {
 	return r.QueryOne(ctx, `
 		SELECT *
@@ -1322,11 +2189,11 @@ func (r *Repository) AddWorkItemEvidence(ctx context.Context, item Record, req W
 	defer tx.Rollback()
 	rows, err := queryTx(ctx, tx, `
 		INSERT INTO evidence_records
-			(work_item_id, project_id, target_type, target_id, evidence_type, document_type, name, document_id, title, description, file_url, mime_type, file_size, caption, revision_no, visibility, payload_json, status, uploaded_by, submitted_by)
+			(work_item_id, project_id, target_type, target_id, evidence_type, document_type, name, document_id, title, description, file_url, mime_type, file_size, storage_provider, storage_key, checksum_sha256, caption, revision_no, visibility, payload_json, status, uploaded_by, submitted_by)
 		VALUES
-			($1, $2, 'work_item', $1, $3, NULLIF($4,''), $5, NULLIF($6,'')::uuid, NULLIF($7,''), NULLIF($8,''), NULLIF($9,''), NULLIF($10,''), NULLIF($11,0), NULLIF($12,''), NULLIF($13,''), $14, $15::jsonb, 'submitted', NULLIF($16,'')::uuid, NULLIF($16,'')::uuid)
+			($1, $2, 'work_item', $1, $3, NULLIF($4,''), $5, NULLIF($6,'')::uuid, NULLIF($7,''), NULLIF($8,''), NULLIF($9,''), NULLIF($10,''), NULLIF($11,0), $12, NULLIF($13,''), NULLIF($14,''), NULLIF($15,''), NULLIF($16,''), $17, $18::jsonb, 'submitted', NULLIF($19,'')::uuid, NULLIF($19,'')::uuid)
 		RETURNING *
-	`, workItemID, projectID, req.EvidenceType, req.DocumentType, req.Name, req.DocumentID, req.Title, req.Description, req.FileURL, req.MIMEType, req.FileSize, req.Caption, req.RevisionNo, req.Visibility, string(rawPayload), actorID)
+	`, workItemID, projectID, req.EvidenceType, req.DocumentType, req.Name, req.DocumentID, req.Title, req.Description, req.FileURL, req.MIMEType, req.FileSize, req.StorageProvider, req.StorageKey, req.ChecksumSHA256, req.Caption, req.RevisionNo, req.Visibility, string(rawPayload), actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -2467,6 +3334,21 @@ func (r *Repository) CreateTemplateWithNodes(ctx context.Context, body Record, u
 			if stepBody["step_type"] == nil {
 				stepBody["step_type"] = "task"
 			}
+			formRequired := workflowFormRequiredForStep(fmt.Sprint(stepBody["step_type"]), stepBody["checklist_required"] == nil || boolValue(stepBody["checklist_required"]))
+			if raw, ok := stepBody["form_required"]; ok {
+				formRequired = boolValue(raw)
+			} else {
+				stepBody["form_required"] = workflowFormRequiredForStep(fmt.Sprint(stepBody["step_type"]), stepBody["checklist_required"] == nil || boolValue(stepBody["checklist_required"]))
+			}
+			if formRequired && cleanID(stepBody["form_version_id"]) == "" {
+				formVersionID, err := r.DefaultWorkflowFormVersionID(ctx, fmt.Sprint(stepBody["step_type"]), stepBody["checklist_required"] == nil || boolValue(stepBody["checklist_required"]))
+				if err != nil {
+					return nil, err
+				}
+				if formVersionID != "" {
+					stepBody["form_version_id"] = formVersionID
+				}
+			}
 			if _, err := r.Insert(ctx, "pipeline_template_steps", templateStepColumns(), stepBody); err != nil {
 				return nil, err
 			}
@@ -2534,6 +3416,8 @@ func (r *Repository) CloneTemplate(ctx context.Context, id, userID string) (Reco
 				"checklist_required":  step["checklist_required"],
 				"document_required":   step["document_required"],
 				"photo_required":      step["photo_required"],
+				"form_version_id":     step["form_version_id"],
+				"form_required":       step["form_required"],
 				"order_index":         step["order_index"],
 			}
 			if _, err := r.Insert(ctx, "pipeline_template_steps", templateStepColumns(), stepBody); err != nil {
@@ -2702,6 +3586,29 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 			`, workItemID, projectID, actorID, workItemStatus, `{"source_type":"pipeline_run_step"}`); err != nil {
 				return nil, err
 			}
+			if formVersionID := cleanID(step["form_version_id"]); formVersionID != "" {
+				formRows, err := queryTx(ctx, tx, `
+					INSERT INTO workflow_form_instances
+						(project_id, work_item_id, pipeline_run_id, run_node_id, run_step_id, template_step_id, form_template_id, form_version_id, form_type, title, required_role_ids, created_by)
+					SELECT $1, $2, $3, $4, $5, $6, v.template_id, v.id, t.form_type, $7, $8::jsonb, NULLIF($9,'')::uuid
+					FROM workflow_form_versions v
+					JOIN workflow_form_templates t ON t.id=v.template_id
+					WHERE v.id=$10
+					ON CONFLICT DO NOTHING
+					RETURNING *
+				`, projectID, workItemID, runID, runNodeID, runStepID, step["id"], step["name"], string(rawWorkItemRoles), actorID, formVersionID)
+				if err != nil {
+					return nil, err
+				}
+				if len(formRows) > 0 {
+					if _, err := tx.ExecContext(ctx, `
+						INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, to_status, comment, metadata_json)
+						VALUES ($1, $2, $3, NULLIF($4,'')::uuid, 'created', 'draft', 'Workflow form instance created from pipeline start', $5::jsonb)
+					`, formRows[0]["id"], projectID, workItemID, actorID, `{"source":"start_pipeline"}`); err != nil {
+						return nil, err
+					}
+				}
+			}
 		}
 	}
 	edges, err := queryTx(ctx, tx, `
@@ -2768,9 +3675,32 @@ func (r *Repository) GetPipelineRun(ctx context.Context, projectID string) (Reco
 	}
 	for _, node := range nodes {
 		steps, _ := r.Query(ctx, `
-			SELECT * FROM pipeline_run_steps
-			WHERE run_node_id=$1
-			ORDER BY order_index, created_at
+			SELECT
+				rs.*,
+				wi.id AS work_item_id,
+				wi.status AS work_item_status,
+				wi.title AS work_item_title,
+				wi.role_ids AS work_item_role_ids,
+				wi.evidence_requirement_json,
+				COALESCE((
+					SELECT COUNT(*)
+					FROM evidence_records er
+					WHERE er.work_item_id=wi.id
+					  AND er.status <> 'rejected'
+				), 0) AS evidence_count,
+				wfi.id AS workflow_form_instance_id,
+				wfi.status AS workflow_form_status,
+				wfi.form_type AS workflow_form_type,
+				wfi.current_revision AS workflow_form_revision,
+				wfi.submitted_at AS workflow_form_submitted_at,
+				pts.form_version_id AS workflow_form_version_id,
+				COALESCE(pts.form_required, false) AS workflow_form_required
+			FROM pipeline_run_steps rs
+			LEFT JOIN work_items wi ON wi.run_step_id=rs.id AND wi.status <> 'cancelled'
+			LEFT JOIN workflow_form_instances wfi ON wfi.run_step_id=rs.id AND wfi.status <> 'cancelled'
+			LEFT JOIN pipeline_template_steps pts ON pts.id=rs.template_step_id
+			WHERE rs.run_node_id=$1
+			ORDER BY rs.order_index, rs.created_at
 		`, node["id"])
 		node["steps"] = steps
 	}
@@ -3396,6 +4326,350 @@ func (r *Repository) ApprovalAction(ctx context.Context, approvalID, action, com
 	return r.GetByID(ctx, "approval_requests", approvalID)
 }
 
+func (r *Repository) ListProjectBOQ(ctx context.Context, projectID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT b.*, m.name AS material_name,
+			COALESCE(b.final_unit_price, b.norm_unit_price, b.expected_unit_price, b.unit_price, 0) AS effective_unit_price,
+			(b.quantity * COALESCE(b.final_unit_price, b.norm_unit_price, b.expected_unit_price, b.unit_price, 0))::numeric(18,2) AS effective_total_amount,
+			CASE
+				WHEN b.final_price_locked THEN 'final_locked'
+				WHEN b.norm_price_locked THEN 'norm_locked'
+				ELSE 'expected'
+			END AS price_lifecycle_status,
+			COALESCE((
+				SELECT jsonb_agg(to_jsonb(price_events) ORDER BY price_events.created_at DESC)
+				FROM (
+					SELECT id, event_type, price_source, from_unit_price, to_unit_price, revision_no, comment, actor_name, created_at
+					FROM boq_unit_price_events
+					WHERE boq_item_id=b.id
+					ORDER BY created_at DESC
+					LIMIT 5
+				) price_events
+			), '[]'::jsonb) AS price_events
+		FROM boq_items b
+		LEFT JOIN materials m ON m.id=b.material_id
+		WHERE b.project_id=$1 AND b.status <> 'deleted'
+		ORDER BY b.category, b.created_at
+	`, projectID)
+}
+
+func (r *Repository) GetBOQItemDetail(ctx context.Context, itemID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT b.*, m.name AS material_name,
+			COALESCE(b.final_unit_price, b.norm_unit_price, b.expected_unit_price, b.unit_price, 0) AS effective_unit_price,
+			(b.quantity * COALESCE(b.final_unit_price, b.norm_unit_price, b.expected_unit_price, b.unit_price, 0))::numeric(18,2) AS effective_total_amount,
+			CASE
+				WHEN b.final_price_locked THEN 'final_locked'
+				WHEN b.norm_price_locked THEN 'norm_locked'
+				ELSE 'expected'
+			END AS price_lifecycle_status,
+			COALESCE((
+				SELECT jsonb_agg(to_jsonb(price_events) ORDER BY price_events.created_at DESC)
+				FROM (
+					SELECT id, event_type, price_source, from_unit_price, to_unit_price, revision_no, comment, actor_name, created_at
+					FROM boq_unit_price_events
+					WHERE boq_item_id=b.id
+					ORDER BY created_at DESC
+					LIMIT 20
+				) price_events
+			), '[]'::jsonb) AS price_events
+		FROM boq_items b
+		LEFT JOIN materials m ON m.id=b.material_id
+		WHERE b.id=$1 AND b.status <> 'deleted'
+	`, itemID)
+}
+
+func (r *Repository) CreateBOQItem(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO boq_items (
+			project_id, category, work_item_name, description, unit, quantity, expected_unit_price,
+			material_id, node_id, status, created_by, price_revision_no
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,'')::uuid,NULLIF($9,'')::uuid,$10,NULLIF($11,'')::uuid,1)
+		RETURNING *
+	`, body["project_id"], body["category"], body["work_item_name"], body["description"], body["unit"], body["quantity"], body["expected_unit_price"], cleanID(body["material_id"]), cleanID(body["node_id"]), body["status"], actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	item := rows[0]
+	if err := insertBOQUnitPriceEventTx(ctx, tx, item, "expected_updated", "expected", nil, number(item["expected_unit_price"]), "Initial expected unit price", actorID, actorName); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(item["project_id"]), actorID, actorName, "boq_created", "boq_item", fmt.Sprint(item["id"]), "Tạo dòng BOQ", Record{"price_revision_no": item["price_revision_no"]}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetBOQItemDetail(ctx, fmt.Sprint(item["id"]))
+}
+
+func (r *Repository) UpdateBOQItem(ctx context.Context, itemID string, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	currentRows, err := queryTx(ctx, tx, `SELECT * FROM boq_items WHERE id=$1 AND status <> 'deleted' FOR UPDATE`, itemID)
+	if err != nil {
+		return nil, err
+	}
+	if len(currentRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := currentRows[0]
+	if boolValue(current["final_price_locked"]) && boqBodyChangesAny(current, body, finalLockedBOQProtectedFields...) {
+		return nil, validationError("Dòng BOQ đã final lock, không thể sửa khối lượng/vật tư/đơn giá", Record{"boq_item_id": itemID})
+	}
+	if boolValue(current["norm_price_locked"]) && boqBodyChangesAny(current, body, "expected_unit_price") {
+		return nil, validationError("Dòng BOQ đã norm lock, không thể sửa expected unit price", Record{"boq_item_id": itemID})
+	}
+
+	specs := []string{"category", "work_item_name", "description", "unit", "quantity", "expected_unit_price", "material_id", "node_id", "status", "approved_by"}
+	sets := make([]string, 0, len(specs)+2)
+	args := make([]any, 0, len(specs)+1)
+	for _, key := range specs {
+		value, ok := body[key]
+		if !ok {
+			continue
+		}
+		args = append(args, value)
+		if key == "material_id" || key == "node_id" || key == "approved_by" {
+			sets = append(sets, fmt.Sprintf("%s=NULLIF($%d,'')::uuid", key, len(args)))
+		} else {
+			sets = append(sets, fmt.Sprintf("%s=$%d", key, len(args)))
+		}
+	}
+	expectedChanged := boqBodyChangesAny(current, body, "expected_unit_price")
+	if expectedChanged {
+		sets = append(sets, "price_revision_no=price_revision_no+1")
+	}
+	if len(sets) == 0 {
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		return r.GetBOQItemDetail(ctx, itemID)
+	}
+	sets = append(sets, "updated_at=now()")
+	args = append(args, itemID)
+	updatedRows, err := queryTx(ctx, tx, fmt.Sprintf(`UPDATE boq_items SET %s WHERE id=$%d RETURNING *`, strings.Join(sets, ","), len(args)), args...)
+	if err != nil {
+		return nil, err
+	}
+	if len(updatedRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	updated := updatedRows[0]
+	if expectedChanged {
+		if err := insertBOQUnitPriceEventTx(ctx, tx, updated, "expected_updated", "expected", numberPtr(current["expected_unit_price"]), number(updated["expected_unit_price"]), "Updated expected unit price", actorID, actorName); err != nil {
+			return nil, err
+		}
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(updated["project_id"]), actorID, actorName, "boq_updated", "boq_item", itemID, "Cập nhật dòng BOQ", Record{"price_revision_no": updated["price_revision_no"]}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetBOQItemDetail(ctx, itemID)
+}
+
+func (r *Repository) UpdateBOQExpectedUnitPrice(ctx context.Context, itemID string, unitPrice float64, comment, actorID, actorName string) (Record, error) {
+	return r.changeBOQUnitPrice(ctx, itemID, "expected_updated", unitPrice, comment, actorID, actorName)
+}
+
+func (r *Repository) LockBOQNormUnitPrice(ctx context.Context, itemID string, unitPrice float64, comment, actorID, actorName string) (Record, error) {
+	return r.changeBOQUnitPrice(ctx, itemID, "norm_locked", unitPrice, comment, actorID, actorName)
+}
+
+func (r *Repository) LockBOQFinalUnitPrice(ctx context.Context, itemID string, unitPrice float64, comment, actorID, actorName string) (Record, error) {
+	return r.changeBOQUnitPrice(ctx, itemID, "final_locked", unitPrice, comment, actorID, actorName)
+}
+
+func (r *Repository) changeBOQUnitPrice(ctx context.Context, itemID, eventType string, unitPrice float64, comment, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	currentRows, err := queryTx(ctx, tx, `SELECT * FROM boq_items WHERE id=$1 AND status <> 'deleted' FOR UPDATE`, itemID)
+	if err != nil {
+		return nil, err
+	}
+	if len(currentRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := currentRows[0]
+	var updatedRows []Record
+	var source string
+	var fromPrice *float64
+	switch eventType {
+	case "expected_updated":
+		if boolValue(current["norm_price_locked"]) || boolValue(current["final_price_locked"]) {
+			return nil, validationError("Không thể sửa expected price sau khi đã lock norm/final", Record{"boq_item_id": itemID})
+		}
+		fromPrice = numberPtr(current["expected_unit_price"])
+		updatedRows, err = queryTx(ctx, tx, `
+			UPDATE boq_items
+			SET expected_unit_price=$2, price_revision_no=price_revision_no+1, updated_at=now()
+			WHERE id=$1
+			RETURNING *
+		`, itemID, unitPrice)
+		source = "expected"
+	case "norm_locked":
+		if boolValue(current["norm_price_locked"]) {
+			return nil, validationError("Dòng BOQ đã norm lock", Record{"boq_item_id": itemID})
+		}
+		if boolValue(current["final_price_locked"]) {
+			return nil, validationError("Dòng BOQ đã final lock", Record{"boq_item_id": itemID})
+		}
+		fromPrice = numberPtr(current["expected_unit_price"])
+		updatedRows, err = queryTx(ctx, tx, `
+			UPDATE boq_items
+			SET norm_unit_price=$2,
+			    norm_price_locked=true,
+			    norm_price_locked_by=NULLIF($3,'')::uuid,
+			    norm_price_locked_at=now(),
+			    norm_price_comment=$4,
+			    price_revision_no=price_revision_no+1,
+			    updated_at=now()
+			WHERE id=$1
+			RETURNING *
+		`, itemID, unitPrice, actorID, comment)
+		source = "norm"
+	case "final_locked":
+		if !boolValue(current["norm_price_locked"]) {
+			return nil, validationError("Cần lock norm price trước khi lock final price", Record{"boq_item_id": itemID})
+		}
+		if boolValue(current["final_price_locked"]) {
+			return nil, validationError("Dòng BOQ đã final lock", Record{"boq_item_id": itemID})
+		}
+		fromPrice = numberPtr(current["norm_unit_price"])
+		updatedRows, err = queryTx(ctx, tx, `
+			UPDATE boq_items
+			SET final_unit_price=$2,
+			    final_price_locked=true,
+			    final_price_locked_by=NULLIF($3,'')::uuid,
+			    final_price_locked_at=now(),
+			    final_price_comment=$4,
+			    price_revision_no=price_revision_no+1,
+			    updated_at=now()
+			WHERE id=$1
+			RETURNING *
+		`, itemID, unitPrice, actorID, comment)
+		source = "final"
+	default:
+		return nil, validationError("Action đơn giá không hợp lệ", Record{"event_type": eventType})
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(updatedRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	updated := updatedRows[0]
+	if err := insertBOQUnitPriceEventTx(ctx, tx, updated, eventType, source, fromPrice, unitPrice, comment, actorID, actorName); err != nil {
+		return nil, err
+	}
+	eventName := "boq_unit_price_" + eventType
+	if err := addAuditTx(ctx, tx, fmt.Sprint(updated["project_id"]), actorID, actorName, eventName, "boq_item", itemID, "Cập nhật lifecycle đơn giá BOQ", Record{
+		"price_source":      source,
+		"unit_price":        unitPrice,
+		"price_revision_no": updated["price_revision_no"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetBOQItemDetail(ctx, itemID)
+}
+
+func insertBOQUnitPriceEventTx(ctx context.Context, tx *sql.Tx, item Record, eventType, source string, fromPrice *float64, toPrice float64, comment, actorID, actorName string) error {
+	snapshot := Record{
+		"boq_item_id":           item["id"],
+		"project_id":            item["project_id"],
+		"quantity":              item["quantity"],
+		"unit":                  item["unit"],
+		"expected_unit_price":   item["expected_unit_price"],
+		"norm_unit_price":       item["norm_unit_price"],
+		"final_unit_price":      item["final_unit_price"],
+		"effective_unit_price":  item["unit_price"],
+		"unit_price_source":     item["unit_price_source"],
+		"price_revision_no":     item["price_revision_no"],
+		"norm_price_locked":     item["norm_price_locked"],
+		"norm_price_locked_at":  item["norm_price_locked_at"],
+		"final_price_locked":    item["final_price_locked"],
+		"final_price_locked_at": item["final_price_locked_at"],
+		"work_item_name":        item["work_item_name"],
+		"category":              item["category"],
+	}
+	rawSnapshot, _ := json.Marshal(snapshot)
+	var from any
+	if fromPrice != nil {
+		from = *fromPrice
+	}
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO boq_unit_price_events (
+			project_id, boq_item_id, event_type, price_source, from_unit_price, to_unit_price,
+			revision_no, comment, snapshot_json, actor_id, actor_name
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,NULLIF($10,'')::uuid,$11)
+	`, item["project_id"], item["id"], eventType, source, from, toPrice, item["price_revision_no"], strings.TrimSpace(comment), string(rawSnapshot), actorID, actorName)
+	return err
+}
+
+var finalLockedBOQProtectedFields = []string{
+	"category",
+	"work_item_name",
+	"description",
+	"unit",
+	"quantity",
+	"material_id",
+	"node_id",
+	"expected_unit_price",
+}
+
+func boqBodyChangesAny(current, body Record, fields ...string) bool {
+	for _, field := range fields {
+		next, ok := body[field]
+		if !ok {
+			continue
+		}
+		if boqFieldChanged(current[field], next) {
+			return true
+		}
+	}
+	return false
+}
+
+func boqFieldChanged(current any, next any) bool {
+	switch next.(type) {
+	case int, int64, float64, float32:
+		return number(current) != number(next)
+	}
+	if _, ok := current.(float64); ok {
+		return number(current) != number(next)
+	}
+	return strings.TrimSpace(fmt.Sprint(current)) != strings.TrimSpace(fmt.Sprint(next))
+}
+
+func numberPtr(value any) *float64 {
+	out := number(value)
+	return &out
+}
+
 func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -3406,11 +4680,39 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 		return nil, err
 	}
 
+	blockers, err := queryTx(ctx, tx, `
+		SELECT id, work_item_name, status, unit_price_source, expected_unit_price, norm_unit_price, final_unit_price, price_revision_no
+		FROM boq_items b
+		WHERE b.project_id=$1 AND b.status='approved' AND NOT b.final_price_locked
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM procurement_request_items pri
+			JOIN procurement_requests pr ON pr.id=pri.request_id
+			WHERE pri.boq_item_id=b.id
+			  AND pr.status <> 'cancelled'
+		  )
+		ORDER BY b.category, b.created_at
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(blockers) > 0 {
+		return nil, validationError("Chỉ sinh yêu cầu mua khi mọi dòng BOQ approved chưa sinh mua sắm đã final lock", Record{"items": blockers})
+	}
+
 	rows, err := queryTx(ctx, tx, `
-		SELECT b.*, m.name AS material_name, m.standard_price
+		SELECT b.*, m.name AS material_name, m.standard_price,
+			COALESCE(b.final_unit_price, b.unit_price) AS effective_unit_price,
+			(
+				SELECT e.id
+				FROM boq_unit_price_events e
+				WHERE e.boq_item_id=b.id AND e.event_type='final_locked'
+				ORDER BY e.created_at DESC
+				LIMIT 1
+			) AS final_price_event_id
 		FROM boq_items b
 		LEFT JOIN materials m ON m.id=b.material_id
-		WHERE b.project_id=$1 AND b.status='approved'
+		WHERE b.project_id=$1 AND b.status='approved' AND b.final_price_locked
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM procurement_request_items pri
@@ -3427,10 +4729,7 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 	}
 	total := 0.0
 	for _, row := range rows {
-		price := number(row["unit_price"])
-		if price == 0 {
-			price = number(row["standard_price"])
-		}
+		price := number(row["effective_unit_price"])
 		total += number(row["quantity"]) * price
 	}
 	requestCode := fmt.Sprintf("PR-%s-%d", projectID[:8], timeNowUnix())
@@ -3448,19 +4747,16 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 	}
 	requestID := fmt.Sprint(reqRows[0]["id"])
 	for _, row := range rows {
-		price := number(row["unit_price"])
-		if price == 0 {
-			price = number(row["standard_price"])
-		}
+		price := number(row["effective_unit_price"])
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO procurement_request_items
-				(request_id, material_id, boq_item_id, quantity_planned, quantity_requested, unit, estimated_unit_price, supplier_name, delivery_status, approval_status)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending','pending')
-		`, requestID, row["material_id"], row["id"], row["quantity"], row["quantity"], row["unit"], price, row["default_supplier"]); err != nil {
+				(request_id, material_id, boq_item_id, quantity_planned, quantity_requested, unit, estimated_unit_price, supplier_name, delivery_status, approval_status, boq_price_source, boq_price_revision_no, boq_price_event_id)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending','pending','final',$9,NULLIF($10,'')::uuid)
+		`, requestID, row["material_id"], row["id"], row["quantity"], row["quantity"], row["unit"], price, row["default_supplier"], row["price_revision_no"], cleanID(row["final_price_event_id"])); err != nil {
 			return nil, err
 		}
 	}
-	rawMetadata, _ := json.Marshal(Record{"total": total})
+	rawMetadata, _ := json.Marshal(Record{"total": total, "boq_price_source": "final"})
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
 		VALUES ($1, NULLIF($2,'')::uuid, $3, 'material_requested', 'procurement_request', $4, 'Sinh yêu cầu mua vật tư từ BOQ', $5::jsonb)

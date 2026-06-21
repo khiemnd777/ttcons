@@ -1,11 +1,15 @@
 package core
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -51,6 +55,139 @@ func TestLegacyStepSubmitFillsChecklistPayload(t *testing.T) {
 	}
 	if _, ok := req.CompletionPayload["checklist"]; !ok {
 		t.Fatalf("expected checklist key in payload, got %#v", req.CompletionPayload)
+	}
+}
+
+func TestWorkflowFormValidationNormalizesAndRejectsBadInput(t *testing.T) {
+	service := NewService(&Repository{}, "test-secret")
+	fields := []Record{
+		{"field_key": "summary", "label": "Kết quả", "field_type": "textarea", "required": true, "validation_json": map[string]any{"min_length": 3}},
+		{"field_key": "confirmed", "label": "Xác nhận", "field_type": "checkbox", "required": true, "validation_json": map[string]any{}},
+		{"field_key": "quantity", "label": "Khối lượng", "field_type": "number", "required": false, "validation_json": map[string]any{"min": float64(0)}},
+	}
+
+	_, err := service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{"summary": "ok", "extra": "bad"}, true)
+	assertValidationError(t, err)
+
+	_, err = service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{"summary": "ok", "confirmed": false}, true)
+	assertValidationError(t, err)
+
+	answers, err := service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{"summary": "  đã xong  ", "confirmed": true, "quantity": "12.5"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if answers["summary"] != "đã xong" || answers["confirmed"] != true || number(answers["quantity"]) != 12.5 {
+		t.Fatalf("normalized answers = %#v", answers)
+	}
+}
+
+func TestWorkflowFormStructuredListValidation(t *testing.T) {
+	service := NewService(&Repository{}, "test-secret")
+	fields := []Record{
+		{
+			"field_key":  "action_items",
+			"label":      "Action items",
+			"field_type": "structured_list",
+			"required":   true,
+			"validation_json": map[string]any{
+				"min_items": float64(1),
+				"item_fields": []any{
+					map[string]any{"key": "title", "label": "Việc cần làm", "type": "text", "required": true, "min_length": float64(3)},
+					map[string]any{"key": "due_date", "label": "Due date", "type": "date", "required": true},
+					map[string]any{"key": "priority", "label": "Priority", "type": "select", "required": true, "options": []any{map[string]any{"value": "normal"}, map[string]any{"value": "high"}}},
+				},
+			},
+		},
+	}
+
+	_, err := service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{"action_items": []any{}}, true)
+	assertValidationError(t, err)
+
+	_, err = service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{"action_items": []any{map[string]any{"title": "ok", "due_date": "bad-date", "priority": "urgent"}}}, true)
+	assertValidationError(t, err)
+
+	answers, err := service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{
+		"action_items": []any{map[string]any{"title": "  Chốt bản vẽ  ", "due_date": "2026-06-30", "priority": "high"}},
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, ok := answers["action_items"].([]Record)
+	if !ok || len(items) != 1 {
+		t.Fatalf("normalized action_items = %#v", answers["action_items"])
+	}
+	if items[0]["title"] != "Chốt bản vẽ" || items[0]["priority"] != "high" {
+		t.Fatalf("normalized structured list item = %#v", items[0])
+	}
+}
+
+func TestBOQUnitPriceValidation(t *testing.T) {
+	expectedPrice, comment, err := normalizeBOQUnitPriceRequest(BOQUnitPriceRequest{UnitPrice: 0, Comment: "  draft expected  "}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expectedPrice != 0 || comment != "draft expected" {
+		t.Fatalf("expected normalized expected price/comment, got %v %q", expectedPrice, comment)
+	}
+	_, _, err = normalizeBOQUnitPriceRequest(BOQUnitPriceRequest{UnitPrice: 0}, true)
+	assertValidationError(t, err)
+	_, err = normalizeBOQItemRequest("project-id", Record{"category": "A", "work_item_name": "Item", "unit": "m2", "quantity": "2.5", "unit_price": "100"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = normalizeBOQItemRequest("project-id", Record{"category": "A", "work_item_name": "Item", "unit": "m2", "quantity": -1}, true)
+	assertValidationError(t, err)
+}
+
+func TestWorkflowFormPDFGeneratorProducesPDFWithSignatureStamp(t *testing.T) {
+	form := Record{
+		"instance": Record{
+			"id":               newID(),
+			"project_id":       newID(),
+			"work_item_id":     newID(),
+			"title":            "Biên bản họp kế hoạch",
+			"form_type":        "meeting_minutes",
+			"status":           "submitted",
+			"current_revision": 2,
+		},
+		"template": Record{"name": "Biên bản họp", "form_type": "meeting_minutes"},
+		"version":  Record{"version_no": 2},
+		"fields": []Record{
+			{"field_key": "summary", "label": "Nội dung", "order_index": 1},
+			{"field_key": "confirmed", "label": "Xác nhận", "order_index": 2},
+		},
+		"answers": Record{"summary": "Đã thống nhất kế hoạch tuần", "confirmed": true},
+		"signatures": []Record{{
+			"signer_name":            "Worker",
+			"purpose":                "internal_ack",
+			"signed_at":              "2026-06-21T10:00:00Z",
+			"payload_hash":           strings.Repeat("a", 64),
+			"visual_checksum_sha256": strings.Repeat("b", 64),
+			"payload_json": Record{
+				"visual_signature": Record{
+					"strokes": []any{
+						map[string]any{"points": []any{
+							map[string]any{"x": 0.1, "y": 0.7},
+							map[string]any{"x": 0.45, "y": 0.25},
+							map[string]any{"x": 0.9, "y": 0.6},
+						}},
+					},
+				},
+			},
+		}},
+	}
+	pdfBytes, payloadHash, err := GenerateWorkflowFormPDF(form)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-1.4")) {
+		t.Fatalf("expected PDF header, got %q", pdfBytes[:8])
+	}
+	if len(payloadHash) != 64 {
+		t.Fatalf("payload hash = %q, want 64 chars", payloadHash)
+	}
+	if !bytes.Contains(pdfBytes, []byte("SIGNED BY Worker")) {
+		t.Fatal("expected generated PDF to include visual signature stamp text")
 	}
 }
 
@@ -301,6 +438,61 @@ func TestActivityAttachmentReferencesAreScopedAndVisible(t *testing.T) {
 		Visibility:   "client",
 		Attachments:  []ActivityAttachmentRequest{{Type: "document", ID: documentID}},
 	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+}
+
+func TestWorkItemEvidenceUploadStoresProtectedFile(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	uploadDir := t.TempDir()
+	service.ConfigureUploads(uploadDir, 1024*1024)
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	content := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0, 'I', 'E', 'N', 'D'}
+	fileHeader := testMultipartFileHeader(t, "file", "site-photo.png", content)
+
+	evidence, err := service.AddWorkItemEvidenceUpload(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Ảnh hiện trường",
+		Caption:      "Trước khi nghiệm thu",
+		Visibility:   "project",
+	}, fileHeader, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if evidence["storage_provider"] != "local" {
+		t.Fatalf("storage_provider = %v, want local", evidence["storage_provider"])
+	}
+	storageKey := fmt.Sprint(evidence["storage_key"])
+	if storageKey == "" || strings.Contains(storageKey, "..") {
+		t.Fatalf("invalid storage_key = %q", storageKey)
+	}
+	sum := sha256.Sum256(content)
+	if got := fmt.Sprint(evidence["checksum_sha256"]); got != hex.EncodeToString(sum[:]) {
+		t.Fatalf("checksum = %s, want %s", got, hex.EncodeToString(sum[:]))
+	}
+	storedPath := filepath.Join(uploadDir, filepath.FromSlash(storageKey))
+	storedBytes, err := os.ReadFile(storedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(storedBytes, content) {
+		t.Fatalf("stored bytes = %v, want %v", storedBytes, content)
+	}
+
+	file, err := service.EvidenceFile(ctx, fmt.Sprint(evidence["id"]), fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file.Path != storedPath || file.MIMEType != "image/png" {
+		t.Fatalf("file result = %#v, want path %s and image/png", file, storedPath)
+	}
+	if !strings.HasSuffix(file.Filename, ".png") {
+		t.Fatalf("filename = %q, want .png suffix", file.Filename)
+	}
+
+	invalidHeader := testMultipartFileHeader(t, "file", "notes.txt", []byte("not an allowed evidence file"))
+	_, err = service.AddWorkItemEvidenceUpload(ctx, fixture.itemID, WorkItemEvidenceRequest{EvidenceType: "photo", Name: "Bad file"}, invalidHeader, fixture.workerID, "Worker")
 	assertValidationError(t, err)
 }
 
@@ -627,6 +819,48 @@ func openProjectOperationsTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
+func testMultipartFileHeader(t *testing.T, fieldName, filename string, content []byte) *multipart.FileHeader {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile(fieldName, filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/upload", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	if err := req.ParseMultipartForm(int64(body.Len()) + 1024); err != nil {
+		t.Fatal(err)
+	}
+	files := req.MultipartForm.File[fieldName]
+	if len(files) != 1 {
+		t.Fatalf("expected one multipart file for %s, got %d", fieldName, len(files))
+	}
+	return files[0]
+}
+
+func testSignatureRequest(comment string) WorkflowFormSignRequest {
+	return WorkflowFormSignRequest{
+		Purpose:               "internal_ack",
+		Comment:               comment,
+		SignatureImageDataURL: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+		SignatureStrokes: []WorkflowFormSignatureStroke{{
+			Points: []WorkflowFormSignaturePoint{
+				{X: 0.1, Y: 0.7},
+				{X: 0.35, Y: 0.25},
+				{X: 0.7, Y: 0.55},
+				{X: 0.9, Y: 0.3},
+			},
+		}},
+	}
+}
+
 func ensureRole(t *testing.T, db *sql.DB, name, displayName string) string {
 	t.Helper()
 	var id string
@@ -779,6 +1013,13 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 	projectID := newID()
 	stepOneID := newID()
 	stepTwoID := newID()
+	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "checklist", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if formVersionID == "" {
+		t.Fatal("expected default checklist form version")
+	}
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM pipeline_templates WHERE id=$1`, templateID)
@@ -792,10 +1033,10 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 		VALUES ($1,$2,'Survey','survey',1,'["PM"]'::jsonb)
 	`, nodeID, templateID)
 	mustExec(t, db, `
-		INSERT INTO pipeline_template_steps (id, node_id, name, step_type, required_role_ids, document_required, photo_required, order_index)
-		VALUES ($1,$2,'Upload survey','document_upload','["PM"]'::jsonb,false,false,1),
-		       ($3,$2,'Confirm survey','checklist','["PM"]'::jsonb,false,false,2)
-	`, stepOneID, nodeID, stepTwoID)
+		INSERT INTO pipeline_template_steps (id, node_id, name, step_type, required_role_ids, document_required, photo_required, form_version_id, form_required, order_index)
+		VALUES ($1,$2,'Upload survey','document_upload','["PM"]'::jsonb,false,false,$4,true,1),
+		       ($3,$2,'Confirm survey','checklist','["PM"]'::jsonb,false,false,$4,true,2)
+	`, stepOneID, nodeID, stepTwoID, formVersionID)
 	mustExec(t, db, `
 		INSERT INTO projects (id, name, code, client_name, status, pipeline_template_id)
 		VALUES ($1,'Ops Project',$2,'Client','draft',$3)
@@ -815,9 +1056,100 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_runs WHERE project_id=$1`, 1, projectID)
 	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_run_steps WHERE project_id=$1`, 2, projectID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='pipeline_run_step'`, 2, projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_instances WHERE project_id=$1`, 2, projectID)
+	nodes, _ := secondRun["nodes"].([]Record)
+	if len(nodes) == 0 {
+		t.Fatal("expected pipeline run nodes")
+	}
+	steps, _ := nodes[0]["steps"].([]Record)
+	if len(steps) != 2 {
+		t.Fatalf("steps = %#v", steps)
+	}
+	for _, step := range steps {
+		if cleanID(step["work_item_id"]) == "" || cleanID(step["workflow_form_instance_id"]) == "" {
+			t.Fatalf("expected enriched step contract, got %#v", step)
+		}
+		if step["workflow_form_status"] != "draft" || !boolValue(step["workflow_form_required"]) {
+			t.Fatalf("unexpected workflow form summary = %#v", step)
+		}
+	}
 }
 
-func TestGenerateProcurementFromBOQUsesApprovedItemsOnly(t *testing.T) {
+func TestWorkflowFormCatalogReturnsPublishedTemplates(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+
+	rows, err := repo.WorkflowFormCatalog(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) == 0 {
+		t.Fatal("expected workflow form catalog rows")
+	}
+
+	foundChecklist := false
+	for _, row := range rows {
+		if cleanID(row["version_id"]) == "" {
+			t.Fatalf("catalog row missing version_id: %#v", row)
+		}
+		if number(row["field_count"]) <= 0 {
+			t.Fatalf("catalog row missing fields: %#v", row)
+		}
+		if row["template_code"] == "builtin_checklist" {
+			foundChecklist = true
+			if number(row["version_no"]) != 2 {
+				t.Fatalf("expected checklist v2 in catalog, got %#v", row["version_no"])
+			}
+			if !containsString(stringSlice(row["required_field_keys"]), "checklist_items") {
+				t.Fatalf("expected checklist required fields, got %#v", row["required_field_keys"])
+			}
+		}
+	}
+	if !foundChecklist {
+		t.Fatal("expected builtin checklist in workflow form catalog")
+	}
+}
+
+func TestPublishTemplateRejectsRequiredStepWithoutPublishedForm(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+
+	actorID := newID()
+	templateID := newID()
+	nodeID := newID()
+	stepID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM pipeline_templates WHERE id=$1`, templateID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Test Actor','active')`, actorID, "ops-publish-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO pipeline_templates (id, name, status, created_by) VALUES ($1,'Invalid Form Template','draft',$2)`, templateID, actorID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_template_nodes (id, template_id, name, type, order_index, responsible_role_ids)
+		VALUES ($1,$2,'Survey','survey',1,'["PM"]'::jsonb)
+	`, nodeID, templateID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_template_steps (id, node_id, name, step_type, required_role_ids, form_required, order_index)
+		VALUES ($1,$2,'Required form step','task','["PM"]'::jsonb,true,1)
+	`, stepID, nodeID)
+
+	_, err := service.PublishTemplate(ctx, templateID, actorID, "actor@test.local")
+	assertValidationError(t, err)
+
+	row, err := repo.GetByID(ctx, "pipeline_templates", templateID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row["status"] != "draft" {
+		t.Fatalf("expected publish validation to keep draft status, got %#v", row["status"])
+	}
+}
+
+func TestGenerateProcurementFromBOQRequiresFinalLockedApprovedItems(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
 	repo := NewRepository(db)
@@ -842,6 +1174,16 @@ func TestGenerateProcurementFromBOQUsesApprovedItemsOnly(t *testing.T) {
 		       ($4,$2,'A','Submitted item','m2',100,10,'submitted',$3)
 	`, approvedBOQID, projectID, actorID, submittedBOQID)
 
+	_, err := repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, "actor@test.local")
+	assertValidationError(t, err)
+
+	if _, err := repo.LockBOQNormUnitPrice(ctx, approvedBOQID, 11, "norm locked", actorID, "actor@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.LockBOQFinalUnitPrice(ctx, approvedBOQID, 12, "final locked", actorID, "actor@test.local"); err != nil {
+		t.Fatal(err)
+	}
+
 	procurement, err := repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, "actor@test.local")
 	if err != nil {
 		t.Fatal(err)
@@ -850,6 +1192,7 @@ func TestGenerateProcurementFromBOQUsesApprovedItemsOnly(t *testing.T) {
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1`, 1, requestID)
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND boq_item_id=$2`, 1, requestID, approvedBOQID)
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND boq_item_id=$2`, 0, requestID, submittedBOQID)
+	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND boq_item_id=$2 AND estimated_unit_price=12 AND boq_price_source='final' AND boq_price_revision_no=2 AND boq_price_event_id IS NOT NULL`, 1, requestID, approvedBOQID)
 }
 
 func TestBatch7StockMovementGuardsWarehouseAndSiteBalances(t *testing.T) {
@@ -1215,6 +1558,448 @@ func TestWorkItemEvidenceRequiredBeforeReviewApprovalAndCompletion(t *testing.T)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='evidence_added'`, 1, completionFixture.itemID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='completed'`, 1, completionFixture.itemID)
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('work_item_evidence_added','work_item_completed')`, 2, completionFixture.projectID)
+}
+
+func TestWorkflowFormSubmitSatisfiesChecklistGate(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	service.ConfigureUploads(t.TempDir(), 1024*1024)
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	mustExec(t, db, `
+		UPDATE work_items
+		SET evidence_requirement_json='{"required_permission":"operation.report","checklist_required":true}'::jsonb
+		WHERE id=$1
+	`, fixture.itemID)
+	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "checklist", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if formVersionID == "" {
+		t.Fatal("expected default checklist form version")
+	}
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Checklist form', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := fmt.Sprint(instanceRows[0]["id"])
+
+	form, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{
+		Answers: Record{
+			"items_done": "Đã kiểm tra checklist",
+			"confirmed":  true,
+		},
+		Comment: "Hoàn tất checklist form",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, _ := form["instance"].(Record)
+	if instance["status"] != "submitted" {
+		t.Fatalf("form status = %#v", instance["status"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1`, 2, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='submitted'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_type='workflow_form_instance' AND target_id=$1`, 1, instanceID)
+
+	completed, err := service.WorkItemAction(ctx, fixture.itemID, "complete", WorkItemActionRequest{Comment: "done"}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed["status"] != "completed" {
+		t.Fatalf("work item status = %v, want completed", completed["status"])
+	}
+}
+
+func TestMeetingMinutesSubmitCreatesActionItemWorkItems(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "meeting_minutes", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if formVersionID == "" {
+		t.Fatal("expected default meeting minutes form version")
+	}
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Meeting minutes form', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := fmt.Sprint(instanceRows[0]["id"])
+
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{
+		Answers: Record{
+			"meeting_title": "Họp kickoff thiết kế",
+			"meeting_date":  "2026-06-30",
+			"chair":         "PM",
+			"attendees": []any{
+				map[string]any{"name": "Nguyễn A", "role": "PM", "attendance": "present"},
+			},
+			"agenda": "Chốt phạm vi thiết kế",
+			"decisions": []any{
+				map[string]any{"content": "Dùng phương án layout A", "owner": "Thiết kế", "target": "Bản vẽ"},
+			},
+			"action_items": []any{
+				map[string]any{"title": "Cập nhật bản vẽ layout A", "owner_role": "Thiết kế", "owner_name": "Nguyễn B", "due_date": "2026-07-02", "priority": "high", "description": "Gửi lại cho PM review"},
+			},
+			"confirmed": true,
+		},
+		Comment: "Submit biên bản họp",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='action_items'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='workflow_form_action_item' AND source_id=$2`, 1, fixture.projectID, instanceID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM work_item_assignments wia
+		JOIN work_items wi ON wi.id=wia.work_item_id
+		WHERE wi.source_type='workflow_form_action_item'
+		  AND wi.source_id=$1
+		  AND wia.assignment_type='role'
+		  AND wia.role_name='Thiết kế'
+	`, 1, instanceID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM work_item_activities wia
+		JOIN work_items wi ON wi.id=wia.work_item_id
+		WHERE wi.source_type='workflow_form_action_item'
+		  AND wi.source_id=$1
+		  AND wia.activity_type='created'
+	`, 1, instanceID)
+}
+
+func TestPlanningDailyReportSubmitCreatesNextPlanWorkItems(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "daily_report", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if formVersionID == "" {
+		t.Fatal("expected default daily report form version")
+	}
+	var versionNo int
+	if err := db.QueryRowContext(ctx, `SELECT version_no FROM workflow_form_versions WHERE id=$1`, formVersionID).Scan(&versionNo); err != nil {
+		t.Fatal(err)
+	}
+	if versionNo != 2 {
+		t.Fatalf("daily report form version = %d, want 2", versionNo)
+	}
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Planning daily report form', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := fmt.Sprint(instanceRows[0]["id"])
+
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{
+		Answers: Record{
+			"report_date":      "2026-07-01",
+			"reported_by":      "PM",
+			"planning_scope":   "design",
+			"progress_percent": 35,
+			"completed_items": []any{
+				map[string]any{"title": "Chốt scope thiết kế", "owner_role": "PM", "result": "done", "note": "Đã xong"},
+			},
+			"next_plan_items": []any{
+				map[string]any{"title": "Chuẩn bị bản vẽ concept", "owner_role": "Thiết kế", "owner_name": "Nguyễn B", "due_date": "2026-07-03", "priority": "high", "description": "Review cùng PM"},
+			},
+			"blockers": []any{
+				map[string]any{"content": "Chờ khách xác nhận vật liệu", "impact": "schedule", "owner_role": "PM", "target_date": "2026-07-02", "severity": "medium"},
+			},
+			"confirmed": true,
+		},
+		Comment: "Submit planning daily report",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='next_plan_items'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='blockers'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='workflow_form_action_item' AND source_id=$2`, 1, fixture.projectID, instanceID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM work_item_assignments wia
+		JOIN work_items wi ON wi.id=wia.work_item_id
+		WHERE wi.source_type='workflow_form_action_item'
+		  AND wi.source_id=$1
+		  AND wia.assignment_type='role'
+		  AND wia.role_name='Thiết kế'
+	`, 1, instanceID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM work_item_activities wia
+		JOIN work_items wi ON wi.id=wia.work_item_id
+		WHERE wi.source_type='workflow_form_action_item'
+		  AND wi.source_id=$1
+		  AND wia.activity_type='created'
+		  AND wia.comment='Next plan item generated from planning daily report'
+	`, 1, instanceID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM work_item_activities
+		WHERE work_item_id=$1
+		  AND activity_type='system_event'
+		  AND comment='Planning daily report generated 1 next plan work items'
+	`, 1, fixture.itemID)
+}
+
+func TestPlanningChecklistSubmitRequiresClearItemsAndValidEvidence(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "checklist", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if formVersionID == "" {
+		t.Fatal("expected default checklist form version")
+	}
+	var versionNo int
+	if err := db.QueryRowContext(ctx, `SELECT version_no FROM workflow_form_versions WHERE id=$1`, formVersionID).Scan(&versionNo); err != nil {
+		t.Fatal(err)
+	}
+	if versionNo != 2 {
+		t.Fatalf("checklist form version = %d, want 2", versionNo)
+	}
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "checklist",
+		Name:         "Checklist planning evidence",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidenceID := fmt.Sprint(evidence["id"])
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Planning checklist form', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := fmt.Sprint(instanceRows[0]["id"])
+
+	blockedAnswers := Record{
+		"check_date":     "2026-07-04",
+		"checked_by":     "PM",
+		"planning_scope": "design",
+		"checklist_items": []any{
+			map[string]any{
+				"title":         "Chốt layout concept",
+				"assignee_role": "Thiết kế",
+				"assignee_name": "Nguyễn B",
+				"status":        "needs_follow_up",
+				"due_date":      "2026-07-05",
+				"evidence_id":   evidenceID,
+				"comment":       "Cần cập nhật thêm",
+			},
+		},
+		"overall_comment": "Chưa đủ điều kiện submit",
+		"confirmed":       true,
+	}
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: blockedAnswers}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	invalidEvidenceAnswers := Record{
+		"check_date":     "2026-07-04",
+		"checked_by":     "PM",
+		"planning_scope": "design",
+		"checklist_items": []any{
+			map[string]any{
+				"title":         "Chốt layout concept",
+				"assignee_role": "Thiết kế",
+				"status":        "done",
+				"evidence_id":   newID(),
+			},
+		},
+		"confirmed": true,
+	}
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: invalidEvidenceAnswers}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	readyAnswers := Record{
+		"check_date":     "2026-07-04",
+		"checked_by":     "PM",
+		"planning_scope": "design",
+		"checklist_items": []any{
+			map[string]any{
+				"title":         "Chốt layout concept",
+				"assignee_role": "Thiết kế",
+				"assignee_name": "Nguyễn B",
+				"status":        "done",
+				"due_date":      "2026-07-05",
+				"evidence_id":   evidenceID,
+				"comment":       "Đã đối chiếu evidence",
+			},
+		},
+		"overall_comment": "Đủ điều kiện submit",
+		"confirmed":       true,
+	}
+	form, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: readyAnswers}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, _ := form["instance"].(Record)
+	if instance["status"] != "submitted" {
+		t.Fatalf("form status = %#v, want submitted", instance["status"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='checklist_items'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='submitted'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND completion_payload_json ? 'checklist_items'`, 1, fixture.itemID)
+}
+
+func TestWorkflowFormSignatureRequiresSubmittedFormAndIsImmutable(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "task", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if formVersionID == "" {
+		t.Fatal("expected default generic workflow form version")
+	}
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Generic submission form', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := fmt.Sprint(instanceRows[0]["id"])
+
+	_, err = service.SignWorkflowForm(ctx, instanceID, WorkflowFormSignRequest{Comment: "Ký khi chưa submit"}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{
+		Answers: Record{"summary": "Đã hoàn tất nội dung cần submit"},
+		Comment: "Submit để ký nội bộ",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	form, err := service.SignWorkflowForm(ctx, instanceID, testSignatureRequest("Đã kiểm tra và xác nhận nội bộ"), fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	signatures, ok := form["signatures"].([]Record)
+	if !ok || len(signatures) != 1 {
+		t.Fatalf("expected one signature, got %#v", form["signatures"])
+	}
+	signatureID := cleanID(signatures[0]["id"])
+	if signatureID == "" {
+		t.Fatalf("signature missing id: %#v", signatures[0])
+	}
+	if signatures[0]["purpose"] != "internal_ack" {
+		t.Fatalf("signature purpose = %#v, want internal_ack", signatures[0]["purpose"])
+	}
+	if hash := fmt.Sprint(signatures[0]["payload_hash"]); len(hash) != 64 {
+		t.Fatalf("payload_hash = %q, want 64 hex chars", hash)
+	}
+	if signatures[0]["visual_storage_provider"] != "local" || cleanID(signatures[0]["visual_storage_key"]) == "" {
+		t.Fatalf("visual storage missing: %#v", signatures[0])
+	}
+	if hash := fmt.Sprint(signatures[0]["visual_checksum_sha256"]); len(hash) != 64 {
+		t.Fatalf("visual_checksum_sha256 = %q, want 64 hex chars", hash)
+	}
+	visualFile, err := service.WorkflowFormSignatureVisual(ctx, signatureID, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if visualFile.MIMEType != "image/png" {
+		t.Fatalf("visual mime = %q, want image/png", visualFile.MIMEType)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='signed'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='system_event' AND metadata_json->>'signature_id'=$2`, 1, fixture.itemID, signatureID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_type='workflow_form_signature' AND target_id=$1 AND event_type='workflow_form_signed'`, 1, signatureID)
+
+	pdfForm, err := service.GenerateWorkflowFormPDFExport(ctx, instanceID, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pdfExports, ok := pdfForm["pdf_exports"].([]Record)
+	if !ok || len(pdfExports) != 1 {
+		t.Fatalf("expected one PDF export, got %#v", pdfForm["pdf_exports"])
+	}
+	pdfExportID := cleanID(pdfExports[0]["id"])
+	if pdfExportID == "" {
+		t.Fatalf("PDF export missing id: %#v", pdfExports[0])
+	}
+	if hash := fmt.Sprint(pdfExports[0]["checksum_sha256"]); len(hash) != 64 {
+		t.Fatalf("PDF checksum = %q, want 64 hex chars", hash)
+	}
+	pdfFile, err := service.WorkflowFormPDFExportFile(ctx, pdfExportID, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pdfBytes, err := os.ReadFile(pdfFile.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-1.4")) {
+		t.Fatalf("expected PDF bytes, got %q", pdfBytes[:8])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='pdf_exported'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_type='workflow_form_pdf_export' AND target_id=$1 AND event_type='workflow_form_pdf_exported'`, 1, pdfExportID)
+
+	_, err = service.SignWorkflowForm(ctx, instanceID, testSignatureRequest("Duplicate"), fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	if _, err := db.ExecContext(ctx, `UPDATE workflow_form_signatures SET comment='mutated' WHERE id=$1`, signatureID); err == nil {
+		t.Fatal("expected immutable workflow form signature update to fail")
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE workflow_form_pdf_exports SET title='mutated' WHERE id=$1`, pdfExportID); err == nil {
+		t.Fatal("expected immutable workflow form PDF export update to fail")
+	}
 }
 
 func TestWorkItemApprovalRequiresDecisionScope(t *testing.T) {

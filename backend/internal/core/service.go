@@ -1,10 +1,22 @@
 package core
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"math"
+	"mime/multipart"
+	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,13 +26,50 @@ import (
 )
 
 type Service struct {
-	repo      *Repository
-	jwtSecret string
-	streamHub *ActivityStreamHub
+	repo           *Repository
+	jwtSecret      string
+	streamHub      *ActivityStreamHub
+	uploadDir      string
+	maxUploadBytes int64
 }
 
 func NewService(repo *Repository, jwtSecret string) *Service {
-	return &Service{repo: repo, jwtSecret: jwtSecret, streamHub: NewActivityStreamHub()}
+	return &Service{
+		repo:           repo,
+		jwtSecret:      jwtSecret,
+		streamHub:      NewActivityStreamHub(),
+		uploadDir:      defaultUploadDir,
+		maxUploadBytes: defaultMaxUploadBytes,
+	}
+}
+
+const (
+	defaultUploadDir      = "uploads"
+	defaultMaxUploadBytes = int64(10 * 1024 * 1024)
+)
+
+type evidenceUploadMimeSpec struct {
+	Extension    string
+	EvidenceType string
+}
+
+var allowedEvidenceUploadMIMEs = map[string]evidenceUploadMimeSpec{
+	"image/jpeg":      {Extension: ".jpg", EvidenceType: "photo"},
+	"image/png":       {Extension: ".png", EvidenceType: "photo"},
+	"image/webp":      {Extension: ".webp", EvidenceType: "photo"},
+	"application/pdf": {Extension: ".pdf", EvidenceType: "document"},
+}
+
+func (s *Service) ConfigureUploads(uploadDir string, maxUploadBytes int64) {
+	uploadDir = strings.TrimSpace(uploadDir)
+	if uploadDir == "" {
+		uploadDir = defaultUploadDir
+	}
+	if maxUploadBytes <= 0 {
+		maxUploadBytes = defaultMaxUploadBytes
+	}
+	s.uploadDir = uploadDir
+	s.maxUploadBytes = maxUploadBytes
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (Record, error) {
@@ -142,6 +191,13 @@ func (s *Service) DeleteTemplate(ctx context.Context, id string) error {
 }
 
 func (s *Service) PublishTemplate(ctx context.Context, id, actorID, actorName string) (Record, error) {
+	issues, err := s.repo.TemplatePublishFormIssues(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(issues) > 0 {
+		return nil, validationError("Template có step bắt buộc workflow form nhưng chưa map form published", Record{"issues": issues})
+	}
 	template, err := s.repo.QueryOne(ctx, `UPDATE pipeline_templates SET status='published', updated_at=now() WHERE id=$1 RETURNING *`, id)
 	if err != nil {
 		return nil, err
@@ -152,6 +208,79 @@ func (s *Service) PublishTemplate(ctx context.Context, id, actorID, actorName st
 
 func (s *Service) CloneTemplate(ctx context.Context, id, actorID string) (Record, error) {
 	return s.repo.CloneTemplate(ctx, id, actorID)
+}
+
+func (s *Service) WorkflowFormCatalog(ctx context.Context) ([]Record, error) {
+	return s.repo.WorkflowFormCatalog(ctx)
+}
+
+func (s *Service) CreateTemplateStep(ctx context.Context, body Record) (Record, error) {
+	if err := s.applyTemplateStepFormDefaults(ctx, body, nil); err != nil {
+		return nil, err
+	}
+	return s.repo.Insert(ctx, "pipeline_template_steps", templateStepColumns(), body)
+}
+
+func (s *Service) UpdateTemplateStep(ctx context.Context, id string, body Record) (Record, error) {
+	current, err := s.repo.GetByID(ctx, "pipeline_template_steps", id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.applyTemplateStepFormDefaults(ctx, body, current); err != nil {
+		return nil, err
+	}
+	return s.repo.Update(ctx, "pipeline_template_steps", templateStepColumns(), id, body)
+}
+
+func (s *Service) applyTemplateStepFormDefaults(ctx context.Context, body Record, current Record) error {
+	if body == nil {
+		return nil
+	}
+	stepType := "task"
+	if current != nil {
+		stepType = strings.TrimSpace(fmt.Sprint(current["step_type"]))
+	}
+	if raw, ok := body["step_type"]; ok {
+		stepType = strings.TrimSpace(fmt.Sprint(raw))
+	}
+	if stepType == "" || stepType == "<nil>" {
+		stepType = "task"
+	}
+	checklistRequired := true
+	if current != nil {
+		checklistRequired = boolValue(current["checklist_required"])
+	}
+	if raw, ok := body["checklist_required"]; ok {
+		checklistRequired = boolValue(raw)
+	}
+	formRequired := workflowFormRequiredForStep(stepType, checklistRequired)
+	if raw, ok := body["form_required"]; ok {
+		formRequired = boolValue(raw)
+	} else {
+		body["form_required"] = formRequired
+	}
+	_, formVersionProvided := body["form_version_id"]
+	if !formVersionProvided && cleanID(current["form_version_id"]) != "" {
+		return nil
+	}
+	if formVersionProvided && cleanID(body["form_version_id"]) != "" {
+		return nil
+	}
+	if !formRequired {
+		return nil
+	}
+	formVersionID, err := s.repo.DefaultWorkflowFormVersionID(ctx, stepType, checklistRequired)
+	if err != nil {
+		return err
+	}
+	if formVersionID != "" {
+		body["form_version_id"] = formVersionID
+	}
+	return nil
+}
+
+func workflowFormRequiredForStep(stepType string, checklistRequired bool) bool {
+	return checklistRequired || statusIn(stepType, "daily_report", "meeting_minutes", "checklist", "acceptance_check", "handover_check")
 }
 
 func (s *Service) StartPipeline(ctx context.Context, projectID, templateID, actorID, actorName string) (Record, error) {
@@ -271,6 +400,228 @@ func (s *Service) WorkItemDetail(ctx context.Context, workItemID, actorID string
 		return nil, err
 	}
 	return s.repo.GetWorkItemDetail(ctx, workItemID, profileIsClient(profile) && !profile.IsManager)
+}
+
+func (s *Service) WorkItemForm(ctx context.Context, workItemID, actorID string) (Record, error) {
+	allowed, err := s.repo.CanViewWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền xem workflow form này")
+	}
+	form, err := s.repo.GetWorkflowFormForWorkItem(ctx, workItemID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Record{"available": false}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	form["available"] = true
+	return form, nil
+}
+
+func (s *Service) SaveWorkflowFormDraft(ctx context.Context, instanceID string, req WorkflowFormSaveRequest, actorID, actorName string) (Record, error) {
+	return s.saveWorkflowForm(ctx, instanceID, req, false, actorID, actorName)
+}
+
+func (s *Service) SubmitWorkflowForm(ctx context.Context, instanceID string, req WorkflowFormSaveRequest, actorID, actorName string) (Record, error) {
+	return s.saveWorkflowForm(ctx, instanceID, req, true, actorID, actorName)
+}
+
+func (s *Service) SignWorkflowForm(ctx context.Context, instanceID string, req WorkflowFormSignRequest, actorID, actorName string) (Record, error) {
+	if !validActivityUUID(instanceID) {
+		return nil, validationError("workflow_form_instance_id không hợp lệ", Record{"workflow_form_instance_id": instanceID})
+	}
+	purpose := strings.TrimSpace(req.Purpose)
+	if purpose == "" {
+		purpose = "internal_ack"
+	}
+	if !validWorkflowSignaturePurpose(purpose) {
+		return nil, validationError("Mục đích ký workflow form không hợp lệ", Record{"purpose": purpose})
+	}
+	comment := strings.TrimSpace(req.Comment)
+	if len([]rune(comment)) > 1000 {
+		return nil, validationError("Ghi chú chữ ký không được vượt quá 1000 ký tự")
+	}
+	form, err := s.repo.GetWorkflowFormInstanceDetail(ctx, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	instance, _ := form["instance"].(Record)
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return nil, validationError("Workflow form phải được submit trước khi ký nội bộ", Record{"status": instance["status"]})
+	}
+	workItemID := cleanID(instance["work_item_id"])
+	if workItemID == "" {
+		return nil, validationError("Workflow form chưa liên kết work item", Record{"workflow_form_instance_id": instanceID})
+	}
+	allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền ký workflow form này")
+	}
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+		return nil, err
+	}
+	imageBytes, imageMIME, err := parseSignatureImageDataURL(req.SignatureImageDataURL)
+	if err != nil {
+		return nil, err
+	}
+	strokes, err := validateSignatureStrokes(req.SignatureStrokes)
+	if err != nil {
+		return nil, err
+	}
+	storageKey := path.Join("workflow-signatures", cleanID(instance["project_id"]), instanceID, uuid.NewString()+".png")
+	visualFile, storedPath, err := s.storeGeneratedFile(storageKey, imageBytes, imageMIME)
+	if err != nil {
+		return nil, err
+	}
+	signedForm, err := s.repo.SignWorkflowForm(ctx, instanceID, purpose, comment, visualFile, strokes, actorID, actorName)
+	if err != nil {
+		_ = os.Remove(storedPath)
+		return nil, err
+	}
+	return signedForm, nil
+}
+
+func validWorkflowSignaturePurpose(purpose string) bool {
+	return statusIn(purpose, "internal_ack", "prepared_by", "reviewed_by", "approved_by", "received_by")
+}
+
+func (s *Service) GenerateWorkflowFormPDFExport(ctx context.Context, instanceID, actorID, actorName string) (Record, error) {
+	if !validActivityUUID(instanceID) {
+		return nil, validationError("workflow_form_instance_id không hợp lệ", Record{"workflow_form_instance_id": instanceID})
+	}
+	form, err := s.repo.GetWorkflowFormInstanceDetail(ctx, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	instance, _ := form["instance"].(Record)
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return nil, validationError("Workflow form phải được submit trước khi export PDF", Record{"status": instance["status"]})
+	}
+	workItemID := cleanID(instance["work_item_id"])
+	projectID := cleanID(instance["project_id"])
+	if workItemID == "" || projectID == "" {
+		return nil, validationError("Workflow form chưa liên kết work item", Record{"workflow_form_instance_id": instanceID})
+	}
+	allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền export PDF workflow form này")
+	}
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+		return nil, err
+	}
+	pdfBytes, payloadHash, err := GenerateWorkflowFormPDF(form)
+	if err != nil {
+		return nil, err
+	}
+	revisionNo := int(number(instance["current_revision"]))
+	fileName := workflowFormPDFFileName(form, revisionNo)
+	storageKey := path.Join("workflow-form-pdfs", projectID, instanceID, uuid.NewString()+".pdf")
+	pdfFile, storedPath, err := s.storeGeneratedFile(storageKey, pdfBytes, "application/pdf")
+	if err != nil {
+		return nil, err
+	}
+	exportedForm, err := s.repo.CreateWorkflowFormPDFExport(ctx, instanceID, fileName, fmt.Sprint(instance["title"]), pdfFile, payloadHash, actorID, actorName)
+	if err != nil {
+		_ = os.Remove(storedPath)
+		return nil, err
+	}
+	return exportedForm, nil
+}
+
+func (s *Service) WorkflowFormSignatureVisual(ctx context.Context, signatureID, actorID string) (EvidenceFileResult, error) {
+	signatureID = cleanID(signatureID)
+	if !validActivityUUID(signatureID) {
+		return EvidenceFileResult{}, validationError("signature_id không hợp lệ", Record{"signature_id": signatureID})
+	}
+	signature, err := s.repo.GetWorkflowFormSignatureDetail(ctx, signatureID)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	allowed, err := s.repo.CanViewWorkItem(ctx, cleanID(signature["work_item_id"]), actorID)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	if !allowed {
+		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem chữ ký này")
+	}
+	return s.storedFileResult(signature, "visual_storage_key", "visual_mime_type", signatureVisualFilename(signature))
+}
+
+func (s *Service) WorkflowFormPDFExportFile(ctx context.Context, exportID, actorID string) (EvidenceFileResult, error) {
+	exportID = cleanID(exportID)
+	if !validActivityUUID(exportID) {
+		return EvidenceFileResult{}, validationError("pdf_export_id không hợp lệ", Record{"pdf_export_id": exportID})
+	}
+	export, err := s.repo.GetWorkflowFormPDFExportDetail(ctx, exportID)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	allowed, err := s.repo.CanViewWorkItem(ctx, cleanID(export["work_item_id"]), actorID)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	if !allowed {
+		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem PDF workflow form này")
+	}
+	return s.storedFileResult(export, "storage_key", "mime_type", fmt.Sprint(export["file_name"]))
+}
+
+func (s *Service) saveWorkflowForm(ctx context.Context, instanceID string, req WorkflowFormSaveRequest, submit bool, actorID, actorName string) (Record, error) {
+	if !validActivityUUID(instanceID) {
+		return nil, validationError("workflow_form_instance_id không hợp lệ", Record{"workflow_form_instance_id": instanceID})
+	}
+	form, err := s.repo.GetWorkflowFormInstanceDetail(ctx, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	instance, _ := form["instance"].(Record)
+	workItemID := cleanID(instance["work_item_id"])
+	if workItemID == "" {
+		return nil, validationError("Workflow form chưa liên kết work item", Record{"workflow_form_instance_id": instanceID})
+	}
+	allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền thao tác workflow form này")
+	}
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+		return nil, err
+	}
+	if submit && statusIn(fmt.Sprint(instance["status"]), "submitted", "cancelled") {
+		return nil, validationError("Trạng thái workflow form không cho phép submit", Record{"status": instance["status"]})
+	}
+	if !submit && statusIn(fmt.Sprint(instance["status"]), "submitted", "cancelled") {
+		return nil, validationError("Trạng thái workflow form không cho phép lưu nháp", Record{"status": instance["status"]})
+	}
+	fields, _ := form["fields"].([]Record)
+	normalized, err := s.validateWorkflowFormAnswers(ctx, instance, fields, req.Answers, submit)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.SaveWorkflowForm(ctx, instanceID, normalized, strings.TrimSpace(req.Comment), submit, actorID, actorName)
 }
 
 func (s *Service) WorkItemAction(ctx context.Context, workItemID, action string, req WorkItemActionRequest, actorID, actorName string) (Record, error) {
@@ -415,7 +766,349 @@ func (s *Service) AddWorkItemEvidence(ctx context.Context, workItemID string, re
 	if err != nil {
 		return nil, err
 	}
+	if normalized.StorageKey != "" {
+		return nil, validationError("Evidence storage nội bộ chỉ được tạo qua endpoint upload")
+	}
 	return s.repo.AddWorkItemEvidence(ctx, item, normalized, actorID, actorName)
+}
+
+func (s *Service) AddWorkItemEvidenceUpload(ctx context.Context, workItemID string, req WorkItemEvidenceRequest, fileHeader *multipart.FileHeader, actorID, actorName string) (Record, error) {
+	allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền thêm evidence cho work item này")
+	}
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+		return nil, err
+	}
+	storedPath, normalized, err := s.storeEvidenceUpload(item, req, fileHeader)
+	if err != nil {
+		return nil, err
+	}
+	evidence, err := s.repo.AddWorkItemEvidence(ctx, item, normalized, actorID, actorName)
+	if err != nil {
+		_ = os.Remove(storedPath)
+		return nil, err
+	}
+	return evidence, nil
+}
+
+type EvidenceFileResult struct {
+	Path     string
+	MIMEType string
+	Filename string
+}
+
+func (s *Service) EvidenceFile(ctx context.Context, evidenceID, actorID string) (EvidenceFileResult, error) {
+	evidenceID = cleanID(evidenceID)
+	if !validActivityUUID(evidenceID) {
+		return EvidenceFileResult{}, validationError("evidence_id không hợp lệ", Record{"evidence_id": evidenceID})
+	}
+	evidence, err := s.repo.GetEvidenceDetail(ctx, evidenceID)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	allowed, err := s.repo.CanViewWorkItem(ctx, cleanID(evidence["work_item_id"]), actorID)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	if !allowed {
+		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem file evidence này")
+	}
+	if fmt.Sprint(evidence["storage_provider"]) != "local" || cleanID(evidence["storage_key"]) == "" {
+		return EvidenceFileResult{}, validationError("Evidence này chưa có file nội bộ được bảo vệ", Record{"evidence_id": evidenceID})
+	}
+	root, err := filepath.Abs(s.uploadDir)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	filePath, err := safeStoragePath(root, fmt.Sprint(evidence["storage_key"]))
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	info, err := os.Stat(filePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return EvidenceFileResult{}, validationError("File evidence không còn tồn tại trong storage", Record{"evidence_id": evidenceID})
+		}
+		return EvidenceFileResult{}, err
+	}
+	if info.IsDir() {
+		return EvidenceFileResult{}, validationError("Đường dẫn evidence không hợp lệ", Record{"evidence_id": evidenceID})
+	}
+	mimeType := strings.TrimSpace(fmt.Sprint(evidence["mime_type"]))
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	return EvidenceFileResult{
+		Path:     filePath,
+		MIMEType: mimeType,
+		Filename: evidenceDownloadName(evidence),
+	}, nil
+}
+
+func (s *Service) storeEvidenceUpload(item Record, req WorkItemEvidenceRequest, fileHeader *multipart.FileHeader) (string, WorkItemEvidenceRequest, error) {
+	if fileHeader == nil {
+		return "", req, validationError("File evidence là bắt buộc")
+	}
+	if fileHeader.Size <= 0 {
+		return "", req, validationError("File evidence không được rỗng")
+	}
+	if fileHeader.Size > s.maxUploadBytes {
+		return "", req, validationError("File evidence vượt quá dung lượng cho phép", Record{"max_bytes": s.maxUploadBytes})
+	}
+	source, err := fileHeader.Open()
+	if err != nil {
+		return "", req, err
+	}
+	defer source.Close()
+
+	header := make([]byte, 512)
+	n, readErr := io.ReadFull(source, header)
+	if readErr != nil && !errors.Is(readErr, io.ErrUnexpectedEOF) && !errors.Is(readErr, io.EOF) {
+		return "", req, readErr
+	}
+	detectedMIME := http.DetectContentType(header[:n])
+	spec, ok := allowedEvidenceUploadMIMEs[detectedMIME]
+	if !ok {
+		return "", req, validationError("Định dạng evidence không được hỗ trợ", Record{"mime_type": detectedMIME})
+	}
+	requestedType := strings.TrimSpace(req.EvidenceType)
+	if requestedType != "" && requestedType != spec.EvidenceType {
+		return "", req, validationError("Loại evidence không khớp với định dạng file", Record{"evidence_type": requestedType, "mime_type": detectedMIME})
+	}
+	if requestedType == "" {
+		req.EvidenceType = spec.EvidenceType
+	}
+	originalName := cleanUploadFilename(fileHeader.Filename)
+	if strings.TrimSpace(req.Name) == "" {
+		req.Name = originalName
+	}
+	if strings.TrimSpace(req.Title) == "" {
+		req.Title = req.Name
+	}
+	req.MIMEType = detectedMIME
+	req.FileSize = fileHeader.Size
+	req.StorageProvider = "local"
+	req.StorageKey = path.Join("evidence", cleanID(item["project_id"]), cleanID(item["id"]), uuid.NewString()+spec.Extension)
+	if req.Payload == nil {
+		req.Payload = Record{}
+	}
+	req.Payload["original_filename"] = originalName
+	req.Payload["detected_mime_type"] = detectedMIME
+
+	normalized, err := validateWorkItemEvidenceRequest(req)
+	if err != nil {
+		return "", req, err
+	}
+	root, err := filepath.Abs(s.uploadDir)
+	if err != nil {
+		return "", req, err
+	}
+	fullPath, err := safeStoragePath(root, normalized.StorageKey)
+	if err != nil {
+		return "", normalized, err
+	}
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0o750); err != nil {
+		return "", normalized, err
+	}
+	destination, err := os.OpenFile(fullPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
+	if err != nil {
+		return "", normalized, err
+	}
+	cleanup := true
+	defer func() {
+		_ = destination.Close()
+		if cleanup {
+			_ = os.Remove(fullPath)
+		}
+	}()
+
+	hasher := sha256.New()
+	reader := io.MultiReader(bytes.NewReader(header[:n]), source)
+	written, err := io.Copy(io.MultiWriter(destination, hasher), reader)
+	if err != nil {
+		return "", normalized, err
+	}
+	if written != fileHeader.Size {
+		return "", normalized, validationError("Kích thước file evidence không khớp dữ liệu upload", Record{"expected": fileHeader.Size, "written": written})
+	}
+	normalized.ChecksumSHA256 = hex.EncodeToString(hasher.Sum(nil))
+	cleanup = false
+	return fullPath, normalized, nil
+}
+
+func (s *Service) storeGeneratedFile(storageKey string, content []byte, mimeType string) (StoredFileMetadata, string, error) {
+	if len(content) == 0 {
+		return StoredFileMetadata{}, "", validationError("File generated không được rỗng")
+	}
+	root, err := filepath.Abs(s.uploadDir)
+	if err != nil {
+		return StoredFileMetadata{}, "", err
+	}
+	fullPath, err := safeStoragePath(root, storageKey)
+	if err != nil {
+		return StoredFileMetadata{}, "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0o750); err != nil {
+		return StoredFileMetadata{}, "", err
+	}
+	destination, err := os.OpenFile(fullPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
+	if err != nil {
+		return StoredFileMetadata{}, "", err
+	}
+	cleanup := true
+	defer func() {
+		_ = destination.Close()
+		if cleanup {
+			_ = os.Remove(fullPath)
+		}
+	}()
+	hasher := sha256.New()
+	written, err := io.Copy(io.MultiWriter(destination, hasher), bytes.NewReader(content))
+	if err != nil {
+		return StoredFileMetadata{}, "", err
+	}
+	if written != int64(len(content)) {
+		return StoredFileMetadata{}, "", validationError("Kích thước generated file không khớp dữ liệu ghi", Record{"expected": len(content), "written": written})
+	}
+	cleanup = false
+	return StoredFileMetadata{
+		StorageProvider: "local",
+		StorageKey:      storageKey,
+		MIMEType:        mimeType,
+		FileSize:        int64(len(content)),
+		ChecksumSHA256:  hex.EncodeToString(hasher.Sum(nil)),
+	}, fullPath, nil
+}
+
+func (s *Service) storedFileResult(record Record, storageKeyField, mimeField, filename string) (EvidenceFileResult, error) {
+	storageKey := strings.TrimSpace(fmt.Sprint(record[storageKeyField]))
+	if storageKey == "" || storageKey == "<nil>" {
+		return EvidenceFileResult{}, validationError("File protected chưa có storage key")
+	}
+	root, err := filepath.Abs(s.uploadDir)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	filePath, err := safeStoragePath(root, storageKey)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	info, err := os.Stat(filePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return EvidenceFileResult{}, validationError("File protected không còn tồn tại trong storage")
+		}
+		return EvidenceFileResult{}, err
+	}
+	if info.IsDir() {
+		return EvidenceFileResult{}, validationError("Đường dẫn protected file không hợp lệ")
+	}
+	mimeType := strings.TrimSpace(fmt.Sprint(record[mimeField]))
+	if mimeType == "" || mimeType == "<nil>" {
+		mimeType = "application/octet-stream"
+	}
+	return EvidenceFileResult{Path: filePath, MIMEType: mimeType, Filename: cleanUploadFilename(filename)}, nil
+}
+
+func parseSignatureImageDataURL(value string) ([]byte, string, error) {
+	value = strings.TrimSpace(value)
+	const prefix = "data:image/png;base64,"
+	if !strings.HasPrefix(value, prefix) {
+		return nil, "", validationError("Chữ ký tay cần là PNG data URL")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(value, prefix))
+	if err != nil {
+		return nil, "", validationError("Dữ liệu ảnh chữ ký không hợp lệ")
+	}
+	if len(decoded) < 16 {
+		return nil, "", validationError("Ảnh chữ ký quá nhỏ hoặc rỗng")
+	}
+	if len(decoded) > 1024*1024 {
+		return nil, "", validationError("Ảnh chữ ký vượt quá dung lượng cho phép", Record{"max_bytes": 1024 * 1024})
+	}
+	pngHeader := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}
+	if !bytes.HasPrefix(decoded, pngHeader) {
+		return nil, "", validationError("Ảnh chữ ký phải là PNG hợp lệ")
+	}
+	return decoded, "image/png", nil
+}
+
+func validateSignatureStrokes(strokes []WorkflowFormSignatureStroke) ([]WorkflowFormSignatureStroke, error) {
+	if len(strokes) == 0 {
+		return nil, validationError("Cần nét ký tay trước khi ký workflow form")
+	}
+	if len(strokes) > 80 {
+		return nil, validationError("Chữ ký có quá nhiều nét", Record{"max_strokes": 80})
+	}
+	totalPoints := 0
+	out := make([]WorkflowFormSignatureStroke, 0, len(strokes))
+	for _, stroke := range strokes {
+		points := make([]WorkflowFormSignaturePoint, 0, len(stroke.Points))
+		for _, point := range stroke.Points {
+			if math.IsNaN(point.X) || math.IsNaN(point.Y) || math.IsInf(point.X, 0) || math.IsInf(point.Y, 0) {
+				return nil, validationError("Tọa độ chữ ký không hợp lệ")
+			}
+			if point.X < 0 || point.X > 1 || point.Y < 0 || point.Y > 1 {
+				return nil, validationError("Tọa độ chữ ký nằm ngoài canvas")
+			}
+			points = append(points, WorkflowFormSignaturePoint{X: point.X, Y: point.Y})
+		}
+		if len(points) >= 2 {
+			totalPoints += len(points)
+			out = append(out, WorkflowFormSignatureStroke{Points: points})
+		}
+	}
+	if totalPoints < 2 {
+		return nil, validationError("Cần nét ký tay trước khi ký workflow form")
+	}
+	if totalPoints > 2000 {
+		return nil, validationError("Chữ ký có quá nhiều điểm", Record{"max_points": 2000})
+	}
+	return out, nil
+}
+
+func workflowFormPDFFileName(form Record, revisionNo int) string {
+	instance, _ := form["instance"].(Record)
+	title := cleanUploadFilename(fmt.Sprintf("%s-rev-%d.pdf", slugText(fmt.Sprint(instance["title"])), revisionNo))
+	if title == "evidence-file" || title == ".pdf" {
+		return fmt.Sprintf("workflow-form-rev-%d.pdf", revisionNo)
+	}
+	return title
+}
+
+func signatureVisualFilename(signature Record) string {
+	name := slugText(fmt.Sprintf("%s-%s", signature["signer_name"], signature["purpose"]))
+	if name == "" {
+		name = "workflow-signature"
+	}
+	return name + ".png"
+}
+
+func slugText(value string) string {
+	value = strings.ToLower(asciiFold(value))
+	var builder strings.Builder
+	lastDash := false
+	for _, char := range value {
+		allowed := (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9')
+		if allowed {
+			builder.WriteRune(char)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			builder.WriteByte('-')
+			lastDash = true
+		}
+	}
+	return strings.Trim(builder.String(), "-")
 }
 
 func (s *Service) AddWorkItemActivity(ctx context.Context, workItemID string, req WorkItemActivityRequest, actorID, actorName string) (Record, error) {
@@ -930,11 +1623,17 @@ func validateWorkItemEvidenceRequest(req WorkItemEvidenceRequest) (WorkItemEvide
 	req.Description = strings.TrimSpace(req.Description)
 	req.FileURL = strings.TrimSpace(req.FileURL)
 	req.MIMEType = strings.TrimSpace(req.MIMEType)
+	req.StorageProvider = strings.TrimSpace(req.StorageProvider)
+	req.StorageKey = strings.TrimSpace(req.StorageKey)
+	req.ChecksumSHA256 = strings.ToLower(strings.TrimSpace(req.ChecksumSHA256))
 	req.Caption = strings.TrimSpace(req.Caption)
 	req.RevisionNo = strings.TrimSpace(req.RevisionNo)
 	req.Visibility = strings.TrimSpace(req.Visibility)
 	if req.Visibility == "" {
 		req.Visibility = "internal"
+	}
+	if req.StorageProvider == "" {
+		req.StorageProvider = "external"
 	}
 	if req.Payload == nil {
 		req.Payload = Record{}
@@ -946,6 +1645,16 @@ func validateWorkItemEvidenceRequest(req WorkItemEvidenceRequest) (WorkItemEvide
 	validVisibility := map[string]bool{"internal": true, "project": true, "client": true}
 	if !validVisibility[req.Visibility] {
 		return req, validationError("Visibility evidence không hợp lệ", Record{"visibility": req.Visibility})
+	}
+	validStorageProvider := map[string]bool{"external": true, "local": true}
+	if !validStorageProvider[req.StorageProvider] {
+		return req, validationError("Storage provider evidence không hợp lệ", Record{"storage_provider": req.StorageProvider})
+	}
+	if req.StorageKey != "" && req.StorageProvider != "local" {
+		return req, validationError("storage_key chỉ hợp lệ với local storage", Record{"storage_provider": req.StorageProvider})
+	}
+	if req.ChecksumSHA256 != "" && !validSHA256Hex(req.ChecksumSHA256) {
+		return req, validationError("Checksum evidence không hợp lệ", Record{"checksum_sha256": req.ChecksumSHA256})
 	}
 	if req.Name == "" {
 		req.Name = req.Title
@@ -959,10 +1668,507 @@ func validateWorkItemEvidenceRequest(req WorkItemEvidenceRequest) (WorkItemEvide
 	if req.FileSize < 0 {
 		return req, validationError("Kích thước file không hợp lệ")
 	}
-	if statusIn(req.EvidenceType, "document", "photo", "link") && req.FileURL == "" && req.DocumentID == "" {
-		return req, validationError("Evidence dạng document/photo/link cần file_url hoặc document_id", Record{"evidence_type": req.EvidenceType})
+	if statusIn(req.EvidenceType, "document", "photo", "link") && req.FileURL == "" && req.DocumentID == "" && req.StorageKey == "" {
+		return req, validationError("Evidence dạng document/photo/link cần file_url, document_id hoặc file upload", Record{"evidence_type": req.EvidenceType})
 	}
 	return req, nil
+}
+
+func validSHA256Hex(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, char := range value {
+		if (char < '0' || char > '9') && (char < 'a' || char > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func safeStoragePath(root, storageKey string) (string, error) {
+	if strings.TrimSpace(storageKey) == "" {
+		return "", validationError("storage_key evidence là bắt buộc")
+	}
+	if filepath.IsAbs(storageKey) {
+		return "", validationError("storage_key evidence không hợp lệ")
+	}
+	cleanKey := filepath.Clean(filepath.FromSlash(storageKey))
+	if cleanKey == "." || cleanKey == ".." || strings.HasPrefix(cleanKey, ".."+string(os.PathSeparator)) {
+		return "", validationError("storage_key evidence không hợp lệ")
+	}
+	fullPath := filepath.Join(root, cleanKey)
+	absPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		return "", err
+	}
+	if absPath != root && !strings.HasPrefix(absPath, root+string(os.PathSeparator)) {
+		return "", validationError("storage_key evidence vượt khỏi storage root")
+	}
+	return absPath, nil
+}
+
+func cleanUploadFilename(filename string) string {
+	name := filepath.Base(strings.TrimSpace(filename))
+	if name == "" || name == "." || name == "<nil>" || name == string(filepath.Separator) {
+		return "evidence-file"
+	}
+	return strings.Trim(name, " \t\r\n")
+}
+
+func evidenceDownloadName(evidence Record) string {
+	name := cleanUploadFilename(fmt.Sprint(evidence["name"]))
+	storageKey := fmt.Sprint(evidence["storage_key"])
+	extension := filepath.Ext(storageKey)
+	if filepath.Ext(name) == "" && extension != "" {
+		name += extension
+	}
+	return name
+}
+
+func (s *Service) validateWorkflowFormAnswers(ctx context.Context, instance Record, fields []Record, answers Record, submit bool) (Record, error) {
+	if answers == nil {
+		answers = Record{}
+	}
+	fieldByKey := map[string]Record{}
+	for _, field := range fields {
+		fieldByKey[fmt.Sprint(field["field_key"])] = field
+	}
+	for key := range answers {
+		if _, ok := fieldByKey[key]; !ok {
+			return nil, validationError("Workflow form có field không thuộc schema", Record{"field": key})
+		}
+	}
+	normalized := Record{}
+	missing := []string{}
+	fieldErrors := Record{}
+	for _, field := range fields {
+		key := fmt.Sprint(field["field_key"])
+		value, hasValue := answers[key]
+		required := boolValue(field["required"])
+		if submit && required && workflowFormValueEmpty(field, value) {
+			missing = append(missing, key)
+			fieldErrors[key] = fmt.Sprintf("%s là bắt buộc", field["label"])
+			continue
+		}
+		if !hasValue || workflowFormValueEmpty(field, value) {
+			continue
+		}
+		normalizedValue, err := s.normalizeWorkflowFormValue(ctx, instance, field, value)
+		if err != nil {
+			fieldErrors[key] = err.Error()
+			continue
+		}
+		normalized[key] = normalizedValue
+	}
+	if len(fieldErrors) > 0 {
+		return nil, validationError("Workflow form có dữ liệu không hợp lệ", Record{"fields": fieldErrors, "missing": missing})
+	}
+	if submit && fmt.Sprint(instance["form_type"]) == "checklist" {
+		if err := validateChecklistSubmitReady(normalized); err != nil {
+			return nil, err
+		}
+	}
+	return normalized, nil
+}
+
+func workflowFormValueEmpty(field Record, value any) bool {
+	fieldType := fmt.Sprint(field["field_type"])
+	switch v := value.(type) {
+	case nil:
+		return true
+	case string:
+		return strings.TrimSpace(v) == ""
+	case []any:
+		return len(v) == 0
+	case []string:
+		return len(v) == 0
+	case []Record:
+		return len(v) == 0
+	case bool:
+		return fieldType == "checkbox" && !v
+	default:
+		text := strings.TrimSpace(fmt.Sprint(v))
+		return text == "" || text == "<nil>"
+	}
+}
+
+func (s *Service) normalizeWorkflowFormValue(ctx context.Context, instance Record, field Record, value any) (any, error) {
+	fieldType := fmt.Sprint(field["field_type"])
+	switch fieldType {
+	case "text", "textarea":
+		text := strings.TrimSpace(fmt.Sprint(value))
+		if err := validateWorkflowTextLength(field, text); err != nil {
+			return nil, err
+		}
+		return text, nil
+	case "number":
+		numeric, err := workflowNumberValue(value)
+		if err != nil {
+			return nil, err
+		}
+		return numeric, validateWorkflowNumberRange(field, numeric)
+	case "date":
+		text := strings.TrimSpace(fmt.Sprint(value))
+		if _, err := time.Parse("2006-01-02", text); err != nil {
+			return nil, errors.New("Ngày không hợp lệ")
+		}
+		return text, nil
+	case "select":
+		text := strings.TrimSpace(fmt.Sprint(value))
+		if text == "" {
+			return nil, errors.New("Lựa chọn không hợp lệ")
+		}
+		if !workflowOptionAllowed(field, text) {
+			return nil, errors.New("Lựa chọn không nằm trong schema")
+		}
+		return text, nil
+	case "multi_select":
+		values, err := workflowStringList(value)
+		if err != nil {
+			return nil, err
+		}
+		for _, selected := range values {
+			if !workflowOptionAllowed(field, selected) {
+				return nil, errors.New("Lựa chọn không nằm trong schema")
+			}
+		}
+		return values, nil
+	case "checkbox":
+		checked, ok := value.(bool)
+		if !ok {
+			return nil, errors.New("Giá trị checkbox phải là boolean")
+		}
+		return checked, nil
+	case "evidence_reference":
+		evidenceID := cleanID(value)
+		if evidenceID == "" {
+			return nil, errors.New("Evidence không hợp lệ")
+		}
+		evidence, err := s.repo.GetEvidenceDetail(ctx, evidenceID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, errors.New("Evidence không tồn tại")
+			}
+			return nil, err
+		}
+		if cleanID(evidence["project_id"]) != cleanID(instance["project_id"]) {
+			return nil, errors.New("Evidence không thuộc công trình này")
+		}
+		if workItemID := cleanID(instance["work_item_id"]); workItemID != "" && cleanID(evidence["work_item_id"]) != workItemID {
+			return nil, errors.New("Evidence không thuộc work item này")
+		}
+		if fmt.Sprint(evidence["status"]) == "rejected" {
+			return nil, errors.New("Evidence đã bị reject")
+		}
+		return evidenceID, nil
+	case "structured_list":
+		return s.normalizeWorkflowStructuredList(ctx, instance, field, value)
+	default:
+		return nil, errors.New("Loại field không được hỗ trợ")
+	}
+}
+
+func validateChecklistSubmitReady(answers Record) error {
+	rawItems, ok := answers["checklist_items"]
+	if !ok {
+		return nil
+	}
+	items, err := workflowRecordList(rawItems)
+	if err != nil {
+		return err
+	}
+	blocking := []Record{}
+	for index, item := range items {
+		status := strings.TrimSpace(fmt.Sprint(item["status"]))
+		if !statusIn(status, "done", "not_applicable") {
+			blocking = append(blocking, Record{
+				"row":    index + 1,
+				"title":  item["title"],
+				"status": status,
+			})
+		}
+	}
+	if len(blocking) == 0 {
+		return nil
+	}
+	return validationError("Checklist còn hạng mục chưa đạt, chỉ được submit khi tất cả item là Done hoặc N/A", Record{
+		"fields":         Record{"checklist_items": "Tất cả checklist item phải là Done hoặc N/A trước khi submit"},
+		"blocking_items": blocking,
+	})
+}
+
+func (s *Service) normalizeWorkflowStructuredList(ctx context.Context, instance Record, field Record, value any) ([]Record, error) {
+	items, err := workflowRecordList(value)
+	if err != nil {
+		return nil, err
+	}
+	validation, _ := field["validation_json"].(map[string]any)
+	minItems := int(number(validation["min_items"]))
+	maxItems := int(number(validation["max_items"]))
+	if minItems > 0 && len(items) < minItems {
+		return nil, fmt.Errorf("%s cần ít nhất %d dòng", field["label"], minItems)
+	}
+	if maxItems > 0 && len(items) > maxItems {
+		return nil, fmt.Errorf("%s không được vượt quá %d dòng", field["label"], maxItems)
+	}
+	rawFields, _ := validation["item_fields"].([]any)
+	if len(rawFields) == 0 {
+		return items, nil
+	}
+	itemFields := make([]Record, 0, len(rawFields))
+	fieldByKey := map[string]Record{}
+	for _, rawField := range rawFields {
+		spec, ok := rawField.(map[string]any)
+		if !ok {
+			continue
+		}
+		key := strings.TrimSpace(fmt.Sprint(spec["key"]))
+		if key == "" || key == "<nil>" {
+			continue
+		}
+		record := Record(spec)
+		itemFields = append(itemFields, record)
+		fieldByKey[key] = record
+	}
+	out := make([]Record, 0, len(items))
+	for index, item := range items {
+		for key := range item {
+			if _, ok := fieldByKey[key]; !ok {
+				return nil, fmt.Errorf("%s dòng %d có field không thuộc schema: %s", field["label"], index+1, key)
+			}
+		}
+		normalized := Record{}
+		for _, spec := range itemFields {
+			key := fmt.Sprint(spec["key"])
+			label := fmt.Sprint(spec["label"])
+			if label == "" || label == "<nil>" {
+				label = key
+			}
+			value, hasValue := item[key]
+			required := boolValue(spec["required"])
+			if required && structuredValueEmpty(spec, value) {
+				return nil, fmt.Errorf("%s dòng %d: %s là bắt buộc", field["label"], index+1, label)
+			}
+			if !hasValue || structuredValueEmpty(spec, value) {
+				continue
+			}
+			normalizedValue, err := s.normalizeStructuredFieldValue(ctx, instance, spec, value)
+			if err != nil {
+				return nil, fmt.Errorf("%s dòng %d: %s", field["label"], index+1, err.Error())
+			}
+			normalized[key] = normalizedValue
+		}
+		if len(normalized) > 0 {
+			out = append(out, normalized)
+		}
+	}
+	if minItems > 0 && len(out) < minItems {
+		return nil, fmt.Errorf("%s cần ít nhất %d dòng hợp lệ", field["label"], minItems)
+	}
+	return out, nil
+}
+
+func workflowRecordList(value any) ([]Record, error) {
+	rawItems, ok := value.([]any)
+	if !ok {
+		if records, ok := value.([]Record); ok {
+			return records, nil
+		}
+		return nil, errors.New("Giá trị danh sách phải là array")
+	}
+	items := make([]Record, 0, len(rawItems))
+	for _, raw := range rawItems {
+		item, ok := raw.(map[string]any)
+		if !ok {
+			return nil, errors.New("Mỗi dòng trong danh sách phải là object")
+		}
+		items = append(items, Record(item))
+	}
+	return items, nil
+}
+
+func structuredValueEmpty(field Record, value any) bool {
+	if value == nil {
+		return true
+	}
+	fieldType := fmt.Sprint(field["type"])
+	if fieldType == "checkbox" {
+		return value != true
+	}
+	if values, ok := value.([]any); ok {
+		return len(values) == 0
+	}
+	return strings.TrimSpace(fmt.Sprint(value)) == "" || strings.TrimSpace(fmt.Sprint(value)) == "<nil>"
+}
+
+func (s *Service) normalizeStructuredFieldValue(ctx context.Context, instance Record, field Record, value any) (any, error) {
+	fieldType := fmt.Sprint(field["type"])
+	label := fmt.Sprint(field["label"])
+	if label == "" || label == "<nil>" {
+		label = fmt.Sprint(field["key"])
+	}
+	switch fieldType {
+	case "text", "textarea":
+		text := strings.TrimSpace(fmt.Sprint(value))
+		if min := int(number(field["min_length"])); min > 0 && len([]rune(text)) < min {
+			return nil, fmt.Errorf("%s phải có ít nhất %d ký tự", label, min)
+		}
+		if max := int(number(field["max_length"])); max > 0 && len([]rune(text)) > max {
+			return nil, fmt.Errorf("%s không được vượt quá %d ký tự", label, max)
+		}
+		return text, nil
+	case "date":
+		text := strings.TrimSpace(fmt.Sprint(value))
+		if _, err := time.Parse("2006-01-02", text); err != nil {
+			return nil, fmt.Errorf("%s không hợp lệ", label)
+		}
+		return text, nil
+	case "select":
+		text := strings.TrimSpace(fmt.Sprint(value))
+		if text == "" {
+			return nil, fmt.Errorf("%s không hợp lệ", label)
+		}
+		if !structuredOptionAllowed(field, text) {
+			return nil, fmt.Errorf("%s không nằm trong schema", label)
+		}
+		return text, nil
+	case "evidence_reference":
+		evidenceID := cleanID(value)
+		if evidenceID == "" {
+			return nil, fmt.Errorf("%s không hợp lệ", label)
+		}
+		evidence, err := s.repo.GetEvidenceDetail(ctx, evidenceID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, fmt.Errorf("%s không tồn tại", label)
+			}
+			return nil, err
+		}
+		if cleanID(evidence["project_id"]) != cleanID(instance["project_id"]) {
+			return nil, fmt.Errorf("%s không thuộc công trình này", label)
+		}
+		if workItemID := cleanID(instance["work_item_id"]); workItemID != "" && cleanID(evidence["work_item_id"]) != workItemID {
+			return nil, fmt.Errorf("%s không thuộc work item này", label)
+		}
+		if fmt.Sprint(evidence["status"]) == "rejected" {
+			return nil, fmt.Errorf("%s đã bị reject", label)
+		}
+		return evidenceID, nil
+	default:
+		return nil, fmt.Errorf("Loại field %s không được hỗ trợ", fieldType)
+	}
+}
+
+func structuredOptionAllowed(field Record, selected string) bool {
+	rawOptions, _ := field["options"].([]any)
+	if len(rawOptions) == 0 {
+		return true
+	}
+	for _, raw := range rawOptions {
+		switch option := raw.(type) {
+		case string:
+			if option == selected {
+				return true
+			}
+		case map[string]any:
+			if strings.TrimSpace(fmt.Sprint(option["value"])) == selected {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func validateWorkflowTextLength(field Record, text string) error {
+	validation, _ := field["validation_json"].(map[string]any)
+	if min := int(number(validation["min_length"])); min > 0 && len([]rune(text)) < min {
+		return fmt.Errorf("%s phải có ít nhất %d ký tự", field["label"], min)
+	}
+	if max := int(number(validation["max_length"])); max > 0 && len([]rune(text)) > max {
+		return fmt.Errorf("%s không được vượt quá %d ký tự", field["label"], max)
+	}
+	return nil
+}
+
+func workflowNumberValue(value any) (float64, error) {
+	switch v := value.(type) {
+	case int:
+		return float64(v), nil
+	case int64:
+		return float64(v), nil
+	case float64:
+		return v, nil
+	case float32:
+		return float64(v), nil
+	case string:
+		out, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+		if err != nil {
+			return 0, errors.New("Giá trị phải là số")
+		}
+		return out, nil
+	default:
+		return 0, errors.New("Giá trị phải là số")
+	}
+}
+
+func validateWorkflowNumberRange(field Record, numeric float64) error {
+	validation, _ := field["validation_json"].(map[string]any)
+	if minValue, ok := validation["min"]; ok && numeric < number(minValue) {
+		return fmt.Errorf("%s phải lớn hơn hoặc bằng %v", field["label"], minValue)
+	}
+	if maxValue, ok := validation["max"]; ok && numeric > number(maxValue) {
+		return fmt.Errorf("%s phải nhỏ hơn hoặc bằng %v", field["label"], maxValue)
+	}
+	return nil
+}
+
+func workflowStringList(value any) ([]string, error) {
+	switch v := value.(type) {
+	case []string:
+		out := make([]string, 0, len(v))
+		seen := map[string]bool{}
+		for _, item := range v {
+			text := strings.TrimSpace(item)
+			if text == "" || seen[text] {
+				continue
+			}
+			seen[text] = true
+			out = append(out, text)
+		}
+		return out, nil
+	case []any:
+		out := make([]string, 0, len(v))
+		seen := map[string]bool{}
+		for _, item := range v {
+			text := strings.TrimSpace(fmt.Sprint(item))
+			if text == "" || text == "<nil>" || seen[text] {
+				continue
+			}
+			seen[text] = true
+			out = append(out, text)
+		}
+		return out, nil
+	default:
+		return nil, errors.New("Giá trị phải là danh sách")
+	}
+}
+
+func workflowOptionAllowed(field Record, value string) bool {
+	options, _ := field["options_json"].([]any)
+	if len(options) == 0 {
+		return true
+	}
+	for _, rawOption := range options {
+		option, _ := rawOption.(map[string]any)
+		if strings.TrimSpace(fmt.Sprint(option["value"])) == value {
+			return true
+		}
+		if option == nil && strings.TrimSpace(fmt.Sprint(rawOption)) == value {
+			return true
+		}
+	}
+	return false
 }
 
 func workItemActionComment(req WorkItemActionRequest) string {
@@ -1006,7 +2212,13 @@ func (s *Service) missingRequiredEvidence(ctx context.Context, item Record, req 
 		missing = append(missing, "photo")
 	}
 	if boolValue(requirement["checklist_required"]) && counts["checklist"] == 0 && !hasChecklistPayload(req.CompletionPayload) {
-		missing = append(missing, "checklist")
+		submittedForm, err := s.repo.HasSubmittedWorkflowFormForWorkItem(ctx, fmt.Sprint(item["id"]))
+		if err != nil {
+			return nil, err
+		}
+		if !submittedForm {
+			missing = append(missing, "checklist")
+		}
 	}
 	return missing, nil
 }
@@ -1181,6 +2393,150 @@ func approvalStatusForAction(action string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func (s *Service) ProjectBOQ(ctx context.Context, projectID string) ([]Record, error) {
+	if cleanID(projectID) == "" {
+		return nil, validationError("project_id không hợp lệ", Record{"project_id": projectID})
+	}
+	return s.repo.ListProjectBOQ(ctx, projectID)
+}
+
+func (s *Service) CreateBOQ(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
+	normalized, err := normalizeBOQItemRequest(projectID, body, true)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.CreateBOQItem(ctx, normalized, actorID, actorName)
+}
+
+func (s *Service) UpdateBOQ(ctx context.Context, itemID string, body Record, actorID, actorName string) (Record, error) {
+	if cleanID(itemID) == "" {
+		return nil, validationError("boq_item_id không hợp lệ", Record{"boq_item_id": itemID})
+	}
+	normalized, err := normalizeBOQItemRequest("", body, false)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.UpdateBOQItem(ctx, itemID, normalized, actorID, actorName)
+}
+
+func (s *Service) UpdateBOQExpectedUnitPrice(ctx context.Context, itemID string, req BOQUnitPriceRequest, actorID, actorName string) (Record, error) {
+	unitPrice, comment, err := normalizeBOQUnitPriceRequest(req, false)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.UpdateBOQExpectedUnitPrice(ctx, itemID, unitPrice, comment, actorID, actorName)
+}
+
+func (s *Service) LockBOQNormUnitPrice(ctx context.Context, itemID string, req BOQUnitPriceRequest, actorID, actorName string) (Record, error) {
+	unitPrice, comment, err := normalizeBOQUnitPriceRequest(req, true)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.LockBOQNormUnitPrice(ctx, itemID, unitPrice, comment, actorID, actorName)
+}
+
+func (s *Service) LockBOQFinalUnitPrice(ctx context.Context, itemID string, req BOQUnitPriceRequest, actorID, actorName string) (Record, error) {
+	unitPrice, comment, err := normalizeBOQUnitPriceRequest(req, true)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.LockBOQFinalUnitPrice(ctx, itemID, unitPrice, comment, actorID, actorName)
+}
+
+func normalizeBOQUnitPriceRequest(req BOQUnitPriceRequest, lock bool) (float64, string, error) {
+	if math.IsNaN(req.UnitPrice) || math.IsInf(req.UnitPrice, 0) {
+		return 0, "", validationError("Đơn giá không hợp lệ")
+	}
+	if lock && req.UnitPrice <= 0 {
+		return 0, "", validationError("Đơn giá lock phải lớn hơn 0")
+	}
+	if !lock && req.UnitPrice < 0 {
+		return 0, "", validationError("Expected unit price không được âm")
+	}
+	comment := strings.TrimSpace(req.Comment)
+	if len([]rune(comment)) > 1000 {
+		return 0, "", validationError("Ghi chú đơn giá không được vượt quá 1000 ký tự")
+	}
+	return req.UnitPrice, comment, nil
+}
+
+func normalizeBOQItemRequest(projectID string, body Record, create bool) (Record, error) {
+	out := Record{}
+	if projectID != "" {
+		if cleanID(projectID) == "" {
+			return nil, validationError("project_id không hợp lệ", Record{"project_id": projectID})
+		}
+		out["project_id"] = projectID
+	}
+	textFields := map[string]int{
+		"category":       120,
+		"work_item_name": 180,
+		"description":    2000,
+		"unit":           40,
+	}
+	for field, maxLen := range textFields {
+		value, ok := body[field]
+		if !ok {
+			continue
+		}
+		text := strings.TrimSpace(fmt.Sprint(value))
+		if len([]rune(text)) > maxLen {
+			return nil, validationError("Dữ liệu BOQ vượt quá độ dài cho phép", Record{"field": field, "max_length": maxLen})
+		}
+		out[field] = text
+	}
+	if create {
+		for _, field := range []string{"category", "work_item_name", "unit"} {
+			if strings.TrimSpace(fmt.Sprint(out[field])) == "" {
+				return nil, validationError("Dòng BOQ thiếu dữ liệu bắt buộc", Record{"field": field})
+			}
+		}
+	}
+	if value, ok := body["quantity"]; ok {
+		quantity, err := workflowNumberValue(value)
+		if err != nil {
+			return nil, validationError("Khối lượng BOQ phải là số")
+		}
+		if quantity < 0 {
+			return nil, validationError("Khối lượng BOQ không được âm")
+		}
+		out["quantity"] = quantity
+	} else if create {
+		out["quantity"] = float64(0)
+	}
+	priceValue, hasExpected := body["expected_unit_price"]
+	if !hasExpected {
+		priceValue, hasExpected = body["unit_price"]
+	}
+	if hasExpected {
+		price, err := workflowNumberValue(priceValue)
+		if err != nil {
+			return nil, validationError("Expected unit price phải là số")
+		}
+		if price < 0 {
+			return nil, validationError("Expected unit price không được âm")
+		}
+		out["expected_unit_price"] = price
+	} else if create {
+		out["expected_unit_price"] = float64(0)
+	}
+	for _, field := range []string{"material_id", "node_id", "approved_by"} {
+		if value, ok := body[field]; ok {
+			out[field] = cleanID(value)
+		}
+	}
+	if value, ok := body["status"]; ok {
+		status := strings.TrimSpace(fmt.Sprint(value))
+		if !statusIn(status, "draft", "submitted", "approved", "revised", "deleted") {
+			return nil, validationError("Trạng thái BOQ không hợp lệ", Record{"status": status})
+		}
+		out["status"] = status
+	} else if create {
+		out["status"] = "draft"
+	}
+	return out, nil
 }
 
 func (s *Service) GenerateProcurementFromBOQ(ctx context.Context, projectID, actorID, actorName string) (Record, error) {

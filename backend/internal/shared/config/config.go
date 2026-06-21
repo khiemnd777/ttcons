@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strconv"
+)
 
 type Config struct {
 	Port           string
@@ -10,6 +13,8 @@ type Config struct {
 	FrontendOrigin string
 	MigrationsDir  string
 	AutoMigrate    bool
+	UploadDir      string
+	MaxUploadBytes int64
 }
 
 func Load() Config {
@@ -21,6 +26,8 @@ func Load() Config {
 		FrontendOrigin: getenv("FRONTEND_ORIGIN", "http://localhost:5173"),
 		MigrationsDir:  getenv("MIGRATIONS_DIR", "migrations"),
 		AutoMigrate:    getenv("AUTO_MIGRATE", "true") != "false",
+		UploadDir:      getenv("UPLOAD_DIR", "uploads"),
+		MaxUploadBytes: getenvInt64("MAX_UPLOAD_BYTES", 10*1024*1024),
 	}
 }
 
@@ -29,4 +36,16 @@ func getenv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func getenvInt64(key string, fallback int64) int64 {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }

@@ -40,6 +40,7 @@ func main() {
 
 	app := fiber.New(fiber.Config{
 		AppName:      "consflow",
+		BodyLimit:    int(cfg.MaxUploadBytes + 1024*1024),
 		ErrorHandler: core.ErrorHandler,
 	})
 	app.Use(cors.New(cors.Config{

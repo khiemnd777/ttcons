@@ -13,6 +13,8 @@ import { useToast } from '../../components/ToastProvider';
 import type { ActivityPayload, EvidenceRecord, WorkItem, WorkItemActivity } from '../../lib/types/domain';
 import { ActivityAttachments } from './ActivityAttachments';
 import { ActivityComposer, type ActivityAttachmentOption } from './ActivityComposer';
+import { EvidencePanel } from './EvidencePanel';
+import { WorkflowFormPanel } from './WorkflowFormPanel';
 import {
   actionDescriptions,
   actionLabels,
@@ -22,7 +24,6 @@ import {
   availableActions,
   compactDateTime,
   departmentLabel,
-  evidenceLabel,
   priorityLabel,
   isWorkOverdue,
   numberValue,
@@ -200,27 +201,10 @@ export function WorkItemDetailDialog({
             </div>
           </section>
 
+          <WorkflowFormPanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
+
           <div className="grid gap-4 xl:grid-cols-2">
-            <section>
-              <h3 className="mb-2 text-sm font-semibold text-ink">Evidence</h3>
-              {evidence.length ? (
-                <div className="space-y-2">
-                  {evidence.map((record) => (
-                    <div key={record.id} className="rounded-md border border-line px-3 py-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-ink">{record.name ?? record.title ?? record.document_name}</p>
-                          <p className="mt-1 text-xs text-slate-500">{evidenceLabel(record.evidence_type)} · {visibilityLabel(record.visibility ?? 'project')} · {compactDateTime(record.created_at)}</p>
-                        </div>
-                        <StatusBadge status={record.status} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="Chưa có evidence cho work item này" />
-              )}
-            </section>
+            <EvidencePanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
             <section>
               <h3 className="mb-2 text-sm font-semibold text-ink">Activity</h3>
               <ActivityComposer

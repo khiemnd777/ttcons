@@ -3,16 +3,24 @@ import clsx from 'clsx';
 import { ChevronDown, GripVertical, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { Dialog } from '../../../components/Dialog';
 import { EnumChip } from '../../../components/EnumChip';
-import type { PipelineNode } from '../../../lib/types/domain';
+import type { PipelineNode, WorkflowFormCatalogItem } from '../../../lib/types/domain';
 import { enumOptions } from '../../../lib/utils/status';
 
 const roleOptions = ['PM', 'QS', 'Thiết kế', 'Giám sát', 'Kế toán', 'Thủ kho', 'QA/QC', 'Giám đốc', 'Chủ đầu tư', 'Mua hàng', 'Đội thi công'];
 const nodeTypes = ['survey', 'design', 'boq', 'budget_approval', 'procurement', 'warehouse_issue', 'construction', 'acceptance', 'rework', 'replanning', 'handover', 'financial_closure', 'custom'];
-const stepTypes = ['task', 'checklist', 'approval', 'document_upload', 'photo_upload', 'budget_check', 'material_check', 'acceptance_check', 'accounting_check'];
+const stepTypes = ['task', 'checklist', 'approval', 'document_upload', 'photo_upload', 'budget_check', 'material_check', 'daily_report', 'meeting_minutes', 'acceptance_check', 'handover_check', 'accounting_check'];
 
 type SelectOption = string | { label: string; value: string };
 type StepDialogMode = 'add' | 'edit' | null;
 type StepDropPosition = 'before' | 'after';
+type DropdownMode = 'overlay' | 'inline';
+type StepForm = {
+  name: string;
+  step_type: string;
+  required_role_ids: string[];
+  form_required: boolean;
+  form_version_id: string;
+};
 
 type NodeInspectorPanelProps = {
   node: PipelineNode;
@@ -20,15 +28,20 @@ type NodeInspectorPanelProps = {
   permissionOptions: SelectOption[];
   permissionsLoading: boolean;
   stepDialogMode: StepDialogMode;
-  stepForm: { name: string; step_type: string; responsible_role_id: string };
+  stepForm: StepForm;
   stepNameInvalid: boolean;
+  stepRolesInvalid: boolean;
+  stepFormInvalid: boolean;
   savePending: boolean;
   addStepPending: boolean;
   updateStepPending: boolean;
   deleteStepPending: boolean;
   reorderStepPending: boolean;
+  workflowForms: WorkflowFormCatalogItem[];
+  workflowFormsLoading: boolean;
+  workflowFormsError: boolean;
   onChangeField: (field: string, value: unknown) => void;
-  onChangeStepField: (field: 'name' | 'step_type' | 'responsible_role_id', value: string) => void;
+  onChangeStepField: (field: keyof StepForm, value: string | string[] | boolean) => void;
   onSave: () => void;
   onClose: () => void;
   onOpenAddStep: () => void;
@@ -47,11 +60,16 @@ export function NodeInspectorPanel({
   stepDialogMode,
   stepForm,
   stepNameInvalid,
+  stepRolesInvalid,
+  stepFormInvalid,
   savePending,
   addStepPending,
   updateStepPending,
   deleteStepPending,
   reorderStepPending,
+  workflowForms,
+  workflowFormsLoading,
+  workflowFormsError,
   onChangeField,
   onChangeStepField,
   onSave,
@@ -78,6 +96,8 @@ export function NodeInspectorPanel({
   }, [node.steps]);
   const stepIds = useMemo(() => sortedSteps.map((step: Record<string, any>) => (step.id ? String(step.id) : '')).filter(Boolean), [sortedSteps]);
   const canReorderSteps = stepIds.length > 1 && !stepActionPending;
+  const formByVersionId = useMemo(() => new Map(workflowForms.map((form) => [String(form.version_id), form])), [workflowForms]);
+  const selectedStepForm = stepForm.form_version_id ? formByVersionId.get(stepForm.form_version_id) : undefined;
 
   const resetStepDragState = () => {
     setDraggedStepId('');
@@ -170,6 +190,7 @@ export function NodeInspectorPanel({
               {sortedSteps.length ? sortedSteps.map((step: Record<string, any>, index: number) => {
                 const stepId = step.id ? String(step.id) : '';
                 const stepRoles = Array.isArray(step.required_role_ids) ? step.required_role_ids.join(', ') : '';
+                const stepWorkflowForm = step.form_version_id ? formByVersionId.get(String(step.form_version_id)) : undefined;
                 const canDragStep = Boolean(stepId) && canReorderSteps;
                 const isDropTarget = Boolean(stepId) && dropTargetStepId === stepId && draggedStepId !== stepId;
                 return (
@@ -209,6 +230,17 @@ export function NodeInspectorPanel({
                         <div className="mt-1 flex flex-wrap gap-1">
                           <EnumChip group="step_type" value={step.step_type} />
                           <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{stepRoles || 'Chưa gán role'}</span>
+                          {stepWorkflowForm ? (
+                            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                              {stepWorkflowForm.template_name} v{stepWorkflowForm.version_no}{step.form_required ? ' · Required' : ' · Optional'}
+                            </span>
+                          ) : step.form_version_id ? (
+                            <span className={clsx('rounded-md px-2 py-0.5 text-xs font-semibold', workflowFormsLoading ? 'bg-slate-100 text-slate-600' : 'bg-amber-50 text-amber-700')}>
+                              {workflowFormsLoading ? 'Đang tải workflow form' : workflowFormsError ? 'Không tải được workflow form' : 'Workflow form không còn active'}
+                            </span>
+                          ) : step.form_required ? (
+                            <span className="rounded-md bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700">Thiếu workflow form</span>
+                          ) : null}
                         </div>
                       </div>
                       {stepId ? (
@@ -257,7 +289,33 @@ export function NodeInspectorPanel({
         <div className="space-y-4">
           <Field label="Tên" value={stepForm.name} onChange={(value) => onChangeStepField('name', value)} invalid={stepNameInvalid} />
           <Select label="Loại" value={stepForm.step_type} options={enumOptions('step_type', stepTypes)} onChange={(value) => onChangeStepField('step_type', value)} />
-          <Select label="Role phụ trách" value={stepForm.responsible_role_id} options={roleOptions} onChange={(value) => onChangeStepField('responsible_role_id', value)} />
+          <MultiSelect
+            label="Role phụ trách"
+            value={stepForm.required_role_ids}
+            options={roleOptions}
+            invalid={stepRolesInvalid}
+            emptyText="Chưa gán role phụ trách"
+            loadingPlaceholder="Đang tải roles..."
+            searchPlaceholder="Gõ để tìm role"
+            fullPlaceholder="Đã chọn hết roles"
+            openButtonTitle="Mở danh sách roles"
+            noResultsText="Không tìm thấy role phù hợp"
+            invalidText="Chọn ít nhất một role phụ trách"
+            removeTitle={(role) => `Bỏ ${role}`}
+            dropdownMode="inline"
+            onChange={(value) => onChangeStepField('required_role_ids', value)}
+          />
+          <WorkflowFormSelect
+            value={stepForm.form_version_id}
+            required={stepForm.form_required}
+            invalid={stepFormInvalid}
+            forms={workflowForms}
+            loading={workflowFormsLoading}
+            error={workflowFormsError}
+            selectedForm={selectedStepForm}
+            onRequiredChange={(value) => onChangeStepField('form_required', value)}
+            onChange={(value) => onChangeStepField('form_version_id', value)}
+          />
         </div>
       </Dialog>
     </>
@@ -310,6 +368,140 @@ function PermissionSelect({
   loading: boolean;
   onChange: (value: string[]) => void;
 }) {
+  return (
+    <MultiSelect
+      label={label}
+      value={value}
+      options={options}
+      loading={loading}
+      emptyText="Không giới hạn permission riêng"
+      loadingPlaceholder="Đang tải permissions..."
+      searchPlaceholder="Gõ để tìm permission"
+      fullPlaceholder="Đã chọn hết permissions"
+      openButtonTitle="Mở danh sách permissions"
+      noResultsText="Không tìm thấy permission phù hợp"
+      removeTitle={(permission) => `Bỏ ${permission}`}
+      onChange={onChange}
+    />
+  );
+}
+
+function WorkflowFormSelect({
+  value,
+  required,
+  invalid,
+  forms,
+  loading,
+  error,
+  selectedForm,
+  onRequiredChange,
+  onChange,
+}: {
+  value: string;
+  required: boolean;
+  invalid: boolean;
+  forms: WorkflowFormCatalogItem[];
+  loading: boolean;
+  error: boolean;
+  selectedForm?: WorkflowFormCatalogItem;
+  onRequiredChange: (value: boolean) => void;
+  onChange: (value: string) => void;
+}) {
+  const disabled = loading || error || !forms.length;
+  const requiredFields = requiredFieldLabels(selectedForm);
+  return (
+    <section className="rounded-md border border-line bg-slate-50 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Workflow Form</h3>
+        </div>
+        <label className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-700">
+          <input type="checkbox" className="h-4 w-4 rounded border-line" checked={required} onChange={(event) => onRequiredChange(event.target.checked)} />
+          Bắt buộc
+        </label>
+      </div>
+      <label className="mt-3 block">
+        <span className="text-xs font-semibold text-slate-600">Form template/version</span>
+        <select
+          className={clsx(
+            'mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring disabled:bg-slate-100',
+            invalid ? 'border-rose-300 bg-rose-50' : 'border-line bg-white',
+          )}
+          value={value ?? ''}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+        >
+          <option value="">{workflowFormEmptyLabel({ required, loading, error, hasForms: forms.length > 0 })}</option>
+          {forms.map((form) => (
+            <option key={form.version_id} value={form.version_id}>
+              {formOptionLabel(form)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {selectedForm ? (
+        <div className="mt-2 rounded-md border border-line bg-white px-3 py-2 text-xs text-slate-600">
+          <p className="font-semibold text-slate-700">{selectedForm.field_count ?? 0} fields · {requiredFields.length ? `Required: ${requiredFields.join(', ')}` : 'Không có field bắt buộc'}</p>
+          <p className="mt-1">{selectedForm.template_description || selectedForm.form_type}</p>
+        </div>
+      ) : null}
+      {invalid ? <p className="mt-2 text-xs font-medium text-rose-600">Chọn workflow form cho step bắt buộc.</p> : null}
+      {error ? <p className="mt-2 text-xs font-medium text-rose-600">Không tải được workflow form catalog.</p> : null}
+      {!loading && !error && !forms.length ? <p className="mt-2 text-xs font-medium text-amber-700">Chưa có published workflow form.</p> : null}
+    </section>
+  );
+}
+
+function workflowFormEmptyLabel({ required, loading, error, hasForms }: { required: boolean; loading: boolean; error: boolean; hasForms: boolean }) {
+  if (loading) return 'Đang tải workflow form...';
+  if (error) return 'Không tải được workflow form';
+  if (!hasForms) return 'Chưa có published workflow form';
+  return required ? 'Chọn workflow form' : 'Không gắn workflow form';
+}
+
+function formOptionLabel(form: WorkflowFormCatalogItem) {
+  return `${form.template_name} · v${form.version_no} · ${form.form_type}`;
+}
+
+function requiredFieldLabels(form?: WorkflowFormCatalogItem) {
+  if (!form) return [];
+  const labelByKey = new Map((form.fields ?? []).map((field) => [field.field_key, field.label || field.field_key]));
+  return (Array.isArray(form.required_field_keys) ? form.required_field_keys : []).map((fieldKey) => labelByKey.get(fieldKey) ?? fieldKey);
+}
+
+function MultiSelect({
+  label,
+  value,
+  options,
+  loading = false,
+  invalid = false,
+  emptyText,
+  loadingPlaceholder,
+  searchPlaceholder,
+  fullPlaceholder,
+  openButtonTitle,
+  noResultsText,
+  invalidText,
+  removeTitle,
+  dropdownMode = 'overlay',
+  onChange,
+}: {
+  label: string;
+  value: string[];
+  options: SelectOption[];
+  loading?: boolean;
+  invalid?: boolean;
+  emptyText: string;
+  loadingPlaceholder: string;
+  searchPlaceholder: string;
+  fullPlaceholder: string;
+  openButtonTitle: string;
+  noResultsText: string;
+  invalidText?: string;
+  removeTitle: (value: string) => string;
+  dropdownMode?: DropdownMode;
+  onChange: (value: string[]) => void;
+}) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const normalizedOptions = useMemo(() => options.map((option) => (typeof option === 'string' ? { label: option, value: option } : option)), [options]);
@@ -322,9 +514,9 @@ function PermissionSelect({
     return availableOptions.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase('vi-VN').includes(normalizedQuery));
   }, [availableOptions, query]);
   const canSearch = !loading && availableOptions.length > 0;
-  const choosePermission = (permission: string) => {
-    if (!availableOptions.some((option) => option.value === permission)) return;
-    onChange([...value, permission]);
+  const chooseValue = (selectedValue: string) => {
+    if (!availableOptions.some((option) => option.value === selectedValue)) return;
+    onChange([...value, selectedValue]);
     setQuery('');
     setOpen(false);
   };
@@ -332,16 +524,16 @@ function PermissionSelect({
   return (
     <div className="block">
       <span className="text-sm font-semibold text-slate-700">{label}</span>
-      <div className="mt-1 rounded-md border border-line px-2 py-2">
+      <div className={clsx('mt-1 rounded-md border px-2 py-2', invalid ? 'border-rose-300 bg-rose-50' : 'border-line')}>
         <div className="flex min-h-8 flex-wrap gap-1">
-          {value.length ? value.map((permission) => (
-            <span key={permission} className="inline-flex max-w-full items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
-              <span className="truncate">{labelByValue.get(permission) ?? permission}</span>
-              <button type="button" title={`Bỏ ${permission}`} className="rounded p-0.5 hover:bg-blue-100" onClick={() => onChange(value.filter((item) => item !== permission))}>
+          {value.length ? value.map((selectedValue) => (
+            <span key={selectedValue} className="inline-flex max-w-full items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
+              <span className="truncate">{labelByValue.get(selectedValue) ?? selectedValue}</span>
+              <button type="button" title={removeTitle(selectedValue)} className="rounded p-0.5 hover:bg-blue-100" onClick={() => onChange(value.filter((item) => item !== selectedValue))}>
                 <X className="h-3 w-3" />
               </button>
             </span>
-          )) : <span className="px-1 py-1 text-xs font-medium text-slate-500">Không giới hạn permission riêng</span>}
+          )) : <span className={clsx('px-1 py-1 text-xs font-medium', invalid ? 'text-rose-700' : 'text-slate-500')}>{emptyText}</span>}
         </div>
         <div
           className="relative mt-2"
@@ -355,7 +547,7 @@ function PermissionSelect({
               className="min-w-0 flex-1 px-3 py-2 text-sm outline-none disabled:bg-slate-100"
               value={query}
               disabled={!canSearch}
-              placeholder={loading ? 'Đang tải permissions...' : availableOptions.length ? 'Gõ để tìm permission' : 'Đã chọn hết permissions'}
+              placeholder={loading ? loadingPlaceholder : availableOptions.length ? searchPlaceholder : fullPlaceholder}
               onFocus={() => {
                 if (canSearch) setOpen(true);
               }}
@@ -366,14 +558,14 @@ function PermissionSelect({
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
-                  if (filteredOptions[0]) choosePermission(filteredOptions[0].value);
+                  if (filteredOptions[0]) chooseValue(filteredOptions[0].value);
                 }
                 if (event.key === 'Escape') setOpen(false);
               }}
             />
             <button
               type="button"
-              title="Mở danh sách permissions"
+              title={openButtonTitle}
               className="grid w-10 place-items-center border-l border-line text-slate-500 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-300"
               disabled={!canSearch}
               onMouseDown={(event) => event.preventDefault()}
@@ -383,25 +575,36 @@ function PermissionSelect({
             </button>
           </div>
           {open && canSearch ? (
-            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 overflow-auto rounded-md border border-line bg-white py-1 shadow-panel">
+            <div
+              className={clsx(
+                'mt-1 overflow-auto rounded-md border border-line bg-white py-1 shadow-panel',
+                dropdownMode === 'overlay' ? 'absolute left-0 right-0 top-full z-50 max-h-56' : 'max-h-40',
+              )}
+            >
               {filteredOptions.length ? filteredOptions.map((option) => (
                 <button
                   key={option.value}
                   type="button"
                   className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50"
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => choosePermission(option.value)}
+                  onClick={() => chooseValue(option.value)}
                 >
                   <span className="block font-semibold text-ink">{option.value}</span>
-                  <span className="block text-xs text-slate-500">{option.label.replace(`${option.value} - `, '')}</span>
+                  {optionLabelDescription(option) ? <span className="block text-xs text-slate-500">{optionLabelDescription(option)}</span> : null}
                 </button>
               )) : (
-                <div className="px-3 py-2 text-sm font-medium text-slate-500">Không tìm thấy permission phù hợp</div>
+                <div className="px-3 py-2 text-sm font-medium text-slate-500">{noResultsText}</div>
               )}
             </div>
           ) : null}
         </div>
       </div>
+      {invalid && invalidText ? <span className="mt-1 block text-xs font-medium text-rose-600">{invalidText}</span> : null}
     </div>
   );
+}
+
+function optionLabelDescription(option: { label: string; value: string }) {
+  if (option.label === option.value) return '';
+  return option.label.startsWith(`${option.value} - `) ? option.label.replace(`${option.value} - `, '') : option.label;
 }

@@ -7,7 +7,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { useToast } from '../../components/ToastProvider';
 import { Dialog } from '../../components/Dialog';
-import type { PipelineEdgeConditionDefinition, PipelineNode, PipelineTemplate, PipelineTemplateEdge } from '../../lib/types/domain';
+import type { PipelineEdgeConditionDefinition, PipelineNode, PipelineTemplate, PipelineTemplateEdge, WorkflowFormCatalogItem } from '../../lib/types/domain';
 import { PipelineBuilderShell } from './components/PipelineBuilderShell';
 import { TemplateSidebar } from './components/TemplateSidebar';
 import { NodeLibraryPanel } from './components/NodeLibraryPanel';
@@ -34,6 +34,14 @@ type EdgeForm = {
   condition_type: string;
   priority: string;
   condition_config: Record<string, any>;
+};
+
+type StepForm = {
+  name: string;
+  step_type: string;
+  required_role_ids: string[];
+  form_required: boolean;
+  form_version_id: string;
 };
 
 const nodeLibrary: NodePreset[] = [
@@ -66,7 +74,7 @@ export function PipelineBuilderPage() {
   const [templateNameSubmitAttempted, setTemplateNameSubmitAttempted] = useState(false);
   const [deleteTemplateDialog, setDeleteTemplateDialog] = useState<PipelineTemplate | null>(null);
   const [stepDialog, setStepDialog] = useState<{ mode: 'add' | 'edit'; step?: Record<string, any> } | null>(null);
-  const [stepForm, setStepForm] = useState({ name: '', step_type: 'task', responsible_role_id: 'PM' });
+  const [stepForm, setStepForm] = useState<StepForm>({ name: '', step_type: 'task', required_role_ids: ['PM'], form_required: true, form_version_id: '' });
   const [stepSubmitAttempted, setStepSubmitAttempted] = useState(false);
   const [nodeForm, setNodeForm] = useState<Record<string, any>>({});
   const [edgeForm, setEdgeForm] = useState<EdgeForm>({ label: '', condition_type: 'always', priority: '100', condition_config: {} });
@@ -81,6 +89,11 @@ export function PipelineBuilderPage() {
   const edgeConditions = useQuery({
     queryKey: ['pipeline-edge-conditions'],
     queryFn: () => get<PipelineEdgeConditionDefinition[]>('/pipeline-edge-conditions'),
+    enabled: Boolean(selectedTemplateId),
+  });
+  const workflowForms = useQuery({
+    queryKey: ['workflow-form-catalog'],
+    queryFn: () => get<WorkflowFormCatalogItem[]>('/workflow-form-templates'),
     enabled: Boolean(selectedTemplateId),
   });
   const permissions = useQuery({
@@ -129,6 +142,10 @@ export function PipelineBuilderPage() {
     })),
     [permissions.data],
   );
+  const workflowFormVersionIds = useMemo(
+    () => new Set((workflowForms.data ?? []).map((form) => String(form.version_id)).filter(Boolean)),
+    [workflowForms.data],
+  );
 
   useEffect(() => {
     if (selectedNodeId && !nodeById.has(selectedNodeId)) setSelectedNodeId('');
@@ -171,7 +188,15 @@ export function PipelineBuilderPage() {
     closeStepDialog();
   }, [detailsNode?.id]);
 
-  const validationIssues = useMemo(() => buildValidationIssues(nodes, rawEdges, edgeConditionTypes), [nodes, rawEdges, edgeConditionTypes]);
+  useEffect(() => {
+    if (!stepDialog || !stepForm.form_required || stepForm.form_version_id || !workflowForms.data?.length) return;
+    setStepForm((current) => {
+      if (!current.form_required || current.form_version_id) return current;
+      return { ...current, form_version_id: defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? []) };
+    });
+  }, [stepDialog, stepForm.form_required, stepForm.form_version_id, workflowForms.data]);
+
+  const validationIssues = useMemo(() => buildValidationIssues(nodes, rawEdges, edgeConditionTypes, workflowFormVersionIds), [nodes, rawEdges, edgeConditionTypes, workflowFormVersionIds]);
 
   const invalidate = (templateId = selectedTemplateId) => {
     queryClient.invalidateQueries({ queryKey: ['pipeline-templates'] });
@@ -430,7 +455,9 @@ export function PipelineBuilderPage() {
         name: stepForm.name.trim(),
         description: 'Checklist mẫu trong node',
         step_type: stepForm.step_type,
-        required_role_ids: [stepForm.responsible_role_id].filter(Boolean),
+        required_role_ids: normalizeRoleIds(stepForm.required_role_ids),
+        form_required: stepForm.form_required,
+        form_version_id: stepForm.form_version_id || null,
         order_index: nextOrderIndex,
       });
     },
@@ -449,7 +476,9 @@ export function PipelineBuilderPage() {
       return put(`/pipeline-steps/${stepId}`, {
         name: stepForm.name.trim(),
         step_type: stepForm.step_type,
-        required_role_ids: [stepForm.responsible_role_id].filter(Boolean),
+        required_role_ids: normalizeRoleIds(stepForm.required_role_ids),
+        form_required: stepForm.form_required,
+        form_version_id: stepForm.form_version_id || null,
       });
     },
     onSuccess: () => {
@@ -511,16 +540,27 @@ export function PipelineBuilderPage() {
   });
 
   const openAddStepDialog = () => {
-    setStepForm({ name: '', step_type: defaultStepTypeForNode(detailsNode?.type), responsible_role_id: defaultRoleForNode(detailsNode?.type) });
+    const stepType = defaultStepTypeForNode(detailsNode?.type);
+    setStepForm({
+      name: '',
+      step_type: stepType,
+      required_role_ids: [defaultRoleForNode(detailsNode?.type)],
+      form_required: true,
+      form_version_id: defaultWorkflowFormVersionForStep(stepType, workflowForms.data ?? []),
+    });
     setStepSubmitAttempted(false);
     setStepDialog({ mode: 'add' });
   };
 
   const openEditStepDialog = (step: Record<string, any>) => {
+    const stepType = String(step.step_type ?? 'task');
+    const formRequired = boolValue(step.form_required, true);
     setStepForm({
       name: String(step.name ?? ''),
-      step_type: String(step.step_type ?? 'task'),
-      responsible_role_id: Array.isArray(step.required_role_ids) && step.required_role_ids[0] ? String(step.required_role_ids[0]) : defaultRoleForNode(detailsNode?.type),
+      step_type: stepType,
+      required_role_ids: normalizeRoleIds(step.required_role_ids),
+      form_required: formRequired,
+      form_version_id: cleanString(step.form_version_id) || (formRequired ? defaultWorkflowFormVersionForStep(stepType, workflowForms.data ?? []) : ''),
     });
     setStepSubmitAttempted(false);
     setStepDialog({ mode: 'edit', step });
@@ -528,16 +568,46 @@ export function PipelineBuilderPage() {
 
   const closeStepDialog = () => {
     setStepDialog(null);
-    setStepForm({ name: '', step_type: 'task', responsible_role_id: 'PM' });
+    setStepForm({ name: '', step_type: 'task', required_role_ids: ['PM'], form_required: true, form_version_id: '' });
     setStepSubmitAttempted(false);
+  };
+
+  const changeStepField = (field: keyof StepForm, value: string | string[] | boolean) => {
+    setStepForm((current) => {
+      if (field === 'step_type') {
+        const stepType = String(value);
+        const currentDefault = defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? []);
+        const shouldRefreshForm = !current.form_version_id || current.form_version_id === currentDefault;
+        return {
+          ...current,
+          step_type: stepType,
+          form_required: current.form_required || workflowFormRequiredForStepType(stepType),
+          form_version_id: shouldRefreshForm ? defaultWorkflowFormVersionForStep(stepType, workflowForms.data ?? []) : current.form_version_id,
+        };
+      }
+      if (field === 'form_required') {
+        const formRequired = Boolean(value);
+        return {
+          ...current,
+          form_required: formRequired,
+          form_version_id: formRequired && !current.form_version_id ? defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? []) : current.form_version_id,
+        };
+      }
+      return { ...current, [field]: value };
+    });
   };
 
   const submitStepDialog = () => {
     setStepSubmitAttempted(true);
-    if (!stepForm.name.trim()) {
+    const invalidFields: string[] = [];
+    if (!stepForm.name.trim()) invalidFields.push('Tên checklist');
+    if (!normalizeRoleIds(stepForm.required_role_ids).length) invalidFields.push('Role phụ trách');
+    if (stepForm.form_required && !stepForm.form_version_id) invalidFields.push('Workflow form');
+    if (stepForm.form_version_id && workflowFormVersionIds.size > 0 && !workflowFormVersionIds.has(stepForm.form_version_id)) invalidFields.push('Workflow form published');
+    if (invalidFields.length) {
       toast.warn({
         title: 'Thiếu thông tin checklist',
-        description: 'Tên checklist là bắt buộc',
+        description: invalidFields.join(', '),
       });
       return;
     }
@@ -735,13 +805,18 @@ export function PipelineBuilderPage() {
               stepDialogMode={stepDialog?.mode ?? null}
               stepForm={stepForm}
               stepNameInvalid={stepSubmitAttempted && !stepForm.name.trim()}
+              stepRolesInvalid={stepSubmitAttempted && !normalizeRoleIds(stepForm.required_role_ids).length}
+              stepFormInvalid={stepSubmitAttempted && stepForm.form_required && !stepForm.form_version_id}
               savePending={saveNode.isPending}
               addStepPending={addStep.isPending}
               updateStepPending={updateStep.isPending}
               deleteStepPending={deleteStep.isPending}
               reorderStepPending={reorderStep.isPending}
+              workflowForms={workflowForms.data ?? []}
+              workflowFormsLoading={workflowForms.isLoading}
+              workflowFormsError={workflowForms.isError}
               onChangeField={(field, value) => setNodeForm((current) => ({ ...current, [field]: value }))}
-              onChangeStepField={(field, value) => setStepForm((current) => ({ ...current, [field]: value }))}
+              onChangeStepField={changeStepField}
               onSave={() => saveNode.mutate()}
               onClose={() => setDetailsNodeId('')}
               onOpenAddStep={openAddStepDialog}
@@ -891,10 +966,26 @@ function isRecord(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+function cleanString(value: unknown) {
+  const text = String(value ?? '').trim();
+  return text && text !== '<nil>' ? text : '';
+}
+
+function boolValue(value: unknown, fallback = false) {
+  if (typeof value === 'boolean') return value;
+  if (value === undefined || value === null || value === '') return fallback;
+  return ['true', '1', 'yes'].includes(String(value).toLocaleLowerCase('vi-VN'));
+}
+
 function normalizePermissions(node: PipelineNode) {
   if (Array.isArray(node.permissions)) return node.permissions.map(String);
   if (node.required_permission) return [String(node.required_permission)];
   return [];
+}
+
+function normalizeRoleIds(value: unknown) {
+  const roles = Array.isArray(value) ? value.map((role) => String(role).trim()).filter(Boolean) : [];
+  return roles.filter((role, index) => roles.indexOf(role) === index);
 }
 
 function sortedStepsForNode(node?: PipelineNode) {
@@ -928,6 +1019,8 @@ function defaultStepsForType(type: string) {
 function defaultStepTypeForNode(type?: string) {
   if (type === 'procurement' || type === 'warehouse_issue') return 'material_check';
   if (type === 'acceptance') return 'acceptance_check';
+  if (type === 'handover') return 'handover_check';
+  if (type === 'construction') return 'daily_report';
   if (type === 'boq' || type === 'budget_approval') return 'budget_check';
   return 'task';
 }
@@ -949,11 +1042,35 @@ function defaultRoleForNode(type?: string) {
   return 'PM';
 }
 
-function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdge[], conditionTypes: Set<string>) {
+function workflowFormRequiredForStepType(stepType: string) {
+  return ['daily_report', 'meeting_minutes', 'checklist', 'acceptance_check', 'handover_check'].includes(stepType);
+}
+
+function workflowFormTypeForStep(stepType: string) {
+  if (stepType === 'daily_report') return 'daily_report';
+  if (stepType === 'meeting_minutes') return 'meeting_minutes';
+  if (['checklist', 'acceptance_check', 'handover_check'].includes(stepType)) return 'checklist';
+  return 'generic_submission';
+}
+
+function defaultWorkflowFormVersionForStep(stepType: string, catalog: WorkflowFormCatalogItem[]) {
+  const formType = workflowFormTypeForStep(stepType);
+  return catalog.find((form) => form.form_type === formType)?.version_id ?? catalog.find((form) => form.form_type === 'generic_submission')?.version_id ?? catalog[0]?.version_id ?? '';
+}
+
+function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdge[], conditionTypes: Set<string>, workflowFormVersionIds: Set<string>) {
   const issues: string[] = [];
   if (!nodes.length) issues.push('Template chưa có node');
   nodes.forEach((node) => {
     if (!node.name?.trim()) issues.push('Có node thiếu tên');
+    (node.steps ?? []).forEach((step: Record<string, any>) => {
+      if (boolValue(step.form_required) && !cleanString(step.form_version_id)) {
+        issues.push(`Step ${step.name || step.id} bắt buộc workflow form nhưng chưa chọn form`);
+      }
+      if (cleanString(step.form_version_id) && workflowFormVersionIds.size > 0 && !workflowFormVersionIds.has(cleanString(step.form_version_id))) {
+        issues.push(`Step ${step.name || step.id} đang dùng workflow form chưa published hoặc không còn active`);
+      }
+    });
   });
   if (nodes.length > 1 && !edges.length) issues.push('Chưa có cạnh được lưu; hiện chỉ có thứ tự node mặc định');
 

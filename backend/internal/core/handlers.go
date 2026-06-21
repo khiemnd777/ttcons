@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"consflow/backend/internal/shared/response"
 
@@ -257,7 +258,7 @@ func (h *Handler) AddTemplateStep(c *fiber.Ctx) error {
 		return err
 	}
 	body["node_id"] = c.Params("id")
-	step, err := h.service.repo.Insert(c.Context(), "pipeline_template_steps", templateStepColumns(), body)
+	step, err := h.service.CreateTemplateStep(c.Context(), body)
 	if err != nil {
 		return err
 	}
@@ -272,7 +273,7 @@ func (h *Handler) UpdateTemplateStep(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	step, err := h.service.repo.Update(c.Context(), "pipeline_template_steps", templateStepColumns(), c.Params("id"), body)
+	step, err := h.service.UpdateTemplateStep(c.Context(), c.Params("id"), body)
 	if err != nil {
 		return err
 	}
@@ -313,6 +314,17 @@ func (h *Handler) PipelineEdgeConditions(c *fiber.Ctx) error {
 		return err
 	}
 	return response.OK(c, PipelineEdgeConditionCatalog())
+}
+
+func (h *Handler) WorkflowFormCatalog(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.WorkflowFormCatalog(c.Context())
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
 }
 
 func (h *Handler) UpdateTemplateEdge(c *fiber.Ctx) error {
@@ -430,6 +442,14 @@ func (h *Handler) GetWorkItem(c *fiber.Ctx) error {
 	return response.OK(c, item)
 }
 
+func (h *Handler) GetWorkItemForm(c *fiber.Ctx) error {
+	form, err := h.service.WorkItemForm(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, form)
+}
+
 func (h *Handler) StartWorkItem(c *fiber.Ctx) error    { return h.workItemAction(c, "start") }
 func (h *Handler) CompleteWorkItem(c *fiber.Ctx) error { return h.workItemAction(c, "complete") }
 func (h *Handler) BlockWorkItem(c *fiber.Ctx) error    { return h.workItemAction(c, "block") }
@@ -476,6 +496,35 @@ func (h *Handler) AddWorkItemEvidence(c *fiber.Ctx) error {
 	return response.Created(c, evidence)
 }
 
+func (h *Handler) UploadWorkItemEvidence(c *fiber.Ctx) error {
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "File evidence là bắt buộc")
+	}
+	req := WorkItemEvidenceRequest{
+		EvidenceType: c.FormValue("evidence_type"),
+		DocumentType: c.FormValue("document_type"),
+		Name:         c.FormValue("name"),
+		Title:        c.FormValue("title"),
+		Description:  c.FormValue("description"),
+		Caption:      c.FormValue("caption"),
+		RevisionNo:   c.FormValue("revision_no"),
+		Visibility:   c.FormValue("visibility"),
+	}
+	if rawPayload := c.FormValue("payload"); rawPayload != "" {
+		payload := Record{}
+		if err := json.Unmarshal([]byte(rawPayload), &payload); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Payload evidence không hợp lệ")
+		}
+		req.Payload = payload
+	}
+	evidence, err := h.service.AddWorkItemEvidenceUpload(c.Context(), c.Params("id"), req, fileHeader, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, evidence)
+}
+
 func (h *Handler) AddWorkItemActivity(c *fiber.Ctx) error {
 	req := WorkItemActivityRequest{}
 	if len(c.Body()) > 0 {
@@ -490,12 +539,95 @@ func (h *Handler) AddWorkItemActivity(c *fiber.Ctx) error {
 	return response.Created(c, activity)
 }
 
+func (h *Handler) SaveWorkflowFormDraft(c *fiber.Ctx) error {
+	req := WorkflowFormSaveRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu workflow form không hợp lệ")
+		}
+	}
+	form, err := h.service.SaveWorkflowFormDraft(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, form)
+}
+
+func (h *Handler) SubmitWorkflowForm(c *fiber.Ctx) error {
+	req := WorkflowFormSaveRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu workflow form không hợp lệ")
+		}
+	}
+	form, err := h.service.SubmitWorkflowForm(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, form)
+}
+
+func (h *Handler) SignWorkflowForm(c *fiber.Ctx) error {
+	req := WorkflowFormSignRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu chữ ký workflow form không hợp lệ")
+		}
+	}
+	form, err := h.service.SignWorkflowForm(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, form)
+}
+
+func (h *Handler) GenerateWorkflowFormPDFExport(c *fiber.Ctx) error {
+	form, err := h.service.GenerateWorkflowFormPDFExport(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, form)
+}
+
 func (h *Handler) MarkActivityRead(c *fiber.Ctx) error {
 	item, err := h.service.MarkActivityRead(c.Context(), c.Params("id"), actorID(c))
 	if err != nil {
 		return err
 	}
 	return response.OK(c, item)
+}
+
+func (h *Handler) GetEvidenceFile(c *fiber.Ctx) error {
+	file, err := h.service.EvidenceFile(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, file.MIMEType)
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf("inline; filename=%q; filename*=UTF-8''%s", "evidence-file", url.PathEscape(file.Filename)))
+	c.Set(fiber.HeaderXContentTypeOptions, "nosniff")
+	return c.SendFile(file.Path)
+}
+
+func (h *Handler) GetWorkflowFormSignatureVisual(c *fiber.Ctx) error {
+	file, err := h.service.WorkflowFormSignatureVisual(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, file.MIMEType)
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf("inline; filename=%q; filename*=UTF-8''%s", "signature.png", url.PathEscape(file.Filename)))
+	c.Set(fiber.HeaderXContentTypeOptions, "nosniff")
+	return c.SendFile(file.Path)
+}
+
+func (h *Handler) GetWorkflowFormPDFExportFile(c *fiber.Ctx) error {
+	file, err := h.service.WorkflowFormPDFExportFile(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, file.MIMEType)
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf("inline; filename=%q; filename*=UTF-8''%s", "workflow-form.pdf", url.PathEscape(file.Filename)))
+	c.Set(fiber.HeaderXContentTypeOptions, "nosniff")
+	return c.SendFile(file.Path)
 }
 
 func (h *Handler) AcceptEvidence(c *fiber.Ctx) error {
@@ -645,13 +777,7 @@ func (h *Handler) ProjectBOQ(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"boq.view"}); err != nil {
 		return err
 	}
-	rows, err := h.service.repo.Query(c.Context(), `
-		SELECT b.*, m.name AS material_name
-		FROM boq_items b
-		LEFT JOIN materials m ON m.id=b.material_id
-		WHERE b.project_id=$1 AND b.status <> 'deleted'
-		ORDER BY b.category, b.created_at
-	`, c.Params("id"))
+	rows, err := h.service.ProjectBOQ(c.Context(), c.Params("id"))
 	if err != nil {
 		return err
 	}
@@ -668,7 +794,7 @@ func (h *Handler) CreateBOQ(c *fiber.Ctx) error {
 	}
 	body["project_id"] = c.Params("id")
 	body["created_by"] = actorID(c)
-	item, err := h.service.repo.Insert(c.Context(), "boq_items", boqColumns(), body)
+	item, err := h.service.CreateBOQ(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -683,7 +809,52 @@ func (h *Handler) UpdateBOQ(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	item, err := h.service.repo.Update(c.Context(), "boq_items", boqColumns(), c.Params("id"), body)
+	item, err := h.service.UpdateBOQ(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
+}
+
+func (h *Handler) UpdateBOQExpectedUnitPrice(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "boq_items", c.Params("id"), []string{"boq.update"}); err != nil {
+		return err
+	}
+	var req BOQUnitPriceRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đơn giá không hợp lệ")
+	}
+	item, err := h.service.UpdateBOQExpectedUnitPrice(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
+}
+
+func (h *Handler) LockBOQNormUnitPrice(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "boq_items", c.Params("id"), []string{"boq.approve"}); err != nil {
+		return err
+	}
+	var req BOQUnitPriceRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đơn giá không hợp lệ")
+	}
+	item, err := h.service.LockBOQNormUnitPrice(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
+}
+
+func (h *Handler) LockBOQFinalUnitPrice(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "boq_items", c.Params("id"), []string{"boq.approve"}); err != nil {
+		return err
+	}
+	var req BOQUnitPriceRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đơn giá không hợp lệ")
+	}
+	item, err := h.service.LockBOQFinalUnitPrice(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}

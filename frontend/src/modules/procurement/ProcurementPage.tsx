@@ -84,16 +84,23 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
       />
       <DataTable
         rows={rows}
+        loading={requests.isLoading}
+        error={requests.error}
+        onRetry={() => requests.refetch()}
+        searchPlaceholder="Tìm mã, yêu cầu, công trình"
+        pageSize={10}
+        defaultSort={{ key: 'request_code', direction: 'asc' }}
         columns={[
-          { key: 'request_code', header: 'Mã' },
-          { key: 'title', header: 'Yêu cầu', render: (row) => <span className="font-semibold text-ink">{row.title}</span> },
-          { key: 'project_name', header: 'Công trình' },
-          { key: 'total_estimated_amount', header: 'Giá trị', render: (row) => <CurrencyText value={row.total_estimated_amount} /> },
-          { key: 'budget_status', header: 'Budget', render: (row) => <EnumChip group="budget_status" value={row.budget_status} /> },
-          { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
+          { key: 'request_code', header: 'Mã', sortable: true },
+          { key: 'title', header: 'Yêu cầu', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.title}</span> },
+          { key: 'project_name', header: 'Công trình', sortable: true },
+          { key: 'total_estimated_amount', header: 'Giá trị', align: 'right', sortable: true, sortValue: (row) => Number(row.total_estimated_amount ?? 0), render: (row) => <CurrencyText value={row.total_estimated_amount} /> },
+          { key: 'budget_status', header: 'Budget', sortable: true, render: (row) => <EnumChip group="budget_status" value={row.budget_status} /> },
+          { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
           {
             key: 'actions',
             header: 'Action',
+            align: 'right',
             render: (row) => (
               <RowActions onView={() => setDialog({ mode: 'view', record: row })} onEdit={() => setDialog({ mode: 'edit', record: row })}>
                 <button title="Duyệt" className="rounded-md border border-line p-1.5 hover:bg-slate-100" onClick={() => action.mutate({ requestId: row.id, name: 'approve' })}><Check className="h-4 w-4" /></button>

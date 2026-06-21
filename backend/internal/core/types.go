@@ -33,19 +33,56 @@ type WorkItemActionRequest struct {
 }
 
 type WorkItemEvidenceRequest struct {
-	EvidenceType string `json:"evidence_type"`
-	DocumentType string `json:"document_type"`
-	Name         string `json:"name"`
-	DocumentID   string `json:"document_id"`
-	Title        string `json:"title"`
-	Description  string `json:"description"`
-	FileURL      string `json:"file_url"`
-	MIMEType     string `json:"mime_type"`
-	FileSize     int64  `json:"file_size"`
-	Caption      string `json:"caption"`
-	RevisionNo   string `json:"revision_no"`
-	Visibility   string `json:"visibility"`
-	Payload      Record `json:"payload"`
+	EvidenceType    string `json:"evidence_type"`
+	DocumentType    string `json:"document_type"`
+	Name            string `json:"name"`
+	DocumentID      string `json:"document_id"`
+	Title           string `json:"title"`
+	Description     string `json:"description"`
+	FileURL         string `json:"file_url"`
+	MIMEType        string `json:"mime_type"`
+	FileSize        int64  `json:"file_size"`
+	StorageProvider string `json:"storage_provider"`
+	StorageKey      string `json:"storage_key"`
+	ChecksumSHA256  string `json:"checksum_sha256"`
+	Caption         string `json:"caption"`
+	RevisionNo      string `json:"revision_no"`
+	Visibility      string `json:"visibility"`
+	Payload         Record `json:"payload"`
+}
+
+type WorkflowFormSaveRequest struct {
+	Answers Record `json:"answers"`
+	Comment string `json:"comment"`
+}
+
+type WorkflowFormSignRequest struct {
+	Purpose               string                        `json:"purpose"`
+	Comment               string                        `json:"comment"`
+	SignatureImageDataURL string                        `json:"signature_image_data_url"`
+	SignatureStrokes      []WorkflowFormSignatureStroke `json:"signature_strokes"`
+}
+
+type BOQUnitPriceRequest struct {
+	UnitPrice float64 `json:"unit_price"`
+	Comment   string  `json:"comment"`
+}
+
+type WorkflowFormSignatureStroke struct {
+	Points []WorkflowFormSignaturePoint `json:"points"`
+}
+
+type WorkflowFormSignaturePoint struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type StoredFileMetadata struct {
+	StorageProvider string `json:"storage_provider"`
+	StorageKey      string `json:"storage_key"`
+	MIMEType        string `json:"mime_type"`
+	FileSize        int64  `json:"file_size"`
+	ChecksumSHA256  string `json:"checksum_sha256"`
 }
 
 type WorkItemActivityRequest struct {

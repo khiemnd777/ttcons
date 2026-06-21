@@ -10,6 +10,7 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - Ignore roadmap columns: `Thời gian dự kiến`, `Phụ thuộc`, `Trạng thái`, `Ưu tiên`.
 - Main need: analyze the roadmap against the current repo and create an agent-facing checklist/memory for long implementation.
 - Added core invariant from user: Pipeline Builder step `Role phụ trách` must support multiple roles, not a single role.
+- Production-grade expectation from user: do not ship MVP-style, placeholder-only, superficial, or half-finished behavior. If a feature cannot be completed end-to-end in the current station, defer it to a dedicated station rather than adding misleading UI.
 
 ## Current Repo Baseline
 
@@ -39,6 +40,7 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 10. User-visible admin lists must hide deleted/cancelled/inactive records at API/query level, not only in frontend.
 11. Protected endpoints must remain under `middleware.AuthRequired`.
 12. Database changes must be new custom SQL migrations. Never edit an already-applied migration and never use Flyway.
+13. Do not add placeholder-only UI for production features. File upload, evidence, PDF, signature, accounting, and workflow form features must be backed by real contracts, persistence, validation, permissions, and user feedback when they are introduced.
 
 ## Roadmap Fit Assessment Memory
 
@@ -227,6 +229,8 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - Add review packages before each code-changing batch.
 - Add Mockup as Text before each UI-changing batch.
 - Track completed batches under `Done`.
+- After completing each implementation station, always report the next recommended station in the final response so the user does not need to ask.
+- Keep each station production-grade. Avoid MVP placeholders; defer incomplete capabilities to a full follow-up station with backend/frontend/storage/validation coverage as needed.
 - Move this plan to `docs/plan-closed/` only when the user says `Đóng plan` or `Đóng lại plan`.
 
 ## Done
@@ -236,9 +240,132 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - Identified current repo as broad demo/full-stack foundation with many partial modules but missing typed business-form layer.
 - Added user-provided invariant: step `Role phụ trách` must be multiple.
 - Created this interruption-safe agent checklist in `docs/current-states.md`.
+- Implemented first roadmap batch for Pipeline Builder step multi-role UI.
+- Changed Pipeline Builder step form state/payload from single `responsible_role_id` to `required_role_ids: string[]`.
+- Added reusable chip multi-select behavior in `NodeInspectorPanel` and reused it for both node permissions and step roles.
+- Added inline/warning validation so step save requires a checklist name and at least one responsible role.
+- Fixed the Pipeline Builder step role dropdown being clipped by the dialog footer by rendering that role menu inline while keeping node permissions as an overlay menu.
+- Implemented Shared UI Refactor 2A for `DataTable`: opt-in search, sort, pagination, loading, error/retry, alignment, and default sort support.
+- Applied the enhanced `DataTable` pattern to Projects, Procurement, and BOQ lists without changing backend API contracts.
+- Implemented Shared UI Refactor 2B for `SimpleForm`: production-grade field metadata, helper text, two-column layout, conditional visibility, disabled rules, multi-select array submission, visible-field validation, and optional reset-on-submit.
+- Applied the enhanced `SimpleForm` pattern to Operations daily report and issue forms without adding placeholder-only fields or changing backend API contracts.
+- Implemented Workflow Form Core 3A schema/API/runtime foundation with new migration `backend/migrations/V10__workflow_form_core.sql`.
+- Added versioned workflow form templates, form versions, fields, runtime instances, answers, and events.
+- Added built-in published form definitions for checklist, daily report, meeting minutes, and generic submission.
+- Mapped pipeline template steps to default form versions and create runtime form instances when starting a pipeline run.
+- Added authenticated workflow form APIs: read form by work item, save draft, and submit form instance with backend schema validation and audit/event logging.
+- Added Work Item dialog `Workflow Form` panel backed by real API persistence, with draft/submit states, inline validation, event trail, and no placeholder upload/PDF/signature controls.
+- Added backend regression coverage for workflow form answer validation and submitted form satisfying checklist gate.
+- Implemented Workflow Form Runtime UX 3B: enriched pipeline run step response with work item id/status/evidence count and workflow form instance/status/type/required summary.
+- Updated Planning/Pipeline runtime UI so form-backed steps open the real Work Item dialog and workflow form panel instead of using an empty direct submit as the primary action.
+- Kept step completion available only when no required form exists or the required workflow form is already submitted; backend evidence/form gates remain authoritative.
+- Added backend regression coverage for enriched runtime step contract after pipeline start.
+- Implemented Workflow Form Authoring 3C so Pipeline Builder can explicitly bind workflow form versions to checklist/steps.
+- Added authenticated `GET /workflow-form-templates` catalog endpoint for active workflow form templates with latest published version, field count, required field keys, and field summaries.
+- Added backend publish validation that rejects templates with `form_required=true` steps missing a published active workflow form version, without mutating template status.
+- Preserved explicit `form_required=false` authoring intent so backend does not silently reattach a default form when an admin clears an optional form.
+- Updated Pipeline Builder step add/edit dialog with workflow form required toggle, form version selector, loading/empty/error states, inline validation, and step-list form status chips.
+- Extended Pipeline Builder local validation to flag required steps without a form and steps pointing at inactive/unpublished form versions.
+- Added backend regression coverage for workflow form catalog rows and publish rejection when a required step has no published form mapping.
+- Implemented Planning Forms 4A for production-grade Meeting Minutes workflow forms.
+- Added migration `backend/migrations/V11__meeting_minutes_form_v2.sql` to publish `builtin_meeting_minutes` v2 with structured attendees, decisions, action items, confirmation, and schema-level validation metadata.
+- Extended workflow form field support with `structured_list` while preserving existing v1 form instances and template step references.
+- Extended work item source typing with `workflow_form_action_item` so submitted meeting minutes can generate traceable follow-up work items.
+- Added backend validation for structured list rows, required cells, date/select schemas, min/max item counts, and text length rules.
+- Added submit-time meeting minutes action item generation inside the workflow form transaction, including work item records, role assignments, activity trail, and generated id payload on the parent work item.
+- Added generic structured-list rendering in `WorkflowFormPanel` so meeting minutes attendees, decisions, and action items are edited as dense row/card controls instead of raw JSON or textarea placeholders.
+- Added backend regression coverage for structured-list validation and meeting minutes submit creating linked action item work items.
+- Implemented Planning Forms 4B for production-grade Planning Daily Report workflow forms.
+- Added migration `backend/migrations/V12__planning_daily_report_form_v2.sql` to publish `builtin_daily_report` v2 with report date, reporter, planning scope, progress percent, completed items, next-plan items, blockers/risks, and confirmation.
+- Reused structured-list workflow form validation/rendering for daily report `Đã làm`, `Sẽ làm`, and `Blocker / Risk` sections without adding placeholder-only upload/PDF/signature fields.
+- Added submit-time daily report next-plan generation inside the workflow form transaction, including linked work items, role assignments, activity trail, and generated id payload on the parent work item.
+- Added backend regression coverage for daily report v2 selection and submit creating linked next-plan work items.
+- Implemented Planning Forms 4C for production-grade Planning Checklist workflow forms.
+- Added migration `backend/migrations/V13__planning_checklist_form_v2.sql` to publish `builtin_checklist` v2 with check date, checker, planning scope, structured checklist items, overall comment, and confirmation.
+- Extended structured-list validation to support real `evidence_reference` cells scoped to the same project/work item and excluding rejected evidence.
+- Added checklist submit hard gate: checklist v2 can save draft with blocked/follow-up rows, but submit is rejected until every checklist item is `done` or `not_applicable`.
+- Preserved checklist auditability by storing submitted `checklist_items` in the parent work item's completion payload, not only a generic submitted marker.
+- Extended `WorkflowFormPanel` structured-list UI with evidence dropdown cells, blank select defaults, rejected-evidence filtering, and checklist-specific inline submit warnings.
+- Added backend regression coverage for checklist v2 catalog selection, invalid evidence rejection, blocked checklist submit rejection, and successful checklist submit payload persistence.
+- Implemented Planning Forms 4D for production-grade internal workflow form signatures.
+- Added migration `backend/migrations/V14__workflow_form_signatures.sql` with `workflow_form_signatures`, immutable update/delete trigger, per-user/per-purpose uniqueness, signed payload hash, and `workflow_form_events` support for `signed`.
+- Added authenticated `POST /workflow-form-instances/:id/sign` action that only signs submitted forms, enforces existing work item actor/permission rules, writes signature/event/activity/audit records in one transaction, and returns refreshed form detail.
+- Added signature payload hashing from the submitted form snapshot, signer identity, purpose, roles, comment, form revision, project, and work item context.
+- Extended workflow form detail responses with `signatures`.
+- Added `WorkflowFormPanel` internal signature section with signer list, timestamp, short hash, comment, draft disabled state, duplicate-current-user disabled state, and sign action.
+- Added backend regression coverage for sign-before-submit rejection, successful signing, duplicate signing rejection, event/activity/audit persistence, and DB immutability trigger.
+- Implemented Planning Forms 4E for production-grade real image/evidence upload and gallery.
+- Added migration `backend/migrations/V15__evidence_file_storage.sql` with evidence storage provider/key/checksum metadata, checksum format validation, and storage-key indexes.
+- Added backend upload configuration via `UPLOAD_DIR` and `MAX_UPLOAD_BYTES`, increased Fiber body limit from that config, and mounted Docker volume `consflow_uploads` at `/app/uploads`.
+- Added authenticated multipart `POST /work-items/:id/evidence/upload` and protected `GET /evidence/:id/file`; binary files are served only after existing work-item visibility checks and storage-path containment checks.
+- Added service-side upload validation for file presence, size, detected MIME allowlist, evidence-type/MIME consistency, safe storage paths, SHA-256 checksum generation, and DB failure cleanup of orphan files.
+- Extended evidence records and frontend types with `storage_provider`, `storage_key`, and `checksum_sha256` while keeping legacy JSON evidence/file_url behavior compatible.
+- Added `EvidencePanel` in the Work Item dialog with real multipart upload, inline validation/warning toasts, protected thumbnail/blob fetching with token, checksum/file metadata display, and open-file action.
+- Added backend regression coverage for upload storage metadata, checksum, stored file bytes, protected file lookup, and invalid MIME rejection.
+- Implemented Planning Forms 4F for production-grade workflow form visual signature stamps and PDF export artifacts.
+- Added migration `backend/migrations/V16__workflow_form_pdf_exports.sql` with visual signature storage metadata on immutable workflow form signatures, append-only immutable `workflow_form_pdf_exports`, storage/checksum constraints, and `pdf_exported` workflow form events.
+- Extended workflow form signing so new signatures require a canvas PNG data URL plus normalized vector strokes; the PNG is stored as a protected local asset and the vector strokes are embedded in the immutable signature payload for PDF stamping.
+- Added protected endpoints for visual signature files and workflow form PDF files, both gated by existing work item visibility checks and protected storage path checks.
+- Added backend PDF generation for submitted workflow forms using the submitted form snapshot, answers, current signatures, payload hash, visual signature stamp boxes, and stored PDF artifact metadata.
+- Added `SignatureCaptureDialog` with canvas pointer capture, clear state, purpose/comment controls, stroke capture, PNG export, and submit gating.
+- Extended `WorkflowFormPanel` with `Ký / Đóng dấu PDF`, visual signature open action, `Generate PDF`, and protected PDF artifact open action.
+- Added backend regression coverage for PDF byte generation with signature stamp text, visual signature metadata/storage lookup, PDF artifact metadata/storage lookup, event/audit persistence, and PDF export immutability when DB-backed tests are enabled.
+- Implemented Planning Forms 4G for production-grade BOQ unit-price lifecycle.
+- Added migration `backend/migrations/V17__boq_unit_price_lifecycle.sql` with `expected_unit_price`, `norm_unit_price`, `final_unit_price`, lock actor/time/comment metadata, price revision tracking, immutable `boq_unit_price_events`, procurement item price-source metadata, and BOQ trigger protection for norm/final locks.
+- Preserved backward compatibility by keeping `boq_items.unit_price` as the effective price used by existing `total_amount` and legacy readers, synchronized from final/norm/expected lifecycle state.
+- Added backend actions for `POST /boq-items/:id/unit-price/expected`, `POST /boq-items/:id/unit-price/lock-norm`, and `POST /boq-items/:id/unit-price/lock-final`, with validation, permission checks, audit logging, immutable price events, and final-lock update protection.
+- Updated BOQ create/update flow so legacy `unit_price` input maps to `expected_unit_price` while normal BOQ edits cannot bypass norm/final lifecycle rules.
+- Updated procurement generation from BOQ so approved BOQ rows must be final locked before purchase requests are generated; generated procurement items now store `boq_price_source`, `boq_price_revision_no`, and `boq_price_event_id`.
+- Rebuilt `BOQPage` with lifecycle metrics, expected/norm/final unit-price display, final-lock status, dedicated Unit Price Lifecycle dialog, price history, and separate update/lock actions.
+- Added frontend BOQ lifecycle types and backend regression coverage for price validation plus BOQ-to-procurement final-lock behavior when DB-backed tests are enabled.
 
 ## Validation Status
 
-- No source code changed.
-- No tests/build run for this documentation-only update.
+- `cd frontend && npm run build` passed after Shared UI Refactor 2B.
+- `cd frontend && npm run build` passed after Workflow Form Core 3A.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Workflow Form Core 3A.
+- `cd backend && make fmt` passed after Workflow Form Core 3A.
+- `cd frontend && npm run build` passed after Workflow Form Runtime UX 3B.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Workflow Form Runtime UX 3B.
+- `cd backend && make fmt` passed after Workflow Form Runtime UX 3B.
+- `cd frontend && npm run build` passed after Workflow Form Authoring 3C; Vite chunk-size warning remains.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Workflow Form Authoring 3C.
+- `cd backend && make fmt` passed after Workflow Form Authoring 3C.
+- `git diff --check` passed after Workflow Form Authoring 3C.
+- `cd frontend && npm run build` passed after Planning Forms 4A; Vite chunk-size warning remains.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Planning Forms 4A.
+- `cd backend && make fmt` passed after Planning Forms 4A.
+- `git diff --check` passed after Planning Forms 4A.
+- `cd backend && make fmt` passed after Planning Forms 4B.
+- `cd frontend && npm run build` passed after Planning Forms 4B; Vite chunk-size warning remains.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Planning Forms 4B.
+- `git diff --check` passed after Planning Forms 4B.
+- `cd backend && make fmt` passed after Planning Forms 4C.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Planning Forms 4C.
+- `cd frontend && npm run build` passed after Planning Forms 4C; Vite chunk-size warning remains.
+- `git diff --check` passed after Planning Forms 4C.
+- `cd backend && make fmt` passed after Planning Forms 4D.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Planning Forms 4D.
+- `cd frontend && npm run build` passed after Planning Forms 4D; Vite chunk-size warning remains.
+- `git diff --check` passed after Planning Forms 4D.
+- `cd backend && make fmt` passed after Planning Forms 4E.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Planning Forms 4E.
+- `cd frontend && npm run build` passed after Planning Forms 4E; Vite chunk-size warning remains.
+- `docker compose config` passed after Planning Forms 4E.
+- `git diff --check` passed after Planning Forms 4E.
+- Custom migration runner for Planning Forms 4E could not apply locally because the reachable PostgreSQL server returned `FATAL: role "consflow" does not exist`; no database role/database mutation was attempted.
+- `cd backend && make fmt` passed after Planning Forms 4F.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Planning Forms 4F.
+- `cd frontend && npm run build` passed after Planning Forms 4F; Vite chunk-size warning remains.
+- `docker compose config` passed after Planning Forms 4F.
+- `git diff --check` passed after Planning Forms 4F.
+- Custom migration runner for Planning Forms 4F could not apply locally because the reachable PostgreSQL server returned `FATAL: role "consflow" does not exist`; no database role/database mutation was attempted.
+- PDF render-to-PNG validation was not run because `pdftoppm` is not available in PATH and no local migrated DB artifact could be generated; byte-level PDF generation regression coverage passed.
+- `cd backend && make fmt` passed after Planning Forms 4G.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Planning Forms 4G.
+- `cd frontend && npm run build` passed after Planning Forms 4G; Vite chunk-size warning remains.
+- `docker compose config` passed after Planning Forms 4G.
+- `git diff --check` passed after Planning Forms 4G.
+- Custom migration runner for Planning Forms 4G could not apply locally because the reachable PostgreSQL server returned `FATAL: role "consflow" does not exist`; no database role/database mutation was attempted.
 - Browser verification not run, per repo rule unless explicitly requested.
+- No backend/API/migration changes were needed for the Pipeline Builder multi-role UI, Shared UI 2A, or Shared UI 2B batches.

@@ -41,7 +41,8 @@ export function setToken(token: string | null) {
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers = new Headers(init.headers);
-  headers.set('Content-Type', 'application/json');
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  if (!isFormData && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   const res = await fetch(`${API_URL}${path}`, {
@@ -64,12 +65,33 @@ export function post<T>(path: string, body?: unknown) {
   return api<T>(path, { method: 'POST', body: JSON.stringify(body ?? {}) });
 }
 
+export function postForm<T>(path: string, body: FormData) {
+  return api<T>(path, { method: 'POST', body });
+}
+
 export function put<T>(path: string, body?: unknown) {
   return api<T>(path, { method: 'PUT', body: JSON.stringify(body ?? {}) });
 }
 
 export function del<T>(path: string) {
   return api<T>(path, { method: 'DELETE' });
+}
+
+export async function downloadBlob(path: string) {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  const res = await fetch(`${API_URL}${path}`, { headers });
+  if (!res.ok) {
+    const contentType = res.headers.get('Content-Type') ?? '';
+    if (contentType.includes('application/json')) {
+      const json = (await res.json().catch(() => null)) as ApiEnvelope<unknown> | null;
+      throw new ApiError(json?.error?.message ?? 'Không tải được file', json?.error?.code, res.status);
+    }
+    const text = await res.text().catch(() => '');
+    throw new ApiError(text || 'Không tải được file', 'DOWNLOAD_ERROR', res.status);
+  }
+  return res.blob();
 }
 
 export function streamSSE<T = any>(
