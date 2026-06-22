@@ -18,6 +18,7 @@ import { ReworkPage } from '../modules/rework/ReworkPage';
 import { HandoverPage } from '../modules/handover/HandoverPage';
 import { AccountingPage } from '../modules/accounting/AccountingPage';
 import { DebtPage } from '../modules/debt/DebtPage';
+import { CoreDataPage } from '../modules/core-data/CoreDataPage';
 import { StaffPage } from '../modules/staff/StaffPage';
 import { RolesPage } from '../modules/rbac/RolesPage';
 import { PermissionsPage } from '../modules/rbac/PermissionsPage';
@@ -65,6 +66,7 @@ export const router = createBrowserRouter([
       { path: '/accounting', element: <AccountingPage global /> },
       { path: '/debt/payables', element: <DebtPage kind="payables" /> },
       { path: '/debt/receivables', element: <DebtPage kind="receivables" /> },
+      { path: '/core-data', element: <CoreDataPage /> },
       { path: '/staff', element: <StaffPage /> },
       { path: '/roles', element: <RolesPage /> },
       { path: '/permissions', element: <PermissionsPage /> },

@@ -128,6 +128,51 @@ func (h *Handler) DeleteProject(c *fiber.Ctx) error {
 	return response.OK(c, Record{"deleted": true})
 }
 
+func (h *Handler) ListPartners(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"catalog.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.ListPartners(c.Context(), PartnerFilter{
+		Query:  c.Query("q"),
+		Type:   c.Query("type"),
+		Status: c.Query("status"),
+	})
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) CreatePartner(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"catalog.manage"}); err != nil {
+		return err
+	}
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.CreatePartner(c.Context(), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) UpdatePartner(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"catalog.manage"}); err != nil {
+		return err
+	}
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.UpdatePartner(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
 func (h *Handler) ListTemplates(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"pipeline.view"}); err != nil {
 		return err
@@ -1157,13 +1202,27 @@ func (h *Handler) ListMaterials(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"warehouse.view", "procurement.view"}); err != nil {
 		return err
 	}
-	return h.list(c, `SELECT * FROM materials WHERE active ORDER BY category, name`)
+	return h.list(c, `
+		SELECT m.*, p.name AS default_supplier_partner_name, p.tax_code AS default_supplier_tax_code
+		FROM materials m
+		LEFT JOIN partners p ON p.id=m.default_supplier_partner_id
+		WHERE m.active
+		ORDER BY m.category, m.name
+	`)
 }
 func (h *Handler) CreateMaterial(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"warehouse.adjust"}); err != nil {
 		return err
 	}
-	return h.create(c, "materials", materialColumns())
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.CreateMaterial(c.Context(), body)
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 func (h *Handler) ListWarehouses(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"warehouse.view"}); err != nil {
@@ -1616,7 +1675,15 @@ func (h *Handler) CreatePayable(c *fiber.Ctx) error {
 	if err := h.requireBodyProjectPermission(c, []string{"accounting.payable_approve"}); err != nil {
 		return err
 	}
-	return h.create(c, "payables", payableColumns())
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.CreatePayable(c.Context(), body)
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 func (h *Handler) ApprovePayable(c *fiber.Ctx) error {
 	return h.payableAction(c, "approve")
@@ -1793,6 +1860,7 @@ func (h *Handler) UploadPayableInputInvoice(c *fiber.Ctx) error {
 		InvoiceNumber:        c.FormValue("invoice_number"),
 		InvoiceSymbol:        c.FormValue("invoice_symbol"),
 		InvoiceDate:          c.FormValue("invoice_date"),
+		VendorPartnerID:      c.FormValue("vendor_partner_id"),
 		VendorName:           c.FormValue("vendor_name"),
 		VendorTaxCode:        c.FormValue("vendor_tax_code"),
 		AmountBeforeVAT:      amountBeforeVAT,
@@ -1977,7 +2045,15 @@ func (h *Handler) CreateReceivable(c *fiber.Ctx) error {
 	if err := h.requireBodyProjectPermission(c, []string{"accounting.receivable_approve"}); err != nil {
 		return err
 	}
-	return h.create(c, "receivables", receivableColumns())
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.CreateReceivable(c.Context(), body)
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 
 func (h *Handler) ListReceivablePaymentSchedules(c *fiber.Ctx) error {
@@ -2148,6 +2224,7 @@ func (h *Handler) UploadReceivableOutputInvoice(c *fiber.Ctx) error {
 		InvoiceNumber:   c.FormValue("invoice_number"),
 		InvoiceSymbol:   c.FormValue("invoice_symbol"),
 		InvoiceDate:     c.FormValue("invoice_date"),
+		ClientPartnerID: c.FormValue("client_partner_id"),
 		ClientName:      c.FormValue("client_name"),
 		ClientTaxCode:   c.FormValue("client_tax_code"),
 		AmountBeforeVAT: amountBeforeVAT,

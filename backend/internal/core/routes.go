@@ -30,6 +30,9 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, _ *redis.Client, cfg config.Conf
 	protected.Get("/projects/:id", h.GetProject)
 	protected.Put("/projects/:id", h.UpdateProject)
 	protected.Delete("/projects/:id", h.DeleteProject)
+	protected.Get("/partners", h.ListPartners)
+	protected.Post("/partners", h.CreatePartner)
+	protected.Put("/partners/:id", h.UpdatePartner)
 
 	protected.Get("/pipeline-templates", h.ListTemplates)
 	protected.Post("/pipeline-templates", h.CreateTemplate)

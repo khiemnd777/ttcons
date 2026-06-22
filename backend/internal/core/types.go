@@ -25,10 +25,17 @@ type ActionRequest struct {
 	Reason  string `json:"reason"`
 }
 
+type PartnerFilter struct {
+	Query  string
+	Type   string
+	Status string
+}
+
 type InputInvoiceRequest struct {
 	InvoiceNumber        string  `json:"invoice_number"`
 	InvoiceSymbol        string  `json:"invoice_symbol"`
 	InvoiceDate          string  `json:"invoice_date"`
+	VendorPartnerID      string  `json:"vendor_partner_id"`
 	VendorName           string  `json:"vendor_name"`
 	VendorTaxCode        string  `json:"vendor_tax_code"`
 	AmountBeforeVAT      float64 `json:"amount_before_vat"`
@@ -43,6 +50,7 @@ type OutputInvoiceRequest struct {
 	InvoiceNumber   string  `json:"invoice_number"`
 	InvoiceSymbol   string  `json:"invoice_symbol"`
 	InvoiceDate     string  `json:"invoice_date"`
+	ClientPartnerID string  `json:"client_partner_id"`
 	ClientName      string  `json:"client_name"`
 	ClientTaxCode   string  `json:"client_tax_code"`
 	AmountBeforeVAT float64 `json:"amount_before_vat"`
@@ -237,17 +245,19 @@ type SurplusHandlingRequest struct {
 }
 
 type IncomingAcceptanceRequest struct {
-	WorkItemID           string                          `json:"work_item_id"`
-	ProcurementRequestID string                          `json:"procurement_request_id"`
-	WarehouseID          string                          `json:"warehouse_id"`
-	SourceType           string                          `json:"source_type"`
-	SupplierName         string                          `json:"supplier_name"`
-	SubcontractorName    string                          `json:"subcontractor_name"`
-	DeliveryReference    string                          `json:"delivery_reference"`
-	ReceivedAt           string                          `json:"received_at"`
-	Result               string                          `json:"result"`
-	Comment              string                          `json:"comment"`
-	Items                []IncomingAcceptanceItemRequest `json:"items"`
+	WorkItemID             string                          `json:"work_item_id"`
+	ProcurementRequestID   string                          `json:"procurement_request_id"`
+	WarehouseID            string                          `json:"warehouse_id"`
+	SourceType             string                          `json:"source_type"`
+	SupplierPartnerID      string                          `json:"supplier_partner_id"`
+	SupplierName           string                          `json:"supplier_name"`
+	SubcontractorPartnerID string                          `json:"subcontractor_partner_id"`
+	SubcontractorName      string                          `json:"subcontractor_name"`
+	DeliveryReference      string                          `json:"delivery_reference"`
+	ReceivedAt             string                          `json:"received_at"`
+	Result                 string                          `json:"result"`
+	Comment                string                          `json:"comment"`
+	Items                  []IncomingAcceptanceItemRequest `json:"items"`
 }
 
 type IncomingAcceptanceItemRequest struct {

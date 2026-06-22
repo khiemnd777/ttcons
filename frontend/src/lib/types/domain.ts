@@ -12,9 +12,28 @@ export type Project = AnyRecord & {
   id: string;
   name: string;
   code: string;
+  partner_id?: string;
   client_name: string;
+  partner_name?: string;
+  partner_tax_code?: string;
   status: string;
   progress_percent: number;
+};
+
+export type Partner = AnyRecord & {
+  id: string;
+  partner_code: string;
+  name: string;
+  legal_name?: string;
+  partner_types: string[];
+  tax_code?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  contact_name?: string;
+  payment_terms_days?: number;
+  notes?: string;
+  active: boolean;
 };
 
 export type PipelineNode = AnyRecord & {
@@ -232,6 +251,7 @@ export type PayableRecord = ProjectOperationsRecord & {
   project_name?: string;
   payable_code: string;
   vendor_type: string;
+  vendor_partner_id?: string;
   vendor_name: string;
   source_type?: string;
   source_id?: string;
@@ -385,6 +405,7 @@ export type ReceivableRecord = ProjectOperationsRecord & {
   project_id: string;
   project_name?: string;
   receivable_code: string;
+  client_partner_id?: string;
   client_name: string;
   contract_amount?: number;
   milestone_name?: string;
@@ -542,6 +563,7 @@ export type InputInvoiceRecord = ProjectOperationsRecord & {
   invoice_number: string;
   invoice_symbol?: string;
   invoice_date: string;
+  vendor_partner_id?: string;
   vendor_name: string;
   vendor_tax_code?: string;
   amount_before_vat: number;
@@ -579,6 +601,7 @@ export type OutputInvoiceRecord = ProjectOperationsRecord & {
   invoice_number: string;
   invoice_symbol?: string;
   invoice_date: string;
+  client_partner_id?: string;
   client_name: string;
   client_tax_code?: string;
   amount_before_vat: number;
@@ -1080,6 +1103,9 @@ export type MaterialCatalogItem = ProjectOperationsRecord & {
   name: string;
   unit: string;
   category?: string;
+  default_supplier_partner_id?: string;
+  default_supplier_partner_name?: string;
+  default_supplier_tax_code?: string;
   default_supplier?: string;
   standard_price?: number;
   active?: boolean;
@@ -1231,7 +1257,9 @@ export type IncomingAcceptanceRecord = ProjectOperationsRecord & {
   warehouse_id?: string;
   warehouse_name?: string;
   source_type: 'supplier' | 'subcontractor' | 'procurement' | 'other' | string;
+  supplier_partner_id?: string;
   supplier_name?: string;
+  subcontractor_partner_id?: string;
   subcontractor_name?: string;
   delivery_reference?: string;
   status: 'draft' | 'submitted' | 'cancelled' | string;
@@ -1274,6 +1302,7 @@ export type IncomingAcceptanceResponse = {
   records?: IncomingAcceptanceRecord[];
   materials?: MaterialCatalogItem[];
   warehouses?: Warehouse[];
+  partners?: Partner[];
   procurement_requests?: ProcurementRequestOption[];
   procurement_request_items?: ProcurementRequestItemOption[];
 };

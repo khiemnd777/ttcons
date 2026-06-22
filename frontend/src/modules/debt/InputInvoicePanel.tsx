@@ -9,8 +9,9 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, get, post, postForm } from '../../lib/api/client';
-import type { InputInvoiceRecord, PayableRecord } from '../../lib/types/domain';
+import type { InputInvoiceRecord, Partner, PayableRecord } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
+import { partnerOptions, vendorPartnerTypes } from '../core-data/partnerUtils';
 
 const maxInvoiceUploadBytes = 10 * 1024 * 1024;
 
@@ -23,6 +24,7 @@ type InvoiceDraft = {
   invoice_number: string;
   invoice_symbol: string;
   invoice_date: string;
+  vendor_partner_id: string;
   vendor_name: string;
   vendor_tax_code: string;
   amount_before_vat: string;
@@ -43,6 +45,7 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
     queryKey: ['input-invoices', payable.id],
     queryFn: () => get<InputInvoiceRecord[]>(`/payables/${payable.id}/input-invoices`),
   });
+  const partners = useQuery({ queryKey: ['partners', 'vendor', 'active'], queryFn: () => get<Partner[]>('/partners?status=active') });
 
   const uploadInvoice = useMutation({
     mutationFn: (formData: FormData) => postForm<InputInvoiceRecord>(`/payables/${payable.id}/input-invoices/upload`, formData),
@@ -72,6 +75,16 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
+  function selectVendorPartner(partnerId: string) {
+    const partner = (partners.data ?? []).find((item) => item.id === partnerId);
+    setDraft((current) => ({
+      ...current,
+      vendor_partner_id: partnerId,
+      vendor_name: partner?.name ?? current.vendor_name,
+      vendor_tax_code: partner?.tax_code ?? current.vendor_tax_code,
+    }));
+  }
+
   function onFileChange(file: File | null) {
     setSelectedFile(file);
     if (file && !draft.invoice_number.trim()) {
@@ -92,6 +105,7 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
     formData.append('invoice_number', draft.invoice_number.trim());
     formData.append('invoice_symbol', draft.invoice_symbol.trim());
     formData.append('invoice_date', draft.invoice_date);
+    formData.append('vendor_partner_id', draft.vendor_partner_id);
     formData.append('vendor_name', draft.vendor_name.trim());
     formData.append('vendor_tax_code', draft.vendor_tax_code.trim());
     formData.append('amount_before_vat', draft.amount_before_vat.trim() || '0');
@@ -223,8 +237,9 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
             <TextField label="Số hoá đơn" value={draft.invoice_number} onChange={(value) => updateDraft('invoice_number', value)} required />
             <TextField label="Ký hiệu" value={draft.invoice_symbol} onChange={(value) => updateDraft('invoice_symbol', value)} />
             <TextField label="Ngày hoá đơn" type="date" value={draft.invoice_date} onChange={(value) => updateDraft('invoice_date', value)} required />
-            <TextField label="Vendor" value={draft.vendor_name} onChange={(value) => updateDraft('vendor_name', value)} required />
-            <TextField label="Mã số thuế vendor" value={draft.vendor_tax_code} onChange={(value) => updateDraft('vendor_tax_code', value)} />
+            <SelectField label="Vendor catalog" value={draft.vendor_partner_id} onChange={selectVendorPartner} options={partnerOptions(partners.data ?? [], vendorPartnerTypes)} />
+            {!draft.vendor_partner_id ? <TextField label="Vendor" value={draft.vendor_name} onChange={(value) => updateDraft('vendor_name', value)} required /> : <ReadOnlyField label="Vendor snapshot" value={draft.vendor_name} />}
+            {!draft.vendor_partner_id ? <TextField label="Mã số thuế vendor" value={draft.vendor_tax_code} onChange={(value) => updateDraft('vendor_tax_code', value)} /> : <ReadOnlyField label="MST vendor" value={draft.vendor_tax_code || '-'} />}
             <TextField label="Yêu cầu mua liên kết" value={draft.procurement_request_id} onChange={(value) => updateDraft('procurement_request_id', value)} placeholder="UUID procurement request nếu có" />
             <TextField label="Trước VAT" type="number" value={draft.amount_before_vat} onChange={(value) => updateDraft('amount_before_vat', value)} min="0" />
             <TextField label="VAT" type="number" value={draft.vat_amount} onChange={(value) => updateDraft('vat_amount', value)} min="0" />
@@ -261,6 +276,7 @@ function defaultDraft(payable: PayableRecord): InvoiceDraft {
     invoice_number: '',
     invoice_symbol: '',
     invoice_date: new Date().toISOString().slice(0, 10),
+    vendor_partner_id: payable.vendor_partner_id ?? '',
     vendor_name: payable.vendor_name ?? '',
     vendor_tax_code: '',
     amount_before_vat: total > 0 ? String(total) : '',
@@ -277,7 +293,7 @@ function validateDraft(draft: InvoiceDraft, selectedFile: File | null) {
   if (selectedFile.type && selectedFile.type !== 'application/pdf') return 'File upload phải là PDF.';
   if (!draft.invoice_number.trim()) return 'Nhập số hoá đơn.';
   if (!draft.invoice_date) return 'Chọn ngày hoá đơn.';
-  if (!draft.vendor_name.trim()) return 'Nhập tên vendor trên hoá đơn.';
+  if (!draft.vendor_partner_id && !draft.vendor_name.trim()) return 'Nhập tên vendor trên hoá đơn.';
   const beforeVAT = Number(draft.amount_before_vat || 0);
   const vat = Number(draft.vat_amount || 0);
   const total = Number(draft.total_amount || 0);
@@ -315,6 +331,41 @@ function IconButton({ label, disabled, onClick, children }: { label: string; dis
     >
       {children}
     </button>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ label: string; value: string }>;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold text-slate-600">{label}</span>
+      <select
+        className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">Nhập tay</option>
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold text-slate-600">{label}</span>
+      <span className="mt-1 block min-h-10 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm text-slate-700">{value || '-'}</span>
+    </label>
   );
 }
 

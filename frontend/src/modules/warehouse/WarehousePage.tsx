@@ -14,6 +14,8 @@ import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { EnumChip } from '../../components/EnumChip';
+import type { Partner } from '../../lib/types/domain';
+import { partnerOptions } from '../core-data/partnerUtils';
 
 export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const { id } = useParams();
@@ -24,6 +26,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const toast = useToast();
   const materials = useQuery({ queryKey: ['materials'], queryFn: () => get<Record<string, any>[]>('/materials') });
   const warehouses = useQuery({ queryKey: ['warehouses'], queryFn: () => get<Record<string, any>[]>('/warehouses') });
+  const partners = useQuery({ queryKey: ['partners', 'supplier', 'active'], queryFn: () => get<Partner[]>('/partners?status=active') });
   const stock = useQuery({ queryKey: ['stock'], queryFn: () => get<Record<string, any>[]>('/stock') });
   const balances = useQuery({ queryKey: ['material-balances', projectId], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/material-balances`), enabled: Boolean(projectId) });
   const createMaterial = useMutation({
@@ -93,7 +96,18 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
             { name: 'name', label: 'Tên vật tư', defaultValue: 'Vật tư mới', required: true },
             { name: 'unit', label: 'Đơn vị', defaultValue: 'cái', required: true },
             { name: 'category', label: 'Nhóm', defaultValue: 'Phụ kiện', required: true },
-            { name: 'default_supplier', label: 'Nhà cung cấp' },
+            {
+              name: 'default_supplier_partner_id',
+              label: 'Nhà cung cấp catalog',
+              type: 'select',
+              options: partnerOptions(partners.data ?? [], ['supplier', 'service_provider', 'other']),
+              helperText: 'Chọn catalog để snapshot tên nhà cung cấp mặc định.',
+            },
+            {
+              name: 'default_supplier',
+              label: 'Nhà cung cấp',
+              hiddenWhen: (values: Record<string, any>) => Boolean(values.default_supplier_partner_id),
+            },
             { name: 'standard_price', label: 'Giá chuẩn', type: 'number', defaultValue: 100000, min: 0 },
           ]}
           onSubmit={(values) => createMaterial.mutateAsync(values)}

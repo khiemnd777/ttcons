@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -138,6 +139,45 @@ func (s *Service) ListProjects(ctx context.Context, actorID string) ([]Record, e
 	return s.repo.ListProjects(ctx, actorID)
 }
 
+func (s *Service) ListPartners(ctx context.Context, filter PartnerFilter) ([]Record, error) {
+	filter.Query = strings.TrimSpace(filter.Query)
+	filter.Type = strings.TrimSpace(filter.Type)
+	filter.Status = strings.TrimSpace(filter.Status)
+	if filter.Type != "" && !validPartnerType(filter.Type) {
+		return nil, validationError("Loại đối tác không hợp lệ", Record{"partner_type": filter.Type})
+	}
+	if filter.Status != "" && !statusIn(filter.Status, "active", "inactive", "all") {
+		return nil, validationError("Trạng thái đối tác không hợp lệ", Record{"status": filter.Status})
+	}
+	return s.repo.ListPartners(ctx, filter)
+}
+
+func (s *Service) CreatePartner(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+	normalized, err := normalizePartnerBody(body, true)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.repo.Insert(ctx, "partners", partnerColumns(), normalized)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, "", actorID, actorName, "partner_created", "partner", cleanID(row["id"]), fmt.Sprintf("Create partner %s", row["name"]), Record{"partner_code": row["partner_code"], "partner_types": row["partner_types"]})
+	return row, nil
+}
+
+func (s *Service) UpdatePartner(ctx context.Context, id string, body Record, actorID, actorName string) (Record, error) {
+	normalized, err := normalizePartnerBody(body, false)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.repo.Update(ctx, "partners", partnerColumns(), id, normalized)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, "", actorID, actorName, "partner_updated", "partner", cleanID(row["id"]), fmt.Sprintf("Update partner %s", row["name"]), Record{"partner_code": row["partner_code"], "partner_types": row["partner_types"]})
+	return row, nil
+}
+
 func (s *Service) CreateProject(ctx context.Context, body Record) (Record, error) {
 	if body["code"] == nil || body["code"] == "" {
 		body["code"] = fmt.Sprintf("PRJ-%d", time.Now().Unix())
@@ -145,10 +185,16 @@ func (s *Service) CreateProject(ctx context.Context, body Record) (Record, error
 	if body["status"] == nil {
 		body["status"] = "draft"
 	}
+	if err := s.applyPartnerSnapshot(ctx, body, "partner_id", "client_name", "", []string{"client"}); err != nil {
+		return nil, err
+	}
 	return s.repo.Insert(ctx, "projects", projectColumns(), body)
 }
 
 func (s *Service) UpdateProject(ctx context.Context, id string, body Record) (Record, error) {
+	if err := s.applyPartnerSnapshot(ctx, body, "partner_id", "client_name", "", []string{"client"}); err != nil {
+		return nil, err
+	}
 	return s.repo.Update(ctx, "projects", projectColumns(), id, body)
 }
 
@@ -158,6 +204,30 @@ func (s *Service) ProjectDetail(ctx context.Context, id string) (Record, error) 
 
 func (s *Service) DeleteProject(ctx context.Context, id string) error {
 	return s.repo.Exec(ctx, `UPDATE projects SET status='cancelled', updated_at=now() WHERE id=$1`, id)
+}
+
+func (s *Service) CreateMaterial(ctx context.Context, body Record) (Record, error) {
+	if err := s.applyPartnerSnapshot(ctx, body, "default_supplier_partner_id", "default_supplier", "", []string{"supplier", "service_provider", "other"}); err != nil {
+		return nil, err
+	}
+	return s.repo.Insert(ctx, "materials", materialColumns(), body)
+}
+
+func (s *Service) CreatePayable(ctx context.Context, body Record) (Record, error) {
+	if body["vendor_type"] == nil || strings.TrimSpace(fmt.Sprint(body["vendor_type"])) == "" {
+		body["vendor_type"] = "supplier"
+	}
+	if err := s.applyPartnerSnapshot(ctx, body, "vendor_partner_id", "vendor_name", "", vendorPartnerTypes()); err != nil {
+		return nil, err
+	}
+	return s.repo.Insert(ctx, "payables", payableColumns(), body)
+}
+
+func (s *Service) CreateReceivable(ctx context.Context, body Record) (Record, error) {
+	if err := s.applyPartnerSnapshot(ctx, body, "client_partner_id", "client_name", "", []string{"client"}); err != nil {
+		return nil, err
+	}
+	return s.repo.Insert(ctx, "receivables", receivableColumns(), body)
 }
 
 func (s *Service) ListTemplates(ctx context.Context) ([]Record, error) {
@@ -801,6 +871,194 @@ func cleanOptionalText(value any) string {
 		return ""
 	}
 	return text
+}
+
+func normalizePartnerBody(body Record, create bool) (Record, error) {
+	if body == nil {
+		body = Record{}
+	}
+	normalized := Record{}
+	for key, value := range body {
+		normalized[key] = value
+	}
+	if create && cleanOptionalText(normalized["partner_code"]) == "" {
+		normalized["partner_code"] = fmt.Sprintf("PT-%d", time.Now().Unix())
+	}
+	for _, field := range []string{"partner_code", "name", "legal_name", "tax_code", "phone", "email", "address", "contact_name", "notes"} {
+		if _, ok := normalized[field]; ok {
+			normalized[field] = strings.TrimSpace(fmt.Sprint(normalized[field]))
+		}
+	}
+	if create || normalized["name"] != nil {
+		if cleanOptionalText(normalized["name"]) == "" {
+			return nil, validationError("Tên đối tác là bắt buộc")
+		}
+	}
+	for _, field := range []string{"partner_code", "name", "legal_name", "tax_code", "phone", "email", "contact_name"} {
+		if len([]rune(cleanOptionalText(normalized[field]))) > 240 {
+			return nil, validationError("Thông tin đối tác không được vượt quá 240 ký tự", Record{"field": field})
+		}
+	}
+	if len([]rune(cleanOptionalText(normalized["address"]))) > 1000 {
+		return nil, validationError("Địa chỉ đối tác không được vượt quá 1000 ký tự")
+	}
+	if len([]rune(cleanOptionalText(normalized["notes"]))) > 2000 {
+		return nil, validationError("Ghi chú đối tác không được vượt quá 2000 ký tự")
+	}
+	if create || normalized["partner_types"] != nil {
+		types, err := normalizePartnerTypes(normalized["partner_types"])
+		if err != nil {
+			return nil, err
+		}
+		if len(types) == 0 {
+			return nil, validationError("Cần chọn ít nhất một loại đối tác")
+		}
+		normalized["partner_types"] = types
+	}
+	if create || normalized["payment_terms_days"] != nil {
+		days := int(number(normalized["payment_terms_days"]))
+		if days < 0 {
+			return nil, validationError("Điều khoản thanh toán không được âm")
+		}
+		normalized["payment_terms_days"] = days
+	}
+	if create && normalized["active"] == nil {
+		normalized["active"] = true
+	}
+	return normalized, nil
+}
+
+func normalizePartnerTypes(value any) ([]string, error) {
+	out := make([]string, 0)
+	seen := map[string]bool{}
+	add := func(raw any) error {
+		for _, part := range strings.Split(fmt.Sprint(raw), ",") {
+			value := strings.TrimSpace(part)
+			if value == "" || value == "<nil>" {
+				continue
+			}
+			if !validPartnerType(value) {
+				return validationError("Loại đối tác không hợp lệ", Record{"partner_type": value})
+			}
+			if !seen[value] {
+				seen[value] = true
+				out = append(out, value)
+			}
+		}
+		return nil
+	}
+	switch typed := value.(type) {
+	case nil:
+		return out, nil
+	case []string:
+		for _, item := range typed {
+			if err := add(item); err != nil {
+				return nil, err
+			}
+		}
+	case []any:
+		for _, item := range typed {
+			if err := add(item); err != nil {
+				return nil, err
+			}
+		}
+	case string:
+		text := strings.TrimSpace(typed)
+		if strings.HasPrefix(text, "[") {
+			var items []string
+			if err := json.Unmarshal([]byte(text), &items); err == nil {
+				for _, item := range items {
+					if err := add(item); err != nil {
+						return nil, err
+					}
+				}
+				return out, nil
+			}
+		}
+		if err := add(typed); err != nil {
+			return nil, err
+		}
+	default:
+		if err := add(typed); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func validPartnerType(value string) bool {
+	return statusIn(value, "client", "supplier", "subcontractor", "labor_team", "transport", "equipment_rental", "service_provider", "other")
+}
+
+func vendorPartnerTypes() []string {
+	return []string{"supplier", "subcontractor", "labor_team", "transport", "equipment_rental", "service_provider", "other"}
+}
+
+func (s *Service) applyPartnerSnapshot(ctx context.Context, body Record, idField, nameField, taxCodeField string, allowedTypes []string) error {
+	if body == nil {
+		return nil
+	}
+	rawID, exists := body[idField]
+	if !exists {
+		return nil
+	}
+	partnerID := cleanID(rawID)
+	if partnerID == "" {
+		body[idField] = nil
+		return nil
+	}
+	partner, err := s.requireActivePartner(ctx, partnerID, allowedTypes)
+	if err != nil {
+		return err
+	}
+	body[idField] = partnerID
+	body[nameField] = cleanOptionalText(partner["name"])
+	if taxCodeField != "" {
+		body[taxCodeField] = cleanOptionalText(partner["tax_code"])
+	}
+	return nil
+}
+
+func (s *Service) requireActivePartner(ctx context.Context, partnerID string, allowedTypes []string) (Record, error) {
+	if !validActivityUUID(partnerID) {
+		return nil, validationError("partner_id không hợp lệ", Record{"partner_id": partnerID})
+	}
+	partner, err := s.repo.GetByID(ctx, "partners", partnerID)
+	if err != nil {
+		return nil, validationError("Đối tác không tồn tại", Record{"partner_id": partnerID})
+	}
+	if active, ok := partner["active"].(bool); ok && !active {
+		return nil, validationError("Đối tác đang inactive", Record{"partner_id": partnerID})
+	}
+	if len(allowedTypes) > 0 && !partnerHasAnyType(partner, allowedTypes) {
+		return nil, validationError("Loại đối tác không phù hợp nghiệp vụ", Record{"partner_id": partnerID, "allowed_types": allowedTypes, "partner_types": partner["partner_types"]})
+	}
+	return partner, nil
+}
+
+func partnerHasAnyType(partner Record, allowedTypes []string) bool {
+	types := map[string]bool{}
+	switch raw := partner["partner_types"].(type) {
+	case []any:
+		for _, item := range raw {
+			types[fmt.Sprint(item)] = true
+		}
+	case []string:
+		for _, item := range raw {
+			types[item] = true
+		}
+	case string:
+		parsed, _ := normalizePartnerTypes(raw)
+		for _, item := range parsed {
+			types[item] = true
+		}
+	}
+	for _, allowed := range allowedTypes {
+		if types[allowed] {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) OwnerClientReconciliation(ctx context.Context, workItemID, actorID string) (Record, error) {
@@ -1991,6 +2249,10 @@ func (s *Service) incomingAcceptanceResponse(ctx context.Context, item Record) (
 	if err != nil {
 		return nil, err
 	}
+	partners, err := s.repo.ListPartners(ctx, PartnerFilter{Status: "active"})
+	if err != nil {
+		return nil, err
+	}
 	acceptances, err := s.repo.ListIncomingAcceptancesForWorkItem(ctx, cleanID(item["id"]))
 	if err != nil {
 		return nil, err
@@ -2010,6 +2272,7 @@ func (s *Service) incomingAcceptanceResponse(ctx context.Context, item Record) (
 		"records":                   acceptances,
 		"materials":                 materials,
 		"warehouses":                warehouses,
+		"partners":                  partners,
 		"procurement_requests":      procurementRequests,
 		"procurement_request_items": procurementItems,
 	}, nil
@@ -2048,8 +2311,24 @@ func (s *Service) normalizeIncomingAcceptanceRequest(ctx context.Context, projec
 	if !statusIn(sourceType, "supplier", "subcontractor", "procurement", "other") {
 		return nil, nil, validationError("Nguồn nghiệm thu đầu vào không hợp lệ", Record{"source_type": sourceType})
 	}
+	supplierPartnerID := cleanID(req.SupplierPartnerID)
+	subcontractorPartnerID := cleanID(req.SubcontractorPartnerID)
 	supplierName := strings.TrimSpace(req.SupplierName)
 	subcontractorName := strings.TrimSpace(req.SubcontractorName)
+	if supplierPartnerID != "" {
+		partner, err := s.requireActivePartner(ctx, supplierPartnerID, []string{"supplier", "service_provider", "other"})
+		if err != nil {
+			return nil, nil, err
+		}
+		supplierName = cleanOptionalText(partner["name"])
+	}
+	if subcontractorPartnerID != "" {
+		partner, err := s.requireActivePartner(ctx, subcontractorPartnerID, []string{"subcontractor", "labor_team"})
+		if err != nil {
+			return nil, nil, err
+		}
+		subcontractorName = cleanOptionalText(partner["name"])
+	}
 	deliveryReference := strings.TrimSpace(req.DeliveryReference)
 	for field, value := range map[string]string{
 		"supplier_name":      supplierName,
@@ -2152,19 +2431,21 @@ func (s *Service) normalizeIncomingAcceptanceRequest(ctx context.Context, projec
 		}
 	}
 	header := Record{
-		"project_id":              projectID,
-		"work_item_id":            workItemID,
-		"procurement_request_id":  procurementRequestID,
-		"warehouse_id":            warehouseID,
-		"source_type":             sourceType,
-		"supplier_name":           supplierName,
-		"subcontractor_name":      subcontractorName,
-		"delivery_reference":      deliveryReference,
-		"received_at":             receivedAt,
-		"result":                  result,
-		"comment":                 comment,
-		"summary_json":            summary,
-		"incoming_material_count": summary["total"],
+		"project_id":               projectID,
+		"work_item_id":             workItemID,
+		"procurement_request_id":   procurementRequestID,
+		"warehouse_id":             warehouseID,
+		"source_type":              sourceType,
+		"supplier_partner_id":      supplierPartnerID,
+		"supplier_name":            supplierName,
+		"subcontractor_partner_id": subcontractorPartnerID,
+		"subcontractor_name":       subcontractorName,
+		"delivery_reference":       deliveryReference,
+		"received_at":              receivedAt,
+		"result":                   result,
+		"comment":                  comment,
+		"summary_json":             summary,
+		"incoming_material_count":  summary["total"],
 	}
 	return header, normalized, nil
 }
@@ -2324,17 +2605,19 @@ func (s *Service) normalizeIncomingAcceptanceItem(ctx context.Context, projectID
 
 func incomingAcceptanceRequestFromRecord(record Record) IncomingAcceptanceRequest {
 	req := IncomingAcceptanceRequest{
-		WorkItemID:           cleanID(record["work_item_id"]),
-		ProcurementRequestID: cleanID(record["procurement_request_id"]),
-		WarehouseID:          cleanID(record["warehouse_id"]),
-		SourceType:           cleanOptionalText(record["source_type"]),
-		SupplierName:         cleanOptionalText(record["supplier_name"]),
-		SubcontractorName:    cleanOptionalText(record["subcontractor_name"]),
-		DeliveryReference:    cleanOptionalText(record["delivery_reference"]),
-		ReceivedAt:           dateOnly(record["received_at"]),
-		Result:               cleanOptionalText(record["result"]),
-		Comment:              cleanOptionalText(record["comment"]),
-		Items:                []IncomingAcceptanceItemRequest{},
+		WorkItemID:             cleanID(record["work_item_id"]),
+		ProcurementRequestID:   cleanID(record["procurement_request_id"]),
+		WarehouseID:            cleanID(record["warehouse_id"]),
+		SourceType:             cleanOptionalText(record["source_type"]),
+		SupplierPartnerID:      cleanID(record["supplier_partner_id"]),
+		SupplierName:           cleanOptionalText(record["supplier_name"]),
+		SubcontractorPartnerID: cleanID(record["subcontractor_partner_id"]),
+		SubcontractorName:      cleanOptionalText(record["subcontractor_name"]),
+		DeliveryReference:      cleanOptionalText(record["delivery_reference"]),
+		ReceivedAt:             dateOnly(record["received_at"]),
+		Result:                 cleanOptionalText(record["result"]),
+		Comment:                cleanOptionalText(record["comment"]),
+		Items:                  []IncomingAcceptanceItemRequest{},
 	}
 	if items, ok := record["items"].([]Record); ok {
 		req.Items = make([]IncomingAcceptanceItemRequest, 0, len(items))
@@ -6232,7 +6515,20 @@ func (s *Service) normalizeInputInvoiceRequest(ctx context.Context, payable Reco
 	if _, err := time.Parse("2006-01-02", invoiceDate); err != nil {
 		return nil, validationError("Ngày hoá đơn không hợp lệ", Record{"invoice_date": invoiceDate})
 	}
+	vendorPartnerID := cleanID(req.VendorPartnerID)
+	if vendorPartnerID == "" {
+		vendorPartnerID = cleanID(payable["vendor_partner_id"])
+	}
 	vendorName := strings.TrimSpace(req.VendorName)
+	vendorTaxCode := strings.TrimSpace(req.VendorTaxCode)
+	if vendorPartnerID != "" {
+		partner, err := s.requireActivePartner(ctx, vendorPartnerID, vendorPartnerTypes())
+		if err != nil {
+			return nil, err
+		}
+		vendorName = cleanOptionalText(partner["name"])
+		vendorTaxCode = cleanOptionalText(partner["tax_code"])
+	}
 	if vendorName == "" {
 		vendorName = cleanOptionalText(payable["vendor_name"])
 	}
@@ -6242,7 +6538,6 @@ func (s *Service) normalizeInputInvoiceRequest(ctx context.Context, payable Reco
 	if len([]rune(vendorName)) > 240 {
 		return nil, validationError("Tên vendor trên hoá đơn không được vượt quá 240 ký tự")
 	}
-	vendorTaxCode := strings.TrimSpace(req.VendorTaxCode)
 	if len([]rune(vendorTaxCode)) > 80 {
 		return nil, validationError("Mã số thuế vendor không được vượt quá 80 ký tự")
 	}
@@ -6301,6 +6596,7 @@ func (s *Service) normalizeInputInvoiceRequest(ctx context.Context, payable Reco
 		"invoice_number":         invoiceNumber,
 		"invoice_symbol":         invoiceSymbol,
 		"invoice_date":           invoiceDate,
+		"vendor_partner_id":      vendorPartnerID,
 		"vendor_name":            vendorName,
 		"vendor_tax_code":        vendorTaxCode,
 		"amount_before_vat":      req.AmountBeforeVAT,
@@ -6436,7 +6732,20 @@ func (s *Service) normalizeOutputInvoiceRequest(ctx context.Context, receivable 
 	if _, err := time.Parse("2006-01-02", invoiceDate); err != nil {
 		return nil, validationError("Ngày hoá đơn không hợp lệ", Record{"invoice_date": invoiceDate})
 	}
+	clientPartnerID := cleanID(req.ClientPartnerID)
+	if clientPartnerID == "" {
+		clientPartnerID = cleanID(receivable["client_partner_id"])
+	}
 	clientName := strings.TrimSpace(req.ClientName)
+	clientTaxCode := strings.TrimSpace(req.ClientTaxCode)
+	if clientPartnerID != "" {
+		partner, err := s.requireActivePartner(ctx, clientPartnerID, []string{"client"})
+		if err != nil {
+			return nil, err
+		}
+		clientName = cleanOptionalText(partner["name"])
+		clientTaxCode = cleanOptionalText(partner["tax_code"])
+	}
 	if clientName == "" {
 		clientName = cleanOptionalText(receivable["client_name"])
 	}
@@ -6446,7 +6755,6 @@ func (s *Service) normalizeOutputInvoiceRequest(ctx context.Context, receivable 
 	if len([]rune(clientName)) > 240 {
 		return nil, validationError("Tên khách hàng trên hoá đơn không được vượt quá 240 ký tự")
 	}
-	clientTaxCode := strings.TrimSpace(req.ClientTaxCode)
 	if len([]rune(clientTaxCode)) > 80 {
 		return nil, validationError("Mã số thuế khách hàng không được vượt quá 80 ký tự")
 	}
@@ -6505,6 +6813,7 @@ func (s *Service) normalizeOutputInvoiceRequest(ctx context.Context, receivable 
 		"invoice_number":    invoiceNumber,
 		"invoice_symbol":    invoiceSymbol,
 		"invoice_date":      invoiceDate,
+		"client_partner_id": clientPartnerID,
 		"client_name":       clientName,
 		"client_tax_code":   clientTaxCode,
 		"amount_before_vat": req.AmountBeforeVAT,

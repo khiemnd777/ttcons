@@ -46,8 +46,8 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 
 | Roadmap item | Current fit | Required direction |
 | --- | --- | --- |
-| Nền tảng | Mostly present | Harden env, CI, observability, backup/restore, deployment checklist. |
-| Dữ liệu lõi | Partial | Add partner/vendor/client/catalog models where needed. |
+| Nền tảng | Done | CI, migration checksum check, request-id logging, validation Make targets, deployment/rollback checklist, backup/restore procedure, and seed policy implemented. |
+| Dữ liệu lõi | Done | Partner catalog, canonical partner links, and snapshot preservation implemented for project/material/procurement/accounting/invoice/acceptance flows. |
 | Auth / RBAC | Partial | Add permission-aware UI, stronger session/token lifecycle, coverage audit. |
 | Lõi module nghiệp vụ | Partial | Refactor generic CRUD into clearer handler-service-repository use cases. |
 | Admin UX | Partial | Improve dense operational UX, errors, loading, empty states, filters. |
@@ -451,6 +451,19 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - Added authenticated `/reports/profit/export` CSV export from the same P&L ledger source.
 - Added `ProfitReportPanel` inside Reports with project/date/status filters, summary cards, warning states, project table, period table, cost breakdown, ledger, reload, and CSV export.
 - Added backend regression coverage for P&L CSV serialization and scoped posted profit summary calculations when DB-backed tests are enabled.
+- Implemented Foundation Hardening 10A for production-grade repo validation and ops readiness.
+- Added `.github/workflows/ci.yml` to run backend format check, migration checksum validation, backend tests, frontend build, and whitespace diff checks.
+- Added read-only migration validation via `go run ./cmd/migrate -check`, `cd backend && make migrate-check`, and root `make migrate-check`.
+- Added root Make validation targets for backend tests, frontend build, migration check, Docker Compose config, and combined test flow while preserving the existing `up`/`restart` Docker sequence.
+- Added request-id middleware and request-id log formatting to the Fiber server without changing API routes or response contracts.
+- Added ops runbooks for deployment/rollback, PostgreSQL backup/restore, and seed/demo data policy in `docs/ops/`.
+- Implemented Dữ liệu lõi as a production-grade partner/client/vendor/catalog foundation.
+- Added migration `backend/migrations/V36__core_partner_catalog.sql` with `partners`, partner type metadata, active filtering, permissions, and nullable partner links for projects, materials, procurement request items, payables, receivables, input/output invoices, and incoming acceptance records.
+- Added authenticated `/partners` list/create/update APIs with `catalog.view` and `catalog.manage` permissions, active/type filters, partner snapshot helpers, and type validation for supplier/client/subcontractor usage.
+- Preserved historical text snapshot fields while allowing canonical `partner_id` links to populate client/vendor/supplier names and tax codes on create/upload/acceptance flows.
+- Added the frontend `Dữ liệu lõi` page under system navigation with partner create/edit/detail dialogs, filters, active states, and dense data table behavior.
+- Added partner selectors to Projects, Materials, Payables, Receivables, input/output invoice upload dialogs, and incoming acceptance supplier/subcontractor fields while keeping manual entry fallback.
+- Updated frontend domain contracts and seed/demo data with deterministic partners and linked sample projects/materials/debts/procurement rows.
 
 ## Validation Status
 
@@ -590,5 +603,18 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - `cd frontend && npm run build` passed after Reporting/P&L Phase 9C; Vite chunk-size warning remains.
 - `git diff --check` passed after Reporting/P&L Phase 9C.
 - Custom migration runner was not run after Reporting/P&L Phase 9C; applying `V35` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/cmd/migrate/main.go backend/cmd/server/main.go backend/internal/shared/migrations/runner.go` passed after Foundation Hardening 10A.
+- `make migrate-check` passed after Foundation Hardening 10A; 35 migration files were validated without connecting to the database.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Foundation Hardening 10A.
+- `cd frontend && npm run build` passed after Foundation Hardening 10A; Vite chunk-size warning remains.
+- `make docker-config` passed after Foundation Hardening 10A.
+- `git diff --check` passed after Foundation Hardening 10A.
+- No new SQL migration was added for Foundation Hardening 10A; no database migration apply was run.
+- `gofmt -w backend/internal/core/types.go backend/internal/core/service.go backend/internal/core/repository.go backend/internal/core/repository_domain.go backend/internal/core/handlers.go backend/internal/core/routes.go` passed after Dữ liệu lõi.
+- `make migrate-check` passed after Dữ liệu lõi; 36 migration files were validated without connecting to the database.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Dữ liệu lõi.
+- `cd frontend && npm run build` passed after Dữ liệu lõi; Vite chunk-size warning remains.
+- `git diff --check` passed after Dữ liệu lõi.
+- Custom migration runner apply was not run after Dữ liệu lõi; applying `V36` still requires a reachable Consflow PostgreSQL role/database.
 - Browser verification not run, per repo rule unless explicitly requested.
 - No backend/API/migration changes were needed for the Pipeline Builder multi-role UI, Shared UI 2A, or Shared UI 2B batches.

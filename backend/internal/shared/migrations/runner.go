@@ -28,6 +28,11 @@ type Result struct {
 	Skipped []string
 }
 
+type CheckResult struct {
+	Count      int
+	Migrations []string
+}
+
 func Run(ctx context.Context, db *sql.DB, dir string) (Result, error) {
 	if strings.TrimSpace(dir) == "" {
 		return Result{}, errors.New("migrations directory is required")
@@ -52,6 +57,24 @@ func Run(ctx context.Context, db *sql.DB, dir string) (Result, error) {
 		} else {
 			result.Skipped = append(result.Skipped, label)
 		}
+	}
+	return result, nil
+}
+
+func CheckDir(dir string) (CheckResult, error) {
+	if strings.TrimSpace(dir) == "" {
+		return CheckResult{}, errors.New("migrations directory is required")
+	}
+	migrations, err := load(dir)
+	if err != nil {
+		return CheckResult{}, err
+	}
+	result := CheckResult{
+		Count:      len(migrations),
+		Migrations: make([]string, 0, len(migrations)),
+	}
+	for _, migration := range migrations {
+		result.Migrations = append(result.Migrations, fmt.Sprintf("%s (%s) %s", migration.Version, migration.Name, migration.SHA256))
 	}
 	return result, nil
 }

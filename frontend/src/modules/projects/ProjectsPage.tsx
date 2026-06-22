@@ -12,7 +12,8 @@ import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
 import { SimpleForm } from '../_shared/SimpleForm';
-import type { Project } from '../../lib/types/domain';
+import type { Partner, Project } from '../../lib/types/domain';
+import { partnerOptions } from '../core-data/partnerUtils';
 
 export function ProjectsPage() {
   const [open, setOpen] = useState(false);
@@ -21,6 +22,7 @@ export function ProjectsPage() {
   const toast = useToast();
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Project[]>('/projects') });
   const templates = useQuery({ queryKey: ['pipeline-templates'], queryFn: () => get<Record<string, any>[]>('/pipeline-templates') });
+  const partners = useQuery({ queryKey: ['partners', 'client', 'active'], queryFn: () => get<Partner[]>('/partners?status=active&type=client') });
   const createProject = useMutation({
     mutationFn: (values: Record<string, any>) => post<Project>('/projects', values),
     onSuccess: () => {
@@ -43,7 +45,21 @@ export function ProjectsPage() {
   const projectFields = (record?: Project) => [
     { name: 'name', label: 'Tên công trình', defaultValue: record?.name ?? 'Công trình mới', required: true },
     { name: 'code', label: 'Mã công trình', defaultValue: record?.code ?? `PRJ-${Date.now().toString().slice(-5)}`, required: true },
-    { name: 'client_name', label: 'Khách hàng / Chủ đầu tư', defaultValue: record?.client_name ?? 'Khách hàng mới', required: true },
+    {
+      name: 'partner_id',
+      label: 'Chủ đầu tư catalog',
+      type: 'select' as const,
+      defaultValue: record?.partner_id ?? '',
+      options: partnerOptions(partners.data ?? [], ['client']),
+      helperText: 'Khi chọn catalog, backend tự snapshot tên chủ đầu tư vào công trình.',
+    },
+    {
+      name: 'client_name',
+      label: 'Khách hàng / Chủ đầu tư',
+      defaultValue: record?.client_name ?? 'Khách hàng mới',
+      required: true,
+      hiddenWhen: (values: Record<string, any>) => Boolean(values.partner_id),
+    },
     { name: 'address', label: 'Địa chỉ', defaultValue: record?.address ?? '' },
     { name: 'planned_start_date', label: 'Ngày bắt đầu dự kiến', type: 'date' as const, defaultValue: record?.planned_start_date?.slice?.(0, 10) ?? '' },
     { name: 'planned_end_date', label: 'Ngày kết thúc dự kiến', type: 'date' as const, defaultValue: record?.planned_end_date?.slice?.(0, 10) ?? '' },
@@ -125,6 +141,8 @@ export function ProjectsPage() {
           { key: 'name', label: 'Tên công trình' },
           { key: 'code', label: 'Mã' },
           { key: 'client_name', label: 'Chủ đầu tư' },
+          { key: 'partner_name', label: 'Đối tác catalog' },
+          { key: 'partner_tax_code', label: 'MST đối tác' },
           { key: 'address', label: 'Địa chỉ' },
           { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
           { key: 'estimated_budget', label: 'Ngân sách', render: (row) => <CurrencyText value={row.estimated_budget} /> },
@@ -139,7 +157,7 @@ export function ProjectsPage() {
             fields={projectFields(dialog.record)}
             onSubmit={(values) => updateProject.mutateAsync({
               projectId: dialog.record.id,
-              values: { ...values, pipeline_template_id: values.pipeline_template_id || null },
+              values: { ...values, partner_id: values.partner_id || null, pipeline_template_id: values.pipeline_template_id || null },
             })}
           />
         ) : null}

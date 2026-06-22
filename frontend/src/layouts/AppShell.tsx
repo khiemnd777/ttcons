@@ -6,6 +6,7 @@ import {
   Building2,
   ClipboardCheck,
   ClipboardList,
+  Database,
   FileClock,
   FileText,
   GitBranch,
@@ -56,6 +57,7 @@ const navGroups = [
   {
     title: 'Hệ thống',
     items: [
+      { to: '/core-data', label: 'Dữ liệu lõi', icon: Database },
       { to: '/staff', label: 'Nhân sự', icon: Users },
       { to: '/roles', label: 'Vai trò', icon: ShieldCheck },
       { to: '/permissions', label: 'Phân quyền', icon: ShieldCheck },

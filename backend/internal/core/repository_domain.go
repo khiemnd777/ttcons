@@ -305,6 +305,38 @@ func (r *Repository) AddAudit(ctx context.Context, projectID, actorID, actorName
 	return err
 }
 
+func (r *Repository) ListPartners(ctx context.Context, filter PartnerFilter) ([]Record, error) {
+	conditions := []string{"1=1"}
+	args := make([]any, 0)
+	switch filter.Status {
+	case "all":
+	case "inactive":
+		conditions = append(conditions, "NOT active")
+	default:
+		conditions = append(conditions, "active")
+	}
+	if filter.Type != "" {
+		args = append(args, filter.Type)
+		conditions = append(conditions, fmt.Sprintf("partner_types ? $%d", len(args)))
+	}
+	if filter.Query != "" {
+		args = append(args, "%"+filter.Query+"%")
+		conditions = append(conditions, fmt.Sprintf(`(
+			partner_code ILIKE $%d
+			OR name ILIKE $%d
+			OR COALESCE(legal_name, '') ILIKE $%d
+			OR COALESCE(tax_code, '') ILIKE $%d
+			OR COALESCE(contact_name, '') ILIKE $%d
+		)`, len(args), len(args), len(args), len(args), len(args)))
+	}
+	return r.Query(ctx, fmt.Sprintf(`
+		SELECT *
+		FROM partners
+		WHERE %s
+		ORDER BY active DESC, lower(name), partner_code
+	`, strings.Join(conditions, " AND ")), args...)
+}
+
 func addAuditTx(ctx context.Context, tx *sql.Tx, projectID, actorID, actorName, eventType, targetType, targetID, description string, metadata any) error {
 	raw, _ := json.Marshal(metadata)
 	var p any = nil
@@ -2606,19 +2638,22 @@ func (r *Repository) SaveIncomingAcceptance(ctx context.Context, acceptanceID st
 				procurement_request_id=NULLIF($3,'')::uuid,
 				warehouse_id=NULLIF($4,'')::uuid,
 				source_type=$5,
-				supplier_name=NULLIF($6,''),
-				subcontractor_name=NULLIF($7,''),
-				delivery_reference=NULLIF($8,''),
-				result=NULLIF($9,''),
-				received_at=NULLIF($10,'')::date,
-				summary_json=$11::jsonb,
-				comment=NULLIF($12,''),
-				updated_by=NULLIF($13,'')::uuid,
+				supplier_partner_id=NULLIF($6,'')::uuid,
+				supplier_name=NULLIF($7,''),
+				subcontractor_partner_id=NULLIF($8,'')::uuid,
+				subcontractor_name=NULLIF($9,''),
+				delivery_reference=NULLIF($10,''),
+				result=NULLIF($11,''),
+				received_at=NULLIF($12,'')::date,
+				summary_json=$13::jsonb,
+				comment=NULLIF($14,''),
+				updated_by=NULLIF($15,'')::uuid,
 				updated_at=now()
 			WHERE id=$1
 			RETURNING id
 		`, acceptanceID, workItemID, cleanID(header["procurement_request_id"]), cleanID(header["warehouse_id"]), header["source_type"],
-			header["supplier_name"], header["subcontractor_name"], header["delivery_reference"], header["result"], header["received_at"],
+			cleanID(header["supplier_partner_id"]), header["supplier_name"], cleanID(header["subcontractor_partner_id"]), header["subcontractor_name"],
+			header["delivery_reference"], header["result"], header["received_at"],
 			string(rawSummary), header["comment"], actorID)
 		if err != nil {
 			return nil, err
@@ -2634,17 +2669,18 @@ func (r *Repository) SaveIncomingAcceptance(ctx context.Context, acceptanceID st
 		rows, err := queryTx(ctx, tx, `
 			INSERT INTO incoming_acceptance_records (
 				acceptance_code, project_id, work_item_id, procurement_request_id, warehouse_id,
-				source_type, supplier_name, subcontractor_name, delivery_reference,
+				source_type, supplier_partner_id, supplier_name, subcontractor_partner_id, subcontractor_name, delivery_reference,
 				status, result, received_at, summary_json, comment, created_by, updated_by
 			)
 			VALUES (
 				$1, $2, NULLIF($3,'')::uuid, NULLIF($4,'')::uuid, NULLIF($5,'')::uuid,
-				$6, NULLIF($7,''), NULLIF($8,''), NULLIF($9,''),
-				'draft', NULLIF($10,''), NULLIF($11,'')::date, $12::jsonb, NULLIF($13,''), NULLIF($14,'')::uuid, NULLIF($14,'')::uuid
+				$6, NULLIF($7,'')::uuid, NULLIF($8,''), NULLIF($9,'')::uuid, NULLIF($10,''), NULLIF($11,''),
+				'draft', NULLIF($12,''), NULLIF($13,'')::date, $14::jsonb, NULLIF($15,''), NULLIF($16,'')::uuid, NULLIF($16,'')::uuid
 			)
 			RETURNING id
 		`, code, projectID, workItemID, cleanID(header["procurement_request_id"]), cleanID(header["warehouse_id"]), header["source_type"],
-			header["supplier_name"], header["subcontractor_name"], header["delivery_reference"], header["result"], header["received_at"],
+			cleanID(header["supplier_partner_id"]), header["supplier_name"], cleanID(header["subcontractor_partner_id"]), header["subcontractor_name"],
+			header["delivery_reference"], header["result"], header["received_at"],
 			string(rawSummary), header["comment"], actorID)
 		if err != nil {
 			return nil, err
@@ -4927,11 +4963,13 @@ func (r *Repository) ListProjects(ctx context.Context, userID string) ([]Record,
 	}
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT p.*, s.full_name AS pm_name, t.name AS pipeline_template_name,
+			pt.name AS partner_name, pt.tax_code AS partner_tax_code,
 			COALESCE((SELECT COUNT(*) FROM issues i WHERE i.project_id=p.id AND i.status IN ('open','in_progress')),0) AS open_issues,
 			COALESCE((SELECT COUNT(*) FROM approval_requests ar WHERE ar.project_id=p.id AND ar.status='pending'),0) AS pending_approvals
 		FROM projects p
 		LEFT JOIN staff s ON s.id=p.pm_staff_id
 		LEFT JOIN pipeline_templates t ON t.id=p.pipeline_template_id
+		LEFT JOIN partners pt ON pt.id=p.partner_id
 		WHERE p.status <> 'cancelled' AND %s
 		ORDER BY p.created_at DESC
 	`, scopeSQL), scopeArgs...)
@@ -4939,10 +4977,12 @@ func (r *Repository) ListProjects(ctx context.Context, userID string) ([]Record,
 
 func (r *Repository) GetProjectDetail(ctx context.Context, id string) (Record, error) {
 	project, err := r.QueryOne(ctx, `
-		SELECT p.*, s.full_name AS pm_name, t.name AS pipeline_template_name
+		SELECT p.*, s.full_name AS pm_name, t.name AS pipeline_template_name,
+			pt.name AS partner_name, pt.tax_code AS partner_tax_code
 		FROM projects p
 		LEFT JOIN staff s ON s.id=p.pm_staff_id
 		LEFT JOIN pipeline_templates t ON t.id=p.pipeline_template_id
+		LEFT JOIN partners pt ON pt.id=p.partner_id
 		WHERE p.id=$1 AND p.status <> 'cancelled'
 	`, id)
 	if err != nil {
@@ -6399,7 +6439,7 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 	}
 
 	rows, err := queryTx(ctx, tx, `
-		SELECT b.*, m.name AS material_name, m.standard_price,
+		SELECT b.*, m.name AS material_name, m.standard_price, m.default_supplier, m.default_supplier_partner_id,
 			COALESCE(b.final_unit_price, b.unit_price) AS effective_unit_price,
 			(
 				SELECT e.id
@@ -6448,9 +6488,9 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 		price := number(row["effective_unit_price"])
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO procurement_request_items
-				(request_id, material_id, boq_item_id, quantity_planned, quantity_requested, unit, estimated_unit_price, supplier_name, delivery_status, approval_status, boq_price_source, boq_price_revision_no, boq_price_event_id)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending','pending','final',$9,NULLIF($10,'')::uuid)
-		`, requestID, row["material_id"], row["id"], row["quantity"], row["quantity"], row["unit"], price, row["default_supplier"], row["price_revision_no"], cleanID(row["final_price_event_id"])); err != nil {
+				(request_id, material_id, boq_item_id, quantity_planned, quantity_requested, unit, estimated_unit_price, supplier_partner_id, supplier_name, delivery_status, approval_status, boq_price_source, boq_price_revision_no, boq_price_event_id)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,'')::uuid,$9,'pending','pending','final',$10,NULLIF($11,'')::uuid)
+		`, requestID, row["material_id"], row["id"], row["quantity"], row["quantity"], row["unit"], price, cleanID(row["default_supplier_partner_id"]), row["default_supplier"], row["price_revision_no"], cleanID(row["final_price_event_id"])); err != nil {
 			return nil, err
 		}
 	}
@@ -6839,10 +6879,13 @@ func (r *Repository) ProjectMaterialBalances(ctx context.Context, projectID stri
 
 func (r *Repository) ListActiveMaterials(ctx context.Context) ([]Record, error) {
 	return r.Query(ctx, `
-		SELECT id, code, name, unit, category, default_supplier, standard_price, active, created_at
-		FROM materials
-		WHERE active
-		ORDER BY category, name, code
+		SELECT m.id, m.code, m.name, m.unit, m.category, m.default_supplier_partner_id, m.default_supplier,
+			p.name AS default_supplier_partner_name, p.tax_code AS default_supplier_tax_code,
+			m.standard_price, m.active, m.created_at
+		FROM materials m
+		LEFT JOIN partners p ON p.id=m.default_supplier_partner_id
+		WHERE m.active
+		ORDER BY m.category, m.name, m.code
 	`)
 }
 
@@ -8170,17 +8213,17 @@ func (r *Repository) CreateInputInvoice(ctx context.Context, payable Record, bod
 	rows, err := queryTx(ctx, tx, `
 		INSERT INTO input_invoices (
 			id, project_id, payable_id, procurement_request_id, document_id,
-			invoice_number, invoice_symbol, invoice_date, vendor_name, vendor_tax_code,
+			invoice_number, invoice_symbol, invoice_date, vendor_partner_id, vendor_name, vendor_tax_code,
 			amount_before_vat, vat_amount, total_amount, currency, status, notes,
 			storage_provider, storage_key, mime_type, file_name, file_size, checksum_sha256,
 			uploaded_by
 		)
 		VALUES (
 			$1, $2, $3, NULLIF($4,'')::uuid, NULLIF($5,'')::uuid,
-			$6, $7, $8::date, $9, $10,
-			$11, $12, $13, 'VND', 'draft', $14,
-			$15, $16, $17, $18, $19, $20,
-			NULLIF($21,'')::uuid
+			$6, $7, $8::date, NULLIF($9,'')::uuid, $10, $11,
+			$12, $13, $14, 'VND', 'draft', $15,
+			$16, $17, $18, $19, $20, $21,
+			NULLIF($22,'')::uuid
 		)
 		RETURNING *
 	`,
@@ -8192,6 +8235,7 @@ func (r *Repository) CreateInputInvoice(ctx context.Context, payable Record, bod
 		fmt.Sprint(body["invoice_number"]),
 		fmt.Sprint(body["invoice_symbol"]),
 		fmt.Sprint(body["invoice_date"]),
+		cleanID(body["vendor_partner_id"]),
 		fmt.Sprint(body["vendor_name"]),
 		fmt.Sprint(body["vendor_tax_code"]),
 		number(body["amount_before_vat"]),
@@ -9295,17 +9339,17 @@ func (r *Repository) CreateOutputInvoice(ctx context.Context, receivable Record,
 	rows, err := queryTx(ctx, tx, `
 		INSERT INTO output_invoices (
 			id, project_id, receivable_id, payment_id, document_id,
-			invoice_number, invoice_symbol, invoice_date, client_name, client_tax_code,
+			invoice_number, invoice_symbol, invoice_date, client_partner_id, client_name, client_tax_code,
 			amount_before_vat, vat_amount, total_amount, currency, status, notes,
 			storage_provider, storage_key, mime_type, file_name, file_size, checksum_sha256,
 			uploaded_by
 		)
 		VALUES (
 			$1, $2, $3, NULLIF($4,'')::uuid, NULLIF($5,'')::uuid,
-			$6, $7, $8::date, $9, $10,
-			$11, $12, $13, 'VND', 'draft', $14,
-			$15, $16, $17, $18, $19, $20,
-			NULLIF($21,'')::uuid
+			$6, $7, $8::date, NULLIF($9,'')::uuid, $10, $11,
+			$12, $13, $14, 'VND', 'draft', $15,
+			$16, $17, $18, $19, $20, $21,
+			NULLIF($22,'')::uuid
 		)
 		RETURNING *
 	`,
@@ -9317,6 +9361,7 @@ func (r *Repository) CreateOutputInvoice(ctx context.Context, receivable Record,
 		fmt.Sprint(body["invoice_number"]),
 		fmt.Sprint(body["invoice_symbol"]),
 		fmt.Sprint(body["invoice_date"]),
+		cleanID(body["client_partner_id"]),
 		fmt.Sprint(body["client_name"]),
 		fmt.Sprint(body["client_tax_code"]),
 		number(body["amount_before_vat"]),

@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 )
 
 func main() {
@@ -49,7 +50,10 @@ func main() {
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 		AllowCredentials: true,
 	}))
-	app.Use(fiberlogger.New())
+	app.Use(requestid.New())
+	app.Use(fiberlogger.New(fiberlogger.Config{
+		Format: "${time} ${status} ${method} ${path} req_id=${locals:requestid} latency=${latency}\n",
+	}))
 
 	core.RegisterRoutes(app, conn, redisClient, cfg)
 

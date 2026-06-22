@@ -19,10 +19,11 @@ import { OutputBillingPlanPanel } from './OutputBillingPlanPanel';
 import { OutputInvoicePanel } from './OutputInvoicePanel';
 import { PayableReconciliationPanel } from './PayableReconciliationPanel';
 import { ReceivableReconciliationPanel } from './ReceivableReconciliationPanel';
-import type { PayableRecord, ReceivableRecord } from '../../lib/types/domain';
+import type { Partner, PayableRecord, ReceivableRecord } from '../../lib/types/domain';
 import { enumOptions } from '../../lib/utils/status';
 import { dateText } from '../../lib/utils/format';
 import { agingBadgeClass, debtAgingLabel, reconciliationClass, reconciliationLabel } from './payableDebtUtils';
+import { partnerOptions, vendorPartnerTypes } from '../core-data/partnerUtils';
 
 export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }) {
   const { id } = useParams();
@@ -31,6 +32,7 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
   const queryClient = useQueryClient();
   const toast = useToast();
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Record<string, any>[]>('/projects') });
+  const partners = useQuery({ queryKey: ['partners', 'active'], queryFn: () => get<Partner[]>('/partners?status=active') });
   const payableScope = id ? `?project_id=${encodeURIComponent(id)}` : '';
   const receivableScope = id ? `?project_id=${encodeURIComponent(id)}` : '';
   const payables = useQuery({ queryKey: ['payables', id ?? 'global'], queryFn: () => get<PayableRecord[]>(`/payables${payableScope}`), enabled: kind !== 'receivables' });
@@ -204,7 +206,20 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
           { name: 'project_id', label: 'Công trình', type: 'select', defaultValue: id ?? '', required: true, options: (projects.data ?? []).map((p) => ({ label: p.name, value: p.id })) },
           { name: 'payable_code', label: 'Mã phải trả', defaultValue: `PAY-${Date.now().toString().slice(-5)}`, required: true },
           { name: 'vendor_type', label: 'Loại vendor', type: 'select', defaultValue: 'supplier', required: true, options: enumOptions('vendor_type', ['supplier', 'subcontractor', 'labor_team', 'transport', 'equipment_rental', 'service_provider', 'other']) },
-          { name: 'vendor_name', label: 'Vendor', defaultValue: 'Nhà cung cấp mới', required: true },
+          {
+            name: 'vendor_partner_id',
+            label: 'Vendor catalog',
+            type: 'select',
+            options: partnerOptions(partners.data ?? [], vendorPartnerTypes),
+            helperText: 'Chọn catalog để snapshot tên vendor vào công nợ.',
+          },
+          {
+            name: 'vendor_name',
+            label: 'Vendor',
+            defaultValue: 'Nhà cung cấp mới',
+            required: true,
+            hiddenWhen: (values: Record<string, any>) => Boolean(values.vendor_partner_id),
+          },
           { name: 'gross_amount', label: 'Gross', type: 'number', defaultValue: 10000000, required: true, min: 0 },
           { name: 'due_date', label: 'Hạn thanh toán', type: 'date' },
           { name: 'advance_amount', label: 'Tạm ứng', type: 'number', defaultValue: 0, min: 0 },
@@ -219,7 +234,20 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
         <SimpleForm fields={[
           { name: 'project_id', label: 'Công trình', type: 'select', required: true, options: (projects.data ?? []).map((p) => ({ label: p.name, value: p.id })) },
           { name: 'receivable_code', label: 'Mã phải thu', defaultValue: `REC-${Date.now().toString().slice(-5)}`, required: true },
-          { name: 'client_name', label: 'Khách hàng', defaultValue: 'Khách hàng', required: true },
+          {
+            name: 'client_partner_id',
+            label: 'Khách hàng catalog',
+            type: 'select',
+            options: partnerOptions(partners.data ?? [], ['client']),
+            helperText: 'Chọn catalog để snapshot tên khách hàng vào công nợ.',
+          },
+          {
+            name: 'client_name',
+            label: 'Khách hàng',
+            defaultValue: 'Khách hàng',
+            required: true,
+            hiddenWhen: (values: Record<string, any>) => Boolean(values.client_partner_id),
+          },
           { name: 'contract_amount', label: 'Giá trị hợp đồng', type: 'number', defaultValue: 100000000, min: 0 },
           { name: 'milestone_name', label: 'Milestone', defaultValue: 'Đợt thanh toán', required: true },
           { name: 'gross_amount', label: 'Gross', type: 'number', defaultValue: 30000000, required: true, min: 0 },

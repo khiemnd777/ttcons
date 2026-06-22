@@ -13,10 +13,12 @@ import type {
   IncomingAcceptanceRecord,
   IncomingAcceptanceResponse,
   MaterialCatalogItem,
+  Partner,
   ProcurementRequestItemOption,
   ProcurementRequestOption,
   Warehouse,
 } from '../../lib/types/domain';
+import { partnerOptions } from '../core-data/partnerUtils';
 
 type LineDraft = {
   key: string;
@@ -38,7 +40,9 @@ type LineDraft = {
 type Draft = {
   id: string;
   source_type: string;
+  supplier_partner_id: string;
   supplier_name: string;
+  subcontractor_partner_id: string;
   subcontractor_name: string;
   procurement_request_id: string;
   warehouse_id: string;
@@ -52,7 +56,9 @@ type Draft = {
 type IncomingAcceptancePayload = {
   work_item_id: string;
   source_type: string;
+  supplier_partner_id: string;
   supplier_name: string;
+  subcontractor_partner_id: string;
   subcontractor_name: string;
   procurement_request_id: string;
   warehouse_id: string;
@@ -135,6 +141,7 @@ export function IncomingAcceptancePanel({
 
   const materials = acceptanceQuery.data?.materials ?? [];
   const warehouses = acceptanceQuery.data?.warehouses ?? [];
+  const partners = acceptanceQuery.data?.partners ?? [];
   const procurementRequests = acceptanceQuery.data?.procurement_requests ?? [];
   const procurementItems = acceptanceQuery.data?.procurement_request_items ?? [];
   const evidenceOptions = useMemo(() => evidence.filter((item) => item.status !== 'rejected'), [evidence]);
@@ -236,7 +243,9 @@ export function IncomingAcceptancePanel({
     return {
       work_item_id: workItemId,
       source_type: draft.source_type,
+      supplier_partner_id: draft.supplier_partner_id,
       supplier_name: draft.supplier_name.trim(),
+      subcontractor_partner_id: draft.subcontractor_partner_id,
       subcontractor_name: draft.subcontractor_name.trim(),
       procurement_request_id: draft.procurement_request_id,
       warehouse_id: draft.warehouse_id,
@@ -373,12 +382,32 @@ export function IncomingAcceptancePanel({
             <input className={controlClassName} type="date" value={draft.received_at} onChange={(event) => updateDraft({ received_at: event.target.value })} disabled={actionPending} />
           </label>
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Nhà cung cấp catalog
+            <PartnerSelect
+              value={draft.supplier_partner_id}
+              partners={partners}
+              allowedTypes={['supplier', 'service_provider', 'other']}
+              onChange={(partnerID, partner) => updateDraft({ supplier_partner_id: partnerID, supplier_name: partner?.name ?? draft.supplier_name })}
+              disabled={actionPending}
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Nhà cung cấp
-            <input className={controlClassName} value={draft.supplier_name} onChange={(event) => updateDraft({ supplier_name: event.target.value })} disabled={actionPending} />
+            <input className={controlClassName} value={draft.supplier_name} onChange={(event) => updateDraft({ supplier_name: event.target.value, supplier_partner_id: '' })} disabled={actionPending || Boolean(draft.supplier_partner_id)} />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Thầu phụ catalog
+            <PartnerSelect
+              value={draft.subcontractor_partner_id}
+              partners={partners}
+              allowedTypes={['subcontractor', 'labor_team']}
+              onChange={(partnerID, partner) => updateDraft({ subcontractor_partner_id: partnerID, subcontractor_name: partner?.name ?? draft.subcontractor_name })}
+              disabled={actionPending}
+            />
           </label>
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Thầu phụ
-            <input className={controlClassName} value={draft.subcontractor_name} onChange={(event) => updateDraft({ subcontractor_name: event.target.value })} disabled={actionPending} />
+            <input className={controlClassName} value={draft.subcontractor_name} onChange={(event) => updateDraft({ subcontractor_name: event.target.value, subcontractor_partner_id: '' })} disabled={actionPending || Boolean(draft.subcontractor_partner_id)} />
           </label>
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Phiếu giao
@@ -601,11 +630,40 @@ function IncomingLine({
 
 const controlClassName = 'mt-1 h-9 w-full rounded-md border border-line bg-white px-2 text-sm font-normal normal-case tracking-normal outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50';
 
+function PartnerSelect({
+  value,
+  partners,
+  allowedTypes,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  partners: Partner[];
+  allowedTypes: string[];
+  disabled: boolean;
+  onChange: (value: string, partner?: Partner) => void;
+}) {
+  const options = partnerOptions(partners, allowedTypes);
+  return (
+    <select
+      className={controlClassName}
+      value={value}
+      onChange={(event) => onChange(event.target.value, partners.find((partner) => partner.id === event.target.value))}
+      disabled={disabled}
+    >
+      <option value="">Nhập tay</option>
+      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+  );
+}
+
 function defaultDraft(): Draft {
   return {
     id: '',
     source_type: 'supplier',
+    supplier_partner_id: '',
     supplier_name: '',
+    subcontractor_partner_id: '',
     subcontractor_name: '',
     procurement_request_id: '',
     warehouse_id: '',
@@ -656,7 +714,9 @@ function draftFromRecord(record: IncomingAcceptanceRecord): Draft {
   return {
     id: String(record.id ?? ''),
     source_type: record.source_type || 'supplier',
+    supplier_partner_id: record.supplier_partner_id ?? '',
     supplier_name: record.supplier_name ?? '',
+    subcontractor_partner_id: record.subcontractor_partner_id ?? '',
     subcontractor_name: record.subcontractor_name ?? '',
     procurement_request_id: record.procurement_request_id ?? '',
     warehouse_id: record.warehouse_id ?? '',
