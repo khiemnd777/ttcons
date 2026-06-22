@@ -53,6 +53,69 @@ type OutputInvoiceRequest struct {
 	Notes           string  `json:"notes"`
 }
 
+type PayablePaymentScheduleRequest struct {
+	ScheduleCode  string  `json:"schedule_code"`
+	MilestoneName string  `json:"milestone_name"`
+	ScheduleType  string  `json:"schedule_type"`
+	PlannedAmount float64 `json:"planned_amount"`
+	DueDate       string  `json:"due_date"`
+	Notes         string  `json:"notes"`
+}
+
+type AdvanceRequestCreateRequest struct {
+	RequestCode string  `json:"request_code"`
+	Amount      float64 `json:"amount"`
+	DueDate     string  `json:"due_date"`
+	Reason      string  `json:"reason"`
+	Notes       string  `json:"notes"`
+}
+
+type PayablePaymentCreateRequest struct {
+	PaymentCode      string  `json:"payment_code"`
+	PaymentType      string  `json:"payment_type"`
+	PaymentMethod    string  `json:"payment_method"`
+	Amount           float64 `json:"amount"`
+	ScheduleID       string  `json:"schedule_id"`
+	AdvanceRequestID string  `json:"advance_request_id"`
+	InputInvoiceID   string  `json:"input_invoice_id"`
+	PaidAt           string  `json:"paid_at"`
+	Notes            string  `json:"notes"`
+}
+
+type AdvanceSettlementRequest struct {
+	Amount         float64 `json:"amount"`
+	InputInvoiceID string  `json:"input_invoice_id"`
+	ScheduleID     string  `json:"schedule_id"`
+	Comment        string  `json:"comment"`
+}
+
+type ReceivableAdvanceReceiptCreateRequest struct {
+	ReceiptCode string  `json:"receipt_code"`
+	Amount      float64 `json:"amount"`
+	DueDate     string  `json:"due_date"`
+	Reason      string  `json:"reason"`
+	Notes       string  `json:"notes"`
+}
+
+type ReceivableReceiptCreateRequest struct {
+	PaymentCode      string  `json:"payment_code"`
+	PaymentType      string  `json:"payment_type"`
+	PaymentMethod    string  `json:"payment_method"`
+	Amount           float64 `json:"amount"`
+	ScheduleID       string  `json:"schedule_id"`
+	AdvanceReceiptID string  `json:"advance_receipt_id"`
+	OutputInvoiceID  string  `json:"output_invoice_id"`
+	PaidAt           string  `json:"paid_at"`
+	Notes            string  `json:"notes"`
+}
+
+type ReceivableAdvanceSettlementRequest struct {
+	Amount          float64 `json:"amount"`
+	OutputInvoiceID string  `json:"output_invoice_id"`
+	ScheduleID      string  `json:"schedule_id"`
+	Comment         string  `json:"comment"`
+}
+
 type WorkItemActionRequest struct {
 	Comment           string   `json:"comment"`
 	Reason            string   `json:"reason"`

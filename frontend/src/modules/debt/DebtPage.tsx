@@ -14,15 +14,12 @@ import { RowActions } from '../../components/RowActions';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { InputInvoicePanel } from './InputInvoicePanel';
+import { InputPaymentPlanPanel } from './InputPaymentPlanPanel';
+import { OutputBillingPlanPanel } from './OutputBillingPlanPanel';
 import { OutputInvoicePanel } from './OutputInvoicePanel';
 import type { PayableRecord, ReceivableRecord } from '../../lib/types/domain';
 import { enumOptions } from '../../lib/utils/status';
 import { dateText } from '../../lib/utils/format';
-
-const debtActionLabels: Record<string, string> = {
-  pay: 'Đã ghi nhận thanh toán phải trả',
-  receive: 'Đã ghi nhận thu tiền phải thu',
-};
 
 export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }) {
   const { id } = useParams();
@@ -51,18 +48,6 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
     },
     onError: (error) => toast.error('Không ghi nhận được phải thu', error),
   });
-  const action = useMutation({
-    mutationFn: ({ path, actionName }: { path: string; actionName: string }) => post(`/${path}/${actionName}`, {}),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['payables'] });
-      queryClient.invalidateQueries({ queryKey: ['input-invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['receivables'] });
-      queryClient.invalidateQueries({ queryKey: ['output-invoices'] });
-      toast.success(debtActionLabels[variables.actionName] ?? 'Đã cập nhật công nợ');
-    },
-    onError: (error) => toast.error('Không cập nhật được công nợ', error),
-  });
-
   return (
     <>
       <PageHeader
@@ -97,7 +82,7 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
                 ),
               },
               { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-              { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'payable', record: row })}><button className="text-sm font-semibold text-blue-700" onClick={() => action.mutate({ path: `payables/${row.id}`, actionName: 'pay' })}>Pay</button></RowActions> },
+              { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'payable', record: row })} /> },
             ]} />
           </section>
         ) : null}
@@ -121,7 +106,7 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
                 ),
               },
               { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-              { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'receivable', record: row })}><button className="text-sm font-semibold text-blue-700" onClick={() => action.mutate({ path: `receivables/${row.id}`, actionName: 'receive' })}>Receive</button></RowActions> },
+              { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'receivable', record: row })} /> },
             ]} />
           </section>
         ) : null}
@@ -167,12 +152,25 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
               <DebtMetric label="Công trình" value={dialog.record.project_name ?? '-'} />
               <DebtMetric label="Gross" value={<CurrencyText value={dialog.record.gross_amount} />} />
               <DebtMetric label="Tổng hoá đơn" value={<CurrencyText value={dialog.record.invoice_total ?? 0} />} />
+              <DebtMetric label="Lịch kỳ" value={<CurrencyText value={dialog.record.scheduled_remaining ?? 0} />} />
+              <DebtMetric label="Ứng trước" value={<CurrencyText value={dialog.record.advance_requested_total ?? 0} />} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <DebtMetric label="Đã trả" value={<CurrencyText value={dialog.record.paid_amount ?? 0} />} />
+              <DebtMetric label="Đã quyết toán ứng" value={<CurrencyText value={dialog.record.advance_settled_total ?? 0} />} />
+              <DebtMetric label="Giữ lại" value={<CurrencyText value={dialog.record.retention_amount ?? 0} />} />
               <DebtMetric
                 label="Mới nhất"
                 value={dialog.record.latest_invoice_number ? `${dialog.record.latest_invoice_number} · ${dateText(dialog.record.latest_invoice_date)}` : '-'}
               />
             </div>
             <InputInvoicePanel
+              payable={dialog.record}
+              onChanged={() => {
+                queryClient.invalidateQueries({ queryKey: ['payables'] });
+              }}
+            />
+            <InputPaymentPlanPanel
               payable={dialog.record}
               onChanged={() => {
                 queryClient.invalidateQueries({ queryKey: ['payables'] });
@@ -194,12 +192,24 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
               <DebtMetric label="Công trình" value={dialog.record.project_name ?? '-'} />
               <DebtMetric label="Gross" value={<CurrencyText value={dialog.record.gross_amount} />} />
               <DebtMetric label="Tổng hoá đơn" value={<CurrencyText value={dialog.record.invoice_total ?? 0} />} />
+              <DebtMetric label="Lịch kỳ" value={<CurrencyText value={dialog.record.scheduled_remaining ?? 0} />} />
+              <DebtMetric label="Ứng trước" value={<CurrencyText value={dialog.record.advance_received_total ?? 0} />} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <DebtMetric label="Đã thu" value={<CurrencyText value={dialog.record.received_amount ?? 0} />} />
+              <DebtMetric label="Đã quyết toán ứng" value={<CurrencyText value={dialog.record.advance_settled_total ?? 0} />} />
               <DebtMetric
                 label="Mới nhất"
                 value={dialog.record.latest_invoice_number ? `${dialog.record.latest_invoice_number} · ${dateText(dialog.record.latest_invoice_date)}` : '-'}
               />
             </div>
             <OutputInvoicePanel
+              receivable={dialog.record}
+              onChanged={() => {
+                queryClient.invalidateQueries({ queryKey: ['receivables'] });
+              }}
+            />
+            <OutputBillingPlanPanel
               receivable={dialog.record}
               onChanged={() => {
                 queryClient.invalidateQueries({ queryKey: ['receivables'] });

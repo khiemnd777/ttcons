@@ -1495,6 +1495,12 @@ func (h *Handler) ListPayables(c *fiber.Ctx) error {
 			COALESCE(inv.invoice_count, 0) AS invoice_count,
 			COALESCE(inv.invoice_total, 0) AS invoice_total,
 			COALESCE(inv.verified_invoice_total, 0) AS verified_invoice_total,
+			COALESCE(sch.schedule_count, 0) AS schedule_count,
+			COALESCE(sch.scheduled_total, 0) AS scheduled_total,
+			COALESCE(sch.scheduled_remaining, 0) AS scheduled_remaining,
+			COALESCE(adv.advance_request_count, 0) AS advance_request_count,
+			COALESCE(adv.advance_requested_total, 0) AS advance_requested_total,
+			COALESCE(adv.advance_settled_total, 0) AS advance_settled_total,
 			latest.latest_invoice_status,
 			latest.latest_invoice_number,
 			latest.latest_invoice_date
@@ -1509,6 +1515,25 @@ func (h *Handler) ListPayables(c *fiber.Ctx) error {
 			FROM input_invoices
 			GROUP BY payable_id
 		) inv ON inv.payable_id=pay.id
+		LEFT JOIN (
+			SELECT
+				payable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('deleted','cancelled')) AS schedule_count,
+				COALESCE(SUM(planned_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS scheduled_total,
+				COALESCE(SUM(remaining_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS scheduled_remaining
+			FROM payable_payment_schedules
+			GROUP BY payable_id
+		) sch ON sch.payable_id=pay.id
+		LEFT JOIN (
+			SELECT
+				payable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('deleted','cancelled')) AS advance_request_count,
+				COALESCE(SUM(amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS advance_requested_total,
+				COALESCE(SUM(settled_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS advance_settled_total
+			FROM advance_requests
+			WHERE payable_id IS NOT NULL
+			GROUP BY payable_id
+		) adv ON adv.payable_id=pay.id
 		LEFT JOIN LATERAL (
 			SELECT status AS latest_invoice_status, invoice_number AS latest_invoice_number, invoice_date AS latest_invoice_date
 			FROM input_invoices ii
@@ -1533,6 +1558,129 @@ func (h *Handler) ApprovePayable(c *fiber.Ctx) error {
 }
 func (h *Handler) PayPayable(c *fiber.Ctx) error {
 	return h.payableAction(c, "pay")
+}
+
+func (h *Handler) ListPayablePaymentSchedules(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "payables", c.Params("id"), []string{"accounting.view", "accounting.payable_view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.PayablePaymentSchedules(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) CreatePayablePaymentSchedule(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "payables", c.Params("id"), []string{"accounting.payment_create", "accounting.payable_approve"}); err != nil {
+		return err
+	}
+	var req PayablePaymentScheduleRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu kỳ thanh toán không hợp lệ")
+	}
+	row, err := h.service.CreatePayablePaymentSchedule(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) ApprovePayablePaymentSchedule(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "payable_payment_schedules", c.Params("id"), []string{"accounting.payable_approve", "accounting.payment_approve"}); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.PayablePaymentScheduleAction(c.Context(), c.Params("id"), "approve", req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) ListPayableAdvanceRequests(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "payables", c.Params("id"), []string{"accounting.view", "accounting.payable_view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.PayableAdvanceRequests(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) CreatePayableAdvanceRequest(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "payables", c.Params("id"), []string{"accounting.payment_create", "accounting.payable_approve"}); err != nil {
+		return err
+	}
+	var req AdvanceRequestCreateRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu ứng trước không hợp lệ")
+	}
+	row, err := h.service.CreatePayableAdvanceRequest(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) ApprovePayableAdvanceRequest(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "advance_requests", c.Params("id"), []string{"accounting.payable_approve", "accounting.payment_approve"}); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.PayableAdvanceRequestAction(c.Context(), c.Params("id"), "approve", req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) SettlePayableAdvanceRequest(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "advance_requests", c.Params("id"), []string{"accounting.payable_approve", "accounting.payment_approve"}); err != nil {
+		return err
+	}
+	var req AdvanceSettlementRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu quyết toán ứng trước không hợp lệ")
+	}
+	row, err := h.service.SettlePayableAdvanceRequest(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) ListPayablePayments(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "payables", c.Params("id"), []string{"accounting.view", "accounting.payable_view", "accounting.payment_create", "accounting.payment_approve"}); err != nil {
+		return err
+	}
+	rows, err := h.service.PayablePayments(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) CreatePayablePayment(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "payables", c.Params("id"), []string{"accounting.payment_create"}); err != nil {
+		return err
+	}
+	var req PayablePaymentCreateRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu thanh toán không hợp lệ")
+	}
+	row, err := h.service.CreatePayablePayment(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 
 func (h *Handler) ListPayableInputInvoices(c *fiber.Ctx) error {
@@ -1642,6 +1790,12 @@ func (h *Handler) ListReceivables(c *fiber.Ctx) error {
 			COALESCE(inv.invoice_count, 0) AS invoice_count,
 			COALESCE(inv.invoice_total, 0) AS invoice_total,
 			COALESCE(inv.issued_invoice_total, 0) AS issued_invoice_total,
+			COALESCE(sched.schedule_count, 0) AS schedule_count,
+			COALESCE(sched.scheduled_total, 0) AS scheduled_total,
+			COALESCE(sched.scheduled_remaining, 0) AS scheduled_remaining,
+			COALESCE(adv.advance_receipt_count, 0) AS advance_receipt_count,
+			COALESCE(adv.advance_received_total, 0) AS advance_received_total,
+			COALESCE(adv.advance_settled_total, 0) AS advance_settled_total,
 			latest.latest_invoice_status,
 			latest.latest_invoice_number,
 			latest.latest_invoice_date
@@ -1663,6 +1817,24 @@ func (h *Handler) ListReceivables(c *fiber.Ctx) error {
 			ORDER BY oi.created_at DESC
 			LIMIT 1
 		) latest ON true
+		LEFT JOIN (
+			SELECT
+				receivable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('cancelled','deleted')) AS schedule_count,
+				COALESCE(SUM(planned_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS scheduled_total,
+				COALESCE(SUM(remaining_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS scheduled_remaining
+			FROM receivable_payment_schedules
+			GROUP BY receivable_id
+		) sched ON sched.receivable_id=rec.id
+		LEFT JOIN (
+			SELECT
+				receivable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('cancelled','deleted')) AS advance_receipt_count,
+				COALESCE(SUM(amount) FILTER (WHERE status IN ('approved','partially_received','received','partially_settled','settled')), 0) AS advance_received_total,
+				COALESCE(SUM(settled_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS advance_settled_total
+			FROM client_advance_receipts
+			GROUP BY receivable_id
+		) adv ON adv.receivable_id=rec.id
 		WHERE rec.status <> 'cancelled'
 		  AND p.status <> 'cancelled'
 		  AND %s
@@ -1674,6 +1846,129 @@ func (h *Handler) CreateReceivable(c *fiber.Ctx) error {
 		return err
 	}
 	return h.create(c, "receivables", receivableColumns())
+}
+
+func (h *Handler) ListReceivablePaymentSchedules(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "receivables", c.Params("id"), []string{"accounting.view", "accounting.receivable_view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.ReceivablePaymentSchedules(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) CreateReceivablePaymentSchedule(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "receivables", c.Params("id"), []string{"accounting.payment_create", "accounting.receivable_approve"}); err != nil {
+		return err
+	}
+	var req PayablePaymentScheduleRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu kỳ thu không hợp lệ")
+	}
+	row, err := h.service.CreateReceivablePaymentSchedule(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) ApproveReceivablePaymentSchedule(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "receivable_payment_schedules", c.Params("id"), []string{"accounting.receivable_approve", "accounting.payment_approve"}); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.ReceivablePaymentScheduleAction(c.Context(), c.Params("id"), "approve", req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) ListReceivableAdvanceReceipts(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "receivables", c.Params("id"), []string{"accounting.view", "accounting.receivable_view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.ReceivableAdvanceReceipts(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) CreateReceivableAdvanceReceipt(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "receivables", c.Params("id"), []string{"accounting.payment_create", "accounting.receivable_approve"}); err != nil {
+		return err
+	}
+	var req ReceivableAdvanceReceiptCreateRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu ứng trước đầu ra không hợp lệ")
+	}
+	row, err := h.service.CreateReceivableAdvanceReceipt(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) ApproveReceivableAdvanceReceipt(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "client_advance_receipts", c.Params("id"), []string{"accounting.receivable_approve", "accounting.payment_approve"}); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.ReceivableAdvanceReceiptAction(c.Context(), c.Params("id"), "approve", req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) SettleReceivableAdvanceReceipt(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "client_advance_receipts", c.Params("id"), []string{"accounting.receivable_approve", "accounting.payment_approve"}); err != nil {
+		return err
+	}
+	var req ReceivableAdvanceSettlementRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu quyết toán ứng trước đầu ra không hợp lệ")
+	}
+	row, err := h.service.SettleReceivableAdvanceReceipt(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) ListReceivablePayments(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "receivables", c.Params("id"), []string{"accounting.view", "accounting.receivable_view", "accounting.payment_create", "accounting.payment_approve"}); err != nil {
+		return err
+	}
+	rows, err := h.service.ReceivablePayments(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) CreateReceivablePayment(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "receivables", c.Params("id"), []string{"accounting.payment_create"}); err != nil {
+		return err
+	}
+	var req ReceivableReceiptCreateRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu phiếu thu không hợp lệ")
+	}
+	row, err := h.service.CreateReceivablePayment(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 
 func (h *Handler) ListReceivableOutputInvoices(c *fiber.Ctx) error {

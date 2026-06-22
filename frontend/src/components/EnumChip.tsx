@@ -37,6 +37,20 @@ const toneByValue: Partial<Record<EnumLabelGroup, Record<string, string>>> = {
     bank_transfer: 'bg-blue-50 text-blue-700 ring-blue-200',
     cash: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   },
+  payment_schedule_type: {
+    advance: 'bg-amber-50 text-amber-800 ring-amber-200',
+    progress: 'bg-blue-50 text-blue-700 ring-blue-200',
+    final: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    retention: 'bg-slate-100 text-slate-700 ring-slate-200',
+    other: defaultTone,
+  },
+  payment_allocation_type: {
+    payable_payment: 'bg-blue-50 text-blue-700 ring-blue-200',
+    advance_payment: 'bg-amber-50 text-amber-800 ring-amber-200',
+    receivable_receipt: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    advance_receipt: 'bg-teal-50 text-teal-700 ring-teal-200',
+    advance_settlement: 'bg-teal-50 text-teal-700 ring-teal-200',
+  },
   vendor_type: {
     supplier: 'bg-blue-50 text-blue-700 ring-blue-200',
     subcontractor: 'bg-indigo-50 text-indigo-700 ring-indigo-200',

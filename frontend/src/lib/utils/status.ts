@@ -8,6 +8,8 @@ export type EnumLabelGroup =
   | 'acceptance_type'
   | 'payment_type'
   | 'payment_method'
+  | 'payment_schedule_type'
+  | 'payment_allocation_type'
   | 'vendor_type'
   | 'impact_scope'
   | 'movement_type'
@@ -57,6 +59,8 @@ export const statusLabels: LabelMap = {
   ordered: 'Đã đặt hàng',
   partially_paid: 'Thanh toán một phần',
   paid: 'Đã thanh toán',
+  partially_settled: 'Quyết toán một phần',
+  settled: 'Đã quyết toán',
   partially_received: 'Thu một phần',
   received: 'Đã nhận',
   revised: 'Đã chỉnh sửa',
@@ -197,6 +201,20 @@ export const enumLabels: Record<EnumLabelGroup, LabelMap> = {
     bank_transfer: 'Chuyển khoản',
     cash: 'Tiền mặt',
   },
+  payment_schedule_type: {
+    advance: 'Ứng trước',
+    progress: 'Thanh toán kỳ',
+    final: 'Kỳ cuối',
+    retention: 'Giữ lại',
+    other: 'Khác',
+  },
+  payment_allocation_type: {
+    payable_payment: 'Thanh toán phải trả',
+    advance_payment: 'Chi ứng trước',
+    receivable_receipt: 'Thu phải thu',
+    advance_receipt: 'Thu ứng trước',
+    advance_settlement: 'Quyết toán ứng trước',
+  },
   vendor_type: {
     supplier: 'Nhà cung cấp',
     subcontractor: 'Thầu phụ',
@@ -323,6 +341,14 @@ export const enumLabels: Record<EnumLabelGroup, LabelMap> = {
     stock_movement_created: 'Đã tạo phiếu kho',
     payable_approved: 'Đã duyệt phải trả',
     payable_paid: 'Đã thanh toán phải trả',
+    payable_payment_schedule_created: 'Tạo kỳ thanh toán đầu vào',
+    payable_payment_schedule_approved: 'Duyệt kỳ thanh toán đầu vào',
+    payable_advance_requested: 'Tạo ứng trước đầu vào',
+    payable_advance_approved: 'Duyệt ứng trước đầu vào',
+    payable_advance_payment_recorded: 'Ghi nhận chi ứng trước',
+    payable_advance_settled: 'Quyết toán ứng trước',
+    payable_payment_created: 'Tạo phiếu thanh toán đầu vào',
+    payable_payment_allocated: 'Ghi nhận thanh toán đầu vào',
     receivable_approved: 'Đã duyệt phải thu',
     receivable_received: 'Đã thu phải thu',
     payment_approved: 'Đã duyệt thanh toán',

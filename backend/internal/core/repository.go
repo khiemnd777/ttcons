@@ -157,7 +157,8 @@ func hasUpdatedAt(table string) bool {
 		"procurement_requests", "boq_items", "issues", "acceptance_records", "rework_requests", "replanning_requests",
 		"handover_records", "accounting_budgets", "payables", "receivables", "payments", "advance_requests",
 		"system_settings", "work_items", "evidence_records", "workflow_form_templates", "workflow_form_versions",
-		"workflow_form_instances", "workflow_form_signatures", "input_invoices", "output_invoices":
+		"workflow_form_instances", "workflow_form_signatures", "input_invoices", "output_invoices",
+		"payable_payment_schedules", "receivable_payment_schedules", "client_advance_receipts":
 		return true
 	default:
 		return false
@@ -202,7 +203,9 @@ func safeTable(table string) string {
 		"role_permissions", "user_roles", "users", "work_items", "work_item_assignments", "work_item_activities",
 		"evidence_records", "workflow_form_templates", "workflow_form_versions", "workflow_form_fields",
 		"workflow_form_instances", "workflow_form_answers", "workflow_form_events", "workflow_form_signatures",
-		"workflow_form_pdf_exports", "boq_unit_price_events", "input_invoices", "output_invoices":
+		"workflow_form_pdf_exports", "boq_unit_price_events", "input_invoices", "output_invoices",
+		"payable_payment_schedules", "payment_allocations", "receivable_payment_schedules", "client_advance_receipts",
+		"receipt_allocations":
 		return table
 	default:
 		return ""

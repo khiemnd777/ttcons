@@ -73,8 +73,8 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 | Nghiệm thu đầu ra | Done | Durable outgoing acceptance records/checklist with work item link, workflow form/PDF references, signature/document gates, submit/chốt result, punch list/rework history, and handover-compatible final pass. |
 | PDF hoá đơn đầu vào | Done | Protected input invoice PDF upload/download linked to payable, optional procurement request, and document metadata. |
 | PDF hoá đơn đầu ra | Done | Protected output invoice PDF upload/download linked to receivable, optional client receipt payment, and document metadata. |
-| Thanh toán kỳ/ứng trước đầu vào | Partial | Payment schedule, advance request, partial pay, settlement. |
-| Thanh toán kỳ/ứng trước đầu ra | Partial | Billing milestone, advance receipt, partial receive, invoice issue. |
+| Thanh toán kỳ/ứng trước đầu vào | Done | Durable input payment schedules, advance requests, partial payment allocations, advance settlement, and payable reconciliation implemented. |
+| Thanh toán kỳ/ứng trước đầu ra | Done | Durable output billing schedules, client advance receipts, partial receipt allocations, advance settlement, issued invoice links, and receivable reconciliation implemented. |
 | Công nợ đầu vào | Partial | Payable aging, vendor ledger, invoice/payment reconciliation. |
 | Công nợ đầu ra | Partial | Receivable aging, client ledger, invoice/receipt reconciliation. |
 | Dòng tiền thu/chi | Partial | Time-series cashflow by project/date/category with export. |
@@ -405,6 +405,20 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - Added `OutputInvoicePanel` inside receivable detail with upload dialog, inline validation/warning toasts, protected PDF open action, issue/void actions, invoice totals, and refreshed receivable invoice counters.
 - Upgraded `DebtPage` receivable rows with invoice count/issued total and typed output-invoice frontend contracts.
 - Added backend regression coverage for output invoice upload, protected file storage bytes/checksum, generated document linkage, receivable/project invoice lists, issue/void transitions, audit logs, and cross-project payment rejection when DB-backed tests are enabled.
+- Implemented Accounting/Debt Phase 8A for production-grade input payment schedules and advances.
+- Added migration `backend/migrations/V29__input_payment_schedule_advance.sql` with `payable_payment_schedules`, `payment_allocations`, and payable/payment metadata on `advance_requests`.
+- Added authenticated input payment APIs for listing/creating/approving payable schedules, listing/creating/approving/settling payable advances, and listing/creating payable-scoped payments.
+- Extended payment approval so payable payment allocations update payable paid/remaining state, schedule paid/remaining state, advance paid state, and audit logs atomically without double-counting advance settlement.
+- Added `InputPaymentPlanPanel` inside payable detail with schedule, advance, payment, and settlement tables/dialogs, inline validation/warning toasts, status chips, and refreshed payable/payment query invalidation.
+- Removed the direct payable-list `Pay` action so users create partial payments from the detail dialog instead of one-click full settlement.
+- Added seed data and backend regression coverage for schedule approval, advance approval, settlement, partial payment allocation, advance payment recording, overpay validation, and audit logging.
+- Implemented Accounting/Debt Phase 8B for production-grade output billing schedules and client advances.
+- Added migration `backend/migrations/V30__output_billing_schedule_advance.sql` with `receivable_payment_schedules`, `client_advance_receipts`, and `receipt_allocations`.
+- Added authenticated output billing APIs for listing/creating/approving receivable schedules, listing/creating/approving/settling client advances, and listing/creating receivable-scoped receipt payments.
+- Extended payment approval so receipt allocations update receivable received/remaining state, schedule received/remaining state, client advance cash state, and audit logs atomically without double-counting approved client advances.
+- Added `OutputBillingPlanPanel` inside receivable detail with schedule, client advance, receipt, and settlement tables/dialogs, inline validation/warning toasts, status chips, issued-invoice linking, and refreshed receivable/payment query invalidation.
+- Removed the direct receivable-list `Receive` action so users create partial receipts from the detail dialog instead of one-click full settlement.
+- Added backend regression coverage for output schedule approval, client advance approval, settlement, partial receipt allocation, advance receipt cash recording, over-receipt validation, and audit logging.
 
 ## Validation Status
 
@@ -509,5 +523,15 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - `cd frontend && npm run build` passed after Documents/PDF Phase 7B; Vite chunk-size warning remains.
 - `git diff --check` passed after Documents/PDF Phase 7B.
 - Custom migration runner was not run after Documents/PDF Phase 7B; applying `V28` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/types.go backend/internal/core/handlers.go backend/internal/core/routes.go backend/internal/core/service.go backend/internal/core/repository.go backend/internal/core/repository_domain.go backend/internal/core/project_operations_integration_test.go` passed after Accounting/Debt Phase 8A.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Accounting/Debt Phase 8A; DB-backed payment schedule/advance integration coverage remains gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Accounting/Debt Phase 8A; Vite chunk-size warning remains.
+- `git diff --check` passed after Accounting/Debt Phase 8A.
+- Custom migration runner was not run after Accounting/Debt Phase 8A; applying `V29` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/types.go backend/internal/core/handlers.go backend/internal/core/routes.go backend/internal/core/service.go backend/internal/core/repository.go backend/internal/core/repository_domain.go backend/internal/core/project_operations_integration_test.go` passed after Accounting/Debt Phase 8B.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Accounting/Debt Phase 8B; DB-backed output billing/advance integration coverage remains gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Accounting/Debt Phase 8B; Vite chunk-size warning remains.
+- `git diff --check` passed after Accounting/Debt Phase 8B.
+- Custom migration runner was not run after Accounting/Debt Phase 8B; applying `V30` still requires a reachable Consflow PostgreSQL role/database.
 - Browser verification not run, per repo rule unless explicitly requested.
 - No backend/API/migration changes were needed for the Pipeline Builder multi-role UI, Shared UI 2A, or Shared UI 2B batches.

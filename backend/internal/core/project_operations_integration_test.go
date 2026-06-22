@@ -1742,6 +1742,327 @@ func TestBatch7AccountingActionsRequireApprovalBeforeSettlement(t *testing.T) {
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('payable_approved','payable_paid','receivable_approved','receivable_received','payment_approved')`, 5, projectID)
 }
 
+func TestInputPaymentScheduleAdvanceAndPartialPaymentReconcilePayable(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupProjectScopeFixture(t, db, []string{
+		"accounting.view",
+		"accounting.payable_view",
+		"accounting.payable_approve",
+		"accounting.payment_create",
+		"accounting.payment_approve",
+	})
+	payableID := newID()
+	mustExec(t, db, `
+		INSERT INTO payables (id, project_id, payable_code, vendor_type, vendor_name, source_type, gross_amount, paid_amount, remaining_amount, status, created_by)
+		VALUES ($1,$2,$3,'supplier','Input Payment Vendor','manual',1000,0,1000,'approved',$4)
+	`, payableID, fixture.projectID, "PAY-IP-"+payableID[:8], fixture.userID)
+
+	schedule, err := service.CreatePayablePaymentSchedule(ctx, payableID, PayablePaymentScheduleRequest{
+		ScheduleCode:  "SCH-IP-001",
+		MilestoneName: "Kỳ vật tư 1",
+		ScheduleType:  "progress",
+		PlannedAmount: 600,
+		DueDate:       "2026-07-15",
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scheduleID := cleanID(schedule["id"])
+	schedule, err = service.PayablePaymentScheduleAction(ctx, scheduleID, "approve", ActionRequest{Comment: "Duyệt kỳ"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if schedule["status"] != "approved" || number(schedule["remaining_amount"]) != 600 {
+		t.Fatalf("schedule = status %v remaining %v, want approved/600", schedule["status"], schedule["remaining_amount"])
+	}
+
+	advance, err := service.CreatePayableAdvanceRequest(ctx, payableID, AdvanceRequestCreateRequest{
+		RequestCode: "ADV-IP-001",
+		Amount:      200,
+		DueDate:     "2026-07-01",
+		Reason:      "Ứng trước cho vendor",
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanceID := cleanID(advance["id"])
+	advance, err = service.PayableAdvanceRequestAction(ctx, advanceID, "approve", ActionRequest{Comment: "Duyệt ứng"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if advance["status"] != "approved" {
+		t.Fatalf("advance status = %v, want approved", advance["status"])
+	}
+	payable, err := repo.GetPayableDetail(ctx, payableID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payable["status"] != "partially_paid" || number(payable["advance_amount"]) != 200 || number(payable["remaining_amount"]) != 800 {
+		t.Fatalf("payable after advance = status %v advance %v remaining %v, want partially_paid/200/800", payable["status"], payable["advance_amount"], payable["remaining_amount"])
+	}
+
+	advance, err = service.SettlePayableAdvanceRequest(ctx, advanceID, AdvanceSettlementRequest{Amount: 50, ScheduleID: scheduleID, Comment: "Đối soát một phần"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if advance["status"] != "partially_settled" || number(advance["settled_amount"]) != 50 {
+		t.Fatalf("advance settlement = status %v settled %v, want partially_settled/50", advance["status"], advance["settled_amount"])
+	}
+
+	payment, err := service.CreatePayablePayment(ctx, payableID, PayablePaymentCreateRequest{
+		PaymentCode:   "PMT-IP-001",
+		PaymentType:   "supplier_payment",
+		PaymentMethod: "bank_transfer",
+		Amount:        300,
+		ScheduleID:    scheduleID,
+		PaidAt:        "2026-07-20",
+		Notes:         "Thanh toán một phần kỳ 1",
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentID := cleanID(payment["id"])
+	if payment["status"] != "draft" || payment["allocation_type"] != "payable_payment" {
+		t.Fatalf("payment = %#v, want draft payable allocation", payment)
+	}
+	payment, err = service.PaymentAction(ctx, paymentID, "approve", ActionRequest{Comment: "Duyệt thanh toán"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payment["status"] != "approved" {
+		t.Fatalf("payment status = %v, want approved", payment["status"])
+	}
+	payable, err = repo.GetPayableDetail(ctx, payableID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payable["status"] != "partially_paid" || number(payable["paid_amount"]) != 300 || number(payable["remaining_amount"]) != 500 {
+		t.Fatalf("payable after payment = status %v paid %v remaining %v, want partially_paid/300/500", payable["status"], payable["paid_amount"], payable["remaining_amount"])
+	}
+	schedule, err = repo.GetPayablePaymentScheduleDetail(ctx, scheduleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if schedule["status"] != "partially_paid" || number(schedule["paid_amount"]) != 300 || number(schedule["remaining_amount"]) != 300 {
+		t.Fatalf("schedule after payment = status %v paid %v remaining %v, want partially_paid/300/300", schedule["status"], schedule["paid_amount"], schedule["remaining_amount"])
+	}
+
+	advancePayment, err := service.CreatePayablePayment(ctx, payableID, PayablePaymentCreateRequest{
+		PaymentCode:      "PMT-IP-ADV",
+		PaymentType:      "advance",
+		PaymentMethod:    "cash",
+		Amount:           200,
+		AdvanceRequestID: advanceID,
+		PaidAt:           "2026-07-02",
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.PaymentAction(ctx, cleanID(advancePayment["id"]), "approve", ActionRequest{Comment: "Chi ứng trước"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	advance, err = repo.GetPayableAdvanceRequestDetail(ctx, advanceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(advance["paid_amount"]) != 200 {
+		t.Fatalf("advance paid_amount = %v, want 200", advance["paid_amount"])
+	}
+	payable, err = repo.GetPayableDetail(ctx, payableID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(payable["remaining_amount"]) != 500 {
+		t.Fatalf("advance payment should not reduce payable twice, remaining = %v, want 500", payable["remaining_amount"])
+	}
+
+	_, err = service.CreatePayablePayment(ctx, payableID, PayablePaymentCreateRequest{
+		PaymentCode:   "PMT-IP-OVER",
+		PaymentMethod: "bank_transfer",
+		Amount:        1000,
+	}, fixture.userID, "Scoped User")
+	assertValidationError(t, err)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM audit_logs
+		WHERE project_id=$1
+		  AND event_type IN (
+		    'payable_payment_schedule_created',
+		    'payable_payment_schedule_approved',
+		    'payable_advance_requested',
+		    'payable_advance_approved',
+		    'payable_advance_settled',
+		    'payable_payment_created',
+		    'payable_payment_allocated',
+		    'payable_advance_payment_recorded'
+		  )
+	`, 9, fixture.projectID)
+}
+
+func TestOutputBillingScheduleAdvanceAndPartialReceiptReconcileReceivable(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupProjectScopeFixture(t, db, []string{
+		"accounting.view",
+		"accounting.receivable_view",
+		"accounting.receivable_approve",
+		"accounting.payment_create",
+		"accounting.payment_approve",
+	})
+	receivableID := newID()
+	mustExec(t, db, `
+		INSERT INTO receivables (id, project_id, receivable_code, client_name, source_type, gross_amount, received_amount, remaining_amount, status, created_by)
+		VALUES ($1,$2,$3,'Output Billing Client','manual',1000,0,1000,'approved',$4)
+	`, receivableID, fixture.projectID, "REC-OB-"+receivableID[:8], fixture.userID)
+
+	schedule, err := service.CreateReceivablePaymentSchedule(ctx, receivableID, PayablePaymentScheduleRequest{
+		ScheduleCode:  "SCH-OB-001",
+		MilestoneName: "Kỳ thu 1",
+		ScheduleType:  "progress",
+		PlannedAmount: 600,
+		DueDate:       "2026-08-15",
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scheduleID := cleanID(schedule["id"])
+	schedule, err = service.ReceivablePaymentScheduleAction(ctx, scheduleID, "approve", ActionRequest{Comment: "Duyệt kỳ"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if schedule["status"] != "approved" || number(schedule["remaining_amount"]) != 600 {
+		t.Fatalf("schedule = status %v remaining %v, want approved/600", schedule["status"], schedule["remaining_amount"])
+	}
+
+	advance, err := service.CreateReceivableAdvanceReceipt(ctx, receivableID, ReceivableAdvanceReceiptCreateRequest{
+		ReceiptCode: "ADV-OB-001",
+		Amount:      200,
+		DueDate:     "2026-08-01",
+		Reason:      "Khách hàng ứng trước",
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanceID := cleanID(advance["id"])
+	advance, err = service.ReceivableAdvanceReceiptAction(ctx, advanceID, "approve", ActionRequest{Comment: "Duyệt ứng"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if advance["status"] != "approved" {
+		t.Fatalf("advance status = %v, want approved", advance["status"])
+	}
+	receivable, err := repo.GetReceivableDetail(ctx, receivableID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receivable["status"] != "partially_received" || number(receivable["received_amount"]) != 200 || number(receivable["remaining_amount"]) != 800 {
+		t.Fatalf("receivable after advance = status %v received %v remaining %v, want partially_received/200/800", receivable["status"], receivable["received_amount"], receivable["remaining_amount"])
+	}
+
+	advance, err = service.SettleReceivableAdvanceReceipt(ctx, advanceID, ReceivableAdvanceSettlementRequest{Amount: 50, ScheduleID: scheduleID, Comment: "Đối soát một phần"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if advance["status"] != "partially_settled" || number(advance["settled_amount"]) != 50 {
+		t.Fatalf("advance settlement = status %v settled %v, want partially_settled/50", advance["status"], advance["settled_amount"])
+	}
+
+	receipt, err := service.CreateReceivablePayment(ctx, receivableID, ReceivableReceiptCreateRequest{
+		PaymentCode:   "RCV-OB-001",
+		PaymentType:   "client_receipt",
+		PaymentMethod: "bank_transfer",
+		Amount:        300,
+		ScheduleID:    scheduleID,
+		PaidAt:        "2026-08-20",
+		Notes:         "Thu một phần kỳ 1",
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt["status"] != "draft" || receipt["allocation_type"] != "receivable_receipt" {
+		t.Fatalf("receipt = %#v, want draft receivable allocation", receipt)
+	}
+	receipt, err = service.PaymentAction(ctx, cleanID(receipt["id"]), "approve", ActionRequest{Comment: "Duyệt phiếu thu"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt["status"] != "approved" {
+		t.Fatalf("receipt status = %v, want approved", receipt["status"])
+	}
+	receivable, err = repo.GetReceivableDetail(ctx, receivableID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receivable["status"] != "partially_received" || number(receivable["received_amount"]) != 500 || number(receivable["remaining_amount"]) != 500 {
+		t.Fatalf("receivable after receipt = status %v received %v remaining %v, want partially_received/500/500", receivable["status"], receivable["received_amount"], receivable["remaining_amount"])
+	}
+	schedule, err = repo.GetReceivablePaymentScheduleDetail(ctx, scheduleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if schedule["status"] != "partially_received" || number(schedule["received_amount"]) != 300 || number(schedule["remaining_amount"]) != 300 {
+		t.Fatalf("schedule after receipt = status %v received %v remaining %v, want partially_received/300/300", schedule["status"], schedule["received_amount"], schedule["remaining_amount"])
+	}
+
+	advanceReceipt, err := service.CreateReceivablePayment(ctx, receivableID, ReceivableReceiptCreateRequest{
+		PaymentCode:      "RCV-OB-ADV",
+		PaymentType:      "advance",
+		PaymentMethod:    "cash",
+		Amount:           200,
+		AdvanceReceiptID: advanceID,
+		PaidAt:           "2026-08-02",
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.PaymentAction(ctx, cleanID(advanceReceipt["id"]), "approve", ActionRequest{Comment: "Thu tiền ứng trước"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	advance, err = repo.GetReceivableAdvanceReceiptDetail(ctx, advanceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(advance["received_amount"]) != 200 {
+		t.Fatalf("advance received_amount = %v, want 200", advance["received_amount"])
+	}
+	receivable, err = repo.GetReceivableDetail(ctx, receivableID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(receivable["remaining_amount"]) != 500 {
+		t.Fatalf("advance receipt payment should not reduce receivable twice, remaining = %v, want 500", receivable["remaining_amount"])
+	}
+
+	_, err = service.CreateReceivablePayment(ctx, receivableID, ReceivableReceiptCreateRequest{
+		PaymentCode:   "RCV-OB-OVER",
+		PaymentMethod: "bank_transfer",
+		Amount:        1000,
+	}, fixture.userID, "Scoped User")
+	assertValidationError(t, err)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM audit_logs
+		WHERE project_id=$1
+		  AND event_type IN (
+		    'receivable_payment_schedule_created',
+		    'receivable_payment_schedule_approved',
+		    'receivable_advance_receipt_created',
+		    'receivable_advance_receipt_approved',
+		    'receivable_advance_receipt_settled',
+		    'receivable_payment_created',
+		    'receivable_payment_allocated',
+		    'receivable_advance_payment_recorded'
+		  )
+	`, 9, fixture.projectID)
+}
+
 func TestWorkItemEvidenceRequiredBeforeReviewApprovalAndCompletion(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

@@ -245,9 +245,87 @@ export type PayableRecord = ProjectOperationsRecord & {
   invoice_count?: number;
   invoice_total?: number;
   verified_invoice_total?: number;
+  schedule_count?: number;
+  scheduled_total?: number;
+  scheduled_remaining?: number;
+  advance_request_count?: number;
+  advance_requested_total?: number;
+  advance_settled_total?: number;
   latest_invoice_status?: string;
   latest_invoice_number?: string;
   latest_invoice_date?: string;
+};
+
+export type PayablePaymentScheduleRecord = ProjectOperationsRecord & {
+  project_id: string;
+  project_name?: string;
+  payable_id: string;
+  payable_code?: string;
+  vendor_name?: string;
+  schedule_code: string;
+  milestone_name: string;
+  schedule_type: 'advance' | 'progress' | 'final' | 'retention' | 'other' | string;
+  planned_amount: number;
+  paid_amount: number;
+  remaining_amount: number;
+  due_date?: string;
+  status: 'draft' | 'approved' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled' | 'deleted' | string;
+  notes?: string;
+  created_by_name?: string;
+  approved_by_name?: string;
+};
+
+export type PayableAdvanceRequestRecord = ProjectOperationsRecord & {
+  project_id: string;
+  project_name?: string;
+  payable_id: string;
+  payable_code?: string;
+  vendor_name?: string;
+  payable_vendor_name?: string;
+  request_code: string;
+  requested_by?: string;
+  requested_by_name?: string;
+  amount: number;
+  paid_amount?: number;
+  settled_amount: number;
+  reason?: string;
+  due_date?: string;
+  paid_at?: string;
+  settled_at?: string;
+  status: 'draft' | 'submitted' | 'approved' | 'partially_settled' | 'settled' | 'cancelled' | 'deleted' | string;
+  payment_id?: string;
+  payment_code?: string;
+  notes?: string;
+  approved_by_name?: string;
+};
+
+export type PayablePaymentRecord = ProjectOperationsRecord & {
+  project_id: string;
+  project_name?: string;
+  payable_id: string;
+  payable_code?: string;
+  payable_vendor_name?: string;
+  payment_code: string;
+  payment_type: string;
+  payment_method: string;
+  target_type?: string;
+  target_id?: string;
+  amount: number;
+  allocation_id?: string;
+  allocation_type?: 'payable_payment' | 'advance_payment' | 'advance_settlement' | string;
+  allocation_amount?: number;
+  allocation_notes?: string;
+  schedule_id?: string;
+  schedule_code?: string;
+  milestone_name?: string;
+  advance_request_id?: string;
+  advance_request_code?: string;
+  input_invoice_id?: string;
+  input_invoice_number?: string;
+  status: 'draft' | 'submitted' | 'pending' | 'approved' | 'paid' | 'cancelled' | string;
+  paid_at?: string;
+  approved_by_name?: string;
+  created_by_name?: string;
 };
 
 export type ReceivableRecord = ProjectOperationsRecord & {
@@ -264,9 +342,87 @@ export type ReceivableRecord = ProjectOperationsRecord & {
   invoice_count?: number;
   invoice_total?: number;
   issued_invoice_total?: number;
+  schedule_count?: number;
+  scheduled_total?: number;
+  scheduled_remaining?: number;
+  advance_receipt_count?: number;
+  advance_received_total?: number;
+  advance_settled_total?: number;
   latest_invoice_status?: string;
   latest_invoice_number?: string;
   latest_invoice_date?: string;
+};
+
+export type ReceivablePaymentScheduleRecord = ProjectOperationsRecord & {
+  project_id: string;
+  project_name?: string;
+  receivable_id: string;
+  receivable_code?: string;
+  client_name?: string;
+  schedule_code: string;
+  milestone_name: string;
+  schedule_type: 'advance' | 'progress' | 'final' | 'retention' | 'other' | string;
+  planned_amount: number;
+  received_amount: number;
+  remaining_amount: number;
+  due_date?: string;
+  status: 'draft' | 'approved' | 'partially_received' | 'received' | 'overdue' | 'cancelled' | 'deleted' | string;
+  notes?: string;
+  created_by_name?: string;
+  approved_by_name?: string;
+};
+
+export type ReceivableAdvanceReceiptRecord = ProjectOperationsRecord & {
+  project_id: string;
+  project_name?: string;
+  receivable_id: string;
+  receivable_code?: string;
+  client_name?: string;
+  receivable_client_name?: string;
+  receipt_code: string;
+  requested_by?: string;
+  requested_by_name?: string;
+  amount: number;
+  received_amount?: number;
+  settled_amount: number;
+  reason?: string;
+  due_date?: string;
+  received_at?: string;
+  settled_at?: string;
+  status: 'draft' | 'submitted' | 'approved' | 'partially_received' | 'received' | 'partially_settled' | 'settled' | 'cancelled' | 'deleted' | string;
+  payment_id?: string;
+  payment_code?: string;
+  notes?: string;
+  approved_by_name?: string;
+};
+
+export type ReceivablePaymentRecord = ProjectOperationsRecord & {
+  project_id: string;
+  project_name?: string;
+  receivable_id: string;
+  receivable_code?: string;
+  receivable_client_name?: string;
+  payment_code: string;
+  payment_type: string;
+  payment_method: string;
+  target_type?: string;
+  target_id?: string;
+  amount: number;
+  allocation_id?: string;
+  allocation_type?: 'receivable_receipt' | 'advance_receipt' | 'advance_settlement' | string;
+  allocation_amount?: number;
+  allocation_notes?: string;
+  schedule_id?: string;
+  schedule_code?: string;
+  milestone_name?: string;
+  advance_receipt_id?: string;
+  advance_receipt_code?: string;
+  output_invoice_id?: string;
+  output_invoice_number?: string;
+  status: 'draft' | 'submitted' | 'pending' | 'approved' | 'paid' | 'cancelled' | string;
+  paid_at?: string;
+  approved_by_name?: string;
+  created_by_name?: string;
 };
 
 export type InputInvoiceRecord = ProjectOperationsRecord & {

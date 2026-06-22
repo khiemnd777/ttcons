@@ -7193,6 +7193,536 @@ func (r *Repository) GetPayableDetail(ctx context.Context, payableID string) (Re
 	`, payableID)
 }
 
+func (r *Repository) ListPayablePaymentSchedules(ctx context.Context, payableID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			pps.*,
+			p.name AS project_name,
+			pay.payable_code,
+			pay.vendor_name,
+			COALESCE(created.full_name, '') AS created_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM payable_payment_schedules pps
+		JOIN projects p ON p.id=pps.project_id
+		JOIN payables pay ON pay.id=pps.payable_id
+		LEFT JOIN users created ON created.id=pps.created_by
+		LEFT JOIN users approved ON approved.id=pps.approved_by
+		WHERE pps.payable_id=$1
+		  AND pps.status NOT IN ('cancelled','deleted')
+		  AND pay.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		ORDER BY pps.due_date NULLS LAST, pps.created_at DESC
+	`, payableID)
+}
+
+func (r *Repository) GetPayablePaymentScheduleDetail(ctx context.Context, scheduleID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			pps.*,
+			p.name AS project_name,
+			pay.payable_code,
+			pay.vendor_name,
+			COALESCE(created.full_name, '') AS created_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM payable_payment_schedules pps
+		JOIN projects p ON p.id=pps.project_id
+		JOIN payables pay ON pay.id=pps.payable_id
+		LEFT JOIN users created ON created.id=pps.created_by
+		LEFT JOIN users approved ON approved.id=pps.approved_by
+		WHERE pps.id=$1
+		  AND pps.status NOT IN ('cancelled','deleted')
+		  AND pay.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+	`, scheduleID)
+}
+
+func (r *Repository) CreatePayablePaymentSchedule(ctx context.Context, payable Record, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	scheduleID := newID()
+	projectID := cleanID(payable["project_id"])
+	payableID := cleanID(payable["id"])
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO payable_payment_schedules (
+			id, project_id, payable_id, schedule_code, milestone_name, schedule_type,
+			planned_amount, paid_amount, remaining_amount, due_date, status, notes, created_by
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,0,$7,NULLIF($8,'')::date,'draft',$9,NULLIF($10,'')::uuid)
+		RETURNING *
+	`, scheduleID, projectID, payableID, body["schedule_code"], body["milestone_name"], body["schedule_type"], number(body["planned_amount"]), fmt.Sprint(body["due_date"]), body["notes"], actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "payable_payment_schedule_created", "payable_payment_schedule", scheduleID, "Tạo kỳ thanh toán đầu vào", Record{
+		"payable_id":     payableID,
+		"schedule_code":  body["schedule_code"],
+		"planned_amount": body["planned_amount"],
+		"schedule_type":  body["schedule_type"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetPayablePaymentScheduleDetail(ctx, scheduleID)
+}
+
+func (r *Repository) PayablePaymentScheduleAction(ctx context.Context, scheduleID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	if action != "approve" {
+		return nil, validationError("Action kỳ thanh toán không hợp lệ", Record{"action": action})
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM payable_payment_schedules WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, scheduleID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	if !statusIn(fromStatus, "draft", "overdue") {
+		return nil, validationError("Trạng thái kỳ thanh toán không cho phép duyệt", Record{"status": fromStatus})
+	}
+	updated, err := queryTx(ctx, tx, `
+		UPDATE payable_payment_schedules
+		SET status='approved',
+			approved_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1 AND status=$3
+		RETURNING *
+	`, scheduleID, actorID, fromStatus)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Trạng thái kỳ thanh toán đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	comment := actionComment(req)
+	metadata := Record{"action": action, "from_status": fromStatus, "to_status": "approved", "payable_id": current["payable_id"]}
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, "payable_payment_schedule_approved", "payable_payment_schedule", scheduleID, "Duyệt kỳ thanh toán đầu vào", metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetPayablePaymentScheduleDetail(ctx, scheduleID)
+}
+
+func (r *Repository) ListPayableAdvanceRequests(ctx context.Context, payableID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			ar.*,
+			p.name AS project_name,
+			pay.payable_code,
+			pay.vendor_type,
+			pay.vendor_name AS payable_vendor_name,
+			pmt.payment_code,
+			pmt.payment_type,
+			COALESCE(requested.full_name, '') AS requested_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM advance_requests ar
+		JOIN projects p ON p.id=ar.project_id
+		JOIN payables pay ON pay.id=ar.payable_id
+		LEFT JOIN payments pmt ON pmt.id=ar.payment_id
+		LEFT JOIN users requested ON requested.id=ar.requested_by
+		LEFT JOIN users approved ON approved.id=ar.approved_by
+		WHERE ar.payable_id=$1
+		  AND ar.status NOT IN ('cancelled','deleted')
+		  AND pay.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		ORDER BY ar.due_date NULLS LAST, ar.created_at DESC
+	`, payableID)
+}
+
+func (r *Repository) GetPayableAdvanceRequestDetail(ctx context.Context, advanceID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			ar.*,
+			p.name AS project_name,
+			pay.payable_code,
+			pay.vendor_type,
+			pay.vendor_name AS payable_vendor_name,
+			pmt.payment_code,
+			pmt.payment_type,
+			COALESCE(requested.full_name, '') AS requested_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM advance_requests ar
+		JOIN projects p ON p.id=ar.project_id
+		JOIN payables pay ON pay.id=ar.payable_id
+		LEFT JOIN payments pmt ON pmt.id=ar.payment_id
+		LEFT JOIN users requested ON requested.id=ar.requested_by
+		LEFT JOIN users approved ON approved.id=ar.approved_by
+		WHERE ar.id=$1
+		  AND ar.status NOT IN ('cancelled','deleted')
+		  AND pay.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+	`, advanceID)
+}
+
+func (r *Repository) CreatePayableAdvanceRequest(ctx context.Context, payable Record, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	advanceID := newID()
+	projectID := cleanID(payable["project_id"])
+	payableID := cleanID(payable["id"])
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO advance_requests (
+			id, project_id, payable_id, request_code, requested_by, amount, reason, status,
+			vendor_name, due_date, notes
+		)
+		VALUES ($1,$2,$3,$4,NULLIF($5,'')::uuid,$6,$7,'draft',$8,NULLIF($9,'')::date,$10)
+		RETURNING *
+	`, advanceID, projectID, payableID, body["request_code"], actorID, number(body["amount"]), body["reason"], body["vendor_name"], fmt.Sprint(body["due_date"]), body["notes"])
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "payable_advance_requested", "advance_request", advanceID, "Tạo yêu cầu ứng trước đầu vào", Record{
+		"payable_id":   payableID,
+		"request_code": body["request_code"],
+		"amount":       body["amount"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetPayableAdvanceRequestDetail(ctx, advanceID)
+}
+
+func (r *Repository) PayableAdvanceRequestAction(ctx context.Context, advanceID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	if action != "approve" {
+		return nil, validationError("Action ứng trước không hợp lệ", Record{"action": action})
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	advanceRows, err := queryTx(ctx, tx, `SELECT * FROM advance_requests WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, advanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(advanceRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	advance := advanceRows[0]
+	fromStatus := fmt.Sprint(advance["status"])
+	if !statusIn(fromStatus, "draft", "submitted") {
+		return nil, validationError("Trạng thái ứng trước không cho phép duyệt", Record{"status": fromStatus})
+	}
+	payableRows, err := queryTx(ctx, tx, `SELECT * FROM payables WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, advance["payable_id"])
+	if err != nil {
+		return nil, err
+	}
+	if len(payableRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	payable := payableRows[0]
+	if !statusIn(fmt.Sprint(payable["status"]), "approved", "partially_paid", "overdue") {
+		return nil, validationError("Phải trả cần được duyệt trước khi duyệt ứng trước", Record{"status": payable["status"]})
+	}
+	amount := number(advance["amount"])
+	if amount <= 0 || amount > number(payable["remaining_amount"]) {
+		return nil, validationError("Số tiền ứng trước vượt số còn phải trả", Record{"amount": amount, "remaining_amount": payable["remaining_amount"]})
+	}
+	updatedAdvance, err := queryTx(ctx, tx, `
+		UPDATE advance_requests
+		SET status='approved',
+			approved_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1 AND status=$3
+		RETURNING *
+	`, advanceID, actorID, fromStatus)
+	if err != nil {
+		return nil, err
+	}
+	if len(updatedAdvance) == 0 {
+		return nil, validationError("Trạng thái ứng trước đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	newRemaining := number(payable["remaining_amount"]) - amount
+	newStatus := payableSettlementStatus(number(payable["paid_amount"])+number(payable["advance_amount"])+amount, newRemaining)
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE payables
+		SET advance_amount=advance_amount + $2,
+			remaining_amount=GREATEST(remaining_amount - $2, 0),
+			status=$3,
+			approved_by=COALESCE(approved_by,NULLIF($4,'')::uuid),
+			updated_at=now()
+		WHERE id=$1
+	`, advance["payable_id"], amount, newStatus, actorID); err != nil {
+		return nil, err
+	}
+	comment := actionComment(req)
+	metadata := Record{"action": action, "from_status": fromStatus, "to_status": "approved", "payable_id": advance["payable_id"], "amount": amount}
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(advance["project_id"]), actorID, actorName, "payable_advance_approved", "advance_request", advanceID, "Duyệt ứng trước đầu vào", metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetPayableAdvanceRequestDetail(ctx, advanceID)
+}
+
+func (r *Repository) SettlePayableAdvanceRequest(ctx context.Context, advanceID string, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM advance_requests WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, advanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	if !statusIn(fromStatus, "approved", "partially_settled") {
+		return nil, validationError("Trạng thái ứng trước không cho phép quyết toán", Record{"status": fromStatus})
+	}
+	amount := number(body["amount"])
+	remaining := number(current["amount"]) - number(current["settled_amount"])
+	if amount <= 0 || amount > remaining {
+		return nil, validationError("Số tiền quyết toán vượt số ứng trước còn lại", Record{"amount": amount, "remaining": remaining})
+	}
+	toStatus := "partially_settled"
+	if amount >= remaining {
+		toStatus = "settled"
+	}
+	updated, err := queryTx(ctx, tx, `
+		UPDATE advance_requests
+		SET settled_amount=settled_amount + $2,
+			status=$3,
+			settled_at=CASE WHEN $3='settled' THEN now() ELSE settled_at END,
+			updated_at=now()
+		WHERE id=$1 AND status=$4
+		RETURNING *
+	`, advanceID, amount, toStatus, fromStatus)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Trạng thái ứng trước đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	metadata := Record{
+		"from_status":      fromStatus,
+		"to_status":        toStatus,
+		"payable_id":       current["payable_id"],
+		"amount":           amount,
+		"input_invoice_id": cleanID(body["input_invoice_id"]),
+		"schedule_id":      cleanID(body["schedule_id"]),
+	}
+	if comment := strings.TrimSpace(fmt.Sprint(body["comment"])); comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, "payable_advance_settled", "advance_request", advanceID, "Quyết toán ứng trước đầu vào", metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetPayableAdvanceRequestDetail(ctx, advanceID)
+}
+
+func (r *Repository) ListPayablePayments(ctx context.Context, payableID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			pmt.*,
+			p.name AS project_name,
+			pa.id AS allocation_id,
+			pa.schedule_id,
+			pa.advance_request_id,
+			pa.input_invoice_id,
+			pa.allocation_type,
+			pa.amount AS allocation_amount,
+			pa.notes AS allocation_notes,
+			pps.schedule_code,
+			pps.milestone_name,
+			ar.request_code AS advance_request_code,
+			ii.invoice_number AS input_invoice_number,
+			pay.payable_code,
+			pay.vendor_name AS payable_vendor_name,
+			COALESCE(created.full_name, '') AS created_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM payments pmt
+		JOIN projects p ON p.id=pmt.project_id
+		JOIN payment_allocations pa ON pa.payment_id=pmt.id
+		JOIN payables pay ON pay.id=pa.payable_id
+		LEFT JOIN payable_payment_schedules pps ON pps.id=pa.schedule_id
+		LEFT JOIN advance_requests ar ON ar.id=pa.advance_request_id
+		LEFT JOIN input_invoices ii ON ii.id=pa.input_invoice_id
+		LEFT JOIN users created ON created.id=pmt.created_by
+		LEFT JOIN users approved ON approved.id=pmt.approved_by
+		WHERE pa.payable_id=$1
+		  AND pmt.status <> 'cancelled'
+		  AND pay.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		ORDER BY pmt.created_at DESC
+	`, payableID)
+}
+
+func (r *Repository) GetPayablePaymentDetail(ctx context.Context, paymentID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			pmt.*,
+			p.name AS project_name,
+			pa.id AS allocation_id,
+			pa.payable_id,
+			pa.schedule_id,
+			pa.advance_request_id,
+			pa.input_invoice_id,
+			pa.allocation_type,
+			pa.amount AS allocation_amount,
+			pa.notes AS allocation_notes,
+			pps.schedule_code,
+			pps.milestone_name,
+			ar.request_code AS advance_request_code,
+			ii.invoice_number AS input_invoice_number,
+			pay.payable_code,
+			pay.vendor_name AS payable_vendor_name,
+			COALESCE(created.full_name, '') AS created_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM payments pmt
+		JOIN projects p ON p.id=pmt.project_id
+		JOIN payment_allocations pa ON pa.payment_id=pmt.id
+		JOIN payables pay ON pay.id=pa.payable_id
+		LEFT JOIN payable_payment_schedules pps ON pps.id=pa.schedule_id
+		LEFT JOIN advance_requests ar ON ar.id=pa.advance_request_id
+		LEFT JOIN input_invoices ii ON ii.id=pa.input_invoice_id
+		LEFT JOIN users created ON created.id=pmt.created_by
+		LEFT JOIN users approved ON approved.id=pmt.approved_by
+		WHERE pmt.id=$1
+		  AND pmt.status <> 'cancelled'
+		  AND pay.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+	`, paymentID)
+}
+
+func (r *Repository) CreatePayablePayment(ctx context.Context, payable Record, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	projectID := cleanID(payable["project_id"])
+	payableID := cleanID(payable["id"])
+	payableRows, err := queryTx(ctx, tx, `SELECT * FROM payables WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, payableID)
+	if err != nil {
+		return nil, err
+	}
+	if len(payableRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	currentPayable := payableRows[0]
+	amount := number(body["amount"])
+	allocationType := fmt.Sprint(body["allocation_type"])
+	scheduleID := cleanID(body["schedule_id"])
+	advanceID := cleanID(body["advance_request_id"])
+	if allocationType == "payable_payment" && scheduleID == "" && amount > number(currentPayable["remaining_amount"]) {
+		return nil, validationError("Số tiền thanh toán vượt số còn phải trả", Record{"amount": amount, "remaining_amount": currentPayable["remaining_amount"]})
+	}
+	if scheduleID != "" {
+		scheduleRows, err := queryTx(ctx, tx, `SELECT * FROM payable_payment_schedules WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, scheduleID)
+		if err != nil {
+			return nil, err
+		}
+		if len(scheduleRows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		schedule := scheduleRows[0]
+		if cleanID(schedule["payable_id"]) != payableID || !statusIn(fmt.Sprint(schedule["status"]), "approved", "partially_paid", "overdue") {
+			return nil, validationError("Kỳ thanh toán không thuộc phải trả hoặc chưa được duyệt", Record{"schedule_id": scheduleID})
+		}
+		if amount > number(schedule["remaining_amount"]) {
+			return nil, validationError("Số tiền thanh toán vượt số còn lại của kỳ", Record{"amount": amount, "schedule_remaining": schedule["remaining_amount"]})
+		}
+	}
+	if advanceID != "" {
+		advanceRows, err := queryTx(ctx, tx, `SELECT * FROM advance_requests WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, advanceID)
+		if err != nil {
+			return nil, err
+		}
+		if len(advanceRows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		advance := advanceRows[0]
+		if cleanID(advance["payable_id"]) != payableID || !statusIn(fmt.Sprint(advance["status"]), "approved", "partially_settled") {
+			return nil, validationError("Ứng trước không thuộc phải trả hoặc chưa được duyệt", Record{"advance_request_id": advanceID})
+		}
+		if amount > number(advance["amount"])-number(advance["paid_amount"]) {
+			return nil, validationError("Số tiền thanh toán vượt số ứng trước chưa chi", Record{"amount": amount})
+		}
+	}
+	paymentID := newID()
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO payments (
+			id, project_id, payment_code, payment_type, target_type, target_id,
+			amount, payment_method, status, paid_at, created_by
+		)
+		VALUES ($1,$2,$3,$4,'payable',$5,$6,$7,'draft',NULLIF($8,'')::timestamptz,NULLIF($9,'')::uuid)
+		RETURNING *
+	`, paymentID, projectID, body["payment_code"], body["payment_type"], payableID, amount, body["payment_method"], fmt.Sprint(body["paid_at"]), actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO payment_allocations (
+			project_id, payment_id, payable_id, schedule_id, advance_request_id, input_invoice_id,
+			allocation_type, amount, notes, created_by
+		)
+		VALUES ($1,$2,$3,NULLIF($4,'')::uuid,NULLIF($5,'')::uuid,NULLIF($6,'')::uuid,$7,$8,$9,NULLIF($10,'')::uuid)
+	`, projectID, paymentID, payableID, scheduleID, advanceID, cleanID(body["input_invoice_id"]), allocationType, amount, body["notes"], actorID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "payable_payment_created", "payment", paymentID, "Tạo phiếu thanh toán đầu vào", Record{
+		"payable_id":         payableID,
+		"amount":             amount,
+		"allocation_type":    allocationType,
+		"schedule_id":        scheduleID,
+		"advance_request_id": advanceID,
+		"input_invoice_id":   cleanID(body["input_invoice_id"]),
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetPayablePaymentDetail(ctx, paymentID)
+}
+
 func (r *Repository) ListInputInvoicesForPayable(ctx context.Context, payableID string) ([]Record, error) {
 	return r.Query(ctx, `
 		SELECT
@@ -7446,6 +7976,534 @@ func (r *Repository) InputInvoiceAction(ctx context.Context, invoiceID, action s
 		return nil, err
 	}
 	return r.GetInputInvoiceDetail(ctx, invoiceID)
+}
+
+func (r *Repository) ListReceivablePaymentSchedules(ctx context.Context, receivableID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			rps.*,
+			p.name AS project_name,
+			rec.receivable_code,
+			rec.client_name,
+			COALESCE(created.full_name, '') AS created_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM receivable_payment_schedules rps
+		JOIN projects p ON p.id=rps.project_id
+		JOIN receivables rec ON rec.id=rps.receivable_id
+		LEFT JOIN users created ON created.id=rps.created_by
+		LEFT JOIN users approved ON approved.id=rps.approved_by
+		WHERE rps.receivable_id=$1
+		  AND rps.status NOT IN ('cancelled','deleted')
+		  AND rec.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		ORDER BY rps.due_date NULLS LAST, rps.created_at DESC
+	`, receivableID)
+}
+
+func (r *Repository) GetReceivablePaymentScheduleDetail(ctx context.Context, scheduleID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			rps.*,
+			p.name AS project_name,
+			rec.receivable_code,
+			rec.client_name,
+			COALESCE(created.full_name, '') AS created_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM receivable_payment_schedules rps
+		JOIN projects p ON p.id=rps.project_id
+		JOIN receivables rec ON rec.id=rps.receivable_id
+		LEFT JOIN users created ON created.id=rps.created_by
+		LEFT JOIN users approved ON approved.id=rps.approved_by
+		WHERE rps.id=$1
+		  AND rps.status NOT IN ('cancelled','deleted')
+		  AND rec.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+	`, scheduleID)
+}
+
+func (r *Repository) CreateReceivablePaymentSchedule(ctx context.Context, receivable Record, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	scheduleID := newID()
+	projectID := cleanID(receivable["project_id"])
+	receivableID := cleanID(receivable["id"])
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO receivable_payment_schedules (
+			id, project_id, receivable_id, schedule_code, milestone_name, schedule_type,
+			planned_amount, received_amount, remaining_amount, due_date, status, notes, created_by
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,0,$7,NULLIF($8,'')::date,'draft',$9,NULLIF($10,'')::uuid)
+		RETURNING *
+	`, scheduleID, projectID, receivableID, body["schedule_code"], body["milestone_name"], body["schedule_type"], number(body["planned_amount"]), fmt.Sprint(body["due_date"]), body["notes"], actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "receivable_payment_schedule_created", "receivable_payment_schedule", scheduleID, "Tạo kỳ thu đầu ra", Record{
+		"receivable_id":  receivableID,
+		"schedule_code":  body["schedule_code"],
+		"planned_amount": body["planned_amount"],
+		"schedule_type":  body["schedule_type"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetReceivablePaymentScheduleDetail(ctx, scheduleID)
+}
+
+func (r *Repository) ReceivablePaymentScheduleAction(ctx context.Context, scheduleID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	if action != "approve" {
+		return nil, validationError("Action kỳ thu không hợp lệ", Record{"action": action})
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM receivable_payment_schedules WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, scheduleID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	if !statusIn(fromStatus, "draft", "overdue") {
+		return nil, validationError("Trạng thái kỳ thu không cho phép duyệt", Record{"status": fromStatus})
+	}
+	updated, err := queryTx(ctx, tx, `
+		UPDATE receivable_payment_schedules
+		SET status='approved',
+			approved_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1 AND status=$3
+		RETURNING *
+	`, scheduleID, actorID, fromStatus)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Trạng thái kỳ thu đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	comment := actionComment(req)
+	metadata := Record{"action": action, "from_status": fromStatus, "to_status": "approved", "receivable_id": current["receivable_id"]}
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, "receivable_payment_schedule_approved", "receivable_payment_schedule", scheduleID, "Duyệt kỳ thu đầu ra", metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetReceivablePaymentScheduleDetail(ctx, scheduleID)
+}
+
+func (r *Repository) ListReceivableAdvanceReceipts(ctx context.Context, receivableID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			car.*,
+			p.name AS project_name,
+			rec.receivable_code,
+			rec.client_name AS receivable_client_name,
+			pmt.payment_code,
+			pmt.payment_type,
+			COALESCE(requested.full_name, '') AS requested_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM client_advance_receipts car
+		JOIN projects p ON p.id=car.project_id
+		JOIN receivables rec ON rec.id=car.receivable_id
+		LEFT JOIN payments pmt ON pmt.id=car.payment_id
+		LEFT JOIN users requested ON requested.id=car.requested_by
+		LEFT JOIN users approved ON approved.id=car.approved_by
+		WHERE car.receivable_id=$1
+		  AND car.status NOT IN ('cancelled','deleted')
+		  AND rec.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		ORDER BY car.due_date NULLS LAST, car.created_at DESC
+	`, receivableID)
+}
+
+func (r *Repository) GetReceivableAdvanceReceiptDetail(ctx context.Context, advanceID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			car.*,
+			p.name AS project_name,
+			rec.receivable_code,
+			rec.client_name AS receivable_client_name,
+			pmt.payment_code,
+			pmt.payment_type,
+			COALESCE(requested.full_name, '') AS requested_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM client_advance_receipts car
+		JOIN projects p ON p.id=car.project_id
+		JOIN receivables rec ON rec.id=car.receivable_id
+		LEFT JOIN payments pmt ON pmt.id=car.payment_id
+		LEFT JOIN users requested ON requested.id=car.requested_by
+		LEFT JOIN users approved ON approved.id=car.approved_by
+		WHERE car.id=$1
+		  AND car.status NOT IN ('cancelled','deleted')
+		  AND rec.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+	`, advanceID)
+}
+
+func (r *Repository) CreateReceivableAdvanceReceipt(ctx context.Context, receivable Record, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	advanceID := newID()
+	projectID := cleanID(receivable["project_id"])
+	receivableID := cleanID(receivable["id"])
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO client_advance_receipts (
+			id, project_id, receivable_id, receipt_code, requested_by, amount, reason, status,
+			client_name, due_date, notes
+		)
+		VALUES ($1,$2,$3,$4,NULLIF($5,'')::uuid,$6,$7,'draft',$8,NULLIF($9,'')::date,$10)
+		RETURNING *
+	`, advanceID, projectID, receivableID, body["receipt_code"], actorID, number(body["amount"]), body["reason"], body["client_name"], fmt.Sprint(body["due_date"]), body["notes"])
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "receivable_advance_receipt_created", "client_advance_receipt", advanceID, "Tạo ứng trước đầu ra", Record{
+		"receivable_id": receivableID,
+		"receipt_code":  body["receipt_code"],
+		"amount":        body["amount"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetReceivableAdvanceReceiptDetail(ctx, advanceID)
+}
+
+func (r *Repository) ReceivableAdvanceReceiptAction(ctx context.Context, advanceID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	if action != "approve" {
+		return nil, validationError("Action ứng trước đầu ra không hợp lệ", Record{"action": action})
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	advanceRows, err := queryTx(ctx, tx, `SELECT * FROM client_advance_receipts WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, advanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(advanceRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	advance := advanceRows[0]
+	fromStatus := fmt.Sprint(advance["status"])
+	if !statusIn(fromStatus, "draft", "submitted") {
+		return nil, validationError("Trạng thái ứng trước đầu ra không cho phép duyệt", Record{"status": fromStatus})
+	}
+	receivableRows, err := queryTx(ctx, tx, `SELECT * FROM receivables WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, advance["receivable_id"])
+	if err != nil {
+		return nil, err
+	}
+	if len(receivableRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	receivable := receivableRows[0]
+	if !statusIn(fmt.Sprint(receivable["status"]), "approved", "partially_received", "overdue") {
+		return nil, validationError("Phải thu cần được duyệt trước khi duyệt ứng trước", Record{"status": receivable["status"]})
+	}
+	amount := number(advance["amount"])
+	if amount <= 0 || amount > number(receivable["remaining_amount"]) {
+		return nil, validationError("Số tiền ứng trước vượt số còn phải thu", Record{"amount": amount, "remaining_amount": receivable["remaining_amount"]})
+	}
+	updatedAdvance, err := queryTx(ctx, tx, `
+		UPDATE client_advance_receipts
+		SET status='approved',
+			approved_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1 AND status=$3
+		RETURNING *
+	`, advanceID, actorID, fromStatus)
+	if err != nil {
+		return nil, err
+	}
+	if len(updatedAdvance) == 0 {
+		return nil, validationError("Trạng thái ứng trước đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	newRemaining := number(receivable["remaining_amount"]) - amount
+	newReceived := number(receivable["received_amount"]) + amount
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE receivables
+		SET received_amount=received_amount + $2,
+			remaining_amount=GREATEST(remaining_amount - $2, 0),
+			status=$3,
+			approved_by=COALESCE(approved_by,NULLIF($4,'')::uuid),
+			updated_at=now()
+		WHERE id=$1
+	`, advance["receivable_id"], amount, receivableSettlementStatus(newReceived, newRemaining), actorID); err != nil {
+		return nil, err
+	}
+	comment := actionComment(req)
+	metadata := Record{"action": action, "from_status": fromStatus, "to_status": "approved", "receivable_id": advance["receivable_id"], "amount": amount}
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(advance["project_id"]), actorID, actorName, "receivable_advance_receipt_approved", "client_advance_receipt", advanceID, "Duyệt ứng trước đầu ra", metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetReceivableAdvanceReceiptDetail(ctx, advanceID)
+}
+
+func (r *Repository) SettleReceivableAdvanceReceipt(ctx context.Context, advanceID string, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM client_advance_receipts WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, advanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	if !statusIn(fromStatus, "approved", "partially_received", "received", "partially_settled") {
+		return nil, validationError("Trạng thái ứng trước không cho phép quyết toán", Record{"status": fromStatus})
+	}
+	amount := number(body["amount"])
+	remaining := number(current["amount"]) - number(current["settled_amount"])
+	if amount <= 0 || amount > remaining {
+		return nil, validationError("Số tiền quyết toán vượt số ứng trước còn lại", Record{"amount": amount, "remaining": remaining})
+	}
+	toStatus := "partially_settled"
+	if amount >= remaining {
+		toStatus = "settled"
+	}
+	updated, err := queryTx(ctx, tx, `
+		UPDATE client_advance_receipts
+		SET settled_amount=settled_amount + $2,
+			status=$3,
+			settled_at=CASE WHEN $3='settled' THEN now() ELSE settled_at END,
+			updated_at=now()
+		WHERE id=$1 AND status=$4
+		RETURNING *
+	`, advanceID, amount, toStatus, fromStatus)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Trạng thái ứng trước đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	metadata := Record{
+		"from_status":       fromStatus,
+		"to_status":         toStatus,
+		"receivable_id":     current["receivable_id"],
+		"amount":            amount,
+		"output_invoice_id": cleanID(body["output_invoice_id"]),
+		"schedule_id":       cleanID(body["schedule_id"]),
+	}
+	if comment := strings.TrimSpace(fmt.Sprint(body["comment"])); comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, "receivable_advance_receipt_settled", "client_advance_receipt", advanceID, "Quyết toán ứng trước đầu ra", metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetReceivableAdvanceReceiptDetail(ctx, advanceID)
+}
+
+func (r *Repository) ListReceivablePayments(ctx context.Context, receivableID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			pmt.*,
+			p.name AS project_name,
+			ra.id AS allocation_id,
+			ra.schedule_id,
+			ra.advance_receipt_id,
+			ra.output_invoice_id,
+			ra.allocation_type,
+			ra.amount AS allocation_amount,
+			ra.notes AS allocation_notes,
+			rps.schedule_code,
+			rps.milestone_name,
+			car.receipt_code AS advance_receipt_code,
+			oi.invoice_number AS output_invoice_number,
+			rec.receivable_code,
+			rec.client_name AS receivable_client_name,
+			COALESCE(created.full_name, '') AS created_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM payments pmt
+		JOIN projects p ON p.id=pmt.project_id
+		JOIN receipt_allocations ra ON ra.payment_id=pmt.id
+		JOIN receivables rec ON rec.id=ra.receivable_id
+		LEFT JOIN receivable_payment_schedules rps ON rps.id=ra.schedule_id
+		LEFT JOIN client_advance_receipts car ON car.id=ra.advance_receipt_id
+		LEFT JOIN output_invoices oi ON oi.id=ra.output_invoice_id
+		LEFT JOIN users created ON created.id=pmt.created_by
+		LEFT JOIN users approved ON approved.id=pmt.approved_by
+		WHERE ra.receivable_id=$1
+		  AND pmt.status <> 'cancelled'
+		  AND rec.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		ORDER BY pmt.created_at DESC
+	`, receivableID)
+}
+
+func (r *Repository) GetReceivablePaymentDetail(ctx context.Context, paymentID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			pmt.*,
+			p.name AS project_name,
+			ra.id AS allocation_id,
+			ra.receivable_id,
+			ra.schedule_id,
+			ra.advance_receipt_id,
+			ra.output_invoice_id,
+			ra.allocation_type,
+			ra.amount AS allocation_amount,
+			ra.notes AS allocation_notes,
+			rps.schedule_code,
+			rps.milestone_name,
+			car.receipt_code AS advance_receipt_code,
+			oi.invoice_number AS output_invoice_number,
+			rec.receivable_code,
+			rec.client_name AS receivable_client_name,
+			COALESCE(created.full_name, '') AS created_by_name,
+			COALESCE(approved.full_name, '') AS approved_by_name
+		FROM payments pmt
+		JOIN projects p ON p.id=pmt.project_id
+		JOIN receipt_allocations ra ON ra.payment_id=pmt.id
+		JOIN receivables rec ON rec.id=ra.receivable_id
+		LEFT JOIN receivable_payment_schedules rps ON rps.id=ra.schedule_id
+		LEFT JOIN client_advance_receipts car ON car.id=ra.advance_receipt_id
+		LEFT JOIN output_invoices oi ON oi.id=ra.output_invoice_id
+		LEFT JOIN users created ON created.id=pmt.created_by
+		LEFT JOIN users approved ON approved.id=pmt.approved_by
+		WHERE pmt.id=$1
+		  AND pmt.status <> 'cancelled'
+		  AND rec.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+	`, paymentID)
+}
+
+func (r *Repository) CreateReceivablePayment(ctx context.Context, receivable Record, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	projectID := cleanID(receivable["project_id"])
+	receivableID := cleanID(receivable["id"])
+	receivableRows, err := queryTx(ctx, tx, `SELECT * FROM receivables WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, receivableID)
+	if err != nil {
+		return nil, err
+	}
+	if len(receivableRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	currentReceivable := receivableRows[0]
+	amount := number(body["amount"])
+	allocationType := fmt.Sprint(body["allocation_type"])
+	scheduleID := cleanID(body["schedule_id"])
+	advanceID := cleanID(body["advance_receipt_id"])
+	if allocationType == "receivable_receipt" && scheduleID == "" && amount > number(currentReceivable["remaining_amount"]) {
+		return nil, validationError("Số tiền thu vượt số còn phải thu", Record{"amount": amount, "remaining_amount": currentReceivable["remaining_amount"]})
+	}
+	if scheduleID != "" {
+		scheduleRows, err := queryTx(ctx, tx, `SELECT * FROM receivable_payment_schedules WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, scheduleID)
+		if err != nil {
+			return nil, err
+		}
+		if len(scheduleRows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		schedule := scheduleRows[0]
+		if cleanID(schedule["receivable_id"]) != receivableID || !statusIn(fmt.Sprint(schedule["status"]), "approved", "partially_received", "overdue") {
+			return nil, validationError("Kỳ thu không thuộc phải thu hoặc chưa được duyệt", Record{"schedule_id": scheduleID})
+		}
+		if amount > number(schedule["remaining_amount"]) {
+			return nil, validationError("Số tiền thu vượt số còn lại của kỳ", Record{"amount": amount, "schedule_remaining": schedule["remaining_amount"]})
+		}
+	}
+	if advanceID != "" {
+		advanceRows, err := queryTx(ctx, tx, `SELECT * FROM client_advance_receipts WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, advanceID)
+		if err != nil {
+			return nil, err
+		}
+		if len(advanceRows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		advance := advanceRows[0]
+		if cleanID(advance["receivable_id"]) != receivableID || !statusIn(fmt.Sprint(advance["status"]), "approved", "partially_received", "received", "partially_settled") {
+			return nil, validationError("Ứng trước không thuộc phải thu hoặc chưa được duyệt", Record{"advance_receipt_id": advanceID})
+		}
+		if amount > number(advance["amount"])-number(advance["received_amount"]) {
+			return nil, validationError("Số tiền thu vượt số ứng trước chưa ghi nhận tiền", Record{"amount": amount})
+		}
+	}
+	paymentID := newID()
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO payments (
+			id, project_id, payment_code, payment_type, target_type, target_id,
+			amount, payment_method, status, paid_at, created_by
+		)
+		VALUES ($1,$2,$3,$4,'receivable',$5,$6,$7,'draft',NULLIF($8,'')::timestamptz,NULLIF($9,'')::uuid)
+		RETURNING *
+	`, paymentID, projectID, body["payment_code"], body["payment_type"], receivableID, amount, body["payment_method"], fmt.Sprint(body["paid_at"]), actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO receipt_allocations (
+			project_id, payment_id, receivable_id, schedule_id, advance_receipt_id, output_invoice_id,
+			allocation_type, amount, notes, created_by
+		)
+		VALUES ($1,$2,$3,NULLIF($4,'')::uuid,NULLIF($5,'')::uuid,NULLIF($6,'')::uuid,$7,$8,$9,NULLIF($10,'')::uuid)
+	`, projectID, paymentID, receivableID, scheduleID, advanceID, cleanID(body["output_invoice_id"]), allocationType, amount, body["notes"], actorID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "receivable_payment_created", "payment", paymentID, "Tạo phiếu thu đầu ra", Record{
+		"receivable_id":      receivableID,
+		"amount":             amount,
+		"allocation_type":    allocationType,
+		"schedule_id":        scheduleID,
+		"advance_receipt_id": advanceID,
+		"output_invoice_id":  cleanID(body["output_invoice_id"]),
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetReceivablePaymentDetail(ctx, paymentID)
 }
 
 func (r *Repository) GetReceivableDetail(ctx context.Context, receivableID string) (Record, error) {
@@ -7826,6 +8884,12 @@ func (r *Repository) PaymentAction(ctx context.Context, id, action string, req A
 	if len(updated) == 0 {
 		return nil, validationError("Trạng thái phiếu thanh toán đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
 	}
+	if err := r.applyPaymentAllocationsTx(ctx, tx, updated[0], actorID, actorName); err != nil {
+		return nil, err
+	}
+	if err := r.applyReceiptAllocationsTx(ctx, tx, updated[0], actorID, actorName); err != nil {
+		return nil, err
+	}
 	comment := actionComment(req)
 	metadata := Record{"action": action, "from_status": fromStatus, "to_status": "approved"}
 	if comment != "" {
@@ -7838,6 +8902,294 @@ func (r *Repository) PaymentAction(ctx context.Context, id, action string, req A
 		return nil, err
 	}
 	return updated[0], nil
+}
+
+func (r *Repository) applyPaymentAllocationsTx(ctx context.Context, tx *sql.Tx, payment Record, actorID, actorName string) error {
+	allocations, err := queryTx(ctx, tx, `SELECT * FROM payment_allocations WHERE payment_id=$1 FOR UPDATE`, payment["id"])
+	if err != nil {
+		return err
+	}
+	for _, allocation := range allocations {
+		amount := number(allocation["amount"])
+		if amount <= 0 {
+			return validationError("Allocation thanh toán không hợp lệ", Record{"allocation_id": allocation["id"]})
+		}
+		projectID := fmt.Sprint(allocation["project_id"])
+		payableID := cleanID(allocation["payable_id"])
+		switch fmt.Sprint(allocation["allocation_type"]) {
+		case "payable_payment":
+			payableRows, err := queryTx(ctx, tx, `SELECT * FROM payables WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, payableID)
+			if err != nil {
+				return err
+			}
+			if len(payableRows) == 0 {
+				return sql.ErrNoRows
+			}
+			payable := payableRows[0]
+			if amount > number(payable["remaining_amount"]) {
+				return validationError("Số tiền thanh toán vượt số còn phải trả", Record{"amount": amount, "remaining_amount": payable["remaining_amount"]})
+			}
+			scheduleID := cleanID(allocation["schedule_id"])
+			if scheduleID != "" {
+				scheduleRows, err := queryTx(ctx, tx, `SELECT * FROM payable_payment_schedules WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, scheduleID)
+				if err != nil {
+					return err
+				}
+				if len(scheduleRows) == 0 {
+					return sql.ErrNoRows
+				}
+				schedule := scheduleRows[0]
+				if cleanID(schedule["payable_id"]) != payableID {
+					return validationError("Kỳ thanh toán không thuộc phải trả", Record{"schedule_id": scheduleID})
+				}
+				if amount > number(schedule["remaining_amount"]) {
+					return validationError("Số tiền thanh toán vượt số còn lại của kỳ", Record{"amount": amount, "schedule_remaining": schedule["remaining_amount"]})
+				}
+				scheduleRemaining := number(schedule["remaining_amount"]) - amount
+				if _, err := tx.ExecContext(ctx, `
+					UPDATE payable_payment_schedules
+					SET paid_amount=paid_amount + $2,
+						remaining_amount=GREATEST(remaining_amount - $2, 0),
+						status=$3,
+						updated_at=now()
+					WHERE id=$1
+				`, scheduleID, amount, scheduleSettlementStatus(scheduleRemaining)); err != nil {
+					return err
+				}
+			}
+			payableRemaining := number(payable["remaining_amount"]) - amount
+			applied := number(payable["paid_amount"]) + number(payable["advance_amount"]) + amount
+			if _, err := tx.ExecContext(ctx, `
+				UPDATE payables
+				SET paid_amount=paid_amount + $2,
+					remaining_amount=GREATEST(remaining_amount - $2, 0),
+					status=$3,
+					approved_by=COALESCE(approved_by,NULLIF($4,'')::uuid),
+					updated_at=now()
+				WHERE id=$1
+			`, payableID, amount, payableSettlementStatus(applied, payableRemaining), actorID); err != nil {
+				return err
+			}
+			if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "payable_payment_allocated", "payment", cleanID(payment["id"]), "Ghi nhận thanh toán từng phần đầu vào", Record{
+				"payable_id":       payableID,
+				"schedule_id":      scheduleID,
+				"input_invoice_id": cleanID(allocation["input_invoice_id"]),
+				"amount":           amount,
+			}); err != nil {
+				return err
+			}
+		case "advance_payment":
+			advanceID := cleanID(allocation["advance_request_id"])
+			if advanceID == "" {
+				return validationError("Thanh toán ứng trước thiếu advance_request_id", Record{"allocation_id": allocation["id"]})
+			}
+			advanceRows, err := queryTx(ctx, tx, `SELECT * FROM advance_requests WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, advanceID)
+			if err != nil {
+				return err
+			}
+			if len(advanceRows) == 0 {
+				return sql.ErrNoRows
+			}
+			advance := advanceRows[0]
+			if cleanID(advance["payable_id"]) != payableID {
+				return validationError("Ứng trước không thuộc phải trả", Record{"advance_request_id": advanceID})
+			}
+			if amount > number(advance["amount"])-number(advance["paid_amount"]) {
+				return validationError("Số tiền chi ứng trước vượt phần chưa chi", Record{"amount": amount})
+			}
+			if _, err := tx.ExecContext(ctx, `
+				UPDATE advance_requests
+				SET paid_amount=paid_amount + $2,
+					payment_id=COALESCE(payment_id, $3),
+					paid_at=COALESCE(paid_at, $4::timestamptz, now()),
+					updated_at=now()
+				WHERE id=$1
+			`, advanceID, amount, payment["id"], payment["paid_at"]); err != nil {
+				return err
+			}
+			if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "payable_advance_payment_recorded", "advance_request", advanceID, "Ghi nhận chi ứng trước đầu vào", Record{
+				"payable_id": payableID,
+				"payment_id": cleanID(payment["id"]),
+				"amount":     amount,
+			}); err != nil {
+				return err
+			}
+		case "advance_settlement":
+			continue
+		default:
+			return validationError("Loại allocation thanh toán không hợp lệ", Record{"allocation_type": allocation["allocation_type"]})
+		}
+	}
+	return nil
+}
+
+func (r *Repository) applyReceiptAllocationsTx(ctx context.Context, tx *sql.Tx, payment Record, actorID, actorName string) error {
+	allocations, err := queryTx(ctx, tx, `SELECT * FROM receipt_allocations WHERE payment_id=$1 FOR UPDATE`, payment["id"])
+	if err != nil {
+		return err
+	}
+	for _, allocation := range allocations {
+		amount := number(allocation["amount"])
+		if amount <= 0 {
+			return validationError("Allocation phiếu thu không hợp lệ", Record{"allocation_id": allocation["id"]})
+		}
+		projectID := fmt.Sprint(allocation["project_id"])
+		receivableID := cleanID(allocation["receivable_id"])
+		switch fmt.Sprint(allocation["allocation_type"]) {
+		case "receivable_receipt":
+			receivableRows, err := queryTx(ctx, tx, `SELECT * FROM receivables WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, receivableID)
+			if err != nil {
+				return err
+			}
+			if len(receivableRows) == 0 {
+				return sql.ErrNoRows
+			}
+			receivable := receivableRows[0]
+			if amount > number(receivable["remaining_amount"]) {
+				return validationError("Số tiền thu vượt số còn phải thu", Record{"amount": amount, "remaining_amount": receivable["remaining_amount"]})
+			}
+			scheduleID := cleanID(allocation["schedule_id"])
+			if scheduleID != "" {
+				scheduleRows, err := queryTx(ctx, tx, `SELECT * FROM receivable_payment_schedules WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, scheduleID)
+				if err != nil {
+					return err
+				}
+				if len(scheduleRows) == 0 {
+					return sql.ErrNoRows
+				}
+				schedule := scheduleRows[0]
+				if cleanID(schedule["receivable_id"]) != receivableID {
+					return validationError("Kỳ thu không thuộc phải thu", Record{"schedule_id": scheduleID})
+				}
+				if amount > number(schedule["remaining_amount"]) {
+					return validationError("Số tiền thu vượt số còn lại của kỳ", Record{"amount": amount, "schedule_remaining": schedule["remaining_amount"]})
+				}
+				scheduleRemaining := number(schedule["remaining_amount"]) - amount
+				if _, err := tx.ExecContext(ctx, `
+					UPDATE receivable_payment_schedules
+					SET received_amount=received_amount + $2,
+						remaining_amount=GREATEST(remaining_amount - $2, 0),
+						status=$3,
+						updated_at=now()
+					WHERE id=$1
+				`, scheduleID, amount, receiptScheduleSettlementStatus(scheduleRemaining)); err != nil {
+					return err
+				}
+			}
+			receivableRemaining := number(receivable["remaining_amount"]) - amount
+			received := number(receivable["received_amount"]) + amount
+			if _, err := tx.ExecContext(ctx, `
+				UPDATE receivables
+				SET received_amount=received_amount + $2,
+					remaining_amount=GREATEST(remaining_amount - $2, 0),
+					status=$3,
+					approved_by=COALESCE(approved_by,NULLIF($4,'')::uuid),
+					updated_at=now()
+				WHERE id=$1
+			`, receivableID, amount, receivableSettlementStatus(received, receivableRemaining), actorID); err != nil {
+				return err
+			}
+			if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "receivable_payment_allocated", "payment", cleanID(payment["id"]), "Ghi nhận thu từng phần đầu ra", Record{
+				"receivable_id":     receivableID,
+				"schedule_id":       scheduleID,
+				"output_invoice_id": cleanID(allocation["output_invoice_id"]),
+				"amount":            amount,
+			}); err != nil {
+				return err
+			}
+		case "advance_receipt":
+			advanceID := cleanID(allocation["advance_receipt_id"])
+			if advanceID == "" {
+				return validationError("Thu ứng trước thiếu advance_receipt_id", Record{"allocation_id": allocation["id"]})
+			}
+			advanceRows, err := queryTx(ctx, tx, `SELECT * FROM client_advance_receipts WHERE id=$1 AND status NOT IN ('cancelled','deleted') FOR UPDATE`, advanceID)
+			if err != nil {
+				return err
+			}
+			if len(advanceRows) == 0 {
+				return sql.ErrNoRows
+			}
+			advance := advanceRows[0]
+			if cleanID(advance["receivable_id"]) != receivableID {
+				return validationError("Ứng trước không thuộc phải thu", Record{"advance_receipt_id": advanceID})
+			}
+			if amount > number(advance["amount"])-number(advance["received_amount"]) {
+				return validationError("Số tiền thu ứng trước vượt phần chưa ghi nhận tiền", Record{"amount": amount})
+			}
+			newReceived := number(advance["received_amount"]) + amount
+			toStatus := clientAdvanceReceiptStatusAfterReceipt(number(advance["amount"]), newReceived, number(advance["settled_amount"]))
+			if _, err := tx.ExecContext(ctx, `
+				UPDATE client_advance_receipts
+				SET received_amount=received_amount + $2,
+					payment_id=COALESCE(payment_id, $3),
+					received_at=COALESCE(received_at, $4::timestamptz, now()),
+					status=$5,
+					updated_at=now()
+				WHERE id=$1
+			`, advanceID, amount, payment["id"], payment["paid_at"], toStatus); err != nil {
+				return err
+			}
+			if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "receivable_advance_payment_recorded", "client_advance_receipt", advanceID, "Ghi nhận thu ứng trước đầu ra", Record{
+				"receivable_id": receivableID,
+				"payment_id":    cleanID(payment["id"]),
+				"amount":        amount,
+			}); err != nil {
+				return err
+			}
+		case "advance_settlement":
+			continue
+		default:
+			return validationError("Loại allocation phiếu thu không hợp lệ", Record{"allocation_type": allocation["allocation_type"]})
+		}
+	}
+	return nil
+}
+
+func payableSettlementStatus(applied, remaining float64) string {
+	if remaining <= 0.000001 {
+		return "paid"
+	}
+	if applied > 0 {
+		return "partially_paid"
+	}
+	return "approved"
+}
+
+func scheduleSettlementStatus(remaining float64) string {
+	if remaining <= 0.000001 {
+		return "paid"
+	}
+	return "partially_paid"
+}
+
+func receivableSettlementStatus(received, remaining float64) string {
+	if remaining <= 0.000001 {
+		return "received"
+	}
+	if received > 0 {
+		return "partially_received"
+	}
+	return "approved"
+}
+
+func receiptScheduleSettlementStatus(remaining float64) string {
+	if remaining <= 0.000001 {
+		return "received"
+	}
+	return "partially_received"
+}
+
+func clientAdvanceReceiptStatusAfterReceipt(total, received, settled float64) string {
+	if settled >= total && total > 0 {
+		return "settled"
+	}
+	if settled > 0 {
+		return "partially_settled"
+	}
+	if received >= total && total > 0 {
+		return "received"
+	}
+	return "partially_received"
 }
 
 func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record, error) {

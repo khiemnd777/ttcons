@@ -1,0 +1,397 @@
+import { type ReactNode, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, HandCoins, Plus, RefreshCw } from 'lucide-react';
+import { CurrencyText } from '../../components/CurrencyText';
+import { DataTable } from '../../components/DataTable';
+import { Dialog } from '../../components/Dialog';
+import { EmptyState } from '../../components/EmptyState';
+import { EnumChip } from '../../components/EnumChip';
+import { RowActions } from '../../components/RowActions';
+import { StatusBadge } from '../../components/StatusBadge';
+import { useToast } from '../../components/ToastProvider';
+import { get, post } from '../../lib/api/client';
+import type {
+  OutputInvoiceRecord,
+  ReceivableAdvanceReceiptRecord,
+  ReceivablePaymentRecord,
+  ReceivablePaymentScheduleRecord,
+  ReceivableRecord,
+} from '../../lib/types/domain';
+import { dateText } from '../../lib/utils/format';
+import { enumOptions } from '../../lib/utils/status';
+import { SimpleForm } from '../_shared/SimpleForm';
+
+type OutputBillingPlanPanelProps = {
+  receivable: ReceivableRecord;
+  onChanged?: () => void;
+};
+
+type OpenDialog =
+  | { type: 'schedule' }
+  | { type: 'advance' }
+  | { type: 'receipt' }
+  | { type: 'settlement'; advance: ReceivableAdvanceReceiptRecord }
+  | null;
+
+export function OutputBillingPlanPanel({ receivable, onChanged }: OutputBillingPlanPanelProps) {
+  const [openDialog, setOpenDialog] = useState<OpenDialog>(null);
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  const schedules = useQuery({
+    queryKey: ['receivable-payment-schedules', receivable.id],
+    queryFn: () => get<ReceivablePaymentScheduleRecord[]>(`/receivables/${receivable.id}/payment-schedules`),
+  });
+  const advances = useQuery({
+    queryKey: ['receivable-advance-receipts', receivable.id],
+    queryFn: () => get<ReceivableAdvanceReceiptRecord[]>(`/receivables/${receivable.id}/advance-receipts`),
+  });
+  const receipts = useQuery({
+    queryKey: ['receivable-payments', receivable.id],
+    queryFn: () => get<ReceivablePaymentRecord[]>(`/receivables/${receivable.id}/payments`),
+  });
+  const invoices = useQuery({
+    queryKey: ['output-invoices', receivable.id],
+    queryFn: () => get<OutputInvoiceRecord[]>(`/receivables/${receivable.id}/output-invoices`),
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['receivable-payment-schedules', receivable.id] });
+    queryClient.invalidateQueries({ queryKey: ['receivable-advance-receipts', receivable.id] });
+    queryClient.invalidateQueries({ queryKey: ['receivable-payments', receivable.id] });
+    queryClient.invalidateQueries({ queryKey: ['receivables'] });
+    queryClient.invalidateQueries({ queryKey: ['payments'] });
+    onChanged?.();
+  };
+
+  const createSchedule = useMutation({
+    mutationFn: (values: Record<string, any>) => post<ReceivablePaymentScheduleRecord>(`/receivables/${receivable.id}/payment-schedules`, values),
+    onSuccess: () => {
+      setOpenDialog(null);
+      invalidate();
+      toast.success('Đã tạo kỳ thu đầu ra');
+    },
+    onError: (error) => toast.error('Không tạo được kỳ thu', error),
+  });
+  const approveSchedule = useMutation({
+    mutationFn: (scheduleID: string) => post<ReceivablePaymentScheduleRecord>(`/receivable-payment-schedules/${scheduleID}/approve`, {}),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Đã duyệt kỳ thu');
+    },
+    onError: (error) => toast.error('Không duyệt được kỳ thu', error),
+  });
+  const createAdvance = useMutation({
+    mutationFn: (values: Record<string, any>) => post<ReceivableAdvanceReceiptRecord>(`/receivables/${receivable.id}/advance-receipts`, values),
+    onSuccess: () => {
+      setOpenDialog(null);
+      invalidate();
+      toast.success('Đã tạo ứng trước đầu ra');
+    },
+    onError: (error) => toast.error('Không tạo được ứng trước', error),
+  });
+  const approveAdvance = useMutation({
+    mutationFn: (advanceID: string) => post<ReceivableAdvanceReceiptRecord>(`/client-advance-receipts/${advanceID}/approve`, {}),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Đã duyệt ứng trước đầu ra');
+    },
+    onError: (error) => toast.error('Không duyệt được ứng trước', error),
+  });
+  const settleAdvance = useMutation({
+    mutationFn: ({ advanceID, values }: { advanceID: string; values: Record<string, any> }) => post<ReceivableAdvanceReceiptRecord>(`/client-advance-receipts/${advanceID}/settle`, values),
+    onSuccess: () => {
+      setOpenDialog(null);
+      invalidate();
+      toast.success('Đã quyết toán ứng trước đầu ra');
+    },
+    onError: (error) => toast.error('Không quyết toán được ứng trước', error),
+  });
+  const createReceipt = useMutation({
+    mutationFn: (values: Record<string, any>) => post<ReceivablePaymentRecord>(`/receivables/${receivable.id}/payments`, values),
+    onSuccess: () => {
+      setOpenDialog(null);
+      invalidate();
+      toast.success('Đã tạo phiếu thu từng phần');
+    },
+    onError: (error) => toast.error('Không tạo được phiếu thu', error),
+  });
+  const approveReceipt = useMutation({
+    mutationFn: (paymentID: string) => post<ReceivablePaymentRecord>(`/payments/${paymentID}/approve`, {}),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Đã duyệt phiếu thu');
+    },
+    onError: (error) => toast.error('Không duyệt được phiếu thu', error),
+  });
+
+  const scheduleRows = schedules.data ?? [];
+  const advanceRows = advances.data ?? [];
+  const receiptRows = receipts.data ?? [];
+  const issuedInvoiceOptions = (invoices.data ?? [])
+    .filter((invoice) => invoice.status === 'issued')
+    .map((invoice) => ({ label: `${invoice.invoice_number} · ${dateText(invoice.invoice_date)}`, value: invoice.id }));
+  const activeScheduleOptions = scheduleRows
+    .filter((row) => ['approved', 'partially_received', 'overdue'].includes(row.status) && Number(row.remaining_amount ?? 0) > 0)
+    .map((row) => ({ label: `${row.schedule_code} · ${row.milestone_name} · ${moneyLabel(row.remaining_amount)}`, value: row.id }));
+  const advanceReceiptOptions = advanceRows
+    .filter((row) => ['approved', 'partially_received', 'received', 'partially_settled'].includes(row.status) && advanceUnreceived(row) > 0)
+    .map((row) => ({ label: `${row.receipt_code} · còn thu ${moneyLabel(advanceUnreceived(row))}`, value: row.id }));
+
+  const summary = useMemo(() => {
+    const planned = scheduleRows.reduce((sum, row) => sum + Number(row.planned_amount ?? 0), 0);
+    const scheduleRemaining = scheduleRows.reduce((sum, row) => sum + Number(row.remaining_amount ?? 0), 0);
+    const advanceApproved = advanceRows
+      .filter((row) => ['approved', 'partially_received', 'received', 'partially_settled', 'settled'].includes(row.status))
+      .reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+    const advanceSettled = advanceRows.reduce((sum, row) => sum + Number(row.settled_amount ?? 0), 0);
+    return { planned, scheduleRemaining, advanceApproved, advanceSettled };
+  }, [advanceRows, scheduleRows]);
+
+  const loading = schedules.isLoading || advances.isLoading || receipts.isLoading;
+  const error = schedules.error || advances.error || receipts.error;
+
+  return (
+    <section className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-4">
+        <MetricTile label="Kế hoạch kỳ" value={<CurrencyText value={summary.planned} />} />
+        <MetricTile label="Còn theo kỳ" value={<CurrencyText value={summary.scheduleRemaining} />} />
+        <MetricTile label="Ứng trước duyệt" value={<CurrencyText value={summary.advanceApproved} />} />
+        <MetricTile label="Đã quyết toán" value={<CurrencyText value={summary.advanceSettled} />} />
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-ink">Thanh toán kỳ / ứng trước đầu ra</h3>
+          <p className="mt-1 text-xs text-slate-500">Phiếu thu từng phần cập nhật phải thu khi được duyệt.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => void Promise.all([schedules.refetch(), advances.refetch(), receipts.refetch()])}>
+            <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            Tải lại
+          </button>
+          <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => setOpenDialog({ type: 'schedule' })}>
+            <Plus className="h-4 w-4" />
+            Kỳ
+          </button>
+          <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => setOpenDialog({ type: 'advance' })}>
+            <HandCoins className="h-4 w-4" />
+            Ứng trước
+          </button>
+          <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpenDialog({ type: 'receipt' })}>
+            <Plus className="h-4 w-4" />
+            Thu tiền
+          </button>
+        </div>
+      </div>
+
+      {error ? (
+        <div className="rounded-md border border-rose-100 bg-rose-50 p-3 text-sm text-rose-700">Không tải được dữ liệu thanh toán đầu ra.</div>
+      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase text-slate-500">Lịch thu</h4>
+          <DataTable
+            rows={scheduleRows}
+            loading={schedules.isLoading}
+            empty="Chưa có kỳ thu"
+            pageSize={5}
+            defaultSort={{ key: 'due_date', direction: 'asc' }}
+            columns={[
+              { key: 'schedule_code', header: 'Mã', sortable: true },
+              { key: 'schedule_type', header: 'Loại', render: (row) => <EnumChip group="payment_schedule_type" value={row.schedule_type} /> },
+              { key: 'milestone_name', header: 'Kỳ', render: (row) => <span className="font-semibold text-ink">{row.milestone_name}</span> },
+              { key: 'due_date', header: 'Due', sortable: true, render: (row) => dateText(row.due_date) },
+              { key: 'planned_amount', header: 'Planned', align: 'right', render: (row) => <CurrencyText value={row.planned_amount} /> },
+              { key: 'remaining_amount', header: 'Còn', align: 'right', render: (row) => <CurrencyText value={row.remaining_amount} /> },
+              { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+              {
+                key: 'actions',
+                header: 'Action',
+                render: (row) => (
+                  <RowActions>
+                    <button className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={row.status !== 'draft' || approveSchedule.isPending} onClick={() => approveSchedule.mutate(row.id)}>
+                      <Check className="mr-1 inline h-4 w-4" />
+                      Duyệt
+                    </button>
+                  </RowActions>
+                ),
+              },
+            ]}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase text-slate-500">Ứng trước khách hàng</h4>
+          <DataTable
+            rows={advanceRows}
+            loading={advances.isLoading}
+            empty="Chưa có ứng trước đầu ra"
+            pageSize={5}
+            defaultSort={{ key: 'due_date', direction: 'asc' }}
+            columns={[
+              { key: 'receipt_code', header: 'Mã', sortable: true },
+              { key: 'amount', header: 'Amount', align: 'right', render: (row) => <CurrencyText value={row.amount} /> },
+              { key: 'received_amount', header: 'Đã thu', align: 'right', render: (row) => <CurrencyText value={row.received_amount ?? 0} /> },
+              { key: 'settled_amount', header: 'Settled', align: 'right', render: (row) => <CurrencyText value={row.settled_amount ?? 0} /> },
+              { key: 'due_date', header: 'Due', sortable: true, render: (row) => dateText(row.due_date) },
+              { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+              {
+                key: 'actions',
+                header: 'Action',
+                render: (row) => (
+                  <RowActions>
+                    <button className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={row.status !== 'draft' || approveAdvance.isPending} onClick={() => approveAdvance.mutate(row.id)}>
+                      Duyệt
+                    </button>
+                    <button className="text-sm font-semibold text-teal-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={!['approved', 'partially_received', 'received', 'partially_settled'].includes(row.status)} onClick={() => setOpenDialog({ type: 'settlement', advance: row })}>
+                      Quyết toán
+                    </button>
+                  </RowActions>
+                ),
+              },
+            ]}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold uppercase text-slate-500">Phiếu thu đầu ra</h4>
+        {receiptRows.length || receipts.isLoading ? (
+          <DataTable
+            rows={receiptRows}
+            loading={receipts.isLoading}
+            empty="Chưa có phiếu thu"
+            pageSize={5}
+            defaultSort={{ key: 'created_at', direction: 'desc' }}
+            columns={[
+              { key: 'payment_code', header: 'Mã', sortable: true },
+              { key: 'payment_type', header: 'Loại', render: (row) => <EnumChip group="payment_type" value={row.payment_type} /> },
+              { key: 'allocation_type', header: 'Allocation', render: (row) => <EnumChip group="payment_allocation_type" value={row.allocation_type ?? 'receivable_receipt'} /> },
+              { key: 'schedule_code', header: 'Kỳ/ứng trước', render: (row) => row.schedule_code ?? row.advance_receipt_code ?? '-' },
+              { key: 'output_invoice_number', header: 'Hoá đơn', render: (row) => row.output_invoice_number ?? '-' },
+              { key: 'amount', header: 'Amount', align: 'right', render: (row) => <CurrencyText value={row.amount} /> },
+              { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+              {
+                key: 'actions',
+                header: 'Action',
+                render: (row) => (
+                  <RowActions>
+                    <button className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={!['draft', 'submitted', 'pending'].includes(row.status) || approveReceipt.isPending} onClick={() => approveReceipt.mutate(row.id)}>
+                      <Check className="mr-1 inline h-4 w-4" />
+                      Duyệt
+                    </button>
+                  </RowActions>
+                ),
+              },
+            ]}
+          />
+        ) : (
+          <EmptyState title="Chưa có phiếu thu" />
+        )}
+      </div>
+
+      <Dialog open={openDialog?.type === 'schedule'} title="Tạo kỳ thu đầu ra" onClose={() => setOpenDialog(null)} size="lg">
+        <SimpleForm
+          layout="two-column"
+          fields={[
+            { name: 'schedule_code', label: 'Mã kỳ', defaultValue: `SCH-${Date.now().toString().slice(-5)}`, required: true },
+            { name: 'schedule_type', label: 'Loại kỳ', type: 'select', defaultValue: 'progress', required: true, options: enumOptions('payment_schedule_type', ['advance', 'progress', 'final', 'retention', 'other']) },
+            { name: 'milestone_name', label: 'Tên kỳ', defaultValue: 'Kỳ thu', required: true, fullWidth: true },
+            { name: 'planned_amount', label: 'Số tiền kế hoạch', type: 'number', defaultValue: Number(receivable.remaining_amount ?? receivable.gross_amount ?? 0), required: true, min: 1 },
+            { name: 'due_date', label: 'Due date', type: 'date' },
+            { name: 'notes', label: 'Ghi chú', type: 'textarea', fullWidth: true },
+          ]}
+          submitLabel="Tạo kỳ"
+          onSubmit={(values) => createSchedule.mutateAsync(values)}
+        />
+      </Dialog>
+
+      <Dialog open={openDialog?.type === 'advance'} title="Tạo ứng trước đầu ra" onClose={() => setOpenDialog(null)} size="lg">
+        <SimpleForm
+          layout="two-column"
+          fields={[
+            { name: 'receipt_code', label: 'Mã ứng trước', defaultValue: `ADV-${Date.now().toString().slice(-5)}`, required: true },
+            { name: 'amount', label: 'Số tiền', type: 'number', defaultValue: Number(receivable.remaining_amount ?? 0), required: true, min: 1 },
+            { name: 'due_date', label: 'Due date', type: 'date' },
+            { name: 'reason', label: 'Lý do', type: 'textarea', fullWidth: true },
+            { name: 'notes', label: 'Ghi chú', type: 'textarea', fullWidth: true },
+          ]}
+          submitLabel="Tạo ứng trước"
+          onSubmit={(values) => createAdvance.mutateAsync(values)}
+        />
+      </Dialog>
+
+      <Dialog open={openDialog?.type === 'receipt'} title="Tạo phiếu thu từng phần" onClose={() => setOpenDialog(null)} size="lg">
+        <SimpleForm
+          layout="two-column"
+          fields={[
+            { name: 'payment_code', label: 'Mã phiếu', defaultValue: `RCV-${Date.now().toString().slice(-5)}`, required: true },
+            { name: 'payment_type', label: 'Loại', type: 'select', defaultValue: 'client_receipt', required: true, options: enumOptions('payment_type', ['client_receipt', 'advance', 'other']) },
+            { name: 'amount', label: 'Số tiền', type: 'number', defaultValue: Number(receivable.remaining_amount ?? 0), required: true, min: 1 },
+            { name: 'payment_method', label: 'Phương thức', type: 'select', defaultValue: 'bank_transfer', required: true, options: enumOptions('payment_method', ['bank_transfer', 'cash']) },
+            { name: 'schedule_id', label: 'Kỳ thu', type: 'select', options: activeScheduleOptions },
+            {
+              name: 'advance_receipt_id',
+              label: 'Ứng trước',
+              type: 'select',
+              options: advanceReceiptOptions,
+              validate: (value, values) => value && values.schedule_id ? 'Chỉ chọn kỳ thu hoặc ứng trước' : undefined,
+            },
+            { name: 'output_invoice_id', label: 'Hoá đơn issued', type: 'select', options: issuedInvoiceOptions },
+            { name: 'paid_at', label: 'Ngày thu', type: 'date', defaultValue: new Date().toISOString().slice(0, 10) },
+            { name: 'notes', label: 'Ghi chú', type: 'textarea', fullWidth: true },
+          ]}
+          submitLabel="Tạo phiếu"
+          onSubmit={(values) => createReceipt.mutateAsync(values)}
+        />
+      </Dialog>
+
+      <Dialog open={openDialog?.type === 'settlement'} title="Quyết toán ứng trước đầu ra" onClose={() => setOpenDialog(null)} size="lg">
+        {openDialog?.type === 'settlement' ? (
+          <SimpleForm
+            layout="two-column"
+            fields={[
+              {
+                name: 'amount',
+                label: 'Số tiền quyết toán',
+                type: 'number',
+                defaultValue: advanceUnsettled(openDialog.advance),
+                required: true,
+                min: 1,
+                max: advanceUnsettled(openDialog.advance),
+              },
+              { name: 'output_invoice_id', label: 'Hoá đơn issued', type: 'select', options: issuedInvoiceOptions },
+              { name: 'schedule_id', label: 'Kỳ thu liên quan', type: 'select', options: activeScheduleOptions },
+              { name: 'comment', label: 'Ghi chú', type: 'textarea', fullWidth: true },
+            ]}
+            submitLabel="Quyết toán"
+            onSubmit={(values) => settleAdvance.mutateAsync({ advanceID: openDialog.advance.id, values })}
+          />
+        ) : null}
+      </Dialog>
+    </section>
+  );
+}
+
+function MetricTile({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-md border border-line bg-slate-50 px-3 py-2">
+      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+      <div className="mt-1 text-base font-semibold text-ink">{value}</div>
+    </div>
+  );
+}
+
+function advanceUnreceived(row: ReceivableAdvanceReceiptRecord) {
+  return Math.max(0, Number(row.amount ?? 0) - Number(row.received_amount ?? 0));
+}
+
+function advanceUnsettled(row: ReceivableAdvanceReceiptRecord) {
+  return Math.max(0, Number(row.amount ?? 0) - Number(row.settled_amount ?? 0));
+}
+
+function moneyLabel(value: unknown) {
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(value ?? 0));
+}

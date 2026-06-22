@@ -281,6 +281,20 @@ INSERT INTO payables (project_id, payable_code, vendor_type, vendor_name, source
 ('30000000-0000-0000-0000-000000000001','PAY-Q1-002','subcontractor','Thầu phụ điện An Tâm','acceptance',100000000,30000000,5000000,0,0,65000000,CURRENT_DATE + INTERVAL '20 day','approved','10000000-0000-0000-0000-000000000004'),
 ('30000000-0000-0000-0000-000000000002','PAY-TD-001','labor_team','Đội sơn Minh Long','operation',45000000,10000000,0,0,0,35000000,CURRENT_DATE - INTERVAL '3 day','overdue','10000000-0000-0000-0000-000000000004');
 
+INSERT INTO payable_payment_schedules (project_id, payable_id, schedule_code, milestone_name, schedule_type, planned_amount, paid_amount, remaining_amount, due_date, status, notes, created_by, approved_by)
+SELECT project_id, id, 'SCH-Q1-001', 'Vật tư điện nước đợt 1', 'progress', 120000000, 60000000, 60000000, CURRENT_DATE + INTERVAL '10 day', 'partially_paid', 'Đợt còn lại sau giao hàng', created_by, '10000000-0000-0000-0000-000000000007'
+FROM payables WHERE payable_code='PAY-Q1-001'
+UNION ALL
+SELECT project_id, id, 'SCH-Q1-002-ADV', 'Ứng trước thầu phụ điện', 'advance', 30000000, 30000000, 0, CURRENT_DATE - INTERVAL '2 day', 'paid', 'Đã duyệt ứng trước khởi công', created_by, '10000000-0000-0000-0000-000000000007'
+FROM payables WHERE payable_code='PAY-Q1-002'
+UNION ALL
+SELECT project_id, id, 'SCH-Q1-002-PROG', 'Thanh toán nghiệm thu điện', 'progress', 65000000, 0, 65000000, CURRENT_DATE + INTERVAL '20 day', 'approved', 'Chờ hồ sơ nghiệm thu và quyết toán ứng', created_by, '10000000-0000-0000-0000-000000000007'
+FROM payables WHERE payable_code='PAY-Q1-002';
+
+INSERT INTO advance_requests (project_id, payable_id, request_code, requested_by, amount, reason, status, approved_by, settled_amount, vendor_name, due_date, paid_amount, paid_at, notes)
+SELECT project_id, id, 'ADV-Q1-001', created_by, 30000000, 'Ứng trước vật tư và nhân công điện', 'partially_settled', '10000000-0000-0000-0000-000000000007', 10000000, vendor_name, CURRENT_DATE - INTERVAL '2 day', 30000000, now() - INTERVAL '2 day', 'Còn quyết toán sau nghiệm thu kỳ'
+FROM payables WHERE payable_code='PAY-Q1-002';
+
 INSERT INTO receivables (project_id, receivable_code, client_name, source_type, contract_amount, milestone_name, gross_amount, received_amount, remaining_amount, due_date, status, created_by) VALUES
 ('30000000-0000-0000-0000-000000000001','REC-Q1-001','Công ty An Phát','milestone',1200000000,'Đợt 1 - Tạm ứng 30%',360000000,360000000,0,CURRENT_DATE - INTERVAL '5 day','received','10000000-0000-0000-0000-000000000004'),
 ('30000000-0000-0000-0000-000000000001','REC-Q1-002','Công ty An Phát','acceptance',1200000000,'Nghiệm thu bán phần',300000000,120000000,180000000,CURRENT_DATE + INTERVAL '12 day','partially_received','10000000-0000-0000-0000-000000000004'),

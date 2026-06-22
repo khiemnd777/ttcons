@@ -30,6 +30,8 @@ const toneByStatus: Record<string, string> = {
   partially_received: 'bg-teal-50 text-teal-700 ring-teal-200',
   paid: 'bg-teal-50 text-teal-700 ring-teal-200',
   partially_paid: 'bg-teal-50 text-teal-700 ring-teal-200',
+  settled: 'bg-teal-50 text-teal-700 ring-teal-200',
+  partially_settled: 'bg-amber-50 text-amber-800 ring-amber-200',
   handed_over: 'bg-teal-50 text-teal-700 ring-teal-200',
   recorded: 'bg-sky-50 text-sky-700 ring-sky-200',
   revised: 'bg-violet-50 text-violet-700 ring-violet-200',
