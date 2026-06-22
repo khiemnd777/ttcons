@@ -43,6 +43,8 @@ It should show:
 
 Then wait for explicit confirmation from the user before editing UI code.
 
+When the user says `tiếp tục triển khai`, agents must treat it as a request to continue the implementation workflow by preparing the next review package and, when UI is involved, a Mockup as Text. It is not permission to edit code, create migrations, update UI, update docs, run implementation-side formatting/build/test commands, or otherwise change repo files. Agents must wait for explicit confirmation after the review package before implementation. Valid implementation confirmations should be clear phrases such as `OK triển khai`, `Duyệt, làm đi`, `Confirm implement`, or `Triển khai theo review package này`.
+
 ## Plan State Notes
 
 - When implementing a plan, create or update that plan in `docs/current-states.md`. Treat this file as the shared agent memory for follow-up work until the plan is completed.

@@ -88,6 +88,7 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - Read `AGENTS.md`.
 - Read this active plan in `docs/current-states.md`.
 - Read `.agents/skills/consflow-module-memory/references/module-keyword-map.md`.
+- If the user says `tiếp tục triển khai`, treat it only as permission to continue the workflow by preparing the next review package and Mockup as Text when UI is involved. Do not edit code, create migrations, update UI, update docs, or run implementation-side formatting/build/test commands until the user explicitly confirms implementation after the review package, such as `OK triển khai`, `Duyệt, làm đi`, `Confirm implement`, or `Triển khai theo review package này`.
 - Identify affected owner paths before editing.
 - If changing code or behavior, present review package and wait for explicit user confirmation.
 - If changing UI, present Mockup as Text and wait for explicit user confirmation.
