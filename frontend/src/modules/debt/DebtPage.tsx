@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
@@ -17,9 +17,12 @@ import { InputInvoicePanel } from './InputInvoicePanel';
 import { InputPaymentPlanPanel } from './InputPaymentPlanPanel';
 import { OutputBillingPlanPanel } from './OutputBillingPlanPanel';
 import { OutputInvoicePanel } from './OutputInvoicePanel';
+import { PayableReconciliationPanel } from './PayableReconciliationPanel';
+import { ReceivableReconciliationPanel } from './ReceivableReconciliationPanel';
 import type { PayableRecord, ReceivableRecord } from '../../lib/types/domain';
 import { enumOptions } from '../../lib/utils/status';
 import { dateText } from '../../lib/utils/format';
+import { agingBadgeClass, debtAgingLabel, reconciliationClass, reconciliationLabel } from './payableDebtUtils';
 
 export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }) {
   const { id } = useParams();
@@ -28,12 +31,26 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
   const queryClient = useQueryClient();
   const toast = useToast();
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Record<string, any>[]>('/projects') });
-  const payables = useQuery({ queryKey: ['payables'], queryFn: () => get<PayableRecord[]>('/payables'), enabled: kind !== 'receivables' });
-  const receivables = useQuery({ queryKey: ['receivables'], queryFn: () => get<ReceivableRecord[]>('/receivables'), enabled: kind !== 'payables' });
+  const payableScope = id ? `?project_id=${encodeURIComponent(id)}` : '';
+  const receivableScope = id ? `?project_id=${encodeURIComponent(id)}` : '';
+  const payables = useQuery({ queryKey: ['payables', id ?? 'global'], queryFn: () => get<PayableRecord[]>(`/payables${payableScope}`), enabled: kind !== 'receivables' });
+  const receivables = useQuery({ queryKey: ['receivables', id ?? 'global'], queryFn: () => get<ReceivableRecord[]>(`/receivables${receivableScope}`), enabled: kind !== 'payables' });
+  const payableRows = payables.data ?? [];
+  const receivableRows = receivables.data ?? [];
+  const payableSummary = useMemo(() => summarizePayables(payableRows), [payableRows]);
+  const receivableSummary = useMemo(() => summarizeReceivables(receivableRows), [receivableRows]);
+  const invalidatePayables = (payableID?: string) => {
+    queryClient.invalidateQueries({ queryKey: ['payables'] });
+    if (payableID) queryClient.invalidateQueries({ queryKey: ['payable-reconciliation', payableID] });
+  };
+  const invalidateReceivables = (receivableID?: string) => {
+    queryClient.invalidateQueries({ queryKey: ['receivables'] });
+    if (receivableID) queryClient.invalidateQueries({ queryKey: ['receivable-reconciliation', receivableID] });
+  };
   const createPayable = useMutation({
     mutationFn: (values: Record<string, any>) => post('/payables', values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payables'] });
+      invalidatePayables();
       setOpen(null);
       toast.success('Đã ghi nhận phải trả');
     },
@@ -42,7 +59,7 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
   const createReceivable = useMutation({
     mutationFn: (values: Record<string, any>) => post('/receivables', values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      invalidateReceivables();
       setOpen(null);
       toast.success('Đã ghi nhận phải thu');
     },
@@ -61,16 +78,40 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
           </>
         }
       />
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className={kind === 'both' ? 'grid gap-4 xl:grid-cols-2' : 'space-y-4'}>
         {kind !== 'receivables' ? (
-          <section>
+          <section className="space-y-3">
             <h2 className="mb-3 text-base font-semibold text-ink">Payables</h2>
-            <DataTable rows={payables.data ?? []} columns={[
-              { key: 'payable_code', header: 'Mã' },
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <DebtMetric label="Tổng còn phải trả" value={<CurrencyText value={payableSummary.remaining} />} />
+              <DebtMetric label="Chưa đến hạn" value={<CurrencyText value={payableSummary.notDue} />} />
+              <DebtMetric label="1-30 ngày" value={<CurrencyText value={payableSummary.bucket1To30} />} />
+              <DebtMetric label="31-60 ngày" value={<CurrencyText value={payableSummary.bucket31To60} />} />
+              <DebtMetric label=">90 ngày" value={<CurrencyText value={payableSummary.bucket90Plus} />} />
+              <DebtMetric label="Cần đối soát" value={String(payableSummary.needsReview)} />
+            </div>
+            <DataTable
+              rows={payableRows}
+              loading={payables.isLoading}
+              error={payables.error}
+              onRetry={() => void payables.refetch()}
+              empty="Chưa có phải trả đầu vào"
+              searchPlaceholder="Tìm mã, vendor, công trình..."
+              pageSize={10}
+              defaultSort={{ key: 'effective_due_date', direction: 'asc' }}
+              columns={[
+              { key: 'payable_code', header: 'Mã', sortable: true },
               { key: 'vendor_name', header: 'Vendor', render: (row) => <span className="font-semibold text-ink">{row.vendor_name}</span> },
               { key: 'project_name', header: 'Công trình' },
               { key: 'gross_amount', header: 'Gross', render: (row) => <CurrencyText value={row.gross_amount} /> },
               { key: 'remaining_amount', header: 'Còn phải trả', render: (row) => <CurrencyText value={row.remaining_amount} /> },
+              { key: 'effective_due_date', header: 'Due', sortable: true, render: (row) => dateText(row.effective_due_date ?? row.due_date) },
+              {
+                key: 'aging_bucket',
+                header: 'Aging',
+                sortable: true,
+                render: (row) => <span className={agingBadgeClass(row.aging_bucket)}>{debtAgingLabel(row.aging_bucket, row.overdue_days)}</span>,
+              },
               {
                 key: 'invoice_count',
                 header: 'Hoá đơn',
@@ -81,43 +122,91 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
                   </div>
                 ),
               },
+              {
+                key: 'reconciliation_status',
+                header: 'Đối soát',
+                render: (row) => <span className={reconciliationClass(row.reconciliation_status, row.reconciliation_issue_count)}>{reconciliationLabel(row.reconciliation_status, row.reconciliation_issue_count)}</span>,
+              },
               { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
               { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'payable', record: row })} /> },
             ]} />
           </section>
         ) : null}
         {kind !== 'payables' ? (
-          <section>
+          <section className="space-y-3">
             <h2 className="mb-3 text-base font-semibold text-ink">Receivables</h2>
-            <DataTable rows={receivables.data ?? []} columns={[
-              { key: 'receivable_code', header: 'Mã' },
-              { key: 'client_name', header: 'Khách hàng', render: (row) => <span className="font-semibold text-ink">{row.client_name}</span> },
-              { key: 'project_name', header: 'Công trình' },
-              { key: 'milestone_name', header: 'Milestone' },
-              { key: 'remaining_amount', header: 'Còn phải thu', render: (row) => <CurrencyText value={row.remaining_amount} /> },
-              {
-                key: 'invoice_count',
-                header: 'Hoá đơn',
-                render: (row) => (
-                  <div className="min-w-32">
-                    <p className="font-semibold text-ink">{Number(row.invoice_count ?? 0)} PDF</p>
-                    <p className="mt-1 text-xs text-slate-500"><CurrencyText value={row.issued_invoice_total ?? 0} /> đã phát hành</p>
-                  </div>
-                ),
-              },
-              { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-              { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'receivable', record: row })} /> },
-            ]} />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <DebtMetric label="Tổng còn phải thu" value={<CurrencyText value={receivableSummary.remaining} />} />
+              <DebtMetric label="Chưa đến hạn" value={<CurrencyText value={receivableSummary.notDue} />} />
+              <DebtMetric label="1-30 ngày" value={<CurrencyText value={receivableSummary.bucket1To30} />} />
+              <DebtMetric label="31-60 ngày" value={<CurrencyText value={receivableSummary.bucket31To60} />} />
+              <DebtMetric label=">90 ngày" value={<CurrencyText value={receivableSummary.bucket90Plus} />} />
+              <DebtMetric label="Cần đối soát" value={String(receivableSummary.needsReview)} />
+            </div>
+            <DataTable
+              rows={receivableRows}
+              loading={receivables.isLoading}
+              error={receivables.error}
+              onRetry={() => void receivables.refetch()}
+              empty="Chưa có phải thu đầu ra"
+              searchPlaceholder="Tìm mã, khách hàng, công trình..."
+              pageSize={10}
+              defaultSort={{ key: 'effective_due_date', direction: 'asc' }}
+              columns={[
+                { key: 'receivable_code', header: 'Mã', sortable: true },
+                { key: 'client_name', header: 'Khách hàng', render: (row) => <span className="font-semibold text-ink">{row.client_name}</span> },
+                { key: 'project_name', header: 'Công trình' },
+                { key: 'milestone_name', header: 'Milestone' },
+                { key: 'gross_amount', header: 'Gross', align: 'right', render: (row) => <CurrencyText value={row.gross_amount} /> },
+                { key: 'remaining_amount', header: 'Còn phải thu', align: 'right', render: (row) => <CurrencyText value={row.remaining_amount} /> },
+                { key: 'effective_due_date', header: 'Due', sortable: true, render: (row) => dateText(row.effective_due_date ?? row.due_date) },
+                {
+                  key: 'aging_bucket',
+                  header: 'Aging',
+                  sortable: true,
+                  render: (row) => <span className={agingBadgeClass(row.aging_bucket)}>{debtAgingLabel(row.aging_bucket, row.overdue_days)}</span>,
+                },
+                {
+                  key: 'invoice_count',
+                  header: 'Hoá đơn',
+                  render: (row) => (
+                    <div className="min-w-32">
+                      <p className="font-semibold text-ink">{Number(row.invoice_count ?? 0)} PDF</p>
+                      <p className="mt-1 text-xs text-slate-500"><CurrencyText value={row.issued_invoice_total ?? 0} /> issued</p>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'received_amount',
+                  header: 'Đã thu/Ứng',
+                  align: 'right',
+                  render: (row) => (
+                    <div className="min-w-32 text-right">
+                      <p className="font-semibold text-ink"><CurrencyText value={row.received_amount ?? 0} /></p>
+                      <p className="mt-1 text-xs text-slate-500">Ứng <CurrencyText value={row.advance_approved_total ?? 0} /></p>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'reconciliation_status',
+                  header: 'Đối soát',
+                  render: (row) => <span className={reconciliationClass(row.reconciliation_status, row.reconciliation_issue_count)}>{reconciliationLabel(row.reconciliation_status, row.reconciliation_issue_count)}</span>,
+                },
+                { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
+                { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'receivable', record: row })} /> },
+              ]}
+            />
           </section>
         ) : null}
       </div>
       <FormDrawer open={open === 'payable'} title="Ghi nhận phải trả" onClose={() => setOpen(null)}>
         <SimpleForm fields={[
-          { name: 'project_id', label: 'Công trình', type: 'select', required: true, options: (projects.data ?? []).map((p) => ({ label: p.name, value: p.id })) },
+          { name: 'project_id', label: 'Công trình', type: 'select', defaultValue: id ?? '', required: true, options: (projects.data ?? []).map((p) => ({ label: p.name, value: p.id })) },
           { name: 'payable_code', label: 'Mã phải trả', defaultValue: `PAY-${Date.now().toString().slice(-5)}`, required: true },
           { name: 'vendor_type', label: 'Loại vendor', type: 'select', defaultValue: 'supplier', required: true, options: enumOptions('vendor_type', ['supplier', 'subcontractor', 'labor_team', 'transport', 'equipment_rental', 'service_provider', 'other']) },
           { name: 'vendor_name', label: 'Vendor', defaultValue: 'Nhà cung cấp mới', required: true },
           { name: 'gross_amount', label: 'Gross', type: 'number', defaultValue: 10000000, required: true, min: 0 },
+          { name: 'due_date', label: 'Hạn thanh toán', type: 'date' },
           { name: 'advance_amount', label: 'Tạm ứng', type: 'number', defaultValue: 0, min: 0 },
           { name: 'retention_amount', label: 'Giữ lại', type: 'number', defaultValue: 0, min: 0 },
           { name: 'deduction_amount', label: 'Khấu trừ', type: 'number', defaultValue: 0, min: 0 },
@@ -134,6 +223,7 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
           { name: 'contract_amount', label: 'Giá trị hợp đồng', type: 'number', defaultValue: 100000000, min: 0 },
           { name: 'milestone_name', label: 'Milestone', defaultValue: 'Đợt thanh toán', required: true },
           { name: 'gross_amount', label: 'Gross', type: 'number', defaultValue: 30000000, required: true, min: 0 },
+          { name: 'due_date', label: 'Hạn thu', type: 'date' },
           { name: 'received_amount', label: 'Đã thu', type: 'number', defaultValue: 0, min: 0 },
           { name: 'remaining_amount', label: 'Còn lại', type: 'number', defaultValue: 30000000, min: 0 },
           { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'recorded', required: true, options: enumOptions('status', ['draft', 'recorded', 'approved', 'partially_received', 'received']) },
@@ -164,16 +254,17 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
                 value={dialog.record.latest_invoice_number ? `${dialog.record.latest_invoice_number} · ${dateText(dialog.record.latest_invoice_date)}` : '-'}
               />
             </div>
+            <PayableReconciliationPanel payable={dialog.record} />
             <InputInvoicePanel
               payable={dialog.record}
               onChanged={() => {
-                queryClient.invalidateQueries({ queryKey: ['payables'] });
+                invalidatePayables(dialog.record.id);
               }}
             />
             <InputPaymentPlanPanel
               payable={dialog.record}
               onChanged={() => {
-                queryClient.invalidateQueries({ queryKey: ['payables'] });
+                invalidatePayables(dialog.record.id);
               }}
             />
           </div>
@@ -193,32 +284,70 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
               <DebtMetric label="Gross" value={<CurrencyText value={dialog.record.gross_amount} />} />
               <DebtMetric label="Tổng hoá đơn" value={<CurrencyText value={dialog.record.invoice_total ?? 0} />} />
               <DebtMetric label="Lịch kỳ" value={<CurrencyText value={dialog.record.scheduled_remaining ?? 0} />} />
-              <DebtMetric label="Ứng trước" value={<CurrencyText value={dialog.record.advance_received_total ?? 0} />} />
+              <DebtMetric label="Ứng duyệt" value={<CurrencyText value={dialog.record.advance_approved_total ?? 0} />} />
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <DebtMetric label="Đã thu" value={<CurrencyText value={dialog.record.received_amount ?? 0} />} />
               <DebtMetric label="Đã quyết toán ứng" value={<CurrencyText value={dialog.record.advance_settled_total ?? 0} />} />
+              <DebtMetric label="Hạn thu" value={dateText(dialog.record.effective_due_date ?? dialog.record.due_date)} />
+              <DebtMetric label="Aging" value={<span className={agingBadgeClass(dialog.record.aging_bucket)}>{debtAgingLabel(dialog.record.aging_bucket, dialog.record.overdue_days)}</span>} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <DebtMetric label="Đối soát" value={<span className={reconciliationClass(dialog.record.reconciliation_status, dialog.record.reconciliation_issue_count)}>{reconciliationLabel(dialog.record.reconciliation_status, dialog.record.reconciliation_issue_count)}</span>} />
               <DebtMetric
                 label="Mới nhất"
                 value={dialog.record.latest_invoice_number ? `${dialog.record.latest_invoice_number} · ${dateText(dialog.record.latest_invoice_date)}` : '-'}
               />
             </div>
+            <ReceivableReconciliationPanel receivable={dialog.record} />
             <OutputInvoicePanel
               receivable={dialog.record}
               onChanged={() => {
-                queryClient.invalidateQueries({ queryKey: ['receivables'] });
+                invalidateReceivables(dialog.record.id);
               }}
             />
             <OutputBillingPlanPanel
               receivable={dialog.record}
               onChanged={() => {
-                queryClient.invalidateQueries({ queryKey: ['receivables'] });
+                invalidateReceivables(dialog.record.id);
               }}
             />
           </div>
         ) : null}
       </Dialog>
     </>
+  );
+}
+
+function summarizePayables(rows: PayableRecord[]) {
+  return rows.reduce(
+    (summary, row) => {
+      const remaining = Number(row.remaining_amount ?? 0);
+      summary.remaining += remaining;
+      if (row.aging_bucket === 'not_due') summary.notDue += remaining;
+      if (row.aging_bucket === '1_30') summary.bucket1To30 += remaining;
+      if (row.aging_bucket === '31_60') summary.bucket31To60 += remaining;
+      if (row.aging_bucket === '90_plus') summary.bucket90Plus += remaining;
+      if (row.reconciliation_status === 'needs_review' || Number(row.reconciliation_issue_count ?? 0) > 0) summary.needsReview += 1;
+      return summary;
+    },
+    { remaining: 0, notDue: 0, bucket1To30: 0, bucket31To60: 0, bucket90Plus: 0, needsReview: 0 },
+  );
+}
+
+function summarizeReceivables(rows: ReceivableRecord[]) {
+  return rows.reduce(
+    (summary, row) => {
+      const remaining = Number(row.remaining_amount ?? 0);
+      summary.remaining += remaining;
+      if (row.aging_bucket === 'not_due') summary.notDue += remaining;
+      if (row.aging_bucket === '1_30') summary.bucket1To30 += remaining;
+      if (row.aging_bucket === '31_60') summary.bucket31To60 += remaining;
+      if (row.aging_bucket === '90_plus') summary.bucket90Plus += remaining;
+      if (row.reconciliation_status === 'needs_review' || Number(row.reconciliation_issue_count ?? 0) > 0) summary.needsReview += 1;
+      return summary;
+    },
+    { remaining: 0, notDue: 0, bucket1To30: 0, bucket31To60: 0, bucket90Plus: 0, needsReview: 0 },
   );
 }
 

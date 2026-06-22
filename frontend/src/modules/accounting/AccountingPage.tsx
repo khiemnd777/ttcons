@@ -16,6 +16,7 @@ import { SimpleForm } from '../_shared/SimpleForm';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { EnumChip } from '../../components/EnumChip';
 import { enumOptions } from '../../lib/utils/status';
+import { CashflowPanel } from './CashflowPanel';
 
 export function AccountingPage({ global = false }: { global?: boolean }) {
   const { id } = useParams();
@@ -31,6 +32,7 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['budget', projectId] });
     queryClient.invalidateQueries({ queryKey: ['payments'] });
+    queryClient.invalidateQueries({ queryKey: ['cashflow-report'] });
   };
   const createBudget = useMutation({
     mutationFn: (values: Record<string, any>) => post(`/projects/${projectId}/budget`, values),
@@ -82,6 +84,9 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
           </>
         }
       />
+      <div className="mb-4">
+        <CashflowPanel projectId={projectId} />
+      </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <section>
           <h2 className="mb-3 text-base font-semibold text-ink">Ngân sách công trình</h2>

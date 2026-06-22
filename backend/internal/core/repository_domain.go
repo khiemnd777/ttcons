@@ -7193,6 +7193,336 @@ func (r *Repository) GetPayableDetail(ctx context.Context, payableID string) (Re
 	`, payableID)
 }
 
+func (r *Repository) PayableReconciliation(ctx context.Context, payableID string) (Record, error) {
+	summary, err := r.QueryOne(ctx, `
+		WITH pay AS (
+			SELECT pay.*, p.name AS project_name
+			FROM payables pay
+			JOIN projects p ON p.id=pay.project_id
+			WHERE pay.id=$1
+			  AND pay.status <> 'cancelled'
+			  AND p.status <> 'cancelled'
+		),
+		inv AS (
+			SELECT
+				payable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('deleted','cancelled')) AS invoice_count,
+				COUNT(*) FILTER (WHERE status='verified') AS verified_invoice_count,
+				COUNT(*) FILTER (WHERE status='rejected') AS rejected_invoice_count,
+				COALESCE(SUM(total_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS invoice_total,
+				COALESCE(SUM(total_amount) FILTER (WHERE status='verified'), 0) AS verified_invoice_total,
+				MAX(invoice_date) FILTER (WHERE status NOT IN ('deleted','cancelled')) AS latest_invoice_date
+			FROM input_invoices
+			WHERE payable_id=$1
+			GROUP BY payable_id
+		),
+		sch AS (
+			SELECT
+				payable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('cancelled','deleted')) AS schedule_count,
+				COUNT(*) FILTER (WHERE status IN ('approved','partially_paid','overdue') AND remaining_amount > 0 AND due_date < CURRENT_DATE) AS overdue_schedule_count,
+				COALESCE(SUM(planned_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS scheduled_total,
+				COALESCE(SUM(paid_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS scheduled_paid_total,
+				COALESCE(SUM(remaining_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS scheduled_remaining,
+				MIN(due_date) FILTER (WHERE status IN ('approved','partially_paid','overdue') AND remaining_amount > 0) AS next_schedule_due_date
+			FROM payable_payment_schedules
+			WHERE payable_id=$1
+			GROUP BY payable_id
+		),
+		adv AS (
+			SELECT
+				payable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('cancelled','deleted')) AS advance_request_count,
+				COALESCE(SUM(amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS advance_requested_total,
+				COALESCE(SUM(amount) FILTER (WHERE status IN ('approved','partially_settled','settled')), 0) AS advance_approved_total,
+				COALESCE(SUM(paid_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS advance_paid_total,
+				COALESCE(SUM(settled_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS advance_settled_total
+			FROM advance_requests
+			WHERE payable_id=$1
+			GROUP BY payable_id
+		),
+		alloc AS (
+			SELECT
+				pa.payable_id,
+				COALESCE(SUM(pa.amount) FILTER (WHERE pmt.status='approved' AND pa.allocation_type='payable_payment'), 0) AS approved_payable_payment_total,
+				COALESCE(SUM(pa.amount) FILTER (WHERE pmt.status='approved' AND pa.allocation_type='advance_payment'), 0) AS approved_advance_payment_total,
+				COALESCE(SUM(pa.amount) FILTER (WHERE pmt.status <> 'cancelled'), 0) AS payment_allocation_total,
+				COUNT(*) FILTER (WHERE pmt.status NOT IN ('approved','cancelled')) AS pending_payment_count
+			FROM payment_allocations pa
+			JOIN payments pmt ON pmt.id=pa.payment_id
+			WHERE pa.payable_id=$1
+			GROUP BY pa.payable_id
+		),
+		calc AS (
+			SELECT
+				pay.*,
+				COALESCE(inv.invoice_count, 0) AS invoice_count,
+				COALESCE(inv.verified_invoice_count, 0) AS verified_invoice_count,
+				COALESCE(inv.rejected_invoice_count, 0) AS rejected_invoice_count,
+				COALESCE(inv.invoice_total, 0) AS invoice_total,
+				COALESCE(inv.verified_invoice_total, 0) AS verified_invoice_total,
+				inv.latest_invoice_date,
+				COALESCE(sch.schedule_count, 0) AS schedule_count,
+				COALESCE(sch.overdue_schedule_count, 0) AS overdue_schedule_count,
+				COALESCE(sch.scheduled_total, 0) AS scheduled_total,
+				COALESCE(sch.scheduled_paid_total, 0) AS scheduled_paid_total,
+				COALESCE(sch.scheduled_remaining, 0) AS scheduled_remaining,
+				sch.next_schedule_due_date,
+				COALESCE(adv.advance_request_count, 0) AS advance_request_count,
+				COALESCE(adv.advance_requested_total, 0) AS advance_requested_total,
+				COALESCE(adv.advance_approved_total, 0) AS advance_approved_total,
+				COALESCE(adv.advance_paid_total, 0) AS advance_paid_total,
+				COALESCE(adv.advance_settled_total, 0) AS advance_settled_total,
+				COALESCE(alloc.approved_payable_payment_total, 0) AS approved_payable_payment_total,
+				COALESCE(alloc.approved_advance_payment_total, 0) AS approved_advance_payment_total,
+				COALESCE(alloc.payment_allocation_total, 0) AS payment_allocation_total,
+				COALESCE(alloc.pending_payment_count, 0) AS pending_payment_count,
+				COALESCE(pay.due_date, sch.next_schedule_due_date, inv.latest_invoice_date) AS effective_due_date,
+				GREATEST(COALESCE(pay.gross_amount,0) - COALESCE(pay.advance_amount,0) - COALESCE(pay.paid_amount,0) - COALESCE(pay.deduction_amount,0), 0) AS computed_remaining
+			FROM pay
+			LEFT JOIN inv ON inv.payable_id=pay.id
+			LEFT JOIN sch ON sch.payable_id=pay.id
+			LEFT JOIN adv ON adv.payable_id=pay.id
+			LEFT JOIN alloc ON alloc.payable_id=pay.id
+		)
+		SELECT
+			calc.*,
+			CASE
+				WHEN COALESCE(remaining_amount,0) <= 0 THEN 0
+				WHEN effective_due_date IS NULL THEN 0
+				WHEN effective_due_date >= CURRENT_DATE THEN 0
+				ELSE CURRENT_DATE - effective_due_date
+			END AS overdue_days,
+			CASE
+				WHEN COALESCE(remaining_amount,0) <= 0 THEN 'settled'
+				WHEN effective_due_date IS NULL THEN 'no_due_date'
+				WHEN effective_due_date >= CURRENT_DATE THEN 'not_due'
+				WHEN CURRENT_DATE - effective_due_date <= 30 THEN '1_30'
+				WHEN CURRENT_DATE - effective_due_date <= 60 THEN '31_60'
+				WHEN CURRENT_DATE - effective_due_date <= 90 THEN '61_90'
+				ELSE '90_plus'
+			END AS aging_bucket,
+			ABS(COALESCE(remaining_amount,0) - COALESCE(computed_remaining,0)) AS balance_difference,
+			GREATEST(COALESCE(gross_amount,0) - COALESCE(verified_invoice_total,0), 0) AS unverified_invoice_gap,
+			GREATEST(COALESCE(advance_approved_total,0) - COALESCE(advance_paid_total,0), 0) AS advance_unpaid_total,
+			GREATEST(COALESCE(advance_paid_total,0) - COALESCE(advance_settled_total,0), 0) AS advance_unsettled_total
+		FROM calc
+	`, payableID)
+	if err != nil {
+		return nil, err
+	}
+	warnings := payableReconciliationWarnings(summary)
+	summary["warning_count"] = len(warnings)
+	if len(warnings) > 0 {
+		summary["reconciliation_status"] = "needs_review"
+	} else {
+		summary["reconciliation_status"] = "ok"
+	}
+
+	ledger, err := r.Query(ctx, `
+		WITH entries AS (
+			SELECT
+				pay.created_at AS occurred_at,
+				0 AS sort_order,
+				'payable_recorded'::text AS entry_type,
+				pay.id::text AS source_id,
+				pay.payable_code::text AS source_code,
+				pay.status::text AS status,
+				'Ghi nhận phải trả'::text AS description,
+				COALESCE(pay.gross_amount,0)::numeric AS debit_amount,
+				0::numeric AS credit_amount,
+				0::numeric AS document_amount,
+				0::numeric AS cash_amount,
+				COALESCE(created.full_name, '') AS actor_name
+			FROM payables pay
+			LEFT JOIN users created ON created.id=pay.created_by
+			WHERE pay.id=$1 AND pay.status <> 'cancelled'
+
+			UNION ALL
+
+			SELECT
+				COALESCE(ii.verified_at, ii.rejected_at, ii.created_at) AS occurred_at,
+				10 AS sort_order,
+				('input_invoice_' || ii.status)::text AS entry_type,
+				ii.id::text AS source_id,
+				ii.invoice_number::text AS source_code,
+				ii.status::text AS status,
+				CASE
+					WHEN ii.status='verified' THEN 'Hoá đơn đầu vào đã xác thực'
+					WHEN ii.status='rejected' THEN 'Hoá đơn đầu vào bị từ chối'
+					ELSE 'Upload hoá đơn đầu vào'
+				END AS description,
+				0::numeric AS debit_amount,
+				0::numeric AS credit_amount,
+				COALESCE(ii.total_amount,0)::numeric AS document_amount,
+				0::numeric AS cash_amount,
+				COALESCE(actor.full_name, '') AS actor_name
+			FROM input_invoices ii
+			LEFT JOIN users actor ON actor.id=COALESCE(ii.verified_by, ii.rejected_by, ii.uploaded_by)
+			WHERE ii.payable_id=$1 AND ii.status NOT IN ('deleted','cancelled')
+
+			UNION ALL
+
+			SELECT
+				ar.updated_at AS occurred_at,
+				20 AS sort_order,
+				'advance_approved'::text AS entry_type,
+				ar.id::text AS source_id,
+				ar.request_code::text AS source_code,
+				ar.status::text AS status,
+				'Ứng trước được duyệt ghi giảm phải trả'::text AS description,
+				0::numeric AS debit_amount,
+				COALESCE(ar.amount,0)::numeric AS credit_amount,
+				0::numeric AS document_amount,
+				0::numeric AS cash_amount,
+				COALESCE(approved.full_name, '') AS actor_name
+			FROM advance_requests ar
+			LEFT JOIN users approved ON approved.id=ar.approved_by
+			WHERE ar.payable_id=$1 AND ar.status IN ('approved','partially_settled','settled')
+
+			UNION ALL
+
+			SELECT
+				COALESCE(pmt.paid_at, pmt.updated_at, pmt.created_at) AS occurred_at,
+				30 AS sort_order,
+				('payment_' || pa.allocation_type)::text AS entry_type,
+				pmt.id::text AS source_id,
+				pmt.payment_code::text AS source_code,
+				pmt.status::text AS status,
+				CASE
+					WHEN pa.allocation_type='advance_payment' THEN 'Chi tiền ứng trước'
+					WHEN pa.allocation_type='advance_settlement' THEN 'Quyết toán ứng trước'
+					ELSE 'Thanh toán phải trả'
+				END AS description,
+				0::numeric AS debit_amount,
+				CASE WHEN pa.allocation_type='payable_payment' THEN COALESCE(pa.amount,0)::numeric ELSE 0::numeric END AS credit_amount,
+				0::numeric AS document_amount,
+				COALESCE(pa.amount,0)::numeric AS cash_amount,
+				COALESCE(approved.full_name, created.full_name, '') AS actor_name
+			FROM payment_allocations pa
+			JOIN payments pmt ON pmt.id=pa.payment_id
+			LEFT JOIN users approved ON approved.id=pmt.approved_by
+			LEFT JOIN users created ON created.id=pmt.created_by
+			WHERE pa.payable_id=$1 AND pmt.status='approved'
+
+			UNION ALL
+
+			SELECT
+				COALESCE(ar.settled_at, ar.updated_at) AS occurred_at,
+				40 AS sort_order,
+				'advance_settled'::text AS entry_type,
+				ar.id::text AS source_id,
+				ar.request_code::text AS source_code,
+				ar.status::text AS status,
+				'Quyết toán ứng trước bằng chứng từ'::text AS description,
+				0::numeric AS debit_amount,
+				0::numeric AS credit_amount,
+				COALESCE(ar.settled_amount,0)::numeric AS document_amount,
+				0::numeric AS cash_amount,
+				''::text AS actor_name
+			FROM advance_requests ar
+			WHERE ar.payable_id=$1
+			  AND ar.status NOT IN ('cancelled','deleted')
+			  AND COALESCE(ar.settled_amount,0) > 0
+		),
+		running AS (
+			SELECT
+				entries.*,
+				SUM(debit_amount - credit_amount) OVER (
+					ORDER BY occurred_at ASC, sort_order ASC, source_id ASC
+					ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+				) AS running_balance
+			FROM entries
+		)
+		SELECT *
+		FROM running
+		ORDER BY occurred_at DESC, sort_order DESC, source_id DESC
+	`, payableID)
+	if err != nil {
+		return nil, err
+	}
+
+	return Record{
+		"summary":  summary,
+		"warnings": warnings,
+		"ledger":   ledger,
+	}, nil
+}
+
+func payableReconciliationWarnings(summary Record) []Record {
+	warnings := []Record{}
+	if number(summary["remaining_amount"]) > 0 && int(number(summary["overdue_days"])) > 0 {
+		severity := "warning"
+		if number(summary["overdue_days"]) > 60 {
+			severity = "critical"
+		}
+		warnings = append(warnings, payableWarning("overdue", severity, "Khoản phải trả đã quá hạn", Record{
+			"effective_due_date": summary["effective_due_date"],
+			"overdue_days":       summary["overdue_days"],
+			"remaining_amount":   summary["remaining_amount"],
+		}))
+	}
+	if number(summary["verified_invoice_total"]) > number(summary["gross_amount"])+1 {
+		warnings = append(warnings, payableWarning("invoice_over_gross", "critical", "Tổng hoá đơn verified vượt giá trị phải trả", Record{
+			"gross_amount":           summary["gross_amount"],
+			"verified_invoice_total": summary["verified_invoice_total"],
+		}))
+	}
+	if number(summary["paid_amount"]) > number(summary["verified_invoice_total"])+1 {
+		warnings = append(warnings, payableWarning("paid_without_verified_invoice", "warning", "Đã thanh toán nhiều hơn tổng hoá đơn verified", Record{
+			"paid_amount":            summary["paid_amount"],
+			"verified_invoice_total": summary["verified_invoice_total"],
+		}))
+	}
+	if number(summary["remaining_amount"]) > 0 && int(number(summary["schedule_count"])) == 0 {
+		warnings = append(warnings, payableWarning("missing_schedule", "warning", "Khoản phải trả còn dư nhưng chưa có lịch thanh toán", Record{
+			"remaining_amount": summary["remaining_amount"],
+		}))
+	}
+	if number(summary["scheduled_remaining"]) > number(summary["remaining_amount"])+1 {
+		warnings = append(warnings, payableWarning("schedule_over_remaining", "warning", "Số còn lại theo lịch lớn hơn số còn phải trả", Record{
+			"scheduled_remaining": summary["scheduled_remaining"],
+			"remaining_amount":    summary["remaining_amount"],
+		}))
+	}
+	if number(summary["advance_unpaid_total"]) > 1 {
+		warnings = append(warnings, payableWarning("advance_unpaid", "warning", "Có ứng trước đã duyệt nhưng chưa chi đủ", Record{
+			"advance_approved_total": summary["advance_approved_total"],
+			"advance_paid_total":     summary["advance_paid_total"],
+			"advance_unpaid_total":   summary["advance_unpaid_total"],
+		}))
+	}
+	if number(summary["advance_unsettled_total"]) > 1 {
+		warnings = append(warnings, payableWarning("advance_unsettled", "warning", "Có ứng trước đã chi nhưng chưa quyết toán đủ", Record{
+			"advance_paid_total":      summary["advance_paid_total"],
+			"advance_settled_total":   summary["advance_settled_total"],
+			"advance_unsettled_total": summary["advance_unsettled_total"],
+		}))
+	}
+	if number(summary["balance_difference"]) > 1 {
+		warnings = append(warnings, payableWarning("balance_difference", "critical", "Số còn phải trả lệch với công thức gross - ứng trước - đã trả - khấu trừ", Record{
+			"remaining_amount":   summary["remaining_amount"],
+			"computed_remaining": summary["computed_remaining"],
+			"balance_difference": summary["balance_difference"],
+		}))
+	}
+	if int(number(summary["pending_payment_count"])) > 0 {
+		warnings = append(warnings, payableWarning("pending_payment", "info", "Có phiếu thanh toán đang chờ duyệt", Record{
+			"pending_payment_count": summary["pending_payment_count"],
+		}))
+	}
+	return warnings
+}
+
+func payableWarning(code, severity, message string, details Record) Record {
+	return Record{
+		"code":     code,
+		"severity": severity,
+		"message":  message,
+		"details":  details,
+	}
+}
+
 func (r *Repository) ListPayablePaymentSchedules(ctx context.Context, payableID string) ([]Record, error) {
 	return r.Query(ctx, `
 		SELECT
@@ -8517,6 +8847,337 @@ func (r *Repository) GetReceivableDetail(ctx context.Context, receivableID strin
 	`, receivableID)
 }
 
+func (r *Repository) ReceivableReconciliation(ctx context.Context, receivableID string) (Record, error) {
+	summary, err := r.QueryOne(ctx, `
+		WITH rec AS (
+			SELECT rec.*, p.name AS project_name
+			FROM receivables rec
+			JOIN projects p ON p.id=rec.project_id
+			WHERE rec.id=$1
+			  AND rec.status <> 'cancelled'
+			  AND p.status <> 'cancelled'
+		),
+		inv AS (
+			SELECT
+				receivable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('deleted','cancelled')) AS invoice_count,
+				COUNT(*) FILTER (WHERE status='issued') AS issued_invoice_count,
+				COUNT(*) FILTER (WHERE status='voided') AS voided_invoice_count,
+				COALESCE(SUM(total_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS invoice_total,
+				COALESCE(SUM(total_amount) FILTER (WHERE status='issued'), 0) AS issued_invoice_total,
+				MAX(invoice_date) FILTER (WHERE status NOT IN ('deleted','cancelled')) AS latest_invoice_date
+			FROM output_invoices
+			WHERE receivable_id=$1
+			GROUP BY receivable_id
+		),
+		sch AS (
+			SELECT
+				receivable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('cancelled','deleted')) AS schedule_count,
+				COUNT(*) FILTER (WHERE status IN ('approved','partially_received','overdue') AND remaining_amount > 0 AND due_date < CURRENT_DATE) AS overdue_schedule_count,
+				COALESCE(SUM(planned_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS scheduled_total,
+				COALESCE(SUM(received_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS scheduled_received_total,
+				COALESCE(SUM(remaining_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS scheduled_remaining,
+				MIN(due_date) FILTER (WHERE status IN ('approved','partially_received','overdue') AND remaining_amount > 0) AS next_schedule_due_date
+			FROM receivable_payment_schedules
+			WHERE receivable_id=$1
+			GROUP BY receivable_id
+		),
+		adv AS (
+			SELECT
+				receivable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('cancelled','deleted')) AS advance_receipt_count,
+				COALESCE(SUM(amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS advance_requested_total,
+				COALESCE(SUM(amount) FILTER (WHERE status IN ('approved','partially_received','received','partially_settled','settled')), 0) AS advance_approved_total,
+				COALESCE(SUM(received_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS advance_received_total,
+				COALESCE(SUM(settled_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS advance_settled_total
+			FROM client_advance_receipts
+			WHERE receivable_id=$1
+			GROUP BY receivable_id
+		),
+		alloc AS (
+			SELECT
+				ra.receivable_id,
+				COALESCE(SUM(ra.amount) FILTER (WHERE pmt.status='approved' AND ra.allocation_type='receivable_receipt'), 0) AS approved_receipt_total,
+				COALESCE(SUM(ra.amount) FILTER (WHERE pmt.status='approved' AND ra.allocation_type='advance_receipt'), 0) AS approved_advance_receipt_total,
+				COALESCE(SUM(ra.amount) FILTER (WHERE pmt.status <> 'cancelled'), 0) AS receipt_allocation_total,
+				COUNT(*) FILTER (WHERE pmt.status NOT IN ('approved','cancelled')) AS pending_receipt_count
+			FROM receipt_allocations ra
+			JOIN payments pmt ON pmt.id=ra.payment_id
+			WHERE ra.receivable_id=$1
+			GROUP BY ra.receivable_id
+		),
+		calc AS (
+			SELECT
+				rec.*,
+				COALESCE(inv.invoice_count, 0) AS invoice_count,
+				COALESCE(inv.issued_invoice_count, 0) AS issued_invoice_count,
+				COALESCE(inv.voided_invoice_count, 0) AS voided_invoice_count,
+				COALESCE(inv.invoice_total, 0) AS invoice_total,
+				COALESCE(inv.issued_invoice_total, 0) AS issued_invoice_total,
+				inv.latest_invoice_date,
+				COALESCE(sch.schedule_count, 0) AS schedule_count,
+				COALESCE(sch.overdue_schedule_count, 0) AS overdue_schedule_count,
+				COALESCE(sch.scheduled_total, 0) AS scheduled_total,
+				COALESCE(sch.scheduled_received_total, 0) AS scheduled_received_total,
+				COALESCE(sch.scheduled_remaining, 0) AS scheduled_remaining,
+				sch.next_schedule_due_date,
+				COALESCE(adv.advance_receipt_count, 0) AS advance_receipt_count,
+				COALESCE(adv.advance_requested_total, 0) AS advance_requested_total,
+				COALESCE(adv.advance_approved_total, 0) AS advance_approved_total,
+				COALESCE(adv.advance_received_total, 0) AS advance_received_total,
+				COALESCE(adv.advance_settled_total, 0) AS advance_settled_total,
+				COALESCE(alloc.approved_receipt_total, 0) AS approved_receipt_total,
+				COALESCE(alloc.approved_advance_receipt_total, 0) AS approved_advance_receipt_total,
+				COALESCE(alloc.receipt_allocation_total, 0) AS receipt_allocation_total,
+				COALESCE(alloc.pending_receipt_count, 0) AS pending_receipt_count,
+				COALESCE(rec.due_date, sch.next_schedule_due_date, inv.latest_invoice_date) AS effective_due_date,
+				GREATEST(COALESCE(rec.gross_amount,0) - COALESCE(rec.received_amount,0), 0) AS computed_remaining
+			FROM rec
+			LEFT JOIN inv ON inv.receivable_id=rec.id
+			LEFT JOIN sch ON sch.receivable_id=rec.id
+			LEFT JOIN adv ON adv.receivable_id=rec.id
+			LEFT JOIN alloc ON alloc.receivable_id=rec.id
+		)
+		SELECT
+			calc.*,
+			CASE
+				WHEN COALESCE(remaining_amount,0) <= 0 THEN 0
+				WHEN effective_due_date IS NULL THEN 0
+				WHEN effective_due_date >= CURRENT_DATE THEN 0
+				ELSE CURRENT_DATE - effective_due_date
+			END AS overdue_days,
+			CASE
+				WHEN COALESCE(remaining_amount,0) <= 0 THEN 'settled'
+				WHEN effective_due_date IS NULL THEN 'no_due_date'
+				WHEN effective_due_date >= CURRENT_DATE THEN 'not_due'
+				WHEN CURRENT_DATE - effective_due_date <= 30 THEN '1_30'
+				WHEN CURRENT_DATE - effective_due_date <= 60 THEN '31_60'
+				WHEN CURRENT_DATE - effective_due_date <= 90 THEN '61_90'
+				ELSE '90_plus'
+			END AS aging_bucket,
+			ABS(COALESCE(remaining_amount,0) - COALESCE(computed_remaining,0)) AS balance_difference,
+			GREATEST(COALESCE(gross_amount,0) - COALESCE(issued_invoice_total,0), 0) AS unissued_invoice_gap,
+			GREATEST(COALESCE(advance_approved_total,0) - COALESCE(advance_received_total,0), 0) AS advance_unreceived_total,
+			GREATEST(COALESCE(advance_received_total,0) - COALESCE(advance_settled_total,0), 0) AS advance_unsettled_total
+		FROM calc
+	`, receivableID)
+	if err != nil {
+		return nil, err
+	}
+	warnings := receivableReconciliationWarnings(summary)
+	summary["warning_count"] = len(warnings)
+	if len(warnings) > 0 {
+		summary["reconciliation_status"] = "needs_review"
+	} else {
+		summary["reconciliation_status"] = "ok"
+	}
+
+	ledger, err := r.Query(ctx, `
+		WITH entries AS (
+			SELECT
+				rec.created_at AS occurred_at,
+				0 AS sort_order,
+				'receivable_recorded'::text AS entry_type,
+				rec.id::text AS source_id,
+				rec.receivable_code::text AS source_code,
+				rec.status::text AS status,
+				'Ghi nhận phải thu'::text AS description,
+				COALESCE(rec.gross_amount,0)::numeric AS debit_amount,
+				0::numeric AS credit_amount,
+				0::numeric AS document_amount,
+				0::numeric AS cash_amount,
+				COALESCE(created.full_name, '') AS actor_name
+			FROM receivables rec
+			LEFT JOIN users created ON created.id=rec.created_by
+			WHERE rec.id=$1 AND rec.status <> 'cancelled'
+
+			UNION ALL
+
+			SELECT
+				COALESCE(oi.issued_at, oi.voided_at, oi.created_at) AS occurred_at,
+				10 AS sort_order,
+				('output_invoice_' || oi.status)::text AS entry_type,
+				oi.id::text AS source_id,
+				oi.invoice_number::text AS source_code,
+				oi.status::text AS status,
+				CASE
+					WHEN oi.status='issued' THEN 'Hoá đơn đầu ra đã phát hành'
+					WHEN oi.status='voided' THEN 'Hoá đơn đầu ra đã huỷ'
+					ELSE 'Upload hoá đơn đầu ra'
+				END AS description,
+				0::numeric AS debit_amount,
+				0::numeric AS credit_amount,
+				COALESCE(oi.total_amount,0)::numeric AS document_amount,
+				0::numeric AS cash_amount,
+				COALESCE(actor.full_name, '') AS actor_name
+			FROM output_invoices oi
+			LEFT JOIN users actor ON actor.id=COALESCE(oi.issued_by, oi.voided_by, oi.uploaded_by)
+			WHERE oi.receivable_id=$1 AND oi.status NOT IN ('deleted','cancelled')
+
+			UNION ALL
+
+			SELECT
+				car.updated_at AS occurred_at,
+				20 AS sort_order,
+				'client_advance_approved'::text AS entry_type,
+				car.id::text AS source_id,
+				car.receipt_code::text AS source_code,
+				car.status::text AS status,
+				'Ứng trước khách hàng được duyệt ghi giảm phải thu'::text AS description,
+				0::numeric AS debit_amount,
+				COALESCE(car.amount,0)::numeric AS credit_amount,
+				0::numeric AS document_amount,
+				0::numeric AS cash_amount,
+				COALESCE(approved.full_name, '') AS actor_name
+			FROM client_advance_receipts car
+			LEFT JOIN users approved ON approved.id=car.approved_by
+			WHERE car.receivable_id=$1 AND car.status IN ('approved','partially_received','received','partially_settled','settled')
+
+			UNION ALL
+
+			SELECT
+				COALESCE(pmt.paid_at, pmt.updated_at, pmt.created_at) AS occurred_at,
+				30 AS sort_order,
+				('receipt_' || ra.allocation_type)::text AS entry_type,
+				pmt.id::text AS source_id,
+				pmt.payment_code::text AS source_code,
+				pmt.status::text AS status,
+				CASE
+					WHEN ra.allocation_type='advance_receipt' THEN 'Thu tiền ứng trước khách hàng'
+					WHEN ra.allocation_type='advance_settlement' THEN 'Quyết toán ứng trước khách hàng'
+					ELSE 'Thu tiền phải thu'
+				END AS description,
+				0::numeric AS debit_amount,
+				CASE WHEN ra.allocation_type='receivable_receipt' THEN COALESCE(ra.amount,0)::numeric ELSE 0::numeric END AS credit_amount,
+				0::numeric AS document_amount,
+				COALESCE(ra.amount,0)::numeric AS cash_amount,
+				COALESCE(approved.full_name, created.full_name, '') AS actor_name
+			FROM receipt_allocations ra
+			JOIN payments pmt ON pmt.id=ra.payment_id
+			LEFT JOIN users approved ON approved.id=pmt.approved_by
+			LEFT JOIN users created ON created.id=pmt.created_by
+			WHERE ra.receivable_id=$1 AND pmt.status='approved'
+
+			UNION ALL
+
+			SELECT
+				COALESCE(car.settled_at, car.updated_at) AS occurred_at,
+				40 AS sort_order,
+				'client_advance_settled'::text AS entry_type,
+				car.id::text AS source_id,
+				car.receipt_code::text AS source_code,
+				car.status::text AS status,
+				'Quyết toán ứng trước bằng chứng từ đầu ra'::text AS description,
+				0::numeric AS debit_amount,
+				0::numeric AS credit_amount,
+				COALESCE(car.settled_amount,0)::numeric AS document_amount,
+				0::numeric AS cash_amount,
+				''::text AS actor_name
+			FROM client_advance_receipts car
+			WHERE car.receivable_id=$1
+			  AND car.status NOT IN ('cancelled','deleted')
+			  AND COALESCE(car.settled_amount,0) > 0
+		),
+		running AS (
+			SELECT
+				entries.*,
+				SUM(debit_amount - credit_amount) OVER (
+					ORDER BY occurred_at ASC, sort_order ASC, source_id ASC
+					ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+				) AS running_balance
+			FROM entries
+		)
+		SELECT *
+		FROM running
+		ORDER BY occurred_at DESC, sort_order DESC, source_id DESC
+	`, receivableID)
+	if err != nil {
+		return nil, err
+	}
+
+	return Record{
+		"summary":  summary,
+		"warnings": warnings,
+		"ledger":   ledger,
+	}, nil
+}
+
+func receivableReconciliationWarnings(summary Record) []Record {
+	warnings := []Record{}
+	if number(summary["remaining_amount"]) > 0 && int(number(summary["overdue_days"])) > 0 {
+		severity := "warning"
+		if number(summary["overdue_days"]) > 60 {
+			severity = "critical"
+		}
+		warnings = append(warnings, receivableWarning("overdue", severity, "Khoản phải thu đã quá hạn", Record{
+			"effective_due_date": summary["effective_due_date"],
+			"overdue_days":       summary["overdue_days"],
+			"remaining_amount":   summary["remaining_amount"],
+		}))
+	}
+	if number(summary["issued_invoice_total"]) > number(summary["gross_amount"])+1 {
+		warnings = append(warnings, receivableWarning("invoice_over_gross", "critical", "Tổng hoá đơn issued vượt giá trị phải thu", Record{
+			"gross_amount":         summary["gross_amount"],
+			"issued_invoice_total": summary["issued_invoice_total"],
+		}))
+	}
+	if number(summary["received_amount"]) > number(summary["issued_invoice_total"])+1 {
+		warnings = append(warnings, receivableWarning("received_without_issued_invoice", "warning", "Đã thu nhiều hơn tổng hoá đơn issued", Record{
+			"received_amount":        summary["received_amount"],
+			"issued_invoice_total":   summary["issued_invoice_total"],
+			"approved_receipt_total": summary["approved_receipt_total"],
+		}))
+	}
+	if number(summary["remaining_amount"]) > 0 && int(number(summary["schedule_count"])) == 0 {
+		warnings = append(warnings, receivableWarning("missing_schedule", "warning", "Khoản phải thu còn dư nhưng chưa có lịch thu", Record{
+			"remaining_amount": summary["remaining_amount"],
+		}))
+	}
+	if number(summary["scheduled_remaining"]) > number(summary["remaining_amount"])+1 {
+		warnings = append(warnings, receivableWarning("schedule_over_remaining", "warning", "Số còn lại theo lịch lớn hơn số còn phải thu", Record{
+			"scheduled_remaining": summary["scheduled_remaining"],
+			"remaining_amount":    summary["remaining_amount"],
+		}))
+	}
+	if number(summary["advance_unreceived_total"]) > 1 {
+		warnings = append(warnings, receivableWarning("advance_unreceived", "warning", "Có ứng trước đã duyệt nhưng chưa thu đủ tiền", Record{
+			"advance_approved_total":   summary["advance_approved_total"],
+			"advance_received_total":   summary["advance_received_total"],
+			"advance_unreceived_total": summary["advance_unreceived_total"],
+		}))
+	}
+	if number(summary["advance_unsettled_total"]) > 1 {
+		warnings = append(warnings, receivableWarning("advance_unsettled", "warning", "Có ứng trước đã thu nhưng chưa quyết toán đủ", Record{
+			"advance_received_total":  summary["advance_received_total"],
+			"advance_settled_total":   summary["advance_settled_total"],
+			"advance_unsettled_total": summary["advance_unsettled_total"],
+		}))
+	}
+	if number(summary["balance_difference"]) > 1 {
+		warnings = append(warnings, receivableWarning("balance_difference", "critical", "Số còn phải thu lệch với công thức gross - đã thu", Record{
+			"remaining_amount":   summary["remaining_amount"],
+			"computed_remaining": summary["computed_remaining"],
+			"balance_difference": summary["balance_difference"],
+		}))
+	}
+	if int(number(summary["pending_receipt_count"])) > 0 {
+		warnings = append(warnings, receivableWarning("pending_receipt", "info", "Có phiếu thu đang chờ duyệt", Record{
+			"pending_receipt_count": summary["pending_receipt_count"],
+		}))
+	}
+	return warnings
+}
+
+func receivableWarning(code, severity, message string, details Record) Record {
+	return Record{
+		"code":     code,
+		"severity": severity,
+		"message":  message,
+		"details":  details,
+	}
+}
+
 func (r *Repository) ListOutputInvoicesForReceivable(ctx context.Context, receivableID string) ([]Record, error) {
 	return r.Query(ctx, `
 		SELECT
@@ -9331,6 +9992,1024 @@ func (r *Repository) Report(ctx context.Context, kind, userID string) ([]Record,
 		`)
 	default:
 		return nil, errors.New("unknown report")
+	}
+}
+
+func (r *Repository) CashflowReport(ctx context.Context, req CashflowReportRequest, userID string) (Record, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
+	if err != nil {
+		return nil, err
+	}
+	statusFilter := cashflowStatusFilter(req.Status)
+
+	openingArgs := append([]any{}, scopeArgs...)
+	openingFromIdx := len(openingArgs) + 1
+	openingArgs = append(openingArgs, req.FromDate)
+	openingProjectFilter := cashflowProjectFilter(&openingArgs, req.ProjectID)
+	openingRows, err := r.Query(ctx, cashflowRowsCTE(
+		scopeSQL,
+		openingProjectFilter,
+		fmt.Sprintf(" AND %s < $%d::date", cashflowOccurredAtSQL(), openingFromIdx),
+		statusFilter,
+	)+`
+		SELECT COALESCE(SUM(net_amount), 0) AS opening_balance
+		FROM cashflow_rows
+	`, openingArgs...)
+	if err != nil {
+		return nil, err
+	}
+	openingBalance := 0.0
+	if len(openingRows) > 0 {
+		openingBalance = number(openingRows[0]["opening_balance"])
+	}
+
+	rangeArgs := append([]any{}, scopeArgs...)
+	fromIdx := len(rangeArgs) + 1
+	rangeArgs = append(rangeArgs, req.FromDate)
+	toIdx := len(rangeArgs) + 1
+	rangeArgs = append(rangeArgs, req.ToDate)
+	rangeProjectFilter := cashflowProjectFilter(&rangeArgs, req.ProjectID)
+	rangeDateFilter := fmt.Sprintf(" AND %s >= $%d::date AND %s < ($%d::date + INTERVAL '1 day')", cashflowOccurredAtSQL(), fromIdx, cashflowOccurredAtSQL(), toIdx)
+	rangeCTE := cashflowRowsCTE(scopeSQL, rangeProjectFilter, rangeDateFilter, statusFilter)
+
+	summaryRows, err := r.Query(ctx, rangeCTE+`
+		SELECT
+			COUNT(*) AS payment_count,
+			COUNT(*) FILTER (WHERE direction='unclassified') AS unclassified_count,
+			COUNT(*) FILTER (WHERE direction='non_cash') AS non_cash_count,
+			COALESCE(SUM(inflow_amount), 0) AS total_inflow,
+			COALESCE(SUM(outflow_amount), 0) AS total_outflow,
+			COALESCE(SUM(net_amount), 0) AS net_flow
+		FROM cashflow_rows
+	`, rangeArgs...)
+	if err != nil {
+		return nil, err
+	}
+	summary := Record{
+		"from":                  req.FromDate,
+		"to":                    req.ToDate,
+		"group_by":              req.GroupBy,
+		"status":                req.Status,
+		"project_id":            req.ProjectID,
+		"opening_balance":       openingBalance,
+		"payment_count":         0,
+		"unclassified_count":    0,
+		"non_cash_count":        0,
+		"total_inflow":          0,
+		"total_outflow":         0,
+		"net_flow":              0,
+		"closing_balance":       openingBalance,
+		"pending_payment_count": 0,
+		"pending_payment_total": 0,
+	}
+	if len(summaryRows) > 0 {
+		row := summaryRows[0]
+		netFlow := number(row["net_flow"])
+		summary["payment_count"] = row["payment_count"]
+		summary["unclassified_count"] = row["unclassified_count"]
+		summary["non_cash_count"] = row["non_cash_count"]
+		summary["total_inflow"] = row["total_inflow"]
+		summary["total_outflow"] = row["total_outflow"]
+		summary["net_flow"] = row["net_flow"]
+		summary["closing_balance"] = openingBalance + netFlow
+	}
+
+	pendingArgs := append([]any{}, scopeArgs...)
+	pendingFromIdx := len(pendingArgs) + 1
+	pendingArgs = append(pendingArgs, req.FromDate)
+	pendingToIdx := len(pendingArgs) + 1
+	pendingArgs = append(pendingArgs, req.ToDate)
+	pendingProjectFilter := cashflowProjectFilter(&pendingArgs, req.ProjectID)
+	pendingDateFilter := fmt.Sprintf(" AND %s >= $%d::date AND %s < ($%d::date + INTERVAL '1 day')", cashflowOccurredAtSQL(), pendingFromIdx, cashflowOccurredAtSQL(), pendingToIdx)
+	pendingRows, err := r.Query(ctx, cashflowRowsCTE(scopeSQL, pendingProjectFilter, pendingDateFilter, " AND pay.status NOT IN ('approved','cancelled')")+`
+		SELECT COUNT(*) AS pending_payment_count, COALESCE(SUM(amount), 0) AS pending_payment_total
+		FROM cashflow_rows
+	`, pendingArgs...)
+	if err != nil {
+		return nil, err
+	}
+	if len(pendingRows) > 0 {
+		summary["pending_payment_count"] = pendingRows[0]["pending_payment_count"]
+		summary["pending_payment_total"] = pendingRows[0]["pending_payment_total"]
+	}
+
+	periodExpr := cashflowPeriodExpr(req.GroupBy)
+	seriesRows, err := r.Query(ctx, rangeCTE+fmt.Sprintf(`
+		SELECT
+			%s AS period_start,
+			COALESCE(SUM(inflow_amount), 0) AS inflow_amount,
+			COALESCE(SUM(outflow_amount), 0) AS outflow_amount,
+			COALESCE(SUM(net_amount), 0) AS net_amount,
+			COUNT(*) AS payment_count
+		FROM cashflow_rows
+		GROUP BY period_start
+		ORDER BY period_start
+	`, periodExpr), rangeArgs...)
+	if err != nil {
+		return nil, err
+	}
+	runningBalance := openingBalance
+	for _, row := range seriesRows {
+		runningBalance += number(row["net_amount"])
+		row["running_balance"] = runningBalance
+	}
+
+	categoryRows, err := r.Query(ctx, rangeCTE+`
+		SELECT
+			category,
+			direction,
+			COUNT(*) AS payment_count,
+			COALESCE(SUM(inflow_amount), 0) AS inflow_amount,
+			COALESCE(SUM(outflow_amount), 0) AS outflow_amount,
+			COALESCE(SUM(net_amount), 0) AS net_amount
+		FROM cashflow_rows
+		GROUP BY category, direction
+		ORDER BY direction, category
+	`, rangeArgs...)
+	if err != nil {
+		return nil, err
+	}
+
+	ledgerRows, err := r.Query(ctx, rangeCTE+`
+		SELECT
+			occurred_at,
+			id,
+			project_id,
+			project_name,
+			payment_code,
+			payment_type,
+			payment_method,
+			status,
+			direction,
+			category,
+			amount,
+			inflow_amount,
+			outflow_amount,
+			net_amount,
+			target_type,
+			target_id,
+			created_by_name,
+			approved_by_name
+		FROM cashflow_rows
+		ORDER BY occurred_at DESC, created_at DESC, id DESC
+	`, rangeArgs...)
+	if err != nil {
+		return nil, err
+	}
+
+	return Record{
+		"summary":    summary,
+		"series":     seriesRows,
+		"categories": categoryRows,
+		"ledger":     ledgerRows,
+	}, nil
+}
+
+func (r *Repository) TaxReport(ctx context.Context, req TaxReportRequest, userID string) (Record, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
+	if err != nil {
+		return nil, err
+	}
+	args := append([]any{}, scopeArgs...)
+	fromIdx := len(args) + 1
+	args = append(args, req.FromDate)
+	toIdx := len(args) + 1
+	args = append(args, req.ToDate)
+	projectFilter := taxProjectFilter(&args, req.ProjectID)
+	inputDateFilter := fmt.Sprintf(" AND ii.invoice_date >= $%d::date AND ii.invoice_date <= $%d::date", fromIdx, toIdx)
+	outputDateFilter := fmt.Sprintf(" AND oi.invoice_date >= $%d::date AND oi.invoice_date <= $%d::date", fromIdx, toIdx)
+	sourceFilter := taxSourceFilter(req.Source)
+	statusFilter := taxStatusFilter(req.Status)
+	baseCTE := taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter)
+	filteredCTE := baseCTE + fmt.Sprintf(`
+		, filtered_tax_rows AS (
+			SELECT * FROM tax_rows
+			WHERE 1=1
+			%s
+			%s
+		)
+	`, sourceFilter, statusFilter)
+
+	summaryRows, err := r.Query(ctx, filteredCTE+`
+		SELECT
+			COUNT(*) AS invoice_count,
+			COUNT(*) FILTER (WHERE direction='input') AS input_invoice_count,
+			COUNT(*) FILTER (WHERE direction='output') AS output_invoice_count,
+			COALESCE(SUM(amount_before_vat) FILTER (WHERE direction='input'), 0) AS input_taxable_amount,
+			COALESCE(SUM(vat_amount) FILTER (WHERE direction='input'), 0) AS input_vat_amount,
+			COALESCE(SUM(total_amount) FILTER (WHERE direction='input'), 0) AS input_total_amount,
+			COALESCE(SUM(amount_before_vat) FILTER (WHERE direction='output'), 0) AS output_taxable_amount,
+			COALESCE(SUM(vat_amount) FILTER (WHERE direction='output'), 0) AS output_vat_amount,
+			COALESCE(SUM(total_amount) FILTER (WHERE direction='output'), 0) AS output_total_amount,
+			COALESCE(SUM(vat_amount) FILTER (WHERE direction='output'), 0) - COALESCE(SUM(vat_amount) FILTER (WHERE direction='input'), 0) AS net_vat_amount,
+			COUNT(*) FILTER (WHERE missing_tax_code) AS missing_tax_code_count,
+			COUNT(*) FILTER (WHERE vat_math_mismatch) AS vat_math_mismatch_count
+		FROM filtered_tax_rows
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+	summary := Record{
+		"from":                    req.FromDate,
+		"to":                      req.ToDate,
+		"group_by":                req.GroupBy,
+		"source":                  req.Source,
+		"status":                  req.Status,
+		"project_id":              req.ProjectID,
+		"invoice_count":           0,
+		"input_invoice_count":     0,
+		"output_invoice_count":    0,
+		"input_taxable_amount":    0,
+		"input_vat_amount":        0,
+		"input_total_amount":      0,
+		"output_taxable_amount":   0,
+		"output_vat_amount":       0,
+		"output_total_amount":     0,
+		"net_vat_amount":          0,
+		"net_vat_status":          "neutral",
+		"missing_tax_code_count":  0,
+		"vat_math_mismatch_count": 0,
+		"excluded_unposted_count": 0,
+		"excluded_unposted_total": 0,
+		"warning_count":           0,
+	}
+	if len(summaryRows) > 0 {
+		for key, value := range summaryRows[0] {
+			summary[key] = value
+		}
+	}
+
+	excludedRows, err := r.Query(ctx, baseCTE+fmt.Sprintf(`
+		SELECT COUNT(*) AS excluded_unposted_count, COALESCE(SUM(total_amount), 0) AS excluded_unposted_total
+		FROM tax_rows
+		WHERE 1=1
+		%s
+		AND NOT posted
+	`, sourceFilter), args...)
+	if err != nil {
+		return nil, err
+	}
+	if len(excludedRows) > 0 {
+		summary["excluded_unposted_count"] = excludedRows[0]["excluded_unposted_count"]
+		summary["excluded_unposted_total"] = excludedRows[0]["excluded_unposted_total"]
+	}
+
+	netVAT := number(summary["net_vat_amount"])
+	if netVAT > 1 {
+		summary["net_vat_status"] = "payable"
+	} else if netVAT < -1 {
+		summary["net_vat_status"] = "credit"
+	}
+	warnings := taxReportWarnings(summary, req.Status)
+	summary["warning_count"] = len(warnings)
+
+	periodRows, err := r.Query(ctx, filteredCTE+fmt.Sprintf(`
+		SELECT
+			%s AS period_start,
+			COUNT(*) AS invoice_count,
+			COUNT(*) FILTER (WHERE direction='input') AS input_invoice_count,
+			COUNT(*) FILTER (WHERE direction='output') AS output_invoice_count,
+			COALESCE(SUM(amount_before_vat) FILTER (WHERE direction='input'), 0) AS input_taxable_amount,
+			COALESCE(SUM(vat_amount) FILTER (WHERE direction='input'), 0) AS input_vat_amount,
+			COALESCE(SUM(total_amount) FILTER (WHERE direction='input'), 0) AS input_total_amount,
+			COALESCE(SUM(amount_before_vat) FILTER (WHERE direction='output'), 0) AS output_taxable_amount,
+			COALESCE(SUM(vat_amount) FILTER (WHERE direction='output'), 0) AS output_vat_amount,
+			COALESCE(SUM(total_amount) FILTER (WHERE direction='output'), 0) AS output_total_amount,
+			COALESCE(SUM(vat_amount) FILTER (WHERE direction='output'), 0) - COALESCE(SUM(vat_amount) FILTER (WHERE direction='input'), 0) AS net_vat_amount
+		FROM filtered_tax_rows
+		GROUP BY period_start
+		ORDER BY period_start
+	`, taxPeriodExpr(req.GroupBy)), args...)
+	if err != nil {
+		return nil, err
+	}
+
+	counterpartyRows, err := r.Query(ctx, filteredCTE+`
+		SELECT
+			direction,
+			tax_code,
+			counterparty_name,
+			COUNT(*) AS invoice_count,
+			COALESCE(SUM(amount_before_vat), 0) AS taxable_amount,
+			COALESCE(SUM(vat_amount), 0) AS vat_amount,
+			COALESCE(SUM(total_amount), 0) AS total_amount,
+			COUNT(*) FILTER (WHERE missing_tax_code OR vat_math_mismatch) AS warning_count
+		FROM filtered_tax_rows
+		GROUP BY direction, tax_code, counterparty_name
+		ORDER BY direction, vat_amount DESC, counterparty_name
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	ledgerRows, err := r.Query(ctx, filteredCTE+`
+		SELECT
+			invoice_date,
+			id,
+			direction,
+			project_id,
+			project_name,
+			invoice_number,
+			invoice_symbol,
+			counterparty_name,
+			tax_code,
+			amount_before_vat,
+			vat_amount,
+			total_amount,
+			currency,
+			status,
+			source_type,
+			source_id,
+			source_code,
+			secondary_source_type,
+			secondary_source_id,
+			secondary_source_code,
+			document_id,
+			document_name,
+			missing_tax_code,
+			vat_math_mismatch,
+			CONCAT_WS('; ',
+				CASE WHEN missing_tax_code THEN 'missing_tax_code' END,
+				CASE WHEN vat_math_mismatch THEN 'vat_math_mismatch' END
+			) AS warning_flags
+		FROM filtered_tax_rows
+		ORDER BY invoice_date DESC, created_at DESC, id DESC
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return Record{
+		"summary":        summary,
+		"periods":        periodRows,
+		"counterparties": counterpartyRows,
+		"ledger":         ledgerRows,
+		"warnings":       warnings,
+	}, nil
+}
+
+func (r *Repository) ProfitReport(ctx context.Context, req ProfitReportRequest, userID string) (Record, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
+	if err != nil {
+		return nil, err
+	}
+	args := append([]any{}, scopeArgs...)
+	fromIdx := len(args) + 1
+	args = append(args, req.FromDate)
+	toIdx := len(args) + 1
+	args = append(args, req.ToDate)
+	projectFilter := profitProjectFilter(&args, req.ProjectID)
+	inputDateFilter := fmt.Sprintf(" AND ii.invoice_date >= $%d::date AND ii.invoice_date <= $%d::date", fromIdx, toIdx)
+	outputDateFilter := fmt.Sprintf(" AND oi.invoice_date >= $%d::date AND oi.invoice_date <= $%d::date", fromIdx, toIdx)
+	statusFilter := profitStatusFilter(req.Status)
+	baseCTE := profitRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter)
+	filteredCTE := baseCTE + fmt.Sprintf(`
+		, filtered_profit_rows AS (
+			SELECT * FROM profit_rows
+			WHERE 1=1
+			%s
+		)
+	`, statusFilter)
+
+	summaryRows, err := r.Query(ctx, filteredCTE+`
+		SELECT
+			COUNT(*) AS ledger_count,
+			COUNT(*) FILTER (WHERE direction='revenue') AS revenue_invoice_count,
+			COUNT(*) FILTER (WHERE direction='cost') AS cost_invoice_count,
+			COALESCE(SUM(revenue_amount), 0) AS revenue_amount,
+			COALESCE(SUM(direct_cost_amount), 0) AS direct_cost_amount,
+			COALESCE(SUM(indirect_cost_amount), 0) AS indirect_cost_amount,
+			COALESCE(SUM(direct_cost_amount + indirect_cost_amount), 0) AS total_cost_amount,
+			COALESCE(SUM(revenue_amount - direct_cost_amount), 0) AS gross_profit,
+			COALESCE(SUM(revenue_amount - direct_cost_amount - indirect_cost_amount), 0) AS net_profit,
+			COUNT(*) FILTER (WHERE unclassified_cost) AS unclassified_cost_count
+		FROM filtered_profit_rows
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+	summary := Record{
+		"from":                    req.FromDate,
+		"to":                      req.ToDate,
+		"group_by":                req.GroupBy,
+		"status":                  req.Status,
+		"project_id":              req.ProjectID,
+		"ledger_count":            0,
+		"revenue_invoice_count":   0,
+		"cost_invoice_count":      0,
+		"revenue_amount":          0,
+		"direct_cost_amount":      0,
+		"indirect_cost_amount":    0,
+		"total_cost_amount":       0,
+		"gross_profit":            0,
+		"net_profit":              0,
+		"gross_margin_percent":    0,
+		"net_margin_percent":      0,
+		"unclassified_cost_count": 0,
+		"excluded_unposted_count": 0,
+		"excluded_unposted_total": 0,
+		"warning_count":           0,
+	}
+	if len(summaryRows) > 0 {
+		for key, value := range summaryRows[0] {
+			summary[key] = value
+		}
+	}
+	profitApplyMargins(summary)
+
+	excludedRows, err := r.Query(ctx, baseCTE+`
+		SELECT COUNT(*) AS excluded_unposted_count, COALESCE(SUM(amount_before_vat), 0) AS excluded_unposted_total
+		FROM profit_rows
+		WHERE NOT posted
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+	if len(excludedRows) > 0 {
+		summary["excluded_unposted_count"] = excludedRows[0]["excluded_unposted_count"]
+		summary["excluded_unposted_total"] = excludedRows[0]["excluded_unposted_total"]
+	}
+	warnings := profitReportWarnings(summary, req.Status)
+	summary["warning_count"] = len(warnings)
+
+	periodRows, err := r.Query(ctx, filteredCTE+fmt.Sprintf(`
+		SELECT
+			%s AS period_start,
+			COUNT(*) AS ledger_count,
+			COUNT(*) FILTER (WHERE direction='revenue') AS revenue_invoice_count,
+			COUNT(*) FILTER (WHERE direction='cost') AS cost_invoice_count,
+			COALESCE(SUM(revenue_amount), 0) AS revenue_amount,
+			COALESCE(SUM(direct_cost_amount), 0) AS direct_cost_amount,
+			COALESCE(SUM(indirect_cost_amount), 0) AS indirect_cost_amount,
+			COALESCE(SUM(direct_cost_amount + indirect_cost_amount), 0) AS total_cost_amount,
+			COALESCE(SUM(revenue_amount - direct_cost_amount), 0) AS gross_profit,
+			COALESCE(SUM(revenue_amount - direct_cost_amount - indirect_cost_amount), 0) AS net_profit
+		FROM filtered_profit_rows
+		GROUP BY period_start
+		ORDER BY period_start
+	`, profitPeriodExpr(req.GroupBy)), args...)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range periodRows {
+		profitApplyMargins(row)
+	}
+
+	projectRows, err := r.Query(ctx, filteredCTE+`
+		SELECT
+			project_id,
+			project_name,
+			COUNT(*) AS ledger_count,
+			COUNT(*) FILTER (WHERE direction='revenue') AS revenue_invoice_count,
+			COUNT(*) FILTER (WHERE direction='cost') AS cost_invoice_count,
+			COALESCE(SUM(revenue_amount), 0) AS revenue_amount,
+			COALESCE(SUM(direct_cost_amount), 0) AS direct_cost_amount,
+			COALESCE(SUM(indirect_cost_amount), 0) AS indirect_cost_amount,
+			COALESCE(SUM(direct_cost_amount + indirect_cost_amount), 0) AS total_cost_amount,
+			COALESCE(SUM(revenue_amount - direct_cost_amount), 0) AS gross_profit,
+			COALESCE(SUM(revenue_amount - direct_cost_amount - indirect_cost_amount), 0) AS net_profit,
+			COUNT(*) FILTER (WHERE unclassified_cost) AS warning_count
+		FROM filtered_profit_rows
+		GROUP BY project_id, project_name
+		ORDER BY net_profit DESC, project_name
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range projectRows {
+		profitApplyMargins(row)
+	}
+
+	breakdownRows, err := r.Query(ctx, filteredCTE+`
+		SELECT
+			cost_type,
+			cost_group,
+			classification_reason,
+			COUNT(*) AS invoice_count,
+			COALESCE(SUM(amount_before_vat), 0) AS cost_amount,
+			COALESCE(SUM(vat_amount), 0) AS vat_amount,
+			COALESCE(SUM(total_amount), 0) AS total_amount,
+			COUNT(*) FILTER (WHERE unclassified_cost) AS warning_count
+		FROM filtered_profit_rows
+		WHERE direction='cost'
+		GROUP BY cost_type, cost_group, classification_reason
+		ORDER BY cost_type, cost_amount DESC, cost_group
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	ledgerRows, err := r.Query(ctx, filteredCTE+`
+		SELECT
+			invoice_date,
+			id,
+			direction,
+			cost_type,
+			cost_group,
+			classification_reason,
+			project_id,
+			project_name,
+			invoice_number,
+			invoice_symbol,
+			counterparty_name,
+			tax_code,
+			amount_before_vat,
+			vat_amount,
+			total_amount,
+			revenue_amount,
+			direct_cost_amount,
+			indirect_cost_amount,
+			currency,
+			status,
+			source_type,
+			source_id,
+			source_code,
+			secondary_source_type,
+			secondary_source_id,
+			secondary_source_code,
+			document_id,
+			document_name,
+			unclassified_cost,
+			CASE WHEN unclassified_cost THEN 'indirect_or_unclassified_cost' ELSE '' END AS warning_flags
+		FROM filtered_profit_rows
+		ORDER BY invoice_date DESC, created_at DESC, id DESC
+	`, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return Record{
+		"summary":        summary,
+		"periods":        periodRows,
+		"projects":       projectRows,
+		"cost_breakdown": breakdownRows,
+		"ledger":         ledgerRows,
+		"warnings":       warnings,
+	}, nil
+}
+
+func profitApplyMargins(row Record) {
+	revenue := number(row["revenue_amount"])
+	row["gross_margin_percent"] = profitMarginPercent(revenue, number(row["gross_profit"]))
+	row["net_margin_percent"] = profitMarginPercent(revenue, number(row["net_profit"]))
+}
+
+func profitMarginPercent(revenue, profit float64) float64 {
+	if math.Abs(revenue) <= 1 {
+		return 0
+	}
+	return profit / revenue * 100
+}
+
+func profitReportWarnings(summary Record, status string) []Record {
+	warnings := []Record{}
+	if count := number(summary["unclassified_cost_count"]); count > 0 {
+		warnings = append(warnings, Record{
+			"code":     "indirect_or_unclassified_cost",
+			"severity": "warning",
+			"message":  "Có chi phí chưa đủ nguồn phân loại direct nên được đưa vào indirect cost",
+			"count":    count,
+		})
+	}
+	if status == "posted" {
+		if count := number(summary["excluded_unposted_count"]); count > 0 {
+			warnings = append(warnings, Record{
+				"code":     "unposted_excluded",
+				"severity": "info",
+				"message":  "Có chứng từ chưa posted bị loại khỏi báo cáo mặc định",
+				"count":    count,
+				"amount":   summary["excluded_unposted_total"],
+			})
+		}
+	}
+	if number(summary["revenue_amount"]) > 0 && number(summary["net_profit"]) < 0 {
+		warnings = append(warnings, Record{
+			"code":     "negative_net_profit",
+			"severity": "warning",
+			"message":  "Net profit đang âm trong khoảng lọc",
+			"amount":   summary["net_profit"],
+		})
+	}
+	return warnings
+}
+
+func taxReportWarnings(summary Record, status string) []Record {
+	warnings := []Record{}
+	if count := number(summary["missing_tax_code_count"]); count > 0 {
+		warnings = append(warnings, Record{
+			"code":     "missing_tax_code",
+			"severity": "warning",
+			"message":  "Có hoá đơn thiếu mã số thuế đối tác",
+			"count":    count,
+		})
+	}
+	if count := number(summary["vat_math_mismatch_count"]); count > 0 {
+		warnings = append(warnings, Record{
+			"code":     "vat_math_mismatch",
+			"severity": "warning",
+			"message":  "Có hoá đơn lệch phép tính trước VAT + VAT = tổng tiền",
+			"count":    count,
+		})
+	}
+	if status == "posted" {
+		if count := number(summary["excluded_unposted_count"]); count > 0 {
+			warnings = append(warnings, Record{
+				"code":     "unposted_excluded",
+				"severity": "info",
+				"message":  "Có hoá đơn chưa posted bị loại khỏi báo cáo mặc định",
+				"count":    count,
+				"amount":   summary["excluded_unposted_total"],
+			})
+		}
+	}
+	return warnings
+}
+
+func taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter string) string {
+	return fmt.Sprintf(`
+		WITH tax_rows AS (
+			SELECT
+				'input'::text AS direction,
+				ii.id::text AS id,
+				ii.project_id::text AS project_id,
+				p.name AS project_name,
+				ii.invoice_number,
+				COALESCE(ii.invoice_symbol, '') AS invoice_symbol,
+				ii.invoice_date,
+				ii.vendor_name AS counterparty_name,
+				COALESCE(ii.vendor_tax_code, '') AS tax_code,
+				ii.amount_before_vat,
+				ii.vat_amount,
+				ii.total_amount,
+				ii.currency,
+				ii.status,
+				(ii.status='verified') AS posted,
+				'payable'::text AS source_type,
+				ii.payable_id::text AS source_id,
+				COALESCE(payable.payable_code, '') AS source_code,
+				'procurement_request'::text AS secondary_source_type,
+				ii.procurement_request_id::text AS secondary_source_id,
+				COALESCE(procurement.request_code, '') AS secondary_source_code,
+				ii.document_id::text AS document_id,
+				COALESCE(doc.name, '') AS document_name,
+				(COALESCE(ii.vendor_tax_code, '') = '') AS missing_tax_code,
+				(ABS((COALESCE(ii.amount_before_vat, 0) + COALESCE(ii.vat_amount, 0)) - COALESCE(ii.total_amount, 0)) > 1) AS vat_math_mismatch,
+				ii.created_at
+			FROM input_invoices ii
+			JOIN projects p ON p.id=ii.project_id
+			LEFT JOIN payables payable ON payable.id=ii.payable_id
+			LEFT JOIN procurement_requests procurement ON procurement.id=ii.procurement_request_id
+			LEFT JOIN documents doc ON doc.id=ii.document_id
+			WHERE ii.status <> 'deleted'
+			  AND p.status <> 'cancelled'
+			  AND %s
+			  %s
+			  %s
+			UNION ALL
+			SELECT
+				'output'::text AS direction,
+				oi.id::text AS id,
+				oi.project_id::text AS project_id,
+				p.name AS project_name,
+				oi.invoice_number,
+				COALESCE(oi.invoice_symbol, '') AS invoice_symbol,
+				oi.invoice_date,
+				oi.client_name AS counterparty_name,
+				COALESCE(oi.client_tax_code, '') AS tax_code,
+				oi.amount_before_vat,
+				oi.vat_amount,
+				oi.total_amount,
+				oi.currency,
+				oi.status,
+				(oi.status='issued') AS posted,
+				'receivable'::text AS source_type,
+				oi.receivable_id::text AS source_id,
+				COALESCE(receivable.receivable_code, '') AS source_code,
+				'payment'::text AS secondary_source_type,
+				oi.payment_id::text AS secondary_source_id,
+				COALESCE(payment.payment_code, '') AS secondary_source_code,
+				oi.document_id::text AS document_id,
+				COALESCE(doc.name, '') AS document_name,
+				(COALESCE(oi.client_tax_code, '') = '') AS missing_tax_code,
+				(ABS((COALESCE(oi.amount_before_vat, 0) + COALESCE(oi.vat_amount, 0)) - COALESCE(oi.total_amount, 0)) > 1) AS vat_math_mismatch,
+				oi.created_at
+			FROM output_invoices oi
+			JOIN projects p ON p.id=oi.project_id
+			LEFT JOIN receivables receivable ON receivable.id=oi.receivable_id
+			LEFT JOIN payments payment ON payment.id=oi.payment_id
+			LEFT JOIN documents doc ON doc.id=oi.document_id
+			WHERE oi.status <> 'deleted'
+			  AND p.status <> 'cancelled'
+			  AND %s
+			  %s
+			  %s
+		)
+	`, scopeSQL, projectFilter, inputDateFilter, scopeSQL, projectFilter, outputDateFilter)
+}
+
+func taxSourceFilter(source string) string {
+	switch source {
+	case "input":
+		return " AND direction='input'"
+	case "output":
+		return " AND direction='output'"
+	default:
+		return ""
+	}
+}
+
+func taxStatusFilter(status string) string {
+	if status == "posted" {
+		return " AND posted"
+	}
+	return ""
+}
+
+func taxProjectFilter(args *[]any, projectID string) string {
+	projectID = cleanID(projectID)
+	if projectID == "" {
+		return ""
+	}
+	*args = append(*args, projectID)
+	return fmt.Sprintf(" AND p.id=$%d::uuid", len(*args))
+}
+
+func taxPeriodExpr(groupBy string) string {
+	if groupBy == "quarter" {
+		return "date_trunc('quarter', invoice_date)::date"
+	}
+	return "date_trunc('month', invoice_date)::date"
+}
+
+func profitRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter string) string {
+	directExpr := `
+		ii.procurement_request_id IS NOT NULL
+		OR lower(COALESCE(payable.source_type, '')) IN ('procurement','boq','boq_item','work_item','acceptance','incoming_acceptance','outgoing_acceptance','operation','rework')
+		OR lower(COALESCE(payable.vendor_type, '')) IN ('supplier','subcontractor')
+	`
+	return fmt.Sprintf(`
+		WITH input_rows AS (
+			SELECT
+				ii.id::text AS id,
+				ii.project_id::text AS project_id,
+				p.name AS project_name,
+				ii.invoice_number,
+				COALESCE(ii.invoice_symbol, '') AS invoice_symbol,
+				ii.invoice_date,
+				ii.vendor_name AS counterparty_name,
+				COALESCE(ii.vendor_tax_code, '') AS tax_code,
+				ii.amount_before_vat,
+				ii.vat_amount,
+				ii.total_amount,
+				ii.currency,
+				ii.status,
+				(ii.status='verified') AS posted,
+				'payable'::text AS source_type,
+				ii.payable_id::text AS source_id,
+				COALESCE(payable.payable_code, '') AS source_code,
+				'procurement_request'::text AS secondary_source_type,
+				ii.procurement_request_id::text AS secondary_source_id,
+				COALESCE(procurement.request_code, '') AS secondary_source_code,
+				ii.document_id::text AS document_id,
+				COALESCE(doc.name, '') AS document_name,
+				(%s) AS direct_cost,
+				CASE
+					WHEN ii.procurement_request_id IS NOT NULL OR lower(COALESCE(payable.source_type, '')) IN ('procurement','boq','boq_item') THEN 'Procurement / BOQ'
+					WHEN lower(COALESCE(payable.vendor_type, ''))='subcontractor' THEN 'Thầu phụ'
+					WHEN lower(COALESCE(payable.vendor_type, ''))='supplier' THEN 'Nhà cung cấp'
+					WHEN COALESCE(payable.source_type, '') <> '' THEN 'Source khác'
+					ELSE 'Chi phí gián tiếp'
+				END AS cost_group,
+				CASE
+					WHEN ii.procurement_request_id IS NOT NULL THEN 'linked_procurement_invoice'
+					WHEN lower(COALESCE(payable.source_type, '')) IN ('procurement','boq','boq_item','work_item','acceptance','incoming_acceptance','outgoing_acceptance','operation','rework') THEN 'payable_source_direct'
+					WHEN lower(COALESCE(payable.vendor_type, '')) IN ('supplier','subcontractor') THEN 'vendor_type_direct'
+					WHEN COALESCE(payable.source_type, '') <> '' THEN 'payable_source_indirect'
+					ELSE 'indirect_fallback'
+				END AS classification_reason,
+				ii.created_at
+			FROM input_invoices ii
+			JOIN projects p ON p.id=ii.project_id
+			LEFT JOIN payables payable ON payable.id=ii.payable_id
+			LEFT JOIN procurement_requests procurement ON procurement.id=ii.procurement_request_id
+			LEFT JOIN documents doc ON doc.id=ii.document_id
+			WHERE ii.status <> 'deleted'
+			  AND p.status <> 'cancelled'
+			  AND %s
+			  %s
+			  %s
+		),
+		output_rows AS (
+			SELECT
+				oi.id::text AS id,
+				oi.project_id::text AS project_id,
+				p.name AS project_name,
+				oi.invoice_number,
+				COALESCE(oi.invoice_symbol, '') AS invoice_symbol,
+				oi.invoice_date,
+				oi.client_name AS counterparty_name,
+				COALESCE(oi.client_tax_code, '') AS tax_code,
+				oi.amount_before_vat,
+				oi.vat_amount,
+				oi.total_amount,
+				oi.currency,
+				oi.status,
+				(oi.status='issued') AS posted,
+				'receivable'::text AS source_type,
+				oi.receivable_id::text AS source_id,
+				COALESCE(receivable.receivable_code, '') AS source_code,
+				'payment'::text AS secondary_source_type,
+				oi.payment_id::text AS secondary_source_id,
+				COALESCE(payment.payment_code, '') AS secondary_source_code,
+				oi.document_id::text AS document_id,
+				COALESCE(doc.name, '') AS document_name,
+				oi.created_at
+			FROM output_invoices oi
+			JOIN projects p ON p.id=oi.project_id
+			LEFT JOIN receivables receivable ON receivable.id=oi.receivable_id
+			LEFT JOIN payments payment ON payment.id=oi.payment_id
+			LEFT JOIN documents doc ON doc.id=oi.document_id
+			WHERE oi.status <> 'deleted'
+			  AND p.status <> 'cancelled'
+			  AND %s
+			  %s
+			  %s
+		),
+		profit_rows AS (
+			SELECT
+				'revenue'::text AS direction,
+				'revenue'::text AS cost_type,
+				'Revenue'::text AS cost_group,
+				'issued_output_invoice'::text AS classification_reason,
+				id,
+				project_id,
+				project_name,
+				invoice_number,
+				invoice_symbol,
+				invoice_date,
+				counterparty_name,
+				tax_code,
+				amount_before_vat,
+				vat_amount,
+				total_amount,
+				amount_before_vat AS revenue_amount,
+				0::numeric AS direct_cost_amount,
+				0::numeric AS indirect_cost_amount,
+				currency,
+				status,
+				posted,
+				source_type,
+				source_id,
+				source_code,
+				secondary_source_type,
+				secondary_source_id,
+				secondary_source_code,
+				document_id,
+				document_name,
+				false AS unclassified_cost,
+				created_at
+			FROM output_rows
+			UNION ALL
+			SELECT
+				'cost'::text AS direction,
+				CASE WHEN direct_cost THEN 'direct' ELSE 'indirect' END AS cost_type,
+				cost_group,
+				classification_reason,
+				id,
+				project_id,
+				project_name,
+				invoice_number,
+				invoice_symbol,
+				invoice_date,
+				counterparty_name,
+				tax_code,
+				amount_before_vat,
+				vat_amount,
+				total_amount,
+				0::numeric AS revenue_amount,
+				CASE WHEN direct_cost THEN amount_before_vat ELSE 0 END AS direct_cost_amount,
+				CASE WHEN direct_cost THEN 0 ELSE amount_before_vat END AS indirect_cost_amount,
+				currency,
+				status,
+				posted,
+				source_type,
+				source_id,
+				source_code,
+				secondary_source_type,
+				secondary_source_id,
+				secondary_source_code,
+				document_id,
+				document_name,
+				NOT direct_cost AS unclassified_cost,
+				created_at
+			FROM input_rows
+		)
+	`, directExpr, scopeSQL, projectFilter, inputDateFilter, scopeSQL, projectFilter, outputDateFilter)
+}
+
+func profitStatusFilter(status string) string {
+	if status == "posted" {
+		return " AND posted"
+	}
+	return ""
+}
+
+func profitProjectFilter(args *[]any, projectID string) string {
+	projectID = cleanID(projectID)
+	if projectID == "" {
+		return ""
+	}
+	*args = append(*args, projectID)
+	return fmt.Sprintf(" AND p.id=$%d::uuid", len(*args))
+}
+
+func profitPeriodExpr(groupBy string) string {
+	if groupBy == "quarter" {
+		return "date_trunc('quarter', invoice_date)::date"
+	}
+	return "date_trunc('month', invoice_date)::date"
+}
+
+func cashflowRowsCTE(scopeSQL, projectFilter, dateFilter, statusFilter string) string {
+	return fmt.Sprintf(`
+		WITH classified AS (
+			SELECT
+				pay.*,
+				p.name AS project_name,
+				COALESCE(created.full_name, '') AS created_by_name,
+				COALESCE(approved.full_name, '') AS approved_by_name,
+				%s AS occurred_at,
+				CASE
+					WHEN pay.payment_type IN ('client_receipt','inbound') OR (pay.payment_type='advance' AND pay.target_type='receivable') THEN 'inflow'
+					WHEN pay.payment_type IN ('supplier_payment','subcontractor_payment','outbound') OR (pay.payment_type='advance' AND pay.target_type='payable') THEN 'outflow'
+					WHEN pay.payment_type='advance_settlement' THEN 'non_cash'
+					ELSE 'unclassified'
+				END AS direction,
+				CASE
+					WHEN pay.payment_type='client_receipt' THEN 'Thu khách hàng'
+					WHEN pay.payment_type='inbound' THEN 'Thu khác'
+					WHEN pay.payment_type='advance' AND pay.target_type='receivable' THEN 'Thu ứng trước khách hàng'
+					WHEN pay.payment_type='supplier_payment' THEN 'Thanh toán nhà cung cấp'
+					WHEN pay.payment_type='subcontractor_payment' THEN 'Thanh toán thầu phụ'
+					WHEN pay.payment_type='outbound' THEN 'Phiếu chi'
+					WHEN pay.payment_type='advance' AND pay.target_type='payable' THEN 'Chi ứng trước'
+					WHEN pay.payment_type='advance_settlement' THEN 'Quyết toán tạm ứng'
+					ELSE 'Unclassified'
+				END AS category
+			FROM payments pay
+			JOIN projects p ON p.id=pay.project_id
+			LEFT JOIN users created ON created.id=pay.created_by
+			LEFT JOIN users approved ON approved.id=pay.approved_by
+			WHERE pay.status <> 'cancelled'
+			  AND p.status <> 'cancelled'
+			  AND %s
+			  %s
+			  %s
+			  %s
+		),
+		cashflow_rows AS (
+			SELECT
+				classified.*,
+				CASE WHEN direction='inflow' THEN COALESCE(amount,0) ELSE 0 END AS inflow_amount,
+				CASE WHEN direction='outflow' THEN COALESCE(amount,0) ELSE 0 END AS outflow_amount,
+				CASE
+					WHEN direction='inflow' THEN COALESCE(amount,0)
+					WHEN direction='outflow' THEN -COALESCE(amount,0)
+					ELSE 0
+				END AS net_amount
+			FROM classified
+		)
+	`, cashflowOccurredAtSQL(), scopeSQL, projectFilter, dateFilter, statusFilter)
+}
+
+func cashflowOccurredAtSQL() string {
+	return "COALESCE(pay.paid_at, pay.updated_at, pay.created_at)"
+}
+
+func cashflowStatusFilter(status string) string {
+	if status == "approved" {
+		return " AND pay.status='approved'"
+	}
+	return ""
+}
+
+func cashflowProjectFilter(args *[]any, projectID string) string {
+	projectID = cleanID(projectID)
+	if projectID == "" {
+		return ""
+	}
+	*args = append(*args, projectID)
+	return fmt.Sprintf(" AND p.id=$%d::uuid", len(*args))
+}
+
+func cashflowPeriodExpr(groupBy string) string {
+	switch groupBy {
+	case "week":
+		return "date_trunc('week', occurred_at)::date"
+	case "month":
+		return "date_trunc('month', occurred_at)::date"
+	default:
+		return "date_trunc('day', occurred_at)::date"
 	}
 }
 

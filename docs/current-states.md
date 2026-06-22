@@ -75,11 +75,11 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 | PDF hoá đơn đầu ra | Done | Protected output invoice PDF upload/download linked to receivable, optional client receipt payment, and document metadata. |
 | Thanh toán kỳ/ứng trước đầu vào | Done | Durable input payment schedules, advance requests, partial payment allocations, advance settlement, and payable reconciliation implemented. |
 | Thanh toán kỳ/ứng trước đầu ra | Done | Durable output billing schedules, client advance receipts, partial receipt allocations, advance settlement, issued invoice links, and receivable reconciliation implemented. |
-| Công nợ đầu vào | Partial | Payable aging, vendor ledger, invoice/payment reconciliation. |
-| Công nợ đầu ra | Partial | Receivable aging, client ledger, invoice/receipt reconciliation. |
-| Dòng tiền thu/chi | Partial | Time-series cashflow by project/date/category with export. |
-| Báo cáo thuế | Missing | Tax/VAT ledger by invoice period and source document. |
-| Báo cáo lợi nhuận | Missing | Project P&L with revenue, direct cost, indirect cost, gross/net margin. |
+| Công nợ đầu vào | Done | Payable aging, vendor ledger, invoice/payment reconciliation, project-scoped AP list, and reconciliation warnings implemented. |
+| Công nợ đầu ra | Done | Receivable aging, client ledger, invoice/receipt reconciliation, project-scoped AR list, and reconciliation warnings implemented. |
+| Dòng tiền thu/chi | Done | Cash-basis inflow/outflow time series by project/date/category with payment ledger and CSV export. |
+| Báo cáo thuế | Done | Tax/VAT ledger by invoice period, source document, counterparty tax code, warning checks, and CSV export. |
+| Báo cáo lợi nhuận | Done | Project P&L with invoice-based revenue, direct/indirect cost, gross/net margin, warning checks, and CSV export. |
 
 ## Production-Grade Implementation Checklist
 
@@ -419,6 +419,38 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - Added `OutputBillingPlanPanel` inside receivable detail with schedule, client advance, receipt, and settlement tables/dialogs, inline validation/warning toasts, status chips, issued-invoice linking, and refreshed receivable/payment query invalidation.
 - Removed the direct receivable-list `Receive` action so users create partial receipts from the detail dialog instead of one-click full settlement.
 - Added backend regression coverage for output schedule approval, client advance approval, settlement, partial receipt allocation, advance receipt cash recording, over-receipt validation, and audit logging.
+- Implemented Accounting/Debt Phase 8C for production-grade input debt aging and reconciliation.
+- Added migration `backend/migrations/V31__payable_aging_reconciliation_indexes.sql` with payable aging and reconciliation indexes.
+- Extended `/payables` with optional `project_id`, due/effective due date, aging bucket, overdue days, advance/payment aggregates, and reconciliation status while keeping project access filtering at API level.
+- Added authenticated `/payables/:id/reconciliation` snapshot with payable summary, warning checks, and vendor ledger rows from payable, input invoices, approved advances, payment allocations, and advance settlement evidence.
+- Added `PayableReconciliationPanel` inside payable detail with reconciliation metric tiles, warning states, and vendor ledger table.
+- Upgraded `DebtPage` payable list with project-scoped AP query, aging summary cards, due/aging/reconciliation columns, and payable due date capture on create.
+- Added backend regression coverage for project-scoped payable aging list output and payable reconciliation snapshot warnings/ledger when DB-backed tests are enabled.
+- Implemented Accounting/Debt Phase 8D for production-grade output debt aging and reconciliation.
+- Added migration `backend/migrations/V32__receivable_aging_reconciliation_indexes.sql` with receivable aging, receipt allocation, and client advance indexes.
+- Extended `/receivables` with optional `project_id`, due/effective due date, aging bucket, overdue days, issued invoice totals, receipt/advance aggregates, and reconciliation status while keeping project access filtering at API level.
+- Added authenticated `/receivables/:id/reconciliation` snapshot with receivable summary, warning checks, and client ledger rows from receivable, output invoices, approved client advances, approved receipt allocations, and advance settlement evidence.
+- Added `ReceivableReconciliationPanel` inside receivable detail with reconciliation metric tiles, warning states, and client ledger table.
+- Upgraded `DebtPage` receivable list with project-scoped AR query, aging summary cards, due/aging/reconciliation columns, and receivable due date capture on create.
+- Added backend regression coverage for project-scoped receivable aging list output and receivable reconciliation snapshot warnings/ledger when DB-backed tests are enabled.
+- Implemented Accounting/Cashflow Phase 9A for production-grade cash-basis thu/chi reporting.
+- Added migration `backend/migrations/V33__cashflow_report_indexes.sql` with a project/status/occurred-at payment index for cashflow queries.
+- Added authenticated `/reports/cashflow` JSON report with date range, project, group-by, and status filters, including opening balance, inflow, outflow, net flow, closing balance, pending payments, time-series, category totals, and ledger rows.
+- Added authenticated `/reports/cashflow/export` CSV export from the same report source.
+- Added `CashflowPanel` inside Accounting with filters, summary cards, time-series table, category table, ledger, reload, and CSV export.
+- Added backend regression coverage for scoped cashflow summary calculations and CSV serialization.
+- Implemented Reporting/Tax Phase 9B for production-grade VAT reporting from input/output invoice source documents.
+- Added migration `backend/migrations/V34__tax_report_indexes.sql` with invoice period/status/tax-code indexes for tax report queries.
+- Added authenticated `/reports/tax` JSON report with date range, project, group-by, source, and posted/all filters, including VAT summary, period rows, counterparty rows, ledger rows, and warnings.
+- Added authenticated `/reports/tax/export` CSV export from the same tax ledger source.
+- Added `TaxReportPanel` inside Reports with project/date/source/status filters, summary cards, warning states, period table, MST/counterparty table, ledger, reload, and CSV export.
+- Added backend regression coverage for tax CSV serialization and scoped posted VAT summary calculations when DB-backed tests are enabled.
+- Implemented Reporting/P&L Phase 9C for production-grade invoice-based project profit reporting.
+- Added migration `backend/migrations/V35__profit_report_indexes.sql` with invoice and payable classification indexes for P&L report queries.
+- Added authenticated `/reports/profit` JSON report with date range, project, group-by, and posted/all filters, including P&L summary, period rows, project rows, cost breakdown, ledger rows, and warnings.
+- Added authenticated `/reports/profit/export` CSV export from the same P&L ledger source.
+- Added `ProfitReportPanel` inside Reports with project/date/status filters, summary cards, warning states, project table, period table, cost breakdown, ledger, reload, and CSV export.
+- Added backend regression coverage for P&L CSV serialization and scoped posted profit summary calculations when DB-backed tests are enabled.
 
 ## Validation Status
 
@@ -533,5 +565,30 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - `cd frontend && npm run build` passed after Accounting/Debt Phase 8B; Vite chunk-size warning remains.
 - `git diff --check` passed after Accounting/Debt Phase 8B.
 - Custom migration runner was not run after Accounting/Debt Phase 8B; applying `V30` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/project_operations_integration_test.go backend/internal/core/repository_domain.go backend/internal/core/routes.go backend/internal/core/service.go` passed after Accounting/Debt Phase 8C.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Accounting/Debt Phase 8C; DB-backed payable reconciliation integration coverage remains gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Accounting/Debt Phase 8C; Vite chunk-size warning remains.
+- `git diff --check` passed after Accounting/Debt Phase 8C.
+- Custom migration runner was not run after Accounting/Debt Phase 8C; applying `V31` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/project_operations_integration_test.go backend/internal/core/repository_domain.go backend/internal/core/routes.go backend/internal/core/service.go` passed after Accounting/Debt Phase 8D.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Accounting/Debt Phase 8D; DB-backed receivable reconciliation integration coverage remains gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Accounting/Debt Phase 8D; Vite chunk-size warning remains.
+- `git diff --check` passed after Accounting/Debt Phase 8D.
+- Custom migration runner was not run after Accounting/Debt Phase 8D; applying `V32` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/project_operations_integration_test.go backend/internal/core/repository_domain.go backend/internal/core/routes.go backend/internal/core/service.go backend/internal/core/types.go` passed after Accounting/Cashflow Phase 9A.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Accounting/Cashflow Phase 9A; DB-backed cashflow integration coverage remains gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Accounting/Cashflow Phase 9A; Vite chunk-size warning remains.
+- `git diff --check` passed after Accounting/Cashflow Phase 9A.
+- Custom migration runner was not run after Accounting/Cashflow Phase 9A; applying `V33` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/project_operations_integration_test.go backend/internal/core/repository_domain.go backend/internal/core/routes.go backend/internal/core/service.go backend/internal/core/types.go` passed after Reporting/Tax Phase 9B.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Reporting/Tax Phase 9B; DB-backed tax report integration coverage remains gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Reporting/Tax Phase 9B; Vite chunk-size warning remains.
+- `git diff --check` passed after Reporting/Tax Phase 9B.
+- Custom migration runner was not run after Reporting/Tax Phase 9B; applying `V34` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/project_operations_integration_test.go backend/internal/core/repository_domain.go backend/internal/core/routes.go backend/internal/core/service.go backend/internal/core/types.go` passed after Reporting/P&L Phase 9C.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Reporting/P&L Phase 9C; DB-backed P&L report integration coverage remains gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Reporting/P&L Phase 9C; Vite chunk-size warning remains.
+- `git diff --check` passed after Reporting/P&L Phase 9C.
+- Custom migration runner was not run after Reporting/P&L Phase 9C; applying `V35` still requires a reachable Consflow PostgreSQL role/database.
 - Browser verification not run, per repo rule unless explicitly requested.
 - No backend/API/migration changes were needed for the Pipeline Builder multi-role UI, Shared UI 2A, or Shared UI 2B batches.

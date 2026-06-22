@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { get } from '../../lib/api/client';
 import type { Project } from '../../lib/types/domain';
 
-export function ProjectSelector({ value, onChange }: { value?: string; onChange: (id: string) => void }) {
+export function ProjectSelector({ value, onChange, placeholder = 'Chọn công trình' }: { value?: string; onChange: (id: string) => void; placeholder?: string }) {
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Project[]>('/projects') });
   return (
     <select
@@ -10,7 +10,7 @@ export function ProjectSelector({ value, onChange }: { value?: string; onChange:
       value={value ?? ''}
       onChange={(event) => onChange(event.target.value)}
     >
-      <option value="">Chọn công trình</option>
+      <option value="">{placeholder}</option>
       {projects.data?.map((project) => (
         <option key={project.id} value={project.id}>
           {project.name}

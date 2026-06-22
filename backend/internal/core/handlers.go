@@ -1,6 +1,8 @@
 package core
 
 import (
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -1481,12 +1483,24 @@ func (h *Handler) ApproveBudget(c *fiber.Ctx) error {
 	return h.setStatus(c, "accounting_budgets", "approved", []string{"accounting.budget_approve"})
 }
 func (h *Handler) ListPayables(c *fiber.Ctx) error {
-	if err := h.requirePermission(c, []string{"accounting.view", "accounting.payable_view"}); err != nil {
+	permissions := []string{"accounting.view", "accounting.payable_view"}
+	if err := h.requirePermission(c, permissions); err != nil {
 		return err
 	}
 	scopeSQL, scopeArgs, err := h.projectAccessFilter(c, "p", 1)
 	if err != nil {
 		return err
+	}
+	projectID := cleanID(c.Query("project_id"))
+	if projectID != "" {
+		if !validActivityUUID(projectID) {
+			return validationError("project_id không hợp lệ", Record{"project_id": projectID})
+		}
+		if err := h.requireProjectPermission(c, projectID, permissions); err != nil {
+			return err
+		}
+		scopeSQL = fmt.Sprintf("(%s) AND pay.project_id=$%d::uuid", scopeSQL, len(scopeArgs)+1)
+		scopeArgs = append(scopeArgs, projectID)
 	}
 	return h.list(c, fmt.Sprintf(`
 		SELECT
@@ -1500,10 +1514,50 @@ func (h *Handler) ListPayables(c *fiber.Ctx) error {
 			COALESCE(sch.scheduled_remaining, 0) AS scheduled_remaining,
 			COALESCE(adv.advance_request_count, 0) AS advance_request_count,
 			COALESCE(adv.advance_requested_total, 0) AS advance_requested_total,
+			COALESCE(adv.advance_approved_total, 0) AS advance_approved_total,
+			COALESCE(adv.advance_paid_total, 0) AS advance_paid_total,
 			COALESCE(adv.advance_settled_total, 0) AS advance_settled_total,
+			COALESCE(payments.approved_payment_total, 0) AS approved_payment_total,
 			latest.latest_invoice_status,
 			latest.latest_invoice_number,
-			latest.latest_invoice_date
+			latest.latest_invoice_date,
+			COALESCE(pay.due_date, sch.next_due_date, latest.latest_invoice_date) AS effective_due_date,
+			CASE
+				WHEN COALESCE(pay.remaining_amount,0) <= 0 THEN 0
+				WHEN COALESCE(pay.due_date, sch.next_due_date, latest.latest_invoice_date) IS NULL THEN 0
+				WHEN COALESCE(pay.due_date, sch.next_due_date, latest.latest_invoice_date) >= CURRENT_DATE THEN 0
+				ELSE CURRENT_DATE - COALESCE(pay.due_date, sch.next_due_date, latest.latest_invoice_date)
+			END AS overdue_days,
+			CASE
+				WHEN COALESCE(pay.remaining_amount,0) <= 0 THEN 'settled'
+				WHEN COALESCE(pay.due_date, sch.next_due_date, latest.latest_invoice_date) IS NULL THEN 'no_due_date'
+				WHEN COALESCE(pay.due_date, sch.next_due_date, latest.latest_invoice_date) >= CURRENT_DATE THEN 'not_due'
+				WHEN CURRENT_DATE - COALESCE(pay.due_date, sch.next_due_date, latest.latest_invoice_date) <= 30 THEN '1_30'
+				WHEN CURRENT_DATE - COALESCE(pay.due_date, sch.next_due_date, latest.latest_invoice_date) <= 60 THEN '31_60'
+				WHEN CURRENT_DATE - COALESCE(pay.due_date, sch.next_due_date, latest.latest_invoice_date) <= 90 THEN '61_90'
+				ELSE '90_plus'
+			END AS aging_bucket,
+			(
+				CASE WHEN COALESCE(pay.remaining_amount,0) > 0 AND COALESCE(pay.due_date, sch.next_due_date, latest.latest_invoice_date) < CURRENT_DATE THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(inv.verified_invoice_total,0) > COALESCE(pay.gross_amount,0) + 1 THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(pay.paid_amount,0) > COALESCE(inv.verified_invoice_total,0) + 1 THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(pay.remaining_amount,0) > 0 AND COALESCE(sch.schedule_count,0) = 0 THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(sch.scheduled_remaining,0) > COALESCE(pay.remaining_amount,0) + 1 THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(adv.advance_approved_total,0) > COALESCE(adv.advance_paid_total,0) + 1 THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(adv.advance_paid_total,0) > COALESCE(adv.advance_settled_total,0) + 1 THEN 1 ELSE 0 END
+			) AS reconciliation_issue_count,
+			CASE
+				WHEN (
+					CASE WHEN COALESCE(pay.remaining_amount,0) > 0 AND COALESCE(pay.due_date, sch.next_due_date, latest.latest_invoice_date) < CURRENT_DATE THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(inv.verified_invoice_total,0) > COALESCE(pay.gross_amount,0) + 1 THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(pay.paid_amount,0) > COALESCE(inv.verified_invoice_total,0) + 1 THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(pay.remaining_amount,0) > 0 AND COALESCE(sch.schedule_count,0) = 0 THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(sch.scheduled_remaining,0) > COALESCE(pay.remaining_amount,0) + 1 THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(adv.advance_approved_total,0) > COALESCE(adv.advance_paid_total,0) + 1 THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(adv.advance_paid_total,0) > COALESCE(adv.advance_settled_total,0) + 1 THEN 1 ELSE 0 END
+				) > 0 THEN 'needs_review'
+				ELSE 'ok'
+			END AS reconciliation_status
 		FROM payables pay
 		JOIN projects p ON p.id=pay.project_id
 		LEFT JOIN (
@@ -1520,7 +1574,8 @@ func (h *Handler) ListPayables(c *fiber.Ctx) error {
 				payable_id,
 				COUNT(*) FILTER (WHERE status NOT IN ('deleted','cancelled')) AS schedule_count,
 				COALESCE(SUM(planned_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS scheduled_total,
-				COALESCE(SUM(remaining_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS scheduled_remaining
+				COALESCE(SUM(remaining_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS scheduled_remaining,
+				MIN(due_date) FILTER (WHERE status IN ('approved','partially_paid','overdue') AND remaining_amount > 0) AS next_due_date
 			FROM payable_payment_schedules
 			GROUP BY payable_id
 		) sch ON sch.payable_id=pay.id
@@ -1529,11 +1584,21 @@ func (h *Handler) ListPayables(c *fiber.Ctx) error {
 				payable_id,
 				COUNT(*) FILTER (WHERE status NOT IN ('deleted','cancelled')) AS advance_request_count,
 				COALESCE(SUM(amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS advance_requested_total,
+				COALESCE(SUM(amount) FILTER (WHERE status IN ('approved','partially_settled','settled')), 0) AS advance_approved_total,
+				COALESCE(SUM(paid_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS advance_paid_total,
 				COALESCE(SUM(settled_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS advance_settled_total
 			FROM advance_requests
 			WHERE payable_id IS NOT NULL
 			GROUP BY payable_id
 		) adv ON adv.payable_id=pay.id
+		LEFT JOIN (
+			SELECT
+				pa.payable_id,
+				COALESCE(SUM(pa.amount) FILTER (WHERE pmt.status='approved' AND pa.allocation_type='payable_payment'), 0) AS approved_payment_total
+			FROM payment_allocations pa
+			JOIN payments pmt ON pmt.id=pa.payment_id
+			GROUP BY pa.payable_id
+		) payments ON payments.payable_id=pay.id
 		LEFT JOIN LATERAL (
 			SELECT status AS latest_invoice_status, invoice_number AS latest_invoice_number, invoice_date AS latest_invoice_date
 			FROM input_invoices ii
@@ -1691,6 +1756,14 @@ func (h *Handler) ListPayableInputInvoices(c *fiber.Ctx) error {
 	return response.OK(c, rows)
 }
 
+func (h *Handler) GetPayableReconciliation(c *fiber.Ctx) error {
+	data, err := h.service.PayableReconciliation(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, data)
+}
+
 func (h *Handler) ProjectInputInvoices(c *fiber.Ctx) error {
 	rows, err := h.service.ProjectInputInvoices(c.Context(), c.Params("id"), actorID(c))
 	if err != nil {
@@ -1794,11 +1867,56 @@ func (h *Handler) ListReceivables(c *fiber.Ctx) error {
 			COALESCE(sched.scheduled_total, 0) AS scheduled_total,
 			COALESCE(sched.scheduled_remaining, 0) AS scheduled_remaining,
 			COALESCE(adv.advance_receipt_count, 0) AS advance_receipt_count,
+			COALESCE(adv.advance_requested_total, 0) AS advance_requested_total,
+			COALESCE(adv.advance_approved_total, 0) AS advance_approved_total,
 			COALESCE(adv.advance_received_total, 0) AS advance_received_total,
 			COALESCE(adv.advance_settled_total, 0) AS advance_settled_total,
+			COALESCE(receipts.approved_receipt_total, 0) AS approved_receipt_total,
+			COALESCE(receipts.approved_advance_receipt_total, 0) AS approved_advance_receipt_total,
+			COALESCE(receipts.receipt_allocation_total, 0) AS receipt_allocation_total,
+			COALESCE(receipts.pending_receipt_count, 0) AS pending_receipt_count,
 			latest.latest_invoice_status,
 			latest.latest_invoice_number,
-			latest.latest_invoice_date
+			latest.latest_invoice_date,
+			COALESCE(rec.due_date, sched.next_due_date, latest.latest_invoice_date) AS effective_due_date,
+			CASE
+				WHEN COALESCE(rec.remaining_amount,0) <= 0 THEN 0
+				WHEN COALESCE(rec.due_date, sched.next_due_date, latest.latest_invoice_date) IS NULL THEN 0
+				WHEN COALESCE(rec.due_date, sched.next_due_date, latest.latest_invoice_date) >= CURRENT_DATE THEN 0
+				ELSE CURRENT_DATE - COALESCE(rec.due_date, sched.next_due_date, latest.latest_invoice_date)
+			END AS overdue_days,
+			CASE
+				WHEN COALESCE(rec.remaining_amount,0) <= 0 THEN 'settled'
+				WHEN COALESCE(rec.due_date, sched.next_due_date, latest.latest_invoice_date) IS NULL THEN 'no_due_date'
+				WHEN COALESCE(rec.due_date, sched.next_due_date, latest.latest_invoice_date) >= CURRENT_DATE THEN 'not_due'
+				WHEN CURRENT_DATE - COALESCE(rec.due_date, sched.next_due_date, latest.latest_invoice_date) <= 30 THEN '1_30'
+				WHEN CURRENT_DATE - COALESCE(rec.due_date, sched.next_due_date, latest.latest_invoice_date) <= 60 THEN '31_60'
+				WHEN CURRENT_DATE - COALESCE(rec.due_date, sched.next_due_date, latest.latest_invoice_date) <= 90 THEN '61_90'
+				ELSE '90_plus'
+			END AS aging_bucket,
+			(
+				CASE WHEN COALESCE(rec.remaining_amount,0) > 0 AND COALESCE(rec.due_date, sched.next_due_date, latest.latest_invoice_date) < CURRENT_DATE THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(inv.issued_invoice_total,0) > COALESCE(rec.gross_amount,0) + 1 THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(rec.received_amount,0) > COALESCE(inv.issued_invoice_total,0) + 1 THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(rec.remaining_amount,0) > 0 AND COALESCE(sched.schedule_count,0) = 0 THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(sched.scheduled_remaining,0) > COALESCE(rec.remaining_amount,0) + 1 THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(adv.advance_approved_total,0) > COALESCE(adv.advance_received_total,0) + 1 THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(adv.advance_received_total,0) > COALESCE(adv.advance_settled_total,0) + 1 THEN 1 ELSE 0 END
+				+ CASE WHEN COALESCE(receipts.pending_receipt_count,0) > 0 THEN 1 ELSE 0 END
+			) AS reconciliation_issue_count,
+			CASE
+				WHEN (
+					CASE WHEN COALESCE(rec.remaining_amount,0) > 0 AND COALESCE(rec.due_date, sched.next_due_date, latest.latest_invoice_date) < CURRENT_DATE THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(inv.issued_invoice_total,0) > COALESCE(rec.gross_amount,0) + 1 THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(rec.received_amount,0) > COALESCE(inv.issued_invoice_total,0) + 1 THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(rec.remaining_amount,0) > 0 AND COALESCE(sched.schedule_count,0) = 0 THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(sched.scheduled_remaining,0) > COALESCE(rec.remaining_amount,0) + 1 THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(adv.advance_approved_total,0) > COALESCE(adv.advance_received_total,0) + 1 THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(adv.advance_received_total,0) > COALESCE(adv.advance_settled_total,0) + 1 THEN 1 ELSE 0 END
+					+ CASE WHEN COALESCE(receipts.pending_receipt_count,0) > 0 THEN 1 ELSE 0 END
+				) > 0 THEN 'needs_review'
+				ELSE 'ok'
+			END AS reconciliation_status
 		FROM receivables rec
 		JOIN projects p ON p.id=rec.project_id
 		LEFT JOIN (
@@ -1822,7 +1940,8 @@ func (h *Handler) ListReceivables(c *fiber.Ctx) error {
 				receivable_id,
 				COUNT(*) FILTER (WHERE status NOT IN ('cancelled','deleted')) AS schedule_count,
 				COALESCE(SUM(planned_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS scheduled_total,
-				COALESCE(SUM(remaining_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS scheduled_remaining
+				COALESCE(SUM(remaining_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS scheduled_remaining,
+				MIN(due_date) FILTER (WHERE status IN ('approved','partially_received','overdue') AND remaining_amount > 0) AS next_due_date
 			FROM receivable_payment_schedules
 			GROUP BY receivable_id
 		) sched ON sched.receivable_id=rec.id
@@ -1830,11 +1949,24 @@ func (h *Handler) ListReceivables(c *fiber.Ctx) error {
 			SELECT
 				receivable_id,
 				COUNT(*) FILTER (WHERE status NOT IN ('cancelled','deleted')) AS advance_receipt_count,
-				COALESCE(SUM(amount) FILTER (WHERE status IN ('approved','partially_received','received','partially_settled','settled')), 0) AS advance_received_total,
+				COALESCE(SUM(amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS advance_requested_total,
+				COALESCE(SUM(amount) FILTER (WHERE status IN ('approved','partially_received','received','partially_settled','settled')), 0) AS advance_approved_total,
+				COALESCE(SUM(received_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS advance_received_total,
 				COALESCE(SUM(settled_amount) FILTER (WHERE status NOT IN ('cancelled','deleted')), 0) AS advance_settled_total
 			FROM client_advance_receipts
 			GROUP BY receivable_id
 		) adv ON adv.receivable_id=rec.id
+		LEFT JOIN (
+			SELECT
+				ra.receivable_id,
+				COALESCE(SUM(ra.amount) FILTER (WHERE pmt.status='approved' AND ra.allocation_type='receivable_receipt'), 0) AS approved_receipt_total,
+				COALESCE(SUM(ra.amount) FILTER (WHERE pmt.status='approved' AND ra.allocation_type='advance_receipt'), 0) AS approved_advance_receipt_total,
+				COALESCE(SUM(ra.amount) FILTER (WHERE pmt.status <> 'cancelled'), 0) AS receipt_allocation_total,
+				COUNT(*) FILTER (WHERE pmt.status NOT IN ('approved','cancelled')) AS pending_receipt_count
+			FROM receipt_allocations ra
+			JOIN payments pmt ON pmt.id=ra.payment_id
+			GROUP BY ra.receivable_id
+		) receipts ON receipts.receivable_id=rec.id
 		WHERE rec.status <> 'cancelled'
 		  AND p.status <> 'cancelled'
 		  AND %s
@@ -1977,6 +2109,14 @@ func (h *Handler) ListReceivableOutputInvoices(c *fiber.Ctx) error {
 		return err
 	}
 	return response.OK(c, rows)
+}
+
+func (h *Handler) GetReceivableReconciliation(c *fiber.Ctx) error {
+	data, err := h.service.ReceivableReconciliation(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, data)
 }
 
 func (h *Handler) ProjectOutputInvoices(c *fiber.Ctx) error {
@@ -2238,6 +2378,144 @@ func (h *Handler) Dashboard(c *fiber.Ctx) error {
 	}
 	return response.OK(c, data)
 }
+func (h *Handler) CashflowReport(c *fiber.Ctx) error {
+	permissions := []string{"report.finance.view", "accounting.view"}
+	if err := h.requirePermission(c, permissions); err != nil {
+		return err
+	}
+	req := cashflowReportRequest(c)
+	if req.ProjectID != "" {
+		if !validActivityUUID(req.ProjectID) {
+			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
+		}
+		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
+			return err
+		}
+	}
+	data, err := h.service.CashflowReport(c.Context(), req, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, data)
+}
+func (h *Handler) CashflowReportCSV(c *fiber.Ctx) error {
+	permissions := []string{"report.finance.view", "accounting.view"}
+	if err := h.requirePermission(c, permissions); err != nil {
+		return err
+	}
+	req := cashflowReportRequest(c)
+	if req.ProjectID != "" {
+		if !validActivityUUID(req.ProjectID) {
+			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
+		}
+		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
+			return err
+		}
+	}
+	data, err := h.service.CashflowReport(c.Context(), req, actorID(c))
+	if err != nil {
+		return err
+	}
+	payload, err := cashflowCSV(data)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, "text/csv; charset=utf-8")
+	c.Set(fiber.HeaderContentDisposition, `attachment; filename="cashflow.csv"`)
+	return c.Send(payload)
+}
+func (h *Handler) TaxReport(c *fiber.Ctx) error {
+	permissions := []string{"report.finance.view", "accounting.view"}
+	if err := h.requirePermission(c, permissions); err != nil {
+		return err
+	}
+	req := taxReportRequest(c)
+	if req.ProjectID != "" {
+		if !validActivityUUID(req.ProjectID) {
+			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
+		}
+		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
+			return err
+		}
+	}
+	data, err := h.service.TaxReport(c.Context(), req, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, data)
+}
+func (h *Handler) TaxReportCSV(c *fiber.Ctx) error {
+	permissions := []string{"report.finance.view", "accounting.view"}
+	if err := h.requirePermission(c, permissions); err != nil {
+		return err
+	}
+	req := taxReportRequest(c)
+	if req.ProjectID != "" {
+		if !validActivityUUID(req.ProjectID) {
+			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
+		}
+		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
+			return err
+		}
+	}
+	data, err := h.service.TaxReport(c.Context(), req, actorID(c))
+	if err != nil {
+		return err
+	}
+	payload, err := taxCSV(data)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, "text/csv; charset=utf-8")
+	c.Set(fiber.HeaderContentDisposition, `attachment; filename="tax-report.csv"`)
+	return c.Send(payload)
+}
+func (h *Handler) ProfitReport(c *fiber.Ctx) error {
+	permissions := []string{"report.finance.view", "accounting.view"}
+	if err := h.requirePermission(c, permissions); err != nil {
+		return err
+	}
+	req := profitReportRequest(c)
+	if req.ProjectID != "" {
+		if !validActivityUUID(req.ProjectID) {
+			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
+		}
+		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
+			return err
+		}
+	}
+	data, err := h.service.ProfitReport(c.Context(), req, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, data)
+}
+func (h *Handler) ProfitReportCSV(c *fiber.Ctx) error {
+	permissions := []string{"report.finance.view", "accounting.view"}
+	if err := h.requirePermission(c, permissions); err != nil {
+		return err
+	}
+	req := profitReportRequest(c)
+	if req.ProjectID != "" {
+		if !validActivityUUID(req.ProjectID) {
+			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
+		}
+		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
+			return err
+		}
+	}
+	data, err := h.service.ProfitReport(c.Context(), req, actorID(c))
+	if err != nil {
+		return err
+	}
+	payload, err := profitCSV(data)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, "text/csv; charset=utf-8")
+	c.Set(fiber.HeaderContentDisposition, `attachment; filename="profit-report.csv"`)
+	return c.Send(payload)
+}
 func (h *Handler) ProjectReport(c *fiber.Ctx) error     { return h.report(c, "projects") }
 func (h *Handler) WarehouseReport(c *fiber.Ctx) error   { return h.report(c, "warehouse") }
 func (h *Handler) ProcurementReport(c *fiber.Ctx) error { return h.report(c, "procurement") }
@@ -2256,6 +2534,138 @@ func (h *Handler) report(c *fiber.Ctx, kind string) error {
 		return err
 	}
 	return response.OK(c, rows)
+}
+
+func cashflowReportRequest(c *fiber.Ctx) CashflowReportRequest {
+	return CashflowReportRequest{
+		ProjectID: cleanID(c.Query("project_id")),
+		FromDate:  strings.TrimSpace(c.Query("from")),
+		ToDate:    strings.TrimSpace(c.Query("to")),
+		GroupBy:   strings.TrimSpace(c.Query("group_by")),
+		Status:    strings.TrimSpace(c.Query("status")),
+	}
+}
+
+func taxReportRequest(c *fiber.Ctx) TaxReportRequest {
+	return TaxReportRequest{
+		ProjectID: cleanID(c.Query("project_id")),
+		FromDate:  strings.TrimSpace(c.Query("from")),
+		ToDate:    strings.TrimSpace(c.Query("to")),
+		GroupBy:   strings.TrimSpace(c.Query("group_by")),
+		Source:    strings.TrimSpace(c.Query("source")),
+		Status:    strings.TrimSpace(c.Query("status")),
+	}
+}
+
+func profitReportRequest(c *fiber.Ctx) ProfitReportRequest {
+	return ProfitReportRequest{
+		ProjectID: cleanID(c.Query("project_id")),
+		FromDate:  strings.TrimSpace(c.Query("from")),
+		ToDate:    strings.TrimSpace(c.Query("to")),
+		GroupBy:   strings.TrimSpace(c.Query("group_by")),
+		Status:    strings.TrimSpace(c.Query("status")),
+	}
+}
+
+func cashflowCSV(data Record) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	if err := writer.Write([]string{"occurred_at", "payment_code", "project_name", "category", "direction", "payment_type", "payment_method", "status", "inflow_amount", "outflow_amount", "net_amount", "target_type"}); err != nil {
+		return nil, err
+	}
+	ledger, _ := data["ledger"].([]Record)
+	for _, row := range ledger {
+		if err := writer.Write([]string{
+			fmt.Sprint(row["occurred_at"]),
+			fmt.Sprint(row["payment_code"]),
+			fmt.Sprint(row["project_name"]),
+			fmt.Sprint(row["category"]),
+			fmt.Sprint(row["direction"]),
+			fmt.Sprint(row["payment_type"]),
+			fmt.Sprint(row["payment_method"]),
+			fmt.Sprint(row["status"]),
+			fmt.Sprint(row["inflow_amount"]),
+			fmt.Sprint(row["outflow_amount"]),
+			fmt.Sprint(row["net_amount"]),
+			fmt.Sprint(row["target_type"]),
+		}); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func taxCSV(data Record) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	if err := writer.Write([]string{"invoice_date", "invoice_number", "source", "project_name", "counterparty_name", "tax_code", "amount_before_vat", "vat_amount", "total_amount", "status", "source_type", "source_code", "document_name", "warning_flags"}); err != nil {
+		return nil, err
+	}
+	ledger, _ := data["ledger"].([]Record)
+	for _, row := range ledger {
+		if err := writer.Write([]string{
+			fmt.Sprint(row["invoice_date"]),
+			fmt.Sprint(row["invoice_number"]),
+			fmt.Sprint(row["direction"]),
+			fmt.Sprint(row["project_name"]),
+			fmt.Sprint(row["counterparty_name"]),
+			fmt.Sprint(row["tax_code"]),
+			fmt.Sprint(row["amount_before_vat"]),
+			fmt.Sprint(row["vat_amount"]),
+			fmt.Sprint(row["total_amount"]),
+			fmt.Sprint(row["status"]),
+			fmt.Sprint(row["source_type"]),
+			fmt.Sprint(row["source_code"]),
+			fmt.Sprint(row["document_name"]),
+			fmt.Sprint(row["warning_flags"]),
+		}); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func profitCSV(data Record) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	if err := writer.Write([]string{"invoice_date", "invoice_number", "direction", "cost_type", "project_name", "counterparty_name", "amount_before_vat", "revenue_amount", "direct_cost_amount", "indirect_cost_amount", "status", "source_type", "source_code", "classification_reason", "warning_flags"}); err != nil {
+		return nil, err
+	}
+	ledger, _ := data["ledger"].([]Record)
+	for _, row := range ledger {
+		if err := writer.Write([]string{
+			fmt.Sprint(row["invoice_date"]),
+			fmt.Sprint(row["invoice_number"]),
+			fmt.Sprint(row["direction"]),
+			fmt.Sprint(row["cost_type"]),
+			fmt.Sprint(row["project_name"]),
+			fmt.Sprint(row["counterparty_name"]),
+			fmt.Sprint(row["amount_before_vat"]),
+			fmt.Sprint(row["revenue_amount"]),
+			fmt.Sprint(row["direct_cost_amount"]),
+			fmt.Sprint(row["indirect_cost_amount"]),
+			fmt.Sprint(row["status"]),
+			fmt.Sprint(row["source_type"]),
+			fmt.Sprint(row["source_code"]),
+			fmt.Sprint(row["classification_reason"]),
+			fmt.Sprint(row["warning_flags"]),
+		}); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 func (h *Handler) Settings(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"settings.view"}); err != nil {

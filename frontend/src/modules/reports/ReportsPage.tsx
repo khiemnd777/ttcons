@@ -5,6 +5,8 @@ import { DataTable } from '../../components/DataTable';
 import { CurrencyText } from '../../components/CurrencyText';
 import { StatusBadge } from '../../components/StatusBadge';
 import { EnumChip } from '../../components/EnumChip';
+import { ProfitReportPanel } from './ProfitReportPanel';
+import { TaxReportPanel } from './TaxReportPanel';
 
 export function ReportsPage() {
   const projects = useQuery({ queryKey: ['report', 'projects'], queryFn: () => get<Record<string, any>[]>('/reports/projects') });
@@ -17,6 +19,8 @@ export function ReportsPage() {
     <>
       <PageHeader title="Báo cáo" description="Báo cáo công trình, vật tư/kho, mua sắm, kế toán/công nợ và nhân sự." />
       <div className="grid gap-5">
+        <ProfitReportPanel />
+        <TaxReportPanel />
         <section>
           <h2 className="mb-3 text-base font-semibold text-ink">Báo cáo công trình</h2>
           <DataTable rows={projects.data ?? []} columns={[
