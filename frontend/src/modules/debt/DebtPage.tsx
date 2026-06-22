@@ -1,19 +1,23 @@
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { get, post } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
+import { Dialog } from '../../components/Dialog';
 import { CurrencyText } from '../../components/CurrencyText';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FormDrawer } from '../../components/FormDrawer';
 import { useToast } from '../../components/ToastProvider';
-import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { SimpleForm } from '../_shared/SimpleForm';
+import { InputInvoicePanel } from './InputInvoicePanel';
+import { OutputInvoicePanel } from './OutputInvoicePanel';
+import type { PayableRecord, ReceivableRecord } from '../../lib/types/domain';
 import { enumOptions } from '../../lib/utils/status';
+import { dateText } from '../../lib/utils/format';
 
 const debtActionLabels: Record<string, string> = {
   pay: 'Đã ghi nhận thanh toán phải trả',
@@ -23,12 +27,12 @@ const debtActionLabels: Record<string, string> = {
 export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }) {
   const { id } = useParams();
   const [open, setOpen] = useState<'payable' | 'receivable' | null>(null);
-  const [dialog, setDialog] = useState<{ type: 'payable' | 'receivable'; record: Record<string, any> } | null>(null);
+  const [dialog, setDialog] = useState<{ type: 'payable'; record: PayableRecord } | { type: 'receivable'; record: ReceivableRecord } | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Record<string, any>[]>('/projects') });
-  const payables = useQuery({ queryKey: ['payables'], queryFn: () => get<Record<string, any>[]>('/payables'), enabled: kind !== 'receivables' });
-  const receivables = useQuery({ queryKey: ['receivables'], queryFn: () => get<Record<string, any>[]>('/receivables'), enabled: kind !== 'payables' });
+  const payables = useQuery({ queryKey: ['payables'], queryFn: () => get<PayableRecord[]>('/payables'), enabled: kind !== 'receivables' });
+  const receivables = useQuery({ queryKey: ['receivables'], queryFn: () => get<ReceivableRecord[]>('/receivables'), enabled: kind !== 'payables' });
   const createPayable = useMutation({
     mutationFn: (values: Record<string, any>) => post('/payables', values),
     onSuccess: () => {
@@ -51,7 +55,9 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
     mutationFn: ({ path, actionName }: { path: string; actionName: string }) => post(`/${path}/${actionName}`, {}),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['payables'] });
+      queryClient.invalidateQueries({ queryKey: ['input-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      queryClient.invalidateQueries({ queryKey: ['output-invoices'] });
       toast.success(debtActionLabels[variables.actionName] ?? 'Đã cập nhật công nợ');
     },
     onError: (error) => toast.error('Không cập nhật được công nợ', error),
@@ -80,6 +86,16 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
               { key: 'project_name', header: 'Công trình' },
               { key: 'gross_amount', header: 'Gross', render: (row) => <CurrencyText value={row.gross_amount} /> },
               { key: 'remaining_amount', header: 'Còn phải trả', render: (row) => <CurrencyText value={row.remaining_amount} /> },
+              {
+                key: 'invoice_count',
+                header: 'Hoá đơn',
+                render: (row) => (
+                  <div className="min-w-32">
+                    <p className="font-semibold text-ink">{Number(row.invoice_count ?? 0)} PDF</p>
+                    <p className="mt-1 text-xs text-slate-500"><CurrencyText value={row.verified_invoice_total ?? 0} /> verified</p>
+                  </div>
+                ),
+              },
               { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
               { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'payable', record: row })}><button className="text-sm font-semibold text-blue-700" onClick={() => action.mutate({ path: `payables/${row.id}`, actionName: 'pay' })}>Pay</button></RowActions> },
             ]} />
@@ -94,6 +110,16 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
               { key: 'project_name', header: 'Công trình' },
               { key: 'milestone_name', header: 'Milestone' },
               { key: 'remaining_amount', header: 'Còn phải thu', render: (row) => <CurrencyText value={row.remaining_amount} /> },
+              {
+                key: 'invoice_count',
+                header: 'Hoá đơn',
+                render: (row) => (
+                  <div className="min-w-32">
+                    <p className="font-semibold text-ink">{Number(row.invoice_count ?? 0)} PDF</p>
+                    <p className="mt-1 text-xs text-slate-500"><CurrencyText value={row.issued_invoice_total ?? 0} /> đã phát hành</p>
+                  </div>
+                ),
+              },
               { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
               { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'receivable', record: row })}><button className="text-sm font-semibold text-blue-700" onClick={() => action.mutate({ path: `receivables/${row.id}`, actionName: 'receive' })}>Receive</button></RowActions> },
             ]} />
@@ -128,35 +154,69 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
           { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'recorded', required: true, options: enumOptions('status', ['draft', 'recorded', 'approved', 'partially_received', 'received']) },
         ]} onSubmit={(values) => createReceivable.mutateAsync(values)} />
       </FormDrawer>
-      <RecordDetailDialog
-        open={dialog?.type === 'payable'}
-        title="Chi tiết phải trả"
-        record={dialog?.record ?? null}
-        onClose={() => setDialog(null)}
-        fields={[
-          { key: 'payable_code', label: 'Mã' },
-          { key: 'vendor_name', label: 'Vendor' },
-          { key: 'project_name', label: 'Công trình' },
-          { key: 'gross_amount', label: 'Gross', render: (row) => <CurrencyText value={row.gross_amount} /> },
-          { key: 'remaining_amount', label: 'Còn phải trả', render: (row) => <CurrencyText value={row.remaining_amount} /> },
-          { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-        ]}
-      />
-      <RecordDetailDialog
-        open={dialog?.type === 'receivable'}
-        title="Chi tiết phải thu"
-        record={dialog?.record ?? null}
-        onClose={() => setDialog(null)}
-        fields={[
-          { key: 'receivable_code', label: 'Mã' },
-          { key: 'client_name', label: 'Khách hàng' },
-          { key: 'project_name', label: 'Công trình' },
-          { key: 'milestone_name', label: 'Milestone' },
-          { key: 'gross_amount', label: 'Gross', render: (row) => <CurrencyText value={row.gross_amount} /> },
-          { key: 'remaining_amount', label: 'Còn phải thu', render: (row) => <CurrencyText value={row.remaining_amount} /> },
-          { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-        ]}
-      />
+      <Dialog open={dialog?.type === 'payable'} title="Chi tiết phải trả" onClose={() => setDialog(null)} size="xl">
+        {dialog?.type === 'payable' ? (
+          <div className="space-y-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <DebtMetric label="Mã" value={dialog.record.payable_code} />
+              <DebtMetric label="Vendor" value={dialog.record.vendor_name} />
+              <DebtMetric label="Còn phải trả" value={<CurrencyText value={dialog.record.remaining_amount} />} />
+              <DebtMetric label="Trạng thái" value={<StatusBadge status={dialog.record.status} />} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <DebtMetric label="Công trình" value={dialog.record.project_name ?? '-'} />
+              <DebtMetric label="Gross" value={<CurrencyText value={dialog.record.gross_amount} />} />
+              <DebtMetric label="Tổng hoá đơn" value={<CurrencyText value={dialog.record.invoice_total ?? 0} />} />
+              <DebtMetric
+                label="Mới nhất"
+                value={dialog.record.latest_invoice_number ? `${dialog.record.latest_invoice_number} · ${dateText(dialog.record.latest_invoice_date)}` : '-'}
+              />
+            </div>
+            <InputInvoicePanel
+              payable={dialog.record}
+              onChanged={() => {
+                queryClient.invalidateQueries({ queryKey: ['payables'] });
+              }}
+            />
+          </div>
+        ) : null}
+      </Dialog>
+      <Dialog open={dialog?.type === 'receivable'} title="Chi tiết phải thu" onClose={() => setDialog(null)} size="xl">
+        {dialog?.type === 'receivable' ? (
+          <div className="space-y-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <DebtMetric label="Mã" value={dialog.record.receivable_code} />
+              <DebtMetric label="Khách hàng" value={dialog.record.client_name} />
+              <DebtMetric label="Còn phải thu" value={<CurrencyText value={dialog.record.remaining_amount} />} />
+              <DebtMetric label="Trạng thái" value={<StatusBadge status={dialog.record.status} />} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <DebtMetric label="Công trình" value={dialog.record.project_name ?? '-'} />
+              <DebtMetric label="Gross" value={<CurrencyText value={dialog.record.gross_amount} />} />
+              <DebtMetric label="Tổng hoá đơn" value={<CurrencyText value={dialog.record.invoice_total ?? 0} />} />
+              <DebtMetric
+                label="Mới nhất"
+                value={dialog.record.latest_invoice_number ? `${dialog.record.latest_invoice_number} · ${dateText(dialog.record.latest_invoice_date)}` : '-'}
+              />
+            </div>
+            <OutputInvoicePanel
+              receivable={dialog.record}
+              onChanged={() => {
+                queryClient.invalidateQueries({ queryKey: ['receivables'] });
+              }}
+            />
+          </div>
+        ) : null}
+      </Dialog>
     </>
+  );
+}
+
+function DebtMetric({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-md border border-line bg-slate-50 px-3 py-2">
+      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+      <div className="mt-1 truncate text-sm font-semibold text-ink">{value}</div>
+    </div>
   );
 }

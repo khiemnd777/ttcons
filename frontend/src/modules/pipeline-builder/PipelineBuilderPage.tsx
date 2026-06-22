@@ -192,9 +192,9 @@ export function PipelineBuilderPage() {
     if (!stepDialog || !stepForm.form_required || stepForm.form_version_id || !workflowForms.data?.length) return;
     setStepForm((current) => {
       if (!current.form_required || current.form_version_id) return current;
-      return { ...current, form_version_id: defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? []) };
+      return { ...current, form_version_id: defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? [], detailsNode?.type, current.name) };
     });
-  }, [stepDialog, stepForm.form_required, stepForm.form_version_id, workflowForms.data]);
+  }, [detailsNode?.type, stepDialog, stepForm.form_required, stepForm.form_version_id, workflowForms.data]);
 
   const validationIssues = useMemo(() => buildValidationIssues(nodes, rawEdges, edgeConditionTypes, workflowFormVersionIds), [nodes, rawEdges, edgeConditionTypes, workflowFormVersionIds]);
 
@@ -546,7 +546,7 @@ export function PipelineBuilderPage() {
       step_type: stepType,
       required_role_ids: [defaultRoleForNode(detailsNode?.type)],
       form_required: true,
-      form_version_id: defaultWorkflowFormVersionForStep(stepType, workflowForms.data ?? []),
+      form_version_id: defaultWorkflowFormVersionForStep(stepType, workflowForms.data ?? [], detailsNode?.type),
     });
     setStepSubmitAttempted(false);
     setStepDialog({ mode: 'add' });
@@ -560,7 +560,7 @@ export function PipelineBuilderPage() {
       step_type: stepType,
       required_role_ids: normalizeRoleIds(step.required_role_ids),
       form_required: formRequired,
-      form_version_id: cleanString(step.form_version_id) || (formRequired ? defaultWorkflowFormVersionForStep(stepType, workflowForms.data ?? []) : ''),
+      form_version_id: cleanString(step.form_version_id) || (formRequired ? defaultWorkflowFormVersionForStep(stepType, workflowForms.data ?? [], detailsNode?.type, String(step.name ?? '')) : ''),
     });
     setStepSubmitAttempted(false);
     setStepDialog({ mode: 'edit', step });
@@ -576,13 +576,23 @@ export function PipelineBuilderPage() {
     setStepForm((current) => {
       if (field === 'step_type') {
         const stepType = String(value);
-        const currentDefault = defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? []);
+        const currentDefault = defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? [], detailsNode?.type, current.name);
         const shouldRefreshForm = !current.form_version_id || current.form_version_id === currentDefault;
         return {
           ...current,
           step_type: stepType,
           form_required: current.form_required || workflowFormRequiredForStepType(stepType),
-          form_version_id: shouldRefreshForm ? defaultWorkflowFormVersionForStep(stepType, workflowForms.data ?? []) : current.form_version_id,
+          form_version_id: shouldRefreshForm ? defaultWorkflowFormVersionForStep(stepType, workflowForms.data ?? [], detailsNode?.type, current.name) : current.form_version_id,
+        };
+      }
+      if (field === 'name') {
+        const name = String(value);
+        const currentDefault = defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? [], detailsNode?.type, current.name);
+        const shouldRefreshForm = !current.form_version_id || current.form_version_id === currentDefault;
+        return {
+          ...current,
+          name,
+          form_version_id: shouldRefreshForm ? defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? [], detailsNode?.type, name) : current.form_version_id,
         };
       }
       if (field === 'form_required') {
@@ -590,7 +600,7 @@ export function PipelineBuilderPage() {
         return {
           ...current,
           form_required: formRequired,
-          form_version_id: formRequired && !current.form_version_id ? defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? []) : current.form_version_id,
+          form_version_id: formRequired && !current.form_version_id ? defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? [], detailsNode?.type, current.name) : current.form_version_id,
         };
       }
       return { ...current, [field]: value };
@@ -1010,8 +1020,8 @@ function defaultStepsForType(type: string) {
     budget_approval: ['Kiểm tra ngân sách', 'Đối chiếu hạn mức', 'Duyệt ngân sách'],
     procurement: ['Sinh nhu cầu vật tư từ BOQ', 'Kiểm tra tồn kho', 'Tạo đề xuất mua vật tư'],
     warehouse_issue: ['Kiểm tra tồn kho', 'Lập phiếu xuất kho', 'Xác nhận vật tư ra công trình'],
-    construction: ['Daily report', 'Ghi nhận vật tư sử dụng', 'Kiểm tra chất lượng'],
-    acceptance: ['Checklist nghiệm thu', 'Upload ảnh minh chứng', 'Pass / Fail nghiệm thu'],
+    construction: ['Daily report thi công', 'Checklist thầu phụ', 'Ghi nhận vật tư sử dụng', 'Kiểm tra chất lượng'],
+    acceptance: ['Checklist nghiệm thu', 'Checklist chủ đầu tư', 'Upload ảnh minh chứng', 'Pass / Fail nghiệm thu'],
   };
   return stepsByType[type] ?? ['Checklist', 'Review', 'Approval'];
 }
@@ -1026,8 +1036,19 @@ function defaultStepTypeForNode(type?: string) {
 }
 
 function defaultStepTypeForStep(nodeType: string, stepName: string) {
-  const normalizedName = stepName.toLocaleLowerCase('vi-VN');
-  if (normalizedName.includes('duyệt') || normalizedName.includes('xác nhận')) return 'approval';
+  const normalizedName = normalizedSearchText(stepName);
+  if (normalizedName.includes('daily report') || normalizedName.includes('nhat ky')) return 'daily_report';
+  if (normalizedName.includes('vat tu')) return 'material_check';
+  if (
+    normalizedName.includes('chu dau tu')
+    || normalizedName.includes('client')
+    || normalizedName.includes('owner')
+    || normalizedName.includes('thau phu')
+    || normalizedName.includes('subcontractor')
+    || normalizedName.includes('checklist')
+    || normalizedName.includes('kiem tra chat luong')
+  ) return 'checklist';
+  if (normalizedName.includes('duyet') || normalizedName.includes('xac nhan')) return 'approval';
   return defaultStepTypeForNode(nodeType);
 }
 
@@ -1053,9 +1074,46 @@ function workflowFormTypeForStep(stepType: string) {
   return 'generic_submission';
 }
 
-function defaultWorkflowFormVersionForStep(stepType: string, catalog: WorkflowFormCatalogItem[]) {
+function defaultWorkflowFormVersionForStep(stepType: string, catalog: WorkflowFormCatalogItem[], nodeType?: string, stepName = '') {
+  const preferredCode = preferredWorkflowFormCodeForStep(stepType, nodeType, stepName);
+  if (preferredCode) {
+    const preferred = catalog.find((form) => form.template_code === preferredCode);
+    if (preferred) return preferred.version_id;
+  }
   const formType = workflowFormTypeForStep(stepType);
   return catalog.find((form) => form.form_type === formType)?.version_id ?? catalog.find((form) => form.form_type === 'generic_submission')?.version_id ?? catalog[0]?.version_id ?? '';
+}
+
+function preferredWorkflowFormCodeForStep(stepType: string, nodeType?: string, stepName = '') {
+  const normalizedName = normalizedSearchText(stepName);
+  if (stepType === 'daily_report') {
+    if (
+      nodeType === 'construction'
+      || normalizedName.includes('thi cong')
+      || normalizedName.includes('cong truong')
+      || normalizedName.includes('construction')
+      || normalizedName.includes('site report')
+    ) {
+      return 'builtin_construction_daily_report';
+    }
+  }
+  if (stepType === 'checklist' && (nodeType === 'construction' || nodeType === 'acceptance')) {
+    if (normalizedName.includes('chu dau tu') || normalizedName.includes('client') || normalizedName.includes('owner')) {
+      return 'builtin_owner_client_checklist';
+    }
+    if (normalizedName.includes('thau phu') || normalizedName.includes('subcontractor')) {
+      return 'builtin_subcontractor_checklist';
+    }
+  }
+  return '';
+}
+
+function normalizedSearchText(value: string) {
+  return value
+    .toLocaleLowerCase('vi-VN')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd');
 }
 
 function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdge[], conditionTypes: Set<string>, workflowFormVersionIds: Set<string>) {

@@ -157,7 +157,7 @@ func hasUpdatedAt(table string) bool {
 		"procurement_requests", "boq_items", "issues", "acceptance_records", "rework_requests", "replanning_requests",
 		"handover_records", "accounting_budgets", "payables", "receivables", "payments", "advance_requests",
 		"system_settings", "work_items", "evidence_records", "workflow_form_templates", "workflow_form_versions",
-		"workflow_form_instances", "workflow_form_signatures":
+		"workflow_form_instances", "workflow_form_signatures", "input_invoices", "output_invoices":
 		return true
 	default:
 		return false
@@ -202,7 +202,7 @@ func safeTable(table string) string {
 		"role_permissions", "user_roles", "users", "work_items", "work_item_assignments", "work_item_activities",
 		"evidence_records", "workflow_form_templates", "workflow_form_versions", "workflow_form_fields",
 		"workflow_form_instances", "workflow_form_answers", "workflow_form_events", "workflow_form_signatures",
-		"workflow_form_pdf_exports", "boq_unit_price_events":
+		"workflow_form_pdf_exports", "boq_unit_price_events", "input_invoices", "output_invoices":
 		return table
 	default:
 		return ""
@@ -280,7 +280,13 @@ func issueColumns() []ColumnSpec {
 }
 
 func acceptanceColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("node_id"), col("type"), col("title"), col("requested_by"), col("inspected_by"), col("approved_by"), col("status"), col("result"), col("notes")}
+	return []ColumnSpec{
+		col("project_id"), col("node_id"), col("work_item_id"), col("form_instance_id"), col("pdf_export_id"),
+		col("type"), col("title"), col("requested_by"), col("inspected_by"), col("approved_by"),
+		col("status"), col("result"), col("acceptance_date"), col("location"), col("client_representative"),
+		col("contractor_representative"), col("scope_summary"), col("signature_status"), col("document_status"),
+		col("notes"), jsonCol("summary_json"),
+	}
 }
 
 func reworkColumns() []ColumnSpec {

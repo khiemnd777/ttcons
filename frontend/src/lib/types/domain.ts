@@ -227,6 +227,121 @@ export type EvidenceRecord = ProjectOperationsRecord & {
   payload_json?: AnyRecord;
 };
 
+export type PayableRecord = ProjectOperationsRecord & {
+  project_id: string;
+  project_name?: string;
+  payable_code: string;
+  vendor_type: string;
+  vendor_name: string;
+  source_type?: string;
+  source_id?: string;
+  gross_amount: number;
+  advance_amount?: number;
+  retention_amount?: number;
+  deduction_amount?: number;
+  paid_amount?: number;
+  remaining_amount?: number;
+  status: 'draft' | 'recorded' | 'approved' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled' | string;
+  invoice_count?: number;
+  invoice_total?: number;
+  verified_invoice_total?: number;
+  latest_invoice_status?: string;
+  latest_invoice_number?: string;
+  latest_invoice_date?: string;
+};
+
+export type ReceivableRecord = ProjectOperationsRecord & {
+  project_id: string;
+  project_name?: string;
+  receivable_code: string;
+  client_name: string;
+  contract_amount?: number;
+  milestone_name?: string;
+  gross_amount: number;
+  received_amount?: number;
+  remaining_amount?: number;
+  status: 'draft' | 'recorded' | 'approved' | 'partially_received' | 'received' | 'overdue' | 'cancelled' | string;
+  invoice_count?: number;
+  invoice_total?: number;
+  issued_invoice_total?: number;
+  latest_invoice_status?: string;
+  latest_invoice_number?: string;
+  latest_invoice_date?: string;
+};
+
+export type InputInvoiceRecord = ProjectOperationsRecord & {
+  project_id: string;
+  project_name?: string;
+  payable_id: string;
+  payable_code?: string;
+  procurement_request_id?: string;
+  procurement_request_code?: string;
+  document_id?: string;
+  document_name?: string;
+  invoice_number: string;
+  invoice_symbol?: string;
+  invoice_date: string;
+  vendor_name: string;
+  vendor_tax_code?: string;
+  amount_before_vat: number;
+  vat_amount: number;
+  total_amount: number;
+  currency: 'VND' | string;
+  status: 'draft' | 'verified' | 'rejected' | 'cancelled' | 'deleted' | string;
+  notes?: string;
+  storage_provider?: 'local' | string;
+  storage_key?: string;
+  mime_type?: string;
+  file_name?: string;
+  file_size?: number;
+  checksum_sha256?: string;
+  uploaded_by?: string;
+  uploaded_by_name?: string;
+  verified_by?: string;
+  verified_by_name?: string;
+  verified_at?: string;
+  rejected_by?: string;
+  rejected_by_name?: string;
+  rejected_at?: string;
+};
+
+export type OutputInvoiceRecord = ProjectOperationsRecord & {
+  project_id: string;
+  project_name?: string;
+  receivable_id: string;
+  receivable_code?: string;
+  payment_id?: string;
+  payment_code?: string;
+  payment_type?: string;
+  document_id?: string;
+  document_name?: string;
+  invoice_number: string;
+  invoice_symbol?: string;
+  invoice_date: string;
+  client_name: string;
+  client_tax_code?: string;
+  amount_before_vat: number;
+  vat_amount: number;
+  total_amount: number;
+  currency: 'VND' | string;
+  status: 'draft' | 'issued' | 'voided' | 'cancelled' | 'deleted' | string;
+  notes?: string;
+  storage_provider?: 'local' | string;
+  storage_key?: string;
+  mime_type?: string;
+  file_name?: string;
+  file_size?: number;
+  checksum_sha256?: string;
+  uploaded_by?: string;
+  uploaded_by_name?: string;
+  issued_by?: string;
+  issued_by_name?: string;
+  issued_at?: string;
+  voided_by?: string;
+  voided_by_name?: string;
+  voided_at?: string;
+};
+
 export type WorkflowFormField = ProjectOperationsRecord & {
   form_version_id: string;
   field_key: string;
@@ -310,6 +425,384 @@ export type WorkflowFormPDFExport = ProjectOperationsRecord & {
   generated_by?: string;
   generated_by_name?: string;
   generated_at: string;
+};
+
+export type SubcontractorReconciliationItem = ProjectOperationsRecord & {
+  reconciliation_id?: string;
+  work_item_id?: string;
+  form_instance_id?: string;
+  item_index: number;
+  checklist_title: string;
+  boq_item_id?: string;
+  boq_item_ref?: string;
+  boq_work_item_name?: string;
+  current_boq_work_item_name?: string;
+  boq_quantity?: number;
+  current_boq_quantity?: number;
+  boq_unit?: string;
+  current_boq_unit?: string;
+  claimed_quantity?: number;
+  confirmed_quantity?: number;
+  variance_quantity?: number;
+  unit?: string;
+  status?: string;
+  evidence_id?: string;
+  evidence_name?: string;
+  evidence_status?: string;
+  owner_response?: string;
+  decision: string;
+  due_date?: string;
+  comment?: string;
+  payload_json?: AnyRecord;
+};
+
+export type SubcontractorReconciliationRecord = ProjectOperationsRecord & {
+  project_id: string;
+  work_item_id: string;
+  form_instance_id: string;
+  form_revision_no: number;
+  status: 'draft' | 'submitted' | 'reopened' | string;
+  subcontractor_name?: string;
+  work_package?: string;
+  construction_area?: string;
+  summary_json?: AnyRecord;
+  comment?: string;
+  submitted_by_name?: string;
+  updated_by_name?: string;
+  submitted_at?: string;
+  items?: SubcontractorReconciliationItem[];
+};
+
+export type SubcontractorReconciliationResponse = {
+  available: boolean;
+  reason?: string;
+  work_item_id?: string;
+  project_id?: string;
+  form?: WorkflowFormDetail;
+  reconciliation?: SubcontractorReconciliationRecord;
+  boq_items?: BOQItem[];
+};
+
+export type OwnerClientReconciliationItem = ProjectOperationsRecord & {
+  reconciliation_id?: string;
+  work_item_id?: string;
+  form_instance_id?: string;
+  item_index: number;
+  checklist_title: string;
+  output_ref?: string;
+  status?: string;
+  client_decision?: string;
+  severity?: string;
+  required_action?: string;
+  due_date?: string;
+  evidence_id?: string;
+  evidence_name?: string;
+  evidence_status?: string;
+  acceptance_id?: string;
+  acceptance_title?: string;
+  current_acceptance_title?: string;
+  acceptance_type?: string;
+  current_acceptance_type?: string;
+  acceptance_status?: string;
+  current_acceptance_status?: string;
+  acceptance_result?: string;
+  current_acceptance_result?: string;
+  decision: string;
+  comment?: string;
+  payload_json?: AnyRecord;
+};
+
+export type OwnerClientReconciliationRecord = ProjectOperationsRecord & {
+  project_id: string;
+  work_item_id: string;
+  form_instance_id: string;
+  form_revision_no: number;
+  status: 'draft' | 'submitted' | 'reopened' | string;
+  client_representative?: string;
+  company_representative?: string;
+  handover_scope?: string;
+  scope_detail?: string;
+  summary_json?: AnyRecord;
+  comment?: string;
+  submitted_by_name?: string;
+  updated_by_name?: string;
+  submitted_at?: string;
+  items?: OwnerClientReconciliationItem[];
+};
+
+export type OwnerClientReconciliationResponse = {
+  available: boolean;
+  reason?: string;
+  work_item_id?: string;
+  project_id?: string;
+  form?: WorkflowFormDetail;
+  reconciliation?: OwnerClientReconciliationRecord;
+  acceptances?: ProjectOperationsRecord[];
+};
+
+export type MaterialCatalogItem = ProjectOperationsRecord & {
+  code: string;
+  name: string;
+  unit: string;
+  category?: string;
+  default_supplier?: string;
+  standard_price?: number;
+  active?: boolean;
+};
+
+export type ProjectMaterialBalance = ProjectOperationsRecord & {
+  material_id: string;
+  code?: string;
+  material_name?: string;
+  unit?: string;
+  category?: string;
+  planned_quantity?: number;
+  issued_quantity?: number;
+  used_quantity?: number;
+  surplus_quantity?: number;
+  surplus_status?: string;
+};
+
+export type MaterialSnapshotItem = ProjectOperationsRecord & {
+  snapshot_id?: string;
+  work_item_id?: string;
+  item_index: number;
+  material_id?: string;
+  material_code?: string;
+  material_name: string;
+  unit: string;
+  source: 'site_balance' | 'warehouse_issue' | 'subcontractor' | 'other' | string;
+  before_quantity: number;
+  added_quantity: number;
+  after_quantity: number;
+  waste_quantity: number;
+  used_quantity: number;
+  affects_site_balance: boolean;
+  site_balance_id?: string;
+  before_evidence_id?: string;
+  before_evidence_name?: string;
+  before_evidence_status?: string;
+  after_evidence_id?: string;
+  after_evidence_name?: string;
+  after_evidence_status?: string;
+  construction_area?: string;
+  condition: 'usable' | 'damaged' | 'mixed' | 'unknown' | string;
+  comment?: string;
+  payload_json?: AnyRecord;
+};
+
+export type MaterialSnapshotRecord = ProjectOperationsRecord & {
+  project_id: string;
+  work_item_id: string;
+  status: 'draft' | 'submitted' | 'reopened' | string;
+  snapshot_date?: string;
+  construction_area?: string;
+  summary_json?: AnyRecord;
+  comment?: string;
+  applied_to_site_balance?: boolean;
+  submitted_by_name?: string;
+  updated_by_name?: string;
+  submitted_at?: string;
+  items?: MaterialSnapshotItem[];
+};
+
+export type MaterialSnapshotResponse = {
+  available: boolean;
+  reason?: string;
+  work_item_id?: string;
+  project_id?: string;
+  snapshot?: MaterialSnapshotRecord;
+  materials?: MaterialCatalogItem[];
+  material_balances?: ProjectMaterialBalance[];
+};
+
+export type Warehouse = ProjectOperationsRecord & {
+  name: string;
+  location?: string;
+  type?: string;
+  active?: boolean;
+};
+
+export type SurplusHandlingRecord = ProjectOperationsRecord & {
+  handling_code: string;
+  work_item_id: string;
+  site_balance_id: string;
+  material_id: string;
+  material_code?: string;
+  material_name?: string;
+  material_unit?: string;
+  material_snapshot_id?: string;
+  material_snapshot_item_id?: string;
+  stock_movement_id?: string;
+  stock_movement_code?: string;
+  stock_movement_type?: string;
+  status: 'draft' | 'submitted' | 'cancelled' | string;
+  handling_type: 'return_to_warehouse' | 'return_to_subcontractor' | string;
+  quantity: number;
+  unit: string;
+  warehouse_id?: string;
+  warehouse_name?: string;
+  custody_location?: string;
+  condition: 'usable' | 'damaged' | 'mixed' | 'unknown' | string;
+  evidence_id?: string;
+  evidence_name?: string;
+  evidence_status?: string;
+  comment?: string;
+  submitted_by?: string;
+  submitted_at?: string;
+};
+
+export type SurplusHandlingResponse = {
+  available: boolean;
+  work_item_id?: string;
+  project_id?: string;
+  material_balances?: ProjectMaterialBalance[];
+  warehouses?: Warehouse[];
+  handlings?: SurplusHandlingRecord[];
+};
+
+export type IncomingAcceptanceItem = ProjectOperationsRecord & {
+  incoming_acceptance_id?: string;
+  project_id?: string;
+  work_item_id?: string;
+  item_index: number;
+  material_id?: string;
+  material_code?: string;
+  material_name: string;
+  procurement_request_item_id?: string;
+  delivered_quantity: number;
+  accepted_quantity: number;
+  rejected_quantity: number;
+  unit: string;
+  condition: 'usable' | 'damaged' | 'mixed' | 'unknown' | string;
+  defect_note?: string;
+  evidence_id?: string;
+  evidence_name?: string;
+  evidence_status?: string;
+  decision: 'pending' | 'accepted' | 'conditional_acceptance' | 'rejected' | string;
+  comment?: string;
+  procurement_quantity_requested?: number;
+  procurement_delivery_status?: string;
+  procurement_approval_status?: string;
+};
+
+export type IncomingAcceptanceRecord = ProjectOperationsRecord & {
+  acceptance_code: string;
+  project_id: string;
+  work_item_id?: string;
+  procurement_request_id?: string;
+  procurement_request_code?: string;
+  procurement_request_title?: string;
+  warehouse_id?: string;
+  warehouse_name?: string;
+  source_type: 'supplier' | 'subcontractor' | 'procurement' | 'other' | string;
+  supplier_name?: string;
+  subcontractor_name?: string;
+  delivery_reference?: string;
+  status: 'draft' | 'submitted' | 'cancelled' | string;
+  result?: 'pass' | 'conditional_pass' | 'fail' | string;
+  received_at?: string;
+  summary_json?: AnyRecord;
+  comment?: string;
+  item_count?: number;
+  submitted_by_name?: string;
+  submitted_at?: string;
+  items?: IncomingAcceptanceItem[];
+};
+
+export type ProcurementRequestOption = ProjectOperationsRecord & {
+  project_id: string;
+  request_code?: string;
+  title?: string;
+  status?: string;
+  item_count?: number;
+};
+
+export type ProcurementRequestItemOption = ProjectOperationsRecord & {
+  request_id: string;
+  request_code?: string;
+  procurement_request_title?: string;
+  material_id?: string;
+  material_code?: string;
+  material_name?: string;
+  work_item_name?: string;
+  quantity_requested?: number;
+  unit?: string;
+  delivery_status?: string;
+  approval_status?: string;
+};
+
+export type IncomingAcceptanceResponse = {
+  available: boolean;
+  work_item_id?: string;
+  project_id?: string;
+  records?: IncomingAcceptanceRecord[];
+  materials?: MaterialCatalogItem[];
+  warehouses?: Warehouse[];
+  procurement_requests?: ProcurementRequestOption[];
+  procurement_request_items?: ProcurementRequestItemOption[];
+};
+
+export type AcceptanceChecklistItem = ProjectOperationsRecord & {
+  acceptance_id?: string;
+  item_index: number;
+  title: string;
+  description?: string;
+  is_passed?: boolean;
+  note?: string;
+  photo_required?: boolean;
+  photo_url?: string;
+  evidence_id?: string;
+  evidence_name?: string;
+  evidence_status?: string;
+  decision: 'pending' | 'pass' | 'conditional_pass' | 'fail' | string;
+  severity?: 'low' | 'medium' | 'high' | 'critical' | string;
+  required_action?: string;
+  due_date?: string;
+  payload_json?: AnyRecord;
+};
+
+export type AcceptanceRecord = ProjectOperationsRecord & {
+  acceptance_code?: string;
+  project_id: string;
+  node_id?: string;
+  work_item_id?: string;
+  work_item_title?: string;
+  form_instance_id?: string;
+  workflow_form_title?: string;
+  pdf_export_id?: string;
+  pdf_file_name?: string;
+  type: 'partial' | 'final' | string;
+  title: string;
+  requested_by?: string;
+  requested_by_name?: string;
+  inspected_by?: string;
+  approved_by?: string;
+  approved_by_name?: string;
+  submitted_by?: string;
+  submitted_by_name?: string;
+  status: 'draft' | 'submitted' | 'completed' | 'cancelled' | string;
+  result?: 'pass' | 'conditional_pass' | 'fail' | string;
+  acceptance_date?: string;
+  location?: string;
+  client_representative?: string;
+  contractor_representative?: string;
+  scope_summary?: string;
+  signature_status?: 'pending' | 'signed' | 'waived' | string;
+  document_status?: 'pending' | 'linked' | 'waived' | string;
+  notes?: string;
+  summary_json?: AnyRecord;
+  checklist_count?: number;
+  submitted_at?: string;
+  checklist?: AcceptanceChecklistItem[];
+};
+
+export type OutgoingAcceptanceResponse = {
+  available: boolean;
+  work_item_id?: string;
+  project_id?: string;
+  records?: AcceptanceRecord[];
+  form?: WorkflowFormDetail & { available?: boolean };
 };
 
 export type WorkItem = ProjectOperationsRecord & {

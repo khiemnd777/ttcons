@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
+	"strings"
 
 	"consflow/backend/internal/shared/response"
 
@@ -537,6 +539,174 @@ func (h *Handler) AddWorkItemActivity(c *fiber.Ctx) error {
 		return err
 	}
 	return response.Created(c, activity)
+}
+
+func (h *Handler) GetSubcontractorReconciliation(c *fiber.Ctx) error {
+	reconciliation, err := h.service.SubcontractorReconciliation(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, reconciliation)
+}
+
+func (h *Handler) SaveSubcontractorReconciliation(c *fiber.Ctx) error {
+	req := SubcontractorReconciliationRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đối soát thầu phụ không hợp lệ")
+		}
+	}
+	reconciliation, err := h.service.SaveSubcontractorReconciliation(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, reconciliation)
+}
+
+func (h *Handler) SubmitSubcontractorReconciliation(c *fiber.Ctx) error {
+	req := SubcontractorReconciliationRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đối soát thầu phụ không hợp lệ")
+		}
+	}
+	reconciliation, err := h.service.SubmitSubcontractorReconciliation(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, reconciliation)
+}
+
+func (h *Handler) GetOwnerClientReconciliation(c *fiber.Ctx) error {
+	reconciliation, err := h.service.OwnerClientReconciliation(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, reconciliation)
+}
+
+func (h *Handler) SaveOwnerClientReconciliation(c *fiber.Ctx) error {
+	req := OwnerClientReconciliationRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đối soát chủ đầu tư không hợp lệ")
+		}
+	}
+	reconciliation, err := h.service.SaveOwnerClientReconciliation(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, reconciliation)
+}
+
+func (h *Handler) SubmitOwnerClientReconciliation(c *fiber.Ctx) error {
+	req := OwnerClientReconciliationRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đối soát chủ đầu tư không hợp lệ")
+		}
+	}
+	reconciliation, err := h.service.SubmitOwnerClientReconciliation(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, reconciliation)
+}
+
+func (h *Handler) GetMaterialSnapshot(c *fiber.Ctx) error {
+	snapshot, err := h.service.MaterialSnapshot(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, snapshot)
+}
+
+func (h *Handler) SaveMaterialSnapshot(c *fiber.Ctx) error {
+	req := MaterialSnapshotRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu snapshot vật tư không hợp lệ")
+		}
+	}
+	snapshot, err := h.service.SaveMaterialSnapshot(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, snapshot)
+}
+
+func (h *Handler) SubmitMaterialSnapshot(c *fiber.Ctx) error {
+	req := MaterialSnapshotRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu snapshot vật tư không hợp lệ")
+		}
+	}
+	snapshot, err := h.service.SubmitMaterialSnapshot(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, snapshot)
+}
+
+func (h *Handler) GetSurplusHandlings(c *fiber.Ctx) error {
+	handlings, err := h.service.SurplusHandlings(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, handlings)
+}
+
+func (h *Handler) CreateSurplusHandling(c *fiber.Ctx) error {
+	req := SurplusHandlingRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xử lý vật tư dư không hợp lệ")
+		}
+	}
+	handling, err := h.service.CreateSurplusHandling(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, handling)
+}
+
+func (h *Handler) UpdateSurplusHandling(c *fiber.Ctx) error {
+	req := SurplusHandlingRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xử lý vật tư dư không hợp lệ")
+		}
+	}
+	handling, err := h.service.UpdateSurplusHandling(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, handling)
+}
+
+func (h *Handler) SubmitSurplusHandling(c *fiber.Ctx) error {
+	handling, err := h.service.SubmitSurplusHandling(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, handling)
+}
+
+func (h *Handler) WorkItemIncomingAcceptances(c *fiber.Ctx) error {
+	rows, err := h.service.WorkItemIncomingAcceptances(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) WorkItemOutgoingAcceptance(c *fiber.Ctx) error {
+	rows, err := h.service.WorkItemOutgoingAcceptance(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
 }
 
 func (h *Handler) SaveWorkflowFormDraft(c *fiber.Ctx) error {
@@ -1089,6 +1259,58 @@ func (h *Handler) MaterialBalances(c *fiber.Ctx) error {
 	return response.OK(c, rows)
 }
 
+func (h *Handler) ProjectIncomingAcceptances(c *fiber.Ctx) error {
+	rows, err := h.service.ProjectIncomingAcceptances(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) CreateIncomingAcceptance(c *fiber.Ctx) error {
+	req := IncomingAcceptanceRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu nghiệm thu đầu vào không hợp lệ")
+		}
+	}
+	record, err := h.service.CreateIncomingAcceptance(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, record)
+}
+
+func (h *Handler) GetIncomingAcceptance(c *fiber.Ctx) error {
+	record, err := h.service.GetIncomingAcceptance(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, record)
+}
+
+func (h *Handler) UpdateIncomingAcceptance(c *fiber.Ctx) error {
+	req := IncomingAcceptanceRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu nghiệm thu đầu vào không hợp lệ")
+		}
+	}
+	record, err := h.service.UpdateIncomingAcceptance(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, record)
+}
+
+func (h *Handler) SubmitIncomingAcceptance(c *fiber.Ctx) error {
+	record, err := h.service.SubmitIncomingAcceptance(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, record)
+}
+
 func (h *Handler) ProjectDailyReports(c *fiber.Ctx) error {
 	return h.projectList(c, "operation_daily_reports", []string{"operation.view"})
 }
@@ -1109,24 +1331,56 @@ func (h *Handler) UpdateIssue(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ProjectAcceptances(c *fiber.Ctx) error {
-	return h.projectList(c, "acceptance_records", []string{"acceptance.view"})
-}
-func (h *Handler) CreateAcceptance(c *fiber.Ctx) error {
-	return h.projectCreate(c, "acceptance_records", acceptanceColumns(), []string{"acceptance.create"})
-}
-func (h *Handler) GetAcceptance(c *fiber.Ctx) error {
-	if err := h.requireRecordProjectPermission(c, "acceptance_records", c.Params("id"), []string{"acceptance.view"}); err != nil {
-		return err
-	}
-	acc, err := h.service.repo.GetByID(c.Context(), "acceptance_records", c.Params("id"))
+	rows, err := h.service.ProjectAcceptances(c.Context(), c.Params("id"), actorID(c))
 	if err != nil {
 		return err
 	}
-	items, _ := h.service.repo.Query(c.Context(), `SELECT * FROM acceptance_checklist_items WHERE acceptance_id=$1 ORDER BY created_at`, c.Params("id"))
-	acc["checklist"] = items
+	return response.OK(c, rows)
+}
+func (h *Handler) CreateAcceptance(c *fiber.Ctx) error {
+	req := AcceptanceRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu nghiệm thu không hợp lệ")
+		}
+	}
+	record, err := h.service.CreateAcceptance(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, record)
+}
+func (h *Handler) GetAcceptance(c *fiber.Ctx) error {
+	acc, err := h.service.GetAcceptance(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
 	return response.OK(c, acc)
 }
+func (h *Handler) UpdateAcceptance(c *fiber.Ctx) error {
+	req := AcceptanceRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu nghiệm thu không hợp lệ")
+		}
+	}
+	record, err := h.service.UpdateAcceptance(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, record)
+}
+func (h *Handler) SubmitAcceptance(c *fiber.Ctx) error {
+	record, err := h.service.SubmitAcceptance(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, record)
+}
 func (h *Handler) PassAcceptance(c *fiber.Ctx) error { return h.acceptanceAction(c, "pass") }
+func (h *Handler) ConditionalPassAcceptance(c *fiber.Ctx) error {
+	return h.acceptanceAction(c, "conditional_pass")
+}
 func (h *Handler) FailAcceptance(c *fiber.Ctx) error { return h.acceptanceAction(c, "fail") }
 func (h *Handler) acceptanceAction(c *fiber.Ctx, result string) error {
 	permissions := []string{"acceptance.approve"}
@@ -1234,7 +1488,39 @@ func (h *Handler) ListPayables(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return h.list(c, fmt.Sprintf(`SELECT pay.*, p.name AS project_name FROM payables pay JOIN projects p ON p.id=pay.project_id WHERE pay.status <> 'cancelled' AND p.status <> 'cancelled' AND %s ORDER BY pay.created_at DESC`, scopeSQL), scopeArgs...)
+	return h.list(c, fmt.Sprintf(`
+		SELECT
+			pay.*,
+			p.name AS project_name,
+			COALESCE(inv.invoice_count, 0) AS invoice_count,
+			COALESCE(inv.invoice_total, 0) AS invoice_total,
+			COALESCE(inv.verified_invoice_total, 0) AS verified_invoice_total,
+			latest.latest_invoice_status,
+			latest.latest_invoice_number,
+			latest.latest_invoice_date
+		FROM payables pay
+		JOIN projects p ON p.id=pay.project_id
+		LEFT JOIN (
+			SELECT
+				payable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('deleted','cancelled')) AS invoice_count,
+				COALESCE(SUM(total_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS invoice_total,
+				COALESCE(SUM(total_amount) FILTER (WHERE status='verified'), 0) AS verified_invoice_total
+			FROM input_invoices
+			GROUP BY payable_id
+		) inv ON inv.payable_id=pay.id
+		LEFT JOIN LATERAL (
+			SELECT status AS latest_invoice_status, invoice_number AS latest_invoice_number, invoice_date AS latest_invoice_date
+			FROM input_invoices ii
+			WHERE ii.payable_id=pay.id AND ii.status NOT IN ('deleted','cancelled')
+			ORDER BY ii.created_at DESC
+			LIMIT 1
+		) latest ON true
+		WHERE pay.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		  AND %s
+		ORDER BY pay.created_at DESC
+	`, scopeSQL), scopeArgs...)
 }
 func (h *Handler) CreatePayable(c *fiber.Ctx) error {
 	if err := h.requireBodyProjectPermission(c, []string{"accounting.payable_approve"}); err != nil {
@@ -1248,6 +1534,99 @@ func (h *Handler) ApprovePayable(c *fiber.Ctx) error {
 func (h *Handler) PayPayable(c *fiber.Ctx) error {
 	return h.payableAction(c, "pay")
 }
+
+func (h *Handler) ListPayableInputInvoices(c *fiber.Ctx) error {
+	rows, err := h.service.PayableInputInvoices(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) ProjectInputInvoices(c *fiber.Ctx) error {
+	rows, err := h.service.ProjectInputInvoices(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) UploadPayableInputInvoice(c *fiber.Ctx) error {
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "File PDF hoá đơn là bắt buộc")
+	}
+	amountBeforeVAT, err := parseFormFloat(c.FormValue("amount_before_vat"))
+	if err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Amount before VAT không hợp lệ")
+	}
+	vatAmount, err := parseFormFloat(c.FormValue("vat_amount"))
+	if err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "VAT amount không hợp lệ")
+	}
+	totalAmount, err := parseFormFloat(c.FormValue("total_amount"))
+	if err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Total amount không hợp lệ")
+	}
+	req := InputInvoiceRequest{
+		InvoiceNumber:        c.FormValue("invoice_number"),
+		InvoiceSymbol:        c.FormValue("invoice_symbol"),
+		InvoiceDate:          c.FormValue("invoice_date"),
+		VendorName:           c.FormValue("vendor_name"),
+		VendorTaxCode:        c.FormValue("vendor_tax_code"),
+		AmountBeforeVAT:      amountBeforeVAT,
+		VATAmount:            vatAmount,
+		TotalAmount:          totalAmount,
+		ProcurementRequestID: c.FormValue("procurement_request_id"),
+		DocumentID:           c.FormValue("document_id"),
+		Notes:                c.FormValue("notes"),
+	}
+	record, err := h.service.CreateInputInvoice(c.Context(), c.Params("id"), req, fileHeader, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, record)
+}
+
+func (h *Handler) VerifyInputInvoice(c *fiber.Ctx) error {
+	return h.inputInvoiceAction(c, "verify")
+}
+
+func (h *Handler) RejectInputInvoice(c *fiber.Ctx) error {
+	return h.inputInvoiceAction(c, "reject")
+}
+
+func (h *Handler) inputInvoiceAction(c *fiber.Ctx, action string) error {
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.InputInvoiceAction(c.Context(), c.Params("id"), action, req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) GetInputInvoiceFile(c *fiber.Ctx) error {
+	file, err := h.service.InputInvoiceFile(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, file.MIMEType)
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf("inline; filename=%q; filename*=UTF-8''%s", "input-invoice.pdf", url.PathEscape(file.Filename)))
+	c.Set(fiber.HeaderXContentTypeOptions, "nosniff")
+	return c.SendFile(file.Path)
+}
+
+func parseFormFloat(value string) (float64, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, nil
+	}
+	return strconv.ParseFloat(value, 64)
+}
+
 func (h *Handler) ListReceivables(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"accounting.view", "accounting.receivable_view"}); err != nil {
 		return err
@@ -1256,7 +1635,39 @@ func (h *Handler) ListReceivables(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return h.list(c, fmt.Sprintf(`SELECT rec.*, p.name AS project_name FROM receivables rec JOIN projects p ON p.id=rec.project_id WHERE rec.status <> 'cancelled' AND p.status <> 'cancelled' AND %s ORDER BY rec.created_at DESC`, scopeSQL), scopeArgs...)
+	return h.list(c, fmt.Sprintf(`
+		SELECT
+			rec.*,
+			p.name AS project_name,
+			COALESCE(inv.invoice_count, 0) AS invoice_count,
+			COALESCE(inv.invoice_total, 0) AS invoice_total,
+			COALESCE(inv.issued_invoice_total, 0) AS issued_invoice_total,
+			latest.latest_invoice_status,
+			latest.latest_invoice_number,
+			latest.latest_invoice_date
+		FROM receivables rec
+		JOIN projects p ON p.id=rec.project_id
+		LEFT JOIN (
+			SELECT
+				receivable_id,
+				COUNT(*) FILTER (WHERE status NOT IN ('deleted','cancelled')) AS invoice_count,
+				COALESCE(SUM(total_amount) FILTER (WHERE status NOT IN ('deleted','cancelled')), 0) AS invoice_total,
+				COALESCE(SUM(total_amount) FILTER (WHERE status='issued'), 0) AS issued_invoice_total
+			FROM output_invoices
+			GROUP BY receivable_id
+		) inv ON inv.receivable_id=rec.id
+		LEFT JOIN LATERAL (
+			SELECT status AS latest_invoice_status, invoice_number AS latest_invoice_number, invoice_date AS latest_invoice_date
+			FROM output_invoices oi
+			WHERE oi.receivable_id=rec.id AND oi.status NOT IN ('deleted','cancelled')
+			ORDER BY oi.created_at DESC
+			LIMIT 1
+		) latest ON true
+		WHERE rec.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		  AND %s
+		ORDER BY rec.created_at DESC
+	`, scopeSQL), scopeArgs...)
 }
 func (h *Handler) CreateReceivable(c *fiber.Ctx) error {
 	if err := h.requireBodyProjectPermission(c, []string{"accounting.receivable_approve"}); err != nil {
@@ -1264,6 +1675,91 @@ func (h *Handler) CreateReceivable(c *fiber.Ctx) error {
 	}
 	return h.create(c, "receivables", receivableColumns())
 }
+
+func (h *Handler) ListReceivableOutputInvoices(c *fiber.Ctx) error {
+	rows, err := h.service.ReceivableOutputInvoices(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) ProjectOutputInvoices(c *fiber.Ctx) error {
+	rows, err := h.service.ProjectOutputInvoices(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) UploadReceivableOutputInvoice(c *fiber.Ctx) error {
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "File PDF hoá đơn là bắt buộc")
+	}
+	amountBeforeVAT, err := parseFormFloat(c.FormValue("amount_before_vat"))
+	if err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Amount before VAT không hợp lệ")
+	}
+	vatAmount, err := parseFormFloat(c.FormValue("vat_amount"))
+	if err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "VAT amount không hợp lệ")
+	}
+	totalAmount, err := parseFormFloat(c.FormValue("total_amount"))
+	if err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Total amount không hợp lệ")
+	}
+	req := OutputInvoiceRequest{
+		InvoiceNumber:   c.FormValue("invoice_number"),
+		InvoiceSymbol:   c.FormValue("invoice_symbol"),
+		InvoiceDate:     c.FormValue("invoice_date"),
+		ClientName:      c.FormValue("client_name"),
+		ClientTaxCode:   c.FormValue("client_tax_code"),
+		AmountBeforeVAT: amountBeforeVAT,
+		VATAmount:       vatAmount,
+		TotalAmount:     totalAmount,
+		PaymentID:       c.FormValue("payment_id"),
+		DocumentID:      c.FormValue("document_id"),
+		Notes:           c.FormValue("notes"),
+	}
+	record, err := h.service.CreateOutputInvoice(c.Context(), c.Params("id"), req, fileHeader, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, record)
+}
+
+func (h *Handler) IssueOutputInvoice(c *fiber.Ctx) error {
+	return h.outputInvoiceAction(c, "issue")
+}
+
+func (h *Handler) VoidOutputInvoice(c *fiber.Ctx) error {
+	return h.outputInvoiceAction(c, "void")
+}
+
+func (h *Handler) outputInvoiceAction(c *fiber.Ctx, action string) error {
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.OutputInvoiceAction(c.Context(), c.Params("id"), action, req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) GetOutputInvoiceFile(c *fiber.Ctx) error {
+	file, err := h.service.OutputInvoiceFile(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, file.MIMEType)
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf("inline; filename=%q; filename*=UTF-8''%s", "output-invoice.pdf", url.PathEscape(file.Filename)))
+	c.Set(fiber.HeaderXContentTypeOptions, "nosniff")
+	return c.SendFile(file.Path)
+}
+
 func (h *Handler) ApproveReceivable(c *fiber.Ctx) error {
 	return h.receivableAction(c, "approve")
 }

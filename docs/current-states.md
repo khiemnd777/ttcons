@@ -62,17 +62,17 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 | Chữ ký ảo | Missing | Internal signature/stamp model with actor/time/immutability. |
 | Hình ảnh | Partial | Real upload/storage/gallery/metadata/permission handling. |
 | Đơn giá | Partial | Unit-price lifecycle: expected, norm locked, final locked. |
-| Checklist thầu phụ | Missing | Dedicated subcontractor checklist form and evidence flow. |
-| Checklist chủ đầu tư | Missing | Dedicated owner/client checklist and signoff flow. |
-| Daily report thi công | Partial | Add did/will, crew, actual quantity, site photo evidence. |
-| Đối soát checklist thầu phụ | Missing | Reconcile subcontractor checklist with BOQ, actual quantity, internal confirmation. |
-| Đối soát checklist chủ đầu tư | Missing | Reconcile owner checklist with internal acceptance and project outputs. |
-| Vật tư trước/sau | Partial | Add before/after material snapshots by work item or construction item. |
-| Lưu kho vật tư tồn | Partial | Add custody location, condition, photo, storage/return record. |
-| Nghiệm thu đầu vào | Partial | Separate supplier/subcontractor incoming acceptance from generic acceptance. |
-| Nghiệm thu đầu ra | Partial | Owner/client outgoing acceptance with checklist, signature, document output. |
-| PDF hoá đơn đầu vào | Missing | Import/export PDF invoice linked to payable/procurement/document. |
-| PDF hoá đơn đầu ra | Missing | Import/export PDF invoice linked to receivable/payment/document. |
+| Checklist thầu phụ | Done | Dedicated subcontractor checklist form and evidence flow implemented; reconciliation is tracked separately. |
+| Checklist chủ đầu tư | Done | Dedicated owner/client checklist and signoff flow implemented; reconciliation is tracked separately. |
+| Daily report thi công | Done | Added did/will, crew, actual quantity, material usage rows, and site photo evidence. |
+| Đối soát checklist thầu phụ | Done | Durable subcontractor checklist reconciliation with BOQ mapping, confirmed quantity, variance, decision, activity, and audit. |
+| Đối soát checklist chủ đầu tư | Done | Durable owner/client checklist reconciliation with acceptance mapping, client decision, required action, final decision, activity, and audit. |
+| Vật tư trước/sau | Done | Durable before/after material snapshot per work item, with submit-time site balance usage application and no stock movement generation. |
+| Lưu kho vật tư tồn | Done | Durable surplus handling with custody location, condition, evidence, partial/handled balance status, and submit-time stock movement linkage. |
+| Nghiệm thu đầu vào | Done | Separate incoming acceptance records/items with procurement/material/evidence references, submit audit, and no automatic stock movement. |
+| Nghiệm thu đầu ra | Done | Durable outgoing acceptance records/checklist with work item link, workflow form/PDF references, signature/document gates, submit/chốt result, punch list/rework history, and handover-compatible final pass. |
+| PDF hoá đơn đầu vào | Done | Protected input invoice PDF upload/download linked to payable, optional procurement request, and document metadata. |
+| PDF hoá đơn đầu ra | Done | Protected output invoice PDF upload/download linked to receivable, optional client receipt payment, and document metadata. |
 | Thanh toán kỳ/ứng trước đầu vào | Partial | Payment schedule, advance request, partial pay, settlement. |
 | Thanh toán kỳ/ứng trước đầu ra | Partial | Billing milestone, advance receipt, partial receive, invoice issue. |
 | Công nợ đầu vào | Partial | Payable aging, vendor ledger, invoice/payment reconciliation. |
@@ -145,6 +145,7 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - Implement owner checklist reconciliation against acceptance/internal output.
 - Implement material before/after reports by work item or construction item.
 - Implement surplus material storage workflow with location, condition, photo, and movement linkage.
+- Implement incoming acceptance by work item for supplier/subcontractor/procurement deliveries, with line decisions, evidence, audit, and no implicit stock movement.
 
 ### 7. Acceptance And Quality
 
@@ -319,6 +320,91 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - Updated procurement generation from BOQ so approved BOQ rows must be final locked before purchase requests are generated; generated procurement items now store `boq_price_source`, `boq_price_revision_no`, and `boq_price_event_id`.
 - Rebuilt `BOQPage` with lifecycle metrics, expected/norm/final unit-price display, final-lock status, dedicated Unit Price Lifecycle dialog, price history, and separate update/lock actions.
 - Added frontend BOQ lifecycle types and backend regression coverage for price validation plus BOQ-to-procurement final-lock behavior when DB-backed tests are enabled.
+- Implemented Construction Phase 5A for production-grade subcontractor checklist workflow forms.
+- Added migration `backend/migrations/V18__subcontractor_checklist_form.sql` to publish `builtin_subcontractor_checklist` with subcontractor identity, work package, construction area, structured checklist rows, quantity claim/confirmation cells, optional evidence references, owner response, and confirmation.
+- Kept subcontractor checklist under existing `form_type='checklist'` to reuse the current workflow form runtime, checklist submit gate, work item completion payload, signature, PDF, and evidence validation behavior without widening form-type constraints.
+- Extended structured-list validation/rendering to support numeric row cells for claimed and confirmed quantities.
+- Updated Pipeline Builder construction presets/default form selection so steps named for subcontractor checklist bind to `Checklist thầu phụ` when the catalog is loaded, while other checklist steps still use the generic checklist form.
+- Added backend fallback form-version selection for pipeline step create/update and template creation so `Checklist thầu phụ` can resolve to the subcontractor checklist even when frontend catalog data is not available.
+- Added backend regression coverage for structured-list numeric cells and subcontractor checklist catalog, blocked submit rejection, invalid quantity rejection, invalid evidence rejection, successful submit, and completion payload persistence when DB-backed tests are enabled.
+- Implemented Construction Phase 5B for production-grade owner/client checklist workflow forms.
+- Added migration `backend/migrations/V19__owner_client_checklist_form.sql` to publish `builtin_owner_client_checklist` with client/company representatives, handover scope, structured checklist rows, client decision, evidence reference, severity, required action, final client note, and confirmation.
+- Kept owner/client checklist under existing `form_type='checklist'` to reuse workflow form runtime, checklist submit gate, work item completion payload, signature, PDF, and evidence validation behavior.
+- Extended backend fallback form-version selection for pipeline step create/update and template creation so `Checklist chủ đầu tư`, `client checklist`, or `owner checklist` resolves to the owner/client checklist form.
+- Updated Pipeline Builder acceptance presets/default form selection so steps named for owner/client checklist bind to `Checklist chủ đầu tư` when the catalog is loaded.
+- Added backend regression coverage for owner/client checklist catalog, default form selection, blocked submit rejection, invalid evidence rejection, successful submit, and completion payload persistence when DB-backed tests are enabled.
+- Deferred owner checklist reconciliation against acceptance/internal output to the next dedicated station.
+- Implemented Construction Phase 5C for production-grade construction daily report workflow forms.
+- Added migration `backend/migrations/V20__construction_daily_report_form.sql` to publish `builtin_construction_daily_report` with report date/reporter, construction scope, weather, progress percent, site photo evidence, completed work rows, crew rows, report-only material usage rows, next-plan rows, blockers, and confirmation.
+- Kept construction daily report under existing `form_type='daily_report'` while using a separate template code from `builtin_daily_report` so planning daily report v2 remains the default for non-construction daily report steps.
+- Generalized daily-report next-plan item generation so construction daily reports produce `construction_daily_report` metadata and comments while planning daily reports keep existing `planning_daily_report` behavior.
+- Updated backend and Pipeline Builder default form selection so `Daily report thi công`, construction node daily-report steps, or site/construction report names bind to `Daily report thi công` when available.
+- Added backend regression coverage for construction daily report catalog, default form selection, invalid evidence rejection, invalid quantity rejection, successful submit, report-only material usage persistence, and next-plan work item generation when DB-backed tests are enabled.
+- Deferred warehouse stock deduction/reconciliation from `material_usage_items`; material usage rows are report evidence only in this station.
+- Implemented Construction Phase 5D for production-grade subcontractor checklist reconciliation.
+- Added migration `backend/migrations/V21__subcontractor_checklist_reconciliation.sql` with durable reconciliation headers and item rows linked to project, work item, submitted workflow form revision, BOQ item snapshot, evidence, confirmed quantity, variance, decision, activity, and audit trail.
+- Added authenticated work item reconciliation APIs: read, save draft, and submit under existing work item auth with project permission checks for `boq.update` or `operation.report`.
+- Kept reconciliation as separate auditable evidence and did not mutate submitted workflow form answers, BOQ, procurement, warehouse stock, payable, or payment state.
+- Added service/repository validation for submitted `builtin_subcontractor_checklist` forms, same-project BOQ mapping, same-work-item evidence, nonnegative quantities, duplicate item rejection, and immutable submitted reconciliation.
+- Added `SubcontractorReconciliationPanel` inside the Work Item dialog under `WorkflowFormPanel`, with loading/error/submit-required states, BOQ select, claim/confirmed/variance display, decision select, line comments, draft save, submit, and dismissible toast feedback through the existing toast provider.
+- Added frontend domain types for subcontractor reconciliation response, header, and item contracts.
+- Added backend regression coverage for reconciliation default generation, invalid BOQ rejection, persistence, variance calculation, workflow form answer immutability, work item activity, audit log, and post-submit edit rejection when DB-backed tests are enabled.
+- Implemented Construction Phase 5E for production-grade owner/client checklist reconciliation.
+- Added migration `backend/migrations/V22__owner_client_checklist_reconciliation.sql` with durable reconciliation headers and item rows linked to project, work item, submitted workflow form revision, evidence, same-project acceptance records, client decision, severity, required action, due date, final reconciliation decision, activity, and audit trail.
+- Added authenticated work item owner/client reconciliation APIs: read, save draft, and submit under existing work item auth with project permission checks for `acceptance.approve`, `acceptance.reject`, or `operation.report`.
+- Kept reconciliation as separate auditable evidence and did not mutate submitted workflow form answers, acceptance status/result, rework, handover, stock, accounting, or PDF state.
+- Added service/repository validation for submitted `builtin_owner_client_checklist` forms, same-project acceptance mapping, same-work-item evidence, valid client/final decisions, submit-time internal acceptance requirements, duplicate item rejection, and immutable submitted reconciliation.
+- Added `OwnerClientReconciliationPanel` inside the Work Item dialog under `WorkflowFormPanel`, with loading/error/submit-required states, acceptance select, client decision/status badges, required action display, final decision select, line comments, draft save, submit, and dismissible toast feedback through the existing toast provider.
+- Added frontend domain types for owner/client reconciliation response, header, and item contracts.
+- Added backend regression coverage for default owner/client reconciliation generation, draft save without acceptance, missing/invalid acceptance rejection on submit, persistence, workflow form answer immutability, work item activity, audit log, and post-submit edit rejection when DB-backed tests are enabled.
+- Implemented Construction Phase 5F for production-grade material before/after snapshots.
+- Added migration `backend/migrations/V23__material_before_after_snapshots.sql` with durable snapshot headers and item rows linked to project, work item, material, site balance, before/after evidence, quantities, condition, source, comments, activity, and audit trail.
+- Added authenticated work item material snapshot APIs: read, save draft, and submit under existing work item auth with project permission checks for `operation.report` or `warehouse.issue`.
+- Kept draft saves report-only; submit is immutable and transactionally increments `site_material_balances.used_quantity`/recomputes surplus for balance-affecting rows without creating `stock_movements`.
+- Added service/repository validation for active materials, same-work-item evidence, nonnegative before/added/after/waste quantities, computed used quantity, site balance existence, submit-time available balance, duplicate item rejection, and post-submit edit rejection.
+- Added `MaterialSnapshotPanel` inside the Work Item dialog under checklist reconciliation panels, with material/source/condition controls, before/added/after/waste quantities, computed used quantity, evidence before/after selectors, draft save, submit, and dismissible toast feedback through the existing toast provider.
+- Added frontend domain types for material snapshot response, header, item, material catalog, and project material balance contracts.
+- Implemented Construction Phase 5G for production-grade surplus material handling.
+- Added migration `backend/migrations/V24__site_surplus_handling.sql` with durable surplus handling headers linked to project, work item, site material balance, material, optional material snapshot, evidence, warehouse, and stock movement.
+- Added authenticated work item surplus handling APIs: read by work item, create draft, update draft, and submit under existing work item auth with submit restricted to `warehouse.surplus_handle`.
+- Kept draft saves report-only; submit is immutable and transactionally creates `return_to_warehouse` or `return_to_subcontractor` stock movement, links the movement back to the handling record, updates site balance, and records activity/audit.
+- Changed stock return balance status semantics so partial surplus handling sets `surplus_status='partial'` and only zero-surplus handling sets `surplus_status='handled'`.
+- Added service/repository validation for same-project site balance, active warehouse, same-work-item evidence, positive quantity, submit-time surplus availability, required custody location/evidence on submit, valid condition/type, and post-submit edit rejection.
+- Added `SurplusHandlingPanel` inside the Work Item dialog under `MaterialSnapshotPanel`, with per-balance draft controls, warehouse/location/evidence/condition fields, save draft, submit, and submitted handling history.
+- Added frontend domain types for surplus handling records, response payload, and warehouses.
+- Implemented Construction Phase 5H for production-grade incoming acceptance.
+- Added migration `backend/migrations/V25__incoming_acceptance.sql` with durable incoming acceptance headers and item rows linked to project, optional work item, procurement request/item, material, warehouse, evidence, source, result, quantities, condition, line decision, activity, and audit trail.
+- Added authenticated incoming acceptance APIs: list by work item, list by project, create draft, update draft, get detail, and submit under existing project/work item auth and project permission checks.
+- Kept draft saves report-only; submit is immutable and records result/activity/audit without creating `stock_movements`, mutating procurement, or changing warehouse/site material balance.
+- Added service/repository validation for same-project work item/procurement/evidence, active material/warehouse, nonnegative delivered/accepted/rejected quantities, accepted+rejected within delivered, line decisions, required defect evidence/note for conditional/rejected rows, derived result, and post-submit edit rejection.
+- Added `IncomingAcceptancePanel` inside the Work Item dialog under `SurplusHandlingPanel`, with source/procurement/warehouse/date/result header, material/procurement item line controls, accepted/rejected quantity validation, condition/decision/evidence/defect controls, draft save, submit, toasts, and submitted acceptance history.
+- Added frontend domain types for incoming acceptance records/items/response and procurement request/item option payloads.
+- Added backend regression coverage proving incoming acceptance draft/submit does not create stock movements, derives `conditional_pass`, persists item quantities, records activity/audit, and rejects post-submit edits.
+- Implemented Acceptance Phase 6A for production-grade outgoing acceptance.
+- Added migration `backend/migrations/V26__outgoing_acceptance_hardening.sql` to harden existing `acceptance_records` and `acceptance_checklist_items` with acceptance codes, work item/form/PDF links, acceptance date/location/representatives/scope, signature/document status, submitted actor/time, structured checklist decisions, severity, evidence, required action, and summary JSON.
+- Added authenticated outgoing acceptance APIs: list by work item, list by project, create draft, update draft, get detail, submit, pass, conditional-pass, fail, and create rework under existing project/work item auth and project permission checks.
+- Kept draft saves mutable/report-only; submit is immutable and enforces signature/document completion or waiver, no pending checklist rows, and real evidence/action requirements for conditional/fail rows.
+- Added service/repository validation for same-project work item, workflow form, PDF export, and evidence references, submitted workflow form linkage, result/checklist consistency, and post-submit edit rejection.
+- Added `OutgoingAcceptancePanel` inside the Work Item dialog under `IncomingAcceptancePanel`, with workflow form/PDF selectors, representative/scope/signature/document fields, checklist decision/severity/evidence/action rows, draft save, submit, and submitted acceptance action history.
+- Upgraded `AcceptancePage` with typed outgoing acceptance list/detail, checklist count, work item/form/PDF/signature/document visibility, submitted-only pass/conditional/fail actions, and failed-completed-only rework action.
+- Added frontend domain types for outgoing acceptance records/checklist/response.
+- Added backend regression coverage proving outgoing acceptance submit locks edits, blocks pass when checklist has fail rows, fail creates punch list/rework history, duplicate rework is rejected, and final pass remains compatible with handover readiness checks.
+- Implemented Documents/PDF Phase 7A for production-grade input invoice PDF handling.
+- Added migration `backend/migrations/V27__input_invoice_pdf.sql` with durable `input_invoices` linked to project, payable, optional procurement request, document metadata, protected local storage metadata, checksum, status, upload/verify/reject actor fields, and active-list indexes.
+- Added authenticated input invoice APIs for list by payable, list by project, upload PDF, protected file open, verify, and reject under existing project accounting permissions.
+- Kept invoice upload from mutating payment schedules or payable payment state; verify/reject only changes invoice status and audit metadata.
+- Added service/repository validation for same-project payable/procurement/document references, PDF-only MIME detection, upload size/checksum/storage-path containment, and protected file lookup.
+- Added `InputInvoicePanel` inside payable detail with upload dialog, inline validation/warning toasts, protected PDF open action, verify/reject actions, invoice totals, and refreshed payable invoice counters.
+- Upgraded `DebtPage` payable rows with invoice count/verified total and typed payable/receivable/input-invoice frontend contracts.
+- Added backend regression coverage for input invoice upload, protected file storage bytes/checksum, generated document linkage, payable/project invoice lists, verify/reject transitions, audit logs, and cross-project procurement rejection when DB-backed tests are enabled.
+- Implemented Documents/PDF Phase 7B for production-grade output invoice PDF handling.
+- Added migration `backend/migrations/V28__output_invoice_pdf.sql` with durable `output_invoices` linked to project, receivable, optional client receipt payment, document metadata, protected local storage metadata, checksum, status, upload/issue/void actor fields, and active-list indexes.
+- Added authenticated output invoice APIs for list by receivable, list by project, upload PDF, protected file open, issue, and void under existing project accounting permissions.
+- Kept output invoice upload from mutating receivable/payment state; issue/void only changes invoice status and audit metadata.
+- Added service/repository validation for same-project receivable/payment/document references, `client_receipt` payment linkage, PDF-only MIME detection, upload size/checksum/storage-path containment, and protected file lookup.
+- Added `OutputInvoicePanel` inside receivable detail with upload dialog, inline validation/warning toasts, protected PDF open action, issue/void actions, invoice totals, and refreshed receivable invoice counters.
+- Upgraded `DebtPage` receivable rows with invoice count/issued total and typed output-invoice frontend contracts.
+- Added backend regression coverage for output invoice upload, protected file storage bytes/checksum, generated document linkage, receivable/project invoice lists, issue/void transitions, audit logs, and cross-project payment rejection when DB-backed tests are enabled.
 
 ## Validation Status
 
@@ -368,5 +454,60 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - `docker compose config` passed after Planning Forms 4G.
 - `git diff --check` passed after Planning Forms 4G.
 - Custom migration runner for Planning Forms 4G could not apply locally because the reachable PostgreSQL server returned `FATAL: role "consflow" does not exist`; no database role/database mutation was attempted.
+- `gofmt -w backend/internal/core/service.go backend/internal/core/repository_domain.go backend/internal/core/project_operations_integration_test.go` passed after Construction Phase 5A.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Construction Phase 5A; DB-backed integration tests remain gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Construction Phase 5A; Vite chunk-size warning remains.
+- `git diff --check` passed after Construction Phase 5A.
+- Custom migration runner was not run after Construction Phase 5A; applying `V18` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/repository_domain.go backend/internal/core/project_operations_integration_test.go` passed after Construction Phase 5B.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Construction Phase 5B; DB-backed integration tests remain gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Construction Phase 5B; Vite chunk-size warning remains.
+- `git diff --check` passed after Construction Phase 5B.
+- Custom migration runner was not run after Construction Phase 5B; applying `V19` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/repository_domain.go backend/internal/core/project_operations_integration_test.go` passed after Construction Phase 5C.
+- `GOCACHE="$PWD/backend/.gocache" go test ./backend/...` passed after Construction Phase 5C; DB-backed integration tests remain gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Construction Phase 5C; Vite chunk-size warning remains.
+- `git diff --check` passed after Construction Phase 5C.
+- Custom migration runner was not run after Construction Phase 5C; applying `V20` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/types.go backend/internal/core/routes.go backend/internal/core/handlers.go backend/internal/core/service.go backend/internal/core/repository_domain.go backend/internal/core/project_operations_integration_test.go` passed after Construction Phase 5D.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Construction Phase 5D.
+- `cd frontend && npm run build` passed after Construction Phase 5D; Vite chunk-size warning remains.
+- `git diff --check` passed after Construction Phase 5D.
+- Custom migration runner was not run after Construction Phase 5D; applying `V21` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/types.go backend/internal/core/routes.go backend/internal/core/handlers.go backend/internal/core/service.go backend/internal/core/repository_domain.go backend/internal/core/project_operations_integration_test.go` passed after Construction Phase 5E.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Construction Phase 5E.
+- `cd frontend && npm run build` passed after Construction Phase 5E; Vite chunk-size warning remains.
+- `git diff --check` passed after Construction Phase 5E.
+- Custom migration runner was not run after Construction Phase 5E; applying `V22` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/project_operations_integration_test.go backend/internal/core/repository_domain.go backend/internal/core/routes.go backend/internal/core/service.go backend/internal/core/types.go` passed after Construction Phase 5F.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Construction Phase 5F.
+- `cd frontend && npm run build` passed after Construction Phase 5F; Vite chunk-size warning remains.
+- `git diff --check` passed after Construction Phase 5F.
+- Custom migration runner was not run after Construction Phase 5F; applying `V23` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/project_operations_integration_test.go backend/internal/core/repository_domain.go backend/internal/core/routes.go backend/internal/core/service.go backend/internal/core/types.go` passed after Construction Phase 5G.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Construction Phase 5G.
+- `cd frontend && npm run build` passed after Construction Phase 5G; Vite chunk-size warning remains.
+- `git diff --check` passed after Construction Phase 5G.
+- Custom migration runner was not run after Construction Phase 5G; applying `V24` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/project_operations_integration_test.go backend/internal/core/repository_domain.go backend/internal/core/routes.go backend/internal/core/service.go backend/internal/core/types.go` passed after Construction Phase 5H.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Construction Phase 5H.
+- `cd frontend && npm run build` passed after Construction Phase 5H; Vite chunk-size warning remains.
+- `git diff --check` passed after Construction Phase 5H.
+- Custom migration runner was not run after Construction Phase 5H; applying `V25` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/project_operations_integration_test.go backend/internal/core/repository.go backend/internal/core/repository_domain.go backend/internal/core/routes.go backend/internal/core/service.go backend/internal/core/types.go` passed after Acceptance Phase 6A.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Acceptance Phase 6A; DB-backed integration tests remain gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Acceptance Phase 6A; Vite chunk-size warning remains.
+- `git diff --check` passed after Acceptance Phase 6A.
+- Custom migration runner was not run after Acceptance Phase 6A; applying `V26` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/project_operations_integration_test.go backend/internal/core/repository.go backend/internal/core/repository_domain.go backend/internal/core/routes.go backend/internal/core/service.go backend/internal/core/types.go` passed after Documents/PDF Phase 7A.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Documents/PDF Phase 7A; DB-backed input invoice integration coverage remains gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Documents/PDF Phase 7A; Vite chunk-size warning remains.
+- `git diff --check` passed after Documents/PDF Phase 7A.
+- Custom migration runner was not run after Documents/PDF Phase 7A; applying `V27` still requires a reachable Consflow PostgreSQL role/database.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/project_operations_integration_test.go backend/internal/core/repository.go backend/internal/core/repository_domain.go backend/internal/core/routes.go backend/internal/core/service.go backend/internal/core/types.go` passed after Documents/PDF Phase 7B.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Documents/PDF Phase 7B; DB-backed output invoice integration coverage remains gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Documents/PDF Phase 7B; Vite chunk-size warning remains.
+- `git diff --check` passed after Documents/PDF Phase 7B.
+- Custom migration runner was not run after Documents/PDF Phase 7B; applying `V28` still requires a reachable Consflow PostgreSQL role/database.
 - Browser verification not run, per repo rule unless explicitly requested.
 - No backend/API/migration changes were needed for the Pipeline Builder multi-role UI, Shared UI 2A, or Shared UI 2B batches.

@@ -14,6 +14,12 @@ import type { ActivityPayload, EvidenceRecord, WorkItem, WorkItemActivity } from
 import { ActivityAttachments } from './ActivityAttachments';
 import { ActivityComposer, type ActivityAttachmentOption } from './ActivityComposer';
 import { EvidencePanel } from './EvidencePanel';
+import { IncomingAcceptancePanel } from './IncomingAcceptancePanel';
+import { MaterialSnapshotPanel } from './MaterialSnapshotPanel';
+import { OwnerClientReconciliationPanel } from './OwnerClientReconciliationPanel';
+import { OutgoingAcceptancePanel } from './OutgoingAcceptancePanel';
+import { SubcontractorReconciliationPanel } from './SubcontractorReconciliationPanel';
+import { SurplusHandlingPanel } from './SurplusHandlingPanel';
 import { WorkflowFormPanel } from './WorkflowFormPanel';
 import {
   actionDescriptions,
@@ -202,6 +208,18 @@ export function WorkItemDetailDialog({
           </section>
 
           <WorkflowFormPanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
+
+          <SubcontractorReconciliationPanel workItemId={detailItem.id} projectId={detailItem.project_id} />
+
+          <OwnerClientReconciliationPanel workItemId={detailItem.id} projectId={detailItem.project_id} />
+
+          <MaterialSnapshotPanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
+
+          <SurplusHandlingPanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
+
+          <IncomingAcceptancePanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
+
+          <OutgoingAcceptancePanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
 
           <div className="grid gap-4 xl:grid-cols-2">
             <EvidencePanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />

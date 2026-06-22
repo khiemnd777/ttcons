@@ -93,6 +93,7 @@ func TestWorkflowFormStructuredListValidation(t *testing.T) {
 				"min_items": float64(1),
 				"item_fields": []any{
 					map[string]any{"key": "title", "label": "Việc cần làm", "type": "text", "required": true, "min_length": float64(3)},
+					map[string]any{"key": "quantity", "label": "Khối lượng", "type": "number", "required": true, "min": float64(0)},
 					map[string]any{"key": "due_date", "label": "Due date", "type": "date", "required": true},
 					map[string]any{"key": "priority", "label": "Priority", "type": "select", "required": true, "options": []any{map[string]any{"value": "normal"}, map[string]any{"value": "high"}}},
 				},
@@ -106,8 +107,13 @@ func TestWorkflowFormStructuredListValidation(t *testing.T) {
 	_, err = service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{"action_items": []any{map[string]any{"title": "ok", "due_date": "bad-date", "priority": "urgent"}}}, true)
 	assertValidationError(t, err)
 
+	_, err = service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{
+		"action_items": []any{map[string]any{"title": "Chốt bản vẽ", "quantity": "-1", "due_date": "2026-06-30", "priority": "normal"}},
+	}, true)
+	assertValidationError(t, err)
+
 	answers, err := service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{
-		"action_items": []any{map[string]any{"title": "  Chốt bản vẽ  ", "due_date": "2026-06-30", "priority": "high"}},
+		"action_items": []any{map[string]any{"title": "  Chốt bản vẽ  ", "quantity": "2.5", "due_date": "2026-06-30", "priority": "high"}},
 	}, true)
 	if err != nil {
 		t.Fatal(err)
@@ -118,6 +124,9 @@ func TestWorkflowFormStructuredListValidation(t *testing.T) {
 	}
 	if items[0]["title"] != "Chốt bản vẽ" || items[0]["priority"] != "high" {
 		t.Fatalf("normalized structured list item = %#v", items[0])
+	}
+	if number(items[0]["quantity"]) != 2.5 {
+		t.Fatalf("normalized quantity = %#v", items[0]["quantity"])
 	}
 }
 
@@ -137,6 +146,30 @@ func TestBOQUnitPriceValidation(t *testing.T) {
 	}
 	_, err = normalizeBOQItemRequest("project-id", Record{"category": "A", "work_item_name": "Item", "unit": "m2", "quantity": -1}, true)
 	assertValidationError(t, err)
+}
+
+func TestDefaultWorkflowFormCodePrefersSpecificStepTypes(t *testing.T) {
+	if got := defaultWorkflowFormCode("daily_report", true, "Checklist thầu phụ"); got != "builtin_daily_report" {
+		t.Fatalf("daily report default form = %s", got)
+	}
+	if got := defaultWorkflowFormCode("daily_report", false, "Daily report thi công"); got != "builtin_construction_daily_report" {
+		t.Fatalf("construction daily report default form = %s", got)
+	}
+	if got := defaultWorkflowFormCode("daily_report", false, "Nhật ký công trường"); got != "builtin_construction_daily_report" {
+		t.Fatalf("site daily report default form = %s", got)
+	}
+	if got := defaultWorkflowFormCode("checklist", true, "Checklist chủ đầu tư"); got != "builtin_owner_client_checklist" {
+		t.Fatalf("owner/client checklist default form = %s", got)
+	}
+	if got := defaultWorkflowFormCode("checklist", true, "Client checklist"); got != "builtin_owner_client_checklist" {
+		t.Fatalf("client checklist default form = %s", got)
+	}
+	if got := defaultWorkflowFormCode("checklist", true, "Checklist thầu phụ"); got != "builtin_subcontractor_checklist" {
+		t.Fatalf("subcontractor checklist default form = %s", got)
+	}
+	if got := defaultWorkflowFormCode("checklist", true, "Checklist nghiệm thu"); got != "builtin_checklist" {
+		t.Fatalf("generic checklist default form = %s", got)
+	}
 }
 
 func TestWorkflowFormPDFGeneratorProducesPDFWithSignatureStamp(t *testing.T) {
@@ -747,6 +780,241 @@ func TestBatch4AccountingListUsesProjectScope(t *testing.T) {
 	if body.Data[0]["project_id"] != fixture.projectID {
 		t.Fatalf("project_id = %v, want %s", body.Data[0]["project_id"], fixture.projectID)
 	}
+}
+
+func TestInputInvoicePDFUploadLinksPayableDocumentAndStatus(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	uploadDir := t.TempDir()
+	service.ConfigureUploads(uploadDir, 1024*1024)
+	fixture := setupProjectScopeFixture(t, db, []string{"accounting.view", "accounting.payable_view", "accounting.payable_approve"})
+	payableID := newID()
+	otherProcurementID := newID()
+	mustExec(t, db, `
+		INSERT INTO payables (id, project_id, payable_code, vendor_type, vendor_name, source_type, gross_amount, remaining_amount, status, created_by)
+		VALUES ($1,$2,$3,'supplier','VAT Vendor','manual',1100000,1100000,'approved',$4)
+	`, payableID, fixture.projectID, "PAY-IN-"+payableID[:8], fixture.userID)
+	mustExec(t, db, `
+		INSERT INTO procurement_requests (id, project_id, request_code, title, requested_by, status, total_estimated_amount)
+		VALUES ($1,$2,$3,'Other procurement',$4,'approved',1100000)
+	`, otherProcurementID, fixture.otherProjectID, "PR-OTHER-"+otherProcurementID[:8], fixture.userID)
+
+	pdfContent := []byte("%PDF-1.4\n% test invoice\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n")
+	invoice, err := service.CreateInputInvoice(ctx, payableID, InputInvoiceRequest{
+		InvoiceNumber:   "VAT-001",
+		InvoiceSymbol:   "C25TAA",
+		InvoiceDate:     "2026-06-22",
+		VendorName:      "VAT Vendor",
+		VendorTaxCode:   "0312345678",
+		AmountBeforeVAT: 1000000,
+		VATAmount:       100000,
+		TotalAmount:     1100000,
+		Notes:           "Hoá đơn mua vật tư",
+	}, testMultipartFileHeader(t, "file", "vat-invoice.pdf", pdfContent), fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if invoice["status"] != "draft" {
+		t.Fatalf("status = %v, want draft", invoice["status"])
+	}
+	invoiceID := cleanID(invoice["id"])
+	documentID := cleanID(invoice["document_id"])
+	if invoiceID == "" || documentID == "" {
+		t.Fatalf("expected invoice and document ids, got invoice=%q document=%q", invoiceID, documentID)
+	}
+	storageKey := fmt.Sprint(invoice["storage_key"])
+	if !strings.HasPrefix(storageKey, fmt.Sprintf("input-invoices/%s/%s/", fixture.projectID, payableID)) || strings.Contains(storageKey, "..") {
+		t.Fatalf("invalid storage_key = %q", storageKey)
+	}
+	sum := sha256.Sum256(pdfContent)
+	if got := fmt.Sprint(invoice["checksum_sha256"]); got != hex.EncodeToString(sum[:]) {
+		t.Fatalf("checksum = %s, want %s", got, hex.EncodeToString(sum[:]))
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM documents WHERE id=$1 AND project_id=$2 AND target_type='input_invoice' AND target_id=$3 AND status='active'`, 1, documentID, fixture.projectID, invoiceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='input_invoice_uploaded' AND target_id=$2`, 1, fixture.projectID, invoiceID)
+
+	file, err := service.InputInvoiceFile(ctx, invoiceID, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file.MIMEType != "application/pdf" || file.Filename != "vat-invoice.pdf" {
+		t.Fatalf("file result = %#v", file)
+	}
+	storedBytes, err := os.ReadFile(file.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(storedBytes, pdfContent) {
+		t.Fatal("stored invoice PDF bytes do not match upload")
+	}
+	if !strings.HasPrefix(file.Path, uploadDir) {
+		t.Fatalf("file path = %q, want under %q", file.Path, uploadDir)
+	}
+
+	payableInvoices, err := service.PayableInputInvoices(ctx, payableID, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(payableInvoices) != 1 || cleanID(payableInvoices[0]["id"]) != invoiceID {
+		t.Fatalf("payable invoices = %#v", payableInvoices)
+	}
+	projectInvoices, err := service.ProjectInputInvoices(ctx, fixture.projectID, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projectInvoices) != 1 || cleanID(projectInvoices[0]["id"]) != invoiceID {
+		t.Fatalf("project invoices = %#v", projectInvoices)
+	}
+
+	verified, err := service.InputInvoiceAction(ctx, invoiceID, "verify", ActionRequest{}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verified["status"] != "verified" || cleanID(verified["verified_by"]) != fixture.userID {
+		t.Fatalf("verified invoice = %#v", verified)
+	}
+	rejected, err := service.InputInvoiceAction(ctx, invoiceID, "reject", ActionRequest{}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rejected["status"] != "rejected" || cleanID(rejected["rejected_by"]) != fixture.userID || cleanID(rejected["verified_by"]) != "" {
+		t.Fatalf("rejected invoice = %#v", rejected)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND target_id=$2 AND event_type IN ('input_invoice_verified','input_invoice_rejected')`, 2, fixture.projectID, invoiceID)
+
+	_, err = service.CreateInputInvoice(ctx, payableID, InputInvoiceRequest{
+		InvoiceNumber:        "VAT-OTHER-PROC",
+		InvoiceDate:          "2026-06-22",
+		VendorName:           "VAT Vendor",
+		AmountBeforeVAT:      1000000,
+		VATAmount:            100000,
+		TotalAmount:          1100000,
+		ProcurementRequestID: otherProcurementID,
+	}, testMultipartFileHeader(t, "file", "other-proc.pdf", pdfContent), fixture.userID, "Scoped User")
+	assertValidationError(t, err)
+}
+
+func TestOutputInvoicePDFUploadLinksReceivablePaymentDocumentAndStatus(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	uploadDir := t.TempDir()
+	service.ConfigureUploads(uploadDir, 1024*1024)
+	fixture := setupProjectScopeFixture(t, db, []string{"accounting.view", "accounting.receivable_view", "accounting.receivable_approve"})
+	receivableID := newID()
+	paymentID := newID()
+	otherPaymentID := newID()
+	mustExec(t, db, `
+		INSERT INTO receivables (id, project_id, receivable_code, client_name, source_type, contract_amount, milestone_name, gross_amount, received_amount, remaining_amount, status, created_by)
+		VALUES ($1,$2,$3,'VAT Client','manual',2200000,'Đợt 1',2200000,0,2200000,'approved',$4)
+	`, receivableID, fixture.projectID, "REC-OUT-"+receivableID[:8], fixture.userID)
+	mustExec(t, db, `
+		INSERT INTO payments (id, project_id, payment_code, payment_type, target_type, target_id, amount, payment_method, status, created_by)
+		VALUES ($1,$2,$3,'client_receipt','receivable',$4,2200000,'bank_transfer','received',$5)
+	`, paymentID, fixture.projectID, "RCV-OUT-"+paymentID[:8], receivableID, fixture.userID)
+	mustExec(t, db, `
+		INSERT INTO payments (id, project_id, payment_code, payment_type, target_type, target_id, amount, payment_method, status, created_by)
+		VALUES ($1,$2,$3,'client_receipt','receivable',$4,2200000,'bank_transfer','received',$5)
+	`, otherPaymentID, fixture.otherProjectID, "RCV-OTH-"+otherPaymentID[:8], receivableID, fixture.userID)
+
+	pdfContent := []byte("%PDF-1.4\n% test output invoice\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n")
+	invoice, err := service.CreateOutputInvoice(ctx, receivableID, OutputInvoiceRequest{
+		InvoiceNumber:   "OUT-001",
+		InvoiceSymbol:   "C25TAA",
+		InvoiceDate:     "2026-06-22",
+		ClientName:      "VAT Client",
+		ClientTaxCode:   "0311111111",
+		AmountBeforeVAT: 2000000,
+		VATAmount:       200000,
+		TotalAmount:     2200000,
+		PaymentID:       paymentID,
+		Notes:           "Hoá đơn đầu ra đợt 1",
+	}, testMultipartFileHeader(t, "file", "output-invoice.pdf", pdfContent), fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if invoice["status"] != "draft" {
+		t.Fatalf("status = %v, want draft", invoice["status"])
+	}
+	invoiceID := cleanID(invoice["id"])
+	documentID := cleanID(invoice["document_id"])
+	if invoiceID == "" || documentID == "" {
+		t.Fatalf("expected invoice and document ids, got invoice=%q document=%q", invoiceID, documentID)
+	}
+	if cleanID(invoice["payment_id"]) != paymentID {
+		t.Fatalf("payment_id = %v, want %s", invoice["payment_id"], paymentID)
+	}
+	storageKey := fmt.Sprint(invoice["storage_key"])
+	if !strings.HasPrefix(storageKey, fmt.Sprintf("output-invoices/%s/%s/", fixture.projectID, receivableID)) || strings.Contains(storageKey, "..") {
+		t.Fatalf("invalid storage_key = %q", storageKey)
+	}
+	sum := sha256.Sum256(pdfContent)
+	if got := fmt.Sprint(invoice["checksum_sha256"]); got != hex.EncodeToString(sum[:]) {
+		t.Fatalf("checksum = %s, want %s", got, hex.EncodeToString(sum[:]))
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM documents WHERE id=$1 AND project_id=$2 AND target_type='output_invoice' AND target_id=$3 AND status='active'`, 1, documentID, fixture.projectID, invoiceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='output_invoice_uploaded' AND target_id=$2`, 1, fixture.projectID, invoiceID)
+
+	file, err := service.OutputInvoiceFile(ctx, invoiceID, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file.MIMEType != "application/pdf" || file.Filename != "output-invoice.pdf" {
+		t.Fatalf("file result = %#v", file)
+	}
+	storedBytes, err := os.ReadFile(file.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(storedBytes, pdfContent) {
+		t.Fatal("stored output invoice PDF bytes do not match upload")
+	}
+	if !strings.HasPrefix(file.Path, uploadDir) {
+		t.Fatalf("file path = %q, want under %q", file.Path, uploadDir)
+	}
+
+	receivableInvoices, err := service.ReceivableOutputInvoices(ctx, receivableID, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(receivableInvoices) != 1 || cleanID(receivableInvoices[0]["id"]) != invoiceID {
+		t.Fatalf("receivable invoices = %#v", receivableInvoices)
+	}
+	projectInvoices, err := service.ProjectOutputInvoices(ctx, fixture.projectID, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projectInvoices) != 1 || cleanID(projectInvoices[0]["id"]) != invoiceID {
+		t.Fatalf("project invoices = %#v", projectInvoices)
+	}
+
+	issued, err := service.OutputInvoiceAction(ctx, invoiceID, "issue", ActionRequest{}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if issued["status"] != "issued" || cleanID(issued["issued_by"]) != fixture.userID {
+		t.Fatalf("issued invoice = %#v", issued)
+	}
+	voided, err := service.OutputInvoiceAction(ctx, invoiceID, "void", ActionRequest{}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if voided["status"] != "voided" || cleanID(voided["voided_by"]) != fixture.userID || cleanID(voided["issued_by"]) != fixture.userID {
+		t.Fatalf("voided invoice = %#v", voided)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND target_id=$2 AND event_type IN ('output_invoice_issued','output_invoice_voided')`, 2, fixture.projectID, invoiceID)
+
+	_, err = service.CreateOutputInvoice(ctx, receivableID, OutputInvoiceRequest{
+		InvoiceNumber:   "OUT-OTHER-PAYMENT",
+		InvoiceDate:     "2026-06-22",
+		ClientName:      "VAT Client",
+		AmountBeforeVAT: 2000000,
+		VATAmount:       200000,
+		TotalAmount:     2200000,
+		PaymentID:       otherPaymentID,
+	}, testMultipartFileHeader(t, "file", "other-payment.pdf", pdfContent), fixture.userID, "Scoped User")
+	assertValidationError(t, err)
 }
 
 func TestBatch4StockAggregateExcludesOutOfScopeProjectMovements(t *testing.T) {
@@ -1778,6 +2046,174 @@ func TestPlanningDailyReportSubmitCreatesNextPlanWorkItems(t *testing.T) {
 	`, 1, fixture.itemID)
 }
 
+func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	rows, err := repo.WorkflowFormCatalog(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundCatalog := false
+	for _, row := range rows {
+		if row["template_code"] == "builtin_construction_daily_report" {
+			foundCatalog = true
+			if row["form_type"] != "daily_report" || number(row["version_no"]) != 1 {
+				t.Fatalf("unexpected construction daily report catalog row: %#v", row)
+			}
+			requiredKeys := stringSlice(row["required_field_keys"])
+			for _, key := range []string{"report_date", "reported_by", "construction_scope", "weather", "completed_items", "confirmed"} {
+				if !containsString(requiredKeys, key) {
+					t.Fatalf("expected %s to be required, got %#v", key, row["required_field_keys"])
+				}
+			}
+		}
+	}
+	if !foundCatalog {
+		t.Fatal("expected construction daily report in workflow form catalog")
+	}
+
+	var formVersionID string
+	if err := db.QueryRowContext(ctx, `
+		SELECT v.id
+		FROM workflow_form_templates t
+		JOIN workflow_form_versions v ON v.template_id=t.id
+		WHERE t.code='builtin_construction_daily_report'
+		  AND t.status='active'
+		  AND v.status='published'
+		ORDER BY v.version_no DESC
+		LIMIT 1
+	`).Scan(&formVersionID); err != nil {
+		t.Fatal(err)
+	}
+	defaultFormVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "daily_report", false, "Daily report thi công")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaultFormVersionID != formVersionID {
+		t.Fatalf("default construction daily report form version = %q, want %q", defaultFormVersionID, formVersionID)
+	}
+
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Ảnh hiện trường ngày 12",
+		FileURL:      "https://example.com/site-photo.jpg",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidenceID := fmt.Sprint(evidence["id"])
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Construction daily report form', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := fmt.Sprint(instanceRows[0]["id"])
+
+	invalidEvidenceAnswers := Record{
+		"report_date":            "2026-07-12",
+		"reported_by":            "Supervisor",
+		"construction_scope":     "civil",
+		"weather":                "normal",
+		"site_photo_evidence_id": newID(),
+		"completed_items": []any{
+			map[string]any{"title": "Xây tường trục A", "actual_quantity": "24.5", "unit": "m2", "result": "done"},
+		},
+		"confirmed": true,
+	}
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: invalidEvidenceAnswers}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	invalidQuantityAnswers := Record{
+		"report_date":        "2026-07-12",
+		"reported_by":        "Supervisor",
+		"construction_scope": "civil",
+		"weather":            "normal",
+		"completed_items": []any{
+			map[string]any{"title": "Xây tường trục A", "actual_quantity": "-1", "unit": "m2", "result": "done"},
+		},
+		"confirmed": true,
+	}
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: invalidQuantityAnswers}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	readyAnswers := Record{
+		"report_date":            "2026-07-12",
+		"reported_by":            "Supervisor",
+		"construction_scope":     "civil",
+		"weather":                "normal",
+		"progress_percent":       42,
+		"site_photo_evidence_id": evidenceID,
+		"completed_items": []any{
+			map[string]any{
+				"title":           "Xây tường trục A",
+				"work_area":       "Tầng 2",
+				"crew_name":       "Tổ nề A",
+				"actual_quantity": "24.5",
+				"unit":            "m2",
+				"material_used":   "Gạch AAC",
+				"result":          "done",
+				"evidence_id":     evidenceID,
+				"note":            "Đạt theo kiểm tra cuối ngày",
+			},
+		},
+		"crew_items": []any{
+			map[string]any{"crew_name": "Tổ nề A", "trade": "Masonry", "worker_count": "8", "work_hours": "8", "note": "Đủ quân số"},
+		},
+		"material_usage_items": []any{
+			map[string]any{"material_name": "Xi măng", "material_code": "XM-01", "quantity": "12", "unit": "bao", "source": "site_balance", "note": "Ghi nhận report, không trừ kho"},
+		},
+		"next_plan_items": []any{
+			map[string]any{"title": "Tô tường khu B", "owner_role": "Giám sát", "owner_name": "Supervisor", "due_date": "2026-07-13", "priority": "high", "description": "Bám theo tiến độ tuần"},
+		},
+		"blockers": []any{
+			map[string]any{"content": "Cần bổ sung xi măng trước ca chiều", "impact": "material", "owner_role": "Thủ kho", "target_date": "2026-07-13", "severity": "medium"},
+		},
+		"confirmed": true,
+	}
+	form, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: readyAnswers}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, _ := form["instance"].(Record)
+	if instance["status"] != "submitted" {
+		t.Fatalf("form status = %#v, want submitted", instance["status"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='completed_items' AND value_json->0->>'actual_quantity'='24.5'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='material_usage_items' AND value_json->0->>'source'='site_balance'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='workflow_form_action_item' AND source_id=$2`, 1, fixture.projectID, instanceID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM work_item_activities wia
+		JOIN work_items wi ON wi.id=wia.work_item_id
+		WHERE wi.source_type='workflow_form_action_item'
+		  AND wi.source_id=$1
+		  AND wia.activity_type='created'
+		  AND wia.comment='Next plan item generated from construction daily report'
+		  AND wia.metadata_json->>'source'='construction_daily_report'
+		  AND wia.metadata_json->>'construction_scope'='civil'
+	`, 1, instanceID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM work_item_activities
+		WHERE work_item_id=$1
+		  AND activity_type='system_event'
+		  AND comment='Construction daily report generated 1 next plan work items'
+		  AND metadata_json->>'source'='construction_daily_report'
+	`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND completion_payload_json->'workflow_form_answers'->'material_usage_items'->0->>'source'='site_balance'`, 1, fixture.itemID)
+}
+
 func TestPlanningChecklistSubmitRequiresClearItemsAndValidEvidence(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
@@ -1888,6 +2324,1147 @@ func TestPlanningChecklistSubmitRequiresClearItemsAndValidEvidence(t *testing.T)
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='checklist_items'`, 1, instanceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='submitted'`, 1, instanceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND completion_payload_json ? 'checklist_items'`, 1, fixture.itemID)
+}
+
+func TestSubcontractorChecklistFormValidatesEvidenceAndQuantities(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	rows, err := repo.WorkflowFormCatalog(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundCatalog := false
+	for _, row := range rows {
+		if row["template_code"] == "builtin_subcontractor_checklist" {
+			foundCatalog = true
+			if row["form_type"] != "checklist" || number(row["version_no"]) != 1 {
+				t.Fatalf("unexpected subcontractor checklist catalog row: %#v", row)
+			}
+			if !containsString(stringSlice(row["required_field_keys"]), "checklist_items") {
+				t.Fatalf("expected checklist_items to be required, got %#v", row["required_field_keys"])
+			}
+		}
+	}
+	if !foundCatalog {
+		t.Fatal("expected subcontractor checklist in workflow form catalog")
+	}
+
+	var formVersionID string
+	if err := db.QueryRowContext(ctx, `
+		SELECT v.id
+		FROM workflow_form_templates t
+		JOIN workflow_form_versions v ON v.template_id=t.id
+		WHERE t.code='builtin_subcontractor_checklist'
+		  AND t.status='active'
+		  AND v.status='published'
+		ORDER BY v.version_no DESC
+		LIMIT 1
+	`).Scan(&formVersionID); err != nil {
+		t.Fatal(err)
+	}
+	defaultFormVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "checklist", true, "Checklist thầu phụ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaultFormVersionID != formVersionID {
+		t.Fatalf("default subcontractor checklist form version = %q, want %q", defaultFormVersionID, formVersionID)
+	}
+
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "checklist",
+		Name:         "Subcontractor checklist evidence",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidenceID := fmt.Sprint(evidence["id"])
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Subcontractor checklist form', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := fmt.Sprint(instanceRows[0]["id"])
+
+	blockedAnswers := Record{
+		"check_date":                   "2026-07-10",
+		"subcontractor_name":           "Đội trần A",
+		"subcontractor_representative": "Anh B",
+		"work_package":                 "ceiling",
+		"construction_area":            "Tầng 2",
+		"checklist_items": []any{
+			map[string]any{
+				"title":              "Lắp khung xương trần",
+				"boq_item_ref":       "BOQ-C-01",
+				"claimed_quantity":   "12.5",
+				"confirmed_quantity": "10",
+				"unit":               "m2",
+				"status":             "needs_follow_up",
+				"evidence_id":        evidenceID,
+				"owner_response":     "adjust_quantity",
+				"due_date":           "2026-07-11",
+				"comment":            "Cần kiểm tra lại mép biên",
+			},
+		},
+		"overall_comment": "Chưa đủ điều kiện submit",
+		"confirmed":       true,
+	}
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: blockedAnswers}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	invalidQuantityAnswers := Record{
+		"check_date":         "2026-07-10",
+		"subcontractor_name": "Đội trần A",
+		"work_package":       "ceiling",
+		"checklist_items": []any{
+			map[string]any{
+				"title":              "Lắp khung xương trần",
+				"claimed_quantity":   "-1",
+				"confirmed_quantity": "10",
+				"status":             "done",
+			},
+		},
+		"confirmed": true,
+	}
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: invalidQuantityAnswers}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	invalidEvidenceAnswers := Record{
+		"check_date":         "2026-07-10",
+		"subcontractor_name": "Đội trần A",
+		"work_package":       "ceiling",
+		"checklist_items": []any{
+			map[string]any{
+				"title":       "Lắp khung xương trần",
+				"status":      "done",
+				"evidence_id": newID(),
+			},
+		},
+		"confirmed": true,
+	}
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: invalidEvidenceAnswers}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	readyAnswers := Record{
+		"check_date":                   "2026-07-10",
+		"subcontractor_name":           "Đội trần A",
+		"subcontractor_representative": "Anh B",
+		"work_package":                 "ceiling",
+		"construction_area":            "Tầng 2",
+		"checklist_items": []any{
+			map[string]any{
+				"title":              "Lắp khung xương trần",
+				"boq_item_ref":       "BOQ-C-01",
+				"claimed_quantity":   "12.5",
+				"confirmed_quantity": "12",
+				"unit":               "m2",
+				"status":             "done",
+				"evidence_id":        evidenceID,
+				"owner_response":     "accepted",
+				"comment":            "Đã đối chiếu evidence",
+			},
+		},
+		"overall_comment": "Đủ điều kiện submit",
+		"confirmed":       true,
+	}
+	form, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: readyAnswers}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, _ := form["instance"].(Record)
+	if instance["status"] != "submitted" {
+		t.Fatalf("form status = %#v, want submitted", instance["status"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='checklist_items' AND value_json->0->>'claimed_quantity'='12.5'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='submitted'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND completion_payload_json->'checklist_items'->0->>'confirmed_quantity'='12'`, 1, fixture.itemID)
+}
+
+func TestSubcontractorChecklistReconciliationPersistsAuditAndValidatesReferences(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	boqItem, err := service.CreateBOQ(ctx, fixture.projectID, Record{
+		"category":            "Trần",
+		"work_item_name":      "BOQ-C-01 Lắp khung xương trần",
+		"unit":                "m2",
+		"quantity":            "12.5",
+		"expected_unit_price": "100000",
+		"status":              "approved",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "checklist",
+		Name:         "Subcontractor reconciliation evidence",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var formVersionID string
+	if err := db.QueryRowContext(ctx, `
+		SELECT v.id
+		FROM workflow_form_templates t
+		JOIN workflow_form_versions v ON v.template_id=t.id
+		WHERE t.code='builtin_subcontractor_checklist'
+		  AND t.status='active'
+		  AND v.status='published'
+		ORDER BY v.version_no DESC
+		LIMIT 1
+	`).Scan(&formVersionID); err != nil {
+		t.Fatal(err)
+	}
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Subcontractor checklist form', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := fmt.Sprint(instanceRows[0]["id"])
+	answers := Record{
+		"check_date":                   "2026-07-10",
+		"subcontractor_name":           "Đội trần A",
+		"subcontractor_representative": "Anh B",
+		"work_package":                 "ceiling",
+		"construction_area":            "Tầng 2",
+		"checklist_items": []any{
+			map[string]any{
+				"title":              "Lắp khung xương trần",
+				"boq_item_ref":       "BOQ-C-01",
+				"claimed_quantity":   "12.5",
+				"confirmed_quantity": "10",
+				"unit":               "m2",
+				"status":             "done",
+				"evidence_id":        fmt.Sprint(evidence["id"]),
+				"owner_response":     "adjust_quantity",
+				"comment":            "Đội thầu phụ claim vượt KL nội bộ",
+			},
+		},
+		"overall_comment": "Chuyển đối soát nội bộ",
+		"confirmed":       true,
+	}
+	if _, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: answers}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+
+	draft, err := service.SubcontractorReconciliation(ctx, fixture.itemID, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if draft["available"] != true {
+		t.Fatalf("reconciliation available = %#v, want true", draft["available"])
+	}
+	reconciliation, _ := draft["reconciliation"].(Record)
+	sourceItems, _ := reconciliation["items"].([]Record)
+	if len(sourceItems) != 1 || sourceItems[0]["decision"] != "adjust_quantity" {
+		t.Fatalf("unexpected default reconciliation items: %#v", sourceItems)
+	}
+
+	confirmed := 9.0
+	_, err = service.SaveSubcontractorReconciliation(ctx, fixture.itemID, SubcontractorReconciliationRequest{
+		Items: []SubcontractorReconciliationItemRequest{{
+			ItemIndex:         0,
+			BOQItemID:         newID(),
+			ConfirmedQuantity: &confirmed,
+			Decision:          "adjust_quantity",
+		}},
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	submitted, err := service.SubmitSubcontractorReconciliation(ctx, fixture.itemID, SubcontractorReconciliationRequest{
+		Comment: "Chốt KL nội bộ 9m2",
+		Items: []SubcontractorReconciliationItemRequest{{
+			ItemIndex:         0,
+			BOQItemID:         fmt.Sprint(boqItem["id"]),
+			ConfirmedQuantity: &confirmed,
+			Decision:          "adjust_quantity",
+			Comment:           "Cắt phần claim chưa đủ evidence",
+		}},
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	submittedRecord, _ := submitted["reconciliation"].(Record)
+	if submittedRecord["status"] != "submitted" {
+		t.Fatalf("reconciliation status = %#v, want submitted", submittedRecord["status"])
+	}
+
+	var status, decision, mappedBOQID string
+	var claimedQuantity, confirmedQuantity, varianceQuantity float64
+	if err := db.QueryRowContext(ctx, `
+		SELECT scr.status, scri.claimed_quantity, scri.confirmed_quantity, scri.variance_quantity, scri.decision, scri.boq_item_id::text
+		FROM subcontractor_checklist_reconciliations scr
+		JOIN subcontractor_checklist_reconciliation_items scri ON scri.reconciliation_id=scr.id
+		WHERE scr.work_item_id=$1
+	`, fixture.itemID).Scan(&status, &claimedQuantity, &confirmedQuantity, &varianceQuantity, &decision, &mappedBOQID); err != nil {
+		t.Fatal(err)
+	}
+	if status != "submitted" || decision != "adjust_quantity" || mappedBOQID != fmt.Sprint(boqItem["id"]) {
+		t.Fatalf("unexpected reconciliation row: status=%s decision=%s boq=%s", status, decision, mappedBOQID)
+	}
+	if claimedQuantity != 12.5 || confirmedQuantity != 9 || varianceQuantity != -3.5 {
+		t.Fatalf("unexpected quantities: claimed=%v confirmed=%v variance=%v", claimedQuantity, confirmedQuantity, varianceQuantity)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='checklist_items' AND value_json->0->>'confirmed_quantity'='10'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='system_event' AND metadata_json->>'status'='submitted'`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='subcontractor_reconciliation_submitted'`, 1, fixture.projectID)
+
+	_, err = service.SaveSubcontractorReconciliation(ctx, fixture.itemID, SubcontractorReconciliationRequest{
+		Items: []SubcontractorReconciliationItemRequest{{
+			ItemIndex: 0,
+			Decision:  "accepted",
+		}},
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+}
+
+func TestOwnerClientChecklistFormValidatesEvidenceAndSubmitGate(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	rows, err := repo.WorkflowFormCatalog(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundCatalog := false
+	for _, row := range rows {
+		if row["template_code"] == "builtin_owner_client_checklist" {
+			foundCatalog = true
+			if row["form_type"] != "checklist" || number(row["version_no"]) != 1 {
+				t.Fatalf("unexpected owner/client checklist catalog row: %#v", row)
+			}
+			if !containsString(stringSlice(row["required_field_keys"]), "checklist_items") {
+				t.Fatalf("expected checklist_items to be required, got %#v", row["required_field_keys"])
+			}
+		}
+	}
+	if !foundCatalog {
+		t.Fatal("expected owner/client checklist in workflow form catalog")
+	}
+
+	var formVersionID string
+	if err := db.QueryRowContext(ctx, `
+		SELECT v.id
+		FROM workflow_form_templates t
+		JOIN workflow_form_versions v ON v.template_id=t.id
+		WHERE t.code='builtin_owner_client_checklist'
+		  AND t.status='active'
+		  AND v.status='published'
+		ORDER BY v.version_no DESC
+		LIMIT 1
+	`).Scan(&formVersionID); err != nil {
+		t.Fatal(err)
+	}
+	defaultFormVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "checklist", true, "Checklist chủ đầu tư")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaultFormVersionID != formVersionID {
+		t.Fatalf("default owner/client checklist form version = %q, want %q", defaultFormVersionID, formVersionID)
+	}
+
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "checklist",
+		Name:         "Owner checklist evidence",
+		Visibility:   "client",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidenceID := fmt.Sprint(evidence["id"])
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Owner client checklist form', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := fmt.Sprint(instanceRows[0]["id"])
+
+	blockedAnswers := Record{
+		"check_date":             "2026-07-12",
+		"client_representative":  "Client A",
+		"company_representative": "Supervisor B",
+		"handover_scope":         "area",
+		"scope_detail":           "Tầng 2",
+		"checklist_items": []any{
+			map[string]any{
+				"title":           "Kiểm tra hoàn thiện sơn",
+				"output_ref":      "ACC-01",
+				"status":          "needs_follow_up",
+				"client_decision": "conditional_pass",
+				"evidence_id":     evidenceID,
+				"severity":        "medium",
+				"required_action": "Bổ sung vá lỗi mép tường",
+				"due_date":        "2026-07-13",
+				"comment":         "Cần xử lý trước bàn giao",
+			},
+		},
+		"final_client_note": "Chưa đủ điều kiện submit",
+		"confirmed":         true,
+	}
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: blockedAnswers}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	invalidEvidenceAnswers := Record{
+		"check_date":            "2026-07-12",
+		"client_representative": "Client A",
+		"handover_scope":        "area",
+		"checklist_items": []any{
+			map[string]any{
+				"title":           "Kiểm tra hoàn thiện sơn",
+				"status":          "done",
+				"client_decision": "pass",
+				"evidence_id":     newID(),
+			},
+		},
+		"confirmed": true,
+	}
+	_, err = service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: invalidEvidenceAnswers}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	readyAnswers := Record{
+		"check_date":             "2026-07-12",
+		"client_representative":  "Client A",
+		"company_representative": "Supervisor B",
+		"handover_scope":         "area",
+		"scope_detail":           "Tầng 2",
+		"checklist_items": []any{
+			map[string]any{
+				"title":           "Kiểm tra hoàn thiện sơn",
+				"output_ref":      "ACC-01",
+				"status":          "done",
+				"client_decision": "pass",
+				"evidence_id":     evidenceID,
+				"comment":         "Đạt theo biên bản",
+			},
+		},
+		"final_client_note": "Đủ điều kiện xác nhận",
+		"confirmed":         true,
+	}
+	form, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: readyAnswers}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, _ := form["instance"].(Record)
+	if instance["status"] != "submitted" {
+		t.Fatalf("form status = %#v, want submitted", instance["status"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='checklist_items' AND value_json->0->>'client_decision'='pass'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='submitted'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND completion_payload_json->'checklist_items'->0->>'client_decision'='pass'`, 1, fixture.itemID)
+}
+
+func TestOwnerClientChecklistReconciliationPersistsAuditAndValidatesAcceptance(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	acceptanceID := newID()
+	mustExec(t, db, `
+		INSERT INTO acceptance_records (id, project_id, type, title, requested_by, approved_by, status, result, notes)
+		VALUES ($1,$2,'final','Final acceptance tầng 2',$3,$3,'completed','pass','Nội bộ nghiệm thu đạt')
+	`, acceptanceID, fixture.projectID, fixture.workerID)
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "checklist",
+		Name:         "Owner reconciliation evidence",
+		Visibility:   "client",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var formVersionID string
+	if err := db.QueryRowContext(ctx, `
+		SELECT v.id
+		FROM workflow_form_templates t
+		JOIN workflow_form_versions v ON v.template_id=t.id
+		WHERE t.code='builtin_owner_client_checklist'
+		  AND t.status='active'
+		  AND v.status='published'
+		ORDER BY v.version_no DESC
+		LIMIT 1
+	`).Scan(&formVersionID); err != nil {
+		t.Fatal(err)
+	}
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Owner client checklist form', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := fmt.Sprint(instanceRows[0]["id"])
+	answers := Record{
+		"check_date":             "2026-07-12",
+		"client_representative":  "Client A",
+		"company_representative": "Supervisor B",
+		"handover_scope":         "area",
+		"scope_detail":           "Tầng 2",
+		"checklist_items": []any{
+			map[string]any{
+				"title":           "Kiểm tra hoàn thiện sơn",
+				"output_ref":      "ACC-01",
+				"status":          "done",
+				"client_decision": "pass",
+				"evidence_id":     fmt.Sprint(evidence["id"]),
+				"comment":         "Đạt theo biên bản",
+			},
+		},
+		"final_client_note": "Đủ điều kiện xác nhận",
+		"confirmed":         true,
+	}
+	if _, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: answers}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+
+	draft, err := service.OwnerClientReconciliation(ctx, fixture.itemID, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if draft["available"] != true {
+		t.Fatalf("reconciliation available = %#v, want true", draft["available"])
+	}
+	reconciliation, _ := draft["reconciliation"].(Record)
+	sourceItems, _ := reconciliation["items"].([]Record)
+	if len(sourceItems) != 1 || sourceItems[0]["decision"] != "accepted" {
+		t.Fatalf("unexpected default owner reconciliation items: %#v", sourceItems)
+	}
+
+	saved, err := service.SaveOwnerClientReconciliation(ctx, fixture.itemID, OwnerClientReconciliationRequest{
+		Comment: "Draft trước khi link nghiệm thu",
+		Items: []OwnerClientReconciliationItemRequest{{
+			ItemIndex: 0,
+			Decision:  "accepted",
+		}},
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	savedRecord, _ := saved["reconciliation"].(Record)
+	if savedRecord["status"] != "draft" {
+		t.Fatalf("draft reconciliation status = %#v, want draft", savedRecord["status"])
+	}
+
+	_, err = service.SubmitOwnerClientReconciliation(ctx, fixture.itemID, OwnerClientReconciliationRequest{
+		Items: []OwnerClientReconciliationItemRequest{{
+			ItemIndex: 0,
+			Decision:  "accepted",
+		}},
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	_, err = service.SubmitOwnerClientReconciliation(ctx, fixture.itemID, OwnerClientReconciliationRequest{
+		Items: []OwnerClientReconciliationItemRequest{{
+			ItemIndex:    0,
+			AcceptanceID: newID(),
+			Decision:     "accepted",
+		}},
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	submitted, err := service.SubmitOwnerClientReconciliation(ctx, fixture.itemID, OwnerClientReconciliationRequest{
+		Comment: "Chốt theo final acceptance",
+		Items: []OwnerClientReconciliationItemRequest{{
+			ItemIndex:    0,
+			AcceptanceID: acceptanceID,
+			Decision:     "accepted",
+			Comment:      "Đạt theo nghiệm thu nội bộ",
+		}},
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	submittedRecord, _ := submitted["reconciliation"].(Record)
+	if submittedRecord["status"] != "submitted" {
+		t.Fatalf("reconciliation status = %#v, want submitted", submittedRecord["status"])
+	}
+
+	var status, decision, mappedAcceptanceID, clientDecision, acceptanceResult string
+	if err := db.QueryRowContext(ctx, `
+		SELECT ocr.status, ocri.decision, ocri.acceptance_id::text, ocri.client_decision, ocri.acceptance_result
+		FROM owner_client_checklist_reconciliations ocr
+		JOIN owner_client_checklist_reconciliation_items ocri ON ocri.reconciliation_id=ocr.id
+		WHERE ocr.work_item_id=$1
+	`, fixture.itemID).Scan(&status, &decision, &mappedAcceptanceID, &clientDecision, &acceptanceResult); err != nil {
+		t.Fatal(err)
+	}
+	if status != "submitted" || decision != "accepted" || mappedAcceptanceID != acceptanceID || clientDecision != "pass" || acceptanceResult != "pass" {
+		t.Fatalf("unexpected owner reconciliation row: status=%s decision=%s acceptance=%s client=%s result=%s", status, decision, mappedAcceptanceID, clientDecision, acceptanceResult)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='checklist_items' AND value_json->0->>'client_decision'='pass'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='system_event' AND metadata_json->>'status'='submitted'`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='owner_client_reconciliation_submitted'`, 1, fixture.projectID)
+
+	_, err = service.SaveOwnerClientReconciliation(ctx, fixture.itemID, OwnerClientReconciliationRequest{
+		Items: []OwnerClientReconciliationItemRequest{{
+			ItemIndex: 0,
+			Decision:  "not_applicable",
+		}},
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+}
+
+func TestMaterialBeforeAfterSnapshotAppliesSiteBalanceWithoutStockMovement(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	warehouseID := newID()
+	materialID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE project_id=$1 AND target_type IN ('stock_movement','material_before_after_snapshot')`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM material_before_after_snapshot_items WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM material_before_after_snapshots WHERE project_id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_movements WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM site_material_balances WHERE project_id=$1 OR material_id=$2`, fixture.projectID, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM materials WHERE id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM warehouses WHERE id=$1`, warehouseID)
+	})
+	mustExec(t, db, `INSERT INTO warehouses (id, name, location, type, active) VALUES ($1,'Snapshot Warehouse','Test','central',true)`, warehouseID)
+	mustExec(t, db, `INSERT INTO materials (id, code, name, unit, category, active) VALUES ($1,$2,'Snapshot Cable','m','Electrical',true)`, materialID, "SNAP-"+materialID[:8])
+
+	if _, err := repo.CreateStockMovement(ctx, StockActionRequest{
+		WarehouseID:  warehouseID,
+		MaterialID:   materialID,
+		MovementType: "receive",
+		Quantity:     20,
+		Unit:         "m",
+		Reason:       "receive for snapshot test",
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.CreateStockMovement(ctx, StockActionRequest{
+		ProjectID:    fixture.projectID,
+		WarehouseID:  warehouseID,
+		MaterialID:   materialID,
+		MovementType: "issue",
+		Quantity:     12,
+		Unit:         "m",
+		Reason:       "issue to site for snapshot test",
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+
+	beforeEvidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Before material count",
+		FileURL:      "/evidence/before-material.jpg",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterEvidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "After material count",
+		FileURL:      "/evidence/after-material.jpg",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	beforeQty := 12.0
+	addedQty := 0.0
+	afterQty := 7.0
+	wasteQty := 1.0
+	affects := true
+	req := MaterialSnapshotRequest{
+		SnapshotDate:     "2026-07-14",
+		ConstructionArea: "Tầng 3",
+		Comment:          "Nháp kiểm kê vật tư trước/sau",
+		Items: []MaterialSnapshotItemRequest{{
+			ItemIndex:          0,
+			MaterialID:         materialID,
+			Source:             "site_balance",
+			BeforeQuantity:     &beforeQty,
+			AddedQuantity:      &addedQty,
+			AfterQuantity:      &afterQty,
+			WasteQuantity:      &wasteQty,
+			AffectsSiteBalance: &affects,
+			BeforeEvidenceID:   fmt.Sprint(beforeEvidence["id"]),
+			AfterEvidenceID:    fmt.Sprint(afterEvidence["id"]),
+			ConstructionArea:   "Tầng 3 - trục A",
+			Condition:          "mixed",
+			Comment:            "Đã dùng 4m, hư hao 1m",
+		}},
+	}
+
+	saved, err := service.SaveMaterialSnapshot(ctx, fixture.itemID, req, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	savedRecord, _ := saved["snapshot"].(Record)
+	if savedRecord["status"] != "draft" {
+		t.Fatalf("draft snapshot status = %#v, want draft", savedRecord["status"])
+	}
+	var used, surplus float64
+	if err := db.QueryRowContext(ctx, `
+		SELECT used_quantity::float8, surplus_quantity::float8
+		FROM site_material_balances
+		WHERE project_id=$1 AND material_id=$2
+	`, fixture.projectID, materialID).Scan(&used, &surplus); err != nil {
+		t.Fatal(err)
+	}
+	if used != 0 || surplus != 12 {
+		t.Fatalf("draft changed balance used=%.3f surplus=%.3f, want 0/12", used, surplus)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1`, 2, materialID)
+
+	req.Comment = "Chốt snapshot vật tư"
+	submitted, err := service.SubmitMaterialSnapshot(ctx, fixture.itemID, req, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	submittedRecord, _ := submitted["snapshot"].(Record)
+	if submittedRecord["status"] != "submitted" || submittedRecord["applied_to_site_balance"] != true {
+		t.Fatalf("submitted snapshot = %#v, want submitted/applied", submittedRecord)
+	}
+	if err := db.QueryRowContext(ctx, `
+		SELECT used_quantity::float8, surplus_quantity::float8
+		FROM site_material_balances
+		WHERE project_id=$1 AND material_id=$2
+	`, fixture.projectID, materialID).Scan(&used, &surplus); err != nil {
+		t.Fatal(err)
+	}
+	if used != 4 || surplus != 8 {
+		t.Fatalf("submitted balance used=%.3f surplus=%.3f, want 4/8", used, surplus)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1`, 2, materialID)
+	assertCount(t, db, `SELECT COUNT(*) FROM material_before_after_snapshot_items WHERE material_id=$1 AND used_quantity=4 AND before_evidence_id=$2 AND after_evidence_id=$3`, 1, materialID, beforeEvidence["id"], afterEvidence["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='system_event' AND metadata_json->>'status'='submitted' AND metadata_json ? 'material_snapshot_id'`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='material_snapshot_submitted'`, 1, fixture.projectID)
+
+	_, err = service.SaveMaterialSnapshot(ctx, fixture.itemID, req, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+}
+
+func TestSiteSurplusHandlingCreatesStockMovementAndPartialStatus(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	suffix := newID()
+	surplusPermissionID := ensurePermission(t, db, "warehouse.surplus_handle", "Xử lý vật tư dư", "warehouse")
+	handlerRoleID := ensureRole(t, db, "surplus_handler_"+suffix[:8], "Surplus Handler")
+	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, handlerRoleID, surplusPermissionID)
+	mustExec(t, db, `INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2)`, fixture.workerID, handlerRoleID)
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, handlerRoleID)
+	})
+
+	warehouseID := newID()
+	materialID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE project_id=$1 AND target_type IN ('stock_movement','site_surplus_handling')`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM site_surplus_handlings WHERE project_id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_movements WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM site_material_balances WHERE project_id=$1 OR material_id=$2`, fixture.projectID, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM materials WHERE id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM warehouses WHERE id=$1`, warehouseID)
+	})
+	mustExec(t, db, `INSERT INTO warehouses (id, name, location, type, active) VALUES ($1,'Surplus Warehouse','Yard','central',true)`, warehouseID)
+	mustExec(t, db, `INSERT INTO materials (id, code, name, unit, category, active) VALUES ($1,$2,'Surplus Cable','m','Electrical',true)`, materialID, "SUR-"+materialID[:8])
+
+	if _, err := repo.CreateStockMovement(ctx, StockActionRequest{
+		WarehouseID:  warehouseID,
+		MaterialID:   materialID,
+		MovementType: "receive",
+		Quantity:     20,
+		Unit:         "m",
+		Reason:       "receive for surplus test",
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.CreateStockMovement(ctx, StockActionRequest{
+		ProjectID:    fixture.projectID,
+		WarehouseID:  warehouseID,
+		MaterialID:   materialID,
+		MovementType: "issue",
+		Quantity:     12,
+		Unit:         "m",
+		Reason:       "issue to site for surplus test",
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, `
+		UPDATE site_material_balances
+		SET used_quantity=4,
+			surplus_quantity=8,
+			surplus_status='pending'
+		WHERE project_id=$1 AND material_id=$2
+	`, fixture.projectID, materialID)
+
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Surplus material photo",
+		FileURL:      "/evidence/surplus-material.jpg",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var balanceID string
+	if err := db.QueryRowContext(ctx, `SELECT id::text FROM site_material_balances WHERE project_id=$1 AND material_id=$2`, fixture.projectID, materialID).Scan(&balanceID); err != nil {
+		t.Fatal(err)
+	}
+
+	firstQty := 3.0
+	draft, err := service.CreateSurplusHandling(ctx, fixture.itemID, SurplusHandlingRequest{
+		SiteBalanceID:   balanceID,
+		HandlingType:    "return_to_warehouse",
+		Quantity:        &firstQty,
+		Unit:            "m",
+		WarehouseID:     warehouseID,
+		CustodyLocation: "Kệ A3",
+		Condition:       "usable",
+		EvidenceID:      fmt.Sprint(evidence["id"]),
+		Comment:         "Lưu lại vật tư dư",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var issued, used, surplus float64
+	var surplusStatus string
+	if err := db.QueryRowContext(ctx, `
+		SELECT issued_quantity::float8, used_quantity::float8, surplus_quantity::float8, surplus_status
+		FROM site_material_balances
+		WHERE id=$1
+	`, balanceID).Scan(&issued, &used, &surplus, &surplusStatus); err != nil {
+		t.Fatal(err)
+	}
+	if issued != 12 || used != 4 || surplus != 8 || surplusStatus != "pending" {
+		t.Fatalf("draft changed balance issued=%.3f used=%.3f surplus=%.3f status=%s", issued, used, surplus, surplusStatus)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1`, 2, materialID)
+
+	submitted, err := service.SubmitSurplusHandling(ctx, fmt.Sprint(draft["id"]), fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if submitted["status"] != "submitted" || cleanID(submitted["stock_movement_id"]) == "" {
+		t.Fatalf("submitted surplus handling = %#v, want submitted with stock movement", submitted)
+	}
+	if err := db.QueryRowContext(ctx, `
+		SELECT issued_quantity::float8, used_quantity::float8, surplus_quantity::float8, surplus_status
+		FROM site_material_balances
+		WHERE id=$1
+	`, balanceID).Scan(&issued, &used, &surplus, &surplusStatus); err != nil {
+		t.Fatal(err)
+	}
+	if issued != 9 || used != 4 || surplus != 5 || surplusStatus != "partial" {
+		t.Fatalf("partial balance issued=%.3f used=%.3f surplus=%.3f status=%s, want 9/4/5/partial", issued, used, surplus, surplusStatus)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1 AND movement_type='return_to_warehouse' AND reference_type='site_surplus_handling'`, 1, materialID)
+
+	secondQty := 5.0
+	second, err := service.CreateSurplusHandling(ctx, fixture.itemID, SurplusHandlingRequest{
+		SiteBalanceID:   balanceID,
+		HandlingType:    "return_to_subcontractor",
+		Quantity:        &secondQty,
+		Unit:            "m",
+		WarehouseID:     warehouseID,
+		CustodyLocation: "Bàn giao đội thầu phụ",
+		Condition:       "mixed",
+		EvidenceID:      fmt.Sprint(evidence["id"]),
+		Comment:         "Trả lại phần còn dư",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SubmitSurplusHandling(ctx, fmt.Sprint(second["id"]), fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(ctx, `
+		SELECT issued_quantity::float8, used_quantity::float8, surplus_quantity::float8, surplus_status
+		FROM site_material_balances
+		WHERE id=$1
+	`, balanceID).Scan(&issued, &used, &surplus, &surplusStatus); err != nil {
+		t.Fatal(err)
+	}
+	if issued != 4 || used != 4 || surplus != 0 || surplusStatus != "handled" {
+		t.Fatalf("handled balance issued=%.3f used=%.3f surplus=%.3f status=%s, want 4/4/0/handled", issued, used, surplus, surplusStatus)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1 AND movement_type='return_to_subcontractor' AND reference_type='site_surplus_handling'`, 1, materialID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='system_event' AND metadata_json->>'status'='submitted' AND metadata_json ? 'surplus_handling_id'`, 2, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='site_surplus_handling_submitted'`, 2, fixture.projectID)
+
+	_, err = service.UpdateSurplusHandling(ctx, fmt.Sprint(submitted["id"]), SurplusHandlingRequest{
+		SiteBalanceID: balanceID,
+		HandlingType:  "return_to_warehouse",
+		Quantity:      &firstQty,
+		Unit:          "m",
+		WarehouseID:   warehouseID,
+		Condition:     "usable",
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+}
+
+func TestIncomingAcceptanceSubmitDoesNotCreateStockMovement(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	warehouseID := newID()
+	materialID := newID()
+	procurementRequestID := newID()
+	procurementItemID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE project_id=$1 AND target_type='incoming_acceptance'`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM incoming_acceptance_records WHERE project_id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM procurement_requests WHERE id=$1`, procurementRequestID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_movements WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM materials WHERE id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM warehouses WHERE id=$1`, warehouseID)
+	})
+	mustExec(t, db, `INSERT INTO warehouses (id, name, location, type, active) VALUES ($1,'Incoming Warehouse','Gate A','central',true)`, warehouseID)
+	mustExec(t, db, `INSERT INTO materials (id, code, name, unit, category, active) VALUES ($1,$2,'Incoming Cable','m','Electrical',true)`, materialID, "IN-"+materialID[:8])
+	mustExec(t, db, `
+		INSERT INTO procurement_requests (id, project_id, request_code, title, requested_by, status)
+		VALUES ($1,$2,$3,'Incoming acceptance procurement',$4,'ordered')
+	`, procurementRequestID, fixture.projectID, "IAR-"+procurementRequestID[:8], fixture.workerID)
+	mustExec(t, db, `
+		INSERT INTO procurement_request_items (id, request_id, material_id, quantity_planned, quantity_requested, unit, estimated_unit_price, delivery_status, approval_status)
+		VALUES ($1,$2,$3,10,10,'m',100,'pending','approved')
+	`, procurementItemID, procurementRequestID, materialID)
+
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Incoming material defect",
+		FileURL:      "/evidence/incoming-material.jpg",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	delivered := 10.0
+	accepted := 8.0
+	rejected := 2.0
+	draft, err := service.CreateIncomingAcceptance(ctx, fixture.projectID, IncomingAcceptanceRequest{
+		WorkItemID:           fixture.itemID,
+		ProcurementRequestID: procurementRequestID,
+		WarehouseID:          warehouseID,
+		SourceType:           "procurement",
+		SupplierName:         "Test Supplier",
+		DeliveryReference:    "DN-001",
+		ReceivedAt:           "2026-06-20",
+		Comment:              "Nghiệm thu đầu vào có vật tư lỗi",
+		Items: []IncomingAcceptanceItemRequest{{
+			ItemIndex:                0,
+			MaterialID:               materialID,
+			ProcurementRequestItemID: procurementItemID,
+			DeliveredQuantity:        &delivered,
+			AcceptedQuantity:         &accepted,
+			RejectedQuantity:         &rejected,
+			Unit:                     "m",
+			Condition:                "mixed",
+			DefectNote:               "Một phần vật tư móp méo",
+			EvidenceID:               fmt.Sprint(evidence["id"]),
+			Decision:                 "conditional_acceptance",
+		}},
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if draft["status"] != "draft" {
+		t.Fatalf("draft status = %v, want draft", draft["status"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1`, 0, materialID)
+
+	submitted, err := service.SubmitIncomingAcceptance(ctx, fmt.Sprint(draft["id"]), fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if submitted["status"] != "submitted" || submitted["result"] != "conditional_pass" {
+		t.Fatalf("submitted incoming acceptance = %#v, want submitted conditional_pass", submitted)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1`, 0, materialID)
+	assertCount(t, db, `SELECT COUNT(*) FROM incoming_acceptance_items WHERE incoming_acceptance_id=$1 AND accepted_quantity=8 AND rejected_quantity=2`, 1, draft["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='system_event' AND metadata_json->>'status'='submitted' AND metadata_json ? 'incoming_acceptance_id'`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='incoming_acceptance_submitted'`, 1, fixture.projectID)
+
+	_, err = service.UpdateIncomingAcceptance(ctx, fmt.Sprint(submitted["id"]), IncomingAcceptanceRequest{
+		WorkItemID: fixture.itemID,
+		SourceType: "supplier",
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+}
+
+func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	handoverID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM handover_records WHERE project_id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM rework_requests WHERE project_id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM issues WHERE project_id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM acceptance_records WHERE project_id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM evidence_records WHERE project_id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM work_item_activities WHERE project_id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE project_id=$1`, fixture.projectID)
+	})
+
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Outgoing defect photo",
+		FileURL:      "/evidence/outgoing-defect.jpg",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidenceID := fmt.Sprint(evidence["id"])
+
+	draft, err := service.CreateAcceptance(ctx, fixture.projectID, AcceptanceRequest{
+		WorkItemID:               fixture.itemID,
+		Type:                     "partial",
+		Title:                    "Nghiệm thu đầu ra có punch list",
+		AcceptanceDate:           "2026-06-20",
+		ClientRepresentative:     "Owner rep",
+		ContractorRepresentative: "Contractor rep",
+		SignatureStatus:          "waived",
+		DocumentStatus:           "waived",
+		Notes:                    "Có lỗi cần sửa trước khi bàn giao",
+		Checklist: []AcceptanceChecklistItemRequest{
+			{ItemIndex: 0, Title: "Bề mặt hoàn thiện", Decision: "pass"},
+			{ItemIndex: 1, Title: "Vệ sinh khu vực", Decision: "fail", Severity: "high", EvidenceID: evidenceID, RequiredAction: "Dọn lại khu vực nghiệm thu"},
+		},
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if draft["status"] != "draft" {
+		t.Fatalf("draft status = %v, want draft", draft["status"])
+	}
+
+	submitted, err := service.SubmitAcceptance(ctx, fmt.Sprint(draft["id"]), fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if submitted["status"] != "submitted" {
+		t.Fatalf("submitted status = %v, want submitted", submitted["status"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='system_event' AND metadata_json->>'status'='submitted' AND metadata_json ? 'acceptance_id'`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='outgoing_acceptance_submitted'`, 1, fixture.projectID)
+
+	_, err = service.UpdateAcceptance(ctx, fmt.Sprint(submitted["id"]), AcceptanceRequest{
+		WorkItemID: fixture.itemID,
+		Title:      "Không được sửa sau submit",
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	_, err = service.AcceptanceAction(ctx, fmt.Sprint(submitted["id"]), "pass", ActionRequest{Comment: "Không hợp lệ vì còn fail"}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	failed, err := service.AcceptanceAction(ctx, fmt.Sprint(submitted["id"]), "fail", ActionRequest{Comment: "Không đạt"}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failed["status"] != "completed" || failed["result"] != "fail" {
+		t.Fatalf("failed acceptance = %#v, want completed/fail", failed)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM issues WHERE project_id=$1 AND requires_rework`, 1, fixture.projectID)
+
+	rework, err := service.CreateReworkFromAcceptance(ctx, fmt.Sprint(failed["id"]), fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rework["status"] != "approved" {
+		t.Fatalf("rework status = %v, want approved", rework["status"])
+	}
+	_, err = service.CreateReworkFromAcceptance(ctx, fmt.Sprint(failed["id"]), fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	finalDraft, err := service.CreateAcceptance(ctx, fixture.projectID, AcceptanceRequest{
+		WorkItemID:               fixture.itemID,
+		Type:                     "final",
+		Title:                    "Nghiệm thu toàn phần đạt",
+		AcceptanceDate:           "2026-06-21",
+		ClientRepresentative:     "Owner rep",
+		ContractorRepresentative: "Contractor rep",
+		SignatureStatus:          "waived",
+		DocumentStatus:           "waived",
+		Checklist: []AcceptanceChecklistItemRequest{{
+			ItemIndex: 0,
+			Title:     "Toàn bộ hạng mục đạt",
+			Decision:  "pass",
+		}},
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalSubmitted, err := service.SubmitAcceptance(ctx, fmt.Sprint(finalDraft["id"]), fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalPassed, err := service.AcceptanceAction(ctx, fmt.Sprint(finalSubmitted["id"]), "pass", ActionRequest{Comment: "Đạt bàn giao"}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if finalPassed["type"] != "final" || finalPassed["result"] != "pass" {
+		t.Fatalf("final acceptance = %#v, want final/pass", finalPassed)
+	}
+
+	mustExec(t, db, `UPDATE issues SET status='closed' WHERE project_id=$1`, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO handover_records
+			(id, project_id, status, final_acceptance_id, documents_ready, warehouse_closed, payables_recorded, receivables_recorded, created_by)
+		VALUES ($1,$2,'draft',$3,true,true,true,true,$4)
+	`, handoverID, fixture.projectID, finalPassed["id"], fixture.workerID)
+	check, err := repo.HandoverCheck(ctx, handoverID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ready, ok := check["ready"].(bool); !ok || !ready {
+		t.Fatalf("handover ready = %#v, blockers = %#v, want ready", check["ready"], check["blockers"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM acceptance_records WHERE project_id=$1 AND type='final' AND status='completed' AND result='pass'`, 1, fixture.projectID)
 }
 
 func TestWorkflowFormSignatureRequiresSubmittedFormAndIsImmutable(t *testing.T) {

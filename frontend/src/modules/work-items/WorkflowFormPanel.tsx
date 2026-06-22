@@ -547,7 +547,7 @@ function validateFieldValue(field: WorkflowFormField, value: unknown) {
 type StructuredFieldSpec = {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'date' | 'select' | 'evidence_reference' | string;
+  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'evidence_reference' | string;
   required?: boolean;
   options?: Array<{ value: string; label?: string }>;
 };
@@ -641,7 +641,7 @@ function StructuredCell({
   onChange: (value: string) => void;
 }) {
   const className = 'mt-1 w-full rounded-md border border-line bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100';
-  const colSpan = spec.type === 'textarea' ? 'md:col-span-5' : 'md:col-span-3';
+  const colSpan = spec.type === 'textarea' ? 'md:col-span-5' : spec.type === 'number' ? 'md:col-span-2' : 'md:col-span-3';
   const selectableEvidence = evidence.filter((record) => record.status !== 'rejected');
   return (
     <label className={clsx('block min-w-0', colSpan)}>
@@ -665,7 +665,13 @@ function StructuredCell({
           ))}
         </select>
       ) : (
-        <input className={className} type={spec.type === 'date' ? 'date' : 'text'} value={textValue(value)} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+        <input
+          className={className}
+          type={spec.type === 'date' || spec.type === 'number' ? spec.type : 'text'}
+          value={textValue(value)}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+        />
       )}
     </label>
   );

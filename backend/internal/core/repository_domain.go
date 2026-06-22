@@ -1166,6 +1166,1658 @@ func (r *Repository) GetWorkflowFormInstanceDetail(ctx context.Context, instance
 	}, nil
 }
 
+func (r *Repository) GetSubcontractorReconciliation(ctx context.Context, workItemID string) (Record, error) {
+	reconciliation, err := r.QueryOne(ctx, `
+		SELECT scr.*, submitted.full_name AS submitted_by_name, updated.full_name AS updated_by_name
+		FROM subcontractor_checklist_reconciliations scr
+		LEFT JOIN users submitted ON submitted.id=scr.submitted_by
+		LEFT JOIN users updated ON updated.id=scr.updated_by
+		WHERE scr.work_item_id=$1
+	`, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	items, err := r.Query(ctx, `
+		SELECT
+			scri.*,
+			b.status AS boq_status,
+			b.category AS boq_category,
+			b.work_item_name AS current_boq_work_item_name,
+			b.quantity AS current_boq_quantity,
+			b.unit AS current_boq_unit,
+			er.name AS evidence_name,
+			er.status AS evidence_status
+		FROM subcontractor_checklist_reconciliation_items scri
+		LEFT JOIN boq_items b ON b.id=scri.boq_item_id
+		LEFT JOIN evidence_records er ON er.id=scri.evidence_id
+		WHERE scri.reconciliation_id=$1
+		ORDER BY scri.item_index, scri.created_at
+	`, reconciliation["id"])
+	if err != nil {
+		return nil, err
+	}
+	reconciliation["items"] = items
+	return reconciliation, nil
+}
+
+func (r *Repository) SaveSubcontractorReconciliation(ctx context.Context, item Record, form Record, comment string, items []Record, summary Record, submit bool, actorID, actorName string) error {
+	workItemID := cleanID(item["id"])
+	projectID := cleanID(item["project_id"])
+	instance, _ := form["instance"].(Record)
+	answers, _ := form["answers"].(Record)
+	formInstanceID := cleanID(instance["id"])
+	formRevisionNo := int(number(instance["current_revision"]))
+	status := "draft"
+	activityComment := "Đã lưu nháp đối soát checklist thầu phụ"
+	eventType := "subcontractor_reconciliation_saved"
+	if submit {
+		status = "submitted"
+		activityComment = "Đã submit đối soát checklist thầu phụ"
+		eventType = "subcontractor_reconciliation_submitted"
+	}
+	if strings.TrimSpace(comment) != "" {
+		activityComment = strings.TrimSpace(comment)
+	}
+	rawSummary, _ := json.Marshal(summary)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	existingRows, err := queryTx(ctx, tx, `
+		SELECT *
+		FROM subcontractor_checklist_reconciliations
+		WHERE work_item_id=$1
+		FOR UPDATE
+	`, workItemID)
+	if err != nil {
+		return err
+	}
+	reconciliationID := ""
+	if len(existingRows) > 0 {
+		if fmt.Sprint(existingRows[0]["status"]) == "submitted" {
+			return validationError("Đối soát checklist thầu phụ đã submit, không thể sửa", Record{"work_item_id": workItemID})
+		}
+		rows, err := queryTx(ctx, tx, `
+			UPDATE subcontractor_checklist_reconciliations
+			SET form_instance_id=$2,
+				form_revision_no=$3,
+				status=$4,
+				subcontractor_name=NULLIF($5,''),
+				work_package=NULLIF($6,''),
+				construction_area=NULLIF($7,''),
+				summary_json=$8::jsonb,
+				comment=NULLIF($9,''),
+				submitted_by=CASE WHEN $10 THEN NULLIF($11,'')::uuid ELSE submitted_by END,
+				submitted_at=CASE WHEN $10 THEN now() ELSE submitted_at END,
+				updated_by=NULLIF($11,'')::uuid,
+				updated_at=now()
+			WHERE id=$1
+			RETURNING id
+		`, existingRows[0]["id"], formInstanceID, formRevisionNo, status, cleanOptionalText(answers["subcontractor_name"]), cleanOptionalText(answers["work_package"]), cleanOptionalText(answers["construction_area"]), string(rawSummary), comment, submit, actorID)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return sql.ErrNoRows
+		}
+		reconciliationID = cleanID(rows[0]["id"])
+	} else {
+		rows, err := queryTx(ctx, tx, `
+			INSERT INTO subcontractor_checklist_reconciliations (
+				project_id, work_item_id, form_instance_id, form_revision_no, status,
+				subcontractor_name, work_package, construction_area, summary_json, comment,
+				created_by, submitted_by, submitted_at, updated_by
+			)
+			VALUES (
+				$1, $2, $3, $4, $5,
+				NULLIF($6,''), NULLIF($7,''), NULLIF($8,''), $9::jsonb, NULLIF($10,''),
+				NULLIF($11,'')::uuid,
+				CASE WHEN $12 THEN NULLIF($11,'')::uuid ELSE NULL END,
+				CASE WHEN $12 THEN now() ELSE NULL END,
+				NULLIF($11,'')::uuid
+			)
+			RETURNING id
+		`, projectID, workItemID, formInstanceID, formRevisionNo, status, cleanOptionalText(answers["subcontractor_name"]), cleanOptionalText(answers["work_package"]), cleanOptionalText(answers["construction_area"]), string(rawSummary), comment, actorID, submit)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return sql.ErrNoRows
+		}
+		reconciliationID = cleanID(rows[0]["id"])
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM subcontractor_checklist_reconciliation_items WHERE reconciliation_id=$1`, reconciliationID); err != nil {
+		return err
+	}
+	for _, row := range items {
+		rawPayload, _ := json.Marshal(row["payload_json"])
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO subcontractor_checklist_reconciliation_items (
+				reconciliation_id, project_id, work_item_id, form_instance_id, item_index,
+				checklist_title, boq_item_id, boq_item_ref, boq_work_item_name, boq_quantity, boq_unit,
+				claimed_quantity, confirmed_quantity, variance_quantity, unit, status, evidence_id,
+				owner_response, decision, due_date, comment, payload_json
+			)
+			VALUES (
+				$1, $2, $3, $4, $5,
+				$6, NULLIF($7,'')::uuid, NULLIF($8,''), NULLIF($9,''), $10, NULLIF($11,''),
+				$12, $13, $14, NULLIF($15,''), NULLIF($16,''), NULLIF($17,'')::uuid,
+				NULLIF($18,''), $19, NULLIF($20,'')::date, NULLIF($21,''), $22::jsonb
+			)
+		`, reconciliationID, projectID, workItemID, formInstanceID, row["item_index"],
+			row["checklist_title"], cleanID(row["boq_item_id"]), row["boq_item_ref"], row["boq_work_item_name"], row["boq_quantity"], row["boq_unit"],
+			row["claimed_quantity"], row["confirmed_quantity"], row["variance_quantity"], row["unit"], row["status"], cleanID(row["evidence_id"]),
+			row["owner_response"], row["decision"], row["due_date"], row["comment"], string(rawPayload)); err != nil {
+			return err
+		}
+	}
+	rawMetadata, _ := json.Marshal(Record{
+		"subcontractor_reconciliation_id": reconciliationID,
+		"workflow_form_instance_id":       formInstanceID,
+		"status":                          status,
+		"summary":                         summary,
+	})
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'project', $5::jsonb)
+	`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE work_items
+		SET updated_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1
+	`, workItemID, actorID); err != nil {
+		return err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "subcontractor_checklist_reconciliation", reconciliationID, activityComment, Record{
+		"work_item_id":              workItemID,
+		"workflow_form_instance_id": formInstanceID,
+		"status":                    status,
+		"summary":                   summary,
+	}); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r *Repository) ListProjectAcceptanceRecords(ctx context.Context, projectID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			ar.*,
+			requested.full_name AS requested_by_name,
+			submitted.full_name AS submitted_by_name,
+			approved.full_name AS approved_by_name,
+			wi.title AS work_item_title,
+			wfi.title AS workflow_form_title,
+			wfpe.file_name AS pdf_file_name,
+			COALESCE(item_counts.item_count, 0) AS checklist_count
+		FROM acceptance_records ar
+		LEFT JOIN users requested ON requested.id=ar.requested_by
+		LEFT JOIN users submitted ON submitted.id=ar.submitted_by
+		LEFT JOIN users approved ON approved.id=ar.approved_by
+		LEFT JOIN work_items wi ON wi.id=ar.work_item_id
+		LEFT JOIN workflow_form_instances wfi ON wfi.id=ar.form_instance_id
+		LEFT JOIN workflow_form_pdf_exports wfpe ON wfpe.id=ar.pdf_export_id
+		LEFT JOIN (
+			SELECT acceptance_id, COUNT(*) AS item_count
+			FROM acceptance_checklist_items
+			GROUP BY acceptance_id
+		) item_counts ON item_counts.acceptance_id=ar.id
+		WHERE ar.project_id=$1
+		  AND ar.status <> 'deleted'
+		  AND ar.status <> 'cancelled'
+		ORDER BY ar.updated_at DESC, ar.created_at DESC, ar.id
+	`, projectID)
+}
+
+func (r *Repository) ListAcceptanceRecordsForWorkItem(ctx context.Context, workItemID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			ar.*,
+			requested.full_name AS requested_by_name,
+			submitted.full_name AS submitted_by_name,
+			approved.full_name AS approved_by_name,
+			wi.title AS work_item_title,
+			wfi.title AS workflow_form_title,
+			wfpe.file_name AS pdf_file_name,
+			COALESCE(item_counts.item_count, 0) AS checklist_count
+		FROM acceptance_records ar
+		LEFT JOIN users requested ON requested.id=ar.requested_by
+		LEFT JOIN users submitted ON submitted.id=ar.submitted_by
+		LEFT JOIN users approved ON approved.id=ar.approved_by
+		LEFT JOIN work_items wi ON wi.id=ar.work_item_id
+		LEFT JOIN workflow_form_instances wfi ON wfi.id=ar.form_instance_id
+		LEFT JOIN workflow_form_pdf_exports wfpe ON wfpe.id=ar.pdf_export_id
+		LEFT JOIN (
+			SELECT acceptance_id, COUNT(*) AS item_count
+			FROM acceptance_checklist_items
+			GROUP BY acceptance_id
+		) item_counts ON item_counts.acceptance_id=ar.id
+		WHERE ar.work_item_id=$1
+		  AND ar.status <> 'deleted'
+		  AND ar.status <> 'cancelled'
+		ORDER BY ar.updated_at DESC, ar.created_at DESC, ar.id
+	`, workItemID)
+}
+
+func (r *Repository) GetAcceptanceDetail(ctx context.Context, acceptanceID string) (Record, error) {
+	record, err := r.QueryOne(ctx, `
+		SELECT
+			ar.*,
+			requested.full_name AS requested_by_name,
+			submitted.full_name AS submitted_by_name,
+			approved.full_name AS approved_by_name,
+			wi.title AS work_item_title,
+			wfi.title AS workflow_form_title,
+			wfpe.file_name AS pdf_file_name
+		FROM acceptance_records ar
+		LEFT JOIN users requested ON requested.id=ar.requested_by
+		LEFT JOIN users submitted ON submitted.id=ar.submitted_by
+		LEFT JOIN users approved ON approved.id=ar.approved_by
+		LEFT JOIN work_items wi ON wi.id=ar.work_item_id
+		LEFT JOIN workflow_form_instances wfi ON wfi.id=ar.form_instance_id
+		LEFT JOIN workflow_form_pdf_exports wfpe ON wfpe.id=ar.pdf_export_id
+		WHERE ar.id=$1
+		  AND ar.status <> 'deleted'
+	`, acceptanceID)
+	if err != nil {
+		return nil, err
+	}
+	items, err := r.Query(ctx, `
+		SELECT
+			aci.*,
+			er.name AS evidence_name,
+			er.status AS evidence_status
+		FROM acceptance_checklist_items aci
+		LEFT JOIN evidence_records er ON er.id=aci.evidence_id
+		WHERE aci.acceptance_id=$1
+		ORDER BY aci.item_index, aci.created_at, aci.id
+	`, acceptanceID)
+	if err != nil {
+		return nil, err
+	}
+	record["checklist"] = items
+	record["checklist_count"] = len(items)
+	return record, nil
+}
+
+func (r *Repository) SaveAcceptance(ctx context.Context, acceptanceID string, header Record, items []Record, actorID, actorName string) (Record, error) {
+	acceptanceID = cleanID(acceptanceID)
+	projectID := cleanID(header["project_id"])
+	workItemID := cleanID(header["work_item_id"])
+	rawSummary, _ := json.Marshal(header["summary_json"])
+	activityComment := cleanOptionalText(header["notes"])
+	if activityComment == "" {
+		activityComment = "Đã lưu nháp nghiệm thu đầu ra"
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if acceptanceID != "" {
+		existingRows, err := queryTx(ctx, tx, `
+			SELECT *
+			FROM acceptance_records
+			WHERE id=$1
+			FOR UPDATE
+		`, acceptanceID)
+		if err != nil {
+			return nil, err
+		}
+		if len(existingRows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		if !statusIn(fmt.Sprint(existingRows[0]["status"]), "draft") {
+			return nil, validationError("Hồ sơ nghiệm thu đầu ra đã submit/chốt, không thể sửa", Record{"acceptance_id": acceptanceID, "status": existingRows[0]["status"]})
+		}
+		if cleanID(existingRows[0]["project_id"]) != projectID {
+			return nil, validationError("Hồ sơ nghiệm thu đầu ra không thuộc công trình", Record{"acceptance_id": acceptanceID})
+		}
+		rows, err := queryTx(ctx, tx, `
+			UPDATE acceptance_records
+			SET work_item_id=NULLIF($2,'')::uuid,
+				form_instance_id=NULLIF($3,'')::uuid,
+				pdf_export_id=NULLIF($4,'')::uuid,
+				type=$5,
+				title=$6,
+				acceptance_date=NULLIF($7,'')::date,
+				location=NULLIF($8,''),
+				client_representative=NULLIF($9,''),
+				contractor_representative=NULLIF($10,''),
+				scope_summary=NULLIF($11,''),
+				signature_status=$12,
+				document_status=$13,
+				notes=NULLIF($14,''),
+				summary_json=$15::jsonb,
+				updated_at=now()
+			WHERE id=$1
+			RETURNING id
+		`, acceptanceID, workItemID, cleanID(header["form_instance_id"]), cleanID(header["pdf_export_id"]), header["type"],
+			header["title"], header["acceptance_date"], header["location"], header["client_representative"], header["contractor_representative"],
+			header["scope_summary"], header["signature_status"], header["document_status"], header["notes"], string(rawSummary))
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM acceptance_checklist_items WHERE acceptance_id=$1`, acceptanceID); err != nil {
+			return nil, err
+		}
+	} else {
+		code := fmt.Sprintf("OA-%s-%d-%s", projectID[:8], timeNowUnix(), newID()[:8])
+		rows, err := queryTx(ctx, tx, `
+			INSERT INTO acceptance_records (
+				acceptance_code, project_id, work_item_id, form_instance_id, pdf_export_id,
+				type, title, requested_by, status, acceptance_date, location,
+				client_representative, contractor_representative, scope_summary,
+				signature_status, document_status, notes, summary_json
+			)
+			VALUES (
+				$1, $2, NULLIF($3,'')::uuid, NULLIF($4,'')::uuid, NULLIF($5,'')::uuid,
+				$6, $7, NULLIF($8,'')::uuid, 'draft', NULLIF($9,'')::date, NULLIF($10,''),
+				NULLIF($11,''), NULLIF($12,''), NULLIF($13,''),
+				$14, $15, NULLIF($16,''), $17::jsonb
+			)
+			RETURNING id
+		`, code, projectID, workItemID, cleanID(header["form_instance_id"]), cleanID(header["pdf_export_id"]),
+			header["type"], header["title"], actorID, header["acceptance_date"], header["location"], header["client_representative"],
+			header["contractor_representative"], header["scope_summary"], header["signature_status"], header["document_status"],
+			header["notes"], string(rawSummary))
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		acceptanceID = cleanID(rows[0]["id"])
+	}
+
+	for _, item := range items {
+		rawPayload, _ := json.Marshal(item["payload_json"])
+		isPassed := cleanOptionalText(item["decision"]) == "pass"
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO acceptance_checklist_items (
+				acceptance_id, item_index, title, description, is_passed, note,
+				photo_required, photo_url, evidence_id, decision, severity, required_action, due_date, payload_json
+			)
+			VALUES (
+				$1, $2, $3, NULLIF($4,''), $5, NULLIF($6,''),
+				$7, NULLIF($8,''), NULLIF($9,'')::uuid, $10, $11, NULLIF($12,''), NULLIF($13,'')::date, $14::jsonb
+			)
+		`, acceptanceID, item["item_index"], item["title"], item["description"], isPassed, item["note"],
+			item["photo_required"], item["photo_url"], cleanID(item["evidence_id"]), item["decision"], item["severity"],
+			item["required_action"], item["due_date"], string(rawPayload)); err != nil {
+			return nil, err
+		}
+	}
+	rawMetadata, _ := json.Marshal(Record{
+		"acceptance_id": acceptanceID,
+		"status":        "draft",
+		"type":          header["type"],
+		"summary":       header["summary_json"],
+	})
+	if workItemID != "" {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'project', $5::jsonb)
+		`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
+			return nil, err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE work_items
+			SET updated_by=NULLIF($2,'')::uuid,
+				updated_at=now()
+			WHERE id=$1
+		`, workItemID, actorID); err != nil {
+			return nil, err
+		}
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "outgoing_acceptance_saved", "acceptance", acceptanceID, activityComment, Record{
+		"work_item_id":     workItemID,
+		"form_instance_id": cleanID(header["form_instance_id"]),
+		"pdf_export_id":    cleanID(header["pdf_export_id"]),
+		"type":             header["type"],
+		"signature_status": header["signature_status"],
+		"document_status":  header["document_status"],
+		"summary":          header["summary_json"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetAcceptanceDetail(ctx, acceptanceID)
+}
+
+func (r *Repository) SubmitAcceptance(ctx context.Context, acceptanceID, actorID, actorName string) (Record, error) {
+	acceptanceID = cleanID(acceptanceID)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `
+		SELECT *
+		FROM acceptance_records
+		WHERE id=$1
+		FOR UPDATE
+	`, acceptanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	record := rows[0]
+	if fmt.Sprint(record["status"]) != "draft" {
+		return nil, validationError("Chỉ hồ sơ nghiệm thu nháp mới được submit", Record{"acceptance_id": acceptanceID, "status": record["status"]})
+	}
+	itemRows, err := queryTx(ctx, tx, `SELECT COUNT(*) AS total FROM acceptance_checklist_items WHERE acceptance_id=$1`, acceptanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(itemRows) == 0 || number(itemRows[0]["total"]) == 0 {
+		return nil, validationError("Cần ít nhất một checklist item để submit nghiệm thu đầu ra")
+	}
+	updated, err := queryTx(ctx, tx, `
+		UPDATE acceptance_records
+		SET status='submitted',
+			submitted_by=NULLIF($2,'')::uuid,
+			submitted_at=now(),
+			updated_at=now()
+		WHERE id=$1
+		RETURNING *
+	`, acceptanceID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	projectID := cleanID(record["project_id"])
+	workItemID := cleanID(record["work_item_id"])
+	comment := cleanOptionalText(record["notes"])
+	if comment == "" {
+		comment = "Đã submit nghiệm thu đầu ra"
+	}
+	rawMetadata, _ := json.Marshal(Record{
+		"acceptance_id": acceptanceID,
+		"status":        "submitted",
+		"type":          record["type"],
+		"summary":       record["summary_json"],
+	})
+	if workItemID != "" {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'project', $5::jsonb)
+		`, workItemID, projectID, actorID, comment, string(rawMetadata)); err != nil {
+			return nil, err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE work_items
+			SET updated_by=NULLIF($2,'')::uuid,
+				updated_at=now()
+			WHERE id=$1
+		`, workItemID, actorID); err != nil {
+			return nil, err
+		}
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "outgoing_acceptance_submitted", "acceptance", acceptanceID, comment, Record{
+		"work_item_id":     workItemID,
+		"form_instance_id": cleanID(record["form_instance_id"]),
+		"pdf_export_id":    cleanID(record["pdf_export_id"]),
+		"type":             record["type"],
+		"summary":          record["summary_json"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetAcceptanceDetail(ctx, acceptanceID)
+}
+
+func (r *Repository) GetOwnerClientReconciliation(ctx context.Context, workItemID string) (Record, error) {
+	reconciliation, err := r.QueryOne(ctx, `
+		SELECT ocr.*, submitted.full_name AS submitted_by_name, updated.full_name AS updated_by_name
+		FROM owner_client_checklist_reconciliations ocr
+		LEFT JOIN users submitted ON submitted.id=ocr.submitted_by
+		LEFT JOIN users updated ON updated.id=ocr.updated_by
+		WHERE ocr.work_item_id=$1
+	`, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	items, err := r.Query(ctx, `
+		SELECT
+			ocri.*,
+			ar.title AS current_acceptance_title,
+			ar.type AS current_acceptance_type,
+			ar.status AS current_acceptance_status,
+			ar.result AS current_acceptance_result,
+			er.name AS evidence_name,
+			er.status AS evidence_status
+		FROM owner_client_checklist_reconciliation_items ocri
+		LEFT JOIN acceptance_records ar ON ar.id=ocri.acceptance_id
+		LEFT JOIN evidence_records er ON er.id=ocri.evidence_id
+		WHERE ocri.reconciliation_id=$1
+		ORDER BY ocri.item_index, ocri.created_at
+	`, reconciliation["id"])
+	if err != nil {
+		return nil, err
+	}
+	reconciliation["items"] = items
+	return reconciliation, nil
+}
+
+func (r *Repository) SaveOwnerClientReconciliation(ctx context.Context, item Record, form Record, comment string, items []Record, summary Record, submit bool, actorID, actorName string) error {
+	workItemID := cleanID(item["id"])
+	projectID := cleanID(item["project_id"])
+	instance, _ := form["instance"].(Record)
+	answers, _ := form["answers"].(Record)
+	formInstanceID := cleanID(instance["id"])
+	formRevisionNo := int(number(instance["current_revision"]))
+	status := "draft"
+	activityComment := "Đã lưu nháp đối soát checklist chủ đầu tư"
+	eventType := "owner_client_reconciliation_saved"
+	if submit {
+		status = "submitted"
+		activityComment = "Đã submit đối soát checklist chủ đầu tư"
+		eventType = "owner_client_reconciliation_submitted"
+	}
+	if strings.TrimSpace(comment) != "" {
+		activityComment = strings.TrimSpace(comment)
+	}
+	rawSummary, _ := json.Marshal(summary)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	existingRows, err := queryTx(ctx, tx, `
+		SELECT *
+		FROM owner_client_checklist_reconciliations
+		WHERE work_item_id=$1
+		FOR UPDATE
+	`, workItemID)
+	if err != nil {
+		return err
+	}
+	reconciliationID := ""
+	if len(existingRows) > 0 {
+		if fmt.Sprint(existingRows[0]["status"]) == "submitted" {
+			return validationError("Đối soát checklist chủ đầu tư đã submit, không thể sửa", Record{"work_item_id": workItemID})
+		}
+		rows, err := queryTx(ctx, tx, `
+			UPDATE owner_client_checklist_reconciliations
+			SET form_instance_id=$2,
+				form_revision_no=$3,
+				status=$4,
+				client_representative=NULLIF($5,''),
+				company_representative=NULLIF($6,''),
+				handover_scope=NULLIF($7,''),
+				scope_detail=NULLIF($8,''),
+				summary_json=$9::jsonb,
+				comment=NULLIF($10,''),
+				submitted_by=CASE WHEN $11 THEN NULLIF($12,'')::uuid ELSE submitted_by END,
+				submitted_at=CASE WHEN $11 THEN now() ELSE submitted_at END,
+				updated_by=NULLIF($12,'')::uuid,
+				updated_at=now()
+			WHERE id=$1
+			RETURNING id
+		`, existingRows[0]["id"], formInstanceID, formRevisionNo, status, cleanOptionalText(answers["client_representative"]), cleanOptionalText(answers["company_representative"]), cleanOptionalText(answers["handover_scope"]), cleanOptionalText(answers["scope_detail"]), string(rawSummary), comment, submit, actorID)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return sql.ErrNoRows
+		}
+		reconciliationID = cleanID(rows[0]["id"])
+	} else {
+		rows, err := queryTx(ctx, tx, `
+			INSERT INTO owner_client_checklist_reconciliations (
+				project_id, work_item_id, form_instance_id, form_revision_no, status,
+				client_representative, company_representative, handover_scope, scope_detail,
+				summary_json, comment, created_by, submitted_by, submitted_at, updated_by
+			)
+			VALUES (
+				$1, $2, $3, $4, $5,
+				NULLIF($6,''), NULLIF($7,''), NULLIF($8,''), NULLIF($9,''),
+				$10::jsonb, NULLIF($11,''), NULLIF($12,'')::uuid,
+				CASE WHEN $13 THEN NULLIF($12,'')::uuid ELSE NULL END,
+				CASE WHEN $13 THEN now() ELSE NULL END,
+				NULLIF($12,'')::uuid
+			)
+			RETURNING id
+		`, projectID, workItemID, formInstanceID, formRevisionNo, status, cleanOptionalText(answers["client_representative"]), cleanOptionalText(answers["company_representative"]), cleanOptionalText(answers["handover_scope"]), cleanOptionalText(answers["scope_detail"]), string(rawSummary), comment, actorID, submit)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return sql.ErrNoRows
+		}
+		reconciliationID = cleanID(rows[0]["id"])
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM owner_client_checklist_reconciliation_items WHERE reconciliation_id=$1`, reconciliationID); err != nil {
+		return err
+	}
+	for _, row := range items {
+		rawPayload, _ := json.Marshal(row["payload_json"])
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO owner_client_checklist_reconciliation_items (
+				reconciliation_id, project_id, work_item_id, form_instance_id, item_index,
+				checklist_title, output_ref, status, client_decision, severity, required_action, due_date,
+				evidence_id, acceptance_id, acceptance_title, acceptance_type, acceptance_status, acceptance_result,
+				decision, comment, payload_json
+			)
+			VALUES (
+				$1, $2, $3, $4, $5,
+				$6, NULLIF($7,''), NULLIF($8,''), NULLIF($9,''), NULLIF($10,''), NULLIF($11,''), NULLIF($12,'')::date,
+				NULLIF($13,'')::uuid, NULLIF($14,'')::uuid, NULLIF($15,''), NULLIF($16,''), NULLIF($17,''), NULLIF($18,''),
+				$19, NULLIF($20,''), $21::jsonb
+			)
+		`, reconciliationID, projectID, workItemID, formInstanceID, row["item_index"],
+			row["checklist_title"], row["output_ref"], row["status"], row["client_decision"], row["severity"], row["required_action"], row["due_date"],
+			cleanID(row["evidence_id"]), cleanID(row["acceptance_id"]), row["acceptance_title"], row["acceptance_type"], row["acceptance_status"], row["acceptance_result"],
+			row["decision"], row["comment"], string(rawPayload)); err != nil {
+			return err
+		}
+	}
+	rawMetadata, _ := json.Marshal(Record{
+		"owner_client_reconciliation_id": reconciliationID,
+		"workflow_form_instance_id":      formInstanceID,
+		"status":                         status,
+		"summary":                        summary,
+	})
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'project', $5::jsonb)
+	`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE work_items
+		SET updated_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1
+	`, workItemID, actorID); err != nil {
+		return err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "owner_client_checklist_reconciliation", reconciliationID, activityComment, Record{
+		"work_item_id":              workItemID,
+		"workflow_form_instance_id": formInstanceID,
+		"status":                    status,
+		"summary":                   summary,
+	}); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r *Repository) GetMaterialSnapshot(ctx context.Context, workItemID string) (Record, error) {
+	snapshot, err := r.QueryOne(ctx, `
+		SELECT mbs.*, submitted.full_name AS submitted_by_name, updated.full_name AS updated_by_name
+		FROM material_before_after_snapshots mbs
+		LEFT JOIN users submitted ON submitted.id=mbs.submitted_by
+		LEFT JOIN users updated ON updated.id=mbs.updated_by
+		WHERE mbs.work_item_id=$1
+	`, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	items, err := r.Query(ctx, `
+		SELECT
+			mbsi.*,
+			m.code AS current_material_code,
+			m.name AS current_material_name,
+			m.unit AS current_material_unit,
+			m.category AS current_material_category,
+			m.active AS current_material_active,
+			smb.issued_quantity AS current_issued_quantity,
+			smb.used_quantity AS current_used_quantity,
+			smb.surplus_quantity AS current_surplus_quantity,
+			before_ev.name AS before_evidence_name,
+			before_ev.status AS before_evidence_status,
+			after_ev.name AS after_evidence_name,
+			after_ev.status AS after_evidence_status
+		FROM material_before_after_snapshot_items mbsi
+		LEFT JOIN materials m ON m.id=mbsi.material_id
+		LEFT JOIN site_material_balances smb ON smb.id=mbsi.site_balance_id
+		LEFT JOIN evidence_records before_ev ON before_ev.id=mbsi.before_evidence_id
+		LEFT JOIN evidence_records after_ev ON after_ev.id=mbsi.after_evidence_id
+		WHERE mbsi.snapshot_id=$1
+		ORDER BY mbsi.item_index, mbsi.created_at
+	`, snapshot["id"])
+	if err != nil {
+		return nil, err
+	}
+	snapshot["items"] = items
+	return snapshot, nil
+}
+
+func (r *Repository) SaveMaterialSnapshot(ctx context.Context, item Record, header Record, items []Record, summary Record, submit bool, actorID, actorName string) error {
+	workItemID := cleanID(item["id"])
+	projectID := cleanID(item["project_id"])
+	snapshotDate := cleanOptionalText(header["snapshot_date"])
+	constructionArea := cleanOptionalText(header["construction_area"])
+	comment := cleanOptionalText(header["comment"])
+	status := "draft"
+	activityComment := "Đã lưu nháp snapshot vật tư trước/sau"
+	eventType := "material_snapshot_saved"
+	if submit {
+		status = "submitted"
+		activityComment = "Đã submit snapshot vật tư trước/sau"
+		eventType = "material_snapshot_submitted"
+	}
+	if comment != "" {
+		activityComment = comment
+	}
+	rawSummary, _ := json.Marshal(summary)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	existingRows, err := queryTx(ctx, tx, `
+		SELECT *
+		FROM material_before_after_snapshots
+		WHERE work_item_id=$1
+		FOR UPDATE
+	`, workItemID)
+	if err != nil {
+		return err
+	}
+	snapshotID := ""
+	if len(existingRows) > 0 {
+		existing := existingRows[0]
+		if fmt.Sprint(existing["status"]) == "submitted" || boolValue(existing["applied_to_site_balance"]) {
+			return validationError("Snapshot vật tư đã submit, không thể sửa", Record{"work_item_id": workItemID})
+		}
+		rows, err := queryTx(ctx, tx, `
+			UPDATE material_before_after_snapshots
+			SET status=$2,
+				snapshot_date=NULLIF($3,'')::date,
+				construction_area=NULLIF($4,''),
+				summary_json=$5::jsonb,
+				comment=NULLIF($6,''),
+				submitted_by=CASE WHEN $7 THEN NULLIF($8,'')::uuid ELSE submitted_by END,
+				submitted_at=CASE WHEN $7 THEN now() ELSE submitted_at END,
+				updated_by=NULLIF($8,'')::uuid,
+				updated_at=now()
+			WHERE id=$1
+			RETURNING id
+		`, existing["id"], status, snapshotDate, constructionArea, string(rawSummary), comment, submit, actorID)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return sql.ErrNoRows
+		}
+		snapshotID = cleanID(rows[0]["id"])
+	} else {
+		rows, err := queryTx(ctx, tx, `
+			INSERT INTO material_before_after_snapshots (
+				project_id, work_item_id, status, snapshot_date, construction_area,
+				summary_json, comment, created_by, submitted_by, submitted_at, updated_by
+			)
+			VALUES (
+				$1, $2, $3, NULLIF($4,'')::date, NULLIF($5,''),
+				$6::jsonb, NULLIF($7,''), NULLIF($8,'')::uuid,
+				CASE WHEN $9 THEN NULLIF($8,'')::uuid ELSE NULL END,
+				CASE WHEN $9 THEN now() ELSE NULL END,
+				NULLIF($8,'')::uuid
+			)
+			RETURNING id
+		`, projectID, workItemID, status, snapshotDate, constructionArea, string(rawSummary), comment, actorID, submit)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return sql.ErrNoRows
+		}
+		snapshotID = cleanID(rows[0]["id"])
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM material_before_after_snapshot_items WHERE snapshot_id=$1`, snapshotID); err != nil {
+		return err
+	}
+	for _, row := range items {
+		rawPayload, _ := json.Marshal(row["payload_json"])
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO material_before_after_snapshot_items (
+				snapshot_id, project_id, work_item_id, item_index,
+				material_id, material_code, material_name, unit, source,
+				before_quantity, added_quantity, after_quantity, waste_quantity, used_quantity,
+				affects_site_balance, site_balance_id, before_evidence_id, after_evidence_id,
+				construction_area, condition, comment, payload_json
+			)
+			VALUES (
+				$1, $2, $3, $4,
+				NULLIF($5,'')::uuid, NULLIF($6,''), $7, $8, $9,
+				$10, $11, $12, $13, $14,
+				$15, NULLIF($16,'')::uuid, NULLIF($17,'')::uuid, NULLIF($18,'')::uuid,
+				NULLIF($19,''), $20, NULLIF($21,''), $22::jsonb
+			)
+		`, snapshotID, projectID, workItemID, row["item_index"],
+			cleanID(row["material_id"]), row["material_code"], row["material_name"], row["unit"], row["source"],
+			row["before_quantity"], row["added_quantity"], row["after_quantity"], row["waste_quantity"], row["used_quantity"],
+			row["affects_site_balance"], cleanID(row["site_balance_id"]), cleanID(row["before_evidence_id"]), cleanID(row["after_evidence_id"]),
+			row["construction_area"], row["condition"], row["comment"], string(rawPayload)); err != nil {
+			return err
+		}
+	}
+	if submit {
+		if err := r.applyMaterialSnapshotToSiteBalanceTx(ctx, tx, projectID, items); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE material_before_after_snapshots
+			SET applied_to_site_balance=true,
+				updated_at=now()
+			WHERE id=$1
+		`, snapshotID); err != nil {
+			return err
+		}
+	}
+	rawMetadata, _ := json.Marshal(Record{
+		"material_snapshot_id":    snapshotID,
+		"status":                  status,
+		"summary":                 summary,
+		"applied_to_site_balance": submit,
+	})
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'project', $5::jsonb)
+	`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE work_items
+		SET updated_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1
+	`, workItemID, actorID); err != nil {
+		return err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "material_before_after_snapshot", snapshotID, activityComment, Record{
+		"work_item_id":            workItemID,
+		"status":                  status,
+		"summary":                 summary,
+		"applied_to_site_balance": submit,
+	}); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r *Repository) applyMaterialSnapshotToSiteBalanceTx(ctx context.Context, tx *sql.Tx, projectID string, items []Record) error {
+	for _, item := range items {
+		if !boolValue(item["affects_site_balance"]) {
+			continue
+		}
+		materialID := cleanID(item["material_id"])
+		balanceID := cleanID(item["site_balance_id"])
+		if materialID == "" || balanceID == "" {
+			return validationError("Dòng snapshot thiếu vật tư hoặc số dư công trình", Record{"item_index": item["item_index"]})
+		}
+		balanceRows, err := queryTx(ctx, tx, `
+			SELECT *
+			FROM site_material_balances
+			WHERE id=$1 AND project_id=$2 AND material_id=$3
+			FOR UPDATE
+		`, balanceID, projectID, materialID)
+		if err != nil {
+			return err
+		}
+		if len(balanceRows) == 0 {
+			return validationError("Không tìm thấy số dư vật tư tại công trình", Record{"item_index": item["item_index"], "material_id": materialID})
+		}
+		usedQuantity := number(item["used_quantity"])
+		if materialSnapshotQuantityExceeds(usedQuantity, materialBalanceAvailable(balanceRows[0])) {
+			return validationError("Số lượng sử dụng vượt vật tư còn tại công trình", Record{
+				"item_index":  item["item_index"],
+				"material_id": materialID,
+				"available":   materialBalanceAvailable(balanceRows[0]),
+				"quantity":    usedQuantity,
+			})
+		}
+		if usedQuantity <= 0 {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE site_material_balances
+			SET used_quantity = used_quantity + $2,
+				surplus_quantity = GREATEST(issued_quantity - (used_quantity + $2), 0),
+				updated_at = now()
+			WHERE id=$1
+		`, balanceID, usedQuantity); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) ListSurplusHandlingsForWorkItem(ctx context.Context, workItemID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			ssh.*,
+			m.code AS material_code,
+			m.name AS material_name,
+			m.unit AS material_unit,
+			w.name AS warehouse_name,
+			er.name AS evidence_name,
+			er.status AS evidence_status,
+			sm.movement_code AS stock_movement_code,
+			sm.movement_type AS stock_movement_type
+		FROM site_surplus_handlings ssh
+		JOIN materials m ON m.id=ssh.material_id
+		LEFT JOIN warehouses w ON w.id=ssh.warehouse_id
+		LEFT JOIN evidence_records er ON er.id=ssh.evidence_id
+		LEFT JOIN stock_movements sm ON sm.id=ssh.stock_movement_id
+		WHERE ssh.work_item_id=$1
+		  AND ssh.status <> 'cancelled'
+		ORDER BY ssh.created_at DESC, ssh.id
+	`, workItemID)
+}
+
+func (r *Repository) GetSurplusHandling(ctx context.Context, handlingID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			ssh.*,
+			m.code AS material_code,
+			m.name AS material_name,
+			m.unit AS material_unit,
+			w.name AS warehouse_name,
+			er.name AS evidence_name,
+			er.status AS evidence_status,
+			sm.movement_code AS stock_movement_code,
+			sm.movement_type AS stock_movement_type
+		FROM site_surplus_handlings ssh
+		JOIN materials m ON m.id=ssh.material_id
+		LEFT JOIN warehouses w ON w.id=ssh.warehouse_id
+		LEFT JOIN evidence_records er ON er.id=ssh.evidence_id
+		LEFT JOIN stock_movements sm ON sm.id=ssh.stock_movement_id
+		WHERE ssh.id=$1
+		  AND ssh.status <> 'cancelled'
+	`, handlingID)
+}
+
+func (r *Repository) SaveSurplusHandling(ctx context.Context, item Record, handlingID string, row Record, actorID, actorName string) (Record, error) {
+	workItemID := cleanID(item["id"])
+	projectID := cleanID(item["project_id"])
+	handlingID = cleanID(handlingID)
+	activityComment := cleanOptionalText(row["comment"])
+	if activityComment == "" {
+		activityComment = "Đã lưu nháp xử lý vật tư dư"
+	}
+	rawPayload, _ := json.Marshal(Record{
+		"material_name":           row["material_name"],
+		"material_code":           row["material_code"],
+		"surplus_before_handling": row["surplus_before_handling"],
+	})
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if handlingID != "" {
+		existingRows, err := queryTx(ctx, tx, `
+			SELECT *
+			FROM site_surplus_handlings
+			WHERE id=$1
+			FOR UPDATE
+		`, handlingID)
+		if err != nil {
+			return nil, err
+		}
+		if len(existingRows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		if fmt.Sprint(existingRows[0]["status"]) == "submitted" {
+			return nil, validationError("Hồ sơ xử lý vật tư dư đã submit, không thể sửa", Record{"surplus_handling_id": handlingID})
+		}
+		if cleanID(existingRows[0]["work_item_id"]) != workItemID {
+			return nil, validationError("Hồ sơ xử lý vật tư dư không thuộc work item", Record{"surplus_handling_id": handlingID})
+		}
+		rows, err := queryTx(ctx, tx, `
+			UPDATE site_surplus_handlings
+			SET site_balance_id=$2,
+				material_id=$3,
+				material_snapshot_id=NULLIF($4,'')::uuid,
+				material_snapshot_item_id=NULLIF($5,'')::uuid,
+				handling_type=$6,
+				quantity=$7,
+				unit=$8,
+				warehouse_id=NULLIF($9,'')::uuid,
+				custody_location=NULLIF($10,''),
+				condition=$11,
+				evidence_id=NULLIF($12,'')::uuid,
+				comment=NULLIF($13,''),
+				payload_json=$14::jsonb,
+				updated_by=NULLIF($15,'')::uuid,
+				updated_at=now()
+			WHERE id=$1
+			RETURNING id
+		`, handlingID, row["site_balance_id"], row["material_id"], cleanID(row["material_snapshot_id"]), cleanID(row["material_snapshot_item_id"]),
+			row["handling_type"], row["quantity"], row["unit"], cleanID(row["warehouse_id"]), row["custody_location"], row["condition"],
+			cleanID(row["evidence_id"]), row["comment"], string(rawPayload), actorID)
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+	} else {
+		code := fmt.Sprintf("SH-%s-%d-%s", workItemID[:8], timeNowUnix(), newID()[:8])
+		rows, err := queryTx(ctx, tx, `
+			INSERT INTO site_surplus_handlings (
+				handling_code, project_id, work_item_id, site_balance_id, material_id,
+				material_snapshot_id, material_snapshot_item_id, status, handling_type,
+				quantity, unit, warehouse_id, custody_location, condition, evidence_id,
+				comment, payload_json, created_by, updated_by
+			)
+			VALUES (
+				$1, $2, $3, $4, $5,
+				NULLIF($6,'')::uuid, NULLIF($7,'')::uuid, 'draft', $8,
+				$9, $10, NULLIF($11,'')::uuid, NULLIF($12,''), $13, NULLIF($14,'')::uuid,
+				NULLIF($15,''), $16::jsonb, NULLIF($17,'')::uuid, NULLIF($17,'')::uuid
+			)
+			RETURNING id
+		`, code, projectID, workItemID, row["site_balance_id"], row["material_id"],
+			cleanID(row["material_snapshot_id"]), cleanID(row["material_snapshot_item_id"]), row["handling_type"],
+			row["quantity"], row["unit"], cleanID(row["warehouse_id"]), row["custody_location"], row["condition"], cleanID(row["evidence_id"]),
+			row["comment"], string(rawPayload), actorID)
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		handlingID = cleanID(rows[0]["id"])
+	}
+	rawMetadata, _ := json.Marshal(Record{
+		"surplus_handling_id": handlingID,
+		"status":              "draft",
+		"handling_type":       row["handling_type"],
+		"material_id":         row["material_id"],
+		"quantity":            row["quantity"],
+	})
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'project', $5::jsonb)
+	`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE work_items
+		SET updated_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1
+	`, workItemID, actorID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "site_surplus_handling_saved", "site_surplus_handling", handlingID, activityComment, Record{
+		"work_item_id":  workItemID,
+		"handling_type": row["handling_type"],
+		"material_id":   row["material_id"],
+		"quantity":      row["quantity"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetSurplusHandling(ctx, handlingID)
+}
+
+func (r *Repository) SubmitSurplusHandling(ctx context.Context, handlingID string, actorID, actorName string) (Record, error) {
+	handlingID = cleanID(handlingID)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `
+		SELECT *
+		FROM site_surplus_handlings
+		WHERE id=$1
+		FOR UPDATE
+	`, handlingID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	handling := rows[0]
+	if fmt.Sprint(handling["status"]) == "submitted" {
+		return nil, validationError("Hồ sơ xử lý vật tư dư đã submit", Record{"surplus_handling_id": handlingID})
+	}
+	projectID := cleanID(handling["project_id"])
+	workItemID := cleanID(handling["work_item_id"])
+	materialID := cleanID(handling["material_id"])
+	warehouseID := cleanID(handling["warehouse_id"])
+	handlingType := cleanOptionalText(handling["handling_type"])
+	quantity := number(handling["quantity"])
+	unit := cleanOptionalText(handling["unit"])
+	if warehouseID == "" || cleanID(handling["evidence_id"]) == "" || cleanOptionalText(handling["custody_location"]) == "" {
+		return nil, validationError("Hồ sơ xử lý vật tư dư thiếu kho, evidence hoặc vị trí lưu/trả")
+	}
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "stock:"+warehouseID+":"+materialID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "site-material:"+projectID+":"+materialID); err != nil {
+		return nil, err
+	}
+	warehouseRows, err := queryTx(ctx, tx, `SELECT id FROM warehouses WHERE id=$1 AND active`, warehouseID)
+	if err != nil {
+		return nil, err
+	}
+	if len(warehouseRows) == 0 {
+		return nil, validationError("Kho không tồn tại hoặc đã ngưng hoạt động", Record{"warehouse_id": warehouseID})
+	}
+	materialRows, err := queryTx(ctx, tx, `SELECT id FROM materials WHERE id=$1 AND active`, materialID)
+	if err != nil {
+		return nil, err
+	}
+	if len(materialRows) == 0 {
+		return nil, validationError("Vật tư không tồn tại hoặc đã ngưng hoạt động", Record{"material_id": materialID})
+	}
+	balanceRows, err := queryTx(ctx, tx, `
+		SELECT *
+		FROM site_material_balances
+		WHERE id=$1 AND project_id=$2 AND material_id=$3
+		FOR UPDATE
+	`, handling["site_balance_id"], projectID, materialID)
+	if err != nil {
+		return nil, err
+	}
+	if len(balanceRows) == 0 {
+		return nil, validationError("Không tìm thấy số dư vật tư tại công trình", Record{"site_balance_id": handling["site_balance_id"]})
+	}
+	if quantityExceedsAvailable(quantity, number(balanceRows[0]["surplus_quantity"])) {
+		return nil, validationError("Số lượng xử lý vượt vật tư dư", Record{"available": balanceRows[0]["surplus_quantity"], "quantity": quantity})
+	}
+
+	code := fmt.Sprintf("SM-%s-%d-%s", handlingType, timeNowUnix(), newID()[:8])
+	reason := cleanOptionalText(handling["comment"])
+	if reason == "" {
+		reason = fmt.Sprintf("Xử lý vật tư dư %s %.3f %s", handlingType, quantity, unit)
+	}
+	movementRows, err := queryTx(ctx, tx, `
+		INSERT INTO stock_movements
+			(movement_code, project_id, warehouse_id, material_id, movement_type, quantity, unit, reason, reference_type, reference_id, created_by, approved_by)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'site_surplus_handling',$9,NULLIF($10,'')::uuid,NULLIF($10,'')::uuid)
+		RETURNING *
+	`, code, projectID, warehouseID, materialID, handlingType, quantity, unit, reason, handlingID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(movementRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	movement := movementRows[0]
+	updatedBalance, err := queryTx(ctx, tx, `
+		UPDATE site_material_balances
+		SET issued_quantity = GREATEST(issued_quantity - $3, 0),
+			surplus_quantity = GREATEST(GREATEST(issued_quantity - $3, 0) - used_quantity, 0),
+			surplus_status = CASE
+				WHEN GREATEST(GREATEST(issued_quantity - $3, 0) - used_quantity, 0) > 0.000001 THEN 'partial'
+				ELSE 'handled'
+			END,
+			updated_at = now()
+		WHERE id=$1 AND project_id=$2
+		RETURNING *
+	`, handling["site_balance_id"], projectID, quantity)
+	if err != nil {
+		return nil, err
+	}
+	if len(updatedBalance) == 0 {
+		return nil, validationError("Không cập nhật được số dư vật tư tại công trình", Record{"site_balance_id": handling["site_balance_id"]})
+	}
+	updated, err := queryTx(ctx, tx, `
+		UPDATE site_surplus_handlings
+		SET status='submitted',
+			stock_movement_id=$2,
+			submitted_by=NULLIF($3,'')::uuid,
+			submitted_at=now(),
+			updated_by=NULLIF($3,'')::uuid,
+			updated_at=now()
+		WHERE id=$1
+		RETURNING *
+	`, handlingID, movement["id"], actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	activityComment := reason
+	rawMetadata, _ := json.Marshal(Record{
+		"surplus_handling_id": handlingID,
+		"stock_movement_id":   movement["id"],
+		"stock_movement_code": movement["movement_code"],
+		"status":              "submitted",
+		"handling_type":       handlingType,
+		"material_id":         materialID,
+		"quantity":            quantity,
+		"surplus_status":      updatedBalance[0]["surplus_status"],
+	})
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'project', $5::jsonb)
+	`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE work_items
+		SET updated_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1
+	`, workItemID, actorID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, stockMovementEvent(handlingType), "stock_movement", cleanID(movement["id"]), stockMovementDescription(StockActionRequest{
+		ProjectID:     projectID,
+		WarehouseID:   warehouseID,
+		MaterialID:    materialID,
+		MovementType:  handlingType,
+		Quantity:      quantity,
+		Unit:          unit,
+		Reason:        reason,
+		ReferenceType: "site_surplus_handling",
+		ReferenceID:   handlingID,
+	}), Record{
+		"movement_type":       handlingType,
+		"quantity":            quantity,
+		"material_id":         materialID,
+		"warehouse_id":        warehouseID,
+		"reference_type":      "site_surplus_handling",
+		"reference_id":        handlingID,
+		"surplus_handling_id": handlingID,
+	}); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "site_surplus_handling_submitted", "site_surplus_handling", handlingID, activityComment, Record{
+		"work_item_id":        workItemID,
+		"stock_movement_id":   movement["id"],
+		"stock_movement_code": movement["movement_code"],
+		"handling_type":       handlingType,
+		"material_id":         materialID,
+		"quantity":            quantity,
+		"surplus_status":      updatedBalance[0]["surplus_status"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetSurplusHandling(ctx, handlingID)
+}
+
+func (r *Repository) ListIncomingAcceptancesForProject(ctx context.Context, projectID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			iar.*,
+			w.name AS warehouse_name,
+			pr.request_code AS procurement_request_code,
+			pr.title AS procurement_request_title,
+			cb.full_name AS created_by_name,
+			sb.full_name AS submitted_by_name,
+			COALESCE(item_counts.item_count, 0) AS item_count
+		FROM incoming_acceptance_records iar
+		LEFT JOIN warehouses w ON w.id=iar.warehouse_id
+		LEFT JOIN procurement_requests pr ON pr.id=iar.procurement_request_id
+		LEFT JOIN users cb ON cb.id=iar.created_by
+		LEFT JOIN users sb ON sb.id=iar.submitted_by
+		LEFT JOIN (
+			SELECT incoming_acceptance_id, COUNT(*) AS item_count
+			FROM incoming_acceptance_items
+			GROUP BY incoming_acceptance_id
+		) item_counts ON item_counts.incoming_acceptance_id=iar.id
+		WHERE iar.project_id=$1
+		  AND iar.status <> 'cancelled'
+		ORDER BY iar.updated_at DESC, iar.created_at DESC, iar.id
+	`, projectID)
+}
+
+func (r *Repository) ListIncomingAcceptancesForWorkItem(ctx context.Context, workItemID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			iar.*,
+			w.name AS warehouse_name,
+			pr.request_code AS procurement_request_code,
+			pr.title AS procurement_request_title,
+			cb.full_name AS created_by_name,
+			sb.full_name AS submitted_by_name,
+			COALESCE(item_counts.item_count, 0) AS item_count
+		FROM incoming_acceptance_records iar
+		LEFT JOIN warehouses w ON w.id=iar.warehouse_id
+		LEFT JOIN procurement_requests pr ON pr.id=iar.procurement_request_id
+		LEFT JOIN users cb ON cb.id=iar.created_by
+		LEFT JOIN users sb ON sb.id=iar.submitted_by
+		LEFT JOIN (
+			SELECT incoming_acceptance_id, COUNT(*) AS item_count
+			FROM incoming_acceptance_items
+			GROUP BY incoming_acceptance_id
+		) item_counts ON item_counts.incoming_acceptance_id=iar.id
+		WHERE iar.work_item_id=$1
+		  AND iar.status <> 'cancelled'
+		ORDER BY iar.updated_at DESC, iar.created_at DESC, iar.id
+	`, workItemID)
+}
+
+func (r *Repository) GetIncomingAcceptance(ctx context.Context, acceptanceID string) (Record, error) {
+	record, err := r.QueryOne(ctx, `
+		SELECT
+			iar.*,
+			w.name AS warehouse_name,
+			pr.request_code AS procurement_request_code,
+			pr.title AS procurement_request_title,
+			cb.full_name AS created_by_name,
+			sb.full_name AS submitted_by_name
+		FROM incoming_acceptance_records iar
+		LEFT JOIN warehouses w ON w.id=iar.warehouse_id
+		LEFT JOIN procurement_requests pr ON pr.id=iar.procurement_request_id
+		LEFT JOIN users cb ON cb.id=iar.created_by
+		LEFT JOIN users sb ON sb.id=iar.submitted_by
+		WHERE iar.id=$1
+		  AND iar.status <> 'cancelled'
+	`, acceptanceID)
+	if err != nil {
+		return nil, err
+	}
+	items, err := r.Query(ctx, `
+		SELECT
+			iai.*,
+			er.name AS evidence_name,
+			er.status AS evidence_status,
+			pri.quantity_requested AS procurement_quantity_requested,
+			pri.delivery_status AS procurement_delivery_status,
+			pri.approval_status AS procurement_approval_status
+		FROM incoming_acceptance_items iai
+		LEFT JOIN evidence_records er ON er.id=iai.evidence_id
+		LEFT JOIN procurement_request_items pri ON pri.id=iai.procurement_request_item_id
+		WHERE iai.incoming_acceptance_id=$1
+		ORDER BY iai.item_index, iai.created_at
+	`, acceptanceID)
+	if err != nil {
+		return nil, err
+	}
+	record["items"] = items
+	record["item_count"] = len(items)
+	return record, nil
+}
+
+func (r *Repository) SaveIncomingAcceptance(ctx context.Context, acceptanceID string, header Record, items []Record, actorID, actorName string) (Record, error) {
+	acceptanceID = cleanID(acceptanceID)
+	projectID := cleanID(header["project_id"])
+	workItemID := cleanID(header["work_item_id"])
+	rawSummary, _ := json.Marshal(header["summary_json"])
+	activityComment := cleanOptionalText(header["comment"])
+	if activityComment == "" {
+		activityComment = "Đã lưu nháp nghiệm thu đầu vào"
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if acceptanceID != "" {
+		existingRows, err := queryTx(ctx, tx, `
+			SELECT *
+			FROM incoming_acceptance_records
+			WHERE id=$1
+			FOR UPDATE
+		`, acceptanceID)
+		if err != nil {
+			return nil, err
+		}
+		if len(existingRows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		if fmt.Sprint(existingRows[0]["status"]) == "submitted" {
+			return nil, validationError("Hồ sơ nghiệm thu đầu vào đã submit, không thể sửa", Record{"incoming_acceptance_id": acceptanceID})
+		}
+		if cleanID(existingRows[0]["project_id"]) != projectID {
+			return nil, validationError("Hồ sơ nghiệm thu đầu vào không thuộc công trình", Record{"incoming_acceptance_id": acceptanceID})
+		}
+		rows, err := queryTx(ctx, tx, `
+			UPDATE incoming_acceptance_records
+			SET work_item_id=NULLIF($2,'')::uuid,
+				procurement_request_id=NULLIF($3,'')::uuid,
+				warehouse_id=NULLIF($4,'')::uuid,
+				source_type=$5,
+				supplier_name=NULLIF($6,''),
+				subcontractor_name=NULLIF($7,''),
+				delivery_reference=NULLIF($8,''),
+				result=NULLIF($9,''),
+				received_at=NULLIF($10,'')::date,
+				summary_json=$11::jsonb,
+				comment=NULLIF($12,''),
+				updated_by=NULLIF($13,'')::uuid,
+				updated_at=now()
+			WHERE id=$1
+			RETURNING id
+		`, acceptanceID, workItemID, cleanID(header["procurement_request_id"]), cleanID(header["warehouse_id"]), header["source_type"],
+			header["supplier_name"], header["subcontractor_name"], header["delivery_reference"], header["result"], header["received_at"],
+			string(rawSummary), header["comment"], actorID)
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM incoming_acceptance_items WHERE incoming_acceptance_id=$1`, acceptanceID); err != nil {
+			return nil, err
+		}
+	} else {
+		code := fmt.Sprintf("IA-%s-%d-%s", projectID[:8], timeNowUnix(), newID()[:8])
+		rows, err := queryTx(ctx, tx, `
+			INSERT INTO incoming_acceptance_records (
+				acceptance_code, project_id, work_item_id, procurement_request_id, warehouse_id,
+				source_type, supplier_name, subcontractor_name, delivery_reference,
+				status, result, received_at, summary_json, comment, created_by, updated_by
+			)
+			VALUES (
+				$1, $2, NULLIF($3,'')::uuid, NULLIF($4,'')::uuid, NULLIF($5,'')::uuid,
+				$6, NULLIF($7,''), NULLIF($8,''), NULLIF($9,''),
+				'draft', NULLIF($10,''), NULLIF($11,'')::date, $12::jsonb, NULLIF($13,''), NULLIF($14,'')::uuid, NULLIF($14,'')::uuid
+			)
+			RETURNING id
+		`, code, projectID, workItemID, cleanID(header["procurement_request_id"]), cleanID(header["warehouse_id"]), header["source_type"],
+			header["supplier_name"], header["subcontractor_name"], header["delivery_reference"], header["result"], header["received_at"],
+			string(rawSummary), header["comment"], actorID)
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		acceptanceID = cleanID(rows[0]["id"])
+	}
+
+	for _, item := range items {
+		rawPayload, _ := json.Marshal(item["payload_json"])
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO incoming_acceptance_items (
+				incoming_acceptance_id, project_id, work_item_id, item_index,
+				material_id, material_code, material_name, procurement_request_item_id,
+				delivered_quantity, accepted_quantity, rejected_quantity, unit,
+				condition, defect_note, evidence_id, decision, comment, payload_json
+			)
+			VALUES (
+				$1, $2, NULLIF($3,'')::uuid, $4,
+				NULLIF($5,'')::uuid, NULLIF($6,''), $7, NULLIF($8,'')::uuid,
+				$9, $10, $11, $12,
+				$13, NULLIF($14,''), NULLIF($15,'')::uuid, $16, NULLIF($17,''), $18::jsonb
+			)
+		`, acceptanceID, projectID, workItemID, item["item_index"], cleanID(item["material_id"]), item["material_code"], item["material_name"],
+			cleanID(item["procurement_request_item_id"]), item["delivered_quantity"], item["accepted_quantity"], item["rejected_quantity"],
+			item["unit"], item["condition"], item["defect_note"], cleanID(item["evidence_id"]), item["decision"], item["comment"], string(rawPayload)); err != nil {
+			return nil, err
+		}
+	}
+	rawMetadata, _ := json.Marshal(Record{
+		"incoming_acceptance_id": acceptanceID,
+		"status":                 "draft",
+		"source_type":            header["source_type"],
+		"result":                 header["result"],
+		"summary":                header["summary_json"],
+	})
+	if workItemID != "" {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'project', $5::jsonb)
+		`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
+			return nil, err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE work_items
+			SET updated_by=NULLIF($2,'')::uuid,
+				updated_at=now()
+			WHERE id=$1
+		`, workItemID, actorID); err != nil {
+			return nil, err
+		}
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "incoming_acceptance_saved", "incoming_acceptance", acceptanceID, activityComment, Record{
+		"work_item_id":           workItemID,
+		"procurement_request_id": cleanID(header["procurement_request_id"]),
+		"warehouse_id":           cleanID(header["warehouse_id"]),
+		"source_type":            header["source_type"],
+		"result":                 header["result"],
+		"summary":                header["summary_json"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetIncomingAcceptance(ctx, acceptanceID)
+}
+
+func (r *Repository) SubmitIncomingAcceptance(ctx context.Context, acceptanceID string, result string, actorID, actorName string) (Record, error) {
+	acceptanceID = cleanID(acceptanceID)
+	result = cleanOptionalText(result)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `
+		SELECT *
+		FROM incoming_acceptance_records
+		WHERE id=$1
+		FOR UPDATE
+	`, acceptanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	record := rows[0]
+	if fmt.Sprint(record["status"]) == "submitted" {
+		return nil, validationError("Hồ sơ nghiệm thu đầu vào đã submit", Record{"incoming_acceptance_id": acceptanceID})
+	}
+	if fmt.Sprint(record["status"]) == "cancelled" {
+		return nil, validationError("Hồ sơ nghiệm thu đầu vào đã hủy", Record{"incoming_acceptance_id": acceptanceID})
+	}
+	itemRows, err := queryTx(ctx, tx, `
+		SELECT COUNT(*) AS total
+		FROM incoming_acceptance_items
+		WHERE incoming_acceptance_id=$1
+	`, acceptanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(itemRows) == 0 || number(itemRows[0]["total"]) == 0 {
+		return nil, validationError("Cần ít nhất một dòng vật tư để submit nghiệm thu đầu vào")
+	}
+	updated, err := queryTx(ctx, tx, `
+		UPDATE incoming_acceptance_records
+		SET status='submitted',
+			submitted_by=NULLIF($2,'')::uuid,
+			submitted_at=now(),
+			result=NULLIF($3,''),
+			updated_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1
+		RETURNING *
+	`, acceptanceID, actorID, result)
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	projectID := cleanID(record["project_id"])
+	workItemID := cleanID(record["work_item_id"])
+	if result == "" {
+		result = cleanOptionalText(record["result"])
+	}
+	comment := cleanOptionalText(record["comment"])
+	if comment == "" {
+		comment = fmt.Sprintf("Submit nghiệm thu đầu vào: %s", result)
+	}
+	rawMetadata, _ := json.Marshal(Record{
+		"incoming_acceptance_id": acceptanceID,
+		"status":                 "submitted",
+		"result":                 result,
+		"summary":                record["summary_json"],
+	})
+	if workItemID != "" {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'project', $5::jsonb)
+		`, workItemID, projectID, actorID, comment, string(rawMetadata)); err != nil {
+			return nil, err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE work_items
+			SET updated_by=NULLIF($2,'')::uuid,
+				updated_at=now()
+			WHERE id=$1
+		`, workItemID, actorID); err != nil {
+			return nil, err
+		}
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "incoming_acceptance_submitted", "incoming_acceptance", acceptanceID, comment, Record{
+		"work_item_id":           workItemID,
+		"procurement_request_id": cleanID(record["procurement_request_id"]),
+		"warehouse_id":           cleanID(record["warehouse_id"]),
+		"source_type":            record["source_type"],
+		"result":                 result,
+		"summary":                record["summary_json"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetIncomingAcceptance(ctx, acceptanceID)
+}
+
 func (r *Repository) HasSubmittedWorkflowFormForWorkItem(ctx context.Context, workItemID string) (bool, error) {
 	rows, err := r.Query(ctx, `
 		SELECT COUNT(*) AS total
@@ -1224,15 +2876,12 @@ func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) 
 	`)
 }
 
-func (r *Repository) DefaultWorkflowFormVersionID(ctx context.Context, stepType string, checklistRequired bool) (string, error) {
-	code := "builtin_generic_submission"
-	if stepType == "daily_report" {
-		code = "builtin_daily_report"
-	} else if stepType == "meeting_minutes" {
-		code = "builtin_meeting_minutes"
-	} else if checklistRequired || statusIn(stepType, "checklist", "acceptance_check", "handover_check") {
-		code = "builtin_checklist"
+func (r *Repository) DefaultWorkflowFormVersionID(ctx context.Context, stepType string, checklistRequired bool, stepContext ...string) (string, error) {
+	stepName := ""
+	if len(stepContext) > 0 {
+		stepName = stepContext[0]
 	}
+	code := defaultWorkflowFormCode(stepType, checklistRequired, stepName)
 	row, err := r.QueryOne(ctx, `
 		SELECT v.id
 		FROM workflow_form_templates t
@@ -1248,6 +2897,40 @@ func (r *Repository) DefaultWorkflowFormVersionID(ctx context.Context, stepType 
 		return "", err
 	}
 	return cleanID(row["id"]), nil
+}
+
+func defaultWorkflowFormCode(stepType string, checklistRequired bool, stepName string) string {
+	normalizedName := normalizedWorkflowStepName(stepName)
+	if stepType == "daily_report" {
+		if isConstructionDailyReportStep(normalizedName) {
+			return "builtin_construction_daily_report"
+		}
+		return "builtin_daily_report"
+	}
+	if stepType == "meeting_minutes" {
+		return "builtin_meeting_minutes"
+	}
+	if statusIn(stepType, "checklist", "acceptance_check", "handover_check") || checklistRequired {
+		if strings.Contains(normalizedName, "chu dau tu") || strings.Contains(normalizedName, "client") || strings.Contains(normalizedName, "owner") {
+			return "builtin_owner_client_checklist"
+		}
+		if strings.Contains(normalizedName, "thau phu") || strings.Contains(normalizedName, "subcontractor") {
+			return "builtin_subcontractor_checklist"
+		}
+		return "builtin_checklist"
+	}
+	return "builtin_generic_submission"
+}
+
+func normalizedWorkflowStepName(stepName string) string {
+	return strings.ToLower(strings.TrimSpace(asciiFold(stepName)))
+}
+
+func isConstructionDailyReportStep(normalizedName string) bool {
+	return strings.Contains(normalizedName, "thi cong") ||
+		strings.Contains(normalizedName, "construction") ||
+		strings.Contains(normalizedName, "cong truong") ||
+		strings.Contains(normalizedName, "site report")
 }
 
 func (r *Repository) TemplatePublishFormIssues(ctx context.Context, templateID string) ([]Record, error) {
@@ -1299,10 +2982,11 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 	defer tx.Rollback()
 
 	rows, err := queryTx(ctx, tx, `
-		SELECT *
-		FROM workflow_form_instances
-		WHERE id=$1
-		FOR UPDATE
+		SELECT wfi.*, wft.code AS form_code
+		FROM workflow_form_instances wfi
+		JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
+		WHERE wfi.id=$1
+		FOR UPDATE OF wfi
 	`, instanceID)
 	if err != nil {
 		return nil, err
@@ -1404,7 +3088,7 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 				}
 			} else if fmt.Sprint(instance["form_type"]) == "daily_report" {
 				var err error
-				generatedWorkItemIDs, err = createPlanningDailyReportNextItemsTx(ctx, tx, instance, answers, actorID)
+				generatedWorkItemIDs, err = createDailyReportNextItemsTx(ctx, tx, instance, answers, actorID)
 				if err != nil {
 					return nil, err
 				}
@@ -1818,7 +3502,7 @@ func createMeetingMinutesActionItemsTx(ctx context.Context, tx *sql.Tx, instance
 	return createdIDs, nil
 }
 
-func createPlanningDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, instance Record, answers Record, actorID string) ([]string, error) {
+func createDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, instance Record, answers Record, actorID string) ([]string, error) {
 	rawNextItems, ok := answers["next_plan_items"]
 	if !ok || workflowFormValueEmpty(Record{"field_type": "structured_list"}, rawNextItems) {
 		return []string{}, nil
@@ -1832,7 +3516,7 @@ func createPlanningDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, insta
 	parentWorkItemID := cleanID(instance["work_item_id"])
 	reportDate := strings.TrimSpace(fmt.Sprint(answers["report_date"]))
 	reportedBy := strings.TrimSpace(fmt.Sprint(answers["reported_by"]))
-	planningScope := strings.TrimSpace(fmt.Sprint(answers["planning_scope"]))
+	reportSource, reportLabel, scopeKey, scopeValue := dailyReportNextItemContext(instance, answers)
 	createdIDs := make([]string, 0, len(nextItems))
 	for index, item := range nextItems {
 		title := strings.TrimSpace(fmt.Sprint(item["title"]))
@@ -1848,10 +3532,10 @@ func createPlanningDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, insta
 		}
 		descriptionParts := []string{}
 		if reportDate != "" && reportDate != "<nil>" {
-			descriptionParts = append(descriptionParts, "Planning daily report: "+reportDate)
+			descriptionParts = append(descriptionParts, reportLabel+": "+reportDate)
 		}
-		if planningScope != "" && planningScope != "<nil>" {
-			descriptionParts = append(descriptionParts, "Scope: "+planningScope)
+		if scopeValue != "" && scopeValue != "<nil>" {
+			descriptionParts = append(descriptionParts, "Scope: "+scopeValue)
 		}
 		if reportedBy != "" && reportedBy != "<nil>" {
 			descriptionParts = append(descriptionParts, "Reporter: "+reportedBy)
@@ -1868,15 +3552,18 @@ func createPlanningDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, insta
 			roleIDs = append(roleIDs, ownerRole)
 		}
 		rawRoles, _ := json.Marshal(roleIDs)
-		rawMetadata, _ := json.Marshal(Record{
-			"source":                    "planning_daily_report",
+		metadata := Record{
+			"source":                    reportSource,
 			"workflow_form_instance_id": instanceID,
 			"parent_work_item_id":       parentWorkItemID,
 			"next_plan_item_index":      index,
 			"next_plan_item":            item,
 			"report_date":               reportDate,
-			"planning_scope":            planningScope,
-		})
+		}
+		if scopeKey != "" {
+			metadata[scopeKey] = scopeValue
+		}
+		rawMetadata, _ := json.Marshal(metadata)
 		workItemID := newID()
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO work_items
@@ -1896,19 +3583,19 @@ func createPlanningDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, insta
 		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, to_status, comment, metadata_json)
-			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'created', 'ready', 'Next plan item generated from planning daily report', $4::jsonb)
-		`, workItemID, projectID, actorID, string(rawMetadata)); err != nil {
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'created', 'ready', $4, $5::jsonb)
+		`, workItemID, projectID, actorID, "Next plan item generated from "+strings.ToLower(reportLabel), string(rawMetadata)); err != nil {
 			return nil, err
 		}
 		createdIDs = append(createdIDs, workItemID)
 	}
 	if len(createdIDs) > 0 && parentWorkItemID != "" {
 		rawMetadata, _ := json.Marshal(Record{
-			"source":                    "planning_daily_report",
+			"source":                    reportSource,
 			"workflow_form_instance_id": instanceID,
 			"generated_work_item_ids":   createdIDs,
 		})
-		comment := fmt.Sprintf("Planning daily report generated %d next plan work items", len(createdIDs))
+		comment := fmt.Sprintf("%s generated %d next plan work items", reportLabel, len(createdIDs))
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, metadata_json)
 			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, $5::jsonb)
@@ -1917,6 +3604,17 @@ func createPlanningDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, insta
 		}
 	}
 	return createdIDs, nil
+}
+
+func dailyReportNextItemContext(instance Record, answers Record) (string, string, string, string) {
+	formCode := strings.TrimSpace(fmt.Sprint(instance["form_code"]))
+	if formCode == "builtin_construction_daily_report" {
+		return "construction_daily_report", "Construction daily report", "construction_scope", strings.TrimSpace(fmt.Sprint(answers["construction_scope"]))
+	}
+	if rawScope, ok := answers["construction_scope"]; ok {
+		return "construction_daily_report", "Construction daily report", "construction_scope", strings.TrimSpace(fmt.Sprint(rawScope))
+	}
+	return "planning_daily_report", "Planning daily report", "planning_scope", strings.TrimSpace(fmt.Sprint(answers["planning_scope"]))
 }
 
 func (r *Repository) GetDocumentAttachment(ctx context.Context, documentID string) (Record, error) {
@@ -3341,7 +5039,7 @@ func (r *Repository) CreateTemplateWithNodes(ctx context.Context, body Record, u
 				stepBody["form_required"] = workflowFormRequiredForStep(fmt.Sprint(stepBody["step_type"]), stepBody["checklist_required"] == nil || boolValue(stepBody["checklist_required"]))
 			}
 			if formRequired && cleanID(stepBody["form_version_id"]) == "" {
-				formVersionID, err := r.DefaultWorkflowFormVersionID(ctx, fmt.Sprint(stepBody["step_type"]), stepBody["checklist_required"] == nil || boolValue(stepBody["checklist_required"]))
+				formVersionID, err := r.DefaultWorkflowFormVersionID(ctx, fmt.Sprint(stepBody["step_type"]), stepBody["checklist_required"] == nil || boolValue(stepBody["checklist_required"]), fmt.Sprint(stepBody["name"]))
 				if err != nil {
 					return nil, err
 				}
@@ -4786,6 +6484,45 @@ func (r *Repository) GetProcurementDetail(ctx context.Context, requestID string)
 	return req, nil
 }
 
+func (r *Repository) ListProjectProcurementRequests(ctx context.Context, projectID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			pr.*,
+			u.full_name AS requested_by_name,
+			COALESCE(item_counts.item_count, 0) AS item_count
+		FROM procurement_requests pr
+		LEFT JOIN users u ON u.id=pr.requested_by
+		LEFT JOIN (
+			SELECT request_id, COUNT(*) AS item_count
+			FROM procurement_request_items
+			GROUP BY request_id
+		) item_counts ON item_counts.request_id=pr.id
+		WHERE pr.project_id=$1
+		  AND pr.status <> 'cancelled'
+		ORDER BY pr.created_at DESC, pr.id
+	`, projectID)
+}
+
+func (r *Repository) ListProjectProcurementRequestItems(ctx context.Context, projectID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			pri.*,
+			pr.project_id,
+			pr.request_code,
+			pr.title AS procurement_request_title,
+			m.code AS material_code,
+			m.name AS material_name,
+			b.work_item_name
+		FROM procurement_request_items pri
+		JOIN procurement_requests pr ON pr.id=pri.request_id
+		LEFT JOIN materials m ON m.id=pri.material_id
+		LEFT JOIN boq_items b ON b.id=pri.boq_item_id
+		WHERE pr.project_id=$1
+		  AND pr.status <> 'cancelled'
+		ORDER BY pr.created_at DESC, pri.created_at, pri.id
+	`, projectID)
+}
+
 func (r *Repository) ProcurementAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -4987,7 +6724,10 @@ func (r *Repository) CreateStockMovement(ctx context.Context, req StockActionReq
 				UPDATE site_material_balances
 				SET issued_quantity = GREATEST(issued_quantity - $3, 0),
 					surplus_quantity = GREATEST(GREATEST(issued_quantity - $3, 0) - used_quantity, 0),
-					surplus_status = 'handled',
+					surplus_status = CASE
+						WHEN GREATEST(GREATEST(issued_quantity - $3, 0) - used_quantity, 0) > 0.000001 THEN 'partial'
+						ELSE 'handled'
+					END,
 					updated_at = now()
 				WHERE project_id=$1 AND material_id=$2
 				RETURNING *
@@ -5095,6 +6835,24 @@ func (r *Repository) ProjectMaterialBalances(ctx context.Context, projectID stri
 		WHERE smb.project_id=$1 AND m.active
 		ORDER BY m.category, m.name
 	`, projectID)
+}
+
+func (r *Repository) ListActiveMaterials(ctx context.Context) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT id, code, name, unit, category, default_supplier, standard_price, active, created_at
+		FROM materials
+		WHERE active
+		ORDER BY category, name, code
+	`)
+}
+
+func (r *Repository) ListActiveWarehouses(ctx context.Context) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT id, name, location, type, active, created_at
+		FROM warehouses
+		WHERE active
+		ORDER BY type, name
+	`)
 }
 
 func (r *Repository) AcceptanceAction(ctx context.Context, id, result string, req ActionRequest, actorID, actorName string) (Record, error) {
@@ -5422,6 +7180,536 @@ func (r *Repository) PayableAction(ctx context.Context, id, action string, req A
 		return nil, err
 	}
 	return updated[0], nil
+}
+
+func (r *Repository) GetPayableDetail(ctx context.Context, payableID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT pay.*, p.name AS project_name
+		FROM payables pay
+		JOIN projects p ON p.id=pay.project_id
+		WHERE pay.id=$1
+		  AND pay.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+	`, payableID)
+}
+
+func (r *Repository) ListInputInvoicesForPayable(ctx context.Context, payableID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			ii.*,
+			p.name AS project_name,
+			pay.payable_code,
+			pay.vendor_type,
+			pay.vendor_name AS payable_vendor_name,
+			pay.gross_amount AS payable_gross_amount,
+			pay.remaining_amount AS payable_remaining_amount,
+			pr.request_code AS procurement_request_code,
+			d.name AS document_name,
+			COALESCE(uploaded.full_name, '') AS uploaded_by_name,
+			COALESCE(verified.full_name, '') AS verified_by_name,
+			COALESCE(rejected.full_name, '') AS rejected_by_name
+		FROM input_invoices ii
+		JOIN projects p ON p.id=ii.project_id
+		JOIN payables pay ON pay.id=ii.payable_id
+		LEFT JOIN procurement_requests pr ON pr.id=ii.procurement_request_id
+		LEFT JOIN documents d ON d.id=ii.document_id
+		LEFT JOIN users uploaded ON uploaded.id=ii.uploaded_by
+		LEFT JOIN users verified ON verified.id=ii.verified_by
+		LEFT JOIN users rejected ON rejected.id=ii.rejected_by
+		WHERE ii.payable_id=$1
+		  AND ii.status NOT IN ('deleted','cancelled')
+		  AND pay.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		ORDER BY ii.invoice_date DESC, ii.created_at DESC
+	`, payableID)
+}
+
+func (r *Repository) ListInputInvoicesForProject(ctx context.Context, projectID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			ii.*,
+			p.name AS project_name,
+			pay.payable_code,
+			pay.vendor_type,
+			pay.vendor_name AS payable_vendor_name,
+			pay.gross_amount AS payable_gross_amount,
+			pay.remaining_amount AS payable_remaining_amount,
+			pr.request_code AS procurement_request_code,
+			d.name AS document_name,
+			COALESCE(uploaded.full_name, '') AS uploaded_by_name,
+			COALESCE(verified.full_name, '') AS verified_by_name,
+			COALESCE(rejected.full_name, '') AS rejected_by_name
+		FROM input_invoices ii
+		JOIN projects p ON p.id=ii.project_id
+		JOIN payables pay ON pay.id=ii.payable_id
+		LEFT JOIN procurement_requests pr ON pr.id=ii.procurement_request_id
+		LEFT JOIN documents d ON d.id=ii.document_id
+		LEFT JOIN users uploaded ON uploaded.id=ii.uploaded_by
+		LEFT JOIN users verified ON verified.id=ii.verified_by
+		LEFT JOIN users rejected ON rejected.id=ii.rejected_by
+		WHERE ii.project_id=$1
+		  AND ii.status NOT IN ('deleted','cancelled')
+		  AND pay.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		ORDER BY ii.invoice_date DESC, ii.created_at DESC
+	`, projectID)
+}
+
+func (r *Repository) GetInputInvoiceDetail(ctx context.Context, invoiceID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			ii.*,
+			p.name AS project_name,
+			pay.payable_code,
+			pay.vendor_type,
+			pay.vendor_name AS payable_vendor_name,
+			pay.gross_amount AS payable_gross_amount,
+			pay.remaining_amount AS payable_remaining_amount,
+			pr.request_code AS procurement_request_code,
+			d.name AS document_name,
+			COALESCE(uploaded.full_name, '') AS uploaded_by_name,
+			COALESCE(verified.full_name, '') AS verified_by_name,
+			COALESCE(rejected.full_name, '') AS rejected_by_name
+		FROM input_invoices ii
+		JOIN projects p ON p.id=ii.project_id
+		JOIN payables pay ON pay.id=ii.payable_id
+		LEFT JOIN procurement_requests pr ON pr.id=ii.procurement_request_id
+		LEFT JOIN documents d ON d.id=ii.document_id
+		LEFT JOIN users uploaded ON uploaded.id=ii.uploaded_by
+		LEFT JOIN users verified ON verified.id=ii.verified_by
+		LEFT JOIN users rejected ON rejected.id=ii.rejected_by
+		WHERE ii.id=$1
+		  AND ii.status NOT IN ('deleted','cancelled')
+		  AND pay.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+	`, invoiceID)
+}
+
+func (r *Repository) CreateInputInvoice(ctx context.Context, payable Record, body Record, file StoredFileMetadata, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	projectID := cleanID(payable["project_id"])
+	payableID := cleanID(payable["id"])
+	invoiceID := newID()
+	documentID := cleanID(body["document_id"])
+	if documentID == "" {
+		documentID = newID()
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO documents (id, project_id, target_type, target_id, name, file_url, document_type, status, uploaded_by)
+			VALUES ($1, $2, 'input_invoice', $3, $4, $5, 'input_invoice_pdf', 'active', NULLIF($6,'')::uuid)
+		`, documentID, projectID, invoiceID, fmt.Sprintf("Hoá đơn đầu vào %s", fmt.Sprint(body["invoice_number"])), fmt.Sprintf("/api/input-invoices/%s/file", invoiceID), actorID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO input_invoices (
+			id, project_id, payable_id, procurement_request_id, document_id,
+			invoice_number, invoice_symbol, invoice_date, vendor_name, vendor_tax_code,
+			amount_before_vat, vat_amount, total_amount, currency, status, notes,
+			storage_provider, storage_key, mime_type, file_name, file_size, checksum_sha256,
+			uploaded_by
+		)
+		VALUES (
+			$1, $2, $3, NULLIF($4,'')::uuid, NULLIF($5,'')::uuid,
+			$6, $7, $8::date, $9, $10,
+			$11, $12, $13, 'VND', 'draft', $14,
+			$15, $16, $17, $18, $19, $20,
+			NULLIF($21,'')::uuid
+		)
+		RETURNING *
+	`,
+		invoiceID,
+		projectID,
+		payableID,
+		cleanID(body["procurement_request_id"]),
+		documentID,
+		fmt.Sprint(body["invoice_number"]),
+		fmt.Sprint(body["invoice_symbol"]),
+		fmt.Sprint(body["invoice_date"]),
+		fmt.Sprint(body["vendor_name"]),
+		fmt.Sprint(body["vendor_tax_code"]),
+		number(body["amount_before_vat"]),
+		number(body["vat_amount"]),
+		number(body["total_amount"]),
+		fmt.Sprint(body["notes"]),
+		file.StorageProvider,
+		file.StorageKey,
+		file.MIMEType,
+		fmt.Sprint(body["file_name"]),
+		file.FileSize,
+		file.ChecksumSHA256,
+		actorID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE payables SET updated_at=now() WHERE id=$1`, payableID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "input_invoice_uploaded", "input_invoice", invoiceID, "Upload PDF hoá đơn đầu vào", Record{
+		"payable_id":             payableID,
+		"document_id":            documentID,
+		"procurement_request_id": cleanID(body["procurement_request_id"]),
+		"invoice_number":         body["invoice_number"],
+		"total_amount":           body["total_amount"],
+		"checksum_sha256":        file.ChecksumSHA256,
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetInputInvoiceDetail(ctx, invoiceID)
+}
+
+func (r *Repository) InputInvoiceAction(ctx context.Context, invoiceID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM input_invoices WHERE id=$1 AND status NOT IN ('deleted','cancelled') FOR UPDATE`, invoiceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	toStatus := ""
+	event := ""
+	var updated []Record
+	switch action {
+	case "verify":
+		if !statusIn(fromStatus, "draft", "rejected") {
+			return nil, validationError("Trạng thái hoá đơn không cho phép xác thực", Record{"status": fromStatus})
+		}
+		toStatus = "verified"
+		event = "input_invoice_verified"
+		updated, err = queryTx(ctx, tx, `
+			UPDATE input_invoices
+			SET status='verified',
+				verified_by=NULLIF($2,'')::uuid,
+				verified_at=now(),
+				rejected_by=NULL,
+				rejected_at=NULL,
+				updated_at=now()
+			WHERE id=$1 AND status=$3
+			RETURNING *
+		`, invoiceID, actorID, fromStatus)
+	case "reject":
+		if !statusIn(fromStatus, "draft", "verified") {
+			return nil, validationError("Trạng thái hoá đơn không cho phép từ chối", Record{"status": fromStatus})
+		}
+		toStatus = "rejected"
+		event = "input_invoice_rejected"
+		updated, err = queryTx(ctx, tx, `
+			UPDATE input_invoices
+			SET status='rejected',
+				rejected_by=NULLIF($2,'')::uuid,
+				rejected_at=now(),
+				verified_by=NULL,
+				verified_at=NULL,
+				updated_at=now()
+			WHERE id=$1 AND status=$3
+			RETURNING *
+		`, invoiceID, actorID, fromStatus)
+	default:
+		return nil, validationError("Action hoá đơn đầu vào không hợp lệ", Record{"action": action})
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Trạng thái hoá đơn đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	comment := actionComment(req)
+	metadata := Record{"action": action, "from_status": fromStatus, "to_status": toStatus, "payable_id": current["payable_id"]}
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, event, "input_invoice", invoiceID, fmt.Sprintf("Cập nhật hoá đơn đầu vào từ %s sang %s", fromStatus, toStatus), metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetInputInvoiceDetail(ctx, invoiceID)
+}
+
+func (r *Repository) GetReceivableDetail(ctx context.Context, receivableID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT rec.*, p.name AS project_name
+		FROM receivables rec
+		JOIN projects p ON p.id=rec.project_id
+		WHERE rec.id=$1
+		  AND rec.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+	`, receivableID)
+}
+
+func (r *Repository) ListOutputInvoicesForReceivable(ctx context.Context, receivableID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			oi.*,
+			p.name AS project_name,
+			rec.receivable_code,
+			rec.client_name AS receivable_client_name,
+			rec.gross_amount AS receivable_gross_amount,
+			rec.remaining_amount AS receivable_remaining_amount,
+			pay.payment_code,
+			pay.payment_type,
+			d.name AS document_name,
+			COALESCE(uploaded.full_name, '') AS uploaded_by_name,
+			COALESCE(issued.full_name, '') AS issued_by_name,
+			COALESCE(voided.full_name, '') AS voided_by_name
+		FROM output_invoices oi
+		JOIN projects p ON p.id=oi.project_id
+		JOIN receivables rec ON rec.id=oi.receivable_id
+		LEFT JOIN payments pay ON pay.id=oi.payment_id
+		LEFT JOIN documents d ON d.id=oi.document_id
+		LEFT JOIN users uploaded ON uploaded.id=oi.uploaded_by
+		LEFT JOIN users issued ON issued.id=oi.issued_by
+		LEFT JOIN users voided ON voided.id=oi.voided_by
+		WHERE oi.receivable_id=$1
+		  AND oi.status NOT IN ('deleted','cancelled')
+		  AND rec.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		ORDER BY oi.invoice_date DESC, oi.created_at DESC
+	`, receivableID)
+}
+
+func (r *Repository) ListOutputInvoicesForProject(ctx context.Context, projectID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT
+			oi.*,
+			p.name AS project_name,
+			rec.receivable_code,
+			rec.client_name AS receivable_client_name,
+			rec.gross_amount AS receivable_gross_amount,
+			rec.remaining_amount AS receivable_remaining_amount,
+			pay.payment_code,
+			pay.payment_type,
+			d.name AS document_name,
+			COALESCE(uploaded.full_name, '') AS uploaded_by_name,
+			COALESCE(issued.full_name, '') AS issued_by_name,
+			COALESCE(voided.full_name, '') AS voided_by_name
+		FROM output_invoices oi
+		JOIN projects p ON p.id=oi.project_id
+		JOIN receivables rec ON rec.id=oi.receivable_id
+		LEFT JOIN payments pay ON pay.id=oi.payment_id
+		LEFT JOIN documents d ON d.id=oi.document_id
+		LEFT JOIN users uploaded ON uploaded.id=oi.uploaded_by
+		LEFT JOIN users issued ON issued.id=oi.issued_by
+		LEFT JOIN users voided ON voided.id=oi.voided_by
+		WHERE oi.project_id=$1
+		  AND oi.status NOT IN ('deleted','cancelled')
+		  AND rec.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		ORDER BY oi.invoice_date DESC, oi.created_at DESC
+	`, projectID)
+}
+
+func (r *Repository) GetOutputInvoiceDetail(ctx context.Context, invoiceID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			oi.*,
+			p.name AS project_name,
+			rec.receivable_code,
+			rec.client_name AS receivable_client_name,
+			rec.gross_amount AS receivable_gross_amount,
+			rec.remaining_amount AS receivable_remaining_amount,
+			pay.payment_code,
+			pay.payment_type,
+			d.name AS document_name,
+			COALESCE(uploaded.full_name, '') AS uploaded_by_name,
+			COALESCE(issued.full_name, '') AS issued_by_name,
+			COALESCE(voided.full_name, '') AS voided_by_name
+		FROM output_invoices oi
+		JOIN projects p ON p.id=oi.project_id
+		JOIN receivables rec ON rec.id=oi.receivable_id
+		LEFT JOIN payments pay ON pay.id=oi.payment_id
+		LEFT JOIN documents d ON d.id=oi.document_id
+		LEFT JOIN users uploaded ON uploaded.id=oi.uploaded_by
+		LEFT JOIN users issued ON issued.id=oi.issued_by
+		LEFT JOIN users voided ON voided.id=oi.voided_by
+		WHERE oi.id=$1
+		  AND oi.status NOT IN ('deleted','cancelled')
+		  AND rec.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+	`, invoiceID)
+}
+
+func (r *Repository) CreateOutputInvoice(ctx context.Context, receivable Record, body Record, file StoredFileMetadata, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	projectID := cleanID(receivable["project_id"])
+	receivableID := cleanID(receivable["id"])
+	invoiceID := newID()
+	documentID := cleanID(body["document_id"])
+	if documentID == "" {
+		documentID = newID()
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO documents (id, project_id, target_type, target_id, name, file_url, document_type, status, uploaded_by)
+			VALUES ($1, $2, 'output_invoice', $3, $4, $5, 'output_invoice_pdf', 'active', NULLIF($6,'')::uuid)
+		`, documentID, projectID, invoiceID, fmt.Sprintf("Hoá đơn đầu ra %s", fmt.Sprint(body["invoice_number"])), fmt.Sprintf("/api/output-invoices/%s/file", invoiceID), actorID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO output_invoices (
+			id, project_id, receivable_id, payment_id, document_id,
+			invoice_number, invoice_symbol, invoice_date, client_name, client_tax_code,
+			amount_before_vat, vat_amount, total_amount, currency, status, notes,
+			storage_provider, storage_key, mime_type, file_name, file_size, checksum_sha256,
+			uploaded_by
+		)
+		VALUES (
+			$1, $2, $3, NULLIF($4,'')::uuid, NULLIF($5,'')::uuid,
+			$6, $7, $8::date, $9, $10,
+			$11, $12, $13, 'VND', 'draft', $14,
+			$15, $16, $17, $18, $19, $20,
+			NULLIF($21,'')::uuid
+		)
+		RETURNING *
+	`,
+		invoiceID,
+		projectID,
+		receivableID,
+		cleanID(body["payment_id"]),
+		documentID,
+		fmt.Sprint(body["invoice_number"]),
+		fmt.Sprint(body["invoice_symbol"]),
+		fmt.Sprint(body["invoice_date"]),
+		fmt.Sprint(body["client_name"]),
+		fmt.Sprint(body["client_tax_code"]),
+		number(body["amount_before_vat"]),
+		number(body["vat_amount"]),
+		number(body["total_amount"]),
+		fmt.Sprint(body["notes"]),
+		file.StorageProvider,
+		file.StorageKey,
+		file.MIMEType,
+		fmt.Sprint(body["file_name"]),
+		file.FileSize,
+		file.ChecksumSHA256,
+		actorID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE receivables SET updated_at=now() WHERE id=$1`, receivableID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "output_invoice_uploaded", "output_invoice", invoiceID, "Upload PDF hoá đơn đầu ra", Record{
+		"receivable_id":   receivableID,
+		"document_id":     documentID,
+		"payment_id":      cleanID(body["payment_id"]),
+		"invoice_number":  body["invoice_number"],
+		"total_amount":    body["total_amount"],
+		"checksum_sha256": file.ChecksumSHA256,
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetOutputInvoiceDetail(ctx, invoiceID)
+}
+
+func (r *Repository) OutputInvoiceAction(ctx context.Context, invoiceID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM output_invoices WHERE id=$1 AND status NOT IN ('deleted','cancelled') FOR UPDATE`, invoiceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	toStatus := ""
+	event := ""
+	var updated []Record
+	switch action {
+	case "issue":
+		if fromStatus != "draft" {
+			return nil, validationError("Trạng thái hoá đơn không cho phép phát hành", Record{"status": fromStatus})
+		}
+		toStatus = "issued"
+		event = "output_invoice_issued"
+		updated, err = queryTx(ctx, tx, `
+			UPDATE output_invoices
+			SET status='issued',
+				issued_by=NULLIF($2,'')::uuid,
+				issued_at=now(),
+				voided_by=NULL,
+				voided_at=NULL,
+				updated_at=now()
+			WHERE id=$1 AND status=$3
+			RETURNING *
+		`, invoiceID, actorID, fromStatus)
+	case "void":
+		if !statusIn(fromStatus, "draft", "issued") {
+			return nil, validationError("Trạng thái hoá đơn không cho phép huỷ", Record{"status": fromStatus})
+		}
+		toStatus = "voided"
+		event = "output_invoice_voided"
+		updated, err = queryTx(ctx, tx, `
+			UPDATE output_invoices
+			SET status='voided',
+				voided_by=NULLIF($2,'')::uuid,
+				voided_at=now(),
+				updated_at=now()
+			WHERE id=$1 AND status=$3
+			RETURNING *
+		`, invoiceID, actorID, fromStatus)
+	default:
+		return nil, validationError("Action hoá đơn đầu ra không hợp lệ", Record{"action": action})
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(updated) == 0 {
+		return nil, validationError("Trạng thái hoá đơn đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	comment := actionComment(req)
+	metadata := Record{"action": action, "from_status": fromStatus, "to_status": toStatus, "receivable_id": current["receivable_id"]}
+	if comment != "" {
+		metadata["comment"] = comment
+	}
+	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, event, "output_invoice", invoiceID, fmt.Sprintf("Cập nhật hoá đơn đầu ra từ %s sang %s", fromStatus, toStatus), metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetOutputInvoiceDetail(ctx, invoiceID)
 }
 
 func (r *Repository) ReceivableAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
