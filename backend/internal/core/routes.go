@@ -65,6 +65,9 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, _ *redis.Client, cfg config.Conf
 
 	protected.Post("/projects/:id/start-pipeline", h.StartPipeline)
 	protected.Get("/projects/:id/pipeline-run", h.GetPipelineRun)
+	protected.Get("/planning/daily-reports", h.PlanningDailyReports)
+	protected.Get("/planning/meeting-minutes", h.PlanningMeetingMinutes)
+	protected.Get("/planning/checklists", h.PlanningChecklists)
 	protected.Get("/projects/:id/work-items", h.ProjectWorkItems)
 	protected.Get("/projects/:id/operations", h.ProjectOperations)
 	protected.Get("/projects/:id/activity/stream", h.ProjectActivityStream)

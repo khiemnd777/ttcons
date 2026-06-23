@@ -1,13 +1,11 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, ReactNode, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Clock3, ExternalLink, FileText, Image as ImageIcon, Loader2, Upload } from 'lucide-react';
+import { CheckCircle2, Clock3, FileText, Image as ImageIcon, Loader2, Upload } from 'lucide-react';
 import clsx from 'clsx';
-import { EmptyState } from '../../components/EmptyState';
-import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
-import { downloadBlob, postForm } from '../../lib/api/client';
+import { post, postForm } from '../../lib/api/client';
 import type { EvidenceRecord } from '../../lib/types/domain';
-import { compactDateTime, evidenceLabel, visibilityLabel } from './workItemPresentation';
+import { EvidenceGallery, formatEvidenceFileSize, isImageEvidence, type EvidenceReviewAction } from './EvidenceGallery';
 
 const maxEvidenceUploadBytes = 10 * 1024 * 1024;
 
@@ -27,7 +25,6 @@ export function EvidencePanel({ workItemId, projectId, evidence }: EvidencePanel
   const [name, setName] = useState('');
   const [caption, setCaption] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const previewUrls = useEvidencePreviewUrls(evidence);
   const stats = useMemo(() => evidenceStats(evidence), [evidence]);
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -49,6 +46,18 @@ export function EvidencePanel({ workItemId, projectId, evidence }: EvidencePanel
     onError: (error) => toast.error('Không upload được evidence', error),
   });
 
+  const reviewEvidence = useMutation({
+    mutationFn: ({ record, action, comment }: { record: EvidenceRecord; action: EvidenceReviewAction; comment: string }) =>
+      post<EvidenceRecord>(`/evidence/${record.id}/${action}`, { comment, reason: action === 'reject' ? comment : undefined }),
+    onSuccess: (_record, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['work-item', workItemId] });
+      queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
+      if (projectId) queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
+      toast.success(variables.action === 'accept' ? 'Đã accept evidence' : 'Đã reject evidence');
+    },
+    onError: (error) => toast.error('Không review được evidence', error),
+  });
+
   function onFileChange(file: File | null) {
     setSelectedFile(file);
     if (file && !name.trim()) setName(file.name);
@@ -61,7 +70,7 @@ export function EvidencePanel({ workItemId, projectId, evidence }: EvidencePanel
       return;
     }
     if (selectedFile.size > maxEvidenceUploadBytes) {
-      toast.warn({ title: 'File quá lớn', description: `Dung lượng tối đa ${formatFileSize(maxEvidenceUploadBytes)}.` });
+      toast.warn({ title: 'File quá lớn', description: `Dung lượng tối đa ${formatEvidenceFileSize(maxEvidenceUploadBytes)}.` });
       return;
     }
     if (selectedFile.type && evidenceType === 'photo' && !selectedFile.type.startsWith('image/')) {
@@ -79,33 +88,6 @@ export function EvidencePanel({ workItemId, projectId, evidence }: EvidencePanel
     formData.append('name', name.trim() || selectedFile.name);
     if (caption.trim()) formData.append('caption', caption.trim());
     uploadEvidence.mutate(formData);
-  }
-
-  async function openEvidence(record: EvidenceRecord) {
-    const previewUrl = previewUrls[record.id];
-    if (previewUrl) {
-      window.open(previewUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    if (record.storage_provider === 'local' && record.storage_key) {
-      const viewer = window.open('', '_blank', 'noopener,noreferrer');
-      try {
-        const blob = await downloadBlob(`/evidence/${record.id}/file`);
-        const objectUrl = URL.createObjectURL(blob);
-        if (viewer) viewer.location.href = objectUrl;
-        else window.open(objectUrl, '_blank', 'noopener,noreferrer');
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-      } catch (error) {
-        viewer?.close();
-        toast.error('Không mở được file evidence', error);
-      }
-      return;
-    }
-    if (record.file_url) {
-      window.open(record.file_url, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    toast.warn({ title: 'Evidence chưa có file', description: 'Record này không có file nội bộ hoặc URL để mở.' });
   }
 
   return (
@@ -176,7 +158,7 @@ export function EvidencePanel({ workItemId, projectId, evidence }: EvidencePanel
           </label>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs text-slate-500">{selectedFile ? `${selectedFile.name} · ${formatFileSize(selectedFile.size)}` : 'PNG/JPG/WebP/PDF <= 10MB'}</span>
+          <span className="text-xs text-slate-500">{selectedFile ? `${selectedFile.name} · ${formatEvidenceFileSize(selectedFile.size)}` : 'PNG/JPG/WebP/PDF <= 10MB'}</span>
           <button
             type="submit"
             className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -188,70 +170,20 @@ export function EvidencePanel({ workItemId, projectId, evidence }: EvidencePanel
         </div>
       </form>
 
-      {evidence.length ? (
-        <div className="mt-3 space-y-2">
-          {evidence.map((record) => {
-            const previewUrl = previewUrls[record.id];
-            const title = evidenceTitle(record);
-            return (
-              <div key={record.id} className="rounded-md border border-line bg-white p-3">
-                <div className="flex gap-3">
-                  <div className="h-20 w-24 shrink-0 overflow-hidden rounded-md border border-line bg-slate-100">
-                    {previewUrl ? (
-                      <img className="h-full w-full object-cover" src={previewUrl} alt={title} />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-slate-400">
-                        {record.evidence_type === 'photo' ? <ImageIcon className="h-7 w-7" /> : <FileText className="h-7 w-7" />}
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-ink">{title}</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {evidenceLabel(record.evidence_type)} · {visibilityLabel(record.visibility ?? 'project')} · {compactDateTime(record.created_at)}
-                        </p>
-                      </div>
-                      <StatusBadge status={record.status} />
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      {record.mime_type ? <span>{record.mime_type}</span> : null}
-                      {record.file_size ? <span>{formatFileSize(record.file_size)}</span> : null}
-                      {record.checksum_sha256 ? <span>sha256:{record.checksum_sha256.slice(0, 12)}</span> : null}
-                    </div>
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <span className={clsx('rounded-md px-2 py-0.5 text-xs font-semibold', record.storage_provider === 'local' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>
-                        {record.storage_provider === 'local' ? 'Protected file' : 'External link'}
-                      </span>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
-                        onClick={() => void openEvidence(record)}
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        Mở
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                {record.caption ? <p className="mt-2 text-sm leading-5 text-slate-600">{record.caption}</p> : null}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="mt-3">
-          <EmptyState title="Chưa có evidence cho work item này" />
-        </div>
-      )}
+      <div className="mt-3">
+        <EvidenceGallery
+          evidence={evidence}
+          emptyTitle="Chưa có evidence cho work item này"
+          onReview={(record, action, comment) => reviewEvidence.mutateAsync({ record, action, comment }).then(() => undefined)}
+        />
+      </div>
     </section>
   );
 }
 
 function evidenceStats(evidence: EvidenceRecord[]) {
   return {
-    photos: evidence.filter((record) => record.evidence_type === 'photo' || String(record.mime_type ?? '').startsWith('image/')).length,
+    photos: evidence.filter(isImageEvidence).length,
     documents: evidence.filter((record) => record.evidence_type === 'document' || String(record.mime_type ?? '').includes('pdf')).length,
     accepted: evidence.filter((record) => record.status === 'accepted').length,
     pending: evidence.filter((record) => ['draft', 'submitted', 'pending'].includes(record.status)).length,
@@ -281,60 +213,4 @@ function EvidenceStat({
       </span>
     </div>
   );
-}
-
-function useEvidencePreviewUrls(evidence: EvidenceRecord[]) {
-  const [urls, setUrls] = useState<Record<string, string>>({});
-  const signature = useMemo(
-    () => evidence.map((record) => `${record.id}:${record.storage_key ?? ''}:${record.updated_at ?? ''}:${record.mime_type ?? ''}`).join('|'),
-    [evidence],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    const objectUrls: string[] = [];
-    setUrls({});
-
-    async function loadPreviews() {
-      const imageRecords = evidence.filter((record) => record.storage_provider === 'local' && record.storage_key && isImageEvidence(record));
-      const entries = await Promise.all(imageRecords.map(async (record) => {
-        try {
-          const blob = await downloadBlob(`/evidence/${record.id}/file`);
-          const objectUrl = URL.createObjectURL(blob);
-          objectUrls.push(objectUrl);
-          return [record.id, objectUrl] as const;
-        } catch {
-          return null;
-        }
-      }));
-      if (!cancelled) {
-        setUrls(Object.fromEntries(entries.filter(Boolean) as Array<readonly [string, string]>));
-      } else {
-        objectUrls.forEach((url) => URL.revokeObjectURL(url));
-      }
-    }
-
-    void loadPreviews();
-    return () => {
-      cancelled = true;
-      objectUrls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [signature]);
-
-  return urls;
-}
-
-function isImageEvidence(record: EvidenceRecord) {
-  return record.evidence_type === 'photo' || String(record.mime_type ?? '').startsWith('image/');
-}
-
-function evidenceTitle(record: EvidenceRecord) {
-  return record.name ?? record.title ?? record.document_name ?? record.id;
-}
-
-function formatFileSize(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return '-';
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }

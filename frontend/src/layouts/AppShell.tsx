@@ -42,6 +42,9 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
       { to: '/pipeline-builder', label: 'Pipeline Builder', icon: GitBranch, permissions: ['pipeline.view'] },
       { to: '/workflow-forms', label: 'Workflow Forms', icon: FileText, permissions: ['pipeline.view'] },
+      { to: '/planning/daily-reports', label: 'Daily report KH', icon: ClipboardList, permissions: ['planning.view', 'pipeline.view'] },
+      { to: '/planning/meeting-minutes', label: 'Biên bản họp', icon: FileText, permissions: ['planning.view', 'pipeline.view'] },
+      { to: '/planning/checklists', label: 'Checklist KH', icon: ClipboardCheck, permissions: ['planning.view', 'pipeline.view'] },
     ],
   },
   {

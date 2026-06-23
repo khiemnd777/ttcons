@@ -43,13 +43,13 @@ import type {
 } from '../../lib/types/domain';
 import type { ActivityAttachmentOption } from '../work-items/ActivityComposer';
 import { ActivityThread } from '../work-items/ActivityThread';
+import { EvidenceGallery, type EvidenceReviewAction } from '../work-items/EvidenceGallery';
 import { WorkItemCard } from '../work-items/WorkItemCard';
 import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
 import {
   asArray,
   compactDateTime,
   departmentLabel,
-  evidenceLabel,
   numberValue,
   prioritizeWorkItems,
 } from '../work-items/workItemPresentation';
@@ -284,7 +284,7 @@ export function ProjectDetailPage() {
           />
         ) : null}
 
-        {activeTab === 'files' ? <ProjectFilesPanel evidence={latestEvidence} /> : null}
+        {activeTab === 'files' ? <ProjectFilesPanel projectId={id} evidence={latestEvidence} /> : null}
 
         {activeTab === 'audit' ? <ProjectAuditPanel projectId={id} initialRows={auditRecent} /> : null}
 
@@ -767,7 +767,19 @@ function ProjectActivityPanel({
   );
 }
 
-function ProjectFilesPanel({ evidence }: { evidence: EvidenceRecord[] }) {
+function ProjectFilesPanel({ projectId, evidence }: { projectId: string; evidence: EvidenceRecord[] }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const reviewEvidence = useMutation({
+    mutationFn: ({ record, action, comment }: { record: EvidenceRecord; action: EvidenceReviewAction; comment: string }) =>
+      post<EvidenceRecord>(`/evidence/${record.id}/${action}`, { comment, reason: action === 'reject' ? comment : undefined }),
+    onSuccess: (_record, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
+      toast.success(variables.action === 'accept' ? 'Đã accept evidence' : 'Đã reject evidence');
+    },
+    onError: (error) => toast.error('Không review được evidence', error),
+  });
+
   return (
     <div className="space-y-4">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -777,25 +789,11 @@ function ProjectFilesPanel({ evidence }: { evidence: EvidenceRecord[] }) {
         </div>
         <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{evidence.length}</span>
       </div>
-      <DataTable
-        rows={evidence}
-        empty="Chưa có evidence mới"
-        columns={[
-          {
-            key: 'name',
-            header: 'Hồ sơ',
-            render: (row) => (
-              <div className="min-w-0">
-                <p className="truncate font-semibold text-ink">{row.name ?? row.title ?? row.document_name ?? '-'}</p>
-                <p className="mt-1 text-xs text-slate-500">{row.document_name ?? row.file_url ?? row.id}</p>
-              </div>
-            ),
-          },
-          { key: 'evidence_type', header: 'Loại', render: (row) => evidenceLabel(row.evidence_type) },
-          { key: 'work_item_title', header: 'Work item', render: (row) => row.work_item_title ?? '-' },
-          { key: 'visibility', header: 'Visibility', render: (row) => enumLabel('visibility', row.visibility ?? 'project') },
-          { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-        ]}
+      <EvidenceGallery
+        evidence={evidence}
+        emptyTitle="Chưa có evidence mới"
+        showWorkItem
+        onReview={(record, action, comment) => reviewEvidence.mutateAsync({ record, action, comment }).then(() => undefined)}
       />
     </div>
   );

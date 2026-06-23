@@ -180,6 +180,38 @@ type WorkflowFormSaveRequest struct {
 	Comment string `json:"comment"`
 }
 
+type PlanningDailyReportFilter struct {
+	ProjectID  string
+	DateFrom   string
+	DateTo     string
+	ReportedBy string
+	Owner      string
+	Status     string
+	Search     string
+}
+
+type PlanningMeetingMinutesFilter struct {
+	ProjectID string
+	DateFrom  string
+	DateTo    string
+	Chair     string
+	Owner     string
+	Status    string
+	Search    string
+}
+
+type PlanningChecklistFilter struct {
+	ProjectID  string
+	DateFrom   string
+	DateTo     string
+	CheckedBy  string
+	Assignee   string
+	ItemStatus string
+	Evidence   string
+	Status     string
+	Search     string
+}
+
 type WorkflowFormTemplateRequest struct {
 	Code        string `json:"code"`
 	Name        string `json:"name"`

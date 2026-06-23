@@ -56,12 +56,12 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 | Workflow thành nghiệp vụ | Done | Workflow runtime now exposes typed business form summaries across pipeline steps and work items, with start-time required form mapping validation. |
 | Giao diện hoá nghiệp vụ kế hoạch | Done | Planning now has a business-facing form workspace with form metrics, filters, required/optional status, next actions, and preserved pipeline runtime controls. |
 | Hệ quy đổi Workflow thành nghiệp vụ | Done | Workflow form template/version governance is now exposed through API/UI, published versions remain immutable, and Pipeline Builder can keep mappings to older published versions. |
-| Daily report kế hoạch | Partial | Add did/will fields, owner, date/user/project filters. |
-| Biên bản họp | Missing | New meeting minutes module/form with action items and project/workflow links. |
-| Checklist kế hoạch | Partial | Typed checklist template/items/assignee/evidence. |
-| Chữ ký ảo | Missing | Internal signature/stamp model with actor/time/immutability. |
-| Hình ảnh | Partial | Real upload/storage/gallery/metadata/permission handling. |
-| Đơn giá | Partial | Unit-price lifecycle: expected, norm locked, final locked. |
+| Daily report kế hoạch | Done | Planning daily reports now have project/date/user/owner/status/search filters, did/will/blocker summaries, and direct work-item form access backed by workflow form runtime data. |
+| Biên bản họp | Done | Meeting minutes now have a read-only planning workspace with project/date/chair/owner/status/search filters, attendees/decisions/action-items summaries, generated work-item counts, and direct work-item form access backed by workflow form runtime data. |
+| Checklist kế hoạch | Done | Planning checklists now have a read-only workspace with project/date/checked-by/assignee/item-status/evidence/form-status/search filters, item/evidence summaries, and direct work-item form access backed by `builtin_checklist` workflow form runtime data. |
+| Chữ ký ảo | Done | Internal workflow-form signatures already have immutable actor/time/revision/hash records; Work Item UI now exposes immutable signature detail, purpose duplication guard, and signing acknowledgement. |
+| Hình ảnh | Done | Real evidence upload/storage was already backed by V15; Work Item and Project Files now expose gallery filters, protected preview/open, full metadata detail, and evidence accept/reject actions through existing permissioned APIs. |
+| Đơn giá | Done | BOQ unit-price lifecycle is backed by V17 expected/norm/final state, immutable price events, final-lock procurement propagation, and readiness UI. |
 | Checklist thầu phụ | Done | Dedicated subcontractor checklist form and evidence flow implemented; reconciliation is tracked separately. |
 | Checklist chủ đầu tư | Done | Dedicated owner/client checklist and signoff flow implemented; reconciliation is tracked separately. |
 | Daily report thi công | Done | Added did/will, crew, actual quantity, material usage rows, and site photo evidence. |
@@ -704,4 +704,59 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - `git diff --check` passed after Hệ quy đổi Workflow thành nghiệp vụ.
 - No SQL migration was added for Hệ quy đổi Workflow thành nghiệp vụ because the existing workflow form schema already supports the governance layer; custom migration runner apply was not run.
 - Browser verification not run after Hệ quy đổi Workflow thành nghiệp vụ, per repo rule unless explicitly requested.
+- Implemented Daily report kế hoạch as a read-only backend/frontend planning report workspace on top of existing `builtin_daily_report` workflow form runtime data.
+- Added protected `GET /planning/daily-reports` with project/date/user/owner/status/search filters, project-visibility scoping, and structured completed/next-plan/blocker counts.
+- Added `/planning/daily-reports` admin UI with dense filters, metrics, daily report table, detail dialog, and direct Work Item form opening.
+- Added a daily report business summary to the Work Item workflow form panel so planning reports surface Đã làm, Sẽ làm, and Blocker/Risk before the generic field controls.
+- Preserved existing workflow form draft/submit/sign/PDF behavior, next-plan work-item generation, pipeline step gates, and pipeline status transitions; no new SQL migration was added.
+- `gofmt -w backend/internal/core/types.go backend/internal/core/routes.go backend/internal/core/handlers.go backend/internal/core/service.go backend/internal/core/repository_domain.go` passed after Daily report kế hoạch.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Daily report kế hoạch.
+- `cd frontend && npm run build` passed after Daily report kế hoạch; Vite chunk-size warning remains.
+- `git diff --check` passed after Daily report kế hoạch.
+- Custom migration runner apply was not run after Daily report kế hoạch because no migration was added.
+- Browser verification not run after Daily report kế hoạch, per repo rule unless explicitly requested.
+- Implemented Biên bản họp as a read-only planning workspace on top of existing `meeting_minutes` workflow form runtime data.
+- Added protected `GET /planning/meeting-minutes` with project/date/chair/owner/status/search filters, project-visibility scoping, v2 structured-list parsing, and v1 textarea fallback fields.
+- Added `/planning/meeting-minutes` admin UI with dense filters, metrics, meeting minutes table, detail dialog, artifacts counts, generated action-item work-item counts, and direct Work Item form opening.
+- Added a meeting-minutes business summary to the Work Item workflow form panel so meeting title/date/chair, attendees, decisions, action items, and agenda are visible before generic field controls.
+- Preserved existing workflow form draft/submit/sign/PDF behavior, meeting action-item work-item generation, pipeline step gates, and pipeline status transitions; no new SQL migration was added.
+- Implemented Checklist kế hoạch as a read-only planning workspace on top of existing `builtin_checklist` workflow form runtime data.
+- Added protected `GET /planning/checklists` with project/date/checked-by/assignee/item-status/evidence/form-status/search filters, project-visibility scoping, structured `checklist_items` parsing, and v1 `items_done`/`exceptions` fallback fields.
+- Added `/planning/checklists` admin UI with dense filters, metrics, checklist table, detail dialog, item/evidence summaries, artifacts counts, and direct Work Item form opening.
+- Added a planning-checklist business summary to the Work Item workflow form panel, scoped to `builtin_checklist` so subcontractor/client checklist flows remain separate.
+- Preserved existing workflow form draft/submit/sign/PDF behavior, checklist submit validation, pipeline step gates, and pipeline status transitions; no new SQL migration was added.
+- `gofmt -w backend/internal/core/types.go backend/internal/core/routes.go backend/internal/core/handlers.go backend/internal/core/service.go backend/internal/core/repository_domain.go` passed after Checklist kế hoạch.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Checklist kế hoạch.
+- `cd frontend && npm run build` passed after Checklist kế hoạch; Vite chunk-size warning remains.
+- `git diff --check` passed after Checklist kế hoạch.
+- Custom migration runner apply was not run after Checklist kế hoạch because no migration was added.
+- Browser verification not run after Checklist kế hoạch, per repo rule unless explicitly requested.
+- Implemented Chữ ký ảo as a Work Item trust/audit UI station on top of the existing immutable workflow-form signature records from V14/V16.
+- Strengthened the workflow form signature panel with revision, signer roles, payload hash, visual checksum, immutable status, and a detail dialog for actor/purpose/time/hash/checksum/comment review.
+- Strengthened the signature capture dialog with an immutable-record acknowledgement, current revision context, and current-user duplicate-purpose guarding before `Ký & lưu`.
+- No backend/API/migration changes were needed for Chữ ký ảo because the existing signature and PDF export model already stores actor/time/revision/hash/visual checksum and enforces immutability.
+- `cd frontend && npm run build` passed after Chữ ký ảo; Vite chunk-size warning remains.
+- `git diff --check` passed after Chữ ký ảo.
+- Backend tests were not run after Chữ ký ảo because no backend code changed.
+- Custom migration runner apply was not run after Chữ ký ảo because no migration was added.
+- Browser verification not run after Chữ ký ảo, per repo rule unless explicitly requested.
+- Implemented Hình ảnh as a frontend evidence gallery/detail/review station on top of the existing V15 local storage and protected evidence file APIs.
+- Added a shared evidence gallery/detail UI for Work Item evidence and Project Files, with photo/document/status filters, search, protected preview/open, full metadata, original filename, checksum, storage, uploader/reviewer, and work item context.
+- Connected evidence accept/reject actions to existing `POST /evidence/:id/accept` and `POST /evidence/:id/reject`, keeping backend permission checks as source of truth and invalidating work item/project views after review.
+- No backend/API/migration changes were needed for Hình ảnh because real upload/storage/protected download/checksum/permission handling already exists.
+- `cd frontend && npm run build` passed after Hình ảnh; Vite chunk-size warning remains.
+- `git diff --check` passed after Hình ảnh.
+- Backend tests were not run after Hình ảnh because no backend code changed.
+- Custom migration runner apply was not run after Hình ảnh because no migration was added.
+- Browser verification not run after Hình ảnh, per repo rule unless explicitly requested.
+- Implemented Đơn giá closeout as frontend BOQ lifecycle readiness hardening on top of the existing V17 unit-price lifecycle.
+- Added BOQ readiness summary for expected, norm locked, final locked, approved, approved-final, and blocker states, with direct links into the Unit Price Lifecycle dialog for approved rows that still need final lock.
+- Disabled `Sinh mua sắm` when approved BOQ rows are not final locked or when no approved final-locked rows exist, keeping the frontend aligned with the existing backend final-lock procurement gate.
+- Improved the Unit Price Lifecycle dialog with next-action guidance, procurement impact copy, lock metadata, and clearer history context.
+- No backend/API/migration changes were needed for Đơn giá closeout because V17 already provides lifecycle fields, immutable events, lock endpoints, and procurement price propagation.
+- `cd frontend && npm run build` passed after Đơn giá; Vite chunk-size warning remains.
+- `git diff --check` passed after Đơn giá.
+- Backend tests were not run after Đơn giá because no backend code changed.
+- Custom migration runner apply was not run after Đơn giá because no migration was added.
+- Browser verification not run after Đơn giá, per repo rule unless explicitly requested.
 - No backend/API/migration changes were needed for the Pipeline Builder multi-role UI, Shared UI 2A, or Shared UI 2B batches.

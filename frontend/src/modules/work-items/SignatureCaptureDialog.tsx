@@ -1,5 +1,5 @@
 import { PointerEvent, useEffect, useRef, useState } from 'react';
-import { Eraser, Loader2, PenLine } from 'lucide-react';
+import { AlertTriangle, Eraser, Loader2, PenLine, ShieldCheck } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 
 export type SignaturePoint = { x: number; y: number };
@@ -16,19 +16,39 @@ type SignatureCaptureDialogProps = {
   open: boolean;
   signerName?: string;
   submitting: boolean;
+  signedPurposes?: string[];
+  formRevision?: number;
   onClose: () => void;
   onSubmit: (payload: SignatureCapturePayload) => void;
 };
 
 const canvasWidth = 640;
 const canvasHeight = 220;
+const signaturePurposeOptions = [
+  { value: 'internal_ack', label: 'Internal ack' },
+  { value: 'prepared_by', label: 'Prepared by' },
+  { value: 'reviewed_by', label: 'Reviewed by' },
+  { value: 'approved_by', label: 'Approved by' },
+  { value: 'received_by', label: 'Received by' },
+];
 
-export function SignatureCaptureDialog({ open, signerName, submitting, onClose, onSubmit }: SignatureCaptureDialogProps) {
+export function SignatureCaptureDialog({
+  open,
+  signerName,
+  submitting,
+  signedPurposes = [],
+  formRevision,
+  onClose,
+  onSubmit,
+}: SignatureCaptureDialogProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [purpose, setPurpose] = useState('internal_ack');
   const [comment, setComment] = useState('');
   const [strokes, setStrokes] = useState<SignatureStroke[]>([]);
   const [activeStroke, setActiveStroke] = useState<SignaturePoint[] | null>(null);
+  const [acknowledgedImmutable, setAcknowledgedImmutable] = useState(false);
+  const signedPurposeSet = new Set(signedPurposes);
+  const purposeAlreadySigned = signedPurposeSet.has(purpose);
 
   useEffect(() => {
     if (!open) return;
@@ -41,6 +61,7 @@ export function SignatureCaptureDialog({ open, signerName, submitting, onClose, 
       setComment('');
       setStrokes([]);
       setActiveStroke(null);
+      setAcknowledgedImmutable(false);
     }
   }, [open]);
 
@@ -106,7 +127,7 @@ export function SignatureCaptureDialog({ open, signerName, submitting, onClose, 
 
   function submit() {
     const allStrokes = activeStroke && activeStroke.length >= 2 ? [...strokes, { points: activeStroke }] : strokes;
-    if (!allStrokes.length) return;
+    if (!allStrokes.length || !acknowledgedImmutable || purposeAlreadySigned) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     drawCanvas(allStrokes, []);
@@ -118,13 +139,14 @@ export function SignatureCaptureDialog({ open, signerName, submitting, onClose, 
     });
   }
 
-  const hasSignature = strokes.length > 0 || Boolean(activeStroke?.length);
+  const hasSignature = strokes.length > 0 || Boolean(activeStroke && activeStroke.length >= 2);
+  const description = [signerName ? `Signer: ${signerName}` : undefined, formRevision ? `Revision: ${formRevision}` : undefined].filter(Boolean).join(' · ');
 
   return (
     <Dialog
       open={open}
       title="Ký / Đóng dấu PDF"
-      description={signerName ? `Signer: ${signerName}` : undefined}
+      description={description || undefined}
       onClose={onClose}
       size="lg"
       footer={
@@ -145,7 +167,7 @@ export function SignatureCaptureDialog({ open, signerName, submitting, onClose, 
             <button
               className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={submit}
-              disabled={submitting || !hasSignature}
+              disabled={submitting || !hasSignature || !acknowledgedImmutable || purposeAlreadySigned}
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
               Ký & lưu
@@ -155,6 +177,17 @@ export function SignatureCaptureDialog({ open, signerName, submitting, onClose, 
       }
     >
       <div className="space-y-3">
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+          <div className="flex items-start gap-2">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+            <div>
+              <p className="font-semibold">Chữ ký được lưu bất biến</p>
+              <p className="mt-1 text-xs leading-5 text-emerald-800">
+                Record ký sẽ gắn với actor, thời điểm ký, purpose, revision hiện tại và payload hash của form đã submit.
+              </p>
+            </div>
+          </div>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label>
             <span className="text-xs font-semibold text-slate-600">Purpose</span>
@@ -162,13 +195,17 @@ export function SignatureCaptureDialog({ open, signerName, submitting, onClose, 
               className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               value={purpose}
               disabled={submitting}
-              onChange={(event) => setPurpose(event.target.value)}
+              onChange={(event) => {
+                setPurpose(event.target.value);
+                setAcknowledgedImmutable(false);
+              }}
             >
-              <option value="internal_ack">Internal ack</option>
-              <option value="prepared_by">Prepared by</option>
-              <option value="reviewed_by">Reviewed by</option>
-              <option value="approved_by">Approved by</option>
-              <option value="received_by">Received by</option>
+              {signaturePurposeOptions.map((option) => (
+                <option key={option.value} value={option.value} disabled={signedPurposeSet.has(option.value)}>
+                  {option.label}
+                  {signedPurposeSet.has(option.value) ? ' (đã ký)' : ''}
+                </option>
+              ))}
             </select>
           </label>
           <label>
@@ -183,6 +220,12 @@ export function SignatureCaptureDialog({ open, signerName, submitting, onClose, 
             />
           </label>
         </div>
+        {purposeAlreadySigned ? (
+          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+            <p className="text-xs leading-5">Bạn đã ký purpose này. Mỗi user chỉ được ký một lần cho cùng purpose trên form instance này.</p>
+          </div>
+        ) : null}
         <canvas
           ref={canvasRef}
           width={canvasWidth}
@@ -198,6 +241,18 @@ export function SignatureCaptureDialog({ open, signerName, submitting, onClose, 
           <p className="font-semibold text-ink">SIGNED BY {signerName ?? 'Current user'}</p>
           <p className="mt-1 text-xs text-slate-500">Stamp sẽ được gắn vào PDF export cùng hash và thời điểm ký.</p>
         </div>
+        <label className="flex items-start gap-2 rounded-md border border-line bg-white p-3 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-line"
+            checked={acknowledgedImmutable}
+            disabled={submitting || purposeAlreadySigned}
+            onChange={(event) => setAcknowledgedImmutable(event.target.checked)}
+          />
+          <span>
+            Tôi xác nhận chữ ký này là append-only và dùng cho đúng purpose/revision đang hiển thị.
+          </span>
+        </label>
       </div>
     </Dialog>
   );

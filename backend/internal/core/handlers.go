@@ -571,6 +571,68 @@ func (h *Handler) GetPipelineRun(c *fiber.Ctx) error {
 	return response.OK(c, run)
 }
 
+func (h *Handler) PlanningDailyReports(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"planning.view", "pipeline.view"}); err != nil {
+		return err
+	}
+	filter := PlanningDailyReportFilter{
+		ProjectID:  c.Query("project_id"),
+		DateFrom:   c.Query("date_from"),
+		DateTo:     c.Query("date_to"),
+		ReportedBy: c.Query("reported_by"),
+		Owner:      c.Query("owner"),
+		Status:     c.Query("status"),
+		Search:     c.Query("search"),
+	}
+	rows, err := h.service.PlanningDailyReports(c.Context(), filter, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) PlanningMeetingMinutes(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"planning.view", "pipeline.view"}); err != nil {
+		return err
+	}
+	filter := PlanningMeetingMinutesFilter{
+		ProjectID: c.Query("project_id"),
+		DateFrom:  c.Query("date_from"),
+		DateTo:    c.Query("date_to"),
+		Chair:     c.Query("chair"),
+		Owner:     c.Query("owner"),
+		Status:    c.Query("status"),
+		Search:    c.Query("search"),
+	}
+	rows, err := h.service.PlanningMeetingMinutes(c.Context(), filter, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) PlanningChecklists(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"planning.view", "pipeline.view"}); err != nil {
+		return err
+	}
+	filter := PlanningChecklistFilter{
+		ProjectID:  c.Query("project_id"),
+		DateFrom:   c.Query("date_from"),
+		DateTo:     c.Query("date_to"),
+		CheckedBy:  c.Query("checked_by"),
+		Assignee:   c.Query("assignee"),
+		ItemStatus: c.Query("item_status"),
+		Evidence:   c.Query("evidence"),
+		Status:     c.Query("status"),
+		Search:     c.Query("search"),
+	}
+	rows, err := h.service.PlanningChecklists(c.Context(), filter, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
 func (h *Handler) ProjectWorkItems(c *fiber.Ctx) error {
 	items, err := h.service.ProjectWorkItems(c.Context(), c.Params("id"), actorID(c))
 	if err != nil {

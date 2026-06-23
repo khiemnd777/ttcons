@@ -5296,6 +5296,176 @@ func (s *Service) PipelineRun(ctx context.Context, projectID, actorID string) (R
 	return s.repo.ProjectPipelineRun(ctx, projectID, actorID)
 }
 
+func (s *Service) PlanningDailyReports(ctx context.Context, filter PlanningDailyReportFilter, actorID string) ([]Record, error) {
+	normalized, err := normalizePlanningDailyReportFilter(filter)
+	if err != nil {
+		return nil, err
+	}
+	if normalized.ProjectID != "" {
+		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, normalized.ProjectID, []string{"planning.view", "pipeline.view"})
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, forbiddenError("Bạn không có quyền xem daily report kế hoạch của công trình này", Record{"permissions": []string{"planning.view", "pipeline.view"}})
+		}
+	}
+	return s.repo.PlanningDailyReports(ctx, normalized, actorID)
+}
+
+func normalizePlanningDailyReportFilter(filter PlanningDailyReportFilter) (PlanningDailyReportFilter, error) {
+	normalized := PlanningDailyReportFilter{
+		ProjectID:  cleanID(filter.ProjectID),
+		DateFrom:   strings.TrimSpace(filter.DateFrom),
+		DateTo:     strings.TrimSpace(filter.DateTo),
+		ReportedBy: strings.TrimSpace(filter.ReportedBy),
+		Owner:      strings.TrimSpace(filter.Owner),
+		Status:     strings.TrimSpace(filter.Status),
+		Search:     strings.TrimSpace(filter.Search),
+	}
+	if normalized.ProjectID != "" && !validActivityUUID(normalized.ProjectID) {
+		return normalized, validationError("project_id không hợp lệ", Record{"project_id": normalized.ProjectID})
+	}
+	if normalized.DateFrom != "" {
+		if _, err := time.Parse("2006-01-02", normalized.DateFrom); err != nil {
+			return normalized, validationError("Ngày bắt đầu không hợp lệ", Record{"date_from": normalized.DateFrom})
+		}
+	}
+	if normalized.DateTo != "" {
+		if _, err := time.Parse("2006-01-02", normalized.DateTo); err != nil {
+			return normalized, validationError("Ngày kết thúc không hợp lệ", Record{"date_to": normalized.DateTo})
+		}
+	}
+	if normalized.DateFrom != "" && normalized.DateTo != "" && normalized.DateFrom > normalized.DateTo {
+		return normalized, validationError("Khoảng ngày daily report không hợp lệ", Record{"date_from": normalized.DateFrom, "date_to": normalized.DateTo})
+	}
+	if normalized.Status == "all" {
+		normalized.Status = ""
+	}
+	if normalized.Status != "" && !statusIn(normalized.Status, "draft", "submitted", "reopened") {
+		return normalized, validationError("Trạng thái daily report không hợp lệ", Record{"status": normalized.Status})
+	}
+	return normalized, nil
+}
+
+func (s *Service) PlanningMeetingMinutes(ctx context.Context, filter PlanningMeetingMinutesFilter, actorID string) ([]Record, error) {
+	normalized, err := normalizePlanningMeetingMinutesFilter(filter)
+	if err != nil {
+		return nil, err
+	}
+	if normalized.ProjectID != "" {
+		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, normalized.ProjectID, []string{"planning.view", "pipeline.view"})
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, forbiddenError("Bạn không có quyền xem biên bản họp của công trình này", Record{"permissions": []string{"planning.view", "pipeline.view"}})
+		}
+	}
+	return s.repo.PlanningMeetingMinutes(ctx, normalized, actorID)
+}
+
+func normalizePlanningMeetingMinutesFilter(filter PlanningMeetingMinutesFilter) (PlanningMeetingMinutesFilter, error) {
+	normalized := PlanningMeetingMinutesFilter{
+		ProjectID: cleanID(filter.ProjectID),
+		DateFrom:  strings.TrimSpace(filter.DateFrom),
+		DateTo:    strings.TrimSpace(filter.DateTo),
+		Chair:     strings.TrimSpace(filter.Chair),
+		Owner:     strings.TrimSpace(filter.Owner),
+		Status:    strings.TrimSpace(filter.Status),
+		Search:    strings.TrimSpace(filter.Search),
+	}
+	if normalized.ProjectID != "" && !validActivityUUID(normalized.ProjectID) {
+		return normalized, validationError("project_id không hợp lệ", Record{"project_id": normalized.ProjectID})
+	}
+	if normalized.DateFrom != "" {
+		if _, err := time.Parse("2006-01-02", normalized.DateFrom); err != nil {
+			return normalized, validationError("Ngày bắt đầu không hợp lệ", Record{"date_from": normalized.DateFrom})
+		}
+	}
+	if normalized.DateTo != "" {
+		if _, err := time.Parse("2006-01-02", normalized.DateTo); err != nil {
+			return normalized, validationError("Ngày kết thúc không hợp lệ", Record{"date_to": normalized.DateTo})
+		}
+	}
+	if normalized.DateFrom != "" && normalized.DateTo != "" && normalized.DateFrom > normalized.DateTo {
+		return normalized, validationError("Khoảng ngày biên bản họp không hợp lệ", Record{"date_from": normalized.DateFrom, "date_to": normalized.DateTo})
+	}
+	if normalized.Status == "all" {
+		normalized.Status = ""
+	}
+	if normalized.Status != "" && !statusIn(normalized.Status, "draft", "submitted", "reopened") {
+		return normalized, validationError("Trạng thái biên bản họp không hợp lệ", Record{"status": normalized.Status})
+	}
+	return normalized, nil
+}
+
+func (s *Service) PlanningChecklists(ctx context.Context, filter PlanningChecklistFilter, actorID string) ([]Record, error) {
+	normalized, err := normalizePlanningChecklistFilter(filter)
+	if err != nil {
+		return nil, err
+	}
+	if normalized.ProjectID != "" {
+		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, normalized.ProjectID, []string{"planning.view", "pipeline.view"})
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, forbiddenError("Bạn không có quyền xem checklist kế hoạch của công trình này", Record{"permissions": []string{"planning.view", "pipeline.view"}})
+		}
+	}
+	return s.repo.PlanningChecklists(ctx, normalized, actorID)
+}
+
+func normalizePlanningChecklistFilter(filter PlanningChecklistFilter) (PlanningChecklistFilter, error) {
+	normalized := PlanningChecklistFilter{
+		ProjectID:  cleanID(filter.ProjectID),
+		DateFrom:   strings.TrimSpace(filter.DateFrom),
+		DateTo:     strings.TrimSpace(filter.DateTo),
+		CheckedBy:  strings.TrimSpace(filter.CheckedBy),
+		Assignee:   strings.TrimSpace(filter.Assignee),
+		ItemStatus: strings.TrimSpace(filter.ItemStatus),
+		Evidence:   strings.TrimSpace(filter.Evidence),
+		Status:     strings.TrimSpace(filter.Status),
+		Search:     strings.TrimSpace(filter.Search),
+	}
+	if normalized.ProjectID != "" && !validActivityUUID(normalized.ProjectID) {
+		return normalized, validationError("project_id không hợp lệ", Record{"project_id": normalized.ProjectID})
+	}
+	if normalized.DateFrom != "" {
+		if _, err := time.Parse("2006-01-02", normalized.DateFrom); err != nil {
+			return normalized, validationError("Ngày bắt đầu không hợp lệ", Record{"date_from": normalized.DateFrom})
+		}
+	}
+	if normalized.DateTo != "" {
+		if _, err := time.Parse("2006-01-02", normalized.DateTo); err != nil {
+			return normalized, validationError("Ngày kết thúc không hợp lệ", Record{"date_to": normalized.DateTo})
+		}
+	}
+	if normalized.DateFrom != "" && normalized.DateTo != "" && normalized.DateFrom > normalized.DateTo {
+		return normalized, validationError("Khoảng ngày checklist kế hoạch không hợp lệ", Record{"date_from": normalized.DateFrom, "date_to": normalized.DateTo})
+	}
+	if normalized.Status == "all" {
+		normalized.Status = ""
+	}
+	if normalized.Status != "" && !statusIn(normalized.Status, "draft", "submitted", "reopened") {
+		return normalized, validationError("Trạng thái checklist kế hoạch không hợp lệ", Record{"status": normalized.Status})
+	}
+	if normalized.ItemStatus == "all" {
+		normalized.ItemStatus = ""
+	}
+	if normalized.ItemStatus != "" && !statusIn(normalized.ItemStatus, "done", "not_applicable", "needs_follow_up", "blocked") {
+		return normalized, validationError("Trạng thái item checklist không hợp lệ", Record{"item_status": normalized.ItemStatus})
+	}
+	if normalized.Evidence == "all" {
+		normalized.Evidence = ""
+	}
+	if normalized.Evidence != "" && !statusIn(normalized.Evidence, "linked", "missing") {
+		return normalized, validationError("Bộ lọc evidence checklist không hợp lệ", Record{"evidence": normalized.Evidence})
+	}
+	return normalized, nil
+}
+
 func (s *Service) SubmitRunStep(ctx context.Context, stepID string, req WorkItemActionRequest, actorID, actorName string) (Record, error) {
 	item, err := s.repo.GetWorkItemByRunStep(ctx, stepID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
