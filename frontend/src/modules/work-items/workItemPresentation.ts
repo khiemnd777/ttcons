@@ -50,6 +50,13 @@ const departmentLabels: Record<string, string> = {
   unassigned: 'Chưa phân công',
 };
 
+const workflowFormTypeLabels: Record<string, string> = {
+  checklist: 'Checklist',
+  daily_report: 'Daily report',
+  meeting_minutes: 'Biên bản họp',
+  generic_submission: 'Submission',
+};
+
 export function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? value as T[] : [];
 }
@@ -88,6 +95,35 @@ export function evidenceLabel(value?: string) {
 
 export function workTypeLabel(value?: string) {
   return enumLabel('work_type', value);
+}
+
+export function workflowFormTypeLabel(value?: string) {
+  const key = String(value ?? '').trim();
+  return workflowFormTypeLabels[key] ?? (key ? key : 'Biểu mẫu nghiệp vụ');
+}
+
+export function hasWorkflowFormSummary(value?: Record<string, unknown> | null) {
+  if (!value) return false;
+  return Boolean(value.workflow_form_instance_id || value.workflow_form_version_id || value.workflow_form_template_code || value.workflow_form_template_name);
+}
+
+export function workflowFormBusinessLabel(value?: Record<string, unknown> | null) {
+  if (!value) return 'Biểu mẫu nghiệp vụ';
+  const templateName = String(value.workflow_form_template_name ?? '').trim();
+  if (templateName) return templateName;
+  return workflowFormTypeLabel(String(value.workflow_form_type ?? ''));
+}
+
+export function workflowFormChipText(value?: Record<string, unknown> | null) {
+  const label = workflowFormBusinessLabel(value);
+  const version = numberValue(value?.workflow_form_version_no);
+  return version > 0 ? `${label} v${version}` : label;
+}
+
+export function workflowFormNextAction(value?: Record<string, unknown> | null) {
+  if (!hasWorkflowFormSummary(value)) return 'Theo dõi activity';
+  if (value?.workflow_form_status !== 'submitted') return 'Submit biểu mẫu nghiệp vụ';
+  return 'Ký / PDF / hoàn tất step';
 }
 
 export function priorityLabel(value?: string) {

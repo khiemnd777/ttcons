@@ -49,12 +49,12 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 | Nền tảng | Done | CI, migration checksum check, request-id logging, validation Make targets, deployment/rollback checklist, backup/restore procedure, and seed policy implemented. |
 | Dữ liệu lõi | Done | Partner catalog, canonical partner links, and snapshot preservation implemented for project/material/procurement/accounting/invoice/acceptance flows. |
 | Auth / RBAC | Done | Permission-aware navigation/routes/actions, DB-backed session refresh/revoke lifecycle, and RBAC assignment matrix implemented. |
-| Lõi module nghiệp vụ | Partial | Refactor generic CRUD into clearer handler-service-repository use cases. |
-| Admin UX | Partial | Improve dense operational UX, errors, loading, empty states, filters. |
-| Shared UI | Partial | Upgrade table/form/dialog patterns before duplicating UI. |
-| Business UI | Partial | Add workflow-form, checklist, evidence, signature, PDF/document components. |
-| Workflow thành nghiệp vụ | Partial | Map workflow step types into typed business form instances. |
-| Giao diện hoá nghiệp vụ kế hoạch | Partial | Build business-facing planning forms, not only raw pipeline controls. |
+| Lõi module nghiệp vụ | Done | Remaining generic CRUD helper usage in core business endpoints was replaced with named handler-service-repository use cases, actor defaults, audit trail, and project-scope safeguards. |
+| Admin UX | Done | Dense operational UX, loading/error/retry, empty states, search/sort/pagination, filters, and action readiness were improved across core admin operation modules. |
+| Shared UI | Done | Shared list/table/form/dialog patterns are now upgraded for the core admin operation screens before further UI duplication. |
+| Business UI | Done | Work-item runtime UI now exposes workflow form, checklist, evidence, signature, and PDF/document artifact components as business-facing panels. |
+| Workflow thành nghiệp vụ | Done | Workflow runtime now exposes typed business form summaries across pipeline steps and work items, with start-time required form mapping validation. |
+| Giao diện hoá nghiệp vụ kế hoạch | Done | Planning now has a business-facing form workspace with form metrics, filters, required/optional status, next actions, and preserved pipeline runtime controls. |
 | Hệ quy đổi Workflow thành nghiệp vụ | Partial | Introduce form template/version/instance layer. |
 | Daily report kế hoạch | Partial | Add did/will fields, owner, date/user/project filters. |
 | Biên bản họp | Missing | New meeting minutes module/form with action items and project/workflow links. |
@@ -634,4 +634,63 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - `git diff --check` passed after Auth / RBAC.
 - Custom migration runner apply was not run after Auth / RBAC; applying `V37` still requires a reachable Consflow PostgreSQL role/database.
 - Browser verification not run after Auth / RBAC, per repo rule unless explicitly requested.
+- Implemented Lõi module nghiệp vụ as a backend service/repository refactor station.
+- Replaced remaining generic CRUD helper call-sites for warehouse create, operations daily reports/issues, rework/replanning, handover, accounting budget, and payments with named handler-service-repository methods.
+- Added service-level actor defaults and audit events for the refactored core business creates/status updates.
+- Blocked issue `project_id` changes during update so project-scoped permission checks cannot be bypassed by moving a record after authorization.
+- Removed the unused generic project-list/project-create/status helper code after the business endpoint call-sites were migrated; generic create/update remains only for Staff/RBAC call-sites outside this station.
+- Added DB-backed integration coverage for actor defaults, audit events, project-scope preservation, and lifecycle status updates; tests remain skipped unless `CONSFLOW_TEST_DATABASE_URL` is set.
+- `gofmt -w backend/internal/core/handlers.go backend/internal/core/service.go backend/internal/core/repository_domain.go backend/internal/core/project_operations_integration_test.go` passed after Lõi module nghiệp vụ.
+- `make migrate-check` passed after Lõi module nghiệp vụ; 37 migration files were validated without connecting to the database.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Lõi module nghiệp vụ; DB-backed business-core integration coverage remains gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `git diff --check` passed after Lõi module nghiệp vụ.
+- No new SQL migration was added for Lõi module nghiệp vụ; custom migration runner apply was not run.
+- Frontend build was not run for Lõi module nghiệp vụ because there were no frontend changes.
+- Browser verification not run after Lõi module nghiệp vụ, per repo rule unless explicitly requested.
+- Implemented Admin UX as a frontend-only operational screen hardening station.
+- Added shared `FilterBar` segmented controls and applied status/type filters to Operations, Warehouse, Rework/Replanning, Handover, and Accounting screens.
+- Enabled enhanced `DataTable` behavior on those screens: loading, error/retry, search, sortable columns, pagination, context-aware empty states, and clearer action readiness.
+- Disabled create/action buttons when required project/catalog context is missing or when row status is no longer actionable.
+- `cd frontend && npm run build` passed after Admin UX; Vite chunk-size warning remains.
+- `git diff --check` passed after Admin UX.
+- No backend/API changes and no SQL migration were added for Admin UX; custom migration runner apply was not run.
+- Browser verification not run after Admin UX, per repo rule unless explicitly requested.
+- Implemented Shared UI as a frontend-only shared component station.
+- Added `ListSection` for consistent dense table section headings without one-off section chrome.
+- Added `RecordFormDialog` on top of shared `Dialog` + `SimpleForm` and converted Operations, Warehouse, Rework/Replanning, Handover, and Accounting create/edit forms away from page-local `FormDrawer` usage.
+- Upgraded `SimpleForm` with optional cancel action support so dialog forms have a consistent `[Hủy] [submit]` action row while preserving existing validation and warning toast behavior.
+- Upgraded `DataTable` with reusable empty-state actions and optional stable row key selection.
+- Added context-aware empty-state create actions to the scoped core admin operation tables where records can be created from that table context.
+- `cd frontend && npm run build` passed after Shared UI; Vite chunk-size warning remains.
+- `git diff --check` passed after Shared UI.
+- No backend/API changes and no SQL migration were added for Shared UI; custom migration runner apply was not run.
+- Browser verification not run after Shared UI, per repo rule unless explicitly requested.
+- Implemented Business UI as a frontend-only work-item runtime station using existing protected workflow form, evidence, signature, and PDF export APIs.
+- Added a business execution summary to the Work Item detail dialog with next action, required evidence, active/accepted evidence, and current status.
+- Added workflow form next-action summary for draft/submit/signature/PDF states without changing the existing `draft -> submitted`, sign, or PDF export transitions.
+- Upgraded checklist structured-list rendering into a business checklist panel with row counts, Done/N/A progress, needs-action count, evidence count, per-row status, evidence selection, and row actions while preserving the existing `checklist_items` answer schema.
+- Improved evidence panel visibility with photo/document/accepted/pending stats and kept protected file upload/open behavior on the existing evidence endpoints.
+- Improved workflow form evidence selector labels so checklist rows show evidence name, type, and status.
+- `cd frontend && npm run build` passed after Business UI; Vite chunk-size warning remains.
+- `git diff --check` passed after Business UI.
+- No backend/API changes and no SQL migration were added for Business UI; custom migration runner apply was not run.
+- Browser verification not run after Business UI, per repo rule unless explicitly requested.
+- Implemented Workflow thành nghiệp vụ as a backend/frontend runtime contract station.
+- Added typed workflow form summary fields to pipeline run steps, project/my work item lists, and work item detail responses: instance/status/type/template/version/required/submitted metadata.
+- Added start-pipeline validation so a template with `form_required=true` cannot create runtime work items unless the mapped workflow form version is published and active.
+- Updated Planning runtime step cards, Work Item cards, Work Item detail metrics, and WorkflowFormPanel copy to show business form identity such as Biên bản họp, Checklist, Daily report, or Submission instead of only generic workflow form wording.
+- Preserved existing workflow form status transitions, signature/PDF flow, step completion gating, multi-role `required_role_ids`, and current schema; no SQL migration was added.
+- `gofmt -w backend/internal/core/repository_domain.go backend/internal/core/project_operations_integration_test.go` passed after Workflow thành nghiệp vụ.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Workflow thành nghiệp vụ.
+- `cd frontend && npm run build` passed after Workflow thành nghiệp vụ; Vite chunk-size warning remains.
+- `git diff --check` passed after Workflow thành nghiệp vụ.
+- Custom migration runner apply was not run after Workflow thành nghiệp vụ because no migration was added.
+- Browser verification not run after Workflow thành nghiệp vụ, per repo rule unless explicitly requested.
+- Implemented Giao diện hoá nghiệp vụ kế hoạch as a frontend-only Planning workspace station.
+- Added Planning form metrics, search, type/status/required filters, business form queue cards, missing-instance visibility, and form-first open action using the existing Work Item detail dialog.
+- Preserved existing pipeline runtime controls for node progress, step completion, approval requests, blockers, and audit playback; no backend status transition was changed.
+- `cd frontend && npm run build` passed after Giao diện hoá nghiệp vụ kế hoạch; Vite chunk-size warning remains.
+- `git diff --check` passed after Giao diện hoá nghiệp vụ kế hoạch.
+- No backend/API changes and no SQL migration were added for Giao diện hoá nghiệp vụ kế hoạch; custom migration runner apply was not run.
+- Browser verification not run after Giao diện hoá nghiệp vụ kế hoạch, per repo rule unless explicitly requested.
 - No backend/API/migration changes were needed for the Pipeline Builder multi-role UI, Shared UI 2A, or Shared UI 2B batches.

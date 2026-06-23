@@ -1,17 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDownToLine, ArrowUpFromLine, Plus, RotateCcw } from 'lucide-react';
+import { ArrowDownToLine, Plus } from 'lucide-react';
 import { get, post } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
-import { FormDrawer } from '../../components/FormDrawer';
 import { CurrencyText } from '../../components/CurrencyText';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
-import { SimpleForm } from '../_shared/SimpleForm';
+import { FilterBar, type FilterOption } from '../../components/FilterBar';
+import { ListSection } from '../../components/ListSection';
+import { RecordFormDialog } from '../_shared/RecordFormDialog';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { EnumChip } from '../../components/EnumChip';
 import type { Partner } from '../../lib/types/domain';
@@ -20,6 +21,8 @@ import { partnerOptions } from '../core-data/partnerUtils';
 export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const { id } = useParams();
   const [projectId, setProjectId] = useState(id ?? '');
+  const [stockFilter, setStockFilter] = useState('all');
+  const [balanceFilter, setBalanceFilter] = useState('all');
   const [open, setOpen] = useState<'material' | 'movement' | null>(null);
   const [dialog, setDialog] = useState<{ type: 'stock' | 'balance'; record: Record<string, any> } | null>(null);
   const queryClient = useQueryClient();
@@ -29,6 +32,26 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const partners = useQuery({ queryKey: ['partners', 'supplier', 'active'], queryFn: () => get<Partner[]>('/partners?status=active') });
   const stock = useQuery({ queryKey: ['stock'], queryFn: () => get<Record<string, any>[]>('/stock') });
   const balances = useQuery({ queryKey: ['material-balances', projectId], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/material-balances`), enabled: Boolean(projectId) });
+  const stockRows = stock.data ?? [];
+  const balanceRows = balances.data ?? [];
+  const filteredStock = useMemo(() => {
+    if (stockFilter === 'in_stock') return stockRows.filter((row) => numeric(row.stock_quantity) > 0);
+    if (stockFilter === 'zero') return stockRows.filter((row) => numeric(row.stock_quantity) <= 0);
+    return stockRows;
+  }, [stockRows, stockFilter]);
+  const filteredBalances = useMemo(() => balanceFilter === 'all' ? balanceRows : balanceRows.filter((row) => row.surplus_status === balanceFilter), [balanceRows, balanceFilter]);
+  const stockFilterOptions = useMemo<FilterOption[]>(() => [
+    { value: 'all', label: 'Tất cả', count: stockRows.length },
+    { value: 'in_stock', label: 'Có tồn', count: stockRows.filter((row) => numeric(row.stock_quantity) > 0).length },
+    { value: 'zero', label: 'Hết tồn', count: stockRows.filter((row) => numeric(row.stock_quantity) <= 0).length },
+  ], [stockRows]);
+  const balanceFilterOptions = useMemo<FilterOption[]>(() => [
+    { value: 'all', label: 'Tất cả', count: balanceRows.length },
+    { value: 'pending', label: 'Pending', count: countBy(balanceRows, 'surplus_status', 'pending') },
+    { value: 'partial', label: 'Partial', count: countBy(balanceRows, 'surplus_status', 'partial') },
+    { value: 'handled', label: 'Handled', count: countBy(balanceRows, 'surplus_status', 'handled') },
+  ], [balanceRows]);
+  const movementDisabled = !materials.data?.length || !warehouses.data?.length;
   const createMaterial = useMutation({
     mutationFn: (values: Record<string, any>) => post('/materials', values),
     onSuccess: () => {
@@ -58,81 +81,89 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
           <>
             {scoped ? <ProjectBackLink projectId={projectId} /> : null}
             {!scoped ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
-            <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100" onClick={() => setOpen('movement')}><ArrowDownToLine className="h-4 w-4" />Nhập / xuất</button>
+            <button disabled={movementDisabled} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setOpen('movement')}><ArrowDownToLine className="h-4 w-4" />Nhập / xuất</button>
             <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen('material')}><Plus className="h-4 w-4" />Vật tư</button>
           </>
         }
       />
+      <div className="mb-4 grid gap-3 xl:grid-cols-2">
+        <FilterBar label="Tồn kho" value={stockFilter} options={stockFilterOptions} onChange={setStockFilter} />
+        <FilterBar label="Tồn site" value={balanceFilter} options={balanceFilterOptions} onChange={setBalanceFilter} disabled={!projectId} />
+      </div>
       <div className="grid gap-4 xl:grid-cols-2">
-        <section>
-          <h2 className="mb-3 text-base font-semibold text-ink">Tồn kho tổng</h2>
-          <DataTable rows={stock.data ?? []} columns={[
-            { key: 'code', header: 'Mã' },
-            { key: 'name', header: 'Vật tư', render: (row) => <span className="font-semibold text-ink">{row.name}</span> },
-            { key: 'category', header: 'Nhóm' },
-            { key: 'stock_quantity', header: 'Tồn' },
+        <ListSection title="Tồn kho tổng">
+          <DataTable rows={filteredStock} loading={stock.isLoading} error={stock.error} onRetry={() => stock.refetch()} searchPlaceholder="Tìm mã, vật tư, nhóm..." pageSize={10} defaultSort={{ key: 'name', direction: 'asc' }} columns={[
+            { key: 'code', header: 'Mã', sortable: true },
+            { key: 'name', header: 'Vật tư', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.name}</span> },
+            { key: 'category', header: 'Nhóm', sortable: true },
+            { key: 'stock_quantity', header: 'Tồn', align: 'right', sortable: true, sortValue: (row) => numeric(row.stock_quantity) },
             { key: 'unit', header: 'ĐVT' },
             { key: 'actions', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'stock', record: row })} /> },
-          ]} />
-        </section>
-        <section>
-          <h2 className="mb-3 text-base font-semibold text-ink">Tồn tại công trình / vật tư dư</h2>
-          <DataTable rows={balances.data ?? []} columns={[
-            { key: 'material_name', header: 'Vật tư' },
-            { key: 'planned_quantity', header: 'Kế hoạch' },
-            { key: 'issued_quantity', header: 'Đã xuất' },
-            { key: 'used_quantity', header: 'Đã dùng' },
-            { key: 'surplus_quantity', header: 'Dư' },
-            { key: 'surplus_status', header: 'Xử lý', render: (row) => <EnumChip group="surplus_status" value={row.surplus_status} /> },
+          ]} empty="Không có vật tư trong bộ lọc này" emptyAction={(
+            <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen('material')}>
+              <Plus className="h-4 w-4" />Vật tư
+            </button>
+          )} />
+        </ListSection>
+        <ListSection title="Tồn tại công trình / vật tư dư">
+          <DataTable rows={filteredBalances} loading={balances.isLoading} error={balances.error} onRetry={() => balances.refetch()} searchPlaceholder="Tìm vật tư, trạng thái xử lý..." pageSize={10} defaultSort={{ key: 'surplus_quantity', direction: 'desc' }} columns={[
+            { key: 'material_name', header: 'Vật tư', sortable: true },
+            { key: 'planned_quantity', header: 'Kế hoạch', align: 'right', sortable: true, sortValue: (row) => numeric(row.planned_quantity) },
+            { key: 'issued_quantity', header: 'Đã xuất', align: 'right', sortable: true, sortValue: (row) => numeric(row.issued_quantity) },
+            { key: 'used_quantity', header: 'Đã dùng', align: 'right', sortable: true, sortValue: (row) => numeric(row.used_quantity) },
+            { key: 'surplus_quantity', header: 'Dư', align: 'right', sortable: true, sortValue: (row) => numeric(row.surplus_quantity) },
+            { key: 'surplus_status', header: 'Xử lý', sortable: true, render: (row) => <EnumChip group="surplus_status" value={row.surplus_status} /> },
             { key: 'actions', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'balance', record: row })} /> },
-          ]} empty="Chọn công trình để xem tồn tại site" />
-        </section>
+          ]} empty={projectId ? 'Không có vật tư site trong bộ lọc này' : 'Chọn công trình để xem tồn tại site'} />
+        </ListSection>
       </div>
-      <FormDrawer open={open === 'material'} title="Thêm vật tư" onClose={() => setOpen(null)}>
-        <SimpleForm
-          submitLabel="Thêm vật tư"
-          fields={[
-            { name: 'code', label: 'Mã vật tư', defaultValue: `MAT-${Date.now().toString().slice(-4)}`, required: true },
-            { name: 'name', label: 'Tên vật tư', defaultValue: 'Vật tư mới', required: true },
-            { name: 'unit', label: 'Đơn vị', defaultValue: 'cái', required: true },
-            { name: 'category', label: 'Nhóm', defaultValue: 'Phụ kiện', required: true },
-            {
-              name: 'default_supplier_partner_id',
-              label: 'Nhà cung cấp catalog',
-              type: 'select',
-              options: partnerOptions(partners.data ?? [], ['supplier', 'service_provider', 'other']),
-              helperText: 'Chọn catalog để snapshot tên nhà cung cấp mặc định.',
-            },
-            {
-              name: 'default_supplier',
-              label: 'Nhà cung cấp',
-              hiddenWhen: (values: Record<string, any>) => Boolean(values.default_supplier_partner_id),
-            },
-            { name: 'standard_price', label: 'Giá chuẩn', type: 'number', defaultValue: 100000, min: 0 },
-          ]}
-          onSubmit={(values) => createMaterial.mutateAsync(values)}
-        />
-      </FormDrawer>
-      <FormDrawer open={open === 'movement'} title="Tạo nhập / xuất kho" onClose={() => setOpen(null)}>
-        <SimpleForm
-          submitLabel="Ghi nhận"
-          fields={[
-            { name: 'movement_type', label: 'Loại', type: 'select', defaultValue: 'receive', options: [
-              { label: 'Nhập kho', value: 'receive' },
-              { label: 'Xuất công trình', value: 'issue' },
-              { label: 'Lưu kho vật tư dư', value: 'return-to-warehouse' },
-              { label: 'Trả thầu phụ', value: 'return-to-subcontractor' },
-            ], required: true },
-            { name: 'project_id', label: 'Công trình', defaultValue: projectId },
-            { name: 'warehouse_id', label: 'Kho', type: 'select', required: true, options: (warehouses.data ?? []).map((w) => ({ label: w.name, value: w.id })) },
-            { name: 'material_id', label: 'Vật tư', type: 'select', required: true, options: (materials.data ?? []).map((m) => ({ label: m.name, value: m.id })) },
-            { name: 'quantity', label: 'Số lượng', type: 'number', defaultValue: 1, required: true, min: 0 },
-            { name: 'unit', label: 'Đơn vị', defaultValue: 'cái', required: true },
-            { name: 'reason', label: 'Lý do', defaultValue: 'Ghi nhận nhập/xuất vật tư' },
-          ]}
-          onSubmit={(values) => movement.mutateAsync(values)}
-        />
-      </FormDrawer>
+      <RecordFormDialog
+        open={open === 'material'}
+        title="Thêm vật tư"
+        submitLabel="Thêm vật tư"
+        onClose={() => setOpen(null)}
+        fields={[
+          { name: 'code', label: 'Mã vật tư', defaultValue: `MAT-${Date.now().toString().slice(-4)}`, required: true },
+          { name: 'name', label: 'Tên vật tư', defaultValue: 'Vật tư mới', required: true },
+          { name: 'unit', label: 'Đơn vị', defaultValue: 'cái', required: true },
+          { name: 'category', label: 'Nhóm', defaultValue: 'Phụ kiện', required: true },
+          {
+            name: 'default_supplier_partner_id',
+            label: 'Nhà cung cấp catalog',
+            type: 'select',
+            options: partnerOptions(partners.data ?? [], ['supplier', 'service_provider', 'other']),
+            helperText: 'Chọn catalog để snapshot tên nhà cung cấp mặc định.',
+          },
+          {
+            name: 'default_supplier',
+            label: 'Nhà cung cấp',
+            hiddenWhen: (values: Record<string, any>) => Boolean(values.default_supplier_partner_id),
+          },
+          { name: 'standard_price', label: 'Giá chuẩn', type: 'number', defaultValue: 100000, min: 0 },
+        ]}
+        onSubmit={(values) => createMaterial.mutateAsync(values)}
+      />
+      <RecordFormDialog
+        open={open === 'movement'}
+        title="Tạo nhập / xuất kho"
+        submitLabel="Ghi nhận"
+        onClose={() => setOpen(null)}
+        fields={[
+          { name: 'movement_type', label: 'Loại', type: 'select', defaultValue: 'receive', options: [
+            { label: 'Nhập kho', value: 'receive' },
+            { label: 'Xuất công trình', value: 'issue' },
+            { label: 'Lưu kho vật tư dư', value: 'return-to-warehouse' },
+            { label: 'Trả thầu phụ', value: 'return-to-subcontractor' },
+          ], required: true },
+          { name: 'project_id', label: 'Công trình', defaultValue: projectId },
+          { name: 'warehouse_id', label: 'Kho', type: 'select', required: true, options: (warehouses.data ?? []).map((w) => ({ label: w.name, value: w.id })) },
+          { name: 'material_id', label: 'Vật tư', type: 'select', required: true, options: (materials.data ?? []).map((m) => ({ label: m.name, value: m.id })) },
+          { name: 'quantity', label: 'Số lượng', type: 'number', defaultValue: 1, required: true, min: 0 },
+          { name: 'unit', label: 'Đơn vị', defaultValue: 'cái', required: true },
+          { name: 'reason', label: 'Lý do', defaultValue: 'Ghi nhận nhập/xuất vật tư' },
+        ]}
+        onSubmit={(values) => movement.mutateAsync(values)}
+      />
       <RecordDetailDialog
         open={dialog?.type === 'stock'}
         title="Chi tiết tồn kho"
@@ -162,4 +193,12 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
       />
     </>
   );
+}
+
+function countBy(rows: Record<string, any>[], key: string, value: string) {
+  return rows.filter((row) => row[key] === value).length;
+}
+
+function numeric(value: unknown) {
+  return Number(value ?? 0);
 }

@@ -22,6 +22,7 @@ export function DataTable<T extends Record<string, any>>({
   rows,
   columns,
   empty,
+  emptyAction,
   loading = false,
   error,
   onRetry,
@@ -29,10 +30,12 @@ export function DataTable<T extends Record<string, any>>({
   pageSize,
   pageSizeOptions,
   defaultSort,
+  getRowKey,
 }: {
   rows: T[];
   columns: Column<T>[];
   empty?: string;
+  emptyAction?: ReactNode;
   loading?: boolean;
   error?: unknown;
   onRetry?: () => void;
@@ -40,6 +43,7 @@ export function DataTable<T extends Record<string, any>>({
   pageSize?: number;
   pageSizeOptions?: number[];
   defaultSort?: { key: string; direction?: SortDirection };
+  getRowKey?: (row: T, index: number) => string | number;
 }) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<{ key: string; direction: SortDirection } | null>(
@@ -47,7 +51,7 @@ export function DataTable<T extends Record<string, any>>({
   );
   const [currentPage, setCurrentPage] = useState(1);
   const [currentPageSize, setCurrentPageSize] = useState(pageSize ?? 0);
-  const enhanced = Boolean(searchPlaceholder || loading || error || onRetry || pageSize || defaultSort);
+  const enhanced = Boolean(searchPlaceholder || loading || error || onRetry || pageSize || defaultSort || emptyAction);
 
   useEffect(() => {
     setCurrentPageSize(pageSize ?? 0);
@@ -83,7 +87,7 @@ export function DataTable<T extends Record<string, any>>({
     setCurrentPage(1);
   }, [query, currentPageSize, rows.length, sort?.key, sort?.direction]);
 
-  if (!enhanced && !rows.length) return <EmptyState title={empty} />;
+  if (!enhanced && !rows.length) return <EmptyState title={empty} action={emptyAction} />;
 
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
@@ -159,7 +163,7 @@ export function DataTable<T extends Record<string, any>>({
           </thead>
           <tbody className="divide-y divide-line">
             {visibleRows.map((row, index) => (
-              <tr key={row.id ?? index} className="hover:bg-slate-50">
+              <tr key={getRowKey?.(row, index) ?? row.id ?? index} className="hover:bg-slate-50">
                 {columns.map((column) => (
                   <td key={column.key} className={clsx('px-4 py-3 text-sm text-slate-700', alignClass(column.align), column.className)}>
                     {column.render ? column.render(row) : row[column.key] ?? '-'}
@@ -172,7 +176,7 @@ export function DataTable<T extends Record<string, any>>({
       </div>
       ) : (
         <div className="p-4">
-          <EmptyState title={query.trim() ? 'Không có dòng phù hợp' : empty} />
+          <EmptyState title={query.trim() ? 'Không có dòng phù hợp' : empty} action={query.trim() ? undefined : emptyAction} />
         </div>
       )}
 

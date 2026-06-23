@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Download, ExternalLink, FileText, Loader2, PenLine, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileText, Loader2, PenLine, Plus, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -42,9 +42,14 @@ export function WorkflowFormPanel({
   const fields = useMemo(() => form.data?.fields ?? [], [form.data?.fields]);
   const instance = form.data?.instance;
   const submitted = instance?.status === 'submitted';
+  const businessFormTitle = form.data?.template?.name ?? instance?.title ?? 'Biểu mẫu nghiệp vụ';
   const signatures = form.data?.signatures ?? [];
   const pdfExports = form.data?.pdf_exports ?? [];
   const signedByCurrentUser = Boolean(user?.id && signatures.some((signature) => signature.signer_user_id === user.id && signature.purpose === 'internal_ack'));
+  const validationIssues = useMemo(() => fields.map((field) => validateFieldValue(field, values[field.field_key])).filter(Boolean), [fields, values]);
+  const checklistField = fields.find((field) => field.field_type === 'structured_list' && field.field_key === 'checklist_items');
+  const checklistStats = checklistField ? checklistStatsFromRows(structuredRows(values[checklistField.field_key])) : null;
+  const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
 
   useEffect(() => {
     setValues(form.data?.answers ?? {});
@@ -63,18 +68,18 @@ export function WorkflowFormPanel({
     mutationFn: () => put<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/draft`, { answers: values }),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã lưu nháp workflow form');
+      toast.success('Đã lưu nháp biểu mẫu nghiệp vụ');
     },
-    onError: (error) => toast.error('Không lưu được workflow form', error),
+    onError: (error) => toast.error('Không lưu được biểu mẫu nghiệp vụ', error),
   });
 
   const submitForm = useMutation({
     mutationFn: () => post<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/submit`, { answers: values }),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã submit workflow form');
+      toast.success('Đã submit biểu mẫu nghiệp vụ');
     },
-    onError: (error) => toast.error('Không submit được workflow form', error),
+    onError: (error) => toast.error('Không submit được biểu mẫu nghiệp vụ', error),
   });
 
   const signForm = useMutation({
@@ -85,14 +90,14 @@ export function WorkflowFormPanel({
       invalidate();
       toast.success('Đã ký và lưu visual stamp');
     },
-    onError: (error) => toast.error('Không ký được workflow form', error),
+    onError: (error) => toast.error('Không ký được biểu mẫu nghiệp vụ', error),
   });
 
   const generatePDF = useMutation({
     mutationFn: () => post<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/pdf-exports`, {}),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã generate PDF workflow form');
+      toast.success('Đã generate PDF biểu mẫu nghiệp vụ');
     },
     onError: (error) => toast.error('Không generate được PDF', error),
   });
@@ -130,7 +135,7 @@ export function WorkflowFormPanel({
     setErrors(nextErrors);
     const labels = fields.filter((field) => nextErrors[field.field_key]).map((field) => field.label);
     if (labels.length) {
-      toast.warn({ title: 'Thiếu dữ liệu workflow form', description: labels.join(', ') });
+      toast.warn({ title: 'Thiếu dữ liệu biểu mẫu nghiệp vụ', description: labels.join(', ') });
       return false;
     }
     return true;
@@ -139,9 +144,28 @@ export function WorkflowFormPanel({
   if (form.isLoading) {
     return (
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Workflow Form</h3>
+        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu nghiệp vụ</h3>
         <div className="rounded-md border border-line bg-white p-4">
           <LoadingSpinner />
+        </div>
+      </section>
+    );
+  }
+
+  if (form.isError) {
+    return (
+      <section>
+        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu nghiệp vụ</h3>
+        <div className="rounded-md border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">
+          <p className="font-semibold">Không tải được biểu mẫu nghiệp vụ</p>
+          <p className="mt-1 text-xs">{form.error instanceof Error ? form.error.message : 'Vui lòng thử lại.'}</p>
+          <button
+            type="button"
+            className="mt-3 rounded-md border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+            onClick={() => form.refetch()}
+          >
+            Thử lại
+          </button>
         </div>
       </section>
     );
@@ -150,8 +174,8 @@ export function WorkflowFormPanel({
   if (!form.data?.available) {
     return (
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Workflow Form</h3>
-        <EmptyState title="Step này chưa có workflow form." />
+        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu nghiệp vụ</h3>
+        <EmptyState title="Step này chưa có biểu mẫu nghiệp vụ." />
       </section>
     );
   }
@@ -160,14 +184,22 @@ export function WorkflowFormPanel({
     <section>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-ink">Workflow Form</h3>
+          <h3 className="text-sm font-semibold text-ink">{businessFormTitle}</h3>
           <p className="mt-1 text-xs text-slate-500">
-            {form.data.template?.name ?? instance?.title} v{form.data.version?.version_no ?? 1}
+            Biểu mẫu nghiệp vụ v{form.data.version?.version_no ?? 1}
           </p>
         </div>
         <StatusBadge status={instance?.status ?? 'draft'} />
       </div>
       <div className="rounded-md border border-line bg-white p-3">
+        <WorkflowBusinessSummary
+          submitted={submitted}
+          validationIssueCount={validationIssues.length}
+          evidenceCount={activeEvidence.length}
+          checklistStats={checklistStats}
+          signatures={signatures}
+          pdfExports={pdfExports}
+        />
         <div className="grid gap-3 md:grid-cols-2">
           {fields.map((field) => (
             <WorkflowFieldControl
@@ -202,25 +234,27 @@ export function WorkflowFormPanel({
               }}
             >
               {submitForm.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Submit form
+              Submit biểu mẫu
             </button>
           </div>
         </div>
-        <WorkflowSignaturePanel
-          signatures={signatures}
-          submitted={submitted}
-          signedByCurrentUser={signedByCurrentUser}
-          signing={signForm.isPending}
-          onOpenSign={() => setSignatureDialogOpen(true)}
-          onOpenVisual={(signature) => void openProtectedBlob(`/workflow-form-signatures/${signature.id}/visual`, 'Không mở được chữ ký')}
-        />
-        <WorkflowPDFExportPanel
-          exports={pdfExports}
-          submitted={submitted}
-          generating={generatePDF.isPending}
-          onGenerate={() => generatePDF.mutate()}
-          onOpen={(record) => void openProtectedBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF workflow form')}
-        />
+        <div className="mt-3 grid gap-3 xl:grid-cols-2">
+          <WorkflowSignaturePanel
+            signatures={signatures}
+            submitted={submitted}
+            signedByCurrentUser={signedByCurrentUser}
+            signing={signForm.isPending}
+            onOpenSign={() => setSignatureDialogOpen(true)}
+            onOpenVisual={(signature) => void openProtectedBlob(`/workflow-form-signatures/${signature.id}/visual`, 'Không mở được chữ ký')}
+          />
+          <WorkflowPDFExportPanel
+            exports={pdfExports}
+            submitted={submitted}
+            generating={generatePDF.isPending}
+            onGenerate={() => generatePDF.mutate()}
+            onOpen={(record) => void openProtectedBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF biểu mẫu nghiệp vụ')}
+          />
+        </div>
         {form.data.events?.length ? (
           <div className="mt-3 space-y-1 border-t border-line pt-3">
             {form.data.events.slice(0, 3).map((event) => (
@@ -242,6 +276,73 @@ export function WorkflowFormPanel({
   );
 }
 
+type ChecklistStats = {
+  total: number;
+  complete: number;
+  needsAction: number;
+  withEvidence: number;
+};
+
+function WorkflowBusinessSummary({
+  submitted,
+  validationIssueCount,
+  evidenceCount,
+  checklistStats,
+  signatures,
+  pdfExports,
+}: {
+  submitted: boolean;
+  validationIssueCount: number;
+  evidenceCount: number;
+  checklistStats: ChecklistStats | null;
+  signatures: WorkflowFormSignature[];
+  pdfExports: WorkflowFormPDFExport[];
+}) {
+  const nextAction = workflowNextAction(submitted, validationIssueCount, signatures.length, pdfExports.length);
+  const blocked = !submitted && validationIssueCount > 0;
+  const tone = blocked ? 'border-amber-200 bg-amber-50' : 'border-blue-100 bg-blue-50';
+  return (
+    <div className={clsx('mb-4 rounded-md border p-3', tone)}>
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 rounded-md bg-white/80 p-2 ring-1 ring-inset ring-white">
+            {blocked ? <AlertTriangle className="h-4 w-4 text-amber-700" /> : <CheckCircle2 className="h-4 w-4 text-blue-700" />}
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">Next action: {nextAction}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              {submitted ? 'Form đã khóa nội dung; chữ ký và PDF dùng bản revision đã submit.' : `${validationIssueCount} validation item cần xử lý trước submit.`}
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[36rem]">
+          <WorkflowStepPill label="Checklist" value={checklistStats ? `${checklistStats.complete}/${checklistStats.total} done` : 'N/A'} active={!submitted && Boolean(checklistStats?.needsAction)} />
+          <WorkflowStepPill label="Evidence" value={`${evidenceCount} active`} active={!submitted && evidenceCount === 0} />
+          <WorkflowStepPill label="Signature" value={`${signatures.length} signed`} active={submitted && signatures.length === 0} />
+          <WorkflowStepPill label="PDF" value={`${pdfExports.length} file`} active={submitted && signatures.length > 0 && pdfExports.length === 0} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkflowStepPill({ label, value, active }: { label: string; value: string; active: boolean }) {
+  return (
+    <div className={clsx('min-w-0 rounded-md px-2.5 py-2 ring-1 ring-inset', active ? 'bg-white text-blue-700 ring-blue-100' : 'bg-white/75 text-slate-600 ring-white')}>
+      <span className="block text-[11px] uppercase tracking-wide text-slate-500">{label}</span>
+      <span className="block truncate">{value}</span>
+    </div>
+  );
+}
+
+function workflowNextAction(submitted: boolean, validationIssueCount: number, signatureCount: number, pdfCount: number) {
+  if (!submitted && validationIssueCount > 0) return 'Hoàn tất checklist/form';
+  if (!submitted) return 'Submit biểu mẫu nghiệp vụ';
+  if (signatureCount === 0) return 'Ký / đóng dấu PDF';
+  if (pdfCount === 0) return 'Generate PDF';
+  return 'Mở artifact hoặc hoàn tất work item';
+}
+
 function WorkflowSignaturePanel({
   signatures,
   submitted,
@@ -259,9 +360,9 @@ function WorkflowSignaturePanel({
 }) {
   const disabled = !submitted || signing;
   return (
-    <section className="mt-3 border-t border-line pt-3">
+    <section className="rounded-md border border-line bg-slate-50 p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-ink">Internal Signatures</h4>
+        <h4 className="text-sm font-semibold text-ink">Chữ ký</h4>
         {signatures.length ? <span className="text-xs font-semibold text-slate-500">{signatures.length} signed</span> : null}
       </div>
       {signatures.length ? (
@@ -301,12 +402,12 @@ function WorkflowSignaturePanel({
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-line px-3 py-4 text-sm font-medium text-slate-500">
-          {submitted ? 'Chưa có chữ ký nội bộ.' : 'Submit form trước khi ký nội bộ.'}
+          {submitted ? 'Chưa có chữ ký nội bộ.' : 'Submit biểu mẫu trước khi ký nội bộ.'}
         </div>
       )}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs text-slate-500">
-          {!submitted ? 'Submit form trước khi ký.' : signedByCurrentUser ? 'Bạn đã ký Internal ack; vẫn có thể ký purpose khác nếu cần.' : 'Canvas signature sẽ được lưu như protected asset.'}
+          {!submitted ? 'Submit biểu mẫu trước khi ký.' : signedByCurrentUser ? 'Bạn đã ký Internal ack; vẫn có thể ký purpose khác nếu cần.' : 'Canvas signature sẽ được lưu như protected asset.'}
         </div>
         <button
           type="button"
@@ -336,9 +437,9 @@ function WorkflowPDFExportPanel({
   onOpen: (record: WorkflowFormPDFExport) => void;
 }) {
   return (
-    <section className="mt-3 border-t border-line pt-3">
+    <section className="rounded-md border border-line bg-slate-50 p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-ink">PDF Artifacts</h4>
+        <h4 className="text-sm font-semibold text-ink">PDF artifacts</h4>
         <button
           type="button"
           className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -374,7 +475,7 @@ function WorkflowPDFExportPanel({
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-line px-3 py-4 text-sm font-medium text-slate-500">
-          {submitted ? 'Chưa generate PDF cho workflow form này.' : 'Submit form trước khi generate PDF.'}
+          {submitted ? 'Chưa generate PDF cho biểu mẫu này.' : 'Submit biểu mẫu trước khi generate PDF.'}
         </div>
       )}
     </section>
@@ -480,12 +581,15 @@ function renderFieldControl(
       <select className={controlClassName} value={textValue(value)} disabled={disabled || selectableEvidence.length === 0} onChange={(event) => onChange(event.target.value)}>
         <option value="">{selectableEvidence.length ? 'Chọn evidence' : 'Chưa có evidence'}</option>
         {selectableEvidence.map((record) => (
-          <option key={record.id} value={record.id}>{record.name ?? record.title ?? record.document_name ?? record.id}</option>
+          <option key={record.id} value={record.id}>{evidenceOptionLabel(record)}</option>
         ))}
       </select>
     );
   }
   if (field.field_type === 'structured_list') {
+    if (field.field_key === 'checklist_items') {
+      return <ChecklistStructuredListControl field={field} value={value} evidence={evidence} disabled={disabled} invalid={invalid} onChange={onChange} />;
+    }
     return <StructuredListControl field={field} value={value} evidence={evidence} disabled={disabled} invalid={invalid} onChange={onChange} />;
   }
   return (
@@ -497,6 +601,12 @@ function renderFieldControl(
       onChange={(event) => onChange(field.field_type === 'number' && event.target.value !== '' ? Number(event.target.value) : event.target.value)}
     />
   );
+}
+
+function evidenceOptionLabel(record: EvidenceRecord) {
+  const title = record.name ?? record.title ?? record.document_name ?? record.id;
+  const kind = enumLabel('evidence_type', record.evidence_type);
+  return `${title} · ${kind} · ${record.status}`;
 }
 
 function fieldOptions(field: WorkflowFormField) {
@@ -627,6 +737,121 @@ function StructuredListControl({
   );
 }
 
+function ChecklistStructuredListControl({
+  field,
+  value,
+  evidence,
+  disabled,
+  invalid,
+  onChange,
+}: {
+  field: WorkflowFormField;
+  value: unknown;
+  evidence: EvidenceRecord[];
+  disabled: boolean;
+  invalid: boolean;
+  onChange: (value: unknown) => void;
+}) {
+  const rows = structuredRows(value);
+  const specs = structuredItemFields(field);
+  const stats = checklistStatsFromRows(rows);
+  const addRow = () => {
+    const nextRow = Object.fromEntries(specs.map((spec) => [spec.key, defaultChecklistCellValue(spec)]));
+    onChange([...rows, nextRow]);
+  };
+  const updateCell = (rowIndex: number, key: string, nextValue: string) => {
+    onChange(rows.map((row, index) => (index === rowIndex ? { ...row, [key]: nextValue } : row)));
+  };
+  const removeRow = (rowIndex: number) => {
+    onChange(rows.filter((_, index) => index !== rowIndex));
+  };
+
+  return (
+    <div className={clsx('mt-1 rounded-md border p-2', invalid ? 'border-rose-300 bg-rose-50' : 'border-line bg-white')}>
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
+          <ChecklistStat label="Rows" value={stats.total} />
+          <ChecklistStat label="Done/N/A" value={stats.complete} />
+          <ChecklistStat label="Needs action" value={stats.needsAction} tone={stats.needsAction ? 'warn' : 'ok'} />
+          <ChecklistStat label="Evidence" value={stats.withEvidence} />
+        </div>
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={disabled || specs.length === 0}
+          onClick={addRow}
+        >
+          <Plus className="h-4 w-4" />
+          Thêm dòng
+        </button>
+      </div>
+      {rows.length ? (
+        <div className="space-y-2">
+          {rows.map((row, rowIndex) => (
+            <div key={rowIndex} className="rounded-md border border-line bg-slate-50 p-2">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">#{rowIndex + 1}</span>
+                  <StatusBadge status={textValue(row.status || 'draft')} />
+                  {row.evidence_id ? <span className="truncate text-xs font-medium text-slate-500">Evidence linked</span> : null}
+                </div>
+                <button
+                  type="button"
+                  title="Xóa dòng"
+                  className="rounded-md border border-line bg-white p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={disabled}
+                  onClick={() => removeRow(rowIndex)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="grid gap-2 md:grid-cols-12">
+                {specs.map((spec) => (
+                  <StructuredCell
+                    key={spec.key}
+                    spec={spec}
+                    value={row[spec.key]}
+                    evidence={evidence}
+                    disabled={disabled}
+                    onChange={(nextValue) => updateCell(rowIndex, spec.key, nextValue)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-md border border-dashed border-line px-3 py-4 text-sm font-medium text-slate-500">Chưa có dòng checklist</div>
+      )}
+    </div>
+  );
+}
+
+function ChecklistStat({ label, value, tone = 'neutral' }: { label: string; value: number; tone?: 'neutral' | 'ok' | 'warn' }) {
+  return (
+    <span className={clsx(
+      'rounded-md px-2 py-1 ring-1 ring-inset',
+      tone === 'warn' ? 'bg-amber-50 text-amber-800 ring-amber-200' : tone === 'ok' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-white text-slate-600 ring-line',
+    )}>
+      {label}: {value}
+    </span>
+  );
+}
+
+function defaultChecklistCellValue(spec: StructuredFieldSpec) {
+  return '';
+}
+
+function checklistStatsFromRows(rows: AnyRecord[]): ChecklistStats {
+  const complete = rows.filter((row) => ['done', 'not_applicable'].includes(String(row.status ?? ''))).length;
+  return {
+    total: rows.length,
+    complete,
+    needsAction: rows.length - complete,
+    withEvidence: rows.filter((row) => Boolean(row.evidence_id)).length,
+  };
+}
+
 function StructuredCell({
   spec,
   value,
@@ -660,7 +885,7 @@ function StructuredCell({
           <option value="">{selectableEvidence.length ? 'Chọn evidence' : 'Chưa có evidence'}</option>
           {selectableEvidence.map((record) => (
             <option key={record.id} value={record.id}>
-              {record.name ?? record.title ?? record.document_name ?? record.id}
+              {evidenceOptionLabel(record)}
             </option>
           ))}
         </select>

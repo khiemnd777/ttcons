@@ -1397,6 +1397,18 @@ export type WorkItem = ProjectOperationsRecord & {
   run_step_id?: string;
   run_step_name?: string;
   evidence_count?: number;
+  workflow_form_instance_id?: string;
+  workflow_form_status?: 'draft' | 'submitted' | 'reopened' | 'cancelled' | string;
+  workflow_form_type?: string;
+  workflow_form_revision?: number;
+  workflow_form_submitted_at?: string;
+  workflow_form_template_id?: string;
+  workflow_form_version_id?: string;
+  workflow_form_version_no?: number;
+  workflow_form_version_status?: string;
+  workflow_form_template_code?: string;
+  workflow_form_template_name?: string;
+  workflow_form_required?: boolean;
   approval_request_id?: string;
   activities?: WorkItemActivity[];
   evidence?: EvidenceRecord[];

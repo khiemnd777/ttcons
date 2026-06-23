@@ -25,7 +25,7 @@ export type FieldDef = {
 };
 
 type FormErrors = Record<string, string>;
-type FormLayout = 'single' | 'two-column';
+export type FormLayout = 'single' | 'two-column';
 
 function fieldInitialValue(field: FieldDef) {
   if (field.defaultValue !== undefined) return field.defaultValue;
@@ -50,15 +50,19 @@ function visibleValues(fields: FieldDef[], values: FormValues) {
 export function SimpleForm({
   fields,
   submitLabel = 'Lưu',
+  cancelLabel = 'Hủy',
   layout = 'single',
   resetOnSubmit = false,
   onSubmit,
+  onCancel,
 }: {
   fields: FieldDef[];
   submitLabel?: string;
+  cancelLabel?: string;
   layout?: FormLayout;
   resetOnSubmit?: boolean;
   onSubmit: (values: FormValues) => Promise<unknown> | unknown;
+  onCancel?: () => void;
 }) {
   const toast = useToast();
   const initialValues = useMemo(() => Object.fromEntries(fields.map((field) => [field.name, fieldInitialValue(field)])), [fields]);
@@ -213,9 +217,21 @@ export function SimpleForm({
         );
       })}
       </div>
-      <button disabled={saving} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-        {saving ? 'Đang lưu...' : submitLabel}
-      </button>
+      <div className={clsx('flex flex-wrap gap-2', onCancel ? 'justify-end' : 'justify-start')}>
+        {onCancel ? (
+          <button
+            type="button"
+            disabled={saving}
+            className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={onCancel}
+          >
+            {cancelLabel}
+          </button>
+        ) : null}
+        <button type="submit" disabled={saving} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+          {saving ? 'Đang lưu...' : submitLabel}
+        </button>
+      </div>
     </form>
   );
 }

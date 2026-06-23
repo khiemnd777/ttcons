@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileCheck2, Loader2, Upload } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
@@ -30,11 +30,14 @@ import {
   availableActions,
   compactDateTime,
   departmentLabel,
+  hasWorkflowFormSummary,
   priorityLabel,
   isWorkOverdue,
   numberValue,
   visibilityLabel,
   workTypeLabel,
+  workflowFormChipText,
+  workflowFormNextAction,
   type WorkItemActionKey,
 } from './workItemPresentation';
 
@@ -182,17 +185,21 @@ export function WorkItemDetailDialog({
             {detailItem.project_code ? <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{detailItem.project_code}</span> : null}
             {detailItem.priority ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Priority: {priorityLabel(detailItem.priority)}</span> : null}
             {detailItem.work_type ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{workTypeLabel(detailItem.work_type)}</span> : null}
+            {hasWorkflowFormSummary(detailItem) ? <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">{workflowFormChipText(detailItem)}</span> : null}
           </div>
 
-          <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-5">
             <DetailMetric label="Owner" value={detailItem.assignee_name ?? (asArray<string>(detailItem.role_ids).join(', ') || '-')} />
             <DetailMetric label="Department" value={departmentLabel(detailItem.department)} />
             <DetailMetric label="Due" value={dateText(detailItem.due_at)} />
             <DetailMetric label="Evidence" value={numberValue(detailItem.evidence_count)} />
+            <DetailMetric label="Biểu mẫu" value={hasWorkflowFormSummary(detailItem) ? `${workflowFormChipText(detailItem)} · ${detailItem.workflow_form_status ?? 'draft'}` : '-'} />
           </div>
 
           {detailItem.description ? <p className="rounded-md border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-700">{detailItem.description}</p> : null}
           {detailItem.blocked_reason ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-700">{detailItem.blocked_reason}</p> : null}
+
+          <WorkItemExecutionSummary item={detailItem} evidence={evidence} actions={actions} />
 
           <section>
             <h3 className="mb-2 text-sm font-semibold text-ink">Required Evidence</h3>
@@ -296,4 +303,72 @@ function DetailMetric({ label, value }: { label: string; value: ReactNode }) {
 
 function RequirementChip({ label }: { label: string }) {
   return <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">{label}</span>;
+}
+
+function WorkItemExecutionSummary({
+  item,
+  evidence,
+  actions,
+}: {
+  item: WorkItem;
+  evidence: EvidenceRecord[];
+  actions: WorkItemActionKey[];
+}) {
+  const requirement = item.evidence_requirement_json ?? {};
+  const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
+  const acceptedEvidence = evidence.filter((record) => record.status === 'accepted').length;
+  const requiredKinds = [
+    requirement.checklist_required ? 'Checklist' : '',
+    requirement.document_required ? 'Document' : '',
+    requirement.photo_required ? 'Photo' : '',
+  ].filter(Boolean);
+  const missingEvidence = requiredKinds.length > 0 && activeEvidence.length === 0;
+  const missingRequiredForm = hasWorkflowFormSummary(item) && item.workflow_form_required && item.workflow_form_status !== 'submitted';
+  const nextAction = item.status === 'blocked'
+    ? 'Resolve blocker'
+    : missingRequiredForm
+      ? workflowFormNextAction(item)
+    : missingEvidence
+      ? 'Upload evidence'
+      : actions.length
+        ? actionLabels[actions[0]]
+        : 'Theo dõi activity';
+  const tone = item.status === 'blocked' || missingEvidence || missingRequiredForm ? 'border-amber-200 bg-amber-50' : 'border-blue-100 bg-blue-50';
+  const icon = item.status === 'blocked' || missingEvidence || missingRequiredForm
+    ? <AlertTriangle className="h-4 w-4 text-amber-700" />
+    : <CheckCircle2 className="h-4 w-4 text-blue-700" />;
+
+  return (
+    <section className={clsx('rounded-md border p-3', tone)}>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 rounded-md bg-white/80 p-2 ring-1 ring-inset ring-white">{icon}</span>
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-ink">Next action: {nextAction}</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              {item.run_node_name ?? item.run_step_name ?? workTypeLabel(item.work_type)} · {dateText(item.due_at)}
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 lg:w-[36rem]">
+          <SummaryPill icon={<FileCheck2 className="h-3.5 w-3.5" />} label="Required" value={requiredKinds.length ? requiredKinds.join(', ') : 'None'} />
+          <SummaryPill icon={<Upload className="h-3.5 w-3.5" />} label="Evidence" value={`${activeEvidence.length} active / ${acceptedEvidence} accepted`} />
+          <SummaryPill icon={<FileCheck2 className="h-3.5 w-3.5" />} label="Biểu mẫu" value={hasWorkflowFormSummary(item) ? `${workflowFormChipText(item)} · ${item.workflow_form_status ?? 'draft'}` : 'Không có'} />
+          <SummaryPill icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Status" value={item.status} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SummaryPill({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 rounded-md bg-white/80 px-2.5 py-2 ring-1 ring-inset ring-white">
+      <span className="shrink-0 text-slate-500">{icon}</span>
+      <span className="min-w-0">
+        <span className="block text-[11px] uppercase tracking-wide text-slate-500">{label}</span>
+        <span className="block truncate text-slate-700">{value}</span>
+      </span>
+    </div>
+  );
 }

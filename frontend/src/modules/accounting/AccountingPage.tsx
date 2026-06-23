@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus } from 'lucide-react';
@@ -7,12 +7,13 @@ import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { CurrencyText } from '../../components/CurrencyText';
 import { StatusBadge } from '../../components/StatusBadge';
-import { FormDrawer } from '../../components/FormDrawer';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
-import { SimpleForm } from '../_shared/SimpleForm';
+import { FilterBar, type FilterOption } from '../../components/FilterBar';
+import { ListSection } from '../../components/ListSection';
+import { RecordFormDialog } from '../_shared/RecordFormDialog';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { EnumChip } from '../../components/EnumChip';
 import { enumOptions } from '../../lib/utils/status';
@@ -21,6 +22,9 @@ import { CashflowPanel } from './CashflowPanel';
 export function AccountingPage({ global = false }: { global?: boolean }) {
   const { id } = useParams();
   const [projectId, setProjectId] = useState(id ?? '');
+  const [budgetStatus, setBudgetStatus] = useState('all');
+  const [paymentStatus, setPaymentStatus] = useState('all');
+  const [paymentType, setPaymentType] = useState('all');
   const [open, setOpen] = useState<'budget' | 'payment' | null>(null);
   const [dialog, setDialog] = useState<{ type: 'budget' | 'payment'; record: Record<string, any> } | null>(null);
   const queryClient = useQueryClient();
@@ -68,7 +72,39 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
     },
     onError: (error) => toast.error('Không duyệt được payment / receipt', error),
   });
-  const paymentRows = (payments.data ?? []).filter((row) => !projectId || row.project_id === projectId);
+  const budgetRows = budgets.data ?? [];
+  const projectPaymentRows = (payments.data ?? []).filter((row) => !projectId || row.project_id === projectId);
+  const filteredBudgets = useMemo(() => budgetStatus === 'all' ? budgetRows : budgetRows.filter((row) => row.status === budgetStatus), [budgetRows, budgetStatus]);
+  const filteredPayments = useMemo(() => projectPaymentRows.filter((row) => {
+    const statusMatch = paymentStatus === 'all' || row.status === paymentStatus;
+    const typeMatch = paymentType === 'all' || row.payment_type === paymentType;
+    return statusMatch && typeMatch;
+  }), [paymentStatus, paymentType, projectPaymentRows]);
+  const budgetFilterOptions = useMemo<FilterOption[]>(() => [
+    { value: 'all', label: 'Tất cả', count: budgetRows.length },
+    { value: 'draft', label: 'Draft', count: countBy(budgetRows, 'status', 'draft') },
+    { value: 'submitted', label: 'Submitted', count: countBy(budgetRows, 'status', 'submitted') },
+    { value: 'approved', label: 'Approved', count: countBy(budgetRows, 'status', 'approved') },
+  ], [budgetRows]);
+  const paymentStatusOptions = useMemo<FilterOption[]>(() => [
+    { value: 'all', label: 'Tất cả', count: projectPaymentRows.length },
+    { value: 'draft', label: 'Draft', count: countBy(projectPaymentRows, 'status', 'draft') },
+    { value: 'pending', label: 'Pending', count: countBy(projectPaymentRows, 'status', 'pending') },
+    { value: 'waiting_approval', label: 'Waiting', count: countBy(projectPaymentRows, 'status', 'waiting_approval') },
+    { value: 'approved', label: 'Approved', count: countBy(projectPaymentRows, 'status', 'approved') },
+    { value: 'paid', label: 'Paid', count: countBy(projectPaymentRows, 'status', 'paid') },
+    { value: 'received', label: 'Received', count: countBy(projectPaymentRows, 'status', 'received') },
+  ], [projectPaymentRows]);
+  const paymentTypeOptions = useMemo<FilterOption[]>(() => [
+    { value: 'all', label: 'Mọi loại', count: projectPaymentRows.length },
+    { value: 'supplier_payment', label: 'Supplier', count: countBy(projectPaymentRows, 'payment_type', 'supplier_payment') },
+    { value: 'subcontractor_payment', label: 'Subcontractor', count: countBy(projectPaymentRows, 'payment_type', 'subcontractor_payment') },
+    { value: 'client_receipt', label: 'Client receipt', count: countBy(projectPaymentRows, 'payment_type', 'client_receipt') },
+    { value: 'outbound', label: 'Outbound', count: countBy(projectPaymentRows, 'payment_type', 'outbound') },
+    { value: 'inbound', label: 'Inbound', count: countBy(projectPaymentRows, 'payment_type', 'inbound') },
+    { value: 'advance', label: 'Advance', count: countBy(projectPaymentRows, 'payment_type', 'advance') },
+    { value: 'other', label: 'Other', count: countBy(projectPaymentRows, 'payment_type', 'other') },
+  ], [projectPaymentRows]);
 
   return (
     <>
@@ -79,41 +115,56 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
           <>
             {!global ? <ProjectBackLink projectId={projectId} /> : null}
             {global ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
-            <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100" onClick={() => setOpen('payment')}><Plus className="h-4 w-4" />Payment</button>
-            <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen('budget')}><Plus className="h-4 w-4" />Budget</button>
+            <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setOpen('payment')}><Plus className="h-4 w-4" />Payment</button>
+            <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setOpen('budget')}><Plus className="h-4 w-4" />Budget</button>
           </>
         }
       />
       <div className="mb-4">
         <CashflowPanel projectId={projectId} />
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <section>
-          <h2 className="mb-3 text-base font-semibold text-ink">Ngân sách công trình</h2>
-          <DataTable rows={budgets.data ?? []} columns={[
-            { key: 'budget_code', header: 'Mã' },
-            { key: 'name', header: 'Ngân sách' },
-            { key: 'approved_amount', header: 'Đã duyệt', render: (row) => <CurrencyText value={row.approved_amount} /> },
-            { key: 'used_amount', header: 'Đã dùng', render: (row) => <CurrencyText value={row.used_amount} /> },
-            { key: 'remaining_amount', header: 'Còn lại', render: (row) => <CurrencyText value={row.remaining_amount} /> },
-            { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-            { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'budget', record: row })}><button className="text-sm font-semibold text-blue-700" onClick={() => approveBudget.mutate(row.id)}>Approve</button></RowActions> },
-          ]} />
-        </section>
-        <section>
-          <h2 className="mb-3 text-base font-semibold text-ink">Payments / Receipts</h2>
-          <DataTable rows={paymentRows} columns={[
-            { key: 'payment_code', header: 'Mã' },
-            { key: 'payment_type', header: 'Loại', render: (row) => <EnumChip group="payment_type" value={row.payment_type} /> },
-            { key: 'project_name', header: 'Công trình' },
-            { key: 'amount', header: 'Số tiền', render: (row) => <CurrencyText value={row.amount} /> },
-            { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-            { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'payment', record: row })}><button className="text-sm font-semibold text-blue-700" onClick={() => approvePayment.mutate(row.id)}><Check className="inline h-4 w-4" /> Approve</button></RowActions> },
-          ]} />
-        </section>
+      <div className="mb-4 grid gap-3 xl:grid-cols-3">
+        <FilterBar label="Budget status" value={budgetStatus} options={budgetFilterOptions} onChange={setBudgetStatus} disabled={!projectId} />
+        <FilterBar label="Payment status" value={paymentStatus} options={paymentStatusOptions} onChange={setPaymentStatus} disabled={!projectId} />
+        <FilterBar label="Payment type" value={paymentType} options={paymentTypeOptions} onChange={setPaymentType} disabled={!projectId} />
       </div>
-      <FormDrawer open={open === 'budget'} title="Tạo ngân sách" onClose={() => setOpen(null)}>
-        <SimpleForm fields={[
+      <div className="grid gap-4 xl:grid-cols-2">
+        <ListSection title="Ngân sách công trình">
+          <DataTable rows={filteredBudgets} loading={budgets.isLoading} error={budgets.error} onRetry={() => budgets.refetch()} searchPlaceholder="Tìm mã, ngân sách, trạng thái..." pageSize={10} defaultSort={{ key: 'budget_code', direction: 'asc' }} columns={[
+            { key: 'budget_code', header: 'Mã', sortable: true },
+            { key: 'name', header: 'Ngân sách', sortable: true },
+            { key: 'approved_amount', header: 'Đã duyệt', align: 'right', sortable: true, sortValue: (row) => Number(row.approved_amount ?? 0), render: (row) => <CurrencyText value={row.approved_amount} /> },
+            { key: 'used_amount', header: 'Đã dùng', align: 'right', sortable: true, sortValue: (row) => Number(row.used_amount ?? 0), render: (row) => <CurrencyText value={row.used_amount} /> },
+            { key: 'remaining_amount', header: 'Còn lại', align: 'right', sortable: true, sortValue: (row) => Number(row.remaining_amount ?? 0), render: (row) => <CurrencyText value={row.remaining_amount} /> },
+            { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
+            { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'budget', record: row })}><button disabled={row.status === 'approved'} className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400" onClick={() => approveBudget.mutate(row.id)}>Approve</button></RowActions> },
+          ]} empty={projectId ? 'Không có ngân sách trong bộ lọc này' : 'Chọn công trình để xem ngân sách'} emptyAction={projectId ? (
+            <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen('budget')}>
+              <Plus className="h-4 w-4" />Budget
+            </button>
+          ) : undefined} />
+        </ListSection>
+        <ListSection title="Payments / Receipts">
+          <DataTable rows={filteredPayments} loading={payments.isLoading} error={payments.error} onRetry={() => payments.refetch()} searchPlaceholder="Tìm mã phiếu, loại, công trình..." pageSize={10} defaultSort={{ key: 'payment_code', direction: 'desc' }} columns={[
+            { key: 'payment_code', header: 'Mã', sortable: true },
+            { key: 'payment_type', header: 'Loại', sortable: true, render: (row) => <EnumChip group="payment_type" value={row.payment_type} /> },
+            { key: 'project_name', header: 'Công trình', sortable: true },
+            { key: 'amount', header: 'Số tiền', align: 'right', sortable: true, sortValue: (row) => Number(row.amount ?? 0), render: (row) => <CurrencyText value={row.amount} /> },
+            { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
+            { key: 'action', header: 'Action', render: (row) => <RowActions onView={() => setDialog({ type: 'payment', record: row })}><button disabled={!['draft', 'submitted', 'pending'].includes(row.status)} className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400" onClick={() => approvePayment.mutate(row.id)}><Check className="inline h-4 w-4" /> Approve</button></RowActions> },
+          ]} empty={projectId ? 'Không có payment / receipt trong bộ lọc này' : 'Chọn công trình để xem payment / receipt'} emptyAction={projectId ? (
+            <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => setOpen('payment')}>
+              <Plus className="h-4 w-4" />Payment
+            </button>
+          ) : undefined} />
+        </ListSection>
+      </div>
+      <RecordFormDialog
+        open={open === 'budget'}
+        title="Tạo ngân sách"
+        submitLabel="Tạo ngân sách"
+        onClose={() => setOpen(null)}
+        fields={[
           { name: 'budget_code', label: 'Mã ngân sách', defaultValue: `BUD-${Date.now().toString().slice(-5)}`, required: true },
           { name: 'name', label: 'Tên ngân sách', defaultValue: 'Ngân sách công trình', required: true },
           { name: 'planned_amount', label: 'Kế hoạch', type: 'number', defaultValue: 100000000, required: true, min: 0 },
@@ -121,18 +172,24 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
           { name: 'used_amount', label: 'Đã dùng', type: 'number', defaultValue: 0, min: 0 },
           { name: 'remaining_amount', label: 'Còn lại', type: 'number', defaultValue: 100000000, min: 0 },
           { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'draft', required: true, options: enumOptions('status', ['draft', 'submitted', 'approved']) },
-        ]} onSubmit={(values) => createBudget.mutateAsync(values)} />
-      </FormDrawer>
-      <FormDrawer open={open === 'payment'} title="Tạo payment / receipt" onClose={() => setOpen(null)}>
-        <SimpleForm fields={[
+        ]}
+        onSubmit={(values) => createBudget.mutateAsync(values)}
+      />
+      <RecordFormDialog
+        open={open === 'payment'}
+        title="Tạo payment / receipt"
+        submitLabel="Tạo payment / receipt"
+        onClose={() => setOpen(null)}
+        fields={[
           { name: 'project_id', label: 'Công trình', type: 'select', defaultValue: projectId, required: true, options: (projects.data ?? []).map((p) => ({ label: p.name, value: p.id })) },
           { name: 'payment_code', label: 'Mã', defaultValue: `PMT-${Date.now().toString().slice(-5)}`, required: true },
           { name: 'payment_type', label: 'Loại', type: 'select', defaultValue: 'supplier_payment', required: true, options: enumOptions('payment_type', ['supplier_payment', 'subcontractor_payment', 'client_receipt', 'advance', 'advance_settlement', 'other']) },
           { name: 'amount', label: 'Số tiền', type: 'number', defaultValue: 10000000, required: true, min: 0 },
           { name: 'payment_method', label: 'Phương thức', type: 'select', defaultValue: 'bank_transfer', required: true, options: enumOptions('payment_method', ['bank_transfer', 'cash']) },
-          { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'draft', required: true, options: enumOptions('status', ['draft', 'waiting_approval', 'approved', 'paid', 'received']) },
-        ]} onSubmit={(values) => createPayment.mutateAsync(values)} />
-      </FormDrawer>
+          { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'draft', required: true, options: enumOptions('status', ['draft', 'submitted', 'pending', 'approved', 'paid', 'received']) },
+        ]}
+        onSubmit={(values) => createPayment.mutateAsync(values)}
+      />
       <RecordDetailDialog
         open={dialog?.type === 'budget'}
         title="Chi tiết ngân sách"
@@ -164,4 +221,8 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
       />
     </>
   );
+}
+
+function countBy(rows: Record<string, any>[], key: string, value: string) {
+  return rows.filter((row) => row[key] === value).length;
 }

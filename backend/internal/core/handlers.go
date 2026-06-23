@@ -1269,7 +1269,15 @@ func (h *Handler) CreateWarehouse(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"warehouse.adjust"}); err != nil {
 		return err
 	}
-	return h.create(c, "warehouses", warehouseColumns())
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.CreateWarehouse(c.Context(), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 
 func (h *Handler) Stock(c *fiber.Ctx) error {
@@ -1408,22 +1416,66 @@ func (h *Handler) SubmitIncomingAcceptance(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ProjectDailyReports(c *fiber.Ctx) error {
-	return h.projectList(c, "operation_daily_reports", []string{"operation.view"})
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"operation.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.ProjectDailyReports(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
 }
 func (h *Handler) CreateDailyReport(c *fiber.Ctx) error {
-	return h.projectCreate(c, "operation_daily_reports", dailyReportColumns(), []string{"operation.report"})
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"operation.report"}); err != nil {
+		return err
+	}
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.CreateDailyReport(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 func (h *Handler) ProjectIssues(c *fiber.Ctx) error {
-	return h.projectList(c, "issues", []string{"operation.view"})
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"operation.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.ProjectIssues(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
 }
 func (h *Handler) CreateIssue(c *fiber.Ctx) error {
-	return h.projectCreate(c, "issues", issueColumns(), []string{"operation.issue_create"})
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"operation.issue_create"}); err != nil {
+		return err
+	}
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.CreateIssue(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 func (h *Handler) UpdateIssue(c *fiber.Ctx) error {
 	if err := h.requireRecordProjectPermission(c, "issues", c.Params("id"), []string{"operation.issue_update"}); err != nil {
 		return err
 	}
-	return h.update(c, "issues", issueColumns())
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.UpdateIssue(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
 }
 
 func (h *Handler) ProjectAcceptances(c *fiber.Ctx) error {
@@ -1508,39 +1560,104 @@ func (h *Handler) CreateReworkFromAcceptance(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ProjectReworks(c *fiber.Ctx) error {
-	return h.projectList(c, "rework_requests", []string{"rework.view"})
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"rework.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.ProjectReworks(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
 }
 func (h *Handler) CreateRework(c *fiber.Ctx) error {
-	return h.projectCreate(c, "rework_requests", reworkColumns(), []string{"rework.create"})
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"rework.create"}); err != nil {
+		return err
+	}
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.CreateRework(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 func (h *Handler) ApproveRework(c *fiber.Ctx) error {
-	return h.setStatus(c, "rework_requests", "approved", []string{"rework.approve"})
+	return h.reworkStatusAction(c, "approved")
 }
 func (h *Handler) CompleteRework(c *fiber.Ctx) error {
-	return h.setStatus(c, "rework_requests", "done", []string{"rework.approve"})
+	return h.reworkStatusAction(c, "done")
 }
 func (h *Handler) ProjectReplannings(c *fiber.Ctx) error {
-	return h.projectList(c, "replanning_requests", []string{"replanning.view"})
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"replanning.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.ProjectReplannings(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
 }
 func (h *Handler) CreateReplanning(c *fiber.Ctx) error {
-	return h.projectCreate(c, "replanning_requests", replanningColumns(), []string{"replanning.create"})
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"replanning.create"}); err != nil {
+		return err
+	}
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.CreateReplanning(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 func (h *Handler) ApproveReplanning(c *fiber.Ctx) error {
-	return h.setStatus(c, "replanning_requests", "approved", []string{"replanning.approve"})
+	if err := h.requireRecordProjectPermission(c, "replanning_requests", c.Params("id"), []string{"replanning.approve"}); err != nil {
+		return err
+	}
+	row, err := h.service.ApproveReplanning(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) reworkStatusAction(c *fiber.Ctx, status string) error {
+	if err := h.requireRecordProjectPermission(c, "rework_requests", c.Params("id"), []string{"rework.approve"}); err != nil {
+		return err
+	}
+	row, err := h.service.UpdateReworkStatus(c.Context(), c.Params("id"), status, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
 }
 
 func (h *Handler) ProjectHandover(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"handover.view"}); err != nil {
 		return err
 	}
-	rows, err := h.service.repo.Query(c.Context(), `SELECT * FROM handover_records WHERE project_id=$1 AND status <> 'deleted' ORDER BY created_at DESC`, c.Params("id"))
+	rows, err := h.service.ProjectHandover(c.Context(), c.Params("id"))
 	if err != nil {
 		return err
 	}
 	return response.OK(c, rows)
 }
 func (h *Handler) CreateHandover(c *fiber.Ctx) error {
-	return h.projectCreate(c, "handover_records", handoverColumns(), []string{"handover.create"})
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"handover.create"}); err != nil {
+		return err
+	}
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.CreateHandover(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 func (h *Handler) CheckHandover(c *fiber.Ctx) error {
 	if err := h.requireRecordProjectPermission(c, "handover_records", c.Params("id"), []string{"handover.view"}); err != nil {
@@ -1568,13 +1685,38 @@ func (h *Handler) CompleteHandover(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ProjectBudget(c *fiber.Ctx) error {
-	return h.projectList(c, "accounting_budgets", []string{"accounting.budget_view"})
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"accounting.budget_view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.ProjectBudget(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
 }
 func (h *Handler) CreateBudget(c *fiber.Ctx) error {
-	return h.projectCreate(c, "accounting_budgets", budgetColumns(), []string{"accounting.budget_approve"})
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"accounting.budget_approve"}); err != nil {
+		return err
+	}
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.CreateBudget(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 func (h *Handler) ApproveBudget(c *fiber.Ctx) error {
-	return h.setStatus(c, "accounting_budgets", "approved", []string{"accounting.budget_approve"})
+	if err := h.requireRecordProjectPermission(c, "accounting_budgets", c.Params("id"), []string{"accounting.budget_approve"}); err != nil {
+		return err
+	}
+	row, err := h.service.ApproveBudget(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
 }
 func (h *Handler) ListPayables(c *fiber.Ctx) error {
 	permissions := []string{"accounting.view", "accounting.payable_view"}
@@ -2324,10 +2466,18 @@ func (h *Handler) ListPayments(c *fiber.Ctx) error {
 	return h.list(c, fmt.Sprintf(`SELECT pay.*, p.name AS project_name FROM payments pay JOIN projects p ON p.id=pay.project_id WHERE pay.status <> 'cancelled' AND p.status <> 'cancelled' AND %s ORDER BY pay.created_at DESC`, scopeSQL), scopeArgs...)
 }
 func (h *Handler) CreatePayment(c *fiber.Ctx) error {
-	if err := h.requireBodyProjectPermission(c, []string{"accounting.payment_create"}); err != nil {
+	body, err := bodyMap(c)
+	if err != nil {
 		return err
 	}
-	return h.create(c, "payments", paymentColumns())
+	if err := h.requireProjectPermission(c, cleanID(body["project_id"]), []string{"accounting.payment_create"}); err != nil {
+		return err
+	}
+	row, err := h.service.CreatePayment(c.Context(), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 func (h *Handler) ApprovePayment(c *fiber.Ctx) error {
 	return h.paymentAction(c, "approve")
@@ -2851,59 +3001,6 @@ func (h *Handler) update(c *fiber.Ctx, table string, specs []ColumnSpec) error {
 	return response.OK(c, row)
 }
 
-func (h *Handler) projectList(c *fiber.Ctx, table string, permissions []string) error {
-	if err := h.requireProjectPermission(c, c.Params("id"), permissions); err != nil {
-		return err
-	}
-	tableName := safeTable(table)
-	rows, err := h.service.repo.Query(c.Context(), fmt.Sprintf("SELECT * FROM %s WHERE project_id=$1%s ORDER BY created_at DESC", tableName, projectListNotDeletedCondition(tableName)), c.Params("id"))
-	if err != nil {
-		return err
-	}
-	return response.OK(c, rows)
-}
-
-func projectListNotDeletedCondition(table string) string {
-	switch table {
-	case "issues", "acceptance_records", "rework_requests", "replanning_requests", "handover_records":
-		return " AND status <> 'deleted'"
-	case "accounting_budgets":
-		return " AND status <> 'cancelled'"
-	default:
-		return ""
-	}
-}
-
-func (h *Handler) projectCreate(c *fiber.Ctx, table string, specs []ColumnSpec, permissions []string) error {
-	if err := h.requireProjectPermission(c, c.Params("id"), permissions); err != nil {
-		return err
-	}
-	body, err := bodyMap(c)
-	if err != nil {
-		return err
-	}
-	body["project_id"] = c.Params("id")
-	if body["created_by"] == nil {
-		body["created_by"] = actorID(c)
-	}
-	row, err := h.service.repo.Insert(c.Context(), table, specs, body)
-	if err != nil {
-		return err
-	}
-	return response.Created(c, row)
-}
-
-func (h *Handler) setStatus(c *fiber.Ctx, table, status string, permissions []string) error {
-	if err := h.requireRecordProjectPermission(c, table, c.Params("id"), permissions); err != nil {
-		return err
-	}
-	row, err := h.service.repo.QueryOne(c.Context(), fmt.Sprintf("UPDATE %s SET status=$2%s WHERE id=$1 RETURNING *", safeTable(table), updatedAtSQL(table)), c.Params("id"), status)
-	if err != nil {
-		return err
-	}
-	return response.OK(c, row)
-}
-
 func (h *Handler) requirePermission(c *fiber.Ctx, permissions []string) error {
 	allowed, err := h.service.repo.CanUsePermission(c.Context(), actorID(c), permissions)
 	if err != nil {
@@ -3034,11 +3131,4 @@ func stringValue(value any) string {
 		return ""
 	}
 	return fmt.Sprint(value)
-}
-
-func updatedAtSQL(table string) string {
-	if hasUpdatedAt(table) {
-		return ", updated_at=now()"
-	}
-	return ""
 }

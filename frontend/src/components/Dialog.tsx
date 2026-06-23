@@ -2,7 +2,7 @@ import { ReactNode, useEffect } from 'react';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
 
-type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
+export type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
 
 const sizeClass: Record<DialogSize, string> = {
   sm: 'max-w-md',

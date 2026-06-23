@@ -1731,6 +1731,207 @@ func batch4TestApp(userID string, register func(*fiber.App, *Handler), handler *
 	return app
 }
 
+func TestBusinessCoreOperationsServiceRecordsActorAndScope(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupProjectScopeFixture(t, db, []string{"operation.view", "operation.report", "operation.issue_create", "operation.issue_update"})
+
+	report, err := service.CreateDailyReport(ctx, fixture.projectID, Record{
+		"report_date":            "2026-06-23",
+		"weather":                "Nắng",
+		"work_summary":           "Đổ bê tông sàn",
+		"manpower_summary":       "8 công nhân",
+		"material_usage_summary": "Bê tông M300",
+		"issues_summary":         "Không",
+		"progress_percent":       42,
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(report["project_id"]) != fixture.projectID || cleanID(report["reported_by"]) != fixture.userID {
+		t.Fatalf("daily report project/reporter = %v/%v, want %s/%s", report["project_id"], report["reported_by"], fixture.projectID, fixture.userID)
+	}
+	reports, err := service.ProjectDailyReports(ctx, fixture.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reports) != 1 || cleanID(reports[0]["id"]) != cleanID(report["id"]) {
+		t.Fatalf("project reports = %#v, want created report", reports)
+	}
+
+	issue, err := service.CreateIssue(ctx, fixture.projectID, Record{
+		"title":               "Sai cao độ",
+		"description":         "Kiểm tra lại cote hoàn thiện",
+		"severity":            "medium",
+		"requires_rework":     true,
+		"requires_replanning": false,
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(issue["project_id"]) != fixture.projectID || cleanID(issue["reported_by"]) != fixture.userID {
+		t.Fatalf("issue project/reporter = %v/%v, want %s/%s", issue["project_id"], issue["reported_by"], fixture.projectID, fixture.userID)
+	}
+	updated, err := service.UpdateIssue(ctx, cleanID(issue["id"]), Record{"project_id": fixture.otherProjectID, "status": "closed", "severity": "high"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(updated["project_id"]) != fixture.projectID {
+		t.Fatalf("issue project_id moved to %v, want fixed %s", updated["project_id"], fixture.projectID)
+	}
+	if updated["status"] != "closed" || updated["severity"] != "high" {
+		t.Fatalf("updated issue status/severity = %v/%v, want closed/high", updated["status"], updated["severity"])
+	}
+	issues, err := service.ProjectIssues(ctx, fixture.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues) != 1 || cleanID(issues[0]["id"]) != cleanID(issue["id"]) {
+		t.Fatalf("project issues = %#v, want created issue", issues)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('daily_report_created','issue_created','issue_updated')`, 3, fixture.projectID)
+}
+
+func TestBusinessCoreLifecycleServiceRecordsActors(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupProjectScopeFixture(t, db, []string{
+		"rework.view",
+		"rework.create",
+		"rework.approve",
+		"replanning.view",
+		"replanning.create",
+		"replanning.approve",
+		"handover.view",
+		"handover.create",
+		"accounting.budget_view",
+		"accounting.budget_approve",
+		"accounting.payment_create",
+	})
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE actor_id=$1 AND project_id IS NULL`, fixture.userID)
+	})
+
+	suffix := fixture.projectID[:8]
+	warehouse, err := service.CreateWarehouse(ctx, Record{"name": "Core WH " + suffix, "location": "Site", "type": "site"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	warehouseID := cleanID(warehouse["id"])
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM warehouses WHERE id=$1`, warehouseID)
+	})
+	if warehouse["active"] != true {
+		t.Fatalf("warehouse active = %v, want DB default true", warehouse["active"])
+	}
+
+	issue, err := service.CreateIssue(ctx, fixture.projectID, Record{"title": "Cần xử lý lại", "severity": "high"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rework, err := service.CreateRework(ctx, fixture.projectID, Record{"issue_id": cleanID(issue["id"]), "title": "Làm lại lớp chống thấm"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(rework["created_by"]) != fixture.userID {
+		t.Fatalf("rework created_by = %v, want %s", rework["created_by"], fixture.userID)
+	}
+	rework, err = service.UpdateReworkStatus(ctx, cleanID(rework["id"]), "approved", fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rework["status"] != "approved" || cleanID(rework["approved_by"]) != fixture.userID {
+		t.Fatalf("rework approval = status %v approved_by %v", rework["status"], rework["approved_by"])
+	}
+	rework, err = service.UpdateReworkStatus(ctx, cleanID(rework["id"]), "done", fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rework["status"] != "done" || cleanID(rework["approved_by"]) != fixture.userID {
+		t.Fatalf("rework completion = status %v approved_by %v", rework["status"], rework["approved_by"])
+	}
+
+	replanning, err := service.CreateReplanning(ctx, fixture.projectID, Record{
+		"issue_id":        cleanID(issue["id"]),
+		"reason":          "Đổi biện pháp thi công",
+		"impact_scope":    "Tiến độ tầng 2",
+		"budget_impact":   1000,
+		"timeline_impact": 2,
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(replanning["created_by"]) != fixture.userID {
+		t.Fatalf("replanning created_by = %v, want %s", replanning["created_by"], fixture.userID)
+	}
+	replanning, err = service.ApproveReplanning(ctx, cleanID(replanning["id"]), fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replanning["status"] != "approved" || cleanID(replanning["approved_by"]) != fixture.userID {
+		t.Fatalf("replanning approval = status %v approved_by %v", replanning["status"], replanning["approved_by"])
+	}
+
+	handover, err := service.CreateHandover(ctx, fixture.projectID, Record{"client_representative": "Client", "company_representative": "PM"}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(handover["created_by"]) != fixture.userID {
+		t.Fatalf("handover created_by = %v, want %s", handover["created_by"], fixture.userID)
+	}
+
+	budget, err := service.CreateBudget(ctx, fixture.projectID, Record{"budget_code": "BUD-CORE-" + suffix, "name": "Core budget", "planned_amount": 1200}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	budget, err = service.ApproveBudget(ctx, cleanID(budget["id"]), fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if budget["status"] != "approved" || cleanID(budget["approved_by"]) != fixture.userID {
+		t.Fatalf("budget approval = status %v approved_by %v", budget["status"], budget["approved_by"])
+	}
+
+	payment, err := service.CreatePayment(ctx, Record{
+		"project_id":     fixture.projectID,
+		"payment_code":   "PMT-CORE-" + suffix,
+		"payment_type":   "outbound",
+		"target_type":    "issue",
+		"target_id":      cleanID(issue["id"]),
+		"amount":         450,
+		"payment_method": "bank_transfer",
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(payment["created_by"]) != fixture.userID {
+		t.Fatalf("payment created_by = %v, want %s", payment["created_by"], fixture.userID)
+	}
+
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM audit_logs
+		WHERE project_id=$1
+			AND event_type IN (
+				'issue_created',
+				'rework_created',
+				'rework_approved',
+				'rework_completed',
+				'replanning_created',
+				'replanning_approved',
+				'handover_created',
+				'budget_created',
+				'budget_approved',
+				'payment_created'
+			)
+	`, 10, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_id=$1 AND event_type='warehouse_created'`, 1, warehouseID)
+}
+
 type workItemFlowFixture struct {
 	projectID string
 	workerID  string
@@ -1790,6 +1991,7 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 	repo := NewRepository(db)
 
 	actorID := newID()
+	actorStaffID := newID()
 	templateID := newID()
 	nodeID := newID()
 	projectID := newID()
@@ -1805,10 +2007,12 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM pipeline_templates WHERE id=$1`, templateID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, actorStaffID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
 	})
 
 	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Test Actor','active')`, actorID, "ops-start-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id, user_id, full_name, email, department, status) VALUES ($1,$2,'Test Actor',$3,'operations','active')`, actorStaffID, actorID, "ops-start-staff-"+actorID+"@test.local")
 	mustExec(t, db, `INSERT INTO pipeline_templates (id, name, status, created_by) VALUES ($1,'Ops Template','published',$2)`, templateID, actorID)
 	mustExec(t, db, `
 		INSERT INTO pipeline_template_nodes (id, template_id, name, type, order_index, responsible_role_ids)
@@ -1823,6 +2027,7 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 		INSERT INTO projects (id, name, code, client_name, status, pipeline_template_id)
 		VALUES ($1,'Ops Project',$2,'Client','draft',$3)
 	`, projectID, "OPS-"+projectID[:8], templateID)
+	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["PM"]'::jsonb,true)`, projectID, actorStaffID)
 
 	firstRun, err := repo.StartPipeline(ctx, projectID, templateID, actorID, "actor@test.local")
 	if err != nil {
@@ -1854,7 +2059,71 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 		if step["workflow_form_status"] != "draft" || !boolValue(step["workflow_form_required"]) {
 			t.Fatalf("unexpected workflow form summary = %#v", step)
 		}
+		if cleanID(step["workflow_form_version_id"]) != formVersionID || fmt.Sprint(step["workflow_form_template_code"]) != "builtin_checklist" || number(step["workflow_form_version_no"]) == 0 {
+			t.Fatalf("expected typed workflow form summary, got %#v", step)
+		}
 	}
+	firstStep := steps[0]
+	workItemID := cleanID(firstStep["work_item_id"])
+	detail, err := repo.GetWorkItemDetail(ctx, workItemID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(detail["workflow_form_instance_id"]) == "" || fmt.Sprint(detail["workflow_form_template_name"]) == "" || !boolValue(detail["workflow_form_required"]) {
+		t.Fatalf("expected workflow form summary on work item detail, got %#v", detail)
+	}
+	projectItems, err := repo.ListProjectWorkItems(ctx, projectID, actorID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundListSummary := false
+	for _, item := range projectItems {
+		if cleanID(item["id"]) == workItemID {
+			foundListSummary = cleanID(item["workflow_form_instance_id"]) != "" &&
+				fmt.Sprint(item["workflow_form_template_code"]) == "builtin_checklist" &&
+				boolValue(item["workflow_form_required"])
+		}
+	}
+	if !foundListSummary {
+		t.Fatalf("expected workflow form summary in project work item list, got %#v", projectItems)
+	}
+}
+
+func TestStartPipelineRejectsRequiredStepWithoutPublishedWorkflowForm(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+
+	actorID := newID()
+	templateID := newID()
+	nodeID := newID()
+	projectID := newID()
+	stepID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM pipeline_templates WHERE id=$1`, templateID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Test Actor','active')`, actorID, "ops-start-invalid-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO pipeline_templates (id, name, status, created_by) VALUES ($1,'Invalid Ops Template','published',$2)`, templateID, actorID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_template_nodes (id, template_id, name, type, order_index, responsible_role_ids)
+		VALUES ($1,$2,'Survey','survey',1,'["PM"]'::jsonb)
+	`, nodeID, templateID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_template_steps (id, node_id, name, step_type, required_role_ids, form_required, order_index)
+		VALUES ($1,$2,'Required business form','checklist','["PM"]'::jsonb,true,1)
+	`, stepID, nodeID)
+	mustExec(t, db, `
+		INSERT INTO projects (id, name, code, client_name, status, pipeline_template_id)
+		VALUES ($1,'Invalid Ops Project',$2,'Client','draft',$3)
+	`, projectID, "OPSI-"+projectID[:8], templateID)
+
+	_, err := repo.StartPipeline(ctx, projectID, templateID, actorID, "actor@test.local")
+	assertValidationError(t, err)
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_runs WHERE project_id=$1`, 0, projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1`, 0, projectID)
 }
 
 func TestWorkflowFormCatalogReturnsPublishedTemplates(t *testing.T) {

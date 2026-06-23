@@ -316,6 +316,159 @@ func (s *Service) CreateMaterial(ctx context.Context, body Record) (Record, erro
 	return s.repo.Insert(ctx, "materials", materialColumns(), body)
 }
 
+func (s *Service) CreateWarehouse(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+	row, err := s.repo.CreateWarehouse(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, "", actorID, actorName, "warehouse_created", "warehouse", cleanID(row["id"]), fmt.Sprintf("Tạo kho %s", row["name"]), Record{"type": row["type"]})
+	return row, nil
+}
+
+func (s *Service) ProjectDailyReports(ctx context.Context, projectID string) ([]Record, error) {
+	return s.repo.ListProjectDailyReports(ctx, cleanID(projectID))
+}
+
+func (s *Service) CreateDailyReport(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
+	body["project_id"] = cleanID(projectID)
+	if cleanID(body["reported_by"]) == "" {
+		body["reported_by"] = actorID
+	}
+	row, err := s.repo.CreateDailyReport(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "daily_report_created", "daily_report", cleanID(row["id"]), fmt.Sprintf("Tạo nhật ký ngày %s", row["report_date"]), Record{"progress_percent": row["progress_percent"]})
+	return row, nil
+}
+
+func (s *Service) ProjectIssues(ctx context.Context, projectID string) ([]Record, error) {
+	return s.repo.ListProjectIssues(ctx, cleanID(projectID))
+}
+
+func (s *Service) CreateIssue(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
+	body["project_id"] = cleanID(projectID)
+	if cleanID(body["reported_by"]) == "" {
+		body["reported_by"] = actorID
+	}
+	row, err := s.repo.CreateIssue(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "issue_created", "issue", cleanID(row["id"]), fmt.Sprintf("Tạo vấn đề %s", row["title"]), Record{"severity": row["severity"], "status": row["status"]})
+	return row, nil
+}
+
+func (s *Service) UpdateIssue(ctx context.Context, id string, body Record, actorID, actorName string) (Record, error) {
+	delete(body, "project_id")
+	row, err := s.repo.UpdateIssue(ctx, cleanID(id), body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "issue_updated", "issue", cleanID(row["id"]), fmt.Sprintf("Cập nhật vấn đề %s", row["title"]), Record{"status": row["status"], "severity": row["severity"]})
+	return row, nil
+}
+
+func (s *Service) ProjectReworks(ctx context.Context, projectID string) ([]Record, error) {
+	return s.repo.ListProjectReworks(ctx, cleanID(projectID))
+}
+
+func (s *Service) CreateRework(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
+	body["project_id"] = cleanID(projectID)
+	if cleanID(body["created_by"]) == "" {
+		body["created_by"] = actorID
+	}
+	row, err := s.repo.CreateRework(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "rework_created", "rework", cleanID(row["id"]), fmt.Sprintf("Tạo yêu cầu làm lại %s", row["title"]), Record{"status": row["status"], "issue_id": cleanID(row["issue_id"]), "acceptance_id": cleanID(row["acceptance_id"])})
+	return row, nil
+}
+
+func (s *Service) UpdateReworkStatus(ctx context.Context, id, status string, actorID, actorName string) (Record, error) {
+	status = strings.TrimSpace(status)
+	if !statusIn(status, "approved", "done") {
+		return nil, validationError("Trạng thái rework không hợp lệ", Record{"status": status})
+	}
+	row, err := s.repo.UpdateReworkStatus(ctx, cleanID(id), status, actorID)
+	if err != nil {
+		return nil, err
+	}
+	event := "rework_approved"
+	if status == "done" {
+		event = "rework_completed"
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, event, "rework", cleanID(row["id"]), fmt.Sprintf("Cập nhật rework sang %s", status), Record{"status": status})
+	return row, nil
+}
+
+func (s *Service) ProjectReplannings(ctx context.Context, projectID string) ([]Record, error) {
+	return s.repo.ListProjectReplannings(ctx, cleanID(projectID))
+}
+
+func (s *Service) CreateReplanning(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
+	body["project_id"] = cleanID(projectID)
+	if cleanID(body["created_by"]) == "" {
+		body["created_by"] = actorID
+	}
+	row, err := s.repo.CreateReplanning(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "replanning_created", "replanning", cleanID(row["id"]), "Tạo yêu cầu lập kế hoạch lại", Record{"status": row["status"], "issue_id": cleanID(row["issue_id"]), "node_id": cleanID(row["node_id"])})
+	return row, nil
+}
+
+func (s *Service) ApproveReplanning(ctx context.Context, id string, actorID, actorName string) (Record, error) {
+	row, err := s.repo.ApproveReplanning(ctx, cleanID(id), actorID)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "replanning_approved", "replanning", cleanID(row["id"]), "Duyệt yêu cầu lập kế hoạch lại", Record{"status": row["status"]})
+	return row, nil
+}
+
+func (s *Service) ProjectHandover(ctx context.Context, projectID string) ([]Record, error) {
+	return s.repo.ListProjectHandover(ctx, cleanID(projectID))
+}
+
+func (s *Service) CreateHandover(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
+	body["project_id"] = cleanID(projectID)
+	if cleanID(body["created_by"]) == "" {
+		body["created_by"] = actorID
+	}
+	row, err := s.repo.CreateHandover(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "handover_created", "handover", cleanID(row["id"]), "Tạo hồ sơ bàn giao", Record{"status": row["status"], "final_acceptance_id": cleanID(row["final_acceptance_id"])})
+	return row, nil
+}
+
+func (s *Service) ProjectBudget(ctx context.Context, projectID string) ([]Record, error) {
+	return s.repo.ListProjectBudget(ctx, cleanID(projectID))
+}
+
+func (s *Service) CreateBudget(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
+	body["project_id"] = cleanID(projectID)
+	row, err := s.repo.CreateBudget(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "budget_created", "budget", cleanID(row["id"]), fmt.Sprintf("Tạo ngân sách %s", row["budget_code"]), Record{"status": row["status"], "planned_amount": row["planned_amount"]})
+	return row, nil
+}
+
+func (s *Service) ApproveBudget(ctx context.Context, id string, actorID, actorName string) (Record, error) {
+	row, err := s.repo.ApproveBudget(ctx, cleanID(id), actorID)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "budget_approved", "budget", cleanID(row["id"]), fmt.Sprintf("Duyệt ngân sách %s", row["budget_code"]), Record{"status": row["status"], "approved_amount": row["approved_amount"]})
+	return row, nil
+}
+
 func (s *Service) CreatePayable(ctx context.Context, body Record) (Record, error) {
 	if body["vendor_type"] == nil || strings.TrimSpace(fmt.Sprint(body["vendor_type"])) == "" {
 		body["vendor_type"] = "supplier"
@@ -6932,6 +7085,18 @@ func (s *Service) PayableAction(ctx context.Context, id, action string, req Acti
 
 func (s *Service) ReceivableAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
 	return s.repo.ReceivableAction(ctx, id, action, req, actorID, actorName)
+}
+
+func (s *Service) CreatePayment(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+	if cleanID(body["created_by"]) == "" {
+		body["created_by"] = actorID
+	}
+	row, err := s.repo.CreatePayment(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "payment_created", "payment", cleanID(row["id"]), fmt.Sprintf("Tạo phiếu thanh toán %s", row["payment_code"]), Record{"status": row["status"], "payment_type": row["payment_type"], "amount": row["amount"]})
+	return row, nil
 }
 
 func (s *Service) PaymentAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {

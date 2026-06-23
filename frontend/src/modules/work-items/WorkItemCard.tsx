@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import { StatusBadge } from '../../components/StatusBadge';
 import { dateText } from '../../lib/utils/format';
 import type { WorkItem } from '../../lib/types/domain';
-import { asArray, departmentLabel, isWorkOverdue, numberValue, workTypeLabel } from './workItemPresentation';
+import { asArray, departmentLabel, hasWorkflowFormSummary, isWorkOverdue, numberValue, workTypeLabel, workflowFormChipText } from './workItemPresentation';
 
 export function WorkItemCard({
   item,
@@ -25,6 +25,11 @@ export function WorkItemCard({
             <StatusBadge status={overdue ? 'overdue' : item.status} />
             {item.project_code ? <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{item.project_code}</span> : null}
             {item.department ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{departmentLabel(item.department)}</span> : null}
+            {hasWorkflowFormSummary(item) ? (
+              <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+                {workflowFormChipText(item)} · {item.workflow_form_status ?? 'draft'}
+              </span>
+            ) : null}
           </div>
           <p className={clsx('mt-2 font-semibold text-ink', compact ? 'text-sm' : 'text-base')}>{title}</p>
           {item.description && !compact ? <p className="mt-1 line-clamp-2 text-sm text-slate-600">{item.description}</p> : null}
@@ -34,6 +39,7 @@ export function WorkItemCard({
             <span>Owner: {item.assignee_name ?? (asArray<string>(item.role_ids).join(', ') || '-')}</span>
             <span>Due: {dateText(item.due_at)}</span>
             <span>Evidence: {numberValue(item.evidence_count)}</span>
+            {hasWorkflowFormSummary(item) ? <span>Biểu mẫu: {item.workflow_form_required ? 'Bắt buộc' : 'Tùy chọn'}</span> : null}
           </div>
         </div>
         <button
