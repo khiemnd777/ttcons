@@ -180,6 +180,33 @@ type WorkflowFormSaveRequest struct {
 	Comment string `json:"comment"`
 }
 
+type WorkflowFormTemplateRequest struct {
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	FormType    string `json:"form_type"`
+	Status      string `json:"status"`
+}
+
+type WorkflowFormVersionRequest struct {
+	SourceVersionID string                     `json:"source_version_id"`
+	Schema          Record                     `json:"schema_json"`
+	Validation      Record                     `json:"validation_json"`
+	Fields          []WorkflowFormFieldRequest `json:"fields"`
+}
+
+type WorkflowFormFieldRequest struct {
+	FieldKey            string `json:"field_key"`
+	Label               string `json:"label"`
+	FieldType           string `json:"field_type"`
+	Required            bool   `json:"required"`
+	Options             any    `json:"options_json"`
+	Validation          Record `json:"validation_json"`
+	HelpText            string `json:"help_text"`
+	OrderIndex          int    `json:"order_index"`
+	VisibilityCondition Record `json:"visibility_condition_json"`
+}
+
 type SubcontractorReconciliationRequest struct {
 	Comment string                                   `json:"comment"`
 	Items   []SubcontractorReconciliationItemRequest `json:"items"`

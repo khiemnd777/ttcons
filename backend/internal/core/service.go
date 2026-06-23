@@ -540,6 +540,86 @@ func (s *Service) WorkflowFormCatalog(ctx context.Context) ([]Record, error) {
 	return s.repo.WorkflowFormCatalog(ctx)
 }
 
+func (s *Service) WorkflowFormTemplateLibrary(ctx context.Context) ([]Record, error) {
+	return s.repo.WorkflowFormTemplateLibrary(ctx)
+}
+
+func (s *Service) WorkflowFormTemplateDetail(ctx context.Context, templateID string) (Record, error) {
+	templateID = cleanID(templateID)
+	if templateID == "" {
+		return nil, validationError("workflow_form_template_id không hợp lệ", Record{"template_id": templateID})
+	}
+	return s.repo.WorkflowFormTemplateDetail(ctx, templateID)
+}
+
+func (s *Service) CreateWorkflowFormTemplate(ctx context.Context, req WorkflowFormTemplateRequest, actorID, actorName string) (Record, error) {
+	normalized, err := normalizeWorkflowFormTemplateRequest(req, true)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.CreateWorkflowFormTemplate(ctx, normalized, actorID, actorName)
+}
+
+func (s *Service) UpdateWorkflowFormTemplate(ctx context.Context, templateID string, req WorkflowFormTemplateRequest, actorID, actorName string) (Record, error) {
+	templateID = cleanID(templateID)
+	if templateID == "" {
+		return nil, validationError("workflow_form_template_id không hợp lệ", Record{"template_id": templateID})
+	}
+	normalized, err := normalizeWorkflowFormTemplateRequest(req, false)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.UpdateWorkflowFormTemplate(ctx, templateID, normalized, actorID, actorName)
+}
+
+func (s *Service) ArchiveWorkflowFormTemplate(ctx context.Context, templateID, actorID, actorName string) (Record, error) {
+	templateID = cleanID(templateID)
+	if templateID == "" {
+		return nil, validationError("workflow_form_template_id không hợp lệ", Record{"template_id": templateID})
+	}
+	return s.repo.ArchiveWorkflowFormTemplate(ctx, templateID, actorID, actorName)
+}
+
+func (s *Service) CreateWorkflowFormVersion(ctx context.Context, templateID string, req WorkflowFormVersionRequest, actorID, actorName string) (Record, error) {
+	templateID = cleanID(templateID)
+	if templateID == "" {
+		return nil, validationError("workflow_form_template_id không hợp lệ", Record{"template_id": templateID})
+	}
+	normalized, err := normalizeWorkflowFormVersionRequest(req, false)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.CreateWorkflowFormVersion(ctx, templateID, normalized, actorID, actorName)
+}
+
+func (s *Service) UpdateWorkflowFormVersion(ctx context.Context, versionID string, req WorkflowFormVersionRequest, actorID, actorName string) (Record, error) {
+	versionID = cleanID(versionID)
+	if versionID == "" {
+		return nil, validationError("workflow_form_version_id không hợp lệ", Record{"version_id": versionID})
+	}
+	normalized, err := normalizeWorkflowFormVersionRequest(req, false)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.UpdateWorkflowFormVersion(ctx, versionID, normalized, actorID, actorName)
+}
+
+func (s *Service) PublishWorkflowFormVersion(ctx context.Context, versionID, actorID, actorName string) (Record, error) {
+	versionID = cleanID(versionID)
+	if versionID == "" {
+		return nil, validationError("workflow_form_version_id không hợp lệ", Record{"version_id": versionID})
+	}
+	return s.repo.PublishWorkflowFormVersion(ctx, versionID, actorID, actorName)
+}
+
+func (s *Service) ArchiveWorkflowFormVersion(ctx context.Context, versionID, actorID, actorName string) (Record, error) {
+	versionID = cleanID(versionID)
+	if versionID == "" {
+		return nil, validationError("workflow_form_version_id không hợp lệ", Record{"version_id": versionID})
+	}
+	return s.repo.ArchiveWorkflowFormVersion(ctx, versionID, actorID, actorName)
+}
+
 func (s *Service) CreateTemplateStep(ctx context.Context, body Record) (Record, error) {
 	if err := s.applyTemplateStepFormDefaults(ctx, body, nil); err != nil {
 		return nil, err
@@ -614,6 +694,150 @@ func (s *Service) applyTemplateStepFormDefaults(ctx context.Context, body Record
 
 func workflowFormRequiredForStep(stepType string, checklistRequired bool) bool {
 	return checklistRequired || statusIn(stepType, "daily_report", "meeting_minutes", "checklist", "acceptance_check", "handover_check")
+}
+
+func normalizeWorkflowFormTemplateRequest(req WorkflowFormTemplateRequest, create bool) (Record, error) {
+	code := strings.TrimSpace(req.Code)
+	name := strings.TrimSpace(req.Name)
+	description := strings.TrimSpace(req.Description)
+	formType := strings.TrimSpace(req.FormType)
+	status := strings.TrimSpace(req.Status)
+	if create {
+		if code == "" || !validWorkflowFormCode(code) {
+			return nil, validationError("Mã workflow form không hợp lệ", Record{"code": code})
+		}
+		if formType == "" {
+			formType = "generic_submission"
+		}
+		if !validWorkflowFormType(formType) {
+			return nil, validationError("Loại workflow form không hợp lệ", Record{"form_type": formType})
+		}
+	}
+	if name == "" {
+		return nil, validationError("Tên workflow form là bắt buộc")
+	}
+	if status == "" {
+		status = "active"
+	}
+	if !statusIn(status, "active", "archived") {
+		return nil, validationError("Trạng thái workflow form template không hợp lệ", Record{"status": status})
+	}
+	out := Record{"name": name, "description": description, "status": status}
+	if create {
+		out["code"] = code
+		out["form_type"] = formType
+	}
+	return out, nil
+}
+
+func normalizeWorkflowFormVersionRequest(req WorkflowFormVersionRequest, requireFields bool) (Record, error) {
+	fields, err := normalizeWorkflowFormFieldRequests(req.Fields, requireFields)
+	if err != nil {
+		return nil, err
+	}
+	schema := req.Schema
+	if schema == nil {
+		schema = Record{}
+	}
+	validation := req.Validation
+	if validation == nil {
+		validation = Record{}
+	}
+	return Record{
+		"source_version_id": cleanID(req.SourceVersionID),
+		"schema_json":       schema,
+		"validation_json":   validation,
+		"fields":            fields,
+	}, nil
+}
+
+func normalizeWorkflowFormFieldRequests(fields []WorkflowFormFieldRequest, requireFields bool) ([]Record, error) {
+	if requireFields && len(fields) == 0 {
+		return nil, validationError("Workflow form version cần ít nhất một field")
+	}
+	seen := map[string]bool{}
+	out := make([]Record, 0, len(fields))
+	for index, field := range fields {
+		fieldKey := strings.TrimSpace(field.FieldKey)
+		if !validWorkflowFieldKey(fieldKey) {
+			return nil, validationError("Field key workflow form không hợp lệ", Record{"field_key": fieldKey})
+		}
+		if seen[fieldKey] {
+			return nil, validationError("Field key workflow form bị trùng", Record{"field_key": fieldKey})
+		}
+		seen[fieldKey] = true
+		label := strings.TrimSpace(field.Label)
+		if label == "" {
+			return nil, validationError("Label field workflow form là bắt buộc", Record{"field_key": fieldKey})
+		}
+		fieldType := strings.TrimSpace(field.FieldType)
+		if !validWorkflowFieldType(fieldType) {
+			return nil, validationError("Field type workflow form không hợp lệ", Record{"field_key": fieldKey, "field_type": fieldType})
+		}
+		orderIndex := field.OrderIndex
+		if orderIndex <= 0 {
+			orderIndex = (index + 1) * 10
+		}
+		options := field.Options
+		if options == nil {
+			options = []any{}
+		}
+		validation := field.Validation
+		if validation == nil {
+			validation = Record{}
+		}
+		visibility := field.VisibilityCondition
+		if visibility == nil {
+			visibility = Record{}
+		}
+		out = append(out, Record{
+			"field_key":                 fieldKey,
+			"label":                     label,
+			"field_type":                fieldType,
+			"required":                  field.Required,
+			"options_json":              options,
+			"validation_json":           validation,
+			"help_text":                 strings.TrimSpace(field.HelpText),
+			"order_index":               orderIndex,
+			"visibility_condition_json": visibility,
+		})
+	}
+	return out, nil
+}
+
+func validWorkflowFormCode(value string) bool {
+	if value == "" {
+		return false
+	}
+	return validWorkflowIdentifier(value)
+}
+
+func validWorkflowFieldKey(value string) bool {
+	return validWorkflowIdentifier(value)
+}
+
+func validWorkflowIdentifier(value string) bool {
+	for index, char := range value {
+		if index == 0 {
+			if char < 'a' || char > 'z' {
+				return false
+			}
+			continue
+		}
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '_' {
+			continue
+		}
+		return false
+	}
+	return value != ""
+}
+
+func validWorkflowFormType(value string) bool {
+	return statusIn(value, "checklist", "daily_report", "meeting_minutes", "generic_submission")
+}
+
+func validWorkflowFieldType(value string) bool {
+	return statusIn(value, "text", "number", "date", "textarea", "select", "multi_select", "checkbox", "evidence_reference", "structured_list")
 }
 
 func (s *Service) StartPipeline(ctx context.Context, projectID, templateID, actorID, actorName string) (Record, error) {

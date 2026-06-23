@@ -460,7 +460,7 @@ function workflowFormEmptyLabel({ required, loading, error, hasForms }: { requir
 }
 
 function formOptionLabel(form: WorkflowFormCatalogItem) {
-  return `${form.template_name} · v${form.version_no} · ${form.form_type}`;
+  return `${form.template_name} · v${form.version_no}${form.latest_published ? ' · latest' : ''} · ${form.form_type}`;
 }
 
 function requiredFieldLabels(form?: WorkflowFormCatalogItem) {

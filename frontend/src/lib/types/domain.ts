@@ -98,6 +98,8 @@ export type WorkflowFormCatalogItem = AnyRecord & {
   version_no: number;
   version_status: 'published' | string;
   published_at?: string;
+  latest_published?: boolean;
+  step_usage_count?: number;
   field_count?: number;
   required_field_keys?: string[];
   fields?: Array<{
@@ -107,6 +109,50 @@ export type WorkflowFormCatalogItem = AnyRecord & {
     required: boolean;
     order_index?: number;
   }>;
+};
+
+export type WorkflowFormTemplateLibraryItem = AnyRecord & {
+  template_id: string;
+  template_code: string;
+  template_name: string;
+  template_description?: string;
+  form_type: 'checklist' | 'daily_report' | 'meeting_minutes' | 'generic_submission' | string;
+  template_status: 'active' | 'archived' | string;
+  latest_version_id?: string;
+  latest_version_no?: number;
+  latest_version_status?: string;
+  version_count?: number;
+  published_version_count?: number;
+  draft_version_count?: number;
+  field_count?: number;
+  step_usage_count?: number;
+  instance_count?: number;
+};
+
+export type WorkflowFormManagedVersion = AnyRecord & {
+  version_id: string;
+  template_id: string;
+  template_code?: string;
+  template_name?: string;
+  form_type?: string;
+  template_status?: string;
+  version_no: number;
+  version_status: 'draft' | 'published' | 'archived' | string;
+  schema_json?: AnyRecord;
+  validation_json?: AnyRecord;
+  published_at?: string;
+  latest_published?: boolean;
+  step_usage_count?: number;
+  instance_count?: number;
+  field_count?: number;
+  fields?: WorkflowFormField[];
+};
+
+export type WorkflowFormManagedTemplate = WorkflowFormTemplateLibraryItem & {
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  versions?: WorkflowFormManagedVersion[];
 };
 
 export type ProjectOperationsRecord = AnyRecord & {

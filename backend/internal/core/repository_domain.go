@@ -3069,6 +3069,20 @@ func (r *Repository) HasSubmittedWorkflowFormForWorkItem(ctx context.Context, wo
 
 func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) {
 	return r.Query(ctx, `
+		WITH latest_published AS (
+			SELECT DISTINCT ON (template_id)
+				id,
+				template_id
+			FROM workflow_form_versions
+			WHERE status='published'
+			ORDER BY template_id, version_no DESC, published_at DESC NULLS LAST, created_at DESC
+		),
+		step_usage AS (
+			SELECT form_version_id, COUNT(*)::int AS step_usage_count
+			FROM pipeline_template_steps
+			WHERE form_version_id IS NOT NULL
+			GROUP BY form_version_id
+		)
 		SELECT
 			t.id AS template_id,
 			t.code AS template_code,
@@ -3080,6 +3094,8 @@ func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) 
 			v.version_no,
 			v.status AS version_status,
 			v.published_at,
+			(v.id=lp.id) AS latest_published,
+			COALESCE(su.step_usage_count, 0) AS step_usage_count,
 			COUNT(f.id)::int AS field_count,
 			COALESCE(
 				jsonb_agg(f.field_key ORDER BY f.order_index, f.created_at, f.id) FILTER (WHERE f.id IS NOT NULL AND f.required),
@@ -3099,18 +3115,572 @@ func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) 
 				'[]'::jsonb
 			) AS fields
 		FROM workflow_form_templates t
-		JOIN LATERAL (
-			SELECT *
-			FROM workflow_form_versions v
-			WHERE v.template_id=t.id AND v.status='published'
-			ORDER BY v.version_no DESC, v.published_at DESC NULLS LAST, v.created_at DESC
-			LIMIT 1
-		) v ON true
+		JOIN workflow_form_versions v ON v.template_id=t.id AND v.status='published'
+		JOIN latest_published lp ON lp.template_id=t.id
 		LEFT JOIN workflow_form_fields f ON f.form_version_id=v.id
+		LEFT JOIN step_usage su ON su.form_version_id=v.id
 		WHERE t.status='active'
-		GROUP BY t.id, t.code, t.name, t.description, t.form_type, t.status, v.id, v.version_no, v.status, v.published_at
-		ORDER BY t.form_type, t.name
+		GROUP BY t.id, t.code, t.name, t.description, t.form_type, t.status, v.id, v.version_no, v.status, v.published_at, lp.id, su.step_usage_count
+		ORDER BY t.form_type, t.name, v.version_no DESC
 	`)
+}
+
+func (r *Repository) WorkflowFormTemplateLibrary(ctx context.Context) ([]Record, error) {
+	return r.Query(ctx, `
+		WITH latest_published AS (
+			SELECT DISTINCT ON (template_id)
+				id,
+				template_id,
+				version_no,
+				status,
+				published_at
+			FROM workflow_form_versions
+			WHERE status='published'
+			ORDER BY template_id, version_no DESC, published_at DESC NULLS LAST, created_at DESC
+		),
+		version_counts AS (
+			SELECT
+				template_id,
+				COUNT(*)::int AS version_count,
+				COUNT(*) FILTER (WHERE status='published')::int AS published_version_count,
+				COUNT(*) FILTER (WHERE status='draft')::int AS draft_version_count
+			FROM workflow_form_versions
+			GROUP BY template_id
+		),
+		field_counts AS (
+			SELECT v.template_id, COUNT(f.id)::int AS field_count
+			FROM workflow_form_versions v
+			LEFT JOIN workflow_form_fields f ON f.form_version_id=v.id
+			GROUP BY v.template_id
+		),
+		step_usage AS (
+			SELECT v.template_id, COUNT(pts.id)::int AS step_usage_count
+			FROM workflow_form_versions v
+			LEFT JOIN pipeline_template_steps pts ON pts.form_version_id=v.id
+			GROUP BY v.template_id
+		),
+		instance_usage AS (
+			SELECT form_template_id AS template_id, COUNT(*)::int AS instance_count
+			FROM workflow_form_instances
+			WHERE status <> 'cancelled'
+			GROUP BY form_template_id
+		)
+		SELECT
+			t.id AS template_id,
+			t.code AS template_code,
+			t.name AS template_name,
+			t.description AS template_description,
+			t.form_type,
+			t.status AS template_status,
+			t.created_at,
+			t.updated_at,
+			lp.id AS latest_version_id,
+			lp.version_no AS latest_version_no,
+			lp.status AS latest_version_status,
+			lp.published_at AS latest_published_at,
+			COALESCE(vc.version_count, 0) AS version_count,
+			COALESCE(vc.published_version_count, 0) AS published_version_count,
+			COALESCE(vc.draft_version_count, 0) AS draft_version_count,
+			COALESCE(fc.field_count, 0) AS field_count,
+			COALESCE(su.step_usage_count, 0) AS step_usage_count,
+			COALESCE(iu.instance_count, 0) AS instance_count
+		FROM workflow_form_templates t
+		LEFT JOIN latest_published lp ON lp.template_id=t.id
+		LEFT JOIN version_counts vc ON vc.template_id=t.id
+		LEFT JOIN field_counts fc ON fc.template_id=t.id
+		LEFT JOIN step_usage su ON su.template_id=t.id
+		LEFT JOIN instance_usage iu ON iu.template_id=t.id
+		ORDER BY CASE WHEN t.status='active' THEN 0 ELSE 1 END, t.form_type, t.name
+	`)
+}
+
+func (r *Repository) WorkflowFormTemplateDetail(ctx context.Context, templateID string) (Record, error) {
+	template, err := r.QueryOne(ctx, `
+		WITH step_usage AS (
+			SELECT v.template_id, COUNT(pts.id)::int AS step_usage_count
+			FROM workflow_form_versions v
+			LEFT JOIN pipeline_template_steps pts ON pts.form_version_id=v.id
+			GROUP BY v.template_id
+		),
+		instance_usage AS (
+			SELECT form_template_id AS template_id, COUNT(*)::int AS instance_count
+			FROM workflow_form_instances
+			WHERE status <> 'cancelled'
+			GROUP BY form_template_id
+		)
+		SELECT
+			t.id AS template_id,
+			t.code AS template_code,
+			t.name AS template_name,
+			t.description AS template_description,
+			t.form_type,
+			t.status AS template_status,
+			t.created_by,
+			t.created_at,
+			t.updated_at,
+			COALESCE(su.step_usage_count, 0) AS step_usage_count,
+			COALESCE(iu.instance_count, 0) AS instance_count
+		FROM workflow_form_templates t
+		LEFT JOIN step_usage su ON su.template_id=t.id
+		LEFT JOIN instance_usage iu ON iu.template_id=t.id
+		WHERE t.id=$1
+	`, templateID)
+	if err != nil {
+		return nil, err
+	}
+	versions, err := r.workflowFormVersions(ctx, templateID)
+	if err != nil {
+		return nil, err
+	}
+	template["versions"] = versions
+	return template, nil
+}
+
+func (r *Repository) WorkflowFormVersionDetail(ctx context.Context, versionID string) (Record, error) {
+	rows, err := r.Query(ctx, workflowFormVersionDetailSQL("WHERE v.id=$1"), versionID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return rows[0], nil
+}
+
+func (r *Repository) workflowFormVersions(ctx context.Context, templateID string) ([]Record, error) {
+	return r.Query(ctx, workflowFormVersionDetailSQL("WHERE v.template_id=$1"), templateID)
+}
+
+func workflowFormVersionDetailSQL(where string) string {
+	return fmt.Sprintf(`
+		WITH latest_published AS (
+			SELECT DISTINCT ON (template_id)
+				id,
+				template_id
+			FROM workflow_form_versions
+			WHERE status='published'
+			ORDER BY template_id, version_no DESC, published_at DESC NULLS LAST, created_at DESC
+		),
+		step_usage AS (
+			SELECT form_version_id, COUNT(*)::int AS step_usage_count
+			FROM pipeline_template_steps
+			WHERE form_version_id IS NOT NULL
+			GROUP BY form_version_id
+		),
+		instance_usage AS (
+			SELECT form_version_id, COUNT(*)::int AS instance_count
+			FROM workflow_form_instances
+			WHERE status <> 'cancelled'
+			GROUP BY form_version_id
+		)
+		SELECT
+			v.id AS version_id,
+			v.template_id,
+			t.code AS template_code,
+			t.name AS template_name,
+			t.form_type,
+			t.status AS template_status,
+			v.version_no,
+			v.status AS version_status,
+			v.schema_json,
+			v.validation_json,
+			v.published_at,
+			v.created_by,
+			v.created_at,
+			v.updated_at,
+			(v.id=lp.id) AS latest_published,
+			COALESCE(su.step_usage_count, 0) AS step_usage_count,
+			COALESCE(iu.instance_count, 0) AS instance_count,
+			COUNT(f.id)::int AS field_count,
+			COALESCE(
+				jsonb_agg(
+					jsonb_build_object(
+						'id', f.id,
+						'form_version_id', f.form_version_id,
+						'field_key', f.field_key,
+						'label', f.label,
+						'field_type', f.field_type,
+						'required', f.required,
+						'options_json', f.options_json,
+						'validation_json', f.validation_json,
+						'help_text', f.help_text,
+						'order_index', f.order_index,
+						'visibility_condition_json', f.visibility_condition_json,
+						'created_at', f.created_at
+					)
+					ORDER BY f.order_index, f.created_at, f.id
+				) FILTER (WHERE f.id IS NOT NULL),
+				'[]'::jsonb
+			) AS fields
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		LEFT JOIN latest_published lp ON lp.template_id=v.template_id
+		LEFT JOIN step_usage su ON su.form_version_id=v.id
+		LEFT JOIN instance_usage iu ON iu.form_version_id=v.id
+		LEFT JOIN workflow_form_fields f ON f.form_version_id=v.id
+		%s
+		GROUP BY v.id, t.id, t.code, t.name, t.form_type, t.status, lp.id, su.step_usage_count, iu.instance_count
+		ORDER BY v.version_no DESC
+	`, where)
+}
+
+func (r *Repository) CreateWorkflowFormTemplate(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+	row, err := r.QueryOne(ctx, `
+		INSERT INTO workflow_form_templates (code, name, description, form_type, status, created_by)
+		VALUES ($1, $2, $3, $4, $5, NULLIF($6,'')::uuid)
+		RETURNING id
+	`, body["code"], body["name"], body["description"], body["form_type"], body["status"], actorID)
+	if err != nil {
+		return nil, err
+	}
+	templateID := cleanID(row["id"])
+	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_created", "workflow_form_template", templateID, fmt.Sprintf("Tạo workflow form template %s", body["name"]), Record{"code": body["code"], "form_type": body["form_type"]})
+	return r.WorkflowFormTemplateDetail(ctx, templateID)
+}
+
+func (r *Repository) UpdateWorkflowFormTemplate(ctx context.Context, templateID string, body Record, actorID, actorName string) (Record, error) {
+	if fmt.Sprint(body["status"]) == "archived" {
+		usageRows, err := r.Query(ctx, `
+			SELECT COUNT(*) AS total
+			FROM pipeline_template_steps pts
+			JOIN workflow_form_versions v ON v.id=pts.form_version_id
+			WHERE v.template_id=$1
+		`, templateID)
+		if err != nil {
+			return nil, err
+		}
+		if len(usageRows) > 0 && number(usageRows[0]["total"]) > 0 {
+			return nil, validationError("Không thể archive workflow form template đang được pipeline step sử dụng", Record{"step_usage_count": usageRows[0]["total"]})
+		}
+	}
+	row, err := r.QueryOne(ctx, `
+		UPDATE workflow_form_templates
+		SET name=$2,
+			description=$3,
+			status=$4,
+			updated_at=now()
+		WHERE id=$1
+		RETURNING id, name
+	`, templateID, body["name"], body["description"], body["status"])
+	if err != nil {
+		return nil, err
+	}
+	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_updated", "workflow_form_template", templateID, fmt.Sprintf("Cập nhật workflow form template %s", row["name"]), Record{"status": body["status"]})
+	return r.WorkflowFormTemplateDetail(ctx, templateID)
+}
+
+func (r *Repository) ArchiveWorkflowFormTemplate(ctx context.Context, templateID string, actorID, actorName string) (Record, error) {
+	usageRows, err := r.Query(ctx, `
+		SELECT COUNT(*) AS total
+		FROM pipeline_template_steps pts
+		JOIN workflow_form_versions v ON v.id=pts.form_version_id
+		WHERE v.template_id=$1
+	`, templateID)
+	if err != nil {
+		return nil, err
+	}
+	if len(usageRows) > 0 && number(usageRows[0]["total"]) > 0 {
+		return nil, validationError("Không thể archive workflow form template đang được pipeline step sử dụng", Record{"step_usage_count": usageRows[0]["total"]})
+	}
+	row, err := r.QueryOne(ctx, `
+		UPDATE workflow_form_templates
+		SET status='archived', updated_at=now()
+		WHERE id=$1
+		RETURNING name
+	`, templateID)
+	if err != nil {
+		return nil, err
+	}
+	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_archived", "workflow_form_template", templateID, fmt.Sprintf("Archive workflow form template %s", row["name"]), Record{})
+	return r.WorkflowFormTemplateDetail(ctx, templateID)
+}
+
+func (r *Repository) CreateWorkflowFormVersion(ctx context.Context, templateID string, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var templateName string
+	if err := tx.QueryRowContext(ctx, `SELECT name FROM workflow_form_templates WHERE id=$1 AND status='active' FOR UPDATE`, templateID).Scan(&templateName); err != nil {
+		return nil, err
+	}
+	sourceVersionID := cleanID(body["source_version_id"])
+	schemaJSON := body["schema_json"]
+	validationJSON := body["validation_json"]
+	fields := workflowFieldRecords(body["fields"])
+	if sourceVersionID != "" {
+		sourceRows, err := tx.QueryContext(ctx, `
+			SELECT schema_json, validation_json
+			FROM workflow_form_versions
+			WHERE id=$1 AND template_id=$2
+		`, sourceVersionID, templateID)
+		if err != nil {
+			return nil, err
+		}
+		source, err := scanRows(sourceRows)
+		sourceRows.Close()
+		if err != nil {
+			return nil, err
+		}
+		if len(source) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		if recordEmpty(schemaJSON) {
+			schemaJSON = source[0]["schema_json"]
+		}
+		if recordEmpty(validationJSON) {
+			validationJSON = source[0]["validation_json"]
+		}
+		if len(fields) == 0 {
+			copied, err := workflowFormFieldRowsTx(ctx, tx, sourceVersionID)
+			if err != nil {
+				return nil, err
+			}
+			fields = copied
+		}
+	}
+	nextVersionNo := 1
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(version_no),0)+1 FROM workflow_form_versions WHERE template_id=$1`, templateID).Scan(&nextVersionNo); err != nil {
+		return nil, err
+	}
+	rawSchema, _ := json.Marshal(defaultRecord(schemaJSON))
+	rawValidation, _ := json.Marshal(defaultRecord(validationJSON))
+	var versionID string
+	if err := tx.QueryRowContext(ctx, `
+		INSERT INTO workflow_form_versions (template_id, version_no, status, schema_json, validation_json, created_by)
+		VALUES ($1, $2, 'draft', $3::jsonb, $4::jsonb, NULLIF($5,'')::uuid)
+		RETURNING id
+	`, templateID, nextVersionNo, string(rawSchema), string(rawValidation), actorID).Scan(&versionID); err != nil {
+		return nil, err
+	}
+	if err := insertWorkflowFormFieldsTx(ctx, tx, versionID, fields); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_created", "workflow_form_version", versionID, fmt.Sprintf("Tạo draft workflow form %s v%d", templateName, nextVersionNo), Record{"template_id": templateID, "source_version_id": sourceVersionID}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.WorkflowFormVersionDetail(ctx, versionID)
+}
+
+func (r *Repository) UpdateWorkflowFormVersion(ctx context.Context, versionID string, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var templateID, templateName, status string
+	var versionNo int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT v.template_id::text, t.name, v.version_no, v.status
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$1
+		FOR UPDATE
+	`, versionID).Scan(&templateID, &templateName, &versionNo, &status); err != nil {
+		return nil, err
+	}
+	if status != "draft" {
+		return nil, validationError("Chỉ draft workflow form version mới được chỉnh sửa", Record{"status": status})
+	}
+	rawSchema, _ := json.Marshal(defaultRecord(body["schema_json"]))
+	rawValidation, _ := json.Marshal(defaultRecord(body["validation_json"]))
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE workflow_form_versions
+		SET schema_json=$2::jsonb,
+			validation_json=$3::jsonb,
+			updated_at=now()
+		WHERE id=$1
+	`, versionID, string(rawSchema), string(rawValidation)); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM workflow_form_fields WHERE form_version_id=$1`, versionID); err != nil {
+		return nil, err
+	}
+	if err := insertWorkflowFormFieldsTx(ctx, tx, versionID, workflowFieldRecords(body["fields"])); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_updated", "workflow_form_version", versionID, fmt.Sprintf("Cập nhật draft workflow form %s v%d", templateName, versionNo), Record{"template_id": templateID}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.WorkflowFormVersionDetail(ctx, versionID)
+}
+
+func (r *Repository) PublishWorkflowFormVersion(ctx context.Context, versionID string, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var templateID, templateName, status string
+	var versionNo int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT v.template_id::text, t.name, v.version_no, v.status
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$1
+		FOR UPDATE
+	`, versionID).Scan(&templateID, &templateName, &versionNo, &status); err != nil {
+		return nil, err
+	}
+	if status != "draft" {
+		return nil, validationError("Chỉ draft workflow form version mới được publish", Record{"status": status})
+	}
+	var fieldCount int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM workflow_form_fields WHERE form_version_id=$1`, versionID).Scan(&fieldCount); err != nil {
+		return nil, err
+	}
+	if fieldCount == 0 {
+		return nil, validationError("Workflow form version cần ít nhất một field trước khi publish")
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE workflow_form_versions
+		SET status='published',
+			published_at=COALESCE(published_at, now()),
+			updated_at=now()
+		WHERE id=$1
+	`, versionID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_published", "workflow_form_version", versionID, fmt.Sprintf("Publish workflow form %s v%d", templateName, versionNo), Record{"template_id": templateID, "field_count": fieldCount}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.WorkflowFormVersionDetail(ctx, versionID)
+}
+
+func (r *Repository) ArchiveWorkflowFormVersion(ctx context.Context, versionID string, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var templateID, templateName, status string
+	var versionNo int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT v.template_id::text, t.name, v.version_no, v.status
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$1
+		FOR UPDATE
+	`, versionID).Scan(&templateID, &templateName, &versionNo, &status); err != nil {
+		return nil, err
+	}
+	if status == "archived" {
+		return r.WorkflowFormVersionDetail(ctx, versionID)
+	}
+	var stepUsage int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM pipeline_template_steps WHERE form_version_id=$1`, versionID).Scan(&stepUsage); err != nil {
+		return nil, err
+	}
+	if stepUsage > 0 {
+		return nil, validationError("Không thể archive workflow form version đang được pipeline step sử dụng", Record{"step_usage_count": stepUsage})
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE workflow_form_versions SET status='archived', updated_at=now() WHERE id=$1`, versionID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_archived", "workflow_form_version", versionID, fmt.Sprintf("Archive workflow form %s v%d", templateName, versionNo), Record{"template_id": templateID}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.WorkflowFormVersionDetail(ctx, versionID)
+}
+
+func workflowFieldRecords(value any) []Record {
+	fields, ok := value.([]Record)
+	if ok {
+		return fields
+	}
+	rawFields, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]Record, 0, len(rawFields))
+	for _, raw := range rawFields {
+		if record, ok := raw.(Record); ok {
+			out = append(out, record)
+			continue
+		}
+		if record, ok := raw.(map[string]any); ok {
+			out = append(out, Record(record))
+		}
+	}
+	return out
+}
+
+func workflowFormFieldRowsTx(ctx context.Context, tx *sql.Tx, versionID string) ([]Record, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT field_key, label, field_type, required, options_json, validation_json, help_text, order_index, visibility_condition_json
+		FROM workflow_form_fields
+		WHERE form_version_id=$1
+		ORDER BY order_index, created_at, id
+	`, versionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanRows(rows)
+}
+
+func insertWorkflowFormFieldsTx(ctx context.Context, tx *sql.Tx, versionID string, fields []Record) error {
+	for index, field := range fields {
+		orderIndex := int(number(field["order_index"]))
+		if orderIndex <= 0 {
+			orderIndex = (index + 1) * 10
+		}
+		rawOptions, _ := json.Marshal(defaultArray(field["options_json"]))
+		rawValidation, _ := json.Marshal(defaultRecord(field["validation_json"]))
+		rawVisibility, _ := json.Marshal(defaultRecord(field["visibility_condition_json"]))
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO workflow_form_fields
+				(form_version_id, field_key, label, field_type, required, options_json, validation_json, help_text, order_index, visibility_condition_json)
+			VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, NULLIF($8,''), $9, $10::jsonb)
+		`, versionID, field["field_key"], field["label"], field["field_type"], boolValue(field["required"]), string(rawOptions), string(rawValidation), cleanOptionalText(field["help_text"]), orderIndex, string(rawVisibility)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func defaultRecord(value any) any {
+	if value == nil {
+		return Record{}
+	}
+	return value
+}
+
+func defaultArray(value any) any {
+	if value == nil {
+		return []any{}
+	}
+	return value
+}
+
+func recordEmpty(value any) bool {
+	if value == nil {
+		return true
+	}
+	if record, ok := value.(Record); ok {
+		return len(record) == 0
+	}
+	if record, ok := value.(map[string]any); ok {
+		return len(record) == 0
+	}
+	return false
 }
 
 func (r *Repository) DefaultWorkflowFormVersionID(ctx context.Context, stepType string, checklistRequired bool, stepContext ...string) (string, error) {

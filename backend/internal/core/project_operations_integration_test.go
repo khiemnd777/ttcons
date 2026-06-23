@@ -250,6 +250,34 @@ func TestDefaultWorkflowFormCodePrefersSpecificStepTypes(t *testing.T) {
 	}
 }
 
+func TestWorkflowFormTemplateAndFieldValidation(t *testing.T) {
+	if _, err := normalizeWorkflowFormTemplateRequest(WorkflowFormTemplateRequest{Code: "Bad Code", Name: "Form", FormType: "checklist"}, true); err == nil {
+		t.Fatal("expected invalid code to fail")
+	}
+	if _, err := normalizeWorkflowFormTemplateRequest(WorkflowFormTemplateRequest{Code: "valid_code", Name: "Form", FormType: "unknown"}, true); err == nil {
+		t.Fatal("expected invalid form type to fail")
+	}
+	fields, err := normalizeWorkflowFormFieldRequests([]WorkflowFormFieldRequest{{
+		FieldKey:   "action_items",
+		Label:      "Action items",
+		FieldType:  "structured_list",
+		Required:   true,
+		OrderIndex: 10,
+	}}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fields) != 1 || fields[0]["field_key"] != "action_items" || fields[0]["field_type"] != "structured_list" {
+		t.Fatalf("unexpected normalized fields: %#v", fields)
+	}
+	if _, err := normalizeWorkflowFormFieldRequests([]WorkflowFormFieldRequest{
+		{FieldKey: "dup", Label: "Dup", FieldType: "text"},
+		{FieldKey: "dup", Label: "Dup 2", FieldType: "text"},
+	}, true); err == nil {
+		t.Fatal("expected duplicate field key to fail")
+	}
+}
+
 func TestWorkflowFormPDFGeneratorProducesPDFWithSignatureStamp(t *testing.T) {
 	form := Record{
 		"instance": Record{
@@ -2147,7 +2175,7 @@ func TestWorkflowFormCatalogReturnsPublishedTemplates(t *testing.T) {
 		if number(row["field_count"]) <= 0 {
 			t.Fatalf("catalog row missing fields: %#v", row)
 		}
-		if row["template_code"] == "builtin_checklist" {
+		if row["template_code"] == "builtin_checklist" && boolValue(row["latest_published"]) {
 			foundChecklist = true
 			if number(row["version_no"]) != 2 {
 				t.Fatalf("expected checklist v2 in catalog, got %#v", row["version_no"])
@@ -2159,6 +2187,83 @@ func TestWorkflowFormCatalogReturnsPublishedTemplates(t *testing.T) {
 	}
 	if !foundChecklist {
 		t.Fatal("expected builtin checklist in workflow form catalog")
+	}
+}
+
+func TestWorkflowFormVersionGovernancePublishesAndKeepsOldCatalogVersions(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	actorID := newID()
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Workflow Form Admin','active')`, actorID, "workflow-form-governance-"+actorID+"@test.local")
+	code := "custom_governance_" + strings.ReplaceAll(newID()[:8], "-", "_")
+
+	template, err := service.CreateWorkflowFormTemplate(ctx, WorkflowFormTemplateRequest{
+		Code:     code,
+		Name:     "Custom Governance Form",
+		FormType: "generic_submission",
+	}, actorID, "Workflow Form Admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	templateID := cleanID(template["template_id"])
+	draft, err := service.CreateWorkflowFormVersion(ctx, templateID, WorkflowFormVersionRequest{
+		Fields: []WorkflowFormFieldRequest{{FieldKey: "summary", Label: "Summary", FieldType: "textarea", Required: true}},
+	}, actorID, "Workflow Form Admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	published, err := service.PublishWorkflowFormVersion(ctx, cleanID(draft["version_id"]), actorID, "Workflow Form Admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if published["version_status"] != "published" || number(published["version_no"]) != 1 {
+		t.Fatalf("unexpected first published version: %#v", published)
+	}
+	nextDraft, err := service.CreateWorkflowFormVersion(ctx, templateID, WorkflowFormVersionRequest{
+		SourceVersionID: cleanID(published["version_id"]),
+	}, actorID, "Workflow Form Admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	updatedDraft, err := service.UpdateWorkflowFormVersion(ctx, cleanID(nextDraft["version_id"]), WorkflowFormVersionRequest{
+		Fields: []WorkflowFormFieldRequest{
+			{FieldKey: "summary", Label: "Summary", FieldType: "textarea", Required: true},
+			{FieldKey: "next_action", Label: "Next action", FieldType: "textarea", Required: false},
+		},
+	}, actorID, "Workflow Form Admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(updatedDraft["field_count"]) != 2 {
+		t.Fatalf("expected updated draft fields, got %#v", updatedDraft)
+	}
+	published2, err := service.PublishWorkflowFormVersion(ctx, cleanID(nextDraft["version_id"]), actorID, "Workflow Form Admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if published2["version_status"] != "published" || !boolValue(published2["latest_published"]) {
+		t.Fatalf("expected second version to be latest published, got %#v", published2)
+	}
+
+	catalog, err := repo.WorkflowFormCatalog(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publishedRows := 0
+	latestVersion := 0.0
+	for _, row := range catalog {
+		if row["template_code"] != code {
+			continue
+		}
+		publishedRows++
+		if boolValue(row["latest_published"]) {
+			latestVersion = number(row["version_no"])
+		}
+	}
+	if publishedRows != 2 || latestVersion != 2 {
+		t.Fatalf("expected both published versions with v2 latest, rows=%d latest=%v", publishedRows, latestVersion)
 	}
 }
 

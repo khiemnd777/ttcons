@@ -411,6 +411,121 @@ func (h *Handler) WorkflowFormCatalog(c *fiber.Ctx) error {
 	return response.OK(c, rows)
 }
 
+func (h *Handler) WorkflowFormTemplateLibrary(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.WorkflowFormTemplateLibrary(c.Context())
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) GetWorkflowFormTemplate(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.view"}); err != nil {
+		return err
+	}
+	template, err := h.service.WorkflowFormTemplateDetail(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, template)
+}
+
+func (h *Handler) CreateWorkflowFormTemplate(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
+		return err
+	}
+	req := WorkflowFormTemplateRequest{}
+	if err := c.BodyParser(&req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu workflow form template không hợp lệ")
+	}
+	template, err := h.service.CreateWorkflowFormTemplate(c.Context(), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, template)
+}
+
+func (h *Handler) UpdateWorkflowFormTemplate(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
+		return err
+	}
+	req := WorkflowFormTemplateRequest{}
+	if err := c.BodyParser(&req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu workflow form template không hợp lệ")
+	}
+	template, err := h.service.UpdateWorkflowFormTemplate(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, template)
+}
+
+func (h *Handler) ArchiveWorkflowFormTemplate(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
+		return err
+	}
+	template, err := h.service.ArchiveWorkflowFormTemplate(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, template)
+}
+
+func (h *Handler) CreateWorkflowFormVersion(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
+		return err
+	}
+	req := WorkflowFormVersionRequest{}
+	if err := c.BodyParser(&req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu workflow form version không hợp lệ")
+	}
+	version, err := h.service.CreateWorkflowFormVersion(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, version)
+}
+
+func (h *Handler) UpdateWorkflowFormVersion(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
+		return err
+	}
+	req := WorkflowFormVersionRequest{}
+	if err := c.BodyParser(&req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu workflow form version không hợp lệ")
+	}
+	version, err := h.service.UpdateWorkflowFormVersion(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, version)
+}
+
+func (h *Handler) PublishWorkflowFormVersion(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
+		return err
+	}
+	version, err := h.service.PublishWorkflowFormVersion(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, version)
+}
+
+func (h *Handler) ArchiveWorkflowFormVersion(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
+		return err
+	}
+	version, err := h.service.ArchiveWorkflowFormVersion(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, version)
+}
+
 func (h *Handler) UpdateTemplateEdge(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
 		return err

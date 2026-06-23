@@ -10,6 +10,7 @@ import { ProjectsPage } from '../modules/projects/ProjectsPage';
 import { ProjectDetailPage } from '../modules/projects/ProjectDetailPage';
 import { MyWorkPage } from '../modules/my-work/MyWorkPage';
 import { PipelineBuilderPage } from '../modules/pipeline-builder/PipelineBuilderPage';
+import { WorkflowFormsPage } from '../modules/workflow-forms/WorkflowFormsPage';
 import { PlanningPage } from '../modules/planning/PlanningPage';
 import { BOQPage } from '../modules/boq/BOQPage';
 import { ProcurementPage } from '../modules/procurement/ProcurementPage';
@@ -74,6 +75,7 @@ export const router = createBrowserRouter([
       { path: '/projects/:id/audit', element: guarded(<AuditPage scoped />, ['audit.view']) },
       { path: '/pipeline-builder', element: guarded(<PipelineBuilderPage />, ['pipeline.view']) },
       { path: '/pipeline-builder/:id', element: guarded(<PipelineBuilderPage />, ['pipeline.view']) },
+      { path: '/workflow-forms', element: guarded(<WorkflowFormsPage />, ['pipeline.view']) },
       { path: '/procurement', element: guarded(<ProcurementPage />, ['procurement.view']) },
       { path: '/warehouse', element: guarded(<WarehousePage />, ['warehouse.view']) },
       { path: '/operations', element: guarded(<OperationsPage global />, ['operation.view']) },

@@ -41,6 +41,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
       { to: '/pipeline-builder', label: 'Pipeline Builder', icon: GitBranch, permissions: ['pipeline.view'] },
+      { to: '/workflow-forms', label: 'Workflow Forms', icon: FileText, permissions: ['pipeline.view'] },
     ],
   },
   {

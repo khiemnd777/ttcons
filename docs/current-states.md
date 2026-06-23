@@ -55,7 +55,7 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 | Business UI | Done | Work-item runtime UI now exposes workflow form, checklist, evidence, signature, and PDF/document artifact components as business-facing panels. |
 | Workflow thành nghiệp vụ | Done | Workflow runtime now exposes typed business form summaries across pipeline steps and work items, with start-time required form mapping validation. |
 | Giao diện hoá nghiệp vụ kế hoạch | Done | Planning now has a business-facing form workspace with form metrics, filters, required/optional status, next actions, and preserved pipeline runtime controls. |
-| Hệ quy đổi Workflow thành nghiệp vụ | Partial | Introduce form template/version/instance layer. |
+| Hệ quy đổi Workflow thành nghiệp vụ | Done | Workflow form template/version governance is now exposed through API/UI, published versions remain immutable, and Pipeline Builder can keep mappings to older published versions. |
 | Daily report kế hoạch | Partial | Add did/will fields, owner, date/user/project filters. |
 | Biên bản họp | Missing | New meeting minutes module/form with action items and project/workflow links. |
 | Checklist kế hoạch | Partial | Typed checklist template/items/assignee/evidence. |
@@ -693,4 +693,15 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - `git diff --check` passed after Giao diện hoá nghiệp vụ kế hoạch.
 - No backend/API changes and no SQL migration were added for Giao diện hoá nghiệp vụ kế hoạch; custom migration runner apply was not run.
 - Browser verification not run after Giao diện hoá nghiệp vụ kế hoạch, per repo rule unless explicitly requested.
+- Implemented Hệ quy đổi Workflow thành nghiệp vụ as a full-stack workflow form governance station.
+- Added protected Workflow Form Library APIs for template library/detail, template create/update/archive, version draft creation, draft field updates, publish, and archive.
+- Expanded the Pipeline Builder workflow form catalog to return all active published versions with `latest_published`, so existing template steps can keep historical published `form_version_id` mappings while new steps still default to latest.
+- Added `/workflow-forms` admin UI for template search/filter, metadata editing, draft cloning, draft field editing, publishing, and archive guard visibility.
+- Preserved runtime workflow form instances, answers, signatures, PDF exports, step completion gates, and existing pipeline status transitions; published versions remain immutable because only draft versions can be edited.
+- `gofmt -w backend/internal/core/types.go backend/internal/core/routes.go backend/internal/core/handlers.go backend/internal/core/service.go backend/internal/core/repository_domain.go backend/internal/core/project_operations_integration_test.go` passed after Hệ quy đổi Workflow thành nghiệp vụ.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Hệ quy đổi Workflow thành nghiệp vụ.
+- `cd frontend && npm run build` passed after Hệ quy đổi Workflow thành nghiệp vụ; Vite chunk-size warning remains.
+- `git diff --check` passed after Hệ quy đổi Workflow thành nghiệp vụ.
+- No SQL migration was added for Hệ quy đổi Workflow thành nghiệp vụ because the existing workflow form schema already supports the governance layer; custom migration runner apply was not run.
+- Browser verification not run after Hệ quy đổi Workflow thành nghiệp vụ, per repo rule unless explicitly requested.
 - No backend/API/migration changes were needed for the Pipeline Builder multi-role UI, Shared UI 2A, or Shared UI 2B batches.
