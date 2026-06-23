@@ -1,0 +1,7 @@
+interface:
+  display_name: "Consflow Commercial Procurement"
+  short_description: "BOQ, unit price, procurement, variance."
+  brand_color: "#CA8A04"
+  default_prompt: "Use $consflow-commercial-procurement-domain to trace BOQ, procurement, unit price, or reconciliation changes."
+policy:
+  allow_implicit_invocation: true

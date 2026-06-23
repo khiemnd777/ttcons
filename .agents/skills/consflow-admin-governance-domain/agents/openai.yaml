@@ -1,0 +1,7 @@
+interface:
+  display_name: "Consflow Admin Governance"
+  short_description: "Auth, RBAC, partners, audit, settings."
+  brand_color: "#4B5563"
+  default_prompt: "Use $consflow-admin-governance-domain to trace auth, RBAC, audit, settings, or master data changes."
+policy:
+  allow_implicit_invocation: true

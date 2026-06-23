@@ -1,0 +1,7 @@
+interface:
+  display_name: "Consflow Reporting Analytics"
+  short_description: "Reports, KPIs, filters, CSV exports."
+  brand_color: "#0891B2"
+  default_prompt: "Use $consflow-reporting-analytics-domain to trace dashboard, report, KPI, or CSV export changes."
+policy:
+  allow_implicit_invocation: true

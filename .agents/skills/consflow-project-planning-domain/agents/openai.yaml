@@ -1,0 +1,7 @@
+interface:
+  display_name: "Consflow Project Planning"
+  short_description: "Projects, planning reports, activity."
+  brand_color: "#0F766E"
+  default_prompt: "Use $consflow-project-planning-domain to trace project setup, planning reports, or planning activity changes."
+policy:
+  allow_implicit_invocation: true

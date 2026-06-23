@@ -1,0 +1,7 @@
+interface:
+  display_name: "Consflow Quality Handover"
+  short_description: "Acceptance, rework, handover gates."
+  brand_color: "#DC2626"
+  default_prompt: "Use $consflow-quality-acceptance-handover-domain to trace acceptance, rework, or handover readiness changes."
+policy:
+  allow_implicit_invocation: true

@@ -35,7 +35,16 @@ Use local names:
 - `consflow-repo-architect`
 - `consflow-backend-workflow`
 - `consflow-frontend-workflow`
-- `consflow-pipeline-domain`
+- `consflow-workflow-orchestration-domain`
+- `consflow-project-planning-domain`
+- `consflow-construction-operations-domain`
+- `consflow-commercial-procurement-domain`
+- `consflow-materials-warehouse-domain`
+- `consflow-quality-acceptance-handover-domain`
+- `consflow-accounting-finance-domain`
+- `consflow-admin-governance-domain`
+- `consflow-reporting-analytics-domain`
+- `consflow-pipeline-domain` for broad legacy cross-domain guardrails
 - `consflow-diagnose`
 - `consflow-docker-ops`
 

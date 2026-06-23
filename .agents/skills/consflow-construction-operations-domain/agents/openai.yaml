@@ -1,0 +1,7 @@
+interface:
+  display_name: "Consflow Construction Ops"
+  short_description: "Field reports, evidence, site work."
+  brand_color: "#EA580C"
+  default_prompt: "Use $consflow-construction-operations-domain to trace field execution, evidence, or site report changes."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Consflow Workflow Orchestration"
+  short_description: "Pipeline, work item, form, approval gates."
+  brand_color: "#2563EB"
+  default_prompt: "Use $consflow-workflow-orchestration-domain to trace a pipeline, work item, approval, or workflow form change safely."
+policy:
+  allow_implicit_invocation: true

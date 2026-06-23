@@ -10,14 +10,24 @@ Use this skill before broad repo scans when a prompt contains module, feature, d
 ## Workflow
 
 1. Read `references/module-keyword-map.md`.
-2. Match the user's keywords to the closest feature owner and aliases.
-3. Start with the listed owner files, then use targeted `rg` searches inside those paths.
-4. If the cache conflicts with local code, trust local code and update the cache as part of the change when appropriate.
-5. For feature, bugfix, code-changing, or UI-changing work, keep the human review gates from `AGENTS.md`.
-6. Pair with the narrower Consflow skill after routing:
+2. Treat `AGENTS.md`, this skill, and `.agents/skills/**/references/*.md` as durable agent memory. Treat `docs/current-states.md` as temporary active-plan memory and `docs/plan-closed/*` as optional historical context only.
+3. If a closed plan contains durable module, feature, invariant, or impact knowledge, promote the useful part into `references/module-keyword-map.md` or the relevant domain map through the normal review gate before depending on it.
+4. Match the user's keywords to the closest feature owner and aliases.
+5. Start with the listed owner files, then use targeted `rg` searches inside those paths.
+6. If the cache conflicts with local code, trust local code and update the cache as part of the change when appropriate.
+7. For feature, bugfix, code-changing, or UI-changing work, keep the human review gates from `AGENTS.md`.
+8. Pair with the narrower Consflow skill after routing:
    - Backend/API/schema: `consflow-backend-workflow`.
    - Frontend/admin UI: `consflow-frontend-workflow`.
-   - Pipeline, BOQ, procurement, warehouse, acceptance, rework, handover invariants: `consflow-pipeline-domain`.
+   - Workflow orchestration, approvals, workflow forms, work item gates: `consflow-workflow-orchestration-domain`.
+   - Projects, planning reports, meeting minutes, planning checklists, activity: `consflow-project-planning-domain`.
+   - Field execution, operations, evidence, construction forms: `consflow-construction-operations-domain`.
+   - BOQ, unit price, procurement, reconciliation: `consflow-commercial-procurement-domain`.
+   - Materials, warehouse, stock, site balances, surplus: `consflow-materials-warehouse-domain`.
+   - Acceptance, rework, replanning, handover: `consflow-quality-acceptance-handover-domain`.
+   - Accounting, AP/AR, invoices, payments, finance reports: `consflow-accounting-finance-domain`.
+   - Auth, staff, RBAC, partners, audit, settings: `consflow-admin-governance-domain`.
+   - Dashboard, reports, KPI, CSV exports: `consflow-reporting-analytics-domain`.
    - Docker/Makefile/runtime: `consflow-docker-ops`.
    - Diagnosis: `consflow-diagnose`.
 

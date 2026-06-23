@@ -51,6 +51,7 @@ When the user says `tiếp tục triển khai`, agents must treat it as a reques
 - Each active plan entry in `docs/current-states.md` must track both work that `will be done` and work that has already been `done`, and agents must keep those notes current as they progress.
 - Use the active plan notes to avoid duplicate work, lost context, or invented context across follow-up turns.
 - When the user says `Đóng lại plan` or `Đóng plan`, move the relevant plan into `docs/plan-closed/`, prefix the closed plan note/title with `[Closed]`, and remove that plan completely from `docs/current-states.md`.
+- Files under `docs/plan-closed/` are historical records only. Do not treat closed plans as durable agent memory or required source of truth; promote durable module, feature, invariant, or routing knowledge into `AGENTS.md` or `.agents/skills/**/references/*.md` through the normal review gate.
 
 ## Repo Map
 

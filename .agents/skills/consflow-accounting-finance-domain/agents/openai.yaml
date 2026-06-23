@@ -1,0 +1,7 @@
+interface:
+  display_name: "Consflow Accounting Finance"
+  short_description: "AP/AR, invoices, payments, reports."
+  brand_color: "#7C3AED"
+  default_prompt: "Use $consflow-accounting-finance-domain to trace accounting, invoice, payment, reconciliation, or finance report changes."
+policy:
+  allow_implicit_invocation: true

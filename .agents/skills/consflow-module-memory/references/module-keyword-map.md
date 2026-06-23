@@ -2,6 +2,14 @@
 
 Use this as a fast routing cache. It is not a replacement for reading code. If a mapping conflicts with code, trust code and update this file when the correction is durable.
 
+## Durable Memory Sources
+
+- Durable repo rules: `AGENTS.md`.
+- Durable routing and domain memory: this file plus `.agents/skills/consflow-*-domain/references/domain-map.md`.
+- Temporary handoff memory: `docs/current-states.md` only while a plan is active.
+- Historical records: `docs/plan-closed/*`. Do not require closed plans for future routing, feature, bugfix, or impact analysis; if a closed plan contains durable knowledge, promote the useful part into this map or a domain map.
+- Final verification source: current code, migrations, and tests. If durable memory conflicts with code, trust code and update memory when the correction is durable.
+
 ## Stable Entry Points
 
 - Repo rules: `AGENTS.md`.
@@ -14,6 +22,22 @@ Use this as a fast routing cache. It is not a replacement for reading code. If a
 - Frontend API/auth/types/utils: `frontend/src/lib/api/client.ts`, `frontend/src/lib/auth/AuthContext.tsx`, `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils`.
 - Shared frontend UI: `frontend/src/components`, `frontend/src/modules/_shared`.
 - Docker/local stack: `docker-compose.yml`, `Makefile`, frontend service/container name `admin`.
+
+## Domain Skill Routing
+
+Use this table before the feature table when a prompt has business-domain words. Pair the domain skill with backend/frontend workflow skills as needed.
+
+| Keywords and aliases | Primary domain skill | Notes |
+|---|---|---|
+| pipeline builder, workflow template, pipeline run, work item, approval, workflow form, form version, publish form, signature, PDF export, required_role_ids | `consflow-workflow-orchestration-domain` | Owns template-vs-runtime, work item gates, workflow form governance, signatures, PDF artifacts, and activity/evidence gates. |
+| project, cong trinh, project member, planning, ke hoach, daily report ke hoach, meeting minutes, bien ban hop, planning checklist, project activity | `consflow-project-planning-domain` | Owns project setup and planning report workspaces backed by workflow form runtime. |
+| thi cong, operations, site report, construction daily report, issue, evidence, photo, checklist thau phu, checklist chu dau tu, crew, actual quantity | `consflow-construction-operations-domain` | Owns field execution and evidence-heavy work item surfaces. Pair with materials/quality when quantities or acceptance are affected. |
+| BOQ, du toan, estimate, unit price, don gia, procurement, mua hang, purchase request, subcontractor reconciliation, owner/client reconciliation, variance | `consflow-commercial-procurement-domain` | Owns commercial quantity/price/procurement flow and reconciliation. |
+| material, vat tu, warehouse, kho, stock, ton kho, issue, receive, transfer, return, site material balance, material snapshot, before after, surplus, custody | `consflow-materials-warehouse-domain` | Owns stock movement traceability, site balances, material snapshots, and surplus handling. |
+| acceptance, nghiem thu, incoming acceptance, outgoing acceptance, quality, pass, conditional pass, fail, punch list, rework, replanning, handover, ban giao | `consflow-quality-acceptance-handover-domain` | Owns quality gates, acceptance history, rework/replanning, and handover readiness. |
+| accounting, ke toan, budget, payable, receivable, cong no, payment, receipt, advance, settlement, invoice, hoa don, AP, AR, cashflow, tax, VAT, profit, P&L | `consflow-accounting-finance-domain` | Owns financial state, AP/AR reconciliation, invoice PDFs, payment schedules, advances, cashflow, tax, and profit reports. |
+| admin, quan tri, auth, refresh token, session, staff, user, role, permission, RBAC, phan quyen, partner, catalog, core data, settings, audit | `consflow-admin-governance-domain` | Owns identity, permissions, project scopes, partner catalog/master data, settings, and audit. |
+| dashboard, reports, bao cao, KPI, analytics, export, CSV, warehouse report, procurement report, accounting report, staff report, tax report, profit report | `consflow-reporting-analytics-domain` | Owns source-backed report/query/export parity. Pair with the source-domain skill for metric semantics. |
 
 ## Shared Utilities And UI
 
@@ -55,6 +79,26 @@ Use this as a fast routing cache. It is not a replacement for reading code. If a
 | migrations, schema, seed, database, bang, SQL | Database / Migrations | No single frontend owner | `backend/internal/shared/migrations`, `backend/cmd/migrate`, repository SQL in `backend/internal/core` | `backend/migrations`, `backend/seed/seed.sql` | Never use Flyway. Add a new ordered migration rather than editing applied files. |
 | docker, compose, make up, restart, admin service, ports | Docker Ops | No feature page | `docker-compose.yml`, `Makefile`, backend/frontend Dockerfiles | PostgreSQL volume, Redis, backend, admin service | Preserve `make up` and `make restart` as down -> build -> run; keep frontend service/container as `admin`. |
 
+## Production-Grade Feature Surfaces Added After V10
+
+- Workflow forms: `frontend/src/modules/workflow-forms`, `/workflow-form-templates`, `/workflow-form-template-library`, `/workflow-form-versions/:id/*`, `/workflow-form-instances/:id/*`, tables `workflow_form_*`, migrations `V10`, `V11`, `V12`, `V13`, `V14`, `V16`.
+- Evidence and protected files: `frontend/src/modules/work-items/EvidencePanel.tsx`, `EvidenceGallery.tsx`, `/work-items/:id/evidence/upload`, `/evidence/:id/file|accept|reject`, tables `evidence_records`, `documents`, migration `V15`.
+- Planning workspaces: `frontend/src/modules/planning-daily-reports`, `meeting-minutes`, `planning-checklists`, routes `/planning/daily-reports`, `/planning/meeting-minutes`, `/planning/checklists`.
+- Construction work item panels: `SubcontractorReconciliationPanel.tsx`, `OwnerClientReconciliationPanel.tsx`, `MaterialSnapshotPanel.tsx`, `SurplusHandlingPanel.tsx`, `IncomingAcceptancePanel.tsx`, `OutgoingAcceptancePanel.tsx`.
+- Commercial/material/quality migrations: `V17` through `V26` cover unit price lifecycle, subcontractor/client checklist forms, construction daily report, reconciliation, material snapshots, surplus, incoming acceptance, and outgoing acceptance hardening.
+- Accounting/debt panels: `frontend/src/modules/debt/InputInvoicePanel.tsx`, `OutputInvoicePanel.tsx`, `InputPaymentPlanPanel.tsx`, `OutputBillingPlanPanel.tsx`, `PayableReconciliationPanel.tsx`, `ReceivableReconciliationPanel.tsx`.
+- Finance/report migrations: `V27` through `V35` cover input/output invoice PDFs, payment schedules, advances, AP/AR reconciliation indexes, cashflow, tax, and profit report indexes.
+- Core/admin hardening: `V36` partner catalog and `V37` auth session lifecycle.
+
+## Production-Grade Operating Gates
+
+- Do not add placeholder-only, demo-only, or misleading UI for production features. If a feature cannot be completed end to end, defer the incomplete surface instead of shipping a fake affordance.
+- Start every feature or bugfix by routing through this map, then read the relevant domain map and owner code. Check backend route, handler, service, repository, frontend route/module, shared types/status labels, migrations, and tests when the surface crosses those boundaries.
+- Durable features need real persistence, validation, permissions, actor/audit or activity history where the local pattern requires it, user feedback, loading/empty/error states, and backend/frontend contract agreement.
+- UI permission states, navigation, and action readiness must mirror backend permission checks but never replace backend enforcement.
+- Project-scoped and user-visible lists must enforce visibility and non-deleted/non-cancelled/non-inactive semantics at the API/query level.
+- Report filters, dashboard cards, warnings, and CSV exports must use the same source-backed query semantics.
+
 ## Backend Search Hints
 
 - Route first: `rg -n "keyword|RouteName" backend/internal/core/routes.go`.
@@ -75,9 +119,16 @@ Use this as a fast routing cache. It is not a replacement for reading code. If a
 - Pipeline templates are reusable definitions; pipeline runs are project-specific runtime copies.
 - Publishing and cloning templates must not mutate historical project runs.
 - Approval actions must preserve actor, status, comments, and timestamps.
+- Workflow form published versions must remain immutable; runtime instances keep stable references.
+- `required_role_ids` must remain a multi-role array across templates, runtime steps, work items, and UI.
 - BOQ approval can generate procurement; do not bypass approval states.
+- BOQ procurement generation must respect final unit-price locks.
 - Procurement receive, stock receive/issue/transfer/return, and site material balances must preserve material traceability.
+- Material snapshots and incoming acceptance must not create implicit warehouse movement unless the explicit local contract says so.
 - Acceptance failure can create rework; rework completion must not erase acceptance history.
 - Handover completion must respect readiness blockers.
-- Accounting/payables/receivables/payments must preserve financial approval and audit trails.
+- Accounting/payables/receivables/payments/invoices/advances must reconcile by project and source document.
+- Cashflow, tax, profit, and CSV exports must stay source-backed and permission-scoped.
+- Partner catalog changes must preserve downstream snapshot fields.
+- Auth refresh/revoke lifecycle must remain DB-backed and protected.
 - User-visible lists must exclude deleted/cancelled/inactive records at the API/query level.

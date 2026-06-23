@@ -1,0 +1,7 @@
+interface:
+  display_name: "Consflow Materials Warehouse"
+  short_description: "Stock, materials, balances, surplus."
+  brand_color: "#16A34A"
+  default_prompt: "Use $consflow-materials-warehouse-domain to trace material stock, balance, snapshot, or surplus changes."
+policy:
+  allow_implicit_invocation: true

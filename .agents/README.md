@@ -12,6 +12,8 @@ Keep skills small and task-specific. Durable project rules belong in `AGENTS.md`
 
 Use `.agents/skills/consflow-module-memory/references/module-keyword-map.md` as the fast keyword-to-module cache before broad scans for feature, route, table, utility, or domain terms.
 
+Closed plans under `docs/plan-closed/` are historical context only. They may be deleted and must not be required for future feature or bugfix work. If a closed plan contains durable routing, invariant, impact, or production-grade behavior knowledge, promote that knowledge into `AGENTS.md`, `consflow-module-memory`, or the relevant domain `references/domain-map.md`.
+
 Run validation from the repo root:
 
 ```bash

@@ -7,6 +7,12 @@ This repo uses local Codex customization surfaces:
 - `.codex/agents` for project-scoped custom subagents.
 - `.agents/skills/consflow-module-memory/references/module-keyword-map.md` for keyword-to-module routing before broad code scans.
 
+Memory policy:
+
+- Durable agent memory belongs in `AGENTS.md` and `.agents/skills/**/references/*.md`.
+- `docs/current-states.md` is only for active plan handoff.
+- `docs/plan-closed/*` is historical and may be deleted. Future agents must not depend on closed plans as a source of truth.
+
 Human review gates:
 
 - Feature, bugfix, or code-changing requests require a review package and explicit user confirmation before implementation.

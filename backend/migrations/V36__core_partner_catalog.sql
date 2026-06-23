@@ -49,7 +49,7 @@ ALTER TABLE input_invoices
 ALTER TABLE output_invoices
   ADD COLUMN IF NOT EXISTS client_partner_id UUID REFERENCES partners(id) ON DELETE SET NULL;
 
-ALTER TABLE incoming_acceptances
+ALTER TABLE incoming_acceptance_records
   ADD COLUMN IF NOT EXISTS supplier_partner_id UUID REFERENCES partners(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS subcontractor_partner_id UUID REFERENCES partners(id) ON DELETE SET NULL;
 
@@ -60,8 +60,8 @@ CREATE INDEX IF NOT EXISTS idx_payables_vendor_partner_id ON payables(vendor_par
 CREATE INDEX IF NOT EXISTS idx_receivables_client_partner_id ON receivables(client_partner_id);
 CREATE INDEX IF NOT EXISTS idx_input_invoices_vendor_partner_id ON input_invoices(vendor_partner_id);
 CREATE INDEX IF NOT EXISTS idx_output_invoices_client_partner_id ON output_invoices(client_partner_id);
-CREATE INDEX IF NOT EXISTS idx_incoming_acceptances_supplier_partner_id ON incoming_acceptances(supplier_partner_id);
-CREATE INDEX IF NOT EXISTS idx_incoming_acceptances_subcontractor_partner_id ON incoming_acceptances(subcontractor_partner_id);
+CREATE INDEX IF NOT EXISTS idx_incoming_acceptance_records_supplier_partner_id ON incoming_acceptance_records(supplier_partner_id);
+CREATE INDEX IF NOT EXISTS idx_incoming_acceptance_records_subcontractor_partner_id ON incoming_acceptance_records(subcontractor_partner_id);
 
 WITH raw_candidates AS (
   SELECT 'client'::text AS partner_type, client_name AS name, NULL::text AS tax_code FROM projects
@@ -85,9 +85,9 @@ WITH raw_candidates AS (
   UNION ALL
   SELECT 'supplier', supplier_name, NULL::text FROM procurement_request_items
   UNION ALL
-  SELECT 'supplier', supplier_name, NULL::text FROM incoming_acceptances
+  SELECT 'supplier', supplier_name, NULL::text FROM incoming_acceptance_records
   UNION ALL
-  SELECT 'subcontractor', subcontractor_name, NULL::text FROM incoming_acceptances
+  SELECT 'subcontractor', subcontractor_name, NULL::text FROM incoming_acceptance_records
 ),
 normalized AS (
   SELECT
@@ -170,14 +170,14 @@ WHERE oi.client_partner_id IS NULL
     OR COALESCE(NULLIF(trim(pr.tax_code), ''), '') = COALESCE(NULLIF(trim(oi.client_tax_code), ''), '')
   );
 
-UPDATE incoming_acceptances ia
+UPDATE incoming_acceptance_records ia
 SET supplier_partner_id = pr.id
 FROM partners pr
 WHERE ia.supplier_partner_id IS NULL
   AND pr.partner_types ? 'supplier'
   AND lower(trim(ia.supplier_name)) = lower(trim(pr.name));
 
-UPDATE incoming_acceptances ia
+UPDATE incoming_acceptance_records ia
 SET subcontractor_partner_id = pr.id
 FROM partners pr
 WHERE ia.subcontractor_partner_id IS NULL

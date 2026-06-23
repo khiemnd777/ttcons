@@ -14,9 +14,25 @@ ALTER TABLE acceptance_records
   ADD COLUMN IF NOT EXISTS submitted_by UUID REFERENCES users(id),
   ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ;
 
-UPDATE acceptance_records
-SET acceptance_code = 'OA-' || upper(substr(id::text, 1, 8))
-WHERE acceptance_code IS NULL OR acceptance_code = '';
+WITH normalized AS (
+  SELECT
+    id,
+    COALESCE(NULLIF(btrim(acceptance_code), ''), 'OA-' || upper(substr(id::text, 1, 8))) AS base_code
+  FROM acceptance_records
+),
+deduped AS (
+  SELECT
+    id,
+    CASE
+      WHEN row_number() OVER (PARTITION BY base_code ORDER BY id) = 1 THEN base_code
+      ELSE base_code || '-' || lpad(row_number() OVER (PARTITION BY base_code ORDER BY id)::text, 2, '0')
+    END AS next_code
+  FROM normalized
+)
+UPDATE acceptance_records records
+SET acceptance_code = deduped.next_code
+FROM deduped
+WHERE records.id = deduped.id;
 
 ALTER TABLE acceptance_records
   ALTER COLUMN acceptance_code SET NOT NULL;
