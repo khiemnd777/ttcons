@@ -5,7 +5,7 @@ TRUNCATE TABLE
   procurement_request_items, procurement_requests, boq_items, approval_actions, approval_requests,
   approval_rules, pipeline_run_steps, pipeline_run_nodes, pipeline_runs, project_members, projects,
   pipeline_template_edges, pipeline_template_steps, pipeline_template_nodes, pipeline_templates,
-  user_roles, role_permissions, permissions, roles, staff, users, warehouses, materials, partners,
+  auth_sessions, user_roles, role_permissions, permissions, roles, staff, users, warehouses, materials, partners,
   system_settings
 RESTART IDENTITY CASCADE;
 

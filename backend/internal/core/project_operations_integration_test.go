@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"consflow/backend/internal/shared/middleware"
 	"consflow/backend/internal/shared/migrations"
 
 	"github.com/gofiber/fiber/v2"
@@ -818,6 +819,100 @@ func TestBatch4ProjectCreateRequiresModulePermission(t *testing.T) {
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusForbidden)
 	}
+}
+
+func TestAuthSessionRefreshAndLogoutRevokesAccess(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	userID := newID()
+	suffix := userID[:8]
+	email := "auth-session-" + suffix + "@test.local"
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM auth_sessions WHERE user_id=$1`, userID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, userID)
+	})
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Auth Session','active')`, userID, email)
+
+	login, err := service.Login(ctx, LoginRequest{Email: email, Password: "pw"}, "test-agent", "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	accessToken := fmt.Sprint(login["token"])
+	refreshToken := fmt.Sprint(login["refresh_token"])
+	if accessToken == "" || refreshToken == "" {
+		t.Fatalf("login tokens missing: %#v", login)
+	}
+
+	handler := NewHandler(service)
+	app := fiber.New(fiber.Config{ErrorHandler: ErrorHandler})
+	app.Use(middleware.AuthRequired("test-secret", repo))
+	app.Get("/me", handler.Me)
+	assertBearerStatus(t, app, "/me", accessToken, http.StatusOK)
+
+	refreshed, err := service.RefreshSession(ctx, refreshToken, "test-agent", "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextAccessToken := fmt.Sprint(refreshed["token"])
+	nextRefreshToken := fmt.Sprint(refreshed["refresh_token"])
+	assertBearerStatus(t, app, "/me", accessToken, http.StatusUnauthorized)
+	assertBearerStatus(t, app, "/me", nextAccessToken, http.StatusOK)
+
+	if err := service.LogoutByRefreshToken(ctx, nextRefreshToken); err != nil {
+		t.Fatal(err)
+	}
+	assertBearerStatus(t, app, "/me", nextAccessToken, http.StatusUnauthorized)
+}
+
+func TestRBACAssignmentsReplaceSnapshots(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	suffix := newID()
+	roleID := ensureRole(t, db, "rbac_replace_"+suffix[:8], "RBAC Replace")
+	firstPermissionID := ensurePermission(t, db, "rbac.replace.first."+suffix[:8], "RBAC Replace First", "rbac")
+	secondPermissionID := ensurePermission(t, db, "rbac.replace.second."+suffix[:8], "RBAC Replace Second", "rbac")
+	userID := newID()
+	projectID := newID()
+	staffID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM project_members WHERE project_id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1`, userID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, roleID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, roleID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, staffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, userID)
+	})
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','RBAC User','active')`, userID, "rbac-user-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id, user_id, full_name, email, department, position, status) VALUES ($1,$2,'RBAC User',$3,'Dự án','Member','active')`, staffID, userID, "rbac-staff-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'RBAC Scoped',$2,'Client','planning')`, projectID, "RBA-"+suffix[:8])
+
+	if _, err := repo.ReplaceRolePermissions(ctx, roleID, []string{firstPermissionID, secondPermissionID}); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM role_permissions WHERE role_id=$1`, 2, roleID)
+	if _, err := repo.ReplaceRolePermissions(ctx, roleID, []string{secondPermissionID}); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM role_permissions WHERE role_id=$1 AND permission_id=$2`, 0, roleID, firstPermissionID)
+	assertCount(t, db, `SELECT COUNT(*) FROM role_permissions WHERE role_id=$1 AND permission_id=$2`, 1, roleID, secondPermissionID)
+
+	if _, err := repo.ReplaceUserRoles(ctx, userID, []string{roleID}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.ReplaceUserRoles(ctx, userID, []string{roleID}, projectID); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM user_roles WHERE user_id=$1 AND project_id IS NULL`, 1, userID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_roles WHERE user_id=$1 AND project_id=$2`, 1, userID, projectID)
+	if _, err := repo.ReplaceUserRoles(ctx, userID, []string{}, ""); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM user_roles WHERE user_id=$1 AND project_id IS NULL`, 0, userID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_roles WHERE user_id=$1 AND project_id=$2`, 1, userID, projectID)
 }
 
 func TestBatch4AccountingListUsesProjectScope(t *testing.T) {
@@ -4690,6 +4785,19 @@ func assertCount(t *testing.T, db *sql.DB, query string, want int, args ...any) 
 	}
 	if got != want {
 		t.Fatalf("count mismatch for %q: got %d want %d", query, got, want)
+	}
+}
+
+func assertBearerStatus(t *testing.T, app *fiber.App, path string, token string, want int) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != want {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, want)
 	}
 }
 

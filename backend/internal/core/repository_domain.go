@@ -59,6 +59,143 @@ func (r *Repository) UserPermissions(ctx context.Context, userID string) ([]stri
 	return permissions, nil
 }
 
+func (r *Repository) CreateAuthSession(ctx context.Context, userID, refreshHash, accessTokenID, userAgent, ipAddress string, expiresAt time.Time) (Record, error) {
+	return r.QueryOne(ctx, `
+		INSERT INTO auth_sessions (user_id, refresh_token_hash, access_token_id, user_agent, ip_address, expires_at)
+		VALUES ($1,$2,$3,NULLIF($4,''),NULLIF($5,''),$6)
+		RETURNING id::text, user_id::text, expires_at
+	`, userID, refreshHash, accessTokenID, strings.TrimSpace(userAgent), strings.TrimSpace(ipAddress), expiresAt)
+}
+
+func (r *Repository) RotateAuthSession(ctx context.Context, currentRefreshHash, nextRefreshHash, accessTokenID, userAgent, ipAddress string, expiresAt time.Time) (Record, error) {
+	return r.QueryOne(ctx, `
+		UPDATE auth_sessions s
+		SET refresh_token_hash=$2,
+			access_token_id=$3,
+			user_agent=NULLIF($4,''),
+			ip_address=NULLIF($5,''),
+			last_used_at=now(),
+			expires_at=$6
+		FROM users u
+		WHERE s.refresh_token_hash=$1
+		  AND s.user_id=u.id
+		  AND u.status='active'
+		  AND s.revoked_at IS NULL
+		  AND s.expires_at > now()
+		RETURNING s.id::text, s.user_id::text, s.expires_at
+	`, currentRefreshHash, nextRefreshHash, accessTokenID, strings.TrimSpace(userAgent), strings.TrimSpace(ipAddress), expiresAt)
+}
+
+func (r *Repository) RevokeAuthSessionByRefreshHash(ctx context.Context, refreshHash string) error {
+	return r.Exec(ctx, `
+		UPDATE auth_sessions
+		SET revoked_at=COALESCE(revoked_at, now())
+		WHERE refresh_token_hash=$1
+	`, refreshHash)
+}
+
+func (r *Repository) AuthSessionActive(ctx context.Context, userID, sessionID, accessTokenID string) (bool, error) {
+	rows, err := r.Query(ctx, `
+		SELECT COUNT(*) AS total
+		FROM auth_sessions s
+		JOIN users u ON u.id=s.user_id
+		WHERE s.id=$1
+		  AND s.user_id=$2
+		  AND s.access_token_id=$3
+		  AND s.revoked_at IS NULL
+		  AND s.expires_at > now()
+		  AND u.status='active'
+	`, sessionID, userID, accessTokenID)
+	if err != nil {
+		return false, err
+	}
+	return len(rows) > 0 && number(rows[0]["total"]) > 0, nil
+}
+
+func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, permissionIDs []string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var roleIDText string
+	var roleDisplayName string
+	if err := tx.QueryRowContext(ctx, `SELECT id::text, display_name FROM roles WHERE id=$1 FOR UPDATE`, roleID).Scan(&roleIDText, &roleDisplayName); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, roleID); err != nil {
+		return nil, err
+	}
+	assigned := 0
+	for _, permissionID := range permissionIDs {
+		var exists int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM permissions WHERE id=$1`, permissionID).Scan(&exists); err != nil {
+			return nil, err
+		}
+		if exists == 0 {
+			return nil, validationError("Permission không tồn tại", Record{"permission_id": permissionID})
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, roleID, permissionID); err != nil {
+			return nil, err
+		}
+		assigned++
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return Record{"id": roleIDText, "display_name": roleDisplayName, "assigned": assigned}, nil
+}
+
+func (r *Repository) ReplaceUserRoles(ctx context.Context, userID string, roleIDs []string, projectID string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var userEmail string
+	if err := tx.QueryRowContext(ctx, `SELECT email FROM users WHERE id=$1 AND status <> 'deleted' FOR UPDATE`, userID).Scan(&userEmail); err != nil {
+		return nil, err
+	}
+	projectID = cleanID(projectID)
+	if projectID != "" {
+		var exists int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM projects WHERE id=$1 AND status <> 'cancelled'`, projectID).Scan(&exists); err != nil {
+			return nil, err
+		}
+		if exists == 0 {
+			return nil, validationError("Công trình không tồn tại hoặc đã huỷ", Record{"project_id": projectID})
+		}
+	}
+	if projectID == "" {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1 AND project_id IS NULL`, userID); err != nil {
+			return nil, err
+		}
+	} else if _, err := tx.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1 AND project_id=$2`, userID, projectID); err != nil {
+		return nil, err
+	}
+
+	assigned := 0
+	for _, roleID := range roleIDs {
+		var exists int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM roles WHERE id=$1`, roleID).Scan(&exists); err != nil {
+			return nil, err
+		}
+		if exists == 0 {
+			return nil, validationError("Role không tồn tại", Record{"role_id": roleID})
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO user_roles (user_id, role_id, project_id) VALUES ($1,$2,NULLIF($3,'')::uuid) ON CONFLICT DO NOTHING`, userID, roleID, projectID); err != nil {
+			return nil, err
+		}
+		assigned++
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return Record{"user_id": userID, "email": userEmail, "project_id": projectID, "assigned": assigned}, nil
+}
+
 type workItemAccessProfile struct {
 	UserID     string
 	StaffID    string

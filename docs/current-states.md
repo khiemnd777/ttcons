@@ -48,7 +48,7 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 | --- | --- | --- |
 | Nền tảng | Done | CI, migration checksum check, request-id logging, validation Make targets, deployment/rollback checklist, backup/restore procedure, and seed policy implemented. |
 | Dữ liệu lõi | Done | Partner catalog, canonical partner links, and snapshot preservation implemented for project/material/procurement/accounting/invoice/acceptance flows. |
-| Auth / RBAC | Partial | Add permission-aware UI, stronger session/token lifecycle, coverage audit. |
+| Auth / RBAC | Done | Permission-aware navigation/routes/actions, DB-backed session refresh/revoke lifecycle, and RBAC assignment matrix implemented. |
 | Lõi module nghiệp vụ | Partial | Refactor generic CRUD into clearer handler-service-repository use cases. |
 | Admin UX | Partial | Improve dense operational UX, errors, loading, empty states, filters. |
 | Shared UI | Partial | Upgrade table/form/dialog patterns before duplicating UI. |
@@ -464,6 +464,16 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - Added the frontend `Dữ liệu lõi` page under system navigation with partner create/edit/detail dialogs, filters, active states, and dense data table behavior.
 - Added partner selectors to Projects, Materials, Payables, Receivables, input/output invoice upload dialogs, and incoming acceptance supplier/subcontractor fields while keeping manual entry fallback.
 - Updated frontend domain contracts and seed/demo data with deterministic partners and linked sample projects/materials/debts/procurement rows.
+- Implemented Auth / RBAC as a production-grade session and authorization hardening station.
+- Added migration `backend/migrations/V37__auth_session_lifecycle.sql` with DB-backed auth sessions, refresh-token hashes, access token ids, expiry, revoke timestamps, and active-session indexes.
+- Moved refresh/logout to HttpOnly refresh-cookie flow while keeping protected business APIs behind `middleware.AuthRequired` with DB session validation.
+- Added configurable access-token TTL, refresh-token TTL, refresh-cookie secure flag, and SameSite mode.
+- Added access tokens with `session_id` and `jti`; refresh rotates both refresh token hash and access token id, and logout revokes the session so existing access tokens are invalidated.
+- Added frontend API credential handling, automatic one-time refresh retry for API/file requests, and auth failure cleanup in `AuthContext`.
+- Added permission-aware app navigation, guarded routes with an explicit "Không đủ quyền" state, and role-aware landing redirect to avoid sending limited users to inaccessible Dashboard routes.
+- Upgraded RBAC UI with role permission matrix assignment grouped/searchable by module, permission list search/loading/error states, and staff role assignment dialog for global or project-scoped roles.
+- Replaced append-only role/permission assignment endpoints with validated transaction-backed snapshot replacement and enriched role/staff list responses for UI state.
+- Added DB-backed regression coverage for session refresh/revoke middleware invalidation and RBAC snapshot replacement.
 
 ## Validation Status
 
@@ -617,4 +627,11 @@ Maintain a durable, interruption-safe checklist for implementing the Google Shee
 - `git diff --check` passed after Dữ liệu lõi.
 - Custom migration runner apply was not run after Dữ liệu lõi; applying `V36` still requires a reachable Consflow PostgreSQL role/database.
 - Browser verification not run, per repo rule unless explicitly requested.
+- `gofmt -w backend/internal/shared/config/config.go backend/internal/shared/middleware/auth.go backend/internal/core/routes.go backend/internal/core/handlers.go backend/internal/core/service.go backend/internal/core/repository_domain.go backend/internal/core/project_operations_integration_test.go` passed after Auth / RBAC.
+- `make migrate-check` passed after Auth / RBAC; 37 migration files were validated without connecting to the database.
+- `cd backend && GOCACHE="$PWD/.gocache" go test ./...` passed after Auth / RBAC; DB-backed session/RBAC integration coverage remains gated by `CONSFLOW_TEST_DATABASE_URL`.
+- `cd frontend && npm run build` passed after Auth / RBAC; Vite chunk-size warning remains.
+- `git diff --check` passed after Auth / RBAC.
+- Custom migration runner apply was not run after Auth / RBAC; applying `V37` still requires a reachable Consflow PostgreSQL role/database.
+- Browser verification not run after Auth / RBAC, per repo rule unless explicitly requested.
 - No backend/API/migration changes were needed for the Pipeline Builder multi-role UI, Shared UI 2A, or Shared UI 2B batches.

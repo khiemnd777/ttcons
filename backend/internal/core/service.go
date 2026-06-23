@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
@@ -27,26 +28,36 @@ import (
 )
 
 type Service struct {
-	repo           *Repository
-	jwtSecret      string
-	streamHub      *ActivityStreamHub
-	uploadDir      string
-	maxUploadBytes int64
+	repo                  *Repository
+	jwtSecret             string
+	streamHub             *ActivityStreamHub
+	uploadDir             string
+	maxUploadBytes        int64
+	accessTokenTTL        time.Duration
+	refreshTokenTTL       time.Duration
+	refreshCookieSecure   bool
+	refreshCookieSameSite string
 }
 
 func NewService(repo *Repository, jwtSecret string) *Service {
 	return &Service{
-		repo:           repo,
-		jwtSecret:      jwtSecret,
-		streamHub:      NewActivityStreamHub(),
-		uploadDir:      defaultUploadDir,
-		maxUploadBytes: defaultMaxUploadBytes,
+		repo:                  repo,
+		jwtSecret:             jwtSecret,
+		streamHub:             NewActivityStreamHub(),
+		uploadDir:             defaultUploadDir,
+		maxUploadBytes:        defaultMaxUploadBytes,
+		accessTokenTTL:        defaultAccessTokenTTL,
+		refreshTokenTTL:       defaultRefreshTokenTTL,
+		refreshCookieSameSite: defaultRefreshCookieSameSite,
 	}
 }
 
 const (
-	defaultUploadDir      = "uploads"
-	defaultMaxUploadBytes = int64(10 * 1024 * 1024)
+	defaultUploadDir             = "uploads"
+	defaultMaxUploadBytes        = int64(10 * 1024 * 1024)
+	defaultAccessTokenTTL        = 15 * time.Minute
+	defaultRefreshTokenTTL       = 7 * 24 * time.Hour
+	defaultRefreshCookieSameSite = "Lax"
 )
 
 type evidenceUploadMimeSpec struct {
@@ -73,7 +84,24 @@ func (s *Service) ConfigureUploads(uploadDir string, maxUploadBytes int64) {
 	s.maxUploadBytes = maxUploadBytes
 }
 
-func (s *Service) Login(ctx context.Context, req LoginRequest) (Record, error) {
+func (s *Service) ConfigureAuth(accessTokenMinutes int64, refreshTokenHours int64, refreshCookieSecure bool, refreshCookieSameSite string) {
+	if accessTokenMinutes <= 0 {
+		accessTokenMinutes = int64(defaultAccessTokenTTL / time.Minute)
+	}
+	if refreshTokenHours <= 0 {
+		refreshTokenHours = int64(defaultRefreshTokenTTL / time.Hour)
+	}
+	refreshCookieSameSite = strings.TrimSpace(refreshCookieSameSite)
+	if refreshCookieSameSite == "" {
+		refreshCookieSameSite = defaultRefreshCookieSameSite
+	}
+	s.accessTokenTTL = time.Duration(accessTokenMinutes) * time.Minute
+	s.refreshTokenTTL = time.Duration(refreshTokenHours) * time.Hour
+	s.refreshCookieSecure = refreshCookieSecure
+	s.refreshCookieSameSite = refreshCookieSameSite
+}
+
+func (s *Service) Login(ctx context.Context, req LoginRequest, userAgent string, ipAddress string) (Record, error) {
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 	if req.Email == "" || req.Password == "" {
 		return nil, errors.New("email and password are required")
@@ -100,14 +128,30 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	token, err := s.signToken(fmt.Sprint(user["id"]), fmt.Sprint(user["email"]), roles)
+	refreshToken, err := newSessionToken()
+	if err != nil {
+		return nil, err
+	}
+	accessTokenID := uuid.NewString()
+	refreshExpiresAt := time.Now().Add(s.refreshTokenTTL)
+	session, err := s.repo.CreateAuthSession(ctx, fmt.Sprint(user["id"]), hashSessionToken(refreshToken), accessTokenID, userAgent, ipAddress, refreshExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+	token, accessExpiresAt, err := s.signToken(fmt.Sprint(user["id"]), fmt.Sprint(user["email"]), roles, fmt.Sprint(session["id"]), accessTokenID)
 	if err != nil {
 		return nil, err
 	}
 	delete(user, "password_hash")
 	user["roles"] = roles
 	user["permissions"] = permissions
-	return Record{"token": token, "user": user}, nil
+	return Record{
+		"token":              token,
+		"access_expires_at":  accessExpiresAt.Format(time.RFC3339),
+		"refresh_token":      refreshToken,
+		"refresh_expires_at": refreshExpiresAt.Format(time.RFC3339),
+		"user":               user,
+	}, nil
 }
 
 func (s *Service) Me(ctx context.Context, userID string) (Record, error) {
@@ -123,16 +167,75 @@ func (s *Service) Me(ctx context.Context, userID string) (Record, error) {
 	return user, nil
 }
 
-func (s *Service) signToken(userID, email string, roles []string) (string, error) {
+func (s *Service) RefreshSession(ctx context.Context, refreshToken string, userAgent string, ipAddress string) (Record, error) {
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return nil, sql.ErrNoRows
+	}
+	nextRefreshToken, err := newSessionToken()
+	if err != nil {
+		return nil, err
+	}
+	accessTokenID := uuid.NewString()
+	refreshExpiresAt := time.Now().Add(s.refreshTokenTTL)
+	session, err := s.repo.RotateAuthSession(ctx, hashSessionToken(refreshToken), hashSessionToken(nextRefreshToken), accessTokenID, userAgent, ipAddress, refreshExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+	userID := fmt.Sprint(session["user_id"])
+	user, err := s.Me(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	roles, _ := user["roles"].([]string)
+	token, accessExpiresAt, err := s.signToken(userID, fmt.Sprint(user["email"]), roles, fmt.Sprint(session["id"]), accessTokenID)
+	if err != nil {
+		return nil, err
+	}
+	return Record{
+		"token":              token,
+		"access_expires_at":  accessExpiresAt.Format(time.RFC3339),
+		"refresh_token":      nextRefreshToken,
+		"refresh_expires_at": refreshExpiresAt.Format(time.RFC3339),
+		"user":               user,
+	}, nil
+}
+
+func (s *Service) LogoutByRefreshToken(ctx context.Context, refreshToken string) error {
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return nil
+	}
+	return s.repo.RevokeAuthSessionByRefreshHash(ctx, hashSessionToken(refreshToken))
+}
+
+func (s *Service) signToken(userID, email string, roles []string, sessionID string, accessTokenID string) (string, time.Time, error) {
+	expiresAt := time.Now().Add(s.accessTokenTTL)
 	claims := jwt.MapClaims{
-		"user_id": userID,
-		"email":   email,
-		"roles":   roles,
-		"exp":     time.Now().Add(12 * time.Hour).Unix(),
-		"iat":     time.Now().Unix(),
+		"user_id":    userID,
+		"email":      email,
+		"roles":      roles,
+		"session_id": sessionID,
+		"jti":        accessTokenID,
+		"exp":        expiresAt.Unix(),
+		"iat":        time.Now().Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(s.jwtSecret))
+	signed, err := token.SignedString([]byte(s.jwtSecret))
+	return signed, expiresAt, err
+}
+
+func newSessionToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
+}
+
+func hashSessionToken(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
 }
 
 func (s *Service) ListProjects(ctx context.Context, actorID string) ([]Record, error) {

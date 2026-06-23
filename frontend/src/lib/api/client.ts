@@ -10,6 +10,8 @@ export type ApiEnvelope<T> = {
 };
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api';
+let authFailureHandler: (() => void) | null = null;
+let refreshPromise: Promise<string | null> | null = null;
 
 export type StreamStatus = 'connected' | 'reconnecting' | 'offline';
 
@@ -38,7 +40,15 @@ export function setToken(token: string | null) {
   else localStorage.removeItem('consflow_token');
 }
 
+export function setAuthFailureHandler(handler: (() => void) | null) {
+  authFailureHandler = handler;
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return request<T>(path, init, true);
+}
+
+async function request<T>(path: string, init: RequestInit = {}, allowRefresh: boolean): Promise<T> {
   const token = getToken();
   const headers = new Headers(init.headers);
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
@@ -48,10 +58,15 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers,
+    credentials: 'include',
   });
   const json = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
 
   if (!res.ok || !json?.success) {
+    if (allowRefresh && shouldRefresh(path, res.status, json?.error?.code)) {
+      const refreshedToken = await refreshAccessToken();
+      if (refreshedToken) return request<T>(path, init, false);
+    }
     throw new ApiError(json?.error?.message ?? 'Không gọi được API', json?.error?.code, res.status);
   }
   return json.data;
@@ -77,12 +92,48 @@ export function del<T>(path: string) {
   return api<T>(path, { method: 'DELETE' });
 }
 
+export async function logoutRequest() {
+  await request<{ logged_out: boolean }>('/auth/logout', { method: 'POST', body: JSON.stringify({}) }, false).catch(() => undefined);
+  setToken(null);
+}
+
+async function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = request<{ token: string }>('/auth/refresh', { method: 'POST', body: JSON.stringify({}) }, false)
+      .then((data) => {
+        setToken(data.token);
+        return data.token;
+      })
+      .catch(() => {
+        setToken(null);
+        authFailureHandler?.();
+        return null;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
+function shouldRefresh(path: string, status: number, code?: string) {
+  return status === 401 && code !== 'INVALID_REFRESH_TOKEN' && !path.startsWith('/auth/login') && !path.startsWith('/auth/refresh') && !path.startsWith('/auth/logout');
+}
+
 export async function downloadBlob(path: string) {
+  return downloadBlobRequest(path, true);
+}
+
+async function downloadBlobRequest(path: string, allowRefresh: boolean) {
   const token = getToken();
   const headers = new Headers();
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  const res = await fetch(`${API_URL}${path}`, { headers });
+  const res = await fetch(`${API_URL}${path}`, { headers, credentials: 'include' });
   if (!res.ok) {
+    if (allowRefresh && res.status === 401) {
+      const refreshedToken = await refreshAccessToken();
+      if (refreshedToken) return downloadBlobRequest(path, false);
+    }
     const contentType = res.headers.get('Content-Type') ?? '';
     if (contentType.includes('application/json')) {
       const json = (await res.json().catch(() => null)) as ApiEnvelope<unknown> | null;
@@ -111,7 +162,7 @@ export function streamSSE<T = any>(
         const headers = new Headers();
         headers.set('Accept', 'text/event-stream');
         if (token) headers.set('Authorization', `Bearer ${token}`);
-        const res = await fetch(`${API_URL}${path}`, { headers, signal: controller.signal });
+        const res = await fetch(`${API_URL}${path}`, { headers, signal: controller.signal, credentials: 'include' });
         if (!res.ok || !res.body) throw new ApiError('Không mở được realtime stream', 'STREAM_ERROR', res.status);
         handlers.onStatus?.('connected');
         await readSSEStream<T>(res.body, handlers.onEvent);

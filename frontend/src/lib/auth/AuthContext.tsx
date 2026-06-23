@@ -1,12 +1,14 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
-import { api, setToken } from '../api/client';
+import { api, logoutRequest, setAuthFailureHandler, setToken } from '../api/client';
 import type { User } from '../types/domain';
 
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
+  hasPermission: (permission: string) => boolean;
+  hasAnyPermission: (permissions?: string[]) => boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -16,6 +18,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setAuthFailureHandler(() => {
+      setUser(null);
+    });
     api<User>('/auth/me')
       .then(setUser)
       .catch(() => {
@@ -23,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
       })
       .finally(() => setLoading(false));
+    return () => setAuthFailureHandler(null);
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -37,9 +43,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(data.token);
         setUser(data.user);
       },
-      logout() {
-        setToken(null);
+      async logout() {
+        await logoutRequest();
         setUser(null);
+      },
+      hasPermission(permission: string) {
+        return Boolean(user?.permissions?.includes(permission));
+      },
+      hasAnyPermission(permissions?: string[]) {
+        if (!permissions?.length) return true;
+        return permissions.some((permission) => user?.permissions?.includes(permission));
       },
     }),
     [user, loading],

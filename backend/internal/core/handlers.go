@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"consflow/backend/internal/shared/response"
 
@@ -17,6 +18,8 @@ import (
 type Handler struct {
 	service *Service
 }
+
+const refreshCookieName = "consflow_refresh_token"
 
 func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
@@ -31,30 +34,33 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	if err := json.Unmarshal(c.Body(), &req); err != nil {
 		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đăng nhập không hợp lệ")
 	}
-	data, err := h.service.Login(c.Context(), req)
+	data, err := h.service.Login(c.Context(), req, c.Get("User-Agent"), c.IP())
 	if err != nil {
 		return response.Fail(c, fiber.StatusUnauthorized, "INVALID_CREDENTIALS", "Email hoặc mật khẩu không đúng")
 	}
+	h.setRefreshCookie(c, fmt.Sprint(data["refresh_token"]), fmt.Sprint(data["refresh_expires_at"]))
+	delete(data, "refresh_token")
+	delete(data, "refresh_expires_at")
 	return response.OK(c, data, "Đăng nhập thành công")
 }
 
 func (h *Handler) Refresh(c *fiber.Ctx) error {
-	user, err := h.service.Me(c.Context(), actorID(c))
+	data, err := h.service.RefreshSession(c.Context(), c.Cookies(refreshCookieName), c.Get("User-Agent"), c.IP())
 	if err != nil {
-		return err
+		h.clearRefreshCookie(c)
+		return response.Fail(c, fiber.StatusUnauthorized, "INVALID_REFRESH_TOKEN", "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại")
 	}
-	roles := []string{}
-	if raw, ok := user["roles"].([]string); ok {
-		roles = raw
-	}
-	token, err := h.service.signToken(fmt.Sprint(user["id"]), fmt.Sprint(user["email"]), roles)
-	if err != nil {
-		return err
-	}
-	return response.OK(c, Record{"token": token})
+	h.setRefreshCookie(c, fmt.Sprint(data["refresh_token"]), fmt.Sprint(data["refresh_expires_at"]))
+	delete(data, "refresh_token")
+	delete(data, "refresh_expires_at")
+	return response.OK(c, data)
 }
 
 func (h *Handler) Logout(c *fiber.Ctx) error {
+	if err := h.service.LogoutByRefreshToken(c.Context(), c.Cookies(refreshCookieName)); err != nil {
+		return err
+	}
+	h.clearRefreshCookie(c)
 	return response.OK(c, Record{"logged_out": true})
 }
 
@@ -64,6 +70,35 @@ func (h *Handler) Me(c *fiber.Ctx) error {
 		return err
 	}
 	return response.OK(c, user)
+}
+
+func (h *Handler) setRefreshCookie(c *fiber.Ctx, token string, expiresAtText string) {
+	expiresAt, err := time.Parse(time.RFC3339, expiresAtText)
+	if err != nil {
+		expiresAt = time.Now().Add(h.service.refreshTokenTTL)
+	}
+	c.Cookie(&fiber.Cookie{
+		Name:     refreshCookieName,
+		Value:    token,
+		Expires:  expiresAt,
+		HTTPOnly: true,
+		Secure:   h.service.refreshCookieSecure,
+		SameSite: h.service.refreshCookieSameSite,
+		Path:     "/api/auth",
+	})
+}
+
+func (h *Handler) clearRefreshCookie(c *fiber.Ctx) {
+	c.Cookie(&fiber.Cookie{
+		Name:     refreshCookieName,
+		Value:    "",
+		Expires:  time.Now().Add(-time.Hour),
+		MaxAge:   -1,
+		HTTPOnly: true,
+		Secure:   h.service.refreshCookieSecure,
+		SameSite: h.service.refreshCookieSameSite,
+		Path:     "/api/auth",
+	})
 }
 
 func (h *Handler) ListProjects(c *fiber.Ctx) error {
@@ -2355,7 +2390,23 @@ func (h *Handler) ListStaff(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"staff.view"}); err != nil {
 		return err
 	}
-	return h.list(c, `SELECT * FROM staff WHERE status <> 'deleted' ORDER BY full_name`)
+	return h.list(c, `
+		SELECT s.*,
+			COALESCE((
+				SELECT jsonb_agg(jsonb_build_object(
+					'id', r.id::text,
+					'name', r.name,
+					'display_name', r.display_name,
+					'project_id', COALESCE(ur.project_id::text, '')
+				) ORDER BY r.display_name)
+				FROM user_roles ur
+				JOIN roles r ON r.id=ur.role_id
+				WHERE ur.user_id=s.user_id
+			), '[]'::jsonb) AS user_roles
+		FROM staff s
+		WHERE s.status <> 'deleted'
+		ORDER BY s.full_name
+	`)
 }
 func (h *Handler) CreateStaff(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"staff.create"}); err != nil {
@@ -2373,7 +2424,16 @@ func (h *Handler) ListRoles(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"role.view"}); err != nil {
 		return err
 	}
-	return h.list(c, `SELECT * FROM roles ORDER BY display_name`)
+	return h.list(c, `
+		SELECT r.*,
+			COALESCE(jsonb_agg(rp.permission_id::text ORDER BY p.module, p.key) FILTER (WHERE rp.permission_id IS NOT NULL), '[]'::jsonb) AS permission_ids,
+			COUNT(rp.permission_id) AS permission_count
+		FROM roles r
+		LEFT JOIN role_permissions rp ON rp.role_id=r.id
+		LEFT JOIN permissions p ON p.id=rp.permission_id
+		GROUP BY r.id
+		ORDER BY r.display_name
+	`)
 }
 func (h *Handler) CreateRole(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"role.create"}); err != nil {
@@ -2402,11 +2462,15 @@ func (h *Handler) AssignRolePermissions(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	permissionIDs, _ := body["permission_ids"].([]any)
-	for _, permissionID := range permissionIDs {
-		_ = h.service.repo.Exec(c.Context(), `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, c.Params("id"), permissionID)
+	permissionIDs, err := idListFromBody(body, "permission_ids")
+	if err != nil {
+		return err
 	}
-	return response.OK(c, Record{"assigned": len(permissionIDs)})
+	result, err := h.service.repo.ReplaceRolePermissions(c.Context(), c.Params("id"), permissionIDs)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result)
 }
 
 func (h *Handler) AssignUserRoles(c *fiber.Ctx) error {
@@ -2417,11 +2481,15 @@ func (h *Handler) AssignUserRoles(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	roleIDs, _ := body["role_ids"].([]any)
-	for _, roleID := range roleIDs {
-		_ = h.service.repo.Exec(c.Context(), `INSERT INTO user_roles (user_id, role_id, project_id) VALUES ($1,$2,NULLIF($3,'')::uuid) ON CONFLICT DO NOTHING`, c.Params("id"), roleID, stringValue(body["project_id"]))
+	roleIDs, err := idListFromBody(body, "role_ids")
+	if err != nil {
+		return err
 	}
-	return response.OK(c, Record{"assigned": len(roleIDs)})
+	result, err := h.service.repo.ReplaceUserRoles(c.Context(), c.Params("id"), roleIDs, stringValue(body["project_id"]))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result)
 }
 
 func (h *Handler) AuditLogs(c *fiber.Ctx) error {
@@ -2887,6 +2955,37 @@ func bodyMap(c *fiber.Ctx) (Record, error) {
 		return nil, response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu gửi lên không hợp lệ")
 	}
 	return body, nil
+}
+
+func idListFromBody(body Record, key string) ([]string, error) {
+	raw := body[key]
+	values := []any{}
+	switch typed := raw.(type) {
+	case nil:
+		return []string{}, nil
+	case []any:
+		values = typed
+	case []string:
+		for _, value := range typed {
+			values = append(values, value)
+		}
+	default:
+		return nil, validationError("Danh sách ID không hợp lệ", Record{"field": key})
+	}
+	seen := map[string]bool{}
+	out := []string{}
+	for _, value := range values {
+		id := cleanID(value)
+		if id == "" || seen[id] {
+			continue
+		}
+		if !validActivityUUID(id) {
+			return nil, validationError("ID không hợp lệ", Record{"field": key, "id": id})
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out, nil
 }
 
 func actionRequest(c *fiber.Ctx) (ActionRequest, error) {

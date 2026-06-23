@@ -6,28 +6,36 @@ import (
 )
 
 type Config struct {
-	Port           string
-	DatabaseURL    string
-	RedisURL       string
-	JWTSecret      string
-	FrontendOrigin string
-	MigrationsDir  string
-	AutoMigrate    bool
-	UploadDir      string
-	MaxUploadBytes int64
+	Port                      string
+	DatabaseURL               string
+	RedisURL                  string
+	JWTSecret                 string
+	FrontendOrigin            string
+	MigrationsDir             string
+	AutoMigrate               bool
+	UploadDir                 string
+	MaxUploadBytes            int64
+	AuthAccessTokenMinutes    int64
+	AuthRefreshTokenHours     int64
+	AuthRefreshCookieSecure   bool
+	AuthRefreshCookieSameSite string
 }
 
 func Load() Config {
 	return Config{
-		Port:           getenv("PORT", "8080"),
-		DatabaseURL:    getenv("DATABASE_URL", "postgres://consflow:consflow@127.0.0.1:5432/consflow?sslmode=disable"),
-		RedisURL:       getenv("REDIS_URL", "redis://localhost:6379/0"),
-		JWTSecret:      getenv("JWT_SECRET", "consflow-local-dev-secret"),
-		FrontendOrigin: getenv("FRONTEND_ORIGIN", "http://localhost:5173"),
-		MigrationsDir:  getenv("MIGRATIONS_DIR", "migrations"),
-		AutoMigrate:    getenv("AUTO_MIGRATE", "true") != "false",
-		UploadDir:      getenv("UPLOAD_DIR", "uploads"),
-		MaxUploadBytes: getenvInt64("MAX_UPLOAD_BYTES", 10*1024*1024),
+		Port:                      getenv("PORT", "8080"),
+		DatabaseURL:               getenv("DATABASE_URL", "postgres://consflow:consflow@127.0.0.1:5432/consflow?sslmode=disable"),
+		RedisURL:                  getenv("REDIS_URL", "redis://localhost:6379/0"),
+		JWTSecret:                 getenv("JWT_SECRET", "consflow-local-dev-secret"),
+		FrontendOrigin:            getenv("FRONTEND_ORIGIN", "http://localhost:5173"),
+		MigrationsDir:             getenv("MIGRATIONS_DIR", "migrations"),
+		AutoMigrate:               getenv("AUTO_MIGRATE", "true") != "false",
+		UploadDir:                 getenv("UPLOAD_DIR", "uploads"),
+		MaxUploadBytes:            getenvInt64("MAX_UPLOAD_BYTES", 10*1024*1024),
+		AuthAccessTokenMinutes:    getenvInt64("AUTH_ACCESS_TOKEN_MINUTES", 15),
+		AuthRefreshTokenHours:     getenvInt64("AUTH_REFRESH_TOKEN_HOURS", 24*7),
+		AuthRefreshCookieSecure:   getenv("AUTH_REFRESH_COOKIE_SECURE", "false") == "true",
+		AuthRefreshCookieSameSite: getenv("AUTH_REFRESH_COOKIE_SAME_SITE", "Lax"),
 	}
 }
 

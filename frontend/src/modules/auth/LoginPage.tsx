@@ -32,7 +32,7 @@ export function LoginPage() {
     defaultValues: { email: demoAccounts[0], password: '123456' },
   });
 
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to="/" replace />;
 
   return (
     <div className="grid min-h-screen place-items-center bg-surface px-4">
@@ -49,7 +49,7 @@ export function LoginPage() {
             setError('');
             try {
               await login(values.email, values.password);
-              navigate('/dashboard');
+              navigate('/');
             } catch (err) {
               setError(err instanceof Error ? err.message : 'Đăng nhập thất bại');
             }

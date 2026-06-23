@@ -1,7 +1,9 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { AppShell } from '../layouts/AppShell';
 import { useAuth } from '../lib/auth/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PermissionDenied } from '../components/PermissionDenied';
 import { LoginPage } from '../modules/auth/LoginPage';
 import { DashboardPage } from '../modules/dashboard/DashboardPage';
 import { ProjectsPage } from '../modules/projects/ProjectsPage';
@@ -33,46 +35,61 @@ function RequireAuth() {
   return <AppShell />;
 }
 
+function RequirePermission({ permissions, children }: { permissions?: string[]; children: ReactNode }) {
+  const { hasAnyPermission } = useAuth();
+  if (!hasAnyPermission(permissions)) return <PermissionDenied permissions={permissions} />;
+  return <>{children}</>;
+}
+
+function HomeRedirect() {
+  const { hasAnyPermission } = useAuth();
+  return <Navigate to={hasAnyPermission(['report.view']) ? '/dashboard' : '/my-work'} replace />;
+}
+
+function guarded(element: ReactNode, permissions?: string[]) {
+  return <RequirePermission permissions={permissions}>{element}</RequirePermission>;
+}
+
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   {
     element: <RequireAuth />,
     children: [
-      { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: '/dashboard', element: <DashboardPage /> },
+      { index: true, element: <HomeRedirect /> },
+      { path: '/dashboard', element: guarded(<DashboardPage />, ['report.view']) },
       { path: '/my-work', element: <MyWorkPage /> },
-      { path: '/projects', element: <ProjectsPage /> },
-      { path: '/projects/:id', element: <ProjectDetailPage /> },
-      { path: '/projects/:id/pipeline', element: <PlanningPage mode="pipeline" /> },
-      { path: '/projects/:id/planning', element: <PlanningPage /> },
-      { path: '/projects/:id/boq', element: <BOQPage /> },
-      { path: '/projects/:id/procurement', element: <ProcurementPage scoped /> },
-      { path: '/projects/:id/warehouse', element: <WarehousePage scoped /> },
-      { path: '/projects/:id/operations', element: <OperationsPage /> },
-      { path: '/projects/:id/acceptance', element: <AcceptancePage /> },
-      { path: '/projects/:id/rework', element: <ReworkPage /> },
-      { path: '/projects/:id/handover', element: <HandoverPage /> },
-      { path: '/projects/:id/accounting', element: <AccountingPage /> },
-      { path: '/projects/:id/debt', element: <DebtPage kind="both" /> },
-      { path: '/projects/:id/audit', element: <AuditPage scoped /> },
-      { path: '/pipeline-builder', element: <PipelineBuilderPage /> },
-      { path: '/pipeline-builder/:id', element: <PipelineBuilderPage /> },
-      { path: '/procurement', element: <ProcurementPage /> },
-      { path: '/warehouse', element: <WarehousePage /> },
-      { path: '/operations', element: <OperationsPage global /> },
-      { path: '/acceptance', element: <AcceptancePage global /> },
-      { path: '/rework', element: <ReworkPage /> },
-      { path: '/handover', element: <HandoverPage /> },
-      { path: '/accounting', element: <AccountingPage global /> },
-      { path: '/debt/payables', element: <DebtPage kind="payables" /> },
-      { path: '/debt/receivables', element: <DebtPage kind="receivables" /> },
-      { path: '/core-data', element: <CoreDataPage /> },
-      { path: '/staff', element: <StaffPage /> },
-      { path: '/roles', element: <RolesPage /> },
-      { path: '/permissions', element: <PermissionsPage /> },
-      { path: '/audit', element: <AuditPage /> },
-      { path: '/reports', element: <ReportsPage /> },
-      { path: '/settings', element: <SettingsPage /> },
+      { path: '/projects', element: guarded(<ProjectsPage />, ['project.view']) },
+      { path: '/projects/:id', element: guarded(<ProjectDetailPage />, ['project.view']) },
+      { path: '/projects/:id/pipeline', element: guarded(<PlanningPage mode="pipeline" />, ['pipeline.view']) },
+      { path: '/projects/:id/planning', element: guarded(<PlanningPage />, ['planning.view', 'pipeline.view']) },
+      { path: '/projects/:id/boq', element: guarded(<BOQPage />, ['boq.view']) },
+      { path: '/projects/:id/procurement', element: guarded(<ProcurementPage scoped />, ['procurement.view']) },
+      { path: '/projects/:id/warehouse', element: guarded(<WarehousePage scoped />, ['warehouse.view']) },
+      { path: '/projects/:id/operations', element: guarded(<OperationsPage />, ['operation.view']) },
+      { path: '/projects/:id/acceptance', element: guarded(<AcceptancePage />, ['acceptance.view']) },
+      { path: '/projects/:id/rework', element: guarded(<ReworkPage />, ['rework.view']) },
+      { path: '/projects/:id/handover', element: guarded(<HandoverPage />, ['handover.view']) },
+      { path: '/projects/:id/accounting', element: guarded(<AccountingPage />, ['accounting.view']) },
+      { path: '/projects/:id/debt', element: guarded(<DebtPage kind="both" />, ['accounting.payable_view', 'accounting.receivable_view']) },
+      { path: '/projects/:id/audit', element: guarded(<AuditPage scoped />, ['audit.view']) },
+      { path: '/pipeline-builder', element: guarded(<PipelineBuilderPage />, ['pipeline.view']) },
+      { path: '/pipeline-builder/:id', element: guarded(<PipelineBuilderPage />, ['pipeline.view']) },
+      { path: '/procurement', element: guarded(<ProcurementPage />, ['procurement.view']) },
+      { path: '/warehouse', element: guarded(<WarehousePage />, ['warehouse.view']) },
+      { path: '/operations', element: guarded(<OperationsPage global />, ['operation.view']) },
+      { path: '/acceptance', element: guarded(<AcceptancePage global />, ['acceptance.view']) },
+      { path: '/rework', element: guarded(<ReworkPage />, ['rework.view']) },
+      { path: '/handover', element: guarded(<HandoverPage />, ['handover.view']) },
+      { path: '/accounting', element: guarded(<AccountingPage global />, ['accounting.view']) },
+      { path: '/debt/payables', element: guarded(<DebtPage kind="payables" />, ['accounting.payable_view']) },
+      { path: '/debt/receivables', element: guarded(<DebtPage kind="receivables" />, ['accounting.receivable_view']) },
+      { path: '/core-data', element: guarded(<CoreDataPage />, ['catalog.view']) },
+      { path: '/staff', element: guarded(<StaffPage />, ['staff.view']) },
+      { path: '/roles', element: guarded(<RolesPage />, ['role.view']) },
+      { path: '/permissions', element: guarded(<PermissionsPage />, ['permission.view']) },
+      { path: '/audit', element: guarded(<AuditPage />, ['audit.view']) },
+      { path: '/reports', element: guarded(<ReportsPage />, ['report.view', 'report.finance.view']) },
+      { path: '/settings', element: guarded(<SettingsPage />, ['settings.view']) },
     ],
   },
 ]);

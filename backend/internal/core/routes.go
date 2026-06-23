@@ -14,15 +14,16 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, _ *redis.Client, cfg config.Conf
 	repo := NewRepository(db)
 	service := NewService(repo, cfg.JWTSecret)
 	service.ConfigureUploads(cfg.UploadDir, cfg.MaxUploadBytes)
+	service.ConfigureAuth(cfg.AuthAccessTokenMinutes, cfg.AuthRefreshTokenHours, cfg.AuthRefreshCookieSecure, cfg.AuthRefreshCookieSameSite)
 	h := NewHandler(service)
 
 	api := app.Group("/api")
 	api.Get("/health", h.Health)
 	api.Post("/auth/login", h.Login)
+	api.Post("/auth/refresh", h.Refresh)
+	api.Post("/auth/logout", h.Logout)
 
-	protected := api.Group("", middleware.AuthRequired(cfg.JWTSecret))
-	protected.Post("/auth/refresh", h.Refresh)
-	protected.Post("/auth/logout", h.Logout)
+	protected := api.Group("", middleware.AuthRequired(cfg.JWTSecret, repo))
 	protected.Get("/auth/me", h.Me)
 
 	protected.Get("/projects", h.ListProjects)
