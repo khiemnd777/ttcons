@@ -8,6 +8,7 @@ import { LoginPage } from '../modules/auth/LoginPage';
 import { DashboardPage } from '../modules/dashboard/DashboardPage';
 import { ProjectsPage } from '../modules/projects/ProjectsPage';
 import { ProjectDetailPage } from '../modules/projects/ProjectDetailPage';
+import { ProjectWorkspaceLayout } from '../modules/projects/ProjectWorkspaceLayout';
 import { MyWorkPage } from '../modules/my-work/MyWorkPage';
 import { PipelineBuilderPage } from '../modules/pipeline-builder/PipelineBuilderPage';
 import { WorkflowFormsPage } from '../modules/workflow-forms/WorkflowFormsPage';
@@ -47,7 +48,7 @@ function RequirePermission({ permissions, children }: { permissions?: string[]; 
 
 function HomeRedirect() {
   const { hasAnyPermission } = useAuth();
-  return <Navigate to={hasAnyPermission(['report.view']) ? '/dashboard' : '/my-work'} replace />;
+  return <Navigate to={hasAnyPermission(['project.view']) ? '/projects' : '/my-work'} replace />;
 }
 
 function guarded(element: ReactNode, permissions?: string[]) {
@@ -63,19 +64,25 @@ export const router = createBrowserRouter([
       { path: '/dashboard', element: guarded(<DashboardPage />, ['report.view']) },
       { path: '/my-work', element: <MyWorkPage /> },
       { path: '/projects', element: guarded(<ProjectsPage />, ['project.view']) },
-      { path: '/projects/:id', element: guarded(<ProjectDetailPage />, ['project.view']) },
-      { path: '/projects/:id/pipeline', element: guarded(<PlanningPage mode="pipeline" />, ['pipeline.view']) },
-      { path: '/projects/:id/planning', element: guarded(<PlanningPage />, ['planning.view', 'pipeline.view']) },
-      { path: '/projects/:id/boq', element: guarded(<BOQPage />, ['boq.view']) },
-      { path: '/projects/:id/procurement', element: guarded(<ProcurementPage scoped />, ['procurement.view']) },
-      { path: '/projects/:id/warehouse', element: guarded(<WarehousePage scoped />, ['warehouse.view']) },
-      { path: '/projects/:id/operations', element: guarded(<OperationsPage />, ['operation.view']) },
-      { path: '/projects/:id/acceptance', element: guarded(<AcceptancePage />, ['acceptance.view']) },
-      { path: '/projects/:id/rework', element: guarded(<ReworkPage />, ['rework.view']) },
-      { path: '/projects/:id/handover', element: guarded(<HandoverPage />, ['handover.view']) },
-      { path: '/projects/:id/accounting', element: guarded(<AccountingPage />, ['accounting.view']) },
-      { path: '/projects/:id/debt', element: guarded(<DebtPage kind="both" />, ['accounting.payable_view', 'accounting.receivable_view']) },
-      { path: '/projects/:id/audit', element: guarded(<AuditPage scoped />, ['audit.view']) },
+      {
+        path: '/projects/:id',
+        element: guarded(<ProjectWorkspaceLayout />, ['project.view']),
+        children: [
+          { index: true, element: <ProjectDetailPage /> },
+          { path: 'pipeline', element: guarded(<PlanningPage mode="pipeline" />, ['pipeline.view']) },
+          { path: 'planning', element: guarded(<PlanningPage />, ['planning.view', 'pipeline.view']) },
+          { path: 'boq', element: guarded(<BOQPage />, ['boq.view']) },
+          { path: 'procurement', element: guarded(<ProcurementPage scoped />, ['procurement.view']) },
+          { path: 'warehouse', element: guarded(<WarehousePage scoped />, ['warehouse.view']) },
+          { path: 'operations', element: guarded(<OperationsPage />, ['operation.view']) },
+          { path: 'acceptance', element: guarded(<AcceptancePage />, ['acceptance.view']) },
+          { path: 'rework', element: guarded(<ReworkPage />, ['rework.view']) },
+          { path: 'handover', element: guarded(<HandoverPage />, ['handover.view']) },
+          { path: 'accounting', element: guarded(<AccountingPage />, ['accounting.view']) },
+          { path: 'debt', element: guarded(<DebtPage kind="both" />, ['accounting.payable_view', 'accounting.receivable_view']) },
+          { path: 'audit', element: guarded(<AuditPage scoped />, ['audit.view']) },
+        ],
+      },
       { path: '/pipeline-builder', element: guarded(<PipelineBuilderPage />, ['pipeline.view']) },
       { path: '/pipeline-builder/:id', element: guarded(<PipelineBuilderPage />, ['pipeline.view']) },
       { path: '/workflow-forms', element: guarded(<WorkflowFormsPage />, ['pipeline.view']) },

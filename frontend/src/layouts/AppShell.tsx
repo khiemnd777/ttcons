@@ -1,26 +1,15 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
-  Boxes,
   BriefcaseBusiness,
   Building2,
-  ClipboardCheck,
-  ClipboardList,
   Database,
   FileClock,
-  FileText,
   GitBranch,
-  Handshake,
-  LayoutDashboard,
   LogOut,
-  PackageCheck,
-  Receipt,
   Settings,
   ShieldCheck,
   Users,
-  WalletCards,
-  Warehouse,
-  Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -35,46 +24,21 @@ type NavItem = {
 
 const navGroups: { title: string; items: NavItem[] }[] = [
   {
-    title: 'Tổng quan',
+    title: 'Làm việc',
     items: [
-      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permissions: ['report.view'] },
-      { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
-      { to: '/pipeline-builder', label: 'Pipeline Builder', icon: GitBranch, permissions: ['pipeline.view'] },
-      { to: '/workflow-forms', label: 'Workflow Forms', icon: FileText, permissions: ['pipeline.view'] },
-      { to: '/planning/daily-reports', label: 'Daily report KH', icon: ClipboardList, permissions: ['planning.view', 'pipeline.view'] },
-      { to: '/planning/meeting-minutes', label: 'Biên bản họp', icon: FileText, permissions: ['planning.view', 'pipeline.view'] },
-      { to: '/planning/checklists', label: 'Checklist KH', icon: ClipboardCheck, permissions: ['planning.view', 'pipeline.view'] },
+      { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
+      { to: '/reports', label: 'Báo cáo', icon: BarChart3, permissions: ['report.view', 'report.finance.view'] },
+      { to: '/pipeline-builder', label: 'Workflow', icon: GitBranch, permissions: ['pipeline.view'] },
     ],
   },
   {
-    title: 'Vận hành',
-    items: [
-      { to: '/procurement', label: 'Mua sắm vật tư', icon: PackageCheck, permissions: ['procurement.view'] },
-      { to: '/warehouse', label: 'Kho vật tư', icon: Warehouse, permissions: ['warehouse.view'] },
-      { to: '/operations', label: 'Thi công', icon: ClipboardList, permissions: ['operation.view'] },
-      { to: '/acceptance', label: 'Nghiệm thu', icon: ClipboardCheck, permissions: ['acceptance.view'] },
-      { to: '/rework', label: 'Rework / Replanning', icon: Wrench, permissions: ['rework.view'] },
-      { to: '/handover', label: 'Bàn giao', icon: Handshake, permissions: ['handover.view'] },
-    ],
-  },
-  {
-    title: 'Tài chính',
-    items: [
-      { to: '/accounting', label: 'Kế toán', icon: WalletCards, permissions: ['accounting.view'] },
-      { to: '/debt/payables', label: 'Công nợ đầu vào', icon: Receipt, permissions: ['accounting.payable_view'] },
-      { to: '/debt/receivables', label: 'Công nợ đầu ra', icon: Receipt, permissions: ['accounting.receivable_view'] },
-    ],
-  },
-  {
-    title: 'Hệ thống',
+    title: 'Quản trị',
     items: [
       { to: '/core-data', label: 'Dữ liệu lõi', icon: Database, permissions: ['catalog.view'] },
       { to: '/staff', label: 'Nhân sự', icon: Users, permissions: ['staff.view'] },
       { to: '/roles', label: 'Vai trò', icon: ShieldCheck, permissions: ['role.view'] },
-      { to: '/permissions', label: 'Phân quyền', icon: ShieldCheck, permissions: ['permission.view'] },
       { to: '/audit', label: 'Audit Log', icon: FileClock, permissions: ['audit.view'] },
-      { to: '/reports', label: 'Báo cáo', icon: BarChart3, permissions: ['report.view', 'report.finance.view'] },
       { to: '/settings', label: 'Cấu hình', icon: Settings, permissions: ['settings.view'] },
     ],
   },
@@ -91,7 +55,9 @@ export function AppShell() {
     }))
     .filter((group) => group.items.length > 0);
 
-  if (location.pathname.startsWith('/pipeline-builder')) {
+  const projectFocusMode = /^\/projects\/[^/]+/.test(location.pathname);
+
+  if (location.pathname.startsWith('/pipeline-builder') || projectFocusMode) {
     return (
       <div className="min-h-screen bg-surface">
         <Outlet />
@@ -143,8 +109,8 @@ export function AppShell() {
         <header className="sticky top-0 z-20 border-b border-line bg-white/95 px-4 py-3 backdrop-blur md:px-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Workflow Operating System</p>
-              <p className="text-sm font-medium text-ink">Quản lý điều kiện để công việc được phép xảy ra</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Construction Workflow OS</p>
+              <p className="text-sm font-medium text-ink">Bắt đầu từ công trình, xử lý nghiệp vụ theo cấu trúc rõ ràng</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden text-right sm:block">

@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -10,7 +10,6 @@ import {
   Clock3,
   FileText,
   GitBranch,
-  Layers3,
   Loader2,
   MessageSquare,
   PackageCheck,
@@ -68,21 +67,6 @@ type ProjectDetailTab = 'overview' | 'workflow' | 'work' | 'activity' | 'files' 
 const ALL_WORK_SURFACE = '__all__';
 const WORK_PAGE_SIZE = 10;
 
-const moduleLinks = [
-  ['Pipeline', 'pipeline'],
-  ['Planning', 'planning'],
-  ['BOQ / Dự toán', 'boq'],
-  ['Mua sắm', 'procurement'],
-  ['Kho', 'warehouse'],
-  ['Thi công', 'operations'],
-  ['Nghiệm thu', 'acceptance'],
-  ['Rework', 'rework'],
-  ['Bàn giao', 'handover'],
-  ['Kế toán', 'accounting'],
-  ['Công nợ', 'debt'],
-  ['Audit', 'audit'],
-];
-
 function currentTimelineNode(nodes: ProjectOperationsTimelineNode[]) {
   return nodes.find((node) => node.status === 'in_progress')
     ?? nodes.find((node) => node.status === 'blocked' || node.status === 'waiting_approval')
@@ -98,12 +82,16 @@ function nodeTone(status?: string) {
   return 'border-slate-200 bg-slate-50 text-slate-600';
 }
 
-function healthTone(value: number, alertTone: string, quietTone = 'border-line bg-white') {
-  return value > 0 ? alertTone : quietTone;
-}
-
 function isOpenWorkItem(item: WorkItem) {
   return item.status !== 'completed' && item.status !== 'cancelled';
+}
+
+function workOwner(item: WorkItem) {
+  return item.assignee_name ?? item.owner_name ?? item.responsible_name ?? item.department_name ?? departmentLabel(item.department) ?? '-';
+}
+
+function workDueDate(item: WorkItem) {
+  return item.due_date ?? item.due_at ?? item.deadline ?? item.planned_end_date;
 }
 
 export function ProjectDetailPage() {
@@ -112,6 +100,7 @@ export function ProjectDetailPage() {
   const [selectedDepartment, setSelectedDepartment] = useState(ALL_WORK_SURFACE);
   const [selectedTimelineNodeId, setSelectedTimelineNodeId] = useState('');
   const [activeTab, setActiveTab] = useState<ProjectDetailTab>('overview');
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -162,6 +151,13 @@ export function ProjectDetailPage() {
       || departmentSurfaces.some((surface) => (surface.department ?? 'unassigned') === selectedDepartment);
     if (!exists) setSelectedDepartment(ALL_WORK_SURFACE);
   }, [departmentSurfaces, selectedDepartment]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'overview' || tab === 'workflow' || tab === 'work' || tab === 'activity' || tab === 'files' || tab === 'audit' || tab === 'members') {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   function openWorkItem(item: WorkItem) {
     setSelectedWork(item);
@@ -232,19 +228,16 @@ export function ProjectDetailPage() {
         {activeTab === 'overview' ? (
           <div className="space-y-4">
             <ProjectSummaryBand project={project} currentNode={currentNode} visibility={data.visibility} />
-            <ModuleShortcuts projectId={id} />
             <HealthStrip data={data} />
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <NextWorkPanel
-                rows={activeWork}
-                onOpenWork={openWorkItem}
-                onShowAll={() => {
-                  setSelectedDepartment(ALL_WORK_SURFACE);
-                  setActiveTab('work');
-                }}
-              />
-              <CommandCenter data={data} blockers={blockers} onOpenWork={openWorkItem} />
-            </div>
+            <ProjectOverviewWorkPanel
+              activeWork={activeWork}
+              blockers={blockers}
+              onOpenWork={openWorkItem}
+              onShowAllWork={() => {
+                setSelectedDepartment(ALL_WORK_SURFACE);
+                setActiveTab('work');
+              }}
+            />
           </div>
         ) : null}
 
@@ -369,7 +362,7 @@ function ProjectDetailTabs({
   onChange: (tab: ProjectDetailTab) => void;
 }) {
   return (
-    <div className="mt-5 overflow-x-auto rounded-lg border border-line bg-white p-1 shadow-panel">
+    <div className="mt-5 overflow-x-auto border-b border-line">
       <div className="flex min-w-max gap-1">
         {tabs.map((tab) => {
           const active = tab.id === activeTab;
@@ -378,8 +371,8 @@ function ProjectDetailTabs({
               key={tab.id}
               type="button"
               className={clsx(
-                'inline-flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold transition focus-ring',
-                active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-ink',
+                'inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition focus-ring',
+                active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-ink',
               )}
               aria-pressed={active}
               onClick={() => onChange(tab.id)}
@@ -388,7 +381,7 @@ function ProjectDetailTabs({
               {typeof tab.count === 'number' ? (
                 <span className={clsx(
                   'rounded px-1.5 py-0.5 text-xs',
-                  active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500',
+                  active ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500',
                 )}
                 >
                   {tab.count}
@@ -462,66 +455,148 @@ function SummaryMetric({ label, value }: { label: string; value: ReactNode }) {
 
 function HealthStrip({ data }: { data: ProjectOperationsResponse }) {
   const health = data.health_counts ?? {};
-  const cards = [
+  const items = [
     {
       label: 'Need action',
       value: numberValue(health.active),
-      sub: `${numberValue(health.completed)} completed`,
       icon: <CircleDot className="h-4 w-4" />,
-      className: 'border-blue-200 bg-blue-50',
+      className: 'text-blue-700',
     },
     {
       label: 'Overdue',
       value: numberValue(health.overdue),
-      sub: 'Quá hạn',
       icon: <Clock3 className="h-4 w-4" />,
-      className: healthTone(numberValue(health.overdue), 'border-red-200 bg-red-50'),
+      className: numberValue(health.overdue) ? 'text-red-700' : 'text-slate-600',
     },
     {
       label: 'Blocked',
       value: numberValue(health.blocked),
-      sub: 'Đang bị chặn',
       icon: <AlertTriangle className="h-4 w-4" />,
-      className: healthTone(numberValue(health.blocked), 'border-rose-200 bg-rose-50'),
+      className: numberValue(health.blocked) ? 'text-rose-700' : 'text-slate-600',
     },
     {
       label: 'Approval',
       value: numberValue(health.waiting_approval),
-      sub: 'Chờ quyết định',
       icon: <CheckCircle2 className="h-4 w-4" />,
-      className: healthTone(numberValue(health.waiting_approval), 'border-amber-200 bg-amber-50'),
+      className: numberValue(health.waiting_approval) ? 'text-amber-700' : 'text-slate-600',
     },
     {
       label: 'Evidence',
       value: numberValue(health.waiting_evidence),
-      sub: 'Chờ hồ sơ',
       icon: <FileText className="h-4 w-4" />,
-      className: healthTone(numberValue(health.waiting_evidence), 'border-violet-200 bg-violet-50'),
+      className: numberValue(health.waiting_evidence) ? 'text-violet-700' : 'text-slate-600',
     },
     {
       label: 'Material',
       value: numberValue(health.material_risks),
-      sub: 'Rủi ro vật tư',
       icon: <PackageCheck className="h-4 w-4" />,
-      className: healthTone(numberValue(health.material_risks), 'border-orange-200 bg-orange-50'),
+      className: numberValue(health.material_risks) ? 'text-orange-700' : 'text-slate-600',
     },
   ];
 
   return (
-    <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-      {cards.map((card) => (
-        <div key={card.label} className={clsx('rounded-lg border p-4 shadow-panel', card.className)}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.label}</p>
-              <p className="mt-2 text-2xl font-semibold text-ink">{card.value}</p>
-            </div>
-            <div className="rounded-md bg-white/75 p-2 text-slate-700">{card.icon}</div>
+    <section className="rounded-lg border border-line bg-white px-4 py-3 shadow-panel">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        {items.map((item) => (
+          <div key={item.label} className="inline-flex items-center gap-2 border-r border-line pr-5 last:border-r-0 last:pr-0">
+            <span className={item.className}>{item.icon}</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</span>
+            <span className="text-sm font-semibold text-ink">{item.value}</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">{card.sub}</p>
-        </div>
-      ))}
+        ))}
+        <span className="text-xs text-slate-500">{numberValue(health.completed)} completed</span>
+      </div>
     </section>
+  );
+}
+
+function ProjectOverviewWorkPanel({
+  activeWork,
+  blockers,
+  onOpenWork,
+  onShowAllWork,
+}: {
+  activeWork: WorkItem[];
+  blockers: WorkItem[];
+  onOpenWork: (item: WorkItem) => void;
+  onShowAllWork: () => void;
+}) {
+  const approvalCount = activeWork.filter((item) => item.status === 'waiting_approval' || item.status === 'waiting_review').length;
+  const blockerCount = activeWork.filter((item) => item.status === 'blocked').length;
+
+  return (
+    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
+      <div className="flex flex-col gap-3 border-b border-line pb-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tổng quan vận hành</p>
+          <h2 className="mt-1 text-base font-semibold text-ink">Việc cần xử lý trong công trình</h2>
+          <p className="mt-1 text-sm text-slate-600">Cây nghiệp vụ bên trái là menu chính; bảng này chỉ giữ các việc đang mở quan trọng nhất.</p>
+        </div>
+        <button
+          type="button"
+          className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          onClick={onShowAllWork}
+        >
+          <TimerReset className="h-4 w-4" />
+          Mở danh sách việc
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line py-3 text-sm">
+        <span><span className="font-semibold text-ink">{activeWork.length}</span> việc đang mở</span>
+        <span><span className="font-semibold text-rose-700">{blockerCount}</span> blocker</span>
+        <span><span className="font-semibold text-amber-700">{approvalCount}</span> chờ duyệt</span>
+        <span><span className="font-semibold text-slate-700">{blockers.length}</span> blocker toàn công trình</span>
+      </div>
+
+      <WorkspaceWorkTable rows={activeWork.slice(0, 8)} onOpenWork={onOpenWork} />
+    </section>
+  );
+}
+
+function WorkspaceWorkTable({ rows, onOpenWork }: { rows: WorkItem[]; onOpenWork: (item: WorkItem) => void }) {
+  if (!rows.length) {
+    return <div className="pt-5"><EmptyState title="Không có việc đang mở trong folder này" /></div>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-line text-sm">
+        <thead className="bg-white">
+          <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <th className="px-0 py-3 pr-4">Việc</th>
+            <th className="px-3 py-3">Trạng thái</th>
+            <th className="px-3 py-3">Phụ trách</th>
+            <th className="px-3 py-3">Hạn</th>
+            <th className="px-0 py-3 pl-3 text-right">Mở</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {rows.map((item) => (
+            <tr key={item.id} className="hover:bg-slate-50">
+              <td className="max-w-md px-0 py-3 pr-4">
+                <p className="truncate font-semibold text-ink">{item.title}</p>
+                <p className="mt-1 truncate text-xs text-slate-500">{item.workflow_name ?? item.node_name ?? departmentLabel(item.department)}</p>
+              </td>
+              <td className="px-3 py-3"><StatusBadge status={item.status} /></td>
+              <td className="px-3 py-3 text-slate-700">{workOwner(item)}</td>
+              <td className="px-3 py-3 text-slate-600">{dateText(workDueDate(item))}</td>
+              <td className="px-0 py-3 pl-3 text-right">
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded-md border border-line p-1.5 text-blue-700 hover:bg-blue-50"
+                  title="Mở việc"
+                  aria-label="Mở việc"
+                  onClick={() => onOpenWork(item)}
+                >
+                  <ArrowUpRight className="h-4 w-4" />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -1039,28 +1114,6 @@ function SurfaceMetric({ label, value }: { label: string; value: number }) {
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-semibold text-ink">{value}</p>
     </div>
-  );
-}
-
-function ModuleShortcuts({ projectId }: { projectId: string }) {
-  return (
-    <section id="project-modules" className="rounded-lg border border-line bg-white p-4 shadow-panel">
-      <div className="mb-3 flex items-center gap-2">
-        <Layers3 className="h-5 w-5 text-blue-700" />
-        <h2 className="font-semibold text-ink">Module Shortcuts</h2>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-        {moduleLinks.map(([label, path]) => (
-          <Link
-            key={path}
-            to={`/projects/${projectId}/${path}`}
-            className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-          >
-            {label}
-          </Link>
-        ))}
-      </div>
-    </section>
   );
 }
 

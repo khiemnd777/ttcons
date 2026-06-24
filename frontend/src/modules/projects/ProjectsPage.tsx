@@ -1,25 +1,56 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FolderOpen, Plus } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  Folder,
+  FolderOpen,
+  Pencil,
+  Plus,
+  Search,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { get, post, put } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
-import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FormDrawer } from '../../components/FormDrawer';
 import { CurrencyText } from '../../components/CurrencyText';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
-import { RowActions } from '../../components/RowActions';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { EmptyState } from '../../components/EmptyState';
+import { useAuth } from '../../lib/auth/AuthContext';
 import { SimpleForm } from '../_shared/SimpleForm';
 import type { Partner, Project } from '../../lib/types/domain';
 import { partnerOptions } from '../core-data/partnerUtils';
 
+type ProjectFolder = {
+  key: string;
+  label: string;
+  description: string;
+  path: string;
+  permissions?: string[];
+};
+
+const projectFolders: ProjectFolder[] = [
+  { key: 'overview', label: 'Tổng quan', description: 'Tình trạng, việc cần xử lý, blocker', path: '', permissions: ['project.view'] },
+  { key: 'planning', label: 'Kế hoạch & Workflow', description: 'Pipeline, planning, BOQ / dự toán', path: '', permissions: ['planning.view', 'pipeline.view', 'boq.view'] },
+  { key: 'materials', label: 'Mua sắm & Vật tư', description: 'Mua sắm, kho vật tư, cân đối vật tư', path: '', permissions: ['procurement.view', 'warehouse.view'] },
+  { key: 'quality', label: 'Thi công & Chất lượng', description: 'Thi công, nghiệm thu, rework', path: '', permissions: ['operation.view', 'acceptance.view', 'rework.view'] },
+  { key: 'finance', label: 'Bàn giao & Tài chính', description: 'Bàn giao, kế toán, công nợ', path: '', permissions: ['handover.view', 'accounting.view', 'accounting.payable_view', 'accounting.receivable_view'] },
+  { key: 'governance', label: 'Quản trị công trình', description: 'Thành viên, hồ sơ, audit', path: '', permissions: ['audit.view', 'project.view'] },
+];
+
 export function ProjectsPage() {
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<{ mode: 'view' | 'edit'; record: Project } | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { hasAnyPermission } = useAuth();
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Project[]>('/projects') });
   const templates = useQuery({ queryKey: ['pipeline-templates'], queryFn: () => get<Record<string, any>[]>('/pipeline-templates') });
   const partners = useQuery({ queryKey: ['partners', 'client', 'active'], queryFn: () => get<Partner[]>('/partners?status=active&type=client') });
@@ -74,11 +105,45 @@ export function ProjectsPage() {
     },
   ];
 
+  const visibleFolders = useMemo(
+    () => projectFolders.filter((folder) => hasAnyPermission(folder.permissions)),
+    [hasAnyPermission],
+  );
+  const statusOptions = useMemo(() => {
+    const values = new Set((projects.data ?? []).map((project) => project.status).filter(Boolean));
+    return Array.from(values).sort();
+  }, [projects.data]);
+  const filteredProjects = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (projects.data ?? []).filter((project) => {
+      const matchesStatus = statusFilter ? project.status === statusFilter : true;
+      const haystack = [project.name, project.code, project.client_name, project.pm_name].filter(Boolean).join(' ').toLowerCase();
+      return matchesStatus && (!query || haystack.includes(query));
+    });
+  }, [projects.data, search, statusFilter]);
+
+  useEffect(() => {
+    if (!projects.data?.length) return;
+    setExpandedProjectIds((current) => {
+      if (current.size) return current;
+      return new Set([projects.data[0].id]);
+    });
+  }, [projects.data]);
+
+  function toggleProject(projectId: string) {
+    setExpandedProjectIds((current) => {
+      const next = new Set(current);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  }
+
   return (
     <>
       <PageHeader
         title="Công trình"
-        description="Quản lý danh sách công trình, trạng thái pipeline, PM phụ trách, ngân sách và các điểm đang bị block."
+        description="Chọn công trình trước, sau đó mở cây nghiệp vụ bên trong công trình."
         actions={
           <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -86,44 +151,84 @@ export function ProjectsPage() {
           </button>
         }
       />
-      <DataTable
-        rows={projects.data ?? []}
-        loading={projects.isLoading}
-        error={projects.error}
-        onRetry={() => projects.refetch()}
-        searchPlaceholder="Tìm công trình, mã, chủ đầu tư"
-        pageSize={10}
-        defaultSort={{ key: 'name', direction: 'asc' }}
-        columns={[
-          {
-            key: 'name',
-            header: 'Công trình',
-            sortable: true,
-            render: (row) => (
-              <button className="font-semibold text-blue-700 hover:underline" onClick={() => setDialog({ mode: 'view', record: row })}>
-                {row.name}
+
+      <section className="rounded-lg border border-line bg-white shadow-panel">
+        <div className="border-b border-line p-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                className="w-full rounded-md border border-line bg-white py-2 pl-9 pr-3 text-sm focus-ring"
+                value={search}
+                placeholder="Tìm công trình, mã, chủ đầu tư"
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            <select
+              className="rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value="">Tất cả trạng thái</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <ProjectExplorerHeader />
+
+        {projects.isLoading ? (
+          <div className="p-8">
+            <LoadingSpinner />
+          </div>
+        ) : null}
+
+        {projects.error ? (
+          <div className="p-5">
+            <div className="rounded-md border border-rose-200 bg-rose-50 p-4">
+              <p className="text-sm font-semibold text-rose-800">Không tải được danh sách công trình</p>
+              <p className="mt-1 text-sm text-rose-700">{projects.error instanceof Error ? projects.error.message : 'Vui lòng thử lại.'}</p>
+              <button className="mt-3 rounded-md bg-white px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100" onClick={() => projects.refetch()}>
+                Tải lại
               </button>
-            ),
-          },
-          { key: 'code', header: 'Mã', sortable: true },
-          { key: 'client_name', header: 'Chủ đầu tư', sortable: true },
-          { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
-          { key: 'estimated_budget', header: 'Ngân sách', align: 'right', sortable: true, sortValue: (row) => Number(row.estimated_budget ?? 0), render: (row) => <CurrencyText value={row.estimated_budget} /> },
-          { key: 'progress_percent', header: 'Tiến độ', align: 'right', sortable: true, sortValue: (row) => Number(row.progress_percent ?? 0), render: (row) => `${row.progress_percent ?? 0}%` },
-          {
-            key: 'actions',
-            header: 'Action',
-            align: 'right',
-            render: (row) => (
-              <RowActions onView={() => setDialog({ mode: 'view', record: row })} onEdit={() => setDialog({ mode: 'edit', record: row })}>
-                <Link title="Mở module công trình" aria-label="Mở module công trình" className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100" to={`/projects/${row.id}`}>
-                  <FolderOpen className="h-4 w-4" />
-                </Link>
-              </RowActions>
-            ),
-          },
-        ]}
-      />
+            </div>
+          </div>
+        ) : null}
+
+        {!projects.isLoading && !projects.error && !filteredProjects.length ? (
+          <div className="p-6">
+            <EmptyState title={projects.data?.length ? 'Không tìm thấy công trình phù hợp' : 'Chưa có công trình'} />
+          </div>
+        ) : null}
+
+        {!projects.isLoading && !projects.error && filteredProjects.length ? (
+          <div className="divide-y divide-line">
+            {filteredProjects.map((project) => {
+              const expanded = expandedProjectIds.has(project.id);
+              return (
+                <div key={project.id}>
+                  <ProjectExplorerRow
+                    project={project}
+                    expanded={expanded}
+                    onToggle={() => toggleProject(project.id)}
+                    onView={() => setDialog({ mode: 'view', record: project })}
+                    onEdit={() => setDialog({ mode: 'edit', record: project })}
+                  />
+                  {expanded ? (
+                    <div className="border-t border-slate-100 bg-slate-50/70 py-2">
+                      {visibleFolders.map((folder) => (
+                        <ProjectFolderRow key={folder.key} project={project} folder={folder} />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </section>
 
       <FormDrawer open={open} title="Tạo công trình mới" onClose={() => setOpen(false)}>
         <SimpleForm
@@ -163,5 +268,116 @@ export function ProjectsPage() {
         ) : null}
       </FormDrawer>
     </>
+  );
+}
+
+function ProjectExplorerHeader() {
+  return (
+    <div className="hidden grid-cols-[minmax(0,1.6fr)_160px_150px_120px_140px] gap-4 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+      <span>Cây công trình</span>
+      <span>Trạng thái</span>
+      <span>PM</span>
+      <span>Tiến độ</span>
+      <span className="text-right">Mở</span>
+    </div>
+  );
+}
+
+function ProjectExplorerRow({
+  project,
+  expanded,
+  onToggle,
+  onView,
+  onEdit,
+}: {
+  project: Project;
+  expanded: boolean;
+  onToggle: () => void;
+  onView: () => void;
+  onEdit: () => void;
+}) {
+  return (
+    <div className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1.6fr)_160px_150px_120px_140px] lg:items-center">
+      <div className="flex min-w-0 items-start gap-3">
+        <button
+          type="button"
+          className="mt-0.5 rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-blue-700 focus-ring"
+          aria-label={expanded ? 'Thu gọn công trình' : 'Mở rộng công trình'}
+          onClick={onToggle}
+        >
+          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </button>
+        <FolderOpen className="mt-1 h-4 w-4 shrink-0 text-blue-700" />
+        <div className="min-w-0">
+          <Link to={`/projects/${project.id}`} className="block truncate text-sm font-semibold text-ink hover:text-blue-700">
+            {project.code} · {project.name}
+          </Link>
+          <p className="mt-1 truncate text-xs text-slate-500">
+            {project.client_name || project.partner_name || 'Chưa có chủ đầu tư'}
+          </p>
+        </div>
+      </div>
+
+      <div><StatusBadge status={project.status} /></div>
+      <div className="text-sm text-slate-700">{project.pm_name ?? '-'}</div>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, Math.max(0, Number(project.progress_percent ?? 0)))}%` }} />
+          </div>
+          <span className="text-xs font-semibold text-slate-600">{project.progress_percent ?? 0}%</span>
+        </div>
+      </div>
+      <div className="flex items-center justify-start gap-2 lg:justify-end">
+        <button
+          type="button"
+          className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100"
+          title="Xem nhanh"
+          aria-label="Xem nhanh công trình"
+          onClick={onView}
+        >
+          <Eye className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100"
+          title="Chỉnh sửa"
+          aria-label="Chỉnh sửa công trình"
+          onClick={onEdit}
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <Link
+          title="Mở cây nghiệp vụ"
+          aria-label="Mở cây nghiệp vụ công trình"
+          className="rounded-md border border-line p-1.5 text-blue-700 hover:bg-blue-50"
+          to={`/projects/${project.id}`}
+        >
+          <FolderOpen className="h-4 w-4" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function ProjectFolderRow({ project, folder }: { project: Project; folder: ProjectFolder }) {
+  const href = folder.path ? `/projects/${project.id}/${folder.path}` : `/projects/${project.id}`;
+  return (
+    <Link
+      to={href}
+      className="grid gap-3 px-4 py-2 hover:bg-white lg:grid-cols-[minmax(0,1.6fr)_160px_150px_120px_140px] lg:items-center"
+    >
+      <div className="ml-8 flex min-w-0 items-start gap-3 border-l border-slate-200 pl-4">
+        <Folder className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-700">{folder.label}</p>
+          <p className="mt-0.5 truncate text-xs text-slate-500">{folder.description}</p>
+        </div>
+      </div>
+      <span className="hidden text-xs text-slate-400 lg:block">Folder</span>
+      <span className="hidden text-xs text-slate-400 lg:block">Theo quyền</span>
+      <span className="hidden text-xs text-slate-400 lg:block">-</span>
+      <span className="hidden text-right text-xs font-semibold text-blue-700 lg:block">Mở</span>
+    </Link>
   );
 }
