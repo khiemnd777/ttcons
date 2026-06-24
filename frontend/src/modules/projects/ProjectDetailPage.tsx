@@ -204,7 +204,7 @@ export function ProjectDetailPage() {
         description={
           [
             project.client_name ? `Client: ${project.client_name}` : null,
-            project.pm_name ? `PM: ${project.pm_name}` : null,
+            project.pm_name ? `Phụ trách: ${project.pm_name}` : null,
             project.status ? `Trạng thái: ${statusLabel(project.status)}` : null,
             project.planned_end_date ? `Kết thúc: ${dateText(project.planned_end_date)}` : null,
           ].filter(Boolean).join(' · ')

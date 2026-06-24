@@ -24,6 +24,7 @@ Done:
 - Updated `AppShell` so project focus mode hides the global sidebar/header, matching the focused `pipeline-builder` behavior.
 - Removed the old embedded business tree from `ProjectDetailPage`; the project workspace layout is now the single owner of that menu.
 - Added query-tab support for project members/files links from the workspace tree.
+- Replaced user-facing `PM` labels with `Phụ trách` and removed internal `Folder` / `Theo quyền` text from project folder rows.
 - Kept backend APIs, routes, migrations, and project-scoped module routes unchanged.
 - Ran `cd frontend && npm run build` successfully after both project-first and focus-mode changes.
 

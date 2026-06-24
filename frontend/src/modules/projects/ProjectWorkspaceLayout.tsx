@@ -131,7 +131,7 @@ export function ProjectWorkspaceLayout() {
               <p className="truncate text-xs text-slate-500">
                 {[
                   project?.client_name ? `Chủ đầu tư: ${project.client_name}` : null,
-                  project?.pm_name ? `PM: ${project.pm_name}` : null,
+                  project?.pm_name ? `Phụ trách: ${project.pm_name}` : null,
                   project?.status ? `Trạng thái: ${statusLabel(project.status)}` : null,
                 ].filter(Boolean).join(' · ') || 'Cây nghiệp vụ là menu chính trong scope công trình'}
               </p>

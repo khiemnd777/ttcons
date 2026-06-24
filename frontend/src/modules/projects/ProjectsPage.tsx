@@ -276,7 +276,7 @@ function ProjectExplorerHeader() {
     <div className="hidden grid-cols-[minmax(0,1.6fr)_160px_150px_120px_140px] gap-4 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
       <span>Cây công trình</span>
       <span>Trạng thái</span>
-      <span>PM</span>
+      <span>Phụ trách</span>
       <span>Tiến độ</span>
       <span className="text-right">Mở</span>
     </div>
@@ -374,9 +374,9 @@ function ProjectFolderRow({ project, folder }: { project: Project; folder: Proje
           <p className="mt-0.5 truncate text-xs text-slate-500">{folder.description}</p>
         </div>
       </div>
-      <span className="hidden text-xs text-slate-400 lg:block">Folder</span>
-      <span className="hidden text-xs text-slate-400 lg:block">Theo quyền</span>
-      <span className="hidden text-xs text-slate-400 lg:block">-</span>
+      <span className="hidden text-xs text-slate-400 lg:block" />
+      <span className="hidden text-xs text-slate-400 lg:block" />
+      <span className="hidden text-xs text-slate-400 lg:block" />
       <span className="hidden text-right text-xs font-semibold text-blue-700 lg:block">Mở</span>
     </Link>
   );
