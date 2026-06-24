@@ -16,7 +16,8 @@ Use this skill before broad repo scans when a prompt contains module, feature, d
 5. Start with the listed owner files, then use targeted `rg` searches inside those paths.
 6. If the cache conflicts with local code, trust local code and update the cache as part of the change when appropriate.
 7. For feature, bugfix, code-changing, or UI-changing work, keep the human review gates from `AGENTS.md`.
-8. Pair with the narrower Consflow skill after routing:
+8. Pair with `consflow-impact-analysis` when the request may overlap existing features, mutate shared state, change status transitions, affect reports/exports, or cross backend/frontend/domain boundaries.
+9. Pair with the narrower Consflow skill after routing:
    - Backend/API/schema: `consflow-backend-workflow`.
    - Frontend/admin UI: `consflow-frontend-workflow`.
    - Workflow orchestration, approvals, workflow forms, work item gates: `consflow-workflow-orchestration-domain`.

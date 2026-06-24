@@ -4,6 +4,7 @@ Repo-scoped skills in this directory:
 
 - `consflow-repo-architect`: routes broad or cross-cutting work across backend, frontend, migrations, and Docker.
 - `consflow-module-memory`: maps prompt keywords and aliases to Consflow modules, routes, tables, utilities, and domain risks before broad scans.
+- `consflow-impact-analysis`: analyzes feature overlap, logic collision, shared state, contract drift, and downstream module effects before risky changes.
 - `consflow-backend-workflow`: implements Go/Fiber/PostgreSQL backend changes with custom migrations.
 - `consflow-frontend-workflow`: implements React/Vite admin UI changes.
 - `consflow-workflow-orchestration-domain`: protects pipeline templates, runtime runs, work items, approvals, workflow forms, signatures, PDFs, and execution gates.

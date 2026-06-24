@@ -1,0 +1,7 @@
+interface:
+  display_name: "Consflow Impact Analysis"
+  short_description: "Find overlap and collision risks"
+  default_prompt: "Use $consflow-impact-analysis to map this Consflow change against existing modules, contracts, status flows, RBAC, audit, reports, and downstream domain risks before implementation."
+
+policy:
+  allow_implicit_invocation: true

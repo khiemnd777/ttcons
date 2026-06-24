@@ -18,10 +18,12 @@ Use this skill before broad implementation or review work in Consflow.
    - Docker/Makefile operations
    - cross-contract change
    - business domain skill ownership
-3. If the request is a feature, bugfix, or code-changing task, prepare a review package and wait for explicit user confirmation before implementation.
-4. If the request changes UI or visual interface, prepare a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
-5. Identify the ownership path before editing:
+3. If the work may overlap existing features, mutate shared state, change status transitions, affect reports/exports, or cross backend/frontend/domain boundaries, run `consflow-impact-analysis` before proposing or editing behavior.
+4. If the request is a feature, bugfix, or code-changing task, prepare a review package and wait for explicit user confirmation before implementation.
+5. If the request changes UI or visual interface, prepare a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
+6. Identify the ownership path before editing:
    - Module/feature keyword cache: `.agents/skills/consflow-module-memory/references/module-keyword-map.md`
+   - Feature overlap / logic collision: `consflow-impact-analysis`
    - Workflow orchestration: `consflow-workflow-orchestration-domain`
    - Project planning: `consflow-project-planning-domain`
    - Construction operations: `consflow-construction-operations-domain`
@@ -38,8 +40,8 @@ Use this skill before broad implementation or review work in Consflow.
    - Frontend route: `frontend/src/app/router.tsx`
    - Frontend module: `frontend/src/modules/<feature>`
    - Shared UI/API/types: `frontend/src/components`, `frontend/src/lib`
-6. State the verification plan before substantial edits.
-7. Pair with the narrower layer skill and the business domain skill that owns the invariants.
+7. State the verification plan before substantial edits.
+8. Pair with the narrower layer skill and the business domain skill that owns the invariants.
 
 ## Architecture Guardrails
 
@@ -55,6 +57,7 @@ Use this skill before broad implementation or review work in Consflow.
 
 - Name the files that own the requested behavior.
 - Name the selected domain skill and why it owns the invariant.
+- Call out overlap/collision findings when `consflow-impact-analysis` applies.
 - Call out API contract changes explicitly.
 - List the commands needed to verify the change.
 - Mention residual risks when a full Docker or browser check was not run.
