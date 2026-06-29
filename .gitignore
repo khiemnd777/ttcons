@@ -10,6 +10,8 @@ frontend/dist/
 tmp/
 uploads/
 backend/uploads/
+!backend/seed/uploads/
+!backend/seed/uploads/**
 
 # env
 .env

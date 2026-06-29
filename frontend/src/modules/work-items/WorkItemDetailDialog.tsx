@@ -14,12 +14,13 @@ import type { ActivityPayload, EvidenceRecord, WorkItem, WorkItemActivity } from
 import { ActivityAttachments } from './ActivityAttachments';
 import { ActivityComposer, type ActivityAttachmentOption } from './ActivityComposer';
 import { EvidencePanel } from './EvidencePanel';
-import { IncomingAcceptancePanel } from './IncomingAcceptancePanel';
-import { MaterialSnapshotPanel } from './MaterialSnapshotPanel';
-import { OwnerClientReconciliationPanel } from './OwnerClientReconciliationPanel';
-import { OutgoingAcceptancePanel } from './OutgoingAcceptancePanel';
-import { SubcontractorReconciliationPanel } from './SubcontractorReconciliationPanel';
-import { SurplusHandlingPanel } from './SurplusHandlingPanel';
+import {
+  WorkItemPrimarySurface,
+  primarySurfaceUsesEvidence,
+  primarySurfaceUsesWorkflowForm,
+  resolveWorkItemPrimarySurface,
+  type WorkItemPrimarySurfaceKind,
+} from './WorkItemPrimarySurface';
 import { WorkflowFormPanel } from './WorkflowFormPanel';
 import {
   actionDescriptions,
@@ -114,6 +115,7 @@ export function WorkItemDetailDialog({
   const activities = asArray<WorkItemActivity>(detailItem?.activities);
   const attachmentOptions = buildActivityAttachmentOptions(evidence);
   const requirement = detailItem?.evidence_requirement_json ?? {};
+  const primarySurface = detailItem ? resolveWorkItemPrimarySurface(detailItem) : null;
   const workContextLabel = detailItem?.run_node_name
     ?? detailItem?.run_step_name
     ?? (detailItem?.work_type ? workTypeLabel(detailItem.work_type) : 'Runtime work');
@@ -199,7 +201,7 @@ export function WorkItemDetailDialog({
           {detailItem.description ? <p className="rounded-md border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-700">{detailItem.description}</p> : null}
           {detailItem.blocked_reason ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-700">{detailItem.blocked_reason}</p> : null}
 
-          <WorkItemExecutionSummary item={detailItem} evidence={evidence} actions={actions} />
+          <WorkItemExecutionSummary item={detailItem} evidence={evidence} actions={actions} primarySurfaceKind={primarySurface?.kind} />
 
           <section>
             <h3 className="mb-2 text-sm font-semibold text-ink">Required Evidence</h3>
@@ -214,57 +216,138 @@ export function WorkItemDetailDialog({
             </div>
           </section>
 
-          <WorkflowFormPanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
+          {primarySurface ? <WorkItemPrimarySurface item={detailItem} evidence={evidence} surface={primarySurface} /> : null}
 
-          <SubcontractorReconciliationPanel workItemId={detailItem.id} projectId={detailItem.project_id} />
-
-          <OwnerClientReconciliationPanel workItemId={detailItem.id} projectId={detailItem.project_id} />
-
-          <MaterialSnapshotPanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
-
-          <SurplusHandlingPanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
-
-          <IncomingAcceptancePanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
-
-          <OutgoingAcceptancePanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <EvidencePanel workItemId={detailItem.id} projectId={detailItem.project_id} evidence={evidence} />
-            <section>
-              <h3 className="mb-2 text-sm font-semibold text-ink">Activity</h3>
-              <ActivityComposer
-                mode="work_item"
-                attachmentOptions={attachmentOptions}
-                submitting={activityAction.isPending}
-                onSubmit={(payload) => {
-                  if (!detailItem.id) return Promise.resolve();
-                  return activityAction.mutateAsync({ workItemId: detailItem.id, payload }).then(() => undefined);
-                }}
-              />
-              {activities.length ? (
-                <div className="mt-3 space-y-2">
-                  {activities.map((activity) => (
-                    <div key={activity.id} className="rounded-md border border-line px-3 py-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-semibold text-ink">{activityLabel(activity.activity_type)}</p>
-                        {activity.visibility ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{visibilityLabel(activity.visibility)}</span> : null}
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {activity.actor_name ?? 'System'} · {compactDateTime(activity.created_at)}
-                      </p>
-                      {activity.comment ? <p className="mt-2 text-sm text-slate-700">{activity.comment}</p> : null}
-                      <ActivityAttachments attachments={activity.attachments} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="Chưa có activity cho work item này" />
-              )}
-            </section>
-          </div>
+          {primarySurface ? (
+            <WorkItemSupportingTabs
+              item={detailItem}
+              evidence={evidence}
+              activities={activities}
+              attachmentOptions={attachmentOptions}
+              activitySubmitting={activityAction.isPending}
+              primarySurfaceKind={primarySurface.kind}
+              onSubmitActivity={(payload) => {
+                if (!detailItem.id) return Promise.resolve();
+                return activityAction.mutateAsync({ workItemId: detailItem.id, payload }).then(() => undefined);
+              }}
+            />
+          ) : null}
         </div>
       ) : null}
     </Dialog>
+  );
+}
+
+type SupportTabKey = 'evidence' | 'activity' | 'form';
+
+function WorkItemSupportingTabs({
+  item,
+  evidence,
+  activities,
+  attachmentOptions,
+  activitySubmitting,
+  primarySurfaceKind,
+  onSubmitActivity,
+}: {
+  item: WorkItem;
+  evidence: EvidenceRecord[];
+  activities: WorkItemActivity[];
+  attachmentOptions: ActivityAttachmentOption[];
+  activitySubmitting: boolean;
+  primarySurfaceKind: WorkItemPrimarySurfaceKind;
+  onSubmitActivity: (payload: ActivityPayload) => Promise<void>;
+}) {
+  const [selectedTab, setSelectedTab] = useState<SupportTabKey>('evidence');
+  const tabs: Array<{ id: SupportTabKey; label: string; count?: number; status?: string }> = [];
+  if (!primarySurfaceUsesEvidence(primarySurfaceKind)) {
+    tabs.push({ id: 'evidence', label: 'Evidence', count: evidence.length });
+  }
+  tabs.push({ id: 'activity', label: 'Activity', count: activities.length });
+  if (hasWorkflowFormSummary(item) && !primarySurfaceUsesWorkflowForm(primarySurfaceKind)) {
+    tabs.push({ id: 'form', label: 'Form / PDF', status: item.workflow_form_status ?? 'draft' });
+  }
+  const activeTab = tabs.some((tab) => tab.id === selectedTab) ? selectedTab : tabs[0]?.id ?? 'activity';
+
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Thông tin hỗ trợ</h3>
+          <p className="mt-1 text-xs text-slate-500">Evidence, activity và biểu mẫu phụ không chen vào luồng xử lý chính.</p>
+        </div>
+        <div className="flex flex-wrap gap-1 rounded-md bg-slate-100 p-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={clsx(
+                'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold',
+                activeTab === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-white/70',
+              )}
+              onClick={() => setSelectedTab(tab.id)}
+            >
+              {tab.label}
+              {typeof tab.count === 'number' ? <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] text-slate-700">{tab.count}</span> : null}
+              {tab.status ? <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] text-emerald-700">{tab.status}</span> : null}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} /> : null}
+      {activeTab === 'activity' ? (
+        <WorkItemActivityPanel
+          activities={activities}
+          attachmentOptions={attachmentOptions}
+          submitting={activitySubmitting}
+          onSubmit={onSubmitActivity}
+        />
+      ) : null}
+      {activeTab === 'form' ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} /> : null}
+    </section>
+  );
+}
+
+function WorkItemActivityPanel({
+  activities,
+  attachmentOptions,
+  submitting,
+  onSubmit,
+}: {
+  activities: WorkItemActivity[];
+  attachmentOptions: ActivityAttachmentOption[];
+  submitting: boolean;
+  onSubmit: (payload: ActivityPayload) => Promise<void>;
+}) {
+  return (
+    <section>
+      <h3 className="mb-2 text-sm font-semibold text-ink">Activity</h3>
+      <ActivityComposer
+        mode="work_item"
+        attachmentOptions={attachmentOptions}
+        submitting={submitting}
+        onSubmit={onSubmit}
+      />
+      {activities.length ? (
+        <div className="mt-3 space-y-2">
+          {activities.map((activity) => (
+            <div key={activity.id} className="rounded-md border border-line px-3 py-2">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-semibold text-ink">{activityLabel(activity.activity_type)}</p>
+                {activity.visibility ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{visibilityLabel(activity.visibility)}</span> : null}
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {activity.actor_name ?? 'System'} · {compactDateTime(activity.created_at)}
+              </p>
+              {activity.comment ? <p className="mt-2 text-sm text-slate-700">{activity.comment}</p> : null}
+              <ActivityAttachments attachments={activity.attachments} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="Chưa có activity cho work item này" />
+      )}
+    </section>
   );
 }
 
@@ -309,10 +392,12 @@ function WorkItemExecutionSummary({
   item,
   evidence,
   actions,
+  primarySurfaceKind,
 }: {
   item: WorkItem;
   evidence: EvidenceRecord[];
   actions: WorkItemActionKey[];
+  primarySurfaceKind?: WorkItemPrimarySurfaceKind;
 }) {
   const requirement = item.evidence_requirement_json ?? {};
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
@@ -324,8 +409,11 @@ function WorkItemExecutionSummary({
   ].filter(Boolean);
   const missingEvidence = requiredKinds.length > 0 && activeEvidence.length === 0;
   const missingRequiredForm = hasWorkflowFormSummary(item) && item.workflow_form_required && item.workflow_form_status !== 'submitted';
+  const surfaceNextAction = primarySurfaceKind ? primarySurfaceNextAction(primarySurfaceKind, actions) : null;
   const nextAction = item.status === 'blocked'
     ? 'Resolve blocker'
+    : surfaceNextAction
+      ? surfaceNextAction
     : missingRequiredForm
       ? workflowFormNextAction(item)
     : missingEvidence
@@ -359,6 +447,29 @@ function WorkItemExecutionSummary({
       </div>
     </section>
   );
+}
+
+function primarySurfaceNextAction(kind: WorkItemPrimarySurfaceKind, actions: WorkItemActionKey[]) {
+  switch (kind) {
+    case 'evidence':
+      return 'Upload evidence';
+    case 'incoming_acceptance':
+      return 'Ghi nhận nghiệm thu đầu vào';
+    case 'material_snapshot':
+      return 'Lưu snapshot vật tư';
+    case 'surplus_handling':
+      return 'Xử lý vật tư dư';
+    case 'outgoing_acceptance':
+      return 'Lập biên bản nghiệm thu';
+    case 'owner_client_reconciliation':
+      return 'Đối chiếu chủ đầu tư';
+    case 'subcontractor_reconciliation':
+      return 'Đối chiếu thầu phụ';
+    case 'generic':
+      return actions.length ? actionLabels[actions[0]] : 'Theo dõi activity';
+    default:
+      return null;
+  }
 }
 
 function SummaryPill({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {

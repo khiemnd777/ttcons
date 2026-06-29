@@ -16,8 +16,13 @@ migrate-check:
 seed:
 	@if docker compose -f ../docker-compose.yml ps --status running postgres >/dev/null 2>&1; then \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -U consflow -d consflow < seed/seed.sql; \
+		if docker compose -f ../docker-compose.yml ps --status running backend >/dev/null 2>&1; then \
+			docker compose -f ../docker-compose.yml cp seed/uploads/. backend:/app/uploads/ >/dev/null; \
+		fi; \
 	else \
 		psql "$(DATABASE_URL)" -f seed/seed.sql; \
+		mkdir -p "$${UPLOAD_DIR:-uploads}"; \
+		cp -R seed/uploads/. "$${UPLOAD_DIR:-uploads}/"; \
 	fi
 
 test:

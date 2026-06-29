@@ -1,13 +1,31 @@
 TRUNCATE TABLE
-  audit_logs, documents, advance_requests, payments, receivables, payables, accounting_budgets,
+  audit_logs,
+  activity_mentions, activity_read_states,
+  receipt_allocations, client_advance_receipts, receivable_payment_schedules,
+  payment_allocations, payable_payment_schedules,
+  output_invoices, input_invoices,
+  incoming_acceptance_items, incoming_acceptance_records,
+  site_surplus_handlings,
+  material_before_after_snapshot_items, material_before_after_snapshots,
+  owner_client_checklist_reconciliation_items, owner_client_checklist_reconciliations,
+  subcontractor_checklist_reconciliation_items, subcontractor_checklist_reconciliations,
+  workflow_form_pdf_exports, workflow_form_signatures, workflow_form_events,
+  workflow_form_answers, workflow_form_instances,
+  evidence_records, work_item_activities, work_item_assignments, work_items,
+  documents, advance_requests, payments, receivables, payables, accounting_budgets,
   handover_records, replanning_requests, rework_requests, acceptance_checklist_items,
   acceptance_records, issues, operation_daily_reports, site_material_balances, stock_movements,
-  procurement_request_items, procurement_requests, boq_items, approval_actions, approval_requests,
-  approval_rules, pipeline_run_steps, pipeline_run_nodes, pipeline_runs, project_members, projects,
+  procurement_request_items, procurement_requests, boq_unit_price_events, boq_items,
+  approval_actions, approval_requests, approval_rules,
+  pipeline_run_edges, pipeline_run_steps, pipeline_run_nodes, pipeline_runs, project_members, projects,
   pipeline_template_edges, pipeline_template_steps, pipeline_template_nodes, pipeline_templates,
-  auth_sessions, user_roles, role_permissions, permissions, roles, staff, users, warehouses, materials, partners,
+  auth_sessions, user_roles, role_permissions, permissions, roles, staff, warehouses, materials, partners,
   system_settings
-RESTART IDENTITY CASCADE;
+RESTART IDENTITY;
+
+UPDATE workflow_form_templates SET created_by = NULL WHERE created_by IS NOT NULL;
+UPDATE workflow_form_versions SET created_by = NULL WHERE created_by IS NOT NULL;
+DELETE FROM users;
 
 INSERT INTO users (id, email, password_hash, full_name, status) VALUES
 ('10000000-0000-0000-0000-000000000001','admin@consflow.local','demo:123456','Admin hệ thống','active'),
@@ -278,10 +296,10 @@ INSERT INTO acceptance_records (id, project_id, type, title, requested_by, statu
 ('71000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','partial','Nghiệm thu trần khu A','10000000-0000-0000-0000-000000000002','completed','conditional_pass','Cần bổ sung ảnh vị trí kỹ thuật'),
 ('71000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000002','partial','Nghiệm thu chống thấm tầng 1','10000000-0000-0000-0000-000000000002','completed','fail','Không đạt do phát sinh ẩm tường');
 
-INSERT INTO acceptance_checklist_items (acceptance_id, title, description, is_passed, note, photo_required) VALUES
-('71000000-0000-0000-0000-000000000001','Bề mặt trần phẳng','Sai số trong ngưỡng cho phép',true,'Đạt',true),
-('71000000-0000-0000-0000-000000000001','Vị trí đèn đúng bản vẽ','Kiểm tra tim đèn',true,'Đạt',true),
-('71000000-0000-0000-0000-000000000002','Tường khô trước khi sơn','Đo độ ẩm bề mặt',false,'Ẩm vượt ngưỡng',true);
+INSERT INTO acceptance_checklist_items (acceptance_id, item_index, title, description, is_passed, note, photo_required) VALUES
+('71000000-0000-0000-0000-000000000001',0,'Bề mặt trần phẳng','Sai số trong ngưỡng cho phép',true,'Đạt',true),
+('71000000-0000-0000-0000-000000000001',1,'Vị trí đèn đúng bản vẽ','Kiểm tra tim đèn',true,'Đạt',true),
+('71000000-0000-0000-0000-000000000002',0,'Tường khô trước khi sơn','Đo độ ẩm bề mặt',false,'Ẩm vượt ngưỡng',true);
 
 INSERT INTO rework_requests (project_id, issue_id, acceptance_id, title, description, status, due_date, created_by) VALUES
 ('30000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000002','71000000-0000-0000-0000-000000000001','Sửa màu sơn pantry','Sơn lại theo mẫu đã duyệt','in_progress',CURRENT_DATE + INTERVAL '3 day','10000000-0000-0000-0000-000000000002');
@@ -298,17 +316,17 @@ INSERT INTO payables (project_id, payable_code, vendor_type, vendor_partner_id, 
 ('30000000-0000-0000-0000-000000000002','PAY-TD-001','labor_team','90000000-0000-0000-0000-000000000202','Đội sơn Minh Long','operation',45000000,10000000,0,0,0,35000000,CURRENT_DATE - INTERVAL '3 day','overdue','10000000-0000-0000-0000-000000000004');
 
 INSERT INTO payable_payment_schedules (project_id, payable_id, schedule_code, milestone_name, schedule_type, planned_amount, paid_amount, remaining_amount, due_date, status, notes, created_by, approved_by)
-SELECT project_id, id, 'SCH-Q1-001', 'Vật tư điện nước đợt 1', 'progress', 120000000, 60000000, 60000000, CURRENT_DATE + INTERVAL '10 day', 'partially_paid', 'Đợt còn lại sau giao hàng', created_by, '10000000-0000-0000-0000-000000000007'
+SELECT project_id, id, 'SCH-Q1-001', 'Vật tư điện nước đợt 1', 'progress', 120000000, 60000000, 60000000, CURRENT_DATE + INTERVAL '10 day', 'partially_paid', 'Đợt còn lại sau giao hàng', created_by, '10000000-0000-0000-0000-000000000007'::uuid
 FROM payables WHERE payable_code='PAY-Q1-001'
 UNION ALL
-SELECT project_id, id, 'SCH-Q1-002-ADV', 'Ứng trước thầu phụ điện', 'advance', 30000000, 30000000, 0, CURRENT_DATE - INTERVAL '2 day', 'paid', 'Đã duyệt ứng trước khởi công', created_by, '10000000-0000-0000-0000-000000000007'
+SELECT project_id, id, 'SCH-Q1-002-ADV', 'Ứng trước thầu phụ điện', 'advance', 30000000, 30000000, 0, CURRENT_DATE - INTERVAL '2 day', 'paid', 'Đã duyệt ứng trước khởi công', created_by, '10000000-0000-0000-0000-000000000007'::uuid
 FROM payables WHERE payable_code='PAY-Q1-002'
 UNION ALL
-SELECT project_id, id, 'SCH-Q1-002-PROG', 'Thanh toán nghiệm thu điện', 'progress', 65000000, 0, 65000000, CURRENT_DATE + INTERVAL '20 day', 'approved', 'Chờ hồ sơ nghiệm thu và quyết toán ứng', created_by, '10000000-0000-0000-0000-000000000007'
+SELECT project_id, id, 'SCH-Q1-002-PROG', 'Thanh toán nghiệm thu điện', 'progress', 65000000, 0, 65000000, CURRENT_DATE + INTERVAL '20 day', 'approved', 'Chờ hồ sơ nghiệm thu và quyết toán ứng', created_by, '10000000-0000-0000-0000-000000000007'::uuid
 FROM payables WHERE payable_code='PAY-Q1-002';
 
 INSERT INTO advance_requests (project_id, payable_id, request_code, requested_by, amount, reason, status, approved_by, settled_amount, vendor_name, due_date, paid_amount, paid_at, notes)
-SELECT project_id, id, 'ADV-Q1-001', created_by, 30000000, 'Ứng trước vật tư và nhân công điện', 'partially_settled', '10000000-0000-0000-0000-000000000007', 10000000, vendor_name, CURRENT_DATE - INTERVAL '2 day', 30000000, now() - INTERVAL '2 day', 'Còn quyết toán sau nghiệm thu kỳ'
+SELECT project_id, id, 'ADV-Q1-001', created_by, 30000000, 'Ứng trước vật tư và nhân công điện', 'partially_settled', '10000000-0000-0000-0000-000000000007'::uuid, 10000000, vendor_name, CURRENT_DATE - INTERVAL '2 day', 30000000, now() - INTERVAL '2 day', 'Còn quyết toán sau nghiệm thu kỳ'
 FROM payables WHERE payable_code='PAY-Q1-002';
 
 INSERT INTO receivables (project_id, receivable_code, client_partner_id, client_name, source_type, contract_amount, milestone_name, gross_amount, received_amount, remaining_amount, due_date, status, created_by) VALUES
@@ -333,3 +351,523 @@ INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_typ
 INSERT INTO system_settings (key, value_json, description) VALUES
 ('client_payment_min_percent','{"construction":30}','Tỷ lệ thu tiền tối thiểu trước khi bắt đầu node thi công'),
 ('surplus_handling_options','["store","return_to_subcontractor"]','Cách xử lý vật tư dư sau thi công');
+
+-- Full workflow/form coverage demo project.
+-- This section is intentionally seeded as runtime data, not migrations:
+-- Pipeline template shows how a user configures Step types in Pipeline Builder;
+-- runtime rows show how one project operates with all current work item types and form templates.
+
+INSERT INTO pipeline_templates (id, name, description, project_type, version, status, created_by) VALUES
+('40000000-0000-0000-0000-000000000010','[Demo] Full workflow form coverage','Template demo bao phủ toàn bộ work item type, workflow form template và form/panel vận hành hiện có.','Hoàn thiện nội thất',1,'published','10000000-0000-0000-0000-000000000001');
+
+INSERT INTO pipeline_template_nodes (id, template_id, name, description, type, order_index, position_x, position_y, responsible_role_ids, required_permission, exit_conditions, approval_rule, rework_enabled, replanning_enabled, fail_path, permissions) VALUES
+('41100000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000010','Khảo sát & Planning','Thu thập hiện trạng, checklist, daily report planning và biên bản họp.','survey',1,80,120,'["Giám sát","PM"]','planning.edit','{"text":"Có ảnh, checklist, daily report và biên bản họp"}','PM duyệt planning',false,true,'previous','["planning.edit"]'),
+('41100000-0000-0000-0000-000000000002','40000000-0000-0000-0000-000000000010','Thiết kế & Xác nhận','Upload bản vẽ, review thiết kế và lấy xác nhận khách hàng.','design',2,360,120,'["PM","Chủ đầu tư"]','planning.edit','{"text":"Bản vẽ và xác nhận khách hàng đã đủ"}','Chủ đầu tư xác nhận',false,true,'replanning','["planning.edit"]'),
+('41100000-0000-0000-0000-000000000003','40000000-0000-0000-0000-000000000010','BOQ · Mua sắm · Kho','Kiểm tra ngân sách, vật tư và nghiệm thu đầu vào.','procurement',3,640,120,'["QS","Mua hàng","Thủ kho"]','procurement.approve','{"text":"Ngân sách và vật tư đầu vào đã kiểm tra"}','PM + Kế toán duyệt',false,false,'previous','["boq.update","procurement.approve","warehouse.receive"]'),
+('41100000-0000-0000-0000-000000000004','40000000-0000-0000-0000-000000000010','Thi công','Thi công, nhật ký, vật tư trước/sau và đối chiếu thầu phụ.','construction',4,920,120,'["Giám sát","Đội thi công","Thầu phụ"]','operation.report','{"text":"Nhật ký, vật tư và đối chiếu thầu phụ đã ghi nhận"}','PM review',true,true,'rework','["operation.report"]'),
+('41100000-0000-0000-0000-000000000005','40000000-0000-0000-0000-000000000010','Nghiệm thu & Bàn giao','Nghiệm thu đầu ra, evidence nghiệm thu, vật tư dư, rework và bàn giao.','handover',5,1200,120,'["QA/QC","PM","Chủ đầu tư"]','handover.approve','{"text":"Nghiệm thu và bàn giao đủ hồ sơ"}','Chủ đầu tư xác nhận',true,true,'rework','["acceptance.approve","handover.approve"]'),
+('41100000-0000-0000-0000-000000000006','40000000-0000-0000-0000-000000000010','Tài chính & Công nợ','Kiểm tra kế toán, hóa đơn, lịch thanh toán và phê duyệt đóng tài chính.','financial_closure',6,1480,120,'["Kế toán","Giám đốc"]','accounting.payment_approve','{"text":"Payable/receivable đã đối soát"}','Giám đốc duyệt',false,false,'none','["accounting.payment_approve"]');
+
+WITH step_seed(id, node_name, order_index, name, step_type, roles, permission_key, checklist_required, document_required, photo_required, form_code, form_version_no, form_required, description) AS (
+  VALUES
+    ('41200000-0000-0000-0000-000000000001','Khảo sát & Planning',1,'Upload ảnh hiện trạng','photo_upload','["Giám sát"]'::jsonb,'planning.edit',false,false,true,NULL::text,NULL::integer,false,'Upload ảnh hiện trường để làm evidence khảo sát.'),
+    ('41200000-0000-0000-0000-000000000002','Khảo sát & Planning',2,'Checklist hiện trạng basic v1','checklist','["Giám sát"]'::jsonb,'planning.edit',true,false,false,'builtin_checklist',1,true,'Checklist v1 basic.'),
+    ('41200000-0000-0000-0000-000000000003','Khảo sát & Planning',3,'Checklist planning structured v2','checklist','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_checklist',2,true,'Checklist v2 structured.'),
+    ('41200000-0000-0000-0000-000000000004','Khảo sát & Planning',4,'Daily report planning v1','daily_report','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_daily_report',1,true,'Daily report v1 basic.'),
+    ('41200000-0000-0000-0000-000000000005','Khảo sát & Planning',5,'Daily report planning structured v2','daily_report','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_daily_report',2,true,'Daily report v2 structured.'),
+    ('41200000-0000-0000-0000-000000000006','Khảo sát & Planning',6,'Biên bản họp basic v1','meeting_minutes','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_meeting_minutes',1,true,'Meeting minutes v1.'),
+    ('41200000-0000-0000-0000-000000000007','Khảo sát & Planning',7,'Biên bản họp structured v2','meeting_minutes','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_meeting_minutes',2,true,'Meeting minutes v2 structured.'),
+    ('41200000-0000-0000-0000-000000000008','Thiết kế & Xác nhận',1,'Upload bản vẽ thiết kế','document_upload','["PM"]'::jsonb,'planning.edit',false,true,false,NULL::text,NULL::integer,false,'Upload PDF/bản vẽ thiết kế.'),
+    ('41200000-0000-0000-0000-000000000009','Thiết kế & Xác nhận',2,'Review phương án thiết kế','design_review','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_generic_submission',1,true,'Review phương án bằng generic submission.'),
+    ('41200000-0000-0000-0000-000000000010','Thiết kế & Xác nhận',3,'Khách hàng xác nhận thiết kế','approval','["Chủ đầu tư","PM"]'::jsonb,'handover.approve',true,false,false,'builtin_owner_client_checklist',1,true,'Xác nhận bên ngoài bởi chủ đầu tư/khách hàng.'),
+    ('41200000-0000-0000-0000-000000000011','BOQ · Mua sắm · Kho',1,'Kiểm tra ngân sách','budget_check','["QS","Kế toán"]'::jsonb,'accounting.budget_approve',true,false,false,'builtin_generic_submission',1,true,'Budget check.'),
+    ('41200000-0000-0000-0000-000000000012','BOQ · Mua sắm · Kho',2,'Kiểm tra nhu cầu vật tư','material_check','["Mua hàng","Thủ kho"]'::jsonb,'warehouse.view',false,false,false,NULL::text,NULL::integer,false,'Material check.'),
+    ('41200000-0000-0000-0000-000000000013','BOQ · Mua sắm · Kho',3,'Nghiệm thu đầu vào vật tư','material_check','["Thủ kho","QA/QC"]'::jsonb,'warehouse.receive',false,false,false,NULL::text,NULL::integer,false,'Incoming acceptance panel.'),
+    ('41200000-0000-0000-0000-000000000014','Thi công',1,'Nhật ký thi công','daily_report','["Giám sát"]'::jsonb,'operation.report',true,false,false,'builtin_construction_daily_report',1,true,'Construction daily report.'),
+    ('41200000-0000-0000-0000-000000000015','Thi công',2,'Vật tư trước/sau','material_check','["Giám sát","Thủ kho"]'::jsonb,'warehouse.view',false,false,false,NULL::text,NULL::integer,false,'Material before/after snapshot.'),
+    ('41200000-0000-0000-0000-000000000016','Thi công',3,'Đối chiếu thầu phụ','checklist','["PM","Thầu phụ"]'::jsonb,'operation.report',true,false,false,'builtin_subcontractor_checklist',1,true,'Checklist/reconciliation thầu phụ.'),
+    ('41200000-0000-0000-0000-000000000017','Nghiệm thu & Bàn giao',1,'Nghiệm thu đầu ra','acceptance_check','["QA/QC","Chủ đầu tư"]'::jsonb,'acceptance.approve',true,false,false,'builtin_checklist',2,true,'Outgoing acceptance.'),
+    ('41200000-0000-0000-0000-000000000018','Nghiệm thu & Bàn giao',2,'Upload ảnh nghiệm thu','photo_upload','["QA/QC"]'::jsonb,'acceptance.create',false,false,true,NULL::text,NULL::integer,false,'Evidence ảnh nghiệm thu.'),
+    ('41200000-0000-0000-0000-000000000019','Nghiệm thu & Bàn giao',3,'Xử lý vật tư dư','material_check','["Thủ kho"]'::jsonb,'warehouse.surplus_handle',false,false,false,NULL::text,NULL::integer,false,'Surplus handling.'),
+    ('41200000-0000-0000-0000-000000000020','Nghiệm thu & Bàn giao',4,'Đối chiếu chủ đầu tư / Bàn giao','handover_check','["PM","Chủ đầu tư"]'::jsonb,'handover.approve',true,false,false,'builtin_owner_client_checklist',1,true,'Owner/client reconciliation, signature, PDF.'),
+    ('41200000-0000-0000-0000-000000000021','Nghiệm thu & Bàn giao',5,'Rework sau nghiệm thu','rework_task','["Đội thi công"]'::jsonb,'rework.create',false,false,false,NULL::text,NULL::integer,false,'Rework task.'),
+    ('41200000-0000-0000-0000-000000000022','Tài chính & Công nợ',1,'Kiểm tra kế toán','accounting_check','["Kế toán"]'::jsonb,'accounting.view',true,false,false,'builtin_generic_submission',1,true,'Accounting check.'),
+    ('41200000-0000-0000-0000-000000000023','Tài chính & Công nợ',2,'Giám đốc duyệt đóng tài chính','approval','["Giám đốc"]'::jsonb,'accounting.payment_approve',true,false,false,'builtin_generic_submission',1,true,'Internal approval.'),
+    ('41200000-0000-0000-0000-000000000024','Tài chính & Công nợ',3,'Cập nhật tổng hợp project','task','["PM"]'::jsonb,'project.update',true,false,false,'builtin_generic_submission',1,true,'Task/generic submission.')
+),
+form_versions AS (
+  SELECT t.code, v.version_no, v.id AS version_id
+  FROM workflow_form_templates t
+  JOIN workflow_form_versions v ON v.template_id=t.id
+)
+INSERT INTO pipeline_template_steps (
+  id, node_id, name, description, step_type, required_role_ids, required_permission,
+  checklist_required, document_required, photo_required, form_version_id, form_required, order_index
+)
+SELECT
+  s.id::uuid, n.id, s.name, s.description, s.step_type, s.roles, s.permission_key,
+  s.checklist_required, s.document_required, s.photo_required, fv.version_id, s.form_required, s.order_index
+FROM step_seed s
+JOIN pipeline_template_nodes n ON n.template_id='40000000-0000-0000-0000-000000000010' AND n.name=s.node_name
+LEFT JOIN form_versions fv ON fv.code=s.form_code AND fv.version_no=s.form_version_no;
+
+INSERT INTO pipeline_template_edges (template_id, from_node_id, to_node_id, condition_type, label, priority)
+SELECT '40000000-0000-0000-0000-000000000010', a.id, b.id, 'always', 'Hoàn tất', 100
+FROM pipeline_template_nodes a
+JOIN pipeline_template_nodes b ON b.order_index=a.order_index + 1
+WHERE a.template_id='40000000-0000-0000-0000-000000000010'
+  AND b.template_id='40000000-0000-0000-0000-000000000010';
+
+INSERT INTO projects (id, name, code, partner_id, client_name, address, planned_start_date, planned_end_date, estimated_budget, contract_amount, status, pipeline_template_id, pm_staff_id, progress_percent, current_pipeline_run_id) VALUES
+('30000000-0000-0000-0000-000000000010','Demo vận hành đầy đủ form','CF-FULL-001','90000000-0000-0000-0000-000000000001','Công ty An Phát','Quận 1, TP.HCM','2026-06-15','2026-09-15',980000000,1450000000,'in_progress','40000000-0000-0000-0000-000000000010','21000000-0000-0000-0000-000000000002',58,'42000000-0000-0000-0000-000000000010');
+
+INSERT INTO project_members (project_id, staff_id, role_ids, assigned_nodes)
+SELECT '30000000-0000-0000-0000-000000000010', s.id, jsonb_build_array(r.display_name), '[]'::jsonb
+FROM staff s
+JOIN users u ON u.id=s.user_id
+JOIN user_roles ur ON ur.user_id=u.id
+JOIN roles r ON r.id=ur.role_id
+WHERE u.email IN ('admin@consflow.local','pm@consflow.local','qs@consflow.local','accounting@consflow.local','warehouse@consflow.local','supervisor@consflow.local','director@consflow.local');
+
+INSERT INTO pipeline_runs (id, project_id, template_id, current_node_id, status, started_at)
+VALUES ('42000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','40000000-0000-0000-0000-000000000010','42100000-0000-0000-0000-000000000004','in_progress',now() - INTERVAL '15 day');
+
+WITH run_node_seed(id, template_node_id, status, started_at, completed_at) AS (
+  VALUES
+    ('42100000-0000-0000-0000-000000000001','41100000-0000-0000-0000-000000000001','completed',now() - INTERVAL '15 day',now() - INTERVAL '12 day'),
+    ('42100000-0000-0000-0000-000000000002','41100000-0000-0000-0000-000000000002','completed',now() - INTERVAL '12 day',now() - INTERVAL '8 day'),
+    ('42100000-0000-0000-0000-000000000003','41100000-0000-0000-0000-000000000003','completed',now() - INTERVAL '8 day',now() - INTERVAL '4 day'),
+    ('42100000-0000-0000-0000-000000000004','41100000-0000-0000-0000-000000000004','in_progress',now() - INTERVAL '4 day',NULL::timestamptz),
+    ('42100000-0000-0000-0000-000000000005','41100000-0000-0000-0000-000000000005','pending',NULL::timestamptz,NULL::timestamptz),
+    ('42100000-0000-0000-0000-000000000006','41100000-0000-0000-0000-000000000006','pending',NULL::timestamptz,NULL::timestamptz)
+)
+INSERT INTO pipeline_run_nodes (
+  id, run_id, project_id, template_node_id, name, description, type, order_index,
+  responsible_role_ids, required_permission, exit_conditions, approval_rule, fail_path,
+  status, started_at, completed_at, permissions
+)
+SELECT
+  s.id::uuid, '42000000-0000-0000-0000-000000000010', '30000000-0000-0000-0000-000000000010',
+  n.id, n.name, n.description, n.type, n.order_index, n.responsible_role_ids,
+  n.required_permission, n.exit_conditions, n.approval_rule, n.fail_path, s.status,
+  s.started_at, s.completed_at, n.permissions
+FROM run_node_seed s
+JOIN pipeline_template_nodes n ON n.id=s.template_node_id::uuid;
+
+WITH run_step_seed(id, template_step_id, run_node_id, status) AS (
+  VALUES
+    ('42200000-0000-0000-0000-000000000001','41200000-0000-0000-0000-000000000001','42100000-0000-0000-0000-000000000001','submitted'),
+    ('42200000-0000-0000-0000-000000000002','41200000-0000-0000-0000-000000000002','42100000-0000-0000-0000-000000000001','submitted'),
+    ('42200000-0000-0000-0000-000000000003','41200000-0000-0000-0000-000000000003','42100000-0000-0000-0000-000000000001','submitted'),
+    ('42200000-0000-0000-0000-000000000004','41200000-0000-0000-0000-000000000004','42100000-0000-0000-0000-000000000001','submitted'),
+    ('42200000-0000-0000-0000-000000000005','41200000-0000-0000-0000-000000000005','42100000-0000-0000-0000-000000000001','submitted'),
+    ('42200000-0000-0000-0000-000000000006','41200000-0000-0000-0000-000000000006','42100000-0000-0000-0000-000000000001','submitted'),
+    ('42200000-0000-0000-0000-000000000007','41200000-0000-0000-0000-000000000007','42100000-0000-0000-0000-000000000001','submitted'),
+    ('42200000-0000-0000-0000-000000000008','41200000-0000-0000-0000-000000000008','42100000-0000-0000-0000-000000000002','submitted'),
+    ('42200000-0000-0000-0000-000000000009','41200000-0000-0000-0000-000000000009','42100000-0000-0000-0000-000000000002','submitted'),
+    ('42200000-0000-0000-0000-000000000010','41200000-0000-0000-0000-000000000010','42100000-0000-0000-0000-000000000002','submitted'),
+    ('42200000-0000-0000-0000-000000000011','41200000-0000-0000-0000-000000000011','42100000-0000-0000-0000-000000000003','submitted'),
+    ('42200000-0000-0000-0000-000000000012','41200000-0000-0000-0000-000000000012','42100000-0000-0000-0000-000000000003','submitted'),
+    ('42200000-0000-0000-0000-000000000013','41200000-0000-0000-0000-000000000013','42100000-0000-0000-0000-000000000003','submitted'),
+    ('42200000-0000-0000-0000-000000000014','41200000-0000-0000-0000-000000000014','42100000-0000-0000-0000-000000000004','submitted'),
+    ('42200000-0000-0000-0000-000000000015','41200000-0000-0000-0000-000000000015','42100000-0000-0000-0000-000000000004','submitted'),
+    ('42200000-0000-0000-0000-000000000016','41200000-0000-0000-0000-000000000016','42100000-0000-0000-0000-000000000004','submitted'),
+    ('42200000-0000-0000-0000-000000000017','41200000-0000-0000-0000-000000000017','42100000-0000-0000-0000-000000000005','pending'),
+    ('42200000-0000-0000-0000-000000000018','41200000-0000-0000-0000-000000000018','42100000-0000-0000-0000-000000000005','pending'),
+    ('42200000-0000-0000-0000-000000000019','41200000-0000-0000-0000-000000000019','42100000-0000-0000-0000-000000000005','pending'),
+    ('42200000-0000-0000-0000-000000000020','41200000-0000-0000-0000-000000000020','42100000-0000-0000-0000-000000000005','pending'),
+    ('42200000-0000-0000-0000-000000000021','41200000-0000-0000-0000-000000000021','42100000-0000-0000-0000-000000000005','pending'),
+    ('42200000-0000-0000-0000-000000000022','41200000-0000-0000-0000-000000000022','42100000-0000-0000-0000-000000000006','pending'),
+    ('42200000-0000-0000-0000-000000000023','41200000-0000-0000-0000-000000000023','42100000-0000-0000-0000-000000000006','pending'),
+    ('42200000-0000-0000-0000-000000000024','41200000-0000-0000-0000-000000000024','42100000-0000-0000-0000-000000000006','pending')
+)
+INSERT INTO pipeline_run_steps (
+  id, run_node_id, project_id, template_step_id, name, description, step_type,
+  required_role_ids, required_permission, checklist_required, document_required, photo_required,
+  order_index, status, submitted_by, submitted_at
+)
+SELECT
+  s.id::uuid, s.run_node_id::uuid, '30000000-0000-0000-0000-000000000010',
+  pts.id, pts.name, pts.description, pts.step_type, pts.required_role_ids, pts.required_permission,
+  pts.checklist_required, pts.document_required, pts.photo_required, pts.order_index, s.status,
+  CASE WHEN s.status='submitted' THEN '10000000-0000-0000-0000-000000000002'::uuid ELSE NULL::uuid END,
+  CASE WHEN s.status='submitted' THEN now() - INTERVAL '2 day' ELSE NULL::timestamptz END
+FROM run_step_seed s
+JOIN pipeline_template_steps pts ON pts.id=s.template_step_id::uuid;
+
+INSERT INTO pipeline_run_edges (run_id, project_id, template_edge_id, from_run_node_id, to_run_node_id, condition_type, condition_config, label, priority)
+SELECT
+  '42000000-0000-0000-0000-000000000010',
+  '30000000-0000-0000-0000-000000000010',
+  e.id,
+  from_node.id,
+  to_node.id,
+  e.condition_type,
+  e.condition_config,
+  e.label,
+  e.priority
+FROM pipeline_template_edges e
+JOIN pipeline_run_nodes from_node ON from_node.template_node_id=e.from_node_id AND from_node.run_id='42000000-0000-0000-0000-000000000010'
+JOIN pipeline_run_nodes to_node ON to_node.template_node_id=e.to_node_id AND to_node.run_id='42000000-0000-0000-0000-000000000010'
+WHERE e.template_id='40000000-0000-0000-0000-000000000010';
+
+WITH wi_seed(id, run_step_id, work_type, status, priority, assignee_staff_id, evidence_requirement_json) AS (
+  VALUES
+    ('43000000-0000-0000-0000-000000000001','42200000-0000-0000-0000-000000000001','photo_upload','completed','normal','21000000-0000-0000-0000-000000000006','{"photo_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000002','42200000-0000-0000-0000-000000000002','checklist','completed','normal','21000000-0000-0000-0000-000000000006','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000003','42200000-0000-0000-0000-000000000003','checklist','completed','normal','21000000-0000-0000-0000-000000000002','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000004','42200000-0000-0000-0000-000000000004','daily_report','completed','normal','21000000-0000-0000-0000-000000000002','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000005','42200000-0000-0000-0000-000000000005','daily_report','completed','normal','21000000-0000-0000-0000-000000000002','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000006','42200000-0000-0000-0000-000000000006','task','completed','normal','21000000-0000-0000-0000-000000000002','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000007','42200000-0000-0000-0000-000000000007','task','completed','normal','21000000-0000-0000-0000-000000000002','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000008','42200000-0000-0000-0000-000000000008','document_upload','completed','normal','21000000-0000-0000-0000-000000000002','{"document_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000009','42200000-0000-0000-0000-000000000009','design_review','completed','normal','21000000-0000-0000-0000-000000000002','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000010','42200000-0000-0000-0000-000000000010','approval','completed','high','21000000-0000-0000-0000-000000000002','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000011','42200000-0000-0000-0000-000000000011','budget_check','completed','high','21000000-0000-0000-0000-000000000004','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000012','42200000-0000-0000-0000-000000000012','material_check','completed','normal','21000000-0000-0000-0000-000000000005','{}'::jsonb),
+    ('43000000-0000-0000-0000-000000000013','42200000-0000-0000-0000-000000000013','material_check','completed','high','21000000-0000-0000-0000-000000000005','{}'::jsonb),
+    ('43000000-0000-0000-0000-000000000014','42200000-0000-0000-0000-000000000014','daily_report','completed','normal','21000000-0000-0000-0000-000000000006','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000015','42200000-0000-0000-0000-000000000015','material_check','completed','normal','21000000-0000-0000-0000-000000000006','{}'::jsonb),
+    ('43000000-0000-0000-0000-000000000016','42200000-0000-0000-0000-000000000016','checklist','completed','normal','21000000-0000-0000-0000-000000000002','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000017','42200000-0000-0000-0000-000000000017','acceptance_check','ready','high','21000000-0000-0000-0000-000000000002','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000018','42200000-0000-0000-0000-000000000018','photo_upload','ready','normal','21000000-0000-0000-0000-000000000006','{"photo_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000019','42200000-0000-0000-0000-000000000019','material_check','ready','normal','21000000-0000-0000-0000-000000000005','{}'::jsonb),
+    ('43000000-0000-0000-0000-000000000020','42200000-0000-0000-0000-000000000020','handover_check','waiting_review','high','21000000-0000-0000-0000-000000000002','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000021','42200000-0000-0000-0000-000000000021','rework_task','ready','normal','21000000-0000-0000-0000-000000000006','{}'::jsonb),
+    ('43000000-0000-0000-0000-000000000022','42200000-0000-0000-0000-000000000022','accounting_check','ready','normal','21000000-0000-0000-0000-000000000004','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000023','42200000-0000-0000-0000-000000000023','approval','waiting_approval','urgent','21000000-0000-0000-0000-000000000007','{"checklist_required":true}'::jsonb),
+    ('43000000-0000-0000-0000-000000000024','42200000-0000-0000-0000-000000000024','task','ready','normal','21000000-0000-0000-0000-000000000002','{"checklist_required":true}'::jsonb)
+)
+INSERT INTO work_items (
+  id, project_id, pipeline_run_id, run_node_id, run_step_id, source_type, source_id,
+  title, description, work_type, status, priority, department, role_ids, assignee_staff_id,
+  planned_start_at, due_at, started_at, completed_at, completion_payload_json,
+  evidence_requirement_json, created_by, updated_by
+)
+SELECT
+  s.id::uuid, '30000000-0000-0000-0000-000000000010', '42000000-0000-0000-0000-000000000010',
+  rs.run_node_id, rs.id, 'pipeline_run_step', rs.id,
+  rs.name, rs.description, s.work_type, s.status, s.priority,
+  rn.name, rs.required_role_ids, s.assignee_staff_id::uuid,
+  now() - INTERVAL '10 day', now() + (rs.order_index || ' day')::interval,
+  CASE WHEN s.status IN ('in_progress','completed','waiting_review','waiting_approval') THEN now() - INTERVAL '5 day' ELSE NULL::timestamptz END,
+  CASE WHEN s.status='completed' THEN now() - INTERVAL '1 day' ELSE NULL::timestamptz END,
+  jsonb_build_object('seed_demo', true, 'primary_work_type', s.work_type),
+  s.evidence_requirement_json,
+  '10000000-0000-0000-0000-000000000002',
+  '10000000-0000-0000-0000-000000000002'
+FROM wi_seed s
+JOIN pipeline_run_steps rs ON rs.id=s.run_step_id::uuid
+JOIN pipeline_run_nodes rn ON rn.id=rs.run_node_id;
+
+INSERT INTO work_item_assignments (work_item_id, assignment_type, staff_id, role_name, created_by)
+SELECT id, 'assignee', assignee_staff_id, NULL, '10000000-0000-0000-0000-000000000002'
+FROM work_items
+WHERE project_id='30000000-0000-0000-0000-000000000010'
+  AND assignee_staff_id IS NOT NULL;
+
+INSERT INTO documents (id, project_id, target_type, target_id, name, file_url, document_type, status, uploaded_by) VALUES
+('46000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000008','Bản vẽ thiết kế demo','https://example.com/consflow/demo-design.pdf','drawing','active','10000000-0000-0000-0000-000000000002'),
+('46000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000020','Biên bản bàn giao demo','https://example.com/consflow/demo-handover.pdf','handover','active','10000000-0000-0000-0000-000000000002'),
+('46000000-0000-0000-0000-000000000003','30000000-0000-0000-0000-000000000010','input_invoice','85000000-0000-0000-0000-000000000001','Hóa đơn đầu vào demo','/input-invoices/85000000-0000-0000-0000-000000000001/file','invoice','active','10000000-0000-0000-0000-000000000004'),
+('46000000-0000-0000-0000-000000000004','30000000-0000-0000-0000-000000000010','output_invoice','85100000-0000-0000-0000-000000000001','Hóa đơn đầu ra demo','/output-invoices/85100000-0000-0000-0000-000000000001/file','invoice','active','10000000-0000-0000-0000-000000000004');
+
+INSERT INTO evidence_records (
+  id, work_item_id, project_id, target_type, target_id, evidence_type, document_type, name, document_id,
+  title, description, file_url, mime_type, file_size, caption, revision_no, visibility, status,
+  uploaded_by, submitted_by, reviewed_by, reviewed_at
+) VALUES
+('45000000-0000-0000-0000-000000000001','43000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000001','photo','photo','Ảnh hiện trạng sảnh',NULL,'Ảnh sảnh trước thi công','Ảnh demo external','https://example.com/consflow/evidence/site-before.jpg','image/jpeg',240000,'Sảnh trước thi công','1','project','accepted','10000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000002',now() - INTERVAL '9 day'),
+('45000000-0000-0000-0000-000000000002','43000000-0000-0000-0000-000000000008','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000008','document','drawing','Bản vẽ thiết kế', '46000000-0000-0000-0000-000000000001','Bản vẽ thiết kế demo','Document demo external','https://example.com/consflow/demo-design.pdf','application/pdf',320000,'Bản vẽ layout đã gửi khách hàng','1','project','accepted','10000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002',now() - INTERVAL '7 day'),
+('45000000-0000-0000-0000-000000000003','43000000-0000-0000-0000-000000000013','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000013','photo','photo','Ảnh vật tư giao tới',NULL,'Ảnh vật tư đầu vào','Ảnh demo incoming acceptance','https://example.com/consflow/evidence/material-delivery.jpg','image/jpeg',180000,'Vật tư giao tại site','1','internal','accepted','10000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000002',now() - INTERVAL '5 day'),
+('45000000-0000-0000-0000-000000000004','43000000-0000-0000-0000-000000000015','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000015','photo','photo','Ảnh vật tư trước khi dùng',NULL,'Trước khi dùng','Before material snapshot','https://example.com/consflow/evidence/material-before.jpg','image/jpeg',160000,'Dây điện còn tại site','1','internal','accepted','10000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000002',now() - INTERVAL '4 day'),
+('45000000-0000-0000-0000-000000000005','43000000-0000-0000-0000-000000000015','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000015','photo','photo','Ảnh vật tư sau khi dùng',NULL,'Sau khi dùng','After material snapshot','https://example.com/consflow/evidence/material-after.jpg','image/jpeg',165000,'Dây điện sau sử dụng','1','internal','accepted','10000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000002',now() - INTERVAL '3 day'),
+('45000000-0000-0000-0000-000000000006','43000000-0000-0000-0000-000000000016','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000016','photo','photo','Ảnh xác nhận thầu phụ',NULL,'Ảnh xác nhận KL điện','Subcontractor evidence','https://example.com/consflow/evidence/subcontractor.jpg','image/jpeg',150000,'Khu vực kéo dây đã hoàn tất','1','internal','accepted','10000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000002',now() - INTERVAL '2 day'),
+('45000000-0000-0000-0000-000000000007','43000000-0000-0000-0000-000000000017','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000017','photo','photo','Ảnh nghiệm thu trần',NULL,'Ảnh nghiệm thu đầu ra','Outgoing acceptance evidence','https://example.com/consflow/evidence/outgoing-acceptance.jpg','image/jpeg',190000,'Trần khu A đạt','1','client','submitted','10000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000006',NULL,NULL),
+('45000000-0000-0000-0000-000000000008','43000000-0000-0000-0000-000000000019','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000019','photo','photo','Ảnh vật tư dư',NULL,'Ảnh vật tư dư','Surplus handling evidence','https://example.com/consflow/evidence/surplus.jpg','image/jpeg',130000,'Sơn còn dư tại site','1','internal','submitted','10000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000005',NULL,NULL),
+('45000000-0000-0000-0000-000000000009','43000000-0000-0000-0000-000000000020','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000020','document','handover','Biên bản bàn giao', '46000000-0000-0000-0000-000000000002','Biên bản bàn giao demo','Handover document','https://example.com/consflow/demo-handover.pdf','application/pdf',280000,'Biên bản bàn giao chuẩn bị ký','1','client','submitted','10000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002',NULL,NULL),
+('45000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000018','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000018','photo','photo','Ảnh nghiệm thu bổ sung',NULL,'Ảnh nghiệm thu bổ sung','Photo upload demo','https://example.com/consflow/evidence/final-photo.jpg','image/jpeg',155000,'Ảnh sau xử lý tồn tại','1','client','submitted','10000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000006',NULL,NULL);
+
+INSERT INTO workflow_form_instances (
+  id, project_id, work_item_id, pipeline_run_id, run_node_id, run_step_id, template_step_id,
+  form_template_id, form_version_id, form_type, title, status, current_revision,
+  answers_snapshot_json, required_role_ids, created_by, submitted_by, submitted_at
+)
+SELECT seed.instance_id::uuid, '30000000-0000-0000-0000-000000000010', wi.id, wi.pipeline_run_id, wi.run_node_id, wi.run_step_id, rs.template_step_id,
+       t.id, v.id, t.form_type, seed.title, seed.status, seed.revision, seed.answers, rs.required_role_ids,
+       '10000000-0000-0000-0000-000000000002',
+       CASE WHEN seed.status='submitted' THEN '10000000-0000-0000-0000-000000000002'::uuid ELSE NULL::uuid END,
+       CASE WHEN seed.status='submitted' THEN now() - INTERVAL '1 day' ELSE NULL::timestamptz END
+FROM (
+  VALUES
+    ('44000000-0000-0000-0000-000000000002','43000000-0000-0000-0000-000000000002','builtin_checklist',1,'Checklist hiện trạng basic v1','submitted',1,'{"items_done":"Đã kiểm tra tường, sàn, trần và cửa hiện hữu.","exceptions":"Không có ngoại lệ lớn.","confirmed":true}'::jsonb),
+    ('44000000-0000-0000-0000-000000000003','43000000-0000-0000-0000-000000000003','builtin_checklist',2,'Checklist planning structured v2','submitted',1,'{"check_date":"2026-06-16","checked_by":"Nguyễn Minh PM","planning_scope":"survey","checklist_items":[{"title":"Chốt phạm vi khảo sát","assignee_role":"PM","assignee_name":"Nguyễn Minh PM","status":"done","due_date":"2026-06-16","comment":"Đủ phạm vi"},{"title":"Đối chiếu ảnh hiện trạng","assignee_role":"Giám sát","assignee_name":"Đặng Khoa","status":"done","due_date":"2026-06-16","evidence_id":"45000000-0000-0000-0000-000000000001","comment":"Đã có ảnh"}],"overall_comment":"Planning survey đã đủ dữ liệu.","confirmed":true}'::jsonb),
+    ('44000000-0000-0000-0000-000000000004','43000000-0000-0000-0000-000000000004','builtin_daily_report',1,'Daily report planning v1','submitted',1,'{"report_date":"2026-06-17","done_today":"Hoàn tất tổng hợp phạm vi khảo sát.","next_plan":"Chuẩn bị review thiết kế.","risk_note":"Không có blocker lớn."}'::jsonb),
+    ('44000000-0000-0000-0000-000000000005','43000000-0000-0000-0000-000000000005','builtin_daily_report',2,'Daily report planning structured v2','submitted',1,'{"report_date":"2026-06-18","reported_by":"Nguyễn Minh PM","planning_scope":"design","progress_percent":35,"completed_items":[{"title":"Chốt layout sơ bộ","owner_role":"PM","result":"done","note":"Đã gửi team thiết kế"}],"next_plan_items":[{"title":"Upload bản vẽ thiết kế","owner_role":"PM","owner_name":"Nguyễn Minh PM","due_date":"2026-06-19","priority":"normal","description":"Upload PDF bản vẽ"}],"blockers":[],"confirmed":true}'::jsonb),
+    ('44000000-0000-0000-0000-000000000006','43000000-0000-0000-0000-000000000006','builtin_meeting_minutes',1,'Biên bản họp basic v1','submitted',1,'{"meeting_date":"2026-06-18","attendees":"PM, QS, Giám sát, đại diện khách hàng","agenda":"Kickoff phạm vi thiết kế và vật tư chính.","decisions":"Chốt layout sơ bộ, giữ ngân sách trần.","action_items":"PM upload bản vẽ trước 19/06."}'::jsonb),
+    ('44000000-0000-0000-0000-000000000007','43000000-0000-0000-0000-000000000007','builtin_meeting_minutes',2,'Biên bản họp structured v2','submitted',1,'{"meeting_title":"Họp chốt thiết kế demo","meeting_date":"2026-06-19","location":"Văn phòng khách hàng","chair":"Nguyễn Minh PM","attendees":[{"name":"Nguyễn Minh PM","role":"PM","attendance":"present"},{"name":"Anh Bình","role":"Chủ đầu tư","attendance":"present"}],"agenda":"Review bản vẽ và các vật tư chính.","decisions":[{"content":"Chốt phương án trần thạch cao khu A","owner":"PM","target":"Thi công"}],"action_items":[{"title":"Upload bản vẽ đã chỉnh","owner_role":"PM","owner_name":"Nguyễn Minh PM","due_date":"2026-06-20","priority":"normal","description":"Gửi lại bản vẽ PDF"}],"confirmed":true}'::jsonb),
+    ('44000000-0000-0000-0000-000000000009','43000000-0000-0000-0000-000000000009','builtin_generic_submission',1,'Review phương án thiết kế','submitted',1,'{"summary":"Phương án thiết kế đã review, chỉ còn ghi chú nhỏ về cao độ trần.","next_action":"Gửi khách hàng xác nhận thiết kế."}'::jsonb),
+    ('44000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000010','builtin_owner_client_checklist',1,'Khách hàng xác nhận thiết kế','submitted',1,'{"check_date":"2026-06-20","client_representative":"Anh Bình","company_representative":"Nguyễn Minh PM","handover_scope":"milestone","scope_detail":"Xác nhận thiết kế trước BOQ","checklist_items":[{"title":"Layout tổng thể","output_ref":"DES-01","status":"done","client_decision":"pass","comment":"Khách hàng đồng ý"},{"title":"Vật liệu sơn","output_ref":"MAT-PAINT","status":"done","client_decision":"conditional_pass","severity":"medium","required_action":"Gửi thêm mẫu màu","due_date":"2026-06-21","comment":"Đạt có điều kiện"}],"final_client_note":"Đồng ý triển khai BOQ sau khi gửi mẫu màu.","confirmed":true}'::jsonb),
+    ('44000000-0000-0000-0000-000000000011','43000000-0000-0000-0000-000000000011','builtin_generic_submission',1,'Kiểm tra ngân sách','submitted',1,'{"summary":"Ngân sách demo trong ngưỡng đã duyệt.","next_action":"Cho phép tạo yêu cầu mua vật tư."}'::jsonb),
+    ('44000000-0000-0000-0000-000000000014','43000000-0000-0000-0000-000000000014','builtin_construction_daily_report',1,'Nhật ký thi công','submitted',1,'{"report_date":"2026-06-27","reported_by":"Đặng Khoa Giám sát","construction_scope":"mep","weather":"normal","progress_percent":58,"site_photo_evidence_id":"45000000-0000-0000-0000-000000000001","completed_items":[{"title":"Kéo dây khu A","work_area":"Khu A","crew_name":"Thầu phụ điện An Tâm","actual_quantity":180,"unit":"m","material_used":"Dây điện Cadivi","result":"done","evidence_id":"45000000-0000-0000-0000-000000000006","note":"Hoàn tất đúng bản vẽ"}],"crew_items":[{"crew_name":"Đội điện An Tâm","trade":"MEP","worker_count":6,"work_hours":8,"note":"Đủ nhân sự"}],"material_usage_items":[{"material_name":"Dây điện Cadivi","material_code":"MAT-CADIVI","quantity":180,"unit":"m","source":"site_balance","note":"Dùng cho khu A"}],"next_plan_items":[{"title":"Kiểm tra chất lượng đầu ra","owner_role":"QA/QC","owner_name":"PM","due_date":"2026-06-28","priority":"high","description":"Chuẩn bị nghiệm thu"}],"blockers":[],"confirmed":true}'::jsonb),
+    ('44000000-0000-0000-0000-000000000016','43000000-0000-0000-0000-000000000016','builtin_subcontractor_checklist',1,'Đối chiếu thầu phụ','submitted',1,'{"check_date":"2026-06-28","subcontractor_name":"Thầu phụ điện An Tâm","subcontractor_representative":"Anh Tâm","work_package":"mep","construction_area":"Khu A","checklist_items":[{"title":"Kéo dây khu A","boq_item_ref":"BOQ-FULL-001","claimed_quantity":180,"confirmed_quantity":176,"unit":"m","status":"done","evidence_id":"45000000-0000-0000-0000-000000000006","owner_response":"adjust_quantity","comment":"Điều chỉnh 4m theo kiểm tra thực tế"}],"overall_comment":"Đối chiếu có chênh lệch nhỏ.","confirmed":true}'::jsonb),
+    ('44000000-0000-0000-0000-000000000017','43000000-0000-0000-0000-000000000017','builtin_checklist',2,'Nghiệm thu đầu ra','draft',0,'{"check_date":"2026-06-29","checked_by":"QA/QC","planning_scope":"other","checklist_items":[{"title":"Kiểm tra trần khu A","assignee_role":"QA/QC","status":"done","evidence_id":"45000000-0000-0000-0000-000000000007","comment":"Đạt"}],"overall_comment":"Chờ khách hàng review.","confirmed":false}'::jsonb),
+    ('44000000-0000-0000-0000-000000000020','43000000-0000-0000-0000-000000000020','builtin_owner_client_checklist',1,'Đối chiếu chủ đầu tư / Bàn giao','submitted',1,'{"check_date":"2026-06-29","client_representative":"Anh Bình","company_representative":"Nguyễn Minh PM","handover_scope":"handover_item","scope_detail":"Bàn giao khu A","checklist_items":[{"title":"Trần khu A","output_ref":"ACC-FULL-001","status":"done","client_decision":"pass","evidence_id":"45000000-0000-0000-0000-000000000007","comment":"Đạt"},{"title":"Hồ sơ bàn giao","output_ref":"DOC-HO","status":"done","client_decision":"conditional_pass","evidence_id":"45000000-0000-0000-0000-000000000009","severity":"low","required_action":"Bổ sung phụ lục ảnh","due_date":"2026-07-01","comment":"Đạt có điều kiện"}],"final_client_note":"Cho phép bàn giao có điều kiện.","confirmed":true}'::jsonb),
+    ('44000000-0000-0000-0000-000000000022','43000000-0000-0000-0000-000000000022','builtin_generic_submission',1,'Kiểm tra kế toán','draft',0,'{"summary":"Đã ghi nhận payable/receivable chính, còn chờ hóa đơn bổ sung.","next_action":"Giám đốc duyệt đóng tài chính."}'::jsonb),
+    ('44000000-0000-0000-0000-000000000023','43000000-0000-0000-0000-000000000023','builtin_generic_submission',1,'Giám đốc duyệt đóng tài chính','draft',0,'{"summary":"Hồ sơ tài chính chờ duyệt.","next_action":"Duyệt hoặc yêu cầu bổ sung chứng từ."}'::jsonb),
+    ('44000000-0000-0000-0000-000000000024','43000000-0000-0000-0000-000000000024','builtin_generic_submission',1,'Cập nhật tổng hợp project','draft',0,'{"summary":"Tổng hợp cuối kỳ đang soạn.","next_action":"Gửi review cho PM."}'::jsonb)
+) AS seed(instance_id, work_item_id, form_code, version_no, title, status, revision, answers)
+JOIN work_items wi ON wi.id=seed.work_item_id::uuid
+JOIN pipeline_run_steps rs ON rs.id=wi.run_step_id
+JOIN workflow_form_templates t ON t.code=seed.form_code
+JOIN workflow_form_versions v ON v.template_id=t.id AND v.version_no=seed.version_no;
+
+INSERT INTO workflow_form_answers (instance_id, field_key, field_type, value_json, revision_no, updated_by)
+SELECT wfi.id, answer.key, COALESCE(wff.field_type, 'text'), answer.value, wfi.current_revision, wfi.created_by
+FROM workflow_form_instances wfi
+CROSS JOIN LATERAL jsonb_each(wfi.answers_snapshot_json) AS answer(key, value)
+LEFT JOIN workflow_form_fields wff ON wff.form_version_id=wfi.form_version_id AND wff.field_key=answer.key
+WHERE wfi.project_id='30000000-0000-0000-0000-000000000010';
+
+INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, to_status, comment, metadata_json)
+SELECT id, project_id, work_item_id, created_by, 'created', 'draft', 'Seed demo form instance', '{"seed_demo":true}'::jsonb
+FROM workflow_form_instances
+WHERE project_id='30000000-0000-0000-0000-000000000010';
+
+INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, from_status, to_status, comment, metadata_json)
+SELECT id, project_id, work_item_id, submitted_by, 'submitted', 'draft', 'submitted', 'Seed demo submitted form', '{"seed_demo":true}'::jsonb
+FROM workflow_form_instances
+WHERE project_id='30000000-0000-0000-0000-000000000010'
+  AND status='submitted';
+
+INSERT INTO workflow_form_signatures (
+  id, project_id, work_item_id, form_instance_id, form_version_id, form_revision_no,
+  purpose, signer_user_id, signer_name, signer_roles_json, comment, payload_json, payload_hash,
+  visual_storage_provider
+)
+SELECT
+  '44500000-0000-0000-0000-000000000020',
+  project_id, work_item_id, id, form_version_id, current_revision,
+  'approved_by', '10000000-0000-0000-0000-000000000002', 'Nguyễn Minh PM',
+  '["PM"]'::jsonb, 'Ký xác nhận nội bộ cho demo bàn giao.',
+  jsonb_build_object('seed_demo', true, 'form_instance_id', id),
+  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  'none'
+FROM workflow_form_instances
+WHERE id='44000000-0000-0000-0000-000000000020';
+
+INSERT INTO workflow_form_pdf_exports (
+  id, project_id, work_item_id, form_instance_id, form_version_id, form_revision_no,
+  title, file_name, storage_provider, storage_key, mime_type, file_size, checksum_sha256,
+  payload_hash, metadata_json, generated_by, generated_by_name
+)
+SELECT
+  '44600000-0000-0000-0000-000000000020',
+  project_id, work_item_id, id, form_version_id, current_revision,
+  'PDF bàn giao demo', 'demo-workflow-form.pdf', 'local',
+  'workflow-form-pdfs/30000000-0000-0000-0000-000000000010/44000000-0000-0000-0000-000000000020/demo-workflow-form.pdf',
+  'application/pdf', 637,
+  '7082569b4e07fb42a1e0f001d618891eac1360d113d9eb954b82f0213cb012ce',
+  'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  '{"seed_demo":true}'::jsonb,
+  '10000000-0000-0000-0000-000000000002', 'Nguyễn Minh PM'
+FROM workflow_form_instances
+WHERE id='44000000-0000-0000-0000-000000000020';
+
+INSERT INTO boq_items (
+  id, project_id, category, work_item_name, description, unit, quantity, unit_price,
+  material_id, status, created_by, approved_by, expected_unit_price, norm_unit_price,
+  final_unit_price, unit_price_source, norm_price_locked, norm_price_locked_by,
+  norm_price_locked_at, final_price_locked, final_price_locked_by, final_price_locked_at,
+  price_revision_no
+) VALUES
+('61000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','Điện','Kéo dây điện khu A','Dây Cadivi âm trần','m',220,12000,'50000000-0000-0000-0000-000000000001','approved','10000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000002',12000,11800,12000,'final',true,'10000000-0000-0000-0000-000000000003',now() - INTERVAL '7 day',true,'10000000-0000-0000-0000-000000000002',now() - INTERVAL '6 day',2),
+('61000000-0000-0000-0000-000000000011','30000000-0000-0000-0000-000000000010','Sơn','Sơn hoàn thiện khu A','Sơn Dulux nội thất','thùng',12,1450000,'50000000-0000-0000-0000-000000000003','approved','10000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000002',1450000,1420000,1450000,'final',true,'10000000-0000-0000-0000-000000000003',now() - INTERVAL '7 day',true,'10000000-0000-0000-0000-000000000002',now() - INTERVAL '6 day',2);
+
+INSERT INTO procurement_requests (id, project_id, request_code, title, requested_by, status, total_estimated_amount, budget_status) VALUES
+('60000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','PR-FULL-001','Mua vật tư demo full workflow','10000000-0000-0000-0000-000000000002','ordered',40800000,'within_budget');
+
+INSERT INTO procurement_request_items (id, request_id, material_id, boq_item_id, quantity_planned, quantity_requested, unit, estimated_unit_price, supplier_partner_id, supplier_name, delivery_status, approval_status) VALUES
+('60100000-0000-0000-0000-000000000010','60000000-0000-0000-0000-000000000010','50000000-0000-0000-0000-000000000001','61000000-0000-0000-0000-000000000010',220,220,'m',12000,'90000000-0000-0000-0000-000000000101','Cadivi','delivered','approved'),
+('60100000-0000-0000-0000-000000000011','60000000-0000-0000-0000-000000000010','50000000-0000-0000-0000-000000000003','61000000-0000-0000-0000-000000000011',12,12,'thùng',1450000,'90000000-0000-0000-0000-000000000103','Dulux','delivered','approved');
+
+INSERT INTO stock_movements (id, movement_code, project_id, warehouse_id, material_id, movement_type, quantity, unit, reason, reference_type, reference_id, created_by, approved_by) VALUES
+('63000000-0000-0000-0000-000000000010','SM-FULL-ISSUE-001','30000000-0000-0000-0000-000000000010','51000000-0000-0000-0000-000000000002','50000000-0000-0000-0000-000000000001','issue',220,'m','Xuất dây điện cho demo full workflow','procurement_request','60000000-0000-0000-0000-000000000010','10000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000002'),
+('63000000-0000-0000-0000-000000000011','SM-FULL-RETURN-001','30000000-0000-0000-0000-000000000010','51000000-0000-0000-0000-000000000001','50000000-0000-0000-0000-000000000003','return',2,'thùng','Lưu kho vật tư dư demo','site_surplus_handling','48100000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000002');
+
+INSERT INTO site_material_balances (id, project_id, material_id, planned_quantity, issued_quantity, used_quantity, surplus_quantity, surplus_status) VALUES
+('62000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','50000000-0000-0000-0000-000000000001',220,220,176,44,'pending'),
+('62000000-0000-0000-0000-000000000011','30000000-0000-0000-0000-000000000010','50000000-0000-0000-0000-000000000003',12,12,10,2,'store_pending');
+
+INSERT INTO incoming_acceptance_records (
+  id, acceptance_code, project_id, work_item_id, procurement_request_id, warehouse_id,
+  source_type, supplier_partner_id, supplier_name, delivery_reference, status, result,
+  received_at, summary_json, comment, created_by, submitted_by, submitted_at, updated_by
+) VALUES
+('48200000-0000-0000-0000-000000000001','IA-FULL-001','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000013','60000000-0000-0000-0000-000000000010','51000000-0000-0000-0000-000000000002','procurement','90000000-0000-0000-0000-000000000101','Cadivi','DN-FULL-001','submitted','conditional_pass',CURRENT_DATE - INTERVAL '5 day','{"line_count":2,"accepted":2}'::jsonb,'Có 2 thùng sơn cần kiểm lại màu.','10000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000005',now() - INTERVAL '5 day','10000000-0000-0000-0000-000000000005');
+
+INSERT INTO incoming_acceptance_items (
+  incoming_acceptance_id, project_id, work_item_id, item_index, material_id, material_code, material_name,
+  procurement_request_item_id, delivered_quantity, accepted_quantity, rejected_quantity, unit, condition,
+  defect_note, evidence_id, decision, comment
+) VALUES
+('48200000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000013',0,'50000000-0000-0000-0000-000000000001','MAT-CADIVI','Dây điện Cadivi','60100000-0000-0000-0000-000000000010',220,220,0,'m','usable',NULL,'45000000-0000-0000-0000-000000000003','accepted','Đạt'),
+('48200000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000013',1,'50000000-0000-0000-0000-000000000003','MAT-DULUX','Sơn Dulux','60100000-0000-0000-0000-000000000011',12,10,0,'thùng','mixed','2 thùng cần kiểm màu trước khi dùng','45000000-0000-0000-0000-000000000003','conditional_acceptance','Chấp nhận có điều kiện');
+
+INSERT INTO material_before_after_snapshots (
+  id, project_id, work_item_id, status, snapshot_date, construction_area, summary_json, comment,
+  applied_to_site_balance, created_by, submitted_by, submitted_at, updated_by
+) VALUES
+('48000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000015','submitted',CURRENT_DATE - INTERVAL '3 day','Khu A','{"rows":1,"used_quantity":176,"surplus_quantity":44}'::jsonb,'Snapshot dây điện trước/sau demo.',true,'10000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000006',now() - INTERVAL '3 day','10000000-0000-0000-0000-000000000006');
+
+INSERT INTO material_before_after_snapshot_items (
+  id, snapshot_id, project_id, work_item_id, item_index, material_id, material_code, material_name,
+  unit, source, before_quantity, added_quantity, after_quantity, waste_quantity, used_quantity,
+  affects_site_balance, site_balance_id, before_evidence_id, after_evidence_id, construction_area,
+  condition, comment
+) VALUES
+('48000000-0000-0000-0000-000000000101','48000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000015',0,'50000000-0000-0000-0000-000000000001','MAT-CADIVI','Dây điện Cadivi','m','site_balance',220,0,44,0,176,true,'62000000-0000-0000-0000-000000000010','45000000-0000-0000-0000-000000000004','45000000-0000-0000-0000-000000000005','Khu A','usable','Dùng 176m, còn 44m.');
+
+INSERT INTO site_surplus_handlings (
+  id, handling_code, project_id, work_item_id, site_balance_id, material_id,
+  material_snapshot_id, material_snapshot_item_id, stock_movement_id, status,
+  handling_type, quantity, unit, warehouse_id, custody_location, condition,
+  evidence_id, comment, created_by, submitted_by, submitted_at, updated_by
+) VALUES
+('48100000-0000-0000-0000-000000000001','SH-FULL-001','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000019','62000000-0000-0000-0000-000000000011','50000000-0000-0000-0000-000000000003',NULL,NULL,'63000000-0000-0000-0000-000000000011','submitted','return_to_warehouse',2,'thùng','51000000-0000-0000-0000-000000000001','Kệ sơn A2','usable','45000000-0000-0000-0000-000000000008','Lưu kho trung tâm 2 thùng sơn dư.','10000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000005',now() - INTERVAL '1 day','10000000-0000-0000-0000-000000000005');
+
+INSERT INTO subcontractor_checklist_reconciliations (
+  id, project_id, work_item_id, form_instance_id, form_revision_no, status, subcontractor_name,
+  work_package, construction_area, summary_json, comment, created_by, submitted_by, submitted_at, updated_by
+) VALUES
+('48300000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000016','44000000-0000-0000-0000-000000000016',1,'submitted','Thầu phụ điện An Tâm','MEP','Khu A','{"items":1,"variance_quantity":4}'::jsonb,'Chấp nhận điều chỉnh KL.', '10000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002',now() - INTERVAL '2 day','10000000-0000-0000-0000-000000000002');
+
+INSERT INTO subcontractor_checklist_reconciliation_items (
+  reconciliation_id, project_id, work_item_id, form_instance_id, item_index,
+  checklist_title, boq_item_id, boq_item_ref, boq_work_item_name, boq_quantity,
+  boq_unit, claimed_quantity, confirmed_quantity, variance_quantity, unit,
+  status, evidence_id, owner_response, decision, due_date, comment
+) VALUES
+('48300000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000016','44000000-0000-0000-0000-000000000016',0,'Kéo dây khu A','61000000-0000-0000-0000-000000000010','BOQ-FULL-001','Kéo dây điện khu A',220,'m',180,176,-4,'m','done','45000000-0000-0000-0000-000000000006','adjust_quantity','adjust_quantity',CURRENT_DATE + INTERVAL '2 day','Điều chỉnh theo đo thực tế.');
+
+INSERT INTO acceptance_records (
+  id, project_id, work_item_id, form_instance_id, acceptance_code, type, title,
+  requested_by, inspected_by, status, result, notes, acceptance_date, location,
+  client_representative, contractor_representative, scope_summary,
+  signature_status, document_status, summary_json, submitted_by, submitted_at
+) VALUES
+('71000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000017','44000000-0000-0000-0000-000000000017','OA-FULL-001','partial','Nghiệm thu đầu ra khu A','10000000-0000-0000-0000-000000000002','21000000-0000-0000-0000-000000000006','submitted','conditional_pass','Chờ bổ sung phụ lục ảnh. ',CURRENT_DATE,'Khu A','Anh Bình','Nguyễn Minh PM','Nghiệm thu trần và MEP khu A','pending','linked','{"items":2,"conditional":1}'::jsonb,'10000000-0000-0000-0000-000000000002',now());
+
+INSERT INTO acceptance_checklist_items (
+  acceptance_id, item_index, title, description, is_passed, note, photo_required,
+  evidence_id, decision, severity, required_action, due_date
+) VALUES
+('71000000-0000-0000-0000-000000000010',0,'Trần khu A phẳng','Kiểm tra hoàn thiện trần',true,'Đạt',true,'45000000-0000-0000-0000-000000000007','pass','low',NULL,NULL),
+('71000000-0000-0000-0000-000000000010',1,'Phụ lục ảnh bàn giao','Cần bổ sung ảnh góc kỹ thuật',false,'Đạt có điều kiện',true,'45000000-0000-0000-0000-000000000010','conditional_pass','medium','Bổ sung phụ lục ảnh',CURRENT_DATE + INTERVAL '2 day');
+
+INSERT INTO owner_client_checklist_reconciliations (
+  id, project_id, work_item_id, form_instance_id, form_revision_no, status,
+  client_representative, company_representative, handover_scope, scope_detail,
+  summary_json, comment, created_by, submitted_by, submitted_at, updated_by
+) VALUES
+('48400000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000020','44000000-0000-0000-0000-000000000020',1,'submitted','Anh Bình','Nguyễn Minh PM','handover_item','Bàn giao khu A','{"items":2,"conditional":1}'::jsonb,'Khách hàng xác nhận bàn giao có điều kiện.','10000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002',now(),'10000000-0000-0000-0000-000000000002');
+
+INSERT INTO owner_client_checklist_reconciliation_items (
+  reconciliation_id, project_id, work_item_id, form_instance_id, item_index,
+  checklist_title, output_ref, status, client_decision, severity, required_action,
+  due_date, evidence_id, acceptance_id, acceptance_title, acceptance_type,
+  acceptance_status, acceptance_result, decision, comment
+) VALUES
+('48400000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000020','44000000-0000-0000-0000-000000000020',0,'Trần khu A','ACC-FULL-001','done','pass','low',NULL,NULL,'45000000-0000-0000-0000-000000000007','71000000-0000-0000-0000-000000000010','Nghiệm thu đầu ra khu A','partial','submitted','conditional_pass','accepted','Đạt'),
+('48400000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','43000000-0000-0000-0000-000000000020','44000000-0000-0000-0000-000000000020',1,'Hồ sơ bàn giao','DOC-HO','done','conditional_pass','medium','Bổ sung phụ lục ảnh',CURRENT_DATE + INTERVAL '2 day','45000000-0000-0000-0000-000000000009','71000000-0000-0000-0000-000000000010','Nghiệm thu đầu ra khu A','partial','submitted','conditional_pass','conditional_acceptance','Đạt có điều kiện');
+
+INSERT INTO issues (id, project_id, title, description, severity, status, reported_by, assigned_to, requires_rework, requires_replanning) VALUES
+('70000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','Bổ sung phụ lục ảnh nghiệm thu','Khách hàng yêu cầu bổ sung ảnh góc kỹ thuật trước bàn giao cuối.','medium','open','10000000-0000-0000-0000-000000000006','21000000-0000-0000-0000-000000000006',true,false);
+
+INSERT INTO rework_requests (id, project_id, issue_id, acceptance_id, title, description, assigned_to, status, due_date, created_by, approved_by) VALUES
+('72000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','70000000-0000-0000-0000-000000000010','71000000-0000-0000-0000-000000000010','Bổ sung ảnh nghiệm thu khu A','Chụp bổ sung góc kỹ thuật và attach vào hồ sơ nghiệm thu.','21000000-0000-0000-0000-000000000006','approved',CURRENT_DATE + INTERVAL '2 day','10000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002');
+
+INSERT INTO handover_records (id, project_id, status, final_acceptance_id, handover_date, client_representative, company_representative, documents_ready, warehouse_closed, payables_recorded, receivables_recorded, notes, created_by) VALUES
+('73000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','checking','71000000-0000-0000-0000-000000000010',CURRENT_DATE + INTERVAL '3 day','Anh Bình','Nguyễn Minh PM',true,false,true,true,'Chờ đóng vật tư dư và phụ lục ảnh.','10000000-0000-0000-0000-000000000002');
+
+INSERT INTO accounting_budgets (project_id, budget_code, name, planned_amount, approved_amount, used_amount, remaining_amount, status, approved_by) VALUES
+('30000000-0000-0000-0000-000000000010','BUD-FULL-001','Ngân sách demo full workflow',980000000,950000000,420000000,530000000,'approved','10000000-0000-0000-0000-000000000007');
+
+INSERT INTO payables (
+  id, project_id, payable_code, vendor_type, vendor_partner_id, vendor_name, source_type,
+  source_id, gross_amount, advance_amount, retention_amount, deduction_amount, paid_amount,
+  remaining_amount, due_date, status, created_by, approved_by
+) VALUES
+('81000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','PAY-FULL-001','supplier','90000000-0000-0000-0000-000000000101','Cadivi','procurement','60000000-0000-0000-0000-000000000010',120000000,30000000,5000000,0,60000000,55000000,CURRENT_DATE + INTERVAL '12 day','partially_paid','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007');
+
+INSERT INTO receivables (
+  id, project_id, receivable_code, client_partner_id, client_name, source_type, source_id,
+  contract_amount, milestone_name, gross_amount, received_amount, remaining_amount,
+  due_date, status, created_by, approved_by
+) VALUES
+('82000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','REC-FULL-001','90000000-0000-0000-0000-000000000001','Công ty An Phát','acceptance','71000000-0000-0000-0000-000000000010',1450000000,'Nghiệm thu khu A',420000000,180000000,240000000,CURRENT_DATE + INTERVAL '14 day','partially_received','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007');
+
+INSERT INTO payments (id, project_id, payment_code, payment_type, target_type, target_id, amount, payment_method, status, paid_at, created_by, approved_by) VALUES
+('83000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','PMT-FULL-001','supplier_payment','payable','81000000-0000-0000-0000-000000000010',60000000,'bank_transfer','paid',now() - INTERVAL '2 day','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007'),
+('83000000-0000-0000-0000-000000000011','30000000-0000-0000-0000-000000000010','RCV-FULL-001','client_receipt','receivable','82000000-0000-0000-0000-000000000010',180000000,'bank_transfer','received',now() - INTERVAL '1 day','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007');
+
+INSERT INTO payable_payment_schedules (id, project_id, payable_id, schedule_code, milestone_name, schedule_type, planned_amount, paid_amount, remaining_amount, due_date, status, notes, created_by, approved_by) VALUES
+('81100000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','81000000-0000-0000-0000-000000000010','SCH-FULL-PAY-001','Tạm ứng vật tư demo','advance',30000000,30000000,0,CURRENT_DATE - INTERVAL '2 day','paid','Đã thanh toán tạm ứng.','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007'),
+('81100000-0000-0000-0000-000000000011','30000000-0000-0000-0000-000000000010','81000000-0000-0000-0000-000000000010','SCH-FULL-PAY-002','Thanh toán sau giao vật tư','progress',90000000,30000000,60000000,CURRENT_DATE + INTERVAL '12 day','partially_paid','Còn lại sau đối soát hóa đơn.','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007');
+
+INSERT INTO advance_requests (id, project_id, payable_id, request_code, requested_by, amount, reason, status, approved_by, settled_amount, vendor_name, due_date, payment_id, paid_amount, paid_at, settled_at, notes) VALUES
+('81200000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','81000000-0000-0000-0000-000000000010','ADV-FULL-001','10000000-0000-0000-0000-000000000004',30000000,'Ứng trước vật tư demo','partially_settled','10000000-0000-0000-0000-000000000007',10000000,'Cadivi',CURRENT_DATE + INTERVAL '10 day','83000000-0000-0000-0000-000000000010',30000000,now() - INTERVAL '2 day',NULL,'Còn quyết toán 20 triệu.');
+
+INSERT INTO input_invoices (
+  id, project_id, payable_id, procurement_request_id, document_id, invoice_number, invoice_symbol,
+  invoice_date, vendor_partner_id, vendor_name, vendor_tax_code, amount_before_vat, vat_amount,
+  total_amount, status, notes, storage_provider, storage_key, mime_type, file_name, file_size,
+  checksum_sha256, uploaded_by, verified_by, verified_at
+) VALUES
+('85000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','81000000-0000-0000-0000-000000000010','60000000-0000-0000-0000-000000000010','46000000-0000-0000-0000-000000000003','INV-FULL-IN-001','AA/26E','2026-06-28','90000000-0000-0000-0000-000000000101','Cadivi','0300427407',100000000,10000000,110000000,'verified','PDF fixture demo.','local','input-invoices/30000000-0000-0000-0000-000000000010/81000000-0000-0000-0000-000000000010/demo-input-invoice.pdf','application/pdf','demo-input-invoice.pdf',623,'49caf29994137a9eee81cadcb106c6821ae45d052652bbed56944cd19186af16','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000004',now() - INTERVAL '1 day');
+
+INSERT INTO payment_allocations (project_id, payment_id, payable_id, schedule_id, advance_request_id, input_invoice_id, allocation_type, amount, notes, created_by) VALUES
+('30000000-0000-0000-0000-000000000010','83000000-0000-0000-0000-000000000010','81000000-0000-0000-0000-000000000010','81100000-0000-0000-0000-000000000010','81200000-0000-0000-0000-000000000010','85000000-0000-0000-0000-000000000001','advance_payment',30000000,'Ứng trước theo hóa đơn demo.','10000000-0000-0000-0000-000000000004'),
+('30000000-0000-0000-0000-000000000010','83000000-0000-0000-0000-000000000010','81000000-0000-0000-0000-000000000010','81100000-0000-0000-0000-000000000011',NULL,'85000000-0000-0000-0000-000000000001','payable_payment',30000000,'Thanh toán tiến độ demo.','10000000-0000-0000-0000-000000000004');
+
+INSERT INTO receivable_payment_schedules (id, project_id, receivable_id, schedule_code, milestone_name, schedule_type, planned_amount, received_amount, remaining_amount, due_date, status, notes, created_by, approved_by) VALUES
+('82100000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','82000000-0000-0000-0000-000000000010','SCH-FULL-REC-001','Tạm ứng khách hàng','advance',180000000,180000000,0,CURRENT_DATE - INTERVAL '1 day','received','Đã thu tạm ứng demo.','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007'),
+('82100000-0000-0000-0000-000000000011','30000000-0000-0000-0000-000000000010','82000000-0000-0000-0000-000000000010','SCH-FULL-REC-002','Thu sau nghiệm thu khu A','progress',240000000,0,240000000,CURRENT_DATE + INTERVAL '14 day','approved','Chờ nghiệm thu có điều kiện hoàn tất.','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007');
+
+INSERT INTO client_advance_receipts (id, project_id, receivable_id, receipt_code, client_name, requested_by, amount, received_amount, settled_amount, reason, due_date, payment_id, received_at, settled_at, status, notes, approved_by) VALUES
+('82200000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','82000000-0000-0000-0000-000000000010','CAR-FULL-001','Công ty An Phát','10000000-0000-0000-0000-000000000004',180000000,180000000,60000000,'Tạm ứng khách hàng demo',CURRENT_DATE - INTERVAL '1 day','83000000-0000-0000-0000-000000000011',now() - INTERVAL '1 day',NULL,'partially_settled','Còn đối trừ sau bàn giao.','10000000-0000-0000-0000-000000000007');
+
+INSERT INTO output_invoices (
+  id, project_id, receivable_id, payment_id, document_id, invoice_number, invoice_symbol,
+  invoice_date, client_partner_id, client_name, client_tax_code, amount_before_vat, vat_amount,
+  total_amount, status, notes, storage_provider, storage_key, mime_type, file_name, file_size,
+  checksum_sha256, uploaded_by, issued_by, issued_at
+) VALUES
+('85100000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','82000000-0000-0000-0000-000000000010','83000000-0000-0000-0000-000000000011','46000000-0000-0000-0000-000000000004','INV-FULL-OUT-001','AB/26E','2026-06-29','90000000-0000-0000-0000-000000000001','Công ty An Phát','0312345678',380000000,38000000,418000000,'issued','PDF fixture demo.','local','output-invoices/30000000-0000-0000-0000-000000000010/82000000-0000-0000-0000-000000000010/demo-output-invoice.pdf','application/pdf','demo-output-invoice.pdf',624,'6d9ca61d3f29fdd585c36e812b5827aa80578e56d9902c45356a5a6a19c0f5ec','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000004',now());
+
+INSERT INTO receipt_allocations (project_id, payment_id, receivable_id, schedule_id, advance_receipt_id, output_invoice_id, allocation_type, amount, notes, created_by) VALUES
+('30000000-0000-0000-0000-000000000010','83000000-0000-0000-0000-000000000011','82000000-0000-0000-0000-000000000010','82100000-0000-0000-0000-000000000010','82200000-0000-0000-0000-000000000010','85100000-0000-0000-0000-000000000001','advance_receipt',180000000,'Thu tạm ứng theo hóa đơn demo.','10000000-0000-0000-0000-000000000004');
+
+INSERT INTO approval_requests (id, target_type, target_id, project_id, requested_by, status, reason, required_roles) VALUES
+('47000000-0000-0000-0000-000000000023','work_item','43000000-0000-0000-0000-000000000023','30000000-0000-0000-0000-000000000010','10000000-0000-0000-0000-000000000004','pending','Duyệt đóng tài chính demo full workflow','["Giám đốc"]');
+
+UPDATE work_items
+SET approval_request_id='47000000-0000-0000-0000-000000000023'
+WHERE id='43000000-0000-0000-0000-000000000023';
+
+INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, to_status, comment, metadata_json)
+SELECT id, project_id, 'work_item', id, created_by, 'created', status, 'Seeded full workflow demo work item', jsonb_build_object('seed_demo', true, 'work_type', work_type)
+FROM work_items
+WHERE project_id='30000000-0000-0000-0000-000000000010';
+
+INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, metadata_json)
+VALUES
+('43000000-0000-0000-0000-000000000015','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000015','10000000-0000-0000-0000-000000000006','system_event','Submitted material before/after snapshot','{"status":"submitted","material_snapshot_id":"48000000-0000-0000-0000-000000000001"}'::jsonb),
+('43000000-0000-0000-0000-000000000019','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000019','10000000-0000-0000-0000-000000000005','system_event','Submitted surplus handling','{"status":"submitted","surplus_handling_id":"48100000-0000-0000-0000-000000000001"}'::jsonb),
+('43000000-0000-0000-0000-000000000013','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000013','10000000-0000-0000-0000-000000000005','system_event','Submitted incoming acceptance','{"status":"submitted","incoming_acceptance_id":"48200000-0000-0000-0000-000000000001"}'::jsonb),
+('43000000-0000-0000-0000-000000000017','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000017','10000000-0000-0000-0000-000000000002','system_event','Submitted outgoing acceptance','{"status":"submitted","acceptance_id":"71000000-0000-0000-0000-000000000010"}'::jsonb),
+('43000000-0000-0000-0000-000000000020','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000020','10000000-0000-0000-0000-000000000002','system_event','Workflow form signed and PDF exported','{"signature_id":"44500000-0000-0000-0000-000000000020","pdf_export_id":"44600000-0000-0000-0000-000000000020"}'::jsonb),
+('43000000-0000-0000-0000-000000000023','30000000-0000-0000-0000-000000000010','work_item','43000000-0000-0000-0000-000000000023','10000000-0000-0000-0000-000000000004','approval_requested','Duyệt đóng tài chính demo full workflow','{"approval_request_id":"47000000-0000-0000-0000-000000000023"}'::jsonb);
+
+INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json) VALUES
+('30000000-0000-0000-0000-000000000010','10000000-0000-0000-0000-000000000001','Admin hệ thống','seed_full_workflow_demo','project','30000000-0000-0000-0000-000000000010','Seed demo project covering all current work item types and forms','{"template_id":"40000000-0000-0000-0000-000000000010","work_items":24,"workflow_form_instances":16}'::jsonb);
