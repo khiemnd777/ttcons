@@ -13,6 +13,13 @@
 - Use `apply_patch` for manual source edits.
 - Do not launch or run Browser, browser-use, Playwright, or headless browser verification unless the user explicitly requests it in that turn. For frontend changes, use non-browser checks by default and report browser verification as skipped.
 
+## Communication Rules
+
+- Agents must use professional Vietnamese pronouns such as "tôi/anh" or neutral wording.
+- Agents must not mirror hostile, insulting, or overly informal pronouns from the user.
+- Even if the user is angry or insulting, agents must remain calm, respectful, and helpful, with a constructive tone.
+- Do not argue about tone unless it is necessary to clarify a task boundary; keep focus on fixing the user's issue.
+
 ## Human Review Gates
 
 Agents must stop before implementation when the request would change code, feature behavior, bugfix behavior, or UI.
@@ -31,6 +38,8 @@ Then wait for an explicit confirmation from the user before editing code.
 When asking the user to confirm review points, decisions, open questions, scope, or implementation steps, list each confirmation point as a numbered item using `1.`, `2.`, `3.`, and so on. Put each point on its own line; do not combine multiple confirmation points into one sentence, paragraph, or bullet.
 
 For UI or interface-changing requests, provide a "Mockup as Text" before implementation. It must be a textual visual mockup: use ASCII/wireframe-style blocks to show the actual screen layout, hierarchy, controls, labels, spacing, and states as the user would see them. Keep notes short and secondary. Do not replace the mockup with only bullet-point descriptions.
+
+Every UI/UX analysis, review package, and Mockup as Text must begin by identifying the `Mục đích chính` of the screen, dialog, panel, or component. Do not start from available data, backend capabilities, form engines, workflow blockers, or feature inventory. The primary purpose must determine the hierarchy, visible sections, default focus, and primary CTA.
 
 It should show:
 
