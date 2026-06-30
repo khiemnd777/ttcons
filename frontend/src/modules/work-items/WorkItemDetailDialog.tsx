@@ -151,7 +151,7 @@ export function WorkItemDetailDialog({
         <div className="space-y-4">
           <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} nextAction={nextAction} />
 
-          <div className="grid gap-4 xl:grid-cols-[15rem_minmax(0,1fr)_18rem]">
+          <div className="grid items-start gap-4 xl:grid-cols-[15rem_minmax(0,1fr)_18rem]">
             <WorkItemProgressRail item={detailItem} />
 
             <main className="min-w-0 space-y-4">
@@ -306,12 +306,12 @@ function WorkItemProgressRail({ item }: { item: WorkItem }) {
   ];
 
   return (
-    <aside className="rounded-lg border border-line bg-white p-3 shadow-panel">
+    <aside className="h-fit rounded-lg border border-line bg-white p-3 shadow-panel xl:sticky xl:top-0 xl:self-start">
       <div className="border-b border-line pb-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Vị trí workflow</p>
         <h3 className="mt-1 text-sm font-semibold text-ink">Tiến trình</h3>
       </div>
-      <ol className="mt-3 space-y-0">
+      <ol className="mt-3 max-h-[calc(100vh-18rem)] space-y-0 overflow-y-auto pr-1">
         {steps.map((step, index) => {
           const current = step.state === 'current';
           const active = step.state === 'active';

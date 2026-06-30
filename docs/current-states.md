@@ -19,6 +19,7 @@ Done:
 - Preserved existing APIs and domain panels; no backend contract or route change was introduced.
 - Ran `cd frontend && npm run build` successfully.
 - Skipped browser verification per repository rule because it was not explicitly requested in this turn.
+- Tuned `Vị trí workflow` so it no longer stretches to the body height; it is sticky on wide viewports with internal timeline scrolling.
 
 ## Full Workflow Demo Seed
 
