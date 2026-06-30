@@ -2,13 +2,14 @@ import { ReactNode, useEffect } from 'react';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
 
-export type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
+export type DialogSize = 'sm' | 'md' | 'lg' | 'xl' | 'workspace';
 
 const sizeClass: Record<DialogSize, string> = {
   sm: 'max-w-md',
   md: 'max-w-xl',
   lg: 'max-w-2xl',
   xl: 'max-w-4xl',
+  workspace: 'max-w-[min(1280px,calc(100vw-2rem))]',
 };
 
 export function Dialog({

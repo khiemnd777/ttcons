@@ -1,0 +1,974 @@
+[
+  {
+    "segment": "000000010000000000000003",
+    "offset": 13007420,
+    "lsn": "0/3C67A3C",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 13059780,
+    "lsn": "0/3C746C4",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 13103260,
+    "lsn": "0/3C7F09C",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 13240820,
+    "lsn": "0/3CA09F4",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 13258636,
+    "lsn": "0/3CA4F8C",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 13388476,
+    "lsn": "0/3CC4ABC",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 13670660,
+    "lsn": "0/3D09904",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 13682324,
+    "lsn": "0/3D0C694",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 14022964,
+    "lsn": "0/3D5F934",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 14228556,
+    "lsn": "0/3D91C4C",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 14246944,
+    "lsn": "0/3D96420",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 14353004,
+    "lsn": "0/3DB026C",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 14366093,
+    "lsn": "0/3DB358D",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 14393960,
+    "lsn": "0/3DBA268",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 14394152,
+    "lsn": "0/3DBA328",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 14395208,
+    "lsn": "0/3DBA748",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 15734572,
+    "lsn": "0/3F0172C",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 15734764,
+    "lsn": "0/3F017EC",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 15735820,
+    "lsn": "0/3F01C0C",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 16172508,
+    "lsn": "0/3F6C5DC",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 15734468,
+    "lsn": "0/3F016C4",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 15916661,
+    "lsn": "0/3F2DE75",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 16172180,
+    "lsn": "0/3F6C494",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 16172292,
+    "lsn": "0/3F6C504",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 16172404,
+    "lsn": "0/3F6C574",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 16487208,
+    "lsn": "0/3FB9328",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 16487320,
+    "lsn": "0/3FB9398",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 16487432,
+    "lsn": "0/3FB9408",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 16487544,
+    "lsn": "0/3FB9478",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 4816647,
+    "lsn": "0/3497F07",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 4920999,
+    "lsn": "0/34B16A7",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 4816795,
+    "lsn": "0/3497F9B",
+    "term": "Nghiệm thu Đầu Ra"
+  },
+  {
+    "segment": "000000010000000000000003",
+    "offset": 4921147,
+    "lsn": "0/34B173B",
+    "term": "Nghiệm thu Đầu Ra"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 847487,
+    "lsn": "0/40CEE7F",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 848223,
+    "lsn": "0/40CF15F",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 848633,
+    "lsn": "0/40CF2F9",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 855792,
+    "lsn": "0/40D0EF0",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 856088,
+    "lsn": "0/40D1018",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 856368,
+    "lsn": "0/40D1130",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 856656,
+    "lsn": "0/40D1250",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 936324,
+    "lsn": "0/40E4984",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 936620,
+    "lsn": "0/40E4AAC",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 936900,
+    "lsn": "0/40E4BC4",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 937188,
+    "lsn": "0/40E4CE4",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1609340,
+    "lsn": "0/4188E7C",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1609636,
+    "lsn": "0/4188FA4",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1609916,
+    "lsn": "0/41890BC",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1610204,
+    "lsn": "0/41891DC",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2154804,
+    "lsn": "0/420E134",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2155084,
+    "lsn": "0/420E24C",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2155372,
+    "lsn": "0/420E36C",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2215684,
+    "lsn": "0/421CF04",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2215980,
+    "lsn": "0/421D02C",
+    "term": "Template hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 849057,
+    "lsn": "0/40CF4A1",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 855512,
+    "lsn": "0/40D0DD8",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 936044,
+    "lsn": "0/40E486C",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1609060,
+    "lsn": "0/4188D64",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2154204,
+    "lsn": "0/420DEDC",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2215404,
+    "lsn": "0/421CDEC",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2251316,
+    "lsn": "0/4225A34",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2340372,
+    "lsn": "0/423B614",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2414492,
+    "lsn": "0/424D79C",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2447652,
+    "lsn": "0/4255924",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2576524,
+    "lsn": "0/427508C",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2624916,
+    "lsn": "0/4280D94",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2723972,
+    "lsn": "0/4299084",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2787604,
+    "lsn": "0/42A8914",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2946588,
+    "lsn": "0/42CF61C",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2996484,
+    "lsn": "0/42DB904",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3013836,
+    "lsn": "0/42DFCCC",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3214564,
+    "lsn": "0/4310CE4",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3258364,
+    "lsn": "0/431B7FC",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3304252,
+    "lsn": "0/4326B3C",
+    "term": "[Template] Hoàn thiện công trình"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 844980,
+    "lsn": "0/40CE4B4",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 845620,
+    "lsn": "0/40CE734",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 845812,
+    "lsn": "0/40CE7F4",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 846868,
+    "lsn": "0/40CEC14",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 855056,
+    "lsn": "0/40D0C10",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 856944,
+    "lsn": "0/40D1370",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 857584,
+    "lsn": "0/40D15F0",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 857776,
+    "lsn": "0/40D16B0",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 858832,
+    "lsn": "0/40D1AD0",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 935396,
+    "lsn": "0/40E45E4",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 935588,
+    "lsn": "0/40E46A4",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 937476,
+    "lsn": "0/40E4E04",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 938116,
+    "lsn": "0/40E5084",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 938308,
+    "lsn": "0/40E5144",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 939364,
+    "lsn": "0/40E5564",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1608412,
+    "lsn": "0/4188ADC",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1608604,
+    "lsn": "0/4188B9C",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1610492,
+    "lsn": "0/41892FC",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1611132,
+    "lsn": "0/418957C",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1611324,
+    "lsn": "0/418963C",
+    "term": "Template hoàn thiện nội thất mới"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 849465,
+    "lsn": "0/40CF639",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 855248,
+    "lsn": "0/40D0CD0",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 935780,
+    "lsn": "0/40E4764",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1608796,
+    "lsn": "0/4188C5C",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2153940,
+    "lsn": "0/420DDD4",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2215140,
+    "lsn": "0/421CCE4",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2251052,
+    "lsn": "0/422592C",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2340108,
+    "lsn": "0/423B50C",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2414228,
+    "lsn": "0/424D694",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2447388,
+    "lsn": "0/425581C",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2576260,
+    "lsn": "0/4274F84",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2624652,
+    "lsn": "0/4280C8C",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2723708,
+    "lsn": "0/4298F7C",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2787340,
+    "lsn": "0/42A880C",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2946324,
+    "lsn": "0/42CF514",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2996220,
+    "lsn": "0/42DB7FC",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3013572,
+    "lsn": "0/42DFBC4",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3214300,
+    "lsn": "0/4310BDC",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3258100,
+    "lsn": "0/431B6F4",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3303988,
+    "lsn": "0/4326A34",
+    "term": "Mẫu thử nghiệm"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 845180,
+    "lsn": "0/40CE57C",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 845292,
+    "lsn": "0/40CE5EC",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 845404,
+    "lsn": "0/40CE65C",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 845516,
+    "lsn": "0/40CE6CC",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 857144,
+    "lsn": "0/40D1438",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 857256,
+    "lsn": "0/40D14A8",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 857368,
+    "lsn": "0/40D1518",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 857480,
+    "lsn": "0/40D1588",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 937676,
+    "lsn": "0/40E4ECC",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 937788,
+    "lsn": "0/40E4F3C",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 937900,
+    "lsn": "0/40E4FAC",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 938012,
+    "lsn": "0/40E501C",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1610692,
+    "lsn": "0/41893C4",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1610804,
+    "lsn": "0/4189434",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1610916,
+    "lsn": "0/41894A4",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 1611028,
+    "lsn": "0/4189514",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2155860,
+    "lsn": "0/420E554",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2155972,
+    "lsn": "0/420E5C4",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2156084,
+    "lsn": "0/420E634",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2156196,
+    "lsn": "0/420E6A4",
+    "term": "Ops Template"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2915497,
+    "lsn": "0/42C7CA9",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2925504,
+    "lsn": "0/42CA3C0",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2933520,
+    "lsn": "0/42CC310",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 2978296,
+    "lsn": "0/42D71F8",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3019136,
+    "lsn": "0/42E1180",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3087167,
+    "lsn": "0/42F1B3F",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3163752,
+    "lsn": "0/4304668",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3198320,
+    "lsn": "0/430CD70",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3199376,
+    "lsn": "0/430D190",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3244220,
+    "lsn": "0/43180BC",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3289952,
+    "lsn": "0/4323360",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3375939,
+    "lsn": "0/4338343",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3533012,
+    "lsn": "0/435E8D4",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3621511,
+    "lsn": "0/4374287",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3625095,
+    "lsn": "0/4375087",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3708044,
+    "lsn": "0/438948C",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 5164615,
+    "lsn": "0/44ECE47",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 5165431,
+    "lsn": "0/44ED177",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 7834655,
+    "lsn": "0/4778C1F",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 9174383,
+    "lsn": "0/48BFD6F",
+    "term": "Chốt Hợp đồng với chủ đầu tư"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3553025,
+    "lsn": "0/4363701",
+    "term": "Nghiệm thu Đầu Ra"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3576848,
+    "lsn": "0/4369410",
+    "term": "Nghiệm thu Đầu Ra"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3593280,
+    "lsn": "0/436D440",
+    "term": "Nghiệm thu Đầu Ra"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3593520,
+    "lsn": "0/436D530",
+    "term": "Nghiệm thu Đầu Ra"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 3621659,
+    "lsn": "0/437431B",
+    "term": "Nghiệm thu Đầu Ra"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 5165579,
+    "lsn": "0/44ED20B",
+    "term": "Nghiệm thu Đầu Ra"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 7834803,
+    "lsn": "0/4778CB3",
+    "term": "Nghiệm thu Đầu Ra"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 9174531,
+    "lsn": "0/48BFE03",
+    "term": "Nghiệm thu Đầu Ra"
+  },
+  {
+    "segment": "000000010000000000000004",
+    "offset": 12146003,
+    "lsn": "0/4B95553",
+    "term": "Nghiệm thu Đầu Ra"
+  }
+]

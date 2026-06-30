@@ -852,7 +852,9 @@ func (r *Repository) ListProjectWorkItems(ctx context.Context, projectID, userID
 	}
 	args := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
 	return r.Query(ctx, fmt.Sprintf(`
-		SELECT wi.*, p.name AS project_name, p.code AS project_code, rn.name AS run_node_name, rs.name AS run_step_name,
+		SELECT wi.*, p.name AS project_name, p.code AS project_code,
+			rn.name AS run_node_name, rn.order_index AS run_node_order_index,
+			rs.name AS run_step_name, rs.order_index AS run_step_order_index,
 			s.full_name AS assignee_name,
 			COALESCE((SELECT COUNT(*) FROM evidence_records er WHERE er.work_item_id=wi.id AND er.status <> 'rejected'),0) AS evidence_count,
 			wfi.id AS workflow_form_instance_id,
@@ -879,13 +881,8 @@ func (r *Repository) ListProjectWorkItems(ctx context.Context, projectID, userID
 		WHERE wi.project_id=$1 AND wi.status <> 'cancelled' AND p.status <> 'cancelled'
 		  AND (%s)
 		ORDER BY
-			CASE wi.status
-				WHEN 'blocked' THEN 1
-				WHEN 'in_progress' THEN 2
-				WHEN 'ready' THEN 3
-				WHEN 'pending' THEN 4
-				ELSE 5
-			END,
+			rn.order_index NULLS LAST,
+			rs.order_index NULLS LAST,
 			wi.due_at NULLS LAST,
 			wi.created_at
 	`, workItemScopeSQL("wi", 2)), args...)

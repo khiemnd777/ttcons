@@ -1,0 +1,812 @@
+{
+  "recovered_from": {
+    "file": "/Users/khiemnguyen/Library/Caches/Codex/Default/Partitions/codex-browser-app/Cache/Cache_Data/c7bb24c21c2b44ca_0",
+    "source": "Library/Caches/Codex/Default/Partitions/codex-browser-app/Cache/Cache_Data/c7bb24c21c2b44ca_0",
+    "url": null
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "created_at": "2026-06-09T08:02:15Z",
+      "created_by": "10000000-0000-0000-0000-000000000001",
+      "description": "Khảo sát → Thiết kế → BOQ → Mua sắm → Kho → Thi công → Nghiệm thu → Bàn giao → Financial Closure",
+      "edges": [
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-09T08:02:15Z",
+          "from_node_id": "41000000-0000-0000-0000-000000000001",
+          "id": "c7b2ada6-836e-4799-9d7b-4fb7209bf61c",
+          "label": "Hoàn tất",
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "to_node_id": "41000000-0000-0000-0000-000000000002"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-09T08:02:15Z",
+          "from_node_id": "41000000-0000-0000-0000-000000000002",
+          "id": "b8c6ccf4-9468-4ee2-9597-f1542c47d1b7",
+          "label": "Hoàn tất",
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "to_node_id": "41000000-0000-0000-0000-000000000003"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-09T08:02:15Z",
+          "from_node_id": "41000000-0000-0000-0000-000000000003",
+          "id": "c49412f4-ae03-4446-8056-ade299907c11",
+          "label": "Hoàn tất",
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "to_node_id": "41000000-0000-0000-0000-000000000004"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-09T08:02:15Z",
+          "from_node_id": "41000000-0000-0000-0000-000000000004",
+          "id": "5fd78f63-8e5c-49c8-8707-8fde6f5c194d",
+          "label": "Hoàn tất",
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "to_node_id": "41000000-0000-0000-0000-000000000005"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-09T08:02:15Z",
+          "from_node_id": "41000000-0000-0000-0000-000000000005",
+          "id": "ee5a8e87-8ef2-4d06-adaa-ce8b12c099a3",
+          "label": "Hoàn tất",
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "to_node_id": "41000000-0000-0000-0000-000000000006"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-09T08:02:15Z",
+          "from_node_id": "41000000-0000-0000-0000-000000000006",
+          "id": "4e46b20a-5fa0-4a5d-acdb-224b238b56ac",
+          "label": "Hoàn tất",
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "to_node_id": "41000000-0000-0000-0000-000000000007"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-09T08:02:15Z",
+          "from_node_id": "41000000-0000-0000-0000-000000000007",
+          "id": "21d38638-32aa-414b-a882-c0f4a984005b",
+          "label": "Hoàn tất",
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "to_node_id": "41000000-0000-0000-0000-000000000008"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-09T08:02:15Z",
+          "from_node_id": "41000000-0000-0000-0000-000000000008",
+          "id": "8023d0d6-c612-4a9e-a40e-c6a0df5041d5",
+          "label": "Hoàn tất",
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "to_node_id": "41000000-0000-0000-0000-000000000009"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-09T08:02:15Z",
+          "from_node_id": "41000000-0000-0000-0000-000000000009",
+          "id": "23132395-145c-477a-84ae-a5c15424510d",
+          "label": "Hoàn tất",
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "to_node_id": "41000000-0000-0000-0000-000000000010"
+        }
+      ],
+      "id": "40000000-0000-0000-0000-000000000001",
+      "name": "Template hoàn thiện nội thất tiêu chuẩn",
+      "nodes": [
+        {
+          "approval_rule": "PM duyệt",
+          "created_at": "2026-06-09T08:02:15Z",
+          "description": "Ghi nhận hiện trạng, kích thước và rủi ro ban đầu.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Có biên bản khảo sát và ảnh hiện trạng"
+          },
+          "fail_path": "previous",
+          "id": "41000000-0000-0000-0000-000000000001",
+          "name": "Khảo sát",
+          "order_index": 1,
+          "position_x": 50,
+          "position_y": 31,
+          "replanning_enabled": true,
+          "required_permission": "planning.edit",
+          "responsible_role_ids": [
+            "Giám sát"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Khảo sát",
+              "document_required": false,
+              "id": "b964d87f-bbf9-4d35-9b33-47d1db67ee0b",
+              "name": "Upload ảnh hiện trạng",
+              "node_id": "41000000-0000-0000-0000-000000000001",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "photo_upload"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Khảo sát",
+              "document_required": false,
+              "id": "6cc91c0a-6459-413a-8d53-ca6b58e03172",
+              "name": "Ghi nhận kích thước chính",
+              "node_id": "41000000-0000-0000-0000-000000000001",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "checklist"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Khảo sát",
+              "document_required": false,
+              "id": "d22dcf50-b05a-4d6a-8687-3a2abdada494",
+              "name": "Xác định rủi ro mặt bằng",
+              "node_id": "41000000-0000-0000-0000-000000000001",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "checklist"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "type": "survey",
+          "updated_at": "2026-06-09T15:14:54Z"
+        },
+        {
+          "approval_rule": "Chủ đầu tư xác nhận",
+          "created_at": "2026-06-09T08:02:15Z",
+          "description": "Chuẩn bị bản vẽ, phương án thiết kế và xác nhận với khách hàng.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Bản vẽ được khách hàng xác nhận"
+          },
+          "fail_path": "replanning",
+          "id": "41000000-0000-0000-0000-000000000002",
+          "name": "Thiết kế",
+          "order_index": 2,
+          "position_x": 366,
+          "position_y": 14,
+          "replanning_enabled": true,
+          "required_permission": "planning.edit",
+          "responsible_role_ids": [
+            "PM"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Thiết kế",
+              "document_required": false,
+              "id": "a23ee5c9-091d-419b-876f-b1c3c91e3016",
+              "name": "Upload bản vẽ",
+              "node_id": "41000000-0000-0000-0000-000000000002",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "document_upload"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Thiết kế",
+              "document_required": false,
+              "id": "947cc3ab-1750-44e9-8a95-5ef2c59c2ff4",
+              "name": "Review phương án thiết kế",
+              "node_id": "41000000-0000-0000-0000-000000000002",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "task"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Thiết kế",
+              "document_required": false,
+              "id": "4c43ba9e-b177-40e8-add5-ef26cd4b5cf5",
+              "name": "Khách hàng xác nhận",
+              "node_id": "41000000-0000-0000-0000-000000000002",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "approval"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "type": "design",
+          "updated_at": "2026-06-09T15:14:56Z"
+        },
+        {
+          "approval_rule": "PM + QS + Kế toán duyệt",
+          "created_at": "2026-06-09T08:02:15Z",
+          "description": "QS bóc tách khối lượng và kiểm tra ngân sách.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "BOQ đã duyệt và ngân sách đã kiểm tra"
+          },
+          "fail_path": "replanning",
+          "id": "41000000-0000-0000-0000-000000000003",
+          "name": "BOQ / Dự toán",
+          "order_index": 3,
+          "position_x": 656,
+          "position_y": 80,
+          "replanning_enabled": true,
+          "required_permission": "boq.update",
+          "responsible_role_ids": [
+            "QS"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node BOQ / Dự toán",
+              "document_required": false,
+              "id": "b2669c07-f108-42b6-828c-3ee6e4c20c76",
+              "name": "Bóc tách khối lượng",
+              "node_id": "41000000-0000-0000-0000-000000000003",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "task"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node BOQ / Dự toán",
+              "document_required": false,
+              "id": "443f0f89-f147-4bd1-9763-7bcd1699afb4",
+              "name": "Nhập đơn giá dự kiến",
+              "node_id": "41000000-0000-0000-0000-000000000003",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "task"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node BOQ / Dự toán",
+              "document_required": false,
+              "id": "6a817280-b5ee-46ce-9542-4a2e21653209",
+              "name": "Kiểm tra ngân sách",
+              "node_id": "41000000-0000-0000-0000-000000000003",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "budget_check"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "type": "boq",
+          "updated_at": "2026-06-09T15:12:21Z"
+        },
+        {
+          "approval_rule": "PM + Kế toán + Giám đốc duyệt",
+          "created_at": "2026-06-09T08:02:15Z",
+          "description": "Kế toán kiểm tra ngân sách, giám đốc duyệt khi vượt hạn mức.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Ngân sách được phê duyệt"
+          },
+          "fail_path": "replanning",
+          "id": "41000000-0000-0000-0000-000000000004",
+          "name": "Duyệt ngân sách",
+          "order_index": 4,
+          "position_x": 948,
+          "position_y": 80,
+          "replanning_enabled": true,
+          "required_permission": "accounting.budget_approve",
+          "responsible_role_ids": [
+            "Kế toán",
+            "Giám đốc"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Duyệt ngân sách",
+              "document_required": false,
+              "id": "2bac52e7-6ba3-4c59-9cdb-5e602849bb2a",
+              "name": "Tổng hợp ngân sách",
+              "node_id": "41000000-0000-0000-0000-000000000004",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "budget_check"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Duyệt ngân sách",
+              "document_required": false,
+              "id": "9591abff-bdad-4bab-846e-2d50f477c501",
+              "name": "Kế toán review",
+              "node_id": "41000000-0000-0000-0000-000000000004",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "approval"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Duyệt ngân sách",
+              "document_required": false,
+              "id": "626bc720-f1de-4c16-9820-4a98945b1308",
+              "name": "Giám đốc duyệt nếu vượt hạn mức",
+              "node_id": "41000000-0000-0000-0000-000000000004",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "approval"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "type": "budget_approval",
+          "updated_at": "2026-06-09T15:12:21Z"
+        },
+        {
+          "approval_rule": "PM + Kế toán duyệt",
+          "created_at": "2026-06-09T08:02:15Z",
+          "description": "Tạo yêu cầu mua, duyệt mua và đặt hàng.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Vật tư cần mua đã được duyệt"
+          },
+          "fail_path": "previous",
+          "id": "41000000-0000-0000-0000-000000000005",
+          "name": "Mua vật tư",
+          "order_index": 5,
+          "position_x": 72,
+          "position_y": 270,
+          "replanning_enabled": false,
+          "required_permission": "procurement.approve",
+          "responsible_role_ids": [
+            "Mua hàng",
+            "Kế toán"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Mua vật tư",
+              "document_required": false,
+              "id": "dfe2ce95-dce0-4046-ac24-c14936736dd4",
+              "name": "Sinh nhu cầu vật tư từ BOQ",
+              "node_id": "41000000-0000-0000-0000-000000000005",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "material_check"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Mua vật tư",
+              "document_required": false,
+              "id": "733049e7-fc09-43f9-aae8-06f252e01816",
+              "name": "PM duyệt nhu cầu",
+              "node_id": "41000000-0000-0000-0000-000000000005",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "approval"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Mua vật tư",
+              "document_required": false,
+              "id": "cf272c31-5b9d-43d1-83d7-68f90d62de10",
+              "name": "Đặt hàng nhà cung cấp",
+              "node_id": "41000000-0000-0000-0000-000000000005",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "task"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "type": "procurement",
+          "updated_at": "2026-06-09T15:12:21Z"
+        },
+        {
+          "approval_rule": "Thủ kho xác nhận",
+          "created_at": "2026-06-09T08:02:15Z",
+          "description": "Kiểm tra tồn kho, xuất vật tư ra công trình.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Vật tư required đã xuất đủ"
+          },
+          "fail_path": "previous",
+          "id": "41000000-0000-0000-0000-000000000006",
+          "name": "Xuất kho",
+          "order_index": 6,
+          "position_x": 364,
+          "position_y": 270,
+          "replanning_enabled": false,
+          "required_permission": "warehouse.issue",
+          "responsible_role_ids": [
+            "Thủ kho"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Xuất kho",
+              "document_required": false,
+              "id": "4a237cc2-e8a8-48b0-8b04-b107fcfdbb88",
+              "name": "Kiểm tra tồn kho",
+              "node_id": "41000000-0000-0000-0000-000000000006",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "material_check"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Xuất kho",
+              "document_required": false,
+              "id": "77e0aa62-1ba3-473e-99e7-f82e6967731e",
+              "name": "Xuất vật tư ra công trình",
+              "node_id": "41000000-0000-0000-0000-000000000006",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "task"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Xuất kho",
+              "document_required": false,
+              "id": "99b35b1d-71d8-4b16-82fd-39f7fdc500c7",
+              "name": "Cập nhật tồn tại site",
+              "node_id": "41000000-0000-0000-0000-000000000006",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "task"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "type": "warehouse_issue",
+          "updated_at": "2026-06-09T15:12:21Z"
+        },
+        {
+          "approval_rule": "PM duyệt",
+          "created_at": "2026-06-09T08:02:15Z",
+          "description": "Daily report, issue, vật tư sử dụng và tiến độ.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "client_payment_min_percent": 30,
+            "materials_required": true
+          },
+          "fail_path": "rework",
+          "id": "41000000-0000-0000-0000-000000000007",
+          "name": "Thi công",
+          "order_index": 7,
+          "position_x": 656,
+          "position_y": 270,
+          "replanning_enabled": true,
+          "required_permission": "operation.report",
+          "responsible_role_ids": [
+            "Giám sát",
+            "Đội thi công"
+          ],
+          "rework_enabled": true,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Thi công",
+              "document_required": false,
+              "id": "8d9b7150-9837-4c62-ab34-06478bbebeae",
+              "name": "Daily report",
+              "node_id": "41000000-0000-0000-0000-000000000007",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "task"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Thi công",
+              "document_required": false,
+              "id": "d52544d7-6330-4656-86ac-cf26ae71cafa",
+              "name": "Ghi nhận vật tư sử dụng",
+              "node_id": "41000000-0000-0000-0000-000000000007",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "material_check"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Thi công",
+              "document_required": false,
+              "id": "1157f9d1-7450-4983-b66e-6da74c6d28f2",
+              "name": "Kiểm tra chất lượng trước nghiệm thu",
+              "node_id": "41000000-0000-0000-0000-000000000007",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "acceptance_check"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "type": "construction",
+          "updated_at": "2026-06-09T15:12:21Z"
+        },
+        {
+          "approval_rule": "QA/QC + Chủ đầu tư xác nhận",
+          "created_at": "2026-06-09T08:02:15Z",
+          "description": "Checklist nghiệm thu, pass/fail, punch list.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Nghiệm thu đạt và punch list đã đóng"
+          },
+          "fail_path": "rework",
+          "id": "41000000-0000-0000-0000-000000000008",
+          "name": "Nghiệm thu",
+          "order_index": 8,
+          "position_x": 948,
+          "position_y": 270,
+          "replanning_enabled": true,
+          "required_permission": "acceptance.approve",
+          "responsible_role_ids": [
+            "QA/QC",
+            "Chủ đầu tư"
+          ],
+          "rework_enabled": true,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Nghiệm thu",
+              "document_required": false,
+              "id": "26838a33-c34d-431a-a70b-8a652aee11cd",
+              "name": "Tạo checklist nghiệm thu",
+              "node_id": "41000000-0000-0000-0000-000000000008",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "acceptance_check"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Nghiệm thu",
+              "document_required": false,
+              "id": "f181695f-46bb-4d2c-905f-54d5fcbe70da",
+              "name": "Upload ảnh minh chứng",
+              "node_id": "41000000-0000-0000-0000-000000000008",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "photo_upload"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Nghiệm thu",
+              "document_required": false,
+              "id": "7f6671be-ef64-4629-b563-e640eac4d934",
+              "name": "Pass/Fail nghiệm thu",
+              "node_id": "41000000-0000-0000-0000-000000000008",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "approval"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "type": "acceptance",
+          "updated_at": "2026-06-09T15:12:21Z"
+        },
+        {
+          "approval_rule": "PM + Chủ đầu tư xác nhận",
+          "created_at": "2026-06-09T08:02:15Z",
+          "description": "Closure checker, biên bản bàn giao, chứng từ.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "{\"text\":\"Nghiệm thu cuối pass, kho và công nợ đã closure\"}"
+          },
+          "fail_path": "previous",
+          "id": "41000000-0000-0000-0000-000000000009",
+          "name": "Bàn giao",
+          "order_index": 9,
+          "position_x": 79,
+          "position_y": 557,
+          "replanning_enabled": false,
+          "required_permission": "handover.approve",
+          "responsible_role_ids": [
+            "PM"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Bàn giao",
+              "document_required": false,
+              "id": "c6cda06e-5314-4afb-a1f0-f94bfa884659",
+              "name": "Kiểm tra punch list đã đóng",
+              "node_id": "41000000-0000-0000-0000-000000000009",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "checklist"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Bàn giao",
+              "document_required": false,
+              "id": "61d60e1c-9310-4e61-b307-0166d9db31ba",
+              "name": "Chuẩn bị biên bản bàn giao",
+              "node_id": "41000000-0000-0000-0000-000000000009",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "document_upload"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Bàn giao",
+              "document_required": false,
+              "id": "3f44b4bf-609a-47f5-813d-c40267dcb947",
+              "name": "Khách hàng xác nhận",
+              "node_id": "41000000-0000-0000-0000-000000000009",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "approval"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "type": "handover",
+          "updated_at": "2026-06-09T15:14:32Z"
+        },
+        {
+          "approval_rule": "Kế toán + Giám đốc duyệt",
+          "created_at": "2026-06-09T08:02:15Z",
+          "description": "Đóng công nợ, thanh toán và báo cáo lãi/lỗ.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Payables/Receivables đã resolve hoặc duyệt pending"
+          },
+          "fail_path": "none",
+          "id": "41000000-0000-0000-0000-000000000010",
+          "name": "Financial Closure",
+          "order_index": 10,
+          "position_x": 386,
+          "position_y": 537,
+          "replanning_enabled": false,
+          "required_permission": "accounting.payment_approve",
+          "responsible_role_ids": [
+            "Kế toán",
+            "Giám đốc"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Financial Closure",
+              "document_required": false,
+              "id": "6f02af16-2c5b-4287-a69b-8b8681537365",
+              "name": "Ghi nhận phải trả/phải thu",
+              "node_id": "41000000-0000-0000-0000-000000000010",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "accounting_check"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Financial Closure",
+              "document_required": false,
+              "id": "c0d9b24b-796b-43a4-843c-013c976f41aa",
+              "name": "Đối chiếu thanh toán",
+              "node_id": "41000000-0000-0000-0000-000000000010",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "accounting_check"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-09T08:02:15Z",
+              "description": "Checklist mẫu của node Financial Closure",
+              "document_required": false,
+              "id": "fb4e947c-e055-4fa2-818d-b1c423ad4573",
+              "name": "Đóng tài chính công trình",
+              "node_id": "41000000-0000-0000-0000-000000000010",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": null,
+              "required_role_ids": [],
+              "step_type": "approval"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000001",
+          "type": "financial_closure",
+          "updated_at": "2026-06-09T15:14:29Z"
+        }
+      ],
+      "project_type": "Hoàn thiện nội thất",
+      "status": "published",
+      "updated_at": "2026-06-09T08:02:15Z",
+      "version": 1
+    },
+    "message": "OK"
+  }
+}

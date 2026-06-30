@@ -1,0 +1,52 @@
+[
+  {
+    "member": "./base/16384/23837",
+    "size": 8192,
+    "out": "backups/recovered-postgres-heap/base_16384_23837.bin",
+    "hitTerms": [
+      "Template hoàn thiện"
+    ]
+  },
+  {
+    "member": "./base/16384/2619",
+    "size": 376832,
+    "out": "backups/recovered-postgres-heap/base_16384_2619.bin",
+    "hitTerms": [
+      "Template hoàn thiện",
+      "Chốt Hợp đồng với chủ đầu tư",
+      "Nghiệm thu Đầu Ra"
+    ]
+  },
+  {
+    "member": "./base/16384/24235",
+    "size": 8192,
+    "out": "backups/recovered-postgres-heap/base_16384_24235.bin",
+    "hitTerms": [
+      "Template hoàn thiện"
+    ]
+  },
+  {
+    "member": "./pg_wal/000000010000000000000003",
+    "size": 16777216,
+    "out": "backups/recovered-postgres-heap/pg_wal_000000010000000000000003.bin",
+    "hitTerms": [
+      "Template hoàn thiện",
+      "Chốt Hợp đồng với chủ đầu tư",
+      "Nghiệm thu Đầu Ra",
+      "Ops Template"
+    ]
+  },
+  {
+    "member": "./pg_wal/000000010000000000000004",
+    "size": 16777216,
+    "out": "backups/recovered-postgres-heap/pg_wal_000000010000000000000004.bin",
+    "hitTerms": [
+      "Template hoàn thiện",
+      "[Template] Hoàn thiện công trình",
+      "Chốt Hợp đồng với chủ đầu tư",
+      "Nghiệm thu Đầu Ra",
+      "Ops Template",
+      "Mẫu thử nghiệm"
+    ]
+  }
+]

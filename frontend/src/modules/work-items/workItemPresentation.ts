@@ -148,6 +148,31 @@ export function isWorkOverdue(item: WorkItem) {
   return !Number.isNaN(due.getTime()) && due.getTime() < Date.now();
 }
 
+function sortIndex(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : Number.MAX_SAFE_INTEGER;
+}
+
+function sortDate(value: unknown) {
+  if (!value) return Number.MAX_SAFE_INTEGER;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? Number.MAX_SAFE_INTEGER : date.getTime();
+}
+
+export function orderWorkItemsByWorkflow(items: WorkItem[]) {
+  return [...items].sort((a, b) => {
+    const nodeDiff = sortIndex(a.run_node_order_index) - sortIndex(b.run_node_order_index);
+    if (nodeDiff !== 0) return nodeDiff;
+    const stepDiff = sortIndex(a.run_step_order_index) - sortIndex(b.run_step_order_index);
+    if (stepDiff !== 0) return stepDiff;
+    const dueDiff = sortDate(a.due_at) - sortDate(b.due_at);
+    if (dueDiff !== 0) return dueDiff;
+    const createdDiff = sortDate(a.created_at) - sortDate(b.created_at);
+    if (createdDiff !== 0) return createdDiff;
+    return String(a.id).localeCompare(String(b.id));
+  });
+}
+
 function workItemRank(item: WorkItem) {
   if (item.status === 'blocked') return 0;
   if (isWorkOverdue(item)) return 1;

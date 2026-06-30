@@ -1,0 +1,713 @@
+{
+  "recovered_from": {
+    "file": "/Users/khiemnguyen/Library/Caches/Microsoft Edge/Default/Cache/Cache_Data/ed38dc59043c3d8a_0",
+    "source": "Library/Caches/Microsoft Edge/Default/Cache/Cache_Data/ed38dc59043c3d8a_0",
+    "url": null
+  },
+  "response": {
+    "success": true,
+    "data": {
+      "created_at": "2026-06-29T15:56:11Z",
+      "created_by": "10000000-0000-0000-0000-000000000001",
+      "description": "Template demo bao phủ toàn bộ work item type, workflow form template và form/panel vận hành hiện có.",
+      "edges": [
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-29T15:56:11Z",
+          "from_node_id": "41100000-0000-0000-0000-000000000002",
+          "id": "33fbcfc4-8eee-4a96-82b4-f848255b4943",
+          "label": "Hoàn tất",
+          "priority": 100,
+          "template_id": "40000000-0000-0000-0000-000000000010",
+          "to_node_id": "41100000-0000-0000-0000-000000000003"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-29T15:56:11Z",
+          "from_node_id": "41100000-0000-0000-0000-000000000005",
+          "id": "3960d54c-a3b7-49e4-9430-e64e5aaea012",
+          "label": "Hoàn tất",
+          "priority": 100,
+          "template_id": "40000000-0000-0000-0000-000000000010",
+          "to_node_id": "41100000-0000-0000-0000-000000000006"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-29T15:56:11Z",
+          "from_node_id": "41100000-0000-0000-0000-000000000004",
+          "id": "5f4ad2ba-a8f5-47bd-80ca-2e3ef7fcbe79",
+          "label": "Hoàn tất",
+          "priority": 100,
+          "template_id": "40000000-0000-0000-0000-000000000010",
+          "to_node_id": "41100000-0000-0000-0000-000000000005"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-29T15:56:11Z",
+          "from_node_id": "41100000-0000-0000-0000-000000000001",
+          "id": "8cb104e4-a978-4dbb-afcc-7ed6981c307b",
+          "label": "Hoàn tất",
+          "priority": 100,
+          "template_id": "40000000-0000-0000-0000-000000000010",
+          "to_node_id": "41100000-0000-0000-0000-000000000002"
+        },
+        {
+          "condition_config": {},
+          "condition_type": "always",
+          "created_at": "2026-06-29T15:56:11Z",
+          "from_node_id": "41100000-0000-0000-0000-000000000003",
+          "id": "b5afd776-f733-4515-94e8-7e168c227213",
+          "label": "Hoàn tất",
+          "priority": 100,
+          "template_id": "40000000-0000-0000-0000-000000000010",
+          "to_node_id": "41100000-0000-0000-0000-000000000004"
+        }
+      ],
+      "id": "40000000-0000-0000-0000-000000000010",
+      "name": "[Demo] Full workflow form coverage",
+      "nodes": [
+        {
+          "approval_rule": "PM duyệt planning",
+          "created_at": "2026-06-29T15:56:11Z",
+          "description": "Thu thập hiện trạng, checklist, daily report planning và biên bản họp.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Có ảnh, checklist, daily report và biên bản họp"
+          },
+          "fail_path": "previous",
+          "id": "41100000-0000-0000-0000-000000000001",
+          "name": "Khảo sát & Planning",
+          "order_index": 1,
+          "permissions": [
+            "planning.edit"
+          ],
+          "position_x": 80,
+          "position_y": 120,
+          "replanning_enabled": true,
+          "required_permission": "planning.edit",
+          "responsible_role_ids": [
+            "Giám sát",
+            "PM"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": false,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Upload ảnh hiện trường để làm evidence khảo sát.",
+              "document_required": false,
+              "form_required": false,
+              "form_version_id": null,
+              "id": "41200000-0000-0000-0000-000000000001",
+              "name": "Upload ảnh hiện trạng",
+              "node_id": "41100000-0000-0000-0000-000000000001",
+              "order_index": 1,
+              "photo_required": true,
+              "required_permission": "planning.edit",
+              "required_role_ids": [
+                "Giám sát"
+              ],
+              "step_type": "photo_upload"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Checklist v1 basic.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+              "id": "41200000-0000-0000-0000-000000000002",
+              "name": "Checklist hiện trạng basic v1",
+              "node_id": "41100000-0000-0000-0000-000000000001",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": "planning.edit",
+              "required_role_ids": [
+                "Giám sát"
+              ],
+              "step_type": "checklist"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Checklist v2 structured.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "0c511ac8-7e29-44c8-9449-4c775269f6d0",
+              "id": "41200000-0000-0000-0000-000000000003",
+              "name": "Checklist planning structured v2",
+              "node_id": "41100000-0000-0000-0000-000000000001",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": "planning.edit",
+              "required_role_ids": [
+                "PM"
+              ],
+              "step_type": "checklist"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Daily report v1 basic.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "4418a590-eccc-4b79-9f8b-42d8b4501341",
+              "id": "41200000-0000-0000-0000-000000000004",
+              "name": "Daily report planning v1",
+              "node_id": "41100000-0000-0000-0000-000000000001",
+              "order_index": 4,
+              "photo_required": false,
+              "required_permission": "planning.edit",
+              "required_role_ids": [
+                "PM"
+              ],
+              "step_type": "daily_report"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Daily report v2 structured.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "8d72bba5-e283-44c5-9044-7426156c2689",
+              "id": "41200000-0000-0000-0000-000000000005",
+              "name": "Daily report planning structured v2",
+              "node_id": "41100000-0000-0000-0000-000000000001",
+              "order_index": 5,
+              "photo_required": false,
+              "required_permission": "planning.edit",
+              "required_role_ids": [
+                "PM"
+              ],
+              "step_type": "daily_report"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Meeting minutes v1.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "069c9218-1d08-4a00-8fd3-15486945a926",
+              "id": "41200000-0000-0000-0000-000000000006",
+              "name": "Biên bản họp basic v1",
+              "node_id": "41100000-0000-0000-0000-000000000001",
+              "order_index": 6,
+              "photo_required": false,
+              "required_permission": "planning.edit",
+              "required_role_ids": [
+                "PM"
+              ],
+              "step_type": "meeting_minutes"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Meeting minutes v2 structured.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "5e714acb-50ca-40fe-9334-0b8035a6e363",
+              "id": "41200000-0000-0000-0000-000000000007",
+              "name": "Biên bản họp structured v2",
+              "node_id": "41100000-0000-0000-0000-000000000001",
+              "order_index": 7,
+              "photo_required": false,
+              "required_permission": "planning.edit",
+              "required_role_ids": [
+                "PM"
+              ],
+              "step_type": "meeting_minutes"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000010",
+          "type": "survey",
+          "updated_at": "2026-06-29T15:56:11Z"
+        },
+        {
+          "approval_rule": "Chủ đầu tư xác nhận",
+          "created_at": "2026-06-29T15:56:11Z",
+          "description": "Upload bản vẽ, review thiết kế và lấy xác nhận khách hàng.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Bản vẽ và xác nhận khách hàng đã đủ"
+          },
+          "fail_path": "replanning",
+          "id": "41100000-0000-0000-0000-000000000002",
+          "name": "Thiết kế & Xác nhận",
+          "order_index": 2,
+          "permissions": [
+            "planning.edit"
+          ],
+          "position_x": 360,
+          "position_y": 120,
+          "replanning_enabled": true,
+          "required_permission": "planning.edit",
+          "responsible_role_ids": [
+            "PM",
+            "Chủ đầu tư"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": false,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Upload PDF/bản vẽ thiết kế.",
+              "document_required": true,
+              "form_required": false,
+              "form_version_id": null,
+              "id": "41200000-0000-0000-0000-000000000008",
+              "name": "Upload bản vẽ thiết kế",
+              "node_id": "41100000-0000-0000-0000-000000000002",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": "planning.edit",
+              "required_role_ids": [
+                "PM"
+              ],
+              "step_type": "document_upload"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Review phương án bằng generic submission.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "c0829526-df63-46d5-a16f-6cc861bd8efb",
+              "id": "41200000-0000-0000-0000-000000000009",
+              "name": "Review phương án thiết kế",
+              "node_id": "41100000-0000-0000-0000-000000000002",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": "planning.edit",
+              "required_role_ids": [
+                "PM"
+              ],
+              "step_type": "design_review"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Xác nhận bên ngoài bởi chủ đầu tư/khách hàng.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "bbae5e11-a9de-478a-b276-ca563cd39074",
+              "id": "41200000-0000-0000-0000-000000000010",
+              "name": "Khách hàng xác nhận thiết kế",
+              "node_id": "41100000-0000-0000-0000-000000000002",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": "handover.approve",
+              "required_role_ids": [
+                "Chủ đầu tư",
+                "PM"
+              ],
+              "step_type": "approval"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000010",
+          "type": "design",
+          "updated_at": "2026-06-29T15:56:11Z"
+        },
+        {
+          "approval_rule": "PM + Kế toán duyệt",
+          "created_at": "2026-06-29T15:56:11Z",
+          "description": "Kiểm tra ngân sách, vật tư và nghiệm thu đầu vào.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Ngân sách và vật tư đầu vào đã kiểm tra"
+          },
+          "fail_path": "previous",
+          "id": "41100000-0000-0000-0000-000000000003",
+          "name": "BOQ · Mua sắm · Kho",
+          "order_index": 3,
+          "permissions": [
+            "boq.update",
+            "procurement.approve",
+            "warehouse.receive"
+          ],
+          "position_x": 640,
+          "position_y": 120,
+          "replanning_enabled": false,
+          "required_permission": "procurement.approve",
+          "responsible_role_ids": [
+            "QS",
+            "Mua hàng",
+            "Thủ kho"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Budget check.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "c0829526-df63-46d5-a16f-6cc861bd8efb",
+              "id": "41200000-0000-0000-0000-000000000011",
+              "name": "Kiểm tra ngân sách",
+              "node_id": "41100000-0000-0000-0000-000000000003",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": "accounting.budget_approve",
+              "required_role_ids": [
+                "QS",
+                "Kế toán"
+              ],
+              "step_type": "budget_check"
+            },
+            {
+              "checklist_required": false,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Material check.",
+              "document_required": false,
+              "form_required": false,
+              "form_version_id": null,
+              "id": "41200000-0000-0000-0000-000000000012",
+              "name": "Kiểm tra nhu cầu vật tư",
+              "node_id": "41100000-0000-0000-0000-000000000003",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": "warehouse.view",
+              "required_role_ids": [
+                "Mua hàng",
+                "Thủ kho"
+              ],
+              "step_type": "material_check"
+            },
+            {
+              "checklist_required": false,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Incoming acceptance panel.",
+              "document_required": false,
+              "form_required": false,
+              "form_version_id": null,
+              "id": "41200000-0000-0000-0000-000000000013",
+              "name": "Nghiệm thu đầu vào vật tư",
+              "node_id": "41100000-0000-0000-0000-000000000003",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": "warehouse.receive",
+              "required_role_ids": [
+                "Thủ kho",
+                "QA/QC"
+              ],
+              "step_type": "material_check"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000010",
+          "type": "procurement",
+          "updated_at": "2026-06-29T15:56:11Z"
+        },
+        {
+          "approval_rule": "PM review",
+          "created_at": "2026-06-29T15:56:11Z",
+          "description": "Thi công, nhật ký, vật tư trước/sau và đối chiếu thầu phụ.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Nhật ký, vật tư và đối chiếu thầu phụ đã ghi nhận"
+          },
+          "fail_path": "rework",
+          "id": "41100000-0000-0000-0000-000000000004",
+          "name": "Thi công",
+          "order_index": 4,
+          "permissions": [
+            "operation.report"
+          ],
+          "position_x": 920,
+          "position_y": 120,
+          "replanning_enabled": true,
+          "required_permission": "operation.report",
+          "responsible_role_ids": [
+            "Giám sát",
+            "Đội thi công",
+            "Thầu phụ"
+          ],
+          "rework_enabled": true,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Construction daily report.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "26001450-84df-438b-924f-5d6d97cd6d9f",
+              "id": "41200000-0000-0000-0000-000000000014",
+              "name": "Nhật ký thi công",
+              "node_id": "41100000-0000-0000-0000-000000000004",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": "operation.report",
+              "required_role_ids": [
+                "Giám sát"
+              ],
+              "step_type": "daily_report"
+            },
+            {
+              "checklist_required": false,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Material before/after snapshot.",
+              "document_required": false,
+              "form_required": false,
+              "form_version_id": null,
+              "id": "41200000-0000-0000-0000-000000000015",
+              "name": "Vật tư trước/sau",
+              "node_id": "41100000-0000-0000-0000-000000000004",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": "warehouse.view",
+              "required_role_ids": [
+                "Giám sát",
+                "Thủ kho"
+              ],
+              "step_type": "material_check"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Checklist/reconciliation thầu phụ.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "504b5ef0-1e58-4781-84fe-188a6b4b2e82",
+              "id": "41200000-0000-0000-0000-000000000016",
+              "name": "Đối chiếu thầu phụ",
+              "node_id": "41100000-0000-0000-0000-000000000004",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": "operation.report",
+              "required_role_ids": [
+                "PM",
+                "Thầu phụ"
+              ],
+              "step_type": "checklist"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000010",
+          "type": "construction",
+          "updated_at": "2026-06-29T15:56:11Z"
+        },
+        {
+          "approval_rule": "Chủ đầu tư xác nhận",
+          "created_at": "2026-06-29T15:56:11Z",
+          "description": "Nghiệm thu đầu ra, evidence nghiệm thu, vật tư dư, rework và bàn giao.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Nghiệm thu và bàn giao đủ hồ sơ"
+          },
+          "fail_path": "rework",
+          "id": "41100000-0000-0000-0000-000000000005",
+          "name": "Nghiệm thu & Bàn giao",
+          "order_index": 5,
+          "permissions": [
+            "acceptance.approve",
+            "handover.approve"
+          ],
+          "position_x": 1280,
+          "position_y": 119,
+          "replanning_enabled": true,
+          "required_permission": "handover.approve",
+          "responsible_role_ids": [
+            "QA/QC",
+            "PM",
+            "Chủ đầu tư"
+          ],
+          "rework_enabled": true,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Outgoing acceptance.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "0c511ac8-7e29-44c8-9449-4c775269f6d0",
+              "id": "41200000-0000-0000-0000-000000000017",
+              "name": "Nghiệm thu đầu ra",
+              "node_id": "41100000-0000-0000-0000-000000000005",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": "acceptance.approve",
+              "required_role_ids": [
+                "QA/QC",
+                "Chủ đầu tư"
+              ],
+              "step_type": "acceptance_check"
+            },
+            {
+              "checklist_required": false,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Evidence ảnh nghiệm thu.",
+              "document_required": false,
+              "form_required": false,
+              "form_version_id": null,
+              "id": "41200000-0000-0000-0000-000000000018",
+              "name": "Upload ảnh nghiệm thu",
+              "node_id": "41100000-0000-0000-0000-000000000005",
+              "order_index": 2,
+              "photo_required": true,
+              "required_permission": "acceptance.create",
+              "required_role_ids": [
+                "QA/QC"
+              ],
+              "step_type": "photo_upload"
+            },
+            {
+              "checklist_required": false,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Surplus handling.",
+              "document_required": false,
+              "form_required": false,
+              "form_version_id": null,
+              "id": "41200000-0000-0000-0000-000000000019",
+              "name": "Xử lý vật tư dư",
+              "node_id": "41100000-0000-0000-0000-000000000005",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": "warehouse.surplus_handle",
+              "required_role_ids": [
+                "Thủ kho"
+              ],
+              "step_type": "material_check"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Owner/client reconciliation, signature, PDF.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "bbae5e11-a9de-478a-b276-ca563cd39074",
+              "id": "41200000-0000-0000-0000-000000000020",
+              "name": "Đối chiếu chủ đầu tư / Bàn giao",
+              "node_id": "41100000-0000-0000-0000-000000000005",
+              "order_index": 4,
+              "photo_required": false,
+              "required_permission": "handover.approve",
+              "required_role_ids": [
+                "PM",
+                "Chủ đầu tư"
+              ],
+              "step_type": "handover_check"
+            },
+            {
+              "checklist_required": false,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Rework task.",
+              "document_required": false,
+              "form_required": false,
+              "form_version_id": null,
+              "id": "41200000-0000-0000-0000-000000000021",
+              "name": "Rework sau nghiệm thu",
+              "node_id": "41100000-0000-0000-0000-000000000005",
+              "order_index": 5,
+              "photo_required": false,
+              "required_permission": "rework.create",
+              "required_role_ids": [
+                "Đội thi công"
+              ],
+              "step_type": "rework_task"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000010",
+          "type": "handover",
+          "updated_at": "2026-06-30T01:29:40Z"
+        },
+        {
+          "approval_rule": "Giám đốc duyệt",
+          "created_at": "2026-06-29T15:56:11Z",
+          "description": "Kiểm tra kế toán, hóa đơn, lịch thanh toán và phê duyệt đóng tài chính.",
+          "entry_conditions": {},
+          "exit_conditions": {
+            "text": "Payable/receivable đã đối soát"
+          },
+          "fail_path": "none",
+          "id": "41100000-0000-0000-0000-000000000006",
+          "name": "Tài chính & Công nợ",
+          "order_index": 6,
+          "permissions": [
+            "accounting.payment_approve"
+          ],
+          "position_x": 1676,
+          "position_y": 119,
+          "replanning_enabled": false,
+          "required_permission": "accounting.payment_approve",
+          "responsible_role_ids": [
+            "Kế toán",
+            "Giám đốc"
+          ],
+          "rework_enabled": false,
+          "status": "active",
+          "steps": [
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Accounting check.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "c0829526-df63-46d5-a16f-6cc861bd8efb",
+              "id": "41200000-0000-0000-0000-000000000022",
+              "name": "Kiểm tra kế toán",
+              "node_id": "41100000-0000-0000-0000-000000000006",
+              "order_index": 1,
+              "photo_required": false,
+              "required_permission": "accounting.view",
+              "required_role_ids": [
+                "Kế toán"
+              ],
+              "step_type": "accounting_check"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Internal approval.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "c0829526-df63-46d5-a16f-6cc861bd8efb",
+              "id": "41200000-0000-0000-0000-000000000023",
+              "name": "Giám đốc duyệt đóng tài chính",
+              "node_id": "41100000-0000-0000-0000-000000000006",
+              "order_index": 2,
+              "photo_required": false,
+              "required_permission": "accounting.payment_approve",
+              "required_role_ids": [
+                "Giám đốc"
+              ],
+              "step_type": "approval"
+            },
+            {
+              "checklist_required": true,
+              "created_at": "2026-06-29T15:56:11Z",
+              "description": "Task/generic submission.",
+              "document_required": false,
+              "form_required": true,
+              "form_version_id": "c0829526-df63-46d5-a16f-6cc861bd8efb",
+              "id": "41200000-0000-0000-0000-000000000024",
+              "name": "Cập nhật tổng hợp project",
+              "node_id": "41100000-0000-0000-0000-000000000006",
+              "order_index": 3,
+              "photo_required": false,
+              "required_permission": "project.update",
+              "required_role_ids": [
+                "PM"
+              ],
+              "step_type": "task"
+            }
+          ],
+          "template_id": "40000000-0000-0000-0000-000000000010",
+          "type": "financial_closure",
+          "updated_at": "2026-06-30T01:29:04Z"
+        }
+      ],
+      "project_type": "Hoàn thiện nội thất",
+      "status": "published",
+      "updated_at": "2026-06-29T15:56:11Z",
+      "version": 1
+    },
+    "message": "OK"
+  }
+}

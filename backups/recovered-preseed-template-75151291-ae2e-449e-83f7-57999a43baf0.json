@@ -1,0 +1,1611 @@
+{
+  "success": true,
+  "data": {
+    "created_at": "2026-06-11T16:51:27Z",
+    "created_by": "10000000-0000-0000-0000-000000000001",
+    "description": "Khảo sát → Thiết kế → BOQ → Mua sắm → Kho → Thi công → Nghiệm thu → Bàn giao → Financial Closure",
+    "edges": [
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "auto",
+            "source": {
+              "nodeId": "183f5c35-85d5-4bfb-80c7-3bc1089488a7",
+              "side": "right"
+            },
+            "target": {
+              "nodeId": "43e4d4e3-94f8-4abc-be00-f12ca02dc939",
+              "side": "left"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T04:07:57Z",
+        "from_node_id": "183f5c35-85d5-4bfb-80c7-3bc1089488a7",
+        "id": "c16d0f9b-ad0c-42d6-818d-12d41a2d2ac4",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "43e4d4e3-94f8-4abc-be00-f12ca02dc939"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "manual",
+            "source": {
+              "nodeId": "43e4d4e3-94f8-4abc-be00-f12ca02dc939",
+              "side": "right"
+            },
+            "target": {
+              "nodeId": "0941dfc7-4468-42db-a9ca-c658c6fb8302",
+              "side": "left"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T04:11:36Z",
+        "from_node_id": "43e4d4e3-94f8-4abc-be00-f12ca02dc939",
+        "id": "ceb26d11-aa6e-4cca-bbc6-5e04e165436a",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "0941dfc7-4468-42db-a9ca-c658c6fb8302"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "manual",
+            "source": {
+              "nodeId": "43e4d4e3-94f8-4abc-be00-f12ca02dc939",
+              "side": "right"
+            },
+            "target": {
+              "nodeId": "f740a783-279c-44c6-be9a-d8f8d9afa760",
+              "side": "left"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T04:14:03Z",
+        "from_node_id": "43e4d4e3-94f8-4abc-be00-f12ca02dc939",
+        "id": "f02bd06b-5cb9-462b-8c37-8b45471d3a9a",
+        "label": "Không thiết kế",
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "f740a783-279c-44c6-be9a-d8f8d9afa760"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "auto",
+            "source": {
+              "nodeId": "7d34bd0c-5a30-4911-9e52-c6d2ad8bd443",
+              "side": "right"
+            },
+            "target": {
+              "nodeId": "21e136f9-df54-4cf9-a947-bd6dd4801afa",
+              "side": "left"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T04:46:01Z",
+        "from_node_id": "7d34bd0c-5a30-4911-9e52-c6d2ad8bd443",
+        "id": "3e89d468-472c-4be3-a123-a75cd2efa180",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "21e136f9-df54-4cf9-a947-bd6dd4801afa"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "auto",
+            "source": {
+              "nodeId": "f740a783-279c-44c6-be9a-d8f8d9afa760",
+              "side": "right"
+            },
+            "target": {
+              "nodeId": "7d34bd0c-5a30-4911-9e52-c6d2ad8bd443",
+              "side": "top"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T04:52:28Z",
+        "from_node_id": "f740a783-279c-44c6-be9a-d8f8d9afa760",
+        "id": "43fb1350-390a-4bba-ae6f-b7b0d940a830",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "7d34bd0c-5a30-4911-9e52-c6d2ad8bd443"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "auto",
+            "source": {
+              "nodeId": "0941dfc7-4468-42db-a9ca-c658c6fb8302",
+              "side": "right"
+            },
+            "target": {
+              "nodeId": "9b44dc20-0b0c-4730-90cd-98677a146e74",
+              "side": "left"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T04:54:42Z",
+        "from_node_id": "0941dfc7-4468-42db-a9ca-c658c6fb8302",
+        "id": "78c05759-b5b3-41d3-ac84-d09a632a3181",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "9b44dc20-0b0c-4730-90cd-98677a146e74"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "auto",
+            "source": {
+              "nodeId": "9b44dc20-0b0c-4730-90cd-98677a146e74",
+              "side": "right"
+            },
+            "target": {
+              "nodeId": "7d34bd0c-5a30-4911-9e52-c6d2ad8bd443",
+              "side": "left"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T04:54:46Z",
+        "from_node_id": "9b44dc20-0b0c-4730-90cd-98677a146e74",
+        "id": "a2bf6afc-cb4b-4034-846e-24bb27c7dbde",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "7d34bd0c-5a30-4911-9e52-c6d2ad8bd443"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "auto",
+            "source": {
+              "nodeId": "f740a783-279c-44c6-be9a-d8f8d9afa760",
+              "side": "top"
+            },
+            "target": {
+              "nodeId": "38fd5701-b3a2-4bdf-84f7-d5d09857f6b6",
+              "side": "bottom"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T06:47:36Z",
+        "from_node_id": "f740a783-279c-44c6-be9a-d8f8d9afa760",
+        "id": "f2516064-cc43-43a8-9320-136c855a2c4b",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "38fd5701-b3a2-4bdf-84f7-d5d09857f6b6"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "auto",
+            "source": {
+              "nodeId": "9b44dc20-0b0c-4730-90cd-98677a146e74",
+              "side": "bottom"
+            },
+            "target": {
+              "nodeId": "81a5d446-a651-4390-8e5c-13a1630d2f50",
+              "side": "top"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T08:04:48Z",
+        "from_node_id": "9b44dc20-0b0c-4730-90cd-98677a146e74",
+        "id": "d2175c45-4cfc-453e-b051-47f14acee52e",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "81a5d446-a651-4390-8e5c-13a1630d2f50"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "auto",
+            "source": {
+              "nodeId": "21e136f9-df54-4cf9-a947-bd6dd4801afa",
+              "side": "right"
+            },
+            "target": {
+              "nodeId": "d40b67db-2d4c-406c-8cf9-0314269dbbe8",
+              "side": "left"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T08:25:33Z",
+        "from_node_id": "21e136f9-df54-4cf9-a947-bd6dd4801afa",
+        "id": "0f359e0d-593e-4cdf-a697-704423299c93",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "d40b67db-2d4c-406c-8cf9-0314269dbbe8"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "auto",
+            "source": {
+              "nodeId": "d40b67db-2d4c-406c-8cf9-0314269dbbe8",
+              "side": "right"
+            },
+            "target": {
+              "nodeId": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+              "side": "left"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T08:25:35Z",
+        "from_node_id": "d40b67db-2d4c-406c-8cf9-0314269dbbe8",
+        "id": "ecdefca7-e115-4606-95fb-9e3894e7f146",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "6ee940f5-15a1-472f-b5c8-97470a75a427"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "manual",
+            "source": {
+              "nodeId": "8b79b48f-9b10-4b4e-addc-c5c126c4ca9f",
+              "side": "right"
+            },
+            "target": {
+              "nodeId": "ff4cf757-07d3-4965-8325-8e2b519adc07",
+              "side": "left"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T08:29:53Z",
+        "from_node_id": "8b79b48f-9b10-4b4e-addc-c5c126c4ca9f",
+        "id": "68f3f85b-ec78-402e-bd70-88d9379e566b",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "ff4cf757-07d3-4965-8325-8e2b519adc07"
+      },
+      {
+        "condition_config": {
+          "diagram": {
+            "portMode": "auto",
+            "source": {
+              "nodeId": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+              "side": "bottom"
+            },
+            "target": {
+              "nodeId": "8b79b48f-9b10-4b4e-addc-c5c126c4ca9f",
+              "side": "top"
+            },
+            "version": 1
+          }
+        },
+        "condition_type": "always",
+        "created_at": "2026-06-15T09:09:25Z",
+        "from_node_id": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+        "id": "84f4e945-a853-46c3-9223-114d01221d4b",
+        "label": null,
+        "priority": 100,
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "to_node_id": "8b79b48f-9b10-4b4e-addc-c5c126c4ca9f"
+      }
+    ],
+    "id": "75151291-ae2e-449e-83f7-57999a43baf0",
+    "name": "[Template] Hoàn thiện công trình",
+    "nodes": [
+      {
+        "approval_rule": "PM duyệt",
+        "created_at": "2026-06-11T16:51:27Z",
+        "description": "Ghi nhận hiện trạng, kích thước và rủi ro ban đầu.\nĐầu ra là biên bản khảo sát.",
+        "entry_conditions": {},
+        "exit_conditions": {
+          "text": "Có biên bản khảo sát và ảnh hiện trạng"
+        },
+        "fail_path": "previous",
+        "id": "183f5c35-85d5-4bfb-80c7-3bc1089488a7",
+        "name": "Khảo sát",
+        "order_index": 1,
+        "permissions": [
+          "planning.edit"
+        ],
+        "position_x": -403,
+        "position_y": -330,
+        "replanning_enabled": true,
+        "required_permission": "planning.edit",
+        "responsible_role_ids": [
+          "Giám sát"
+        ],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-12T07:50:42Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "2ab9a294-3d4b-45ee-94db-d6759691b6c4",
+            "name": "K/s Yêu cầu của chủ đầu tư (Primary: PM, GĐ. Secondary: Qs, Sale, Đội kỹ thuật)",
+            "node_id": "183f5c35-85d5-4bfb-80c7-3bc1089488a7",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "PM"
+            ],
+            "step_type": "checklist"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-11T16:51:27Z",
+            "description": "Checklist mẫu của node Khảo sát",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "f1824b16-0aea-4071-ac7e-c65a5dda01ab",
+            "name": "Khảo sát / Chụp / Upload ảnh hiện trạng",
+            "node_id": "183f5c35-85d5-4bfb-80c7-3bc1089488a7",
+            "order_index": 2,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "photo_upload"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-12T07:57:09Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "b167ab58-376f-4b32-a4e4-5bb77c1e219f",
+            "name": "Thiết kế nắm phong cách (Thiết kế)",
+            "node_id": "183f5c35-85d5-4bfb-80c7-3bc1089488a7",
+            "order_index": 3,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Thiết kế"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-11T16:51:27Z",
+            "description": "Checklist mẫu của node Khảo sát",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "40061e82-e06a-49e2-bb05-06a7312b0cd4",
+            "name": "Ghi nhận kích thước chính (Qs, Thiết kế)",
+            "node_id": "183f5c35-85d5-4bfb-80c7-3bc1089488a7",
+            "order_index": 4,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Thiết kế"
+            ],
+            "step_type": "checklist"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-11T16:51:27Z",
+            "description": "Checklist mẫu của node Khảo sát",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "e2f9a00f-461a-4e04-92ac-d13fadc016c0",
+            "name": "Xác định rủi ro mặt bằng (Qs, Đội kỹ thuật)",
+            "node_id": "183f5c35-85d5-4bfb-80c7-3bc1089488a7",
+            "order_index": 5,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "checklist"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:09:28Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "bd748bcb-d9d8-44fe-b86e-f94e43d74ec0",
+            "name": "Biên bản khảo sát",
+            "node_id": "183f5c35-85d5-4bfb-80c7-3bc1089488a7",
+            "order_index": 6,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "checklist"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "survey",
+        "updated_at": "2026-06-15T04:40:50Z"
+      },
+      {
+        "approval_rule": "Chủ đầu tư xác nhận",
+        "created_at": "2026-06-11T16:51:27Z",
+        "description": "Chuẩn bị bản vẽ, phương án thiết kế và xác nhận với khách hàng.",
+        "entry_conditions": {},
+        "exit_conditions": {
+          "text": "Bản vẽ được khách hàng xác nhận"
+        },
+        "fail_path": "replanning",
+        "id": "0941dfc7-4468-42db-a9ca-c658c6fb8302",
+        "name": "Thiết kế",
+        "order_index": 2,
+        "permissions": [
+          "planning.edit"
+        ],
+        "position_x": 303,
+        "position_y": -159,
+        "replanning_enabled": true,
+        "required_permission": "planning.edit",
+        "responsible_role_ids": [
+          "PM"
+        ],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:18:13Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "4365a3df-33ea-435e-b11d-d38cea52b3a9",
+            "name": "Trảo đổi / Lên bảng vẽ bố trí mặt bằng",
+            "node_id": "0941dfc7-4468-42db-a9ca-c658c6fb8302",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "PM"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:18:26Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "f329e010-54c7-43b3-bb6a-9311a0fabd73",
+            "name": "Trảo đổi / Lên bảng vẽ 3D",
+            "node_id": "0941dfc7-4468-42db-a9ca-c658c6fb8302",
+            "order_index": 2,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "PM"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-11T16:51:27Z",
+            "description": "Checklist mẫu của node Thiết kế",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "8172c264-6360-4842-8702-5827bd38850f",
+            "name": "Trảo đổi / Lên bảng vẽ thi công",
+            "node_id": "0941dfc7-4468-42db-a9ca-c658c6fb8302",
+            "order_index": 3,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "PM"
+            ],
+            "step_type": "document_upload"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:28:30Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "dfdd72e0-505c-487d-ac46-8f5df917edfa",
+            "name": "Chốt với Sale / Chủ đầu tư",
+            "node_id": "0941dfc7-4468-42db-a9ca-c658c6fb8302",
+            "order_index": 4,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "PM"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:27:18Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "aedbf8d2-6eca-484f-b31f-906755ffe563",
+            "name": "Đưa bảng vẽ qua bên QS.",
+            "node_id": "0941dfc7-4468-42db-a9ca-c658c6fb8302",
+            "order_index": 5,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "PM"
+            ],
+            "step_type": "task"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "design",
+        "updated_at": "2026-06-15T04:30:07Z"
+      },
+      {
+        "approval_rule": null,
+        "created_at": "2026-06-15T04:04:55Z",
+        "description": "Họp thống nhất vấn đề, lên báo giá, phân việc. Kỹ thuật sẽ làm gì. Đầu ra là Khối lượng, hạng mục, báo giá từ thầu phụ.",
+        "entry_conditions": {},
+        "exit_conditions": {},
+        "fail_path": "previous",
+        "id": "43e4d4e3-94f8-4abc-be00-f12ca02dc939",
+        "name": "Họp báo cáo khảo sát",
+        "order_index": 11,
+        "permissions": [],
+        "position_x": -54,
+        "position_y": -330,
+        "replanning_enabled": false,
+        "required_permission": null,
+        "responsible_role_ids": [],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:22:06Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "1b45d003-badc-4d99-b170-1aab721cf142",
+            "name": "QS / Bốc khối lượng không Thiết kế",
+            "node_id": "43e4d4e3-94f8-4abc-be00-f12ca02dc939",
+            "order_index": 3,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:22:52Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "7227e4f2-64a1-48a6-a246-ba3fe30fccca",
+            "name": "Thiết kế / Lên bảng bố trí mặt bằng",
+            "node_id": "43e4d4e3-94f8-4abc-be00-f12ca02dc939",
+            "order_index": 4,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:23:03Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "d96a6380-d825-41dc-8b3f-1c81fd7c8051",
+            "name": "Thiết kế / Lên bảng vẽ 3D",
+            "node_id": "43e4d4e3-94f8-4abc-be00-f12ca02dc939",
+            "order_index": 5,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:23:15Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "06a51e41-527d-431f-8bd9-0c968492eaae",
+            "name": "Thiết kế / Lên bảng vẽ thi công",
+            "node_id": "43e4d4e3-94f8-4abc-be00-f12ca02dc939",
+            "order_index": 6,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:23:30Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "cd6274ed-4fd3-4e5a-9880-796ff4c1748d",
+            "name": "Biên bản cuộc họp",
+            "node_id": "43e4d4e3-94f8-4abc-be00-f12ca02dc939",
+            "order_index": 7,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "survey",
+        "updated_at": "2026-06-15T04:14:07Z"
+      },
+      {
+        "approval_rule": null,
+        "created_at": "2026-06-15T04:13:14Z",
+        "description": "",
+        "entry_conditions": {},
+        "exit_conditions": {},
+        "fail_path": "previous",
+        "id": "f740a783-279c-44c6-be9a-d8f8d9afa760",
+        "name": "BOQ (Không thiết kế)",
+        "order_index": 12,
+        "permissions": [],
+        "position_x": 456,
+        "position_y": -436,
+        "replanning_enabled": false,
+        "required_permission": null,
+        "responsible_role_ids": [],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:30:49Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "1c69d6bc-b4b3-4a4d-8f88-974c347b24e4",
+            "name": "QS Lấy giá từ thầu phụ / giá tổ đội / vật tư",
+            "node_id": "f740a783-279c-44c6-be9a-d8f8d9afa760",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "PM"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:31:52Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "270aa4d2-d9cd-4131-9703-11fe8e6aa02d",
+            "name": "QS / PM / GĐ Kiểm tra đơn giá để ra được đầu vào hợp lý.",
+            "node_id": "f740a783-279c-44c6-be9a-d8f8d9afa760",
+            "order_index": 2,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "PM"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:21:24Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "bf0786fe-80b8-459f-b469-9f1f89abee0d",
+            "name": "GĐ Review định mức quản lý",
+            "node_id": "f740a783-279c-44c6-be9a-d8f8d9afa760",
+            "order_index": 3,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "PM"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:26:34Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "5f978ec3-3652-444f-a4bf-2a959b673dd9",
+            "name": "QS / PM / GĐ Gửi BOQ qua chủ đầu tư",
+            "node_id": "f740a783-279c-44c6-be9a-d8f8d9afa760",
+            "order_index": 4,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "PM"
+            ],
+            "step_type": "task"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "design",
+        "updated_at": "2026-06-15T06:09:36Z"
+      },
+      {
+        "approval_rule": null,
+        "created_at": "2026-06-15T04:36:59Z",
+        "description": "Đàm phán giá cùng với chủ đầu tư và các bộ phận liên quan.",
+        "entry_conditions": {},
+        "exit_conditions": {},
+        "fail_path": "previous",
+        "id": "7d34bd0c-5a30-4911-9e52-c6d2ad8bd443",
+        "name": "Đàm phán giá",
+        "order_index": 13,
+        "permissions": [],
+        "position_x": 969,
+        "position_y": -307,
+        "replanning_enabled": false,
+        "required_permission": null,
+        "responsible_role_ids": [],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:38:23Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "4f373783-6984-4ac7-b221-f0f1f7a37d13",
+            "name": "Sale / QS / PM / GĐ Đàm phán Thầu phụ để có giá hợp lý",
+            "node_id": "7d34bd0c-5a30-4911-9e52-c6d2ad8bd443",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Kế toán"
+            ],
+            "step_type": "budget_check"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:39:52Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "e83b229b-5596-4e80-b148-8ce2694dcab5",
+            "name": "QS / PM Chốt lại định mức",
+            "node_id": "7d34bd0c-5a30-4911-9e52-c6d2ad8bd443",
+            "order_index": 2,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Kế toán"
+            ],
+            "step_type": "budget_check"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:43:30Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "73222beb-e15e-4353-a121-2d1623691ffc",
+            "name": "GĐ Review & Chốt báo cáo đơn giá",
+            "node_id": "7d34bd0c-5a30-4911-9e52-c6d2ad8bd443",
+            "order_index": 3,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Kế toán"
+            ],
+            "step_type": "budget_check"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "budget_approval",
+        "updated_at": "2026-06-15T08:07:09Z"
+      },
+      {
+        "approval_rule": null,
+        "created_at": "2026-06-15T04:45:32Z",
+        "description": "Hợp đồng với chủ đầu tư",
+        "entry_conditions": {},
+        "exit_conditions": {},
+        "fail_path": "previous",
+        "id": "21e136f9-df54-4cf9-a947-bd6dd4801afa",
+        "name": "Chốt Hợp đồng với chủ đầu tư",
+        "order_index": 14,
+        "permissions": [],
+        "position_x": 1324,
+        "position_y": -297,
+        "replanning_enabled": false,
+        "required_permission": null,
+        "responsible_role_ids": [],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:46:45Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "2984a759-7114-42d8-b894-1607b9846112",
+            "name": "QS Lên báo giá & hợp đồng",
+            "node_id": "21e136f9-df54-4cf9-a947-bd6dd4801afa",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:47:04Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "1d998f6a-cced-4350-96e7-3480dc9c8c65",
+            "name": "Kế toán / Pháp lý check lại hợp đồng",
+            "node_id": "21e136f9-df54-4cf9-a947-bd6dd4801afa",
+            "order_index": 2,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:47:32Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "2aa92b61-cf93-4bd2-99a2-d4075406f6d3",
+            "name": "Sale / PM / QS Gửi nội dung file mềm qua (bảng tiến độ / đề nghị tạm ứng / ký duyệt của 2 bên) Chủ đầu tư",
+            "node_id": "21e136f9-df54-4cf9-a947-bd6dd4801afa",
+            "order_index": 3,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:49:41Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "f7eec56f-c22a-4135-9203-370957f97c54",
+            "name": "PM / GĐ review và ký duyệt",
+            "node_id": "21e136f9-df54-4cf9-a947-bd6dd4801afa",
+            "order_index": 4,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:50:50Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "56ce2a30-2fd7-4b28-a891-4346382061c6",
+            "name": "In và gửi bảng cứng (hợp đồng / hồ sơ tạm ứng) cho Chủ đầu tư",
+            "node_id": "21e136f9-df54-4cf9-a947-bd6dd4801afa",
+            "order_index": 5,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "survey",
+        "updated_at": "2026-06-15T08:19:15Z"
+      },
+      {
+        "approval_rule": null,
+        "created_at": "2026-06-15T04:54:05Z",
+        "description": "",
+        "entry_conditions": {},
+        "exit_conditions": {},
+        "fail_path": "previous",
+        "id": "9b44dc20-0b0c-4730-90cd-98677a146e74",
+        "name": "BOQ (Có thiết kế)",
+        "order_index": 15,
+        "permissions": [],
+        "position_x": 617,
+        "position_y": -140,
+        "replanning_enabled": false,
+        "required_permission": null,
+        "responsible_role_ids": [],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T04:57:05Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "cdcecc5e-b961-40ba-b115-2eb1a53e29cc",
+            "name": "QS / Sale / PM Gửi BOQ qua Chủ đầu tư",
+            "node_id": "9b44dc20-0b0c-4730-90cd-98677a146e74",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "survey",
+        "updated_at": "2026-06-15T04:57:06Z"
+      },
+      {
+        "approval_rule": null,
+        "created_at": "2026-06-15T06:41:37Z",
+        "description": "",
+        "entry_conditions": {},
+        "exit_conditions": {},
+        "fail_path": "previous",
+        "id": "38fd5701-b3a2-4bdf-84f7-d5d09857f6b6",
+        "name": "Đầu Vào Tổ Đội / Thầu Phụ / Cung cấp vật tư",
+        "order_index": 16,
+        "permissions": [],
+        "position_x": 456,
+        "position_y": -692,
+        "replanning_enabled": false,
+        "required_permission": null,
+        "responsible_role_ids": [],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T06:42:56Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "8fc4b627-bfb8-41ee-9fc7-e111b82b73fd",
+            "name": "QS / Bốc Khối Lượng",
+            "node_id": "38fd5701-b3a2-4bdf-84f7-d5d09857f6b6",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T06:43:57Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "c1169ea1-6dd8-4f49-a385-27b871825022",
+            "name": "Mua Hàng / QS Mua hàng với Tổ Đội / Thầu Phụ / Cung cấp vật tư",
+            "node_id": "38fd5701-b3a2-4bdf-84f7-d5d09857f6b6",
+            "order_index": 2,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T06:44:39Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "409fa098-f3af-458e-8532-de989b88ab83",
+            "name": "Mua hàng / QS Ký hợp đồng / Hồ sơ tạm ứng với Tổ Đội / Thầu Phụ / Nhà Cung Cấp Vật Tự",
+            "node_id": "38fd5701-b3a2-4bdf-84f7-d5d09857f6b6",
+            "order_index": 3,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T06:46:26Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "5864af5f-14ec-4d1a-9873-bc13b0ccb8d5",
+            "name": "PM / GĐ Review & Check Đầu Vào",
+            "node_id": "38fd5701-b3a2-4bdf-84f7-d5d09857f6b6",
+            "order_index": 4,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "survey",
+        "updated_at": "2026-06-15T06:48:06Z"
+      },
+      {
+        "approval_rule": null,
+        "created_at": "2026-06-15T08:03:51Z",
+        "description": "",
+        "entry_conditions": {},
+        "exit_conditions": {},
+        "fail_path": "previous",
+        "id": "81a5d446-a651-4390-8e5c-13a1630d2f50",
+        "name": "Đầu Vào Tổ Đội / Thầu Phụ / Cung cấp vật tư",
+        "order_index": 17,
+        "permissions": [],
+        "position_x": 617,
+        "position_y": 108,
+        "replanning_enabled": false,
+        "required_permission": null,
+        "responsible_role_ids": [],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-21T07:18:26Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "8f1872a9-741f-4c47-bc67-f799b208186f",
+            "name": "Test",
+            "node_id": "81a5d446-a651-4390-8e5c-13a1630d2f50",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát",
+              "PM",
+              "Giám đốc"
+            ],
+            "step_type": "task"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "survey",
+        "updated_at": "2026-06-21T07:18:36Z"
+      },
+      {
+        "approval_rule": null,
+        "created_at": "2026-06-15T08:20:12Z",
+        "description": "Daily report, issue, vật tư sử dụng và tiến độ.",
+        "entry_conditions": {},
+        "exit_conditions": {},
+        "fail_path": "previous",
+        "id": "d40b67db-2d4c-406c-8cf9-0314269dbbe8",
+        "name": "QA & QC",
+        "order_index": 18,
+        "permissions": [],
+        "position_x": 1690,
+        "position_y": -307,
+        "replanning_enabled": false,
+        "required_permission": null,
+        "responsible_role_ids": [],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:23:06Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "d9f792b6-f710-4d04-82e4-eafe915ab6cd",
+            "name": "QS / PM / Thiết Kế / QA Họp & phân công",
+            "node_id": "d40b67db-2d4c-406c-8cf9-0314269dbbe8",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:49:17Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "8be99d46-6b1c-4434-b9cf-7ff27299f5f1",
+            "name": "Chốt biên bản cuộc họp",
+            "node_id": "d40b67db-2d4c-406c-8cf9-0314269dbbe8",
+            "order_index": 2,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:24:31Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "59458fbb-1cbf-4d59-88ca-6e052a49ab54",
+            "name": "[QA] Đảm bảo chất lượng / kế hoạch thi công",
+            "node_id": "d40b67db-2d4c-406c-8cf9-0314269dbbe8",
+            "order_index": 3,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:50:05Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "c37d420b-ac23-41ab-971c-b30bc8adba13",
+            "name": "[QA] Báo cáo liên tục trong quá trình thi công",
+            "node_id": "d40b67db-2d4c-406c-8cf9-0314269dbbe8",
+            "order_index": 4,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "construction",
+        "updated_at": "2026-06-15T08:50:18Z"
+      },
+      {
+        "approval_rule": null,
+        "created_at": "2026-06-15T08:25:19Z",
+        "description": "Checklist nghiệm thu, pass/fail và punch list.",
+        "entry_conditions": {},
+        "exit_conditions": {},
+        "fail_path": "previous",
+        "id": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+        "name": "Nghiệm thu Đầu Vào",
+        "order_index": 19,
+        "permissions": [],
+        "position_x": 2067,
+        "position_y": -307,
+        "replanning_enabled": false,
+        "required_permission": null,
+        "responsible_role_ids": [],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:25:55Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "3374b8dc-b19d-4856-aff7-e7b23bfa5388",
+            "name": "[QA, QS] Nghiệm thu Thầu Phụ / Tổ Đội ( Đưa số liệu cho QS kiểm tra)",
+            "node_id": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "QA/QC"
+            ],
+            "step_type": "acceptance_check"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:26:30Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "669c672f-5ee5-4a3d-9a4b-d2cfbcadfe29",
+            "name": "[QA, QS] Nghiệm thu Vật tư (Đầu vào vs Đầu ra) (Đưa số liệu cho QS kiểm tra)",
+            "node_id": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+            "order_index": 2,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "QA/QC"
+            ],
+            "step_type": "acceptance_check"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:52:57Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "3e250cc2-fbea-4ce2-9088-d817e0e87b94",
+            "name": "[QS] Hồ sơ kiểm tra khối lượng thầu phụ (Áp giá vào)",
+            "node_id": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+            "order_index": 3,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "QA/QC"
+            ],
+            "step_type": "acceptance_check"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:53:23Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "5bcb7c13-3c4c-4c2d-8d9c-d861d349663a",
+            "name": "[GĐ] Review & Check hồ sơ kiểm tra khối lượng thầu phụ",
+            "node_id": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+            "order_index": 4,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "QA/QC"
+            ],
+            "step_type": "acceptance_check"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:27:07Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "708555e9-5510-471f-b0c5-bc1db6c89819",
+            "name": "[QS] Hồ sơ thanh toán cho thầu phụ",
+            "node_id": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+            "order_index": 5,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "QA/QC"
+            ],
+            "step_type": "acceptance_check"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:54:28Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "32c0e7b5-61d5-4693-aa89-079c581feceb",
+            "name": "[GĐ] Ký nghiệm thu hồ sơ thanh toán",
+            "node_id": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+            "order_index": 6,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "QA/QC"
+            ],
+            "step_type": "acceptance_check"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:55:39Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "1e40e026-0207-465b-b5f5-ce7de49caba3",
+            "name": "[Kế toán] Kiểm tra hồ sơ thanh toán",
+            "node_id": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+            "order_index": 7,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "QA/QC"
+            ],
+            "step_type": "acceptance_check"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:57:27Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "eee62e37-6bba-4bf0-ba0c-7804192d47a9",
+            "name": "Thanh toán cho Thầu Phụ (thanh toán đợt {n})",
+            "node_id": "6ee940f5-15a1-472f-b5c8-97470a75a427",
+            "order_index": 8,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "QA/QC"
+            ],
+            "step_type": "acceptance_check"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "acceptance",
+        "updated_at": "2026-06-15T08:57:31Z"
+      },
+      {
+        "approval_rule": null,
+        "created_at": "2026-06-15T08:28:05Z",
+        "description": "",
+        "entry_conditions": {},
+        "exit_conditions": {},
+        "fail_path": "previous",
+        "id": "ff4cf757-07d3-4965-8325-8e2b519adc07",
+        "name": "Kết thúc",
+        "order_index": 20,
+        "permissions": [],
+        "position_x": 2791,
+        "position_y": -288,
+        "replanning_enabled": false,
+        "required_permission": null,
+        "responsible_role_ids": [],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:29:40Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "852e6c0e-c4d1-4f5a-a6bb-f0238d73321d",
+            "name": "Kế toán Thầu phụ Xuất hoá đơn về công ty",
+            "node_id": "ff4cf757-07d3-4965-8325-8e2b519adc07",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:43:57Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "295239f1-f28c-49ae-84fa-9a367c1e9d94",
+            "name": "Kế toán Xuất Hoá đơn cho Chủ đầu tư",
+            "node_id": "ff4cf757-07d3-4965-8325-8e2b519adc07",
+            "order_index": 2,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "survey",
+        "updated_at": "2026-06-15T09:10:49Z"
+      },
+      {
+        "approval_rule": null,
+        "created_at": "2026-06-15T08:57:35Z",
+        "description": "Ghi nhận hiện trạng, kích thước và rủi ro ban đầu.",
+        "entry_conditions": {},
+        "exit_conditions": {},
+        "fail_path": "previous",
+        "id": "8b79b48f-9b10-4b4e-addc-c5c126c4ca9f",
+        "name": "Nghiệm thu Đầu Ra",
+        "order_index": 21,
+        "permissions": [],
+        "position_x": 2429,
+        "position_y": -307,
+        "replanning_enabled": false,
+        "required_permission": null,
+        "responsible_role_ids": [],
+        "rework_enabled": false,
+        "status": "active",
+        "steps": [
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:58:45Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "1e53991f-5acf-414e-95f2-29e8765cb671",
+            "name": "[QA / QS / PM / GĐ] Nghiệm thu & ký duyệt công trình",
+            "node_id": "8b79b48f-9b10-4b4e-addc-c5c126c4ca9f",
+            "order_index": 1,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:59:11Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "994521ac-0489-4791-8f56-f06c3ba6c4e2",
+            "name": "[GĐ] Hồ sơ nghiệm thu & Ký duyệt",
+            "node_id": "8b79b48f-9b10-4b4e-addc-c5c126c4ca9f",
+            "order_index": 2,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:59:30Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "fbbeacd7-b855-466f-9a59-5c0fe527c40c",
+            "name": "[Kế toán / QS / PM / GĐ] Hồ sơ thanh toán & quyết toán & Ký duyệt (các bên)",
+            "node_id": "8b79b48f-9b10-4b4e-addc-c5c126c4ca9f",
+            "order_index": 3,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:59:40Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "27b5c3e0-66d9-4799-bbc7-9d34845dc99c",
+            "name": "Xuất Hoá Đơn",
+            "node_id": "8b79b48f-9b10-4b4e-addc-c5c126c4ca9f",
+            "order_index": 4,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          },
+          {
+            "checklist_required": true,
+            "created_at": "2026-06-15T08:59:46Z",
+            "description": "Checklist mẫu trong node",
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "1a277afa-7ff8-4326-aa4d-e6ab46a431d3",
+            "id": "83c9c9ba-b036-49d0-b18a-7d13c411f093",
+            "name": "Thanh Toán (thanh toán nhiều kỳ)",
+            "node_id": "8b79b48f-9b10-4b4e-addc-c5c126c4ca9f",
+            "order_index": 5,
+            "photo_required": false,
+            "required_permission": null,
+            "required_role_ids": [
+              "Giám sát"
+            ],
+            "step_type": "task"
+          }
+        ],
+        "template_id": "75151291-ae2e-449e-83f7-57999a43baf0",
+        "type": "survey",
+        "updated_at": "2026-06-15T09:10:45Z"
+      }
+    ],
+    "project_type": "Hoàn thiện nội thất",
+    "status": "draft",
+    "updated_at": "2026-06-12T05:42:06Z",
+    "version": 1
+  },
+  "message": "OK"
+}

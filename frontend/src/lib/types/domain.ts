@@ -1567,8 +1567,10 @@ export type WorkItem = ProjectOperationsRecord & {
   pipeline_run_id?: string;
   run_node_id?: string;
   run_node_name?: string;
+  run_node_order_index?: number;
   run_step_id?: string;
   run_step_name?: string;
+  run_step_order_index?: number;
   evidence_count?: number;
   workflow_form_instance_id?: string;
   workflow_form_status?: 'draft' | 'submitted' | 'reopened' | 'cancelled' | string;

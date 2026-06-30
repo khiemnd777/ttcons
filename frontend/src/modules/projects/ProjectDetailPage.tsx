@@ -50,6 +50,7 @@ import {
   compactDateTime,
   departmentLabel,
   numberValue,
+  orderWorkItemsByWorkflow,
   prioritizeWorkItems,
 } from '../work-items/workItemPresentation';
 
@@ -121,7 +122,9 @@ export function ProjectDetailPage() {
 
   const data = operations.data;
   const allWorkItems = useMemo(() => asArray<WorkItem>(data?.work_items), [data?.work_items]);
-  const activeWork = useMemo(() => prioritizeWorkItems(allWorkItems.filter(isOpenWorkItem)), [allWorkItems]);
+  const openWorkItems = useMemo(() => allWorkItems.filter(isOpenWorkItem), [allWorkItems]);
+  const workflowWork = useMemo(() => orderWorkItemsByWorkflow(openWorkItems), [openWorkItems]);
+  const priorityWork = useMemo(() => prioritizeWorkItems(openWorkItems), [openWorkItems]);
   const blockers = useMemo(() => prioritizeWorkItems(asArray<WorkItem>(data?.blockers)), [data?.blockers]);
   const departmentSurfaces = useMemo(() => asArray<DepartmentSurface>(data?.department_surfaces), [data?.department_surfaces]);
   const timeline = useMemo(() => asArray<ProjectOperationsTimelineNode>(data?.workflow_timeline), [data?.workflow_timeline]);
@@ -185,12 +188,12 @@ export function ProjectDetailPage() {
   const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
   const selectedTimelineNode = timeline.find((node) => node.id === selectedTimelineNodeId) ?? currentNode ?? timeline[0];
   const nodeActiveWork = selectedTimelineNode
-    ? prioritizeWorkItems(allWorkItems.filter((item) => item.run_node_id === selectedTimelineNode.id && isOpenWorkItem(item)))
-    : activeWork;
+    ? orderWorkItemsByWorkflow(openWorkItems.filter((item) => item.run_node_id === selectedTimelineNode.id))
+    : workflowWork;
   const tabs: Array<{ id: ProjectDetailTab; label: string; count?: number }> = [
     { id: 'overview', label: 'Tổng quan', count: numberValue(data.health_counts?.active) },
     { id: 'workflow', label: 'Workflow', count: timeline.length },
-    { id: 'work', label: 'Công việc', count: activeWork.length },
+    { id: 'work', label: 'Công việc', count: workflowWork.length },
     { id: 'activity', label: 'Trao đổi', count: latestActivity.length },
     { id: 'files', label: 'Hồ sơ', count: latestEvidence.length },
     { id: 'audit', label: 'Audit', count: auditRecent.length },
@@ -213,7 +216,7 @@ export function ProjectDetailPage() {
           <HeaderActions
             hasPipeline={hasPipeline}
             startPending={startPipeline.isPending}
-            activeWork={activeWork}
+            priorityWork={priorityWork}
             blockers={blockers}
             onStartPipeline={() => startPipeline.mutate()}
             onOpenWork={openWorkItem}
@@ -230,7 +233,7 @@ export function ProjectDetailPage() {
             <ProjectSummaryBand project={project} currentNode={currentNode} visibility={data.visibility} />
             <HealthStrip data={data} />
             <ProjectOverviewWorkPanel
-              activeWork={activeWork}
+              priorityWork={priorityWork}
               blockers={blockers}
               onOpenWork={openWorkItem}
               onShowAllWork={() => {
@@ -259,7 +262,7 @@ export function ProjectDetailPage() {
         {activeTab === 'work' ? (
           <DepartmentSurfaces
             surfaces={departmentSurfaces}
-            allRows={activeWork}
+            allRows={workflowWork}
             selectedDepartment={selectedDepartment}
             onSelectDepartment={setSelectedDepartment}
             onOpenWork={openWorkItem}
@@ -304,7 +307,7 @@ export function ProjectDetailPage() {
 function HeaderActions({
   hasPipeline,
   startPending,
-  activeWork,
+  priorityWork,
   blockers,
   onStartPipeline,
   onOpenWork,
@@ -312,14 +315,14 @@ function HeaderActions({
 }: {
   hasPipeline: boolean;
   startPending: boolean;
-  activeWork: WorkItem[];
+  priorityWork: WorkItem[];
   blockers: WorkItem[];
   onStartPipeline: () => void;
   onOpenWork: (item: WorkItem) => void;
   projectId: string;
 }) {
-  const approvalWork = activeWork.find((item) => item.status === 'waiting_approval' || item.status === 'waiting_review');
-  const primaryWork = blockers[0] ?? approvalWork ?? activeWork[0];
+  const approvalWork = priorityWork.find((item) => item.status === 'waiting_approval' || item.status === 'waiting_review');
+  const primaryWork = blockers[0] ?? approvalWork ?? priorityWork[0];
 
   return (
     <>
@@ -511,26 +514,26 @@ function HealthStrip({ data }: { data: ProjectOperationsResponse }) {
 }
 
 function ProjectOverviewWorkPanel({
-  activeWork,
+  priorityWork,
   blockers,
   onOpenWork,
   onShowAllWork,
 }: {
-  activeWork: WorkItem[];
+  priorityWork: WorkItem[];
   blockers: WorkItem[];
   onOpenWork: (item: WorkItem) => void;
   onShowAllWork: () => void;
 }) {
-  const approvalCount = activeWork.filter((item) => item.status === 'waiting_approval' || item.status === 'waiting_review').length;
-  const blockerCount = activeWork.filter((item) => item.status === 'blocked').length;
+  const approvalCount = priorityWork.filter((item) => item.status === 'waiting_approval' || item.status === 'waiting_review').length;
+  const blockerCount = priorityWork.filter((item) => item.status === 'blocked').length;
 
   return (
     <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="flex flex-col gap-3 border-b border-line pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tổng quan vận hành</p>
-          <h2 className="mt-1 text-base font-semibold text-ink">Việc cần xử lý trong công trình</h2>
-          <p className="mt-1 text-sm text-slate-600">Cây nghiệp vụ bên trái là menu chính; bảng này chỉ giữ các việc đang mở quan trọng nhất.</p>
+          <h2 className="mt-1 text-base font-semibold text-ink">Hàng ưu tiên</h2>
+          <p className="mt-1 text-sm text-slate-600">Các việc cần can thiệp sớm, tách khỏi thứ tự workflow trong tab Workflow.</p>
         </div>
         <button
           type="button"
@@ -543,13 +546,13 @@ function ProjectOverviewWorkPanel({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line py-3 text-sm">
-        <span><span className="font-semibold text-ink">{activeWork.length}</span> việc đang mở</span>
+        <span><span className="font-semibold text-ink">{priorityWork.length}</span> việc đang mở</span>
         <span><span className="font-semibold text-rose-700">{blockerCount}</span> blocker</span>
         <span><span className="font-semibold text-amber-700">{approvalCount}</span> chờ duyệt</span>
         <span><span className="font-semibold text-slate-700">{blockers.length}</span> blocker toàn công trình</span>
       </div>
 
-      <WorkspaceWorkTable rows={activeWork.slice(0, 8)} onOpenWork={onOpenWork} />
+      <WorkspaceWorkTable rows={priorityWork.slice(0, 8)} onOpenWork={onOpenWork} />
     </section>
   );
 }
@@ -740,10 +743,10 @@ function ActiveWorkPanel({
         <div className="flex min-w-0 items-center gap-2">
           <TimerReset className="h-5 w-5 shrink-0 text-blue-700" />
           <h2 className="truncate font-semibold text-ink">
-            Active Work{selectedNode?.name ? ` · ${selectedNode.name}` : ''}
+            Công việc theo thứ tự workflow{selectedNode?.name ? ` · ${selectedNode.name}` : ''}
           </h2>
         </div>
-        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{rows.length} open</span>
+        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{rows.length} đang mở</span>
       </div>
       {rows.length ? (
         <div className="space-y-3">
@@ -982,7 +985,7 @@ function DepartmentSurfaces({
     : surfaces.find((surface) => (surface.department ?? 'unassigned') === selectedDepartment);
   const activeRows = useMemo(() => {
     if (selectedDepartment === ALL_WORK_SURFACE) return allRows;
-    return prioritizeWorkItems(asArray<WorkItem>(selectedSurface?.work_items).filter(isOpenWorkItem));
+    return orderWorkItemsByWorkflow(asArray<WorkItem>(selectedSurface?.work_items).filter(isOpenWorkItem));
   }, [allRows, selectedDepartment, selectedSurface?.work_items]);
   const totalPages = Math.max(1, Math.ceil(activeRows.length / WORK_PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
