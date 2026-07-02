@@ -21,7 +21,7 @@ Use this skill for inventory state and material traceability.
 3. Keep site material balances separate from warehouse stock unless a movement explicitly links them.
 4. For material before/after snapshots, preserve submit-time site balance usage and evidence links.
 5. For surplus handling, preserve partial/handled balances, custody, condition, evidence, and movement linkage.
-6. For code or UI changes, follow the repo review package and Mockup as Text gates before editing.
+6. For feature, bugfix, code-changing, or UI-changing requests, stop before editing and produce the repo review package. Include current contract/invariant, evidence, root cause or unresolved risk, clarification questions, implementation plan, validation plan, and any required Mockup as Text. Wait for explicit user confirmation.
 
 ## Guardrails
 

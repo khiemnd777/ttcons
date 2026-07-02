@@ -21,7 +21,7 @@ Use this skill for the field-execution layer that records what happened on site.
 3. Keep construction reports and checklist forms backed by real workflow form instances or durable records.
 4. Trace any material quantity or surplus implication into the materials/warehouse domain before changing stock or site balance behavior.
 5. Keep activity and audit entries useful for site handoff.
-6. For code or UI changes, follow the repo review package and Mockup as Text gates before editing.
+6. For feature, bugfix, code-changing, or UI-changing requests, stop before editing and produce the repo review package. Include current contract/invariant, evidence, root cause or unresolved risk, clarification questions, implementation plan, validation plan, and any required Mockup as Text. Wait for explicit user confirmation.
 
 ## Guardrails
 

@@ -1,5 +1,30 @@
 # Current States
 
+## Work Item Support Workspace Retouch
+
+Status: complete
+
+Will be done:
+- Refactor only the `THÔNG TIN HỖ TRỢ` area inside the work item detail workspace.
+- Keep backend routes, API response contracts, mutations, and query invalidation behavior unchanged.
+- Retouch the support shell so evidence, activity, and workflow form/PDF share a clearer workspace hierarchy.
+- Make evidence list/gallery-first with compact upload controls.
+- Make activity timeline-first with a compact composer entry point.
+- Make workflow form/PDF summary-first with validation, form fields, signature, and PDF artifacts separated clearly.
+- Run `cd frontend && npm run build`; browser verification is skipped unless explicitly requested.
+
+Done:
+- User approved the review package with `Approve`.
+- Re-read Consflow frontend workflow skill, AGENTS.md, router, UI guardrails, current plan notes, and target work item components.
+- Refactored `WorkItemSupportingTabs` into a clearer support workspace shell with status-aware tabs and a next support action.
+- Changed work-item activity support to timeline-first with a compact composer toggle.
+- Changed work-item evidence support to summary/list-first and moved upload into a compact expandable panel.
+- Added a list variant to `EvidenceGallery` while preserving the existing card default for project files.
+- Reworked `WorkflowFormPanel` into an action center, processing summary, form fields section, artifacts column, and form event panel.
+- Removed the old unused workflow form summary helper after replacing it with the new summary layout.
+- Ran `cd frontend && npm run build` successfully.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
 ## Workflow Detail Workspace UI
 
 Status: complete

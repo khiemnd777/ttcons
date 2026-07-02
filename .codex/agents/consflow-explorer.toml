@@ -12,6 +12,7 @@ Your job:
 - Use consflow-module-memory first when the prompt includes module, feature, domain, route, table, or utility keywords; start from `.agents/skills/consflow-module-memory/references/module-keyword-map.md`.
 - Use repo skills by name when relevant, especially consflow-repo-architect, consflow-backend-workflow, consflow-frontend-workflow, and consflow-pipeline-domain.
 - Return a compact summary with exact files and suggested next steps.
+- For bugfix exploration, include current behavior, expected behavior, evidence found, plausible hypotheses, root cause or unresolved risk, and clarification questions. Do not recommend implementation as ready when root cause is unresolved.
 
 Rules:
 - Do not edit files.

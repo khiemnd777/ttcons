@@ -19,6 +19,7 @@ type EvidenceUploadType = 'photo' | 'document';
 type EvidenceVisibility = 'internal' | 'project' | 'client';
 
 export function EvidencePanel({ workItemId, projectId, evidence }: EvidencePanelProps) {
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [evidenceType, setEvidenceType] = useState<EvidenceUploadType>('photo');
   const [visibility, setVisibility] = useState<EvidenceVisibility>('project');
@@ -37,6 +38,7 @@ export function EvidencePanel({ workItemId, projectId, evidence }: EvidencePanel
       setCaption('');
       setEvidenceType('photo');
       setVisibility('project');
+      setUploadOpen(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       queryClient.invalidateQueries({ queryKey: ['work-item', workItemId] });
       queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
@@ -91,89 +93,107 @@ export function EvidencePanel({ workItemId, projectId, evidence }: EvidencePanel
   }
 
   return (
-    <section>
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-ink">Evidence</h3>
-        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{evidence.length} file</span>
+    <section className="space-y-3">
+      <div className="flex flex-col gap-3 rounded-md border border-line bg-slate-50 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sổ minh chứng</p>
+          <h3 className="mt-0.5 text-sm font-semibold text-ink">{evidence.length} hồ sơ minh chứng</h3>
+          <p className="mt-1 text-xs text-slate-500">Photo {stats.photos} · Document {stats.documents} · Pending {stats.pending}</p>
+        </div>
+        <button
+          type="button"
+          className={clsx(
+            'inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold',
+            uploadOpen ? 'border border-line bg-white text-slate-700 hover:bg-slate-100' : 'bg-blue-600 text-white hover:bg-blue-700',
+          )}
+          onClick={() => setUploadOpen((current) => !current)}
+        >
+          <Upload className="h-4 w-4" />
+          {uploadOpen ? 'Ẩn upload' : 'Upload minh chứng'}
+        </button>
       </div>
-      <div className="mb-3 grid gap-2 sm:grid-cols-4">
+
+      <div className="grid gap-2 sm:grid-cols-4">
         <EvidenceStat icon={<ImageIcon className="h-3.5 w-3.5" />} label="Photo" value={stats.photos} />
         <EvidenceStat icon={<FileText className="h-3.5 w-3.5" />} label="Document" value={stats.documents} />
         <EvidenceStat icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Accepted" value={stats.accepted} tone="ok" />
         <EvidenceStat icon={<Clock3 className="h-3.5 w-3.5" />} label="Pending" value={stats.pending} tone={stats.pending ? 'warn' : 'neutral'} />
       </div>
 
-      <form className="rounded-md border border-line bg-slate-50 p-3" onSubmit={submitUpload}>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="sm:col-span-2">
-            <span className="text-xs font-semibold text-slate-600">File</span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,application/pdf"
-              className="mt-1 block w-full rounded-md border border-line bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-              onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
-            />
-          </label>
-          <label>
-            <span className="text-xs font-semibold text-slate-600">Loại</span>
-            <select
-              className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              value={evidenceType}
-              onChange={(event) => setEvidenceType(event.target.value as EvidenceUploadType)}
+      {uploadOpen ? (
+        <form className="rounded-md border border-blue-100 bg-blue-50/40 p-3" onSubmit={submitUpload}>
+          <div className="grid gap-2 lg:grid-cols-[minmax(0,1.4fr)_9rem_9rem_minmax(0,1fr)_minmax(0,1fr)]">
+            <label className="min-w-0">
+              <span className="text-xs font-semibold text-slate-600">File</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,application/pdf"
+                className="mt-1 block w-full rounded-md border border-line bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
+                onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            <label>
+              <span className="text-xs font-semibold text-slate-600">Loại</span>
+              <select
+                className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                value={evidenceType}
+                onChange={(event) => setEvidenceType(event.target.value as EvidenceUploadType)}
+              >
+                <option value="photo">Photo</option>
+                <option value="document">Document PDF</option>
+              </select>
+            </label>
+            <label>
+              <span className="text-xs font-semibold text-slate-600">Visibility</span>
+              <select
+                className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                value={visibility}
+                onChange={(event) => setVisibility(event.target.value as EvidenceVisibility)}
+              >
+                <option value="internal">Internal</option>
+                <option value="project">Project</option>
+                <option value="client">Client</option>
+              </select>
+            </label>
+            <label>
+              <span className="text-xs font-semibold text-slate-600">Tên evidence</span>
+              <input
+                className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Tên file / hạng mục"
+              />
+            </label>
+            <label>
+              <span className="text-xs font-semibold text-slate-600">Caption</span>
+              <input
+                className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                value={caption}
+                onChange={(event) => setCaption(event.target.value)}
+                placeholder="Ghi chú hiện trường"
+              />
+            </label>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs text-slate-500">{selectedFile ? `${selectedFile.name} · ${formatEvidenceFileSize(selectedFile.size)}` : 'PNG/JPG/WebP/PDF <= 10MB'}</span>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={uploadEvidence.isPending}
             >
-              <option value="photo">Photo</option>
-              <option value="document">Document PDF</option>
-            </select>
-          </label>
-          <label>
-            <span className="text-xs font-semibold text-slate-600">Visibility</span>
-            <select
-              className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              value={visibility}
-              onChange={(event) => setVisibility(event.target.value as EvidenceVisibility)}
-            >
-              <option value="internal">Internal</option>
-              <option value="project">Project</option>
-              <option value="client">Client</option>
-            </select>
-          </label>
-          <label>
-            <span className="text-xs font-semibold text-slate-600">Tên evidence</span>
-            <input
-              className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Tên file / hạng mục"
-            />
-          </label>
-          <label>
-            <span className="text-xs font-semibold text-slate-600">Caption</span>
-            <input
-              className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              value={caption}
-              onChange={(event) => setCaption(event.target.value)}
-              placeholder="Ghi chú hiện trường"
-            />
-          </label>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs text-slate-500">{selectedFile ? `${selectedFile.name} · ${formatEvidenceFileSize(selectedFile.size)}` : 'PNG/JPG/WebP/PDF <= 10MB'}</span>
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={uploadEvidence.isPending}
-          >
-            {uploadEvidence.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            Upload
-          </button>
-        </div>
-      </form>
+              {uploadEvidence.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Upload
+            </button>
+          </div>
+        </form>
+      ) : null}
 
-      <div className="mt-3">
+      <div>
         <EvidenceGallery
           evidence={evidence}
           emptyTitle="Chưa có evidence cho work item này"
+          variant="list"
           onReview={(record, action, comment) => reviewEvidence.mutateAsync({ record, action, comment }).then(() => undefined)}
         />
       </div>

@@ -20,16 +20,17 @@ Use this skill for backend API, data, auth, migration, and domain behavior chang
 1. Trace the route and endpoint contract.
 2. Locate the service method or repository helper that owns the behavior.
 3. Confirm request and response shapes used by the frontend.
-4. For feature, bugfix, or code-changing requests, present a review package and wait for explicit user confirmation before implementation.
-5. For schema changes:
+4. For bugfixes or unclear behavior changes, use `consflow-diagnose`: build a pass/fail signal when feasible, write falsifiable hypotheses, and identify the root cause or unresolved risk before proposing edits. Do not implement a speculative backend fix.
+5. For feature, bugfix, or code-changing requests, present a review package with current behavior, expected behavior, evidence, root cause or unresolved risk, files likely to change, implementation plan, validation plan, and open questions. Wait for explicit user confirmation before implementation.
+6. For schema changes:
    - create a new migration in `backend/migrations`
    - use a monotonically increasing version, normally `V<N>__description.sql`
    - do not change applied migrations because checksums are recorded
    - update seed data only when demo or required reference data changes
-6. Keep validation and actor extraction close to handlers; keep business transitions in services.
-7. Preserve response envelope behavior via `backend/internal/shared/response`.
-8. User-visible list endpoints must filter out deleted records using the table's local marker, such as `status <> 'cancelled'`, `status <> 'deleted'`, or `active = true`.
-9. Run focused validation.
+7. Keep validation and actor extraction close to handlers; keep business transitions in services.
+8. Preserve response envelope behavior via `backend/internal/shared/response`.
+9. User-visible list endpoints must filter out deleted records using the table's local marker, such as `status <> 'cancelled'`, `status <> 'deleted'`, or `active = true`.
+10. Run focused validation.
 
 ## Migration Rules
 

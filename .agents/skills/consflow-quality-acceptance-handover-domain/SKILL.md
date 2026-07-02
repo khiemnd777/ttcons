@@ -21,7 +21,7 @@ Use this skill for quality gates and final readiness.
 3. Preserve fail to punch list/rework to re-acceptance history without erasing previous decisions.
 4. Respect handover readiness blockers across acceptance, procurement, warehouse, and accounting states.
 5. Keep evidence, signature, and PDF requirements as gates when the local contract requires them.
-6. For code or UI changes, follow the repo review package and Mockup as Text gates before editing.
+6. For feature, bugfix, code-changing, or UI-changing requests, stop before editing and produce the repo review package. Include current contract/invariant, evidence, root cause or unresolved risk, clarification questions, implementation plan, validation plan, and any required Mockup as Text. Wait for explicit user confirmation.
 
 ## Guardrails
 

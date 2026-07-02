@@ -21,7 +21,7 @@ Use this skill for system governance, identity, permissions, and master data.
 3. Keep backend permission checks and frontend route/action visibility aligned.
 4. For partners/master data, preserve active filtering, allowed partner types, and snapshot fields on downstream project/material/procurement/accounting/invoice records.
 5. Preserve audit logs for domain transitions and admin changes where local patterns exist.
-6. For code or UI changes, follow the repo review package and Mockup as Text gates before editing.
+6. For feature, bugfix, code-changing, or UI-changing requests, stop before editing and produce the repo review package. Include current contract/invariant, evidence, root cause or unresolved risk, clarification questions, implementation plan, validation plan, and any required Mockup as Text. Wait for explicit user confirmation.
 
 ## Guardrails
 

@@ -19,9 +19,10 @@ Use this skill before broad implementation or review work in Consflow.
    - cross-contract change
    - business domain skill ownership
 3. If the work may overlap existing features, mutate shared state, change status transitions, affect reports/exports, or cross backend/frontend/domain boundaries, run `consflow-impact-analysis` before proposing or editing behavior.
-4. If the request is a feature, bugfix, or code-changing task, prepare a review package and wait for explicit user confirmation before implementation.
-5. If the request changes UI or visual interface, prepare a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
-6. Identify the ownership path before editing:
+4. If the request is a bugfix or unclear behavior change, run `consflow-diagnose` before implementation. State current behavior, expected behavior, evidence, hypotheses, root cause or unresolved risk, and clarification questions. Do not propose an implementable fix from assumption.
+5. If the request is a feature, bugfix, or code-changing task, prepare a review package with current behavior, expected behavior, evidence, root cause or unresolved risk, files likely to change, implementation plan, validation plan, and open questions. Wait for explicit user confirmation before implementation.
+6. If the request changes UI or visual interface, prepare a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
+7. Identify the ownership path before editing:
    - Module/feature keyword cache: `.agents/skills/consflow-module-memory/references/module-keyword-map.md`
    - Feature overlap / logic collision: `consflow-impact-analysis`
    - Workflow orchestration: `consflow-workflow-orchestration-domain`
@@ -40,8 +41,8 @@ Use this skill before broad implementation or review work in Consflow.
    - Frontend route: `frontend/src/app/router.tsx`
    - Frontend module: `frontend/src/modules/<feature>`
    - Shared UI/API/types: `frontend/src/components`, `frontend/src/lib`
-7. State the verification plan before substantial edits.
-8. Pair with the narrower layer skill and the business domain skill that owns the invariants.
+8. State the verification plan before substantial edits.
+9. Pair with the narrower layer skill and the business domain skill that owns the invariants.
 
 ## Architecture Guardrails
 

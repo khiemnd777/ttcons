@@ -20,7 +20,7 @@ Good loops for this repo:
 - SQL check with `psql` for migration or data integrity issues.
 - Docker log check with `make log SERVICE=backend` or `make log SERVICE=admin`.
 
-Do not proceed with a speculative fix if the bug can be reproduced locally but no loop has been built.
+Do not proceed with a speculative fix if the bug can be reproduced locally but no loop has been built. If it cannot be reproduced locally, state the missing evidence and keep the work in diagnosis/review mode until the user confirms the unresolved risk.
 
 ## Phase 2: Reproduce
 
@@ -49,7 +49,8 @@ Use targeted logs or temporary probes only at boundaries tied to a hypothesis. T
 
 ## Phase 5: Fix And Lock It Down
 
-- Before implementing a bugfix or code change, present the diagnosis summary, proposed fix, files likely to change, validation plan, and wait for explicit user confirmation.
+- Before implementing a bugfix or code change, present the diagnosis summary, current behavior, expected behavior, evidence, winning hypothesis, root cause or unresolved risk, proposed fix, files likely to change, implementation plan, validation plan, and wait for explicit user confirmation.
+- If the root cause is not identified, do not edit code. Ask for clarification or explicit approval of the unresolved risk.
 - If the fix changes UI, include a "Mockup as Text" and wait for explicit user confirmation before editing UI code. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
 - Add a regression test when a stable seam exists.
 - Use a new migration for schema fixes.

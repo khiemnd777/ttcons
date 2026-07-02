@@ -29,7 +29,7 @@ Use this skill when a Consflow task may overlap existing features, mutate shared
    - user-visible action readiness vs backend authorization
    - derived balances, reconciliations, report metrics, and blockers
    - actor, timestamp, comment, evidence, signature, and history requirements
-5. Decide whether the task is safe to implement as scoped, needs a split, or needs review clarification. Keep the human review gates from `AGENTS.md`.
+5. Decide whether the task is safe to implement as scoped, needs a split, or needs review clarification. For bugfixes, state the current behavior, expected behavior, evidence, root cause or unresolved risk, and hypotheses that were ruled in or out. Keep the human review gates from `AGENTS.md`.
 6. During implementation or review, verify that every changed contract is matched across backend, frontend, shared types/status utils, migrations, tests, and reports/exports when relevant.
 
 ## Collision Checklist

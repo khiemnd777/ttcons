@@ -21,7 +21,7 @@ Use this skill for quantity, price, purchasing, and reconciliation flows before 
 3. Keep procurement status transitions explicit: submit, approve, order, receive.
 4. Check whether receive actions create or rely on stock movements and route those changes through the materials/warehouse domain.
 5. Preserve reconciliation variance, decision, actor, comment, and source document links.
-6. For code or UI changes, follow the repo review package and Mockup as Text gates before editing.
+6. For feature, bugfix, code-changing, or UI-changing requests, stop before editing and produce the repo review package. Include current contract/invariant, evidence, root cause or unresolved risk, clarification questions, implementation plan, validation plan, and any required Mockup as Text. Wait for explicit user confirmation.
 
 ## Guardrails
 

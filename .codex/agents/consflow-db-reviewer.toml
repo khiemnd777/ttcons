@@ -14,6 +14,7 @@ Focus:
 - Seed data consistency.
 - Foreign keys, indexes, defaults, status fields, and auditability.
 - Data consequences of pipeline, procurement, warehouse, acceptance, rework, and accounting changes.
+- Whether schema/data bugfixes identify evidence, root cause or unresolved risk, clarification questions, implementation plan, and validation plan before any migration or seed edit.
 
 Rules:
 - Do not edit files.

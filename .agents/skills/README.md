@@ -33,6 +33,9 @@ Human review gates:
 
 - Feature, bugfix, or code-changing work must produce a review package and wait for explicit user confirmation before implementation.
 - UI or interface-changing work must produce a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
+- Skills do not grant permission to implement. They may route, read, diagnose, and review until the review package is confirmed by the user.
+- Bugfixes and unclear behavior changes must include current behavior, expected behavior, evidence, likely root cause, unresolved risks, clarification questions, implementation plan, and validation plan before any edit.
+- If the root cause is not identified or scope is ambiguous, stop at diagnosis/review and ask for clarification or explicit approval of the unresolved risk. Do not edit code from assumption.
 
 Durable memory policy:
 

@@ -8,6 +8,7 @@
 - Follow SOLID and DRY. Prefer shared components, helpers, and narrow abstractions when a UI, validation, toast, query, or action pattern repeats across modules.
 - For every feature request, bugfix request, or code-changing request, first present a review package and wait for explicit user confirmation before implementation.
 - For every UI or visual-interface change, first produce a "Mockup as Text" for user review and wait for explicit confirmation before implementation. "Mockup as Text" means a visual mockup represented in text, not a prose UX specification.
+- For every bugfix or unclear behavior change, do not implement from assumption. First identify the current behavior, expected behavior, evidence, likely root cause, unresolved risks, clarification questions, implementation plan, and validation plan. If the root cause is not known, stop at diagnosis/review and ask for clarification or approval of the unresolved risk; do not edit code.
 - Never use Flyway. Database changes use the custom migration runner in `backend/internal/shared/migrations` and SQL files in `backend/migrations`.
 - Do not revert user edits or run destructive git commands unless the user explicitly asks.
 - Use `apply_patch` for manual source edits.
@@ -27,6 +28,8 @@ Agents must stop before implementation when the request would change code, featu
 For feature, bugfix, or code-changing requests, provide a review package with:
 
 - problem summary
+- current behavior, expected behavior, and evidence gathered from local code or reproducible checks
+- root cause for bugfixes, or explicit unresolved root-cause risk when it cannot yet be proven
 - files likely to change
 - proposed behavior
 - implementation outline
@@ -34,6 +37,8 @@ For feature, bugfix, or code-changing requests, provide a review package with:
 - risks or open questions
 
 Then wait for an explicit confirmation from the user before editing code.
+
+If the task is a bugfix and the bug can be reproduced locally, build the smallest repeatable pass/fail signal before proposing a fix. If it cannot be reproduced locally, state exactly what evidence is missing, list falsifiable hypotheses, and stop before implementation until the user confirms the plan or clarifies the missing context.
 
 When asking the user to confirm review points, decisions, open questions, scope, or implementation steps, list each confirmation point as a numbered item using `1.`, `2.`, `3.`, and so on. Put each point on its own line; do not combine multiple confirmation points into one sentence, paragraph, or bullet.
 

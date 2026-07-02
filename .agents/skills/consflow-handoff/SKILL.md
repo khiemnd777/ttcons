@@ -14,6 +14,7 @@ Include:
 - Objective and latest user request.
 - Current repo state and files changed.
 - Important decisions and tradeoffs.
+- Diagnosis status: reproduction signal, evidence, root cause or unresolved risk, and remaining clarification questions.
 - Commands run and their outcomes.
 - Validation still needed.
 - Known blockers or risks.
@@ -27,6 +28,7 @@ Include:
 - Redact secrets, tokens, passwords, and private personal data.
 - Keep the handoff compact enough for a fresh session to act immediately.
 - If saving to disk, prefer a temp file unless the user asks for a repo document.
+- A handoff does not authorize implementation. Any next-session feature, bugfix, code-changing, or UI-changing work must still pass the repo review package, Mockup as Text when relevant, root-cause/clarification gate, and explicit user confirmation before editing.
 
 ## Suggested Skills Section
 

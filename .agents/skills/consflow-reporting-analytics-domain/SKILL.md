@@ -21,7 +21,7 @@ Use this skill for source-backed reporting, dashboard, and export work.
 3. Keep backend report queries as the source of truth. Frontend tables may filter/sort for display but must not invent scoped data.
 4. Keep CSV exports aligned with the same filters and source logic as the UI endpoint.
 5. Preserve warning checks for missing data, reconciliation gaps, tax code gaps, negative profit, stale status, or other report-specific caveats.
-6. For code or UI changes, follow the repo review package and Mockup as Text gates before editing.
+6. For feature, bugfix, code-changing, or UI-changing requests, stop before editing and produce the repo review package. Include current contract/invariant, evidence, root cause or unresolved risk, clarification questions, implementation plan, validation plan, and any required Mockup as Text. Wait for explicit user confirmation.
 
 ## Guardrails
 

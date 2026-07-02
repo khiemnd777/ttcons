@@ -477,43 +477,79 @@ function WorkItemSupportingTabs({
   onSubmitActivity: (payload: ActivityPayload) => Promise<void>;
 }) {
   const [selectedTab, setSelectedTab] = useState<SupportTabKey>('evidence');
-  const tabs: Array<{ id: SupportTabKey; label: string; count?: number; status?: string }> = [];
+  const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
+  const pendingEvidence = evidence.filter((record) => ['draft', 'submitted', 'pending'].includes(String(record.status)));
+  const tabs: Array<{ id: SupportTabKey; label: string; count?: number; status?: string; description: string }> = [];
   if (!primarySurfaceUsesEvidence(primarySurfaceKind)) {
-    tabs.push({ id: 'evidence', label: 'Minh chứng', count: evidence.length });
+    tabs.push({
+      id: 'evidence',
+      label: 'Minh chứng',
+      count: activeEvidence.length,
+      description: pendingEvidence.length ? `${pendingEvidence.length} pending` : 'Sẵn sàng',
+    });
   }
-  tabs.push({ id: 'activity', label: 'Hoạt động', count: activities.length });
+  tabs.push({
+    id: 'activity',
+    label: 'Hoạt động',
+    count: activities.length,
+    description: activities[0] ? `Mới nhất ${compactDateTime(activities[0].created_at)}` : 'Chưa có activity',
+  });
   if (hasWorkflowFormSummary(item) && !primarySurfaceUsesWorkflowForm(primarySurfaceKind)) {
-    tabs.push({ id: 'form', label: 'Biểu mẫu / PDF', status: item.workflow_form_status ?? 'draft' });
+    tabs.push({
+      id: 'form',
+      label: 'Biểu mẫu / PDF',
+      status: item.workflow_form_status ?? 'draft',
+      description: workflowFormChipText(item),
+    });
   }
   const activeTab = tabs.some((tab) => tab.id === selectedTab) ? selectedTab : tabs[0]?.id ?? 'activity';
+  const activeTabMeta = tabs.find((tab) => tab.id === activeTab);
+  const supportAction = resolveSupportTabAction(activeTab, item, evidence, activities);
 
   return (
-    <section className="rounded-lg border border-line bg-white shadow-panel">
-      <div className="flex flex-col gap-3 border-b border-line px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin hỗ trợ</p>
-          <h3 className="mt-0.5 text-sm font-semibold text-ink">Minh chứng, hoạt động và biểu mẫu liên quan</h3>
+    <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
+      <div className="border-b border-line bg-white px-4 py-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin hỗ trợ</p>
+            <h3 className="mt-0.5 text-sm font-semibold text-ink">Minh chứng, trao đổi và biểu mẫu của work item</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Theo dõi hồ sơ, trao đổi và artifact phục vụ bước đang xử lý.</p>
+          </div>
+          <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs lg:max-w-72">
+            <p className="font-semibold uppercase tracking-wide text-blue-700">Việc hỗ trợ tiếp theo</p>
+            <p className="mt-1 font-semibold text-blue-950">{supportAction}</p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-1 rounded-md bg-slate-100 p-1">
+
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
               className={clsx(
-                'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold',
-                activeTab === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-white/70',
+                'min-w-0 rounded-md border px-3 py-2 text-left transition',
+                activeTab === tab.id ? 'border-blue-300 bg-blue-50 shadow-sm' : 'border-line bg-slate-50 hover:border-blue-200 hover:bg-white',
               )}
               onClick={() => setSelectedTab(tab.id)}
             >
-              {tab.label}
-              {typeof tab.count === 'number' ? <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] text-slate-700">{tab.count}</span> : null}
-              {tab.status ? <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] text-emerald-700">{tab.status}</span> : null}
+              <span className="flex min-w-0 items-center justify-between gap-2">
+                <span className={clsx('truncate text-xs font-semibold uppercase tracking-wide', activeTab === tab.id ? 'text-blue-700' : 'text-slate-600')}>{tab.label}</span>
+                {typeof tab.count === 'number' ? <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-inset ring-line">{tab.count}</span> : null}
+                {tab.status ? <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-100">{tab.status}</span> : null}
+              </span>
+              <span className="mt-1 block truncate text-xs text-slate-500">{tab.description}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="border-b border-line bg-slate-50 px-4 py-2">
+        <p className="text-xs font-semibold text-slate-600">
+          Đang xem: <span className="text-ink">{activeTabMeta?.label ?? 'Thông tin hỗ trợ'}</span>
+        </p>
+      </div>
+
+      <div className="bg-white p-4">
         {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} /> : null}
         {activeTab === 'activity' ? (
           <WorkItemActivityPanel
@@ -529,6 +565,18 @@ function WorkItemSupportingTabs({
   );
 }
 
+function resolveSupportTabAction(activeTab: SupportTabKey, item: WorkItem, evidence: EvidenceRecord[], activities: WorkItemActivity[]) {
+  if (activeTab === 'evidence') {
+    const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
+    const pending = evidence.filter((record) => ['draft', 'submitted', 'pending'].includes(String(record.status))).length;
+    if (!activeEvidence.length) return 'Bổ sung minh chứng cho work item';
+    if (pending) return `Review ${pending} minh chứng đang pending`;
+    return 'Minh chứng đã sẵn sàng';
+  }
+  if (activeTab === 'form') return workflowFormNextAction(item);
+  return activities.length ? `Theo dõi ${activities.length} hoạt động gần nhất` : 'Ghi activity đầu tiên';
+}
+
 function WorkItemActivityPanel({
   activities,
   attachmentOptions,
@@ -540,34 +588,65 @@ function WorkItemActivityPanel({
   submitting: boolean;
   onSubmit: (payload: ActivityPayload) => Promise<void>;
 }) {
+  const [composerOpen, setComposerOpen] = useState(false);
+  const latestActivity = activities[0];
   return (
-    <section>
-      <ActivityComposer
-        mode="work_item"
-        attachmentOptions={attachmentOptions}
-        submitting={submitting}
-        onSubmit={onSubmit}
-      />
+    <section className="space-y-3">
+      <div className="flex flex-col gap-3 rounded-md border border-line bg-slate-50 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dòng hoạt động</p>
+          <h3 className="mt-0.5 text-sm font-semibold text-ink">{activities.length} hoạt động</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            {latestActivity ? `${latestActivity.actor_name ?? 'System'} · ${compactDateTime(latestActivity.created_at)}` : 'Chưa có trao đổi hoặc sự kiện cho work item này.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          onClick={() => setComposerOpen((current) => !current)}
+        >
+          <MessageSquare className="h-4 w-4" />
+          {composerOpen ? 'Ẩn composer' : 'Ghi activity'}
+        </button>
+      </div>
+
+      {composerOpen ? (
+        <ActivityComposer
+          mode="work_item"
+          attachmentOptions={attachmentOptions}
+          submitting={submitting}
+          onSubmit={(payload) => onSubmit(payload).then(() => setComposerOpen(false))}
+        />
+      ) : null}
+
       {activities.length ? (
-        <div className="mt-3 space-y-2">
+        <div className="space-y-2">
           {activities.map((activity) => (
-            <div key={activity.id} className="rounded-md border border-line px-3 py-2">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-sm font-semibold text-ink">{activityLabel(activity.activity_type)}</p>
-                {activity.visibility ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{visibilityLabel(activity.visibility)}</span> : null}
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {activity.actor_name ?? 'System'} · {compactDateTime(activity.created_at)}
-              </p>
-              {activity.comment ? <p className="mt-2 text-sm text-slate-700">{activity.comment}</p> : null}
-              <ActivityAttachments attachments={activity.attachments} />
-            </div>
+            <ActivityTimelineItem key={activity.id} activity={activity} />
           ))}
         </div>
       ) : (
         <EmptyState title="Chưa có activity cho work item này" />
       )}
     </section>
+  );
+}
+
+function ActivityTimelineItem({ activity }: { activity: WorkItemActivity }) {
+  return (
+    <article className="rounded-md border border-line bg-white px-3 py-2.5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-ink">{activityLabel(activity.activity_type)}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {activity.actor_name ?? 'System'} · {compactDateTime(activity.created_at)}
+          </p>
+        </div>
+        {activity.visibility ? <span className="w-fit rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{visibilityLabel(activity.visibility)}</span> : null}
+      </div>
+      {activity.comment ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-5 text-slate-700">{activity.comment}</p> : null}
+      <ActivityAttachments attachments={activity.attachments} />
+    </article>
   );
 }
 

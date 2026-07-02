@@ -25,16 +25,17 @@ Read `references/domain-model.md` before changing workflow behavior. If the task
 
 1. Identify the source state, target state, actor, and audit consequence.
 2. Determine whether the change affects a template, a project runtime record, or both.
-3. For feature, bugfix, or code-changing requests, present a review package and wait for explicit user confirmation before implementation.
-4. For UI or interface changes, present a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
-5. Trace downstream modules with the relevant domain skill:
+3. For bugfixes or unclear behavior changes, identify evidence, hypotheses, root cause or unresolved risk, and clarification questions before proposing edits. Do not change workflow state from assumption.
+4. For feature, bugfix, or code-changing requests, present a review package with current behavior, expected behavior, evidence, root cause or unresolved risk, files likely to change, implementation plan, validation plan, and open questions. Wait for explicit user confirmation before implementation.
+5. For UI or interface changes, present a "Mockup as Text" and wait for explicit user confirmation before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
+6. Trace downstream modules with the relevant domain skill:
    - BOQ/unit price/procurement: `consflow-commercial-procurement-domain`.
    - Procurement receive/stock/site balance/surplus: `consflow-materials-warehouse-domain`.
    - Acceptance/rework/replanning/handover: `consflow-quality-acceptance-handover-domain`.
    - Payable/receivable/payment/invoice/report consequences: `consflow-accounting-finance-domain`.
    - Workflow form, signature, PDF, work item gates: `consflow-workflow-orchestration-domain`.
-6. Check that the frontend module and backend API agree on status names and allowed actions.
-7. Preserve history. Do not replace state transitions with blind updates when actor/time/comment history matters.
+7. Check that the frontend module and backend API agree on status names and allowed actions.
+8. Preserve history. Do not replace state transitions with blind updates when actor/time/comment history matters.
 
 ## Guardrails
 

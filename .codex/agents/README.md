@@ -26,3 +26,5 @@ Implementation gate:
 
 - Workspace-write agents must not implement feature, bugfix, or code-changing work until the user has reviewed a proposed change package and explicitly confirmed.
 - UI changes additionally require a "Mockup as Text" reviewed and confirmed by the user before implementation. "Mockup as Text" means an ASCII/wireframe-style visual mockup in text, not only a prose UX specification.
+- Bugfixes and unclear behavior changes must include current behavior, expected behavior, evidence, hypotheses, root cause or unresolved risk, clarification questions, implementation plan, and validation plan before any edit.
+- If root cause or scope remains unresolved, subagents must stop at diagnosis/review and ask the parent agent for clarification or explicit approval of the unresolved risk.

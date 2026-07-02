@@ -36,13 +36,14 @@ make log SERVICE=admin
 
 1. Read `Makefile` and `docker-compose.yml`.
 2. Check whether the task changes service name, port, build context, env var, volume, or startup order.
-3. For Docker or Makefile code/config changes, present a review package and wait for explicit user confirmation before implementation.
-4. Validate Compose shape before running the stack:
+3. For startup/runtime bugs, build the smallest repeatable signal from logs, health checks, `docker compose config`, or service status before proposing a fix. State root cause or unresolved risk; do not edit Docker/Makefile config from assumption.
+4. For Docker or Makefile code/config changes, present a review package with current behavior, expected behavior, evidence, root cause or unresolved risk, files likely to change, implementation plan, validation plan, and open questions. Wait for explicit user confirmation before implementation.
+5. Validate Compose shape before running the stack:
    ```bash
    docker compose config
    ```
-5. For runtime validation, use the Make targets unless a narrower Docker command is required.
-6. If Docker socket access is sandboxed, request scoped approval with the exact reason.
+6. For runtime validation, use the Make targets unless a narrower Docker command is required.
+7. If Docker socket access is sandboxed, request scoped approval with the exact reason.
 
 ## Verification
 

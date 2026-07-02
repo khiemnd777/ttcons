@@ -60,6 +60,10 @@ export function WorkflowFormPanel({
   const isMeetingMinutes = instance?.form_type === 'meeting_minutes';
   const isPlanningChecklist = instance?.form_type === 'checklist' && form.data?.template?.code === 'builtin_checklist';
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
+  const validationIssueLabels = useMemo(
+    () => fields.filter((field) => validateFieldValue(field, values[field.field_key])).map((field) => field.label),
+    [fields, values],
+  );
 
   useEffect(() => {
     setValues(form.data?.answers ?? {});
@@ -190,94 +194,95 @@ export function WorkflowFormPanel({
     );
   }
 
+  const formActionPending = saveDraft.isPending || submitForm.isPending;
+
   return (
-    <section>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold text-ink">{businessFormTitle}</h3>
-          <p className="mt-1 text-xs text-slate-500">
-            Biểu mẫu nghiệp vụ v{form.data.version?.version_no ?? 1}
-          </p>
-        </div>
-        <StatusBadge status={instance?.status ?? 'draft'} />
-      </div>
-      <div className="rounded-md border border-line bg-white p-3">
-        <WorkflowBusinessSummary
-          submitted={submitted}
-          validationIssueCount={validationIssues.length}
-          evidenceCount={activeEvidence.length}
-          checklistStats={checklistStats}
-          signatures={signatures}
-          pdfExports={pdfExports}
-        />
-        {isPlanningDailyReport ? <PlanningDailyReportSummary values={values} submitted={submitted} /> : null}
-        {isMeetingMinutes ? <MeetingMinutesSummary values={values} submitted={submitted} /> : null}
-        {isPlanningChecklist ? <PlanningChecklistSummary values={values} submitted={submitted} /> : null}
-        <div className="grid gap-3 md:grid-cols-2">
-          {fields.map((field) => (
-            <WorkflowFieldControl
-              key={field.field_key}
-              field={field}
-              value={values[field.field_key]}
-              evidence={evidence}
-              error={errors[field.field_key]}
-              disabled={submitted || saveDraft.isPending || submitForm.isPending}
-              onChange={(value) => setFieldValue(field, value)}
-            />
-          ))}
-        </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-          <div className="text-xs text-slate-500">
-            {instance?.submitted_at ? `Submitted ${compactDateTime(instance.submitted_at)}` : `Updated ${compactDateTime(instance?.updated_at)}`}
-          </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button
-              className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={submitted || saveDraft.isPending || submitForm.isPending}
-              onClick={() => saveDraft.mutate()}
-            >
-              {saveDraft.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Lưu nháp
-            </button>
-            <button
-              className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={submitted || saveDraft.isPending || submitForm.isPending}
-              onClick={() => {
-                if (validateBeforeSubmit()) submitForm.mutate();
-              }}
-            >
-              {submitForm.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Submit biểu mẫu
-            </button>
-          </div>
-        </div>
-        <div className="mt-3 grid gap-3 xl:grid-cols-2">
-          <WorkflowSignaturePanel
+    <section className="space-y-3">
+      <WorkflowFormActionCenter
+        title={businessFormTitle}
+        versionNo={Number(form.data.version?.version_no ?? 1)}
+        status={instance?.status ?? 'draft'}
+        submitted={submitted}
+        validationIssueLabels={validationIssueLabels}
+        updatedAt={instance?.updated_at}
+        submittedAt={instance?.submitted_at}
+        saving={saveDraft.isPending}
+        submitting={submitForm.isPending}
+        onSave={() => saveDraft.mutate()}
+        onSubmit={() => {
+          if (validateBeforeSubmit()) submitForm.mutate();
+        }}
+      />
+
+      <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_19rem]">
+        <div className="min-w-0 space-y-3">
+          <WorkflowFormOperationsSummary
+            submitted={submitted}
+            validationIssueCount={validationIssues.length}
+            evidenceCount={activeEvidence.length}
+            checklistStats={checklistStats}
             signatures={signatures}
-            submitted={submitted}
-            signedByCurrentUser={signedByCurrentUser}
-            signing={signForm.isPending}
-            onOpenSign={() => setSignatureDialogOpen(true)}
-            onViewDetail={(signature) => setSignatureDetail(signature)}
-            onOpenVisual={(signature) => void openProtectedBlob(`/workflow-form-signatures/${signature.id}/visual`, 'Không mở được chữ ký')}
+            pdfExports={pdfExports}
           />
-          <WorkflowPDFExportPanel
-            exports={pdfExports}
-            submitted={submitted}
-            generating={generatePDF.isPending}
-            onGenerate={() => generatePDF.mutate()}
-            onOpen={(record) => void openProtectedBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF biểu mẫu nghiệp vụ')}
-          />
+          {isPlanningDailyReport ? <PlanningDailyReportSummary values={values} submitted={submitted} /> : null}
+          {isMeetingMinutes ? <MeetingMinutesSummary values={values} submitted={submitted} /> : null}
+          {isPlanningChecklist ? <PlanningChecklistSummary values={values} submitted={submitted} /> : null}
+
+          <section className="rounded-md border border-line bg-white">
+            <div className="flex flex-col gap-2 border-b border-line bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trường dữ liệu</p>
+                <h4 className="mt-0.5 text-sm font-semibold text-ink">Dữ liệu biểu mẫu</h4>
+              </div>
+              <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{fields.length} fields</span>
+            </div>
+            <div className="grid gap-3 p-3 md:grid-cols-2">
+              {fields.map((field) => (
+                <WorkflowFieldControl
+                  key={field.field_key}
+                  field={field}
+                  value={values[field.field_key]}
+                  evidence={evidence}
+                  error={errors[field.field_key]}
+                  disabled={submitted || formActionPending}
+                  onChange={(value) => setFieldValue(field, value)}
+                />
+              ))}
+            </div>
+            <div className="border-t border-line bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              {instance?.submitted_at ? `Submitted ${compactDateTime(instance.submitted_at)}` : `Updated ${compactDateTime(instance?.updated_at)}`}
+            </div>
+          </section>
         </div>
-        {form.data.events?.length ? (
-          <div className="mt-3 space-y-1 border-t border-line pt-3">
-            {form.data.events.slice(0, 3).map((event) => (
-              <p key={event.id} className="text-xs text-slate-500">
-                {event.actor_name ?? 'System'} · {enumLabel('event_type', String(event.event_type))} · {compactDateTime(event.created_at)}
-              </p>
-            ))}
-          </div>
-        ) : null}
+
+        <aside className="min-w-0 space-y-3">
+          <section className="rounded-md border border-line bg-white">
+            <div className="border-b border-line bg-slate-50 px-3 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Artifact biểu mẫu</p>
+              <h4 className="mt-0.5 text-sm font-semibold text-ink">Chữ ký và PDF</h4>
+            </div>
+            <div className="space-y-3 p-3">
+              <WorkflowSignaturePanel
+                signatures={signatures}
+                submitted={submitted}
+                signedByCurrentUser={signedByCurrentUser}
+                signing={signForm.isPending}
+                onOpenSign={() => setSignatureDialogOpen(true)}
+                onViewDetail={(signature) => setSignatureDetail(signature)}
+                onOpenVisual={(signature) => void openProtectedBlob(`/workflow-form-signatures/${signature.id}/visual`, 'Không mở được chữ ký')}
+              />
+              <WorkflowPDFExportPanel
+                exports={pdfExports}
+                submitted={submitted}
+                generating={generatePDF.isPending}
+                onGenerate={() => generatePDF.mutate()}
+                onOpen={(record) => void openProtectedBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF biểu mẫu nghiệp vụ')}
+              />
+            </div>
+          </section>
+
+          {form.data.events?.length ? <WorkflowFormEventsPanel events={form.data.events} /> : null}
+        </aside>
       </div>
       <SignatureCaptureDialog
         open={signatureDialogOpen}
@@ -346,6 +351,137 @@ const checklistItemStatusLabels: Record<string, string> = {
   needs_follow_up: 'Needs follow-up',
   blocked: 'Blocked',
 };
+
+function WorkflowFormActionCenter({
+  title,
+  versionNo,
+  status,
+  submitted,
+  validationIssueLabels,
+  updatedAt,
+  submittedAt,
+  saving,
+  submitting,
+  onSave,
+  onSubmit,
+}: {
+  title: string;
+  versionNo: number;
+  status: string;
+  submitted: boolean;
+  validationIssueLabels: string[];
+  updatedAt?: string;
+  submittedAt?: string;
+  saving: boolean;
+  submitting: boolean;
+  onSave: () => void;
+  onSubmit: () => void;
+}) {
+  const blocked = !submitted && validationIssueLabels.length > 0;
+  const issuePreview = validationIssueLabels.slice(0, 4).join(', ');
+  const extraIssues = validationIssueLabels.length > 4 ? ` +${validationIssueLabels.length - 4}` : '';
+  return (
+    <section className={clsx('rounded-md border p-3', blocked ? 'border-amber-200 bg-amber-50' : 'border-line bg-white')}>
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold text-ink">{title}</h3>
+            <StatusBadge status={status} />
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Biểu mẫu nghiệp vụ v{versionNo} · {submittedAt ? `Submitted ${compactDateTime(submittedAt)}` : `Updated ${compactDateTime(updatedAt)}`}
+          </p>
+          <div className="mt-3 flex items-start gap-2">
+            <span className={clsx('mt-0.5 rounded-md p-1.5', blocked ? 'bg-white text-amber-700' : 'bg-blue-50 text-blue-700')}>
+              {blocked ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink">
+                {blocked ? 'Cần hoàn tất dữ liệu trước submit' : submitted ? 'Form đã submit, chuyển sang artifact' : 'Sẵn sàng lưu nháp hoặc submit'}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-600">
+                {blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung form đã khóa; chữ ký và PDF dùng revision đã submit.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2 xl:justify-end">
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={submitted || saving || submitting}
+            onClick={onSave}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Lưu nháp
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={submitted || saving || submitting}
+            onClick={onSubmit}
+          >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Submit biểu mẫu
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WorkflowFormOperationsSummary({
+  submitted,
+  validationIssueCount,
+  evidenceCount,
+  checklistStats,
+  signatures,
+  pdfExports,
+}: {
+  submitted: boolean;
+  validationIssueCount: number;
+  evidenceCount: number;
+  checklistStats: ChecklistStats | null;
+  signatures: WorkflowFormSignature[];
+  pdfExports: WorkflowFormPDFExport[];
+}) {
+  const nextAction = workflowNextAction(submitted, validationIssueCount, signatures.length, pdfExports.length);
+  return (
+    <section className="rounded-md border border-line bg-white p-3">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tóm tắt xử lý</p>
+          <h4 className="mt-0.5 text-sm font-semibold text-ink">Việc tiếp theo: {nextAction}</h4>
+        </div>
+        <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[36rem]">
+          <WorkflowStepPill label="Checklist" value={checklistStats ? `${checklistStats.complete}/${checklistStats.total} done` : 'N/A'} active={!submitted && Boolean(checklistStats?.needsAction)} />
+          <WorkflowStepPill label="Evidence" value={`${evidenceCount} active`} active={!submitted && evidenceCount === 0} />
+          <WorkflowStepPill label="Signature" value={`${signatures.length} signed`} active={submitted && signatures.length === 0} />
+          <WorkflowStepPill label="PDF" value={`${pdfExports.length} file`} active={submitted && signatures.length > 0 && pdfExports.length === 0} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WorkflowFormEventsPanel({ events }: { events: AnyRecord[] }) {
+  return (
+    <section className="rounded-md border border-line bg-white">
+      <div className="border-b border-line bg-slate-50 px-3 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lịch sử form</p>
+        <h4 className="mt-0.5 text-sm font-semibold text-ink">Sự kiện gần nhất</h4>
+      </div>
+      <div className="divide-y divide-line">
+        {events.slice(0, 5).map((event) => (
+          <div key={String(event.id)} className="px-3 py-2">
+            <p className="text-xs font-semibold text-ink">{enumLabel('event_type', String(event.event_type))}</p>
+            <p className="mt-1 text-xs text-slate-500">{event.actor_name ?? 'System'} · {compactDateTime(event.created_at)}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function PlanningDailyReportSummary({ values, submitted }: { values: AnyRecord; submitted: boolean }) {
   const completedItems = structuredRows(values.completed_items);
@@ -606,49 +742,6 @@ function MeetingSummaryList({
       ) : (
         <p className="rounded-md border border-dashed border-line bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">{empty}</p>
       )}
-    </div>
-  );
-}
-
-function WorkflowBusinessSummary({
-  submitted,
-  validationIssueCount,
-  evidenceCount,
-  checklistStats,
-  signatures,
-  pdfExports,
-}: {
-  submitted: boolean;
-  validationIssueCount: number;
-  evidenceCount: number;
-  checklistStats: ChecklistStats | null;
-  signatures: WorkflowFormSignature[];
-  pdfExports: WorkflowFormPDFExport[];
-}) {
-  const nextAction = workflowNextAction(submitted, validationIssueCount, signatures.length, pdfExports.length);
-  const blocked = !submitted && validationIssueCount > 0;
-  const tone = blocked ? 'border-amber-200 bg-amber-50' : 'border-blue-100 bg-blue-50';
-  return (
-    <div className={clsx('mb-4 rounded-md border p-3', tone)}>
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 rounded-md bg-white/80 p-2 ring-1 ring-inset ring-white">
-            {blocked ? <AlertTriangle className="h-4 w-4 text-amber-700" /> : <CheckCircle2 className="h-4 w-4 text-blue-700" />}
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-ink">Next action: {nextAction}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
-              {submitted ? 'Form đã khóa nội dung; chữ ký và PDF dùng bản revision đã submit.' : `${validationIssueCount} validation item cần xử lý trước submit.`}
-            </p>
-          </div>
-        </div>
-        <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[36rem]">
-          <WorkflowStepPill label="Checklist" value={checklistStats ? `${checklistStats.complete}/${checklistStats.total} done` : 'N/A'} active={!submitted && Boolean(checklistStats?.needsAction)} />
-          <WorkflowStepPill label="Evidence" value={`${evidenceCount} active`} active={!submitted && evidenceCount === 0} />
-          <WorkflowStepPill label="Signature" value={`${signatures.length} signed`} active={submitted && signatures.length === 0} />
-          <WorkflowStepPill label="PDF" value={`${pdfExports.length} file`} active={submitted && signatures.length > 0 && pdfExports.length === 0} />
-        </div>
-      </div>
     </div>
   );
 }

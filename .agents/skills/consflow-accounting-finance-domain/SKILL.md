@@ -21,7 +21,7 @@ Use this skill for financial state, documents, and reports.
 3. Keep input and output invoice PDF storage protected and linked to the correct AP/AR record and project.
 4. Treat cashflow as cash-basis from payment ledger, tax as invoice/VAT ledger, and profit as invoice-based revenue/cost unless local code says otherwise.
 5. Preserve approval, issue/void, verify/reject, pay/receive, and settle state transitions with actor/comment/timestamp.
-6. For code or UI changes, follow the repo review package and Mockup as Text gates before editing.
+6. For feature, bugfix, code-changing, or UI-changing requests, stop before editing and produce the repo review package. Include current contract/invariant, evidence, root cause or unresolved risk, clarification questions, implementation plan, validation plan, and any required Mockup as Text. Wait for explicit user confirmation.
 
 ## Guardrails
 

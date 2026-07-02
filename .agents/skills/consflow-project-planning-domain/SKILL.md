@@ -21,7 +21,7 @@ Use this skill for project setup and planning-phase business work before or arou
 3. Treat planning daily reports, meeting minutes, and planning checklists as workflow-form-backed business views unless local code says otherwise.
 4. Keep generated action items or next-plan work items traceable to the source form/activity.
 5. Preserve dense admin UI patterns, shared dialogs, inline validation, and toast feedback for create/edit flows.
-6. For code or UI changes, follow the repo review package and Mockup as Text gates before editing.
+6. For feature, bugfix, code-changing, or UI-changing requests, stop before editing and produce the repo review package. Include current contract/invariant, evidence, root cause or unresolved risk, clarification questions, implementation plan, validation plan, and any required Mockup as Text. Wait for explicit user confirmation.
 
 ## Guardrails
 

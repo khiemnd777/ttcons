@@ -17,6 +17,7 @@ type EvidenceGalleryProps = {
   evidence: EvidenceRecord[];
   emptyTitle?: string;
   showWorkItem?: boolean;
+  variant?: 'cards' | 'list';
   onReview?: (record: EvidenceRecord, action: EvidenceReviewAction, comment: string) => Promise<void>;
 };
 
@@ -33,6 +34,7 @@ export function EvidenceGallery({
   evidence,
   emptyTitle = 'Chưa có evidence',
   showWorkItem = false,
+  variant = 'cards',
   onReview,
 }: EvidenceGalleryProps) {
   const toast = useToast();
@@ -120,7 +122,32 @@ export function EvidenceGallery({
         </label>
       </div>
 
-      {rows.length ? (
+      {rows.length && variant === 'list' ? (
+        <div className="overflow-hidden rounded-md border border-line bg-white">
+          <div className="hidden grid-cols-[minmax(0,1.6fr)_8rem_8rem_7rem_8rem] gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+            <span>Evidence</span>
+            <span>Loại</span>
+            <span>Visibility</span>
+            <span>Trạng thái</span>
+            <span className="text-right">Thao tác</span>
+          </div>
+          <div className="divide-y divide-line">
+            {rows.map((record) => (
+              <EvidenceListRow
+                key={record.id}
+                record={record}
+                previewUrl={previewUrls[record.id]}
+                showWorkItem={showWorkItem}
+                onOpen={() => void openEvidence(record)}
+                onSelect={() => {
+                  setSelected(record);
+                  setReviewComment('');
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      ) : rows.length ? (
         <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
           {rows.map((record) => (
             <EvidenceCard
@@ -156,6 +183,68 @@ export function EvidenceGallery({
         onReview={(action) => void submitReview(action)}
       />
     </div>
+  );
+}
+
+function EvidenceListRow({
+  record,
+  previewUrl,
+  showWorkItem,
+  onOpen,
+  onSelect,
+}: {
+  record: EvidenceRecord;
+  previewUrl?: string;
+  showWorkItem: boolean;
+  onOpen: () => void;
+  onSelect: () => void;
+}) {
+  const title = evidenceTitle(record);
+  return (
+    <article className="grid gap-3 px-3 py-3 lg:grid-cols-[minmax(0,1.6fr)_8rem_8rem_7rem_8rem] lg:items-center">
+      <button type="button" className="flex min-w-0 items-start gap-3 text-left" onClick={onSelect}>
+        <span className="grid h-12 w-14 shrink-0 place-items-center overflow-hidden rounded-md border border-line bg-slate-100 text-slate-400">
+          {previewUrl ? (
+            <img className="h-full w-full object-cover" src={previewUrl} alt={title} />
+          ) : isImageEvidence(record) ? (
+            <ImageIcon className="h-5 w-5" />
+          ) : (
+            <FileText className="h-5 w-5" />
+          )}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold text-ink">{title}</span>
+          <span className="mt-1 block truncate text-xs text-slate-500">
+            {[record.caption, record.mime_type, record.file_size ? formatEvidenceFileSize(record.file_size) : undefined].filter(Boolean).join(' · ') || compactDateTime(record.created_at)}
+          </span>
+          {showWorkItem ? <span className="mt-1 block truncate text-xs text-slate-500">{record.work_item_title ?? 'Work item'}</span> : null}
+        </span>
+      </button>
+      <div className="text-xs font-semibold text-slate-600 lg:text-sm lg:font-medium">
+        <span className="mr-2 text-[11px] uppercase tracking-wide text-slate-400 lg:hidden">Loại</span>
+        {evidenceLabel(record.evidence_type)}
+      </div>
+      <div className="text-xs font-semibold text-slate-600 lg:text-sm lg:font-medium">
+        <span className="mr-2 text-[11px] uppercase tracking-wide text-slate-400 lg:hidden">Visibility</span>
+        {visibilityLabel(record.visibility ?? 'project')}
+      </div>
+      <div>
+        <StatusBadge status={record.status} />
+      </div>
+      <div className="flex flex-wrap gap-2 lg:justify-end">
+        <button type="button" className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100" onClick={onSelect}>
+          Chi tiết
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+          onClick={onOpen}
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Mở
+        </button>
+      </div>
+    </article>
   );
 }
 

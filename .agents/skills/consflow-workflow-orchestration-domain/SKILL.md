@@ -23,7 +23,7 @@ Use this skill for the system that turns reusable workflow definitions into proj
 5. For form submit/sign/PDF flows, preserve actor, timestamp, revision, payload hash, checksum, and file visibility.
 6. Trace downstream effects into planning, construction, commercial/procurement, quality, and finance domains when work item completion unlocks them.
 7. Check backend/frontend status labels, allowed actions, and response fields together.
-8. For code or UI changes, follow the repo review package and Mockup as Text gates before editing.
+8. For feature, bugfix, code-changing, or UI-changing requests, stop before editing and produce the repo review package. Include current contract/invariant, evidence, root cause or unresolved risk, clarification questions, implementation plan, validation plan, and any required Mockup as Text. Wait for explicit user confirmation.
 
 ## Guardrails
 
