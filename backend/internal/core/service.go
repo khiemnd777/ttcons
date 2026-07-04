@@ -3519,7 +3519,14 @@ func (s *Service) WorkItemAction(ctx context.Context, workItemID, action string,
 	if plan.CreatesApproval {
 		return s.repo.RequestWorkItemApproval(ctx, item, req, actorID, actorName)
 	}
-	return s.repo.ApplyWorkItemTransition(ctx, item, plan.ToStatus, plan.ActivityType, req, actorID, actorName)
+	updated, err := s.repo.ApplyWorkItemTransition(ctx, item, plan.ToStatus, plan.ActivityType, req, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	if plan.ToStatus == "completed" {
+		_ = s.repo.RunClientWorkflowAutomationForWorkItem(ctx, cleanID(updated["id"]), actorID, actorName)
+	}
+	return updated, nil
 }
 
 type workItemTransitionPlan struct {
@@ -5467,11 +5474,13 @@ func normalizePlanningChecklistFilter(filter PlanningChecklistFilter) (PlanningC
 }
 
 func (s *Service) SubmitRunStep(ctx context.Context, stepID string, req WorkItemActionRequest, actorID, actorName string) (Record, error) {
+	workItemID := ""
 	item, err := s.repo.GetWorkItemByRunStep(ctx, stepID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 	if err == nil {
+		workItemID = cleanID(item["id"])
 		fromStatus := fmt.Sprint(item["status"])
 		if !canCompleteWorkItemStatus(fromStatus) {
 			return nil, validationError("Trạng thái work item không cho phép hoàn tất", Record{"status": fromStatus})
@@ -5495,7 +5504,14 @@ func (s *Service) SubmitRunStep(ctx context.Context, stepID string, req WorkItem
 			return nil, validationError("Work item cần đủ evidence trước khi hoàn tất", Record{"missing_evidence": missing})
 		}
 	}
-	return s.repo.SubmitRunStep(ctx, stepID, req, actorID, actorName)
+	step, err := s.repo.SubmitRunStep(ctx, stepID, req, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	if workItemID != "" {
+		_ = s.repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, actorID, actorName)
+	}
+	return step, nil
 }
 
 func canCompleteWorkItemStatus(status string) bool {

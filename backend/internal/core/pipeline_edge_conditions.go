@@ -18,19 +18,20 @@ type EdgeConditionDefinition struct {
 
 var pipelineEdgeConditionCatalog = []EdgeConditionDefinition{
 	{Type: "always", Label: "Luôn chuyển", Description: "Chuyển sang node đích khi node nguồn hoàn tất.", DefaultLabel: "", Category: "core"},
-	{Type: "order_index", Label: "Theo thứ tự node", Description: "Chỉ chuyển nếu node đích đứng sau node nguồn trong thứ tự template.", DefaultLabel: "", Category: "core"},
-	{Type: "approval_approved", Label: "Approval đã duyệt", Description: "Chuyển khi approval request của node nguồn đã được duyệt.", DefaultLabel: "", Category: "approval"},
-	{Type: "approval_rejected", Label: "Approval bị từ chối", Description: "Chuyển khi approval request của node nguồn bị từ chối.", DefaultLabel: "", Category: "approval"},
+	{Type: "order_index", Label: "Theo thứ tự node", Description: "Chỉ chuyển nếu node đích đứng sau node nguồn trong thứ tự mẫu quy trình.", DefaultLabel: "", Category: "core"},
+	{Type: "approval_approved", Label: "Phê duyệt đã duyệt", Description: "Chuyển khi yêu cầu phê duyệt của node nguồn đã được duyệt.", DefaultLabel: "", Category: "approval"},
+	{Type: "approval_rejected", Label: "Phê duyệt bị từ chối", Description: "Chuyển khi yêu cầu phê duyệt của node nguồn bị từ chối.", DefaultLabel: "", Category: "approval"},
 	{Type: "acceptance_passed", Label: "Nghiệm thu đạt", Description: "Chuyển khi công trình có nghiệm thu đã hoàn tất với kết quả đạt.", DefaultLabel: "", Category: "quality"},
 	{Type: "acceptance_failed", Label: "Nghiệm thu không đạt", Description: "Chuyển khi công trình có nghiệm thu không đạt.", DefaultLabel: "", Category: "quality"},
-	{Type: "rework_required", Label: "Cần rework", Description: "Chuyển khi issue hoặc nghiệm thu đang yêu cầu rework.", DefaultLabel: "", Category: "rework"},
-	{Type: "rework_completed", Label: "Rework hoàn tất", Description: "Chuyển khi rework đã hoàn tất và không còn rework đang mở.", DefaultLabel: "", Category: "rework"},
-	{Type: "replanning_required", Label: "Cần replanning", Description: "Chuyển khi issue hoặc replanning request đang yêu cầu lập lại kế hoạch.", DefaultLabel: "", Category: "planning"},
+	{Type: "rework_required", Label: "Cần làm lại", Description: "Chuyển khi vấn đề hoặc nghiệm thu đang yêu cầu làm lại.", DefaultLabel: "", Category: "rework"},
+	{Type: "rework_completed", Label: "Làm lại đã hoàn tất", Description: "Chuyển khi việc làm lại đã hoàn tất và không còn yêu cầu làm lại đang mở.", DefaultLabel: "", Category: "rework"},
+	{Type: "replanning_required", Label: "Cần lập lại kế hoạch", Description: "Chuyển khi vấn đề hoặc yêu cầu lập lại kế hoạch đang mở.", DefaultLabel: "", Category: "planning"},
 	{Type: "materials_issued", Label: "Vật tư đã xuất đủ", Description: "Chuyển khi vật tư theo kế hoạch không còn thiếu tại công trình.", DefaultLabel: "", Category: "material"},
 	{Type: "boq_approved", Label: "BOQ đã duyệt", Description: "Chuyển khi BOQ có dữ liệu và toàn bộ item đã được duyệt.", DefaultLabel: "", Category: "commercial"},
 	{Type: "procurement_approved", Label: "Mua vật tư đã duyệt", Description: "Chuyển khi yêu cầu mua vật tư đã được duyệt hoặc đã vào các trạng thái sau duyệt.", DefaultLabel: "", Category: "material"},
+	{Type: "workflow_form_answer_equals", Label: "Câu trả lời biểu mẫu bằng giá trị", Description: "Chuyển khi biểu mẫu quy trình đã được gửi ở node nguồn và có trường khớp giá trị cấu hình.", DefaultLabel: "", Category: "workflow_form"},
 	{Type: "handover_ready", Label: "Sẵn sàng bàn giao", Description: "Chuyển khi nghiệm thu, punch list, kho, chứng từ và công nợ không còn blocker bàn giao.", DefaultLabel: "", Category: "handover"},
-	{Type: "financial_ready", Label: "Sẵn sàng đóng tài chính", Description: "Chuyển khi công nợ phải thu/phải trả không còn khoản mở.", DefaultLabel: "", Category: "finance"},
+	{Type: "financial_ready", Label: "Sẵn sàng đóng tài chính", Description: "Chuyển khi công nợ phải thu/phải trả không còn khoản đang mở.", DefaultLabel: "", Category: "finance"},
 }
 
 func PipelineEdgeConditionCatalog() []EdgeConditionDefinition {

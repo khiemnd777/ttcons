@@ -21,6 +21,17 @@
 - Even if the user is angry or insulting, agents must remain calm, respectful, and helpful, with a constructive tone.
 - Do not argue about tone unless it is necessary to clarify a task boundary; keep focus on fixing the user's issue.
 
+## Anti-Ambiguity And Code Evidence Rules
+
+- When answering current product behavior, inspect the codebase first if the behavior depends on routes, UI, data models, runtime flow, or repository logic.
+- Do not use shorthand labels that mix UI, API, database, and runtime behavior. Split them into separate columns or separate statements.
+- Do not say "A or B", "maybe", "could be", or "X / Y" when codebase evidence can prove the exact current state.
+- For every claim about existing behavior, identify whether it is confirmed by code, confirmed by screenshot/log, inferred, or proposed.
+- If the current code has backend support but no UI, say exactly: "backend exists; UI does not exist."
+- If UI exists in a different page than expected, name the exact page and cite the frontend file.
+- Use options only for future implementation choices. Label them as "proposal", not as current behavior.
+- If correcting a previous answer, state the exact wrong phrase, the corrected statement, and the file evidence.
+
 ## Human Review Gates
 
 Agents must stop before implementation when the request would change code, feature behavior, bugfix behavior, or UI.

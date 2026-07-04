@@ -2154,6 +2154,358 @@ func TestStartPipelineRejectsRequiredStepWithoutPublishedWorkflowForm(t *testing
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1`, 0, projectID)
 }
 
+func TestClientOfficialWorkflowTemplateMigrationShape(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	templateID := "40000000-0000-0000-0000-000000000020"
+
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_templates WHERE id=$1 AND status='published'`, 1, templateID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_template_nodes WHERE template_id=$1`, 12, templateID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_template_steps pts
+		JOIN pipeline_template_nodes ptn ON ptn.id=pts.node_id
+		WHERE ptn.template_id=$1
+	`, 52, templateID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_template_edges pte
+		JOIN pipeline_template_nodes from_node ON from_node.id=pte.from_node_id
+		JOIN pipeline_template_nodes to_node ON to_node.id=pte.to_node_id
+		WHERE pte.template_id=$1
+			AND from_node.name IN ('BOQ (Không thiết kế)','BOQ (Có thiết kế)')
+			AND to_node.name='Đầu Vào: Tổ Đội / Thầu Phụ / Cung cấp vật tư'
+	`, 2, templateID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_template_edges
+		WHERE template_id=$1
+			AND condition_type='workflow_form_answer_equals'
+			AND condition_config ? 'field_key'
+	`, 2, templateID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_template_nodes
+		WHERE template_id=$1
+			AND name='Đầu Vào: Tổ Đội / Thầu Phụ / Cung cấp vật tư'
+			AND exit_conditions->>'mandatory_gate'='true'
+	`, 1, templateID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_template_edges
+		WHERE template_id=$1
+			AND id='41600000-0000-0000-0000-000000000007'
+			AND condition_type='procurement_approved'
+	`, 1, templateID)
+}
+
+func TestClientOfficialWorkflowRoutesByDesignDecisionFormAnswer(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+
+	actorID := newID()
+	actorStaffID := newID()
+	projectID := newID()
+	templateID := "40000000-0000-0000-0000-000000000020"
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, actorStaffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Test Actor','active')`, actorID, "client-flow-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id, user_id, full_name, email, department, status) VALUES ($1,$2,'Test Actor',$3,'operations','active')`, actorStaffID, actorID, "client-flow-staff-"+actorID+"@test.local")
+	mustExec(t, db, `
+		INSERT INTO projects (id, name, code, client_name, status, pipeline_template_id)
+		VALUES ($1,'Client Official Flow Project',$2,'Client','draft',$3)
+	`, projectID, "COF-"+projectID[:8], templateID)
+	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["PM"]'::jsonb,true)`, projectID, actorStaffID)
+
+	run, err := repo.StartPipeline(ctx, projectID, templateID, actorID, "Test Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	surveyNodeID := runNodeIDByName(t, run, "Khảo sát")
+	meetingNodeID := runNodeIDByName(t, run, "Họp báo cáo khảo sát")
+
+	if _, err := repo.AdvanceRunNode(ctx, surveyNodeID, actorID, "Test Actor"); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, `
+		UPDATE workflow_form_instances
+		SET status='submitted',
+			current_revision=1,
+			answers_snapshot_json='{"needs_design":"no","decision_note":"Khách chốt không thiết kế"}'::jsonb,
+			submitted_by=$3,
+			submitted_at=now(),
+			updated_at=now()
+		WHERE project_id=$1
+			AND run_node_id=$2
+			AND form_template_id=(SELECT id FROM workflow_form_templates WHERE code='client_design_branch_decision')
+	`, projectID, meetingNodeID, actorID)
+
+	if _, err := repo.AdvanceRunNode(ctx, meetingNodeID, actorID, "Test Actor"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_runs pr
+		JOIN pipeline_run_nodes rn ON rn.id=pr.current_node_id
+		WHERE pr.project_id=$1 AND rn.name='BOQ (Không thiết kế)'
+	`, 1, projectID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_run_nodes
+		WHERE project_id=$1 AND name='Thiết kế' AND status='in_progress'
+	`, 0, projectID)
+}
+
+func TestClientWorkflowAutomationRecordsBlockedBOQOnce(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	fixture := setupClientOfficialWorkflowFixture(t, db, 150000000)
+	workItemID := clientOfficialWorkItemIDByNodeName(t, db, fixture.projectID, "BOQ (Có thiết kế)")
+	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
+
+	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM workflow_automation_events
+		WHERE work_item_id=$1
+			AND action_key='generate_procurement_from_boq'
+			AND status='blocked'
+			AND blocker_reason='Chưa có dòng BOQ để sinh yêu cầu mua'
+			AND run_count=2
+	`, 1, workItemID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM work_item_activities
+		WHERE work_item_id=$1
+			AND activity_type='blocker'
+			AND metadata_json->>'automation_action'='generate_procurement_from_boq'
+	`, 1, workItemID)
+}
+
+func TestClientWorkflowAutomationGeneratesProcurementIdempotently(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	fixture := setupClientOfficialWorkflowFixture(t, db, 150000000)
+	workItemID := clientOfficialWorkItemIDByNodeName(t, db, fixture.projectID, "BOQ (Có thiết kế)")
+	boqID := newID()
+	mustExec(t, db, `
+		INSERT INTO boq_items (
+			id, project_id, category, work_item_name, unit, quantity, unit_price,
+			status, created_by, approved_by, expected_unit_price, norm_unit_price,
+			final_unit_price, unit_price_source, norm_price_locked, norm_price_locked_by,
+			norm_price_locked_at, final_price_locked, final_price_locked_by,
+			final_price_locked_at, price_revision_no
+		)
+		VALUES (
+			$1,$2,'Vật tư','Gạch lát','m2',10,100,
+			'approved',$3,$3,100,100,
+			120,'final',true,$3,
+			now(),true,$3,
+			now(),1
+		)
+	`, boqID, fixture.projectID, fixture.actorID)
+	mustExec(t, db, `
+		INSERT INTO boq_unit_price_events (project_id, boq_item_id, event_type, price_source, to_unit_price, revision_no, actor_id, actor_name)
+		VALUES ($1,$2,'final_locked','final',120,1,$3,'Client Actor')
+	`, fixture.projectID, boqID, fixture.actorID)
+	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
+
+	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM procurement_requests WHERE project_id=$1 AND status='waiting_approval'`, 1, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE boq_item_id=$1`, 1, boqID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM workflow_automation_events
+		WHERE work_item_id=$1
+			AND action_key='generate_procurement_from_boq'
+			AND status='succeeded'
+			AND target_type='procurement_request'
+			AND run_count=2
+	`, 1, workItemID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM work_item_activities
+		WHERE work_item_id=$1
+			AND activity_type='system_event'
+			AND metadata_json->>'automation_action'='generate_procurement_from_boq'
+	`, 1, workItemID)
+}
+
+func TestClientWorkflowAutomationCreatesIncomingScheduleAndInvoiceBlocker(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	fixture := setupClientOfficialWorkflowFixture(t, db, 150000000)
+	workItemID := clientOfficialWorkItemIDByNodeName(t, db, fixture.projectID, "Nghiệm thu Đầu Vào")
+	procurementID := newID()
+	mustExec(t, db, `
+		INSERT INTO procurement_requests (id, project_id, request_code, title, requested_by, status, total_estimated_amount)
+		VALUES ($1,$2,$3,'Đầu vào đã duyệt',$4,'approved',75000000)
+	`, procurementID, fixture.projectID, "PR-IN-"+procurementID[:8], fixture.actorID)
+	mustExec(t, db, `
+		INSERT INTO procurement_request_items (request_id, quantity_planned, quantity_requested, unit, estimated_unit_price, supplier_name, approval_status)
+		VALUES ($1,1,1,'gói',75000000,'Nhà cung cấp kiểm thử','approved')
+	`, procurementID)
+	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
+
+	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM incoming_acceptance_records WHERE work_item_id=$1 AND status='draft'`, 1, workItemID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM payables
+		WHERE project_id=$1
+			AND source_type='procurement'
+			AND source_id=$2
+			AND status='draft'
+			AND gross_amount=75000000
+			AND remaining_amount=75000000
+	`, 1, fixture.projectID, procurementID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM payable_payment_schedules pps
+		JOIN payables pay ON pay.id=pps.payable_id
+		WHERE pay.project_id=$1
+			AND pay.source_id=$2
+			AND pps.schedule_code='LICH-THANH-TOAN-001'
+			AND pps.milestone_name='Thanh toán đầu vào sau nghiệm thu'
+			AND pps.status='draft'
+			AND pps.planned_amount=75000000
+			AND pps.remaining_amount=75000000
+	`, 1, fixture.projectID, procurementID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM input_invoices ii
+		JOIN payables pay ON pay.id=ii.payable_id
+		WHERE pay.project_id=$1 AND pay.source_id=$2
+	`, 0, fixture.projectID, procurementID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM workflow_automation_events
+		WHERE work_item_id=$1
+			AND action_key='incoming_acceptance_finance_scaffold'
+			AND status='blocked'
+			AND target_type='payable'
+			AND blocker_reason='Cần tải lên và xác minh hóa đơn đầu vào thật'
+			AND run_count=2
+	`, 1, workItemID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM work_item_activities
+		WHERE work_item_id=$1
+			AND activity_type='blocker'
+			AND comment='Cần tải lên và xác minh hóa đơn đầu vào thật'
+			AND metadata_json->>'automation_action'='incoming_acceptance_finance_scaffold'
+	`, 1, workItemID)
+}
+
+func TestClientWorkflowAutomationCreatesOutgoingAcceptanceAndReceivableDrafts(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	fixture := setupClientOfficialWorkflowFixture(t, db, 180000000)
+	workItemID := clientOfficialWorkItemIDByNodeName(t, db, fixture.projectID, "Nghiệm thu Đầu Ra")
+	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
+
+	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM acceptance_records WHERE work_item_id=$1 AND type='final' AND status='draft'`, 1, workItemID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM receivables rec
+		JOIN acceptance_records acc ON acc.id=rec.source_id
+		WHERE acc.work_item_id=$1
+			AND rec.source_type='acceptance'
+			AND rec.status='draft'
+			AND rec.gross_amount=180000000
+			AND rec.remaining_amount=180000000
+	`, 1, workItemID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM receivable_payment_schedules rps
+		JOIN receivables rec ON rec.id=rps.receivable_id
+		JOIN acceptance_records acc ON acc.id=rec.source_id
+		WHERE acc.work_item_id=$1
+			AND rps.schedule_code='LICH-THU-TIEN-001'
+			AND rps.milestone_name='Thu tiền đầu ra sau nghiệm thu'
+			AND rps.status='draft'
+			AND rps.planned_amount=180000000
+			AND rps.remaining_amount=180000000
+	`, 1, workItemID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM output_invoices oi
+		JOIN receivables rec ON rec.id=oi.receivable_id
+		JOIN acceptance_records acc ON acc.id=rec.source_id
+		WHERE acc.work_item_id=$1
+	`, 0, workItemID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM workflow_automation_events
+		WHERE work_item_id=$1
+			AND action_key='outgoing_acceptance_finance_scaffold'
+			AND status='blocked'
+			AND target_type='receivable'
+			AND blocker_reason='Cần tải lên và phát hành hóa đơn đầu ra thật'
+			AND run_count=2
+	`, 1, workItemID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM work_item_activities
+		WHERE work_item_id=$1
+			AND activity_type='blocker'
+			AND comment='Cần tải lên và phát hành hóa đơn đầu ra thật'
+			AND metadata_json->>'automation_action'='outgoing_acceptance_finance_scaffold'
+	`, 1, workItemID)
+}
+
+func TestWorkflowFormAnswerValueMatches(t *testing.T) {
+	tests := []struct {
+		name     string
+		actual   any
+		expected any
+		want     bool
+	}{
+		{name: "string ignores case and spaces", actual: " No ", expected: "no", want: true},
+		{name: "bool parses expected string", actual: true, expected: "true", want: true},
+		{name: "number string matches numeric", actual: "12.5", expected: 12.5, want: true},
+		{name: "expected list matches one value", actual: "no", expected: []any{"yes", "no"}, want: true},
+		{name: "actual list matches expected", actual: []any{"draft", "approved"}, expected: "approved", want: true},
+		{name: "mismatch", actual: "yes", expected: "no", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := workflowFormAnswerValueMatches(tt.actual, tt.expected); got != tt.want {
+				t.Fatalf("workflowFormAnswerValueMatches(%#v, %#v) = %v, want %v", tt.actual, tt.expected, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestWorkflowFormCatalogReturnsPublishedTemplates(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
@@ -5144,6 +5496,54 @@ func TestGenericApprovalActionRequiresDecisionScope(t *testing.T) {
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='approval_granted'`, 1, fixture.projectID)
 }
 
+type clientOfficialWorkflowFixture struct {
+	projectID    string
+	actorID      string
+	actorStaffID string
+}
+
+func setupClientOfficialWorkflowFixture(t *testing.T, db *sql.DB, contractAmount float64) clientOfficialWorkflowFixture {
+	t.Helper()
+	ctx := context.Background()
+	repo := NewRepository(db)
+	templateID := clientOfficialWorkflowTemplateID
+	actorID := newID()
+	actorStaffID := newID()
+	projectID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, actorStaffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Client Actor','active')`, actorID, "client-auto-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id, user_id, full_name, email, department, status) VALUES ($1,$2,'Client Actor',$3,'operations','active')`, actorStaffID, actorID, "client-auto-staff-"+actorID+"@test.local")
+	mustExec(t, db, `
+		INSERT INTO projects (id, name, code, client_name, status, pipeline_template_id, contract_amount)
+		VALUES ($1,'Client Automation Project',$2,'Client','draft',$3,$4)
+	`, projectID, "CA-"+projectID[:8], templateID, contractAmount)
+	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["PM"]'::jsonb,true)`, projectID, actorStaffID)
+	if _, err := repo.StartPipeline(ctx, projectID, templateID, actorID, "Client Actor"); err != nil {
+		t.Fatal(err)
+	}
+	return clientOfficialWorkflowFixture{projectID: projectID, actorID: actorID, actorStaffID: actorStaffID}
+}
+
+func clientOfficialWorkItemIDByNodeName(t *testing.T, db *sql.DB, projectID, nodeName string) string {
+	t.Helper()
+	var workItemID string
+	if err := db.QueryRowContext(context.Background(), `
+		SELECT wi.id::text
+		FROM work_items wi
+		JOIN pipeline_run_nodes rn ON rn.id=wi.run_node_id
+		WHERE wi.project_id=$1 AND rn.name=$2
+		ORDER BY wi.created_at, wi.id
+		LIMIT 1
+	`, projectID, nodeName).Scan(&workItemID); err != nil {
+		t.Fatal(err)
+	}
+	return workItemID
+}
+
 func mustExec(t *testing.T, db *sql.DB, query string, args ...any) {
 	t.Helper()
 	if _, err := db.ExecContext(context.Background(), query, args...); err != nil {
@@ -5160,6 +5560,18 @@ func assertCount(t *testing.T, db *sql.DB, query string, want int, args ...any) 
 	if got != want {
 		t.Fatalf("count mismatch for %q: got %d want %d", query, got, want)
 	}
+}
+
+func runNodeIDByName(t *testing.T, run Record, name string) string {
+	t.Helper()
+	nodes, _ := run["nodes"].([]Record)
+	for _, node := range nodes {
+		if fmt.Sprint(node["name"]) == name {
+			return cleanID(node["id"])
+		}
+	}
+	t.Fatalf("run node %q not found in %#v", name, nodes)
+	return ""
 }
 
 func assertBearerStatus(t *testing.T, app *fiber.App, path string, token string, want int) {

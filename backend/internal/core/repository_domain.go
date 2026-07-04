@@ -14,6 +14,19 @@ import (
 	"time"
 )
 
+const clientOfficialWorkflowTemplateID = "40000000-0000-0000-0000-000000000020"
+
+type workflowAutomationOutcome struct {
+	ActionKey     string
+	Status        string
+	Message       string
+	TargetType    string
+	TargetID      string
+	BlockerReason string
+	ErrorMessage  string
+	Metadata      Record
+}
+
 func (r *Repository) FindUserByEmail(ctx context.Context, email string) (Record, error) {
 	return r.QueryOne(ctx, `
 		SELECT id, email, password_hash, full_name, status, created_at, updated_at
@@ -7017,6 +7030,868 @@ func (r *Repository) SubmitRunStep(ctx context.Context, stepID string, req WorkI
 	return step, nil
 }
 
+func (r *Repository) RunClientWorkflowAutomationForWorkItem(ctx context.Context, workItemID, actorID, actorName string) error {
+	workItemID = cleanID(workItemID)
+	if workItemID == "" {
+		return nil
+	}
+	contextRow, err := r.clientWorkflowAutomationContext(ctx, workItemID)
+	if err != nil {
+		return err
+	}
+	if cleanID(contextRow["template_id"]) != clientOfficialWorkflowTemplateID {
+		return nil
+	}
+	if fmt.Sprint(contextRow["status"]) != "completed" {
+		return nil
+	}
+	actionKey := clientWorkflowAutomationAction(contextRow)
+	if actionKey == "" {
+		return nil
+	}
+	outcome, err := r.executeClientWorkflowAutomation(ctx, contextRow, actionKey, actorID, actorName)
+	if err != nil {
+		outcome = workflowAutomationOutcome{
+			ActionKey:    actionKey,
+			Status:       "failed",
+			Message:      "Tự động hóa quy trình lỗi",
+			ErrorMessage: err.Error(),
+			Metadata:     Record{"error": err.Error()},
+		}
+	}
+	return r.recordClientWorkflowAutomationOutcome(ctx, contextRow, outcome, actorID, actorName)
+}
+
+func (r *Repository) clientWorkflowAutomationContext(ctx context.Context, workItemID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			wi.*,
+			pr.id AS pipeline_run_id,
+			pr.template_id,
+			pt.name AS template_name,
+			rn.id AS context_run_node_id,
+			rn.name AS run_node_name,
+			rn.type AS run_node_type,
+			rn.order_index AS run_node_order_index,
+			rs.id AS context_run_step_id,
+			rs.name AS run_step_name,
+			rs.step_type AS run_step_type
+		FROM work_items wi
+		LEFT JOIN pipeline_runs pr ON pr.id=wi.pipeline_run_id
+		LEFT JOIN pipeline_templates pt ON pt.id=pr.template_id
+		LEFT JOIN pipeline_run_nodes rn ON rn.id=wi.run_node_id
+		LEFT JOIN pipeline_run_steps rs ON rs.id=wi.run_step_id
+		WHERE wi.id=$1
+	`, workItemID)
+}
+
+func clientWorkflowAutomationAction(contextRow Record) string {
+	nodeName := strings.TrimSpace(fmt.Sprint(contextRow["run_node_name"]))
+	switch {
+	case strings.HasPrefix(nodeName, "BOQ ("):
+		return "generate_procurement_from_boq"
+	case strings.HasPrefix(nodeName, "Đầu Vào:"):
+		return "input_procurement_gate"
+	case nodeName == "Nghiệm thu Đầu Vào":
+		return "incoming_acceptance_finance_scaffold"
+	case nodeName == "Nghiệm thu Đầu Ra":
+		return "outgoing_acceptance_finance_scaffold"
+	case strings.HasPrefix(nodeName, "Kết thúc"):
+		return "handover_financial_closure_check"
+	default:
+		return ""
+	}
+}
+
+func (r *Repository) executeClientWorkflowAutomation(ctx context.Context, contextRow Record, actionKey, actorID, actorName string) (workflowAutomationOutcome, error) {
+	switch actionKey {
+	case "generate_procurement_from_boq":
+		return r.automateClientBOQProcurement(ctx, contextRow, actorID, actorName)
+	case "input_procurement_gate":
+		return r.automateClientInputProcurementGate(ctx, contextRow)
+	case "incoming_acceptance_finance_scaffold":
+		return r.automateClientIncomingAcceptanceFinance(ctx, contextRow, actorID, actorName)
+	case "outgoing_acceptance_finance_scaffold":
+		return r.automateClientOutgoingAcceptanceFinance(ctx, contextRow, actorID, actorName)
+	case "handover_financial_closure_check":
+		return r.automateClientHandoverClosure(ctx, contextRow, actorID, actorName)
+	default:
+		return workflowAutomationOutcome{}, nil
+	}
+}
+
+func (r *Repository) automateClientBOQProcurement(ctx context.Context, contextRow Record, actorID, actorName string) (workflowAutomationOutcome, error) {
+	projectID := cleanID(contextRow["project_id"])
+	summary, err := r.QueryOne(ctx, `
+		SELECT
+			COUNT(*) AS total,
+			COUNT(*) FILTER (WHERE status <> 'approved' OR NOT final_price_locked) AS not_ready,
+			COUNT(*) FILTER (
+				WHERE status='approved'
+				  AND final_price_locked
+				  AND NOT EXISTS (
+					SELECT 1
+					FROM procurement_request_items pri
+					JOIN procurement_requests pr ON pr.id=pri.request_id
+					WHERE pri.boq_item_id=boq_items.id
+					  AND pr.status <> 'cancelled'
+				  )
+			) AS ready_without_procurement
+		FROM boq_items
+		WHERE project_id=$1 AND status <> 'deleted'
+	`, projectID)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	metadata := Record{
+		"node":                      contextRow["run_node_name"],
+		"boq_total":                 number(summary["total"]),
+		"boq_not_ready":             number(summary["not_ready"]),
+		"ready_without_procurement": number(summary["ready_without_procurement"]),
+	}
+	if number(summary["total"]) == 0 {
+		return automationBlocked("generate_procurement_from_boq", "Chưa có dòng BOQ để sinh yêu cầu mua", metadata), nil
+	}
+	if number(summary["not_ready"]) > 0 {
+		return automationBlocked("generate_procurement_from_boq", "BOQ còn dòng chưa approved hoặc chưa final lock đơn giá", metadata), nil
+	}
+	if number(summary["ready_without_procurement"]) > 0 {
+		procurement, err := r.GenerateProcurementFromBOQ(ctx, projectID, actorID, actorName)
+		if err != nil {
+			var statusErr StatusError
+			if errors.As(err, &statusErr) {
+				metadata["validation"] = statusErr.Message
+				if statusErr.Details != nil {
+					metadata["details"] = statusErr.Details
+				}
+				return automationBlocked("generate_procurement_from_boq", statusErr.Message, metadata), nil
+			}
+			return workflowAutomationOutcome{}, err
+		}
+		return automationSucceeded("generate_procurement_from_boq", "Đã sinh yêu cầu mua từ BOQ", "procurement_request", cleanID(procurement["id"]), metadata), nil
+	}
+	procurement, err := r.firstProjectProcurement(ctx, projectID)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	if procurement == nil {
+		return automationBlocked("generate_procurement_from_boq", "Không còn dòng BOQ nào cần sinh mua sắm nhưng cũng chưa có yêu cầu mua", metadata), nil
+	}
+	return automationSucceeded("generate_procurement_from_boq", "Yêu cầu mua từ BOQ đã tồn tại", "procurement_request", cleanID(procurement["id"]), metadata), nil
+}
+
+func (r *Repository) automateClientInputProcurementGate(ctx context.Context, contextRow Record) (workflowAutomationOutcome, error) {
+	projectID := cleanID(contextRow["project_id"])
+	summary, err := r.QueryOne(ctx, `
+		SELECT
+			COUNT(*) AS total,
+			COUNT(*) FILTER (WHERE status NOT IN ('approved','ordered','partially_received','received')) AS not_approved
+		FROM procurement_requests
+		WHERE project_id=$1 AND status <> 'cancelled'
+	`, projectID)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	metadata := Record{
+		"node":                     contextRow["run_node_name"],
+		"procurement_total":        number(summary["total"]),
+		"procurement_not_approved": number(summary["not_approved"]),
+	}
+	if number(summary["total"]) == 0 {
+		return automationBlocked("input_procurement_gate", "Chưa có yêu cầu mua/đầu vào bắt buộc", metadata), nil
+	}
+	if number(summary["not_approved"]) > 0 {
+		return automationBlocked("input_procurement_gate", "Còn yêu cầu mua/đầu vào chưa được duyệt", metadata), nil
+	}
+	procurement, err := r.firstProjectProcurement(ctx, projectID)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	targetID := ""
+	if procurement != nil {
+		targetID = cleanID(procurement["id"])
+	}
+	return automationSucceeded("input_procurement_gate", "Đầu vào bắt buộc đã có procurement được duyệt", "procurement_request", targetID, metadata), nil
+}
+
+func (r *Repository) automateClientIncomingAcceptanceFinance(ctx context.Context, contextRow Record, actorID, actorName string) (workflowAutomationOutcome, error) {
+	projectID := cleanID(contextRow["project_id"])
+	procurement, err := r.firstApprovedProjectProcurement(ctx, projectID)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	if procurement == nil {
+		return automationBlocked("incoming_acceptance_finance_scaffold", "Chưa có yêu cầu mua/đầu vào đã duyệt để mở nghiệm thu đầu vào", Record{"node": contextRow["run_node_name"]}), nil
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	defer tx.Rollback()
+	acceptanceID, payableID, metadata, err := r.ensureIncomingAcceptanceFinanceScaffoldTx(ctx, tx, contextRow, procurement, actorID, actorName)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	if payableID != "" {
+		metadata["payable_id"] = payableID
+		ready, err := r.clientInputInvoiceVerified(ctx, payableID)
+		if err != nil {
+			return workflowAutomationOutcome{}, err
+		}
+		if !ready {
+			metadata["input_invoice_required"] = "Cần tải lên và xác minh hóa đơn đầu vào thật"
+			return automationBlockedWithTarget("incoming_acceptance_finance_scaffold", "Cần tải lên và xác minh hóa đơn đầu vào thật", "payable", payableID, metadata), nil
+		}
+	} else {
+		return automationBlockedWithTarget("incoming_acceptance_finance_scaffold", "Cần mở công nợ đầu vào trước khi lập lịch thanh toán và hóa đơn thật", "incoming_acceptance", acceptanceID, metadata), nil
+	}
+	return automationSucceeded("incoming_acceptance_finance_scaffold", "Đã mở hồ sơ nghiệm thu đầu vào, công nợ và lịch thanh toán dạng nháp", "incoming_acceptance", acceptanceID, metadata), nil
+}
+
+func (r *Repository) ensureIncomingAcceptanceFinanceScaffoldTx(ctx context.Context, tx *sql.Tx, contextRow, procurement Record, actorID, actorName string) (string, string, Record, error) {
+	projectID := cleanID(contextRow["project_id"])
+	workItemID := cleanID(contextRow["id"])
+	procurementID := cleanID(procurement["id"])
+	supplierName := cleanOptionalText(procurement["supplier_name"])
+	if supplierName == "" {
+		supplierName = "Nhà cung cấp / Thầu phụ"
+	}
+	metadata := Record{
+		"node":                   contextRow["run_node_name"],
+		"procurement_request_id": procurementID,
+	}
+	acceptanceRows, err := queryTx(ctx, tx, `
+		SELECT id
+		FROM incoming_acceptance_records
+		WHERE work_item_id=$1 AND status <> 'cancelled'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, workItemID)
+	if err != nil {
+		return "", "", nil, err
+	}
+	acceptanceID := ""
+	if len(acceptanceRows) > 0 {
+		acceptanceID = cleanID(acceptanceRows[0]["id"])
+		metadata["incoming_acceptance_existing"] = true
+	} else {
+		code := fmt.Sprintf("IA-%s-%d-%s", projectID[:8], timeNowUnix(), newID()[:8])
+		rawSummary, _ := json.Marshal(Record{"automation_scaffold": true, "procurement_request_id": procurementID})
+		rows, err := queryTx(ctx, tx, `
+			INSERT INTO incoming_acceptance_records (
+				acceptance_code, project_id, work_item_id, procurement_request_id,
+				source_type, supplier_name, delivery_reference, status, summary_json,
+				created_by, updated_by
+			)
+			VALUES ($1,$2,$3,$4,'procurement',$5,$6,'draft',$7::jsonb,NULLIF($8,'')::uuid,NULLIF($8,'')::uuid)
+			RETURNING id
+		`, code, projectID, workItemID, procurementID, supplierName, procurement["request_code"], string(rawSummary), actorID)
+		if err != nil {
+			return "", "", nil, err
+		}
+		if len(rows) == 0 {
+			return "", "", nil, sql.ErrNoRows
+		}
+		acceptanceID = cleanID(rows[0]["id"])
+		metadata["incoming_acceptance_created"] = true
+		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "incoming_acceptance_saved", "incoming_acceptance", acceptanceID, "Tự động mở hồ sơ nghiệm thu đầu vào dạng nháp", metadata); err != nil {
+			return "", "", nil, err
+		}
+	}
+	payableRows, err := queryTx(ctx, tx, `
+		SELECT id
+		FROM payables
+		WHERE project_id=$1 AND source_type='procurement' AND source_id=$2 AND status <> 'cancelled'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, projectID, procurementID)
+	if err != nil {
+		return "", "", nil, err
+	}
+	payableID := ""
+	amount := number(procurement["total_estimated_amount"])
+	if len(payableRows) > 0 {
+		payableID = cleanID(payableRows[0]["id"])
+		metadata["payable_existing"] = true
+	} else if amount > 0 {
+		code := fmt.Sprintf("AP-AUTO-%s-%d-%s", projectID[:8], timeNowUnix(), newID()[:6])
+		rows, err := queryTx(ctx, tx, `
+			INSERT INTO payables (
+				project_id, payable_code, vendor_type, vendor_name, source_type, source_id,
+				gross_amount, paid_amount, remaining_amount, status, created_by
+			)
+			VALUES ($1,$2,'supplier',$3,'procurement',$4,$5,0,$5,'draft',NULLIF($6,'')::uuid)
+			RETURNING id
+		`, projectID, code, supplierName, procurementID, amount, actorID)
+		if err != nil {
+			return "", "", nil, err
+		}
+		if len(rows) == 0 {
+			return "", "", nil, sql.ErrNoRows
+		}
+		payableID = cleanID(rows[0]["id"])
+		metadata["payable_created"] = true
+		metadata["payable_amount"] = amount
+		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "payable_created", "payable", payableID, "Tự động mở công nợ đầu vào dạng nháp từ yêu cầu mua", metadata); err != nil {
+			return "", "", nil, err
+		}
+	} else {
+		metadata["payable_blocker"] = "Yêu cầu mua chưa có giá trị dự toán để mở công nợ đầu vào"
+	}
+	if payableID != "" {
+		if err := r.ensurePayablePaymentScheduleScaffoldTx(ctx, tx, projectID, payableID, actorID, actorName, metadata); err != nil {
+			return "", "", nil, err
+		}
+	}
+	return acceptanceID, payableID, metadata, nil
+}
+
+func (r *Repository) automateClientOutgoingAcceptanceFinance(ctx context.Context, contextRow Record, actorID, actorName string) (workflowAutomationOutcome, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	defer tx.Rollback()
+	acceptanceID, receivableID, metadata, err := r.ensureOutgoingAcceptanceFinanceScaffoldTx(ctx, tx, contextRow, actorID, actorName)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	if receivableID != "" {
+		metadata["receivable_id"] = receivableID
+		ready, err := r.clientOutputInvoiceIssued(ctx, receivableID)
+		if err != nil {
+			return workflowAutomationOutcome{}, err
+		}
+		if !ready {
+			metadata["output_invoice_required"] = "Cần tải lên và phát hành hóa đơn đầu ra thật"
+			return automationBlockedWithTarget("outgoing_acceptance_finance_scaffold", "Cần tải lên và phát hành hóa đơn đầu ra thật", "receivable", receivableID, metadata), nil
+		}
+	} else {
+		return automationBlockedWithTarget("outgoing_acceptance_finance_scaffold", "Cần mở công nợ đầu ra trước khi lập lịch thu tiền và hóa đơn thật", "acceptance", acceptanceID, metadata), nil
+	}
+	return automationSucceeded("outgoing_acceptance_finance_scaffold", "Đã mở hồ sơ nghiệm thu đầu ra, công nợ và lịch thu tiền dạng nháp", "acceptance", acceptanceID, metadata), nil
+}
+
+func (r *Repository) ensureOutgoingAcceptanceFinanceScaffoldTx(ctx context.Context, tx *sql.Tx, contextRow Record, actorID, actorName string) (string, string, Record, error) {
+	projectID := cleanID(contextRow["project_id"])
+	workItemID := cleanID(contextRow["id"])
+	runNodeID := cleanID(contextRow["run_node_id"])
+	metadata := Record{"node": contextRow["run_node_name"]}
+	acceptanceRows, err := queryTx(ctx, tx, `
+		SELECT id
+		FROM acceptance_records
+		WHERE work_item_id=$1 AND status <> 'cancelled'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, workItemID)
+	if err != nil {
+		return "", "", nil, err
+	}
+	acceptanceID := ""
+	if len(acceptanceRows) > 0 {
+		acceptanceID = cleanID(acceptanceRows[0]["id"])
+		metadata["acceptance_existing"] = true
+	} else {
+		code := fmt.Sprintf("OA-%s-%d-%s", projectID[:8], timeNowUnix(), newID()[:8])
+		rawSummary, _ := json.Marshal(Record{"automation_scaffold": true})
+		rows, err := queryTx(ctx, tx, `
+			INSERT INTO acceptance_records (
+				acceptance_code, project_id, node_id, work_item_id, type, title,
+				requested_by, status, signature_status, document_status, summary_json, notes
+			)
+			VALUES ($1,$2,NULLIF($3,'')::uuid,$4,'final','Nghiệm thu đầu ra chính thức',NULLIF($5,'')::uuid,'draft','pending','pending',$6::jsonb,'Tự động mở từ quy trình chính thức')
+			RETURNING id
+		`, code, projectID, runNodeID, workItemID, actorID, string(rawSummary))
+		if err != nil {
+			return "", "", nil, err
+		}
+		if len(rows) == 0 {
+			return "", "", nil, sql.ErrNoRows
+		}
+		acceptanceID = cleanID(rows[0]["id"])
+		metadata["acceptance_created"] = true
+		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "outgoing_acceptance_saved", "acceptance", acceptanceID, "Tự động mở hồ sơ nghiệm thu đầu ra dạng nháp", metadata); err != nil {
+			return "", "", nil, err
+		}
+	}
+	projectRows, err := queryTx(ctx, tx, `SELECT client_name, contract_amount FROM projects WHERE id=$1`, projectID)
+	if err != nil {
+		return "", "", nil, err
+	}
+	clientName := "Chủ đầu tư"
+	contractAmount := 0.0
+	if len(projectRows) > 0 {
+		clientName = cleanOptionalText(projectRows[0]["client_name"])
+		contractAmount = number(projectRows[0]["contract_amount"])
+	}
+	if clientName == "" {
+		clientName = "Chủ đầu tư"
+	}
+	receivableRows, err := queryTx(ctx, tx, `
+		SELECT id
+		FROM receivables
+		WHERE project_id=$1 AND source_type='acceptance' AND source_id=$2 AND status <> 'cancelled'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, projectID, acceptanceID)
+	if err != nil {
+		return "", "", nil, err
+	}
+	receivableID := ""
+	if len(receivableRows) > 0 {
+		receivableID = cleanID(receivableRows[0]["id"])
+		metadata["receivable_existing"] = true
+	} else if contractAmount > 0 {
+		code := fmt.Sprintf("AR-AUTO-%s-%d-%s", projectID[:8], timeNowUnix(), newID()[:6])
+		rows, err := queryTx(ctx, tx, `
+			INSERT INTO receivables (
+				project_id, receivable_code, client_name, source_type, source_id,
+				contract_amount, milestone_name, gross_amount, received_amount, remaining_amount,
+				status, created_by
+			)
+			VALUES ($1,$2,$3,'acceptance',$4,$5,'Nghiệm thu đầu ra',$5,0,$5,'draft',NULLIF($6,'')::uuid)
+			RETURNING id
+		`, projectID, code, clientName, acceptanceID, contractAmount, actorID)
+		if err != nil {
+			return "", "", nil, err
+		}
+		if len(rows) == 0 {
+			return "", "", nil, sql.ErrNoRows
+		}
+		receivableID = cleanID(rows[0]["id"])
+		metadata["receivable_created"] = true
+		metadata["receivable_amount"] = contractAmount
+		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "receivable_created", "receivable", receivableID, "Tự động mở công nợ đầu ra dạng nháp từ nghiệm thu", metadata); err != nil {
+			return "", "", nil, err
+		}
+	} else {
+		metadata["receivable_blocker"] = "Công trình chưa có giá trị hợp đồng để mở công nợ đầu ra"
+	}
+	if receivableID != "" {
+		if err := r.ensureReceivablePaymentScheduleScaffoldTx(ctx, tx, projectID, receivableID, actorID, actorName, metadata); err != nil {
+			return "", "", nil, err
+		}
+	}
+	return acceptanceID, receivableID, metadata, nil
+}
+
+func (r *Repository) automateClientHandoverClosure(ctx context.Context, contextRow Record, actorID, actorName string) (workflowAutomationOutcome, error) {
+	projectID := cleanID(contextRow["project_id"])
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	defer tx.Rollback()
+	handoverID, metadata, err := r.ensureHandoverScaffoldTx(ctx, tx, contextRow, actorID, actorName)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	if handoverID == "" {
+		return automationBlocked("handover_financial_closure_check", "Chưa có hồ sơ nghiệm thu đầu ra để mở bàn giao", metadata), nil
+	}
+	check, err := r.HandoverCheck(ctx, handoverID)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	blockers, _ := check["blockers"].([]string)
+	if len(blockers) > 0 {
+		metadata["handover_blockers"] = blockers
+		return automationBlockedWithTarget("handover_financial_closure_check", "Bàn giao/đóng tài chính còn điều kiện chưa hoàn tất", "handover", handoverID, metadata), nil
+	}
+	metadata["project_id"] = projectID
+	return automationSucceeded("handover_financial_closure_check", "Bàn giao và đóng tài chính đã sẵn sàng", "handover", handoverID, metadata), nil
+}
+
+func (r *Repository) ensurePayablePaymentScheduleScaffoldTx(ctx context.Context, tx *sql.Tx, projectID, payableID, actorID, actorName string, metadata Record) error {
+	rows, err := queryTx(ctx, tx, `
+		SELECT gross_amount, remaining_amount
+		FROM payables
+		WHERE id=$1 AND project_id=$2 AND status <> 'cancelled'
+		FOR UPDATE
+	`, payableID, projectID)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		metadata["payment_schedule_blocker"] = "Không tìm thấy công nợ đầu vào để lập lịch thanh toán"
+		return nil
+	}
+	amount := number(rows[0]["remaining_amount"])
+	if amount <= 0 {
+		amount = number(rows[0]["gross_amount"])
+	}
+	if amount <= 0 {
+		metadata["payment_schedule_blocker"] = "Công nợ đầu vào không có số tiền để lập lịch thanh toán"
+		return nil
+	}
+	const scheduleCode = "LICH-THANH-TOAN-001"
+	existing, err := queryTx(ctx, tx, `
+		SELECT id
+		FROM payable_payment_schedules
+		WHERE payable_id=$1
+			AND schedule_code=$2
+			AND status NOT IN ('cancelled','deleted')
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, payableID, scheduleCode)
+	if err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		metadata["payment_schedule_id"] = cleanID(existing[0]["id"])
+		metadata["payment_schedule_existing"] = true
+		return nil
+	}
+	scheduleID := newID()
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO payable_payment_schedules (
+			id, project_id, payable_id, schedule_code, milestone_name, schedule_type,
+			planned_amount, paid_amount, remaining_amount, status, notes, created_by
+		)
+		VALUES ($1,$2,$3,$4,'Thanh toán đầu vào sau nghiệm thu','final',$5,0,$5,'draft','Tự động tạo từ quy trình chính thức; kế toán cần kiểm tra trước khi duyệt.',NULLIF($6,'')::uuid)
+	`, scheduleID, projectID, payableID, scheduleCode, amount, actorID); err != nil {
+		return err
+	}
+	metadata["payment_schedule_id"] = scheduleID
+	metadata["payment_schedule_created"] = true
+	metadata["payment_schedule_amount"] = amount
+	return addAuditTx(ctx, tx, projectID, actorID, actorName, "payable_payment_schedule_created", "payable_payment_schedule", scheduleID, "Tự động tạo lịch thanh toán đầu vào dạng nháp", Record{
+		"payable_id":     payableID,
+		"schedule_code":  scheduleCode,
+		"planned_amount": amount,
+		"schedule_type":  "final",
+	})
+}
+
+func (r *Repository) ensureReceivablePaymentScheduleScaffoldTx(ctx context.Context, tx *sql.Tx, projectID, receivableID, actorID, actorName string, metadata Record) error {
+	rows, err := queryTx(ctx, tx, `
+		SELECT gross_amount, remaining_amount
+		FROM receivables
+		WHERE id=$1 AND project_id=$2 AND status <> 'cancelled'
+		FOR UPDATE
+	`, receivableID, projectID)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		metadata["billing_schedule_blocker"] = "Không tìm thấy công nợ đầu ra để lập lịch thu tiền"
+		return nil
+	}
+	amount := number(rows[0]["remaining_amount"])
+	if amount <= 0 {
+		amount = number(rows[0]["gross_amount"])
+	}
+	if amount <= 0 {
+		metadata["billing_schedule_blocker"] = "Công nợ đầu ra không có số tiền để lập lịch thu tiền"
+		return nil
+	}
+	const scheduleCode = "LICH-THU-TIEN-001"
+	existing, err := queryTx(ctx, tx, `
+		SELECT id
+		FROM receivable_payment_schedules
+		WHERE receivable_id=$1
+			AND schedule_code=$2
+			AND status NOT IN ('cancelled','deleted')
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, receivableID, scheduleCode)
+	if err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		metadata["billing_schedule_id"] = cleanID(existing[0]["id"])
+		metadata["billing_schedule_existing"] = true
+		return nil
+	}
+	scheduleID := newID()
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO receivable_payment_schedules (
+			id, project_id, receivable_id, schedule_code, milestone_name, schedule_type,
+			planned_amount, received_amount, remaining_amount, status, notes, created_by
+		)
+		VALUES ($1,$2,$3,$4,'Thu tiền đầu ra sau nghiệm thu','final',$5,0,$5,'draft','Tự động tạo từ quy trình chính thức; kế toán cần kiểm tra trước khi duyệt.',NULLIF($6,'')::uuid)
+	`, scheduleID, projectID, receivableID, scheduleCode, amount, actorID); err != nil {
+		return err
+	}
+	metadata["billing_schedule_id"] = scheduleID
+	metadata["billing_schedule_created"] = true
+	metadata["billing_schedule_amount"] = amount
+	return addAuditTx(ctx, tx, projectID, actorID, actorName, "receivable_payment_schedule_created", "receivable_payment_schedule", scheduleID, "Tự động tạo lịch thu tiền đầu ra dạng nháp", Record{
+		"receivable_id":  receivableID,
+		"schedule_code":  scheduleCode,
+		"planned_amount": amount,
+		"schedule_type":  "final",
+	})
+}
+
+func (r *Repository) clientInputInvoiceVerified(ctx context.Context, payableID string) (bool, error) {
+	rows, err := r.Query(ctx, `
+		SELECT COUNT(*) AS total
+		FROM input_invoices
+		WHERE payable_id=$1 AND status='verified'
+	`, payableID)
+	if err != nil {
+		return false, err
+	}
+	return len(rows) > 0 && number(rows[0]["total"]) > 0, nil
+}
+
+func (r *Repository) clientOutputInvoiceIssued(ctx context.Context, receivableID string) (bool, error) {
+	rows, err := r.Query(ctx, `
+		SELECT COUNT(*) AS total
+		FROM output_invoices
+		WHERE receivable_id=$1 AND status='issued'
+	`, receivableID)
+	if err != nil {
+		return false, err
+	}
+	return len(rows) > 0 && number(rows[0]["total"]) > 0, nil
+}
+
+func (r *Repository) ensureHandoverScaffoldTx(ctx context.Context, tx *sql.Tx, contextRow Record, actorID, actorName string) (string, Record, error) {
+	projectID := cleanID(contextRow["project_id"])
+	metadata := Record{"node": contextRow["run_node_name"]}
+	acceptanceRows, err := queryTx(ctx, tx, `
+		SELECT id, status, result
+		FROM acceptance_records
+		WHERE project_id=$1 AND type='final' AND status <> 'cancelled'
+		ORDER BY updated_at DESC, created_at DESC
+		LIMIT 1
+	`, projectID)
+	if err != nil {
+		return "", nil, err
+	}
+	if len(acceptanceRows) == 0 {
+		metadata["handover_blocker"] = "missing_final_acceptance"
+		return "", metadata, nil
+	}
+	finalAcceptanceID := cleanID(acceptanceRows[0]["id"])
+	metadata["final_acceptance_id"] = finalAcceptanceID
+	handoverRows, err := queryTx(ctx, tx, `
+		SELECT id
+		FROM handover_records
+		WHERE project_id=$1 AND status <> 'deleted'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, projectID)
+	if err != nil {
+		return "", nil, err
+	}
+	if len(handoverRows) > 0 {
+		metadata["handover_existing"] = true
+		return cleanID(handoverRows[0]["id"]), metadata, nil
+	}
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO handover_records (project_id, status, final_acceptance_id, notes, created_by)
+		VALUES ($1,'draft',$2,'Tự động mở từ quy trình chính thức',NULLIF($3,'')::uuid)
+		RETURNING id
+	`, projectID, finalAcceptanceID, actorID)
+	if err != nil {
+		return "", nil, err
+	}
+	if len(rows) == 0 {
+		return "", nil, sql.ErrNoRows
+	}
+	handoverID := cleanID(rows[0]["id"])
+	metadata["handover_created"] = true
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "handover_created", "handover", handoverID, "Tự động mở hồ sơ bàn giao dạng nháp", metadata); err != nil {
+		return "", nil, err
+	}
+	return handoverID, metadata, nil
+}
+
+func (r *Repository) firstProjectProcurement(ctx context.Context, projectID string) (Record, error) {
+	rows, err := r.Query(ctx, `
+		SELECT pr.*
+		FROM procurement_requests pr
+		WHERE pr.project_id=$1 AND pr.status <> 'cancelled'
+		ORDER BY pr.created_at DESC
+		LIMIT 1
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	return rows[0], nil
+}
+
+func (r *Repository) firstApprovedProjectProcurement(ctx context.Context, projectID string) (Record, error) {
+	rows, err := r.Query(ctx, `
+		SELECT
+			pr.*,
+			COALESCE(NULLIF(string_agg(DISTINCT NULLIF(btrim(pri.supplier_name), ''), ', '), ''), 'Nhà cung cấp / Thầu phụ') AS supplier_name
+		FROM procurement_requests pr
+		LEFT JOIN procurement_request_items pri ON pri.request_id=pr.id
+		WHERE pr.project_id=$1
+		  AND pr.status IN ('approved','ordered','partially_received','received')
+		GROUP BY pr.id
+		ORDER BY pr.created_at DESC
+		LIMIT 1
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	return rows[0], nil
+}
+
+func automationSucceeded(actionKey, message, targetType, targetID string, metadata Record) workflowAutomationOutcome {
+	return workflowAutomationOutcome{
+		ActionKey:  actionKey,
+		Status:     "succeeded",
+		Message:    message,
+		TargetType: targetType,
+		TargetID:   cleanID(targetID),
+		Metadata:   metadata,
+	}
+}
+
+func automationBlocked(actionKey, reason string, metadata Record) workflowAutomationOutcome {
+	return automationBlockedWithTarget(actionKey, reason, "", "", metadata)
+}
+
+func automationBlockedWithTarget(actionKey, reason, targetType, targetID string, metadata Record) workflowAutomationOutcome {
+	return workflowAutomationOutcome{
+		ActionKey:     actionKey,
+		Status:        "blocked",
+		Message:       reason,
+		TargetType:    targetType,
+		TargetID:      cleanID(targetID),
+		BlockerReason: reason,
+		Metadata:      metadata,
+	}
+}
+
+func (r *Repository) recordClientWorkflowAutomationOutcome(ctx context.Context, contextRow Record, outcome workflowAutomationOutcome, actorID, actorName string) error {
+	if outcome.ActionKey == "" || outcome.Status == "" {
+		return nil
+	}
+	projectID := cleanID(contextRow["project_id"])
+	workItemID := cleanID(contextRow["id"])
+	sourceType := "work_item"
+	sourceID := workItemID
+	idempotencyKey := strings.Join([]string{clientOfficialWorkflowTemplateID, sourceType, sourceID, outcome.ActionKey}, ":")
+	metadata := outcome.Metadata
+	if metadata == nil {
+		metadata = Record{}
+	}
+	metadata["template_id"] = cleanID(contextRow["template_id"])
+	metadata["run_node_id"] = cleanID(contextRow["run_node_id"])
+	metadata["run_step_id"] = cleanID(contextRow["run_step_id"])
+	metadata["work_item_id"] = workItemID
+	rawMetadata, _ := json.Marshal(metadata)
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	existing, err := queryTx(ctx, tx, `
+		SELECT id, status, target_type, target_id, blocker_reason, error_message
+		FROM workflow_automation_events
+		WHERE idempotency_key=$1
+		LIMIT 1
+	`, idempotencyKey)
+	if err != nil {
+		return err
+	}
+	changed := len(existing) == 0
+	if len(existing) > 0 {
+		prev := existing[0]
+		changed = fmt.Sprint(prev["status"]) != outcome.Status ||
+			cleanOptionalText(prev["target_type"]) != outcome.TargetType ||
+			cleanID(prev["target_id"]) != cleanID(outcome.TargetID) ||
+			cleanOptionalText(prev["blocker_reason"]) != outcome.BlockerReason ||
+			cleanOptionalText(prev["error_message"]) != outcome.ErrorMessage
+	}
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO workflow_automation_events (
+			project_id, pipeline_run_id, run_node_id, run_step_id, work_item_id,
+			source_type, source_id, action_key, idempotency_key, status,
+			target_type, target_id, blocker_reason, error_message, metadata_json,
+			actor_id, actor_name
+		)
+		VALUES (
+			$1, NULLIF($2,'')::uuid, NULLIF($3,'')::uuid, NULLIF($4,'')::uuid, NULLIF($5,'')::uuid,
+			$6, $7, $8, $9, $10,
+			NULLIF($11,''), NULLIF($12,'')::uuid, NULLIF($13,''), NULLIF($14,''), $15::jsonb,
+			NULLIF($16,'')::uuid, NULLIF($17,'')
+		)
+		ON CONFLICT (idempotency_key)
+		DO UPDATE SET
+			status=EXCLUDED.status,
+			target_type=EXCLUDED.target_type,
+			target_id=EXCLUDED.target_id,
+			blocker_reason=EXCLUDED.blocker_reason,
+			error_message=EXCLUDED.error_message,
+			metadata_json=EXCLUDED.metadata_json,
+			actor_id=EXCLUDED.actor_id,
+			actor_name=EXCLUDED.actor_name,
+			run_count=workflow_automation_events.run_count + 1,
+			updated_at=now()
+		RETURNING id
+	`, projectID, cleanID(contextRow["pipeline_run_id"]), cleanID(contextRow["run_node_id"]), cleanID(contextRow["run_step_id"]), workItemID,
+		sourceType, sourceID, outcome.ActionKey, idempotencyKey, outcome.Status,
+		outcome.TargetType, cleanID(outcome.TargetID), outcome.BlockerReason, outcome.ErrorMessage, string(rawMetadata),
+		actorID, actorName)
+	if err != nil {
+		return err
+	}
+	eventID := ""
+	if len(rows) > 0 {
+		eventID = cleanID(rows[0]["id"])
+	}
+	if changed && workItemID != "" {
+		activityType := "system_event"
+		if outcome.Status == "blocked" {
+			activityType = "blocker"
+		}
+		activityMetadata := Record{
+			"automation_event_id": eventID,
+			"automation_action":   outcome.ActionKey,
+			"automation_status":   outcome.Status,
+			"target_type":         outcome.TargetType,
+			"target_id":           cleanID(outcome.TargetID),
+			"metadata":            metadata,
+		}
+		if outcome.BlockerReason != "" {
+			activityMetadata["blocker_reason"] = outcome.BlockerReason
+		}
+		if outcome.ErrorMessage != "" {
+			activityMetadata["error_message"] = outcome.ErrorMessage
+		}
+		rawActivityMetadata, _ := json.Marshal(activityMetadata)
+		comment := outcome.Message
+		if comment == "" {
+			comment = "Tự động hóa quy trình đã cập nhật trạng thái"
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, $4, $5, 'project', $6::jsonb)
+		`, workItemID, projectID, actorID, activityType, comment, string(rawActivityMetadata)); err != nil {
+			return err
+		}
+		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_automation_"+outcome.Status, "work_item", workItemID, comment, activityMetadata); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (r *Repository) RequestNodeApproval(ctx context.Context, nodeID, actorID, actorName, reason string) (Record, error) {
 	node, err := r.GetByID(ctx, "pipeline_run_nodes", nodeID)
 	if err != nil {
@@ -7276,7 +8151,7 @@ func (r *Repository) runEdgeConditionMet(ctx context.Context, tx *sql.Tx, edge, 
 			return false, "", err
 		}
 		matched := missing == 0
-		return matched, boolReason(matched, "all planned materials have been issued", "planned materials are still missing"), nil
+		return matched, boolReason(matched, "Vật tư theo kế hoạch đã xuất đủ", "Vật tư theo kế hoạch vẫn còn thiếu"), nil
 	case "boq_approved":
 		total, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM boq_items WHERE project_id=$1 AND status <> 'deleted'`, projectID)
 		if err != nil {
@@ -7287,7 +8162,7 @@ func (r *Repository) runEdgeConditionMet(ctx context.Context, tx *sql.Tx, edge, 
 			return false, "", err
 		}
 		matched := total > 0 && notApproved == 0
-		return matched, boolReason(matched, "all BOQ items are approved", "BOQ is missing or has unapproved items"), nil
+		return matched, boolReason(matched, "Tất cả dòng BOQ đã được duyệt", "BOQ đang thiếu dữ liệu hoặc còn dòng chưa duyệt"), nil
 	case "procurement_approved":
 		total, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM procurement_requests WHERE project_id=$1 AND status <> 'cancelled'`, projectID)
 		if err != nil {
@@ -7302,7 +8177,9 @@ func (r *Repository) runEdgeConditionMet(ctx context.Context, tx *sql.Tx, edge, 
 			return false, "", err
 		}
 		matched := total > 0 && notApproved == 0
-		return matched, boolReason(matched, "procurement requests are approved", "procurement is missing or has unapproved requests"), nil
+		return matched, boolReason(matched, "Yêu cầu mua/đầu vào đã được duyệt", "Thiếu yêu cầu mua/đầu vào hoặc còn yêu cầu chưa được duyệt"), nil
+	case "workflow_form_answer_equals":
+		return r.workflowFormAnswerEqualsCondition(ctx, tx, edge, projectID, nodeID)
 	case "handover_ready":
 		return r.handoverReadyCondition(ctx, tx, projectID)
 	case "financial_ready":
@@ -7318,10 +8195,149 @@ func (r *Repository) runEdgeConditionMet(ctx context.Context, tx *sql.Tx, edge, 
 			return false, "", err
 		}
 		matched := openDebt == 0
-		return matched, boolReason(matched, "no open payable or receivable balance", "payable or receivable balances are still open"), nil
+		return matched, boolReason(matched, "Không còn công nợ phải thu hoặc phải trả đang mở", "Công nợ phải thu hoặc phải trả vẫn còn mở"), nil
 	default:
-		return false, fmt.Sprintf("unsupported condition_type %s", edgeConditionType(edge)), nil
+		return false, fmt.Sprintf("Loại điều kiện chuyển bước chưa được hỗ trợ: %s", edgeConditionType(edge)), nil
 	}
+}
+
+func (r *Repository) workflowFormAnswerEqualsCondition(ctx context.Context, tx *sql.Tx, edge Record, projectID, runNodeID string) (bool, string, error) {
+	config := edgeConditionConfig(edge)
+	fieldKey := strings.TrimSpace(fmt.Sprint(config["field_key"]))
+	if fieldKey == "" || fieldKey == "<nil>" {
+		return false, "Điều kiện biểu mẫu quy trình thiếu field_key", nil
+	}
+	expected, hasExpected := config["value"]
+	if !hasExpected {
+		expected, hasExpected = config["expected_value"]
+	}
+	if !hasExpected {
+		return false, fmt.Sprintf("Điều kiện biểu mẫu quy trình %s thiếu giá trị mong đợi", fieldKey), nil
+	}
+	rows, err := queryTx(ctx, tx, `
+		SELECT answers_snapshot_json
+		FROM workflow_form_instances
+		WHERE project_id=$1
+			AND run_node_id=$2
+			AND status='submitted'
+			AND answers_snapshot_json ? $3
+		ORDER BY submitted_at DESC NULLS LAST, updated_at DESC, id DESC
+		LIMIT 1
+	`, projectID, runNodeID, fieldKey)
+	if err != nil {
+		return false, "", err
+	}
+	if len(rows) == 0 {
+		return false, fmt.Sprintf("Câu trả lời biểu mẫu quy trình %s chưa được gửi", fieldKey), nil
+	}
+	answers := recordFromAny(rows[0]["answers_snapshot_json"])
+	actual, ok := answers[fieldKey]
+	if !ok {
+		return false, fmt.Sprintf("Câu trả lời biểu mẫu quy trình %s đang thiếu", fieldKey), nil
+	}
+	matched := workflowFormAnswerValueMatches(actual, expected)
+	return matched, boolReason(
+		matched,
+		fmt.Sprintf("Câu trả lời biểu mẫu quy trình %s khớp %s", fieldKey, edgeExpectedDisplay(expected)),
+		fmt.Sprintf("Câu trả lời biểu mẫu quy trình %s không khớp %s", fieldKey, edgeExpectedDisplay(expected)),
+	), nil
+}
+
+func edgeConditionConfig(edge Record) Record {
+	return recordFromAny(edge["condition_config"])
+}
+
+func recordFromAny(value any) Record {
+	switch typed := value.(type) {
+	case Record:
+		return typed
+	case map[string]any:
+		return Record(typed)
+	default:
+		return Record{}
+	}
+}
+
+func workflowFormAnswerValueMatches(actual any, expected any) bool {
+	switch expectedValues := expected.(type) {
+	case []any:
+		for _, expectedValue := range expectedValues {
+			if workflowFormAnswerValueMatches(actual, expectedValue) {
+				return true
+			}
+		}
+		return false
+	case []string:
+		for _, expectedValue := range expectedValues {
+			if workflowFormAnswerValueMatches(actual, expectedValue) {
+				return true
+			}
+		}
+		return false
+	}
+	switch actualValues := actual.(type) {
+	case []any:
+		for _, actualValue := range actualValues {
+			if workflowFormAnswerValueMatches(actualValue, expected) {
+				return true
+			}
+		}
+		return false
+	case []string:
+		for _, actualValue := range actualValues {
+			if workflowFormAnswerValueMatches(actualValue, expected) {
+				return true
+			}
+		}
+		return false
+	}
+	if actualBool, ok := actual.(bool); ok {
+		expectedBool, err := strconv.ParseBool(strings.TrimSpace(fmt.Sprint(expected)))
+		return err == nil && actualBool == expectedBool
+	}
+	if expectedBool, ok := expected.(bool); ok {
+		actualBool, err := strconv.ParseBool(strings.TrimSpace(fmt.Sprint(actual)))
+		return err == nil && actualBool == expectedBool
+	}
+	if actualNumber, ok := strictFloat(actual); ok {
+		expectedNumber, expectedOK := strictFloat(expected)
+		return expectedOK && actualNumber == expectedNumber
+	}
+	if expectedNumber, ok := strictFloat(expected); ok {
+		actualNumber, actualOK := strictFloat(actual)
+		return actualOK && actualNumber == expectedNumber
+	}
+	return strings.EqualFold(strings.TrimSpace(fmt.Sprint(actual)), strings.TrimSpace(fmt.Sprint(expected)))
+}
+
+func strictFloat(value any) (float64, bool) {
+	switch typed := value.(type) {
+	case int:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	case float64:
+		return typed, true
+	case float32:
+		return float64(typed), true
+	case string:
+		text := strings.TrimSpace(typed)
+		if text == "" {
+			return 0, false
+		}
+		parsed, err := strconv.ParseFloat(text, 64)
+		return parsed, err == nil && !math.IsNaN(parsed)
+	default:
+		return 0, false
+	}
+}
+
+func edgeExpectedDisplay(value any) string {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return strings.TrimSpace(fmt.Sprint(value))
+	}
+	return string(raw)
 }
 
 func (r *Repository) edgeExists(ctx context.Context, tx *sql.Tx, passReason, failReason, query string, args ...any) (bool, string, error) {
@@ -7372,7 +8388,7 @@ func (r *Repository) handoverReadyCondition(ctx context.Context, tx *sql.Tx, pro
 		return false, "", err
 	}
 	matched := handoverReady > 0 && failedAcceptance == 0 && openIssues == 0 && pendingSurplus == 0
-	return matched, boolReason(matched, "handover checklist has no blockers", "handover still has blockers"), nil
+	return matched, boolReason(matched, "Hồ sơ bàn giao không còn blocker", "Hồ sơ bàn giao còn blocker"), nil
 }
 
 func (r *Repository) scalarNumberTx(ctx context.Context, tx *sql.Tx, query string, args ...any) (float64, error) {
@@ -7963,7 +8979,7 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 		return nil, err
 	}
 	if len(rows) == 0 {
-		return nil, errors.New("no BOQ items available to generate procurement")
+		return nil, errors.New("Không có dòng BOQ đủ điều kiện để sinh yêu cầu mua")
 	}
 	total := 0.0
 	for _, row := range rows {
@@ -8674,7 +9690,7 @@ func (r *Repository) HandoverCheck(ctx context.Context, id string) (Record, erro
 		blockers = append(blockers, "Chứng từ bàn giao chưa đủ")
 	}
 	if handover["warehouse_closed"] != true {
-		blockers = append(blockers, "Kho công trình chưa closure")
+		blockers = append(blockers, "Kho công trình chưa đóng")
 	}
 	if handover["payables_recorded"] != true {
 		blockers = append(blockers, "Công nợ đầu vào chưa ghi nhận")

@@ -1,0 +1,5 @@
+.gocache/
+uploads/
+seed/uploads/
+*.test
+.DS_Store
