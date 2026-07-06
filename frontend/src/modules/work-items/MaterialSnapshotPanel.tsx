@@ -58,7 +58,7 @@ type MaterialSnapshotPayload = {
 };
 
 const sourceOptions = [
-  { value: 'site_balance', label: 'Site balance' },
+  { value: 'site_balance', label: 'Tồn công trình' },
   { value: 'warehouse_issue', label: 'Xuất kho' },
   { value: 'subcontractor', label: 'Thầu phụ' },
   { value: 'other', label: 'Khác' },
@@ -126,7 +126,7 @@ export function MaterialSnapshotPanel({
 
   function buildPayload(requireComplete: boolean): MaterialSnapshotPayload | null {
     const invalid: string[] = [];
-    if (requireComplete && !snapshotDate) invalid.push('Ngày snapshot');
+    if (requireComplete && !snapshotDate) invalid.push('Ngày ghi nhận');
     if (requireComplete && rows.length === 0) invalid.push('Ít nhất một dòng vật tư');
 
     const payloadRows = rows.map((row, index) => {
@@ -145,7 +145,7 @@ export function MaterialSnapshotPanel({
       if (!unit) invalid.push(`${label}: đơn vị`);
       if ([before, added, after, waste].some((value) => value < 0 || !Number.isFinite(value))) invalid.push(`${label}: số lượng`);
       if (used < -0.000001) invalid.push(`${label}: KL dùng âm`);
-      if (row.affects_site_balance && !balanceByMaterialId.has(row.material_id)) invalid.push(`${label}: chưa có site balance`);
+      if (row.affects_site_balance && !balanceByMaterialId.has(row.material_id)) invalid.push(`${label}: chưa có tồn công trình`);
       if (requireComplete && row.affects_site_balance) {
         const available = balanceAvailable(balanceByMaterialId.get(row.material_id));
         if (used > available + 0.000001) invalid.push(`${label}: vượt tồn công trình`);
@@ -171,7 +171,7 @@ export function MaterialSnapshotPanel({
     });
 
     if (invalid.length) {
-      toast.warn({ title: 'Dữ liệu snapshot chưa hợp lệ', description: invalid.slice(0, 6).join(', ') });
+      toast.warn({ title: 'Dữ liệu ghi nhận vật tư chưa hợp lệ', description: invalid.slice(0, 6).join(', ') });
       return null;
     }
     return {
@@ -192,9 +192,9 @@ export function MaterialSnapshotPanel({
       if (!updated) return;
       resetFromResponse(updated);
       invalidate();
-      toast.success('Đã lưu nháp snapshot vật tư');
+      toast.success('Đã lưu nháp ghi nhận vật tư');
     },
-    onError: (error) => toast.error('Không lưu được snapshot vật tư', error),
+    onError: (error) => toast.error('Không lưu được ghi nhận vật tư', error),
   });
 
   const submitSnapshot = useMutation({
@@ -207,9 +207,9 @@ export function MaterialSnapshotPanel({
       if (!updated) return;
       resetFromResponse(updated);
       invalidate();
-      toast.success('Đã submit snapshot vật tư');
+      toast.success('Đã gửi ghi nhận vật tư');
     },
-    onError: (error) => toast.error('Không submit được snapshot vật tư', error),
+    onError: (error) => toast.error('Không gửi được ghi nhận vật tư', error),
   });
 
   const actionPending = snapshotQuery.isFetching || saveDraft.isPending || submitSnapshot.isPending;
@@ -244,7 +244,7 @@ export function MaterialSnapshotPanel({
         <h3 className="mb-2 text-sm font-semibold text-ink">Vật tư trước/sau</h3>
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-amber-900">Không tải được snapshot vật tư</p>
+            <p className="text-sm font-semibold text-amber-900">Không tải được ghi nhận vật tư</p>
             <button
               className="inline-flex items-center gap-2 rounded-md border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
               onClick={() => snapshotQuery.refetch()}
@@ -275,22 +275,22 @@ export function MaterialSnapshotPanel({
       <div className="rounded-md border border-line bg-white p-3">
         <div className="grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-5">
           <SummaryChip label="Dòng" value={summaryCount(record.summary_json, 'total', rows.length)} />
-          <SummaryChip label="Ảnh hưởng balance" value={summaryCount(record.summary_json, 'affects_site_balance')} tone="blue" />
-          <SummaryChip label="Đủ evidence" value={summaryCount(record.summary_json, 'complete_evidence')} tone="emerald" />
+          <SummaryChip label="Ảnh hưởng tồn công trình" value={summaryCount(record.summary_json, 'affects_site_balance')} tone="blue" />
+          <SummaryChip label="Đủ minh chứng" value={summaryCount(record.summary_json, 'complete_evidence')} tone="emerald" />
           <SummaryChip label="Hư hao" value={summaryCount(record.summary_json, 'with_waste_or_damage')} tone="amber" />
           <SummaryChip label="KL dùng" value={summaryNumber(record.summary_json, 'site_balance_used_total')} />
         </div>
 
         {locked ? (
           <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            Đã submit bởi {record.submitted_by_name ?? 'người dùng'} {record.submitted_at ? `ngày ${dateText(record.submitted_at)}` : ''}.
+            Đã gửi bởi {record.submitted_by_name ?? 'người dùng'} {record.submitted_at ? `ngày ${dateText(record.submitted_at)}` : ''}.
           </div>
         ) : null}
 
         <div className="mt-3 grid gap-3 lg:grid-cols-[180px_1fr]">
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="material-snapshot-date">
-              Ngày snapshot
+              Ngày ghi nhận
             </label>
             <input
               id="material-snapshot-date"
@@ -326,12 +326,12 @@ export function MaterialSnapshotPanel({
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             disabled={locked || actionPending}
-            placeholder="Ghi chú khi lưu / submit snapshot vật tư"
+            placeholder="Ghi chú khi lưu / gửi ghi nhận vật tư"
           />
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-          <p className="text-xs text-slate-500">Submit sẽ cộng KL dùng vào site material balance, không tạo stock movement.</p>
+          <p className="text-xs text-slate-500">Khi gửi, hệ thống sẽ cộng khối lượng dùng vào tồn công trình và không tạo phiếu xuất kho.</p>
           <button
             className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={locked || actionPending}
@@ -361,12 +361,12 @@ export function MaterialSnapshotPanel({
           </div>
         ) : (
           <div className="mt-3">
-            <EmptyState title="Chưa có dòng snapshot vật tư." />
+            <EmptyState title="Chưa có dòng ghi nhận vật tư." />
           </div>
         )}
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-          <p className="text-xs text-slate-500">{record.updated_at ? `Cập nhật ${dateText(record.updated_at)}` : 'Chưa lưu snapshot'}</p>
+          <p className="text-xs text-slate-500">{record.updated_at ? `Cập nhật ${dateText(record.updated_at)}` : 'Chưa lưu ghi nhận vật tư'}</p>
           <div className="flex flex-wrap justify-end gap-2">
             <button
               className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -382,7 +382,7 @@ export function MaterialSnapshotPanel({
               onClick={() => submitSnapshot.mutate()}
             >
               {submitSnapshot.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Submit snapshot
+              Gửi ghi nhận
             </button>
           </div>
         </div>
@@ -422,7 +422,7 @@ function MaterialSnapshotRow({
       <div className="min-w-0">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-semibold text-ink">Dòng {index + 1}</p>
-          {overAvailable ? <span className="rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">Vượt balance</span> : null}
+          {overAvailable ? <span className="rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">Vượt tồn công trình</span> : null}
         </div>
         <label className="mt-2 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`material-${row.item_index}`}>
           Vật tư
@@ -454,7 +454,7 @@ function MaterialSnapshotRow({
             value={row.material_name}
             onChange={(event) => onChange({ material_name: event.target.value })}
             disabled={disabled}
-            placeholder="Tên vật tư ngoài site balance"
+            placeholder="Tên vật tư ngoài tồn công trình"
           />
         ) : null}
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -498,12 +498,12 @@ function MaterialSnapshotRow({
             onChange={(event) => onChange({ affects_site_balance: event.target.checked })}
             disabled={disabled}
           />
-          Cộng KL dùng vào site balance khi submit
+          Cộng khối lượng dùng vào tồn công trình khi gửi
         </label>
         <p className="mt-1 text-xs text-slate-500">
           {row.affects_site_balance
-            ? `${material?.code ?? 'Balance'} · còn ${formatQty(available)} ${row.unit || material?.unit || ''}`
-            : 'Dòng ghi nhận báo cáo, không ảnh hưởng balance'}
+            ? `${material?.code ?? 'Tồn công trình'} · còn ${formatQty(available)} ${row.unit || material?.unit || ''}`
+            : 'Dòng ghi nhận báo cáo, không ảnh hưởng tồn công trình'}
         </p>
       </div>
 
@@ -528,7 +528,7 @@ function MaterialSnapshotRow({
 
       <div>
         <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`before-evidence-${row.item_index}`}>
-          Evidence trước
+          Minh chứng trước
         </label>
         <select
           id={`before-evidence-${row.item_index}`}
@@ -545,7 +545,7 @@ function MaterialSnapshotRow({
           ))}
         </select>
         <label className="mt-2 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`after-evidence-${row.item_index}`}>
-          Evidence sau
+          Minh chứng sau
         </label>
         <select
           id={`after-evidence-${row.item_index}`}
@@ -713,7 +713,16 @@ function materialLabel(material: MaterialCatalogItem) {
 }
 
 function evidenceLabel(evidence: EvidenceRecord) {
-  return `${evidence.name ?? evidence.title ?? evidence.id} (${evidence.status ?? 'submitted'})`;
+  return `${evidence.name ?? evidence.title ?? evidence.id} (${evidenceStatusLabel(evidence.status)})`;
+}
+
+function evidenceStatusLabel(status?: string) {
+  if (status === 'accepted') return 'đã chấp nhận';
+  if (status === 'rejected') return 'đã từ chối';
+  if (status === 'pending') return 'đang chờ';
+  if (status === 'draft') return 'nháp';
+  if (status === 'submitted') return 'đã gửi';
+  return status ?? 'đã gửi';
 }
 
 function formatQty(value: number) {

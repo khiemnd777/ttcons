@@ -45,7 +45,7 @@ export function WorkflowFormPanel({
   const fields = useMemo(() => form.data?.fields ?? [], [form.data?.fields]);
   const instance = form.data?.instance;
   const submitted = instance?.status === 'submitted';
-  const businessFormTitle = form.data?.template?.name ?? instance?.title ?? 'Biểu mẫu nghiệp vụ';
+  const businessFormTitle = form.data?.template?.name ?? instance?.title ?? 'Biểu mẫu quy trình';
   const signatures = form.data?.signatures ?? [];
   const pdfExports = form.data?.pdf_exports ?? [];
   const signedPurposesByCurrentUser = useMemo(
@@ -82,18 +82,18 @@ export function WorkflowFormPanel({
     mutationFn: () => put<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/draft`, { answers: values }),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã lưu nháp biểu mẫu nghiệp vụ');
+      toast.success('Đã lưu nháp biểu mẫu quy trình');
     },
-    onError: (error) => toast.error('Không lưu được biểu mẫu nghiệp vụ', error),
+    onError: (error) => toast.error('Không lưu được biểu mẫu quy trình', error),
   });
 
   const submitForm = useMutation({
     mutationFn: () => post<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/submit`, { answers: values }),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã submit biểu mẫu nghiệp vụ');
+      toast.success('Đã gửi biểu mẫu quy trình');
     },
-    onError: (error) => toast.error('Không submit được biểu mẫu nghiệp vụ', error),
+    onError: (error) => toast.error('Không gửi được biểu mẫu quy trình', error),
   });
 
   const signForm = useMutation({
@@ -102,18 +102,18 @@ export function WorkflowFormPanel({
     onSuccess: () => {
       setSignatureDialogOpen(false);
       invalidate();
-      toast.success('Đã ký và lưu visual stamp');
+      toast.success('Đã ký và lưu dấu ký trực quan');
     },
-    onError: (error) => toast.error('Không ký được biểu mẫu nghiệp vụ', error),
+    onError: (error) => toast.error('Không ký được biểu mẫu quy trình', error),
   });
 
   const generatePDF = useMutation({
     mutationFn: () => post<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/pdf-exports`, {}),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã generate PDF biểu mẫu nghiệp vụ');
+      toast.success('Đã tạo PDF biểu mẫu quy trình');
     },
-    onError: (error) => toast.error('Không generate được PDF', error),
+    onError: (error) => toast.error('Không tạo được PDF', error),
   });
 
   async function openProtectedBlob(path: string, fallbackTitle: string) {
@@ -149,7 +149,7 @@ export function WorkflowFormPanel({
     setErrors(nextErrors);
     const labels = fields.filter((field) => nextErrors[field.field_key]).map((field) => field.label);
     if (labels.length) {
-      toast.warn({ title: 'Thiếu dữ liệu biểu mẫu nghiệp vụ', description: labels.join(', ') });
+      toast.warn({ title: 'Thiếu dữ liệu biểu mẫu quy trình', description: labels.join(', ') });
       return false;
     }
     return true;
@@ -158,7 +158,7 @@ export function WorkflowFormPanel({
   if (form.isLoading) {
     return (
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu nghiệp vụ</h3>
+        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu quy trình</h3>
         <div className="rounded-md border border-line bg-white p-4">
           <LoadingSpinner />
         </div>
@@ -169,9 +169,9 @@ export function WorkflowFormPanel({
   if (form.isError) {
     return (
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu nghiệp vụ</h3>
+        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu quy trình</h3>
         <div className="rounded-md border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">
-          <p className="font-semibold">Không tải được biểu mẫu nghiệp vụ</p>
+          <p className="font-semibold">Không tải được biểu mẫu quy trình</p>
           <p className="mt-1 text-xs">{form.error instanceof Error ? form.error.message : 'Vui lòng thử lại.'}</p>
           <button
             type="button"
@@ -188,8 +188,8 @@ export function WorkflowFormPanel({
   if (!form.data?.available) {
     return (
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu nghiệp vụ</h3>
-        <EmptyState title="Step này chưa có biểu mẫu nghiệp vụ." />
+        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu quy trình</h3>
+        <EmptyState title="Bước này chưa có biểu mẫu quy trình." />
       </section>
     );
   }
@@ -234,7 +234,7 @@ export function WorkflowFormPanel({
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trường dữ liệu</p>
                 <h4 className="mt-0.5 text-sm font-semibold text-ink">Dữ liệu biểu mẫu</h4>
               </div>
-              <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{fields.length} fields</span>
+              <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{fields.length} trường</span>
             </div>
             <div className="grid gap-3 p-3 md:grid-cols-2">
               {fields.map((field) => (
@@ -250,7 +250,7 @@ export function WorkflowFormPanel({
               ))}
             </div>
             <div className="border-t border-line bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              {instance?.submitted_at ? `Submitted ${compactDateTime(instance.submitted_at)}` : `Updated ${compactDateTime(instance?.updated_at)}`}
+              {instance?.submitted_at ? `Đã gửi ${compactDateTime(instance.submitted_at)}` : `Cập nhật ${compactDateTime(instance?.updated_at)}`}
             </div>
           </section>
         </div>
@@ -258,7 +258,7 @@ export function WorkflowFormPanel({
         <aside className="min-w-0 space-y-3">
           <section className="rounded-md border border-line bg-white">
             <div className="border-b border-line bg-slate-50 px-3 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Artifact biểu mẫu</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tài liệu biểu mẫu</p>
               <h4 className="mt-0.5 text-sm font-semibold text-ink">Chữ ký và PDF</h4>
             </div>
             <div className="space-y-3 p-3">
@@ -276,7 +276,7 @@ export function WorkflowFormPanel({
                 submitted={submitted}
                 generating={generatePDF.isPending}
                 onGenerate={() => generatePDF.mutate()}
-                onOpen={(record) => void openProtectedBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF biểu mẫu nghiệp vụ')}
+                onOpen={(record) => void openProtectedBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF biểu mẫu quy trình')}
               />
             </div>
           </section>
@@ -320,36 +320,36 @@ const planningScopeLabels: Record<string, string> = {
 };
 
 const dailyResultLabels: Record<string, string> = {
-  done: 'Done',
-  partial: 'Partial',
-  blocked: 'Blocked',
+  done: 'Hoàn tất',
+  partial: 'Một phần',
+  blocked: 'Bị chặn',
 };
 
 const dailyPriorityLabels: Record<string, string> = {
-  low: 'Low',
-  normal: 'Normal',
-  high: 'High',
-  urgent: 'Urgent',
+  low: 'Thấp',
+  normal: 'Bình thường',
+  high: 'Cao',
+  urgent: 'Khẩn cấp',
 };
 
 const dailySeverityLabels: Record<string, string> = {
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  critical: 'Critical',
+  low: 'Thấp',
+  medium: 'Trung bình',
+  high: 'Cao',
+  critical: 'Nghiêm trọng',
 };
 
 const meetingAttendanceLabels: Record<string, string> = {
   present: 'Có mặt',
-  remote: 'Remote',
+  remote: 'Từ xa',
   absent: 'Vắng',
 };
 
 const checklistItemStatusLabels: Record<string, string> = {
-  done: 'Done',
-  not_applicable: 'N/A',
-  needs_follow_up: 'Needs follow-up',
-  blocked: 'Blocked',
+  done: 'Hoàn tất',
+  not_applicable: 'Không áp dụng',
+  needs_follow_up: 'Cần theo dõi',
+  blocked: 'Bị chặn',
 };
 
 function WorkflowFormActionCenter({
@@ -389,7 +389,7 @@ function WorkflowFormActionCenter({
             <StatusBadge status={status} />
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Biểu mẫu nghiệp vụ v{versionNo} · {submittedAt ? `Submitted ${compactDateTime(submittedAt)}` : `Updated ${compactDateTime(updatedAt)}`}
+            Biểu mẫu quy trình v{versionNo} · {submittedAt ? `Đã gửi ${compactDateTime(submittedAt)}` : `Cập nhật ${compactDateTime(updatedAt)}`}
           </p>
           <div className="mt-3 flex items-start gap-2">
             <span className={clsx('mt-0.5 rounded-md p-1.5', blocked ? 'bg-white text-amber-700' : 'bg-blue-50 text-blue-700')}>
@@ -397,10 +397,10 @@ function WorkflowFormActionCenter({
             </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-ink">
-                {blocked ? 'Cần hoàn tất dữ liệu trước submit' : submitted ? 'Form đã submit, chuyển sang artifact' : 'Sẵn sàng lưu nháp hoặc submit'}
+                {blocked ? 'Cần hoàn tất dữ liệu trước khi gửi' : submitted ? 'Biểu mẫu đã gửi, chuyển sang tài liệu' : 'Sẵn sàng lưu nháp hoặc gửi'}
               </p>
               <p className="mt-1 text-xs leading-5 text-slate-600">
-                {blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung form đã khóa; chữ ký và PDF dùng revision đã submit.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
+                {blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung biểu mẫu đã khóa; chữ ký và PDF dùng phiên bản đã gửi.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
               </p>
             </div>
           </div>
@@ -422,7 +422,7 @@ function WorkflowFormActionCenter({
             onClick={onSubmit}
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Submit biểu mẫu
+            Gửi biểu mẫu
           </button>
         </div>
       </div>
@@ -454,10 +454,10 @@ function WorkflowFormOperationsSummary({
           <h4 className="mt-0.5 text-sm font-semibold text-ink">Việc tiếp theo: {nextAction}</h4>
         </div>
         <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[36rem]">
-          <WorkflowStepPill label="Checklist" value={checklistStats ? `${checklistStats.complete}/${checklistStats.total} done` : 'N/A'} active={!submitted && Boolean(checklistStats?.needsAction)} />
-          <WorkflowStepPill label="Evidence" value={`${evidenceCount} active`} active={!submitted && evidenceCount === 0} />
-          <WorkflowStepPill label="Signature" value={`${signatures.length} signed`} active={submitted && signatures.length === 0} />
-          <WorkflowStepPill label="PDF" value={`${pdfExports.length} file`} active={submitted && signatures.length > 0 && pdfExports.length === 0} />
+          <WorkflowStepPill label="Checklist" value={checklistStats ? `${checklistStats.complete}/${checklistStats.total} hoàn tất` : 'Không áp dụng'} active={!submitted && Boolean(checklistStats?.needsAction)} />
+          <WorkflowStepPill label="Minh chứng" value={`${evidenceCount} đang hiệu lực`} active={!submitted && evidenceCount === 0} />
+          <WorkflowStepPill label="Chữ ký" value={`${signatures.length} đã ký`} active={submitted && signatures.length === 0} />
+          <WorkflowStepPill label="PDF" value={`${pdfExports.length} tệp`} active={submitted && signatures.length > 0 && pdfExports.length === 0} />
         </div>
       </div>
     </section>
@@ -468,14 +468,14 @@ function WorkflowFormEventsPanel({ events }: { events: AnyRecord[] }) {
   return (
     <section className="rounded-md border border-line bg-white">
       <div className="border-b border-line bg-slate-50 px-3 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lịch sử form</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lịch sử biểu mẫu</p>
         <h4 className="mt-0.5 text-sm font-semibold text-ink">Sự kiện gần nhất</h4>
       </div>
       <div className="divide-y divide-line">
         {events.slice(0, 5).map((event) => (
           <div key={String(event.id)} className="px-3 py-2">
             <p className="text-xs font-semibold text-ink">{enumLabel('event_type', String(event.event_type))}</p>
-            <p className="mt-1 text-xs text-slate-500">{event.actor_name ?? 'System'} · {compactDateTime(event.created_at)}</p>
+            <p className="mt-1 text-xs text-slate-500">{event.actor_name ?? 'Hệ thống'} · {compactDateTime(event.created_at)}</p>
           </div>
         ))}
       </div>
@@ -491,22 +491,22 @@ function PlanningDailyReportSummary({ values, submitted }: { values: AnyRecord; 
     <section className="mb-4 rounded-md border border-emerald-100 bg-emerald-50 p-3">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink">Daily report kế hoạch</p>
+          <p className="text-sm font-semibold text-ink">Nhật ký kế hoạch</p>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            {submitted ? 'Report đã submit; các hạng mục sẽ làm đã được dùng để sinh next-plan work item.' : 'Hoàn tất phần Đã làm và Sẽ làm trước khi submit report.'}
+            {submitted ? 'Nhật ký đã gửi; các hạng mục sẽ làm đã được dùng để sinh đầu việc kế hoạch tiếp theo.' : 'Hoàn tất phần Đã làm và Sẽ làm trước khi gửi nhật ký.'}
           </p>
         </div>
         <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[40rem]">
           <WorkflowStepPill label="Ngày" value={dateText(values.report_date)} active={!values.report_date} />
-          <WorkflowStepPill label="Reporter" value={textOrDash(values.reported_by)} active={!values.reported_by} />
-          <WorkflowStepPill label="Scope" value={planningScopeLabel(values.planning_scope)} active={!values.planning_scope} />
-          <WorkflowStepPill label="Progress" value={values.progress_percent === undefined ? '-' : percent(values.progress_percent)} active={false} />
+          <WorkflowStepPill label="Người báo cáo" value={textOrDash(values.reported_by)} active={!values.reported_by} />
+          <WorkflowStepPill label="Phạm vi" value={planningScopeLabel(values.planning_scope)} active={!values.planning_scope} />
+          <WorkflowStepPill label="Tiến độ" value={values.progress_percent === undefined ? '-' : percent(values.progress_percent)} active={false} />
         </div>
       </div>
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
         <DailyReportList title="Đã làm" items={completedItems} empty="Chưa có hạng mục đã làm." meta={completedItemMeta} />
         <DailyReportList title="Sẽ làm" items={nextPlanItems} empty="Chưa có việc sẽ làm." meta={nextPlanItemMeta} />
-        <DailyReportList title="Blocker / Risk" items={blockers} empty="Chưa có blocker." meta={blockerItemMeta} />
+        <DailyReportList title="Điểm chặn / Rủi ro" items={blockers} empty="Chưa có điểm chặn." meta={blockerItemMeta} />
       </div>
     </section>
   );
@@ -530,14 +530,14 @@ function MeetingMinutesSummary({ values, submitted }: { values: AnyRecord; submi
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">{textOrDash(values.meeting_title) === '-' ? 'Biên bản họp' : textOrDash(values.meeting_title)}</p>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            {submitted ? 'Biên bản đã submit; action items được dùng để sinh work item theo workflow form.' : 'Hoàn tất người tham dự, quyết định và action items trước khi submit biên bản.'}
+            {submitted ? 'Biên bản đã gửi; đầu việc được dùng để sinh đầu việc theo biểu mẫu quy trình.' : 'Hoàn tất người tham dự, quyết định và đầu việc trước khi gửi biên bản.'}
           </p>
         </div>
         <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[40rem]">
           <WorkflowStepPill label="Ngày họp" value={dateText(values.meeting_date)} active={!values.meeting_date} />
           <WorkflowStepPill label="Chủ trì" value={textOrDash(values.chair)} active={!values.chair} />
           <WorkflowStepPill label="Tham dự" value={`${attendeeCount} người`} active={!attendeeCount} />
-          <WorkflowStepPill label="Action" value={`${actionCount} item`} active={!submitted && actionCount > 0} />
+          <WorkflowStepPill label="Đầu việc" value={`${actionCount} mục`} active={!submitted && actionCount > 0} />
         </div>
       </div>
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
@@ -547,7 +547,7 @@ function MeetingMinutesSummary({ values, submitted }: { values: AnyRecord; submi
           fallbackText={attendeesText}
           empty="Chưa có người tham dự."
           meta={meetingAttendeeMeta}
-          countLabel={attendees.length ? `${presentCount} present · ${remoteCount} remote` : undefined}
+          countLabel={attendees.length ? `${presentCount} có mặt · ${remoteCount} từ xa` : undefined}
         />
         <MeetingSummaryList
           title="Quyết định"
@@ -557,15 +557,15 @@ function MeetingMinutesSummary({ values, submitted }: { values: AnyRecord; submi
           meta={meetingDecisionMeta}
         />
         <MeetingSummaryList
-          title="Action items"
+          title="Đầu việc"
           items={actionItems}
           fallbackText={actionItemsText}
-          empty="Chưa có action item."
+          empty="Chưa có đầu việc."
           meta={meetingActionItemMeta}
         />
       </div>
       <div className="mt-3 rounded-md border border-indigo-100 bg-white/80 px-3 py-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Agenda</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nội dung họp</p>
         <p className="mt-1 line-clamp-3 whitespace-pre-wrap break-words text-xs leading-5 text-slate-600">{textOrDash(values.agenda)}</p>
       </div>
     </section>
@@ -593,28 +593,28 @@ function PlanningChecklistSummary({ values, submitted }: { values: AnyRecord; su
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">Checklist kế hoạch</p>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            {submitted ? 'Checklist đã submit; completion payload lưu lại checklist_items để audit step.' : 'Submit chỉ được phép khi mọi item ở trạng thái Done hoặc N/A.'}
+            {submitted ? 'Checklist đã gửi; dữ liệu hoàn tất được lưu lại để kiểm tra bước.' : 'Chỉ được gửi khi mọi dòng ở trạng thái Hoàn tất hoặc Không áp dụng.'}
           </p>
         </div>
         <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[40rem]">
           <WorkflowStepPill label="Ngày" value={dateText(values.check_date)} active={!values.check_date} />
-          <WorkflowStepPill label="Scope" value={planningScopeLabel(values.planning_scope)} active={!values.planning_scope} />
-          <WorkflowStepPill label="Checked by" value={textOrDash(values.checked_by)} active={!values.checked_by} />
-          <WorkflowStepPill label="Evidence" value={`${evidenceLinked}/${itemCount} linked`} active={!submitted && evidenceMissing > 0} />
+          <WorkflowStepPill label="Phạm vi" value={planningScopeLabel(values.planning_scope)} active={!values.planning_scope} />
+          <WorkflowStepPill label="Người kiểm tra" value={textOrDash(values.checked_by)} active={!values.checked_by} />
+          <WorkflowStepPill label="Minh chứng" value={`${evidenceLinked}/${itemCount} đã liên kết`} active={!submitted && evidenceMissing > 0} />
         </div>
       </div>
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
-        <PlanningChecklistList title="Done / N/A" items={items.filter((item) => ['done', 'not_applicable'].includes(String(item.status ?? '')))} fallbackText={items.length ? '' : itemsDoneText} empty="Chưa có item Done/N/A." />
-        <PlanningChecklistList title="Needs action" items={items.filter((item) => !['done', 'not_applicable'].includes(String(item.status ?? '')))} fallbackText={items.length ? '' : exceptionsText} empty="Không có item cần xử lý." />
+        <PlanningChecklistList title="Hoàn tất / Không áp dụng" items={items.filter((item) => ['done', 'not_applicable'].includes(String(item.status ?? '')))} fallbackText={items.length ? '' : itemsDoneText} empty="Chưa có dòng hoàn tất/không áp dụng." />
+        <PlanningChecklistList title="Cần xử lý" items={items.filter((item) => !['done', 'not_applicable'].includes(String(item.status ?? '')))} fallbackText={items.length ? '' : exceptionsText} empty="Không có dòng cần xử lý." />
         <div className="min-w-0 rounded-md bg-white/80 p-3 ring-1 ring-inset ring-white">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tổng quan</p>
             <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{itemCount}</span>
           </div>
           <div className="grid gap-2 text-xs font-semibold text-slate-600">
-            <WorkflowStepPill label="Complete" value={`${doneCount}/${itemCount} done`} active={false} />
-            <WorkflowStepPill label="Needs action" value={`${needsActionCount} item`} active={!submitted && needsActionCount > 0} />
-            <WorkflowStepPill label="Evidence missing" value={`${evidenceMissing} item`} active={!submitted && evidenceMissing > 0} />
+            <WorkflowStepPill label="Hoàn tất" value={`${doneCount}/${itemCount} hoàn tất`} active={false} />
+            <WorkflowStepPill label="Cần xử lý" value={`${needsActionCount} dòng`} active={!submitted && needsActionCount > 0} />
+            <WorkflowStepPill label="Thiếu minh chứng" value={`${evidenceMissing} dòng`} active={!submitted && evidenceMissing > 0} />
           </div>
         </div>
       </div>
@@ -653,7 +653,7 @@ function DailyReportList({
               <p className="mt-1 break-words text-xs text-slate-500">{meta(item)}</p>
             </article>
           ))}
-          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong form</p> : null}
+          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong biểu mẫu</p> : null}
         </div>
       ) : (
         <p className="rounded-md border border-dashed border-line bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">{empty}</p>
@@ -691,7 +691,7 @@ function PlanningChecklistList({
               <p className="mt-1 break-words text-xs text-slate-500">{planningChecklistItemMeta(item)}</p>
             </article>
           ))}
-          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong form</p> : null}
+          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong biểu mẫu</p> : null}
         </div>
       ) : fallbackText ? (
         <p className="line-clamp-5 whitespace-pre-wrap break-words rounded-md border border-line bg-white px-3 py-2 text-xs leading-5 text-slate-600">{fallbackText}</p>
@@ -735,7 +735,7 @@ function MeetingSummaryList({
               <p className="mt-1 break-words text-xs text-slate-500">{meta(item)}</p>
             </article>
           ))}
-          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong form</p> : null}
+          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong biểu mẫu</p> : null}
         </div>
       ) : fallbackText ? (
         <p className="line-clamp-5 whitespace-pre-wrap break-words rounded-md border border-line bg-white px-3 py-2 text-xs leading-5 text-slate-600">{fallbackText}</p>
@@ -756,11 +756,11 @@ function WorkflowStepPill({ label, value, active }: { label: string; value: stri
 }
 
 function workflowNextAction(submitted: boolean, validationIssueCount: number, signatureCount: number, pdfCount: number) {
-  if (!submitted && validationIssueCount > 0) return 'Hoàn tất checklist/form';
-  if (!submitted) return 'Submit biểu mẫu nghiệp vụ';
+  if (!submitted && validationIssueCount > 0) return 'Hoàn tất checklist/biểu mẫu';
+  if (!submitted) return 'Gửi biểu mẫu quy trình';
   if (signatureCount === 0) return 'Ký / đóng dấu PDF';
-  if (pdfCount === 0) return 'Generate PDF';
-  return 'Mở artifact hoặc hoàn tất work item';
+  if (pdfCount === 0) return 'Tạo PDF';
+  return 'Mở tài liệu hoặc hoàn tất đầu việc';
 }
 
 function dailyItemTitle(item: AnyRecord, fallback: string) {
@@ -771,24 +771,24 @@ function dailyItemTitle(item: AnyRecord, fallback: string) {
 function completedItemMeta(item: AnyRecord) {
   return [
     dailyResultLabels[String(item.result ?? '')] ?? item.result,
-    item.owner_role ? `Owner: ${item.owner_role}` : '',
+    item.owner_role ? `Phụ trách: ${item.owner_role}` : '',
   ].filter(Boolean).join(' · ') || '-';
 }
 
 function nextPlanItemMeta(item: AnyRecord) {
   return [
     dailyPriorityLabels[String(item.priority ?? '')] ?? item.priority,
-    item.owner_role || item.owner_name ? `Owner: ${[item.owner_role, item.owner_name].filter(Boolean).join(' / ')}` : '',
-    item.due_date ? `Due: ${dateText(item.due_date)}` : '',
+    item.owner_role || item.owner_name ? `Phụ trách: ${[item.owner_role, item.owner_name].filter(Boolean).join(' / ')}` : '',
+    item.due_date ? `Hạn: ${dateText(item.due_date)}` : '',
   ].filter(Boolean).join(' · ') || '-';
 }
 
 function blockerItemMeta(item: AnyRecord) {
   return [
-    item.impact ? `Impact: ${item.impact}` : '',
+    item.impact ? `Ảnh hưởng: ${item.impact}` : '',
     dailySeverityLabels[String(item.severity ?? '')] ?? item.severity,
-    item.owner_role ? `Owner: ${item.owner_role}` : '',
-    item.target_date ? `Target: ${dateText(item.target_date)}` : '',
+    item.owner_role ? `Phụ trách: ${item.owner_role}` : '',
+    item.target_date ? `Mốc: ${dateText(item.target_date)}` : '',
   ].filter(Boolean).join(' · ') || '-';
 }
 
@@ -806,16 +806,16 @@ function meetingAttendeeMeta(item: AnyRecord) {
 
 function meetingDecisionMeta(item: AnyRecord) {
   return [
-    item.owner ? `Owner: ${item.owner}` : '',
-    item.target ? `Target: ${dateText(item.target)}` : '',
+    item.owner ? `Phụ trách: ${item.owner}` : '',
+    item.target ? `Mốc: ${dateText(item.target)}` : '',
   ].filter(Boolean).join(' · ') || '-';
 }
 
 function meetingActionItemMeta(item: AnyRecord) {
   return [
     dailyPriorityLabels[String(item.priority ?? '')] ?? item.priority,
-    item.owner_role || item.owner_name ? `Owner: ${[item.owner_role, item.owner_name].filter(Boolean).join(' / ')}` : '',
-    item.due_date ? `Due: ${dateText(item.due_date)}` : '',
+    item.owner_role || item.owner_name ? `Phụ trách: ${[item.owner_role, item.owner_name].filter(Boolean).join(' / ')}` : '',
+    item.due_date ? `Hạn: ${dateText(item.due_date)}` : '',
   ].filter(Boolean).join(' · ') || '-';
 }
 
@@ -826,15 +826,15 @@ function meetingAttendanceLabel(value: unknown) {
 
 function planningChecklistItemTitle(item: AnyRecord) {
   const title = String(item.title ?? item.content ?? '').trim();
-  return title || 'Checklist item';
+  return title || 'Dòng checklist';
 }
 
 function planningChecklistItemMeta(item: AnyRecord) {
   return [
     checklistItemStatusLabel(item.status),
-    item.assignee_role || item.assignee_name ? `Assignee: ${[item.assignee_role, item.assignee_name].filter(Boolean).join(' / ')}` : '',
-    item.due_date ? `Due: ${dateText(item.due_date)}` : '',
-    item.evidence_id ? 'Evidence linked' : 'Evidence missing',
+    item.assignee_role || item.assignee_name ? `Người phụ trách: ${[item.assignee_role, item.assignee_name].filter(Boolean).join(' / ')}` : '',
+    item.due_date ? `Hạn: ${dateText(item.due_date)}` : '',
+    item.evidence_id ? 'Đã liên kết minh chứng' : 'Thiếu minh chứng',
   ].filter(Boolean).join(' · ') || '-';
 }
 
@@ -875,7 +875,7 @@ function WorkflowSignaturePanel({
     <section className="rounded-md border border-line bg-slate-50 p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-ink">Chữ ký</h4>
-        {signatures.length ? <span className="text-xs font-semibold text-slate-500">{signatures.length} signed</span> : null}
+        {signatures.length ? <span className="text-xs font-semibold text-slate-500">{signatures.length} đã ký</span> : null}
       </div>
       {signatures.length ? (
         <div className="space-y-2">
@@ -885,13 +885,13 @@ function WorkflowSignaturePanel({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink">{signature.signer_name}</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {signaturePurposeLabel(signature.purpose)} · Rev {signature.form_revision_no} · {compactDateTime(signature.signed_at)}
+                    {signaturePurposeLabel(signature.purpose)} · Phiên bản {signature.form_revision_no} · {compactDateTime(signature.signed_at)}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Roles: {signatureRolesText(signature)} · payload {shortHash(signature.payload_hash)}
+                    Vai trò: {signatureRolesText(signature)} · mã nội dung {shortHash(signature.payload_hash)}
                   </p>
                   {signature.visual_checksum_sha256 ? (
-                    <p className="mt-1 text-xs text-slate-500">visual sha256:{signature.visual_checksum_sha256.slice(0, 12)}</p>
+                    <p className="mt-1 text-xs text-slate-500">dấu ký sha256:{signature.visual_checksum_sha256.slice(0, 12)}</p>
                   ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -910,12 +910,12 @@ function WorkflowSignaturePanel({
                       onClick={() => onOpenVisual(signature)}
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
-                      Visual
+                      Dấu ký
                     </button>
                   ) : null}
                   <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    immutable
+                    Không thể chỉnh sửa
                   </span>
                 </div>
               </div>
@@ -925,12 +925,12 @@ function WorkflowSignaturePanel({
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-line px-3 py-4 text-sm font-medium text-slate-500">
-          {submitted ? 'Chưa có chữ ký nội bộ.' : 'Submit biểu mẫu trước khi ký nội bộ.'}
+          {submitted ? 'Chưa có chữ ký nội bộ.' : 'Gửi biểu mẫu trước khi ký nội bộ.'}
         </div>
       )}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs text-slate-500">
-          {!submitted ? 'Submit biểu mẫu trước khi ký.' : signedByCurrentUser ? 'Bạn đã ký Internal ack; vẫn có thể ký purpose khác nếu cần.' : 'Canvas signature sẽ được lưu như protected asset.'}
+          {!submitted ? 'Gửi biểu mẫu trước khi ký.' : signedByCurrentUser ? 'Bạn đã ký xác nhận nội bộ; vẫn có thể ký mục đích khác nếu cần.' : 'Chữ ký canvas sẽ được lưu như tệp được bảo vệ.'}
         </div>
         <button
           type="button"
@@ -960,12 +960,12 @@ function SignatureDetailDialog({
     <Dialog
       open={Boolean(signature)}
       title="Chi tiết chữ ký"
-      description="Actor, purpose, revision và hash được ghi lại cùng record chữ ký."
+      description="Người thao tác, mục đích, phiên bản và mã kiểm tra được ghi lại cùng bản ghi chữ ký."
       size="lg"
       onClose={onClose}
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-slate-500">Payload hash dùng để đối chiếu nội dung form tại thời điểm ký.</p>
+          <p className="text-xs text-slate-500">Mã nội dung dùng để đối chiếu nội dung biểu mẫu tại thời điểm ký.</p>
           <div className="flex flex-wrap justify-end gap-2">
             {signature.visual_storage_key ? (
               <button
@@ -974,7 +974,7 @@ function SignatureDetailDialog({
                 onClick={() => onOpenVisual(signature)}
               >
                 <ExternalLink className="h-4 w-4" />
-                Mở visual
+                Mở dấu ký
               </button>
             ) : null}
             <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>
@@ -986,26 +986,26 @@ function SignatureDetailDialog({
     >
       <div className="space-y-4">
         <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
-          <p className="text-sm font-semibold text-emerald-900">Immutable signature record</p>
+          <p className="text-sm font-semibold text-emerald-900">Bản ghi chữ ký không thể chỉnh sửa</p>
           <p className="mt-1 text-xs leading-5 text-emerald-800">
-            Chữ ký này được lưu append-only theo form instance, signer, purpose và revision. Nếu cần thay đổi nội dung, cần tạo revision/form mới thay vì sửa record ký.
+            Chữ ký này được lưu chỉ thêm mới theo biểu mẫu, người ký, mục đích và phiên bản. Nếu cần thay đổi nội dung, cần tạo phiên bản/biểu mẫu mới thay vì sửa bản ghi ký.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <SignatureDetailField label="Signer" value={signature.signer_name || '-'} />
-          <SignatureDetailField label="Signer user ID" value={signature.signer_user_id || '-'} mono />
-          <SignatureDetailField label="Purpose" value={signaturePurposeLabel(signature.purpose)} />
-          <SignatureDetailField label="Signed at" value={compactDateTime(signature.signed_at)} />
-          <SignatureDetailField label="Form revision" value={`Rev ${signature.form_revision_no}`} />
-          <SignatureDetailField label="Roles at signing" value={signatureRolesText(signature)} />
-          <SignatureDetailField label="Visual artifact" value={signatureVisualText(signature)} />
-          <SignatureDetailField label="Visual provider" value={signature.visual_storage_provider || '-'} />
+          <SignatureDetailField label="Người ký" value={signature.signer_name || '-'} />
+          <SignatureDetailField label="ID người ký" value={signature.signer_user_id || '-'} mono />
+          <SignatureDetailField label="Mục đích" value={signaturePurposeLabel(signature.purpose)} />
+          <SignatureDetailField label="Thời điểm ký" value={compactDateTime(signature.signed_at)} />
+          <SignatureDetailField label="Phiên bản biểu mẫu" value={`Phiên bản ${signature.form_revision_no}`} />
+          <SignatureDetailField label="Vai trò lúc ký" value={signatureRolesText(signature)} />
+          <SignatureDetailField label="Tệp dấu ký" value={signatureVisualText(signature)} />
+          <SignatureDetailField label="Nơi lưu dấu ký" value={signature.visual_storage_provider || '-'} />
         </div>
-        <SignatureHashBlock label="Payload hash" value={signature.payload_hash} />
-        <SignatureHashBlock label="Visual checksum sha256" value={signature.visual_checksum_sha256} />
+        <SignatureHashBlock label="Mã nội dung" value={signature.payload_hash} />
+        <SignatureHashBlock label="Checksum dấu ký sha256" value={signature.visual_checksum_sha256} />
         {signature.comment ? (
           <div className="rounded-md border border-line bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Comment</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ghi chú</p>
             <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{signature.comment}</p>
           </div>
         ) : null}
@@ -1048,7 +1048,7 @@ function WorkflowPDFExportPanel({
   return (
     <section className="rounded-md border border-line bg-slate-50 p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-ink">PDF artifacts</h4>
+        <h4 className="text-sm font-semibold text-ink">Tệp PDF</h4>
         <button
           type="button"
           className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1056,7 +1056,7 @@ function WorkflowPDFExportPanel({
           onClick={onGenerate}
         >
           {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-          Generate PDF
+          Tạo PDF
         </button>
       </div>
       {exports.length ? (
@@ -1067,7 +1067,7 @@ function WorkflowPDFExportPanel({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink">{record.file_name}</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Rev {record.form_revision_no} · {compactDateTime(record.generated_at)} · sha256:{record.checksum_sha256.slice(0, 12)}
+                    Phiên bản {record.form_revision_no} · {compactDateTime(record.generated_at)} · sha256:{record.checksum_sha256.slice(0, 12)}
                   </p>
                 </div>
                 <button
@@ -1084,7 +1084,7 @@ function WorkflowPDFExportPanel({
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-line px-3 py-4 text-sm font-medium text-slate-500">
-          {submitted ? 'Chưa generate PDF cho biểu mẫu này.' : 'Submit biểu mẫu trước khi generate PDF.'}
+          {submitted ? 'Chưa tạo PDF cho biểu mẫu này.' : 'Gửi biểu mẫu trước khi tạo PDF.'}
         </div>
       )}
     </section>
@@ -1113,7 +1113,7 @@ function signatureVisualText(signature: WorkflowFormSignature) {
   return [
     signature.visual_mime_type,
     signature.visual_file_size ? fileSizeText(signature.visual_file_size) : undefined,
-    signature.visual_storage_key ? 'protected asset' : undefined,
+    signature.visual_storage_key ? 'tệp được bảo vệ' : undefined,
   ].filter(Boolean).join(' · ') || '-';
 }
 
@@ -1126,16 +1126,16 @@ function fileSizeText(value: number) {
 function signaturePurposeLabel(purpose?: string) {
   switch (purpose) {
     case 'prepared_by':
-      return 'Prepared by';
+      return 'Người lập';
     case 'reviewed_by':
-      return 'Reviewed by';
+      return 'Người rà soát';
     case 'approved_by':
-      return 'Approved by';
+      return 'Người phê duyệt';
     case 'received_by':
-      return 'Received by';
+      return 'Người nhận';
     case 'internal_ack':
     default:
-      return 'Internal ack';
+      return 'Xác nhận nội bộ';
   }
 }
 
@@ -1216,7 +1216,7 @@ function renderFieldControl(
     const selectableEvidence = evidence.filter((record) => record.status !== 'rejected');
     return (
       <select className={controlClassName} value={textValue(value)} disabled={disabled || selectableEvidence.length === 0} onChange={(event) => onChange(event.target.value)}>
-        <option value="">{selectableEvidence.length ? 'Chọn evidence' : 'Chưa có evidence'}</option>
+        <option value="">{selectableEvidence.length ? 'Chọn minh chứng' : 'Chưa có minh chứng'}</option>
         {selectableEvidence.map((record) => (
           <option key={record.id} value={record.id}>{evidenceOptionLabel(record)}</option>
         ))}
@@ -1285,7 +1285,7 @@ function validateFieldValue(field: WorkflowFormField, value: unknown) {
       }
     }
     if (field.field_key === 'checklist_items' && !['done', 'not_applicable'].includes(String(row.status ?? ''))) {
-      return `${field.label} dòng ${rowIndex + 1}: status phải là Done hoặc N/A trước khi submit`;
+      return `${field.label} dòng ${rowIndex + 1}: trạng thái phải là Hoàn tất hoặc Không áp dụng trước khi gửi`;
     }
   }
   return '';
@@ -1407,10 +1407,10 @@ function ChecklistStructuredListControl({
     <div className={clsx('mt-1 rounded-md border p-2', invalid ? 'border-rose-300 bg-rose-50' : 'border-line bg-white')}>
       <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
-          <ChecklistStat label="Rows" value={stats.total} />
-          <ChecklistStat label="Done/N/A" value={stats.complete} />
-          <ChecklistStat label="Needs action" value={stats.needsAction} tone={stats.needsAction ? 'warn' : 'ok'} />
-          <ChecklistStat label="Evidence" value={stats.withEvidence} />
+          <ChecklistStat label="Dòng" value={stats.total} />
+          <ChecklistStat label="Hoàn tất/Không áp dụng" value={stats.complete} />
+          <ChecklistStat label="Cần xử lý" value={stats.needsAction} tone={stats.needsAction ? 'warn' : 'ok'} />
+          <ChecklistStat label="Minh chứng" value={stats.withEvidence} />
         </div>
         <button
           type="button"
@@ -1430,7 +1430,7 @@ function ChecklistStructuredListControl({
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">#{rowIndex + 1}</span>
                   <StatusBadge status={textValue(row.status || 'draft')} />
-                  {row.evidence_id ? <span className="truncate text-xs font-medium text-slate-500">Evidence linked</span> : null}
+                  {row.evidence_id ? <span className="truncate text-xs font-medium text-slate-500">Đã liên kết minh chứng</span> : null}
                 </div>
                 <button
                   type="button"
@@ -1519,7 +1519,7 @@ function StructuredCell({
         </select>
       ) : spec.type === 'evidence_reference' ? (
         <select className={className} value={textValue(value)} disabled={disabled || selectableEvidence.length === 0} onChange={(event) => onChange(event.target.value)}>
-          <option value="">{selectableEvidence.length ? 'Chọn evidence' : 'Chưa có evidence'}</option>
+          <option value="">{selectableEvidence.length ? 'Chọn minh chứng' : 'Chưa có minh chứng'}</option>
           {selectableEvidence.map((record) => (
             <option key={record.id} value={record.id}>
               {evidenceOptionLabel(record)}

@@ -22,17 +22,17 @@ type EvidenceGalleryProps = {
 };
 
 const filters: Array<{ id: EvidenceFilter; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'photo', label: 'Photo' },
-  { id: 'document', label: 'Document' },
-  { id: 'submitted', label: 'Submitted' },
-  { id: 'accepted', label: 'Accepted' },
-  { id: 'rejected', label: 'Rejected' },
+  { id: 'all', label: 'Tất cả' },
+  { id: 'photo', label: 'Ảnh' },
+  { id: 'document', label: 'Tài liệu' },
+  { id: 'submitted', label: 'Đã gửi' },
+  { id: 'accepted', label: 'Đã duyệt' },
+  { id: 'rejected', label: 'Từ chối' },
 ];
 
 export function EvidenceGallery({
   evidence,
-  emptyTitle = 'Chưa có evidence',
+  emptyTitle = 'Chưa có minh chứng',
   showWorkItem = false,
   variant = 'cards',
   onReview,
@@ -63,7 +63,7 @@ export function EvidenceGallery({
         window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
       } catch (error) {
         viewer?.close();
-        toast.error('Không mở được file evidence', error);
+        toast.error('Không mở được tệp minh chứng', error);
       }
       return;
     }
@@ -71,14 +71,14 @@ export function EvidenceGallery({
       window.open(record.file_url, '_blank', 'noopener,noreferrer');
       return;
     }
-    toast.warn({ title: 'Evidence chưa có file', description: 'Record này không có file nội bộ hoặc URL để mở.' });
+    toast.warn({ title: 'Minh chứng chưa có tệp', description: 'Bản ghi này không có tệp nội bộ hoặc URL để mở.' });
   }
 
   async function submitReview(action: EvidenceReviewAction) {
     if (!selected || !onReview) return;
     const comment = reviewComment.trim();
     if (action === 'reject' && !comment) {
-      toast.warn({ title: 'Thiếu lý do reject', description: 'Nhập lý do để từ chối evidence.' });
+      toast.warn({ title: 'Thiếu lý do từ chối', description: 'Nhập lý do để từ chối minh chứng.' });
       return;
     }
     setReviewingAction(action);
@@ -117,7 +117,7 @@ export function EvidenceGallery({
             className="w-full rounded-md border border-line bg-white py-2 pl-8 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Tìm evidence, work item, caption"
+            placeholder="Tìm minh chứng, đầu việc, mô tả"
           />
         </label>
       </div>
@@ -125,9 +125,9 @@ export function EvidenceGallery({
       {rows.length && variant === 'list' ? (
         <div className="overflow-hidden rounded-md border border-line bg-white">
           <div className="hidden grid-cols-[minmax(0,1.6fr)_8rem_8rem_7rem_8rem] gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-            <span>Evidence</span>
+            <span>Minh chứng</span>
             <span>Loại</span>
-            <span>Visibility</span>
+            <span>Phạm vi hiển thị</span>
             <span>Trạng thái</span>
             <span className="text-right">Thao tác</span>
           </div>
@@ -164,7 +164,7 @@ export function EvidenceGallery({
           ))}
         </div>
       ) : (
-        <EmptyState title={evidence.length ? 'Không có evidence phù hợp bộ lọc' : emptyTitle} />
+        <EmptyState title={evidence.length ? 'Không có minh chứng phù hợp bộ lọc' : emptyTitle} />
       )}
 
       <EvidenceDetailDialog
@@ -217,7 +217,7 @@ function EvidenceListRow({
           <span className="mt-1 block truncate text-xs text-slate-500">
             {[record.caption, record.mime_type, record.file_size ? formatEvidenceFileSize(record.file_size) : undefined].filter(Boolean).join(' · ') || compactDateTime(record.created_at)}
           </span>
-          {showWorkItem ? <span className="mt-1 block truncate text-xs text-slate-500">{record.work_item_title ?? 'Work item'}</span> : null}
+          {showWorkItem ? <span className="mt-1 block truncate text-xs text-slate-500">{record.work_item_title ?? 'Đầu việc'}</span> : null}
         </span>
       </button>
       <div className="text-xs font-semibold text-slate-600 lg:text-sm lg:font-medium">
@@ -225,7 +225,7 @@ function EvidenceListRow({
         {evidenceLabel(record.evidence_type)}
       </div>
       <div className="text-xs font-semibold text-slate-600 lg:text-sm lg:font-medium">
-        <span className="mr-2 text-[11px] uppercase tracking-wide text-slate-400 lg:hidden">Visibility</span>
+        <span className="mr-2 text-[11px] uppercase tracking-wide text-slate-400 lg:hidden">Phạm vi</span>
         {visibilityLabel(record.visibility ?? 'project')}
       </div>
       <div>
@@ -282,7 +282,7 @@ function EvidenceCard({
           <p className="mt-1 truncate text-xs text-slate-500">
             {evidenceLabel(record.evidence_type)} · {visibilityLabel(record.visibility ?? 'project')} · {compactDateTime(record.created_at)}
           </p>
-          {showWorkItem ? <p className="mt-1 truncate text-xs text-slate-500">{record.work_item_title ?? 'Work item'}</p> : null}
+          {showWorkItem ? <p className="mt-1 truncate text-xs text-slate-500">{record.work_item_title ?? 'Đầu việc'}</p> : null}
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
             {record.mime_type ? <span>{record.mime_type}</span> : null}
             {record.file_size ? <span>{formatEvidenceFileSize(record.file_size)}</span> : null}
@@ -292,7 +292,7 @@ function EvidenceCard({
       </button>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <span className={clsx('rounded-md px-2 py-0.5 text-xs font-semibold', record.storage_provider === 'local' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>
-          {record.storage_provider === 'local' ? 'Protected file' : 'External link'}
+          {record.storage_provider === 'local' ? 'Tệp được bảo vệ' : 'Liên kết ngoài'}
         </span>
         <div className="flex flex-wrap justify-end gap-2">
           <button type="button" className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100" onClick={onSelect}>
@@ -341,13 +341,13 @@ function EvidenceDetailDialog({
   return (
     <Dialog
       open={Boolean(record)}
-      title="Chi tiết evidence"
-      description="Metadata, storage và trạng thái review của file evidence."
+      title="Chi tiết minh chứng"
+      description="Thông tin tệp, nơi lưu trữ và trạng thái rà soát của minh chứng."
       size="xl"
       onClose={onClose}
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-slate-500">Protected files được mở qua API có kiểm tra quyền work item.</p>
+          <p className="text-xs text-slate-500">Tệp được bảo vệ được mở qua API có kiểm tra quyền đầu việc.</p>
           <div className="flex flex-wrap justify-end gap-2">
             {reviewable ? (
               <>
@@ -358,7 +358,7 @@ function EvidenceDetailDialog({
                   onClick={() => onReview('reject')}
                 >
                   {reviewingAction === 'reject' ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
-                  Reject
+                  Từ chối
                 </button>
                 <button
                   type="button"
@@ -367,7 +367,7 @@ function EvidenceDetailDialog({
                   onClick={() => onReview('accept')}
                 >
                   {reviewingAction === 'accept' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  Accept
+                  Duyệt
                 </button>
               </>
             ) : null}
@@ -377,7 +377,7 @@ function EvidenceDetailDialog({
               onClick={onOpen}
             >
               <ExternalLink className="h-4 w-4" />
-              Mở file
+              Mở tệp
             </button>
             <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>
               Đóng
@@ -408,30 +408,30 @@ function EvidenceDetailDialog({
             <StatusBadge status={record.status} />
           </div>
           <div className="grid gap-2">
-            <EvidenceMeta label="Type" value={evidenceLabel(record.evidence_type)} />
-            <EvidenceMeta label="Visibility" value={visibilityLabel(record.visibility ?? 'project')} />
-            {showWorkItem ? <EvidenceMeta label="Work item" value={record.work_item_title ?? '-'} /> : null}
-            <EvidenceMeta label="Submitted by" value={record.submitted_by_name ?? record.uploaded_by ?? '-'} />
-            <EvidenceMeta label="Submitted at" value={compactDateTime(record.created_at)} />
-            <EvidenceMeta label="Reviewed by" value={record.reviewed_by_name ?? record.reviewed_by ?? '-'} />
-            <EvidenceMeta label="Reviewed at" value={compactDateTime(record.reviewed_at)} />
-            <EvidenceMeta label="Storage" value={record.storage_provider === 'local' ? 'Protected local file' : (record.file_url ? 'External link' : '-')} />
-            <EvidenceMeta label="MIME / Size" value={[record.mime_type, record.file_size ? formatEvidenceFileSize(record.file_size) : undefined].filter(Boolean).join(' · ') || '-'} />
-            <EvidenceMeta label="Original filename" value={originalFilename(record) ?? '-'} />
+            <EvidenceMeta label="Loại" value={evidenceLabel(record.evidence_type)} />
+            <EvidenceMeta label="Phạm vi hiển thị" value={visibilityLabel(record.visibility ?? 'project')} />
+            {showWorkItem ? <EvidenceMeta label="Đầu việc" value={record.work_item_title ?? '-'} /> : null}
+            <EvidenceMeta label="Người gửi" value={record.submitted_by_name ?? record.uploaded_by ?? '-'} />
+            <EvidenceMeta label="Thời điểm gửi" value={compactDateTime(record.created_at)} />
+            <EvidenceMeta label="Người rà soát" value={record.reviewed_by_name ?? record.reviewed_by ?? '-'} />
+            <EvidenceMeta label="Thời điểm rà soát" value={compactDateTime(record.reviewed_at)} />
+            <EvidenceMeta label="Nơi lưu trữ" value={record.storage_provider === 'local' ? 'Tệp nội bộ được bảo vệ' : (record.file_url ? 'Liên kết ngoài' : '-')} />
+            <EvidenceMeta label="MIME / Dung lượng" value={[record.mime_type, record.file_size ? formatEvidenceFileSize(record.file_size) : undefined].filter(Boolean).join(' · ') || '-'} />
+            <EvidenceMeta label="Tên tệp gốc" value={originalFilename(record) ?? '-'} />
           </div>
           <div className="rounded-md border border-line bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Checksum sha256</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mã kiểm tra SHA-256</p>
             <p className="mt-1 break-all font-mono text-xs leading-5 text-slate-700">{record.checksum_sha256 || '-'}</p>
           </div>
           {reviewable ? (
             <label className="block">
-              <span className="text-xs font-semibold text-slate-600">Review comment</span>
+              <span className="text-xs font-semibold text-slate-600">Ghi chú rà soát</span>
               <textarea
                 className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
                 rows={3}
                 value={reviewComment}
                 onChange={(event) => onReviewCommentChange(event.target.value)}
-                placeholder="Lý do accept/reject"
+                placeholder="Lý do duyệt/từ chối"
                 disabled={Boolean(reviewingAction)}
               />
             </label>

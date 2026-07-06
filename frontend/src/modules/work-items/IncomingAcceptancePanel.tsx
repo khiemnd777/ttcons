@@ -91,9 +91,9 @@ const sourceOptions = [
 ];
 
 const resultOptions = [
-  { value: 'pass', label: 'Pass' },
-  { value: 'conditional_pass', label: 'Conditional pass' },
-  { value: 'fail', label: 'Fail' },
+  { value: 'pass', label: 'Đạt' },
+  { value: 'conditional_pass', label: 'Đạt có điều kiện' },
+  { value: 'fail', label: 'Không đạt' },
 ];
 
 const conditionOptions = [
@@ -104,10 +104,10 @@ const conditionOptions = [
 ];
 
 const decisionOptions = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'accepted', label: 'Accepted' },
-  { value: 'conditional_acceptance', label: 'Conditional' },
-  { value: 'rejected', label: 'Rejected' },
+  { value: 'pending', label: 'Đang chờ' },
+  { value: 'accepted', label: 'Chấp nhận' },
+  { value: 'conditional_acceptance', label: 'Chấp nhận có điều kiện' },
+  { value: 'rejected', label: 'Từ chối' },
 ];
 
 export function IncomingAcceptancePanel({
@@ -193,7 +193,7 @@ export function IncomingAcceptancePanel({
 
   function buildPayload(requireComplete: boolean): IncomingAcceptancePayload | null {
     const invalid: string[] = [];
-    if (!projectId) invalid.push('Project');
+    if (!projectId) invalid.push('Công trình');
     if (requireComplete && !draft.received_at) invalid.push('Ngày nhận');
     const materialByID = new Map(materials.map((item) => [String(item.id), item]));
     const procurementItemByID = new Map(procurementItems.map((item) => [String(item.id), item]));
@@ -217,7 +217,7 @@ export function IncomingAcceptancePanel({
       if (accepted + rejected > delivered + 0.000001) invalid.push(`Vượt SL giao dòng ${index + 1}`);
       if (requireComplete && line.decision === 'pending') invalid.push(`Quyết định dòng ${index + 1}`);
       const evidenceRequired = line.decision !== 'accepted' || line.condition !== 'usable' || rejected > 0;
-      if (requireComplete && evidenceRequired && !line.evidence_id) invalid.push(`Evidence dòng ${index + 1}`);
+      if (requireComplete && evidenceRequired && !line.evidence_id) invalid.push(`Minh chứng dòng ${index + 1}`);
       if (requireComplete && evidenceRequired && !line.defect_note.trim()) invalid.push(`Mô tả lỗi dòng ${index + 1}`);
       return {
         item_index: index,
@@ -287,9 +287,9 @@ export function IncomingAcceptancePanel({
       if (!record) return;
       setDraft(defaultDraft());
       invalidate();
-      toast.success('Đã submit nghiệm thu đầu vào');
+      toast.success('Đã gửi nghiệm thu đầu vào');
     },
-    onError: (error) => toast.error('Không submit được nghiệm thu đầu vào', error),
+    onError: (error) => toast.error('Không gửi được nghiệm thu đầu vào', error),
   });
 
   const actionPending = saveDraft.isPending || submitDraft.isPending || acceptanceQuery.isFetching || draftDetailQuery.isFetching;
@@ -333,7 +333,7 @@ export function IncomingAcceptancePanel({
         <div>
           <h3 className="text-sm font-semibold text-ink">Nghiệm thu đầu vào</h3>
           <p className="mt-1 text-xs text-slate-500">
-            {submitted.length ? `${submitted.length} hồ sơ đã submit` : 'Chưa có hồ sơ đã submit'}
+            {submitted.length ? `${submitted.length} hồ sơ đã gửi` : 'Chưa có hồ sơ đã gửi'}
           </p>
         </div>
         <StatusBadge status={draft.id ? 'draft' : 'new'} />
@@ -473,13 +473,13 @@ export function IncomingAcceptancePanel({
               onClick={() => submitDraft.mutate()}
             >
               {submitDraft.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Submit
+              Gửi
             </button>
           </div>
         </div>
 
         <div>
-          <h4 className="mb-2 text-sm font-semibold text-ink">Hồ sơ đã submit</h4>
+          <h4 className="mb-2 text-sm font-semibold text-ink">Hồ sơ đã gửi</h4>
           {submitted.length ? (
             <div className="space-y-2">
               {submitted.map((record) => (
@@ -499,7 +499,7 @@ export function IncomingAcceptancePanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="Chưa có hồ sơ nghiệm thu đầu vào đã submit" />
+            <EmptyState title="Chưa có hồ sơ nghiệm thu đầu vào đã gửi" />
           )}
         </div>
       </div>
@@ -609,7 +609,7 @@ function IncomingLine({
       </select>
       <div className="grid gap-1">
         <select className={controlClassName} value={line.evidence_id} onChange={(event) => onChange({ evidence_id: event.target.value })} disabled={disabled}>
-          <option value="">Evidence</option>
+          <option value="">Minh chứng</option>
           {evidence.map((record) => (
             <option key={record.id} value={record.id}>{evidenceLabel(record)}</option>
           ))}
@@ -786,5 +786,14 @@ function procurementItemLabel(item: ProcurementRequestItemOption) {
 }
 
 function evidenceLabel(evidence: EvidenceRecord) {
-  return `${evidence.name ?? evidence.title ?? evidence.id} (${evidence.status ?? 'submitted'})`;
+  return `${evidence.name ?? evidence.title ?? evidence.id} (${evidenceStatusLabel(evidence.status)})`;
+}
+
+function evidenceStatusLabel(status?: string) {
+  if (status === 'accepted') return 'đã chấp nhận';
+  if (status === 'rejected') return 'đã từ chối';
+  if (status === 'pending') return 'đang chờ';
+  if (status === 'draft') return 'nháp';
+  if (status === 'submitted') return 'đã gửi';
+  return status ?? 'đã gửi';
 }

@@ -685,7 +685,7 @@ func (h *Handler) AddProjectActivity(c *fiber.Ctx) error {
 	req := WorkItemActivityRequest{}
 	if len(c.Body()) > 0 {
 		if err := json.Unmarshal(c.Body(), &req); err != nil {
-			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu activity không hợp lệ")
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu hoạt động không hợp lệ")
 		}
 	}
 	activity, err := h.service.AddProjectActivity(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
@@ -747,7 +747,7 @@ func (h *Handler) AddWorkItemEvidence(c *fiber.Ctx) error {
 	req := WorkItemEvidenceRequest{}
 	if len(c.Body()) > 0 {
 		if err := json.Unmarshal(c.Body(), &req); err != nil {
-			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu evidence không hợp lệ")
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu minh chứng không hợp lệ")
 		}
 	}
 	evidence, err := h.service.AddWorkItemEvidence(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
@@ -760,7 +760,7 @@ func (h *Handler) AddWorkItemEvidence(c *fiber.Ctx) error {
 func (h *Handler) UploadWorkItemEvidence(c *fiber.Ctx) error {
 	fileHeader, err := c.FormFile("file")
 	if err != nil || fileHeader == nil {
-		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "File evidence là bắt buộc")
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Tệp minh chứng là bắt buộc")
 	}
 	req := WorkItemEvidenceRequest{
 		EvidenceType: c.FormValue("evidence_type"),
@@ -775,7 +775,7 @@ func (h *Handler) UploadWorkItemEvidence(c *fiber.Ctx) error {
 	if rawPayload := c.FormValue("payload"); rawPayload != "" {
 		payload := Record{}
 		if err := json.Unmarshal([]byte(rawPayload), &payload); err != nil {
-			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Payload evidence không hợp lệ")
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Nội dung minh chứng không hợp lệ")
 		}
 		req.Payload = payload
 	}
@@ -790,7 +790,7 @@ func (h *Handler) AddWorkItemActivity(c *fiber.Ctx) error {
 	req := WorkItemActivityRequest{}
 	if len(c.Body()) > 0 {
 		if err := json.Unmarshal(c.Body(), &req); err != nil {
-			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu activity không hợp lệ")
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu hoạt động không hợp lệ")
 		}
 	}
 	activity, err := h.service.AddWorkItemActivity(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
@@ -884,7 +884,7 @@ func (h *Handler) SaveMaterialSnapshot(c *fiber.Ctx) error {
 	req := MaterialSnapshotRequest{}
 	if len(c.Body()) > 0 {
 		if err := json.Unmarshal(c.Body(), &req); err != nil {
-			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu snapshot vật tư không hợp lệ")
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu ghi nhận vật tư không hợp lệ")
 		}
 	}
 	snapshot, err := h.service.SaveMaterialSnapshot(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
@@ -898,7 +898,7 @@ func (h *Handler) SubmitMaterialSnapshot(c *fiber.Ctx) error {
 	req := MaterialSnapshotRequest{}
 	if len(c.Body()) > 0 {
 		if err := json.Unmarshal(c.Body(), &req); err != nil {
-			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu snapshot vật tư không hợp lệ")
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu ghi nhận vật tư không hợp lệ")
 		}
 	}
 	snapshot, err := h.service.SubmitMaterialSnapshot(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
@@ -1032,7 +1032,7 @@ func (h *Handler) GetEvidenceFile(c *fiber.Ctx) error {
 		return err
 	}
 	c.Set(fiber.HeaderContentType, file.MIMEType)
-	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf("inline; filename=%q; filename*=UTF-8''%s", "evidence-file", url.PathEscape(file.Filename)))
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf("inline; filename=%q; filename*=UTF-8''%s", "minh-chung", url.PathEscape(file.Filename)))
 	c.Set(fiber.HeaderXContentTypeOptions, "nosniff")
 	return c.SendFile(file.Path)
 }
@@ -1071,7 +1071,7 @@ func (h *Handler) evidenceAction(c *fiber.Ctx, action string) error {
 	req := ActionRequest{}
 	if len(c.Body()) > 0 {
 		if err := json.Unmarshal(c.Body(), &req); err != nil {
-			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu evidence action không hợp lệ")
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu thao tác minh chứng không hợp lệ")
 		}
 	}
 	evidence, err := h.service.EvidenceAction(c.Context(), c.Params("id"), action, req, actorID(c), actorName(c))
@@ -2200,15 +2200,15 @@ func (h *Handler) UploadPayableInputInvoice(c *fiber.Ctx) error {
 	}
 	amountBeforeVAT, err := parseFormFloat(c.FormValue("amount_before_vat"))
 	if err != nil {
-		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Amount before VAT không hợp lệ")
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Giá trị trước VAT không hợp lệ")
 	}
 	vatAmount, err := parseFormFloat(c.FormValue("vat_amount"))
 	if err != nil {
-		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "VAT amount không hợp lệ")
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Tiền VAT không hợp lệ")
 	}
 	totalAmount, err := parseFormFloat(c.FormValue("total_amount"))
 	if err != nil {
-		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Total amount không hợp lệ")
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Tổng tiền không hợp lệ")
 	}
 	req := InputInvoiceRequest{
 		InvoiceNumber:        c.FormValue("invoice_number"),
@@ -2564,15 +2564,15 @@ func (h *Handler) UploadReceivableOutputInvoice(c *fiber.Ctx) error {
 	}
 	amountBeforeVAT, err := parseFormFloat(c.FormValue("amount_before_vat"))
 	if err != nil {
-		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Amount before VAT không hợp lệ")
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Giá trị trước VAT không hợp lệ")
 	}
 	vatAmount, err := parseFormFloat(c.FormValue("vat_amount"))
 	if err != nil {
-		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "VAT amount không hợp lệ")
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Tiền VAT không hợp lệ")
 	}
 	totalAmount, err := parseFormFloat(c.FormValue("total_amount"))
 	if err != nil {
-		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Total amount không hợp lệ")
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Tổng tiền không hợp lệ")
 	}
 	req := OutputInvoiceRequest{
 		InvoiceNumber:   c.FormValue("invoice_number"),

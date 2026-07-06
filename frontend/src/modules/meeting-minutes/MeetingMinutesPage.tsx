@@ -28,21 +28,21 @@ type Filters = {
 const statusOptions = [
   { value: 'all', label: 'Tất cả trạng thái' },
   { value: 'draft', label: 'Nháp' },
-  { value: 'submitted', label: 'Đã submit' },
+  { value: 'submitted', label: 'Đã gửi' },
   { value: 'reopened', label: 'Mở lại' },
 ];
 
 const attendanceLabels: Record<string, string> = {
   present: 'Có mặt',
-  remote: 'Remote',
+  remote: 'Từ xa',
   absent: 'Vắng',
 };
 
 const priorityLabels: Record<string, string> = {
-  low: 'Low',
-  normal: 'Normal',
-  high: 'High',
-  urgent: 'Urgent',
+  low: 'Thấp',
+  normal: 'Bình thường',
+  high: 'Cao',
+  urgent: 'Khẩn cấp',
 };
 
 export function MeetingMinutesPage() {
@@ -92,7 +92,7 @@ export function MeetingMinutesPage() {
     <>
       <PageHeader
         title="Biên bản họp"
-        description="Theo dõi biên bản họp từ workflow form runtime, action items và link công trình/workflow."
+        description="Theo dõi biên bản họp từ biểu mẫu quy trình đang chạy, đầu việc và liên kết công trình/quy trình."
         actions={
           <button
             className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
@@ -136,10 +136,10 @@ export function MeetingMinutesPage() {
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Owner
+            Phụ trách
             <input
               className="rounded-md border border-line px-3 py-2 text-sm normal-case tracking-normal text-ink outline-none focus:ring-2 focus:ring-blue-100"
-              placeholder="Owner quyết định/action"
+              placeholder="Người phụ trách quyết định/đầu việc"
               value={filters.owner}
               onChange={(event) => updateFilter('owner', event.target.value)}
             />
@@ -160,7 +160,7 @@ export function MeetingMinutesPage() {
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             className="w-full rounded-md border border-line py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-            placeholder="Tìm công trình, node, step, tiêu đề, agenda, quyết định, action item"
+            placeholder="Tìm công trình, node, bước, tiêu đề, nội dung họp, quyết định, đầu việc"
             value={filters.search}
             onChange={(event) => updateFilter('search', event.target.value)}
           />
@@ -168,13 +168,13 @@ export function MeetingMinutesPage() {
       </section>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={<FileText className="h-5 w-5" />} label="Biên bản" value={metrics.total} sub={`${metrics.needsSubmit} cần submit`} />
-        <MetricCard icon={<Users className="h-5 w-5" />} label="Người tham dự" value={metrics.attendees} sub={`${metrics.submitted} đã submit`} />
-        <MetricCard icon={<CheckSquare className="h-5 w-5" />} label="Quyết định" value={metrics.decisions} sub="decision rows" />
-        <MetricCard icon={<CalendarDays className="h-5 w-5" />} label="Action items" value={metrics.actionItems} sub={`${metrics.generatedItems} work item đã sinh`} />
+        <MetricCard icon={<FileText className="h-5 w-5" />} label="Biên bản" value={metrics.total} sub={`${metrics.needsSubmit} cần gửi`} />
+        <MetricCard icon={<Users className="h-5 w-5" />} label="Người tham dự" value={metrics.attendees} sub={`${metrics.submitted} đã gửi`} />
+        <MetricCard icon={<CheckSquare className="h-5 w-5" />} label="Quyết định" value={metrics.decisions} sub="dòng quyết định" />
+        <MetricCard icon={<CalendarDays className="h-5 w-5" />} label="Đầu việc" value={metrics.actionItems} sub={`${metrics.generatedItems} đầu việc đã sinh`} />
       </div>
 
-      <ListSection title="Meeting minutes" description={`${rows.length} biên bản khớp bộ lọc hiện tại`}>
+      <ListSection title="Biên bản họp" description={`${rows.length} biên bản khớp bộ lọc hiện tại`}>
         <DataTable
           rows={rows}
           loading={meetings.isLoading}
@@ -215,7 +215,7 @@ export function MeetingMinutesPage() {
             { key: 'attendee_count', header: 'Tham dự', align: 'center', sortable: true, render: (row) => numberValue(row.attendee_count) },
             {
               key: 'decision_action',
-              header: 'D/A',
+              header: 'Q/ĐV',
               align: 'center',
               sortValue: (row) => numberValue(row.decision_count) + numberValue(row.action_item_count),
               render: (row) => (
@@ -224,18 +224,18 @@ export function MeetingMinutesPage() {
                 </span>
               ),
             },
-            { key: 'generated_work_item_count', header: 'Generated', align: 'center', sortable: true, render: (row) => numberValue(row.generated_work_item_count) },
-            { key: 'status', header: 'Status', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
+            { key: 'generated_work_item_count', header: 'Đã sinh', align: 'center', sortable: true, render: (row) => numberValue(row.generated_work_item_count) },
+            { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
             {
               key: 'actions',
-              header: 'Action',
+              header: 'Thao tác',
               render: (row) => (
                 <RowActions onView={() => setDetailMeeting(row)}>
                   <button
                     className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300"
                     disabled={!row.work_item_id}
                     onClick={() => openWorkItem(row)}
-                    title={row.work_item_id ? 'Mở work item/form' : 'Biên bản chưa có work item'}
+                    title={row.work_item_id ? 'Mở đầu việc/biểu mẫu' : 'Biên bản chưa có đầu việc'}
                     type="button"
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -302,7 +302,7 @@ function MeetingMinutesDetailDialog({
             type="button"
           >
             <ExternalLink className="h-4 w-4" />
-            Mở work item/form
+            Mở đầu việc/biểu mẫu
           </button>
         </div>
       ) : null}
@@ -310,32 +310,32 @@ function MeetingMinutesDetailDialog({
       {meeting ? (
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <DetailPill label="Status" value={<StatusBadge status={meeting.status} />} />
-            <DetailPill label="Meeting date" value={dateText(meeting.meeting_date)} />
-            <DetailPill label="Chair" value={meeting.chair || '-'} />
-            <DetailPill label="Updated" value={compactDateTime(meeting.updated_at)} />
+            <DetailPill label="Trạng thái" value={<StatusBadge status={meeting.status} />} />
+            <DetailPill label="Ngày họp" value={dateText(meeting.meeting_date)} />
+            <DetailPill label="Chủ trì" value={meeting.chair || '-'} />
+            <DetailPill label="Cập nhật" value={compactDateTime(meeting.updated_at)} />
           </div>
           <section className="rounded-md border border-line bg-slate-50 p-3">
             <p className="text-sm font-semibold text-ink">{meetingTitle(meeting)}</p>
             <div className="mt-2 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
-              <p>Location: <span className="font-semibold text-ink">{meeting.location || '-'}</span></p>
-              <p>Submitted by: <span className="font-semibold text-ink">{meeting.submitted_by_name || '-'}</span></p>
+              <p>Địa điểm: <span className="font-semibold text-ink">{meeting.location || '-'}</span></p>
+              <p>Người gửi: <span className="font-semibold text-ink">{meeting.submitted_by_name || '-'}</span></p>
               <p>Node: <span className="font-semibold text-ink">{meeting.run_node_name ?? '-'}</span></p>
-              <p>Step: <span className="font-semibold text-ink">{meeting.run_step_name ?? '-'}</span></p>
+              <p>Bước: <span className="font-semibold text-ink">{meeting.run_step_name ?? '-'}</span></p>
             </div>
           </section>
           <div className="grid gap-4 xl:grid-cols-3">
             <AttendeesList meeting={meeting} />
             <StructuredItems title="Quyết định" items={arrayValue(meeting.decisions)} fallbackText={meeting.decisions_text} empty="Chưa có quyết định." renderMeta={decisionMeta} />
-            <StructuredItems title="Action items" items={arrayValue(meeting.action_items)} fallbackText={meeting.action_items_text} empty="Chưa có action item." renderMeta={actionItemMeta} />
+            <StructuredItems title="Đầu việc" items={arrayValue(meeting.action_items)} fallbackText={meeting.action_items_text} empty="Chưa có đầu việc." renderMeta={actionItemMeta} />
           </div>
           <section className="rounded-md border border-line bg-white p-3">
-            <h3 className="text-sm font-semibold text-ink">Agenda</h3>
+            <h3 className="text-sm font-semibold text-ink">Nội dung họp</h3>
             <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{meeting.agenda || '-'}</p>
           </section>
           <div className="grid gap-2 rounded-md border border-line bg-slate-50 p-3 text-xs text-slate-600 md:grid-cols-2">
-            <p>Generated work items: <span className="font-semibold text-ink">{numberValue(meeting.generated_work_item_count)}</span></p>
-            <p>Artifacts: <span className="font-semibold text-ink">{numberValue(meeting.signature_count)} chữ ký · {numberValue(meeting.pdf_export_count)} PDF · {numberValue(meeting.evidence_count)} evidence</span></p>
+            <p>Đầu việc đã sinh: <span className="font-semibold text-ink">{numberValue(meeting.generated_work_item_count)}</span></p>
+            <p>Tài liệu: <span className="font-semibold text-ink">{numberValue(meeting.signature_count)} chữ ký · {numberValue(meeting.pdf_export_count)} PDF · {numberValue(meeting.evidence_count)} minh chứng</span></p>
           </div>
         </div>
       ) : <EmptyState title="Chưa chọn biên bản họp." />}
@@ -494,16 +494,16 @@ function itemTitle(item: Record<string, any>, fallback: string) {
 
 function decisionMeta(item: Record<string, any>) {
   return [
-    item.owner ? `Owner: ${item.owner}` : '',
-    item.target ? `Target: ${dateText(item.target)}` : '',
+    item.owner ? `Phụ trách: ${item.owner}` : '',
+    item.target ? `Mốc: ${dateText(item.target)}` : '',
   ].filter(Boolean).join(' · ') || '-';
 }
 
 function actionItemMeta(item: Record<string, any>) {
   return [
     priorityLabels[String(item.priority ?? '')] ?? item.priority,
-    item.owner_role || item.owner_name ? `Owner: ${[item.owner_role, item.owner_name].filter(Boolean).join(' / ')}` : '',
-    item.due_date ? `Due: ${dateText(item.due_date)}` : '',
+    item.owner_role || item.owner_name ? `Phụ trách: ${[item.owner_role, item.owner_name].filter(Boolean).join(' / ')}` : '',
+    item.due_date ? `Hạn: ${dateText(item.due_date)}` : '',
   ].filter(Boolean).join(' · ') || '-';
 }
 

@@ -55,14 +55,14 @@ func GenerateWorkflowFormPDF(form Record) ([]byte, string, error) {
 	answers, _ := form["answers"].(Record)
 	signatures, _ := form["signatures"].([]Record)
 
-	addLine(18, fmt.Sprintf("Workflow Form Export - %s", instance["title"]))
-	addLine(10, fmt.Sprintf("Template: %s v%v", template["name"], version["version_no"]))
-	addLine(10, fmt.Sprintf("Form type: %s | Status: %s | Revision: %v", instance["form_type"], instance["status"], instance["current_revision"]))
-	addLine(10, fmt.Sprintf("Project: %s | Work item: %s", instance["project_id"], instance["work_item_id"]))
-	addLine(9, fmt.Sprintf("Payload hash: %s", payloadHash))
+	addLine(18, fmt.Sprintf("Xuất biểu mẫu quy trình - %s", instance["title"]))
+	addLine(10, fmt.Sprintf("Mẫu: %s v%v", template["name"], version["version_no"]))
+	addLine(10, fmt.Sprintf("Loại biểu mẫu: %s | Trạng thái: %s | Phiên bản: %v", instance["form_type"], instance["status"], instance["current_revision"]))
+	addLine(10, fmt.Sprintf("Công trình: %s | Đầu việc: %s", instance["project_id"], instance["work_item_id"]))
+	addLine(9, fmt.Sprintf("Mã kiểm tra nội dung: %s", payloadHash))
 	addGap(10)
 
-	addLine(14, "Answers")
+	addLine(14, "Nội dung trả lời")
 	for _, field := range fields {
 		key := fmt.Sprint(field["field_key"])
 		label := fmt.Sprint(field["label"])

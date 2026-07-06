@@ -121,7 +121,7 @@ export function ActivityComposer({
   function addMention() {
     const id = mentionId.trim();
     if (!id) {
-      toast.warn({ title: 'Thiếu mention', description: mentionType === 'role' ? 'Nhập role label cần mention.' : 'Nhập ID cần mention.' });
+      toast.warn({ title: 'Thiếu người được nhắc', description: mentionType === 'role' ? 'Nhập nhãn vai trò cần nhắc.' : 'Nhập ID cần nhắc.' });
       return;
     }
     const next = { type: mentionType, id, label: mentionLabel.trim() || undefined };
@@ -136,7 +136,7 @@ export function ActivityComposer({
   function addAttachment() {
     const id = referenceId.trim();
     if (!id) {
-      toast.warn({ title: 'Thiếu attachment', description: 'Cần chọn hoặc nhập ID evidence/document.' });
+      toast.warn({ title: 'Thiếu tệp đính kèm', description: 'Cần chọn hoặc nhập ID minh chứng/tài liệu.' });
       return;
     }
     const selected = attachmentOptions.find((option) => option.type === referenceType && option.id === id);
@@ -155,11 +155,11 @@ export function ActivityComposer({
     const missing = [
       !comment.trim() ? 'nội dung' : '',
       needsDueAt && !dueAt ? 'ngày nhắc' : '',
-      needsReference && !attachments.length ? 'evidence/document' : '',
-      needsTargetId && !targetId.trim() ? 'target record' : '',
+      needsReference && !attachments.length ? 'minh chứng/tài liệu' : '',
+      needsTargetId && !targetId.trim() ? 'bản ghi đích' : '',
     ].filter(Boolean);
     if (missing.length) {
-      toast.warn({ title: 'Thiếu thông tin activity', description: `Cần nhập: ${missing.join(', ')}` });
+      toast.warn({ title: 'Thiếu thông tin hoạt động', description: `Cần nhập: ${missing.join(', ')}` });
       return;
     }
 
@@ -199,7 +199,7 @@ export function ActivityComposer({
     <form className="rounded-md border border-line bg-slate-50 p-3" onSubmit={submit}>
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Type</span>
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Loại</span>
           <select
             className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700"
             value={activityType}
@@ -209,7 +209,7 @@ export function ActivityComposer({
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Visibility</span>
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Phạm vi hiển thị</span>
           <select
             className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700"
             value={visibility}
@@ -223,7 +223,7 @@ export function ActivityComposer({
       {allowTarget ? (
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Scope</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Phạm vi</span>
             <select
               className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700"
               value={targetScope}
@@ -237,7 +237,7 @@ export function ActivityComposer({
           </label>
           {targetScope !== 'project' ? (
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Target</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Đích</span>
               {visibleTargetOptions.length ? (
                 <select
                   className={clsx(
@@ -247,7 +247,7 @@ export function ActivityComposer({
                   value={targetId}
                   onChange={(event) => setTargetId(event.target.value)}
                 >
-                  <option value="">Chọn target</option>
+                  <option value="">Chọn đích</option>
                   {visibleTargetOptions.map((option) => <option key={`${option.scope_type}:${option.scope_id}`} value={option.scope_id}>{option.label}</option>)}
                 </select>
               ) : (
@@ -258,7 +258,7 @@ export function ActivityComposer({
                   )}
                   value={targetId}
                   onChange={(event) => setTargetId(event.target.value)}
-                  placeholder="Record ID"
+                  placeholder="ID bản ghi"
                 />
               )}
             </label>
@@ -274,14 +274,14 @@ export function ActivityComposer({
         value={comment}
         onBlur={() => setTouched(true)}
         onChange={(event) => setComment(event.target.value)}
-        placeholder="Nhập nội dung activity"
+        placeholder="Nhập nội dung hoạt động"
       />
 
       {showsDueAt || activityType === 'decision' || needsReference ? (
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {showsDueAt ? (
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{activityType === 'reminder' ? 'Due date' : 'Blocker due'}</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{activityType === 'reminder' ? 'Ngày nhắc' : 'Hạn điểm chặn'}</span>
               <input
                 className={clsx(
                   'w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500',
@@ -295,7 +295,7 @@ export function ActivityComposer({
           ) : null}
           {activityType === 'blocker' || activityType === 'decision' ? (
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Owner ID</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">ID người phụ trách</span>
               <input
                 className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                 value={ownerId}
@@ -307,7 +307,7 @@ export function ActivityComposer({
             <div className={clsx('rounded-md border bg-white p-2 sm:col-span-2', missingReference ? 'border-amber-300 bg-amber-50' : 'border-line')}>
               <div className="grid gap-2 sm:grid-cols-[130px_minmax(0,1fr)_minmax(0,1fr)_auto]">
                 <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Attachment</span>
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Tệp đính kèm</span>
                   <select
                     className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700"
                     value={referenceType}
@@ -321,7 +321,7 @@ export function ActivityComposer({
                   </select>
                 </label>
                 <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Record</span>
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Bản ghi</span>
                   {visibleAttachmentOptions.length ? (
                     <select
                       className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700"
@@ -332,7 +332,7 @@ export function ActivityComposer({
                         setReferenceLabel(selected?.label ?? '');
                       }}
                     >
-                      <option value="">Chọn attachment</option>
+                      <option value="">Chọn tệp đính kèm</option>
                       {visibleAttachmentOptions.map((option) => (
                         <option key={`${option.type}:${option.id}`} value={option.id}>
                           {option.label}{option.status ? ` · ${statusLabel(option.status)}` : ''}{option.visibility ? ` · ${enumLabel('visibility', option.visibility)}` : ''}
@@ -349,7 +349,7 @@ export function ActivityComposer({
                   )}
                 </label>
                 <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Label</span>
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Nhãn</span>
                   <input
                     className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                     value={referenceLabel}
@@ -361,7 +361,7 @@ export function ActivityComposer({
                   className="mt-5 inline-flex h-10 items-center justify-center rounded-md border border-line px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                   type="button"
                   onClick={addAttachment}
-                  aria-label="Add attachment"
+                  aria-label="Thêm tệp đính kèm"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -375,7 +375,7 @@ export function ActivityComposer({
                         type="button"
                         className="rounded p-0.5 hover:bg-emerald-100"
                         onClick={() => setAttachments((current) => current.filter((item) => !(item.type === attachment.type && item.id === attachment.id)))}
-                        aria-label="Remove attachment"
+                        aria-label="Gỡ tệp đính kèm"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -391,7 +391,7 @@ export function ActivityComposer({
       <div className="mt-2 rounded-md border border-line bg-white p-2">
         <div className="grid gap-2 sm:grid-cols-[130px_minmax(0,1fr)_minmax(0,1fr)_auto]">
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Mention</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Nhắc đến</span>
             <select
               className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700"
               value={mentionType}
@@ -401,7 +401,7 @@ export function ActivityComposer({
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{mentionType === 'role' ? 'Role label' : 'ID'}</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{mentionType === 'role' ? 'Nhãn vai trò' : 'ID'}</span>
             <input
               className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               value={mentionId}
@@ -410,7 +410,7 @@ export function ActivityComposer({
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Label</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Nhãn</span>
             <input
               className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               value={mentionLabel}
@@ -422,7 +422,7 @@ export function ActivityComposer({
             className="mt-5 inline-flex h-10 items-center justify-center rounded-md border border-line px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             type="button"
             onClick={addMention}
-            aria-label="Add mention"
+            aria-label="Thêm người được nhắc"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -436,7 +436,7 @@ export function ActivityComposer({
                   type="button"
                   className="rounded p-0.5 hover:bg-blue-100"
                   onClick={() => setMentions((current) => current.filter((item) => !(item.type === mention.type && item.id === mention.id)))}
-                  aria-label="Remove mention"
+                  aria-label="Gỡ người được nhắc"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -453,7 +453,7 @@ export function ActivityComposer({
           disabled={submitting}
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Gửi activity
+          Gửi hoạt động
         </button>
       </div>
     </form>

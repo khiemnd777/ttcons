@@ -28,24 +28,24 @@ type Filters = {
 };
 
 const statusOptions = [
-  { value: 'all', label: 'Tất cả form status' },
+  { value: 'all', label: 'Tất cả trạng thái biểu mẫu' },
   { value: 'draft', label: 'Nháp' },
-  { value: 'submitted', label: 'Đã submit' },
+  { value: 'submitted', label: 'Đã gửi' },
   { value: 'reopened', label: 'Mở lại' },
 ];
 
 const itemStatusOptions = [
-  { value: 'all', label: 'Tất cả item status' },
-  { value: 'done', label: 'Done' },
-  { value: 'not_applicable', label: 'N/A' },
-  { value: 'needs_follow_up', label: 'Needs follow-up' },
-  { value: 'blocked', label: 'Blocked' },
+  { value: 'all', label: 'Tất cả trạng thái hạng mục' },
+  { value: 'done', label: 'Hoàn tất' },
+  { value: 'not_applicable', label: 'Không áp dụng' },
+  { value: 'needs_follow_up', label: 'Cần theo dõi' },
+  { value: 'blocked', label: 'Đang bị chặn' },
 ];
 
 const evidenceOptions = [
-  { value: 'all', label: 'Tất cả evidence' },
-  { value: 'linked', label: 'Có evidence' },
-  { value: 'missing', label: 'Thiếu evidence' },
+  { value: 'all', label: 'Tất cả minh chứng' },
+  { value: 'linked', label: 'Có minh chứng' },
+  { value: 'missing', label: 'Thiếu minh chứng' },
 ];
 
 const planningScopeLabels: Record<string, string> = {
@@ -109,7 +109,7 @@ export function PlanningChecklistsPage() {
     <>
       <PageHeader
         title="Checklist kế hoạch"
-        description="Theo dõi checklist planning từ workflow form runtime, assignee, evidence và trạng thái item."
+        description="Theo dõi checklist kế hoạch từ biểu mẫu quy trình đang chạy, người phụ trách, minh chứng và trạng thái hạng mục."
         actions={
           <button
             className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
@@ -147,16 +147,16 @@ export function PlanningChecklistsPage() {
             Người kiểm tra
             <input
               className="rounded-md border border-line px-3 py-2 text-sm normal-case tracking-normal text-ink outline-none focus:ring-2 focus:ring-blue-100"
-              placeholder="Tên hoặc submitter"
+              placeholder="Tên hoặc người gửi"
               value={filters.checkedBy}
               onChange={(event) => updateFilter('checkedBy', event.target.value)}
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Assignee
+            Người phụ trách
             <input
               className="rounded-md border border-line px-3 py-2 text-sm normal-case tracking-normal text-ink outline-none focus:ring-2 focus:ring-blue-100"
-              placeholder="Role hoặc tên assignee"
+              placeholder="Vai trò hoặc tên người phụ trách"
               value={filters.assignee}
               onChange={(event) => updateFilter('assignee', event.target.value)}
             />
@@ -164,7 +164,7 @@ export function PlanningChecklistsPage() {
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Item status
+            Trạng thái hạng mục
             <select
               className="rounded-md border border-line px-3 py-2 text-sm normal-case tracking-normal text-ink outline-none focus:ring-2 focus:ring-blue-100"
               value={filters.itemStatus}
@@ -174,7 +174,7 @@ export function PlanningChecklistsPage() {
             </select>
           </label>
           <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Evidence
+            Minh chứng
             <select
               className="rounded-md border border-line px-3 py-2 text-sm normal-case tracking-normal text-ink outline-none focus:ring-2 focus:ring-blue-100"
               value={filters.evidence}
@@ -184,7 +184,7 @@ export function PlanningChecklistsPage() {
             </select>
           </label>
           <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Form status
+            Trạng thái biểu mẫu
             <select
               className="rounded-md border border-line px-3 py-2 text-sm normal-case tracking-normal text-ink outline-none focus:ring-2 focus:ring-blue-100"
               value={filters.status}
@@ -199,7 +199,7 @@ export function PlanningChecklistsPage() {
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             className="w-full rounded-md border border-line py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-            placeholder="Tìm công trình, node, step, hạng mục, assignee, comment"
+            placeholder="Tìm công trình, node, bước, hạng mục, người phụ trách, ghi chú"
             value={filters.search}
             onChange={(event) => updateFilter('search', event.target.value)}
           />
@@ -207,13 +207,13 @@ export function PlanningChecklistsPage() {
       </section>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={<ClipboardCheck className="h-5 w-5" />} label="Checklists" value={metrics.total} sub={`${metrics.needsSubmit} cần submit`} />
-        <MetricCard icon={<FileCheck2 className="h-5 w-5" />} label="Items" value={metrics.items} sub="checklist rows" />
-        <MetricCard icon={<CheckCircle2 className="h-5 w-5" />} label="Done / N/A" value={metrics.done} sub={`${metrics.submitted} đã submit`} />
-        <MetricCard icon={<ClipboardCheck className="h-5 w-5" />} label="Needs action" value={metrics.needsAction} sub={`${metrics.evidenceMissing} thiếu evidence`} />
+        <MetricCard icon={<ClipboardCheck className="h-5 w-5" />} label="Checklist" value={metrics.total} sub={`${metrics.needsSubmit} cần gửi`} />
+        <MetricCard icon={<FileCheck2 className="h-5 w-5" />} label="Hạng mục" value={metrics.items} sub="Dòng checklist" />
+        <MetricCard icon={<CheckCircle2 className="h-5 w-5" />} label="Hoàn tất / Không áp dụng" value={metrics.done} sub={`${metrics.submitted} đã gửi`} />
+        <MetricCard icon={<ClipboardCheck className="h-5 w-5" />} label="Cần xử lý" value={metrics.needsAction} sub={`${metrics.evidenceMissing} thiếu minh chứng`} />
       </div>
 
-      <ListSection title="Planning checklists" description={`${rows.length} checklist khớp bộ lọc hiện tại`}>
+      <ListSection title="Checklist kế hoạch" description={`${rows.length} checklist khớp bộ lọc hiện tại`}>
         <DataTable
           rows={rows}
           loading={checklists.isLoading}
@@ -238,11 +238,11 @@ export function PlanningChecklistsPage() {
                 </div>
               ),
             },
-            { key: 'planning_scope', header: 'Scope', sortable: true, render: (row) => planningScopeLabel(row.planning_scope) },
-            { key: 'checked_by', header: 'Checked by', sortable: true, render: (row) => row.checked_by || row.submitted_by_name || '-' },
+            { key: 'planning_scope', header: 'Phạm vi', sortable: true, render: (row) => planningScopeLabel(row.planning_scope) },
+            { key: 'checked_by', header: 'Người kiểm tra', sortable: true, render: (row) => row.checked_by || row.submitted_by_name || '-' },
             {
               key: 'items',
-              header: 'Done / Total',
+              header: 'Hoàn tất / Tổng',
               align: 'center',
               sortValue: (row) => numberValue(row.done_count) + numberValue(row.item_count),
               render: (row) => (
@@ -251,29 +251,29 @@ export function PlanningChecklistsPage() {
                 </span>
               ),
             },
-            { key: 'needs_action_count', header: 'Needs', align: 'center', sortable: true, render: (row) => numberValue(row.needs_action_count) },
+            { key: 'needs_action_count', header: 'Cần xử lý', align: 'center', sortable: true, render: (row) => numberValue(row.needs_action_count) },
             {
               key: 'evidence',
-              header: 'Evidence',
+              header: 'Minh chứng',
               align: 'center',
               sortValue: (row) => numberValue(row.evidence_linked_count),
               render: (row) => (
                 <span className="whitespace-nowrap text-xs font-semibold text-slate-700">
-                  {numberValue(row.evidence_linked_count)} linked
+                  {numberValue(row.evidence_linked_count)} đã liên kết
                 </span>
               ),
             },
-            { key: 'status', header: 'Status', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
+            { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
             {
               key: 'actions',
-              header: 'Action',
+              header: 'Thao tác',
               render: (row) => (
                 <RowActions onView={() => setDetailChecklist(row)}>
                   <button
                     className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300"
                     disabled={!row.work_item_id}
                     onClick={() => openWorkItem(row)}
-                    title={row.work_item_id ? 'Mở work item/form' : 'Checklist chưa có work item'}
+                    title={row.work_item_id ? 'Mở đầu việc/biểu mẫu' : 'Checklist chưa có đầu việc'}
                     type="button"
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -340,7 +340,7 @@ function PlanningChecklistDetailDialog({
             type="button"
           >
             <ExternalLink className="h-4 w-4" />
-            Mở work item/form
+            Mở đầu việc/biểu mẫu
           </button>
         </div>
       ) : null}
@@ -348,31 +348,31 @@ function PlanningChecklistDetailDialog({
       {checklist ? (
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <DetailPill label="Status" value={<StatusBadge status={checklist.status} />} />
-            <DetailPill label="Check date" value={dateText(checklist.check_date)} />
-            <DetailPill label="Checked by" value={checklist.checked_by || checklist.submitted_by_name || '-'} />
-            <DetailPill label="Updated" value={compactDateTime(checklist.updated_at)} />
+            <DetailPill label="Trạng thái" value={<StatusBadge status={checklist.status} />} />
+            <DetailPill label="Ngày kiểm tra" value={dateText(checklist.check_date)} />
+            <DetailPill label="Người kiểm tra" value={checklist.checked_by || checklist.submitted_by_name || '-'} />
+            <DetailPill label="Cập nhật" value={compactDateTime(checklist.updated_at)} />
           </div>
           <section className="rounded-md border border-line bg-slate-50 p-3">
             <p className="text-sm font-semibold text-ink">{checklistTitle(checklist)}</p>
             <div className="mt-2 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
-              <p>Scope: <span className="font-semibold text-ink">{planningScopeLabel(checklist.planning_scope)}</span></p>
-              <p>Submitted by: <span className="font-semibold text-ink">{checklist.submitted_by_name || '-'}</span></p>
+              <p>Phạm vi: <span className="font-semibold text-ink">{planningScopeLabel(checklist.planning_scope)}</span></p>
+              <p>Người gửi: <span className="font-semibold text-ink">{checklist.submitted_by_name || '-'}</span></p>
               <p>Node: <span className="font-semibold text-ink">{checklist.run_node_name ?? '-'}</span></p>
-              <p>Step: <span className="font-semibold text-ink">{checklist.run_step_name ?? '-'}</span></p>
+              <p>Bước: <span className="font-semibold text-ink">{checklist.run_step_name ?? '-'}</span></p>
             </div>
           </section>
           <ChecklistItems checklist={checklist} />
           {checklist.overall_comment || checklist.items_done_text || checklist.exceptions_text ? (
             <section className="grid gap-3 xl:grid-cols-3">
-              <LegacyText title="Items done" text={checklist.items_done_text} empty="Không có legacy items done." />
-              <LegacyText title="Exceptions" text={checklist.exceptions_text} empty="Không có ngoại lệ." />
+              <LegacyText title="Hạng mục đã hoàn tất" text={checklist.items_done_text} empty="Không có dữ liệu hạng mục đã hoàn tất cũ." />
+              <LegacyText title="Ngoại lệ" text={checklist.exceptions_text} empty="Không có ngoại lệ." />
               <LegacyText title="Ghi chú tổng quan" text={checklist.overall_comment} empty="Không có ghi chú tổng quan." />
             </section>
           ) : null}
           <div className="grid gap-2 rounded-md border border-line bg-slate-50 p-3 text-xs text-slate-600 md:grid-cols-2">
-            <p>Summary: <span className="font-semibold text-ink">{numberValue(checklist.done_count)} Done/N/A · {numberValue(checklist.needs_action_count)} needs action · {numberValue(checklist.evidence_linked_count)} evidence linked</span></p>
-            <p>Artifacts: <span className="font-semibold text-ink">{numberValue(checklist.signature_count)} chữ ký · {numberValue(checklist.pdf_export_count)} PDF · {numberValue(checklist.evidence_count)} evidence</span></p>
+            <p>Tóm tắt: <span className="font-semibold text-ink">{numberValue(checklist.done_count)} hoàn tất/không áp dụng · {numberValue(checklist.needs_action_count)} cần xử lý · {numberValue(checklist.evidence_linked_count)} minh chứng đã liên kết</span></p>
+            <p>Tài liệu: <span className="font-semibold text-ink">{numberValue(checklist.signature_count)} chữ ký · {numberValue(checklist.pdf_export_count)} PDF · {numberValue(checklist.evidence_count)} minh chứng</span></p>
           </div>
         </div>
       ) : <EmptyState title="Chưa chọn checklist kế hoạch." />}
@@ -394,7 +394,7 @@ function ChecklistItems({ checklist }: { checklist: PlanningChecklistItem }) {
   return (
     <section>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-ink">Checklist items</h3>
+        <h3 className="text-sm font-semibold text-ink">Hạng mục checklist</h3>
         <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{numberValue(checklist.item_count)}</span>
       </div>
       {items.length ? (
@@ -411,7 +411,7 @@ function ChecklistItems({ checklist }: { checklist: PlanningChecklistItem }) {
           ))}
         </div>
       ) : (
-        <div className="rounded-md border border-dashed border-line bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Chưa có structured checklist item.</div>
+        <div className="rounded-md border border-dashed border-line bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Chưa có hạng mục checklist có cấu trúc.</div>
       )}
     </section>
   );
@@ -491,14 +491,14 @@ function checklistTitle(checklist: PlanningChecklistItem) {
 
 function itemTitle(item: Record<string, any>) {
   const title = String(item.title ?? item.content ?? '').trim();
-  return title || 'Checklist item';
+  return title || 'Hạng mục checklist';
 }
 
 function itemMeta(item: Record<string, any>) {
   return [
-    item.assignee_role || item.assignee_name ? `Assignee: ${[item.assignee_role, item.assignee_name].filter(Boolean).join(' / ')}` : '',
-    item.due_date ? `Due: ${dateText(item.due_date)}` : '',
-    item.evidence_id ? 'Evidence linked' : 'Evidence missing',
+    item.assignee_role || item.assignee_name ? `Người phụ trách: ${[item.assignee_role, item.assignee_name].filter(Boolean).join(' / ')}` : '',
+    item.due_date ? `Hạn: ${dateText(item.due_date)}` : '',
+    item.evidence_id ? 'Đã liên kết minh chứng' : 'Thiếu minh chứng',
   ].filter(Boolean).join(' · ') || '-';
 }
 

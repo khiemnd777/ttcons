@@ -25,11 +25,11 @@ type SignatureCaptureDialogProps = {
 const canvasWidth = 640;
 const canvasHeight = 220;
 const signaturePurposeOptions = [
-  { value: 'internal_ack', label: 'Internal ack' },
-  { value: 'prepared_by', label: 'Prepared by' },
-  { value: 'reviewed_by', label: 'Reviewed by' },
-  { value: 'approved_by', label: 'Approved by' },
-  { value: 'received_by', label: 'Received by' },
+  { value: 'internal_ack', label: 'Xác nhận nội bộ' },
+  { value: 'prepared_by', label: 'Người lập' },
+  { value: 'reviewed_by', label: 'Người rà soát' },
+  { value: 'approved_by', label: 'Người phê duyệt' },
+  { value: 'received_by', label: 'Người nhận' },
 ];
 
 export function SignatureCaptureDialog({
@@ -140,7 +140,7 @@ export function SignatureCaptureDialog({
   }
 
   const hasSignature = strokes.length > 0 || Boolean(activeStroke && activeStroke.length >= 2);
-  const description = [signerName ? `Signer: ${signerName}` : undefined, formRevision ? `Revision: ${formRevision}` : undefined].filter(Boolean).join(' · ');
+  const description = [signerName ? `Người ký: ${signerName}` : undefined, formRevision ? `Phiên bản: ${formRevision}` : undefined].filter(Boolean).join(' · ');
 
   return (
     <Dialog
@@ -158,7 +158,7 @@ export function SignatureCaptureDialog({
             disabled={submitting || !hasSignature}
           >
             <Eraser className="h-4 w-4" />
-            Clear
+            Xóa chữ ký
           </button>
           <div className="flex flex-wrap justify-end gap-2">
             <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose} disabled={submitting}>
@@ -183,14 +183,14 @@ export function SignatureCaptureDialog({
             <div>
               <p className="font-semibold">Chữ ký được lưu bất biến</p>
               <p className="mt-1 text-xs leading-5 text-emerald-800">
-                Record ký sẽ gắn với actor, thời điểm ký, purpose, revision hiện tại và payload hash của form đã submit.
+                Bản ghi ký sẽ gắn với người thao tác, thời điểm ký, mục đích ký, phiên bản hiện tại và mã kiểm tra của biểu mẫu đã gửi.
               </p>
             </div>
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label>
-            <span className="text-xs font-semibold text-slate-600">Purpose</span>
+            <span className="text-xs font-semibold text-slate-600">Mục đích ký</span>
             <select
               className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               value={purpose}
@@ -209,7 +209,7 @@ export function SignatureCaptureDialog({
             </select>
           </label>
           <label>
-            <span className="text-xs font-semibold text-slate-600">Comment</span>
+            <span className="text-xs font-semibold text-slate-600">Ghi chú</span>
             <input
               className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               value={comment}
@@ -223,7 +223,7 @@ export function SignatureCaptureDialog({
         {purposeAlreadySigned ? (
           <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
-            <p className="text-xs leading-5">Bạn đã ký purpose này. Mỗi user chỉ được ký một lần cho cùng purpose trên form instance này.</p>
+            <p className="text-xs leading-5">Bạn đã ký mục đích này. Mỗi người dùng chỉ được ký một lần cho cùng mục đích trên biểu mẫu này.</p>
           </div>
         ) : null}
         <canvas
@@ -238,8 +238,8 @@ export function SignatureCaptureDialog({
           onPointerLeave={finishStroke}
         />
         <div className="rounded-md border border-line bg-slate-50 p-3 text-sm">
-          <p className="font-semibold text-ink">SIGNED BY {signerName ?? 'Current user'}</p>
-          <p className="mt-1 text-xs text-slate-500">Stamp sẽ được gắn vào PDF export cùng hash và thời điểm ký.</p>
+          <p className="font-semibold text-ink">KÝ BỞI {signerName ?? 'Người dùng hiện tại'}</p>
+          <p className="mt-1 text-xs text-slate-500">Dấu ký sẽ được gắn vào bản PDF cùng mã kiểm tra và thời điểm ký.</p>
         </div>
         <label className="flex items-start gap-2 rounded-md border border-line bg-white p-3 text-sm text-slate-700">
           <input
@@ -250,7 +250,7 @@ export function SignatureCaptureDialog({
             onChange={(event) => setAcknowledgedImmutable(event.target.checked)}
           />
           <span>
-            Tôi xác nhận chữ ký này là append-only và dùng cho đúng purpose/revision đang hiển thị.
+            Tôi xác nhận chữ ký này chỉ được ghi thêm và dùng đúng mục đích/phiên bản đang hiển thị.
           </span>
         </label>
       </div>

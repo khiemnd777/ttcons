@@ -33,7 +33,7 @@ const decisionOptions = [
   { value: 'accepted', label: 'Chấp nhận' },
   { value: 'adjust_quantity', label: 'Điều chỉnh KL' },
   { value: 'rework_required', label: 'Yêu cầu làm lại' },
-  { value: 'waiting_evidence', label: 'Chờ evidence' },
+  { value: 'waiting_evidence', label: 'Chờ minh chứng' },
   { value: 'rejected', label: 'Từ chối' },
 ];
 
@@ -133,9 +133,9 @@ export function SubcontractorReconciliationPanel({
       if (!updated) return;
       resetFromResponse(updated);
       invalidate();
-      toast.success('Đã submit đối soát thầu phụ');
+      toast.success('Đã gửi đối soát thầu phụ');
     },
-    onError: (error) => toast.error('Không submit được đối soát thầu phụ', error),
+    onError: (error) => toast.error('Không gửi được đối soát thầu phụ', error),
   });
   const pending = reconciliation.isFetching || saveDraft.isPending || submitReconciliation.isPending;
 
@@ -176,11 +176,11 @@ export function SubcontractorReconciliationPanel({
 
   if (!reconciliation.data?.available) {
     const reason = reconciliation.data?.reason ?? '';
-    if (!reason.toLowerCase().includes('submit')) return null;
+    if (!reason.toLowerCase().includes('submit') && !reason.toLowerCase().includes('gửi')) return null;
     return (
       <section>
         <h3 className="mb-2 text-sm font-semibold text-ink">Đối soát thầu phụ</h3>
-        <EmptyState title={reason || 'Submit checklist thầu phụ trước khi đối soát.'} />
+        <EmptyState title={reason || 'Gửi checklist thầu phụ trước khi đối soát.'} />
       </section>
     );
   }
@@ -205,12 +205,12 @@ export function SubcontractorReconciliationPanel({
           <SummaryChip label="Chấp nhận" value={summaryCount(record.summary_json, 'accepted')} tone="emerald" />
           <SummaryChip label="Điều chỉnh" value={summaryCount(record.summary_json, 'adjust_quantity')} tone="blue" />
           <SummaryChip label="Làm lại" value={summaryCount(record.summary_json, 'rework_required')} tone="rose" />
-          <SummaryChip label="Chờ evidence" value={summaryCount(record.summary_json, 'waiting_evidence')} tone="amber" />
+          <SummaryChip label="Chờ minh chứng" value={summaryCount(record.summary_json, 'waiting_evidence')} tone="amber" />
         </div>
 
         {locked ? (
           <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            Đã submit bởi {record.submitted_by_name ?? 'người dùng'} {record.submitted_at ? `ngày ${dateText(record.submitted_at)}` : ''}.
+            Đã gửi bởi {record.submitted_by_name ?? 'người dùng'} {record.submitted_at ? `ngày ${dateText(record.submitted_at)}` : ''}.
           </div>
         ) : null}
 
@@ -224,7 +224,7 @@ export function SubcontractorReconciliationPanel({
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             disabled={locked || pending}
-            placeholder="Ghi chú nội bộ khi lưu / submit đối soát"
+            placeholder="Ghi chú nội bộ khi lưu / gửi đối soát"
           />
         </div>
 
@@ -247,7 +247,7 @@ export function SubcontractorReconciliationPanel({
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
           <p className="text-xs text-slate-500">
-            Revision form #{record.form_revision_no ?? 0}
+            Phiên bản biểu mẫu #{record.form_revision_no ?? 0}
             {record.updated_at ? ` · cập nhật ${dateText(record.updated_at)}` : ''}
           </p>
           <div className="flex flex-wrap justify-end gap-2">
@@ -265,7 +265,7 @@ export function SubcontractorReconciliationPanel({
               onClick={() => submitReconciliation.mutate()}
             >
               {submitReconciliation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Submit đối soát
+              Gửi đối soát
             </button>
           </div>
         </div>
@@ -301,7 +301,7 @@ function ReconciliationItemRow({
           {item.owner_response ? <StatusBadge status={item.owner_response} /> : null}
           {item.evidence_id ? <StatusBadge status={item.evidence_status ?? 'submitted'} /> : null}
         </div>
-        {item.evidence_name ? <p className="mt-2 truncate text-xs text-slate-500">Evidence: {item.evidence_name}</p> : null}
+        {item.evidence_name ? <p className="mt-2 truncate text-xs text-slate-500">Minh chứng: {item.evidence_name}</p> : null}
         {item.boq_item_ref ? <p className="mt-1 truncate text-xs text-slate-500">Ref: {item.boq_item_ref}</p> : null}
       </div>
 
@@ -316,7 +316,7 @@ function ReconciliationItemRow({
           onChange={(event) => onChange({ boq_item_id: event.target.value })}
           disabled={disabled}
         >
-          <option value="">Chưa map BOQ</option>
+          <option value="">Chưa gắn BOQ</option>
           {draft.boq_item_id && !selectedBOQExists ? (
             <option value={draft.boq_item_id}>{item.boq_work_item_name ?? draft.boq_item_id}</option>
           ) : null}
@@ -332,7 +332,7 @@ function ReconciliationItemRow({
       </div>
 
       <div className="grid grid-cols-3 gap-2 lg:block lg:space-y-2">
-        <QuantityMetric label="Claim" value={item.claimed_quantity} unit={item.unit} />
+        <QuantityMetric label="Yêu cầu" value={item.claimed_quantity} unit={item.unit} />
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Xác nhận</span>
           <input

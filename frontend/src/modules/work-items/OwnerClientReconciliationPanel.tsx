@@ -30,10 +30,10 @@ type ReconciliationPayload = {
 const decisionOptions = [
   { value: 'accepted', label: 'Chấp nhận' },
   { value: 'conditional_acceptance', label: 'Chấp nhận có điều kiện' },
-  { value: 'rework_required', label: 'Yêu cầu rework' },
+  { value: 'rework_required', label: 'Yêu cầu sửa lỗi' },
   { value: 'waiting_internal_acceptance', label: 'Chờ nghiệm thu nội bộ' },
   { value: 'rejected', label: 'Từ chối' },
-  { value: 'not_applicable', label: 'N/A' },
+  { value: 'not_applicable', label: 'Không áp dụng' },
 ];
 
 export function OwnerClientReconciliationPanel({
@@ -128,9 +128,9 @@ export function OwnerClientReconciliationPanel({
       if (!updated) return;
       resetFromResponse(updated);
       invalidate();
-      toast.success('Đã submit đối soát chủ đầu tư');
+      toast.success('Đã gửi đối soát chủ đầu tư');
     },
-    onError: (error) => toast.error('Không submit được đối soát chủ đầu tư', error),
+    onError: (error) => toast.error('Không gửi được đối soát chủ đầu tư', error),
   });
   const pending = reconciliation.isFetching || saveDraft.isPending || submitReconciliation.isPending;
 
@@ -171,11 +171,11 @@ export function OwnerClientReconciliationPanel({
 
   if (!reconciliation.data?.available) {
     const reason = reconciliation.data?.reason ?? '';
-    if (!reason.toLowerCase().includes('submit')) return null;
+    if (!reason.toLowerCase().includes('submit') && !reason.toLowerCase().includes('gửi')) return null;
     return (
       <section>
         <h3 className="mb-2 text-sm font-semibold text-ink">Đối soát chủ đầu tư</h3>
-        <EmptyState title={reason || 'Submit checklist chủ đầu tư trước khi đối soát.'} />
+        <EmptyState title={reason || 'Gửi checklist chủ đầu tư trước khi đối soát.'} />
       </section>
     );
   }
@@ -199,14 +199,14 @@ export function OwnerClientReconciliationPanel({
           <SummaryChip label="Tổng" value={summaryCount(record.summary_json, 'total', items.length)} />
           <SummaryChip label="Chấp nhận" value={summaryCount(record.summary_json, 'accepted')} tone="emerald" />
           <SummaryChip label="Có điều kiện" value={summaryCount(record.summary_json, 'conditional_acceptance')} tone="blue" />
-          <SummaryChip label="Rework" value={summaryCount(record.summary_json, 'rework_required')} tone="rose" />
+          <SummaryChip label="Sửa lỗi" value={summaryCount(record.summary_json, 'rework_required')} tone="rose" />
           <SummaryChip label="Chờ nội bộ" value={summaryCount(record.summary_json, 'waiting_internal_acceptance')} tone="amber" />
-          <SummaryChip label="N/A" value={summaryCount(record.summary_json, 'not_applicable')} />
+          <SummaryChip label="Không áp dụng" value={summaryCount(record.summary_json, 'not_applicable')} />
         </div>
 
         {locked ? (
           <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            Đã submit bởi {record.submitted_by_name ?? 'người dùng'} {record.submitted_at ? `ngày ${dateText(record.submitted_at)}` : ''}.
+            Đã gửi bởi {record.submitted_by_name ?? 'người dùng'} {record.submitted_at ? `ngày ${dateText(record.submitted_at)}` : ''}.
           </div>
         ) : null}
 
@@ -220,7 +220,7 @@ export function OwnerClientReconciliationPanel({
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             disabled={locked || pending}
-            placeholder="Ghi chú nội bộ khi lưu / submit đối soát"
+            placeholder="Ghi chú nội bộ khi lưu / gửi đối soát"
           />
         </div>
 
@@ -244,7 +244,7 @@ export function OwnerClientReconciliationPanel({
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
           <p className="text-xs text-slate-500">
-            Revision form #{record.form_revision_no ?? 0}
+            Phiên bản biểu mẫu #{record.form_revision_no ?? 0}
             {record.updated_at ? ` · cập nhật ${dateText(record.updated_at)}` : ''}
           </p>
           <div className="flex flex-wrap justify-end gap-2">
@@ -262,7 +262,7 @@ export function OwnerClientReconciliationPanel({
               onClick={() => submitReconciliation.mutate()}
             >
               {submitReconciliation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Submit đối soát
+              Gửi đối soát
             </button>
           </div>
         </div>
@@ -299,8 +299,8 @@ function ReconciliationItemRow({
           {item.severity ? <StatusBadge status={item.severity} /> : null}
           {item.evidence_id ? <StatusBadge status={item.evidence_status ?? 'submitted'} /> : null}
         </div>
-        {item.evidence_name ? <p className="mt-2 truncate text-xs text-slate-500">Evidence: {item.evidence_name}</p> : null}
-        {item.output_ref ? <p className="mt-1 truncate text-xs text-slate-500">Output: {item.output_ref}</p> : null}
+        {item.evidence_name ? <p className="mt-2 truncate text-xs text-slate-500">Minh chứng: {item.evidence_name}</p> : null}
+        {item.output_ref ? <p className="mt-1 truncate text-xs text-slate-500">Đầu ra: {item.output_ref}</p> : null}
         {item.required_action ? <p className="mt-2 text-xs leading-5 text-slate-600">Yêu cầu: {item.required_action}</p> : null}
       </div>
 
@@ -315,7 +315,7 @@ function ReconciliationItemRow({
           onChange={(event) => onChange({ acceptance_id: event.target.value })}
           disabled={disabled}
         >
-          <option value="">Chưa link nghiệm thu</option>
+          <option value="">Chưa liên kết nghiệm thu</option>
           {draft.acceptance_id && !selectedExists ? (
             <option value={draft.acceptance_id}>{item.acceptance_title ?? draft.acceptance_id}</option>
           ) : null}

@@ -2352,7 +2352,10 @@ func TestClientWorkflowAutomationCreatesIncomingScheduleAndInvoiceBlocker(t *tes
 	ctx := context.Background()
 	repo := NewRepository(db)
 	fixture := setupClientOfficialWorkflowFixture(t, db, 150000000)
-	workItemID := clientOfficialWorkItemIDByNodeName(t, db, fixture.projectID, "Nghiệm thu Đầu Vào")
+	workItemIDs := clientOfficialWorkItemIDsByNodeName(t, db, fixture.projectID, "Nghiệm thu Đầu Vào")
+	if len(workItemIDs) < 2 {
+		t.Fatalf("expected multiple incoming acceptance work items, got %d", len(workItemIDs))
+	}
 	procurementID := newID()
 	mustExec(t, db, `
 		INSERT INTO procurement_requests (id, project_id, request_code, title, requested_by, status, total_estimated_amount)
@@ -2362,15 +2365,21 @@ func TestClientWorkflowAutomationCreatesIncomingScheduleAndInvoiceBlocker(t *tes
 		INSERT INTO procurement_request_items (request_id, quantity_planned, quantity_requested, unit, estimated_unit_price, supplier_name, approval_status)
 		VALUES ($1,1,1,'gói',75000000,'Nhà cung cấp kiểm thử','approved')
 	`, procurementID)
-	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
-
-	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
-		t.Fatal(err)
+	for _, workItemID := range workItemIDs {
+		mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
+		if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
-		t.Fatal(err)
-	}
-	assertCount(t, db, `SELECT COUNT(*) FROM incoming_acceptance_records WHERE work_item_id=$1 AND status='draft'`, 1, workItemID)
+	firstWorkItemID := workItemIDs[0]
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM incoming_acceptance_records
+		WHERE project_id=$1
+			AND procurement_request_id=$2
+			AND source_type='procurement'
+			AND status='draft'
+	`, 1, fixture.projectID, procurementID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM payables
@@ -2402,21 +2411,23 @@ func TestClientWorkflowAutomationCreatesIncomingScheduleAndInvoiceBlocker(t *tes
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM workflow_automation_events
-		WHERE work_item_id=$1
+		WHERE source_type='pipeline_run_node'
+			AND source_id=(SELECT run_node_id FROM work_items WHERE id=$1)
 			AND action_key='incoming_acceptance_finance_scaffold'
 			AND status='blocked'
 			AND target_type='payable'
 			AND blocker_reason='Cần tải lên và xác minh hóa đơn đầu vào thật'
-			AND run_count=2
-	`, 1, workItemID)
+			AND run_count=$2
+	`, 1, firstWorkItemID, len(workItemIDs))
 	assertCount(t, db, `
 		SELECT COUNT(*)
-		FROM work_item_activities
-		WHERE work_item_id=$1
+		FROM work_item_activities wia
+		JOIN work_items wi ON wi.id=wia.work_item_id
+		WHERE wi.run_node_id=(SELECT run_node_id FROM work_items WHERE id=$1)
 			AND activity_type='blocker'
 			AND comment='Cần tải lên và xác minh hóa đơn đầu vào thật'
 			AND metadata_json->>'automation_action'='incoming_acceptance_finance_scaffold'
-	`, 1, workItemID)
+	`, 1, firstWorkItemID)
 }
 
 func TestClientWorkflowAutomationCreatesOutgoingAcceptanceAndReceivableDrafts(t *testing.T) {
@@ -2424,63 +2435,78 @@ func TestClientWorkflowAutomationCreatesOutgoingAcceptanceAndReceivableDrafts(t 
 	ctx := context.Background()
 	repo := NewRepository(db)
 	fixture := setupClientOfficialWorkflowFixture(t, db, 180000000)
-	workItemID := clientOfficialWorkItemIDByNodeName(t, db, fixture.projectID, "Nghiệm thu Đầu Ra")
-	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
-
-	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
-		t.Fatal(err)
+	workItemIDs := clientOfficialWorkItemIDsByNodeName(t, db, fixture.projectID, "Nghiệm thu Đầu Ra")
+	if len(workItemIDs) < 2 {
+		t.Fatalf("expected multiple outgoing acceptance work items, got %d", len(workItemIDs))
 	}
-	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
-		t.Fatal(err)
+	for _, workItemID := range workItemIDs {
+		mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
+		if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+			t.Fatal(err)
+		}
 	}
-	assertCount(t, db, `SELECT COUNT(*) FROM acceptance_records WHERE work_item_id=$1 AND type='final' AND status='draft'`, 1, workItemID)
+	firstWorkItemID := workItemIDs[0]
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM acceptance_records
+		WHERE project_id=$1
+			AND node_id=(SELECT run_node_id FROM work_items WHERE id=$2)
+			AND type='final'
+			AND status='draft'
+			AND summary_json->>'automation_scaffold'='true'
+	`, 1, fixture.projectID, firstWorkItemID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM receivables rec
 		JOIN acceptance_records acc ON acc.id=rec.source_id
-		WHERE acc.work_item_id=$1
+		WHERE acc.project_id=$1
+			AND acc.node_id=(SELECT run_node_id FROM work_items WHERE id=$2)
 			AND rec.source_type='acceptance'
 			AND rec.status='draft'
 			AND rec.gross_amount=180000000
 			AND rec.remaining_amount=180000000
-	`, 1, workItemID)
+	`, 1, fixture.projectID, firstWorkItemID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM receivable_payment_schedules rps
 		JOIN receivables rec ON rec.id=rps.receivable_id
 		JOIN acceptance_records acc ON acc.id=rec.source_id
-		WHERE acc.work_item_id=$1
+		WHERE acc.project_id=$1
+			AND acc.node_id=(SELECT run_node_id FROM work_items WHERE id=$2)
 			AND rps.schedule_code='LICH-THU-TIEN-001'
 			AND rps.milestone_name='Thu tiền đầu ra sau nghiệm thu'
 			AND rps.status='draft'
 			AND rps.planned_amount=180000000
 			AND rps.remaining_amount=180000000
-	`, 1, workItemID)
+	`, 1, fixture.projectID, firstWorkItemID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM output_invoices oi
 		JOIN receivables rec ON rec.id=oi.receivable_id
 		JOIN acceptance_records acc ON acc.id=rec.source_id
-		WHERE acc.work_item_id=$1
-	`, 0, workItemID)
+		WHERE acc.project_id=$1
+			AND acc.node_id=(SELECT run_node_id FROM work_items WHERE id=$2)
+	`, 0, fixture.projectID, firstWorkItemID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM workflow_automation_events
-		WHERE work_item_id=$1
+		WHERE source_type='pipeline_run_node'
+			AND source_id=(SELECT run_node_id FROM work_items WHERE id=$1)
 			AND action_key='outgoing_acceptance_finance_scaffold'
 			AND status='blocked'
 			AND target_type='receivable'
 			AND blocker_reason='Cần tải lên và phát hành hóa đơn đầu ra thật'
-			AND run_count=2
-	`, 1, workItemID)
+			AND run_count=$2
+	`, 1, firstWorkItemID, len(workItemIDs))
 	assertCount(t, db, `
 		SELECT COUNT(*)
-		FROM work_item_activities
-		WHERE work_item_id=$1
+		FROM work_item_activities wia
+		JOIN work_items wi ON wi.id=wia.work_item_id
+		WHERE wi.run_node_id=(SELECT run_node_id FROM work_items WHERE id=$1)
 			AND activity_type='blocker'
 			AND comment='Cần tải lên và phát hành hóa đơn đầu ra thật'
 			AND metadata_json->>'automation_action'='outgoing_acceptance_finance_scaffold'
-	`, 1, workItemID)
+	`, 1, firstWorkItemID)
 }
 
 func TestWorkflowFormAnswerValueMatches(t *testing.T) {
@@ -5542,6 +5568,37 @@ func clientOfficialWorkItemIDByNodeName(t *testing.T, db *sql.DB, projectID, nod
 		t.Fatal(err)
 	}
 	return workItemID
+}
+
+func clientOfficialWorkItemIDsByNodeName(t *testing.T, db *sql.DB, projectID, nodeName string) []string {
+	t.Helper()
+	rows, err := db.QueryContext(context.Background(), `
+		SELECT wi.id::text
+		FROM work_items wi
+		JOIN pipeline_run_nodes rn ON rn.id=wi.run_node_id
+		WHERE wi.project_id=$1 AND rn.name=$2
+		ORDER BY wi.created_at, wi.id
+	`, projectID, nodeName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	var workItemIDs []string
+	for rows.Next() {
+		var workItemID string
+		if err := rows.Scan(&workItemID); err != nil {
+			t.Fatal(err)
+		}
+		workItemIDs = append(workItemIDs, workItemID)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if len(workItemIDs) == 0 {
+		t.Fatalf("work items for node %q not found", nodeName)
+	}
+	return workItemIDs
 }
 
 func mustExec(t *testing.T, db *sql.DB, query string, args ...any) {

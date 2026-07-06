@@ -12,7 +12,7 @@ import { ActivityAttachments } from './ActivityAttachments';
 import { ActivityComposer, type ActivityAttachmentOption, type ActivityTargetOption } from './ActivityComposer';
 
 const filterScopes = [
-  { value: '', label: 'All scopes' },
+  { value: '', label: 'Tất cả phạm vi' },
   { value: 'project', label: scopeTypeLabel('project') },
   { value: 'work_item', label: scopeTypeLabel('work_item') },
   { value: 'boq_item', label: scopeTypeLabel('boq_item') },
@@ -65,9 +65,9 @@ export function ActivityThread({
       queryClient.invalidateQueries({ queryKey: ['project-activity', projectId] });
       queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
       onChanged?.();
-      toast.success('Đã gửi activity');
+      toast.success('Đã gửi hoạt động');
     },
-    onError: (error) => toast.error('Không gửi được activity', error),
+    onError: (error) => toast.error('Không gửi được hoạt động', error),
   });
 
   const markRead = useMutation({
@@ -76,7 +76,7 @@ export function ActivityThread({
       queryClient.invalidateQueries({ queryKey: ['project-activity', projectId] });
       queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
     },
-    onError: (error) => toast.error('Không cập nhật được read state', error),
+    onError: (error) => toast.error('Không cập nhật được trạng thái đã đọc', error),
   });
 
   const rows = activity.data ?? [];
@@ -127,7 +127,7 @@ export function ActivityThread({
           disabled={!scopeFilter}
           value={scopeIdFilter}
           onChange={(event) => setScopeIdFilter(event.target.value)}
-          placeholder={scopeFilter ? 'Filter target ID' : 'Target filter disabled'}
+          placeholder={scopeFilter ? 'Lọc theo mã đối tượng' : 'Chưa chọn phạm vi lọc'}
         />
         <button
           className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
@@ -145,11 +145,11 @@ export function ActivityThread({
         <div className="rounded-md border border-rose-200 bg-rose-50 p-3">
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
-            <p className="text-sm text-rose-700">Không tải được activity thread.</p>
+            <p className="text-sm text-rose-700">Không tải được luồng hoạt động.</p>
           </div>
         </div>
       ) : null}
-      {!activity.isLoading && !activity.error && !rows.length ? <EmptyState title="Chưa có activity trong scope này" /> : null}
+      {!activity.isLoading && !activity.error && !rows.length ? <EmptyState title="Chưa có hoạt động trong phạm vi này" /> : null}
 
       {rows.length ? (
         <div className="space-y-2">
@@ -158,12 +158,12 @@ export function ActivityThread({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex min-w-0 flex-wrap items-center gap-1">
-                    {item.is_unread ? <span className="rounded-md bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">Unread</span> : null}
-                    {item.mentioned_me ? <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">@you</span> : null}
+                    {item.is_unread ? <span className="rounded-md bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">Chưa đọc</span> : null}
+                    {item.mentioned_me ? <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">@tôi</span> : null}
                     <p className="text-sm font-semibold text-ink">{activityLabel(item.activity_type)}</p>
                   </div>
                   <p className="mt-1 line-clamp-1 text-xs text-slate-500">
-                    {item.actor_name ?? 'System'} · {item.target_label ?? item.work_item_title ?? (item.scope_type ? scopeTypeLabel(item.scope_type) : 'Công trình')} · {compactDateTime(item.created_at)}
+                    {item.actor_name ?? 'Hệ thống'} · {item.target_label ?? item.work_item_title ?? (item.scope_type ? scopeTypeLabel(item.scope_type) : 'Công trình')} · {compactDateTime(item.created_at)}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap justify-end gap-1">
@@ -176,7 +176,7 @@ export function ActivityThread({
                       onClick={() => markRead.mutate(item.id)}
                     >
                       <CheckCircle2 className="h-3 w-3" />
-                      Read
+                      Đã đọc
                     </button>
                   ) : null}
                 </div>
@@ -192,7 +192,7 @@ export function ActivityThread({
 }
 
 function LiveStatusBadge({ status }: { status: StreamStatus }) {
-  const label = status === 'connected' ? 'Live connected' : status === 'reconnecting' ? 'Reconnecting' : 'Offline';
+  const label = status === 'connected' ? 'Đang kết nối trực tiếp' : status === 'reconnecting' ? 'Đang kết nối lại' : 'Mất kết nối';
   const tone = status === 'connected' ? 'bg-emerald-50 text-emerald-700' : status === 'reconnecting' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600';
   const dot = status === 'connected' ? 'bg-emerald-500' : status === 'reconnecting' ? 'bg-amber-500' : 'bg-slate-400';
   return (

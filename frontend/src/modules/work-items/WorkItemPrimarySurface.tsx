@@ -65,8 +65,8 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
   if (['photo_upload', 'document_upload', 'evidence_upload'].includes(workType)) {
     return {
       kind: 'evidence',
-      title: 'Nộp evidence',
-      description: 'Việc chính là upload đúng ảnh/tài liệu và kiểm tra trạng thái evidence.',
+      title: 'Nộp minh chứng',
+      description: 'Việc chính là tải đúng ảnh/tài liệu và kiểm tra trạng thái minh chứng.',
     };
   }
 
@@ -74,7 +74,7 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
     return {
       kind: 'approval',
       title: 'Phê duyệt / xác nhận',
-      description: 'Việc chính là xem nội dung cần duyệt, ghi nhận quyết định và giữ lại dấu vết audit.',
+      description: 'Việc chính là xem nội dung cần duyệt, ghi nhận quyết định và giữ lại nhật ký kiểm tra.',
     };
   }
 
@@ -82,7 +82,7 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
     return {
       kind: 'outgoing_acceptance',
       title: 'Nghiệm thu đầu ra',
-      description: 'Việc chính là lập biên bản nghiệm thu, ghi nhận pass/fail và punch list.',
+      description: 'Việc chính là lập biên bản nghiệm thu, ghi nhận đạt/không đạt và danh sách cần xử lý.',
     };
   }
 
@@ -91,7 +91,7 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
       return {
         kind: 'incoming_acceptance',
         title: 'Nghiệm thu đầu vào',
-        description: 'Việc chính là kiểm nhận vật tư, số lượng nhận/từ chối và evidence giao nhận.',
+        description: 'Việc chính là kiểm nhận vật tư, số lượng nhận/từ chối và minh chứng giao nhận.',
       };
     }
     if (includesAny(searchText, ['vật tư dư', 'vat tu du', 'surplus', 'lưu kho', 'luu kho'])) {
@@ -103,8 +103,8 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
     }
     return {
       kind: 'material_snapshot',
-      title: 'Snapshot vật tư',
-      description: 'Việc chính là ghi nhận vật tư trước/sau thi công và ảnh hưởng material balance.',
+      title: 'Ghi nhận vật tư',
+      description: 'Việc chính là ghi nhận vật tư trước/sau thi công và ảnh hưởng tồn công trình.',
     };
   }
 
@@ -128,14 +128,14 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
     return {
       kind: 'workflow_form',
       title: workflowFormChipText(item),
-      description: 'Việc chính là hoàn tất biểu mẫu nghiệp vụ của step trước khi gửi review/duyệt.',
+      description: 'Việc chính là hoàn tất biểu mẫu nghiệp vụ của bước trước khi gửi rà soát/duyệt.',
     };
   }
 
   return {
     kind: 'generic',
     title: workTypeLabel(item.work_type),
-    description: 'Việc chính là xử lý trạng thái, activity và evidence liên quan đến work item.',
+    description: 'Việc chính là xử lý trạng thái, hoạt động và minh chứng liên quan đến đầu việc.',
   };
 }
 
@@ -198,7 +198,7 @@ function ApprovalPrimaryPanel({ item, evidence }: { item: WorkItem; evidence: Ev
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-ink">Quyết định cần ghi nhận</h3>
             <p className="mt-1 text-sm leading-6 text-slate-700">
-              Kiểm tra nội dung, evidence và biểu mẫu liên quan. Các nút duyệt, từ chối hoặc yêu cầu sửa nằm ở footer để giữ một điểm ra quyết định duy nhất.
+              Kiểm tra nội dung, minh chứng và biểu mẫu liên quan. Các nút duyệt, từ chối hoặc yêu cầu sửa nằm ở cuối màn hình để giữ một điểm ra quyết định duy nhất.
             </p>
           </div>
           <div className="shrink-0">
@@ -208,7 +208,7 @@ function ApprovalPrimaryPanel({ item, evidence }: { item: WorkItem; evidence: Ev
         <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
           <ApprovalFact label="Bộ phận" value={departmentLabel(item.department)} />
           <ApprovalFact label="Hạn" value={dateText(item.due_at)} />
-          <ApprovalFact label="Approval" value={item.approval_request_id ? 'Đã liên kết' : 'Chưa liên kết'} />
+          <ApprovalFact label="Phê duyệt" value={item.approval_request_id ? 'Đã liên kết' : 'Chưa liên kết'} />
         </div>
       </div>
       {hasWorkflowFormSummary(item) ? (
@@ -230,12 +230,12 @@ function GenericPrimaryPanel({ item }: { item: WorkItem }) {
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            {item.description || 'Work item này chưa có form hoặc panel nghiệp vụ riêng. Dùng evidence, activity và footer actions để xử lý.'}
+            {item.description || 'Đầu việc này chưa có biểu mẫu hoặc panel nghiệp vụ riêng. Dùng minh chứng, hoạt động và thao tác cuối màn hình để xử lý.'}
           </p>
           <div className="mt-3 grid gap-2 text-xs sm:grid-cols-4">
             <ApprovalFact label="Loại" value={workTypeLabel(item.work_type)} />
             <ApprovalFact label="Node" value={item.run_node_name ?? '-'} />
-            <ApprovalFact label="Step" value={item.run_step_name ?? '-'} />
+            <ApprovalFact label="Bước" value={item.run_step_name ?? '-'} />
             <ApprovalFact label="Hạn" value={dateText(item.due_at)} />
           </div>
         </div>

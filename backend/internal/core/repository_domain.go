@@ -147,7 +147,7 @@ func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, 
 			return nil, err
 		}
 		if exists == 0 {
-			return nil, validationError("Permission không tồn tại", Record{"permission_id": permissionID})
+			return nil, validationError("Quyền không tồn tại", Record{"permission_id": permissionID})
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, roleID, permissionID); err != nil {
 			return nil, err
@@ -196,7 +196,7 @@ func (r *Repository) ReplaceUserRoles(ctx context.Context, userID string, roleID
 			return nil, err
 		}
 		if exists == 0 {
-			return nil, validationError("Role không tồn tại", Record{"role_id": roleID})
+			return nil, validationError("Vai trò không tồn tại", Record{"role_id": roleID})
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO user_roles (user_id, role_id, project_id) VALUES ($1,$2,NULLIF($3,'')::uuid) ON CONFLICT DO NOTHING`, userID, roleID, projectID); err != nil {
 			return nil, err
@@ -374,7 +374,7 @@ func (r *Repository) CanAccessProjectPermission(ctx context.Context, userID, pro
 func (r *Repository) RecordProjectID(ctx context.Context, table, id string) (string, error) {
 	table = safeTable(table)
 	if table == "" {
-		return "", errors.New("invalid table")
+		return "", errors.New("Bảng không hợp lệ")
 	}
 	row, err := r.QueryOne(ctx, fmt.Sprintf(`SELECT COALESCE(project_id::text, '') AS project_id FROM %s WHERE id=$1`, table), id)
 	if err != nil {
@@ -2168,7 +2168,7 @@ func (r *Repository) SaveSubcontractorReconciliation(ctx context.Context, item R
 	eventType := "subcontractor_reconciliation_saved"
 	if submit {
 		status = "submitted"
-		activityComment = "Đã submit đối soát checklist thầu phụ"
+		activityComment = "Đã gửi đối soát checklist thầu phụ"
 		eventType = "subcontractor_reconciliation_submitted"
 	}
 	if strings.TrimSpace(comment) != "" {
@@ -2194,7 +2194,7 @@ func (r *Repository) SaveSubcontractorReconciliation(ctx context.Context, item R
 	reconciliationID := ""
 	if len(existingRows) > 0 {
 		if fmt.Sprint(existingRows[0]["status"]) == "submitted" {
-			return validationError("Đối soát checklist thầu phụ đã submit, không thể sửa", Record{"work_item_id": workItemID})
+			return validationError("Đối soát checklist thầu phụ đã gửi, không thể sửa", Record{"work_item_id": workItemID})
 		}
 		rows, err := queryTx(ctx, tx, `
 			UPDATE subcontractor_checklist_reconciliations
@@ -2432,7 +2432,7 @@ func (r *Repository) SaveAcceptance(ctx context.Context, acceptanceID string, he
 			return nil, sql.ErrNoRows
 		}
 		if !statusIn(fmt.Sprint(existingRows[0]["status"]), "draft") {
-			return nil, validationError("Hồ sơ nghiệm thu đầu ra đã submit/chốt, không thể sửa", Record{"acceptance_id": acceptanceID, "status": existingRows[0]["status"]})
+			return nil, validationError("Hồ sơ nghiệm thu đầu ra đã gửi/chốt, không thể sửa", Record{"acceptance_id": acceptanceID, "status": existingRows[0]["status"]})
 		}
 		if cleanID(existingRows[0]["project_id"]) != projectID {
 			return nil, validationError("Hồ sơ nghiệm thu đầu ra không thuộc công trình", Record{"acceptance_id": acceptanceID})
@@ -2576,14 +2576,14 @@ func (r *Repository) SubmitAcceptance(ctx context.Context, acceptanceID, actorID
 	}
 	record := rows[0]
 	if fmt.Sprint(record["status"]) != "draft" {
-		return nil, validationError("Chỉ hồ sơ nghiệm thu nháp mới được submit", Record{"acceptance_id": acceptanceID, "status": record["status"]})
+		return nil, validationError("Chỉ hồ sơ nghiệm thu nháp mới được gửi", Record{"acceptance_id": acceptanceID, "status": record["status"]})
 	}
 	itemRows, err := queryTx(ctx, tx, `SELECT COUNT(*) AS total FROM acceptance_checklist_items WHERE acceptance_id=$1`, acceptanceID)
 	if err != nil {
 		return nil, err
 	}
 	if len(itemRows) == 0 || number(itemRows[0]["total"]) == 0 {
-		return nil, validationError("Cần ít nhất một checklist item để submit nghiệm thu đầu ra")
+		return nil, validationError("Cần ít nhất một dòng checklist để gửi nghiệm thu đầu ra")
 	}
 	updated, err := queryTx(ctx, tx, `
 		UPDATE acceptance_records
@@ -2604,7 +2604,7 @@ func (r *Repository) SubmitAcceptance(ctx context.Context, acceptanceID, actorID
 	workItemID := cleanID(record["work_item_id"])
 	comment := cleanOptionalText(record["notes"])
 	if comment == "" {
-		comment = "Đã submit nghiệm thu đầu ra"
+		comment = "Đã gửi nghiệm thu đầu ra"
 	}
 	rawMetadata, _ := json.Marshal(Record{
 		"acceptance_id": acceptanceID,
@@ -2688,7 +2688,7 @@ func (r *Repository) SaveOwnerClientReconciliation(ctx context.Context, item Rec
 	eventType := "owner_client_reconciliation_saved"
 	if submit {
 		status = "submitted"
-		activityComment = "Đã submit đối soát checklist chủ đầu tư"
+		activityComment = "Đã gửi đối soát checklist chủ đầu tư"
 		eventType = "owner_client_reconciliation_submitted"
 	}
 	if strings.TrimSpace(comment) != "" {
@@ -2714,7 +2714,7 @@ func (r *Repository) SaveOwnerClientReconciliation(ctx context.Context, item Rec
 	reconciliationID := ""
 	if len(existingRows) > 0 {
 		if fmt.Sprint(existingRows[0]["status"]) == "submitted" {
-			return validationError("Đối soát checklist chủ đầu tư đã submit, không thể sửa", Record{"work_item_id": workItemID})
+			return validationError("Đối soát checklist chủ đầu tư đã gửi, không thể sửa", Record{"work_item_id": workItemID})
 		}
 		rows, err := queryTx(ctx, tx, `
 			UPDATE owner_client_checklist_reconciliations
@@ -2870,11 +2870,11 @@ func (r *Repository) SaveMaterialSnapshot(ctx context.Context, item Record, head
 	constructionArea := cleanOptionalText(header["construction_area"])
 	comment := cleanOptionalText(header["comment"])
 	status := "draft"
-	activityComment := "Đã lưu nháp snapshot vật tư trước/sau"
+	activityComment := "Đã lưu nháp ghi nhận vật tư trước/sau"
 	eventType := "material_snapshot_saved"
 	if submit {
 		status = "submitted"
-		activityComment = "Đã submit snapshot vật tư trước/sau"
+		activityComment = "Đã gửi ghi nhận vật tư trước/sau"
 		eventType = "material_snapshot_submitted"
 	}
 	if comment != "" {
@@ -2901,7 +2901,7 @@ func (r *Repository) SaveMaterialSnapshot(ctx context.Context, item Record, head
 	if len(existingRows) > 0 {
 		existing := existingRows[0]
 		if fmt.Sprint(existing["status"]) == "submitted" || boolValue(existing["applied_to_site_balance"]) {
-			return validationError("Snapshot vật tư đã submit, không thể sửa", Record{"work_item_id": workItemID})
+			return validationError("Ghi nhận vật tư đã gửi, không thể sửa", Record{"work_item_id": workItemID})
 		}
 		rows, err := queryTx(ctx, tx, `
 			UPDATE material_before_after_snapshots
@@ -3145,10 +3145,10 @@ func (r *Repository) SaveSurplusHandling(ctx context.Context, item Record, handl
 			return nil, sql.ErrNoRows
 		}
 		if fmt.Sprint(existingRows[0]["status"]) == "submitted" {
-			return nil, validationError("Hồ sơ xử lý vật tư dư đã submit, không thể sửa", Record{"surplus_handling_id": handlingID})
+			return nil, validationError("Hồ sơ xử lý vật tư dư đã gửi, không thể sửa", Record{"surplus_handling_id": handlingID})
 		}
 		if cleanID(existingRows[0]["work_item_id"]) != workItemID {
-			return nil, validationError("Hồ sơ xử lý vật tư dư không thuộc work item", Record{"surplus_handling_id": handlingID})
+			return nil, validationError("Hồ sơ xử lý vật tư dư không thuộc đầu việc", Record{"surplus_handling_id": handlingID})
 		}
 		rows, err := queryTx(ctx, tx, `
 			UPDATE site_surplus_handlings
@@ -3263,7 +3263,7 @@ func (r *Repository) SubmitSurplusHandling(ctx context.Context, handlingID strin
 	}
 	handling := rows[0]
 	if fmt.Sprint(handling["status"]) == "submitted" {
-		return nil, validationError("Hồ sơ xử lý vật tư dư đã submit", Record{"surplus_handling_id": handlingID})
+		return nil, validationError("Hồ sơ xử lý vật tư dư đã gửi", Record{"surplus_handling_id": handlingID})
 	}
 	projectID := cleanID(handling["project_id"])
 	workItemID := cleanID(handling["work_item_id"])
@@ -3273,7 +3273,7 @@ func (r *Repository) SubmitSurplusHandling(ctx context.Context, handlingID strin
 	quantity := number(handling["quantity"])
 	unit := cleanOptionalText(handling["unit"])
 	if warehouseID == "" || cleanID(handling["evidence_id"]) == "" || cleanOptionalText(handling["custody_location"]) == "" {
-		return nil, validationError("Hồ sơ xử lý vật tư dư thiếu kho, evidence hoặc vị trí lưu/trả")
+		return nil, validationError("Hồ sơ xử lý vật tư dư thiếu kho, minh chứng hoặc vị trí lưu/trả")
 	}
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "stock:"+warehouseID+":"+materialID); err != nil {
 		return nil, err
@@ -3551,7 +3551,7 @@ func (r *Repository) SaveIncomingAcceptance(ctx context.Context, acceptanceID st
 			return nil, sql.ErrNoRows
 		}
 		if fmt.Sprint(existingRows[0]["status"]) == "submitted" {
-			return nil, validationError("Hồ sơ nghiệm thu đầu vào đã submit, không thể sửa", Record{"incoming_acceptance_id": acceptanceID})
+			return nil, validationError("Hồ sơ nghiệm thu đầu vào đã gửi, không thể sửa", Record{"incoming_acceptance_id": acceptanceID})
 		}
 		if cleanID(existingRows[0]["project_id"]) != projectID {
 			return nil, validationError("Hồ sơ nghiệm thu đầu vào không thuộc công trình", Record{"incoming_acceptance_id": acceptanceID})
@@ -3698,7 +3698,7 @@ func (r *Repository) SubmitIncomingAcceptance(ctx context.Context, acceptanceID 
 	}
 	record := rows[0]
 	if fmt.Sprint(record["status"]) == "submitted" {
-		return nil, validationError("Hồ sơ nghiệm thu đầu vào đã submit", Record{"incoming_acceptance_id": acceptanceID})
+		return nil, validationError("Hồ sơ nghiệm thu đầu vào đã gửi", Record{"incoming_acceptance_id": acceptanceID})
 	}
 	if fmt.Sprint(record["status"]) == "cancelled" {
 		return nil, validationError("Hồ sơ nghiệm thu đầu vào đã hủy", Record{"incoming_acceptance_id": acceptanceID})
@@ -3712,7 +3712,7 @@ func (r *Repository) SubmitIncomingAcceptance(ctx context.Context, acceptanceID 
 		return nil, err
 	}
 	if len(itemRows) == 0 || number(itemRows[0]["total"]) == 0 {
-		return nil, validationError("Cần ít nhất một dòng vật tư để submit nghiệm thu đầu vào")
+		return nil, validationError("Cần ít nhất một dòng vật tư để gửi nghiệm thu đầu vào")
 	}
 	updated, err := queryTx(ctx, tx, `
 		UPDATE incoming_acceptance_records
@@ -3738,7 +3738,7 @@ func (r *Repository) SubmitIncomingAcceptance(ctx context.Context, acceptanceID 
 	}
 	comment := cleanOptionalText(record["comment"])
 	if comment == "" {
-		comment = fmt.Sprintf("Submit nghiệm thu đầu vào: %s", result)
+		comment = fmt.Sprintf("Gửi nghiệm thu đầu vào: %s", result)
 	}
 	rawMetadata, _ := json.Marshal(Record{
 		"incoming_acceptance_id": acceptanceID,
@@ -4057,7 +4057,7 @@ func (r *Repository) CreateWorkflowFormTemplate(ctx context.Context, body Record
 		return nil, err
 	}
 	templateID := cleanID(row["id"])
-	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_created", "workflow_form_template", templateID, fmt.Sprintf("Tạo workflow form template %s", body["name"]), Record{"code": body["code"], "form_type": body["form_type"]})
+	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_created", "workflow_form_template", templateID, fmt.Sprintf("Tạo mẫu biểu mẫu quy trình %s", body["name"]), Record{"code": body["code"], "form_type": body["form_type"]})
 	return r.WorkflowFormTemplateDetail(ctx, templateID)
 }
 
@@ -4073,7 +4073,7 @@ func (r *Repository) UpdateWorkflowFormTemplate(ctx context.Context, templateID 
 			return nil, err
 		}
 		if len(usageRows) > 0 && number(usageRows[0]["total"]) > 0 {
-			return nil, validationError("Không thể archive workflow form template đang được pipeline step sử dụng", Record{"step_usage_count": usageRows[0]["total"]})
+			return nil, validationError("Không thể lưu trữ mẫu biểu mẫu quy trình đang được bước quy trình sử dụng", Record{"step_usage_count": usageRows[0]["total"]})
 		}
 	}
 	row, err := r.QueryOne(ctx, `
@@ -4088,7 +4088,7 @@ func (r *Repository) UpdateWorkflowFormTemplate(ctx context.Context, templateID 
 	if err != nil {
 		return nil, err
 	}
-	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_updated", "workflow_form_template", templateID, fmt.Sprintf("Cập nhật workflow form template %s", row["name"]), Record{"status": body["status"]})
+	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_updated", "workflow_form_template", templateID, fmt.Sprintf("Cập nhật mẫu biểu mẫu quy trình %s", row["name"]), Record{"status": body["status"]})
 	return r.WorkflowFormTemplateDetail(ctx, templateID)
 }
 
@@ -4103,7 +4103,7 @@ func (r *Repository) ArchiveWorkflowFormTemplate(ctx context.Context, templateID
 		return nil, err
 	}
 	if len(usageRows) > 0 && number(usageRows[0]["total"]) > 0 {
-		return nil, validationError("Không thể archive workflow form template đang được pipeline step sử dụng", Record{"step_usage_count": usageRows[0]["total"]})
+		return nil, validationError("Không thể lưu trữ mẫu biểu mẫu quy trình đang được bước quy trình sử dụng", Record{"step_usage_count": usageRows[0]["total"]})
 	}
 	row, err := r.QueryOne(ctx, `
 		UPDATE workflow_form_templates
@@ -4114,7 +4114,7 @@ func (r *Repository) ArchiveWorkflowFormTemplate(ctx context.Context, templateID
 	if err != nil {
 		return nil, err
 	}
-	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_archived", "workflow_form_template", templateID, fmt.Sprintf("Archive workflow form template %s", row["name"]), Record{})
+	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_archived", "workflow_form_template", templateID, fmt.Sprintf("Lưu trữ mẫu biểu mẫu quy trình %s", row["name"]), Record{})
 	return r.WorkflowFormTemplateDetail(ctx, templateID)
 }
 
@@ -4181,7 +4181,7 @@ func (r *Repository) CreateWorkflowFormVersion(ctx context.Context, templateID s
 	if err := insertWorkflowFormFieldsTx(ctx, tx, versionID, fields); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_created", "workflow_form_version", versionID, fmt.Sprintf("Tạo draft workflow form %s v%d", templateName, nextVersionNo), Record{"template_id": templateID, "source_version_id": sourceVersionID}); err != nil {
+	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_created", "workflow_form_version", versionID, fmt.Sprintf("Tạo nháp biểu mẫu quy trình %s v%d", templateName, nextVersionNo), Record{"template_id": templateID, "source_version_id": sourceVersionID}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -4209,7 +4209,7 @@ func (r *Repository) UpdateWorkflowFormVersion(ctx context.Context, versionID st
 		return nil, err
 	}
 	if status != "draft" {
-		return nil, validationError("Chỉ draft workflow form version mới được chỉnh sửa", Record{"status": status})
+		return nil, validationError("Chỉ phiên bản nháp biểu mẫu quy trình mới được chỉnh sửa", Record{"status": status})
 	}
 	rawSchema, _ := json.Marshal(defaultRecord(body["schema_json"]))
 	rawValidation, _ := json.Marshal(defaultRecord(body["validation_json"]))
@@ -4228,7 +4228,7 @@ func (r *Repository) UpdateWorkflowFormVersion(ctx context.Context, versionID st
 	if err := insertWorkflowFormFieldsTx(ctx, tx, versionID, workflowFieldRecords(body["fields"])); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_updated", "workflow_form_version", versionID, fmt.Sprintf("Cập nhật draft workflow form %s v%d", templateName, versionNo), Record{"template_id": templateID}); err != nil {
+	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_updated", "workflow_form_version", versionID, fmt.Sprintf("Cập nhật nháp biểu mẫu quy trình %s v%d", templateName, versionNo), Record{"template_id": templateID}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -4256,14 +4256,14 @@ func (r *Repository) PublishWorkflowFormVersion(ctx context.Context, versionID s
 		return nil, err
 	}
 	if status != "draft" {
-		return nil, validationError("Chỉ draft workflow form version mới được publish", Record{"status": status})
+		return nil, validationError("Chỉ phiên bản nháp biểu mẫu quy trình mới được phát hành", Record{"status": status})
 	}
 	var fieldCount int
 	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM workflow_form_fields WHERE form_version_id=$1`, versionID).Scan(&fieldCount); err != nil {
 		return nil, err
 	}
 	if fieldCount == 0 {
-		return nil, validationError("Workflow form version cần ít nhất một field trước khi publish")
+		return nil, validationError("Phiên bản biểu mẫu quy trình cần ít nhất một trường trước khi phát hành")
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE workflow_form_versions
@@ -4274,7 +4274,7 @@ func (r *Repository) PublishWorkflowFormVersion(ctx context.Context, versionID s
 	`, versionID); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_published", "workflow_form_version", versionID, fmt.Sprintf("Publish workflow form %s v%d", templateName, versionNo), Record{"template_id": templateID, "field_count": fieldCount}); err != nil {
+	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_published", "workflow_form_version", versionID, fmt.Sprintf("Phát hành biểu mẫu quy trình %s v%d", templateName, versionNo), Record{"template_id": templateID, "field_count": fieldCount}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -4309,12 +4309,12 @@ func (r *Repository) ArchiveWorkflowFormVersion(ctx context.Context, versionID s
 		return nil, err
 	}
 	if stepUsage > 0 {
-		return nil, validationError("Không thể archive workflow form version đang được pipeline step sử dụng", Record{"step_usage_count": stepUsage})
+		return nil, validationError("Không thể lưu trữ phiên bản biểu mẫu quy trình đang được bước quy trình sử dụng", Record{"step_usage_count": stepUsage})
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE workflow_form_versions SET status='archived', updated_at=now() WHERE id=$1`, versionID); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_archived", "workflow_form_version", versionID, fmt.Sprintf("Archive workflow form %s v%d", templateName, versionNo), Record{"template_id": templateID}); err != nil {
+	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_archived", "workflow_form_version", versionID, fmt.Sprintf("Lưu trữ biểu mẫu quy trình %s v%d", templateName, versionNo), Record{"template_id": templateID}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -4531,7 +4531,7 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 	instance := rows[0]
 	fromStatus := fmt.Sprint(instance["status"])
 	if statusIn(fromStatus, "cancelled") || (!submit && fromStatus == "submitted") || (submit && fromStatus == "submitted") {
-		return nil, validationError("Trạng thái workflow form đã thay đổi, vui lòng tải lại", Record{"status": fromStatus})
+		return nil, validationError("Trạng thái biểu mẫu quy trình đã thay đổi, vui lòng tải lại", Record{"status": fromStatus})
 	}
 	revisionNo := int(number(instance["current_revision"]))
 	if submit {
@@ -4601,9 +4601,9 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 		activityComment := comment
 		if activityComment == "" {
 			if submit {
-				activityComment = "Workflow form submitted"
+				activityComment = "Đã gửi biểu mẫu quy trình"
 			} else {
-				activityComment = "Workflow form draft saved"
+				activityComment = "Đã lưu nháp biểu mẫu quy trình"
 			}
 		}
 		if _, err := tx.ExecContext(ctx, `
@@ -4642,7 +4642,7 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 					payload["checklist"] = checklistItems
 				} else {
 					payload["checklist"] = []Record{{
-						"label":    "Submitted workflow form",
+						"label":    "Đã gửi biểu mẫu quy trình",
 						"checked":  true,
 						"source":   "workflow_form",
 						"form_id":  instanceID,
@@ -4661,9 +4661,9 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 				return nil, err
 			}
 		}
-		auditDescription := "Lưu nháp workflow form"
+		auditDescription := "Lưu nháp biểu mẫu quy trình"
 		if submit {
-			auditDescription = "Submit workflow form"
+			auditDescription = "Gửi biểu mẫu quy trình"
 		}
 		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_"+eventType, "workflow_form_instance", instanceID, auditDescription, Record{"work_item_id": workItemID, "form_type": instance["form_type"], "revision_no": revisionNo}); err != nil {
 			return nil, err
@@ -4702,14 +4702,14 @@ func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, 
 	}
 	instance := rows[0]
 	if fmt.Sprint(instance["status"]) != "submitted" {
-		return nil, validationError("Workflow form phải được submit trước khi ký nội bộ", Record{"status": instance["status"]})
+		return nil, validationError("Biểu mẫu quy trình phải được gửi trước khi ký nội bộ", Record{"status": instance["status"]})
 	}
 	projectID := cleanID(instance["project_id"])
 	workItemID := cleanID(instance["work_item_id"])
 	formVersionID := cleanID(instance["form_version_id"])
 	revisionNo := int(number(instance["current_revision"]))
 	if workItemID == "" || projectID == "" || formVersionID == "" {
-		return nil, validationError("Workflow form thiếu liên kết để ký", Record{"workflow_form_instance_id": instanceID})
+		return nil, validationError("Biểu mẫu quy trình thiếu liên kết để ký", Record{"workflow_form_instance_id": instanceID})
 	}
 
 	duplicateRows, err := queryTx(ctx, tx, `
@@ -4721,7 +4721,7 @@ func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, 
 		return nil, err
 	}
 	if len(duplicateRows) > 0 && number(duplicateRows[0]["total"]) > 0 {
-		return nil, validationError("Bạn đã ký workflow form này cho mục đích này", Record{"purpose": purpose})
+		return nil, validationError("Bạn đã ký biểu mẫu quy trình này cho mục đích này", Record{"purpose": purpose})
 	}
 
 	roleRows, err := queryTx(ctx, tx, `
@@ -4798,7 +4798,7 @@ func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, 
 	})
 	eventComment := comment
 	if eventComment == "" {
-		eventComment = "Workflow form signed"
+		eventComment = "Đã ký biểu mẫu quy trình"
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, from_status, to_status, comment, metadata_json)
@@ -4806,7 +4806,7 @@ func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, 
 	`, instanceID, projectID, workItemID, actorID, eventComment, string(rawMetadata)); err != nil {
 		return nil, err
 	}
-	activityComment := fmt.Sprintf("Workflow form signed: %s", purpose)
+	activityComment := fmt.Sprintf("Đã ký biểu mẫu quy trình: %s", purpose)
 	if comment != "" {
 		activityComment = comment
 	}
@@ -4816,7 +4816,7 @@ func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, 
 	`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_signed", "workflow_form_signature", signatureID, "Ký nội bộ workflow form", Record{
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_signed", "workflow_form_signature", signatureID, "Ký nội bộ biểu mẫu quy trình", Record{
 		"work_item_id":              workItemID,
 		"workflow_form_instance_id": instanceID,
 		"purpose":                   purpose,
@@ -4858,14 +4858,14 @@ func (r *Repository) CreateWorkflowFormPDFExport(ctx context.Context, instanceID
 	}
 	instance := rows[0]
 	if fmt.Sprint(instance["status"]) != "submitted" {
-		return nil, validationError("Workflow form phải được submit trước khi export PDF", Record{"status": instance["status"]})
+		return nil, validationError("Biểu mẫu quy trình phải được gửi trước khi xuất PDF", Record{"status": instance["status"]})
 	}
 	projectID := cleanID(instance["project_id"])
 	workItemID := cleanID(instance["work_item_id"])
 	formVersionID := cleanID(instance["form_version_id"])
 	revisionNo := int(number(instance["current_revision"]))
 	if workItemID == "" || projectID == "" || formVersionID == "" {
-		return nil, validationError("Workflow form thiếu liên kết để export PDF", Record{"workflow_form_instance_id": instanceID})
+		return nil, validationError("Biểu mẫu quy trình thiếu liên kết để xuất PDF", Record{"workflow_form_instance_id": instanceID})
 	}
 	if strings.TrimSpace(title) == "" {
 		title = fmt.Sprint(instance["title"])
@@ -4907,16 +4907,16 @@ func (r *Repository) CreateWorkflowFormPDFExport(ctx context.Context, instanceID
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, from_status, to_status, comment, metadata_json)
 		VALUES ($1, $2, $3, NULLIF($4,'')::uuid, 'pdf_exported', 'submitted', 'submitted', $5, $6::jsonb)
-	`, instanceID, projectID, workItemID, actorID, fmt.Sprintf("Export PDF workflow form: %s", fileName), string(rawEventMetadata)); err != nil {
+	`, instanceID, projectID, workItemID, actorID, fmt.Sprintf("Xuất PDF biểu mẫu quy trình: %s", fileName), string(rawEventMetadata)); err != nil {
 		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
 		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'internal', $5::jsonb)
-	`, workItemID, projectID, actorID, fmt.Sprintf("Workflow form PDF exported: %s", fileName), string(rawEventMetadata)); err != nil {
+	`, workItemID, projectID, actorID, fmt.Sprintf("Đã xuất PDF biểu mẫu quy trình: %s", fileName), string(rawEventMetadata)); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_pdf_exported", "workflow_form_pdf_export", exportID, "Export PDF workflow form", eventMetadata); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_pdf_exported", "workflow_form_pdf_export", exportID, "Xuất PDF biểu mẫu quy trình", eventMetadata); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -5013,7 +5013,7 @@ func createMeetingMinutesActionItemsTx(ctx context.Context, tx *sql.Tx, instance
 		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, to_status, comment, metadata_json)
-			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'created', 'ready', 'Action item generated from meeting minutes', $4::jsonb)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'created', 'ready', 'Đầu việc được sinh từ biên bản họp', $4::jsonb)
 		`, workItemID, projectID, actorID, string(rawMetadata)); err != nil {
 			return nil, err
 		}
@@ -5025,7 +5025,7 @@ func createMeetingMinutesActionItemsTx(ctx context.Context, tx *sql.Tx, instance
 			"workflow_form_instance_id": instanceID,
 			"generated_work_item_ids":   createdIDs,
 		})
-		comment := fmt.Sprintf("Meeting minutes generated %d action item work items", len(createdIDs))
+		comment := fmt.Sprintf("Biên bản họp đã sinh %d đầu việc", len(createdIDs))
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, metadata_json)
 			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, $5::jsonb)
@@ -5069,13 +5069,13 @@ func createDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, instance Reco
 			descriptionParts = append(descriptionParts, reportLabel+": "+reportDate)
 		}
 		if scopeValue != "" && scopeValue != "<nil>" {
-			descriptionParts = append(descriptionParts, "Scope: "+scopeValue)
+			descriptionParts = append(descriptionParts, "Phạm vi: "+scopeValue)
 		}
 		if reportedBy != "" && reportedBy != "<nil>" {
-			descriptionParts = append(descriptionParts, "Reporter: "+reportedBy)
+			descriptionParts = append(descriptionParts, "Người báo cáo: "+reportedBy)
 		}
 		if ownerName != "" && ownerName != "<nil>" {
-			descriptionParts = append(descriptionParts, "Owner: "+ownerName)
+			descriptionParts = append(descriptionParts, "Người phụ trách: "+ownerName)
 		}
 		if note := strings.TrimSpace(fmt.Sprint(item["description"])); note != "" && note != "<nil>" {
 			descriptionParts = append(descriptionParts, note)
@@ -5118,7 +5118,7 @@ func createDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, instance Reco
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, to_status, comment, metadata_json)
 			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'created', 'ready', $4, $5::jsonb)
-		`, workItemID, projectID, actorID, "Next plan item generated from "+strings.ToLower(reportLabel), string(rawMetadata)); err != nil {
+		`, workItemID, projectID, actorID, "Đầu việc kế hoạch tiếp theo được sinh từ "+strings.ToLower(reportLabel), string(rawMetadata)); err != nil {
 			return nil, err
 		}
 		createdIDs = append(createdIDs, workItemID)
@@ -5129,7 +5129,7 @@ func createDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, instance Reco
 			"workflow_form_instance_id": instanceID,
 			"generated_work_item_ids":   createdIDs,
 		})
-		comment := fmt.Sprintf("%s generated %d next plan work items", reportLabel, len(createdIDs))
+		comment := fmt.Sprintf("%s đã sinh %d đầu việc kế hoạch tiếp theo", reportLabel, len(createdIDs))
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, metadata_json)
 			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, $5::jsonb)
@@ -5143,12 +5143,12 @@ func createDailyReportNextItemsTx(ctx context.Context, tx *sql.Tx, instance Reco
 func dailyReportNextItemContext(instance Record, answers Record) (string, string, string, string) {
 	formCode := strings.TrimSpace(fmt.Sprint(instance["form_code"]))
 	if formCode == "builtin_construction_daily_report" {
-		return "construction_daily_report", "Construction daily report", "construction_scope", strings.TrimSpace(fmt.Sprint(answers["construction_scope"]))
+		return "construction_daily_report", "Nhật ký thi công", "construction_scope", strings.TrimSpace(fmt.Sprint(answers["construction_scope"]))
 	}
 	if rawScope, ok := answers["construction_scope"]; ok {
-		return "construction_daily_report", "Construction daily report", "construction_scope", strings.TrimSpace(fmt.Sprint(rawScope))
+		return "construction_daily_report", "Nhật ký thi công", "construction_scope", strings.TrimSpace(fmt.Sprint(rawScope))
 	}
-	return "planning_daily_report", "Planning daily report", "planning_scope", strings.TrimSpace(fmt.Sprint(answers["planning_scope"]))
+	return "planning_daily_report", "Nhật ký kế hoạch", "planning_scope", strings.TrimSpace(fmt.Sprint(answers["planning_scope"]))
 }
 
 func (r *Repository) GetDocumentAttachment(ctx context.Context, documentID string) (Record, error) {
@@ -5165,7 +5165,7 @@ func (r *Repository) RequestWorkItemApproval(ctx context.Context, item Record, r
 	fromStatus := fmt.Sprint(item["status"])
 	comment := workItemActionComment(req)
 	if comment == "" {
-		comment = "Yêu cầu duyệt work item"
+		comment = "Yêu cầu duyệt đầu việc"
 	}
 	requiredRoles := normalizedRoleList(req.RequiredRoles)
 	if len(requiredRoles) == 0 {
@@ -5228,7 +5228,7 @@ func (r *Repository) RequestWorkItemApproval(ctx context.Context, item Record, r
 		return nil, err
 	}
 	if len(updated) == 0 {
-		return nil, validationError("Trạng thái work item đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+		return nil, validationError("Trạng thái đầu việc đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
 	}
 	if err := applyRunStepStatusTx(ctx, tx, item, "waiting_approval", actorID); err != nil {
 		return nil, err
@@ -5291,7 +5291,7 @@ func (r *Repository) ApplyWorkItemTransition(ctx context.Context, item Record, t
 		return nil, err
 	}
 	if len(updated) == 0 {
-		return nil, validationError("Trạng thái work item đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+		return nil, validationError("Trạng thái đầu việc đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
 	}
 
 	if err := applyRunStepStatusTx(ctx, tx, item, toStatus, actorID); err != nil {
@@ -5374,7 +5374,7 @@ func (r *Repository) ApplyWorkItemDecision(ctx context.Context, item Record, act
 		return nil, err
 	}
 	if len(updated) == 0 {
-		return nil, validationError("Trạng thái work item đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+		return nil, validationError("Trạng thái đầu việc đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
 	}
 	if err := applyRunStepStatusTx(ctx, tx, item, toStatus, actorID); err != nil {
 		return nil, err
@@ -5445,7 +5445,7 @@ func (r *Repository) AddWorkItemEvidence(ctx context.Context, item Record, req W
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
 		VALUES ($1, NULLIF($2,'')::uuid, $3, 'work_item_evidence_added', 'work_item', $4, $5, $6::jsonb)
-	`, projectID, actorID, actorName, workItemID, fmt.Sprintf("Thêm evidence %s cho work item %s", req.Name, item["title"]), string(rawMetadata)); err != nil {
+	`, projectID, actorID, actorName, workItemID, fmt.Sprintf("Thêm minh chứng %s cho đầu việc %s", req.Name, item["title"]), string(rawMetadata)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -5651,16 +5651,27 @@ func workItemActivityEvent(activityType string) string {
 func workItemActivityDescription(activityType string, item Record, comment string) string {
 	title := fmt.Sprint(item["title"])
 	if activityType == "comment" {
-		return fmt.Sprintf("Ghi chú work item %s", title)
+		return fmt.Sprintf("Ghi chú đầu việc %s", title)
 	}
-	return fmt.Sprintf("Tạo activity %s cho work item %s: %s", activityType, title, comment)
+	return fmt.Sprintf("Tạo hoạt động %s cho đầu việc %s: %s", activityType, title, comment)
 }
 
 func projectActivityDescription(activityType string, comment string) string {
 	if activityType == "comment" {
 		return "Ghi chú công trình"
 	}
-	return fmt.Sprintf("Tạo activity %s cho công trình: %s", activityType, comment)
+	return fmt.Sprintf("Tạo hoạt động %s cho công trình: %s", activityType, comment)
+}
+
+func evidenceReviewActionLabel(action string) string {
+	switch action {
+	case "accept":
+		return "Chấp nhận"
+	case "reject":
+		return "Từ chối"
+	default:
+		return action
+	}
 }
 
 func (r *Repository) EvidenceAction(ctx context.Context, evidence Record, item Record, action string, req ActionRequest, actorID, actorName string) (Record, error) {
@@ -5696,7 +5707,7 @@ func (r *Repository) EvidenceAction(ctx context.Context, evidence Record, item R
 		return nil, err
 	}
 	if len(updated) == 0 {
-		return nil, validationError("Evidence đã được review hoặc không còn hợp lệ", Record{"status": evidence["status"]})
+		return nil, validationError("Minh chứng đã được rà soát hoặc không còn hợp lệ", Record{"status": evidence["status"]})
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, metadata_json)
@@ -5704,10 +5715,11 @@ func (r *Repository) EvidenceAction(ctx context.Context, evidence Record, item R
 	`, workItemID, projectID, actorID, activityType, comment, string(rawMetadata)); err != nil {
 		return nil, err
 	}
+	actionLabel := evidenceReviewActionLabel(action)
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
 		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, 'evidence_record', $5, $6, $7::jsonb)
-	`, projectID, actorID, actorName, "work_item_"+activityType, evidenceID, fmt.Sprintf("%s evidence %s", action, evidence["name"]), string(rawMetadata)); err != nil {
+	`, projectID, actorID, actorName, "work_item_"+activityType, evidenceID, fmt.Sprintf("%s minh chứng %s", actionLabel, evidence["name"]), string(rawMetadata)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -5741,25 +5753,25 @@ func workItemAuditDescription(activityType string, item Record, comment string) 
 	title := fmt.Sprint(item["title"])
 	switch activityType {
 	case "started":
-		return fmt.Sprintf("Bắt đầu work item %s", title)
+		return fmt.Sprintf("Bắt đầu đầu việc %s", title)
 	case "completed":
-		return fmt.Sprintf("Hoàn tất work item %s", title)
+		return fmt.Sprintf("Hoàn tất đầu việc %s", title)
 	case "blocked":
-		return fmt.Sprintf("Block work item %s: %s", title, comment)
+		return fmt.Sprintf("Chặn đầu việc %s: %s", title, comment)
 	case "blocker_resolved":
-		return fmt.Sprintf("Resolve blocker work item %s: %s", title, comment)
+		return fmt.Sprintf("Gỡ điểm chặn đầu việc %s: %s", title, comment)
 	case "review_requested":
-		return fmt.Sprintf("Yêu cầu review work item %s", title)
+		return fmt.Sprintf("Yêu cầu rà soát đầu việc %s", title)
 	case "approval_requested":
-		return fmt.Sprintf("Yêu cầu duyệt work item %s", title)
+		return fmt.Sprintf("Yêu cầu duyệt đầu việc %s", title)
 	case "approved":
-		return fmt.Sprintf("Duyệt work item %s", title)
+		return fmt.Sprintf("Duyệt đầu việc %s", title)
 	case "rejected":
-		return fmt.Sprintf("Reject work item %s: %s", title, comment)
+		return fmt.Sprintf("Từ chối đầu việc %s: %s", title, comment)
 	case "changes_requested":
-		return fmt.Sprintf("Yêu cầu chỉnh sửa work item %s: %s", title, comment)
+		return fmt.Sprintf("Yêu cầu chỉnh sửa đầu việc %s: %s", title, comment)
 	default:
-		return fmt.Sprintf("Cập nhật work item %s", title)
+		return fmt.Sprintf("Cập nhật đầu việc %s", title)
 	}
 }
 
@@ -6718,7 +6730,7 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 		}
 	}
 	if templateID == "" {
-		return nil, errors.New("project has no pipeline template")
+		return nil, errors.New("Công trình chưa có mẫu quy trình")
 	}
 
 	formIssues, err := queryTx(ctx, tx, templatePublishFormIssuesSQL(), templateID)
@@ -6726,7 +6738,7 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 		return nil, err
 	}
 	if len(formIssues) > 0 {
-		return nil, validationError("Template có step bắt buộc workflow form nhưng chưa map form published", Record{"issues": formIssues})
+		return nil, validationError("Mẫu quy trình có bước bắt buộc biểu mẫu quy trình nhưng chưa gắn phiên bản biểu mẫu đã phát hành", Record{"issues": formIssues})
 	}
 
 	runID := newID()
@@ -6746,7 +6758,7 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 		return nil, err
 	}
 	if len(nodes) == 0 {
-		return nil, errors.New("template has no nodes")
+		return nil, errors.New("Mẫu quy trình chưa có node")
 	}
 
 	currentNodeID := ""
@@ -6826,7 +6838,7 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 			}
 			if _, err := tx.ExecContext(ctx, `
 				INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, to_status, comment, metadata_json)
-				VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'created', $4, 'Work item generated from pipeline run step', $5::jsonb)
+				VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'created', $4, 'Đầu việc được tạo từ bước chạy quy trình', $5::jsonb)
 			`, workItemID, projectID, actorID, workItemStatus, `{"source_type":"pipeline_run_step"}`); err != nil {
 				return nil, err
 			}
@@ -6847,7 +6859,7 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 				if len(formRows) > 0 {
 					if _, err := tx.ExecContext(ctx, `
 						INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, to_status, comment, metadata_json)
-						VALUES ($1, $2, $3, NULLIF($4,'')::uuid, 'created', 'draft', 'Workflow form instance created from pipeline start', $5::jsonb)
+						VALUES ($1, $2, $3, NULLIF($4,'')::uuid, 'created', 'draft', 'Biểu mẫu quy trình được tạo khi khởi động quy trình', $5::jsonb)
 					`, formRows[0]["id"], projectID, workItemID, actorID, `{"source":"start_pipeline"}`); err != nil {
 						return nil, err
 					}
@@ -6967,7 +6979,7 @@ func (r *Repository) SubmitRunStep(ctx context.Context, stepID string, req WorkI
 	rawPayload, _ := json.Marshal(payload)
 	comment := strings.TrimSpace(req.Comment)
 	if comment == "" {
-		comment = "Completed through legacy pipeline step submit"
+		comment = "Hoàn tất qua thao tác gửi bước quy trình cũ"
 	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -7153,7 +7165,7 @@ func (r *Repository) automateClientBOQProcurement(ctx context.Context, contextRo
 		return automationBlocked("generate_procurement_from_boq", "Chưa có dòng BOQ để sinh yêu cầu mua", metadata), nil
 	}
 	if number(summary["not_ready"]) > 0 {
-		return automationBlocked("generate_procurement_from_boq", "BOQ còn dòng chưa approved hoặc chưa final lock đơn giá", metadata), nil
+		return automationBlocked("generate_procurement_from_boq", "BOQ còn dòng chưa duyệt hoặc chưa khóa đơn giá cuối", metadata), nil
 	}
 	if number(summary["ready_without_procurement"]) > 0 {
 		procurement, err := r.GenerateProcurementFromBOQ(ctx, projectID, actorID, actorName)
@@ -7266,10 +7278,13 @@ func (r *Repository) ensureIncomingAcceptanceFinanceScaffoldTx(ctx context.Conte
 	acceptanceRows, err := queryTx(ctx, tx, `
 		SELECT id
 		FROM incoming_acceptance_records
-		WHERE work_item_id=$1 AND status <> 'cancelled'
+		WHERE project_id=$1
+			AND procurement_request_id=$2
+			AND source_type='procurement'
+			AND status <> 'cancelled'
 		ORDER BY created_at DESC
 		LIMIT 1
-	`, workItemID)
+	`, projectID, procurementID)
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -7383,13 +7398,29 @@ func (r *Repository) ensureOutgoingAcceptanceFinanceScaffoldTx(ctx context.Conte
 	workItemID := cleanID(contextRow["id"])
 	runNodeID := cleanID(contextRow["run_node_id"])
 	metadata := Record{"node": contextRow["run_node_name"]}
-	acceptanceRows, err := queryTx(ctx, tx, `
-		SELECT id
-		FROM acceptance_records
-		WHERE work_item_id=$1 AND status <> 'cancelled'
-		ORDER BY created_at DESC
-		LIMIT 1
-	`, workItemID)
+	var acceptanceRows []Record
+	var err error
+	if runNodeID != "" {
+		acceptanceRows, err = queryTx(ctx, tx, `
+			SELECT id
+			FROM acceptance_records
+			WHERE project_id=$1
+				AND node_id=$2
+				AND type='final'
+				AND status <> 'cancelled'
+				AND summary_json->>'automation_scaffold'='true'
+			ORDER BY created_at DESC
+			LIMIT 1
+		`, projectID, runNodeID)
+	} else {
+		acceptanceRows, err = queryTx(ctx, tx, `
+			SELECT id
+			FROM acceptance_records
+			WHERE work_item_id=$1 AND status <> 'cancelled'
+			ORDER BY created_at DESC
+			LIMIT 1
+		`, workItemID)
+	}
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -7775,14 +7806,24 @@ func automationBlockedWithTarget(actionKey, reason, targetType, targetID string,
 	}
 }
 
+func clientWorkflowAutomationSource(contextRow Record, actionKey string) (string, string) {
+	workItemID := cleanID(contextRow["id"])
+	switch actionKey {
+	case "incoming_acceptance_finance_scaffold", "outgoing_acceptance_finance_scaffold", "handover_financial_closure_check":
+		if runNodeID := cleanID(contextRow["run_node_id"]); runNodeID != "" {
+			return "pipeline_run_node", runNodeID
+		}
+	}
+	return "work_item", workItemID
+}
+
 func (r *Repository) recordClientWorkflowAutomationOutcome(ctx context.Context, contextRow Record, outcome workflowAutomationOutcome, actorID, actorName string) error {
 	if outcome.ActionKey == "" || outcome.Status == "" {
 		return nil
 	}
 	projectID := cleanID(contextRow["project_id"])
 	workItemID := cleanID(contextRow["id"])
-	sourceType := "work_item"
-	sourceID := workItemID
+	sourceType, sourceID := clientWorkflowAutomationSource(contextRow, outcome.ActionKey)
 	idempotencyKey := strings.Join([]string{clientOfficialWorkflowTemplateID, sourceType, sourceID, outcome.ActionKey}, ":")
 	metadata := outcome.Metadata
 	if metadata == nil {
@@ -7792,6 +7833,8 @@ func (r *Repository) recordClientWorkflowAutomationOutcome(ctx context.Context, 
 	metadata["run_node_id"] = cleanID(contextRow["run_node_id"])
 	metadata["run_step_id"] = cleanID(contextRow["run_step_id"])
 	metadata["work_item_id"] = workItemID
+	metadata["automation_source_type"] = sourceType
+	metadata["automation_source_id"] = sourceID
 	rawMetadata, _ := json.Marshal(metadata)
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -8084,36 +8127,36 @@ func (r *Repository) runEdgeConditionMet(ctx context.Context, tx *sql.Tx, edge, 
 
 	switch edgeConditionType(edge) {
 	case "", "always":
-		return true, "condition always matched", nil
+		return true, "Điều kiện luôn khớp", nil
 	case "order_index":
 		matched := number(edge["to_order_index"]) > number(fromNode["order_index"])
-		return matched, boolReason(matched, "target node is after source node", "target node is not after source node"), nil
+		return matched, boolReason(matched, "Node đích đứng sau node nguồn", "Node đích không đứng sau node nguồn"), nil
 	case "approval_approved":
-		return r.edgeExists(ctx, tx, "node approval has been approved", "node approval is not approved", `
+		return r.edgeExists(ctx, tx, "Phê duyệt node đã được duyệt", "Phê duyệt node chưa được duyệt", `
 			SELECT COUNT(*) AS total
 			FROM approval_requests
 			WHERE project_id=$1 AND target_type='pipeline_run_node' AND target_id=$2 AND status='approved'
 		`, projectID, nodeID)
 	case "approval_rejected":
-		return r.edgeExists(ctx, tx, "node approval has been rejected", "node approval is not rejected", `
+		return r.edgeExists(ctx, tx, "Phê duyệt node đã bị từ chối", "Phê duyệt node chưa bị từ chối", `
 			SELECT COUNT(*) AS total
 			FROM approval_requests
 			WHERE project_id=$1 AND target_type='pipeline_run_node' AND target_id=$2 AND status='rejected'
 		`, projectID, nodeID)
 	case "acceptance_passed":
-		return r.edgeExists(ctx, tx, "acceptance passed", "no completed passed acceptance", `
+		return r.edgeExists(ctx, tx, "Nghiệm thu đã đạt", "Chưa có nghiệm thu hoàn tất đạt", `
 			SELECT COUNT(*) AS total
 			FROM acceptance_records
 			WHERE project_id=$1 AND result='pass' AND status='completed'
 		`, projectID)
 	case "acceptance_failed":
-		return r.edgeExists(ctx, tx, "acceptance failed", "no failed acceptance", `
+		return r.edgeExists(ctx, tx, "Nghiệm thu không đạt", "Chưa có nghiệm thu không đạt", `
 			SELECT COUNT(*) AS total
 			FROM acceptance_records
 			WHERE project_id=$1 AND result='fail'
 		`, projectID)
 	case "rework_required":
-		return r.edgeExists(ctx, tx, "rework is required", "no open rework requirement", `
+		return r.edgeExists(ctx, tx, "Cần sửa lỗi", "Không có yêu cầu sửa lỗi đang mở", `
 			SELECT COUNT(*) AS total
 			FROM (
 				SELECT id FROM rework_requests WHERE project_id=$1 AND status IN ('draft','approved','in_progress')
@@ -8131,9 +8174,9 @@ func (r *Repository) runEdgeConditionMet(ctx context.Context, tx *sql.Tx, edge, 
 			return false, "", err
 		}
 		matched := total > 0 && open == 0
-		return matched, boolReason(matched, "all rework requests are done", "rework requests are still open or do not exist"), nil
+		return matched, boolReason(matched, "Tất cả yêu cầu sửa lỗi đã hoàn tất", "Yêu cầu sửa lỗi vẫn đang mở hoặc chưa tồn tại"), nil
 	case "replanning_required":
-		return r.edgeExists(ctx, tx, "replanning is required", "no open replanning requirement", `
+		return r.edgeExists(ctx, tx, "Cần lập kế hoạch lại", "Không có yêu cầu lập kế hoạch lại đang mở", `
 			SELECT COUNT(*) AS total
 			FROM (
 				SELECT id FROM replanning_requests WHERE project_id=$1 AND status IN ('draft','submitted')
@@ -8388,7 +8431,7 @@ func (r *Repository) handoverReadyCondition(ctx context.Context, tx *sql.Tx, pro
 		return false, "", err
 	}
 	matched := handoverReady > 0 && failedAcceptance == 0 && openIssues == 0 && pendingSurplus == 0
-	return matched, boolReason(matched, "Hồ sơ bàn giao không còn blocker", "Hồ sơ bàn giao còn blocker"), nil
+	return matched, boolReason(matched, "Hồ sơ bàn giao không còn điểm chặn", "Hồ sơ bàn giao còn điểm chặn"), nil
 }
 
 func (r *Repository) scalarNumberTx(ctx context.Context, tx *sql.Tx, query string, args ...any) (float64, error) {
@@ -8512,7 +8555,7 @@ func (r *Repository) nodeBlockers(ctx context.Context, node Record) []string {
 			WHERE project_id=$1 AND issued_quantity < planned_quantity
 		`, projectID)
 		if len(missing) > 0 && number(missing[0]["total"]) > 0 {
-			blockers = append(blockers, "Vật tư required chưa được xuất đủ ra công trình")
+			blockers = append(blockers, "Vật tư bắt buộc chưa được xuất đủ ra công trình")
 		}
 	}
 	return blockers
@@ -8534,7 +8577,7 @@ func (r *Repository) ApprovalAction(ctx context.Context, approvalID, action, com
 	}
 	status, ok := approvalStatusForAction(action)
 	if !ok {
-		return nil, validationError("Action approval không hợp lệ", Record{"action": action})
+		return nil, validationError("Hành động phê duyệt không hợp lệ", Record{"action": action})
 	}
 	event := "approval_granted"
 	if action == "reject" {
@@ -8568,10 +8611,11 @@ func (r *Repository) ApprovalAction(ctx context.Context, approvalID, action, com
 	if _, err := tx.ExecContext(ctx, `UPDATE approval_requests SET status=$2, resolved_at=now() WHERE id=$1`, approvalID, status); err != nil {
 		return nil, err
 	}
+	actionLabel := approvalAuditActionLabel(action)
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
 		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, $8::jsonb)
-	`, projectParam, actorID, actorName, event, targetType, targetParam, fmt.Sprintf("%s approval: %s", action, comment), string(rawMetadata)); err != nil {
+	`, projectParam, actorID, actorName, event, targetType, targetParam, fmt.Sprintf("%s phê duyệt: %s", actionLabel, comment), string(rawMetadata)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -8655,7 +8699,7 @@ func (r *Repository) CreateBOQItem(ctx context.Context, body Record, actorID, ac
 		return nil, sql.ErrNoRows
 	}
 	item := rows[0]
-	if err := insertBOQUnitPriceEventTx(ctx, tx, item, "expected_updated", "expected", nil, number(item["expected_unit_price"]), "Initial expected unit price", actorID, actorName); err != nil {
+	if err := insertBOQUnitPriceEventTx(ctx, tx, item, "expected_updated", "expected", nil, number(item["expected_unit_price"]), "Thiết lập đơn giá dự kiến ban đầu", actorID, actorName); err != nil {
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, fmt.Sprint(item["project_id"]), actorID, actorName, "boq_created", "boq_item", fmt.Sprint(item["id"]), "Tạo dòng BOQ", Record{"price_revision_no": item["price_revision_no"]}); err != nil {
@@ -8683,10 +8727,10 @@ func (r *Repository) UpdateBOQItem(ctx context.Context, itemID string, body Reco
 	}
 	current := currentRows[0]
 	if boolValue(current["final_price_locked"]) && boqBodyChangesAny(current, body, finalLockedBOQProtectedFields...) {
-		return nil, validationError("Dòng BOQ đã final lock, không thể sửa khối lượng/vật tư/đơn giá", Record{"boq_item_id": itemID})
+		return nil, validationError("Dòng BOQ đã khóa đơn giá cuối, không thể sửa khối lượng/vật tư/đơn giá", Record{"boq_item_id": itemID})
 	}
 	if boolValue(current["norm_price_locked"]) && boqBodyChangesAny(current, body, "expected_unit_price") {
-		return nil, validationError("Dòng BOQ đã norm lock, không thể sửa expected unit price", Record{"boq_item_id": itemID})
+		return nil, validationError("Dòng BOQ đã khóa đơn giá định mức, không thể sửa đơn giá dự kiến", Record{"boq_item_id": itemID})
 	}
 
 	specs := []string{"category", "work_item_name", "description", "unit", "quantity", "expected_unit_price", "material_id", "node_id", "status", "approved_by"}
@@ -8725,7 +8769,7 @@ func (r *Repository) UpdateBOQItem(ctx context.Context, itemID string, body Reco
 	}
 	updated := updatedRows[0]
 	if expectedChanged {
-		if err := insertBOQUnitPriceEventTx(ctx, tx, updated, "expected_updated", "expected", numberPtr(current["expected_unit_price"]), number(updated["expected_unit_price"]), "Updated expected unit price", actorID, actorName); err != nil {
+		if err := insertBOQUnitPriceEventTx(ctx, tx, updated, "expected_updated", "expected", numberPtr(current["expected_unit_price"]), number(updated["expected_unit_price"]), "Cập nhật đơn giá dự kiến", actorID, actorName); err != nil {
 			return nil, err
 		}
 	}
@@ -8771,7 +8815,7 @@ func (r *Repository) changeBOQUnitPrice(ctx context.Context, itemID, eventType s
 	switch eventType {
 	case "expected_updated":
 		if boolValue(current["norm_price_locked"]) || boolValue(current["final_price_locked"]) {
-			return nil, validationError("Không thể sửa expected price sau khi đã lock norm/final", Record{"boq_item_id": itemID})
+			return nil, validationError("Không thể sửa đơn giá dự kiến sau khi đã khóa đơn giá định mức/cuối", Record{"boq_item_id": itemID})
 		}
 		fromPrice = numberPtr(current["expected_unit_price"])
 		updatedRows, err = queryTx(ctx, tx, `
@@ -8783,10 +8827,10 @@ func (r *Repository) changeBOQUnitPrice(ctx context.Context, itemID, eventType s
 		source = "expected"
 	case "norm_locked":
 		if boolValue(current["norm_price_locked"]) {
-			return nil, validationError("Dòng BOQ đã norm lock", Record{"boq_item_id": itemID})
+			return nil, validationError("Dòng BOQ đã khóa đơn giá định mức", Record{"boq_item_id": itemID})
 		}
 		if boolValue(current["final_price_locked"]) {
-			return nil, validationError("Dòng BOQ đã final lock", Record{"boq_item_id": itemID})
+			return nil, validationError("Dòng BOQ đã khóa đơn giá cuối", Record{"boq_item_id": itemID})
 		}
 		fromPrice = numberPtr(current["expected_unit_price"])
 		updatedRows, err = queryTx(ctx, tx, `
@@ -8804,10 +8848,10 @@ func (r *Repository) changeBOQUnitPrice(ctx context.Context, itemID, eventType s
 		source = "norm"
 	case "final_locked":
 		if !boolValue(current["norm_price_locked"]) {
-			return nil, validationError("Cần lock norm price trước khi lock final price", Record{"boq_item_id": itemID})
+			return nil, validationError("Cần khóa đơn giá định mức trước khi khóa đơn giá cuối", Record{"boq_item_id": itemID})
 		}
 		if boolValue(current["final_price_locked"]) {
-			return nil, validationError("Dòng BOQ đã final lock", Record{"boq_item_id": itemID})
+			return nil, validationError("Dòng BOQ đã khóa đơn giá cuối", Record{"boq_item_id": itemID})
 		}
 		fromPrice = numberPtr(current["norm_unit_price"])
 		updatedRows, err = queryTx(ctx, tx, `
@@ -8824,7 +8868,7 @@ func (r *Repository) changeBOQUnitPrice(ctx context.Context, itemID, eventType s
 		`, itemID, unitPrice, actorID, comment)
 		source = "final"
 	default:
-		return nil, validationError("Action đơn giá không hợp lệ", Record{"event_type": eventType})
+		return nil, validationError("Hành động đơn giá không hợp lệ", Record{"event_type": eventType})
 	}
 	if err != nil {
 		return nil, err
@@ -8951,7 +8995,7 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 		return nil, err
 	}
 	if len(blockers) > 0 {
-		return nil, validationError("Chỉ sinh yêu cầu mua khi mọi dòng BOQ approved chưa sinh mua sắm đã final lock", Record{"items": blockers})
+		return nil, validationError("Chỉ sinh yêu cầu mua khi mọi dòng BOQ đã duyệt, chưa sinh mua sắm và đã khóa đơn giá cuối", Record{"items": blockers})
 	}
 
 	rows, err := queryTx(ctx, tx, `
@@ -9153,7 +9197,7 @@ func procurementTransitionForAction(action, fromStatus string) (string, string, 
 			return "received", "warehouse_received", nil
 		}
 	default:
-		return "", "", validationError("Action yêu cầu mua không hợp lệ", Record{"action": action})
+		return "", "", validationError("Hành động yêu cầu mua không hợp lệ", Record{"action": action})
 	}
 	return "", "", validationError("Trạng thái yêu cầu mua không cho phép thao tác này", Record{"action": action, "status": fromStatus})
 }
@@ -9598,7 +9642,7 @@ func (r *Repository) AcceptanceAction(ctx context.Context, id, result string, re
 			return nil, err
 		}
 		if len(issueRows) > 0 {
-			if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "rework_requested", "issue", fmt.Sprint(issueRows[0]["id"]), "Nghiệm thu fail tạo punch list/rework", Record{"acceptance_id": id}); err != nil {
+			if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "rework_requested", "issue", fmt.Sprint(issueRows[0]["id"]), "Nghiệm thu không đạt tạo danh sách lỗi/sửa lỗi", Record{"acceptance_id": id}); err != nil {
 				return nil, err
 			}
 			metadata["issue_id"] = issueRows[0]["id"]
@@ -9629,7 +9673,7 @@ func (r *Repository) CreateReworkFromAcceptance(ctx context.Context, acceptanceI
 	}
 	acc := accRows[0]
 	if fmt.Sprint(acc["status"]) != "completed" || fmt.Sprint(acc["result"]) != "fail" {
-		return nil, validationError("Chỉ tạo rework từ nghiệm thu đã fail", Record{"status": acc["status"], "result": acc["result"]})
+		return nil, validationError("Chỉ tạo sửa lỗi từ nghiệm thu không đạt", Record{"status": acc["status"], "result": acc["result"]})
 	}
 	existing, err := queryTx(ctx, tx, `
 		SELECT COUNT(*) AS total
@@ -9640,14 +9684,14 @@ func (r *Repository) CreateReworkFromAcceptance(ctx context.Context, acceptanceI
 		return nil, err
 	}
 	if len(existing) > 0 && number(existing[0]["total"]) > 0 {
-		return nil, validationError("Nghiệm thu này đã có rework đang mở", Record{"acceptance_id": acceptanceID})
+		return nil, validationError("Nghiệm thu này đã có yêu cầu sửa lỗi đang mở", Record{"acceptance_id": acceptanceID})
 	}
 	reworkRows, err := queryTx(ctx, tx, `
 		INSERT INTO rework_requests
 			(project_id, acceptance_id, node_id, title, description, status, created_by, approved_by)
 		VALUES ($1,$2,$3,$4,$5,'approved',NULLIF($6,'')::uuid,NULLIF($6,'')::uuid)
 		RETURNING *
-	`, acc["project_id"], acceptanceID, acc["node_id"], fmt.Sprintf("Rework sau nghiệm thu: %s", acc["title"]), acc["notes"], actorID)
+	`, acc["project_id"], acceptanceID, acc["node_id"], fmt.Sprintf("Sửa lỗi sau nghiệm thu: %s", acc["title"]), acc["notes"], actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -9655,7 +9699,7 @@ func (r *Repository) CreateReworkFromAcceptance(ctx context.Context, acceptanceI
 		return nil, sql.ErrNoRows
 	}
 	rework := reworkRows[0]
-	if err := addAuditTx(ctx, tx, fmt.Sprint(acc["project_id"]), actorID, actorName, "rework_requested", "rework_request", fmt.Sprint(rework["id"]), "Tạo rework request từ nghiệm thu fail", Record{"acceptance_id": acceptanceID}); err != nil {
+	if err := addAuditTx(ctx, tx, fmt.Sprint(acc["project_id"]), actorID, actorName, "rework_requested", "rework_request", fmt.Sprint(rework["id"]), "Tạo yêu cầu sửa lỗi từ nghiệm thu không đạt", Record{"acceptance_id": acceptanceID}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -9680,7 +9724,7 @@ func (r *Repository) HandoverCheck(ctx context.Context, id string) (Record, erro
 	}
 	openIssues, _ := r.Query(ctx, `SELECT COUNT(*) AS total FROM issues WHERE project_id=$1 AND status IN ('open','in_progress')`, projectID)
 	if len(openIssues) > 0 && number(openIssues[0]["total"]) > 0 {
-		blockers = append(blockers, "Còn punch list/issue chưa đóng")
+		blockers = append(blockers, "Còn danh sách lỗi/vấn đề chưa đóng")
 	}
 	pendingSurplus, _ := r.Query(ctx, `SELECT COUNT(*) AS total FROM site_material_balances WHERE project_id=$1 AND surplus_quantity > 0 AND surplus_status <> 'handled'`, projectID)
 	if len(pendingSurplus) > 0 && number(pendingSurplus[0]["total"]) > 0 {
@@ -9842,7 +9886,7 @@ func (r *Repository) PayableAction(ctx context.Context, id, action string, req A
 			RETURNING *
 		`, id, remaining, actorID, fromStatus)
 	default:
-		return nil, validationError("Action phải trả không hợp lệ", Record{"action": action})
+		return nil, validationError("Hành động phải trả không hợp lệ", Record{"action": action})
 	}
 	if err != nil {
 		return nil, err
@@ -10032,7 +10076,7 @@ func (r *Repository) PayableReconciliation(ctx context.Context, payableID string
 				CASE
 					WHEN ii.status='verified' THEN 'Hoá đơn đầu vào đã xác thực'
 					WHEN ii.status='rejected' THEN 'Hoá đơn đầu vào bị từ chối'
-					ELSE 'Upload hoá đơn đầu vào'
+					ELSE 'Tải lên hoá đơn đầu vào'
 				END AS description,
 				0::numeric AS debit_amount,
 				0::numeric AS credit_amount,
@@ -10288,7 +10332,7 @@ func (r *Repository) CreatePayablePaymentSchedule(ctx context.Context, payable R
 
 func (r *Repository) PayablePaymentScheduleAction(ctx context.Context, scheduleID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
 	if action != "approve" {
-		return nil, validationError("Action kỳ thanh toán không hợp lệ", Record{"action": action})
+		return nil, validationError("Hành động kỳ thanh toán không hợp lệ", Record{"action": action})
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -10426,7 +10470,7 @@ func (r *Repository) CreatePayableAdvanceRequest(ctx context.Context, payable Re
 
 func (r *Repository) PayableAdvanceRequestAction(ctx context.Context, advanceID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
 	if action != "approve" {
-		return nil, validationError("Action ứng trước không hợp lệ", Record{"action": action})
+		return nil, validationError("Hành động ứng trước không hợp lệ", Record{"action": action})
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -10898,7 +10942,7 @@ func (r *Repository) CreateInputInvoice(ctx context.Context, payable Record, bod
 	if _, err := tx.ExecContext(ctx, `UPDATE payables SET updated_at=now() WHERE id=$1`, payableID); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "input_invoice_uploaded", "input_invoice", invoiceID, "Upload PDF hoá đơn đầu vào", Record{
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "input_invoice_uploaded", "input_invoice", invoiceID, "Tải PDF hóa đơn đầu vào", Record{
 		"payable_id":             payableID,
 		"document_id":            documentID,
 		"procurement_request_id": cleanID(body["procurement_request_id"]),
@@ -10969,7 +11013,7 @@ func (r *Repository) InputInvoiceAction(ctx context.Context, invoiceID, action s
 			RETURNING *
 		`, invoiceID, actorID, fromStatus)
 	default:
-		return nil, validationError("Action hoá đơn đầu vào không hợp lệ", Record{"action": action})
+		return nil, validationError("Hành động hoá đơn đầu vào không hợp lệ", Record{"action": action})
 	}
 	if err != nil {
 		return nil, err
@@ -11074,7 +11118,7 @@ func (r *Repository) CreateReceivablePaymentSchedule(ctx context.Context, receiv
 
 func (r *Repository) ReceivablePaymentScheduleAction(ctx context.Context, scheduleID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
 	if action != "approve" {
-		return nil, validationError("Action kỳ thu không hợp lệ", Record{"action": action})
+		return nil, validationError("Hành động kỳ thu không hợp lệ", Record{"action": action})
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -11210,7 +11254,7 @@ func (r *Repository) CreateReceivableAdvanceReceipt(ctx context.Context, receiva
 
 func (r *Repository) ReceivableAdvanceReceiptAction(ctx context.Context, advanceID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
 	if action != "approve" {
-		return nil, validationError("Action ứng trước đầu ra không hợp lệ", Record{"action": action})
+		return nil, validationError("Hành động ứng trước đầu ra không hợp lệ", Record{"action": action})
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -11687,7 +11731,7 @@ func (r *Repository) ReceivableReconciliation(ctx context.Context, receivableID 
 				CASE
 					WHEN oi.status='issued' THEN 'Hoá đơn đầu ra đã phát hành'
 					WHEN oi.status='voided' THEN 'Hoá đơn đầu ra đã huỷ'
-					ELSE 'Upload hoá đơn đầu ra'
+					ELSE 'Tải lên hoá đơn đầu ra'
 				END AS description,
 				0::numeric AS debit_amount,
 				0::numeric AS credit_amount,
@@ -12024,7 +12068,7 @@ func (r *Repository) CreateOutputInvoice(ctx context.Context, receivable Record,
 	if _, err := tx.ExecContext(ctx, `UPDATE receivables SET updated_at=now() WHERE id=$1`, receivableID); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "output_invoice_uploaded", "output_invoice", invoiceID, "Upload PDF hoá đơn đầu ra", Record{
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "output_invoice_uploaded", "output_invoice", invoiceID, "Tải PDF hóa đơn đầu ra", Record{
 		"receivable_id":   receivableID,
 		"document_id":     documentID,
 		"payment_id":      cleanID(body["payment_id"]),
@@ -12093,7 +12137,7 @@ func (r *Repository) OutputInvoiceAction(ctx context.Context, invoiceID, action 
 			RETURNING *
 		`, invoiceID, actorID, fromStatus)
 	default:
-		return nil, validationError("Action hoá đơn đầu ra không hợp lệ", Record{"action": action})
+		return nil, validationError("Hành động hoá đơn đầu ra không hợp lệ", Record{"action": action})
 	}
 	if err != nil {
 		return nil, err
@@ -12170,7 +12214,7 @@ func (r *Repository) ReceivableAction(ctx context.Context, id, action string, re
 			RETURNING *
 		`, id, remaining, actorID, fromStatus)
 	default:
-		return nil, validationError("Action phải thu không hợp lệ", Record{"action": action})
+		return nil, validationError("Hành động phải thu không hợp lệ", Record{"action": action})
 	}
 	if err != nil {
 		return nil, err
@@ -12194,7 +12238,7 @@ func (r *Repository) ReceivableAction(ctx context.Context, id, action string, re
 
 func (r *Repository) PaymentAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
 	if action != "approve" {
-		return nil, validationError("Action phiếu thanh toán không hợp lệ", Record{"action": action})
+		return nil, validationError("Hành động phiếu thanh toán không hợp lệ", Record{"action": action})
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -12257,7 +12301,7 @@ func (r *Repository) applyPaymentAllocationsTx(ctx context.Context, tx *sql.Tx, 
 	for _, allocation := range allocations {
 		amount := number(allocation["amount"])
 		if amount <= 0 {
-			return validationError("Allocation thanh toán không hợp lệ", Record{"allocation_id": allocation["id"]})
+			return validationError("Phân bổ thanh toán không hợp lệ", Record{"allocation_id": allocation["id"]})
 		}
 		projectID := fmt.Sprint(allocation["project_id"])
 		payableID := cleanID(allocation["payable_id"])
@@ -12362,7 +12406,7 @@ func (r *Repository) applyPaymentAllocationsTx(ctx context.Context, tx *sql.Tx, 
 		case "advance_settlement":
 			continue
 		default:
-			return validationError("Loại allocation thanh toán không hợp lệ", Record{"allocation_type": allocation["allocation_type"]})
+			return validationError("Loại phân bổ thanh toán không hợp lệ", Record{"allocation_type": allocation["allocation_type"]})
 		}
 	}
 	return nil
@@ -12376,7 +12420,7 @@ func (r *Repository) applyReceiptAllocationsTx(ctx context.Context, tx *sql.Tx, 
 	for _, allocation := range allocations {
 		amount := number(allocation["amount"])
 		if amount <= 0 {
-			return validationError("Allocation phiếu thu không hợp lệ", Record{"allocation_id": allocation["id"]})
+			return validationError("Phân bổ phiếu thu không hợp lệ", Record{"allocation_id": allocation["id"]})
 		}
 		projectID := fmt.Sprint(allocation["project_id"])
 		receivableID := cleanID(allocation["receivable_id"])
@@ -12484,7 +12528,7 @@ func (r *Repository) applyReceiptAllocationsTx(ctx context.Context, tx *sql.Tx, 
 		case "advance_settlement":
 			continue
 		default:
-			return validationError("Loại allocation phiếu thu không hợp lệ", Record{"allocation_type": allocation["allocation_type"]})
+			return validationError("Loại phân bổ phiếu thu không hợp lệ", Record{"allocation_type": allocation["allocation_type"]})
 		}
 	}
 	return nil
@@ -12675,7 +12719,7 @@ func (r *Repository) Report(ctx context.Context, kind, userID string) ([]Record,
 			ORDER BY s.full_name
 		`)
 	default:
-		return nil, errors.New("unknown report")
+		return nil, errors.New("Báo cáo không hợp lệ")
 	}
 }
 
@@ -13251,7 +13295,7 @@ func profitReportWarnings(summary Record, status string) []Record {
 		warnings = append(warnings, Record{
 			"code":     "indirect_or_unclassified_cost",
 			"severity": "warning",
-			"message":  "Có chi phí chưa đủ nguồn phân loại direct nên được đưa vào indirect cost",
+			"message":  "Có chi phí chưa đủ nguồn phân loại trực tiếp nên được đưa vào chi phí gián tiếp",
 			"count":    count,
 		})
 	}
@@ -13260,7 +13304,7 @@ func profitReportWarnings(summary Record, status string) []Record {
 			warnings = append(warnings, Record{
 				"code":     "unposted_excluded",
 				"severity": "info",
-				"message":  "Có chứng từ chưa posted bị loại khỏi báo cáo mặc định",
+				"message":  "Có chứng từ chưa ghi nhận bị loại khỏi báo cáo mặc định",
 				"count":    count,
 				"amount":   summary["excluded_unposted_total"],
 			})
@@ -13270,7 +13314,7 @@ func profitReportWarnings(summary Record, status string) []Record {
 		warnings = append(warnings, Record{
 			"code":     "negative_net_profit",
 			"severity": "warning",
-			"message":  "Net profit đang âm trong khoảng lọc",
+			"message":  "Lợi nhuận ròng đang âm trong khoảng lọc",
 			"amount":   summary["net_profit"],
 		})
 	}
@@ -13300,7 +13344,7 @@ func taxReportWarnings(summary Record, status string) []Record {
 			warnings = append(warnings, Record{
 				"code":     "unposted_excluded",
 				"severity": "info",
-				"message":  "Có hoá đơn chưa posted bị loại khỏi báo cáo mặc định",
+				"message":  "Có hóa đơn chưa ghi nhận bị loại khỏi báo cáo mặc định",
 				"count":    count,
 				"amount":   summary["excluded_unposted_total"],
 			})

@@ -30,7 +30,7 @@ var pipelineEdgeConditionCatalog = []EdgeConditionDefinition{
 	{Type: "boq_approved", Label: "BOQ đã duyệt", Description: "Chuyển khi BOQ có dữ liệu và toàn bộ item đã được duyệt.", DefaultLabel: "", Category: "commercial"},
 	{Type: "procurement_approved", Label: "Mua vật tư đã duyệt", Description: "Chuyển khi yêu cầu mua vật tư đã được duyệt hoặc đã vào các trạng thái sau duyệt.", DefaultLabel: "", Category: "material"},
 	{Type: "workflow_form_answer_equals", Label: "Câu trả lời biểu mẫu bằng giá trị", Description: "Chuyển khi biểu mẫu quy trình đã được gửi ở node nguồn và có trường khớp giá trị cấu hình.", DefaultLabel: "", Category: "workflow_form"},
-	{Type: "handover_ready", Label: "Sẵn sàng bàn giao", Description: "Chuyển khi nghiệm thu, punch list, kho, chứng từ và công nợ không còn blocker bàn giao.", DefaultLabel: "", Category: "handover"},
+	{Type: "handover_ready", Label: "Sẵn sàng bàn giao", Description: "Chuyển khi nghiệm thu, danh sách lỗi, kho, chứng từ và công nợ không còn điểm chặn bàn giao.", DefaultLabel: "", Category: "handover"},
 	{Type: "financial_ready", Label: "Sẵn sàng đóng tài chính", Description: "Chuyển khi công nợ phải thu/phải trả không còn khoản đang mở.", DefaultLabel: "", Category: "finance"},
 }
 
@@ -51,20 +51,20 @@ func edgeConditionDefinition(conditionType string) (EdgeConditionDefinition, boo
 func prepareTemplateEdgeBody(body Record, partial bool) error {
 	if !partial {
 		if strings.TrimSpace(fmt.Sprint(body["from_node_id"])) == "" {
-			return errors.New("from_node_id is required")
+			return errors.New("from_node_id là bắt buộc")
 		}
 		if strings.TrimSpace(fmt.Sprint(body["to_node_id"])) == "" {
-			return errors.New("to_node_id is required")
+			return errors.New("to_node_id là bắt buộc")
 		}
 	}
 
 	if value, ok := body["condition_type"]; ok {
 		conditionType := strings.TrimSpace(fmt.Sprint(value))
 		if conditionType == "" || conditionType == "<nil>" {
-			return errors.New("condition_type is required")
+			return errors.New("condition_type là bắt buộc")
 		}
 		if _, exists := edgeConditionDefinition(conditionType); !exists {
-			return fmt.Errorf("unsupported condition_type %q", conditionType)
+			return fmt.Errorf("condition_type không được hỗ trợ: %q", conditionType)
 		}
 		body["condition_type"] = conditionType
 	} else if !partial {
@@ -77,7 +77,7 @@ func prepareTemplateEdgeBody(body Record, partial bool) error {
 			label = ""
 		}
 		if len([]rune(label)) > 80 {
-			return errors.New("label must be 80 characters or fewer")
+			return errors.New("Nhãn điều kiện không được vượt quá 80 ký tự")
 		}
 		body["label"] = label
 	}
@@ -100,7 +100,7 @@ func prepareTemplateEdgeBody(body Record, partial bool) error {
 		switch config.(type) {
 		case Record, map[string]any:
 		default:
-			return errors.New("condition_config must be an object")
+			return errors.New("condition_config phải là object")
 		}
 	}
 
@@ -120,27 +120,27 @@ func parseEdgePriority(value any) (int, error) {
 		return validateEdgePriority(int(v))
 	case float64:
 		if math.Trunc(v) != v {
-			return 0, errors.New("priority must be an integer")
+			return 0, errors.New("priority phải là số nguyên")
 		}
 		return validateEdgePriority(int(v))
 	case string:
 		trimmed := strings.TrimSpace(v)
 		if trimmed == "" {
-			return 0, errors.New("priority is required")
+			return 0, errors.New("priority là bắt buộc")
 		}
 		parsed, err := strconv.Atoi(trimmed)
 		if err != nil {
-			return 0, errors.New("priority must be an integer")
+			return 0, errors.New("priority phải là số nguyên")
 		}
 		return validateEdgePriority(parsed)
 	default:
-		return 0, errors.New("priority must be an integer")
+		return 0, errors.New("priority phải là số nguyên")
 	}
 }
 
 func validateEdgePriority(priority int) (int, error) {
 	if priority < 1 || priority > 999 {
-		return 0, errors.New("priority must be between 1 and 999")
+		return 0, errors.New("priority phải nằm trong khoảng 1 đến 999")
 	}
 	return priority, nil
 }

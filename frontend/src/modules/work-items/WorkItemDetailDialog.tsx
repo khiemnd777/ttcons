@@ -19,6 +19,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { get, post } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
+import { statusLabel } from '../../lib/utils/status';
 import { useToast } from '../../components/ToastProvider';
 import type { ActivityPayload, EvidenceRecord, WorkItem, WorkItemActivity } from '../../lib/types/domain';
 import { ActivityAttachments } from './ActivityAttachments';
@@ -91,7 +92,7 @@ export function WorkItemDetailDialog({
       onChanged?.(updated);
       toast.success(`Đã ${actionLabels[variables.action].toLowerCase()}`);
     },
-    onError: (error) => toast.error('Không thao tác được work item', error),
+    onError: (error) => toast.error('Không thao tác được đầu việc', error),
   });
   const activityAction = useMutation({
     mutationFn: ({ workItemId, payload }: { workItemId: string; payload: ActivityPayload }) =>
@@ -103,9 +104,9 @@ export function WorkItemDetailDialog({
       if (detailItem?.project_id) {
         queryClient.invalidateQueries({ queryKey: ['project-operations', detailItem.project_id] });
       }
-      toast.success('Đã gửi activity');
+      toast.success('Đã gửi hoạt động');
     },
-    onError: (error) => toast.error('Không gửi được activity', error),
+    onError: (error) => toast.error('Không gửi được hoạt động', error),
   });
 
   function runAction(action: WorkItemActionKey) {
@@ -135,18 +136,18 @@ export function WorkItemDetailDialog({
   const latestActivity = activities[0];
   const workContextLabel = detailItem?.run_node_name
     ?? detailItem?.run_step_name
-    ?? (detailItem?.work_type ? workTypeLabel(detailItem.work_type) : 'Runtime work');
+    ?? (detailItem?.work_type ? workTypeLabel(detailItem.work_type) : 'Đầu việc đang chạy');
 
   return (
     <Dialog
       open={open}
-      title={detailItem?.title ?? 'Workflow detail'}
+      title={detailItem?.title ?? 'Chi tiết đầu việc'}
       description={detailItem ? `${detailItem.project_name ?? 'Công trình'} · ${departmentLabel(detailItem.department)} · ${workContextLabel}` : undefined}
       onClose={closeDialog}
       size="workspace"
     >
       {workDetail.isLoading && !detailItem ? <LoadingSpinner /> : null}
-      {workDetail.error && !detailItem ? <EmptyState title="Không tải được workflow detail" /> : null}
+      {workDetail.error && !detailItem ? <EmptyState title="Không tải được chi tiết đầu việc" /> : null}
       {detailItem ? (
         <div className="space-y-4">
           <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} nextAction={nextAction} />
@@ -235,16 +236,16 @@ function WorkItemWorkspaceHeader({
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
   const contextStats = [
     { label: 'Node', value: item.run_node_name ?? '-' },
-    { label: 'Step', value: item.run_step_name ?? '-' },
-    { label: 'Evidence', value: `${activeEvidence.length} active / ${numberValue(item.evidence_count)} total` },
-    { label: 'Biểu mẫu', value: hasWorkflowFormSummary(item) ? `${workflowFormChipText(item)} · ${item.workflow_form_status ?? 'draft'}` : '-' },
+    { label: 'Bước', value: item.run_step_name ?? '-' },
+    { label: 'Minh chứng', value: `${activeEvidence.length} hiệu lực / ${numberValue(item.evidence_count)} tổng` },
+    { label: 'Biểu mẫu', value: hasWorkflowFormSummary(item) ? `${workflowFormChipText(item)} · ${statusLabel(item.workflow_form_status ?? 'draft')}` : '-' },
   ];
 
   return (
     <section className="rounded-lg border border-line bg-white shadow-panel">
       <div className="flex flex-col gap-3 border-b border-line px-4 py-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Workflow runtime</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quy trình đang chạy</p>
           <h3 className="mt-1 text-base font-semibold text-ink">{item.title}</h3>
           <p className="mt-1 text-sm text-slate-600">Trạng thái, điều kiện hoàn thành và hành động tiếp theo.</p>
         </div>
@@ -284,21 +285,21 @@ function WorkItemProgressRail({ item }: { item: WorkItem }) {
     },
     {
       id: 'node',
-      label: 'Node workflow',
+      label: 'Node quy trình',
       value: item.run_node_name ?? 'Chưa gắn node',
       meta: item.run_node_order_index ? `Thứ tự ${item.run_node_order_index}` : '',
       state: item.run_node_name ? 'active' : 'neutral',
     },
     {
       id: 'step',
-      label: 'Step',
-      value: item.run_step_name ?? 'Chưa gắn step',
+      label: 'Bước',
+      value: item.run_step_name ?? 'Chưa gắn bước',
       meta: item.run_step_order_index ? `Thứ tự ${item.run_step_order_index}` : '',
       state: item.run_step_name ? 'current' : 'neutral',
     },
     {
       id: 'work-item',
-      label: 'Work item',
+      label: 'Đầu việc',
       value: item.title,
       meta: workTypeLabel(item.work_type),
       state: 'current',
@@ -349,7 +350,7 @@ function WorkItemRequirementPanel({ rows }: { rows: RequirementRow[] }) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Điều kiện bắt buộc</p>
-          <h3 className="mt-0.5 text-sm font-semibold text-ink">Gates trước khi hoàn thành</h3>
+          <h3 className="mt-0.5 text-sm font-semibold text-ink">Điều kiện trước khi hoàn thành</h3>
         </div>
         <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{rows.length} mục</span>
       </div>
@@ -437,7 +438,7 @@ function WorkItemActionPanel({
           <ActionFact
             icon={<MessageSquare className="h-4 w-4" />}
             label="Hoạt động gần nhất"
-            value={`${latestActivity.actor_name ?? 'System'} · ${compactDateTime(latestActivity.created_at)}`}
+            value={`${latestActivity.actor_name ?? 'Hệ thống'} · ${compactDateTime(latestActivity.created_at)}`}
           />
         ) : null}
       </div>
@@ -485,14 +486,14 @@ function WorkItemSupportingTabs({
       id: 'evidence',
       label: 'Minh chứng',
       count: activeEvidence.length,
-      description: pendingEvidence.length ? `${pendingEvidence.length} pending` : 'Sẵn sàng',
+      description: pendingEvidence.length ? `${pendingEvidence.length} đang chờ` : 'Sẵn sàng',
     });
   }
   tabs.push({
     id: 'activity',
     label: 'Hoạt động',
     count: activities.length,
-    description: activities[0] ? `Mới nhất ${compactDateTime(activities[0].created_at)}` : 'Chưa có activity',
+    description: activities[0] ? `Mới nhất ${compactDateTime(activities[0].created_at)}` : 'Chưa có hoạt động',
   });
   if (hasWorkflowFormSummary(item) && !primarySurfaceUsesWorkflowForm(primarySurfaceKind)) {
     tabs.push({
@@ -512,8 +513,8 @@ function WorkItemSupportingTabs({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin hỗ trợ</p>
-            <h3 className="mt-0.5 text-sm font-semibold text-ink">Minh chứng, trao đổi và biểu mẫu của work item</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Theo dõi hồ sơ, trao đổi và artifact phục vụ bước đang xử lý.</p>
+            <h3 className="mt-0.5 text-sm font-semibold text-ink">Minh chứng, trao đổi và biểu mẫu của đầu việc</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Theo dõi hồ sơ, trao đổi và tài liệu phục vụ bước đang xử lý.</p>
           </div>
           <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs lg:max-w-72">
             <p className="font-semibold uppercase tracking-wide text-blue-700">Việc hỗ trợ tiếp theo</p>
@@ -535,7 +536,7 @@ function WorkItemSupportingTabs({
               <span className="flex min-w-0 items-center justify-between gap-2">
                 <span className={clsx('truncate text-xs font-semibold uppercase tracking-wide', activeTab === tab.id ? 'text-blue-700' : 'text-slate-600')}>{tab.label}</span>
                 {typeof tab.count === 'number' ? <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-inset ring-line">{tab.count}</span> : null}
-                {tab.status ? <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-100">{tab.status}</span> : null}
+                {tab.status ? <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-100">{statusLabel(tab.status)}</span> : null}
               </span>
               <span className="mt-1 block truncate text-xs text-slate-500">{tab.description}</span>
             </button>
@@ -569,12 +570,12 @@ function resolveSupportTabAction(activeTab: SupportTabKey, item: WorkItem, evide
   if (activeTab === 'evidence') {
     const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
     const pending = evidence.filter((record) => ['draft', 'submitted', 'pending'].includes(String(record.status))).length;
-    if (!activeEvidence.length) return 'Bổ sung minh chứng cho work item';
-    if (pending) return `Review ${pending} minh chứng đang pending`;
+    if (!activeEvidence.length) return 'Bổ sung minh chứng cho đầu việc';
+    if (pending) return `Rà soát ${pending} minh chứng đang chờ`;
     return 'Minh chứng đã sẵn sàng';
   }
   if (activeTab === 'form') return workflowFormNextAction(item);
-  return activities.length ? `Theo dõi ${activities.length} hoạt động gần nhất` : 'Ghi activity đầu tiên';
+  return activities.length ? `Theo dõi ${activities.length} hoạt động gần nhất` : 'Ghi hoạt động đầu tiên';
 }
 
 function WorkItemActivityPanel({
@@ -597,7 +598,7 @@ function WorkItemActivityPanel({
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dòng hoạt động</p>
           <h3 className="mt-0.5 text-sm font-semibold text-ink">{activities.length} hoạt động</h3>
           <p className="mt-1 text-xs text-slate-500">
-            {latestActivity ? `${latestActivity.actor_name ?? 'System'} · ${compactDateTime(latestActivity.created_at)}` : 'Chưa có trao đổi hoặc sự kiện cho work item này.'}
+            {latestActivity ? `${latestActivity.actor_name ?? 'Hệ thống'} · ${compactDateTime(latestActivity.created_at)}` : 'Chưa có trao đổi hoặc sự kiện cho đầu việc này.'}
           </p>
         </div>
         <button
@@ -606,7 +607,7 @@ function WorkItemActivityPanel({
           onClick={() => setComposerOpen((current) => !current)}
         >
           <MessageSquare className="h-4 w-4" />
-          {composerOpen ? 'Ẩn composer' : 'Ghi activity'}
+          {composerOpen ? 'Ẩn ô nhập' : 'Ghi hoạt động'}
         </button>
       </div>
 
@@ -626,7 +627,7 @@ function WorkItemActivityPanel({
           ))}
         </div>
       ) : (
-        <EmptyState title="Chưa có activity cho work item này" />
+        <EmptyState title="Chưa có hoạt động cho đầu việc này" />
       )}
     </section>
   );
@@ -639,7 +640,7 @@ function ActivityTimelineItem({ activity }: { activity: WorkItemActivity }) {
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">{activityLabel(activity.activity_type)}</p>
           <p className="mt-1 text-xs text-slate-500">
-            {activity.actor_name ?? 'System'} · {compactDateTime(activity.created_at)}
+            {activity.actor_name ?? 'Hệ thống'} · {compactDateTime(activity.created_at)}
           </p>
         </div>
         {activity.visibility ? <span className="w-fit rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{visibilityLabel(activity.visibility)}</span> : null}
@@ -720,7 +721,7 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
   if (item.blocked_reason) {
     rows.push({
       id: 'blocker',
-      label: 'Blocker đang mở',
+      label: 'Điểm chặn đang mở',
       description: item.blocked_reason,
       state: 'blocked',
     });
@@ -733,8 +734,8 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
       id: 'workflow-form',
       label: required ? 'Biểu mẫu nghiệp vụ bắt buộc' : 'Biểu mẫu nghiệp vụ',
       description: submitted
-        ? `${workflowFormChipText(item)} đã được submit.`
-        : `${workflowFormChipText(item)} đang ở trạng thái ${item.workflow_form_status ?? 'draft'}.`,
+        ? `${workflowFormChipText(item)} đã được gửi.`
+        : `${workflowFormChipText(item)} đang ở trạng thái ${statusLabel(item.workflow_form_status ?? 'draft')}.`,
       state: submitted ? 'done' : required ? 'blocked' : 'warning',
     });
   }
@@ -752,7 +753,7 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
     rows.push({
       id: 'evidence-optional',
       label: 'Minh chứng',
-      description: activeEvidence.length ? `${activeEvidence.length} minh chứng đang hiệu lực.` : 'Không có yêu cầu evidence đặc biệt.',
+      description: activeEvidence.length ? `${activeEvidence.length} minh chứng đang hiệu lực.` : 'Không có yêu cầu minh chứng đặc biệt.',
       state: activeEvidence.length ? 'done' : 'neutral',
     });
   }
@@ -760,8 +761,8 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
   if (item.status === 'waiting_approval' || item.status === 'waiting_review' || item.approval_request_id) {
     rows.push({
       id: 'approval',
-      label: item.status === 'waiting_review' ? 'Đang chờ review' : 'Phê duyệt',
-      description: item.approval_request_id ? 'Approval request đã được liên kết với work item.' : 'Work item đang ở hàng chờ xử lý.',
+      label: item.status === 'waiting_review' ? 'Đang chờ rà soát' : 'Phê duyệt',
+      description: item.approval_request_id ? 'Yêu cầu phê duyệt đã được liên kết với đầu việc.' : 'Đầu việc đang ở hàng chờ xử lý.',
       state: item.status === 'waiting_approval' || item.status === 'waiting_review' ? 'warning' : 'done',
     });
   }
@@ -808,7 +809,7 @@ function primarySurfaceNextAction(kind: WorkItemPrimarySurfaceKind, actions: Wor
     case 'incoming_acceptance':
       return 'Ghi nhận nghiệm thu đầu vào';
     case 'material_snapshot':
-      return 'Lưu snapshot vật tư';
+      return 'Lưu ghi nhận vật tư';
     case 'surplus_handling':
       return 'Xử lý vật tư dư';
     case 'outgoing_acceptance':

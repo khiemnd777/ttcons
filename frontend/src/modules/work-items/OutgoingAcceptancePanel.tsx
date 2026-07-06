@@ -53,34 +53,34 @@ type AcceptancePayload = Omit<Draft, 'id' | 'checklist'> & {
 };
 
 const typeOptions = [
-  { value: 'partial', label: 'Partial' },
-  { value: 'final', label: 'Final' },
+  { value: 'partial', label: 'Một phần' },
+  { value: 'final', label: 'Cuối cùng' },
 ];
 
 const decisionOptions = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'pass', label: 'Pass' },
-  { value: 'conditional_pass', label: 'Conditional' },
-  { value: 'fail', label: 'Fail' },
+  { value: 'pending', label: 'Đang chờ' },
+  { value: 'pass', label: 'Đạt' },
+  { value: 'conditional_pass', label: 'Đạt có điều kiện' },
+  { value: 'fail', label: 'Không đạt' },
 ];
 
 const severityOptions = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'critical', label: 'Critical' },
+  { value: 'low', label: 'Thấp' },
+  { value: 'medium', label: 'Trung bình' },
+  { value: 'high', label: 'Cao' },
+  { value: 'critical', label: 'Nghiêm trọng' },
 ];
 
 const signatureOptions = [
   { value: 'pending', label: 'Chờ ký' },
   { value: 'signed', label: 'Đã ký' },
-  { value: 'waived', label: 'Waive chữ ký' },
+  { value: 'waived', label: 'Bỏ qua chữ ký' },
 ];
 
 const documentOptions = [
   { value: 'pending', label: 'Chờ PDF' },
-  { value: 'linked', label: 'Đã link PDF' },
-  { value: 'waived', label: 'Waive tài liệu' },
+  { value: 'linked', label: 'Đã liên kết PDF' },
+  { value: 'waived', label: 'Bỏ qua tài liệu' },
 ];
 
 export function OutgoingAcceptancePanel({
@@ -166,18 +166,18 @@ export function OutgoingAcceptancePanel({
 
   function buildPayload(requireComplete: boolean): AcceptancePayload | null {
     const invalid: string[] = [];
-    if (!projectId) invalid.push('Project');
+    if (!projectId) invalid.push('Công trình');
     if (!draft.title.trim()) invalid.push('Tiêu đề');
     if (requireComplete && !draft.acceptance_date) invalid.push('Ngày nghiệm thu');
-    if (requireComplete && draft.signature_status === 'pending') invalid.push('Chữ ký/PDF stamp');
+    if (requireComplete && draft.signature_status === 'pending') invalid.push('Chữ ký/dấu PDF');
     if (requireComplete && draft.document_status === 'pending') invalid.push('Tài liệu/PDF');
     const lines = draft.checklist.filter(hasLineInput);
-    if (requireComplete && lines.length === 0) invalid.push('Checklist');
+    if (requireComplete && lines.length === 0) invalid.push('Checklist nghiệm thu');
     const checklist = lines.map((line, index) => {
       if (!line.title.trim()) invalid.push(`Tên checklist dòng ${index + 1}`);
       if (requireComplete && line.decision === 'pending') invalid.push(`Quyết định dòng ${index + 1}`);
       const evidenceRequired = line.photo_required || line.decision === 'conditional_pass' || line.decision === 'fail';
-      if (requireComplete && evidenceRequired && !line.evidence_id && !line.photo_url.trim()) invalid.push(`Evidence dòng ${index + 1}`);
+      if (requireComplete && evidenceRequired && !line.evidence_id && !line.photo_url.trim()) invalid.push(`Minh chứng dòng ${index + 1}`);
       if (requireComplete && (line.decision === 'conditional_pass' || line.decision === 'fail') && !line.required_action.trim()) {
         invalid.push(`Yêu cầu xử lý dòng ${index + 1}`);
       }
@@ -247,9 +247,9 @@ export function OutgoingAcceptancePanel({
       if (!record) return;
       setDraft(defaultDraft(formInstance?.id, pdfExports[0]?.id, signatures.length > 0));
       invalidate();
-      toast.success('Đã submit nghiệm thu đầu ra');
+      toast.success('Đã gửi nghiệm thu đầu ra');
     },
-    onError: (error) => toast.error('Không submit được nghiệm thu đầu ra', error),
+    onError: (error) => toast.error('Không gửi được nghiệm thu đầu ra', error),
   });
 
   const actionMutation = useMutation({
@@ -303,7 +303,7 @@ export function OutgoingAcceptancePanel({
         <div>
           <h3 className="text-sm font-semibold text-ink">Nghiệm thu đầu ra</h3>
           <p className="mt-1 text-xs text-slate-500">
-            {submitted.length ? `${submitted.length} hồ sơ đã submit/chốt` : 'Chưa có hồ sơ đã submit'}
+            {submitted.length ? `${submitted.length} hồ sơ đã gửi/chốt` : 'Chưa có hồ sơ đã gửi'}
           </p>
         </div>
         <StatusBadge status={draft.id ? 'draft' : 'new'} />
@@ -350,9 +350,9 @@ export function OutgoingAcceptancePanel({
             </select>
           </label>
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 lg:col-span-2">
-            Workflow form
+            Biểu mẫu quy trình
             <select className={controlClassName} value={draft.form_instance_id} onChange={(event) => updateDraft({ form_instance_id: event.target.value })} disabled={actionPending || !formInstance?.id}>
-              <option value="">{formInstance?.id ? 'Không link form' : 'Chưa có form'}</option>
+              <option value="">{formInstance?.id ? 'Không liên kết biểu mẫu' : 'Chưa có biểu mẫu'}</option>
               {formInstance?.id ? <option value={formInstance.id}>{formInstance.title}</option> : null}
             </select>
           </label>
@@ -364,7 +364,7 @@ export function OutgoingAcceptancePanel({
               onChange={(event) => updateDraft({ pdf_export_id: event.target.value, document_status: event.target.value ? 'linked' : draft.document_status })}
               disabled={actionPending || pdfExports.length === 0}
             >
-              <option value="">{pdfExports.length ? 'Không link PDF' : 'Chưa có PDF'}</option>
+              <option value="">{pdfExports.length ? 'Không liên kết PDF' : 'Chưa có PDF'}</option>
               {pdfExports.map((record) => (
                 <option key={record.id} value={record.id}>{record.file_name ?? record.title ?? record.id}</option>
               ))}
@@ -415,13 +415,13 @@ export function OutgoingAcceptancePanel({
             </button>
             <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={actionPending} onClick={() => submitDraft.mutate()}>
               {submitDraft.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Submit
+              Gửi
             </button>
           </div>
         </div>
 
         <div>
-          <h4 className="mb-2 text-sm font-semibold text-ink">Hồ sơ đã submit/chốt</h4>
+          <h4 className="mb-2 text-sm font-semibold text-ink">Hồ sơ đã gửi/chốt</h4>
           {submitted.length ? (
             <div className="space-y-2">
               {submitted.map((record) => (
@@ -432,7 +432,7 @@ export function OutgoingAcceptancePanel({
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
                       {record.acceptance_date ? dateText(record.acceptance_date) : record.type}
-                      {record.submitted_at ? ` · Submit ${dateText(record.submitted_at)}` : ''}
+                      {record.submitted_at ? ` · Gửi ${dateText(record.submitted_at)}` : ''}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -442,9 +442,9 @@ export function OutgoingAcceptancePanel({
                   </div>
                   {record.status === 'submitted' ? (
                     <div className="flex flex-wrap justify-end gap-2">
-                      <button className="rounded-md border border-line p-1.5 hover:bg-slate-100 disabled:opacity-60" disabled={actionPending} title="Pass" onClick={() => actionMutation.mutate({ acceptanceId: String(record.id), action: 'pass' })}><Check className="h-4 w-4" /></button>
-                      <button className="rounded-md border border-line p-1.5 hover:bg-slate-100 disabled:opacity-60" disabled={actionPending} title="Conditional pass" onClick={() => actionMutation.mutate({ acceptanceId: String(record.id), action: 'conditional-pass' })}><RotateCcw className="h-4 w-4" /></button>
-                      <button className="rounded-md border border-line p-1.5 hover:bg-slate-100 disabled:opacity-60" disabled={actionPending} title="Fail" onClick={() => actionMutation.mutate({ acceptanceId: String(record.id), action: 'fail' })}><X className="h-4 w-4" /></button>
+                      <button className="rounded-md border border-line p-1.5 hover:bg-slate-100 disabled:opacity-60" disabled={actionPending} title="Đạt" onClick={() => actionMutation.mutate({ acceptanceId: String(record.id), action: 'pass' })}><Check className="h-4 w-4" /></button>
+                      <button className="rounded-md border border-line p-1.5 hover:bg-slate-100 disabled:opacity-60" disabled={actionPending} title="Đạt có điều kiện" onClick={() => actionMutation.mutate({ acceptanceId: String(record.id), action: 'conditional-pass' })}><RotateCcw className="h-4 w-4" /></button>
+                      <button className="rounded-md border border-line p-1.5 hover:bg-slate-100 disabled:opacity-60" disabled={actionPending} title="Không đạt" onClick={() => actionMutation.mutate({ acceptanceId: String(record.id), action: 'fail' })}><X className="h-4 w-4" /></button>
                     </div>
                   ) : (
                     <span />
@@ -453,7 +453,7 @@ export function OutgoingAcceptancePanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="Chưa có hồ sơ nghiệm thu đầu ra đã submit" />
+            <EmptyState title="Chưa có hồ sơ nghiệm thu đầu ra đã gửi" />
           )}
         </div>
       </div>
@@ -490,7 +490,7 @@ function AcceptanceLine({
       </select>
       <div className="grid gap-1">
         <select className={clsx(controlClassName, needsEvidence && !line.evidence_id && !line.photo_url && 'border-amber-300 bg-amber-50')} value={line.evidence_id} onChange={(event) => onChange({ evidence_id: event.target.value })} disabled={disabled}>
-          <option value="">{needsEvidence ? 'Cần evidence' : 'Evidence'}</option>
+          <option value="">{needsEvidence ? 'Cần minh chứng' : 'Minh chứng'}</option>
           {evidence.map((record) => (
             <option key={record.id} value={record.id}>{evidenceLabel(record)}</option>
           ))}
@@ -501,7 +501,7 @@ function AcceptanceLine({
         <input className={controlClassName} type="date" value={line.due_date} onChange={(event) => onChange({ due_date: event.target.value })} disabled={disabled} />
         <label className="inline-flex h-9 items-center gap-2 rounded-md border border-line px-2 text-xs font-semibold text-slate-600">
           <input type="checkbox" checked={line.photo_required} onChange={(event) => onChange({ photo_required: event.target.checked })} disabled={disabled} />
-          Photo
+          Ảnh
         </label>
       </div>
       <button className="inline-flex h-9 items-center justify-center rounded-md border border-line text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60" disabled={disabled} onClick={onRemove} aria-label="Xóa dòng nghiệm thu">
@@ -603,11 +603,20 @@ function dateOnly(value?: string) {
 }
 
 function evidenceLabel(evidence: EvidenceRecord) {
-  return `${evidence.name ?? evidence.title ?? evidence.id} (${evidence.status ?? 'submitted'})`;
+  return `${evidence.name ?? evidence.title ?? evidence.id} (${evidenceStatusLabel(evidence.status)})`;
 }
 
 function actionToastTitle(action: string) {
-  if (action === 'pass') return 'Đã pass nghiệm thu đầu ra';
-  if (action === 'conditional-pass') return 'Đã conditional pass nghiệm thu đầu ra';
-  return 'Đã fail nghiệm thu đầu ra';
+  if (action === 'pass') return 'Đã chốt nghiệm thu đầu ra đạt';
+  if (action === 'conditional-pass') return 'Đã chốt nghiệm thu đầu ra đạt có điều kiện';
+  return 'Đã chốt nghiệm thu đầu ra không đạt';
+}
+
+function evidenceStatusLabel(status?: string) {
+  if (status === 'accepted') return 'đã chấp nhận';
+  if (status === 'rejected') return 'đã từ chối';
+  if (status === 'pending') return 'đang chờ';
+  if (status === 'draft') return 'nháp';
+  if (status === 'submitted') return 'đã gửi';
+  return status ?? 'đã gửi';
 }

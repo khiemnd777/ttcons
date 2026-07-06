@@ -125,7 +125,7 @@ export function SurplusHandlingPanel({
     if (!unit) invalid.push('Đơn vị');
     if (!draft.warehouse_id) invalid.push('Kho');
     if (requireComplete && !draft.custody_location.trim()) invalid.push('Vị trí lưu/trả');
-    if (requireComplete && !draft.evidence_id) invalid.push('Evidence');
+    if (requireComplete && !draft.evidence_id) invalid.push('Minh chứng');
     if (invalid.length) {
       toast.warn({ title: 'Dữ liệu xử lý vật tư dư chưa hợp lệ', description: invalid.join(', ') });
       return null;
@@ -171,9 +171,9 @@ export function SurplusHandlingPanel({
     onSuccess: (record) => {
       if (!record) return;
       invalidate();
-      toast.success('Đã submit xử lý vật tư dư');
+      toast.success('Đã gửi xử lý vật tư dư');
     },
-    onError: (error) => toast.error('Không submit được xử lý vật tư dư', error),
+    onError: (error) => toast.error('Không gửi được xử lý vật tư dư', error),
   });
   const actionPending = saveDraft.isPending || submitDraft.isPending || handlingQuery.isFetching;
 
@@ -245,11 +245,11 @@ export function SurplusHandlingPanel({
             })}
           </div>
         ) : (
-          <EmptyState title="Chưa có vật tư dư cần xử lý cho work item này" />
+          <EmptyState title="Chưa có vật tư dư cần xử lý cho đầu việc này" />
         )}
 
         <div className="mt-4">
-          <h4 className="mb-2 text-sm font-semibold text-ink">Hồ sơ đã submit</h4>
+          <h4 className="mb-2 text-sm font-semibold text-ink">Hồ sơ đã gửi</h4>
           {submitted.length ? (
             <div className="space-y-2">
               {submitted.map((handling) => (
@@ -269,7 +269,7 @@ export function SurplusHandlingPanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="Chưa có hồ sơ xử lý vật tư dư đã submit" />
+            <EmptyState title="Chưa có hồ sơ xử lý vật tư dư đã gửi" />
           )}
         </div>
       </div>
@@ -377,7 +377,7 @@ function SurplusRow({
           value={draft.warehouse_id}
           onChange={(event) => onChange({ warehouse_id: event.target.value })}
           disabled={disabled}
-          aria-label="Kho/staging warehouse"
+          aria-label="Kho trung chuyển"
         >
           <option value="">Chọn kho</option>
           {warehouses.map((warehouse) => (
@@ -396,9 +396,9 @@ function SurplusRow({
           value={draft.evidence_id}
           onChange={(event) => onChange({ evidence_id: event.target.value })}
           disabled={disabled}
-          aria-label="Evidence vật tư dư"
+          aria-label="Minh chứng vật tư dư"
         >
-          <option value="">Chọn evidence</option>
+          <option value="">Chọn minh chứng</option>
           {evidence.map((item) => (
             <option key={item.id} value={item.id}>{evidenceLabel(item)}</option>
           ))}
@@ -427,7 +427,7 @@ function SurplusRow({
           onClick={onSubmit}
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Submit
+          Gửi
         </button>
       </div>
     </div>
@@ -485,5 +485,14 @@ function warehouseLabel(warehouse: Warehouse) {
 }
 
 function evidenceLabel(evidence: EvidenceRecord) {
-  return `${evidence.name ?? evidence.title ?? evidence.id} (${evidence.status ?? 'submitted'})`;
+  return `${evidence.name ?? evidence.title ?? evidence.id} (${evidenceStatusLabel(evidence.status)})`;
+}
+
+function evidenceStatusLabel(status?: string) {
+  if (status === 'accepted') return 'đã chấp nhận';
+  if (status === 'rejected') return 'đã từ chối';
+  if (status === 'pending') return 'đang chờ';
+  if (status === 'draft') return 'nháp';
+  if (status === 'submitted') return 'đã gửi';
+  return status ?? 'đã gửi';
 }

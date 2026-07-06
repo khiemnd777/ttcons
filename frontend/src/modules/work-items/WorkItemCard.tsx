@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { StatusBadge } from '../../components/StatusBadge';
 import { dateText } from '../../lib/utils/format';
+import { statusLabel } from '../../lib/utils/status';
 import type { WorkItem } from '../../lib/types/domain';
 import { asArray, departmentLabel, hasWorkflowFormSummary, isWorkOverdue, numberValue, workTypeLabel, workflowFormChipText } from './workItemPresentation';
 
@@ -27,18 +28,18 @@ export function WorkItemCard({
             {item.department ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{departmentLabel(item.department)}</span> : null}
             {hasWorkflowFormSummary(item) ? (
               <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-                {workflowFormChipText(item)} · {item.workflow_form_status ?? 'draft'}
+                {workflowFormChipText(item)} · {statusLabel(item.workflow_form_status ?? 'draft')}
               </span>
             ) : null}
           </div>
           <p className={clsx('mt-2 font-semibold text-ink', compact ? 'text-sm' : 'text-base')}>{title}</p>
           {item.description && !compact ? <p className="mt-1 line-clamp-2 text-sm text-slate-600">{item.description}</p> : null}
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-            <span>{item.project_name ?? 'Project'}</span>
-            <span>{item.run_node_name ?? item.run_step_name ?? (item.work_type ? workTypeLabel(item.work_type) : 'Runtime work')}</span>
-            <span>Owner: {item.assignee_name ?? (asArray<string>(item.role_ids).join(', ') || '-')}</span>
-            <span>Due: {dateText(item.due_at)}</span>
-            <span>Evidence: {numberValue(item.evidence_count)}</span>
+            <span>{item.project_name ?? 'Công trình'}</span>
+            <span>{item.run_node_name ?? item.run_step_name ?? (item.work_type ? workTypeLabel(item.work_type) : 'Đầu việc quy trình')}</span>
+            <span>Phụ trách: {item.assignee_name ?? (asArray<string>(item.role_ids).join(', ') || '-')}</span>
+            <span>Hạn: {dateText(item.due_at)}</span>
+            <span>Minh chứng: {numberValue(item.evidence_count)}</span>
             {hasWorkflowFormSummary(item) ? <span>Biểu mẫu: {item.workflow_form_required ? 'Bắt buộc' : 'Tùy chọn'}</span> : null}
           </div>
         </div>
@@ -46,7 +47,7 @@ export function WorkItemCard({
           className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
           onClick={onOpen}
         >
-          Open
+          Mở
         </button>
       </div>
       {item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{item.blocked_reason}</p> : null}

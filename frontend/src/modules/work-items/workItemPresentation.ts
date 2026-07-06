@@ -15,9 +15,9 @@ export type WorkItemActionKey =
 export const actionLabels: Record<WorkItemActionKey, string> = {
   start: 'Bắt đầu',
   complete: 'Hoàn tất',
-  block: 'Báo blocker',
-  'resolve-blocker': 'Resolve blocker',
-  'request-review': 'Gửi review',
+  block: 'Báo điểm chặn',
+  'resolve-blocker': 'Gỡ điểm chặn',
+  'request-review': 'Gửi rà soát',
   'request-approval': 'Gửi duyệt',
   approve: 'Duyệt',
   reject: 'Từ chối',
@@ -25,14 +25,14 @@ export const actionLabels: Record<WorkItemActionKey, string> = {
 };
 
 export const actionDescriptions: Record<WorkItemActionKey, string> = {
-  start: 'Chuyển work item sang đang xử lý.',
-  complete: 'Hoàn tất work item khi đủ evidence bắt buộc.',
-  block: 'Ghi nhận blocker và lý do dừng việc.',
-  'resolve-blocker': 'Gỡ blocker và đưa work item về trạng thái làm tiếp.',
-  'request-review': 'Gửi work item sang hàng chờ review.',
-  'request-approval': 'Tạo hoặc đồng bộ approval request cho work item.',
-  approve: 'Duyệt và hoàn tất work item.',
-  reject: 'Từ chối và trả work item về cần chỉnh sửa.',
+  start: 'Chuyển đầu việc sang đang xử lý.',
+  complete: 'Hoàn tất đầu việc khi đủ minh chứng bắt buộc.',
+  block: 'Ghi nhận điểm chặn và lý do dừng việc.',
+  'resolve-blocker': 'Gỡ điểm chặn và đưa đầu việc về trạng thái làm tiếp.',
+  'request-review': 'Gửi đầu việc sang hàng chờ rà soát.',
+  'request-approval': 'Tạo hoặc đồng bộ yêu cầu phê duyệt cho đầu việc.',
+  approve: 'Duyệt và hoàn tất đầu việc.',
+  reject: 'Từ chối và trả đầu việc về cần chỉnh sửa.',
   'request-change': 'Yêu cầu chỉnh sửa trước khi duyệt.',
 };
 
@@ -46,15 +46,15 @@ const departmentLabels: Record<string, string> = {
   qa: 'QA/QC',
   qaqc: 'QA/QC',
   accounting: 'Kế toán',
-  client: 'Client',
+  client: 'Chủ đầu tư',
   unassigned: 'Chưa phân công',
 };
 
 const workflowFormTypeLabels: Record<string, string> = {
   checklist: 'Checklist',
-  daily_report: 'Daily report',
+  daily_report: 'Nhật ký',
   meeting_minutes: 'Biên bản họp',
-  generic_submission: 'Submission',
+  generic_submission: 'Biểu mẫu gửi thông tin',
 };
 
 export function asArray<T>(value: unknown): T[] {
@@ -99,7 +99,7 @@ export function workTypeLabel(value?: string) {
 
 export function workflowFormTypeLabel(value?: string) {
   const key = String(value ?? '').trim();
-  return workflowFormTypeLabels[key] ?? (key ? key : 'Biểu mẫu nghiệp vụ');
+  return workflowFormTypeLabels[key] ?? (key ? key : 'Biểu mẫu quy trình');
 }
 
 export function hasWorkflowFormSummary(value?: Record<string, unknown> | null) {
@@ -108,7 +108,7 @@ export function hasWorkflowFormSummary(value?: Record<string, unknown> | null) {
 }
 
 export function workflowFormBusinessLabel(value?: Record<string, unknown> | null) {
-  if (!value) return 'Biểu mẫu nghiệp vụ';
+  if (!value) return 'Biểu mẫu quy trình';
   const templateName = String(value.workflow_form_template_name ?? '').trim();
   if (templateName) return templateName;
   return workflowFormTypeLabel(String(value.workflow_form_type ?? ''));
@@ -121,9 +121,9 @@ export function workflowFormChipText(value?: Record<string, unknown> | null) {
 }
 
 export function workflowFormNextAction(value?: Record<string, unknown> | null) {
-  if (!hasWorkflowFormSummary(value)) return 'Theo dõi activity';
-  if (value?.workflow_form_status !== 'submitted') return 'Submit biểu mẫu nghiệp vụ';
-  return 'Ký / PDF / hoàn tất step';
+  if (!hasWorkflowFormSummary(value)) return 'Theo dõi hoạt động';
+  if (value?.workflow_form_status !== 'submitted') return 'Gửi biểu mẫu quy trình';
+  return 'Ký / PDF / hoàn tất bước';
 }
 
 export function priorityLabel(value?: string) {

@@ -105,7 +105,7 @@ func (h *Handler) ProjectActivityStream(c *fiber.Ctx) error {
 		return err
 	}
 	if !allowed {
-		return forbiddenError("Bạn không có quyền xem activity của công trình này")
+		return forbiddenError("Bạn không có quyền xem hoạt động của công trình này")
 	}
 	h.writeActivityStream(c, func(event ActivityStreamEvent) (string, ActivityStreamEvent, bool) {
 		if event.ProjectID != projectID {

@@ -54,20 +54,20 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
     mutationFn: () => post(`/projects/${id}/start-pipeline`, {}),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã start pipeline run');
+      toast.success('Đã khởi động quy trình đang chạy');
     },
-    onError: (error) => toast.error('Không start được pipeline run', error),
+    onError: (error) => toast.error('Không khởi động được quy trình đang chạy', error),
   });
   const submitStep = useMutation({
     mutationFn: (stepId: string) => post(`/pipeline-run-steps/${stepId}/submit`, {}),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã submit step');
+      toast.success('Đã gửi bước');
     },
-    onError: (error) => toast.error('Không submit được step', error),
+    onError: (error) => toast.error('Không gửi được bước', error),
   });
   const requestApproval = useMutation({
-    mutationFn: (nodeId: string) => post(`/pipeline-run-nodes/${nodeId}/request-approval`, { reason: 'Yêu cầu review/approval để chuyển node' }),
+    mutationFn: (nodeId: string) => post(`/pipeline-run-nodes/${nodeId}/request-approval`, { reason: 'Yêu cầu rà soát/phê duyệt để chuyển node' }),
     onSuccess: () => {
       invalidate();
       toast.success('Đã gửi yêu cầu duyệt');
@@ -86,9 +86,9 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
     mutationFn: (nodeId: string) => post(`/pipeline-run-nodes/${nodeId}/block`, { reason: blockReason || 'Bị chặn bởi điều kiện vận hành' }),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã block node');
+      toast.success('Đã chặn node');
     },
-    onError: (error) => toast.error('Không block được node', error),
+    onError: (error) => toast.error('Không chặn được node', error),
   });
 
   const nodes = run.data?.nodes ?? [];
@@ -109,7 +109,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
   function openStepWorkItem(step: Record<string, any>) {
     const workItem = stepToWorkItem(step, run.data);
     if (!workItem) {
-      toast.warn({ title: 'Step chưa có work item', description: 'Pipeline runtime chưa tạo work item cho step này.' });
+      toast.warn({ title: 'Bước chưa có đầu việc', description: 'Quy trình đang chạy chưa tạo đầu việc cho bước này.' });
       return;
     }
     setSelectedWorkItem(workItem);
@@ -120,8 +120,8 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
   return (
     <>
       <PageHeader
-        title={mode === 'pipeline' ? 'Pipeline công trình' : 'Planning Workspace'}
-        description={run.data ? `${run.data.project_name} · Template: ${run.data.template_name}` : 'Chưa có pipeline run cho công trình này.'}
+        title={mode === 'pipeline' ? 'Quy trình công trình' : 'Không gian kế hoạch'}
+        description={run.data ? `${run.data.project_name} · Mẫu: ${run.data.template_name}` : 'Chưa có quy trình đang chạy cho công trình này.'}
         actions={
           <>
             <ProjectBackLink projectId={id} />
@@ -131,14 +131,14 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
               onClick={() => start.mutate()}
             >
               <Play className="h-4 w-4" />
-              Start / Reset run
+              Khởi động / tạo lại quy trình
             </button>
           </>
         }
       />
       {!run.data ? (
         <EmptyState
-          title="Chưa có pipeline run. Start pipeline để clone template thành workflow thật."
+          title="Chưa có quy trình đang chạy. Khởi động quy trình để tạo bản vận hành từ mẫu."
           action={
             <button
               className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -146,7 +146,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
               onClick={() => start.mutate()}
             >
               <Play className="h-4 w-4" />
-              Start pipeline
+              Khởi động quy trình
             </button>
           }
         />
@@ -252,18 +252,18 @@ type PlanningFormFilters = {
 const planningFormTypeOptions = [
   ['all', 'Tất cả loại'],
   ['meeting_minutes', 'Biên bản họp'],
-  ['daily_report', 'Daily report'],
+  ['daily_report', 'Nhật ký'],
   ['checklist', 'Checklist'],
-  ['generic_submission', 'Submission'],
+  ['generic_submission', 'Biểu mẫu gửi thông tin'],
 ];
 
 const planningFormStatusOptions = [
   ['all', 'Tất cả trạng thái'],
-  ['needs_submit', 'Cần submit'],
+  ['needs_submit', 'Cần gửi'],
   ['draft', 'Nháp'],
   ['submitted', 'Đã gửi'],
-  ['blocked', 'Blocked'],
-  ['missing', 'Thiếu instance'],
+  ['blocked', 'Bị chặn'],
+  ['missing', 'Thiếu biểu mẫu'],
 ];
 
 const planningFormRequirementOptions = [
@@ -301,9 +301,9 @@ function PlanningFormWorkspace({
 }) {
   const metricCards = [
     { label: 'Biểu mẫu', value: metrics.total, sub: `${metrics.required} bắt buộc`, tone: 'text-blue-700', bg: 'bg-blue-50' },
-    { label: 'Cần submit', value: metrics.needsSubmit, sub: 'Nháp / mở lại', tone: 'text-amber-800', bg: 'bg-amber-50' },
-    { label: 'Đã submit', value: metrics.submitted, sub: 'Chờ ký / PDF / step', tone: 'text-emerald-700', bg: 'bg-emerald-50' },
-    { label: 'Blocked / thiếu', value: metrics.blocked + metrics.missing, sub: `${metrics.blocked} blocked · ${metrics.missing} thiếu`, tone: 'text-rose-700', bg: 'bg-rose-50' },
+    { label: 'Cần gửi', value: metrics.needsSubmit, sub: 'Nháp / mở lại', tone: 'text-amber-800', bg: 'bg-amber-50' },
+    { label: 'Đã gửi', value: metrics.submitted, sub: 'Chờ ký / PDF / bước', tone: 'text-emerald-700', bg: 'bg-emerald-50' },
+    { label: 'Bị chặn / thiếu', value: metrics.blocked + metrics.missing, sub: `${metrics.blocked} bị chặn · ${metrics.missing} thiếu`, tone: 'text-rose-700', bg: 'bg-rose-50' },
   ];
 
   return (
@@ -317,7 +317,7 @@ function PlanningFormWorkspace({
                 <p className={`mt-2 text-2xl font-black ${card.tone}`}>{card.value}</p>
               </div>
               <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-md ${card.bg} ${card.tone}`}>
-                {card.label === 'Blocked / thiếu' ? <AlertTriangle className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                {card.label === 'Bị chặn / thiếu' ? <AlertTriangle className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
               </div>
             </div>
             <p className="mt-2 text-xs text-slate-500">{card.sub}</p>
@@ -331,7 +331,7 @@ function PlanningFormWorkspace({
             <ClipboardList className="h-5 w-5 shrink-0 text-blue-700" />
             <div>
               <h2 className="font-semibold text-ink">Biểu mẫu kế hoạch</h2>
-              <p className="mt-1 text-xs text-slate-500">{filteredRows.length}/{rows.length} biểu mẫu trong pipeline run</p>
+              <p className="mt-1 text-xs text-slate-500">{filteredRows.length}/{rows.length} biểu mẫu trong quy trình đang chạy</p>
             </div>
           </div>
         </div>
@@ -342,7 +342,7 @@ function PlanningFormWorkspace({
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               className="w-full rounded-md border border-line py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Tìm biểu mẫu, node, step"
+              placeholder="Tìm biểu mẫu, node, bước"
               value={search}
               onChange={(event) => onSearchChange(event.target.value)}
             />
@@ -374,7 +374,7 @@ function PlanningFormWorkspace({
         </div>
 
         {!rows.length ? (
-          <EmptyState title="Pipeline này chưa có biểu mẫu kế hoạch." />
+          <EmptyState title="Quy trình này chưa có biểu mẫu kế hoạch." />
         ) : filteredRows.length ? (
           <div className="space-y-3">
             {filteredRows.map((row) => <PlanningFormRowCard key={row.id} row={row} onOpen={() => onOpenRow(row)} />)}
@@ -401,7 +401,7 @@ function PlanningFormRowCard({ row, onOpen }: { row: PlanningFormRow; onOpen: ()
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             {row.missingInstance ? (
-              <span className="rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">Thiếu instance</span>
+              <span className="rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">Thiếu biểu mẫu</span>
             ) : row.blocked ? (
               <StatusBadge status="blocked" />
             ) : (
@@ -409,20 +409,20 @@ function PlanningFormRowCard({ row, onOpen }: { row: PlanningFormRow; onOpen: ()
             )}
             <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{row.formTypeLabel}</span>
             <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{row.required ? 'Bắt buộc' : 'Tùy chọn'}</span>
-            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Evidence: {row.evidenceCount}</span>
+            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Minh chứng: {row.evidenceCount}</span>
           </div>
           <p className="mt-2 text-sm font-semibold text-ink">{row.formTitle}</p>
           <p className="mt-1 text-xs text-slate-500">
-            Node: {row.node.name ?? '-'} · Step: {row.step.name ?? '-'}
+            Node: {row.node.name ?? '-'} · Bước: {row.step.name ?? '-'}
           </p>
-          <p className="mt-2 text-xs font-medium text-slate-600">Next: {row.nextAction}</p>
-          <p className="mt-1 text-xs text-slate-500">Work item: {row.workItem?.title ?? 'Chưa có work item'}</p>
+          <p className="mt-2 text-xs font-medium text-slate-600">Bước tiếp theo: {row.nextAction}</p>
+          <p className="mt-1 text-xs text-slate-500">Đầu việc: {row.workItem?.title ?? 'Chưa có đầu việc'}</p>
         </div>
         <button
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
           disabled={disabled}
           onClick={onOpen}
-          title={disabled ? 'Biểu mẫu chưa sẵn sàng để mở' : 'Mở biểu mẫu nghiệp vụ'}
+          title={disabled ? 'Biểu mẫu chưa sẵn sàng để mở' : 'Mở biểu mẫu quy trình'}
         >
           <ClipboardList className="h-4 w-4" />
           Mở biểu mẫu
@@ -468,8 +468,8 @@ function PipelineRuntimeSection({
       {showHeading ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-base font-semibold text-ink">Pipeline runtime</h2>
-            <p className="mt-1 text-xs text-slate-500">Node, step và approval action giữ nguyên để điều phối runtime.</p>
+            <h2 className="text-base font-semibold text-ink">Quy trình đang chạy</h2>
+            <p className="mt-1 text-xs text-slate-500">Node, bước và hành động phê duyệt giữ nguyên để điều phối quy trình đang chạy.</p>
           </div>
         </div>
       ) : null}
@@ -477,7 +477,7 @@ function PipelineRuntimeSection({
         <section className="space-y-4">
           <div className="rounded-lg border border-line bg-white p-4 shadow-panel">
             <div className="mb-2 flex items-center justify-between text-sm">
-              <span className="font-semibold text-ink">Tiến độ pipeline</span>
+              <span className="font-semibold text-ink">Tiến độ quy trình</span>
               <span className="font-semibold text-blue-700">{percent}% · {completed}/{nodes.length} node</span>
             </div>
             <div className="h-2 rounded-full bg-slate-100">
@@ -497,7 +497,7 @@ function PipelineRuntimeSection({
                 <p className="mt-2 line-clamp-2 text-xs text-slate-500">{node.description}</p>
                 <div className="mt-3 flex flex-wrap gap-1">
                   <StatusBadge status={node.status} />
-                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{node.steps?.filter((s: Record<string, any>) => s.status === 'completed').length ?? 0}/{node.steps?.length ?? 0} step</span>
+                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{node.steps?.filter((s: Record<string, any>) => s.status === 'completed').length ?? 0}/{node.steps?.length ?? 0} bước</span>
                 </div>
               </button>
             ))}
@@ -514,9 +514,9 @@ function PipelineRuntimeSection({
               <StatusBadge status={selectedNode?.status} />
             </div>
             <dl className="mb-4 grid gap-2 rounded-lg bg-slate-50 p-3 text-sm">
-              <div className="flex justify-between gap-3"><dt className="text-slate-500">Role</dt><dd className="font-medium text-ink">{selectedNode?.responsible_role_ids?.join?.(', ') ?? '-'}</dd></div>
-              <div className="flex justify-between gap-3"><dt className="text-slate-500">Approval</dt><dd className="font-medium text-ink">{selectedNode?.approval_rule ?? '-'}</dd></div>
-              <div className="flex justify-between gap-3"><dt className="text-slate-500">Fail path</dt><dd className="font-medium text-ink"><EnumChip group="fail_path" value={selectedNode?.fail_path} /></dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-slate-500">Vai trò</dt><dd className="font-medium text-ink">{selectedNode?.responsible_role_ids?.join?.(', ') ?? '-'}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-slate-500">Phê duyệt</dt><dd className="font-medium text-ink">{selectedNode?.approval_rule ?? '-'}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-slate-500">Nhánh khi không đạt</dt><dd className="font-medium text-ink"><EnumChip group="fail_path" value={selectedNode?.fail_path} /></dd></div>
             </dl>
             <div className="space-y-2">
               {(selectedNode?.steps ?? []).map((step: Record<string, any>) => {
@@ -540,9 +540,9 @@ function PipelineRuntimeSection({
                             </span>
                           ) : null}
                           {hasForm ? <StatusBadge status={step.workflow_form_status ?? 'draft'} /> : null}
-                          <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Evidence: {numberValue(step.evidence_count)}</span>
+                          <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Minh chứng: {numberValue(step.evidence_count)}</span>
                         </div>
-                        {hasFormSummary ? <p className="mt-2 text-xs font-medium text-slate-500">Next: {workflowFormNextAction(step)}</p> : null}
+                        {hasFormSummary ? <p className="mt-2 text-xs font-medium text-slate-500">Bước tiếp theo: {workflowFormNextAction(step)}</p> : null}
                       </div>
                       {completedStep ? <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-600" /> : null}
                     </div>
@@ -563,17 +563,17 @@ function PipelineRuntimeSection({
                             onClick={() => onSubmitStep(String(step.id))}
                           >
                             <FileCheck2 className="h-3.5 w-3.5" />
-                            Hoàn tất step
+                            Hoàn tất bước
                           </button>
                         ) : null}
                         {formRequired && hasForm && !formSubmitted ? (
                           <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
-                            Cần submit form
+                            Cần gửi biểu mẫu
                           </span>
                         ) : null}
                         {formRequired && !hasForm ? (
                           <span className="inline-flex items-center rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">
-                            Thiếu form instance
+                            Thiếu biểu mẫu
                           </span>
                         ) : null}
                       </div>
@@ -589,7 +589,7 @@ function PipelineRuntimeSection({
                 onClick={() => selectedNode?.id && onAdvance(String(selectedNode.id))}
               >
                 <CheckCircle2 className="h-4 w-4" />
-                Advance node
+                Chuyển node tiếp theo
               </button>
               <button
                 className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -597,15 +597,15 @@ function PipelineRuntimeSection({
                 onClick={() => selectedNode?.id && onRequestApproval(String(selectedNode.id))}
               >
                 <Send className="h-4 w-4" />
-                Request approval
+                Yêu cầu phê duyệt
               </button>
               <div className="flex gap-2">
-                <input className="min-w-0 flex-1 rounded-md border border-line px-3 py-2 text-sm focus-ring" placeholder="Lý do block" value={blockReason} onChange={(event) => onBlockReasonChange(event.target.value)} />
+                <input className="min-w-0 flex-1 rounded-md border border-line px-3 py-2 text-sm focus-ring" placeholder="Lý do chặn" value={blockReason} onChange={(event) => onBlockReasonChange(event.target.value)} />
                 <button
                   className="rounded-md bg-rose-600 px-3 py-2 text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={!selectedNode?.id}
                   onClick={() => selectedNode?.id && onBlock(String(selectedNode.id))}
-                  title="Block node"
+                  title="Chặn node"
                 >
                   <Ban className="h-4 w-4" />
                 </button>
@@ -613,7 +613,7 @@ function PipelineRuntimeSection({
             </div>
           </div>
           <div>
-            <h2 className="mb-3 text-base font-semibold text-ink">Audit / Playback</h2>
+            <h2 className="mb-3 text-base font-semibold text-ink">Nhật ký / Xem lại</h2>
             <Timeline events={auditEvents} />
           </div>
         </aside>
@@ -639,7 +639,7 @@ function buildPlanningFormRows(nodes: Record<string, any>[], run?: Record<string
       const submitted = formStatus === 'submitted';
       const needsSubmit = !missingInstance && !blocked && !submitted;
       const formTitle = hasSummary ? workflowFormChipText(step) : workflowFormBusinessLabel(step);
-      const nextAction = missingInstance ? 'Kiểm tra mapping biểu mẫu trước khi hoàn tất step' : workflowFormNextAction(step);
+      const nextAction = missingInstance ? 'Kiểm tra việc gắn biểu mẫu trước khi hoàn tất bước' : workflowFormNextAction(step);
       const searchText = [
         formTitle,
         formType,
