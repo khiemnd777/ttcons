@@ -10,6 +10,7 @@ import { ProjectsPage } from '../modules/projects/ProjectsPage';
 import { ProjectDetailPage } from '../modules/projects/ProjectDetailPage';
 import { ProjectWorkspaceLayout } from '../modules/projects/ProjectWorkspaceLayout';
 import { MyWorkPage } from '../modules/my-work/MyWorkPage';
+import { WorkItemDetailPage } from '../modules/work-items/WorkItemDetailPage';
 import { PipelineBuilderPage } from '../modules/pipeline-builder/PipelineBuilderPage';
 import { WorkflowFormsPage } from '../modules/workflow-forms/WorkflowFormsPage';
 import { PlanningDailyReportsPage } from '../modules/planning-daily-reports/PlanningDailyReportsPage';
@@ -63,12 +64,14 @@ export const router = createBrowserRouter([
       { index: true, element: <HomeRedirect /> },
       { path: '/dashboard', element: guarded(<DashboardPage />, ['report.view']) },
       { path: '/my-work', element: <MyWorkPage /> },
+      { path: '/work-items/:id', element: <WorkItemDetailPage /> },
       { path: '/projects', element: guarded(<ProjectsPage />, ['project.view']) },
       {
         path: '/projects/:id',
         element: guarded(<ProjectWorkspaceLayout />, ['project.view']),
         children: [
           { index: true, element: <ProjectDetailPage /> },
+          { path: 'work-items/:workItemId', element: <WorkItemDetailPage /> },
           { path: 'pipeline', element: guarded(<PlanningPage mode="pipeline" />, ['pipeline.view']) },
           { path: 'planning', element: guarded(<PlanningPage />, ['planning.view', 'pipeline.view']) },
           { path: 'boq', element: guarded(<BOQPage />, ['boq.view']) },

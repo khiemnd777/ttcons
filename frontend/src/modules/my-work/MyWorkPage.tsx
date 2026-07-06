@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, AtSign, Bell, BriefcaseBusiness, CheckCircle2, Clock3, MessageSquare, RefreshCw, ShieldAlert, SlidersHorizontal } from 'lucide-react';
 import clsx from 'clsx';
@@ -13,7 +13,7 @@ import type { ActivityAttentionItem, WorkItem } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { ActivityAttachments } from '../work-items/ActivityAttachments';
 import { WorkItemCard } from '../work-items/WorkItemCard';
-import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
+import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
 import {
   asArray,
   activityLabel,
@@ -68,7 +68,8 @@ export function MyWorkPage() {
   const [selectedPriority, setSelectedPriority] = useState('all');
   const [selectedAttentionQueue, setSelectedAttentionQueue] = useState<AttentionQueueKey>('all');
   const [attentionStreamStatus, setAttentionStreamStatus] = useState<StreamStatus>('reconnecting');
-  const [selectedWork, setSelectedWork] = useState<WorkItem | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const workItems = useQuery({
     queryKey: ['my-work-items'],
@@ -126,7 +127,7 @@ export function MyWorkPage() {
     });
   }, [rows, selectedDeadline, selectedPriority, selectedProject, selectedQueue, selectedStatus, selectedWorkType]);
 
-  const selectedContext = selectedWork ?? filteredRows[0] ?? null;
+  const selectedContext = filteredRows[0] ?? null;
   const summary = useMemo(() => buildSummary(rows), [rows]);
   const attentionRows = useMemo(() => asArray<ActivityAttentionItem>(activityAttention.data), [activityAttention.data]);
 
@@ -240,20 +241,13 @@ export function MyWorkPage() {
 
         <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)_340px]">
           <QueueTabs selectedQueue={selectedQueue} counts={queueCounts} onSelect={setSelectedQueue} />
-          <WorkQueueList rows={filteredRows} selectedWork={selectedWork} onOpen={setSelectedWork} />
+          <WorkQueueList
+            rows={filteredRows}
+            onOpen={(item) => navigate(workItemDetailPath(item.id, currentReturnTo(location), item.project_id))}
+          />
           <ContextPanel item={selectedContext} />
         </div>
       </section>
-
-      <WorkItemDetailDialog
-        open={Boolean(selectedWork)}
-        item={selectedWork}
-        onClose={() => setSelectedWork(null)}
-        onChanged={(item) => {
-          setSelectedWork(item);
-          queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
-        }}
-      />
     </>
   );
 }
@@ -499,18 +493,16 @@ function QueueTabs({
 
 function WorkQueueList({
   rows,
-  selectedWork,
   onOpen,
 }: {
   rows: WorkItem[];
-  selectedWork: WorkItem | null;
   onOpen: (item: WorkItem) => void;
 }) {
   if (!rows.length) return <EmptyState title="Không có work item trong queue này" />;
   return (
     <div className="max-h-[720px] space-y-3 overflow-y-auto pr-1">
       {rows.map((item) => (
-        <div key={item.id} className={clsx(selectedWork?.id === item.id && 'rounded-lg ring-2 ring-blue-300')}>
+        <div key={item.id}>
           <WorkItemCard item={item} onOpen={() => onOpen(item)} />
         </div>
       ))}

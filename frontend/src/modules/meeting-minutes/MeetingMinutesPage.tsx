@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { CalendarDays, CheckSquare, ExternalLink, FileText, RotateCcw, Search, Users } from 'lucide-react';
 import { get } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
@@ -11,8 +12,8 @@ import { RowActions } from '../../components/RowActions';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { dateText } from '../../lib/utils/format';
-import type { MeetingMinutesItem, WorkItem } from '../../lib/types/domain';
-import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
+import type { MeetingMinutesItem } from '../../lib/types/domain';
+import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
 import { compactDateTime, numberValue } from '../work-items/workItemPresentation';
 
 type Filters = {
@@ -46,7 +47,8 @@ const priorityLabels: Record<string, string> = {
 };
 
 export function MeetingMinutesPage() {
-  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [filters, setFilters] = useState<Filters>({
     projectId: '',
     dateFrom: '',
@@ -57,7 +59,6 @@ export function MeetingMinutesPage() {
     search: '',
   });
   const [detailMeeting, setDetailMeeting] = useState<MeetingMinutesItem | null>(null);
-  const [selectedWorkItem, setSelectedWorkItem] = useState<WorkItem | null>(null);
 
   const queryPath = useMemo(() => meetingMinutesPath(filters), [filters]);
   const meetings = useQuery({
@@ -84,8 +85,7 @@ export function MeetingMinutesPage() {
   }
 
   function openWorkItem(meeting: MeetingMinutesItem) {
-    const item = meetingToWorkItem(meeting);
-    if (item) setSelectedWorkItem(item);
+    if (meeting.work_item_id) navigate(workItemDetailPath(meeting.work_item_id, currentReturnTo(location), meeting.project_id));
   }
 
   return (
@@ -248,15 +248,6 @@ export function MeetingMinutesPage() {
       </ListSection>
 
       <MeetingMinutesDetailDialog meeting={detailMeeting} onClose={() => setDetailMeeting(null)} onOpenWorkItem={openWorkItem} />
-      <WorkItemDetailDialog
-        open={Boolean(selectedWorkItem)}
-        item={selectedWorkItem}
-        onClose={() => setSelectedWorkItem(null)}
-        onChanged={() => {
-          queryClient.invalidateQueries({ queryKey: ['planning-meeting-minutes'] });
-          meetings.refetch();
-        }}
-      />
     </>
   );
 }
@@ -448,33 +439,6 @@ function meetingMetrics(rows: MeetingMinutesItem[]) {
     decisions: rows.reduce((sum, row) => sum + numberValue(row.decision_count), 0),
     actionItems: rows.reduce((sum, row) => sum + numberValue(row.action_item_count), 0),
     generatedItems: rows.reduce((sum, row) => sum + numberValue(row.generated_work_item_count), 0),
-  };
-}
-
-function meetingToWorkItem(meeting: MeetingMinutesItem): WorkItem | null {
-  if (!meeting.work_item_id) return null;
-  return {
-    id: meeting.work_item_id,
-    project_id: meeting.project_id,
-    project_name: meeting.project_name,
-    title: meeting.work_item_title ?? meetingTitle(meeting),
-    status: meeting.work_item_status ?? meeting.status,
-    work_type: 'meeting_minutes',
-    source_type: 'pipeline_run_step',
-    source_id: meeting.run_step_id,
-    run_node_id: meeting.run_node_id,
-    run_node_name: meeting.run_node_name,
-    run_step_id: meeting.run_step_id,
-    run_step_name: meeting.run_step_name,
-    workflow_form_instance_id: meeting.form_instance_id,
-    workflow_form_status: meeting.status,
-    workflow_form_type: 'meeting_minutes',
-    workflow_form_revision: meeting.current_revision,
-    workflow_form_submitted_at: meeting.submitted_at,
-    workflow_form_template_code: meeting.template_code,
-    workflow_form_template_name: meeting.template_name,
-    workflow_form_version_no: meeting.version_no,
-    evidence_count: numberValue(meeting.evidence_count),
   };
 }
 

@@ -25,7 +25,7 @@ const filters: Array<{ id: EvidenceFilter; label: string }> = [
   { id: 'all', label: 'Tất cả' },
   { id: 'photo', label: 'Ảnh' },
   { id: 'document', label: 'Tài liệu' },
-  { id: 'submitted', label: 'Đã gửi' },
+  { id: 'submitted', label: 'Đang chờ' },
   { id: 'accepted', label: 'Đã duyệt' },
   { id: 'rejected', label: 'Từ chối' },
 ];
@@ -95,23 +95,8 @@ export function EvidenceGallery({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {filters.map((filter) => (
-            <button
-              key={filter.id}
-              type="button"
-              className={clsx(
-                'rounded-md border px-2.5 py-1.5 text-xs font-semibold',
-                activeFilter === filter.id ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-line bg-white text-slate-600 hover:bg-slate-50',
-              )}
-              onClick={() => setActiveFilter(filter.id)}
-            >
-              {filter.label} {filterCounts[filter.id]}
-            </button>
-          ))}
-        </div>
-        <label className="relative min-w-0 lg:w-72">
+      <div className="space-y-2">
+        <label className="relative block w-full">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
           <input
             className="w-full rounded-md border border-line bg-white py-2 pl-8 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
@@ -120,6 +105,43 @@ export function EvidenceGallery({
             placeholder="Tìm minh chứng, đầu việc, mô tả"
           />
         </label>
+        <div className="min-w-0 space-y-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Lọc minh chứng</p>
+          <div className="inline-flex max-w-full flex-wrap gap-1 rounded-lg border border-line bg-slate-50 p-1" role="group" aria-label="Lọc minh chứng">
+            {filters.map((filter) => {
+              const selected = activeFilter === filter.id;
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  aria-pressed={selected}
+                  className={clsx(
+                    'inline-flex min-h-8 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+                    selected
+                      ? 'border-blue-300 bg-white text-blue-700 shadow-sm ring-1 ring-inset ring-blue-100'
+                      : 'border-transparent bg-transparent text-slate-600 hover:border-line hover:bg-white hover:text-ink',
+                  )}
+                  onClick={() => setActiveFilter(filter.id)}
+                >
+                  {selected ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <span className="h-2 w-2 shrink-0 rounded-full border border-slate-300 bg-white" aria-hidden="true" />
+                  )}
+                  <span>{filter.label}</span>
+                  <span
+                    className={clsx(
+                      'rounded-full px-1.5 py-0.5 text-[11px] tabular-nums',
+                      selected ? 'bg-blue-100 text-blue-700' : 'bg-white text-slate-500 ring-1 ring-inset ring-line',
+                    )}
+                  >
+                    {filterCounts[filter.id]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {rows.length && variant === 'list' ? (

@@ -214,75 +214,71 @@ export function WorkflowFormPanel({
         }}
       />
 
-      <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_19rem]">
-        <div className="min-w-0 space-y-3">
-          <WorkflowFormOperationsSummary
-            submitted={submitted}
-            validationIssueCount={validationIssues.length}
-            evidenceCount={activeEvidence.length}
-            checklistStats={checklistStats}
-            signatures={signatures}
-            pdfExports={pdfExports}
-          />
-          {isPlanningDailyReport ? <PlanningDailyReportSummary values={values} submitted={submitted} /> : null}
-          {isMeetingMinutes ? <MeetingMinutesSummary values={values} submitted={submitted} /> : null}
-          {isPlanningChecklist ? <PlanningChecklistSummary values={values} submitted={submitted} /> : null}
+      <div className="space-y-3">
+        <WorkflowFormOperationsSummary
+          submitted={submitted}
+          validationIssueCount={validationIssues.length}
+          evidenceCount={activeEvidence.length}
+          checklistStats={checklistStats}
+          signatures={signatures}
+          pdfExports={pdfExports}
+        />
+        {isPlanningDailyReport ? <PlanningDailyReportSummary values={values} submitted={submitted} /> : null}
+        {isMeetingMinutes ? <MeetingMinutesSummary values={values} submitted={submitted} /> : null}
+        {isPlanningChecklist ? <PlanningChecklistSummary values={values} submitted={submitted} /> : null}
 
-          <section className="rounded-md border border-line bg-white">
-            <div className="flex flex-col gap-2 border-b border-line bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trường dữ liệu</p>
-                <h4 className="mt-0.5 text-sm font-semibold text-ink">Dữ liệu biểu mẫu</h4>
-              </div>
-              <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{fields.length} trường</span>
+        <section className="rounded-md border border-line bg-white">
+          <div className="flex flex-col gap-2 border-b border-line bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trường dữ liệu</p>
+              <h4 className="mt-0.5 text-sm font-semibold text-ink">Dữ liệu biểu mẫu</h4>
             </div>
-            <div className="grid gap-3 p-3 md:grid-cols-2">
-              {fields.map((field) => (
-                <WorkflowFieldControl
-                  key={field.field_key}
-                  field={field}
-                  value={values[field.field_key]}
-                  evidence={evidence}
-                  error={errors[field.field_key]}
-                  disabled={submitted || formActionPending}
-                  onChange={(value) => setFieldValue(field, value)}
-                />
-              ))}
-            </div>
-            <div className="border-t border-line bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              {instance?.submitted_at ? `Đã gửi ${compactDateTime(instance.submitted_at)}` : `Cập nhật ${compactDateTime(instance?.updated_at)}`}
-            </div>
-          </section>
-        </div>
-
-        <aside className="min-w-0 space-y-3">
-          <section className="rounded-md border border-line bg-white">
-            <div className="border-b border-line bg-slate-50 px-3 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tài liệu biểu mẫu</p>
-              <h4 className="mt-0.5 text-sm font-semibold text-ink">Chữ ký và PDF</h4>
-            </div>
-            <div className="space-y-3 p-3">
-              <WorkflowSignaturePanel
-                signatures={signatures}
-                submitted={submitted}
-                signedByCurrentUser={signedByCurrentUser}
-                signing={signForm.isPending}
-                onOpenSign={() => setSignatureDialogOpen(true)}
-                onViewDetail={(signature) => setSignatureDetail(signature)}
-                onOpenVisual={(signature) => void openProtectedBlob(`/workflow-form-signatures/${signature.id}/visual`, 'Không mở được chữ ký')}
+            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{fields.length} trường</span>
+          </div>
+          <div className="grid gap-3 p-3">
+            {fields.map((field) => (
+              <WorkflowFieldControl
+                key={field.field_key}
+                field={field}
+                value={values[field.field_key]}
+                evidence={evidence}
+                error={errors[field.field_key]}
+                disabled={submitted || formActionPending}
+                onChange={(value) => setFieldValue(field, value)}
               />
-              <WorkflowPDFExportPanel
-                exports={pdfExports}
-                submitted={submitted}
-                generating={generatePDF.isPending}
-                onGenerate={() => generatePDF.mutate()}
-                onOpen={(record) => void openProtectedBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF biểu mẫu quy trình')}
-              />
-            </div>
-          </section>
+            ))}
+          </div>
+          <div className="border-t border-line bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            {instance?.submitted_at ? `Đã gửi ${compactDateTime(instance.submitted_at)}` : `Cập nhật ${compactDateTime(instance?.updated_at)}`}
+          </div>
+        </section>
 
-          {form.data.events?.length ? <WorkflowFormEventsPanel events={form.data.events} /> : null}
-        </aside>
+        <section className="rounded-md border border-line bg-white">
+          <div className="border-b border-line bg-slate-50 px-3 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tài liệu biểu mẫu</p>
+            <h4 className="mt-0.5 text-sm font-semibold text-ink">Chữ ký và PDF</h4>
+          </div>
+          <div className="space-y-3 p-3">
+            <WorkflowSignaturePanel
+              signatures={signatures}
+              submitted={submitted}
+              signedByCurrentUser={signedByCurrentUser}
+              signing={signForm.isPending}
+              onOpenSign={() => setSignatureDialogOpen(true)}
+              onViewDetail={(signature) => setSignatureDetail(signature)}
+              onOpenVisual={(signature) => void openProtectedBlob(`/workflow-form-signatures/${signature.id}/visual`, 'Không mở được chữ ký')}
+            />
+            <WorkflowPDFExportPanel
+              exports={pdfExports}
+              submitted={submitted}
+              generating={generatePDF.isPending}
+              onGenerate={() => generatePDF.mutate()}
+              onOpen={(record) => void openProtectedBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF biểu mẫu quy trình')}
+            />
+          </div>
+        </section>
+
+        {form.data.events?.length ? <WorkflowFormEventsPanel events={form.data.events} /> : null}
       </div>
       <SignatureCaptureDialog
         open={signatureDialogOpen}

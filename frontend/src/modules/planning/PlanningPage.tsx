@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Ban, CheckCircle2, ClipboardList, FileCheck2, FileText, Play, Search, Send } from 'lucide-react';
 import { get, post } from '../../lib/api/client';
@@ -12,7 +12,7 @@ import { useToast } from '../../components/ToastProvider';
 import { EnumChip } from '../../components/EnumChip';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import type { WorkItem } from '../../lib/types/domain';
-import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
+import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
 import {
   hasWorkflowFormSummary,
   numberValue,
@@ -24,10 +24,11 @@ import {
 
 export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipeline' }) {
   const { id = '' } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const toast = useToast();
   const [selectedNodeId, setSelectedNodeId] = useState('');
-  const [selectedWorkItem, setSelectedWorkItem] = useState<WorkItem | null>(null);
   const [blockReason, setBlockReason] = useState('');
   const [formSearch, setFormSearch] = useState('');
   const [formTypeFilter, setFormTypeFilter] = useState('all');
@@ -47,8 +48,8 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['pipeline-run', id] });
     queryClient.invalidateQueries({ queryKey: ['project-audit', id] });
-    queryClient.invalidateQueries({ queryKey: ['work-item', selectedWorkItem?.id ?? ''] });
-    queryClient.invalidateQueries({ queryKey: ['work-item-form', selectedWorkItem?.id ?? ''] });
+    queryClient.invalidateQueries({ queryKey: ['work-item'] });
+    queryClient.invalidateQueries({ queryKey: ['work-item-form'] });
   };
   const start = useMutation({
     mutationFn: () => post(`/projects/${id}/start-pipeline`, {}),
@@ -112,7 +113,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
       toast.warn({ title: 'Bước chưa có đầu việc', description: 'Quy trình đang chạy chưa tạo đầu việc cho bước này.' });
       return;
     }
-    setSelectedWorkItem(workItem);
+    navigate(workItemDetailPath(workItem.id, currentReturnTo(location), workItem.project_id ?? id));
   }
 
   if (run.isLoading) return <LoadingSpinner />;
@@ -200,15 +201,6 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
           onBlockReasonChange={setBlockReason}
         />
       )}
-      <WorkItemDetailDialog
-        open={Boolean(selectedWorkItem)}
-        item={selectedWorkItem}
-        onClose={() => setSelectedWorkItem(null)}
-        onChanged={(item) => {
-          setSelectedWorkItem(item);
-          invalidate();
-        }}
-      />
     </>
   );
 }

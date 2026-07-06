@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -44,7 +44,7 @@ import type { ActivityAttachmentOption } from '../work-items/ActivityComposer';
 import { ActivityThread } from '../work-items/ActivityThread';
 import { EvidenceGallery, type EvidenceReviewAction } from '../work-items/EvidenceGallery';
 import { WorkItemCard } from '../work-items/WorkItemCard';
-import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
+import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
 import {
   asArray,
   compactDateTime,
@@ -97,11 +97,12 @@ function workDueDate(item: WorkItem) {
 
 export function ProjectDetailPage() {
   const { id = '' } = useParams();
-  const [selectedWork, setSelectedWork] = useState<WorkItem | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState(ALL_WORK_SURFACE);
   const [selectedTimelineNodeId, setSelectedTimelineNodeId] = useState('');
   const [activeTab, setActiveTab] = useState<ProjectDetailTab>('overview');
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -163,7 +164,7 @@ export function ProjectDetailPage() {
   }, [searchParams]);
 
   function openWorkItem(item: WorkItem) {
-    setSelectedWork(item);
+    navigate(workItemDetailPath(item.id, currentReturnTo(location), item.project_id ?? id));
   }
 
   if (operations.isLoading) return <ProjectOperationsSkeleton />;
@@ -288,18 +289,6 @@ export function ProjectDetailPage() {
           visibleMembers.length ? <ProjectMembers rows={visibleMembers} /> : <EmptyState title="Chưa có thành viên công trình" />
         ) : null}
       </div>
-
-      <WorkItemDetailDialog
-        open={Boolean(selectedWork)}
-        item={selectedWork}
-        onClose={() => {
-          setSelectedWork(null);
-        }}
-        onChanged={(item) => {
-          setSelectedWork(item);
-          queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
-        }}
-      />
     </>
   );
 }

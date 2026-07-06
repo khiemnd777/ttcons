@@ -64,15 +64,43 @@ export function WorkItemDetailDialog({
   onClose: () => void;
   onChanged?: (item: WorkItem) => void;
 }) {
+  const workContextLabel = item?.run_node_name
+    ?? item?.run_step_name
+    ?? (item?.work_type ? workTypeLabel(item.work_type) : 'Đầu việc đang chạy');
+
+  return (
+    <Dialog
+      open={open}
+      title={item?.title ?? 'Chi tiết đầu việc'}
+      description={item ? `${item.project_name ?? 'Công trình'} · ${departmentLabel(item.department)} · ${workContextLabel}` : undefined}
+      onClose={onClose}
+      size="workspace"
+    >
+      <WorkItemDetailWorkspace item={item} onClose={onClose} onChanged={onChanged} />
+    </Dialog>
+  );
+}
+
+export function WorkItemDetailWorkspace({
+  item,
+  workItemId,
+  onClose,
+  onChanged,
+}: {
+  item?: WorkItem | null;
+  workItemId?: string;
+  onClose?: () => void;
+  onChanged?: (item: WorkItem) => void;
+}) {
   const [actionText, setActionText] = useState('');
   const [pendingAction, setPendingAction] = useState<WorkItemActionKey | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
-  const selectedWorkId = item?.id ?? '';
+  const selectedWorkId = workItemId ?? item?.id ?? '';
   const workDetail = useQuery({
     queryKey: ['work-item', selectedWorkId],
     queryFn: () => get<WorkItem>(`/work-items/${selectedWorkId}`),
-    enabled: open && Boolean(selectedWorkId),
+    enabled: Boolean(selectedWorkId),
     retry: false,
   });
   const detailItem = workDetail.data ?? item;
@@ -123,7 +151,7 @@ export function WorkItemDetailDialog({
   function closeDialog() {
     setActionText('');
     setPendingAction(null);
-    onClose();
+    onClose?.();
   }
 
   const actions = availableActions(detailItem?.status);
@@ -134,27 +162,15 @@ export function WorkItemDetailDialog({
   const requirementRows = detailItem ? buildRequirementRows(detailItem, evidence) : [];
   const nextAction = detailItem ? resolveNextAction(detailItem, evidence, actions, primarySurface?.kind) : '';
   const latestActivity = activities[0];
-  const workContextLabel = detailItem?.run_node_name
-    ?? detailItem?.run_step_name
-    ?? (detailItem?.work_type ? workTypeLabel(detailItem.work_type) : 'Đầu việc đang chạy');
-
   return (
-    <Dialog
-      open={open}
-      title={detailItem?.title ?? 'Chi tiết đầu việc'}
-      description={detailItem ? `${detailItem.project_name ?? 'Công trình'} · ${departmentLabel(detailItem.department)} · ${workContextLabel}` : undefined}
-      onClose={closeDialog}
-      size="workspace"
-    >
+    <>
       {workDetail.isLoading && !detailItem ? <LoadingSpinner /> : null}
       {workDetail.error && !detailItem ? <EmptyState title="Không tải được chi tiết đầu việc" /> : null}
       {detailItem ? (
         <div className="space-y-4">
           <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} nextAction={nextAction} />
 
-          <div className="grid items-start gap-4 xl:grid-cols-[15rem_minmax(0,1fr)_18rem]">
-            <WorkItemProgressRail item={detailItem} />
-
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
             <main className="min-w-0 space-y-4">
               <section className="rounded-lg border border-line bg-white shadow-panel">
                 <div className="border-b border-line px-4 py-3">
@@ -210,7 +226,7 @@ export function WorkItemDetailDialog({
           </div>
         </div>
       ) : null}
-    </Dialog>
+    </>
   );
 }
 
@@ -274,76 +290,6 @@ function WorkItemWorkspaceHeader({
   );
 }
 
-function WorkItemProgressRail({ item }: { item: WorkItem }) {
-  const steps = [
-    {
-      id: 'project',
-      label: 'Công trình',
-      value: item.project_code ?? item.project_name ?? '-',
-      meta: item.project_name && item.project_code ? item.project_name : '',
-      state: 'context',
-    },
-    {
-      id: 'node',
-      label: 'Node quy trình',
-      value: item.run_node_name ?? 'Chưa gắn node',
-      meta: item.run_node_order_index ? `Thứ tự ${item.run_node_order_index}` : '',
-      state: item.run_node_name ? 'active' : 'neutral',
-    },
-    {
-      id: 'step',
-      label: 'Bước',
-      value: item.run_step_name ?? 'Chưa gắn bước',
-      meta: item.run_step_order_index ? `Thứ tự ${item.run_step_order_index}` : '',
-      state: item.run_step_name ? 'current' : 'neutral',
-    },
-    {
-      id: 'work-item',
-      label: 'Đầu việc',
-      value: item.title,
-      meta: workTypeLabel(item.work_type),
-      state: 'current',
-    },
-  ];
-
-  return (
-    <aside className="h-fit rounded-lg border border-line bg-white p-3 shadow-panel xl:sticky xl:top-0 xl:self-start">
-      <div className="border-b border-line pb-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Vị trí workflow</p>
-        <h3 className="mt-1 text-sm font-semibold text-ink">Tiến trình</h3>
-      </div>
-      <ol className="mt-3 max-h-[calc(100vh-18rem)] space-y-0 overflow-y-auto pr-1">
-        {steps.map((step, index) => {
-          const current = step.state === 'current';
-          const active = step.state === 'active';
-          return (
-            <li key={step.id} className="relative flex gap-3 pb-4 last:pb-0">
-              {index < steps.length - 1 ? <span className="absolute left-[0.5625rem] top-5 h-[calc(100%-1rem)] w-px bg-line" /> : null}
-              <span
-                className={clsx(
-                  'relative z-10 mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ring-4 ring-white',
-                  current
-                    ? 'bg-blue-600 text-white'
-                    : active
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-slate-200 text-slate-500',
-                )}
-              >
-                {current ? <Circle className="h-2.5 w-2.5 fill-current" /> : active ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-2.5 w-2.5" />}
-              </span>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{step.label}</p>
-                <p className={clsx('mt-0.5 line-clamp-2 text-sm font-semibold', current ? 'text-blue-800' : 'text-ink')}>{step.value}</p>
-                {step.meta ? <p className="mt-1 truncate text-xs text-slate-500">{step.meta}</p> : null}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-    </aside>
-  );
-}
-
 function WorkItemRequirementPanel({ rows }: { rows: RequirementRow[] }) {
   return (
     <section className="rounded-md border border-line bg-slate-50 p-3">
@@ -396,7 +342,7 @@ function WorkItemActionPanel({
   const secondaryActions = actions.slice(1);
 
   return (
-    <aside className="rounded-lg border border-line bg-white p-3 shadow-panel xl:sticky xl:top-0 xl:self-start">
+    <aside className="rounded-lg border border-line bg-white p-3 shadow-panel xl:sticky xl:top-[5.5rem] xl:self-start">
       <div className="border-b border-line pb-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Việc cần làm</p>
         <h3 className="mt-1 text-sm font-semibold text-ink">{nextAction}</h3>
@@ -504,53 +450,53 @@ function WorkItemSupportingTabs({
     });
   }
   const activeTab = tabs.some((tab) => tab.id === selectedTab) ? selectedTab : tabs[0]?.id ?? 'activity';
-  const activeTabMeta = tabs.find((tab) => tab.id === activeTab);
   const supportAction = resolveSupportTabAction(activeTab, item, evidence, activities);
 
   return (
     <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
-      <div className="border-b border-line bg-white px-4 py-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div className="border-b border-line bg-white px-4 pt-3">
+        <div className="space-y-3">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin hỗ trợ</p>
             <h3 className="mt-0.5 text-sm font-semibold text-ink">Minh chứng, trao đổi và biểu mẫu của đầu việc</h3>
             <p className="mt-1 text-xs leading-5 text-slate-500">Theo dõi hồ sơ, trao đổi và tài liệu phục vụ bước đang xử lý.</p>
           </div>
-          <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs lg:max-w-72">
+          <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs">
             <p className="font-semibold uppercase tracking-wide text-blue-700">Việc hỗ trợ tiếp theo</p>
             <p className="mt-1 font-semibold text-blue-950">{supportAction}</p>
           </div>
         </div>
 
-        <div className="mt-3 grid gap-2 md:grid-cols-3">
+        <div className="mt-3 flex overflow-x-auto" role="tablist" aria-label="Thông tin hỗ trợ">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              id={`work-item-support-tab-${tab.id}`}
+              aria-selected={activeTab === tab.id}
+              aria-controls={`work-item-support-panel-${tab.id}`}
               className={clsx(
-                'min-w-0 rounded-md border px-3 py-2 text-left transition',
-                activeTab === tab.id ? 'border-blue-300 bg-blue-50 shadow-sm' : 'border-line bg-slate-50 hover:border-blue-200 hover:bg-white',
+                'inline-flex min-h-10 shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm font-semibold transition',
+                activeTab === tab.id ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-ink',
               )}
               onClick={() => setSelectedTab(tab.id)}
             >
-              <span className="flex min-w-0 items-center justify-between gap-2">
-                <span className={clsx('truncate text-xs font-semibold uppercase tracking-wide', activeTab === tab.id ? 'text-blue-700' : 'text-slate-600')}>{tab.label}</span>
-                {typeof tab.count === 'number' ? <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-inset ring-line">{tab.count}</span> : null}
-                {tab.status ? <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-100">{statusLabel(tab.status)}</span> : null}
-              </span>
-              <span className="mt-1 block truncate text-xs text-slate-500">{tab.description}</span>
+              <span>{tab.label}</span>
+              {typeof tab.count === 'number' ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-inset ring-line">{tab.count}</span> : null}
+              {tab.status ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-100">{statusLabel(tab.status)}</span> : null}
+              <span className="sr-only">{tab.description}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="border-b border-line bg-slate-50 px-4 py-2">
-        <p className="text-xs font-semibold text-slate-600">
-          Đang xem: <span className="text-ink">{activeTabMeta?.label ?? 'Thông tin hỗ trợ'}</span>
-        </p>
-      </div>
-
-      <div className="bg-white p-4">
+      <div
+        role="tabpanel"
+        id={`work-item-support-panel-${activeTab}`}
+        aria-labelledby={`work-item-support-tab-${activeTab}`}
+        className="bg-white p-4"
+      >
         {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} /> : null}
         {activeTab === 'activity' ? (
           <WorkItemActivityPanel

@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle2, ClipboardCheck, ExternalLink, FileCheck2, RotateCcw, Search } from 'lucide-react';
 import { get } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
@@ -11,8 +12,8 @@ import { RowActions } from '../../components/RowActions';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { dateText } from '../../lib/utils/format';
-import type { PlanningChecklistItem, WorkItem } from '../../lib/types/domain';
-import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
+import type { PlanningChecklistItem } from '../../lib/types/domain';
+import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
 import { compactDateTime, numberValue } from '../work-items/workItemPresentation';
 
 type Filters = {
@@ -59,7 +60,8 @@ const planningScopeLabels: Record<string, string> = {
 };
 
 export function PlanningChecklistsPage() {
-  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [filters, setFilters] = useState<Filters>({
     projectId: '',
     dateFrom: '',
@@ -72,7 +74,6 @@ export function PlanningChecklistsPage() {
     search: '',
   });
   const [detailChecklist, setDetailChecklist] = useState<PlanningChecklistItem | null>(null);
-  const [selectedWorkItem, setSelectedWorkItem] = useState<WorkItem | null>(null);
 
   const queryPath = useMemo(() => planningChecklistPath(filters), [filters]);
   const checklists = useQuery({
@@ -101,8 +102,7 @@ export function PlanningChecklistsPage() {
   }
 
   function openWorkItem(checklist: PlanningChecklistItem) {
-    const item = checklistToWorkItem(checklist);
-    if (item) setSelectedWorkItem(item);
+    if (checklist.work_item_id) navigate(workItemDetailPath(checklist.work_item_id, currentReturnTo(location), checklist.project_id));
   }
 
   return (
@@ -286,15 +286,6 @@ export function PlanningChecklistsPage() {
       </ListSection>
 
       <PlanningChecklistDetailDialog checklist={detailChecklist} onClose={() => setDetailChecklist(null)} onOpenWorkItem={openWorkItem} />
-      <WorkItemDetailDialog
-        open={Boolean(selectedWorkItem)}
-        item={selectedWorkItem}
-        onClose={() => setSelectedWorkItem(null)}
-        onChanged={() => {
-          queryClient.invalidateQueries({ queryKey: ['planning-checklists'] });
-          checklists.refetch();
-        }}
-      />
     </>
   );
 }
@@ -450,33 +441,6 @@ function checklistMetrics(rows: PlanningChecklistItem[]) {
     done: rows.reduce((sum, row) => sum + numberValue(row.done_count), 0),
     needsAction: rows.reduce((sum, row) => sum + numberValue(row.needs_action_count), 0),
     evidenceMissing: rows.reduce((sum, row) => sum + numberValue(row.evidence_missing_count), 0),
-  };
-}
-
-function checklistToWorkItem(checklist: PlanningChecklistItem): WorkItem | null {
-  if (!checklist.work_item_id) return null;
-  return {
-    id: checklist.work_item_id,
-    project_id: checklist.project_id,
-    project_name: checklist.project_name,
-    title: checklist.work_item_title ?? checklistTitle(checklist),
-    status: checklist.work_item_status ?? checklist.status,
-    work_type: 'checklist',
-    source_type: 'pipeline_run_step',
-    source_id: checklist.run_step_id,
-    run_node_id: checklist.run_node_id,
-    run_node_name: checklist.run_node_name,
-    run_step_id: checklist.run_step_id,
-    run_step_name: checklist.run_step_name,
-    workflow_form_instance_id: checklist.form_instance_id,
-    workflow_form_status: checklist.status,
-    workflow_form_type: 'checklist',
-    workflow_form_revision: checklist.current_revision,
-    workflow_form_submitted_at: checklist.submitted_at,
-    workflow_form_template_code: checklist.template_code,
-    workflow_form_template_name: checklist.template_name,
-    workflow_form_version_no: checklist.version_no,
-    evidence_count: numberValue(checklist.evidence_count),
   };
 }
 

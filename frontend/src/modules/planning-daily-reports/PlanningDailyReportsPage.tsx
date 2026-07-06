@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { CalendarDays, ClipboardList, ExternalLink, FileText, RotateCcw, Search } from 'lucide-react';
 import { get } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
@@ -11,8 +12,8 @@ import { RowActions } from '../../components/RowActions';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { dateText, percent } from '../../lib/utils/format';
-import type { PlanningDailyReportItem, WorkItem } from '../../lib/types/domain';
-import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
+import type { PlanningDailyReportItem } from '../../lib/types/domain';
+import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
 import { compactDateTime, numberValue } from '../work-items/workItemPresentation';
 
 type Filters = {
@@ -63,7 +64,8 @@ const severityLabels: Record<string, string> = {
 };
 
 export function PlanningDailyReportsPage() {
-  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [filters, setFilters] = useState<Filters>({
     projectId: '',
     dateFrom: '',
@@ -74,7 +76,6 @@ export function PlanningDailyReportsPage() {
     search: '',
   });
   const [detailReport, setDetailReport] = useState<PlanningDailyReportItem | null>(null);
-  const [selectedWorkItem, setSelectedWorkItem] = useState<WorkItem | null>(null);
 
   const queryPath = useMemo(() => planningDailyReportPath(filters), [filters]);
   const reports = useQuery({
@@ -101,8 +102,7 @@ export function PlanningDailyReportsPage() {
   }
 
   function openWorkItem(report: PlanningDailyReportItem) {
-    const item = reportToWorkItem(report);
-    if (item) setSelectedWorkItem(item);
+    if (report.work_item_id) navigate(workItemDetailPath(report.work_item_id, currentReturnTo(location), report.project_id));
   }
 
   return (
@@ -253,15 +253,6 @@ export function PlanningDailyReportsPage() {
       </ListSection>
 
       <PlanningDailyReportDetailDialog report={detailReport} onClose={() => setDetailReport(null)} onOpenWorkItem={openWorkItem} />
-      <WorkItemDetailDialog
-        open={Boolean(selectedWorkItem)}
-        item={selectedWorkItem}
-        onClose={() => setSelectedWorkItem(null)}
-        onChanged={() => {
-          queryClient.invalidateQueries({ queryKey: ['planning-daily-reports'] });
-          reports.refetch();
-        }}
-      />
     </>
   );
 }
@@ -402,33 +393,6 @@ function dailyReportMetrics(rows: PlanningDailyReportItem[]) {
     nextPlanItems: rows.reduce((sum, row) => sum + numberValue(row.next_plan_count), 0),
     blockers: rows.reduce((sum, row) => sum + numberValue(row.blocker_count), 0),
     generatedItems: rows.reduce((sum, row) => sum + numberValue(row.generated_work_item_count), 0),
-  };
-}
-
-function reportToWorkItem(report: PlanningDailyReportItem): WorkItem | null {
-  if (!report.work_item_id) return null;
-  return {
-    id: report.work_item_id,
-    project_id: report.project_id,
-    project_name: report.project_name,
-    title: report.work_item_title ?? report.title,
-    status: report.work_item_status ?? report.status,
-    work_type: 'daily_report',
-    source_type: 'pipeline_run_step',
-    source_id: report.run_step_id,
-    run_node_id: report.run_node_id,
-    run_node_name: report.run_node_name,
-    run_step_id: report.run_step_id,
-    run_step_name: report.run_step_name,
-    workflow_form_instance_id: report.form_instance_id,
-    workflow_form_status: report.status,
-    workflow_form_type: 'daily_report',
-    workflow_form_revision: report.current_revision,
-    workflow_form_submitted_at: report.submitted_at,
-    workflow_form_template_code: report.template_code,
-    workflow_form_template_name: report.template_name,
-    workflow_form_version_no: report.version_no,
-    evidence_count: numberValue(report.evidence_count),
   };
 }
 
