@@ -20,7 +20,7 @@ export function WorkItemDetailPage() {
     <div className="space-y-4">
       <PageHeader
         title="Chi tiết đầu việc"
-        description="Không gian xử lý đầu việc, biểu mẫu, minh chứng, hoạt động và hành động workflow."
+        description="Không gian xử lý đầu việc, hồ sơ nghiệp vụ, minh chứng, hoạt động và hành động workflow."
         actions={
           <button
             className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"

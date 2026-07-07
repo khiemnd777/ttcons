@@ -13,7 +13,7 @@ import type { AnyRecord, EvidenceRecord, WorkflowFormDetail, WorkflowFormField, 
 import { dateText, percent } from '../../lib/utils/format';
 import { enumLabel } from '../../lib/utils/status';
 import { SignatureCaptureDialog, type SignatureStroke } from './SignatureCaptureDialog';
-import { compactDateTime } from './workItemPresentation';
+import { compactDateTime, isGenericWorkflowFormTemplate, workflowFormTypeLabel } from './workItemPresentation';
 
 type FormErrors = Record<string, string>;
 
@@ -45,7 +45,12 @@ export function WorkflowFormPanel({
   const fields = useMemo(() => form.data?.fields ?? [], [form.data?.fields]);
   const instance = form.data?.instance;
   const submitted = instance?.status === 'submitted';
-  const businessFormTitle = form.data?.template?.name ?? instance?.title ?? 'Biểu mẫu quy trình';
+  const businessFormTitle = workflowFormPanelTitle(
+    instance?.title,
+    form.data?.template?.code,
+    form.data?.template?.name,
+    instance?.form_type,
+  );
   const signatures = form.data?.signatures ?? [];
   const pdfExports = form.data?.pdf_exports ?? [];
   const signedPurposesByCurrentUser = useMemo(
@@ -82,18 +87,18 @@ export function WorkflowFormPanel({
     mutationFn: () => put<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/draft`, { answers: values }),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã lưu nháp biểu mẫu quy trình');
+      toast.success('Đã lưu nháp hồ sơ nghiệp vụ');
     },
-    onError: (error) => toast.error('Không lưu được biểu mẫu quy trình', error),
+    onError: (error) => toast.error('Không lưu được hồ sơ nghiệp vụ', error),
   });
 
   const submitForm = useMutation({
     mutationFn: () => post<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/submit`, { answers: values }),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã gửi biểu mẫu quy trình');
+      toast.success('Đã gửi hồ sơ nghiệp vụ');
     },
-    onError: (error) => toast.error('Không gửi được biểu mẫu quy trình', error),
+    onError: (error) => toast.error('Không gửi được hồ sơ nghiệp vụ', error),
   });
 
   const signForm = useMutation({
@@ -104,14 +109,14 @@ export function WorkflowFormPanel({
       invalidate();
       toast.success('Đã ký và lưu dấu ký trực quan');
     },
-    onError: (error) => toast.error('Không ký được biểu mẫu quy trình', error),
+    onError: (error) => toast.error('Không ký được hồ sơ nghiệp vụ', error),
   });
 
   const generatePDF = useMutation({
     mutationFn: () => post<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/pdf-exports`, {}),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã tạo PDF biểu mẫu quy trình');
+      toast.success('Đã tạo PDF hồ sơ nghiệp vụ');
     },
     onError: (error) => toast.error('Không tạo được PDF', error),
   });
@@ -149,7 +154,7 @@ export function WorkflowFormPanel({
     setErrors(nextErrors);
     const labels = fields.filter((field) => nextErrors[field.field_key]).map((field) => field.label);
     if (labels.length) {
-      toast.warn({ title: 'Thiếu dữ liệu biểu mẫu quy trình', description: labels.join(', ') });
+      toast.warn({ title: 'Thiếu thông tin nghiệp vụ', description: labels.join(', ') });
       return false;
     }
     return true;
@@ -158,7 +163,7 @@ export function WorkflowFormPanel({
   if (form.isLoading) {
     return (
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu quy trình</h3>
+        <h3 className="mb-2 text-sm font-semibold text-ink">Hồ sơ nghiệp vụ</h3>
         <div className="rounded-md border border-line bg-white p-4">
           <LoadingSpinner />
         </div>
@@ -169,9 +174,9 @@ export function WorkflowFormPanel({
   if (form.isError) {
     return (
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu quy trình</h3>
+        <h3 className="mb-2 text-sm font-semibold text-ink">Hồ sơ nghiệp vụ</h3>
         <div className="rounded-md border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">
-          <p className="font-semibold">Không tải được biểu mẫu quy trình</p>
+          <p className="font-semibold">Không tải được hồ sơ nghiệp vụ</p>
           <p className="mt-1 text-xs">{form.error instanceof Error ? form.error.message : 'Vui lòng thử lại.'}</p>
           <button
             type="button"
@@ -188,8 +193,8 @@ export function WorkflowFormPanel({
   if (!form.data?.available) {
     return (
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Biểu mẫu quy trình</h3>
-        <EmptyState title="Bước này chưa có biểu mẫu quy trình." />
+        <h3 className="mb-2 text-sm font-semibold text-ink">Hồ sơ nghiệp vụ</h3>
+        <EmptyState title="Bước này chưa có hồ sơ nghiệp vụ." />
       </section>
     );
   }
@@ -230,10 +235,10 @@ export function WorkflowFormPanel({
         <section className="rounded-md border border-line bg-white">
           <div className="flex flex-col gap-2 border-b border-line bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trường dữ liệu</p>
-              <h4 className="mt-0.5 text-sm font-semibold text-ink">Dữ liệu biểu mẫu</h4>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nội dung cần xử lý</p>
+              <h4 className="mt-0.5 text-sm font-semibold text-ink">Thông tin nghiệp vụ</h4>
             </div>
-            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{fields.length} trường</span>
+            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{fields.length} thông tin</span>
           </div>
           <div className="grid gap-3 p-3">
             {fields.map((field) => (
@@ -255,7 +260,7 @@ export function WorkflowFormPanel({
 
         <section className="rounded-md border border-line bg-white">
           <div className="border-b border-line bg-slate-50 px-3 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tài liệu biểu mẫu</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tài liệu nghiệp vụ</p>
             <h4 className="mt-0.5 text-sm font-semibold text-ink">Chữ ký và PDF</h4>
           </div>
           <div className="space-y-3 p-3">
@@ -273,7 +278,7 @@ export function WorkflowFormPanel({
               submitted={submitted}
               generating={generatePDF.isPending}
               onGenerate={() => generatePDF.mutate()}
-              onOpen={(record) => void openProtectedBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF biểu mẫu quy trình')}
+              onOpen={(record) => void openProtectedBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF hồ sơ nghiệp vụ')}
             />
           </div>
         </section>
@@ -348,6 +353,14 @@ const checklistItemStatusLabels: Record<string, string> = {
   blocked: 'Bị chặn',
 };
 
+function workflowFormPanelTitle(instanceTitle?: string, templateCode?: string, templateName?: string, formType?: string) {
+  const runtimeTitle = String(instanceTitle ?? '').trim();
+  if (runtimeTitle && !isGenericWorkflowFormTemplate(undefined, runtimeTitle)) return runtimeTitle;
+  const businessTemplateName = String(templateName ?? '').trim();
+  if (businessTemplateName && !isGenericWorkflowFormTemplate(templateCode, businessTemplateName)) return businessTemplateName;
+  return workflowFormTypeLabel(formType);
+}
+
 function WorkflowFormActionCenter({
   title,
   versionNo,
@@ -385,7 +398,7 @@ function WorkflowFormActionCenter({
             <StatusBadge status={status} />
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Biểu mẫu quy trình v{versionNo} · {submittedAt ? `Đã gửi ${compactDateTime(submittedAt)}` : `Cập nhật ${compactDateTime(updatedAt)}`}
+            Hồ sơ nghiệp vụ v{versionNo} · {submittedAt ? `Đã gửi ${compactDateTime(submittedAt)}` : `Cập nhật ${compactDateTime(updatedAt)}`}
           </p>
           <div className="mt-3 flex items-start gap-2">
             <span className={clsx('mt-0.5 rounded-md p-1.5', blocked ? 'bg-white text-amber-700' : 'bg-blue-50 text-blue-700')}>
@@ -393,10 +406,10 @@ function WorkflowFormActionCenter({
             </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-ink">
-                {blocked ? 'Cần hoàn tất dữ liệu trước khi gửi' : submitted ? 'Biểu mẫu đã gửi, chuyển sang tài liệu' : 'Sẵn sàng lưu nháp hoặc gửi'}
+                {blocked ? 'Cần hoàn tất thông tin trước khi gửi' : submitted ? 'Hồ sơ đã gửi, chuyển sang tài liệu' : 'Sẵn sàng lưu nháp hoặc gửi'}
               </p>
               <p className="mt-1 text-xs leading-5 text-slate-600">
-                {blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung biểu mẫu đã khóa; chữ ký và PDF dùng phiên bản đã gửi.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
+                {blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung hồ sơ đã khóa; chữ ký và PDF dùng phiên bản đã gửi.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
               </p>
             </div>
           </div>
@@ -418,7 +431,7 @@ function WorkflowFormActionCenter({
             onClick={onSubmit}
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Gửi biểu mẫu
+            Gửi hồ sơ
           </button>
         </div>
       </div>
@@ -464,7 +477,7 @@ function WorkflowFormEventsPanel({ events }: { events: AnyRecord[] }) {
   return (
     <section className="rounded-md border border-line bg-white">
       <div className="border-b border-line bg-slate-50 px-3 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lịch sử biểu mẫu</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lịch sử hồ sơ</p>
         <h4 className="mt-0.5 text-sm font-semibold text-ink">Sự kiện gần nhất</h4>
       </div>
       <div className="divide-y divide-line">
@@ -526,7 +539,7 @@ function MeetingMinutesSummary({ values, submitted }: { values: AnyRecord; submi
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">{textOrDash(values.meeting_title) === '-' ? 'Biên bản họp' : textOrDash(values.meeting_title)}</p>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            {submitted ? 'Biên bản đã gửi; đầu việc được dùng để sinh đầu việc theo biểu mẫu quy trình.' : 'Hoàn tất người tham dự, quyết định và đầu việc trước khi gửi biên bản.'}
+            {submitted ? 'Biên bản đã gửi; đầu việc được dùng để sinh đầu việc theo hồ sơ nghiệp vụ.' : 'Hoàn tất người tham dự, quyết định và đầu việc trước khi gửi biên bản.'}
           </p>
         </div>
         <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[40rem]">
@@ -649,7 +662,7 @@ function DailyReportList({
               <p className="mt-1 break-words text-xs text-slate-500">{meta(item)}</p>
             </article>
           ))}
-          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong biểu mẫu</p> : null}
+          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong hồ sơ</p> : null}
         </div>
       ) : (
         <p className="rounded-md border border-dashed border-line bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">{empty}</p>
@@ -687,7 +700,7 @@ function PlanningChecklistList({
               <p className="mt-1 break-words text-xs text-slate-500">{planningChecklistItemMeta(item)}</p>
             </article>
           ))}
-          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong biểu mẫu</p> : null}
+          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong hồ sơ</p> : null}
         </div>
       ) : fallbackText ? (
         <p className="line-clamp-5 whitespace-pre-wrap break-words rounded-md border border-line bg-white px-3 py-2 text-xs leading-5 text-slate-600">{fallbackText}</p>
@@ -731,7 +744,7 @@ function MeetingSummaryList({
               <p className="mt-1 break-words text-xs text-slate-500">{meta(item)}</p>
             </article>
           ))}
-          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong biểu mẫu</p> : null}
+          {items.length > 3 ? <p className="text-xs font-medium text-slate-500">+{items.length - 3} dòng khác trong hồ sơ</p> : null}
         </div>
       ) : fallbackText ? (
         <p className="line-clamp-5 whitespace-pre-wrap break-words rounded-md border border-line bg-white px-3 py-2 text-xs leading-5 text-slate-600">{fallbackText}</p>
@@ -752,8 +765,8 @@ function WorkflowStepPill({ label, value, active }: { label: string; value: stri
 }
 
 function workflowNextAction(submitted: boolean, validationIssueCount: number, signatureCount: number, pdfCount: number) {
-  if (!submitted && validationIssueCount > 0) return 'Hoàn tất checklist/biểu mẫu';
-  if (!submitted) return 'Gửi biểu mẫu quy trình';
+  if (!submitted && validationIssueCount > 0) return 'Hoàn tất checklist/hồ sơ';
+  if (!submitted) return 'Gửi hồ sơ nghiệp vụ';
   if (signatureCount === 0) return 'Ký / đóng dấu PDF';
   if (pdfCount === 0) return 'Tạo PDF';
   return 'Mở tài liệu hoặc hoàn tất đầu việc';
@@ -921,12 +934,12 @@ function WorkflowSignaturePanel({
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-line px-3 py-4 text-sm font-medium text-slate-500">
-          {submitted ? 'Chưa có chữ ký nội bộ.' : 'Gửi biểu mẫu trước khi ký nội bộ.'}
+          {submitted ? 'Chưa có chữ ký nội bộ.' : 'Gửi hồ sơ trước khi ký nội bộ.'}
         </div>
       )}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs text-slate-500">
-          {!submitted ? 'Gửi biểu mẫu trước khi ký.' : signedByCurrentUser ? 'Bạn đã ký xác nhận nội bộ; vẫn có thể ký mục đích khác nếu cần.' : 'Chữ ký canvas sẽ được lưu như tệp được bảo vệ.'}
+          {!submitted ? 'Gửi hồ sơ trước khi ký.' : signedByCurrentUser ? 'Bạn đã ký xác nhận nội bộ; vẫn có thể ký mục đích khác nếu cần.' : 'Chữ ký canvas sẽ được lưu như tệp được bảo vệ.'}
         </div>
         <button
           type="button"
@@ -961,7 +974,7 @@ function SignatureDetailDialog({
       onClose={onClose}
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-slate-500">Mã nội dung dùng để đối chiếu nội dung biểu mẫu tại thời điểm ký.</p>
+          <p className="text-xs text-slate-500">Mã nội dung dùng để đối chiếu nội dung hồ sơ tại thời điểm ký.</p>
           <div className="flex flex-wrap justify-end gap-2">
             {signature.visual_storage_key ? (
               <button
@@ -984,7 +997,7 @@ function SignatureDetailDialog({
         <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
           <p className="text-sm font-semibold text-emerald-900">Bản ghi chữ ký không thể chỉnh sửa</p>
           <p className="mt-1 text-xs leading-5 text-emerald-800">
-            Chữ ký này được lưu chỉ thêm mới theo biểu mẫu, người ký, mục đích và phiên bản. Nếu cần thay đổi nội dung, cần tạo phiên bản/biểu mẫu mới thay vì sửa bản ghi ký.
+            Chữ ký này được lưu chỉ thêm mới theo hồ sơ, người ký, mục đích và phiên bản. Nếu cần thay đổi nội dung, cần tạo phiên bản/hồ sơ mới thay vì sửa bản ghi ký.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -992,7 +1005,7 @@ function SignatureDetailDialog({
           <SignatureDetailField label="ID người ký" value={signature.signer_user_id || '-'} mono />
           <SignatureDetailField label="Mục đích" value={signaturePurposeLabel(signature.purpose)} />
           <SignatureDetailField label="Thời điểm ký" value={compactDateTime(signature.signed_at)} />
-          <SignatureDetailField label="Phiên bản biểu mẫu" value={`Phiên bản ${signature.form_revision_no}`} />
+          <SignatureDetailField label="Phiên bản hồ sơ" value={`Phiên bản ${signature.form_revision_no}`} />
           <SignatureDetailField label="Vai trò lúc ký" value={signatureRolesText(signature)} />
           <SignatureDetailField label="Tệp dấu ký" value={signatureVisualText(signature)} />
           <SignatureDetailField label="Nơi lưu dấu ký" value={signature.visual_storage_provider || '-'} />
@@ -1080,7 +1093,7 @@ function WorkflowPDFExportPanel({
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-line px-3 py-4 text-sm font-medium text-slate-500">
-          {submitted ? 'Chưa tạo PDF cho biểu mẫu này.' : 'Gửi biểu mẫu trước khi tạo PDF.'}
+          {submitted ? 'Chưa tạo PDF cho hồ sơ này.' : 'Gửi hồ sơ trước khi tạo PDF.'}
         </div>
       )}
     </section>

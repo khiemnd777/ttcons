@@ -1,5 +1,126 @@
 # Current States
 
+## Official Workflow Business Forms Product Grade
+
+Status: complete
+
+Mục đích chính:
+- Turn official client workflow template `40000000-0000-0000-0000-000000000020` into a production-grade operational workflow where every Node > Step opens the correct business form, checklist, evidence gate, or domain panel.
+- Remove user-facing generic wording from production work-item execution UI. Users must see business language, not implementation language such as `Generic submission`, `Workflow Form`, or `Trường dữ liệu`.
+
+Evidence gathered:
+- `backend/migrations/V38__client_workflow_template.sql` defines the official client workflow template with 12 nodes and 52 steps.
+- In V38, 51/52 steps map to `builtin_generic_submission`; step 2 is evidence-only with no form; step 11 maps to `client_design_branch_decision`.
+- `backend/migrations/V40__vietnamese_official_workflow_text.sql` only cleans Vietnamese labels/descriptions and does not replace the generic form mapping.
+- Existing business UI/form surfaces in the repo include planning daily report, meeting minutes, planning checklist, evidence, BOQ unit price lifecycle, subcontractor checklist, owner/client checklist, construction daily report, reconciliation panels, material snapshot, surplus handling, incoming/outgoing acceptance, input/output invoices, payment schedules, debt reconciliation, cashflow, tax, and profit reporting.
+
+Will be done:
+- Save this active plan as the shared source-of-truth before implementation.
+- Produce a review package before any code, migration, or UI change.
+- Produce a Mockup as Text before any UI change.
+- Classify all 52 steps as one of: keep evidence-only, remap to existing business form, remap to existing domain panel, create a new `client_*` workflow form, or remove generic fallback.
+- Design field-level specs for every new `client_*` workflow form: field key, label, type, required flag, validation, help text, signature/PDF needs, and completion gate.
+- Add only new migrations for form templates/versions/fields and step remapping. Do not edit already-applied migrations.
+- Preserve workflow template/runtime separation. Publishing, remapping, and cloning must not silently mutate submitted or historical project runs.
+- Define runtime migration handling for existing draft instances separately from submitted/signed/PDF instances.
+- Update work-item UI labels so business users see the current step's business form title, expected input, and next action, not internal generic template names.
+- Verify backend/frontend contracts around form detail, form submit, signature, PDF, evidence, required gates, activity/audit, and RBAC.
+- Build a UAT script that starts a project from template `40000000-0000-0000-0000-000000000020` and checks every node/step mapping.
+
+Done:
+- User confirmed the plan-save direction with `OK`.
+- User approved implementation with `OK triển khai với điều phối subagents phù hợp, đúng skills và hiệu quả`.
+- Re-read Consflow repo architecture and workflow orchestration guardrails.
+- Re-read V38 official workflow template and V40 Vietnamese text cleanup migration.
+- Re-read the user-provided business UI/form catalog attachment.
+- Confirmed the current plan was not yet present in `docs/current-states.md` before this entry.
+- Delegated frontend work-item form-copy cleanup to a frontend subagent; build passed in that subagent's scope.
+- Delegated migration/schema safety review to a DB reviewer subagent; reviewer confirmed the safe path is a new V41 migration, published versions, and template-step remap only.
+- Added `backend/migrations/V41__official_workflow_business_forms.sql` to seed official `client_*` business forms and remap template `40000000-0000-0000-0000-000000000020` away from `builtin_generic_submission` for future runs.
+- Preserved step 2 as evidence-only and preserved step 11 branch routing through `needs_design` on `client_design_branch_decision` version 2.
+- Kept runtime instances, submitted answers, signatures, and PDF exports untouched.
+- Updated work-item execution UI copy so user-facing execution labels say `Hồ sơ nghiệp vụ`, `Nội dung cần xử lý`, and `Thông tin nghiệp vụ` instead of generic form-engine wording.
+- Updated work-item primary panel routing so document-upload steps with a workflow form open the business hồ sơ, incoming acceptance steps open incoming acceptance, procurement material steps with forms open hồ sơ nghiệp vụ, and subcontractor quantity dossier steps open reconciliation.
+- Ran `make migrate-check`: 42 migrations checked successfully.
+- Applied V41 successfully to the running Docker PostgreSQL stack through `/app/consflow-migrate`: `applied=1 skipped=40`.
+- Verified template `40000000-0000-0000-0000-000000000020` in PostgreSQL: 52 total steps, 51 steps with forms, 0 steps on `builtin_generic_submission`, step 2 remains evidence-only, step 11 remains `client_design_branch_decision` v2 with `needs_design`.
+- Added `backend/migrations/V42__remap_official_workflow_draft_forms.sql` to remap existing blank draft runtime instances from official workflow runs away from `builtin_generic_submission`.
+- Applied V42 successfully to the running Docker PostgreSQL stack through `/app/consflow-migrate`: `applied=1 skipped=41`.
+- Verified existing official workflow runtime instances in PostgreSQL: 0 `workflow_form_instances` remain on `builtin_generic_submission`.
+- Ran `GOCACHE=$PWD/.gocache go test ./...` in `backend`: pass.
+- Ran `npm run build` in `frontend`: pass; Vite reported only the existing large chunk warning.
+- Browser/Playwright verification was skipped per repo rule because it was not explicitly requested in this turn.
+
+Source-of-truth mapping:
+
+| # | Node | Step / checklist | Current mapping | Product-grade target | Implementation status |
+|---|---|---|---|---|---|
+| 1 | Khảo sát | Khảo sát yêu cầu của chủ đầu tư | `builtin_generic_submission` | New `client_survey_requirement_intake` form for owner requirements, scope, stakeholders, constraints, deadline, and notes | Implemented in V41 |
+| 2 | Khảo sát | Khảo sát / Chụp / Tải ảnh hiện trạng | No form; photo evidence required | Evidence-only step with guided photo categories, location/area, before-condition notes, and required evidence gate | Evidence-only preserved |
+| 3 | Khảo sát | Thiết kế nắm phong cách | `builtin_generic_submission` | New `client_design_style_brief` form for style direction, references, materials, color tone, exclusions, and owner preference | Implemented in V41 |
+| 4 | Khảo sát | Ghi nhận kích thước chính | `builtin_generic_submission` | New `client_site_measurement_record` form for measured areas, dimensions, unit, tolerance, measurement owner, and attachment evidence | Implemented in V41 |
+| 5 | Khảo sát | Xác định rủi ro mặt bằng | `builtin_generic_submission` | New `client_site_risk_assessment` checklist for structural, MEP, access, safety, schedule, and cost risks | Implemented in V41 |
+| 6 | Khảo sát | Biên bản khảo sát | `builtin_generic_submission` | New `client_site_survey_minutes` form with survey conclusion, participants, issues, required attachments, signature, and PDF | Implemented in V41 |
+| 7 | Họp báo cáo khảo sát | QS / Bốc khối lượng không thiết kế | `builtin_generic_submission` | BOQ/takeoff business surface plus a takeoff summary form if embedded work-item submission is needed | Implemented in V41 |
+| 8 | Họp báo cáo khảo sát | Thiết kế / Lên bản bố trí mặt bằng | `builtin_generic_submission` | New `client_design_layout_submission` form for layout revision, file links, assumptions, owner feedback, and readiness | Implemented in V41 |
+| 9 | Họp báo cáo khảo sát | Thiết kế / Lên bản vẽ 3D | `builtin_generic_submission` | New `client_design_3d_submission` form for 3D package, revision, render files, owner comments, and approval readiness | Implemented in V41 |
+| 10 | Họp báo cáo khảo sát | Thiết kế / Lên bản vẽ thi công | `builtin_generic_submission` | New `client_construction_drawing_submission` form for drawing set, revision, issued-for status, and attachment evidence | Implemented in V41 |
+| 11 | Họp báo cáo khảo sát | Biên bản cuộc họp | `client_design_branch_decision` | Business meeting minutes with participants, decisions, tasks, and routing field `needs_design`; branch decision remains but cannot be the whole meeting form | Implemented in V41 |
+| 12 | Thiết kế | Trao đổi / Lên bản vẽ bố trí mặt bằng | `builtin_generic_submission` | New `client_design_review_layout` form for design iteration, comments, blockers, attachment, and next revision | Implemented in V41 |
+| 13 | Thiết kế | Trao đổi / Lên bản vẽ 3D | `builtin_generic_submission` | New `client_design_review_3d` form for 3D iteration, comments, acceptance criteria, attachment, and next revision | Implemented in V41 |
+| 14 | Thiết kế | Trao đổi / Lên bản vẽ thi công | `builtin_generic_submission` | New `client_design_review_construction_drawing` form with document upload, drawing status, revision, and review notes | Implemented in V41 |
+| 15 | Thiết kế | Chốt với Sale / Chủ đầu tư | `builtin_generic_submission` | Owner/client confirmation checklist or new `client_design_owner_approval` form with approval status and signature/PDF | Implemented in V41 |
+| 16 | Thiết kế | Đưa bản vẽ qua bên QS | `builtin_generic_submission` | New `client_design_to_qs_handoff` form with handoff package, drawing revision, BOQ assumptions, and receiver confirmation | Implemented in V41 |
+| 17 | BOQ (Không thiết kế) | QS lấy giá từ thầu phụ / tổ đội / vật tư | `builtin_generic_submission` | BOQ unit price lifecycle plus supplier price collection fields | Implemented in V41 |
+| 18 | BOQ (Không thiết kế) | QS / PM / GĐ kiểm tra đơn giá đầu vào | `builtin_generic_submission` | BOQ price check/approval form with margin, variance, and reviewer decision | Implemented in V41 |
+| 19 | BOQ (Không thiết kế) | GĐ rà soát định mức quản lý | `builtin_generic_submission` | Director management-rate review form with approval, conditions, and audit note | Implemented in V41 |
+| 20 | BOQ (Không thiết kế) | QS / PM / GĐ gửi BOQ qua chủ đầu tư | `builtin_generic_submission` | BOQ submission package with document upload, sent date, recipient, version, and evidence | Implemented in V41 |
+| 21 | BOQ (Có thiết kế) | QS / Sale / PM gửi BOQ qua chủ đầu tư | `builtin_generic_submission` | BOQ-after-design submission package with drawing revision linkage and owner delivery evidence | Implemented in V41 |
+| 22 | Đầu Vào | QS / Bốc khối lượng | `builtin_generic_submission` | Procurement input takeoff form or BOQ-derived procurement quantity review | Implemented in V41 |
+| 23 | Đầu Vào | Mua hàng / QS mua hàng với tổ đội / thầu phụ / NCC vật tư | `builtin_generic_submission` | Procurement sourcing form for vendor, scope, quotes, lead time, comparison, and selected option | Implemented in V41 |
+| 24 | Đầu Vào | Mua hàng / QS ký hợp đồng / hồ sơ tạm ứng | `builtin_generic_submission` | Input contract/advance package using contract document upload and input payment schedule/advance surface | Implemented in V41 |
+| 25 | Đầu Vào | PM / GĐ rà soát & kiểm tra đầu vào | `builtin_generic_submission` | Procurement approval checklist with scope, price, contract, advance, risk, and approve/reject decision | Implemented in V41 |
+| 26 | Đàm phán giá | Sale / QS / PM / GĐ đàm phán thầu phụ | `builtin_generic_submission` | Negotiation log form with parties, original price, negotiated price, concessions, and decision | Implemented in V41 |
+| 27 | Đàm phán giá | QS / PM chốt lại định mức | `builtin_generic_submission` | Final rate/margin confirmation form linked to BOQ unit price lifecycle | Implemented in V41 |
+| 28 | Đàm phán giá | GĐ rà soát & chốt báo cáo đơn giá | `builtin_generic_submission` | Director final price approval form with signed decision and audit note | Implemented in V41 |
+| 29 | Chốt Hợp đồng với chủ đầu tư | QS lên báo giá & hợp đồng | `builtin_generic_submission` | Owner quote/contract package form with quote version, contract draft, payment terms, and files | Implemented in V41 |
+| 30 | Chốt Hợp đồng với chủ đầu tư | Kế toán / Pháp lý kiểm tra hợp đồng | `builtin_generic_submission` | Legal/finance contract review checklist with risk flags, tax/payment terms, and required corrections | Implemented in V41 |
+| 31 | Chốt Hợp đồng với chủ đầu tư | Gửi file mềm cho chủ đầu tư | `builtin_generic_submission` | Owner soft-file submission form with document list, delivery channel, recipient, and sent evidence | Implemented in V41 |
+| 32 | Chốt Hợp đồng với chủ đầu tư | PM / GĐ rà soát và ký duyệt | `builtin_generic_submission` | Internal contract approval/signature form with PDF/signature gate | Implemented in V41 |
+| 33 | Chốt Hợp đồng với chủ đầu tư | In và gửi bản cứng cho chủ đầu tư | `builtin_generic_submission` | Hardcopy dispatch form with print set, courier/hand delivery, receiver, date, and evidence | Implemented in V41 |
+| 34 | QA & QC / Thi công | QS / PM / Thiết kế / QA họp & phân công | `builtin_generic_submission` | Meeting minutes plus construction assignment matrix | Implemented in V41 |
+| 35 | QA & QC / Thi công | Chốt biên bản cuộc họp | `builtin_generic_submission` | Meeting minutes v2 with PDF/signature, action items, owners, and due dates | Implemented in V41 |
+| 36 | QA & QC / Thi công | QA đảm bảo chất lượng / kế hoạch thi công | `builtin_generic_submission` | QA/construction plan checklist with inspection criteria and schedule | Implemented in V41 |
+| 37 | QA & QC / Thi công | QA báo cáo liên tục trong quá trình thi công | `builtin_generic_submission` | Existing construction daily report form | Implemented in V41 |
+| 38 | Nghiệm thu Đầu Vào | Nghiệm thu thầu phụ / tổ đội | `builtin_generic_submission` | Incoming acceptance panel plus subcontractor checklist/reconciliation | Implemented in V41 |
+| 39 | Nghiệm thu Đầu Vào | Nghiệm thu vật tư đầu vào vs đầu ra | `builtin_generic_submission` | Incoming acceptance panel plus material before/after snapshot | Implemented in V41 |
+| 40 | Nghiệm thu Đầu Vào | QS hồ sơ kiểm tra khối lượng thầu phụ | `builtin_generic_submission` | Subcontractor reconciliation panel with quantity and pricing check | Implemented in V41 |
+| 41 | Nghiệm thu Đầu Vào | GĐ rà soát hồ sơ kiểm tra khối lượng thầu phụ | `builtin_generic_submission` | Director approval checklist/signature for subcontractor quantity dossier | Implemented in V41 |
+| 42 | Nghiệm thu Đầu Vào | QS hồ sơ thanh toán cho thầu phụ | `builtin_generic_submission` | Input invoice/payment schedule/payable dossier surface | Implemented in V41 |
+| 43 | Nghiệm thu Đầu Vào | GĐ ký nghiệm thu hồ sơ thanh toán | `builtin_generic_submission` | Signed payment acceptance approval with PDF/signature gate | Implemented in V41 |
+| 44 | Nghiệm thu Đầu Vào | Kế toán kiểm tra hồ sơ thanh toán | `builtin_generic_submission` | Payable reconciliation/input invoice review panel | Implemented in V41 |
+| 45 | Nghiệm thu Đầu Vào | Thanh toán cho thầu phụ | `builtin_generic_submission` | Input payment plan/payment execution surface | Implemented in V41 |
+| 46 | Nghiệm thu Đầu Ra | QA / QS / PM / GĐ nghiệm thu & ký duyệt công trình | `builtin_generic_submission` | Outgoing acceptance panel plus owner/client checklist and signature | Implemented in V41 |
+| 47 | Nghiệm thu Đầu Ra | GĐ hồ sơ nghiệm thu & ký duyệt | `builtin_generic_submission` | Director outgoing acceptance approval with PDF/signature gate | Implemented in V41 |
+| 48 | Nghiệm thu Đầu Ra | Hồ sơ thanh toán & quyết toán & ký duyệt | `builtin_generic_submission` | Output billing/receivable settlement package with document upload and approval | Implemented in V41 |
+| 49 | Nghiệm thu Đầu Ra | Xuất hóa đơn | `builtin_generic_submission` | Output invoice PDF panel | Implemented in V41 |
+| 50 | Nghiệm thu Đầu Ra | Thanh toán nhiều kỳ | `builtin_generic_submission` | Output billing schedule/payment collection panel | Implemented in V41 |
+| 51 | Kết thúc: Bàn giao + Đóng tài chính | Kế toán thầu phụ xuất hóa đơn về công ty | `builtin_generic_submission` | Input invoice PDF/AP closure surface | Implemented in V41 |
+| 52 | Kết thúc: Bàn giao + Đóng tài chính | Kế toán xuất hóa đơn cho chủ đầu tư | `builtin_generic_submission` | Output invoice PDF/AR closure plus cashflow/tax/profit closure checks | Implemented in V41 |
+
+Product-grade definition of done:
+- 52/52 steps are explicitly classified and implemented with no accidental generic fallback in the official client template.
+- 0 user-facing occurrences of `Generic submission`, `Trường dữ liệu`, or `Workflow Form` remain in the work-item execution experience for official client workflow runs.
+- Every required form has domain-specific labels, help text, validation, and completion summary.
+- Evidence-only steps explain exactly what evidence the user must upload.
+- Domain-panel steps open the relevant business panel with clear empty/loading/error states.
+- Submitted/signed/PDF historical form instances remain auditable and are not silently rewritten.
+- Draft runtime instances have a documented migration/remap path before any data rewrite is implemented.
+- Backend tests, frontend build, and migration validation pass. Browser verification remains skipped unless explicitly requested by the user in that turn.
+
+Implementation review package:
+- Completed before code changes and approved by the user before implementation.
+
 ## Work Item Remove Workflow Position Rail
 
 Status: complete

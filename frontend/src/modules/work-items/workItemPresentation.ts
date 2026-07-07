@@ -54,8 +54,24 @@ const workflowFormTypeLabels: Record<string, string> = {
   checklist: 'Checklist',
   daily_report: 'Nhật ký',
   meeting_minutes: 'Biên bản họp',
-  generic_submission: 'Biểu mẫu gửi thông tin',
+  generic_submission: 'Hồ sơ nghiệp vụ',
 };
+
+const genericWorkflowFormTemplateCodes = new Set([
+  'builtin_generic_submission',
+  'generic_submission',
+]);
+
+const genericWorkflowFormTemplateNames = new Set([
+  'generic submission',
+  'workflow form',
+  'biểu mẫu quy trình',
+  'bieu mau quy trinh',
+  'biểu mẫu gửi thông tin',
+  'bieu mau gui thong tin',
+  'hồ sơ nghiệp vụ',
+  'ho so nghiep vu',
+]);
 
 export function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? value as T[] : [];
@@ -99,7 +115,13 @@ export function workTypeLabel(value?: string) {
 
 export function workflowFormTypeLabel(value?: string) {
   const key = String(value ?? '').trim();
-  return workflowFormTypeLabels[key] ?? (key ? key : 'Biểu mẫu quy trình');
+  return workflowFormTypeLabels[key] ?? (key ? key : 'Hồ sơ nghiệp vụ');
+}
+
+export function isGenericWorkflowFormTemplate(code?: unknown, name?: unknown) {
+  const templateCode = String(code ?? '').trim().toLowerCase();
+  const templateName = String(name ?? '').trim().toLowerCase();
+  return genericWorkflowFormTemplateCodes.has(templateCode) || genericWorkflowFormTemplateNames.has(templateName);
 }
 
 export function hasWorkflowFormSummary(value?: Record<string, unknown> | null) {
@@ -108,9 +130,13 @@ export function hasWorkflowFormSummary(value?: Record<string, unknown> | null) {
 }
 
 export function workflowFormBusinessLabel(value?: Record<string, unknown> | null) {
-  if (!value) return 'Biểu mẫu quy trình';
+  if (!value) return 'Hồ sơ nghiệp vụ';
+  const explicitTitle = firstNonEmpty(value.workflow_form_title, value.workflow_form_instance_title);
+  if (explicitTitle && !isGenericWorkflowFormTemplate(undefined, explicitTitle)) return explicitTitle;
   const templateName = String(value.workflow_form_template_name ?? '').trim();
-  if (templateName) return templateName;
+  if (templateName && !isGenericWorkflowFormTemplate(value.workflow_form_template_code, templateName)) return templateName;
+  const runtimeTitle = firstNonEmpty(value.run_step_name, value.title, value.work_item_title);
+  if (runtimeTitle && !isGenericWorkflowFormTemplate(undefined, runtimeTitle)) return runtimeTitle;
   return workflowFormTypeLabel(String(value.workflow_form_type ?? ''));
 }
 
@@ -122,8 +148,16 @@ export function workflowFormChipText(value?: Record<string, unknown> | null) {
 
 export function workflowFormNextAction(value?: Record<string, unknown> | null) {
   if (!hasWorkflowFormSummary(value)) return 'Theo dõi hoạt động';
-  if (value?.workflow_form_status !== 'submitted') return 'Gửi biểu mẫu quy trình';
+  if (value?.workflow_form_status !== 'submitted') return 'Gửi hồ sơ nghiệp vụ';
   return 'Ký / PDF / hoàn tất bước';
+}
+
+function firstNonEmpty(...values: unknown[]) {
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (text) return text;
+  }
+  return '';
 }
 
 export function priorityLabel(value?: string) {

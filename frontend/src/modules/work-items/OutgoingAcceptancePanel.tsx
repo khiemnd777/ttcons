@@ -350,9 +350,9 @@ export function OutgoingAcceptancePanel({
             </select>
           </label>
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 lg:col-span-2">
-            Biểu mẫu quy trình
+            Hồ sơ nghiệp vụ
             <select className={controlClassName} value={draft.form_instance_id} onChange={(event) => updateDraft({ form_instance_id: event.target.value })} disabled={actionPending || !formInstance?.id}>
-              <option value="">{formInstance?.id ? 'Không liên kết biểu mẫu' : 'Chưa có biểu mẫu'}</option>
+              <option value="">{formInstance?.id ? 'Không liên kết hồ sơ' : 'Chưa có hồ sơ'}</option>
               {formInstance?.id ? <option value={formInstance.id}>{formInstance.title}</option> : null}
             </select>
           </label>

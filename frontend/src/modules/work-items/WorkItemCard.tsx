@@ -40,7 +40,7 @@ export function WorkItemCard({
             <span>Phụ trách: {item.assignee_name ?? (asArray<string>(item.role_ids).join(', ') || '-')}</span>
             <span>Hạn: {dateText(item.due_at)}</span>
             <span>Minh chứng: {numberValue(item.evidence_count)}</span>
-            {hasWorkflowFormSummary(item) ? <span>Biểu mẫu: {item.workflow_form_required ? 'Bắt buộc' : 'Tùy chọn'}</span> : null}
+            {hasWorkflowFormSummary(item) ? <span>Hồ sơ: {item.workflow_form_required ? 'Bắt buộc' : 'Tùy chọn'}</span> : null}
           </div>
         </div>
         <button

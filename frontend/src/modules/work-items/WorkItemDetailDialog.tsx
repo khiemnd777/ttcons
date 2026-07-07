@@ -254,7 +254,7 @@ function WorkItemWorkspaceHeader({
     { label: 'Node', value: item.run_node_name ?? '-' },
     { label: 'Bước', value: item.run_step_name ?? '-' },
     { label: 'Minh chứng', value: `${activeEvidence.length} hiệu lực / ${numberValue(item.evidence_count)} tổng` },
-    { label: 'Biểu mẫu', value: hasWorkflowFormSummary(item) ? `${workflowFormChipText(item)} · ${statusLabel(item.workflow_form_status ?? 'draft')}` : '-' },
+    { label: 'Hồ sơ', value: hasWorkflowFormSummary(item) ? `${workflowFormChipText(item)} · ${statusLabel(item.workflow_form_status ?? 'draft')}` : '-' },
   ];
 
   return (
@@ -444,7 +444,7 @@ function WorkItemSupportingTabs({
   if (hasWorkflowFormSummary(item) && !primarySurfaceUsesWorkflowForm(primarySurfaceKind)) {
     tabs.push({
       id: 'form',
-      label: 'Biểu mẫu / PDF',
+      label: 'Hồ sơ / PDF',
       status: item.workflow_form_status ?? 'draft',
       description: workflowFormChipText(item),
     });
@@ -458,7 +458,7 @@ function WorkItemSupportingTabs({
         <div className="space-y-3">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin hỗ trợ</p>
-            <h3 className="mt-0.5 text-sm font-semibold text-ink">Minh chứng, trao đổi và biểu mẫu của đầu việc</h3>
+            <h3 className="mt-0.5 text-sm font-semibold text-ink">Minh chứng, trao đổi và hồ sơ của đầu việc</h3>
             <p className="mt-1 text-xs leading-5 text-slate-500">Theo dõi hồ sơ, trao đổi và tài liệu phục vụ bước đang xử lý.</p>
           </div>
           <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs">
@@ -678,7 +678,7 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
     const required = Boolean(item.workflow_form_required);
     rows.push({
       id: 'workflow-form',
-      label: required ? 'Biểu mẫu nghiệp vụ bắt buộc' : 'Biểu mẫu nghiệp vụ',
+      label: required ? 'Hồ sơ nghiệp vụ bắt buộc' : 'Hồ sơ nghiệp vụ',
       description: submitted
         ? `${workflowFormChipText(item)} đã được gửi.`
         : `${workflowFormChipText(item)} đang ở trạng thái ${statusLabel(item.workflow_form_status ?? 'draft')}.`,
@@ -765,7 +765,7 @@ function primarySurfaceNextAction(kind: WorkItemPrimarySurfaceKind, actions: Wor
     case 'subcontractor_reconciliation':
       return 'Đối chiếu thầu phụ';
     case 'workflow_form':
-      return 'Hoàn tất biểu mẫu nghiệp vụ';
+      return 'Hoàn tất hồ sơ nghiệp vụ';
     case 'approval':
       return actions.length ? actionLabels[actions[0]] : 'Theo dõi phê duyệt';
     case 'generic':

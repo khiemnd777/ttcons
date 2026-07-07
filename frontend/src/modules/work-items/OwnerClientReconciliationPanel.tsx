@@ -244,7 +244,7 @@ export function OwnerClientReconciliationPanel({
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
           <p className="text-xs text-slate-500">
-            Phiên bản biểu mẫu #{record.form_revision_no ?? 0}
+            Phiên bản hồ sơ #{record.form_revision_no ?? 0}
             {record.updated_at ? ` · cập nhật ${dateText(record.updated_at)}` : ''}
           </p>
           <div className="flex flex-wrap justify-end gap-2">

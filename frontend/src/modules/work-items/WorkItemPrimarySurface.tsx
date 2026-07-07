@@ -51,6 +51,7 @@ export function WorkItemPrimarySurface({
 
 export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySurfaceDefinition {
   const workType = normalizeSearch(item.work_type);
+  const hasWorkflowForm = hasWorkflowFormSummary(item);
   const searchText = normalizeSearch([
     item.work_type,
     item.title,
@@ -61,8 +62,45 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
     item.workflow_form_template_code,
     item.workflow_form_template_name,
   ].filter(Boolean).join(' '));
+  const isIncomingAcceptance = includesAny(searchText, [
+    'nghiệm thu đầu vào',
+    'nghiem thu dau vao',
+    'incoming acceptance',
+    'nghiệm thu thầu phụ',
+    'nghiem thu thau phu',
+    'nghiệm thu vật tư',
+    'nghiem thu vat tu',
+  ]);
+  const isOutgoingAcceptance = includesAny(searchText, [
+    'nghiệm thu đầu ra',
+    'nghiem thu dau ra',
+    'outgoing acceptance',
+    'nghiệm thu & ký duyệt công trình',
+    'nghiem thu & ky duyet cong trinh',
+  ]);
+  const isProcurementMaterialWorkflow = workType === 'material_check' && hasWorkflowForm && includesAny(searchText, [
+    'mua hàng',
+    'mua hang',
+    'tổ đội',
+    'to doi',
+    'thầu phụ',
+    'thau phu',
+    'nhà cung cấp',
+    'nha cung cap',
+    'cung cấp vật tư',
+    'cung cap vat tu',
+  ]);
+  const isSubcontractorQuantityDossier = includesAny(searchText, [
+    'hồ sơ kiểm tra khối lượng thầu phụ',
+    'ho so kiem tra khoi luong thau phu',
+    'kiểm tra khối lượng thầu phụ',
+    'kiem tra khoi luong thau phu',
+    'đối chiếu thầu phụ',
+    'doi chieu thau phu',
+    'subcontractor reconciliation',
+  ]);
 
-  if (['photo_upload', 'document_upload', 'evidence_upload'].includes(workType)) {
+  if (['photo_upload', 'evidence_upload'].includes(workType)) {
     return {
       kind: 'evidence',
       title: 'Nộp minh chứng',
@@ -78,11 +116,35 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
     };
   }
 
-  if (workType === 'acceptance_check' || includesAny(searchText, ['nghiệm thu đầu ra', 'nghiem thu dau ra', 'outgoing acceptance'])) {
+  if (isSubcontractorQuantityDossier) {
+    return {
+      kind: 'subcontractor_reconciliation',
+      title: 'Đối chiếu khối lượng thầu phụ',
+      description: 'Việc chính là đối chiếu khối lượng, đơn giá áp dụng, chứng từ và công nợ với thầu phụ.',
+    };
+  }
+
+  if (workType === 'acceptance_check' && isIncomingAcceptance) {
+    return {
+      kind: 'incoming_acceptance',
+      title: 'Nghiệm thu đầu vào',
+      description: 'Việc chính là kiểm nhận vật tư/thầu phụ, số lượng đạt/từ chối và minh chứng giao nhận.',
+    };
+  }
+
+  if (workType === 'acceptance_check' || isOutgoingAcceptance) {
     return {
       kind: 'outgoing_acceptance',
       title: 'Nghiệm thu đầu ra',
       description: 'Việc chính là lập biên bản nghiệm thu, ghi nhận đạt/không đạt và danh sách cần xử lý.',
+    };
+  }
+
+  if (isProcurementMaterialWorkflow) {
+    return {
+      kind: 'workflow_form',
+      title: workflowFormChipText(item),
+      description: 'Việc chính là hoàn tất hồ sơ mua hàng/đầu vào của bước trước khi gửi rà soát/duyệt.',
     };
   }
 
@@ -108,14 +170,6 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
     };
   }
 
-  if (includesAny(searchText, ['đối chiếu thầu phụ', 'doi chieu thau phu', 'subcontractor'])) {
-    return {
-      kind: 'subcontractor_reconciliation',
-      title: 'Đối chiếu thầu phụ',
-      description: 'Việc chính là đối chiếu khối lượng, chứng từ và công nợ với thầu phụ.',
-    };
-  }
-
   if (workType === 'handover_check' || includesAny(searchText, ['đối chiếu chủ đầu tư', 'doi chieu chu dau tu', 'owner client'])) {
     return {
       kind: 'owner_client_reconciliation',
@@ -124,11 +178,19 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
     };
   }
 
-  if (hasWorkflowFormSummary(item)) {
+  if (workType === 'document_upload' && !hasWorkflowForm) {
+    return {
+      kind: 'evidence',
+      title: 'Nộp tài liệu',
+      description: 'Việc chính là tải đúng tài liệu và kiểm tra trạng thái minh chứng.',
+    };
+  }
+
+  if (hasWorkflowForm) {
     return {
       kind: 'workflow_form',
       title: workflowFormChipText(item),
-      description: 'Việc chính là hoàn tất biểu mẫu nghiệp vụ của bước trước khi gửi rà soát/duyệt.',
+      description: 'Việc chính là hoàn tất hồ sơ nghiệp vụ của bước trước khi gửi rà soát/duyệt.',
     };
   }
 
@@ -198,7 +260,7 @@ function ApprovalPrimaryPanel({ item, evidence }: { item: WorkItem; evidence: Ev
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-ink">Quyết định cần ghi nhận</h3>
             <p className="mt-1 text-sm leading-6 text-slate-700">
-              Kiểm tra nội dung, minh chứng và biểu mẫu liên quan. Các nút duyệt, từ chối hoặc yêu cầu sửa nằm ở cuối màn hình để giữ một điểm ra quyết định duy nhất.
+              Kiểm tra nội dung, minh chứng và hồ sơ liên quan. Các nút duyệt, từ chối hoặc yêu cầu sửa nằm ở cuối màn hình để giữ một điểm ra quyết định duy nhất.
             </p>
           </div>
           <div className="shrink-0">
@@ -214,7 +276,7 @@ function ApprovalPrimaryPanel({ item, evidence }: { item: WorkItem; evidence: Ev
       {hasWorkflowFormSummary(item) ? (
         <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} />
       ) : (
-        <EmptyState title="Không có biểu mẫu nghiệp vụ gắn với phê duyệt này." />
+        <EmptyState title="Không có hồ sơ nghiệp vụ gắn với phê duyệt này." />
       )}
     </section>
   );
@@ -230,7 +292,7 @@ function GenericPrimaryPanel({ item }: { item: WorkItem }) {
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            {item.description || 'Đầu việc này chưa có biểu mẫu hoặc panel nghiệp vụ riêng. Dùng minh chứng, hoạt động và thao tác cuối màn hình để xử lý.'}
+            {item.description || 'Đầu việc này chưa có hồ sơ hoặc panel nghiệp vụ riêng. Dùng minh chứng, hoạt động và thao tác cuối màn hình để xử lý.'}
           </p>
           <div className="mt-3 grid gap-2 text-xs sm:grid-cols-4">
             <ApprovalFact label="Loại" value={workTypeLabel(item.work_type)} />

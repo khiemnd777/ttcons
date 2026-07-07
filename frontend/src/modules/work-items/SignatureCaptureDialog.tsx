@@ -183,7 +183,7 @@ export function SignatureCaptureDialog({
             <div>
               <p className="font-semibold">Chữ ký được lưu bất biến</p>
               <p className="mt-1 text-xs leading-5 text-emerald-800">
-                Bản ghi ký sẽ gắn với người thao tác, thời điểm ký, mục đích ký, phiên bản hiện tại và mã kiểm tra của biểu mẫu đã gửi.
+                Bản ghi ký sẽ gắn với người thao tác, thời điểm ký, mục đích ký, phiên bản hiện tại và mã kiểm tra của hồ sơ đã gửi.
               </p>
             </div>
           </div>
@@ -223,7 +223,7 @@ export function SignatureCaptureDialog({
         {purposeAlreadySigned ? (
           <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
-            <p className="text-xs leading-5">Bạn đã ký mục đích này. Mỗi người dùng chỉ được ký một lần cho cùng mục đích trên biểu mẫu này.</p>
+            <p className="text-xs leading-5">Bạn đã ký mục đích này. Mỗi người dùng chỉ được ký một lần cho cùng mục đích trên hồ sơ này.</p>
           </div>
         ) : null}
         <canvas
