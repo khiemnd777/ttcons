@@ -901,6 +901,60 @@ func (r *Repository) ListProjectWorkItems(ctx context.Context, projectID, userID
 	`, workItemScopeSQL("wi", 2)), args...)
 }
 
+func (r *Repository) ListProjectWorkflowSidebarWorkItems(ctx context.Context, projectID, userID string) ([]Record, error) {
+	profile, err := r.WorkItemAccessProfile(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	args := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	return r.Query(ctx, fmt.Sprintf(`
+		SELECT
+			wi.id,
+			wi.project_id,
+			wi.run_node_id,
+			wi.run_step_id,
+			wi.title,
+			wi.description,
+			wi.work_type,
+			wi.status,
+			wi.role_ids,
+			wi.due_at,
+			wi.evidence_requirement_json,
+			rn.name AS run_node_name,
+			rn.order_index AS run_node_order_index,
+			rs.name AS run_step_name,
+			rs.order_index AS run_step_order_index,
+			COALESCE((SELECT COUNT(*) FROM evidence_records er WHERE er.work_item_id=wi.id AND er.status <> 'rejected'),0) AS evidence_count,
+			wfi.id AS workflow_form_instance_id,
+			wfi.status AS workflow_form_status,
+			wfi.form_type AS workflow_form_type,
+			wfi.current_revision AS workflow_form_revision,
+			wfi.submitted_at AS workflow_form_submitted_at,
+			wfi.form_template_id AS workflow_form_template_id,
+			wfi.form_version_id AS workflow_form_version_id,
+			wfv.version_no AS workflow_form_version_no,
+			wfv.status AS workflow_form_version_status,
+			wft.code AS workflow_form_template_code,
+			wft.name AS workflow_form_template_name,
+			COALESCE(pts.form_required, false) AS workflow_form_required
+		FROM work_items wi
+		JOIN projects p ON p.id=wi.project_id
+		LEFT JOIN pipeline_run_nodes rn ON rn.id=wi.run_node_id
+		LEFT JOIN pipeline_run_steps rs ON rs.id=wi.run_step_id
+		LEFT JOIN pipeline_template_steps pts ON pts.id=rs.template_step_id
+		LEFT JOIN workflow_form_instances wfi ON wfi.work_item_id=wi.id AND wfi.status <> 'cancelled'
+		LEFT JOIN workflow_form_versions wfv ON wfv.id=wfi.form_version_id
+		LEFT JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
+		WHERE wi.project_id=$1 AND wi.status <> 'cancelled' AND p.status <> 'cancelled'
+		  AND (%s)
+		ORDER BY
+			rn.order_index NULLS LAST,
+			rs.order_index NULLS LAST,
+			wi.due_at NULLS LAST,
+			wi.created_at
+	`, workItemScopeSQL("wi", 2)), args...)
+}
+
 func (r *Repository) ListMyWorkItems(ctx context.Context, userID string) ([]Record, error) {
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
 	if err != nil {
@@ -5783,7 +5837,10 @@ func cleanID(value any) string {
 	return text
 }
 
-func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID string) (Record, error) {
+func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID string, filter ProjectOperationsFilter) (Record, error) {
+	if filter.View == projectOperationsViewWorkflowSidebar {
+		return r.ProjectOperationsWorkflowSidebar(ctx, projectID, userID)
+	}
 	project, err := r.GetProjectDetail(ctx, projectID)
 	if err != nil {
 		return nil, err
@@ -5854,6 +5911,46 @@ func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID st
 		"pipeline_run":        run,
 		"summary":             summary,
 		"work_items":          workItems,
+	}, nil
+}
+
+func (r *Repository) ProjectOperationsWorkflowSidebar(ctx context.Context, projectID, userID string) (Record, error) {
+	project, err := r.GetProjectSummary(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	profile, err := r.WorkItemAccessProfile(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	permissions, err := r.UserProjectPermissions(ctx, userID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	workItems, err := r.ListProjectWorkflowSidebarWorkItems(ctx, projectID, userID)
+	if err != nil {
+		return nil, err
+	}
+	summary, _, _ := summarizeWorkItems(workItems)
+	run, err := r.GetPipelineRun(ctx, projectID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	if run != nil && !profile.IsManager {
+		run = scopePipelineRunToWorkItems(run, workItems)
+	}
+	visibility := projectOperationsVisibility(profile, permissions)
+	healthCounts := projectOperationsHealthCounts(summary, Record{})
+	projectSummary := projectOperationsProjectSummary(project)
+	return Record{
+		"project":           projectSummary,
+		"project_summary":   projectSummary,
+		"visibility":        visibility,
+		"health_counts":     healthCounts,
+		"workflow_timeline": workflowTimeline(run),
+		"pipeline_run":      run,
+		"summary":           summary,
+		"work_items":        workItems,
 	}, nil
 }
 
@@ -6486,15 +6583,7 @@ func (r *Repository) ListProjects(ctx context.Context, userID string) ([]Record,
 }
 
 func (r *Repository) GetProjectDetail(ctx context.Context, id string) (Record, error) {
-	project, err := r.QueryOne(ctx, `
-		SELECT p.*, s.full_name AS pm_name, t.name AS pipeline_template_name,
-			pt.name AS partner_name, pt.tax_code AS partner_tax_code
-		FROM projects p
-		LEFT JOIN staff s ON s.id=p.pm_staff_id
-		LEFT JOIN pipeline_templates t ON t.id=p.pipeline_template_id
-		LEFT JOIN partners pt ON pt.id=p.partner_id
-		WHERE p.id=$1 AND p.status <> 'cancelled'
-	`, id)
+	project, err := r.GetProjectSummary(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -6507,6 +6596,18 @@ func (r *Repository) GetProjectDetail(ctx context.Context, id string) (Record, e
 	`, id)
 	project["members"] = members
 	return project, nil
+}
+
+func (r *Repository) GetProjectSummary(ctx context.Context, id string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT p.*, s.full_name AS pm_name, t.name AS pipeline_template_name,
+			pt.name AS partner_name, pt.tax_code AS partner_tax_code
+		FROM projects p
+		LEFT JOIN staff s ON s.id=p.pm_staff_id
+		LEFT JOIN pipeline_templates t ON t.id=p.pipeline_template_id
+		LEFT JOIN partners pt ON pt.id=p.partner_id
+		WHERE p.id=$1 AND p.status <> 'cancelled'
+	`, id)
 }
 
 func (r *Repository) GetTemplateDetail(ctx context.Context, id string) (Record, error) {
@@ -6929,43 +7030,53 @@ func (r *Repository) GetPipelineRun(ctx context.Context, projectID string) (Reco
 	if err != nil {
 		return nil, err
 	}
+	stepRows, err := r.Query(ctx, `
+		SELECT
+			rs.*,
+			wi.id AS work_item_id,
+			wi.status AS work_item_status,
+			wi.title AS work_item_title,
+			wi.role_ids AS work_item_role_ids,
+			wi.evidence_requirement_json,
+			COALESCE((
+				SELECT COUNT(*)
+				FROM evidence_records er
+				WHERE er.work_item_id=wi.id
+				  AND er.status <> 'rejected'
+			), 0) AS evidence_count,
+			wfi.id AS workflow_form_instance_id,
+			wfi.status AS workflow_form_status,
+			wfi.form_type AS workflow_form_type,
+			wfi.current_revision AS workflow_form_revision,
+			wfi.submitted_at AS workflow_form_submitted_at,
+			wfi.form_template_id AS workflow_form_template_id,
+			COALESCE(wfi.form_version_id, pts.form_version_id) AS workflow_form_version_id,
+			wfv.version_no AS workflow_form_version_no,
+			wfv.status AS workflow_form_version_status,
+			wft.code AS workflow_form_template_code,
+			wft.name AS workflow_form_template_name,
+			COALESCE(pts.form_required, false) AS workflow_form_required
+		FROM pipeline_run_steps rs
+		JOIN pipeline_run_nodes rn ON rn.id=rs.run_node_id
+		LEFT JOIN work_items wi ON wi.run_step_id=rs.id AND wi.status <> 'cancelled'
+		LEFT JOIN workflow_form_instances wfi ON wfi.run_step_id=rs.id AND wfi.status <> 'cancelled'
+		LEFT JOIN pipeline_template_steps pts ON pts.id=rs.template_step_id
+		LEFT JOIN workflow_form_versions wfv ON wfv.id=COALESCE(wfi.form_version_id, pts.form_version_id)
+		LEFT JOIN workflow_form_templates wft ON wft.id=COALESCE(wfi.form_template_id, wfv.template_id)
+		WHERE rn.run_id=$1
+		ORDER BY rn.order_index, rs.order_index, rs.created_at
+	`, run["id"])
+	if err != nil {
+		return nil, err
+	}
+	stepsByNodeID := map[string][]Record{}
+	for _, step := range stepRows {
+		nodeID := cleanID(step["run_node_id"])
+		stepsByNodeID[nodeID] = append(stepsByNodeID[nodeID], step)
+	}
 	for _, node := range nodes {
-		steps, _ := r.Query(ctx, `
-			SELECT
-				rs.*,
-				wi.id AS work_item_id,
-				wi.status AS work_item_status,
-				wi.title AS work_item_title,
-				wi.role_ids AS work_item_role_ids,
-				wi.evidence_requirement_json,
-				COALESCE((
-					SELECT COUNT(*)
-					FROM evidence_records er
-					WHERE er.work_item_id=wi.id
-					  AND er.status <> 'rejected'
-				), 0) AS evidence_count,
-				wfi.id AS workflow_form_instance_id,
-				wfi.status AS workflow_form_status,
-				wfi.form_type AS workflow_form_type,
-				wfi.current_revision AS workflow_form_revision,
-				wfi.submitted_at AS workflow_form_submitted_at,
-				wfi.form_template_id AS workflow_form_template_id,
-				COALESCE(wfi.form_version_id, pts.form_version_id) AS workflow_form_version_id,
-				wfv.version_no AS workflow_form_version_no,
-				wfv.status AS workflow_form_version_status,
-				wft.code AS workflow_form_template_code,
-				wft.name AS workflow_form_template_name,
-				COALESCE(pts.form_required, false) AS workflow_form_required
-			FROM pipeline_run_steps rs
-			LEFT JOIN work_items wi ON wi.run_step_id=rs.id AND wi.status <> 'cancelled'
-			LEFT JOIN workflow_form_instances wfi ON wfi.run_step_id=rs.id AND wfi.status <> 'cancelled'
-			LEFT JOIN pipeline_template_steps pts ON pts.id=rs.template_step_id
-			LEFT JOIN workflow_form_versions wfv ON wfv.id=COALESCE(wfi.form_version_id, pts.form_version_id)
-			LEFT JOIN workflow_form_templates wft ON wft.id=COALESCE(wfi.form_template_id, wfv.template_id)
-			WHERE rs.run_node_id=$1
-			ORDER BY rs.order_index, rs.created_at
-		`, node["id"])
-		node["steps"] = steps
+		nodeID := cleanID(node["id"])
+		node["steps"] = stepsByNodeID[nodeID]
 	}
 	run["nodes"] = nodes
 	return run, nil

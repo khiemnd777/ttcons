@@ -662,7 +662,9 @@ func (h *Handler) MyActivityAttention(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ProjectOperations(c *fiber.Ctx) error {
-	operations, err := h.service.ProjectOperations(c.Context(), c.Params("id"), actorID(c))
+	operations, err := h.service.ProjectOperations(c.Context(), c.Params("id"), actorID(c), ProjectOperationsFilter{
+		View: c.Query("view"),
+	})
 	if err != nil {
 		return err
 	}

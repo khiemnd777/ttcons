@@ -21,9 +21,16 @@ import clsx from 'clsx';
 import { StatusBadge } from '../../components/StatusBadge';
 import { get } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
-import type { ProjectOperationsResponse, ProjectOperationsTimelineNode, WorkItem } from '../../lib/types/domain';
+import type {
+  ProjectOperationsResponse,
+  ProjectOperationsSidebarResponse,
+  ProjectOperationsTimelineNode,
+  WorkItem,
+} from '../../lib/types/domain';
 import { statusLabel } from '../../lib/utils/status';
 import { workItemDetailPath } from '../work-items/workItemNavigation';
+
+type ProjectWorkspaceOperations = ProjectOperationsResponse | ProjectOperationsSidebarResponse;
 
 type WorkspaceChild = {
   label: string;
@@ -108,9 +115,13 @@ export function ProjectWorkspaceLayout() {
   const { user, logout, hasAnyPermission } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const showWorkflowSidebar = isProjectWorkItemDetailPath(location.pathname);
+  const operationsView = showWorkflowSidebar ? 'workflow-sidebar' : 'full';
   const operations = useQuery({
-    queryKey: ['project-operations', id],
-    queryFn: () => get<ProjectOperationsResponse>(`/projects/${id}/operations`),
+    queryKey: ['project-operations', id, operationsView],
+    queryFn: () => get<ProjectOperationsResponse | ProjectOperationsSidebarResponse>(
+      `/projects/${id}/operations${showWorkflowSidebar ? '?view=workflow-sidebar' : ''}`,
+    ),
     enabled: Boolean(id),
     retry: false,
   });
@@ -122,7 +133,6 @@ export function ProjectWorkspaceLayout() {
       children: group.children.filter((child) => hasAnyPermission(child.permissions)),
     }))
     .filter((group) => hasAnyPermission(group.permissions) || group.children.length > 0);
-  const showWorkflowSidebar = isProjectWorkItemDetailPath(location.pathname);
   const activeWorkItemId = showWorkflowSidebar ? activeWorkItemIdFromPath(location.pathname) : '';
 
   return (
@@ -252,7 +262,7 @@ function WorkflowSidebar({
   projectId: string;
   projectName: string;
   projectCode: string;
-  operations?: ProjectOperationsResponse;
+  operations?: ProjectWorkspaceOperations;
   loading: boolean;
   error: unknown;
   activeWorkItemId: string;

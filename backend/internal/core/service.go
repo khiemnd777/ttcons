@@ -904,7 +904,19 @@ func (s *Service) MyActivityAttention(ctx context.Context, filter ActivityAttent
 	return s.repo.ListMyActivityAttention(ctx, actorID, profile, filter)
 }
 
-func (s *Service) ProjectOperations(ctx context.Context, projectID, actorID string) (Record, error) {
+const (
+	projectOperationsViewFull            = ""
+	projectOperationsViewWorkflowSidebar = "workflow-sidebar"
+)
+
+func (s *Service) ProjectOperations(ctx context.Context, projectID, actorID string, filter ProjectOperationsFilter) (Record, error) {
+	filter.View = strings.ToLower(strings.TrimSpace(filter.View))
+	if filter.View == "full" {
+		filter.View = projectOperationsViewFull
+	}
+	if filter.View != projectOperationsViewFull && filter.View != projectOperationsViewWorkflowSidebar {
+		return nil, validationError("Kiểu dữ liệu điều hành công trình không hợp lệ", Record{"view": filter.View})
+	}
 	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
 	if err != nil {
 		return nil, err
@@ -912,7 +924,7 @@ func (s *Service) ProjectOperations(ctx context.Context, projectID, actorID stri
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền xem điều hành công trình này")
 	}
-	return s.repo.ProjectOperations(ctx, projectID, actorID)
+	return s.repo.ProjectOperations(ctx, projectID, actorID, filter)
 }
 
 func (s *Service) ProjectActivity(ctx context.Context, projectID string, filter ProjectActivityFilter, actorID string) ([]Record, error) {

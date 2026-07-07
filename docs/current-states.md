@@ -1,5 +1,38 @@
 # Current States
 
+## Project Operations Lightweight Workflow Sidebar Payload
+
+Status: complete
+
+Mục đích chính:
+- Make project-scoped work item detail pages load the workflow sidebar quickly by requesting only the project summary, workflow timeline, run nodes/steps, and minimal work item data needed for sidebar navigation.
+
+Will be done:
+- Keep the default `/projects/:id/operations` dashboard contract unchanged.
+- Add a lightweight `view=workflow-sidebar` variant for `/projects/:id/operations`.
+- Preserve project operations visibility, project/work item scoping, runtime workflow gates, form/evidence/signature/PDF semantics, and audit/activity behavior.
+- Batch pipeline run step loading so runtime nodes no longer trigger one step query per node.
+- Update `ProjectWorkspaceLayout` to use the lightweight view only on project-scoped work item detail routes.
+- Update frontend types for the lighter operations response shape.
+- Add or adjust focused tests when a stable backend seam exists.
+- Run focused backend validation and `cd frontend && npm run build` when feasible. Browser verification remains skipped unless explicitly requested.
+
+Done:
+- User approved the review package with `OK`.
+- Re-read Consflow backend workflow, diagnose, workflow orchestration, module memory, AGENTS, route, handler, service, repository, frontend layout, router, and shared type code.
+- Confirmed root cause: project-scoped work item detail pages fetch the full project operations dashboard response even though the detail content fetches `/work-items/:id` separately.
+- Added `ProjectOperationsFilter` with a validated `view=workflow-sidebar` backend variant.
+- Kept default `/projects/:id/operations` full dashboard response unchanged.
+- Added lightweight project operations repository response with project summary, visibility, health counts, workflow timeline, pipeline run, summary, and sidebar work items only.
+- Added minimal sidebar work-item query that preserves project/work item scoping and workflow form/evidence summary fields.
+- Batched `GetPipelineRun` step loading into one query grouped by node, preserving `pipeline_run.nodes[].steps`.
+- Updated `ProjectWorkspaceLayout` so project-scoped work item detail routes request `/projects/:id/operations?view=workflow-sidebar`; non-detail project workspace routes still request the full endpoint.
+- Added `ProjectOperationsSidebarResponse` frontend type.
+- Extended the DB-backed start-pipeline integration test to assert the lightweight operations response shape when `CONSFLOW_TEST_DATABASE_URL` is available.
+- Ran `GOCACHE=$PWD/.gocache go test ./internal/core` in `backend`: pass.
+- Ran `GOCACHE=$PWD/.gocache go test ./...` in `backend`: pass.
+- Ran `npm run build` in `frontend`: pass; Vite reported only the existing large chunk warning.
+
 ## Work Item Detail Workflow Sidebar Collapse Scroll
 
 Status: complete

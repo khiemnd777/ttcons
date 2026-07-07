@@ -1644,3 +1644,14 @@ export type ProjectOperationsResponse = AnyRecord & {
   summary?: AnyRecord;
   work_items: WorkItem[];
 };
+
+export type ProjectOperationsSidebarResponse = AnyRecord & {
+  project?: Project;
+  project_summary?: AnyRecord;
+  visibility?: ProjectOperationsVisibility;
+  health_counts?: ProjectOperationsHealthCounts;
+  workflow_timeline?: ProjectOperationsTimelineNode[];
+  pipeline_run?: AnyRecord | null;
+  summary?: AnyRecord;
+  work_items?: WorkItem[];
+};

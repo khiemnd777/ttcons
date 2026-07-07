@@ -425,6 +425,10 @@ type ProjectActivityFilter struct {
 	Limit     int
 }
 
+type ProjectOperationsFilter struct {
+	View string
+}
+
 type ActivityAttentionFilter struct {
 	Queue     string
 	ProjectID string

@@ -2041,6 +2041,10 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 
 	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Test Actor','active')`, actorID, "ops-start-"+actorID+"@test.local")
 	mustExec(t, db, `INSERT INTO staff (id, user_id, full_name, email, department, status) VALUES ($1,$2,'Test Actor',$3,'operations','active')`, actorStaffID, actorID, "ops-start-staff-"+actorID+"@test.local")
+	operationViewID := ensurePermission(t, db, "operation.view", "Xem thi công", "operation")
+	pmRoleID := ensureRole(t, db, "pm", "PM")
+	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, pmRoleID, operationViewID)
+	mustExec(t, db, `INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, actorID, pmRoleID)
 	mustExec(t, db, `INSERT INTO pipeline_templates (id, name, status, created_by) VALUES ($1,'Ops Template','published',$2)`, templateID, actorID)
 	mustExec(t, db, `
 		INSERT INTO pipeline_template_nodes (id, template_id, name, type, order_index, responsible_role_ids)
@@ -2114,6 +2118,32 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 	}
 	if !foundListSummary {
 		t.Fatalf("expected workflow form summary in project work item list, got %#v", projectItems)
+	}
+	lightOperations, err := repo.ProjectOperations(ctx, projectID, actorID, ProjectOperationsFilter{View: projectOperationsViewWorkflowSidebar})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := lightOperations["latest_activity"]; ok {
+		t.Fatalf("expected lightweight operations to omit latest_activity, got %#v", lightOperations["latest_activity"])
+	}
+	if _, ok := lightOperations["latest_evidence"]; ok {
+		t.Fatalf("expected lightweight operations to omit latest_evidence, got %#v", lightOperations["latest_evidence"])
+	}
+	if _, ok := lightOperations["audit_summary"]; ok {
+		t.Fatalf("expected lightweight operations to omit audit_summary, got %#v", lightOperations["audit_summary"])
+	}
+	lightRun, _ := lightOperations["pipeline_run"].(Record)
+	lightNodes, _ := lightRun["nodes"].([]Record)
+	if len(lightNodes) != 1 {
+		t.Fatalf("expected lightweight operations to include one runtime node, got %#v", lightOperations["pipeline_run"])
+	}
+	lightSteps, _ := lightNodes[0]["steps"].([]Record)
+	if len(lightSteps) != 2 {
+		t.Fatalf("expected lightweight operations to include runtime steps, got %#v", lightNodes[0]["steps"])
+	}
+	lightItems, _ := lightOperations["work_items"].([]Record)
+	if len(lightItems) != 2 {
+		t.Fatalf("expected lightweight operations to include sidebar work items, got %#v", lightOperations["work_items"])
 	}
 }
 
