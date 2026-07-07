@@ -1,5 +1,104 @@
 # Current States
 
+## Work Item Detail Workflow Sidebar Active Node Border
+
+Status: complete
+
+Mục đích chính:
+- Make the workflow node containing the active Checklist / Step visually identifiable by highlighting the node border in the left work item detail timeline.
+
+Will be done:
+- Highlight the outer border/ring for the workflow node that contains the active work item step.
+- Keep the active step highlight unchanged.
+- Keep other workflow nodes on the neutral border style.
+- Preserve expand/collapse, auto-scroll, project-scoped links, backend APIs, workflow gates, form/evidence/signature/PDF behavior, and action semantics.
+- Run `cd frontend && npm run build`; browser verification is skipped unless explicitly requested.
+
+Done:
+- User approved the review package with `Approve`.
+- Re-read Consflow frontend workflow, workflow orchestration, module memory, AGENTS, module keyword map, domain map, UI guardrails, and current `ProjectWorkspaceLayout` sidebar code.
+- Updated `frontend/src/modules/projects/ProjectWorkspaceLayout.tsx` so the node containing the active work item step gets a blue border/ring, blue-tinted header line, and blue-tinted internal dividers.
+- Kept active step highlight, expand/collapse, auto-scroll, backend APIs, workflow gates, forms, evidence, signatures, PDFs, and action semantics unchanged.
+- Ran `cd frontend && npm run build` successfully; Vite reported only the existing large chunk warning.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Work Item Detail Workflow Sidebar Collapse Scroll
+
+Status: complete
+
+Mục đích chính:
+- Keep the work item detail workflow sidebar focused on the currently selected Checklist / Step by expanding only the active node by default and auto-scrolling to the active step.
+
+Will be done:
+- Add expand/collapse controls for workflow nodes in the project-scoped work item detail sidebar.
+- Default to only the node containing the selected work item step being expanded.
+- Collapse other nodes by default when the active work item changes.
+- Auto-scroll the sidebar to the active step after expansion.
+- Preserve project-scoped work item links, active state, fallback step data, backend APIs, workflow gates, form/evidence/signature/PDF behavior, and action semantics.
+- Run `cd frontend && npm run build`; browser verification is skipped unless explicitly requested.
+
+Done:
+- User approved the review package with `OK triển khai.`
+- Re-read Consflow frontend workflow, workflow orchestration, module memory, AGENTS, module keyword map, domain map, UI guardrails, router, shared domain types, and current `ProjectWorkspaceLayout` sidebar code.
+- Added workflow node expand/collapse state in `frontend/src/modules/projects/ProjectWorkspaceLayout.tsx`.
+- Defaulted the sidebar to expand only the node containing the active work item step, with other nodes collapsed on active work item changes.
+- Added node header toggle buttons with expanded/collapsed chevrons and `aria-expanded`.
+- Added active step ref and auto-scroll to center the selected step after the active node expands.
+- Preserved project-scoped work item links, active state, fallback step data, backend APIs, workflow gates, forms, evidence, signatures, PDFs, and action semantics.
+- Ran `cd frontend && npm run build` successfully; Vite reported only the existing large chunk warning.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Work Item Detail Workflow Sidebar Step Fallback
+
+Status: complete
+
+Mục đích chính:
+- Ensure the work item detail left workflow sidebar shows real Checklist / Step rows, not only workflow nodes, when `pipeline_run.nodes[].steps` is empty in `/projects/:id/operations`.
+
+Will be done:
+- Keep using existing `/projects/:id/operations`; do not add backend endpoints or migrations.
+- Build sidebar steps from `pipeline_run.nodes[].steps` when available.
+- Fallback/merge steps from `operations.work_items` grouped by `run_node_id` and `run_step_id`.
+- Preserve project-scoped work item detail links, active step state, workflow gates, forms, evidence, signatures, PDFs, and action semantics.
+- Run `cd frontend && npm run build`; browser verification is skipped unless explicitly requested.
+
+Done:
+- User confirmed implementation with `OK triển khai`.
+- Re-read Consflow frontend workflow, workflow orchestration, module memory, AGENTS, domain map, module keyword map, and UI guardrails.
+- Confirmed root cause: sidebar only read `pipeline_run.nodes[].steps`, while available `operations.work_items` already contains `run_node_id`, `run_step_id`, `run_node_name`, and `run_step_name`.
+- Updated `frontend/src/modules/projects/ProjectWorkspaceLayout.tsx` to merge `pipeline_run.nodes[].steps` with fallback steps built from `operations.work_items`.
+- Added stable step grouping by `run_node_id`, dedupe/merge by `run_step_id`, workflow-order sorting, and fallback node construction when needed.
+- Preserved project-scoped work item links, active state, status/evidence/form chips, backend APIs, and runtime workflow semantics.
+- Ran `cd frontend && npm run build` successfully; Vite reported only the existing large chunk warning.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Work Item Detail Workflow Sidebar Timeline
+
+Status: complete
+
+Mục đích chính:
+- Replace the left `Cây nghiệp vụ` menu only on project-scoped work item detail pages with a workflow > Checklist / Step timeline so users can see progress and jump between runtime work items from the same project workspace.
+
+Will be done:
+- Keep project workspace navigation unchanged on non-work-item project pages.
+- In `/projects/:id/work-items/:workItemId`, render a workflow timeline sidebar using existing `/projects/:id/operations` data.
+- Show overall step progress and per-node progress.
+- Show node > Checklist / Step rows with status, active state, evidence/form hints, and disabled state for steps without a `work_item_id`.
+- Let clicking an enabled step open the corresponding project-scoped work item detail route on the right.
+- Preserve backend APIs, workflow gates, form/evidence/signature/PDF behavior, query invalidation, and runtime workflow semantics.
+- Run `cd frontend && npm run build`; browser verification is skipped unless explicitly requested.
+
+Done:
+- User approved the review package with `Approve`.
+- Re-read Consflow frontend workflow, workflow orchestration, module memory, and UI guardrail skills.
+- Confirmed `/projects/:id/operations` already provides `pipeline_run` and `workflow_timeline`; no backend or migration change is needed for this scope.
+- Updated `frontend/src/modules/projects/ProjectWorkspaceLayout.tsx` so project-scoped work item detail pages render a `Workflow` sidebar instead of `Cây nghiệp vụ`.
+- Kept the existing `Cây nghiệp vụ` sidebar unchanged for non-work-item project workspace pages.
+- Added overall step progress, per-node progress, node > Checklist / Step rows, active state, disabled state for steps without `work_item_id`, and project-scoped links to work item detail pages.
+- Preserved backend APIs, route contracts, workflow gates, form/evidence/signature/PDF behavior, and query invalidation semantics.
+- Ran `cd frontend && npm run build` successfully; Vite reported only the existing large chunk warning.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
 ## Official Workflow Business Forms Product Grade
 
 Status: complete
