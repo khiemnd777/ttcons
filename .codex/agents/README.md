@@ -18,9 +18,16 @@ Available agents:
 
 Subagents inherit the parent session sandbox and approvals at runtime. The TOML files document intended behavior and may set a narrower sandbox for read-only reviewers.
 
-Routing cache:
+Mandatory mapping bootstrap:
 
-- Subagents should use `.agents/skills/consflow-module-memory/references/module-keyword-map.md` before broad scans when prompts mention Consflow modules, features, routes, tables, utilities, or domain terms.
+- Subagents must use `.agents/skills/consflow-module-memory/SKILL.md` and `.agents/skills/consflow-module-memory/references/module-keyword-map.md` before broad scans, diagnosis, review, implementation planning, or code edits.
+- After the central map is loaded, subagents must load the targeted detail maps that match the task:
+  - Backend/API/schema/function work: `.agents/skills/consflow-module-memory/references/backend-function-map.md`.
+  - Frontend/UI/helper/API usage work: `.agents/skills/consflow-module-memory/references/frontend-ui-utility-map.md`.
+  - Bug/regression/root-cause work: `.agents/skills/consflow-module-memory/references/root-cause-triage-map.md`.
+  - Business-domain invariants: relevant `.agents/skills/consflow-*-domain/references/domain-map.md`.
+- Subagent summaries must name mapping files loaded, matched feature/domain/function group/UI surface, owner files, and first targeted searches.
+- Mapping maintenance gate: if a code-changing subagent changes feature/function/helper/UI/route/contract/table/status/domain behavior, it must update relevant mapping files in the same work turn or ask the parent to do so before finalizing.
 
 Implementation gate:
 

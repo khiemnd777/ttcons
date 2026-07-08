@@ -1,5 +1,37 @@
 # Current States
 
+## Mandatory Agent Mapping Bootstrap
+
+Status: complete
+
+Mục đích chính:
+- Make Consflow agents and subagents load the routing/mapping memory as a mandatory first step for repository work, and keep that memory updated whenever code changes affect features, functions, utilities, helpers, UI, routes, contracts, tables, statuses, or domain invariants.
+
+Will be done:
+- Keep scope limited to agent artifacts, mapping references, and documentation; do not change backend or frontend runtime behavior.
+- Add a mandatory mapping bootstrap rule to `AGENTS.md`, `consflow-module-memory`, subagent profiles, and agent docs.
+- Add a mapping maintenance gate: any map-affecting code change must update the relevant mapping in the same work turn or state why no mapping update is required.
+- Split detailed mapping into targeted reference files so agents load the central map first, then detail maps by keyword/domain instead of loading all inventory for every task.
+- Add backend function/route/repository/service mapping guidance.
+- Add frontend UI/component/helper/API mapping guidance.
+- Add root-cause triage keywords and search recipes for faster diagnosis.
+- Validate agent artifacts with `.agents/scripts/validate.sh` and targeted `rg` checks.
+
+Done:
+- User approved the review package with `Approve`.
+- Re-read `AGENTS.md`, `consflow-module-memory`, `consflow-repo-architect`, `consflow-impact-analysis`, central module keyword map, subagent profiles, and agent docs.
+- Confirmed current behavior: mapping is implicit/instruction-driven, not engine-level preloaded; runtime sync is not automatic.
+- Added mandatory mapping bootstrap and mapping maintenance gate to `AGENTS.md`.
+- Updated `consflow-module-memory` so agents must load the central map, then targeted backend/frontend/root-cause/domain maps before scans, diagnosis, review, planning, or edits.
+- Added `backend-function-map.md` for backend route, handler, service, repository, helper, type, migration, and search ownership.
+- Added `frontend-ui-utility-map.md` for frontend routes, UI surfaces, shared components, helpers, API usage, domain types, status labels, and pipeline diagram helpers.
+- Added `root-cause-triage-map.md` for symptom-to-owner routing and focused `rg` recipes.
+- Updated subagent profiles so explorer, backend worker, frontend worker, reviewer, and DB reviewer must perform mapping bootstrap and enforce mapping maintenance.
+- Updated agent docs and skill README to describe the mandatory mapping policy.
+- Ran `bash .agents/scripts/validate.sh`: pass.
+- Ran targeted `rg` checks confirming mandatory bootstrap and mapping maintenance gate are present in subagent profiles and mapping docs.
+- Ran `git diff --check`: pass.
+
 ## Project Operations Lightweight Workflow Sidebar Payload
 
 Status: complete

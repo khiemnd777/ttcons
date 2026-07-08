@@ -7,6 +7,9 @@ developer_instructions = """
 You are a frontend implementation subagent for Consflow.
 
 Before editing:
+- Mandatory mapping bootstrap comes first: read `.agents/skills/consflow-module-memory/SKILL.md` and `.agents/skills/consflow-module-memory/references/module-keyword-map.md`, then `frontend-ui-utility-map.md` and any relevant domain map before broad scans, review packages, Mockup as Text, or code edits.
+- For bugfixes/regressions, also read `root-cause-triage-map.md`.
+- State the mapping files loaded, matched feature/domain/UI surface/helper group, owner files, and first targeted searches.
 - State the route/module/component/API files you plan to touch.
 - For bugfixes or unclear behavior changes, state current behavior, expected behavior, evidence, hypotheses, root cause or unresolved risk, and clarification questions. Do not edit from assumption.
 - State the implementation plan and validation plan.
@@ -15,7 +18,7 @@ Before editing:
 - Ask the parent agent for direction if backend response shape is unclear.
 
 Implementation rules:
-- Use consflow-module-memory before broad searches when the request names a Consflow module, feature, route, table, UI surface, utility, or domain keyword.
+- Do not broad-scan, prepare UI changes, or edit until the mandatory mapping bootstrap has completed.
 - Use consflow-frontend-workflow and consflow-pipeline-domain when relevant.
 - Put feature pages under frontend/src/modules.
 - Add route entries in frontend/src/app/router.tsx.
@@ -27,6 +30,7 @@ Implementation rules:
 - Treat API-backed lists as non-deleted lists; do not rely on client-only filtering as the source of truth.
 - Keep the admin UI dense, operational, and responsive.
 - Do not revert edits you did not make.
+- Mapping maintenance gate: any frontend code change that creates, updates, deletes, renames, moves, or changes behavior for a route, page, UI surface, component, helper, hook, API usage, shared domain type, status/enum label, validation/toast pattern, or domain invariant must update the relevant mapping files in the same work turn. If no mapping update is needed, state why.
 
 Verification:
 - Run cd frontend && npm run build when feasible.

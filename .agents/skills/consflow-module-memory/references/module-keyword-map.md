@@ -1,14 +1,44 @@
 # Consflow Module Keyword Map
 
-Use this as a fast routing cache. It is not a replacement for reading code. If a mapping conflicts with code, trust code and update this file when the correction is durable.
+Use this as the mandatory central routing cache. It is not a replacement for reading code. If a mapping conflicts with code, trust code and update this file when the correction is durable.
 
 ## Durable Memory Sources
 
 - Durable repo rules: `AGENTS.md`.
 - Durable routing and domain memory: this file plus `.agents/skills/consflow-*-domain/references/domain-map.md`.
+- Durable backend function/helper map: `.agents/skills/consflow-module-memory/references/backend-function-map.md`.
+- Durable frontend UI/utility/helper map: `.agents/skills/consflow-module-memory/references/frontend-ui-utility-map.md`.
+- Durable diagnosis search map: `.agents/skills/consflow-module-memory/references/root-cause-triage-map.md`.
 - Temporary handoff memory: `docs/current-states.md` only while a plan is active.
 - Historical records: `docs/plan-closed/*`. Do not require closed plans for future routing, feature, bugfix, or impact analysis; if a closed plan contains durable knowledge, promote the useful part into this map or a domain map.
 - Final verification source: current code, migrations, and tests. If durable memory conflicts with code, trust code and update memory when the correction is durable.
+
+## Mandatory Bootstrap Sequence
+
+1. Load this central map before broad scans, diagnosis, review, implementation planning, or code edits.
+2. Match the prompt to a feature, domain, route, table, function group, frontend surface, shared utility, or root-cause symptom.
+3. Load the targeted detail map:
+   - Backend/API/schema/function work: `backend-function-map.md`.
+   - Frontend/UI/helper/API usage work: `frontend-ui-utility-map.md`.
+   - Bug/regression/performance/root-cause work: `root-cause-triage-map.md`.
+   - Business-domain invariants: the matching `consflow-*-domain/references/domain-map.md`.
+4. Start with owner files from the map, then run targeted `rg` searches in those paths.
+5. State the matched feature/domain, mapping files loaded, owner files, and first searches before presenting a review package, diagnosis, implementation plan, or review findings.
+6. If a subagent is spawned, pass the matched maps and owner files to that subagent and require the same bootstrap.
+
+## Mapping Maintenance Gate
+
+Any code change that creates, updates, deletes, renames, moves, or changes behavior for a mapped surface must update mapping in the same work turn.
+
+Update this central map, a detail map, or a domain map when touching:
+
+- feature/module ownership, routes, handlers, services, repositories, request/response types
+- frontend routes, pages, dialogs, panels, components, hooks, helpers, API calls, shared types
+- SQL tables, migrations, seed data, status/enum values, permissions, reports, CSV exports
+- workflow gates, approval states, audit/activity behavior, stock/finance/acceptance invariants
+- root-cause triage keywords, search recipes, or agent/subagent workflow
+
+If no mapping update is required after a code change, state the reason in the final response or review notes.
 
 ## Stable Entry Points
 
@@ -50,6 +80,10 @@ Use this table before the feature table when a prompt has business-domain words.
 | dialog, modal, create/edit/view detail | `frontend/src/components/Dialog.tsx`, `frontend/src/components/RecordDetailDialog.tsx`, `frontend/src/components/FormDrawer.tsx`, `frontend/src/modules/_shared/SimpleForm.tsx` | Prefer shared dialog/modal flows for create, view, and edit. |
 | table, row actions, empty/loading states | `frontend/src/components/DataTable.tsx`, `frontend/src/components/RowActions.tsx`, `frontend/src/components/EmptyState.tsx`, `frontend/src/components/LoadingSpinner.tsx`, `frontend/src/components/PageHeader.tsx`, `frontend/src/components/StatCard.tsx` | Reuse before adding primitives. |
 | project selector | `frontend/src/modules/_shared/ProjectSelector.tsx` | Used by scoped/global pages that need project context. |
+| frontend API methods, refresh token, blob download, SSE stream | `frontend/src/lib/api/client.ts` | Map API contract changes here and in `frontend-ui-utility-map.md`; do not bypass `get`, `post`, `put`, `del`, `postForm`, `downloadBlob`, or `streamSSE`. |
+| frontend domain types | `frontend/src/lib/types/domain.ts` | Update when backend response shapes change. Pair with route, handler, service, repository, and status label changes. |
+| pipeline diagram geometry/routing/hit testing | `frontend/src/modules/pipeline-builder/components/diagram/*` | Read `frontend-ui-utility-map.md` before changing connector behavior, drag/drop, adorner, routing, persistence, or canvas interactions. |
+| work item execution presentation/navigation | `frontend/src/modules/work-items/workItemPresentation.ts`, `frontend/src/modules/work-items/workItemNavigation.ts`, `frontend/src/modules/work-items/WorkItemPrimarySurface.tsx`, `frontend/src/modules/projects/ProjectWorkspaceLayout.tsx` | Shared by my-work, project work item detail, project operations, planning workspaces, activity surfaces. |
 
 ## Feature Routing
 
@@ -92,6 +126,8 @@ Use this table before the feature table when a prompt has business-domain words.
 
 ## Production-Grade Operating Gates
 
+- Mandatory mapping bootstrap applies before feature, bugfix, review, root-cause, or code-changing work.
+- Mapping maintenance applies after code changes. Update mapping immediately when code changes affect feature/function/helper/UI/route/contract/table/status/domain behavior; otherwise state why no mapping update was required.
 - Do not add placeholder-only, demo-only, or misleading UI for production features. If a feature cannot be completed end to end, defer the incomplete surface instead of shipping a fake affordance.
 - Start every feature or bugfix by routing through this map, then read the relevant domain map and owner code. Check backend route, handler, service, repository, frontend route/module, shared types/status labels, migrations, and tests when the surface crosses those boundaries.
 - Durable features need real persistence, validation, permissions, actor/audit or activity history where the local pattern requires it, user feedback, loading/empty/error states, and backend/frontend contract agreement.
@@ -101,6 +137,7 @@ Use this table before the feature table when a prompt has business-domain words.
 
 ## Backend Search Hints
 
+- Load `backend-function-map.md` for route -> handler -> service -> repository -> table/function ownership.
 - Route first: `rg -n "keyword|RouteName" backend/internal/core/routes.go`.
 - Handler next: `rg -n "func \\(h \\*Handler\\).*Keyword|/route-fragment|TableName" backend/internal/core/handlers.go`.
 - Service next: `rg -n "func \\(s \\*Service\\).*Keyword|DomainAction" backend/internal/core/service.go`.
@@ -109,10 +146,17 @@ Use this table before the feature table when a prompt has business-domain words.
 
 ## Frontend Search Hints
 
+- Load `frontend-ui-utility-map.md` for route -> page -> component/helper/API/type ownership.
 - Route/page first: `rg -n "path:|<PageName>|/api-fragment" frontend/src/app/router.tsx frontend/src/modules`.
 - API calls: `rg -n "get\\(|post\\(|put\\(|delete\\(|/api-fragment" frontend/src/modules frontend/src/lib`.
 - Shared presentation/status: `rg -n "status|label|EnumChip|StatusBadge|toast" frontend/src/components frontend/src/lib frontend/src/modules`.
 - Work-item UI is shared across `my-work`, project detail, and activity surfaces; inspect `frontend/src/modules/work-items` before duplicating components.
+
+## Root-Cause Triage Hints
+
+- Load `root-cause-triage-map.md` before bugfixes, regressions, slow flows, stale UI, failed status transitions, missing rows, upload/download issues, permissions, or report discrepancies.
+- Always split evidence by backend route/API behavior, frontend UI behavior, database state, runtime state, and mapping assumptions.
+- If root cause is unresolved, stop at diagnosis/review and ask for clarification or approval of the unresolved risk before editing.
 
 ## High-Risk Domain Invariants
 

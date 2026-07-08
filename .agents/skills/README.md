@@ -3,7 +3,7 @@
 Repo-scoped skills in this directory:
 
 - `consflow-repo-architect`: routes broad or cross-cutting work across backend, frontend, migrations, and Docker.
-- `consflow-module-memory`: maps prompt keywords and aliases to Consflow modules, routes, tables, utilities, and domain risks before broad scans.
+- `consflow-module-memory`: mandatory mapping bootstrap that maps prompt keywords and aliases to Consflow modules, features, functions, routes, tables, UI surfaces, utilities, helpers, triage recipes, and domain risks before broad scans, diagnosis, review, planning, or code edits.
 - `consflow-impact-analysis`: analyzes feature overlap, logic collision, shared state, contract drift, and downstream module effects before risky changes.
 - `consflow-backend-workflow`: implements Go/Fiber/PostgreSQL backend changes with custom migrations.
 - `consflow-frontend-workflow`: implements React/Vite admin UI changes.
@@ -40,5 +40,7 @@ Human review gates:
 Durable memory policy:
 
 - Treat `AGENTS.md`, `.agents/skills/**/SKILL.md`, and `.agents/skills/**/references/*.md` as the durable agent memory surfaces.
+- Mandatory mapping references include `.agents/skills/consflow-module-memory/references/module-keyword-map.md`, `backend-function-map.md`, `frontend-ui-utility-map.md`, `root-cause-triage-map.md`, and relevant domain maps.
+- Mapping maintenance gate: whenever code changes affect feature/function/helper/UI/route/contract/table/status/domain behavior, update the relevant mapping files in the same work turn or state why no mapping update is required.
 - Treat `docs/current-states.md` as temporary active-plan memory only.
 - Treat `docs/plan-closed/*` as historical records only. Do not require closed plans for future routing, feature, or bugfix work; promote durable knowledge from them into the skill references instead.

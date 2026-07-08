@@ -1,7 +1,7 @@
 interface:
   display_name: "Consflow Module Memory"
-  short_description: "Map prompts to Consflow modules fast"
-  default_prompt: "Use $consflow-module-memory to map this Consflow keyword to the right module, route, tables, and utilities before changing code."
+  short_description: "Mandatory Consflow mapping bootstrap"
+  default_prompt: "Use $consflow-module-memory as the mandatory bootstrap: load the central map, targeted detail maps, matched owner files, and mapping maintenance gate before changing code."
 
 policy:
   allow_implicit_invocation: true

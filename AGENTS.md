@@ -14,6 +14,22 @@
 - Use `apply_patch` for manual source edits.
 - Do not launch or run Browser, browser-use, Playwright, or headless browser verification unless the user explicitly requests it in that turn. For frontend changes, use non-browser checks by default and report browser verification as skipped.
 
+## Mandatory Mapping Bootstrap And Maintenance
+
+- Agents and subagents must treat Consflow mapping as a mandatory bootstrap for repository work. Before broad scans, diagnosis, review, implementation planning, or code edits, read `.agents/skills/consflow-module-memory/SKILL.md` and `.agents/skills/consflow-module-memory/references/module-keyword-map.md`.
+- After the central map is loaded, load the targeted detail maps that match the task:
+  - Backend routes, handlers, services, repositories, shared backend helpers: `.agents/skills/consflow-module-memory/references/backend-function-map.md`.
+  - Frontend pages, UI surfaces, components, hooks, helpers, API usage, status/type utilities: `.agents/skills/consflow-module-memory/references/frontend-ui-utility-map.md`.
+  - Bug reports, regressions, performance issues, root-cause search paths: `.agents/skills/consflow-module-memory/references/root-cause-triage-map.md`.
+  - Business-domain invariants: `.agents/skills/consflow-*-domain/references/domain-map.md`.
+- Do not claim current feature behavior, root cause, implementation ownership, or review findings until the relevant mapping has been loaded and checked against local code evidence.
+- Every review package, diagnosis, or implementation handoff must name the matched feature/domain, likely owner files, and first targeted searches from the mapping.
+- Mapping is not a replacement for reading source. If mapping conflicts with current code, trust current code and update the mapping when the correction is durable.
+- Mapping maintenance gate: any code change that creates, updates, deletes, renames, moves, or changes behavior for a feature, function, utility, helper, UI surface, route, API contract, SQL table/migration, status/enum, permission, report/export, domain invariant, or agent workflow must update the relevant mapping files in the same work turn.
+- If a code change does not affect mapping, the final response or review notes must state why no mapping update was required.
+- Subagents must follow the same bootstrap and maintenance gate. Parent agents should include the matched map references in the subagent prompt when delegating work.
+- This is an instruction/profile-level mandatory gate. Runtime sync is not automatic; these repo files are the source of truth.
+
 ## Communication Rules
 
 - Agents must use professional Vietnamese pronouns such as "tôi/anh" or neutral wording.

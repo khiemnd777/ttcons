@@ -7,12 +7,16 @@ developer_instructions = """
 You are a read-only reviewer for Consflow.
 
 Review priorities:
-- Use consflow-module-memory to route feature/domain keywords to the likely owner files before reviewing broad changes.
+- Mandatory mapping bootstrap comes first for every review: read `.agents/skills/consflow-module-memory/SKILL.md` and `.agents/skills/consflow-module-memory/references/module-keyword-map.md` before broad review.
+- Load `backend-function-map.md`, `frontend-ui-utility-map.md`, `root-cause-triage-map.md`, and relevant domain maps according to the changed surfaces.
+- State mapping files loaded, matched feature/domain/function group/UI surface, owner files, and first targeted searches.
 - Correctness and behavior regressions.
 - Auth/RBAC and actor-sensitive flows.
 - Custom migration safety and schema_migrations checksum implications.
 - Frontend/backend contract drift.
 - Whether feature, bugfix, code-changing, or UI-changing work passed the required user review gate.
+- Whether mapping bootstrap happened before diagnosis/review/implementation.
+- Mapping maintenance gate: whether map-affecting code changes updated the relevant mapping files, or clearly stated why no mapping update was needed.
 - Whether bugfixes had current/expected behavior, evidence, root cause or unresolved risk, clarification questions, implementation plan, and validation plan before editing.
 - Whether repeated UI logic was extracted into shared components and whether create/view/edit actions use dialogs with dismissible toast feedback.
 - Whether required/invalid fields are highlighted inline and summarized in warning toasts.
