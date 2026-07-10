@@ -104,6 +104,22 @@ func prepareTemplateEdgeBody(body Record, partial bool) error {
 		}
 	}
 
+	if strings.TrimSpace(fmt.Sprint(body["condition_type"])) == "workflow_form_answer_equals" {
+		config := Record{}
+		switch value := body["condition_config"].(type) {
+		case Record:
+			config = value
+		case map[string]any:
+			config = Record(value)
+		}
+		if strings.TrimSpace(fmt.Sprint(config["field_key"])) == "" || fmt.Sprint(config["field_key"]) == "<nil>" {
+			return errors.New("field_key là bắt buộc cho điều kiện câu trả lời biểu mẫu")
+		}
+		if _, exists := config["value"]; !exists {
+			return errors.New("value là bắt buộc cho điều kiện câu trả lời biểu mẫu")
+		}
+	}
+
 	return nil
 }
 

@@ -300,8 +300,7 @@ func (h *Handler) AddTemplateNode(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	body["template_id"] = c.Params("id")
-	node, err := h.service.repo.Insert(c.Context(), "pipeline_template_nodes", templateNodeColumns(), body)
+	node, err := h.service.CreateTemplateNode(c.Context(), c.Params("id"), body)
 	if err != nil {
 		return err
 	}
@@ -316,7 +315,7 @@ func (h *Handler) UpdateTemplateNode(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	node, err := h.service.repo.Update(c.Context(), "pipeline_template_nodes", templateNodeColumns(), c.Params("id"), body)
+	node, err := h.service.UpdateTemplateNode(c.Context(), c.Params("id"), body)
 	if err != nil {
 		return err
 	}
@@ -327,7 +326,7 @@ func (h *Handler) DeleteTemplateNode(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
 		return err
 	}
-	if err := h.service.repo.Exec(c.Context(), `DELETE FROM pipeline_template_nodes WHERE id=$1`, c.Params("id")); err != nil {
+	if err := h.service.DeleteTemplateNode(c.Context(), c.Params("id")); err != nil {
 		return err
 	}
 	return response.OK(c, Record{"deleted": true})
@@ -368,7 +367,7 @@ func (h *Handler) DeleteTemplateStep(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
 		return err
 	}
-	if err := h.service.repo.Exec(c.Context(), `DELETE FROM pipeline_template_steps WHERE id=$1`, c.Params("id")); err != nil {
+	if err := h.service.DeleteTemplateStep(c.Context(), c.Params("id")); err != nil {
 		return err
 	}
 	return response.OK(c, Record{"deleted": true})
@@ -382,11 +381,10 @@ func (h *Handler) AddTemplateEdge(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	body["template_id"] = c.Params("id")
 	if err := prepareTemplateEdgeBody(body, false); err != nil {
 		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 	}
-	edge, err := h.service.repo.Insert(c.Context(), "pipeline_template_edges", edgeColumns(), body)
+	edge, err := h.service.CreateTemplateEdge(c.Context(), c.Params("id"), body)
 	if err != nil {
 		return err
 	}
@@ -537,7 +535,7 @@ func (h *Handler) UpdateTemplateEdge(c *fiber.Ctx) error {
 	if err := prepareTemplateEdgeBody(body, true); err != nil {
 		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 	}
-	edge, err := h.service.repo.Update(c.Context(), "pipeline_template_edges", edgeColumns(), c.Params("id"), body)
+	edge, err := h.service.UpdateTemplateEdge(c.Context(), c.Params("id"), body)
 	if err != nil {
 		return err
 	}
@@ -548,7 +546,7 @@ func (h *Handler) DeleteTemplateEdge(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
 		return err
 	}
-	if err := h.service.repo.Exec(c.Context(), `DELETE FROM pipeline_template_edges WHERE id=$1`, c.Params("id")); err != nil {
+	if err := h.service.DeleteTemplateEdge(c.Context(), c.Params("id")); err != nil {
 		return err
 	}
 	return response.OK(c, Record{"deleted": true})
@@ -1296,20 +1294,22 @@ func (h *Handler) SubmitBOQ(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"boq.update"}); err != nil {
 		return err
 	}
-	if err := h.service.repo.Exec(c.Context(), `UPDATE boq_items SET status='submitted', updated_at=now() WHERE project_id=$1 AND status='draft'`, c.Params("id")); err != nil {
+	result, err := h.service.BOQProjectAction(c.Context(), c.Params("id"), "submit", actorID(c), actorName(c))
+	if err != nil {
 		return err
 	}
-	return response.OK(c, Record{"submitted": true})
+	return response.OK(c, result)
 }
 
 func (h *Handler) ApproveBOQ(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"boq.approve"}); err != nil {
 		return err
 	}
-	if err := h.service.repo.Exec(c.Context(), `UPDATE boq_items SET status='approved', approved_by=NULLIF($2,'')::uuid, updated_at=now() WHERE project_id=$1 AND status IN ('submitted','draft')`, c.Params("id"), actorID(c)); err != nil {
+	result, err := h.service.BOQProjectAction(c.Context(), c.Params("id"), "approve", actorID(c), actorName(c))
+	if err != nil {
 		return err
 	}
-	return response.OK(c, Record{"approved": true})
+	return response.OK(c, result)
 }
 
 func (h *Handler) GenerateProcurementFromBOQ(c *fiber.Ctx) error {
@@ -1318,6 +1318,565 @@ func (h *Handler) GenerateProcurementFromBOQ(c *fiber.Ctx) error {
 		return err
 	}
 	return response.Created(c, req)
+}
+
+func (h *Handler) ProjectSupplierQuotations(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"procurement.view", "boq.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.ProjectSupplierQuotations(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) CreateSupplierQuotation(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"procurement.create"}); err != nil {
+		return err
+	}
+	var req SupplierQuotationRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu báo giá không hợp lệ")
+	}
+	quotation, err := h.service.SaveSupplierQuotation(c.Context(), c.Params("id"), "", req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, quotation)
+}
+
+func (h *Handler) GetSupplierQuotation(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "supplier_quotations", c.Params("id"), []string{"procurement.view", "boq.view"}); err != nil {
+		return err
+	}
+	quotation, err := h.service.SupplierQuotationDetail(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, quotation)
+}
+
+func (h *Handler) UpdateSupplierQuotation(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "supplier_quotations", c.Params("id"), []string{"procurement.create"}); err != nil {
+		return err
+	}
+	current, err := h.service.SupplierQuotationDetail(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	var req SupplierQuotationRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu báo giá không hợp lệ")
+	}
+	quotation, err := h.service.SaveSupplierQuotation(c.Context(), cleanID(current["project_id"]), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, quotation)
+}
+
+func (h *Handler) SubmitSupplierQuotation(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "supplier_quotations", c.Params("id"), []string{"procurement.create"}); err != nil {
+		return err
+	}
+	quotation, err := h.service.SubmitSupplierQuotation(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, quotation)
+}
+
+func (h *Handler) QualifySupplierQuotation(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "supplier_quotations", c.Params("id"), []string{"procurement.approve", "boq.approve"}); err != nil {
+		return err
+	}
+	var req SupplierQuotationQualificationRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đánh giá báo giá không hợp lệ")
+	}
+	quotation, err := h.service.QualifySupplierQuotation(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, quotation)
+}
+
+func (h *Handler) SelectSupplierQuote(c *fiber.Ctx) error {
+	row, err := h.service.repo.QueryOne(c.Context(), `
+		SELECT q.project_id
+		FROM supplier_quotation_items qi
+		JOIN supplier_quotations q ON q.id=qi.quotation_id
+		WHERE qi.id=$1 AND q.status <> 'cancelled'
+	`, c.Params("id"))
+	if err != nil {
+		return err
+	}
+	if err := h.requireProjectPermission(c, cleanID(row["project_id"]), []string{"procurement.approve", "boq.approve"}); err != nil {
+		return err
+	}
+	var req SupplierQuoteSelectionRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu chọn báo giá không hợp lệ")
+	}
+	boq, err := h.service.SelectSupplierQuote(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, boq)
+}
+
+func (h *Handler) SupplierQuoteComparison(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"procurement.view", "boq.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.SupplierQuoteComparison(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) ProjectContracts(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"contract.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.ProjectContracts(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) CreateContract(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"contract.create"}); err != nil {
+		return err
+	}
+	var req ContractRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu hợp đồng không hợp lệ")
+	}
+	row, err := h.service.SaveContract(c.Context(), c.Params("id"), "", req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) GetContract(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "contracts", c.Params("id"), []string{"contract.view"}); err != nil {
+		return err
+	}
+	row, err := h.service.ContractDetail(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) UpdateContract(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "contracts", c.Params("id"), []string{"contract.create"}); err != nil {
+		return err
+	}
+	current, err := h.service.ContractDetail(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	var req ContractRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu hợp đồng không hợp lệ")
+	}
+	row, err := h.service.SaveContract(c.Context(), cleanID(current["project_id"]), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) CreateContractVersion(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "contracts", c.Params("id"), []string{"contract.create"}); err != nil {
+		return err
+	}
+	var req ContractVersionRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu version hợp đồng không hợp lệ")
+	}
+	row, err := h.service.CreateContractVersion(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) SubmitContractVersion(c *fiber.Ctx) error {
+	return h.contractVersionAction(c, "submit", []string{"contract.review"})
+}
+func (h *Handler) ApproveContractVersion(c *fiber.Ctx) error {
+	return h.contractVersionAction(c, "approve", []string{"contract.approve"})
+}
+func (h *Handler) SignContractVersion(c *fiber.Ctx) error {
+	return h.contractVersionAction(c, "sign", []string{"contract.sign"})
+}
+
+func (h *Handler) contractVersionAction(c *fiber.Ctx, action string, permissions []string) error {
+	if err := h.requireContractChildPermission(c, "version", c.Params("id"), permissions); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.ContractVersionAction(c.Context(), c.Params("id"), action, actionComment(req), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) ActivateContract(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "contracts", c.Params("id"), []string{"contract.sign"}); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.ActivateContract(c.Context(), c.Params("id"), actionComment(req), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) CreateContractMilestone(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "contracts", c.Params("id"), []string{"contract.milestone_manage"}); err != nil {
+		return err
+	}
+	var req ContractMilestoneRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu milestone không hợp lệ")
+	}
+	row, err := h.service.CreateContractMilestone(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) EligibleContractMilestone(c *fiber.Ctx) error {
+	return h.contractMilestoneAction(c, "eligible")
+}
+
+func (h *Handler) OpenContractMilestoneObligation(c *fiber.Ctx) error {
+	return h.contractMilestoneAction(c, "open-obligation")
+}
+
+func (h *Handler) contractMilestoneAction(c *fiber.Ctx, action string) error {
+	if err := h.requireContractChildPermission(c, "milestone", c.Params("id"), []string{"contract.milestone_manage"}); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.ContractMilestoneAction(c.Context(), c.Params("id"), action, actionComment(req), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) CreateContractVariation(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "contracts", c.Params("id"), []string{"contract.create"}); err != nil {
+		return err
+	}
+	var req ContractVariationRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu variation không hợp lệ")
+	}
+	row, err := h.service.CreateContractVariation(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) SubmitContractVariation(c *fiber.Ctx) error {
+	return h.contractVariationAction(c, "submit", []string{"contract.review"})
+}
+func (h *Handler) ApproveContractVariation(c *fiber.Ctx) error {
+	return h.contractVariationAction(c, "approve", []string{"contract.approve"})
+}
+func (h *Handler) RejectContractVariation(c *fiber.Ctx) error {
+	return h.contractVariationAction(c, "reject", []string{"contract.approve"})
+}
+func (h *Handler) IncorporateContractVariation(c *fiber.Ctx) error {
+	return h.contractVariationAction(c, "incorporate", []string{"contract.create"})
+}
+
+func (h *Handler) contractVariationAction(c *fiber.Ctx, action string, permissions []string) error {
+	if err := h.requireContractChildPermission(c, "variation", c.Params("id"), permissions); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.ContractVariationAction(c.Context(), c.Params("id"), action, actionComment(req), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) ReleaseContractRetention(c *fiber.Ctx) error {
+	if err := h.requireContractChildPermission(c, "retention", c.Params("id"), []string{"contract.retention_release"}); err != nil {
+		return err
+	}
+	var req ContractRetentionReleaseRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu giải phóng giữ lại không hợp lệ")
+	}
+	row, err := h.service.ReleaseContractRetention(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) requireContractChildPermission(c *fiber.Ctx, kind, id string, permissions []string) error {
+	queries := map[string]string{
+		"version":   `SELECT c.project_id FROM contract_versions child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
+		"milestone": `SELECT c.project_id FROM contract_milestones child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
+		"variation": `SELECT c.project_id FROM contract_variations child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
+		"retention": `SELECT c.project_id FROM contract_retentions child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
+	}
+	query := queries[kind]
+	if query == "" {
+		return validationError("Loại hồ sơ hợp đồng không hợp lệ")
+	}
+	row, err := h.service.repo.QueryOne(c.Context(), query, id)
+	if err != nil {
+		return err
+	}
+	return h.requireProjectPermission(c, cleanID(row["project_id"]), permissions)
+}
+
+func (h *Handler) ProjectQualityWorkspace(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"quality.view"}); err != nil {
+		return err
+	}
+	row, err := h.service.ProjectQualityWorkspace(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) CreateQualityITP(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"quality.create"}); err != nil {
+		return err
+	}
+	var req QualityITPRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu ITP không hợp lệ")
+	}
+	row, err := h.service.CreateQualityITP(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) ReviseQualityITP(c *fiber.Ctx) error {
+	if err := h.requireQualityChildPermission(c, "itp", c.Params("id"), []string{"quality.create"}); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.ReviseQualityITP(c.Context(), c.Params("id"), actionComment(req), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) SubmitQualityITP(c *fiber.Ctx) error {
+	return h.qualityITPAction(c, "submit", []string{"quality.review"})
+}
+func (h *Handler) ApproveQualityITP(c *fiber.Ctx) error {
+	return h.qualityITPAction(c, "approve", []string{"quality.approve"})
+}
+func (h *Handler) ActivateQualityITP(c *fiber.Ctx) error {
+	return h.qualityITPAction(c, "activate", []string{"quality.approve"})
+}
+
+func (h *Handler) qualityITPAction(c *fiber.Ctx, action string, permissions []string) error {
+	if err := h.requireQualityChildPermission(c, "itp", c.Params("id"), permissions); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.QualityITPAction(c.Context(), c.Params("id"), action, actionComment(req), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) CreateQualityInspectionRequest(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"quality.create"}); err != nil {
+		return err
+	}
+	var req QualityInspectionRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu RFI không hợp lệ")
+	}
+	row, err := h.service.CreateQualityInspectionRequest(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) SubmitQualityInspectionRequest(c *fiber.Ctx) error {
+	return h.qualityInspectionAction(c, "submit", []string{"quality.create"})
+}
+func (h *Handler) ScheduleQualityInspectionRequest(c *fiber.Ctx) error {
+	return h.qualityInspectionAction(c, "schedule", []string{"quality.inspect"})
+}
+func (h *Handler) InspectQualityRequest(c *fiber.Ctx) error {
+	return h.qualityInspectionAction(c, "inspect", []string{"quality.inspect"})
+}
+
+func (h *Handler) qualityInspectionAction(c *fiber.Ctx, action string, permissions []string) error {
+	if err := h.requireQualityChildPermission(c, "rfi", c.Params("id"), permissions); err != nil {
+		return err
+	}
+	var req QualityInspectionDecisionRequest
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu inspection không hợp lệ")
+		}
+	}
+	row, err := h.service.QualityInspectionAction(c.Context(), c.Params("id"), action, req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) CreateQualityNCR(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"quality.ncr_manage"}); err != nil {
+		return err
+	}
+	var req QualityNCRRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu NCR không hợp lệ")
+	}
+	row, err := h.service.CreateQualityNCR(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) SubmitQualityNCRRootCause(c *fiber.Ctx) error {
+	return h.qualityNCRAction(c, "root-cause")
+}
+func (h *Handler) SubmitQualityNCRCorrective(c *fiber.Ctx) error {
+	return h.qualityNCRAction(c, "corrective")
+}
+func (h *Handler) LinkQualityNCRReinspection(c *fiber.Ctx) error {
+	return h.qualityNCRAction(c, "reinspection")
+}
+func (h *Handler) CloseQualityNCR(c *fiber.Ctx) error { return h.qualityNCRAction(c, "close") }
+
+func (h *Handler) qualityNCRAction(c *fiber.Ctx, action string) error {
+	if err := h.requireQualityChildPermission(c, "ncr", c.Params("id"), []string{"quality.ncr_manage"}); err != nil {
+		return err
+	}
+	var req QualityNCRActionRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xử lý NCR không hợp lệ")
+	}
+	row, err := h.service.QualityNCRAction(c.Context(), c.Params("id"), action, req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) CreateRecurringPlan(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"quality.recurring_manage"}); err != nil {
+		return err
+	}
+	var req ConstructionRecurringPlanRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu lịch lặp không hợp lệ")
+	}
+	row, err := h.service.CreateRecurringPlan(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) GenerateRecurringOccurrences(c *fiber.Ctx) error {
+	if err := h.requireQualityChildPermission(c, "recurring_plan", c.Params("id"), []string{"quality.recurring_manage"}); err != nil {
+		return err
+	}
+	body, _ := bodyMap(c)
+	row, err := h.service.GenerateRecurringOccurrences(c.Context(), c.Params("id"), stringValue(body["through_date"]), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) CompleteRecurringOccurrence(c *fiber.Ctx) error {
+	return h.recurringOccurrenceAction(c, "complete")
+}
+func (h *Handler) SkipRecurringOccurrence(c *fiber.Ctx) error {
+	return h.recurringOccurrenceAction(c, "skip")
+}
+
+func (h *Handler) recurringOccurrenceAction(c *fiber.Ctx, action string) error {
+	if err := h.requireQualityChildPermission(c, "occurrence", c.Params("id"), []string{"quality.recurring_manage"}); err != nil {
+		return err
+	}
+	var req ConstructionRecurringOccurrenceRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu occurrence không hợp lệ")
+	}
+	row, err := h.service.RecurringOccurrenceAction(c.Context(), c.Params("id"), action, req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) requireQualityChildPermission(c *fiber.Ctx, kind, id string, permissions []string) error {
+	queries := map[string]string{
+		"itp":            `SELECT project_id FROM quality_itp_plans WHERE id=$1`,
+		"rfi":            `SELECT project_id FROM quality_inspection_requests WHERE id=$1`,
+		"ncr":            `SELECT project_id FROM quality_ncrs WHERE id=$1`,
+		"recurring_plan": `SELECT project_id FROM construction_recurring_plans WHERE id=$1`,
+		"occurrence":     `SELECT project_id FROM construction_recurring_occurrences WHERE id=$1`,
+	}
+	query := queries[kind]
+	if query == "" {
+		return validationError("Loại hồ sơ QA/QC không hợp lệ")
+	}
+	row, err := h.service.repo.QueryOne(c.Context(), query, id)
+	if err != nil {
+		return err
+	}
+	return h.requireProjectPermission(c, cleanID(row["project_id"]), permissions)
 }
 
 func (h *Handler) ListProcurement(c *fiber.Ctx) error {
@@ -1329,9 +1888,24 @@ func (h *Handler) ListProcurement(c *fiber.Ctx) error {
 		return err
 	}
 	rows, err := h.service.repo.Query(c.Context(), fmt.Sprintf(`
-		SELECT pr.*, p.name AS project_name
+		SELECT pr.*, p.name AS project_name,
+			COALESCE(items.item_count,0) AS item_count,
+			COALESCE(items.quantity_requested,0) AS quantity_requested,
+			COALESCE(items.accepted_quantity,0) AS accepted_quantity
 		FROM procurement_requests pr
 		JOIN projects p ON p.id=pr.project_id
+		LEFT JOIN LATERAL (
+			SELECT COUNT(*) AS item_count, SUM(pri.quantity_requested) AS quantity_requested,
+				SUM(COALESCE(received.accepted_quantity,0)) AS accepted_quantity
+			FROM procurement_request_items pri
+			LEFT JOIN LATERAL (
+				SELECT SUM(iai.accepted_quantity) AS accepted_quantity
+				FROM incoming_acceptance_items iai
+				JOIN incoming_acceptance_records iar ON iar.id=iai.incoming_acceptance_id AND iar.status='submitted'
+				WHERE iai.procurement_request_item_id=pri.id
+			) received ON true
+			WHERE pri.request_id=pr.id
+		) items ON true
 		WHERE pr.status <> 'cancelled' AND p.status <> 'cancelled' AND %s
 		ORDER BY pr.created_at DESC
 	`, scopeSQL), scopeArgs...)
@@ -1352,8 +1926,7 @@ func (h *Handler) CreateProcurement(c *fiber.Ctx) error {
 	if body["request_code"] == nil {
 		body["request_code"] = fmt.Sprintf("PR-%d", timeNowUnix())
 	}
-	body["requested_by"] = actorID(c)
-	req, err := h.service.repo.Insert(c.Context(), "procurement_requests", procurementColumns(), body)
+	req, err := h.service.CreateProcurement(c.Context(), body, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -1379,7 +1952,7 @@ func (h *Handler) UpdateProcurement(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	req, err := h.service.repo.Update(c.Context(), "procurement_requests", procurementColumns(), c.Params("id"), body)
+	req, err := h.service.UpdateProcurement(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -1824,29 +2397,78 @@ func (h *Handler) ProjectHandover(c *fiber.Ctx) error {
 	}
 	return response.OK(c, rows)
 }
+func (h *Handler) HandoverOptions(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"handover.view", "handover.create"}); err != nil {
+		return err
+	}
+	options, err := h.service.HandoverOptions(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, options)
+}
 func (h *Handler) CreateHandover(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"handover.create"}); err != nil {
 		return err
 	}
-	body, err := bodyMap(c)
-	if err != nil {
+	var req HandoverCreateRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
 		return err
 	}
-	row, err := h.service.CreateHandover(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	row, err := h.service.CreateHandover(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
 	return response.Created(c, row)
 }
-func (h *Handler) CheckHandover(c *fiber.Ctx) error {
+func (h *Handler) GetHandover(c *fiber.Ctx) error {
 	if err := h.requireRecordProjectPermission(c, "handover_records", c.Params("id"), []string{"handover.view"}); err != nil {
 		return err
 	}
-	check, err := h.service.HandoverCheck(c.Context(), c.Params("id"))
+	row, err := h.service.HandoverDetail(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+func (h *Handler) SubmitHandover(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "handover_records", c.Params("id"), []string{"handover.create", "handover.verify"}); err != nil {
+		return err
+	}
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.SubmitHandover(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+func (h *Handler) CheckHandover(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "handover_records", c.Params("id"), []string{"handover.verify", "handover.approve"}); err != nil {
+		return err
+	}
+	check, err := h.service.HandoverCheck(c.Context(), c.Params("id"), actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
 	return response.OK(c, check)
+}
+
+func (h *Handler) UpdateHandoverChecklistItem(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "handover_checklist_items", c.Params("id"), []string{"handover.verify"}); err != nil {
+		return err
+	}
+	var req HandoverChecklistItemRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return err
+	}
+	row, err := h.service.UpdateHandoverChecklistItem(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
 }
 func (h *Handler) CompleteHandover(c *fiber.Ctx) error {
 	if err := h.requireRecordProjectPermission(c, "handover_records", c.Params("id"), []string{"handover.approve"}); err != nil {
@@ -2028,14 +2650,14 @@ func (h *Handler) ListPayables(c *fiber.Ctx) error {
 	`, scopeSQL), scopeArgs...)
 }
 func (h *Handler) CreatePayable(c *fiber.Ctx) error {
-	if err := h.requireBodyProjectPermission(c, []string{"accounting.payable_approve"}); err != nil {
+	var req PayableCreateRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
 		return err
 	}
-	body, err := bodyMap(c)
-	if err != nil {
+	if err := h.requireProjectPermission(c, cleanID(req.ProjectID), []string{"accounting.payable_approve"}); err != nil {
 		return err
 	}
-	row, err := h.service.CreatePayable(c.Context(), body)
+	row, err := h.service.CreatePayable(c.Context(), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -2398,14 +3020,14 @@ func (h *Handler) ListReceivables(c *fiber.Ctx) error {
 	`, scopeSQL), scopeArgs...)
 }
 func (h *Handler) CreateReceivable(c *fiber.Ctx) error {
-	if err := h.requireBodyProjectPermission(c, []string{"accounting.receivable_approve"}); err != nil {
+	var req ReceivableCreateRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
 		return err
 	}
-	body, err := bodyMap(c)
-	if err != nil {
+	if err := h.requireProjectPermission(c, cleanID(req.ProjectID), []string{"accounting.receivable_approve"}); err != nil {
 		return err
 	}
-	row, err := h.service.CreateReceivable(c.Context(), body)
+	row, err := h.service.CreateReceivable(c.Context(), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}

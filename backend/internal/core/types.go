@@ -25,6 +25,47 @@ type ActionRequest struct {
 	Reason  string `json:"reason"`
 }
 
+type PayableCreateRequest struct {
+	ProjectID       string  `json:"project_id"`
+	PayableCode     string  `json:"payable_code"`
+	VendorType      string  `json:"vendor_type"`
+	VendorPartnerID string  `json:"vendor_partner_id"`
+	VendorName      string  `json:"vendor_name"`
+	GrossAmount     float64 `json:"gross_amount"`
+	AdvanceAmount   float64 `json:"advance_amount"`
+	RetentionAmount float64 `json:"retention_amount"`
+	DeductionAmount float64 `json:"deduction_amount"`
+	DueDate         string  `json:"due_date"`
+}
+
+type ReceivableCreateRequest struct {
+	ProjectID       string  `json:"project_id"`
+	ReceivableCode  string  `json:"receivable_code"`
+	ClientPartnerID string  `json:"client_partner_id"`
+	ClientName      string  `json:"client_name"`
+	ContractAmount  float64 `json:"contract_amount"`
+	MilestoneName   string  `json:"milestone_name"`
+	GrossAmount     float64 `json:"gross_amount"`
+	DueDate         string  `json:"due_date"`
+}
+
+type HandoverCreateRequest struct {
+	HandoverCode           string `json:"handover_code"`
+	FinalAcceptanceID      string `json:"final_acceptance_id"`
+	WorkflowFormInstanceID string `json:"workflow_form_instance_id"`
+	HandoverDate           string `json:"handover_date"`
+	ClientRepresentative   string `json:"client_representative"`
+	CompanyRepresentative  string `json:"company_representative"`
+	Notes                  string `json:"notes"`
+}
+
+type HandoverChecklistItemRequest struct {
+	Status     string `json:"status"`
+	EvidenceID string `json:"evidence_id"`
+	DocumentID string `json:"document_id"`
+	Notes      string `json:"notes"`
+}
+
 type PartnerFilter struct {
 	Query  string
 	Type   string
@@ -376,6 +417,193 @@ type WorkflowFormSignRequest struct {
 type BOQUnitPriceRequest struct {
 	UnitPrice float64 `json:"unit_price"`
 	Comment   string  `json:"comment"`
+}
+
+type SupplierQuotationRequest struct {
+	QuotationCode     string                         `json:"quotation_code"`
+	SupplierPartnerID string                         `json:"supplier_partner_id"`
+	QuotationDate     string                         `json:"quotation_date"`
+	ValidUntil        string                         `json:"valid_until"`
+	Currency          string                         `json:"currency"`
+	PaymentTermsDays  int                            `json:"payment_terms_days"`
+	LeadTimeDays      int                            `json:"lead_time_days"`
+	DeliveryTerms     string                         `json:"delivery_terms"`
+	WarrantyTerms     string                         `json:"warranty_terms"`
+	Notes             string                         `json:"notes"`
+	Items             []SupplierQuotationItemRequest `json:"items"`
+}
+
+type SupplierQuotationItemRequest struct {
+	BOQItemID        string  `json:"boq_item_id"`
+	Description      string  `json:"description"`
+	Unit             string  `json:"unit"`
+	Quantity         float64 `json:"quantity"`
+	UnitPrice        float64 `json:"unit_price"`
+	DiscountAmount   float64 `json:"discount_amount"`
+	TaxRate          float64 `json:"tax_rate"`
+	LeadTimeDays     int     `json:"lead_time_days"`
+	ComplianceStatus string  `json:"compliance_status"`
+	DeviationNote    string  `json:"deviation_note"`
+}
+
+type SupplierQuotationQualificationRequest struct {
+	TechnicalStatus  string `json:"technical_status"`
+	CommercialStatus string `json:"commercial_status"`
+	Comment          string `json:"comment"`
+}
+
+type SupplierQuoteSelectionRequest struct {
+	DecisionReason string `json:"decision_reason"`
+}
+
+type ContractRequest struct {
+	ContractCode          string  `json:"contract_code"`
+	Title                 string  `json:"title"`
+	ContractType          string  `json:"contract_type"`
+	Direction             string  `json:"direction"`
+	CounterpartyPartnerID string  `json:"counterparty_partner_id"`
+	CounterpartyName      string  `json:"counterparty_name"`
+	Currency              string  `json:"currency"`
+	OriginalAmount        float64 `json:"original_amount"`
+	AdvancePercent        float64 `json:"advance_percent"`
+	RetentionPercent      float64 `json:"retention_percent"`
+	WarrantyDays          int     `json:"warranty_days"`
+	SignedDate            string  `json:"signed_date"`
+	EffectiveDate         string  `json:"effective_date"`
+	ExpiryDate            string  `json:"expiry_date"`
+}
+
+type ContractVersionRequest struct {
+	VersionLabel     string  `json:"version_label"`
+	Amount           float64 `json:"amount"`
+	ScopeSummary     string  `json:"scope_summary"`
+	CommercialTerms  Record  `json:"commercial_terms"`
+	PaymentTerms     Record  `json:"payment_terms"`
+	PlannedStartDate string  `json:"planned_start_date"`
+	PlannedEndDate   string  `json:"planned_end_date"`
+	DocumentID       string  `json:"document_id"`
+	Comment          string  `json:"comment"`
+}
+
+type ContractMilestoneRequest struct {
+	MilestoneCode      string  `json:"milestone_code"`
+	MilestoneName      string  `json:"milestone_name"`
+	SequenceNo         int     `json:"sequence_no"`
+	MilestoneType      string  `json:"milestone_type"`
+	AmountBasis        string  `json:"amount_basis"`
+	Percentage         float64 `json:"percentage"`
+	GrossAmount        float64 `json:"gross_amount"`
+	RetentionPercent   float64 `json:"retention_percent"`
+	PlannedDate        string  `json:"planned_date"`
+	DueDays            int     `json:"due_days"`
+	AcceptanceRequired bool    `json:"acceptance_required"`
+	AcceptanceID       string  `json:"acceptance_id"`
+}
+
+type ContractVariationRequest struct {
+	VariationCode string  `json:"variation_code"`
+	Title         string  `json:"title"`
+	VariationType string  `json:"variation_type"`
+	Reason        string  `json:"reason"`
+	AmountDelta   float64 `json:"amount_delta"`
+	DaysDelta     int     `json:"days_delta"`
+	ScopeDelta    string  `json:"scope_delta"`
+	DocumentID    string  `json:"document_id"`
+	Comment       string  `json:"comment"`
+}
+
+type ContractRetentionReleaseRequest struct {
+	Amount  float64 `json:"amount"`
+	DueDate string  `json:"due_date"`
+	Comment string  `json:"comment"`
+}
+
+type QualityITPRequest struct {
+	ITPCode       string                  `json:"itp_code"`
+	Title         string                  `json:"title"`
+	Discipline    string                  `json:"discipline"`
+	WorkPackage   string                  `json:"work_package"`
+	DocumentID    string                  `json:"document_id"`
+	ReviewComment string                  `json:"review_comment"`
+	Items         []QualityITPItemRequest `json:"items"`
+}
+
+type QualityITPItemRequest struct {
+	SequenceNo            int    `json:"sequence_no"`
+	ActivityName          string `json:"activity_name"`
+	InspectionStage       string `json:"inspection_stage"`
+	AcceptanceCriteria    string `json:"acceptance_criteria"`
+	InspectionMethod      string `json:"inspection_method"`
+	ControlPoint          string `json:"control_point"`
+	FrequencyType         string `json:"frequency_type"`
+	FrequencyValue        int    `json:"frequency_value"`
+	ResponsibleRole       string `json:"responsible_role"`
+	EvidenceRequired      bool   `json:"evidence_required"`
+	ClientWitnessRequired bool   `json:"client_witness_required"`
+	Notes                 string `json:"notes"`
+}
+
+type QualityInspectionRequest struct {
+	RFICode               string `json:"rfi_code"`
+	ITPItemID             string `json:"itp_item_id"`
+	WorkItemID            string `json:"work_item_id"`
+	Location              string `json:"location"`
+	LotReference          string `json:"lot_reference"`
+	RequestedInspectionAt string `json:"requested_inspection_at"`
+	RequestComment        string `json:"request_comment"`
+	RequestEvidenceID     string `json:"request_evidence_id"`
+}
+
+type QualityInspectionDecisionRequest struct {
+	Result               string `json:"result"`
+	Comment              string `json:"comment"`
+	InspectionEvidenceID string `json:"inspection_evidence_id"`
+}
+
+type QualityNCRRequest struct {
+	NCRCode         string `json:"ncr_code"`
+	SourceType      string `json:"source_type"`
+	SourceID        string `json:"source_id"`
+	RFIID           string `json:"rfi_id"`
+	WorkItemID      string `json:"work_item_id"`
+	IssueID         string `json:"issue_id"`
+	Title           string `json:"title"`
+	Severity        string `json:"severity"`
+	Nonconformity   string `json:"nonconformity"`
+	ImmediateAction string `json:"immediate_action"`
+	DueDate         string `json:"due_date"`
+	EvidenceID      string `json:"evidence_id"`
+	OwnerID         string `json:"owner_id"`
+}
+
+type QualityNCRActionRequest struct {
+	RootCause            string `json:"root_cause"`
+	CorrectiveAction     string `json:"corrective_action"`
+	PreventiveAction     string `json:"preventive_action"`
+	CorrectiveEvidenceID string `json:"corrective_evidence_id"`
+	ReinspectionRFIID    string `json:"reinspection_rfi_id"`
+	Comment              string `json:"comment"`
+}
+
+type ConstructionRecurringPlanRequest struct {
+	PlanCode         string `json:"plan_code"`
+	Title            string `json:"title"`
+	Description      string `json:"description"`
+	RecurrenceType   string `json:"recurrence_type"`
+	IntervalValue    int    `json:"interval_value"`
+	StartDate        string `json:"start_date"`
+	EndDate          string `json:"end_date"`
+	DueTime          string `json:"due_time"`
+	ResponsibleRole  string `json:"responsible_role"`
+	AssignedUserID   string `json:"assigned_user_id"`
+	EvidenceRequired bool   `json:"evidence_required"`
+	SourceWorkItemID string `json:"source_work_item_id"`
+}
+
+type ConstructionRecurringOccurrenceRequest struct {
+	Comment    string `json:"comment"`
+	EvidenceID string `json:"evidence_id"`
+	Reason     string `json:"reason"`
 }
 
 type WorkflowFormSignatureStroke struct {

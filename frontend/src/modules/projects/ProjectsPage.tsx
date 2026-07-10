@@ -36,8 +36,8 @@ type ProjectFolder = {
 const projectFolders: ProjectFolder[] = [
   { key: 'overview', label: 'Tổng quan', description: 'Tình trạng, việc cần xử lý, blocker', path: '', permissions: ['project.view'] },
   { key: 'planning', label: 'Kế hoạch & Workflow', description: 'Pipeline, planning, BOQ / dự toán', path: '', permissions: ['planning.view', 'pipeline.view', 'boq.view'] },
-  { key: 'materials', label: 'Mua sắm & Vật tư', description: 'Mua sắm, kho vật tư, cân đối vật tư', path: '', permissions: ['procurement.view', 'warehouse.view'] },
-  { key: 'quality', label: 'Thi công & Chất lượng', description: 'Thi công, nghiệm thu, rework', path: '', permissions: ['operation.view', 'acceptance.view', 'rework.view'] },
+  { key: 'materials', label: 'Thương mại & Vật tư', description: 'Hợp đồng, mua sắm, kho vật tư, cân đối vật tư', path: '', permissions: ['contract.view', 'procurement.view', 'warehouse.view'] },
+  { key: 'quality', label: 'Thi công & Chất lượng', description: 'Thi công, ITP/RFI/NCR, nghiệm thu, rework', path: '', permissions: ['operation.view', 'quality.view', 'acceptance.view', 'rework.view'] },
   { key: 'finance', label: 'Bàn giao & Tài chính', description: 'Bàn giao, kế toán, công nợ', path: '', permissions: ['handover.view', 'accounting.view', 'accounting.payable_view', 'accounting.receivable_view'] },
   { key: 'governance', label: 'Quản trị công trình', description: 'Thành viên, hồ sơ, audit', path: '', permissions: ['audit.view', 'project.view'] },
 ];
@@ -101,7 +101,9 @@ export function ProjectsPage() {
       label: 'Pipeline template',
       type: 'select' as const,
       defaultValue: record?.pipeline_template_id ?? '',
-      options: (templates.data ?? []).map((template) => ({ label: `${template.name} v${template.version}`, value: template.id })),
+      options: (templates.data ?? [])
+        .filter((template) => template.status === 'published')
+        .map((template) => ({ label: `${template.name} · revision ${template.revision_no ?? template.version}`, value: template.id })),
     },
   ];
 

@@ -20,21 +20,24 @@ Use this map after `module-keyword-map.md` for React/Vite admin UI, frontend hel
 | `/dashboard` | `modules/dashboard/DashboardPage.tsx` | `components/StatCard.tsx`, status/format helpers | `/reports/dashboard` |
 | `/projects` | `modules/projects/ProjectsPage.tsx` | `RecordFormDialog`, `SimpleForm`, `partnerUtils`, project/workspace navigation | `/projects`, `/pipeline-templates`, `/partners` |
 | `/projects/:id` workspace | `modules/projects/ProjectWorkspaceLayout.tsx`, `ProjectDetailPage.tsx` | work-item cards, activity, evidence, project sidebar, workflow sidebar | `/projects/:id/operations`, `/projects/:id/audit-logs`, `/projects/:id/start-pipeline` |
-| `/projects/:id/work-items/:workItemId`, `/work-items/:id` | `modules/work-items/WorkItemDetailPage.tsx` | `WorkItemPrimarySurface`, `WorkflowFormPanel`, evidence/activity panels, navigation/presentation helpers | `/work-items/:id`, work-item action/evidence/form routes |
+| `/projects/:id/work-items/:workItemId`, `/work-items/:id` | `modules/work-items/WorkItemDetailPage.tsx` | `WorkItemPrimarySurface` resolves snapshotted `surface_kind`; requirement panel shows stable required-automation status/reason and completion safely retries the idempotent hard gate | `/work-items/:id`, work-item action/evidence/form routes |
 | `/my-work` | `modules/my-work/MyWorkPage.tsx` | `WorkItemCard`, activity attention panel, SSE status | `/me/work-items`, `/me/activity-attention`, SSE stream |
-| `/pipeline-builder`, `/pipeline-builder/:id` | `modules/pipeline-builder/PipelineBuilderPage.tsx`, `components/*`, `components/diagram/*` | diagram routing, hit testing, edge persistence, inspector panels | pipeline template/node/step/edge routes |
+| `/pipeline-builder`, `/pipeline-builder/:id` | `modules/pipeline-builder/PipelineBuilderPage.tsx`, `components/*`, `components/diagram/*` | diagram routing, stable edge conditions, published-revision read-only mode, revision creation, structured node approval-policy editor (`any/all/quorum/ordered`) | pipeline template/node/step/edge routes |
 | `/workflow-forms` | `modules/workflow-forms/WorkflowFormsPage.tsx` | form library/version dialogs and status labels | workflow form template/version routes |
 | `/planning/daily-reports` | `modules/planning-daily-reports/PlanningDailyReportsPage.tsx` | work-item navigation/presentation | `/planning/daily-reports` |
 | `/planning/meeting-minutes` | `modules/meeting-minutes/MeetingMinutesPage.tsx` | work-item navigation/presentation | `/planning/meeting-minutes` |
 | `/planning/checklists` | `modules/planning-checklists/PlanningChecklistsPage.tsx` | work-item navigation/presentation | `/planning/checklists` |
 | project/global planning | `modules/planning/PlanningPage.tsx` | pipeline runtime controls, audit log, work-item links | `/projects/:id/pipeline-run`, run node/step action routes |
-| BOQ | `modules/boq/BOQPage.tsx` | `CurrencyText`, status labels, dialogs | BOQ and unit-price routes |
-| procurement | `modules/procurement/ProcurementPage.tsx` | dialog/forms/status labels | procurement routes |
+| BOQ / supplier quotation comparison | `modules/boq/BOQPage.tsx`, `modules/boq/SupplierQuotationWorkspace.tsx` | `Dialog`, `CurrencyText`, `StatusBadge`, partner catalog, inline quote-item grid | BOQ lifecycle plus supplier quotation/list/detail/submit/qualify/comparison/select routes |
+| procurement | `modules/procurement/ProcurementPage.tsx` | `Dialog`, `SimpleForm`, `StatusBadge`, partner catalog, acceptance progress/detail table | procurement list/detail/update and submit/approve/order/receive routes |
+| contracts | `modules/contracts/ContractsPage.tsx`; contract primary surface in `modules/work-items/WorkItemPrimarySurface.tsx` | project workspace route, `Dialog`, `SimpleForm`, `StatusBadge`, `CurrencyText`, partner catalog, capability buttons | contract list/detail/version/milestone/variation/retention routes |
 | warehouse | `modules/warehouse/WarehousePage.tsx` | stock forms, partner/project selectors | material/warehouse/stock/material-balance routes |
 | operations | `modules/operations/OperationsPage.tsx` | daily report and issue dialogs | daily report/issue routes |
+| quality | `modules/quality/QualityPage.tsx`; quality primary surface in `modules/work-items/WorkItemPrimarySurface.tsx` | project workspace route, ITP revision/item editor, RFI inspection, NCR lifecycle, recurring occurrence controls, capability-gated actions | project quality workspace and quality ITP/RFI/NCR/recurring routes |
 | acceptance | `modules/acceptance/AcceptancePage.tsx` | acceptance detail/actions | acceptance routes |
 | rework | `modules/rework/ReworkPage.tsx` | rework/replanning dialogs | rework/replanning routes |
-| handover | `modules/handover/HandoverPage.tsx` | handover check/complete actions | handover routes |
+| handover | `modules/handover/HandoverPage.tsx`; handover primary surface in `modules/work-items/WorkItemPrimarySurface.tsx` | project package list, final-acceptance source selector, checklist evidence/document verification, blocker snapshot, submit/check/complete confirmation | handover list/options/detail/checklist/submit/check/complete routes |
+| finance work-item surface | finance primary surface in `modules/work-items/WorkItemPrimarySurface.tsx`; `modules/debt/DebtPage.tsx`, invoice/payment/reconciliation panels | routes official finance steps to project debt workspace while preserving the workflow form/PDF support tab | AP/AR, invoice, schedule, advance, payment and reconciliation routes |
 | accounting | `modules/accounting/AccountingPage.tsx`, `CashflowPanel.tsx` | budgets, payments, cashflow report | budget/payment/report routes |
 | debt/payables/receivables | `modules/debt/DebtPage.tsx` plus debt panels | invoice, payment plan, billing plan, reconciliation panels | payable/receivable/payment/invoice routes |
 | core data | `modules/core-data/CoreDataPage.tsx`, `partnerUtils.ts` | partner type helpers | partner routes |
@@ -90,4 +93,3 @@ Use this map after `module-keyword-map.md` for React/Vite admin UI, frontend hel
 - Toast/validation: `rg -n "useToast|toast\\.|submitAttempted|required|invalid|warning|error" frontend/src/modules frontend/src/components`.
 - Work item presentation: `rg -n "WorkItemPrimarySurface|workItemPresentation|workItemNavigation|evidence|workflow form|returnTo" frontend/src/modules/work-items frontend/src/modules/projects`.
 - Diagram bugs: `rg -n "connector|port|drag|pan|zoom|route|hitTest|nodeRects|edgePersistence" frontend/src/modules/pipeline-builder/components/diagram frontend/src/modules/pipeline-builder/PipelineBuilderPage.tsx`.
-

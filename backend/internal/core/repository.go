@@ -88,6 +88,14 @@ func normalizeValue(value any) any {
 }
 
 func (r *Repository) Insert(ctx context.Context, table string, specs []ColumnSpec, body Record) (Record, error) {
+	return insertRecord(ctx, r.db, table, specs, body)
+}
+
+type queryContext interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
+func insertRecord(ctx context.Context, db queryContext, table string, specs []ColumnSpec, body Record) (Record, error) {
 	table = safeTable(table)
 	if table == "" {
 		return nil, errors.New("invalid table")
@@ -115,7 +123,19 @@ func (r *Repository) Insert(ctx context.Context, table string, specs []ColumnSpe
 		return nil, errors.New("no fields to insert")
 	}
 	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) RETURNING *", table, strings.Join(cols, ","), strings.Join(holders, ","))
-	return r.QueryOne(ctx, query, args...)
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	records, err := scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return records[0], nil
 }
 
 func (r *Repository) Update(ctx context.Context, table string, specs []ColumnSpec, id string, body Record) (Record, error) {
@@ -225,15 +245,15 @@ func partnerColumns() []ColumnSpec {
 }
 
 func templateColumns() []ColumnSpec {
-	return []ColumnSpec{col("name"), col("description"), col("project_type"), col("version"), col("status"), col("created_by")}
+	return []ColumnSpec{col("id"), col("name"), col("description"), col("project_type"), col("version"), col("status"), col("created_by"), col("template_family_id"), col("revision_no"), col("source_template_id"), col("engine_version"), col("definition_hash"), col("published_at"), col("published_by")}
 }
 
 func templateNodeColumns() []ColumnSpec {
-	return []ColumnSpec{col("template_id"), col("name"), col("description"), col("type"), col("position_x"), col("position_y"), col("order_index"), jsonCol("responsible_role_ids"), col("required_permission"), jsonCol("permissions"), jsonCol("entry_conditions"), jsonCol("exit_conditions"), col("approval_rule"), col("rework_enabled"), col("replanning_enabled"), col("fail_path"), col("status")}
+	return []ColumnSpec{col("template_id"), col("name"), col("description"), col("type"), col("position_x"), col("position_y"), col("order_index"), jsonCol("responsible_role_ids"), col("required_permission"), jsonCol("permissions"), jsonCol("entry_conditions"), jsonCol("exit_conditions"), col("approval_rule"), jsonCol("approval_policy_json"), col("rework_enabled"), col("replanning_enabled"), col("fail_path"), col("status")}
 }
 
 func templateStepColumns() []ColumnSpec {
-	return []ColumnSpec{col("node_id"), col("name"), col("description"), col("step_type"), jsonCol("required_role_ids"), col("required_permission"), col("checklist_required"), col("document_required"), col("photo_required"), col("form_version_id"), col("form_required"), col("order_index")}
+	return []ColumnSpec{col("node_id"), col("name"), col("description"), col("step_type"), jsonCol("required_role_ids"), col("required_permission"), col("checklist_required"), col("document_required"), col("photo_required"), col("form_version_id"), col("form_required"), col("surface_kind"), col("domain_action_key"), col("order_index")}
 }
 
 func workItemColumns() []ColumnSpec {
@@ -259,7 +279,11 @@ func boqColumns() []ColumnSpec {
 }
 
 func procurementColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("request_code"), col("title"), col("requested_by"), col("status"), col("total_estimated_amount"), col("budget_status"), col("approval_request_id")}
+	return []ColumnSpec{
+		col("project_id"), col("request_code"), col("title"), col("requested_by"), col("status"),
+		col("total_estimated_amount"), col("budget_status"), col("approval_request_id"), col("supplier_partner_id"),
+		col("supplier_name"), col("order_reference"), col("expected_delivery_date"),
+	}
 }
 
 func procurementItemColumns() []ColumnSpec {
@@ -267,6 +291,7 @@ func procurementItemColumns() []ColumnSpec {
 		col("request_id"), col("material_id"), col("boq_item_id"), col("node_id"), col("quantity_planned"),
 		col("quantity_requested"), col("unit"), col("estimated_unit_price"), col("supplier_partner_id"), col("supplier_name"), col("delivery_status"),
 		col("approval_status"), col("boq_price_source"), col("boq_price_revision_no"), col("boq_price_event_id"),
+		col("supplier_quotation_item_id"), col("quoted_unit_price"), col("price_variance_amount"),
 	}
 }
 
@@ -305,7 +330,7 @@ func replanningColumns() []ColumnSpec {
 }
 
 func handoverColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("status"), col("final_acceptance_id"), col("handover_date"), col("client_representative"), col("company_representative"), col("documents_ready"), col("warehouse_closed"), col("payables_recorded"), col("receivables_recorded"), col("notes"), col("created_by"), col("approved_by")}
+	return []ColumnSpec{col("project_id"), col("handover_code"), col("status"), col("final_acceptance_id"), col("workflow_form_instance_id"), col("handover_date"), col("client_representative"), col("company_representative"), col("documents_ready"), col("warehouse_closed"), col("payables_recorded"), col("receivables_recorded"), jsonCol("readiness_snapshot_json"), col("notes"), col("created_by"), col("approved_by")}
 }
 
 func budgetColumns() []ColumnSpec {

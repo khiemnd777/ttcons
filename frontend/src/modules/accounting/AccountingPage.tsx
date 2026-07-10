@@ -184,9 +184,8 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
           { name: 'project_id', label: 'Công trình', type: 'select', defaultValue: projectId, required: true, options: (projects.data ?? []).map((p) => ({ label: p.name, value: p.id })) },
           { name: 'payment_code', label: 'Mã', defaultValue: `PMT-${Date.now().toString().slice(-5)}`, required: true },
           { name: 'payment_type', label: 'Loại', type: 'select', defaultValue: 'supplier_payment', required: true, options: enumOptions('payment_type', ['supplier_payment', 'subcontractor_payment', 'client_receipt', 'advance', 'advance_settlement', 'other']) },
-          { name: 'amount', label: 'Số tiền', type: 'number', defaultValue: 10000000, required: true, min: 0 },
+          { name: 'amount', label: 'Số tiền', type: 'number', defaultValue: 10000000, required: true, min: 0, helperText: 'Phiếu luôn được tạo ở trạng thái nháp và chỉ chuyển trạng thái qua phê duyệt.' },
           { name: 'payment_method', label: 'Phương thức', type: 'select', defaultValue: 'bank_transfer', required: true, options: enumOptions('payment_method', ['bank_transfer', 'cash']) },
-          { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'draft', required: true, options: enumOptions('status', ['draft', 'submitted', 'pending', 'approved', 'paid', 'received']) },
         ]}
         onSubmit={(values) => createPayment.mutateAsync(values)}
       />

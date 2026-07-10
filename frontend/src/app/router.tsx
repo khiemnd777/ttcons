@@ -19,8 +19,10 @@ import { PlanningChecklistsPage } from '../modules/planning-checklists/PlanningC
 import { PlanningPage } from '../modules/planning/PlanningPage';
 import { BOQPage } from '../modules/boq/BOQPage';
 import { ProcurementPage } from '../modules/procurement/ProcurementPage';
+import { ContractsPage } from '../modules/contracts/ContractsPage';
 import { WarehousePage } from '../modules/warehouse/WarehousePage';
 import { OperationsPage } from '../modules/operations/OperationsPage';
+import { QualityPage } from '../modules/quality/QualityPage';
 import { AcceptancePage } from '../modules/acceptance/AcceptancePage';
 import { ReworkPage } from '../modules/rework/ReworkPage';
 import { HandoverPage } from '../modules/handover/HandoverPage';
@@ -76,8 +78,10 @@ export const router = createBrowserRouter([
           { path: 'planning', element: guarded(<PlanningPage />, ['planning.view', 'pipeline.view']) },
           { path: 'boq', element: guarded(<BOQPage />, ['boq.view']) },
           { path: 'procurement', element: guarded(<ProcurementPage scoped />, ['procurement.view']) },
+          { path: 'contracts', element: guarded(<ContractsPage />, ['contract.view']) },
           { path: 'warehouse', element: guarded(<WarehousePage scoped />, ['warehouse.view']) },
           { path: 'operations', element: guarded(<OperationsPage />, ['operation.view']) },
+          { path: 'quality', element: guarded(<QualityPage />, ['quality.view']) },
           { path: 'acceptance', element: guarded(<AcceptancePage />, ['acceptance.view']) },
           { path: 'rework', element: guarded(<ReworkPage />, ['rework.view']) },
           { path: 'handover', element: guarded(<HandoverPage />, ['handover.view']) },

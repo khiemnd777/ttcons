@@ -46,6 +46,7 @@ export type PipelineNode = AnyRecord & {
   position_y?: number;
   responsible_role_ids?: string[];
   approval_rule?: string;
+  approval_policy_json?: AnyRecord;
   required_permission?: string;
   permissions?: string[];
   exit_conditions?: AnyRecord;
@@ -82,6 +83,13 @@ export type PipelineTemplate = AnyRecord & {
   project_type?: string;
   status: string;
   version: number;
+  revision_no?: number;
+  template_family_id?: string;
+  source_template_id?: string;
+  engine_version?: number;
+  definition_hash?: string;
+  published_at?: string;
+  published_by?: string;
   node_count?: number;
   nodes?: PipelineNode[];
   edges?: PipelineTemplateEdge[];
@@ -201,6 +209,287 @@ export type BOQItem = ProjectOperationsRecord & {
   final_price_comment?: string;
   price_revision_no?: number;
   price_events?: BOQUnitPriceEvent[];
+  selected_quotation_item_id?: string;
+  selected_quotation_code?: string;
+  selected_supplier_partner_id?: string;
+  selected_supplier_name?: string;
+  quoted_unit_price?: number;
+  price_waiver_reason?: string;
+};
+
+export type SupplierQuotationItem = ProjectOperationsRecord & {
+  quotation_id: string;
+  boq_item_id: string;
+  material_id?: string;
+  description: string;
+  unit: string;
+  quantity: number;
+  unit_price: number;
+  discount_amount: number;
+  tax_rate: number;
+  amount_before_tax: number;
+  total_amount: number;
+  lead_time_days: number;
+  compliance_status: string;
+  deviation_note?: string;
+  work_item_name?: string;
+  variance_to_norm?: number;
+};
+
+export type SupplierQuotation = ProjectOperationsRecord & {
+  quotation_code: string;
+  supplier_partner_id: string;
+  supplier_name: string;
+  supplier_tax_code?: string;
+  quotation_date: string;
+  valid_until?: string;
+  currency: string;
+  payment_terms_days: number;
+  lead_time_days: number;
+  delivery_terms?: string;
+  warranty_terms?: string;
+  status: string;
+  technical_status: string;
+  commercial_status: string;
+  notes?: string;
+  item_count?: number;
+  amount_before_tax?: number;
+  total_amount?: number;
+  items?: SupplierQuotationItem[];
+};
+
+export type SupplierQuoteComparison = {
+  boq_item_id: string;
+  category: string;
+  work_item_name: string;
+  unit: string;
+  quantity: number;
+  expected_unit_price: number;
+  norm_unit_price?: number;
+  final_unit_price?: number;
+  norm_price_locked: boolean;
+  final_price_locked: boolean;
+  selected_quotation_item_id?: string;
+  price_waiver_reason?: string;
+  quotations: Array<{
+    quotation_item_id: string;
+    quotation_id: string;
+    quotation_code: string;
+    supplier_partner_id: string;
+    supplier_name: string;
+    quotation_status: string;
+    valid_until?: string;
+    unit_price: number;
+    discount_amount: number;
+    tax_rate: number;
+    total_amount: number;
+    lead_time_days: number;
+    compliance_status: string;
+    variance_to_norm: number;
+    is_selected: boolean;
+  }>;
+};
+
+export type ContractVersion = ProjectOperationsRecord & {
+  contract_id: string;
+  version_no: number;
+  version_label: string;
+  source_variation_id?: string;
+  amount: number;
+  scope_summary: string;
+  commercial_terms_json?: Record<string, any>;
+  payment_terms_json?: Record<string, any>;
+  planned_start_date?: string;
+  planned_end_date?: string;
+  document_id?: string;
+  definition_hash: string;
+  status: string;
+  review_comment?: string;
+  signature_comment?: string;
+};
+
+export type ContractMilestone = ProjectOperationsRecord & {
+  contract_id: string;
+  contract_version_id: string;
+  milestone_code: string;
+  milestone_name: string;
+  sequence_no: number;
+  milestone_type: string;
+  amount_basis: string;
+  percentage?: number;
+  gross_amount: number;
+  retention_percent: number;
+  retention_amount: number;
+  net_amount: number;
+  planned_date?: string;
+  due_days: number;
+  acceptance_required: boolean;
+  acceptance_id?: string;
+  status: string;
+  obligation_type?: string;
+  obligation_id?: string;
+};
+
+export type ContractVariation = ProjectOperationsRecord & {
+  contract_id: string;
+  variation_code: string;
+  title: string;
+  variation_type: string;
+  reason: string;
+  amount_delta: number;
+  days_delta: number;
+  scope_delta?: string;
+  status: string;
+  resulting_version_id?: string;
+};
+
+export type ContractRetention = ProjectOperationsRecord & {
+  contract_id: string;
+  source_milestone_id: string;
+  milestone_code: string;
+  milestone_name: string;
+  direction: string;
+  held_amount: number;
+  released_amount: number;
+  outstanding_amount: number;
+  warranty_end_date?: string;
+  status: string;
+  releases?: Array<Record<string, any>>;
+};
+
+export type Contract = ProjectOperationsRecord & {
+  contract_code: string;
+  title: string;
+  contract_type: string;
+  direction: string;
+  counterparty_partner_id?: string;
+  counterparty_name: string;
+  currency: string;
+  original_amount: number;
+  current_amount: number;
+  advance_percent: number;
+  retention_percent: number;
+  warranty_days: number;
+  signed_date?: string;
+  effective_date?: string;
+  expiry_date?: string;
+  status: string;
+  current_version_id?: string;
+  current_version_no?: number;
+  current_version_label?: string;
+  current_version_status?: string;
+  milestone_count?: number;
+  variation_count?: number;
+  retention_outstanding?: number;
+  versions?: ContractVersion[];
+  milestones?: ContractMilestone[];
+  variations?: ContractVariation[];
+  retentions?: ContractRetention[];
+};
+
+export type QualityITPItem = ProjectOperationsRecord & {
+  itp_plan_id: string;
+  sequence_no: number;
+  activity_name: string;
+  inspection_stage: string;
+  acceptance_criteria: string;
+  inspection_method: string;
+  control_point: string;
+  frequency_type: string;
+  frequency_value: number;
+  responsible_role: string;
+  evidence_required: boolean;
+  client_witness_required: boolean;
+};
+
+export type QualityITPPlan = ProjectOperationsRecord & {
+  family_id: string;
+  itp_code: string;
+  title: string;
+  discipline: string;
+  work_package: string;
+  revision_no: number;
+  definition_hash: string;
+  status: string;
+  item_count: number;
+  items: QualityITPItem[];
+};
+
+export type QualityInspectionRequestRecord = ProjectOperationsRecord & {
+  rfi_code: string;
+  itp_plan_id: string;
+  itp_item_id: string;
+  itp_code: string;
+  activity_name: string;
+  control_point: string;
+  work_item_id?: string;
+  work_item_title?: string;
+  location: string;
+  lot_reference?: string;
+  requested_inspection_at: string;
+  status: string;
+  result?: string;
+  evidence_required: boolean;
+};
+
+export type QualityNCRRecord = ProjectOperationsRecord & {
+  ncr_code: string;
+  source_type: string;
+  source_id: string;
+  rfi_id?: string;
+  rfi_code?: string;
+  work_item_id?: string;
+  rework_request_id?: string;
+  rework_status?: string;
+  title: string;
+  severity: string;
+  nonconformity: string;
+  root_cause?: string;
+  corrective_action?: string;
+  due_date?: string;
+  status: string;
+};
+
+export type RecurringPlan = ProjectOperationsRecord & {
+  plan_code: string;
+  title: string;
+  recurrence_type: string;
+  interval_value: number;
+  start_date: string;
+  end_date?: string;
+  next_due_date: string;
+  responsible_role: string;
+  assigned_user_id?: string;
+  assigned_user_name?: string;
+  evidence_required: boolean;
+  status: string;
+  pending_count: number;
+  overdue_count: number;
+  completed_count: number;
+};
+
+export type RecurringOccurrence = ProjectOperationsRecord & {
+  plan_id: string;
+  plan_code: string;
+  plan_title: string;
+  occurrence_date: string;
+  due_at?: string;
+  assigned_user_id?: string;
+  assigned_user_name?: string;
+  evidence_required: boolean;
+  status: string;
+  effective_status: string;
+};
+
+export type QualityWorkspace = {
+  itp_plans: QualityITPPlan[];
+  inspection_requests: QualityInspectionRequestRecord[];
+  ncrs: QualityNCRRecord[];
+  recurring_plans: RecurringPlan[];
+  recurring_occurrences: RecurringOccurrence[];
+  evidence_options: Array<ProjectOperationsRecord & { work_item_id?: string; name: string; evidence_type: string; status: string; work_item_title?: string }>;
+  work_items: Array<ProjectOperationsRecord & { title: string; status: string; work_type: string }>;
+  participants: Array<{ id: string; full_name: string; email: string }>;
 };
 
 export type WorkItemActivity = ProjectOperationsRecord & {
@@ -1584,6 +1873,20 @@ export type WorkItem = ProjectOperationsRecord & {
   workflow_form_template_code?: string;
   workflow_form_template_name?: string;
   workflow_form_required?: boolean;
+  required_workflow_form_version_id?: string;
+  pipeline_engine_version?: number;
+  surface_kind?: string;
+  domain_action_key?: string;
+  automation_events?: Array<{
+    id: string;
+    action_key: string;
+    status: 'succeeded' | 'blocked' | 'failed' | 'skipped' | string;
+    blocker_reason?: string;
+    error_message?: string;
+    target_type?: string;
+    target_id?: string;
+    updated_at?: string;
+  }>;
   approval_request_id?: string;
   activities?: WorkItemActivity[];
   evidence?: EvidenceRecord[];

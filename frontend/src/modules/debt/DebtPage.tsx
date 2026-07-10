@@ -220,14 +220,11 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
             required: true,
             hiddenWhen: (values: Record<string, any>) => Boolean(values.vendor_partner_id),
           },
-          { name: 'gross_amount', label: 'Gross', type: 'number', defaultValue: 10000000, required: true, min: 0 },
+          { name: 'gross_amount', label: 'Gross', type: 'number', defaultValue: 10000000, required: true, min: 0, helperText: 'Hệ thống tạo nháp và tự tính đã trả/còn lại.' },
           { name: 'due_date', label: 'Hạn thanh toán', type: 'date' },
           { name: 'advance_amount', label: 'Tạm ứng', type: 'number', defaultValue: 0, min: 0 },
           { name: 'retention_amount', label: 'Giữ lại', type: 'number', defaultValue: 0, min: 0 },
           { name: 'deduction_amount', label: 'Khấu trừ', type: 'number', defaultValue: 0, min: 0 },
-          { name: 'paid_amount', label: 'Đã trả', type: 'number', defaultValue: 0, min: 0 },
-          { name: 'remaining_amount', label: 'Còn lại', type: 'number', defaultValue: 10000000, min: 0 },
-          { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'recorded', required: true, options: enumOptions('status', ['draft', 'recorded', 'approved', 'partially_paid', 'paid']) },
         ]} onSubmit={(values) => createPayable.mutateAsync(values)} />
       </FormDrawer>
       <FormDrawer open={open === 'receivable'} title="Ghi nhận phải thu" onClose={() => setOpen(null)}>
@@ -250,11 +247,8 @@ export function DebtPage({ kind }: { kind: 'payables' | 'receivables' | 'both' }
           },
           { name: 'contract_amount', label: 'Giá trị hợp đồng', type: 'number', defaultValue: 100000000, min: 0 },
           { name: 'milestone_name', label: 'Milestone', defaultValue: 'Đợt thanh toán', required: true },
-          { name: 'gross_amount', label: 'Gross', type: 'number', defaultValue: 30000000, required: true, min: 0 },
+          { name: 'gross_amount', label: 'Gross', type: 'number', defaultValue: 30000000, required: true, min: 0, helperText: 'Hệ thống tạo nháp và tự tính đã thu/còn lại.' },
           { name: 'due_date', label: 'Hạn thu', type: 'date' },
-          { name: 'received_amount', label: 'Đã thu', type: 'number', defaultValue: 0, min: 0 },
-          { name: 'remaining_amount', label: 'Còn lại', type: 'number', defaultValue: 30000000, min: 0 },
-          { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'recorded', required: true, options: enumOptions('status', ['draft', 'recorded', 'approved', 'partially_received', 'received']) },
         ]} onSubmit={(values) => createReceivable.mutateAsync(values)} />
       </FormDrawer>
       <Dialog open={dialog?.type === 'payable'} title="Chi tiết phải trả" onClose={() => setDialog(null)} size="xl">

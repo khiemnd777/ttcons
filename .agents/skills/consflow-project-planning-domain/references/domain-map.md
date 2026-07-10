@@ -14,10 +14,12 @@
 - Planning: `/projects/:id/start-pipeline`, `/projects/:id/pipeline-run`, `/projects/:id/work-items`
 - Planning reports: `/planning/daily-reports`, `/planning/meeting-minutes`, `/planning/checklists`
 - Activity: `/projects/:id/activity`, `/projects/:id/activity/stream`, `/me/activity-attention`
+- Contract workspace: `/projects/:id/contracts`; activating the signed main-client contract updates the project-level `contract_amount` compatibility snapshot.
 
 ## Tables And Migrations
 
 - `projects`, `project_members`, `audit_logs`
+- Commercial project master: `contracts`, signed `contract_versions`; `projects.contract_amount` is not the version history.
 - Runtime planning: `pipeline_runs`, `pipeline_run_nodes`, `pipeline_run_steps`, `work_items`
 - Form-backed planning: `workflow_form_instances`, `workflow_form_answers`, `workflow_form_events`
 - Activity: `work_item_activities`, `activity_mentions`, `activity_read_states`

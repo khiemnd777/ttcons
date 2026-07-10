@@ -16,21 +16,30 @@
 - Receivables: `/receivables`, `/receivables/:id/approve|receive`, `/receivables/:id/payment-schedules`, `/receivable-payment-schedules/:id/approve`, `/receivables/:id/advance-receipts`, `/client-advance-receipts/:id/approve|settle`, `/receivables/:id/payments`, `/receivables/:id/output-invoices/upload`, `/receivables/:id/reconciliation`
 - Invoice files/actions: `/projects/:id/input-invoices`, `/input-invoices/:id/file|verify|reject`, `/projects/:id/output-invoices`, `/output-invoices/:id/file|issue|void`
 - Reports: `/reports/cashflow`, `/reports/tax`, `/reports/profit` and export routes
+- Contract sources: `/projects/:id/contracts`, contract version/milestone/variation/retention actions; milestones and retention releases materialize draft AP/AR records.
+- Handover closure: `/projects/:id/handover`, `/projects/:id/handover/options`, handover submit/check/complete and checklist verification routes consume finance readiness without rewriting the finance ledger.
 
 ## Tables And Migrations
 
 - `accounting_budgets`, `payables`, `receivables`, `payments`, `advance_requests`, `payment_allocations`
 - `input_invoices`, `output_invoices`
 - `payable_payment_schedules`, `receivable_payment_schedules`, `client_advance_receipts`
+- `contracts`, `contract_versions`, `contract_milestones`, `contract_variations`, `contract_retentions`, `contract_retention_releases`
 - Related documents: `documents`, `evidence_records`, `partners`
-- Relevant migrations: `V1`, `V27`, `V28`, `V29`, `V30`, `V31`, `V32`, `V33`, `V34`, `V35`, `V36`
+- Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`
 
 ## Invariants
 
 - AP/AR records reconcile to invoices, payments/receipts, advances, settlements, and source documents.
+- API creation of manual AP/AR is server-owned: new records start `draft`, paid/received amounts start at zero, remaining balance is computed from normalized obligation fields, and the actor/audit trail is recorded. Client-supplied status or derived balances are ignored by typed contracts.
+- Generic payment/receipt creation always starts `draft`; approval is the only path that sets approval actor/time. AP/AR-linked payments should use the dedicated allocation endpoints so reconciliation stays correct.
 - Input invoice PDFs belong to payables; output invoice PDFs belong to receivables.
 - Cashflow, tax, and profit reports must stay source-backed and permission-scoped.
 - CSV exports must use the same filters and source logic as UI reports.
+- Active signed contract versions are the commercial source of truth. `projects.contract_amount` is only the active main-client compatibility snapshot.
+- A milestone can open AP/AR only after the contract is active and the milestone is eligible; acceptance-required milestones must reference an approved pass/conditional-pass acceptance.
+- Retention held at milestone obligation time is reconciled through append-only release rows; each release creates a traceable AP/AR source record and cannot exceed outstanding retention.
+- Handover readiness reads AP/AR remaining balances and pending payment status; it snapshots those facts but never force-closes financial records.
 
 ## Cross-Domain Checks
 

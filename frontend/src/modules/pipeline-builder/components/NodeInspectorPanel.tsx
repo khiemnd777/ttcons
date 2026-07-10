@@ -98,6 +98,14 @@ export function NodeInspectorPanel({
   const canReorderSteps = stepIds.length > 1 && !stepActionPending;
   const formByVersionId = useMemo(() => new Map(workflowForms.map((form) => [String(form.version_id), form])), [workflowForms]);
   const selectedStepForm = stepForm.form_version_id ? formByVersionId.get(stepForm.form_version_id) : undefined;
+  const approvalPolicy = isRecord(nodeForm.approval_policy_json) ? nodeForm.approval_policy_json : { mode: 'none' };
+  const approvalMode = String(approvalPolicy.mode ?? 'none');
+  const approvalRoles = Array.isArray(approvalPolicy.roles) ? approvalPolicy.roles.map(String) : [];
+  const updateApprovalPolicy = (patch: Record<string, unknown>) => {
+    const next = { ...approvalPolicy, ...patch };
+    if (next.mode === 'none') onChangeField('approval_policy_json', { mode: 'none' });
+    else onChangeField('approval_policy_json', next);
+  };
 
   const resetStepDragState = () => {
     setDraggedStepId('');
@@ -180,6 +188,64 @@ export function NodeInspectorPanel({
             loading={permissionsLoading}
             onChange={(value) => onChangeField('permissions', value)}
           />
+
+          <section className="rounded-md border border-line bg-slate-50 p-3">
+            <h3 className="text-sm font-semibold text-ink">Approval policy</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Policy này được snapshot vào run và quyết định role, quorum, thứ tự duyệt.</p>
+            <div className="mt-3 space-y-3">
+              <Select
+                label="Chế độ"
+                value={approvalMode}
+                options={[
+                  { label: 'Không yêu cầu', value: 'none' },
+                  { label: 'Một trong các role', value: 'any' },
+                  { label: 'Tất cả role', value: 'all' },
+                  { label: 'Theo quorum', value: 'quorum' },
+                  { label: 'Theo thứ tự role', value: 'ordered' },
+                ]}
+                onChange={(value) => updateApprovalPolicy({ mode: value, roles: approvalRoles, quorum: Number(approvalPolicy.quorum ?? 1) || 1, requester_cannot_approve: approvalPolicy.requester_cannot_approve ?? true, comment_required: approvalPolicy.comment_required ?? true })}
+              />
+              {approvalMode !== 'none' ? (
+                <>
+                  <MultiSelect
+                    label={approvalMode === 'ordered' ? 'Thứ tự role duyệt' : 'Role được duyệt'}
+                    value={approvalRoles}
+                    options={roleOptions}
+                    emptyText="Chưa chọn role phê duyệt"
+                    loadingPlaceholder="Đang tải roles..."
+                    searchPlaceholder="Gõ để tìm role"
+                    fullPlaceholder="Đã chọn hết roles"
+                    openButtonTitle="Mở danh sách roles"
+                    noResultsText="Không tìm thấy role phù hợp"
+                    removeTitle={(role) => `Bỏ ${role}`}
+                    dropdownMode="inline"
+                    onChange={(roles) => updateApprovalPolicy({ roles, stages: undefined })}
+                  />
+                  {approvalMode === 'quorum' ? (
+                    <label className="block">
+                      <span className="text-sm font-semibold text-slate-700">Quorum</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={Math.max(1, approvalRoles.length)}
+                        className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm focus-ring"
+                        value={Number(approvalPolicy.quorum ?? 1)}
+                        onChange={(event) => updateApprovalPolicy({ quorum: Number(event.target.value) })}
+                      />
+                    </label>
+                  ) : null}
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <input type="checkbox" checked={approvalPolicy.requester_cannot_approve !== false} onChange={(event) => updateApprovalPolicy({ requester_cannot_approve: event.target.checked })} />
+                    Người gửi không được tự duyệt
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <input type="checkbox" checked={approvalPolicy.comment_required !== false} onChange={(event) => updateApprovalPolicy({ comment_required: event.target.checked })} />
+                    Bắt buộc nhập ý kiến duyệt
+                  </label>
+                </>
+              ) : null}
+            </div>
+          </section>
 
           <div className="border-t border-line pt-4">
             <div className="flex items-center justify-between gap-2">
@@ -324,6 +390,10 @@ export function NodeInspectorPanel({
 
 function sameStringArray(left: string[], right: string[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function Field({ label, value, onChange, textarea, invalid }: { label: string; value?: string; onChange: (value: string) => void; textarea?: boolean; invalid?: boolean }) {

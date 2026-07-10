@@ -136,6 +136,17 @@ func TestLegacyStepSubmitFillsChecklistPayload(t *testing.T) {
 	}
 }
 
+func TestEngineV2StepSubmitDoesNotSynthesizeLegacyChecklist(t *testing.T) {
+	item := Record{
+		"pipeline_engine_version":   2,
+		"evidence_requirement_json": map[string]any{"checklist_required": true},
+	}
+	req := withLegacyChecklistCompletion(item, WorkItemActionRequest{})
+	if hasChecklistPayload(req.CompletionPayload) {
+		t.Fatalf("engine v2 must require its exact workflow form instead of a synthetic checklist: %#v", req.CompletionPayload)
+	}
+}
+
 func TestWorkflowFormValidationNormalizesAndRejectsBadInput(t *testing.T) {
 	service := NewService(&Repository{}, "test-secret")
 	fields := []Record{
@@ -461,7 +472,7 @@ func TestActivityMentionsUnreadAndRoleScope(t *testing.T) {
 		actorStaffID, actorUserID, "mention-actor-staff-"+suffix+"@test.local", pmStaffID, pmUserID, "mention-pm-staff-"+suffix+"@test.local", outsideStaffID, outsideUserID, "mention-outside-staff-"+suffix+"@test.local")
 	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Mention Project',$2,'Client','planning')`, projectID, "MEN-"+suffix[:8])
 	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["Batch3 Reporter"]'::jsonb,true),($1,$3,'["Batch3 PM"]'::jsonb,true)`, projectID, actorStaffID, pmStaffID)
-	mustExec(t, db, `INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2),($3,$4),($5,$4)`, actorUserID, reporterRoleID, pmUserID, pmRoleID, outsideUserID, pmRoleID)
+	mustExec(t, db, `INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2),($3,$4),($5,$4)`, actorUserID, reporterRoleID, pmUserID, pmRoleID, outsideUserID)
 
 	activity, err := service.AddProjectActivity(ctx, projectID, WorkItemActivityRequest{
 		ActivityType: "question",
@@ -1904,7 +1915,7 @@ func TestBusinessCoreLifecycleServiceRecordsActors(t *testing.T) {
 		t.Fatalf("replanning approval = status %v approved_by %v", replanning["status"], replanning["approved_by"])
 	}
 
-	handover, err := service.CreateHandover(ctx, fixture.projectID, Record{"client_representative": "Client", "company_representative": "PM"}, fixture.userID, "Scoped User")
+	handover, err := service.CreateHandover(ctx, fixture.projectID, HandoverCreateRequest{ClientRepresentative: "Client", CompanyRepresentative: "PM"}, fixture.userID, "Scoped User")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2045,7 +2056,7 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 	pmRoleID := ensureRole(t, db, "pm", "PM")
 	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, pmRoleID, operationViewID)
 	mustExec(t, db, `INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, actorID, pmRoleID)
-	mustExec(t, db, `INSERT INTO pipeline_templates (id, name, status, created_by) VALUES ($1,'Ops Template','published',$2)`, templateID, actorID)
+	mustExec(t, db, `INSERT INTO pipeline_templates (id, template_family_id, revision_no, name, status, created_by) VALUES ($1,$1,1,'Ops Template','published',$2)`, templateID, actorID)
 	mustExec(t, db, `
 		INSERT INTO pipeline_template_nodes (id, template_id, name, type, order_index, responsible_role_ids)
 		VALUES ($1,$2,'Survey','survey',1,'["PM"]'::jsonb)
@@ -2164,7 +2175,7 @@ func TestStartPipelineRejectsRequiredStepWithoutPublishedWorkflowForm(t *testing
 	})
 
 	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Test Actor','active')`, actorID, "ops-start-invalid-"+actorID+"@test.local")
-	mustExec(t, db, `INSERT INTO pipeline_templates (id, name, status, created_by) VALUES ($1,'Invalid Ops Template','published',$2)`, templateID, actorID)
+	mustExec(t, db, `INSERT INTO pipeline_templates (id, template_family_id, revision_no, name, status, created_by) VALUES ($1,$1,1,'Invalid Ops Template','published',$2)`, templateID, actorID)
 	mustExec(t, db, `
 		INSERT INTO pipeline_template_nodes (id, template_id, name, type, order_index, responsible_role_ids)
 		VALUES ($1,$2,'Survey','survey',1,'["PM"]'::jsonb)
@@ -2258,6 +2269,7 @@ func TestClientOfficialWorkflowRoutesByDesignDecisionFormAnswer(t *testing.T) {
 	surveyNodeID := runNodeIDByName(t, run, "Khảo sát")
 	meetingNodeID := runNodeIDByName(t, run, "Họp báo cáo khảo sát")
 
+	satisfyRunNodeForAdvance(t, db, surveyNodeID, actorID)
 	if _, err := repo.AdvanceRunNode(ctx, surveyNodeID, actorID, "Test Actor"); err != nil {
 		t.Fatal(err)
 	}
@@ -2272,8 +2284,9 @@ func TestClientOfficialWorkflowRoutesByDesignDecisionFormAnswer(t *testing.T) {
 		WHERE project_id=$1
 			AND run_node_id=$2
 			AND form_template_id=(SELECT id FROM workflow_form_templates WHERE code='client_design_branch_decision')
-	`, projectID, meetingNodeID, actorID)
+		`, projectID, meetingNodeID, actorID)
 
+	satisfyRunNodeForAdvance(t, db, meetingNodeID, actorID)
 	if _, err := repo.AdvanceRunNode(ctx, meetingNodeID, actorID, "Test Actor"); err != nil {
 		t.Fatal(err)
 	}
@@ -2298,17 +2311,13 @@ func TestClientWorkflowAutomationRecordsBlockedBOQOnce(t *testing.T) {
 	workItemID := clientOfficialWorkItemIDByNodeName(t, db, fixture.projectID, "BOQ (Có thiết kế)")
 	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
 
-	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
-		t.Fatal(err)
-	}
-	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
-		t.Fatal(err)
-	}
+	assertValidationError(t, repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"))
+	assertValidationError(t, repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"))
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM workflow_automation_events
 		WHERE work_item_id=$1
-			AND action_key='generate_procurement_from_boq'
+			AND action_key='procurement.generate_from_boq'
 			AND status='blocked'
 			AND blocker_reason='Chưa có dòng BOQ để sinh yêu cầu mua'
 			AND run_count=2
@@ -2318,7 +2327,7 @@ func TestClientWorkflowAutomationRecordsBlockedBOQOnce(t *testing.T) {
 		FROM work_item_activities
 		WHERE work_item_id=$1
 			AND activity_type='blocker'
-			AND metadata_json->>'automation_action'='generate_procurement_from_boq'
+			AND metadata_json->>'automation_action'='procurement.generate_from_boq'
 	`, 1, workItemID)
 }
 
@@ -2335,14 +2344,14 @@ func TestClientWorkflowAutomationGeneratesProcurementIdempotently(t *testing.T) 
 			status, created_by, approved_by, expected_unit_price, norm_unit_price,
 			final_unit_price, unit_price_source, norm_price_locked, norm_price_locked_by,
 			norm_price_locked_at, final_price_locked, final_price_locked_by,
-			final_price_locked_at, price_revision_no
+			final_price_locked_at, price_revision_no, price_waiver_reason
 		)
 		VALUES (
 			$1,$2,'Vật tư','Gạch lát','m2',10,100,
 			'approved',$3,$3,100,100,
 			120,'final',true,$3,
 			now(),true,$3,
-			now(),1
+			now(),1,'UAT không áp dụng báo giá nhà cung cấp'
 		)
 	`, boqID, fixture.projectID, fixture.actorID)
 	mustExec(t, db, `
@@ -2351,10 +2360,10 @@ func TestClientWorkflowAutomationGeneratesProcurementIdempotently(t *testing.T) 
 	`, fixture.projectID, boqID, fixture.actorID)
 	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
 
-	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+	if err := repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
+	if err := repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
 		t.Fatal(err)
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_requests WHERE project_id=$1 AND status='waiting_approval'`, 1, fixture.projectID)
@@ -2363,7 +2372,7 @@ func TestClientWorkflowAutomationGeneratesProcurementIdempotently(t *testing.T) 
 		SELECT COUNT(*)
 		FROM workflow_automation_events
 		WHERE work_item_id=$1
-			AND action_key='generate_procurement_from_boq'
+			AND action_key='procurement.generate_from_boq'
 			AND status='succeeded'
 			AND target_type='procurement_request'
 			AND run_count=2
@@ -2373,7 +2382,7 @@ func TestClientWorkflowAutomationGeneratesProcurementIdempotently(t *testing.T) 
 		FROM work_item_activities
 		WHERE work_item_id=$1
 			AND activity_type='system_event'
-			AND metadata_json->>'automation_action'='generate_procurement_from_boq'
+			AND metadata_json->>'automation_action'='procurement.generate_from_boq'
 	`, 1, workItemID)
 }
 
@@ -2382,10 +2391,7 @@ func TestClientWorkflowAutomationCreatesIncomingScheduleAndInvoiceBlocker(t *tes
 	ctx := context.Background()
 	repo := NewRepository(db)
 	fixture := setupClientOfficialWorkflowFixture(t, db, 150000000)
-	workItemIDs := clientOfficialWorkItemIDsByNodeName(t, db, fixture.projectID, "Nghiệm thu Đầu Vào")
-	if len(workItemIDs) < 2 {
-		t.Fatalf("expected multiple incoming acceptance work items, got %d", len(workItemIDs))
-	}
+	workItemID := clientOfficialWorkItemIDByAction(t, db, fixture.projectID, "finance.scaffold_incoming_acceptance")
 	procurementID := newID()
 	mustExec(t, db, `
 		INSERT INTO procurement_requests (id, project_id, request_code, title, requested_by, status, total_estimated_amount)
@@ -2395,13 +2401,9 @@ func TestClientWorkflowAutomationCreatesIncomingScheduleAndInvoiceBlocker(t *tes
 		INSERT INTO procurement_request_items (request_id, quantity_planned, quantity_requested, unit, estimated_unit_price, supplier_name, approval_status)
 		VALUES ($1,1,1,'gói',75000000,'Nhà cung cấp kiểm thử','approved')
 	`, procurementID)
-	for _, workItemID := range workItemIDs {
-		mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
-		if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	firstWorkItemID := workItemIDs[0]
+	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
+	assertValidationError(t, repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"))
+	assertValidationError(t, repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"))
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM incoming_acceptance_records
@@ -2443,12 +2445,12 @@ func TestClientWorkflowAutomationCreatesIncomingScheduleAndInvoiceBlocker(t *tes
 		FROM workflow_automation_events
 		WHERE source_type='pipeline_run_node'
 			AND source_id=(SELECT run_node_id FROM work_items WHERE id=$1)
-			AND action_key='incoming_acceptance_finance_scaffold'
+			AND action_key='finance.scaffold_incoming_acceptance'
 			AND status='blocked'
 			AND target_type='payable'
 			AND blocker_reason='Cần tải lên và xác minh hóa đơn đầu vào thật'
 			AND run_count=$2
-	`, 1, firstWorkItemID, len(workItemIDs))
+	`, 1, workItemID, 2)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM work_item_activities wia
@@ -2456,8 +2458,8 @@ func TestClientWorkflowAutomationCreatesIncomingScheduleAndInvoiceBlocker(t *tes
 		WHERE wi.run_node_id=(SELECT run_node_id FROM work_items WHERE id=$1)
 			AND activity_type='blocker'
 			AND comment='Cần tải lên và xác minh hóa đơn đầu vào thật'
-			AND metadata_json->>'automation_action'='incoming_acceptance_finance_scaffold'
-	`, 1, firstWorkItemID)
+			AND metadata_json->>'automation_action'='finance.scaffold_incoming_acceptance'
+	`, 1, workItemID)
 }
 
 func TestClientWorkflowAutomationCreatesOutgoingAcceptanceAndReceivableDrafts(t *testing.T) {
@@ -2465,17 +2467,9 @@ func TestClientWorkflowAutomationCreatesOutgoingAcceptanceAndReceivableDrafts(t 
 	ctx := context.Background()
 	repo := NewRepository(db)
 	fixture := setupClientOfficialWorkflowFixture(t, db, 180000000)
-	workItemIDs := clientOfficialWorkItemIDsByNodeName(t, db, fixture.projectID, "Nghiệm thu Đầu Ra")
-	if len(workItemIDs) < 2 {
-		t.Fatalf("expected multiple outgoing acceptance work items, got %d", len(workItemIDs))
-	}
-	for _, workItemID := range workItemIDs {
-		mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
-		if err := repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	firstWorkItemID := workItemIDs[0]
+	workItemID := clientOfficialWorkItemIDByAction(t, db, fixture.projectID, "finance.scaffold_outgoing_acceptance")
+	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
+	assertValidationError(t, repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"))
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM acceptance_records
@@ -2484,7 +2478,7 @@ func TestClientWorkflowAutomationCreatesOutgoingAcceptanceAndReceivableDrafts(t 
 			AND type='final'
 			AND status='draft'
 			AND summary_json->>'automation_scaffold'='true'
-	`, 1, fixture.projectID, firstWorkItemID)
+	`, 1, fixture.projectID, workItemID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM receivables rec
@@ -2495,7 +2489,7 @@ func TestClientWorkflowAutomationCreatesOutgoingAcceptanceAndReceivableDrafts(t 
 			AND rec.status='draft'
 			AND rec.gross_amount=180000000
 			AND rec.remaining_amount=180000000
-	`, 1, fixture.projectID, firstWorkItemID)
+	`, 1, fixture.projectID, workItemID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM receivable_payment_schedules rps
@@ -2508,7 +2502,7 @@ func TestClientWorkflowAutomationCreatesOutgoingAcceptanceAndReceivableDrafts(t 
 			AND rps.status='draft'
 			AND rps.planned_amount=180000000
 			AND rps.remaining_amount=180000000
-	`, 1, fixture.projectID, firstWorkItemID)
+	`, 1, fixture.projectID, workItemID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM output_invoices oi
@@ -2516,18 +2510,18 @@ func TestClientWorkflowAutomationCreatesOutgoingAcceptanceAndReceivableDrafts(t 
 		JOIN acceptance_records acc ON acc.id=rec.source_id
 		WHERE acc.project_id=$1
 			AND acc.node_id=(SELECT run_node_id FROM work_items WHERE id=$2)
-	`, 0, fixture.projectID, firstWorkItemID)
+	`, 0, fixture.projectID, workItemID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM workflow_automation_events
 		WHERE source_type='pipeline_run_node'
 			AND source_id=(SELECT run_node_id FROM work_items WHERE id=$1)
-			AND action_key='outgoing_acceptance_finance_scaffold'
+			AND action_key='finance.scaffold_outgoing_acceptance'
 			AND status='blocked'
 			AND target_type='receivable'
 			AND blocker_reason='Cần tải lên và phát hành hóa đơn đầu ra thật'
 			AND run_count=$2
-	`, 1, firstWorkItemID, len(workItemIDs))
+	`, 1, workItemID, 1)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM work_item_activities wia
@@ -2535,8 +2529,8 @@ func TestClientWorkflowAutomationCreatesOutgoingAcceptanceAndReceivableDrafts(t 
 		WHERE wi.run_node_id=(SELECT run_node_id FROM work_items WHERE id=$1)
 			AND activity_type='blocker'
 			AND comment='Cần tải lên và phát hành hóa đơn đầu ra thật'
-			AND metadata_json->>'automation_action'='outgoing_acceptance_finance_scaffold'
-	`, 1, firstWorkItemID)
+			AND metadata_json->>'automation_action'='finance.scaffold_outgoing_acceptance'
+	`, 1, workItemID)
 }
 
 func TestWorkflowFormAnswerValueMatches(t *testing.T) {
@@ -2691,7 +2685,7 @@ func TestPublishTemplateRejectsRequiredStepWithoutPublishedForm(t *testing.T) {
 	})
 
 	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Test Actor','active')`, actorID, "ops-publish-"+actorID+"@test.local")
-	mustExec(t, db, `INSERT INTO pipeline_templates (id, name, status, created_by) VALUES ($1,'Invalid Form Template','draft',$2)`, templateID, actorID)
+	mustExec(t, db, `INSERT INTO pipeline_templates (id, template_family_id, revision_no, name, status, created_by) VALUES ($1,$1,1,'Invalid Form Template','draft',$2)`, templateID, actorID)
 	mustExec(t, db, `
 		INSERT INTO pipeline_template_nodes (id, template_id, name, type, order_index, responsible_role_ids)
 		VALUES ($1,$2,'Survey','survey',1,'["PM"]'::jsonb)
@@ -2757,6 +2751,339 @@ func TestGenerateProcurementFromBOQRequiresFinalLockedApprovedItems(t *testing.T
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND boq_item_id=$2`, 1, requestID, approvedBOQID)
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND boq_item_id=$2`, 0, requestID, submittedBOQID)
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND boq_item_id=$2 AND estimated_unit_price=12 AND boq_price_source='final' AND boq_price_revision_no=2 AND boq_price_event_id IS NOT NULL`, 1, requestID, approvedBOQID)
+}
+
+func TestSupplierQuotationSelectionLocksBOQAndSnapshotsProcurement(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+
+	actorID := newID()
+	projectID := newID()
+	partnerID := newID()
+	boqID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM partners WHERE id=$1`, partnerID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Commercial Actor','active')`, actorID, "quote-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Quotation Project',$2,'Client','planning')`, projectID, "QT-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO partners (id, partner_code, name, partner_types, active) VALUES ($1,$2,'Qualified Supplier','["supplier"]'::jsonb,true)`, partnerID, "SUP-"+partnerID[:8])
+	mustExec(t, db, `
+		INSERT INTO boq_items (id, project_id, category, work_item_name, unit, quantity, unit_price, expected_unit_price, status, created_by)
+		VALUES ($1,$2,'A','Concrete supply','m3',10,100,100,'approved',$3)
+	`, boqID, projectID, actorID)
+	if _, err := repo.LockBOQNormUnitPrice(ctx, boqID, 105, "Approved norm", actorID, "commercial@test.local"); err != nil {
+		t.Fatal(err)
+	}
+
+	quotation, err := service.SaveSupplierQuotation(ctx, projectID, "", SupplierQuotationRequest{
+		QuotationCode:     "BG-TEST-001",
+		SupplierPartnerID: partnerID,
+		QuotationDate:     time.Now().Format("2006-01-02"),
+		ValidUntil:        time.Now().AddDate(0, 1, 0).Format("2006-01-02"),
+		Currency:          "VND",
+		PaymentTermsDays:  30,
+		Items: []SupplierQuotationItemRequest{{
+			BOQItemID: boqID, Quantity: 10, UnitPrice: 102, ComplianceStatus: "compliant",
+		}},
+	}, actorID, "commercial@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	quotationID := cleanID(quotation["id"])
+	quotation, err = service.SubmitSupplierQuotation(ctx, quotationID, actorID, "commercial@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	quotation, err = service.QualifySupplierQuotation(ctx, quotationID, SupplierQuotationQualificationRequest{
+		TechnicalStatus: "compliant", CommercialStatus: "compliant", Comment: "Đạt yêu cầu kỹ thuật và thương mại",
+	}, actorID, "commercial@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := quotation["items"].([]Record)
+	if len(items) != 1 {
+		t.Fatalf("quotation items = %d, want 1", len(items))
+	}
+	quotationItemID := cleanID(items[0]["id"])
+	boq, err := service.SelectSupplierQuote(ctx, quotationItemID, SupplierQuoteSelectionRequest{DecisionReason: "Giá tốt nhất trong các hồ sơ đạt kỹ thuật"}, actorID, "commercial@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !boolValue(boq["final_price_locked"]) || number(boq["final_unit_price"]) != 102 || cleanID(boq["selected_quotation_item_id"]) != quotationItemID {
+		t.Fatalf("selected BOQ snapshot = %#v", boq)
+	}
+
+	procurement, err := repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, "commercial@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestID := cleanID(procurement["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM procurement_requests WHERE id=$1 AND supplier_partner_id=$2 AND status='waiting_approval'`, 1, requestID, partnerID)
+	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND supplier_quotation_item_id=$2 AND quoted_unit_price=102 AND supplier_partner_id=$3`, 1, requestID, quotationItemID, partnerID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='supplier_quote_selected' AND target_id=$2`, 1, projectID, boqID)
+}
+
+func TestContractLifecycleCreatesVersionedObligationsVariationAndRetention(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	actorID := newID()
+	projectID := newID()
+	partnerID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM partners WHERE id=$1`, partnerID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Contract Actor','active')`, actorID, "contract-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status) VALUES ($1,'Contract Project',$2,'Client','planning')`, projectID, "CT-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO partners (id,partner_code,name,partner_types,active) VALUES ($1,$2,'Contract Client','["client"]'::jsonb,true)`, partnerID, "CLI-"+partnerID[:8])
+
+	contract, err := service.SaveContract(ctx, projectID, "", ContractRequest{
+		ContractCode: "HD-001", Title: "Hợp đồng thi công chính", ContractType: "main_client", Direction: "receivable",
+		CounterpartyPartnerID: partnerID, Currency: "VND", OriginalAmount: 1000000, AdvancePercent: 10,
+		RetentionPercent: 5, WarrantyDays: 0, EffectiveDate: time.Now().Format("2006-01-02"),
+	}, actorID, "contract@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	contractID := cleanID(contract["id"])
+	contract, err = service.CreateContractVersion(ctx, contractID, ContractVersionRequest{
+		VersionLabel: "Hợp đồng gốc", Amount: 1000000, ScopeSummary: "Thi công hoàn thiện", CommercialTerms: Record{"currency": "VND"}, PaymentTerms: Record{"advance_percent": 10},
+	}, actorID, "contract@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	versions := contract["versions"].([]Record)
+	versionID := cleanID(versions[0]["id"])
+	if _, err = service.ContractVersionAction(ctx, versionID, "submit", "Gửi review", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.ContractVersionAction(ctx, versionID, "approve", "Đã kiểm tra pháp lý và thương mại", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.ContractVersionAction(ctx, versionID, "sign", "Hai bên đã ký", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	contract, err = service.ActivateContract(ctx, contractID, "Kích hoạt hợp đồng", actorID, "contract@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contract["status"] != "active" || number(contract["current_amount"]) != 1000000 {
+		t.Fatalf("active contract = %#v", contract)
+	}
+
+	contract, err = service.CreateContractMilestone(ctx, contractID, ContractMilestoneRequest{
+		MilestoneCode: "M01", MilestoneName: "Thanh toán đợt 1", SequenceNo: 1, MilestoneType: "progress",
+		AmountBasis: "percentage", Percentage: 10, RetentionPercent: 5, PlannedDate: time.Now().Format("2006-01-02"), DueDays: 7,
+	}, actorID, "contract@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	milestones := contract["milestones"].([]Record)
+	milestoneID := cleanID(milestones[0]["id"])
+	if _, err = service.ContractMilestoneAction(ctx, milestoneID, "eligible", "Đủ điều kiện theo tiến độ", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	contract, err = service.ContractMilestoneAction(ctx, milestoneID, "open-obligation", "Mở phải thu", actorID, "contract@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM receivables WHERE project_id=$1 AND source_type='contract_milestone' AND source_id=$2 AND gross_amount=95000 AND remaining_amount=95000`, 1, projectID, milestoneID)
+	assertCount(t, db, `SELECT COUNT(*) FROM contract_retentions WHERE contract_id=$1 AND source_milestone_id=$2 AND held_amount=5000 AND outstanding_amount=5000`, 1, contractID, milestoneID)
+
+	contract, err = service.CreateContractVariation(ctx, contractID, ContractVariationRequest{
+		VariationCode: "PL-01", Title: "Bổ sung phạm vi", VariationType: "mixed", Reason: "Chủ đầu tư yêu cầu bổ sung",
+		AmountDelta: 100000, DaysDelta: 5, ScopeDelta: "Bổ sung khu vực sảnh",
+	}, actorID, "contract@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	variations := contract["variations"].([]Record)
+	variationID := cleanID(variations[0]["id"])
+	if _, err = service.ContractVariationAction(ctx, variationID, "submit", "Gửi duyệt phụ lục", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.ContractVariationAction(ctx, variationID, "approve", "Duyệt giá trị và tiến độ", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	contract, err = service.ContractVariationAction(ctx, variationID, "incorporate", "Tạo version phụ lục", actorID, "contract@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	versions = contract["versions"].([]Record)
+	if number(versions[0]["amount"]) != 1100000 || versions[0]["status"] != "draft" || cleanID(versions[0]["source_variation_id"]) != variationID {
+		t.Fatalf("variation version = %#v", versions[0])
+	}
+	newVersionID := cleanID(versions[0]["id"])
+	if _, err = service.ContractVersionAction(ctx, newVersionID, "submit", "Gửi review V2", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.ContractVersionAction(ctx, newVersionID, "approve", "Duyệt V2", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.ContractVersionAction(ctx, newVersionID, "sign", "Ký V2", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.ActivateContract(ctx, contractID, "Kích hoạt V2", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM projects WHERE id=$1 AND contract_amount=1100000`, 1, projectID)
+
+	retentions := contract["retentions"].([]Record)
+	retentionID := cleanID(retentions[0]["id"])
+	if _, err = service.ReleaseContractRetention(ctx, retentionID, ContractRetentionReleaseRequest{Amount: 5000, DueDate: time.Now().Format("2006-01-02"), Comment: "Hết bảo hành"}, actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM contract_retentions WHERE id=$1 AND status='released' AND outstanding_amount=0`, 1, retentionID)
+	assertCount(t, db, `SELECT COUNT(*) FROM receivables WHERE project_id=$1 AND source_type='contract_retention' AND source_id=$2 AND gross_amount=5000`, 1, projectID, retentionID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='contract_variation_incorporated'`, 1, projectID)
+}
+
+func TestQualityITPRFINCRReinspectionAndRecurringLifecycle(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	requestEvidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo", Name: "Ảnh trước kiểm tra", FileURL: "/evidence/quality-request.jpg", Visibility: "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inspectionEvidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo", Name: "Ảnh inspection fail", FileURL: "/evidence/quality-fail.jpg", Visibility: "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	correctiveEvidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo", Name: "Ảnh corrective", FileURL: "/evidence/quality-corrective.jpg", Visibility: "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	passEvidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo", Name: "Ảnh tái kiểm tra đạt", FileURL: "/evidence/quality-pass.jpg", Visibility: "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	workspace, err := service.CreateQualityITP(ctx, fixture.projectID, QualityITPRequest{
+		ITPCode: "ITP-MEP-01", Title: "ITP lắp đặt MEP", Discipline: "MEP", WorkPackage: "Điện âm trần",
+		Items: []QualityITPItemRequest{{SequenceNo: 1, ActivityName: "Kiểm tra tuyến ống", InspectionStage: "Trước khi đóng trần", AcceptanceCriteria: "Đúng bản vẽ và cao độ", InspectionMethod: "Đo và kiểm tra trực quan", ControlPoint: "hold", FrequencyType: "each_lot", FrequencyValue: 1, ResponsibleRole: "QA/QC", EvidenceRequired: true, ClientWitnessRequired: true}},
+	}, fixture.pmID, "PM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	itps := workspace["itp_plans"].([]Record)
+	itpID := cleanID(itps[0]["id"])
+	itpItems := itps[0]["items"].([]Record)
+	itpItemID := cleanID(itpItems[0]["id"])
+	if _, err = service.QualityITPAction(ctx, itpID, "submit", "Gửi review", fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.QualityITPAction(ctx, itpID, "approve", "Đã review tiêu chí", fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.QualityITPAction(ctx, itpID, "activate", "Áp dụng tại hiện trường", fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+
+	workspace, err = service.CreateQualityInspectionRequest(ctx, fixture.projectID, QualityInspectionRequest{
+		RFICode: "RFI-001", ITPItemID: itpItemID, WorkItemID: fixture.itemID, Location: "Tầng 2 trục A", LotReference: "LOT-MEP-01",
+		RequestedInspectionAt: time.Now().Add(time.Hour).UTC().Format(time.RFC3339), RequestComment: "Mời kiểm tra trước đóng trần", RequestEvidenceID: cleanID(requestEvidence["id"]),
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rfis := workspace["inspection_requests"].([]Record)
+	rfiID := cleanID(rfis[0]["id"])
+	if _, err = service.QualityInspectionAction(ctx, rfiID, "submit", QualityInspectionDecisionRequest{}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	workspace, err = service.QualityInspectionAction(ctx, rfiID, "inspect", QualityInspectionDecisionRequest{Result: "fail", Comment: "Sai cao độ tuyến ống", InspectionEvidenceID: cleanID(inspectionEvidence["id"])}, fixture.pmID, "PM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ncrs := workspace["ncrs"].([]Record)
+	if len(ncrs) != 1 || ncrs[0]["status"] != "open" || cleanID(ncrs[0]["rework_request_id"]) == "" {
+		t.Fatalf("auto NCR = %#v", ncrs)
+	}
+	ncrID := cleanID(ncrs[0]["id"])
+	reworkID := cleanID(ncrs[0]["rework_request_id"])
+	if _, err = service.QualityNCRAction(ctx, ncrID, "root-cause", QualityNCRActionRequest{RootCause: "Sai mốc chuẩn", PreventiveAction: "Bổ sung checklist cao độ"}, fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.QualityNCRAction(ctx, ncrID, "corrective", QualityNCRActionRequest{CorrectiveAction: "Tháo và lắp lại tuyến ống", CorrectiveEvidenceID: cleanID(correctiveEvidence["id"])}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	workspace, err = service.CreateQualityInspectionRequest(ctx, fixture.projectID, QualityInspectionRequest{
+		RFICode: "RFI-002", ITPItemID: itpItemID, WorkItemID: fixture.itemID, Location: "Tầng 2 trục A", LotReference: "LOT-MEP-01-RE",
+		RequestedInspectionAt: time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339), RequestComment: "Tái kiểm tra sau rework", RequestEvidenceID: cleanID(correctiveEvidence["id"]),
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rfis = workspace["inspection_requests"].([]Record)
+	var reinspectionID string
+	for _, row := range rfis {
+		if row["rfi_code"] == "RFI-002" {
+			reinspectionID = cleanID(row["id"])
+		}
+	}
+	if _, err = service.QualityInspectionAction(ctx, reinspectionID, "submit", QualityInspectionDecisionRequest{}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.QualityInspectionAction(ctx, reinspectionID, "inspect", QualityInspectionDecisionRequest{Result: "pass", Comment: "Đạt sau rework", InspectionEvidenceID: cleanID(passEvidence["id"])}, fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.QualityNCRAction(ctx, ncrID, "reinspection", QualityNCRActionRequest{ReinspectionRFIID: reinspectionID}, fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.UpdateReworkStatus(ctx, reworkID, "approved", fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.UpdateReworkStatus(ctx, reworkID, "done", fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.QualityNCRAction(ctx, ncrID, "close", QualityNCRActionRequest{Comment: "Đã tái kiểm tra đạt và đóng NCR"}, fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+
+	workspace, err = service.CreateRecurringPlan(ctx, fixture.projectID, ConstructionRecurringPlanRequest{
+		PlanCode: "QA-DAILY-01", Title: "QA walkdown hằng ngày", Description: "Kiểm tra hiện trường cuối ngày", RecurrenceType: "daily", IntervalValue: 1,
+		StartDate: time.Now().Format("2006-01-02"), EndDate: time.Now().AddDate(0, 0, 1).Format("2006-01-02"), ResponsibleRole: "QA/QC", AssignedUserID: fixture.pmID, EvidenceRequired: true, SourceWorkItemID: fixture.itemID,
+	}, fixture.pmID, "PM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plans := workspace["recurring_plans"].([]Record)
+	planID := cleanID(plans[0]["id"])
+	workspace, err = service.GenerateRecurringOccurrences(ctx, planID, time.Now().AddDate(0, 0, 1).Format("2006-01-02"), fixture.pmID, "PM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	occurrences := workspace["recurring_occurrences"].([]Record)
+	if len(occurrences) != 2 {
+		t.Fatalf("occurrences = %d, want 2", len(occurrences))
+	}
+	if _, err = service.RecurringOccurrenceAction(ctx, cleanID(occurrences[0]["id"]), "complete", ConstructionRecurringOccurrenceRequest{Comment: "Đã walkdown", EvidenceID: cleanID(passEvidence["id"])}, fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM quality_ncrs WHERE id=$1 AND status='closed'`, 1, ncrID)
+	assertCount(t, db, `SELECT COUNT(*) FROM rework_requests WHERE id=$1 AND status='done'`, 1, reworkID)
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_recurring_occurrences WHERE plan_id=$1 AND status='completed'`, 1, planID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('quality_itp_activated','quality_rfi_inspected','quality_ncr_created','quality_ncr_closed','recurring_occurrences_generated','recurring_occurrence_completed')`, 7, fixture.projectID)
 }
 
 func TestBatch7StockMovementGuardsWarehouseAndSiteBalances(t *testing.T) {
@@ -2852,8 +3179,8 @@ func TestBatch7StockMovementGuardsWarehouseAndSiteBalances(t *testing.T) {
 	if err := db.QueryRowContext(ctx, `SELECT issued_quantity::float8, surplus_quantity::float8, surplus_status FROM site_material_balances WHERE project_id=$1 AND material_id=$2`, projectID, materialID).Scan(&issued, &surplus, &surplusStatus); err != nil {
 		t.Fatal(err)
 	}
-	if issued != 1 || surplus != 1 || surplusStatus != "handled" {
-		t.Fatalf("site balance = issued %.3f surplus %.3f status %s, want 1/1/handled", issued, surplus, surplusStatus)
+	if issued != 1 || surplus != 1 || surplusStatus != "partial" {
+		t.Fatalf("site balance = issued %.3f surplus %.3f status %s, want 1/1/partial", issued, surplus, surplusStatus)
 	}
 	if err := db.QueryRowContext(ctx, `
 		SELECT COALESCE(SUM(CASE
@@ -2940,9 +3267,9 @@ func TestBatch7HandoverBlockedAuditIncludesAccountingBlockers(t *testing.T) {
 	`, acceptanceID, projectID, actorID)
 	mustExec(t, db, `
 		INSERT INTO handover_records
-			(id, project_id, status, final_acceptance_id, documents_ready, warehouse_closed, payables_recorded, receivables_recorded, created_by)
-		VALUES ($1,$2,'draft',$3,true,true,true,true,$4)
-	`, handoverID, projectID, acceptanceID, actorID)
+			(id, project_id, handover_code, status, final_acceptance_id, documents_ready, warehouse_closed, payables_recorded, receivables_recorded, created_by)
+		VALUES ($1,$2,$3,'submitted',$4,true,true,true,true,$5)
+	`, handoverID, projectID, "HO-B7-"+handoverID[:8], acceptanceID, actorID)
 	mustExec(t, db, `
 		INSERT INTO payables (id, project_id, payable_code, vendor_type, vendor_name, source_type, gross_amount, paid_amount, remaining_amount, status, created_by)
 		VALUES ($1,$2,$3,'supplier','Batch7 Supplier','manual',100,0,100,'approved',$4)
@@ -3036,6 +3363,49 @@ func TestBatch7AccountingActionsRequireApprovalBeforeSettlement(t *testing.T) {
 		t.Fatalf("payment = status %v approved_by %v paid_at %v, want approved actor paid_at", payment["status"], payment["approved_by"], payment["paid_at"])
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('payable_approved','payable_paid','receivable_approved','receivable_received','payment_approved')`, 5, projectID)
+}
+
+func TestFinancialCreationIgnoresClientDerivedStateAndAuditsActor(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupProjectScopeFixture(t, db, []string{"accounting.payable_approve", "accounting.receivable_approve", "accounting.payment_create"})
+	suffix := strings.ToUpper(strings.ReplaceAll(newID(), "-", ""))[:8]
+
+	payable, err := service.CreatePayable(ctx, PayableCreateRequest{
+		ProjectID: fixture.projectID, PayableCode: "PAY-HARD-" + suffix, VendorType: "supplier", VendorName: "Nhà cung cấp hardening",
+		GrossAmount: 1000, AdvanceAmount: 100, DeductionAmount: 50, RetentionAmount: 25,
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payable["status"] != "draft" || number(payable["paid_amount"]) != 0 || number(payable["remaining_amount"]) != 850 {
+		t.Fatalf("payable derived state = status %v paid %v remaining %v, want draft/0/850", payable["status"], payable["paid_amount"], payable["remaining_amount"])
+	}
+
+	receivable, err := service.CreateReceivable(ctx, ReceivableCreateRequest{
+		ProjectID: fixture.projectID, ReceivableCode: "REC-HARD-" + suffix, ClientName: "Chủ đầu tư hardening",
+		ContractAmount: 2000, MilestoneName: "Đợt 1", GrossAmount: 600,
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receivable["status"] != "draft" || number(receivable["received_amount"]) != 0 || number(receivable["remaining_amount"]) != 600 {
+		t.Fatalf("receivable derived state = status %v received %v remaining %v, want draft/0/600", receivable["status"], receivable["received_amount"], receivable["remaining_amount"])
+	}
+
+	payment, err := service.CreatePayment(ctx, Record{
+		"project_id": fixture.projectID, "payment_code": "PMT-HARD-" + suffix, "payment_type": "other",
+		"amount": 200, "payment_method": "bank_transfer", "status": "approved", "approved_by": fixture.userID,
+	}, fixture.userID, "Scoped User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payment["status"] != "draft" || payment["approved_by"] != nil {
+		t.Fatalf("payment client state leaked = status %v approved_by %v, want draft/nil", payment["status"], payment["approved_by"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND actor_id=$2 AND event_type IN ('payable_created','receivable_created','payment_created')`, 3, fixture.projectID, fixture.userID)
 }
 
 func TestInputPaymentScheduleAdvanceAndPartialPaymentReconcilePayable(t *testing.T) {
@@ -3658,7 +4028,13 @@ func TestWorkflowFormSubmitSatisfiesChecklistGate(t *testing.T) {
 		SET evidence_requirement_json='{"required_permission":"operation.report","checklist_required":true}'::jsonb
 		WHERE id=$1
 	`, fixture.itemID)
-	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "checklist", true)
+	var formVersionID string
+	err := db.QueryRowContext(ctx, `
+		SELECT v.id FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE t.code='builtin_checklist' AND t.status='active' AND v.status='published'
+		ORDER BY v.version_no DESC LIMIT 1
+	`).Scan(&formVersionID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3680,8 +4056,13 @@ func TestWorkflowFormSubmitSatisfiesChecklistGate(t *testing.T) {
 
 	form, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{
 		Answers: Record{
-			"items_done": "Đã kiểm tra checklist",
-			"confirmed":  true,
+			"check_date":     "2026-07-10",
+			"checked_by":     "Worker",
+			"planning_scope": "other",
+			"checklist_items": []any{
+				map[string]any{"title": "Đã kiểm tra checklist", "assignee_role": "PM", "status": "done", "comment": "Đạt"},
+			},
+			"confirmed": true,
 		},
 		Comment: "Hoàn tất checklist form",
 	}, fixture.workerID, "Worker")
@@ -3692,7 +4073,7 @@ func TestWorkflowFormSubmitSatisfiesChecklistGate(t *testing.T) {
 	if instance["status"] != "submitted" {
 		t.Fatalf("form status = %#v", instance["status"])
 	}
-	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1`, 2, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1`, 5, instanceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='submitted'`, 1, instanceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_type='workflow_form_instance' AND target_id=$1`, 1, instanceID)
 
@@ -3852,14 +4233,14 @@ func TestPlanningDailyReportSubmitCreatesNextPlanWorkItems(t *testing.T) {
 		WHERE wi.source_type='workflow_form_action_item'
 		  AND wi.source_id=$1
 		  AND wia.activity_type='created'
-		  AND wia.comment='Next plan item generated from planning daily report'
+		  AND wia.comment='Đầu việc kế hoạch tiếp theo được sinh từ nhật ký kế hoạch'
 	`, 1, instanceID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM work_item_activities
 		WHERE work_item_id=$1
 		  AND activity_type='system_event'
-		  AND comment='Planning daily report generated 1 next plan work items'
+		  AND comment='Nhật ký kế hoạch đã sinh 1 đầu việc kế hoạch tiếp theo'
 	`, 1, fixture.itemID)
 }
 
@@ -4008,6 +4389,22 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='completed_items' AND value_json->0->>'actual_quantity'='24.5'`, 1, instanceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='material_usage_items' AND value_json->0->>'source'='site_balance'`, 1, instanceID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM operation_daily_reports
+		WHERE project_id=$1
+		  AND workflow_form_instance_id=$2
+		  AND work_item_id=$3
+		  AND report_date='2026-07-12'
+		  AND reported_by=$4
+		  AND progress_percent=42
+		  AND primary_evidence_id=$5
+		  AND work_summary='Xây tường trục A'
+		  AND manpower_summary='8 nhân sự / 1 đội'
+		  AND material_usage_summary='Xi măng'
+		  AND issues_summary='Cần bổ sung xi măng trước ca chiều'
+		  AND structured_json->'completed_items'->0->>'actual_quantity'='24.5'
+	`, 1, fixture.projectID, instanceID, fixture.itemID, fixture.workerID, evidenceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='workflow_form_action_item' AND source_id=$2`, 1, fixture.projectID, instanceID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
@@ -4016,7 +4413,7 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 		WHERE wi.source_type='workflow_form_action_item'
 		  AND wi.source_id=$1
 		  AND wia.activity_type='created'
-		  AND wia.comment='Next plan item generated from construction daily report'
+		  AND wia.comment='Đầu việc kế hoạch tiếp theo được sinh từ nhật ký thi công'
 		  AND wia.metadata_json->>'source'='construction_daily_report'
 		  AND wia.metadata_json->>'construction_scope'='civil'
 	`, 1, instanceID)
@@ -4025,7 +4422,7 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 		FROM work_item_activities
 		WHERE work_item_id=$1
 		  AND activity_type='system_event'
-		  AND comment='Construction daily report generated 1 next plan work items'
+		  AND comment='Nhật ký thi công đã sinh 1 đầu việc kế hoạch tiếp theo'
 		  AND metadata_json->>'source'='construction_daily_report'
 	`, 1, fixture.itemID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND completion_payload_json->'workflow_form_answers'->'material_usage_items'->0->>'source'='site_balance'`, 1, fixture.itemID)
@@ -5156,7 +5553,6 @@ func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
 	service := NewService(repo, "test-secret")
 	fixture := setupWorkItemFlowFixture(t, db, false)
 
-	handoverID := newID()
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM handover_records WHERE project_id=$1`, fixture.projectID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM rework_requests WHERE project_id=$1`, fixture.projectID)
@@ -5269,18 +5665,46 @@ func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
 	}
 
 	mustExec(t, db, `UPDATE issues SET status='closed' WHERE project_id=$1`, fixture.projectID)
-	mustExec(t, db, `
-		INSERT INTO handover_records
-			(id, project_id, status, final_acceptance_id, documents_ready, warehouse_closed, payables_recorded, receivables_recorded, created_by)
-		VALUES ($1,$2,'draft',$3,true,true,true,true,$4)
-	`, handoverID, fixture.projectID, finalPassed["id"], fixture.workerID)
-	check, err := repo.HandoverCheck(ctx, handoverID)
+	if _, err := service.UpdateReworkStatus(ctx, cleanID(rework["id"]), "done", fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	acceptedEvidence, err := service.EvidenceAction(ctx, evidenceID, "accept", ActionRequest{Comment: "Dùng cho hồ sơ bàn giao"}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handover, err := service.CreateHandover(ctx, fixture.projectID, HandoverCreateRequest{
+		FinalAcceptanceID: cleanID(finalPassed["id"]), ClientRepresentative: "Owner rep", CompanyRepresentative: "Contractor rep",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handoverID := cleanID(handover["id"])
+	for _, raw := range handover["checklist_items"].([]Record) {
+		if raw["source_type"] == nil || strings.TrimSpace(fmt.Sprint(raw["source_type"])) == "" {
+			if _, err := repo.UpdateHandoverChecklistItem(ctx, cleanID(raw["id"]), Record{"status": "verified", "evidence_id": acceptedEvidence["id"]}, fixture.workerID, "Worker"); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if _, err := repo.SubmitHandover(ctx, handoverID, ActionRequest{Comment: "Gửi kiểm tra"}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	check, err := repo.HandoverCheck(ctx, handoverID, fixture.workerID, "Worker")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if ready, ok := check["ready"].(bool); !ok || !ready {
 		t.Fatalf("handover ready = %#v, blockers = %#v, want ready", check["ready"], check["blockers"])
 	}
+	completed, err := repo.CompleteHandover(ctx, handoverID, ActionRequest{Comment: "Hai bên xác nhận bàn giao"}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed["status"] != "handed_over" || completed["completed_at"] == nil {
+		t.Fatalf("handover completion = status %v completed_at %v, want handed_over timestamp", completed["status"], completed["completed_at"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM handover_checklist_items WHERE handover_id=$1 AND required AND status='verified'`, 8, handoverID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('handover_submitted','handover_ready','handover_completed')`, 4, fixture.projectID)
 	assertCount(t, db, `SELECT COUNT(*) FROM acceptance_records WHERE project_id=$1 AND type='final' AND status='completed' AND result='pass'`, 1, fixture.projectID)
 }
 
@@ -5289,6 +5713,7 @@ func TestWorkflowFormSignatureRequiresSubmittedFormAndIsImmutable(t *testing.T) 
 	ctx := context.Background()
 	repo := NewRepository(db)
 	service := NewService(repo, "test-secret")
+	service.ConfigureUploads(t.TempDir(), 1024*1024)
 	fixture := setupWorkItemFlowFixture(t, db, false)
 
 	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "task", false)
@@ -5598,6 +6023,42 @@ func clientOfficialWorkItemIDByNodeName(t *testing.T, db *sql.DB, projectID, nod
 		t.Fatal(err)
 	}
 	return workItemID
+}
+
+func clientOfficialWorkItemIDByAction(t *testing.T, db *sql.DB, projectID, actionKey string) string {
+	t.Helper()
+	var workItemID string
+	if err := db.QueryRowContext(context.Background(), `
+		SELECT wi.id::text
+		FROM work_items wi
+		JOIN pipeline_run_steps rs ON rs.id=wi.run_step_id
+		WHERE wi.project_id=$1 AND rs.domain_action_key=$2
+		ORDER BY wi.created_at,wi.id
+		LIMIT 1
+	`, projectID, actionKey).Scan(&workItemID); err != nil {
+		t.Fatal(err)
+	}
+	return workItemID
+}
+
+func satisfyRunNodeForAdvance(t *testing.T, db *sql.DB, runNodeID, actorID string) {
+	t.Helper()
+	ctx := context.Background()
+	mustExec(t, db, `
+		UPDATE workflow_form_instances
+		SET status='submitted',current_revision=GREATEST(current_revision,1),submitted_by=$2,submitted_at=COALESCE(submitted_at,now()),updated_at=now()
+		WHERE run_node_id=$1 AND status <> 'cancelled'
+	`, runNodeID, actorID)
+	mustExec(t, db, `UPDATE pipeline_run_steps SET status='completed',submitted_by=$2,submitted_at=COALESCE(submitted_at,now()) WHERE run_node_id=$1`, runNodeID, actorID)
+	mustExec(t, db, `UPDATE work_items SET status='completed',completed_at=COALESCE(completed_at,now()),updated_at=now() WHERE run_node_id=$1`, runNodeID)
+	var projectID string
+	if err := db.QueryRowContext(ctx, `SELECT project_id::text FROM pipeline_run_nodes WHERE id=$1`, runNodeID).Scan(&projectID); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, `
+		INSERT INTO approval_requests (target_type,target_id,project_id,requested_by,status,reason,required_roles,resolved_at)
+		VALUES ('pipeline_run_node',$1,$2,$3,'approved','UAT fixture đã duyệt node','[]'::jsonb,now())
+	`, runNodeID, projectID, actorID)
 }
 
 func clientOfficialWorkItemIDsByNodeName(t *testing.T, db *sql.DB, projectID, nodeName string) []string {

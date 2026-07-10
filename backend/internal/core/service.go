@@ -433,17 +433,58 @@ func (s *Service) ProjectHandover(ctx context.Context, projectID string) ([]Reco
 	return s.repo.ListProjectHandover(ctx, cleanID(projectID))
 }
 
-func (s *Service) CreateHandover(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
-	body["project_id"] = cleanID(projectID)
-	if cleanID(body["created_by"]) == "" {
-		body["created_by"] = actorID
+func (s *Service) HandoverOptions(ctx context.Context, projectID string) (Record, error) {
+	return s.repo.HandoverOptions(ctx, cleanID(projectID))
+}
+
+func (s *Service) CreateHandover(ctx context.Context, projectID string, req HandoverCreateRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	if !validActivityUUID(projectID) {
+		return nil, validationError("project_id không hợp lệ", Record{"project_id": projectID})
 	}
-	row, err := s.repo.CreateHandover(ctx, body)
+	clientRepresentative := strings.TrimSpace(req.ClientRepresentative)
+	companyRepresentative := strings.TrimSpace(req.CompanyRepresentative)
+	if clientRepresentative == "" || companyRepresentative == "" {
+		return nil, validationError("Hồ sơ bàn giao cần đại diện hai bên", Record{"client_representative": clientRepresentative, "company_representative": companyRepresentative})
+	}
+	handoverCode := strings.TrimSpace(req.HandoverCode)
+	if handoverCode == "" {
+		randomCode := strings.ToUpper(strings.ReplaceAll(newID(), "-", ""))
+		handoverCode = "HO-" + randomCode[:10]
+	}
+	if len([]rune(handoverCode)) > 80 {
+		return nil, validationError("Mã bàn giao không được vượt quá 80 ký tự")
+	}
+	handoverDate, err := normalizeOptionalDate(req.HandoverDate, "handover_date")
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "handover_created", "handover", cleanID(row["id"]), "Tạo hồ sơ bàn giao", Record{"status": row["status"], "final_acceptance_id": cleanID(row["final_acceptance_id"])})
-	return row, nil
+	finalAcceptanceID := cleanID(req.FinalAcceptanceID)
+	if finalAcceptanceID != "" {
+		acceptance, err := s.repo.GetByID(ctx, "acceptance_records", finalAcceptanceID)
+		if err != nil || cleanID(acceptance["project_id"]) != projectID || fmt.Sprint(acceptance["type"]) != "final" {
+			return nil, validationError("Nghiệm thu cuối không thuộc công trình", Record{"final_acceptance_id": finalAcceptanceID})
+		}
+	}
+	formInstanceID := cleanID(req.WorkflowFormInstanceID)
+	if formInstanceID != "" {
+		instance, err := s.repo.GetByID(ctx, "workflow_form_instances", formInstanceID)
+		if err != nil || cleanID(instance["project_id"]) != projectID {
+			return nil, validationError("Biểu mẫu bàn giao không thuộc công trình", Record{"workflow_form_instance_id": formInstanceID})
+		}
+	}
+	notes := strings.TrimSpace(req.Notes)
+	if len([]rune(notes)) > 4000 {
+		return nil, validationError("Ghi chú bàn giao không được vượt quá 4000 ký tự")
+	}
+	return s.repo.CreateHandoverPackage(ctx, Record{
+		"project_id": projectID, "handover_code": handoverCode, "status": "draft",
+		"final_acceptance_id": finalAcceptanceID, "workflow_form_instance_id": formInstanceID,
+		"handover_date": handoverDate, "client_representative": clientRepresentative,
+		"company_representative": companyRepresentative, "documents_ready": false,
+		"warehouse_closed": false, "payables_recorded": false, "receivables_recorded": false,
+		"notes": notes, "created_by": actorID,
+	}, actorID, actorName)
 }
 
 func (s *Service) ProjectBudget(ctx context.Context, projectID string) ([]Record, error) {
@@ -469,21 +510,72 @@ func (s *Service) ApproveBudget(ctx context.Context, id string, actorID, actorNa
 	return row, nil
 }
 
-func (s *Service) CreatePayable(ctx context.Context, body Record) (Record, error) {
-	if body["vendor_type"] == nil || strings.TrimSpace(fmt.Sprint(body["vendor_type"])) == "" {
-		body["vendor_type"] = "supplier"
+func (s *Service) CreatePayable(ctx context.Context, req PayableCreateRequest, actorID, actorName string) (Record, error) {
+	projectID := cleanID(req.ProjectID)
+	code := strings.TrimSpace(req.PayableCode)
+	if !validActivityUUID(projectID) || code == "" || req.GrossAmount <= 0 {
+		return nil, validationError("Phải trả cần công trình, mã và giá trị lớn hơn 0", Record{"project_id": projectID, "payable_code": code, "gross_amount": req.GrossAmount})
+	}
+	if req.AdvanceAmount < 0 || req.RetentionAmount < 0 || req.DeductionAmount < 0 || req.AdvanceAmount+req.DeductionAmount > req.GrossAmount {
+		return nil, validationError("Giá trị tạm ứng/giữ lại/khấu trừ không hợp lệ")
+	}
+	dueDate, err := normalizeOptionalDate(req.DueDate, "due_date")
+	if err != nil {
+		return nil, err
+	}
+	vendorType := strings.TrimSpace(req.VendorType)
+	if vendorType == "" {
+		vendorType = "supplier"
+	}
+	if !statusIn(vendorType, vendorPartnerTypes()...) {
+		return nil, validationError("Loại vendor không hợp lệ", Record{"vendor_type": vendorType})
+	}
+	body := Record{
+		"project_id": projectID, "payable_code": code, "vendor_type": vendorType,
+		"vendor_partner_id": cleanID(req.VendorPartnerID), "vendor_name": strings.TrimSpace(req.VendorName),
+		"source_type": "manual", "gross_amount": req.GrossAmount, "advance_amount": req.AdvanceAmount,
+		"retention_amount": req.RetentionAmount, "deduction_amount": req.DeductionAmount,
+		"paid_amount": 0, "remaining_amount": req.GrossAmount - req.AdvanceAmount - req.DeductionAmount,
+		"due_date": dueDate, "status": "draft", "created_by": actorID,
 	}
 	if err := s.applyPartnerSnapshot(ctx, body, "vendor_partner_id", "vendor_name", "", vendorPartnerTypes()); err != nil {
 		return nil, err
 	}
-	return s.repo.Insert(ctx, "payables", payableColumns(), body)
+	row, err := s.repo.Insert(ctx, "payables", payableColumns(), body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, projectID, actorID, actorName, "payable_created", "payable", cleanID(row["id"]), "Tạo phải trả ở trạng thái nháp", Record{"payable_code": code, "gross_amount": req.GrossAmount, "remaining_amount": row["remaining_amount"]})
+	return row, nil
 }
 
-func (s *Service) CreateReceivable(ctx context.Context, body Record) (Record, error) {
+func (s *Service) CreateReceivable(ctx context.Context, req ReceivableCreateRequest, actorID, actorName string) (Record, error) {
+	projectID := cleanID(req.ProjectID)
+	code := strings.TrimSpace(req.ReceivableCode)
+	if !validActivityUUID(projectID) || code == "" || req.GrossAmount <= 0 {
+		return nil, validationError("Phải thu cần công trình, mã và giá trị lớn hơn 0", Record{"project_id": projectID, "receivable_code": code, "gross_amount": req.GrossAmount})
+	}
+	dueDate, err := normalizeOptionalDate(req.DueDate, "due_date")
+	if err != nil {
+		return nil, err
+	}
+	body := Record{
+		"project_id": projectID, "receivable_code": code,
+		"client_partner_id": cleanID(req.ClientPartnerID), "client_name": strings.TrimSpace(req.ClientName),
+		"source_type": "manual", "contract_amount": req.ContractAmount,
+		"milestone_name": strings.TrimSpace(req.MilestoneName), "gross_amount": req.GrossAmount,
+		"received_amount": 0, "remaining_amount": req.GrossAmount, "due_date": dueDate,
+		"status": "draft", "created_by": actorID,
+	}
 	if err := s.applyPartnerSnapshot(ctx, body, "client_partner_id", "client_name", "", []string{"client"}); err != nil {
 		return nil, err
 	}
-	return s.repo.Insert(ctx, "receivables", receivableColumns(), body)
+	row, err := s.repo.Insert(ctx, "receivables", receivableColumns(), body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, projectID, actorID, actorName, "receivable_created", "receivable", cleanID(row["id"]), "Tạo phải thu ở trạng thái nháp", Record{"receivable_code": code, "gross_amount": req.GrossAmount, "remaining_amount": row["remaining_amount"]})
+	return row, nil
 }
 
 func (s *Service) ListTemplates(ctx context.Context) ([]Record, error) {
@@ -491,7 +583,7 @@ func (s *Service) ListTemplates(ctx context.Context) ([]Record, error) {
 		SELECT t.*, COUNT(n.id) AS node_count
 		FROM pipeline_templates t
 		LEFT JOIN pipeline_template_nodes n ON n.template_id=t.id
-		WHERE t.status <> 'deleted'
+		WHERE t.status NOT IN ('deleted','archived')
 		GROUP BY t.id
 		ORDER BY t.updated_at DESC, t.created_at DESC
 	`)
@@ -502,29 +594,63 @@ func (s *Service) TemplateDetail(ctx context.Context, id string) (Record, error)
 }
 
 func (s *Service) CreateTemplate(ctx context.Context, body Record, actorID string) (Record, error) {
-	if body["status"] == nil {
-		body["status"] = "draft"
+	body["status"] = "draft"
+	for _, key := range []string{"id", "template_family_id", "revision_no", "source_template_id", "definition_hash", "published_at", "published_by"} {
+		delete(body, key)
 	}
 	return s.repo.CreateTemplateWithNodes(ctx, body, actorID)
 }
 
 func (s *Service) UpdateTemplate(ctx context.Context, id string, body Record) (Record, error) {
+	if _, err := s.ensureDraftTemplate(ctx, "template", id); err != nil {
+		return nil, err
+	}
+	for _, key := range []string{"id", "status", "version", "created_by", "template_family_id", "revision_no", "source_template_id", "engine_version", "definition_hash", "published_at", "published_by"} {
+		delete(body, key)
+	}
 	return s.repo.Update(ctx, "pipeline_templates", templateColumns(), id, body)
 }
 
 func (s *Service) DeleteTemplate(ctx context.Context, id string) error {
-	return s.repo.Exec(ctx, `UPDATE pipeline_templates SET status='deleted', updated_at=now() WHERE id=$1`, id)
+	template, err := s.repo.GetByID(ctx, "pipeline_templates", id)
+	if err != nil {
+		return err
+	}
+	targetStatus := "deleted"
+	if strings.TrimSpace(fmt.Sprint(template["status"])) == "published" {
+		targetStatus = "archived"
+	}
+	return s.repo.Exec(ctx, `UPDATE pipeline_templates SET status=$2, updated_at=now() WHERE id=$1`, id, targetStatus)
 }
 
 func (s *Service) PublishTemplate(ctx context.Context, id, actorID, actorName string) (Record, error) {
-	issues, err := s.repo.TemplatePublishFormIssues(ctx, id)
+	template, err := s.repo.GetTemplateDetail(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(fmt.Sprint(template["status"])) == "published" {
+		return template, nil
+	}
+	if strings.TrimSpace(fmt.Sprint(template["status"])) != "draft" {
+		return nil, validationError("Chỉ revision nháp mới có thể được phát hành", Record{"template_id": id, "status": template["status"]})
+	}
+	issues, err := s.repo.TemplatePublishIssues(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if len(issues) > 0 {
-		return nil, validationError("Mẫu có bước bắt buộc biểu mẫu quy trình nhưng chưa gắn phiên bản biểu mẫu đã phát hành", Record{"issues": issues})
+		return nil, validationError("Mẫu quy trình chưa đạt điều kiện phát hành", Record{"issues": issues})
 	}
-	template, err := s.repo.QueryOne(ctx, `UPDATE pipeline_templates SET status='published', updated_at=now() WHERE id=$1 RETURNING *`, id)
+	definitionHash, err := templateDefinitionHash(template)
+	if err != nil {
+		return nil, err
+	}
+	template, err = s.repo.QueryOne(ctx, `
+		UPDATE pipeline_templates
+		SET status='published', definition_hash=$2, published_at=now(), published_by=NULLIF($3,'')::uuid, updated_at=now()
+		WHERE id=$1 AND status='draft'
+		RETURNING *
+	`, id, definitionHash, actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -621,6 +747,9 @@ func (s *Service) ArchiveWorkflowFormVersion(ctx context.Context, versionID, act
 }
 
 func (s *Service) CreateTemplateStep(ctx context.Context, body Record) (Record, error) {
+	if _, err := s.ensureDraftTemplate(ctx, "node", cleanID(body["node_id"])); err != nil {
+		return nil, err
+	}
 	if err := s.applyTemplateStepFormDefaults(ctx, body, nil); err != nil {
 		return nil, err
 	}
@@ -628,6 +757,9 @@ func (s *Service) CreateTemplateStep(ctx context.Context, body Record) (Record, 
 }
 
 func (s *Service) UpdateTemplateStep(ctx context.Context, id string, body Record) (Record, error) {
+	if _, err := s.ensureDraftTemplate(ctx, "step", id); err != nil {
+		return nil, err
+	}
 	current, err := s.repo.GetByID(ctx, "pipeline_template_steps", id)
 	if err != nil {
 		return nil, err
@@ -636,6 +768,13 @@ func (s *Service) UpdateTemplateStep(ctx context.Context, id string, body Record
 		return nil, err
 	}
 	return s.repo.Update(ctx, "pipeline_template_steps", templateStepColumns(), id, body)
+}
+
+func (s *Service) DeleteTemplateStep(ctx context.Context, id string) error {
+	if _, err := s.ensureDraftTemplate(ctx, "step", id); err != nil {
+		return err
+	}
+	return s.repo.Exec(ctx, `DELETE FROM pipeline_template_steps WHERE id=$1`, id)
 }
 
 func (s *Service) applyTemplateStepFormDefaults(ctx context.Context, body Record, current Record) error {
@@ -672,6 +811,13 @@ func (s *Service) applyTemplateStepFormDefaults(ctx context.Context, body Record
 	} else {
 		body["form_required"] = formRequired
 	}
+	if _, provided := body["surface_kind"]; !provided {
+		if current != nil && strings.TrimSpace(fmt.Sprint(current["surface_kind"])) != "" && fmt.Sprint(current["surface_kind"]) != "<nil>" {
+			body["surface_kind"] = current["surface_kind"]
+		} else {
+			body["surface_kind"] = defaultStepSurfaceKind(stepType, formRequired)
+		}
+	}
 	_, formVersionProvided := body["form_version_id"]
 	if !formVersionProvided && cleanID(current["form_version_id"]) != "" {
 		return nil
@@ -694,6 +840,19 @@ func (s *Service) applyTemplateStepFormDefaults(ctx context.Context, body Record
 
 func workflowFormRequiredForStep(stepType string, checklistRequired bool) bool {
 	return checklistRequired || statusIn(stepType, "daily_report", "meeting_minutes", "checklist", "acceptance_check", "handover_check")
+}
+
+func defaultStepSurfaceKind(stepType string, formRequired bool) string {
+	switch {
+	case statusIn(stepType, "photo_upload", "evidence_upload"):
+		return "evidence"
+	case stepType == "approval":
+		return "approval"
+	case formRequired:
+		return "workflow_form"
+	default:
+		return "generic"
+	}
 }
 
 func normalizeWorkflowFormTemplateRequest(req WorkflowFormTemplateRequest, create bool) (Record, error) {
@@ -1053,6 +1212,9 @@ func (s *Service) saveSubcontractorReconciliation(ctx context.Context, workItemI
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
 		return nil, err
 	}
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
@@ -1608,6 +1770,9 @@ func (s *Service) saveOwnerClientReconciliation(ctx context.Context, workItemID 
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
 		return nil, err
 	}
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
@@ -3020,6 +3185,24 @@ func (s *Service) normalizeIncomingAcceptanceItem(ctx context.Context, projectID
 	if materialSnapshotQuantityExceeds(acceptedQuantity+rejectedQuantity, deliveredQuantity) {
 		return nil, validationError("Số lượng nhận và từ chối vượt số lượng giao", Record{"item_index": itemIndex, "delivered_quantity": deliveredQuantity})
 	}
+	if submit && procurementItem != nil {
+		alreadyAccepted, err := s.repo.QueryOne(ctx, `
+			SELECT COALESCE(SUM(iai.accepted_quantity),0) AS accepted_quantity
+			FROM incoming_acceptance_items iai
+			JOIN incoming_acceptance_records iar ON iar.id=iai.incoming_acceptance_id
+			WHERE iai.procurement_request_item_id=$1 AND iar.status='submitted'
+		`, procurementRequestItemID)
+		if err != nil {
+			return nil, err
+		}
+		acceptedBefore := number(alreadyAccepted["accepted_quantity"])
+		requested := number(procurementItem["quantity_requested"])
+		if materialSnapshotQuantityExceeds(acceptedBefore+acceptedQuantity, requested) {
+			return nil, validationError("Khối lượng nghiệm thu lũy kế vượt khối lượng yêu cầu mua", Record{
+				"item_index": itemIndex, "quantity_requested": requested, "accepted_before": acceptedBefore, "accepted_quantity": acceptedQuantity,
+			})
+		}
+	}
 
 	condition := strings.TrimSpace(req.Condition)
 	if condition == "" {
@@ -3460,6 +3643,9 @@ func (s *Service) saveWorkflowForm(ctx context.Context, instanceID string, req W
 	if err != nil {
 		return nil, err
 	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+		return nil, err
+	}
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
 		return nil, err
 	}
@@ -3487,6 +3673,9 @@ func (s *Service) WorkItemAction(ctx context.Context, workItemID, action string,
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
 		return nil, err
 	}
 	plan, err := workItemTransitionForAction(action, item)
@@ -3525,6 +3714,11 @@ func (s *Service) WorkItemAction(ctx context.Context, workItemID, action string,
 			return nil, validationError("Đầu việc cần đủ minh chứng trước khi gửi rà soát, gửi duyệt hoặc hoàn tất", Record{"missing_evidence": missing})
 		}
 	}
+	if plan.ToStatus == "completed" {
+		if err := s.repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, actorID, actorName); err != nil {
+			return nil, err
+		}
+	}
 	if plan.Decision {
 		return s.repo.ApplyWorkItemDecision(ctx, item, action, plan.ToStatus, plan.ActivityType, req, actorID, actorName)
 	}
@@ -3539,6 +3733,36 @@ func (s *Service) WorkItemAction(ctx context.Context, workItemID, action string,
 		_ = s.repo.RunClientWorkflowAutomationForWorkItem(ctx, cleanID(updated["id"]), actorID, actorName)
 	}
 	return updated, nil
+}
+
+func (s *Service) requireActivePipelineWorkItem(ctx context.Context, item Record) error {
+	if int(number(item["pipeline_engine_version"])) < 2 || cleanID(item["pipeline_run_id"]) == "" {
+		return nil
+	}
+	rows, err := s.repo.Query(ctx, `
+		SELECT pr.current_node_id, rn.status AS node_status
+		FROM pipeline_runs pr
+		LEFT JOIN pipeline_run_nodes rn ON rn.id=pr.current_node_id
+		WHERE pr.id=$1
+	`, item["pipeline_run_id"])
+	if err != nil {
+		return err
+	}
+	currentNodeID := ""
+	if len(rows) > 0 {
+		currentNodeID = cleanID(rows[0]["current_node_id"])
+	}
+	if currentNodeID == "" || currentNodeID != cleanID(item["run_node_id"]) {
+		return validationError("Đầu việc chưa thuộc node đang thực hiện của quy trình", Record{
+			"work_item_id":    item["id"],
+			"run_node_id":     item["run_node_id"],
+			"current_node_id": currentNodeID,
+		})
+	}
+	if !statusIn(fmt.Sprint(rows[0]["node_status"]), "in_progress", "waiting_approval", "blocked") {
+		return validationError("Node của đầu việc chưa sẵn sàng thao tác", Record{"node_status": rows[0]["node_status"]})
+	}
+	return nil
 }
 
 type workItemTransitionPlan struct {
@@ -5227,6 +5451,17 @@ func (s *Service) missingRequiredEvidence(ctx context.Context, item Record, req 
 		return nil, err
 	}
 	missing := []string{}
+	engineVersion := int(number(item["pipeline_engine_version"]))
+	formRequired := boolValue(item["workflow_form_required"]) || boolValue(requirement["form_required"])
+	requiredFormVersionID := cleanID(item["required_workflow_form_version_id"])
+	if requiredFormVersionID == "" {
+		requiredFormVersionID = cleanID(requirement["form_version_id"])
+	}
+	exactFormSubmitted := fmt.Sprint(item["workflow_form_status"]) == "submitted" &&
+		(requiredFormVersionID == "" || cleanID(item["workflow_form_version_id"]) == requiredFormVersionID)
+	if engineVersion >= 2 && formRequired && !exactFormSubmitted {
+		missing = append(missing, "workflow_form")
+	}
 	if boolValue(requirement["document_required"]) && counts["document"] == 0 {
 		missing = append(missing, "document")
 	}
@@ -5234,6 +5469,12 @@ func (s *Service) missingRequiredEvidence(ctx context.Context, item Record, req 
 		missing = append(missing, "photo")
 	}
 	if boolValue(requirement["checklist_required"]) && counts["checklist"] == 0 && !hasChecklistPayload(req.CompletionPayload) {
+		if engineVersion >= 2 && formRequired {
+			if !exactFormSubmitted && !stringSliceContains(missing, "workflow_form") {
+				missing = append(missing, "workflow_form")
+			}
+			return missing, nil
+		}
 		submittedForm, err := s.repo.HasSubmittedWorkflowFormForWorkItem(ctx, fmt.Sprint(item["id"]))
 		if err != nil {
 			return nil, err
@@ -5246,6 +5487,9 @@ func (s *Service) missingRequiredEvidence(ctx context.Context, item Record, req 
 }
 
 func withLegacyChecklistCompletion(item Record, req WorkItemActionRequest) WorkItemActionRequest {
+	if int(number(item["pipeline_engine_version"])) >= 2 {
+		return req
+	}
 	requirement, _ := item["evidence_requirement_json"].(map[string]any)
 	if !boolValue(requirement["checklist_required"]) || hasChecklistPayload(req.CompletionPayload) {
 		return req
@@ -5263,6 +5507,15 @@ func withLegacyChecklistCompletion(item Record, req WorkItemActionRequest) WorkI
 	}
 	req.CompletionPayload = payload
 	return req
+}
+
+func stringSliceContains(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
 }
 
 func hasChecklistPayload(payload Record) bool {
@@ -5493,6 +5746,9 @@ func (s *Service) SubmitRunStep(ctx context.Context, stepID string, req WorkItem
 	}
 	if err == nil {
 		workItemID = cleanID(item["id"])
+		if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+			return nil, err
+		}
 		fromStatus := fmt.Sprint(item["status"])
 		if !canCompleteWorkItemStatus(fromStatus) {
 			return nil, validationError("Trạng thái đầu việc không cho phép hoàn tất", Record{"status": fromStatus})
@@ -5515,6 +5771,9 @@ func (s *Service) SubmitRunStep(ctx context.Context, stepID string, req WorkItem
 		if len(missing) > 0 {
 			return nil, validationError("Đầu việc cần đủ minh chứng trước khi hoàn tất", Record{"missing_evidence": missing})
 		}
+		if err := s.repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, actorID, actorName); err != nil {
+			return nil, err
+		}
 	}
 	step, err := s.repo.SubmitRunStep(ctx, stepID, req, actorID, actorName)
 	if err != nil {
@@ -5535,6 +5794,23 @@ func (s *Service) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorName
 }
 
 func (s *Service) RequestNodeApproval(ctx context.Context, nodeID, actorID, actorName, reason string) (Record, error) {
+	node, err := s.repo.GetByID(ctx, "pipeline_run_nodes", nodeID)
+	if err != nil {
+		return nil, err
+	}
+	issues, err := s.repo.NodeCompletionIssues(ctx, node)
+	if err != nil {
+		return nil, err
+	}
+	blocking := []Record{}
+	for _, issue := range issues {
+		if fmt.Sprint(issue["code"]) != "NODE_APPROVAL_REQUIRED" {
+			blocking = append(blocking, issue)
+		}
+	}
+	if len(blocking) > 0 {
+		return nil, validationError("Node chưa đủ điều kiện gửi phê duyệt", Record{"issues": blocking})
+	}
 	return s.repo.RequestNodeApproval(ctx, nodeID, actorID, actorName, reason)
 }
 
@@ -5572,7 +5848,7 @@ func (s *Service) ApprovalAction(ctx context.Context, id, action, comment, actor
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền duyệt yêu cầu này")
 	}
-	return s.repo.ApprovalAction(ctx, id, action, comment, actorID, actorName)
+	return s.repo.ApplyApprovalPolicyAction(ctx, request, action, comment, actorID, actorName)
 }
 
 func normalizeApprovalAction(action string) string {
@@ -5616,6 +5892,14 @@ func (s *Service) ProjectBOQ(ctx context.Context, projectID string) ([]Record, e
 	return s.repo.ListProjectBOQ(ctx, projectID)
 }
 
+func (s *Service) BOQProjectAction(ctx context.Context, projectID, action, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	if projectID == "" {
+		return nil, validationError("project_id không hợp lệ")
+	}
+	return s.repo.BOQProjectAction(ctx, projectID, action, actorID, actorName)
+}
+
 func (s *Service) CreateBOQ(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
 	normalized, err := normalizeBOQItemRequest(projectID, body, true)
 	if err != nil {
@@ -5656,7 +5940,158 @@ func (s *Service) LockBOQFinalUnitPrice(ctx context.Context, itemID string, req 
 	if err != nil {
 		return nil, err
 	}
+	if comment == "" {
+		return nil, validationError("Khóa giá cuối thủ công cần nêu lý do miễn so sánh báo giá")
+	}
 	return s.repo.LockBOQFinalUnitPrice(ctx, itemID, unitPrice, comment, actorID, actorName)
+}
+
+func (s *Service) ProjectSupplierQuotations(ctx context.Context, projectID string) ([]Record, error) {
+	return s.repo.ListProjectSupplierQuotations(ctx, cleanID(projectID))
+}
+
+func (s *Service) SupplierQuotationDetail(ctx context.Context, quotationID string) (Record, error) {
+	return s.repo.GetSupplierQuotationDetail(ctx, cleanID(quotationID))
+}
+
+func (s *Service) SaveSupplierQuotation(ctx context.Context, projectID, quotationID string, req SupplierQuotationRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	if projectID == "" {
+		return nil, validationError("project_id không hợp lệ")
+	}
+	partner, err := s.requireActivePartner(ctx, cleanID(req.SupplierPartnerID), []string{"supplier", "service_provider", "other"})
+	if err != nil {
+		return nil, err
+	}
+	header, items, err := s.normalizeSupplierQuotation(ctx, projectID, req)
+	if err != nil {
+		return nil, err
+	}
+	header["supplier_partner_id"] = cleanID(partner["id"])
+	header["supplier_name"] = cleanOptionalText(partner["name"])
+	if cleanOptionalText(header["quotation_code"]) == "" {
+		header["quotation_code"] = fmt.Sprintf("BG-%s-%d", projectID[:8], timeNowUnix())
+	}
+	return s.repo.SaveSupplierQuotation(ctx, projectID, cleanID(quotationID), header, items, actorID, actorName)
+}
+
+func (s *Service) SubmitSupplierQuotation(ctx context.Context, quotationID, actorID, actorName string) (Record, error) {
+	return s.repo.SupplierQuotationAction(ctx, cleanID(quotationID), "submit", "", "", "", actorID, actorName)
+}
+
+func (s *Service) QualifySupplierQuotation(ctx context.Context, quotationID string, req SupplierQuotationQualificationRequest, actorID, actorName string) (Record, error) {
+	technicalStatus := strings.TrimSpace(req.TechnicalStatus)
+	commercialStatus := strings.TrimSpace(req.CommercialStatus)
+	comment := strings.TrimSpace(req.Comment)
+	if !statusIn(technicalStatus, "compliant", "conditional", "non_compliant") {
+		return nil, validationError("Kết quả đánh giá kỹ thuật không hợp lệ", Record{"technical_status": technicalStatus})
+	}
+	if !statusIn(commercialStatus, "compliant", "non_compliant") {
+		return nil, validationError("Kết quả đánh giá thương mại không hợp lệ", Record{"commercial_status": commercialStatus})
+	}
+	if comment == "" {
+		return nil, validationError("Đánh giá báo giá cần có nhận xét")
+	}
+	return s.repo.SupplierQuotationAction(ctx, cleanID(quotationID), "qualify", technicalStatus, commercialStatus, comment, actorID, actorName)
+}
+
+func (s *Service) SelectSupplierQuote(ctx context.Context, quotationItemID string, req SupplierQuoteSelectionRequest, actorID, actorName string) (Record, error) {
+	reason := strings.TrimSpace(req.DecisionReason)
+	if reason == "" {
+		return nil, validationError("Quyết định chọn báo giá cần nêu lý do")
+	}
+	if len([]rune(reason)) > 2000 {
+		return nil, validationError("Lý do chọn báo giá không được vượt quá 2000 ký tự")
+	}
+	return s.repo.SelectSupplierQuote(ctx, cleanID(quotationItemID), reason, actorID, actorName)
+}
+
+func (s *Service) SupplierQuoteComparison(ctx context.Context, projectID string) ([]Record, error) {
+	return s.repo.SupplierQuoteComparison(ctx, cleanID(projectID))
+}
+
+func (s *Service) normalizeSupplierQuotation(ctx context.Context, projectID string, req SupplierQuotationRequest) (Record, []Record, error) {
+	quotationDate := strings.TrimSpace(req.QuotationDate)
+	if quotationDate == "" {
+		quotationDate = time.Now().Format("2006-01-02")
+	}
+	quotedAt, err := time.Parse("2006-01-02", quotationDate)
+	if err != nil {
+		return nil, nil, validationError("Ngày báo giá không hợp lệ")
+	}
+	validUntil := strings.TrimSpace(req.ValidUntil)
+	if validUntil != "" {
+		validAt, err := time.Parse("2006-01-02", validUntil)
+		if err != nil || validAt.Before(quotedAt) {
+			return nil, nil, validationError("Hạn hiệu lực báo giá không hợp lệ")
+		}
+	}
+	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
+	if currency == "" {
+		currency = "VND"
+	}
+	if len(currency) != 3 {
+		return nil, nil, validationError("Mã tiền tệ phải gồm 3 ký tự")
+	}
+	if req.PaymentTermsDays < 0 || req.LeadTimeDays < 0 {
+		return nil, nil, validationError("Số ngày thanh toán/giao hàng không được âm")
+	}
+	if len(req.Items) == 0 {
+		return nil, nil, validationError("Báo giá cần ít nhất một dòng BOQ")
+	}
+	items := make([]Record, 0, len(req.Items))
+	seen := map[string]bool{}
+	for index, itemReq := range req.Items {
+		boqID := cleanID(itemReq.BOQItemID)
+		if boqID == "" || seen[boqID] {
+			return nil, nil, validationError("Dòng BOQ trong báo giá không hợp lệ hoặc bị trùng", Record{"item_index": index})
+		}
+		seen[boqID] = true
+		boq, err := s.repo.GetBOQItemDetail(ctx, boqID)
+		if err != nil || cleanID(boq["project_id"]) != projectID {
+			return nil, nil, validationError("Dòng BOQ không thuộc công trình", Record{"item_index": index, "boq_item_id": boqID})
+		}
+		if fmt.Sprint(boq["status"]) == "deleted" || boolValue(boq["final_price_locked"]) {
+			return nil, nil, validationError("Dòng BOQ đã khóa giá hoặc không còn hiệu lực", Record{"item_index": index, "boq_item_id": boqID})
+		}
+		quantity := itemReq.Quantity
+		if quantity <= 0 || math.IsNaN(quantity) || math.IsInf(quantity, 0) {
+			quantity = number(boq["quantity"])
+		}
+		if quantity <= 0 || itemReq.UnitPrice <= 0 || math.IsNaN(itemReq.UnitPrice) || math.IsInf(itemReq.UnitPrice, 0) {
+			return nil, nil, validationError("Khối lượng và đơn giá báo giá phải lớn hơn 0", Record{"item_index": index})
+		}
+		if itemReq.DiscountAmount < 0 || itemReq.DiscountAmount > quantity*itemReq.UnitPrice || itemReq.TaxRate < 0 || itemReq.TaxRate > 100 || itemReq.LeadTimeDays < 0 {
+			return nil, nil, validationError("Chiết khấu, thuế hoặc thời gian giao hàng không hợp lệ", Record{"item_index": index})
+		}
+		compliance := strings.TrimSpace(itemReq.ComplianceStatus)
+		if compliance == "" {
+			compliance = "pending"
+		}
+		if !statusIn(compliance, "pending", "compliant", "conditional", "non_compliant") {
+			return nil, nil, validationError("Mức đáp ứng của dòng báo giá không hợp lệ", Record{"item_index": index})
+		}
+		description := strings.TrimSpace(itemReq.Description)
+		if description == "" {
+			description = cleanOptionalText(boq["work_item_name"])
+		}
+		unit := strings.TrimSpace(itemReq.Unit)
+		if unit == "" {
+			unit = cleanOptionalText(boq["unit"])
+		}
+		items = append(items, Record{
+			"boq_item_id": boqID, "material_id": cleanID(boq["material_id"]), "description": description,
+			"unit": unit, "quantity": quantity, "unit_price": itemReq.UnitPrice, "discount_amount": itemReq.DiscountAmount,
+			"tax_rate": itemReq.TaxRate, "lead_time_days": itemReq.LeadTimeDays, "compliance_status": compliance,
+			"deviation_note": strings.TrimSpace(itemReq.DeviationNote),
+		})
+	}
+	header := Record{
+		"quotation_code": strings.TrimSpace(req.QuotationCode), "quotation_date": quotationDate, "valid_until": validUntil,
+		"currency": currency, "payment_terms_days": req.PaymentTermsDays, "lead_time_days": req.LeadTimeDays,
+		"delivery_terms": strings.TrimSpace(req.DeliveryTerms), "warranty_terms": strings.TrimSpace(req.WarrantyTerms), "notes": strings.TrimSpace(req.Notes),
+	}
+	return header, items, nil
 }
 
 func normalizeBOQUnitPriceRequest(req BOQUnitPriceRequest, lock bool) (float64, string, error) {
@@ -5771,8 +6206,428 @@ func (s *Service) GenerateProcurementFromBOQ(ctx context.Context, projectID, act
 	return s.repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, actorName)
 }
 
+func (s *Service) CreateProcurement(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+	normalized, err := s.normalizeProcurementHeader(ctx, body, true)
+	if err != nil {
+		return nil, err
+	}
+	normalized["requested_by"] = actorID
+	normalized["status"] = "draft"
+	row, err := s.repo.Insert(ctx, "procurement_requests", procurementColumns(), normalized)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "procurement_created", "procurement_request", cleanID(row["id"]), "Tạo yêu cầu mua", Record{"request_code": row["request_code"]})
+	return row, nil
+}
+
+func (s *Service) UpdateProcurement(ctx context.Context, id string, body Record, actorID, actorName string) (Record, error) {
+	current, err := s.repo.GetByID(ctx, "procurement_requests", cleanID(id))
+	if err != nil {
+		return nil, err
+	}
+	if statusIn(fmt.Sprint(current["status"]), "ordered", "partially_received", "received", "cancelled") {
+		return nil, validationError("Yêu cầu mua đã đặt/nhận hàng, không thể sửa thông tin thương mại", Record{"status": current["status"]})
+	}
+	body["project_id"] = current["project_id"]
+	body["request_code"] = current["request_code"]
+	body["status"] = current["status"]
+	body["requested_by"] = current["requested_by"]
+	normalized, err := s.normalizeProcurementHeader(ctx, body, false)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.repo.Update(ctx, "procurement_requests", procurementColumns(), id, normalized)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "procurement_updated", "procurement_request", cleanID(row["id"]), "Cập nhật yêu cầu mua", Record{"request_code": row["request_code"]})
+	return row, nil
+}
+
+func (s *Service) normalizeProcurementHeader(ctx context.Context, body Record, create bool) (Record, error) {
+	out := Record{}
+	projectID := cleanID(body["project_id"])
+	if projectID == "" {
+		return nil, validationError("Công trình là bắt buộc")
+	}
+	out["project_id"] = projectID
+	requestCode := strings.TrimSpace(fmt.Sprint(body["request_code"]))
+	if requestCode == "" && create {
+		requestCode = fmt.Sprintf("PR-%d", timeNowUnix())
+	}
+	if requestCode == "" {
+		return nil, validationError("Mã yêu cầu mua là bắt buộc")
+	}
+	title := strings.TrimSpace(fmt.Sprint(body["title"]))
+	if title == "" {
+		return nil, validationError("Tiêu đề yêu cầu mua là bắt buộc")
+	}
+	out["request_code"] = requestCode
+	out["title"] = title
+	out["requested_by"] = cleanID(body["requested_by"])
+	out["status"] = strings.TrimSpace(fmt.Sprint(body["status"]))
+	if out["status"] == "" {
+		out["status"] = "draft"
+	}
+	total := number(body["total_estimated_amount"])
+	if total < 0 {
+		return nil, validationError("Giá trị dự kiến không được âm")
+	}
+	out["total_estimated_amount"] = total
+	budgetStatus := strings.TrimSpace(fmt.Sprint(body["budget_status"]))
+	if budgetStatus == "" {
+		budgetStatus = "within_budget"
+	}
+	if !statusIn(budgetStatus, "within_budget", "budget_exceeded") {
+		return nil, validationError("Trạng thái ngân sách không hợp lệ")
+	}
+	out["budget_status"] = budgetStatus
+	out["approval_request_id"] = cleanID(body["approval_request_id"])
+	partnerID := cleanID(body["supplier_partner_id"])
+	if partnerID != "" {
+		partner, err := s.requireActivePartner(ctx, partnerID, []string{"supplier", "service_provider", "other"})
+		if err != nil {
+			return nil, err
+		}
+		out["supplier_partner_id"] = partnerID
+		out["supplier_name"] = cleanOptionalText(partner["name"])
+	} else {
+		out["supplier_partner_id"] = ""
+		out["supplier_name"] = strings.TrimSpace(fmt.Sprint(body["supplier_name"]))
+	}
+	out["order_reference"] = strings.TrimSpace(fmt.Sprint(body["order_reference"]))
+	expectedDeliveryDate := dateOnly(body["expected_delivery_date"])
+	if expectedDeliveryDate != "" {
+		if _, err := time.Parse("2006-01-02", expectedDeliveryDate); err != nil {
+			return nil, validationError("Ngày giao dự kiến không hợp lệ")
+		}
+	}
+	out["expected_delivery_date"] = expectedDeliveryDate
+	return out, nil
+}
+
 func (s *Service) ProcurementAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
 	return s.repo.ProcurementAction(ctx, id, action, req, actorID, actorName)
+}
+
+func (s *Service) ProjectContracts(ctx context.Context, projectID string) ([]Record, error) {
+	return s.repo.ListProjectContracts(ctx, cleanID(projectID))
+}
+
+func (s *Service) ContractDetail(ctx context.Context, contractID string) (Record, error) {
+	return s.repo.GetContractDetail(ctx, cleanID(contractID))
+}
+
+func (s *Service) SaveContract(ctx context.Context, projectID, contractID string, req ContractRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	if projectID == "" {
+		return nil, validationError("project_id không hợp lệ")
+	}
+	contractType := strings.TrimSpace(req.ContractType)
+	direction := strings.TrimSpace(req.Direction)
+	if !statusIn(contractType, "main_client", "subcontractor", "supplier", "service", "other") {
+		return nil, validationError("Loại hợp đồng không hợp lệ")
+	}
+	if !statusIn(direction, "receivable", "payable") || (contractType == "main_client" && direction != "receivable") {
+		return nil, validationError("Chiều tài chính của hợp đồng không hợp lệ")
+	}
+	partnerID := cleanID(req.CounterpartyPartnerID)
+	partnerName := strings.TrimSpace(req.CounterpartyName)
+	if partnerID != "" {
+		allowedTypes := vendorPartnerTypes()
+		if direction == "receivable" {
+			allowedTypes = []string{"client"}
+		}
+		partner, err := s.requireActivePartner(ctx, partnerID, allowedTypes)
+		if err != nil {
+			return nil, err
+		}
+		partnerName = cleanOptionalText(partner["name"])
+	}
+	if partnerName == "" {
+		return nil, validationError("Đối tác hợp đồng là bắt buộc")
+	}
+	code := strings.TrimSpace(req.ContractCode)
+	title := strings.TrimSpace(req.Title)
+	if code == "" || title == "" {
+		return nil, validationError("Mã và tên hợp đồng là bắt buộc")
+	}
+	if req.OriginalAmount < 0 || req.AdvancePercent < 0 || req.AdvancePercent > 100 || req.RetentionPercent < 0 || req.RetentionPercent > 100 || req.WarrantyDays < 0 {
+		return nil, validationError("Giá trị, tạm ứng, giữ lại hoặc bảo hành không hợp lệ")
+	}
+	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
+	if currency == "" {
+		currency = "VND"
+	}
+	if len(currency) != 3 {
+		return nil, validationError("Mã tiền tệ phải gồm 3 ký tự")
+	}
+	signedDate, effectiveDate, expiryDate, err := normalizeContractDates(req.SignedDate, req.EffectiveDate, req.ExpiryDate)
+	if err != nil {
+		return nil, err
+	}
+	body := Record{
+		"project_id": projectID, "contract_code": code, "title": title, "contract_type": contractType, "direction": direction,
+		"counterparty_partner_id": partnerID, "counterparty_name": partnerName, "currency": currency,
+		"original_amount": req.OriginalAmount, "advance_percent": req.AdvancePercent, "retention_percent": req.RetentionPercent,
+		"warranty_days": req.WarrantyDays, "signed_date": signedDate, "effective_date": effectiveDate, "expiry_date": expiryDate,
+	}
+	return s.repo.SaveContract(ctx, contractID, body, actorID, actorName)
+}
+
+func normalizeContractDates(signedDate, effectiveDate, expiryDate string) (string, string, string, error) {
+	values := []string{strings.TrimSpace(signedDate), strings.TrimSpace(effectiveDate), strings.TrimSpace(expiryDate)}
+	for _, value := range values {
+		if value != "" {
+			if _, err := time.Parse("2006-01-02", value); err != nil {
+				return "", "", "", validationError("Ngày hợp đồng không hợp lệ")
+			}
+		}
+	}
+	if values[1] != "" && values[2] != "" && values[2] < values[1] {
+		return "", "", "", validationError("Ngày hết hạn phải sau ngày hiệu lực")
+	}
+	return values[0], values[1], values[2], nil
+}
+
+func (s *Service) CreateContractVersion(ctx context.Context, contractID string, req ContractVersionRequest, actorID, actorName string) (Record, error) {
+	if req.Amount < 0 || strings.TrimSpace(req.ScopeSummary) == "" {
+		return nil, validationError("Giá trị và phạm vi phiên bản hợp đồng không hợp lệ")
+	}
+	startDate, endDate, _, err := normalizeContractDates(req.PlannedStartDate, req.PlannedEndDate, "")
+	if err != nil {
+		return nil, err
+	}
+	if startDate != "" && endDate != "" && endDate < startDate {
+		return nil, validationError("Ngày kết thúc phiên bản phải sau ngày bắt đầu")
+	}
+	body := Record{
+		"version_label": strings.TrimSpace(req.VersionLabel), "amount": req.Amount, "scope_summary": strings.TrimSpace(req.ScopeSummary),
+		"commercial_terms_json": req.CommercialTerms, "payment_terms_json": req.PaymentTerms,
+		"planned_start_date": startDate, "planned_end_date": endDate, "document_id": cleanID(req.DocumentID), "comment": strings.TrimSpace(req.Comment),
+	}
+	return s.repo.CreateContractVersion(ctx, cleanID(contractID), body, actorID, actorName)
+}
+
+func (s *Service) ContractVersionAction(ctx context.Context, versionID, action, comment, actorID, actorName string) (Record, error) {
+	comment = strings.TrimSpace(comment)
+	if statusIn(action, "approve", "sign") && comment == "" {
+		return nil, validationError("Duyệt/ký phiên bản hợp đồng cần có nhận xét")
+	}
+	return s.repo.ContractVersionAction(ctx, cleanID(versionID), action, comment, actorID, actorName)
+}
+
+func (s *Service) ActivateContract(ctx context.Context, contractID, comment, actorID, actorName string) (Record, error) {
+	return s.repo.ActivateContract(ctx, cleanID(contractID), strings.TrimSpace(comment), actorID, actorName)
+}
+
+func (s *Service) CreateContractMilestone(ctx context.Context, contractID string, req ContractMilestoneRequest, actorID, actorName string) (Record, error) {
+	if strings.TrimSpace(req.MilestoneCode) == "" || strings.TrimSpace(req.MilestoneName) == "" || req.SequenceNo <= 0 {
+		return nil, validationError("Mã, tên và thứ tự milestone là bắt buộc")
+	}
+	if !statusIn(req.MilestoneType, "advance", "progress", "final", "retention_release", "other") || !statusIn(req.AmountBasis, "fixed", "percentage", "quantity_certificate") {
+		return nil, validationError("Loại milestone hoặc cơ sở giá trị không hợp lệ")
+	}
+	if req.GrossAmount < 0 || req.Percentage < 0 || req.Percentage > 100 || req.RetentionPercent < 0 || req.RetentionPercent > 100 || req.DueDays < 0 {
+		return nil, validationError("Giá trị milestone không hợp lệ")
+	}
+	plannedDate := strings.TrimSpace(req.PlannedDate)
+	if plannedDate != "" {
+		if _, err := time.Parse("2006-01-02", plannedDate); err != nil {
+			return nil, validationError("Ngày milestone không hợp lệ")
+		}
+	}
+	body := Record{
+		"milestone_code": strings.TrimSpace(req.MilestoneCode), "milestone_name": strings.TrimSpace(req.MilestoneName), "sequence_no": req.SequenceNo,
+		"milestone_type": req.MilestoneType, "amount_basis": req.AmountBasis, "percentage": req.Percentage, "gross_amount": req.GrossAmount,
+		"retention_percent": req.RetentionPercent, "planned_date": plannedDate, "due_days": req.DueDays,
+		"acceptance_required": req.AcceptanceRequired, "acceptance_id": cleanID(req.AcceptanceID),
+	}
+	return s.repo.CreateContractMilestone(ctx, cleanID(contractID), body, actorID, actorName)
+}
+
+func (s *Service) ContractMilestoneAction(ctx context.Context, milestoneID, action, comment, actorID, actorName string) (Record, error) {
+	return s.repo.ContractMilestoneAction(ctx, cleanID(milestoneID), action, strings.TrimSpace(comment), actorID, actorName)
+}
+
+func (s *Service) CreateContractVariation(ctx context.Context, contractID string, req ContractVariationRequest, actorID, actorName string) (Record, error) {
+	if strings.TrimSpace(req.VariationCode) == "" || strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Reason) == "" {
+		return nil, validationError("Mã, tên và lý do phụ lục/variation là bắt buộc")
+	}
+	if !statusIn(req.VariationType, "scope", "price", "time", "mixed") {
+		return nil, validationError("Loại variation không hợp lệ")
+	}
+	body := Record{"variation_code": strings.TrimSpace(req.VariationCode), "title": strings.TrimSpace(req.Title), "variation_type": req.VariationType,
+		"reason": strings.TrimSpace(req.Reason), "amount_delta": req.AmountDelta, "days_delta": req.DaysDelta,
+		"scope_delta": strings.TrimSpace(req.ScopeDelta), "document_id": cleanID(req.DocumentID), "comment": strings.TrimSpace(req.Comment)}
+	return s.repo.CreateContractVariation(ctx, cleanID(contractID), body, actorID, actorName)
+}
+
+func (s *Service) ContractVariationAction(ctx context.Context, variationID, action, comment, actorID, actorName string) (Record, error) {
+	comment = strings.TrimSpace(comment)
+	if statusIn(action, "approve", "reject") && comment == "" {
+		return nil, validationError("Duyệt/từ chối variation cần có nhận xét")
+	}
+	return s.repo.ContractVariationAction(ctx, cleanID(variationID), action, comment, actorID, actorName)
+}
+
+func (s *Service) ReleaseContractRetention(ctx context.Context, retentionID string, req ContractRetentionReleaseRequest, actorID, actorName string) (Record, error) {
+	if req.Amount <= 0 || strings.TrimSpace(req.Comment) == "" {
+		return nil, validationError("Số tiền và lý do giải phóng giữ lại là bắt buộc")
+	}
+	dueDate := strings.TrimSpace(req.DueDate)
+	if dueDate != "" {
+		if _, err := time.Parse("2006-01-02", dueDate); err != nil {
+			return nil, validationError("Ngày đến hạn giải phóng giữ lại không hợp lệ")
+		}
+	}
+	return s.repo.ReleaseContractRetention(ctx, cleanID(retentionID), req.Amount, dueDate, strings.TrimSpace(req.Comment), actorID, actorName)
+}
+
+func (s *Service) ProjectQualityWorkspace(ctx context.Context, projectID string) (Record, error) {
+	return s.repo.ProjectQualityWorkspace(ctx, cleanID(projectID))
+}
+
+func (s *Service) CreateQualityITP(ctx context.Context, projectID string, req QualityITPRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	if projectID == "" || strings.TrimSpace(req.ITPCode) == "" || strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Discipline) == "" || strings.TrimSpace(req.WorkPackage) == "" {
+		return nil, validationError("Mã, tên, bộ môn và gói công việc ITP là bắt buộc")
+	}
+	if len(req.Items) == 0 {
+		return nil, validationError("ITP cần ít nhất một inspection item")
+	}
+	items := make([]Record, 0, len(req.Items))
+	seen := map[int]bool{}
+	for index, item := range req.Items {
+		if item.SequenceNo <= 0 || seen[item.SequenceNo] || strings.TrimSpace(item.ActivityName) == "" || strings.TrimSpace(item.AcceptanceCriteria) == "" || strings.TrimSpace(item.InspectionMethod) == "" || strings.TrimSpace(item.ResponsibleRole) == "" {
+			return nil, validationError("Inspection item ITP không hợp lệ hoặc trùng thứ tự", Record{"item_index": index})
+		}
+		seen[item.SequenceNo] = true
+		controlPoint := strings.TrimSpace(item.ControlPoint)
+		if !statusIn(controlPoint, "review", "witness", "hold", "surveillance") {
+			return nil, validationError("Control point ITP không hợp lệ", Record{"item_index": index})
+		}
+		frequencyType := strings.TrimSpace(item.FrequencyType)
+		if !statusIn(frequencyType, "each_lot", "daily", "weekly", "quantity", "custom") || item.FrequencyValue <= 0 {
+			return nil, validationError("Tần suất ITP không hợp lệ", Record{"item_index": index})
+		}
+		items = append(items, Record{"sequence_no": item.SequenceNo, "activity_name": strings.TrimSpace(item.ActivityName), "inspection_stage": strings.TrimSpace(item.InspectionStage), "acceptance_criteria": strings.TrimSpace(item.AcceptanceCriteria), "inspection_method": strings.TrimSpace(item.InspectionMethod), "control_point": controlPoint, "frequency_type": frequencyType, "frequency_value": item.FrequencyValue, "responsible_role": strings.TrimSpace(item.ResponsibleRole), "evidence_required": item.EvidenceRequired, "client_witness_required": item.ClientWitnessRequired, "notes": strings.TrimSpace(item.Notes)})
+	}
+	header := Record{"itp_code": strings.TrimSpace(req.ITPCode), "title": strings.TrimSpace(req.Title), "discipline": strings.TrimSpace(req.Discipline), "work_package": strings.TrimSpace(req.WorkPackage), "document_id": cleanID(req.DocumentID), "review_comment": strings.TrimSpace(req.ReviewComment)}
+	return s.repo.CreateQualityITP(ctx, projectID, header, items, actorID, actorName)
+}
+
+func (s *Service) ReviseQualityITP(ctx context.Context, itpID, comment, actorID, actorName string) (Record, error) {
+	return s.repo.ReviseQualityITP(ctx, cleanID(itpID), strings.TrimSpace(comment), actorID, actorName)
+}
+
+func (s *Service) QualityITPAction(ctx context.Context, itpID, action, comment, actorID, actorName string) (Record, error) {
+	comment = strings.TrimSpace(comment)
+	if statusIn(action, "approve", "activate") && comment == "" {
+		return nil, validationError("Duyệt/kích hoạt ITP cần có nhận xét")
+	}
+	return s.repo.QualityITPAction(ctx, cleanID(itpID), action, comment, actorID, actorName)
+}
+
+func (s *Service) CreateQualityInspectionRequest(ctx context.Context, projectID string, req QualityInspectionRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	if projectID == "" || cleanID(req.ITPItemID) == "" || strings.TrimSpace(req.RFICode) == "" || strings.TrimSpace(req.Location) == "" {
+		return nil, validationError("Mã RFI, ITP item và vị trí kiểm tra là bắt buộc")
+	}
+	requestedAt := strings.TrimSpace(req.RequestedInspectionAt)
+	if _, err := time.Parse(time.RFC3339, requestedAt); err != nil {
+		return nil, validationError("Thời điểm yêu cầu kiểm tra phải theo RFC3339")
+	}
+	body := Record{"rfi_code": strings.TrimSpace(req.RFICode), "itp_item_id": cleanID(req.ITPItemID), "work_item_id": cleanID(req.WorkItemID), "location": strings.TrimSpace(req.Location), "lot_reference": strings.TrimSpace(req.LotReference), "requested_inspection_at": requestedAt, "request_comment": strings.TrimSpace(req.RequestComment), "request_evidence_id": cleanID(req.RequestEvidenceID)}
+	return s.repo.CreateQualityInspectionRequest(ctx, projectID, body, actorID, actorName)
+}
+
+func (s *Service) QualityInspectionAction(ctx context.Context, rfiID, action string, req QualityInspectionDecisionRequest, actorID, actorName string) (Record, error) {
+	if action == "inspect" {
+		if !statusIn(req.Result, "pass", "conditional_pass", "fail") || strings.TrimSpace(req.Comment) == "" {
+			return nil, validationError("Inspection cần kết quả và nhận xét")
+		}
+	}
+	return s.repo.QualityInspectionAction(ctx, cleanID(rfiID), action, strings.TrimSpace(req.Result), strings.TrimSpace(req.Comment), cleanID(req.InspectionEvidenceID), actorID, actorName)
+}
+
+func (s *Service) CreateQualityNCR(ctx context.Context, projectID string, req QualityNCRRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	if projectID == "" || strings.TrimSpace(req.NCRCode) == "" || strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Nonconformity) == "" || !statusIn(req.SourceType, "rfi", "issue", "work_item", "manual") || !statusIn(req.Severity, "low", "medium", "high", "critical") {
+		return nil, validationError("Dữ liệu NCR không hợp lệ")
+	}
+	dueDate := strings.TrimSpace(req.DueDate)
+	if dueDate != "" {
+		if _, err := time.Parse("2006-01-02", dueDate); err != nil {
+			return nil, validationError("Hạn NCR không hợp lệ")
+		}
+	}
+	sourceID := cleanID(req.SourceID)
+	if sourceID == "" {
+		sourceID = map[string]string{"rfi": cleanID(req.RFIID), "issue": cleanID(req.IssueID), "work_item": cleanID(req.WorkItemID), "manual": projectID}[req.SourceType]
+	}
+	if sourceID == "" {
+		return nil, validationError("NCR cần hồ sơ nguồn phù hợp")
+	}
+	body := Record{"ncr_code": strings.TrimSpace(req.NCRCode), "source_type": req.SourceType, "source_id": sourceID, "rfi_id": cleanID(req.RFIID), "work_item_id": cleanID(req.WorkItemID), "issue_id": cleanID(req.IssueID), "title": strings.TrimSpace(req.Title), "severity": req.Severity, "nonconformity": strings.TrimSpace(req.Nonconformity), "immediate_action": strings.TrimSpace(req.ImmediateAction), "due_date": dueDate, "evidence_id": cleanID(req.EvidenceID), "owner_id": cleanID(req.OwnerID)}
+	return s.repo.CreateQualityNCR(ctx, projectID, body, actorID, actorName)
+}
+
+func (s *Service) QualityNCRAction(ctx context.Context, ncrID, action string, req QualityNCRActionRequest, actorID, actorName string) (Record, error) {
+	if action == "root-cause" && strings.TrimSpace(req.RootCause) == "" {
+		return nil, validationError("NCR cần phân tích nguyên nhân gốc")
+	}
+	if action == "corrective" && (strings.TrimSpace(req.CorrectiveAction) == "" || cleanID(req.CorrectiveEvidenceID) == "") {
+		return nil, validationError("Corrective action cần nội dung và minh chứng")
+	}
+	if action == "reinspection" && cleanID(req.ReinspectionRFIID) == "" {
+		return nil, validationError("Cần liên kết RFI tái kiểm tra")
+	}
+	if action == "close" && strings.TrimSpace(req.Comment) == "" {
+		return nil, validationError("Đóng NCR cần nhận xét")
+	}
+	return s.repo.QualityNCRAction(ctx, cleanID(ncrID), action, req, actorID, actorName)
+}
+
+func (s *Service) CreateRecurringPlan(ctx context.Context, projectID string, req ConstructionRecurringPlanRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	if projectID == "" || strings.TrimSpace(req.PlanCode) == "" || strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.ResponsibleRole) == "" || !statusIn(req.RecurrenceType, "daily", "weekly", "monthly", "custom_days") || req.IntervalValue <= 0 {
+		return nil, validationError("Dữ liệu lịch QA/QC lặp không hợp lệ")
+	}
+	startDate := strings.TrimSpace(req.StartDate)
+	endDate := strings.TrimSpace(req.EndDate)
+	if _, err := time.Parse("2006-01-02", startDate); err != nil {
+		return nil, validationError("Ngày bắt đầu lịch lặp không hợp lệ")
+	}
+	if endDate != "" {
+		if _, err := time.Parse("2006-01-02", endDate); err != nil || endDate < startDate {
+			return nil, validationError("Ngày kết thúc lịch lặp không hợp lệ")
+		}
+	}
+	body := Record{"plan_code": strings.TrimSpace(req.PlanCode), "title": strings.TrimSpace(req.Title), "description": strings.TrimSpace(req.Description), "recurrence_type": req.RecurrenceType, "interval_value": req.IntervalValue, "start_date": startDate, "end_date": endDate, "due_time": strings.TrimSpace(req.DueTime), "responsible_role": strings.TrimSpace(req.ResponsibleRole), "assigned_user_id": cleanID(req.AssignedUserID), "evidence_required": req.EvidenceRequired, "source_work_item_id": cleanID(req.SourceWorkItemID)}
+	return s.repo.CreateRecurringPlan(ctx, projectID, body, actorID, actorName)
+}
+
+func (s *Service) GenerateRecurringOccurrences(ctx context.Context, planID string, throughDate string, actorID, actorName string) (Record, error) {
+	throughDate = strings.TrimSpace(throughDate)
+	if throughDate == "" {
+		throughDate = time.Now().Format("2006-01-02")
+	}
+	if _, err := time.Parse("2006-01-02", throughDate); err != nil {
+		return nil, validationError("Ngày sinh occurrence không hợp lệ")
+	}
+	return s.repo.GenerateRecurringOccurrences(ctx, cleanID(planID), throughDate, actorID, actorName)
+}
+
+func (s *Service) RecurringOccurrenceAction(ctx context.Context, occurrenceID, action string, req ConstructionRecurringOccurrenceRequest, actorID, actorName string) (Record, error) {
+	if action == "complete" && strings.TrimSpace(req.Comment) == "" {
+		return nil, validationError("Hoàn tất occurrence cần ghi chú")
+	}
+	if action == "skip" && strings.TrimSpace(req.Reason) == "" {
+		return nil, validationError("Bỏ qua occurrence cần lý do")
+	}
+	return s.repo.RecurringOccurrenceAction(ctx, cleanID(occurrenceID), action, strings.TrimSpace(req.Comment), cleanID(req.EvidenceID), strings.TrimSpace(req.Reason), actorID, actorName)
 }
 
 func (s *Service) CreateStockMovement(ctx context.Context, req StockActionRequest, actorID, actorName string) (Record, error) {
@@ -6348,8 +7203,32 @@ func recordValue(value any) Record {
 	}
 }
 
-func (s *Service) HandoverCheck(ctx context.Context, id string) (Record, error) {
-	return s.repo.HandoverCheck(ctx, id)
+func (s *Service) HandoverDetail(ctx context.Context, id string) (Record, error) {
+	return s.repo.GetHandoverDetail(ctx, cleanID(id))
+}
+
+func (s *Service) SubmitHandover(ctx context.Context, id string, req ActionRequest, actorID, actorName string) (Record, error) {
+	return s.repo.SubmitHandover(ctx, cleanID(id), req, actorID, actorName)
+}
+
+func (s *Service) HandoverCheck(ctx context.Context, id, actorID, actorName string) (Record, error) {
+	return s.repo.HandoverCheck(ctx, cleanID(id), actorID, actorName)
+}
+
+func (s *Service) UpdateHandoverChecklistItem(ctx context.Context, id string, req HandoverChecklistItemRequest, actorID, actorName string) (Record, error) {
+	status := strings.TrimSpace(req.Status)
+	if !statusIn(status, "pending", "verified", "waived") {
+		return nil, validationError("Trạng thái checklist bàn giao không hợp lệ", Record{"status": status})
+	}
+	evidenceID := cleanID(req.EvidenceID)
+	documentID := cleanID(req.DocumentID)
+	notes := strings.TrimSpace(req.Notes)
+	if len([]rune(notes)) > 2000 {
+		return nil, validationError("Ghi chú checklist không được vượt quá 2000 ký tự")
+	}
+	return s.repo.UpdateHandoverChecklistItem(ctx, cleanID(id), Record{
+		"status": status, "evidence_id": evidenceID, "document_id": documentID, "notes": notes,
+	}, actorID, actorName)
 }
 
 func (s *Service) CompleteHandover(ctx context.Context, id string, req ActionRequest, actorID, actorName string) (Record, error) {
@@ -7523,10 +8402,33 @@ func (s *Service) ReceivableAction(ctx context.Context, id, action string, req A
 }
 
 func (s *Service) CreatePayment(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
-	if cleanID(body["created_by"]) == "" {
-		body["created_by"] = actorID
+	projectID := cleanID(body["project_id"])
+	paymentCode := strings.TrimSpace(fmt.Sprint(body["payment_code"]))
+	paymentType := strings.TrimSpace(fmt.Sprint(body["payment_type"]))
+	paymentMethod := strings.TrimSpace(fmt.Sprint(body["payment_method"]))
+	amount := number(body["amount"])
+	if !validActivityUUID(projectID) || paymentCode == "" || amount <= 0 {
+		return nil, validationError("Phiếu thu/chi cần công trình, mã và số tiền lớn hơn 0", Record{"project_id": projectID, "payment_code": paymentCode, "amount": amount})
 	}
-	row, err := s.repo.CreatePayment(ctx, body)
+	if !statusIn(paymentType, "supplier_payment", "subcontractor_payment", "client_receipt", "outbound", "inbound", "advance", "advance_settlement", "other") {
+		return nil, validationError("Loại phiếu thu/chi không hợp lệ", Record{"payment_type": paymentType})
+	}
+	if paymentMethod == "" {
+		paymentMethod = "bank_transfer"
+	}
+	if !statusIn(paymentMethod, "bank_transfer", "cash") {
+		return nil, validationError("Phương thức thanh toán không hợp lệ", Record{"payment_method": paymentMethod})
+	}
+	targetType := strings.TrimSpace(fmt.Sprint(body["target_type"]))
+	if targetType == "<nil>" {
+		targetType = ""
+	}
+	normalized := Record{
+		"project_id": projectID, "payment_code": paymentCode, "payment_type": paymentType,
+		"target_type": targetType, "target_id": cleanID(body["target_id"]),
+		"amount": amount, "payment_method": paymentMethod, "status": "draft", "created_by": actorID,
+	}
+	row, err := s.repo.CreatePayment(ctx, normalized)
 	if err != nil {
 		return nil, err
 	}

@@ -29,10 +29,12 @@
 - Every stock operation keeps source, target, actor, quantity, material, and project traceability.
 - Material snapshot submit applies site balance usage but does not create warehouse movement by itself.
 - Surplus handling can be partial and must keep remaining/handled state consistent.
+- Returning only part of the available site material leaves `surplus_status='partial'` when a positive surplus remains; it becomes `handled` only when no surplus remains. Stock SQL binds quantities explicitly as numeric to avoid PostgreSQL parameter type ambiguity.
 - Warehouse report and stock list must agree on active material and movement state.
 
 ## Cross-Domain Checks
 
 - Pair with procurement when receive/order flows create stock movements or material obligations.
+- Procurement `receive` now reconciles submitted incoming-acceptance quantities into `partially_received`/`received`; it does not create `stock_movements`. Warehouse receipt remains an explicit stock action with its own balance ledger and audit.
 - Pair with construction operations when site usage, before/after snapshots, or surplus handling changes work item state.
 - Pair with quality/acceptance/handover when incoming acceptance, outgoing acceptance, or handover blockers depend on material state.

@@ -18,6 +18,7 @@ import { Dialog } from '../../components/Dialog';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { currency } from '../../lib/utils/format';
 import { enumOptions } from '../../lib/utils/status';
+import { SupplierQuotationWorkspace } from './SupplierQuotationWorkspace';
 
 type PriceAction = 'expected' | 'norm' | 'final';
 
@@ -168,6 +169,10 @@ export function BOQPage() {
       toast.warn({ title: 'Đơn giá không hợp lệ', description: action === 'expected' ? 'Expected price phải lớn hơn hoặc bằng 0.' : 'Giá lock phải lớn hơn 0.' });
       return;
     }
+    if (action === 'final' && !priceForm.comment.trim()) {
+      toast.warn({ title: 'Thiếu lý do miễn báo giá', description: 'Khóa giá cuối thủ công chỉ dùng khi có lý do miễn so sánh báo giá.' });
+      return;
+    }
     const payload = { itemId: priceDialog.id, unitPrice, comment: priceForm.comment };
     if (action === 'expected') updateExpected.mutate(payload);
     if (action === 'norm') lockNorm.mutate(payload);
@@ -214,6 +219,8 @@ export function BOQPage() {
       </div>
 
       <UnitPriceReadinessPanel readiness={priceReadiness} onOpenItem={setPriceDialog} />
+
+      <SupplierQuotationWorkspace projectId={id} boqItems={rows} />
 
       <DataTable
         rows={rows}
@@ -476,7 +483,7 @@ function UnitPriceLifecycleDialog({
           />
           <PriceStagePanel
             title="Final price"
-            description="Giá cuối dùng cho procurement. Cần lock norm trước khi lock final."
+            description="Ưu tiên chọn tại bảng so sánh báo giá. Khóa thủ công cần ghi rõ lý do miễn báo giá."
             value={form.final}
             disabled={pending || Boolean(!item.norm_price_locked || item.final_price_locked)}
             buttonLabel={item.final_price_locked ? 'Đã lock final' : 'Lock final'}
@@ -657,9 +664,9 @@ function boqPriceReadiness(rows: BOQItem[]): BOQPriceReadiness {
   const finalLockedCount = rows.filter((item) => item.final_price_locked).length;
   const approved = rows.filter((item) => item.status === 'approved');
   const approvedFinal = approved.filter((item) => item.final_price_locked);
-  const approvedPendingFinal = approved.filter((item) => !item.final_price_locked);
+  const approvedPendingFinal = approved.filter((item) => !item.final_price_locked || (!item.selected_quotation_item_id && !item.price_waiver_reason));
   const generateDisabledReason = approvedPendingFinal.length
-    ? `${approvedPendingFinal.length} dòng approved chưa final lock.`
+    ? `${approvedPendingFinal.length} dòng approved chưa khóa giá cuối hoặc chưa có báo giá/lý do miễn báo giá.`
     : approvedFinal.length === 0
       ? 'Chưa có dòng approved đã final lock để sinh mua sắm.'
       : '';
@@ -679,7 +686,7 @@ function boqPriceReadiness(rows: BOQItem[]): BOQPriceReadiness {
 
 function boqNextAction(rows: BOQItem[], approvedPendingFinal: BOQItem[], approvedFinalCount: number) {
   if (!rows.length) return 'Thêm dòng BOQ';
-  if (approvedPendingFinal.length) return 'Lock final price cho dòng approved';
+  if (approvedPendingFinal.length) return 'Hoàn tất chọn báo giá hoặc ghi lý do miễn báo giá';
   if (approvedFinalCount > 0) return 'Sinh yêu cầu mua sắm';
   if (rows.some((item) => item.status === 'draft' || item.status === 'revised')) return 'Submit BOQ';
   if (rows.some((item) => item.status === 'submitted')) return 'Approve BOQ';

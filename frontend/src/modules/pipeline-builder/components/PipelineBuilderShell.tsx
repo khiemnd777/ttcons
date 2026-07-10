@@ -11,6 +11,7 @@ type PipelineBuilderShellProps = {
   templateStatus?: string;
   templateDescription?: string;
   selectedTemplateId: string;
+  isReadOnly: boolean;
   canDeleteSelection: boolean;
   deleteSelectionLabel: string;
   nodeCount: number;
@@ -33,6 +34,7 @@ export function PipelineBuilderShell({
   templateStatus,
   templateDescription,
   selectedTemplateId,
+  isReadOnly,
   canDeleteSelection,
   deleteSelectionLabel,
   nodeCount,
@@ -60,7 +62,7 @@ export function PipelineBuilderShell({
                 {templateStatus ? <StatusBadge status={templateStatus} /> : null}
                 <button
                   title="Đổi tên template"
-                  disabled={!selectedTemplateId}
+                  disabled={!selectedTemplateId || isReadOnly}
                   className="rounded-md border border-line p-1.5 text-slate-500 hover:bg-slate-100 hover:text-ink disabled:opacity-50"
                   onClick={onRenameTemplate}
                 >
@@ -70,15 +72,15 @@ export function PipelineBuilderShell({
               <p className="mt-1 line-clamp-1 text-sm text-slate-500">{templateDescription ?? 'Chọn template hoặc tạo template mới để bắt đầu.'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button title="Clone template" disabled={!selectedTemplateId} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50" onClick={onCloneTemplate}>
+              <button title="Tạo revision nháp mới" disabled={!selectedTemplateId} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50" onClick={onCloneTemplate}>
                 <Copy className="h-4 w-4" />
-                Clone
+                Tạo revision
               </button>
-              <button title="Publish template" disabled={!selectedTemplateId} className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" onClick={onPublishTemplate}>
+              <button title="Phát hành revision" disabled={!selectedTemplateId || isReadOnly} className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" onClick={onPublishTemplate}>
                 <Send className="h-4 w-4" />
-                Publish
+                Phát hành
               </button>
-              <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50" onClick={onAutoLayout} disabled={!nodeCount || autoLayoutPending}>
+              <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50" onClick={onAutoLayout} disabled={!nodeCount || autoLayoutPending || isReadOnly}>
                 <Wand2 className="h-4 w-4" />
                 Tự sắp xếp
               </button>
@@ -86,13 +88,19 @@ export function PipelineBuilderShell({
                 <CheckCircle2 className="h-4 w-4" />
                 Kiểm tra
               </button>
-              <button className="inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50" onClick={onDeleteSelection} disabled={!canDeleteSelection || deleteSelectionPending}>
+              <button className="inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50" onClick={onDeleteSelection} disabled={!canDeleteSelection || deleteSelectionPending || isReadOnly}>
                 <Trash2 className="h-4 w-4" />
                 {deleteSelectionLabel}
               </button>
             </div>
           </div>
         </div>
+
+        {isReadOnly ? (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+            Revision đã phát hành đang ở chế độ chỉ đọc. Chọn <strong>Tạo revision</strong> để chỉnh sửa mà không làm thay đổi các công trình lịch sử.
+          </div>
+        ) : null}
 
         {children}
         {inspector}

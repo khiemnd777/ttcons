@@ -1,5 +1,138 @@
 # Current States
 
+## Product-grade Workflow Engine And Business Forms
+
+Status: complete
+
+Mục đích chính:
+- Biến pipeline thành hợp đồng thực thi nghiệp vụ: template đã phát hành bất biến, project chỉ chạy đúng phiên bản đã phát hành, và mọi bước nghiệp vụ phải đạt đúng gate trước khi quy trình đi tiếp.
+
+Will be done:
+- S0: lập baseline tương thích cho template `40000000-0000-0000-0000-000000000020`, các run hiện hữu và dữ liệu form lịch sử; không sửa submitted/signed/PDF history.
+- S1: thêm template lineage, revision, engine version, definition hash, published actor/time; khóa mọi đường ghi vào template đã phát hành.
+- S1: mở rộng publish validation cho graph, form version, condition config và permission; project chỉ được start bằng template published.
+- S2-S5: runtime snapshot, gate engine, state transition/branch, hard automation, approval và capability-driven UI.
+- B5: hoàn tất UAT, regression hardening và sign-off toàn hệ thống theo các vertical slice đã duyệt.
+- Mỗi slice cập nhật migration, backend/frontend contract, mapping, automated tests và UAT evidence tương ứng.
+
+Done:
+- User approved the complete review package with `OK triển khai theo review package này.`
+- Loaded the mandatory module memory, backend/frontend maps, workflow orchestration, project planning, commercial/procurement, construction operations, quality/acceptance/handover, accounting/finance, administration/governance, reporting and impact-analysis domain guidance.
+- Confirmed from current code that published pipeline templates remain writable through template/node/step/edge endpoints and `StartPipeline` does not reject a selected draft template.
+- Confirmed the current publish gate only validates required workflow-form mappings.
+- Began S0-S1 with an additive migration and shared immutable-template/publish-validation design; existing run/form history remains out of mutation scope.
+- Added V43 template lifecycle schema: family/revision/source lineage, engine version, definition hash, publish actor/time, plus run engine/hash snapshots.
+- Made template creation and revision cloning transactional; clone now creates the next draft revision in the same family.
+- Guarded every template/node/step/edge structural write so published revisions are immutable; deleting a published revision archives it.
+- Expanded publish validation to graph root/sink/reachability/cycle, required published forms, answer-condition field/value validity, and permission-key existence.
+- Updated Pipeline Builder with published read-only mode, `Tạo revision`, local graph validation, and authoring controls for `workflow_form_answer_equals.field_key/value`.
+- Filtered Project template choices to published revisions and made backend `StartPipeline` reject draft/archived templates.
+- Added V44 runtime completion gates: run-step snapshots of exact required form version, engine-v2 active-node enforcement, exact form submission, complete work items/steps, node approval, and blocked automation checks before advance.
+- Removed synthetic legacy checklist completion from engine v2 while preserving compatibility for engine-v1 runs.
+- Added direct non-selected branch skipping/cancellation and excluded skipped nodes from runtime progress.
+- Added V45 stable work-item surface binding with template/run-step snapshots of `surface_kind` and `domain_action_key`.
+- Bound official steps 38/39/40/46 explicitly: subcontractor checklist reconciliation, incoming material acceptance, quantity dossier workflow form, and owner/client reconciliation respectively; this removes the prior title-based misrouting.
+- Updated work-item primary-surface resolution to prefer the backend snapshot and retain text heuristics only for legacy/non-pipeline records.
+- Added V46 hard automation and structured approval-policy schema, including request policy snapshots, current approval stage, and actor role labels on approval actions.
+- Replaced engine-v2 display-name dispatch with stable terminal `domain_action_key` mappings for BOQ/procurement, input/output finance scaffolds, and handover readiness; engine v1 retains legacy behavior.
+- Required engine-v2 hard automation to succeed before work-item/legacy-step completion. Blocked/failed outcomes are stored with the same idempotency key and returned as actionable validation blockers instead of being ignored after completion.
+- Added work-item automation-event payload and requirement-panel status so users see the exact hard action and blocker; retrying completion safely retries the same idempotent action.
+- Implemented structured approval evaluation for `any`, `all`, `quorum`, and ordered role stages with requester separation, required comments, duplicate-approval prevention, row locking, stage progression, and audit.
+- Added Pipeline Builder approval-policy controls for mode, ordered roles, quorum, requester separation, and required comments.
+- Completed B1 supplier quotation and procurement vertical slice with V47: supplier quotation headers/items, qualification state, immutable submitted quote items, auditable quote selection history, BOQ selected-quote/waiver source, procurement quotation snapshots, supplier/PO/delivery metadata, and supporting indexes/constraints.
+- Added project supplier-quotation list/create/detail/update/submit/qualify APIs, BOQ-line comparison API, and qualified-quote selection API. Selection requires approved BOQ + norm lock, validates quote/item compliance and validity, locks final price atomically, writes the immutable BOQ price event, and records audit metadata.
+- Manual BOQ final-price lock now requires an explicit quotation-waiver reason. BOQ submit/approve now use transactional state transitions with audit and no longer approve draft rows directly.
+- Procurement generation now requires a selected quote or waiver source, groups BOQ lines into one request per supplier, and snapshots quote item, supplier, BOQ price revision/event, quoted price, and variance while retaining the legacy top-level response shape.
+- Procurement create/update now validates project, title, budget state, partner catalog, and delivery date and writes audit. Structured approval requests can no longer be silently forced approved by the procurement action endpoint.
+- Procurement ordering now requires supplier, PO/order reference, and expected delivery date. Receive derives `partially_received`/`received` only from submitted incoming-acceptance quantities; cumulative accepted quantity cannot exceed requested quantity, and no implicit stock movement is created.
+- Added the BOQ `Báo giá nhà cung cấp & so sánh thương mại` workspace with quote editor, supplier catalog, quote-item grid, technical/commercial assessment, comparison table, decision reason, loading/empty/error states, and responsive horizontal tables.
+- Reworked the Procurement page around generated requests and real lifecycle actions, with supplier/order metadata, source-price detail, incoming-acceptance progress, status-specific actions, and shared dialogs instead of one-off drawers.
+- Added DB-backed integration coverage for quote submission/qualification/selection, BOQ final lock, procurement supplier/quote snapshot, and the legacy manual-waiver generation path.
+- Applied V47 successfully through the running backend migration runner and verified schema migration version `47` in PostgreSQL.
+- Ran B1 DB-backed integration tests inside the backend Docker network: both targeted scenarios pass.
+- Ran `GOCACHE=$PWD/.gocache go test ./...` in `backend`: pass.
+- Ran `make migrate-check`: 47 migrations checked successfully.
+- Ran `npm run build` in `frontend`: pass; only the existing large chunk warning remains.
+- Browser verification for B1 was skipped because it was not explicitly requested.
+- Completed B2 contract lifecycle with V48-V50: project-scoped contracts, signed immutable versions, payment milestones, variation/appendix workflow, retention ledger/release history, dedicated contract RBAC, cascade-safe history triggers, and official-workflow surface binding.
+- Added contract lifecycle API and service/repository transitions: create/update draft contract, create version, submit/review/approve/sign, activate signed current version, create/qualify milestone, materialize AP/AR, create/submit/approve/reject/incorporate variation, and release retention into traceable AP/AR.
+- Kept `projects.contract_amount` as a compatibility snapshot updated only from the active signed main-client contract; signed `contract_versions` and `contracts.current_amount` are now the commercial source of truth.
+- Version definition hashes cover amount, scope, commercial/payment terms, dates and document reference. Signed versions cannot be updated; incorporated/rejected variations cannot be updated. Project cascade cleanup remains possible through V49 without exposing a direct history-delete API.
+- Milestone obligation creation requires an active contract and eligible milestone. Acceptance-required milestones require an approved pass/conditional-pass acceptance. Obligation creation is idempotent and snapshots contract/milestone source into payable/receivable records.
+- Milestone retention creates a held ledger entry. Retention release is warranty-gated, cannot exceed outstanding retention, appends a numbered release row, opens a traceable AP/AR record, and updates held/partial/released state with audit.
+- Approved variation incorporation creates the next draft version with revised amount, schedule and scope. It does not silently mutate the active signed version; the new revision must pass review/approve/sign/activate again.
+- Added `frontend/src/modules/contracts/ContractsPage.tsx` with project-scoped contract list, capability-gated lifecycle actions, version hash/status table, milestone/AP-AR actions, variation revision controls, retention release dialog, loading/empty/error states and responsive tables.
+- Added `/projects/:id/contracts` to router and project workspace navigation under `Thương mại & Vật tư`; added contract domain types and Vietnamese status presentation.
+- Added `surface_kind='contract'` to workflow surface contracts. Official template steps 24 and 29-31/33 open the Contract Workspace while preserving the step business form/PDF as a supporting tab; step 32 remains the structured approval surface. Only pending runtime steps are remapped.
+- Applied V48, V49 and V50 successfully through the running backend migration runner; PostgreSQL confirms five official template steps on the contract surface and seven contract permission keys.
+- Added and ran DB-backed integration coverage for contract create → version review/approve/sign → activation → milestone → receivable/retention → variation/revision → re-sign/re-activate → retention release. The scenario passes inside the Docker network and cleanup is cascade-safe.
+- Ran backend core tests, `make migrate-check` for 50 migrations, and frontend production build successfully; only the existing large chunk warning remains.
+- Browser verification for B2 was skipped because it was not explicitly requested.
+- Completed B3 QA/QC and construction execution with V51-V53: revisioned ITP plans/items, RFI inspection lifecycle, NCR root-cause/corrective/reinspection lifecycle, recurring construction occurrences, dedicated quality RBAC, official-workflow quality surfaces, and an idempotent construction daily-report source bridge.
+- Added the project quality workspace API and transactional transitions for ITP create/revise/submit/approve/activate, RFI create/submit/schedule/inspect, NCR create/root-cause/corrective/reinspection/close, recurring plan generation and occurrence complete/skip.
+- Rejected RFI inspection now creates a linked NCR and draft rework atomically. NCR closure requires project-owned corrective evidence, an accepted/conditional reinspection RFI, and completed linked rework; actor and audit history are preserved.
+- Active/approved/superseded ITP definitions are immutable and hash-backed. Only one active revision exists per project/family; recurring occurrence generation is idempotent by plan/date and respects evidence gates.
+- Added `frontend/src/modules/quality/QualityPage.tsx` with capability-gated ITP, RFI, NCR and recurring-work sections, including structured editors, lifecycle actions, loading/empty/error states, project-owned evidence selection and responsive tables.
+- Added `/projects/:id/quality`, project workspace navigation, quality frontend contracts/status labels, and the `quality` work-item primary surface. Official workflow steps 36-37 now open the quality workspace while completed historical runtime steps remain unchanged.
+- Submitted `builtin_construction_daily_report` forms now sync idempotently into `operation_daily_reports` with workflow-form/work-item/evidence linkage, structured answer snapshot, progress, work, crew, material and issue summaries; the existing next-plan work-item generation remains intact.
+- Applied V51, V52 and V53 with the custom migration runner. `make migrate-check` validates all 53 migrations.
+- Added DB-backed lifecycle coverage for ITP -> failed RFI -> NCR/rework -> corrective evidence -> accepted reinspection -> close and recurring occurrence completion. Added daily-report bridge assertions covering the complete structured mapping.
+- Ran targeted Docker/PostgreSQL integration tests for B3 and both planning/construction daily-report next-plan flows: all pass.
+- Ran backend core tests and the frontend production build successfully during B3 implementation; the final full-suite validation remains part of the B3 completion gate below.
+- Browser verification for B3 was skipped because it was not explicitly requested.
+- Completed B4 financial creation and handover package hardening with V54-V56: typed/server-owned AP/AR creation, draft-only generic payment creation, actor audit, handover package lifecycle, evidence/document checklist, readiness snapshot, new verification permission, official finance/handover workflow surfaces, and historical checklist backfill.
+- Manual AP/AR APIs no longer accept client-controlled paid/received/remaining/status fields. Payables derive remaining from gross minus advance/deduction; receivables derive remaining from gross; all new records start draft with zero paid/received and audited creator.
+- Generic payment/receipt creation validates project/code/type/method/positive amount, ignores client approval/status fields, and always starts draft. Dedicated payable/receivable payment endpoints continue to own allocation and reconciliation updates.
+- Added exact final-acceptance source locking, handover code, workflow-form source, checklist items, accepted-evidence/active-document verification, submit/check/ready/blocked/handed-over lifecycle, checked/completed actor timestamps, and immutable completion snapshot semantics.
+- Readiness now checks the linked final acceptance, open issues, NCRs, rework, material surplus, AP/AR remaining balances, pending payments and all required checklist items. Complete always reruns readiness immediately before writing `handed_over`.
+- Rebuilt `HandoverPage.tsx` as a dense project workspace with package summary, exact acceptance selection, checklist evidence/document verification, blocker display, capability-gated submit/check/complete actions and required completion comment. Removed self-attested readiness checkboxes.
+- Removed client-editable derived balance/status controls from AP/AR and generic payment create forms. Server ownership is explained inline.
+- Added finance and handover primary work-item surfaces. Official steps 42, 44-45 and 48-51 open the project debt/finance workspace; step 52 opens the handover package while preserving each workflow form/PDF in the support tab. Only pending runtime steps are remapped.
+- Applied V54-V56 with the custom migration runner; V54 backfills legacy `checking` to `submitted`, and V56 gives every historical non-deleted handover the same eight required checklist items.
+- DB-backed regression chain passes for input/output invoice PDF, payable/receivable approval, payment schedule, advance, partial payment/receipt allocation, reconciliation ledger/aging, derived-state hardening, blocked handover and acceptance -> verified package -> readiness -> completed handover.
+- Frontend production build passes after the B4 workspace/forms/surface changes; only the existing large chunk warning remains.
+- Browser verification for B4 was skipped because it was not explicitly requested.
+- Completed B5 full impact audit and DB-backed UAT hardening across template/runtime, forms/signatures/PDF, activity/RBAC, BOQ/procurement, contract, stock/materials, QA/NCR/rework, invoice/payment/reconciliation and handover.
+- The first full DB suite exposed two production SQL defects that focused tests had not reached: runtime queries ordered `pipeline_run_steps` by a non-existent `created_at`, and site-material balance SQL reused an untyped quantity placeholder across numeric/integer expressions. Both root causes were fixed in repository code.
+- Explicit UUID/text casts were added to activity mention insertion SQL after the full suite exposed PostgreSQL parameter inference ambiguity on role mentions.
+- UAT fixtures were migrated to the current engine-v2 contract: template lineage is mandatory, node completion fixtures satisfy exact forms/steps/approvals, and official hard automation is selected by `domain_action_key` instead of legacy display-name dispatch.
+- Updated checklist UAT to the currently published structured planning-checklist schema and configured test-local upload storage for signature artifact verification.
+- Corrected the material ledger regression expectation: a partial return with positive remaining surplus stays `partial`, not `handled`.
+- Re-ran every previously failing regression group: all pass.
+- Re-ran the entire compiled core test suite with `CONSFLOW_TEST_DATABASE_URL` against PostgreSQL in Docker: `PASS`.
+- Final backend `go test ./...`, frontend production build, `make migrate-check` for 56 migrations, agent artifact validation and `git diff --check` all pass. Browser verification was not run because it was not explicitly requested.
+- Applied V43, V44, and V45 successfully through the running backend container migration runner.
+- Applied V46 successfully through the running backend container migration runner.
+- Ran `make migrate-check`: 46 migrations checked successfully.
+- Ran `GOCACHE=$PWD/.gocache go test ./...` in `backend`: pass.
+- Ran `npm run build` in `frontend`: pass; only the existing large chunk warning remains.
+- Browser verification was skipped because it was not explicitly requested.
+
+## Pipeline Builder Back Navigation
+
+Status: complete
+
+Mục đích chính:
+- Add a clear `[← Quay lại]` control to the full-screen Pipeline Builder workspace so users can return to the previous page without using the browser chrome.
+
+Will be done:
+- Reuse the existing `TemplateSidebar` back-button surface instead of adding a new UI primitive.
+- Change the button label from `Back` to `Quay lại`.
+- Route the button through browser/app history with a safe `/` fallback when no internal history entry exists.
+- Keep backend APIs, template publish/clone/edit behavior, canvas/diagram interactions, workflow gates, and runtime copies unchanged.
+- Update the frontend UI mapping because the Pipeline Builder surface behavior changes.
+- Run `cd frontend && npm run build`; browser verification remains skipped unless explicitly requested.
+
+Done:
+- User approved the review package with `OK`.
+- Re-read Consflow module memory, frontend workflow, workflow orchestration domain, central module map, frontend UI map, domain map, `AGENTS.md`, router, app shell, and Pipeline Builder owner files.
+- Enabled the existing Pipeline Builder sidebar back-button surface.
+- Changed the back button label from `Back` to `Quay lại` and added a Vietnamese title.
+- Updated Pipeline Builder back behavior to use browser/app history with `/` as a fallback when no internal history entry exists.
+- Updated `frontend-ui-utility-map.md` to record Pipeline Builder sidebar back navigation.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
 ## Mandatory Agent Mapping Bootstrap
 
 Status: complete

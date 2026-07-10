@@ -67,10 +67,11 @@ const workspaceGroups: WorkspaceGroup[] = [
   },
   {
     key: 'materials',
-    label: 'Mua sắm & Vật tư',
+    label: 'Thương mại & Vật tư',
     to: 'procurement',
-    permissions: ['procurement.view', 'warehouse.view'],
+    permissions: ['procurement.view', 'warehouse.view', 'contract.view'],
     children: [
+      { label: 'Hợp đồng', to: 'contracts', permissions: ['contract.view'] },
       { label: 'Mua sắm', to: 'procurement', permissions: ['procurement.view'] },
       { label: 'Kho vật tư', to: 'warehouse', permissions: ['warehouse.view'] },
     ],
@@ -79,9 +80,10 @@ const workspaceGroups: WorkspaceGroup[] = [
     key: 'quality',
     label: 'Thi công & Chất lượng',
     to: 'operations',
-    permissions: ['operation.view', 'acceptance.view', 'rework.view'],
+    permissions: ['operation.view', 'quality.view', 'acceptance.view', 'rework.view'],
     children: [
       { label: 'Thi công', to: 'operations', permissions: ['operation.view'] },
+      { label: 'QA/QC · ITP/RFI/NCR', to: 'quality', permissions: ['quality.view'] },
       { label: 'Nghiệm thu', to: 'acceptance', permissions: ['acceptance.view'] },
       { label: 'Rework', to: 'rework', permissions: ['rework.view'] },
     ],

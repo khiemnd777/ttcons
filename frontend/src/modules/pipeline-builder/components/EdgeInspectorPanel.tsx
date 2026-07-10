@@ -5,6 +5,7 @@ type EdgeForm = {
   label: string;
   condition_type: string;
   priority: string;
+  condition_config: Record<string, any>;
 };
 
 type EdgeInspectorPanelProps = {
@@ -17,8 +18,11 @@ type EdgeInspectorPanelProps = {
   edgeForm: EdgeForm;
   conditionInvalid: boolean;
   priorityInvalid: boolean;
+  answerConfigInvalid: boolean;
+  answerFieldOptions: Array<{ label: string; value: string }>;
   savePending: boolean;
-  onChangeField: (field: keyof EdgeForm, value: string) => void;
+  onChangeField: (field: 'label' | 'condition_type' | 'priority', value: string) => void;
+  onChangeConditionConfig: (field: string, value: any) => void;
   onSave: () => void;
   onClose: () => void;
 };
@@ -33,8 +37,11 @@ export function EdgeInspectorPanel({
   edgeForm,
   conditionInvalid,
   priorityInvalid,
+  answerConfigInvalid,
+  answerFieldOptions,
   savePending,
   onChangeField,
+  onChangeConditionConfig,
   onSave,
   onClose,
 }: EdgeInspectorPanelProps) {
@@ -66,6 +73,26 @@ export function EdgeInspectorPanel({
           invalidText="Nhãn tối đa 80 ký tự"
           onChange={(value) => onChangeField('label', value)}
         />
+
+        {edgeForm.condition_type === 'workflow_form_answer_equals' ? (
+          <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50/50 p-3">
+            <Select
+              label="Trường biểu mẫu nguồn"
+              value={String(edgeForm.condition_config.field_key ?? '')}
+              options={answerFieldOptions}
+              invalid={answerConfigInvalid && !edgeForm.condition_config.field_key}
+              invalidText={answerFieldOptions.length ? 'Chọn trường dùng để rẽ nhánh' : 'Node nguồn chưa có trường biểu mẫu khả dụng'}
+              onChange={(value) => onChangeConditionConfig('field_key', value)}
+            />
+            <Field
+              label="Giá trị cần khớp"
+              value={String(edgeForm.condition_config.value ?? '')}
+              invalid={answerConfigInvalid && String(edgeForm.condition_config.value ?? '').trim() === ''}
+              invalidText="Nhập giá trị dùng để rẽ nhánh"
+              onChange={(value) => onChangeConditionConfig('value', value)}
+            />
+          </div>
+        ) : null}
         <Select
           label="Điều kiện chuyển tiếp"
           value={edgeForm.condition_type}

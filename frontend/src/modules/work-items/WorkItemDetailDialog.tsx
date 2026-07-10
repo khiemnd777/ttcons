@@ -673,6 +673,26 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
     });
   }
 
+  if (item.domain_action_key) {
+    const latestAutomation = (item.automation_events ?? []).find((event) => event.action_key === item.domain_action_key);
+    const automationStatus = latestAutomation?.status;
+    const reason = latestAutomation?.blocker_reason || latestAutomation?.error_message;
+    rows.push({
+      id: 'required-automation',
+      label: 'Tự động hóa nghiệp vụ bắt buộc',
+      description: automationStatus === 'succeeded'
+        ? `${item.domain_action_key} đã hoàn tất thành công.`
+        : automationStatus === 'blocked' || automationStatus === 'failed'
+          ? `${item.domain_action_key}: ${reason || 'Đang bị chặn; dùng lại thao tác hoàn tất sau khi khắc phục.'}`
+          : `${item.domain_action_key} sẽ được kiểm tra trước khi đầu việc hoàn tất.`,
+      state: automationStatus === 'succeeded' || automationStatus === 'skipped'
+        ? 'done'
+        : automationStatus === 'blocked' || automationStatus === 'failed'
+          ? 'blocked'
+          : 'neutral',
+    });
+  }
+
   if (hasWorkflowFormSummary(item)) {
     const submitted = item.workflow_form_status === 'submitted';
     const required = Boolean(item.workflow_form_required);

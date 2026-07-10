@@ -128,6 +128,21 @@ export function PipelineBuilderPage() {
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const selectedNode = selectedNodeId ? nodeById.get(selectedNodeId) : undefined;
   const selectedConnector = selectedConnectorId ? rawEdges.find((edge) => String(edge.id) === selectedConnectorId) : undefined;
+  const isReadOnly = Boolean(template.data && template.data.status !== 'draft');
+  const answerFieldOptions = useMemo(() => {
+    if (!selectedConnector) return [];
+    const sourceNode = nodeById.get(String(selectedConnector.from_node_id));
+    const versionIds = new Set((sourceNode?.steps ?? []).map((step: Record<string, any>) => String(step.form_version_id ?? '')).filter(Boolean));
+    const seen = new Set<string>();
+    return (workflowForms.data ?? []).flatMap((form) => {
+      if (!versionIds.has(String(form.version_id))) return [];
+      return (form.fields ?? []).flatMap((field) => {
+        if (seen.has(field.field_key)) return [];
+        seen.add(field.field_key);
+        return [{ label: `${field.label} (${field.field_key})`, value: field.field_key }];
+      });
+    });
+  }, [nodeById, selectedConnector, workflowForms.data]);
   const selectedConnectorSource = selectedConnector ? nodeById.get(String(selectedConnector.from_node_id)) : undefined;
   const selectedConnectorTarget = selectedConnector ? nodeById.get(String(selectedConnector.to_node_id)) : undefined;
   const detailsNode = detailsNodeId ? nodeById.get(detailsNodeId) : undefined;
@@ -184,6 +199,7 @@ export function PipelineBuilderPage() {
       description: detailsNode.description ?? '',
       type: detailsNode.type ?? 'custom',
       permissions: normalizePermissions(detailsNode),
+      approval_policy_json: isRecord(detailsNode.approval_policy_json) ? detailsNode.approval_policy_json : { mode: 'none' },
     });
     closeStepDialog();
   }, [detailsNode?.id]);
@@ -255,7 +271,7 @@ export function PipelineBuilderPage() {
       setSelectedConnectorId('');
       setDetailsNodeId('');
       navigate(`/pipeline-builder/${created.id}`);
-      toast.success('Đã clone template');
+      toast.success('Đã tạo revision nháp mới');
     },
     onError: (error) => toast.error('Không clone được template', error),
   });
@@ -333,6 +349,7 @@ export function PipelineBuilderPage() {
         description: nodeForm.description,
         type: nodeForm.type,
         permissions: Array.isArray(nodeForm.permissions) ? nodeForm.permissions : [],
+        approval_policy_json: isRecord(nodeForm.approval_policy_json) ? nodeForm.approval_policy_json : { mode: 'none' },
       });
     },
     onSuccess: () => {
@@ -636,6 +653,10 @@ export function PipelineBuilderPage() {
     if (!edgeForm.condition_type || !edgeConditionTypes.has(edgeForm.condition_type)) invalidLabels.push('Điều kiện chuyển tiếp');
     if (!Number.isInteger(priority) || priority < 1 || priority > 999) invalidLabels.push('Ưu tiên');
     if (edgeConditions.isError) invalidLabels.push('Danh sách điều kiện');
+    if (edgeForm.condition_type === 'workflow_form_answer_equals') {
+      if (!String(edgeForm.condition_config.field_key ?? '').trim()) invalidLabels.push('Trường biểu mẫu nguồn');
+      if (String(edgeForm.condition_config.value ?? '').trim() === '') invalidLabels.push('Giá trị cần khớp');
+    }
 
     if (invalidLabels.length) {
       toast.warn({
@@ -744,6 +765,15 @@ export function PipelineBuilderPage() {
     });
   };
 
+  const goBack = () => {
+    const historyIndex = Number(window.history.state?.idx ?? 0);
+    if (historyIndex > 0) {
+      navigate(-1);
+      return;
+    }
+    navigate('/');
+  };
+
   const connectorMutationPending = createEdge.isPending || updateEdge.isPending || deleteEdge.isPending || saveEdgeSettings.isPending;
   const canDeleteSelection = Boolean(selectedConnector || selectedNode);
   const deleteSelectionLabel = selectedConnector ? 'Xóa connector' : 'Xóa node';
@@ -772,10 +802,10 @@ export function PipelineBuilderPage() {
             templates={templates.data ?? []}
             selectedTemplateId={selectedTemplateId}
             expanded={templatesExpanded}
-            showBackButton={false}
+            showBackButton
             createTemplatePending={createTemplate.isPending}
             deleteTemplatePendingId={deleteTemplate.isPending ? deleteTemplateDialog?.id : undefined}
-            onBack={() => navigate('/dashboard')}
+            onBack={goBack}
             onCreateTemplate={() => createTemplate.mutate()}
             onDeleteTemplate={setDeleteTemplateDialog}
             onToggleExpanded={() => setTemplatesExpanded((current) => !current)}
@@ -783,7 +813,7 @@ export function PipelineBuilderPage() {
           >
             <NodeLibraryPanel
               presets={nodeLibrary}
-              canAddNode={Boolean(selectedTemplateId)}
+              canAddNode={Boolean(selectedTemplateId) && !isReadOnly}
               addNodePending={addNode.isPending}
               onAddNode={(preset) => addNode.mutate(preset)}
             />
@@ -793,6 +823,7 @@ export function PipelineBuilderPage() {
         templateStatus={template.data?.status}
         templateDescription={template.data?.description}
         selectedTemplateId={selectedTemplateId}
+        isReadOnly={isReadOnly}
         canDeleteSelection={canDeleteSelection}
         deleteSelectionLabel={deleteSelectionLabel}
         nodeCount={nodes.length}
@@ -806,7 +837,7 @@ export function PipelineBuilderPage() {
         onValidatePipeline={validatePipeline}
         onDeleteSelection={deleteSelection}
         inspector={
-          detailsNode ? (
+          !isReadOnly && detailsNode ? (
             <NodeInspectorPanel
               node={detailsNode}
               nodeForm={nodeForm}
@@ -836,7 +867,7 @@ export function PipelineBuilderPage() {
               onDeleteStep={(stepId) => deleteStep.mutate(stepId)}
               onReorderSteps={(orderedStepIds) => reorderStep.mutate({ orderedStepIds })}
             />
-          ) : selectedConnector ? (
+          ) : !isReadOnly && selectedConnector ? (
             <EdgeInspectorPanel
               edge={selectedConnector}
               fromNode={selectedConnectorSource}
@@ -847,8 +878,11 @@ export function PipelineBuilderPage() {
               edgeForm={edgeForm}
               conditionInvalid={edgeSubmitAttempted && (!edgeForm.condition_type || !edgeConditionTypes.has(edgeForm.condition_type))}
               priorityInvalid={edgeSubmitAttempted && !validEdgePriority(edgeForm.priority)}
+              answerConfigInvalid={edgeSubmitAttempted && edgeForm.condition_type === 'workflow_form_answer_equals' && (!String(edgeForm.condition_config.field_key ?? '').trim() || String(edgeForm.condition_config.value ?? '').trim() === '')}
+              answerFieldOptions={answerFieldOptions}
               savePending={saveEdgeSettings.isPending}
               onChangeField={(field, value) => setEdgeForm((current) => ({ ...current, [field]: value }))}
+              onChangeConditionConfig={(field, value) => setEdgeForm((current) => ({ ...current, condition_config: { ...current.condition_config, [field]: value } }))}
               onSave={submitEdgeSettings}
               onClose={() => setSelectedConnectorId('')}
             />
@@ -868,7 +902,7 @@ export function PipelineBuilderPage() {
             nodes={nodes}
             edges={rawEdges}
             selectedNodeId={selectedNodeId}
-            connectorMutationPending={connectorMutationPending}
+            connectorMutationPending={connectorMutationPending || isReadOnly}
             onSelectNode={(nodeId) => {
               setSelectedNodeId(nodeId);
               setSelectedConnectorId('');
@@ -885,11 +919,11 @@ export function PipelineBuilderPage() {
               setSelectedConnectorId('');
               setDetailsNodeId((current) => (current === nodeId ? '' : nodeId));
             }}
-            onSaveNodePosition={(nodeId, position) => saveNodePosition.mutate({ nodeId, position })}
-            onCreateConnector={(input) => createEdge.mutate(input)}
-            onReconnectConnector={(input) => updateEdge.mutate(input)}
-            onDeleteConnector={(connectorId) => deleteEdge.mutate(connectorId)}
-            onDeleteNode={(nodeId) => deleteNode.mutate(nodeId)}
+            onSaveNodePosition={(nodeId, position) => { if (!isReadOnly) saveNodePosition.mutate({ nodeId, position }); }}
+            onCreateConnector={(input) => { if (!isReadOnly) createEdge.mutate(input); }}
+            onReconnectConnector={(input) => { if (!isReadOnly) updateEdge.mutate(input); }}
+            onDeleteConnector={(connectorId) => { if (!isReadOnly) deleteEdge.mutate(connectorId); }}
+            onDeleteNode={(nodeId) => { if (!isReadOnly) deleteNode.mutate(nodeId); }}
           />
         )}
       </PipelineBuilderShell>
@@ -1133,6 +1167,9 @@ function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdg
   if (nodes.length > 1 && !edges.length) issues.push('Chưa có cạnh được lưu; hiện chỉ có thứ tự node mặc định');
 
   const nodeIds = new Set(nodes.map((node) => node.id));
+  const indegree = new Map(nodes.map((node) => [node.id, 0]));
+  const outdegree = new Map(nodes.map((node) => [node.id, 0]));
+  const adjacency = new Map(nodes.map((node) => [node.id, [] as string[]]));
   edges.forEach((edge) => {
     if (!nodeIds.has(String(edge.from_node_id))) issues.push('Có cạnh trỏ từ node đã xóa');
     if (!nodeIds.has(String(edge.to_node_id))) issues.push('Có cạnh trỏ tới node đã xóa');
@@ -1140,6 +1177,49 @@ function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdg
     if (!String(edge.condition_type ?? '').trim()) issues.push('Có connector thiếu điều kiện chuyển tiếp');
     if (conditionTypes.size && !conditionTypes.has(String(edge.condition_type ?? ''))) issues.push(`Connector ${edge.label || edge.id} dùng điều kiện chuyển tiếp không được hỗ trợ`);
     if (!validEdgePriority(String(edge.priority ?? 100))) issues.push(`Connector ${edge.label || edge.id} có priority không hợp lệ`);
+    if (nodeIds.has(String(edge.from_node_id)) && nodeIds.has(String(edge.to_node_id))) {
+      const from = String(edge.from_node_id);
+      const to = String(edge.to_node_id);
+      outdegree.set(from, (outdegree.get(from) ?? 0) + 1);
+      indegree.set(to, (indegree.get(to) ?? 0) + 1);
+      adjacency.get(from)?.push(to);
+    }
+    if (edge.condition_type === 'workflow_form_answer_equals') {
+      const config = isRecord(edge.condition_config) ? edge.condition_config : {};
+      if (!cleanString(config.field_key) || !Object.prototype.hasOwnProperty.call(config, 'value') || cleanString(config.value) === '') {
+        issues.push(`Connector ${edge.label || edge.id} thiếu trường hoặc giá trị rẽ nhánh`);
+      }
+    }
   });
+  if (nodes.length) {
+    const roots = nodes.filter((node) => (indegree.get(node.id) ?? 0) === 0);
+    const sinks = nodes.filter((node) => (outdegree.get(node.id) ?? 0) === 0);
+    if (roots.length !== 1) issues.push(`Template phải có đúng một node bắt đầu; hiện có ${roots.length}`);
+    if (sinks.length !== 1) issues.push(`Template phải có đúng một node kết thúc; hiện có ${sinks.length}`);
+    if (roots.length === 1) {
+      const visited = new Set<string>();
+      const queue = [roots[0].id];
+      while (queue.length) {
+        const nodeId = queue.shift()!;
+        if (visited.has(nodeId)) continue;
+        visited.add(nodeId);
+        queue.push(...(adjacency.get(nodeId) ?? []));
+      }
+      if (visited.size !== nodes.length) issues.push(`Có ${nodes.length - visited.size} node không thể đi tới từ node bắt đầu`);
+    }
+    const remainingIndegree = new Map(indegree);
+    const queue = nodes.filter((node) => (remainingIndegree.get(node.id) ?? 0) === 0).map((node) => node.id);
+    let processed = 0;
+    while (queue.length) {
+      const nodeId = queue.shift()!;
+      processed += 1;
+      (adjacency.get(nodeId) ?? []).forEach((nextId) => {
+        const nextDegree = (remainingIndegree.get(nextId) ?? 0) - 1;
+        remainingIndegree.set(nextId, nextDegree);
+        if (nextDegree === 0) queue.push(nextId);
+      });
+    }
+    if (processed !== nodes.length) issues.push('Template có connector tạo chu trình không được kiểm soát');
+  }
   return issues;
 }

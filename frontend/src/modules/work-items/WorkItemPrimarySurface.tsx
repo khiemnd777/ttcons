@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, FileCheck2, FileText, PackageCheck, Upload } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, FileCheck2, FileText, PackageCheck, ScrollText, ShieldCheck, Upload } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
 import { StatusBadge } from '../../components/StatusBadge';
 import type { EvidenceRecord, WorkItem } from '../../lib/types/domain';
@@ -24,6 +25,10 @@ export type WorkItemPrimarySurfaceKind =
   | 'outgoing_acceptance'
   | 'owner_client_reconciliation'
   | 'subcontractor_reconciliation'
+  | 'contract'
+  | 'quality'
+  | 'finance'
+  | 'handover'
   | 'generic';
 
 export type WorkItemPrimarySurfaceDefinition = {
@@ -50,6 +55,9 @@ export function WorkItemPrimarySurface({
 }
 
 export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySurfaceDefinition {
+  const configuredSurface = configuredPrimarySurface(item);
+  if (configuredSurface) return configuredSurface;
+
   const workType = normalizeSearch(item.work_type);
   const hasWorkflowForm = hasWorkflowFormSummary(item);
   const searchText = normalizeSearch([
@@ -201,6 +209,83 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
   };
 }
 
+function configuredPrimarySurface(item: WorkItem): WorkItemPrimarySurfaceDefinition | null {
+  const definitions: Partial<Record<WorkItemPrimarySurfaceKind, WorkItemPrimarySurfaceDefinition>> = {
+    workflow_form: {
+      kind: 'workflow_form',
+      title: workflowFormChipText(item),
+      description: 'Hoàn tất đúng hồ sơ nghiệp vụ đã được cấu hình cho revision quy trình này.',
+    },
+    evidence: {
+      kind: 'evidence',
+      title: 'Nộp minh chứng',
+      description: 'Tải đúng ảnh hoặc tài liệu bắt buộc của bước trước khi hoàn tất.',
+    },
+    approval: {
+      kind: 'approval',
+      title: 'Phê duyệt / xác nhận',
+      description: 'Kiểm tra hồ sơ, ghi nhận quyết định và giữ đầy đủ dấu vết phê duyệt.',
+    },
+    incoming_acceptance: {
+      kind: 'incoming_acceptance',
+      title: 'Nghiệm thu đầu vào',
+      description: 'Kiểm nhận lô vật tư, số lượng đạt/từ chối và chứng từ giao nhận.',
+    },
+    material_snapshot: {
+      kind: 'material_snapshot',
+      title: 'Ghi nhận vật tư',
+      description: 'Ghi nhận số lượng vật tư trước/sau và ảnh hưởng tồn tại công trình.',
+    },
+    surplus_handling: {
+      kind: 'surplus_handling',
+      title: 'Xử lý vật tư dư',
+      description: 'Lưu kho, bàn giao hoặc xử lý vật tư còn dư với đầy đủ truy vết.',
+    },
+    outgoing_acceptance: {
+      kind: 'outgoing_acceptance',
+      title: 'Nghiệm thu đầu ra',
+      description: 'Lập biên bản nghiệm thu, kết quả và danh sách tồn tại cần xử lý.',
+    },
+    owner_client_reconciliation: {
+      kind: 'owner_client_reconciliation',
+      title: 'Đối chiếu chủ đầu tư',
+      description: 'Đối chiếu checklist, hồ sơ nghiệm thu, khối lượng và trạng thái với chủ đầu tư.',
+    },
+    subcontractor_reconciliation: {
+      kind: 'subcontractor_reconciliation',
+      title: 'Đối chiếu khối lượng thầu phụ',
+      description: 'Đối chiếu checklist, khối lượng xác nhận, BOQ và chứng từ thầu phụ.',
+    },
+    contract: {
+      kind: 'contract',
+      title: 'Hợp đồng & nghĩa vụ thương mại',
+      description: 'Tạo/review/ký version hợp đồng, milestone, phụ lục và khoản giữ lại trong workspace công trình.',
+    },
+    quality: {
+      kind: 'quality',
+      title: 'QA/QC · ITP/RFI/NCR',
+      description: 'Quản lý kế hoạch kiểm tra, inspection, không phù hợp/rework và occurrence QA/QC lặp.',
+    },
+    finance: {
+      kind: 'finance',
+      title: 'Hóa đơn, công nợ và thu/chi',
+      description: 'Xử lý AP/AR, hóa đơn PDF, kỳ thanh toán, ứng trước, phân bổ thu/chi và đối soát trong sổ tài chính công trình.',
+    },
+    handover: {
+      kind: 'handover',
+      title: 'Đóng tài chính & bàn giao',
+      description: 'Hoàn thiện checklist chứng từ, kiểm tra readiness và khóa gói hồ sơ bàn giao công trình.',
+    },
+    generic: {
+      kind: 'generic',
+      title: workTypeLabel(item.work_type),
+      description: 'Xử lý trạng thái, hoạt động và minh chứng của đầu việc.',
+    },
+  };
+  const kind = String(item.surface_kind ?? '') as WorkItemPrimarySurfaceKind;
+  return definitions[kind] ?? null;
+}
+
 export function primarySurfaceUsesWorkflowForm(kind: WorkItemPrimarySurfaceKind) {
   return kind === 'workflow_form' || kind === 'approval';
 }
@@ -229,9 +314,59 @@ function renderPrimaryPanel(kind: WorkItemPrimarySurfaceKind, item: WorkItem, ev
       return <OwnerClientReconciliationPanel workItemId={item.id} projectId={item.project_id} />;
     case 'subcontractor_reconciliation':
       return <SubcontractorReconciliationPanel workItemId={item.id} projectId={item.project_id} />;
+    case 'contract':
+      return <ContractPrimaryPanel item={item} />;
+    case 'quality':
+      return <QualityPrimaryPanel item={item} />;
+    case 'finance':
+      return <FinancePrimaryPanel item={item} />;
+    case 'handover':
+      return <HandoverPrimaryPanel item={item} />;
     default:
       return <GenericPrimaryPanel item={item} />;
   }
+}
+
+function ContractPrimaryPanel({ item }: { item: WorkItem }) {
+  return <section className="rounded-md border border-indigo-200 bg-indigo-50 p-4">
+    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h3 className="text-sm font-semibold text-ink">Workspace hợp đồng của công trình</h3>
+        <p className="mt-1 text-sm leading-6 text-slate-700">Xử lý hợp đồng trong domain workspace để giữ version, phê duyệt, milestone AP/AR, variation và retention có truy vết. Hồ sơ biểu mẫu/PDF của bước vẫn nằm ở tab hỗ trợ bên dưới.</p>
+      </div>
+      <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700" to={`/projects/${item.project_id}/contracts`}><ScrollText className="h-4 w-4" /> Mở hợp đồng</Link>
+    </div>
+  </section>;
+}
+
+function QualityPrimaryPanel({ item }: { item: WorkItem }) {
+  return <section className="rounded-md border border-cyan-200 bg-cyan-50 p-4">
+    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h3 className="text-sm font-semibold text-ink">Quality Workspace của công trình</h3>
+        <p className="mt-1 text-sm leading-6 text-slate-700">Lập/activate ITP, tạo RFI theo hold point, xử lý NCR–rework–tái kiểm tra và theo dõi lịch QA/QC lặp. Hồ sơ form của bước vẫn được giữ trong tab hỗ trợ.</p>
+      </div>
+      <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-cyan-700 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-800" to={`/projects/${item.project_id}/quality`}><ShieldCheck className="h-4 w-4" /> Mở QA/QC</Link>
+    </div>
+  </section>;
+}
+
+function FinancePrimaryPanel({ item }: { item: WorkItem }) {
+  return <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
+    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div><h3 className="text-sm font-semibold text-ink">Sổ công nợ và chứng từ công trình</h3><p className="mt-1 text-sm leading-6 text-slate-700">Tạo/duyệt AP/AR, tải và xác minh hóa đơn PDF, lập kỳ, ứng trước, thu/chi và kiểm tra reconciliation. Biểu mẫu/PDF của bước vẫn nằm ở tab hỗ trợ.</p></div>
+      <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800" to={`/projects/${item.project_id}/debt`}><FileText className="h-4 w-4" /> Mở công nợ</Link>
+    </div>
+  </section>;
+}
+
+function HandoverPrimaryPanel({ item }: { item: WorkItem }) {
+  return <section className="rounded-md border border-teal-200 bg-teal-50 p-4">
+    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div><h3 className="text-sm font-semibold text-ink">Gói hồ sơ đóng tài chính & bàn giao</h3><p className="mt-1 text-sm leading-6 text-slate-700">Khóa nghiệm thu cuối, xác minh checklist/evidence, kiểm tra QA–kho–AP/AR–thu chi và hoàn tất bàn giao có snapshot/audit.</p></div>
+      <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800" to={`/projects/${item.project_id}/handover`}><PackageCheck className="h-4 w-4" /> Mở bàn giao</Link>
+    </div>
+  </section>;
 }
 
 function PrimarySurfaceHeader({ surface, item }: { surface: WorkItemPrimarySurfaceDefinition; item: WorkItem }) {
@@ -339,6 +474,10 @@ function surfaceIcon(kind: WorkItemPrimarySurfaceKind) {
     case 'owner_client_reconciliation':
     case 'subcontractor_reconciliation':
       return <FileCheck2 className="h-3.5 w-3.5" />;
+    case 'contract':
+      return <ScrollText className="h-3.5 w-3.5" />;
+    case 'quality':
+      return <ShieldCheck className="h-3.5 w-3.5" />;
     case 'generic':
       return <AlertTriangle className="h-3.5 w-3.5" />;
     default:
