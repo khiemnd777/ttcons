@@ -31,9 +31,15 @@
 - Meeting minutes action items and daily report next-plan outputs remain traceable.
 - Planning checklist evidence/status summaries do not replace the underlying submitted form history.
 - Project detail and global workspaces must agree on statuses and available actions.
+- Project Detail Workflow is the project history surface: default to all node work items, keep completed and skipped records discoverable with filters, and render skipped work-item detail read-only without weakening action permissions.
 
 ## Cross-Domain Checks
 
 - Pair with workflow orchestration when planning records are backed by workflow form instances, work items, signatures, or PDF exports.
 - Pair with construction operations when planning outputs become field execution work or project activity.
 - Pair with reporting when changing planning metrics, filters, date scopes, owner scopes, or CSV/reportable fields.
+
+## Golden Sample
+
+- Use `GOLDEN-REAL-001` as the completed flagship project and `GOLDEN-NO-DESIGN-001` as the mutually exclusive branch companion when reviewing project-first navigation, planning runtime and form-backed planning records.
+- Use `GOLDEN-LIVE-001` to experience real planning/runtime transitions. It intentionally starts at 0% with only the Khảo sát node active; reset it with local/dev `make seed` after an operational walkthrough.

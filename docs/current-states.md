@@ -1,5 +1,170 @@
 # Current States
 
+## Published Pipeline Node Inspector
+
+Status: complete
+
+Mục đích chính:
+- Cho phép người dùng xem đầy đủ Cấu hình Node của revision workflow đã phát hành mà không mở bất kỳ đường chỉnh sửa nào.
+
+Will be done:
+- Render Node Inspector khi một node được chọn ở template `published`, gắn nhãn chỉ xem và giữ nút đóng.
+- Khóa các trường cấu hình/approval policy và ẩn toàn bộ thao tác lưu, thêm, sửa, xóa, kéo sắp xếp step hoặc mở dialog chỉnh sửa.
+- Bổ sung regression check cho hợp đồng UI này, cập nhật mapping Pipeline Builder và chạy frontend validation không dùng browser.
+- Mở từng Checklist / Step ở revision đã phát hành bằng dialog chỉ xem, hiển thị đúng cấu hình Step và Workflow Form hiện hữu.
+
+Done:
+- User approved the review package with `Approve`.
+- Confirmed the node-detail toggle sets `detailsNodeId`, but `PipelineBuilderPage` only renders Node Inspector when `!isReadOnly`.
+- Confirmed backend `ensureDraftTemplate` continues to reject every node/step/edge write for a published revision; no backend contract, migration or runtime pipeline behavior is in scope.
+- Published revisions now render the selected Node Inspector with a `Đã phát hành · Chỉ xem` label and an explicit immutability notice.
+- Disabled every node/approval control; removed save, step add/edit/delete and step-drag affordances; blocked step edit-dialog display and guarded mutation callbacks.
+- Updated central and frontend Pipeline Builder mappings and added a source-level regression check for the read-only Node Inspector contract.
+- Validation passed: `cd frontend && npm run check:pipeline-builder` and `git diff --check`. Browser verification was skipped because it was not explicitly requested.
+- User approved the Step detail review package with `Approve`.
+- Each Step card in a published revision now opens by click, Enter or Space and exposes an explicit `Xem` affordance.
+- Reused the Step dialog in `view` mode: it shows the exact stored name, type, roles, form version and required-field summary, disables all controls and offers only `Đóng`.
+- Updated the Pipeline Builder regression check and the central/frontend maps for the read-only Step-detail contract.
+- Validation passed: `cd frontend && npm run check:pipeline-builder` and `git diff --check`. Browser verification was skipped because it was not explicitly requested.
+
+## Workflow Overall Progress Excludes Skipped Branches
+
+Status: complete
+
+Mục đích chính:
+- Tiến độ chung phản ánh nhánh workflow thực tế đã thực hiện, đồng thời công khai số step bị bỏ qua thay vì làm project hoàn tất chỉ đạt 92%.
+
+Will be done:
+- Loại runtime step `skipped`/`cancelled` khỏi mẫu số tiến độ thực hiện.
+- Hiển thị riêng số step thực hiện và số step đã bỏ qua.
+- Giữ tổng coverage template trong dữ liệu workflow, không giả các step bỏ qua thành đã hoàn tất.
+- Cập nhật frontend mapping và chạy frontend build, backend regression, agent validation, diff check.
+
+Done:
+- Screenshot and source confirmed the old calculation used all 52 runtime steps as denominator, while only 48 executed steps entered the completed numerator.
+- User approved `100% · 48/48 step thực hiện · 4 đã bỏ qua` with `OK triển khai`.
+- Overall sidebar progress now filters skipped/cancelled steps out of the execution denominator before calculating completion.
+- Sidebar displays executable completion and separately discloses skipped count plus total workflow coverage.
+- Updated frontend mapping with the execution-progress denominator invariant.
+- Validation passed: frontend production build, backend core regression tests, agent artifact validation and `git diff --check`. Browser verification was skipped because it was not explicitly requested.
+
+## Workflow Sidebar Submitted Step Progress
+
+Status: complete
+
+Mục đích chính:
+- Đồng bộ bộ đếm và thanh tiến độ của cây workflow với trạng thái hiển thị từng work item, để node có năm step đã thỏa gate hiển thị `5/5` thay vì `0/5`.
+
+Will be done:
+- Coi runtime step `submitted` và `completed` là đã hoàn tất khi tính sidebar progress.
+- Ưu tiên `completed_steps` và `progress_percent` từ backend timeline khi payload có summary.
+- Không tính `skipped` hoặc `cancelled` vào tiến độ thực hiện.
+- Đồng bộ icon fallback của step `submitted` với trạng thái hoàn tất.
+- Cập nhật frontend mapping và chạy frontend build, backend regression, agent validation và diff check.
+
+Done:
+- User confirmed the screenshot expectation: five completed work items in node `Họp báo cáo khảo sát` must display `5/5`.
+- Root cause confirmed in `ProjectWorkspaceLayout`: row status prefers `work_item_status=completed`, while node counter reads runtime `step.status=submitted` through a helper that only accepted literal `completed`.
+- User approved the review package with `OK triển khai`.
+- Updated sidebar completion semantics so `submitted` and `completed` both count as satisfied steps; skipped/cancelled remain outside completed progress.
+- Node counters now prefer backend `completed_steps` and `progress_percent` with bounded fallback calculation from runtime steps.
+- Updated fallback step icon semantics and frontend mapping for the shared workflow-sidebar contract.
+- Validation passed: frontend production build, backend core regression tests, agent artifact validation and `git diff --check`. Browser verification was skipped because it was not explicitly requested.
+
+## Project Workflow Work Item History Visibility
+
+Status: complete
+
+Mục đích chính:
+- Giữ toàn bộ work item theo đúng node workflow ngay trên Project Detail để người dùng xem được việc đang xử lý, đã hoàn tất và đã bỏ qua mà không phải chuyển sang UI khác.
+
+Will be done:
+- Project Operations trả cả work item terminal cho màn hình lịch sử, nhưng các API danh sách tác nghiệp và action gate vẫn không đưa work item đã hủy vào hàng đợi xử lý.
+- Cho phép mở work item đã bỏ qua ở chế độ read-only để xem activity và metadata lịch sử.
+- Timeline đếm runtime step `submitted` là đã hoàn thành và tách số bước `skipped`.
+- Panel workflow mặc định hiển thị tất cả, có tìm kiếm và bộ lọc Cần xử lý/Chờ duyệt/Bị chặn/Hoàn tất/Đã bỏ qua.
+- Badge Công việc dùng tổng số thay vì chỉ số đang mở; empty state phân biệt chưa phát sinh, không khớp bộ lọc và node đã bỏ qua.
+- Bổ sung test, cập nhật mapping, chạy backend test, frontend build và diff check.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai theo mockup này`.
+- Confirmed frontend `ProjectDetailPage` filters out `completed` and `cancelled` before rendering the workflow panel and tab count.
+- Confirmed Project Operations currently uses the operational list query that excludes cancelled records.
+- Confirmed Golden Sample runtime nodes are completed while executed runtime steps use terminal status `submitted`, causing the existing timeline aggregation to report `0/N`.
+- Added a Project Operations history query that includes completed/cancelled work items without changing the operational `/projects/:id/work-items` queue contract.
+- Kept cancelled work items viewable under the original project/RBAC scope while `CanActOnWorkItem` continues to reject them.
+- Updated workflow timeline aggregation so `submitted` and `completed` steps count as complete, skipped/cancelled steps are reported separately and skipped nodes remain at 0% execution progress.
+- Rebuilt the Project Detail workflow panel with default `Tất cả`, total count, search, status filters, explicit skipped-branch context, terminal compact cards and status-specific empty states.
+- Changed the Project Detail `Công việc` tab count from open-only to all visible project work items and excluded skipped nodes from automatic current-node selection.
+- Added a read-only skipped-work-item detail surface that exposes history without primary business actions or activity composer.
+- Added focused timeline regression coverage and updated central, backend, frontend, workflow orchestration and project-planning maps.
+- Validation passed: backend core/full tests, frontend production build, agent artifact validation and `git diff --check`. Browser verification was skipped because it was not explicitly requested.
+
+## Golden Live Operational Project
+
+Status: complete
+
+Mục đích chính:
+- Cung cấp một project Golden chưa hoàn tất để người dùng tự vận hành từng node, step, form, approval và nghiệp vụ từ khảo sát đến bàn giao trên đúng engine-v2 contract.
+
+Will be done:
+- Sửa approval policy của official template trong seed về đúng schema V46 (`roles`, `quorum`, `requester_cannot_approve`, `comment_required`, `signature_required`) và mode `any`.
+- Bổ sung demo users/staff cho Mua hàng, QA/QC, Đội thi công, Thầu phụ và Chủ đầu tư.
+- Tạo `GOLDEN-LIVE-001` ở trạng thái planning 0%, node Khảo sát in-progress, sáu work item ready, các node/step còn lại pending và 51 workflow form draft.
+- Không seed answer, evidence, approval hoặc domain ledger cho Live project để người dùng tự tạo qua UI/API.
+- Thêm runbook theo node/vai trò/gate và validator đảm bảo project thực sự chưa được thao tác.
+- Seed database sạch và local, chạy fixture/database validator, backend tests, migration check và frontend build.
+
+Done:
+- User approved the review package with `OK triển khai Golden Live`.
+- Confirmed `StartPipeline` creates the first node `in_progress`, first-node work items `ready`, later work items `pending`, all runtime steps `pending`, and exact draft form instances.
+- Confirmed current Golden seed approval policy uses incompatible keys and would fail normalization/request-approval for a real engine-v2 run.
+- Confirmed the current demo accounts do not cover procurement, QA/QC, construction team, subcontractor or client roles.
+- Added five demo users/staff/role assignments: procurement, QA/QC, construction team, subcontractor and client; all use the documented local password and are members of Golden Live.
+- Corrected official seeded approval policies to the exact V46 contract with mode `any`, role array, quorum, requester separation, comment and signature flags.
+- Restored the 15 contract/quality/handover permissions and role-permission matrix that base seed reset previously removed after migrations.
+- Added `backend/seed/golden_live_project.sql`, mirroring `StartPipeline` state: one in-progress survey node, eleven pending nodes, 52 pending run steps, six ready work items, 46 pending work items and 51 untouched draft form instances.
+- Golden Live intentionally has zero answers, evidence, approvals, documents, BOQ, quotations, procurement, contracts, stock, quality, acceptance, finance, invoice or handover records after seed.
+- Added `backend/seed/GOLDEN_LIVE_RUNBOOK.md` with project scenario, role accounts, node-by-node operating sequence, expected blockers and reset instructions.
+- Extended `backend/Makefile` to seed Golden Live before validation and expanded `validate_golden_project.sql` with runtime, untouched-data, policy-contract, RBAC and role-account assertions.
+- Updated module-memory, backend, workflow, project-planning and admin-governance maps with Golden Live ownership and invariants.
+- Rebuilt a separate V1-V56 PostgreSQL database and ran base + completed Golden + Golden Live + validator successfully.
+- Applied `make seed` successfully to the running local database; Golden Live is ready for use at project id `30000000-0000-0000-0000-000000000022`.
+- Final validation passed: Golden fixtures, Golden database validator, backend tests, 56 migration checks and frontend production build. Browser verification was skipped because it was not explicitly requested.
+
+## Golden Sample 100% Official Workflow
+
+Status: complete
+
+Mục đích chính:
+- Cung cấp một bộ dữ liệu chuẩn để nhìn xuyên suốt toàn bộ Consflow như một công trình thật, dùng đúng template chính thức `40000000-0000-0000-0000-000000000020` và không bỏ sót node, step, form hay ledger nghiệp vụ.
+
+Will be done:
+- Tạo flagship `GOLDEN-REAL-001` chạy nhánh Có thiết kế đến hoàn thành/bàn giao/đóng tài chính.
+- Tạo companion `GOLDEN-NO-DESIGN-001` chạy nhánh Không thiết kế để bao phủ nhánh loại trừ mà không làm sai workflow thực tế.
+- Bao phủ 12 node, 52 step, 51 workflow form, evidence, approvals, signatures, PDF và activity/audit.
+- Seed đầy đủ BOQ, báo giá/so sánh, procurement, hợp đồng/version/milestone/variation/retention, kho/vật tư, nhật ký thi công, ITP/RFI/NCR/recurring, nghiệm thu/rework, AP/AR, hóa đơn/thanh toán và handover checklist.
+- Thêm validator định lượng cho coverage, quan hệ nguồn, cân bằng kho/tài chính và trạng thái bàn giao cuối.
+- Chạy seed trên PostgreSQL đã migrate V56, validator, backend tests, frontend build và diff checks; browser verification chỉ chạy khi được yêu cầu riêng.
+
+Done:
+- User approved the review package with `OK triển khai Golden Sample`.
+- Confirmed the existing `CF-FULL-001` is tied to demo template `...0010` and lacks V47-V56 commercial/contract/quality coverage.
+- Confirmed the official template has 12 nodes, 52 steps, 51 required forms and one evidence-only step, including mutually exclusive design/no-design branches.
+- Loaded module-memory, backend/database workflow, project planning, workflow orchestration, commercial/procurement, construction, materials, quality/handover, finance and impact-analysis guidance.
+- Chosen a flagship plus companion structure so 100% branch coverage remains truthful to a real project execution.
+- Added `backend/seed/golden_project.sql` to rebuild the official V56 form/surface bindings after a local reset, then generate two complete runtime snapshots with 24 total nodes, 104 steps/work items, 92 submitted form instances, 94 accepted evidence records, signatures, approvals, activity and audit.
+- Added `backend/seed/golden_project_domains.sql` with six final-locked BOQ lines, three suppliers/eighteen quote items, six selections, two received procurement requests, two incoming acceptances, explicit receive/issue/return stock ledgers, six closed site balances and three construction reports.
+- Added `backend/seed/golden_project_closure.sql` with ITP Rev.01/Rev.02, pass/fail/reinspection RFIs, closed NCR, completed rework, three recurring QA occurrences, final pass acceptance and subcontractor/client reconciliation.
+- Added `backend/seed/golden_project_finance.sql` with three active contracts, four signed versions, incorporated variation, six paid milestones, three released retentions, four AP, five AR, nine terminal payments/receipts, schedules, settled advances, invoice allocations, material closure and a handed-over 8/8 package.
+- Added `backend/seed/validate_golden_project.sql`; `make seed-validate` reports `GOLDEN_SAMPLE_VALIDATION_PASSED` and exact project counts.
+- Added eight rendered Golden business PDFs, copied invoice fixtures, a checksum manifest and `make seed-fixtures-check`; visual QA found no clipping, overlap or unreadable Vietnamese text.
+- Fixed base seed drift exposed by a clean V56 database: reset now cascades to later domain tables; pipeline templates include required lineage/engine/hash/publish fields; legacy handover rows include `handover_code` and current statuses.
+- Updated `backend/Makefile` so `make seed` applies base + Golden layers, validates the suite and copies upload fixtures; applied it successfully to the running local database.
+- Rebuilt a separate clean PostgreSQL database through all V1-V56 SQL migrations, then ran every seed layer and validator successfully.
+- Updated central/backend/domain maps with Golden Sample ownership, IDs, coverage and validation commands.
+- Ran backend tests, migration check for 56 migrations, frontend production build, PDF fixture validation and Golden database validation successfully. Browser verification was skipped because it was not explicitly requested.
+
 ## Product-grade Workflow Engine And Business Forms
 
 Status: complete

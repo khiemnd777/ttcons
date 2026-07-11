@@ -12,6 +12,7 @@ const files = {
   dragPreviewLayer: 'src/modules/pipeline-builder/components/diagram/DragPreviewLayer.tsx',
   nodeLayer: 'src/modules/pipeline-builder/components/diagram/NodeLayer.tsx',
   nodeCard: 'src/modules/pipeline-builder/components/diagram/NodeCard.tsx',
+  nodeInspector: 'src/modules/pipeline-builder/components/NodeInspectorPanel.tsx',
   geometry: 'src/modules/pipeline-builder/components/diagram/geometry.ts',
   hitTesting: 'src/modules/pipeline-builder/components/diagram/hitTesting.ts',
   router: 'src/modules/pipeline-builder/components/diagram/router.ts',
@@ -26,6 +27,19 @@ const failures = [];
 check('PipelineBuilderPage composes DiagramCanvas', () => {
   expectIncludes(source.page, "import { DiagramCanvas }", files.page);
   expectIncludes(source.page, '<DiagramCanvas', files.page);
+});
+
+check('Published templates expose a read-only node inspector', () => {
+  expectIncludes(source.page, 'detailsNode ? (', files.page);
+  expectIncludes(source.page, 'readOnly={isReadOnly}', files.page);
+  expectIncludes(source.page, "mode: 'view'", files.page);
+  expectIncludes(source.nodeInspector, 'readOnly: boolean', files.nodeInspector);
+  expectIncludes(source.nodeInspector, 'Đã phát hành · Chỉ xem', files.nodeInspector);
+  expectIncludes(source.nodeInspector, 'onOpenViewStep', files.nodeInspector);
+  expectIncludes(source.nodeInspector, "stepDialogMode === 'view'", files.nodeInspector);
+  expectIncludes(source.nodeInspector, "open={Boolean(stepDialogMode) && (!readOnly || stepDialogMode === 'view')}", files.nodeInspector);
+  expectIncludes(source.nodeInspector, 'disabled={stepDialogReadOnly}', files.nodeInspector);
+  expectIncludes(source.nodeInspector, 'Nội dung bên dưới chỉ để xem.', files.nodeInspector);
 });
 
 check('PipelineBuilderPage does not own diagram layers or geometry', () => {

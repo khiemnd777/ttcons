@@ -15,6 +15,7 @@ import {
   PackageCheck,
   Play,
   RefreshCw,
+  Search,
   ShieldAlert,
   TimerReset,
   Users,
@@ -64,6 +65,7 @@ type DepartmentSurface = {
 };
 
 type ProjectDetailTab = 'overview' | 'workflow' | 'work' | 'activity' | 'files' | 'audit' | 'members';
+type WorkflowWorkFilter = 'all' | 'open' | 'waiting' | 'blocked' | 'completed' | 'skipped';
 
 const ALL_WORK_SURFACE = '__all__';
 const WORK_PAGE_SIZE = 10;
@@ -71,7 +73,7 @@ const WORK_PAGE_SIZE = 10;
 function currentTimelineNode(nodes: ProjectOperationsTimelineNode[]) {
   return nodes.find((node) => node.status === 'in_progress')
     ?? nodes.find((node) => node.status === 'blocked' || node.status === 'waiting_approval')
-    ?? nodes.find((node) => node.status !== 'completed' && node.status !== 'cancelled')
+    ?? nodes.find((node) => !['completed', 'cancelled', 'skipped'].includes(node.status))
     ?? nodes[nodes.length - 1];
 }
 
@@ -188,13 +190,13 @@ export function ProjectDetailPage() {
   const latestActivity = asArray<WorkItemActivity>(data.latest_activity);
   const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
   const selectedTimelineNode = timeline.find((node) => node.id === selectedTimelineNodeId) ?? currentNode ?? timeline[0];
-  const nodeActiveWork = selectedTimelineNode
-    ? orderWorkItemsByWorkflow(openWorkItems.filter((item) => item.run_node_id === selectedTimelineNode.id))
-    : workflowWork;
+  const nodeWorkItems = selectedTimelineNode
+    ? orderWorkItemsByWorkflow(allWorkItems.filter((item) => item.run_node_id === selectedTimelineNode.id))
+    : orderWorkItemsByWorkflow(allWorkItems);
   const tabs: Array<{ id: ProjectDetailTab; label: string; count?: number }> = [
     { id: 'overview', label: 'Tổng quan', count: numberValue(data.health_counts?.active) },
     { id: 'workflow', label: 'Workflow', count: timeline.length },
-    { id: 'work', label: 'Công việc', count: workflowWork.length },
+    { id: 'work', label: 'Công việc', count: allWorkItems.length },
     { id: 'activity', label: 'Trao đổi', count: latestActivity.length },
     { id: 'files', label: 'Hồ sơ', count: latestEvidence.length },
     { id: 'audit', label: 'Audit', count: auditRecent.length },
@@ -256,14 +258,14 @@ export function ProjectDetailPage() {
               onStartPipeline={() => startPipeline.mutate()}
               onSelectNode={setSelectedTimelineNodeId}
             />
-            <ActiveWorkPanel rows={nodeActiveWork} selectedNode={selectedTimelineNode} onOpenWork={openWorkItem} />
+            <WorkflowWorkPanel rows={nodeWorkItems} selectedNode={selectedTimelineNode} onOpenWork={openWorkItem} />
           </div>
         ) : null}
 
         {activeTab === 'work' ? (
           <DepartmentSurfaces
             surfaces={departmentSurfaces}
-            allRows={workflowWork}
+            allRows={allWorkItems}
             selectedDepartment={selectedDepartment}
             onSelectDepartment={setSelectedDepartment}
             onOpenWork={openWorkItem}
@@ -698,9 +700,7 @@ function WorkflowTimeline({
                       <p className="truncate text-sm font-semibold text-ink">
                         {node.order_index ? `${node.order_index}. ` : null}{node.name}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {enumLabel('node_type', node.type)} · {numberValue(node.completed_steps)}/{numberValue(node.step_count)} steps
-                      </p>
+                      <p className="mt-1 text-xs text-slate-500">{timelineStepSummary(node)}</p>
                     </div>
                     <StatusBadge status={node.status} />
                   </div>
@@ -717,7 +717,7 @@ function WorkflowTimeline({
   );
 }
 
-function ActiveWorkPanel({
+function WorkflowWorkPanel({
   rows,
   selectedNode,
   onOpenWork,
@@ -726,6 +726,25 @@ function ActiveWorkPanel({
   selectedNode?: ProjectOperationsTimelineNode;
   onOpenWork: (item: WorkItem) => void;
 }) {
+  const [filter, setFilter] = useState<WorkflowWorkFilter>('all');
+  const [search, setSearch] = useState('');
+  const counts = useMemo(() => workflowWorkCounts(rows), [rows]);
+  const visibleRows = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase('vi');
+    return rows.filter((item) => {
+      if (!matchesWorkflowWorkFilter(item, filter)) return false;
+      if (!query) return true;
+      return [item.title, item.description, item.assignee_name, item.run_step_name, item.workflow_form_template_name]
+        .some((value) => String(value ?? '').toLocaleLowerCase('vi').includes(query));
+    });
+  }, [filter, rows, search]);
+  const selectedNodeSkipped = selectedNode?.status === 'skipped' || selectedNode?.status === 'cancelled';
+
+  useEffect(() => {
+    setFilter('all');
+    setSearch('');
+  }, [selectedNode?.id]);
+
   return (
     <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -735,17 +754,107 @@ function ActiveWorkPanel({
             Công việc theo thứ tự workflow{selectedNode?.name ? ` · ${selectedNode.name}` : ''}
           </h2>
         </div>
-        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{rows.length} đang mở</span>
+        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{rows.length} work item</span>
       </div>
+
       {rows.length ? (
-        <div className="space-y-3">
-          {rows.map((item) => <WorkItemCard key={item.id} item={item} onOpen={() => onOpenWork(item)} />)}
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2" aria-label="Lọc công việc workflow">
+            {workflowWorkFilterOptions(counts).map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={clsx(
+                  'rounded-md border px-2.5 py-1.5 text-xs font-semibold transition focus-ring',
+                  filter === option.id ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-line bg-white text-slate-600 hover:border-blue-300',
+                )}
+                aria-pressed={filter === option.id}
+                onClick={() => setFilter(option.id)}
+              >
+                {option.label} {option.count}
+              </button>
+            ))}
+          </div>
+
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              className="w-full rounded-md border border-line bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Tìm công việc, form, người thực hiện..."
+            />
+          </label>
+
+          {selectedNodeSkipped ? (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <span className="font-semibold">Nhánh “{selectedNode?.name}” không được lựa chọn.</span>{' '}
+              {counts.skipped} work item được lưu ở chế độ chỉ đọc để truy vết quy trình.
+            </div>
+          ) : null}
+
+          {visibleRows.length ? (
+            <div className="space-y-3">
+              {visibleRows.map((item) => (
+                <WorkItemCard
+                  key={item.id}
+                  item={item}
+                  compact={item.status === 'completed' || item.status === 'cancelled'}
+                  displayStatus={item.status === 'cancelled' ? 'skipped' : undefined}
+                  onOpen={() => onOpenWork(item)}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="Không có công việc phù hợp bộ lọc" />
+          )}
         </div>
       ) : (
-        <EmptyState title={selectedNode?.name ? `Không có work item đang mở trong ${selectedNode.name}` : 'Không có work item đang mở'} />
+        <EmptyState title={selectedNode?.name ? `Node ${selectedNode.name} chưa phát sinh work item` : 'Chưa phát sinh work item'} />
       )}
     </section>
   );
+}
+
+function timelineStepSummary(node: ProjectOperationsTimelineNode) {
+  const prefix = enumLabel('node_type', node.type);
+  const total = numberValue(node.step_count);
+  const skipped = numberValue(node.skipped_steps);
+  if (node.status === 'skipped' || node.status === 'cancelled') {
+    return `${prefix} · 0/${total} bước thực hiện · ${skipped || total} bước đã bỏ qua`;
+  }
+  return `${prefix} · ${numberValue(node.completed_steps)}/${total} bước hoàn tất`;
+}
+
+function workflowWorkCounts(rows: WorkItem[]) {
+  return {
+    all: rows.length,
+    open: rows.filter((item) => isOpenWorkItem(item)).length,
+    waiting: rows.filter((item) => item.status === 'waiting_approval' || item.status === 'waiting_review').length,
+    blocked: rows.filter((item) => item.status === 'blocked').length,
+    completed: rows.filter((item) => item.status === 'completed').length,
+    skipped: rows.filter((item) => item.status === 'cancelled').length,
+  };
+}
+
+function workflowWorkFilterOptions(counts: ReturnType<typeof workflowWorkCounts>): Array<{ id: WorkflowWorkFilter; label: string; count: number }> {
+  return [
+    { id: 'all', label: 'Tất cả', count: counts.all },
+    { id: 'open', label: 'Cần xử lý', count: counts.open },
+    { id: 'waiting', label: 'Chờ duyệt', count: counts.waiting },
+    { id: 'blocked', label: 'Bị chặn', count: counts.blocked },
+    { id: 'completed', label: 'Hoàn tất', count: counts.completed },
+    { id: 'skipped', label: 'Đã bỏ qua', count: counts.skipped },
+  ];
+}
+
+function matchesWorkflowWorkFilter(item: WorkItem, filter: WorkflowWorkFilter) {
+  if (filter === 'all') return true;
+  if (filter === 'open') return isOpenWorkItem(item);
+  if (filter === 'waiting') return item.status === 'waiting_approval' || item.status === 'waiting_review';
+  if (filter === 'blocked') return item.status === 'blocked';
+  if (filter === 'completed') return item.status === 'completed';
+  return item.status === 'cancelled';
 }
 
 function CommandCenter({

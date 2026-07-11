@@ -47,3 +47,7 @@
 - Pair with construction operations when acceptance consumes work-item evidence, checklist results, site reports, or rework activity.
 - Pair with materials/warehouse and procurement when incoming acceptance or handover readiness depends on deliveries, stock, site balance, or surplus.
 - Pair with accounting/finance when handover blockers depend on unpaid AP/AR, invoices, advances, settlements, or reconciliation warnings.
+
+## Golden Sample
+
+- `GOLDEN-REAL-001` preserves ITP Rev.01/Rev.02, pass/fail/reinspection RFI history, a closed NCR linked to completed rework, recurring QA occurrences, final pass acceptance and a handed-over package with 8/8 verified checklist items.

@@ -1924,6 +1924,7 @@ export type ProjectOperationsTimelineNode = AnyRecord & {
   type?: string;
   step_count?: number;
   completed_steps?: number;
+  skipped_steps?: number;
   started_at?: string;
   completed_at?: string;
   progress_percent?: number;

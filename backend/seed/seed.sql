@@ -21,7 +21,7 @@ TRUNCATE TABLE
   pipeline_template_edges, pipeline_template_steps, pipeline_template_nodes, pipeline_templates,
   auth_sessions, user_roles, role_permissions, permissions, roles, staff, warehouses, materials, partners,
   system_settings
-RESTART IDENTITY;
+RESTART IDENTITY CASCADE;
 
 UPDATE workflow_form_templates SET created_by = NULL WHERE created_by IS NOT NULL;
 UPDATE workflow_form_versions SET created_by = NULL WHERE created_by IS NOT NULL;
@@ -34,7 +34,12 @@ INSERT INTO users (id, email, password_hash, full_name, status) VALUES
 ('10000000-0000-0000-0000-000000000004','accounting@consflow.local','demo:123456','Lê Mai Kế toán','active'),
 ('10000000-0000-0000-0000-000000000005','warehouse@consflow.local','demo:123456','Phạm Long Thủ kho','active'),
 ('10000000-0000-0000-0000-000000000006','supervisor@consflow.local','demo:123456','Đặng Khoa Giám sát','active'),
-('10000000-0000-0000-0000-000000000007','director@consflow.local','demo:123456','Võ An Giám đốc','active');
+('10000000-0000-0000-0000-000000000007','director@consflow.local','demo:123456','Võ An Giám đốc','active'),
+('10000000-0000-0000-0000-000000000008','procurement@consflow.local','demo:123456','Ngô Lan Mua hàng','active'),
+('10000000-0000-0000-0000-000000000009','qaqc@consflow.local','demo:123456','Phan Huy QA/QC','active'),
+('10000000-0000-0000-0000-000000000010','construction@consflow.local','demo:123456','Đội trưởng Nguyễn Tín','active'),
+('10000000-0000-0000-0000-000000000011','subcontractor@consflow.local','demo:123456','Đại diện Thầu phụ An Tâm','active'),
+('10000000-0000-0000-0000-000000000012','client@consflow.local','demo:123456','Anh Bình Chủ đầu tư','active');
 
 INSERT INTO roles (id, name, display_name, description, system_role) VALUES
 ('20000000-0000-0000-0000-000000000001','admin','Admin','Quản trị toàn hệ thống',true),
@@ -165,7 +170,12 @@ INSERT INTO staff (id, user_id, full_name, email, phone, department, position, s
 ('21000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000004','Lê Mai Kế toán','accounting@consflow.local','0900000004','Kế toán','Accountant','active'),
 ('21000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000005','Phạm Long Thủ kho','warehouse@consflow.local','0900000005','Kho','Warehouse Lead','active'),
 ('21000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000006','Đặng Khoa Giám sát','supervisor@consflow.local','0900000006','Thi công','Site Supervisor','active'),
-('21000000-0000-0000-0000-000000000007','10000000-0000-0000-0000-000000000007','Võ An Giám đốc','director@consflow.local','0900000007','Ban giám đốc','Director','active');
+('21000000-0000-0000-0000-000000000007','10000000-0000-0000-0000-000000000007','Võ An Giám đốc','director@consflow.local','0900000007','Ban giám đốc','Director','active'),
+('21000000-0000-0000-0000-000000000008','10000000-0000-0000-0000-000000000008','Ngô Lan Mua hàng','procurement@consflow.local','0900000008','Mua hàng','Procurement Lead','active'),
+('21000000-0000-0000-0000-000000000009','10000000-0000-0000-0000-000000000009','Phan Huy QA/QC','qaqc@consflow.local','0900000009','QA/QC','Quality Engineer','active'),
+('21000000-0000-0000-0000-000000000010','10000000-0000-0000-0000-000000000010','Đội trưởng Nguyễn Tín','construction@consflow.local','0900000010','Thi công','Construction Team Lead','active'),
+('21000000-0000-0000-0000-000000000011','10000000-0000-0000-0000-000000000011','Đại diện Thầu phụ An Tâm','subcontractor@consflow.local','0900000011','Thầu phụ','Subcontractor Representative','active'),
+('21000000-0000-0000-0000-000000000012','10000000-0000-0000-0000-000000000012','Anh Bình Chủ đầu tư','client@consflow.local','0900000012','Chủ đầu tư','Client Representative','active');
 
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id FROM users u JOIN roles r ON
@@ -175,10 +185,18 @@ SELECT u.id, r.id FROM users u JOIN roles r ON
   (u.email='accounting@consflow.local' AND r.name='accounting') OR
   (u.email='warehouse@consflow.local' AND r.name='warehouse') OR
   (u.email='supervisor@consflow.local' AND r.name='supervisor') OR
-  (u.email='director@consflow.local' AND r.name='director');
+  (u.email='director@consflow.local' AND r.name='director') OR
+  (u.email='procurement@consflow.local' AND r.name='procurement') OR
+  (u.email='qaqc@consflow.local' AND r.name='qa_qc') OR
+  (u.email='construction@consflow.local' AND r.name='construction_team') OR
+  (u.email='subcontractor@consflow.local' AND r.name='subcontractor') OR
+  (u.email='client@consflow.local' AND r.name='client');
 
-INSERT INTO pipeline_templates (id, name, description, project_type, version, status, created_by) VALUES
-('40000000-0000-0000-0000-000000000001','Template hoàn thiện nội thất tiêu chuẩn','Khảo sát → Thiết kế → BOQ → Mua sắm → Kho → Thi công → Nghiệm thu → Bàn giao → Financial Closure','Hoàn thiện nội thất',1,'published','10000000-0000-0000-0000-000000000001');
+INSERT INTO pipeline_templates (
+  id, name, description, project_type, version, status, created_by,
+  template_family_id, revision_no, engine_version, definition_hash, published_at, published_by
+) VALUES
+('40000000-0000-0000-0000-000000000001','Template hoàn thiện nội thất tiêu chuẩn','Khảo sát → Thiết kế → BOQ → Mua sắm → Kho → Thi công → Nghiệm thu → Bàn giao → Financial Closure','Hoàn thiện nội thất',1,'published','10000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001',1,1,repeat('1',64),now(),'10000000-0000-0000-0000-000000000001');
 
 INSERT INTO pipeline_template_nodes (id, template_id, name, description, type, order_index, position_x, position_y, responsible_role_ids, required_permission, exit_conditions, approval_rule, rework_enabled, replanning_enabled, fail_path) VALUES
 ('41000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001','Khảo sát','Ghi nhận hiện trạng, kích thước và rủi ro ban đầu.','survey',1,80,120,'["Giám sát"]','planning.edit','{"text":"Có biên bản khảo sát và ảnh hiện trạng"}','PM duyệt',false,true,'previous'),
@@ -288,7 +306,10 @@ SET label=EXCLUDED.label,
     help_text=EXCLUDED.help_text,
     order_index=EXCLUDED.order_index;
 
-INSERT INTO pipeline_templates (id, name, description, project_type, version, status, created_by)
+INSERT INTO pipeline_templates (
+  id, name, description, project_type, version, status, created_by,
+  template_family_id, revision_no, engine_version, definition_hash, published_at, published_by
+)
 VALUES (
   '40000000-0000-0000-0000-000000000020',
   '[Client] Workflow hoàn thiện công trình chính thức',
@@ -296,7 +317,13 @@ VALUES (
   'Hoàn thiện công trình',
   1,
   'published',
-  NULL
+  NULL,
+  '40000000-0000-0000-0000-000000000020',
+  1,
+  2,
+  repeat('2',64),
+  now(),
+  '10000000-0000-0000-0000-000000000001'
 )
 ON CONFLICT (id) DO UPDATE
 SET name=EXCLUDED.name,
@@ -304,6 +331,12 @@ SET name=EXCLUDED.name,
     project_type=EXCLUDED.project_type,
     version=EXCLUDED.version,
     status=EXCLUDED.status,
+    template_family_id=EXCLUDED.template_family_id,
+    revision_no=EXCLUDED.revision_no,
+    engine_version=EXCLUDED.engine_version,
+    definition_hash=EXCLUDED.definition_hash,
+    published_at=EXCLUDED.published_at,
+    published_by=EXCLUDED.published_by,
     updated_at=now();
 
 WITH node_seed(id, name, description, type, order_index, position_x, position_y, roles, required_permission, permissions, exit_conditions, approval_rule, rework_enabled, replanning_enabled, fail_path) AS (
@@ -546,8 +579,8 @@ INSERT INTO rework_requests (project_id, issue_id, acceptance_id, title, descrip
 INSERT INTO replanning_requests (project_id, issue_id, reason, impact_scope, budget_impact, timeline_impact, status, created_by) VALUES
 ('30000000-0000-0000-0000-000000000002','70000000-0000-0000-0000-000000000001','Hiện trạng khác khảo sát, cần cập nhật chống thấm','boq',45000000,5,'submitted','10000000-0000-0000-0000-000000000002');
 
-INSERT INTO handover_records (project_id, status, client_representative, company_representative, documents_ready, warehouse_closed, payables_recorded, receivables_recorded, notes, created_by) VALUES
-('30000000-0000-0000-0000-000000000001','checking','Anh Bình','Nguyễn Minh PM',true,false,true,true,'Đang chờ xử lý vật tư dư','10000000-0000-0000-0000-000000000002');
+INSERT INTO handover_records (project_id, handover_code, status, client_representative, company_representative, documents_ready, warehouse_closed, payables_recorded, receivables_recorded, notes, created_by) VALUES
+('30000000-0000-0000-0000-000000000001','HO-CF-Q1-001','submitted','Anh Bình','Nguyễn Minh PM',true,false,true,true,'Đang chờ xử lý vật tư dư','10000000-0000-0000-0000-000000000002');
 
 INSERT INTO payables (project_id, payable_code, vendor_type, vendor_partner_id, vendor_name, source_type, gross_amount, advance_amount, retention_amount, deduction_amount, paid_amount, remaining_amount, due_date, status, created_by) VALUES
 ('30000000-0000-0000-0000-000000000001','PAY-Q1-001','supplier','90000000-0000-0000-0000-000000000101','Cadivi','procurement',120000000,0,0,0,60000000,60000000,CURRENT_DATE + INTERVAL '10 day','partially_paid','10000000-0000-0000-0000-000000000004'),
@@ -596,8 +629,11 @@ INSERT INTO system_settings (key, value_json, description) VALUES
 -- Pipeline template shows how a user configures Step types in Pipeline Builder;
 -- runtime rows show how one project operates with all current work item types and form templates.
 
-INSERT INTO pipeline_templates (id, name, description, project_type, version, status, created_by) VALUES
-('40000000-0000-0000-0000-000000000010','[Demo] Full workflow form coverage','Template demo bao phủ toàn bộ work item type, workflow form template và form/panel vận hành hiện có.','Hoàn thiện nội thất',1,'published','10000000-0000-0000-0000-000000000001');
+INSERT INTO pipeline_templates (
+  id, name, description, project_type, version, status, created_by,
+  template_family_id, revision_no, engine_version, definition_hash, published_at, published_by
+) VALUES
+('40000000-0000-0000-0000-000000000010','[Demo] Full workflow form coverage','Template demo bao phủ toàn bộ work item type, workflow form template và form/panel vận hành hiện có.','Hoàn thiện nội thất',1,'published','10000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000010',1,1,repeat('a',64),now(),'10000000-0000-0000-0000-000000000001');
 
 INSERT INTO pipeline_template_nodes (id, template_id, name, description, type, order_index, position_x, position_y, responsible_role_ids, required_permission, exit_conditions, approval_rule, rework_enabled, replanning_enabled, fail_path, permissions) VALUES
 ('41100000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000010','Khảo sát & Planning','Thu thập hiện trạng, checklist, daily report planning và biên bản họp.','survey',1,80,120,'["Giám sát","PM"]','planning.edit','{"text":"Có ảnh, checklist, daily report và biên bản họp"}','PM duyệt planning',false,true,'previous','["planning.edit"]'),
@@ -1026,8 +1062,8 @@ INSERT INTO issues (id, project_id, title, description, severity, status, report
 INSERT INTO rework_requests (id, project_id, issue_id, acceptance_id, title, description, assigned_to, status, due_date, created_by, approved_by) VALUES
 ('72000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','70000000-0000-0000-0000-000000000010','71000000-0000-0000-0000-000000000010','Bổ sung ảnh nghiệm thu khu A','Chụp bổ sung góc kỹ thuật và attach vào hồ sơ nghiệm thu.','21000000-0000-0000-0000-000000000006','approved',CURRENT_DATE + INTERVAL '2 day','10000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002');
 
-INSERT INTO handover_records (id, project_id, status, final_acceptance_id, handover_date, client_representative, company_representative, documents_ready, warehouse_closed, payables_recorded, receivables_recorded, notes, created_by) VALUES
-('73000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','checking','71000000-0000-0000-0000-000000000010',CURRENT_DATE + INTERVAL '3 day','Anh Bình','Nguyễn Minh PM',true,false,true,true,'Chờ đóng vật tư dư và phụ lục ảnh.','10000000-0000-0000-0000-000000000002');
+INSERT INTO handover_records (id, project_id, handover_code, status, final_acceptance_id, handover_date, client_representative, company_representative, documents_ready, warehouse_closed, payables_recorded, receivables_recorded, notes, created_by) VALUES
+('73000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','HO-CF-FULL-001','submitted','71000000-0000-0000-0000-000000000010',CURRENT_DATE + INTERVAL '3 day','Anh Bình','Nguyễn Minh PM',true,false,true,true,'Chờ đóng vật tư dư và phụ lục ảnh.','10000000-0000-0000-0000-000000000002');
 
 INSERT INTO accounting_budgets (project_id, budget_code, name, planned_amount, approved_amount, used_amount, remaining_amount, status, approved_by) VALUES
 ('30000000-0000-0000-0000-000000000010','BUD-FULL-001','Ngân sách demo full workflow',980000000,950000000,420000000,530000000,'approved','10000000-0000-0000-0000-000000000007');

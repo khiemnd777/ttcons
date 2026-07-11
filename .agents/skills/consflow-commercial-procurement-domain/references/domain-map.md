@@ -40,3 +40,7 @@
 - Pair with materials/warehouse when procurement receive, stock movement, material balance, or surplus handling can change.
 - Pair with quality/acceptance when owner/client reconciliation, outgoing acceptance, punch list, or handover readiness depends on commercial records.
 - Pair with accounting/finance when procurement, invoices, payables, advances, payments, or vendor ledgers depend on BOQ or purchase data.
+
+## Golden Sample
+
+- `GOLDEN-REAL-001` is the review fixture for six approved/final-locked BOQ lines, a three-supplier/eighteen-line quote matrix, six selections, two received procurement requests, three active signed contracts, milestone obligations, variation history and released retention.

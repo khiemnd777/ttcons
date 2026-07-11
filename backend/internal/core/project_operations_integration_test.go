@@ -25,6 +25,30 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+func TestWorkflowTimelineCountsSubmittedAndSkippedSteps(t *testing.T) {
+	run := Record{"nodes": []Record{
+		{
+			"id": "completed-node", "name": "Khảo sát", "status": "completed",
+			"steps": []Record{{"status": "submitted"}, {"status": "completed"}},
+		},
+		{
+			"id": "skipped-node", "name": "BOQ không thiết kế", "status": "skipped",
+			"steps": []Record{{"status": "skipped"}, {"status": "cancelled"}},
+		},
+	}}
+
+	timeline := workflowTimeline(run)
+	if len(timeline) != 2 {
+		t.Fatalf("workflowTimeline returned %d nodes, want 2", len(timeline))
+	}
+	if number(timeline[0]["completed_steps"]) != 2 || number(timeline[0]["progress_percent"]) != 100 {
+		t.Fatalf("completed node summary = %#v, want 2/2 and 100%%", timeline[0])
+	}
+	if number(timeline[1]["completed_steps"]) != 0 || number(timeline[1]["skipped_steps"]) != 2 || number(timeline[1]["progress_percent"]) != 0 {
+		t.Fatalf("skipped node summary = %#v, want 0 completed, 2 skipped and 0%%", timeline[1])
+	}
+}
+
 func TestHasChecklistPayloadRequiresChecklistContent(t *testing.T) {
 	tests := []struct {
 		name    string

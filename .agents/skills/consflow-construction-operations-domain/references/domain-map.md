@@ -40,3 +40,7 @@
 - Pair with commercial/procurement when actual quantities, subcontractor checklist data, owner/client checklist data, or reconciliation variance changes.
 - Pair with materials/warehouse when material usage, before/after snapshots, surplus, stock issue, stock return, or site balance changes.
 - Pair with quality/acceptance/handover when evidence, checklist status, punch list, rework, or acceptance readiness changes.
+
+## Golden Sample
+
+- `GOLDEN-REAL-001` contains accepted evidence for every executed runtime step, three dated construction reports, subcontractor/client reconciliation, material before/after history and a resolved site issue.

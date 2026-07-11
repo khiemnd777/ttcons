@@ -102,6 +102,11 @@ Tất cả dùng mật khẩu `123456`.
 - warehouse@consflow.local
 - supervisor@consflow.local
 - director@consflow.local
+- procurement@consflow.local
+- qaqc@consflow.local
+- construction@consflow.local
+- subcontractor@consflow.local
+- client@consflow.local
 
 ## Module chính
 

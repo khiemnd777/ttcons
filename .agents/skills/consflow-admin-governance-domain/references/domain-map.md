@@ -36,3 +36,8 @@
 - Pair with every affected source domain when adding permissions, roles, navigation entries, project scopes, or row actions.
 - Pair with commercial, quality, and accounting domains when partner catalog fields or snapshot semantics change.
 - Check audit logs and actor propagation when changing any privileged action, approval action, or session lifecycle behavior.
+
+## Golden Live Accounts
+
+- Local/dev seed includes dedicated users for procurement, QA/QC, construction team, subcontractor and client roles (`procurement@`, `qaqc@`, `construction@`, `subcontractor@`, `client@consflow.local`), all documented in `backend/seed/GOLDEN_LIVE_RUNBOOK.md`.
+- `GOLDEN-LIVE-001` has twelve active project members so role-scoped work, requester/approver separation and external client/subcontractor participation can be exercised without weakening backend RBAC.

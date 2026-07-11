@@ -1,0 +1,34 @@
+{
+  "client_site_survey_minutes": {
+    "size": 48086,
+    "sha256": "be36110502f3e7656053b0c4bc13d030231aa83153b2823ee684900e3684954e"
+  },
+  "client_procurement_contract_advance_package": {
+    "size": 47537,
+    "sha256": "9f3e8309b504e5278950d2355717eb417a81e5f1efa2641ded09e51e9eef8b50"
+  },
+  "client_owner_contract_package": {
+    "size": 47725,
+    "sha256": "0475d85b62c99866bb255e935a018e3b93291a58b16e3489532717346b377724"
+  },
+  "builtin_meeting_minutes": {
+    "size": 47452,
+    "sha256": "48f22ba2e7b15294d468560aae786a58e64c4aabdab7bb6dff870ac3f0ce93d9"
+  },
+  "builtin_subcontractor_checklist": {
+    "size": 47358,
+    "sha256": "177c903d72e68792d1fd71fefc1aefa8f7930a8f5602e1211e6227bda8ff0f6b"
+  },
+  "builtin_owner_client_checklist": {
+    "size": 47693,
+    "sha256": "efb57270985ba212f54f5ffaa8e16538a2a6ab98d39f3de478093d4ee01f8942"
+  },
+  "client_output_settlement_package": {
+    "size": 47231,
+    "sha256": "8783e51407c661d954e8081cce812b26b1a06d661e355efeae5bb11b131ede99"
+  },
+  "client_output_invoice_closure": {
+    "size": 47244,
+    "sha256": "490615e7443a34c268d524defd2091e97ba692c7e04fcbf5cc6e55a8164d51a8"
+  }
+}

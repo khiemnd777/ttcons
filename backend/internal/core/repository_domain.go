@@ -577,11 +577,11 @@ func hasAnyString(values []string, required []string) bool {
 }
 
 func (r *Repository) CanViewWorkItem(ctx context.Context, workItemID, userID string) (bool, error) {
-	return r.canAccessWorkItem(ctx, workItemID, userID, true)
+	return r.canAccessWorkItem(ctx, workItemID, userID, true, true)
 }
 
 func (r *Repository) CanActOnWorkItem(ctx context.Context, workItemID, userID string) (bool, error) {
-	return r.canAccessWorkItem(ctx, workItemID, userID, false)
+	return r.canAccessWorkItem(ctx, workItemID, userID, false, false)
 }
 
 func (r *Repository) CanDecideWorkItem(ctx context.Context, item Record, userID string) (bool, error) {
@@ -836,7 +836,7 @@ func normalizeRoleLabel(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
 
-func (r *Repository) canAccessWorkItem(ctx context.Context, workItemID, userID string, includeWatchers bool) (bool, error) {
+func (r *Repository) canAccessWorkItem(ctx context.Context, workItemID, userID string, includeWatchers, includeCancelled bool) (bool, error) {
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
 	if err != nil {
 		return false, err
@@ -847,13 +847,17 @@ func (r *Repository) canAccessWorkItem(ctx context.Context, workItemID, userID s
 	}
 	args := workItemScopeArgs(profile, managerOverride, includeWatchers)
 	args = append([]any{workItemID}, args...)
+	statusCondition := "wi.status <> 'cancelled'"
+	if includeCancelled {
+		statusCondition = "TRUE"
+	}
 	rows, err := r.Query(ctx, fmt.Sprintf(`
 		SELECT COUNT(*) AS total
 		FROM work_items wi
 		JOIN projects p ON p.id=wi.project_id
-		WHERE wi.id=$1 AND wi.status <> 'cancelled' AND p.status <> 'cancelled'
+		WHERE wi.id=$1 AND %s AND p.status <> 'cancelled'
 		  AND (%s)
-	`, workItemScopeSQL("wi", 2)), args...)
+	`, statusCondition, workItemScopeSQL("wi", 2)), args...)
 	if err != nil {
 		return false, err
 	}
@@ -861,11 +865,23 @@ func (r *Repository) canAccessWorkItem(ctx context.Context, workItemID, userID s
 }
 
 func (r *Repository) ListProjectWorkItems(ctx context.Context, projectID, userID string) ([]Record, error) {
+	return r.listProjectWorkItems(ctx, projectID, userID, false)
+}
+
+func (r *Repository) ListProjectOperationsWorkItems(ctx context.Context, projectID, userID string) ([]Record, error) {
+	return r.listProjectWorkItems(ctx, projectID, userID, true)
+}
+
+func (r *Repository) listProjectWorkItems(ctx context.Context, projectID, userID string, includeCancelled bool) ([]Record, error) {
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 	args := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	statusCondition := "wi.status <> 'cancelled'"
+	if includeCancelled {
+		statusCondition = "TRUE"
+	}
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT wi.*, p.name AS project_name, p.code AS project_code,
 			rn.name AS run_node_name, rn.order_index AS run_node_order_index,
@@ -897,14 +913,14 @@ func (r *Repository) ListProjectWorkItems(ctx context.Context, projectID, userID
 		LEFT JOIN workflow_form_instances wfi ON wfi.work_item_id=wi.id AND wfi.status <> 'cancelled'
 		LEFT JOIN workflow_form_versions wfv ON wfv.id=wfi.form_version_id
 		LEFT JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
-		WHERE wi.project_id=$1 AND wi.status <> 'cancelled' AND p.status <> 'cancelled'
+		WHERE wi.project_id=$1 AND %s AND p.status <> 'cancelled'
 		  AND (%s)
 		ORDER BY
 			rn.order_index NULLS LAST,
 			rs.order_index NULLS LAST,
 			wi.due_at NULLS LAST,
 			wi.created_at
-	`, workItemScopeSQL("wi", 2)), args...)
+	`, statusCondition, workItemScopeSQL("wi", 2)), args...)
 }
 
 func (r *Repository) ListProjectWorkflowSidebarWorkItems(ctx context.Context, projectID, userID string) ([]Record, error) {
@@ -955,7 +971,7 @@ func (r *Repository) ListProjectWorkflowSidebarWorkItems(ctx context.Context, pr
 		LEFT JOIN workflow_form_instances wfi ON wfi.work_item_id=wi.id AND wfi.status <> 'cancelled'
 		LEFT JOIN workflow_form_versions wfv ON wfv.id=wfi.form_version_id
 		LEFT JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
-		WHERE wi.project_id=$1 AND wi.status <> 'cancelled' AND p.status <> 'cancelled'
+		WHERE wi.project_id=$1 AND p.status <> 'cancelled'
 		  AND (%s)
 		ORDER BY
 			rn.order_index NULLS LAST,
@@ -1270,7 +1286,7 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 		LEFT JOIN workflow_form_instances wfi ON wfi.work_item_id=wi.id AND wfi.status <> 'cancelled'
 		LEFT JOIN workflow_form_versions wfv ON wfv.id=wfi.form_version_id
 		LEFT JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
-		WHERE wi.id=$1 AND wi.status <> 'cancelled' AND p.status <> 'cancelled'
+		WHERE wi.id=$1 AND p.status <> 'cancelled'
 	`, workItemID)
 	if err != nil {
 		return nil, err
@@ -5966,7 +5982,7 @@ func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID st
 	if !profile.IsManager {
 		delete(project, "members")
 	}
-	workItems, err := r.ListProjectWorkItems(ctx, projectID, userID)
+	workItems, err := r.ListProjectOperationsWorkItems(ctx, projectID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -6446,10 +6462,18 @@ func workflowTimeline(run Record) []Record {
 	for _, node := range nodes {
 		steps, _ := node["steps"].([]Record)
 		completedSteps := 0
+		skippedSteps := 0
 		for _, step := range steps {
-			if fmt.Sprint(step["status"]) == "completed" {
+			switch fmt.Sprint(step["status"]) {
+			case "completed", "submitted":
 				completedSteps++
+			case "skipped", "cancelled":
+				skippedSteps++
 			}
+		}
+		progressSteps := completedSteps
+		if fmt.Sprint(node["status"]) == "skipped" {
+			progressSteps = 0
 		}
 		out = append(out, Record{
 			"id":               node["id"],
@@ -6459,7 +6483,8 @@ func workflowTimeline(run Record) []Record {
 			"status":           node["status"],
 			"step_count":       len(steps),
 			"completed_steps":  completedSteps,
-			"progress_percent": percent(completedSteps, len(steps)),
+			"skipped_steps":    skippedSteps,
+			"progress_percent": percent(progressSteps, len(steps)),
 			"started_at":       node["started_at"],
 			"completed_at":     node["completed_at"],
 		})

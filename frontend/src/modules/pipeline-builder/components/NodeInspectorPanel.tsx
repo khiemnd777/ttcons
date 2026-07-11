@@ -11,7 +11,7 @@ const nodeTypes = ['survey', 'design', 'boq', 'budget_approval', 'procurement', 
 const stepTypes = ['task', 'checklist', 'approval', 'document_upload', 'photo_upload', 'budget_check', 'material_check', 'daily_report', 'meeting_minutes', 'acceptance_check', 'handover_check', 'accounting_check'];
 
 type SelectOption = string | { label: string; value: string };
-type StepDialogMode = 'add' | 'edit' | null;
+type StepDialogMode = 'add' | 'edit' | 'view' | null;
 type StepDropPosition = 'before' | 'after';
 type DropdownMode = 'overlay' | 'inline';
 type StepForm = {
@@ -24,6 +24,7 @@ type StepForm = {
 
 type NodeInspectorPanelProps = {
   node: PipelineNode;
+  readOnly: boolean;
   nodeForm: Record<string, any>;
   permissionOptions: SelectOption[];
   permissionsLoading: boolean;
@@ -46,6 +47,7 @@ type NodeInspectorPanelProps = {
   onClose: () => void;
   onOpenAddStep: () => void;
   onOpenEditStep: (step: Record<string, any>) => void;
+  onOpenViewStep: (step: Record<string, any>) => void;
   onCloseStepDialog: () => void;
   onSubmitStep: () => void;
   onDeleteStep: (stepId: string) => void;
@@ -54,6 +56,7 @@ type NodeInspectorPanelProps = {
 
 export function NodeInspectorPanel({
   node,
+  readOnly,
   nodeForm,
   permissionOptions,
   permissionsLoading,
@@ -76,13 +79,15 @@ export function NodeInspectorPanel({
   onClose,
   onOpenAddStep,
   onOpenEditStep,
+  onOpenViewStep,
   onCloseStepDialog,
   onSubmitStep,
   onDeleteStep,
   onReorderSteps,
 }: NodeInspectorPanelProps) {
   const stepSavePending = addStepPending || updateStepPending;
-  const stepActionPending = stepSavePending || deleteStepPending || reorderStepPending;
+  const stepActionPending = readOnly || stepSavePending || deleteStepPending || reorderStepPending;
+  const stepDialogReadOnly = readOnly || stepDialogMode === 'view';
   const [draggedStepId, setDraggedStepId] = useState('');
   const [dropTargetStepId, setDropTargetStepId] = useState('');
   const [dropPosition, setDropPosition] = useState<StepDropPosition>('before');
@@ -95,7 +100,7 @@ export function NodeInspectorPanel({
     });
   }, [node.steps]);
   const stepIds = useMemo(() => sortedSteps.map((step: Record<string, any>) => (step.id ? String(step.id) : '')).filter(Boolean), [sortedSteps]);
-  const canReorderSteps = stepIds.length > 1 && !stepActionPending;
+  const canReorderSteps = !readOnly && stepIds.length > 1 && !stepActionPending;
   const formByVersionId = useMemo(() => new Map(workflowForms.map((form) => [String(form.version_id), form])), [workflowForms]);
   const selectedStepForm = stepForm.form_version_id ? formByVersionId.get(stepForm.form_version_id) : undefined;
   const approvalPolicy = isRecord(nodeForm.approval_policy_json) ? nodeForm.approval_policy_json : { mode: 'none' };
@@ -165,27 +170,38 @@ export function NodeInspectorPanel({
       <aside className="pipeline-details-panel absolute bottom-4 right-4 top-20 z-30 w-[380px] overflow-auto rounded-lg border border-line bg-white p-4 shadow-panel">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-ink">Cấu hình Node</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-semibold text-ink">Cấu hình Node</h2>
+              {readOnly ? <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Đã phát hành · Chỉ xem</span> : null}
+            </div>
             <p className="mt-1 text-xs text-slate-500">{node.name}</p>
           </div>
           <div className="flex gap-2">
-            <button title="Lưu node" className="rounded-md bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:opacity-50" disabled={savePending} onClick={onSave}>
-              <Save className="h-4 w-4" />
-            </button>
+            {!readOnly ? (
+              <button title="Lưu node" className="rounded-md bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:opacity-50" disabled={savePending} onClick={onSave}>
+                <Save className="h-4 w-4" />
+              </button>
+            ) : null}
             <button title="Đóng cấu hình" className="rounded-md border border-line p-2 text-slate-500 hover:bg-slate-100" onClick={onClose}>
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
+        {readOnly ? (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+            Revision đã phát hành là bất biến. Chọn <strong>Tạo revision</strong> để chỉnh sửa mà không thay đổi các công trình lịch sử.
+          </div>
+        ) : null}
         <div className="space-y-3">
-          <Field label="Tên node" value={nodeForm.name} onChange={(value) => onChangeField('name', value)} />
-          <Field label="Mô tả" value={nodeForm.description} onChange={(value) => onChangeField('description', value)} textarea />
-          <Select label="Node type" value={nodeForm.type} options={enumOptions('node_type', nodeTypes)} onChange={(value) => onChangeField('type', value)} />
+          <Field label="Tên node" value={nodeForm.name} onChange={(value) => onChangeField('name', value)} disabled={readOnly} />
+          <Field label="Mô tả" value={nodeForm.description} onChange={(value) => onChangeField('description', value)} textarea disabled={readOnly} />
+          <Select label="Node type" value={nodeForm.type} options={enumOptions('node_type', nodeTypes)} onChange={(value) => onChangeField('type', value)} disabled={readOnly} />
           <PermissionSelect
             label="Permissions"
             value={Array.isArray(nodeForm.permissions) ? nodeForm.permissions : []}
             options={permissionOptions}
             loading={permissionsLoading}
+            disabled={readOnly}
             onChange={(value) => onChangeField('permissions', value)}
           />
 
@@ -203,6 +219,7 @@ export function NodeInspectorPanel({
                   { label: 'Theo quorum', value: 'quorum' },
                   { label: 'Theo thứ tự role', value: 'ordered' },
                 ]}
+                disabled={readOnly}
                 onChange={(value) => updateApprovalPolicy({ mode: value, roles: approvalRoles, quorum: Number(approvalPolicy.quorum ?? 1) || 1, requester_cannot_approve: approvalPolicy.requester_cannot_approve ?? true, comment_required: approvalPolicy.comment_required ?? true })}
               />
               {approvalMode !== 'none' ? (
@@ -219,6 +236,7 @@ export function NodeInspectorPanel({
                     noResultsText="Không tìm thấy role phù hợp"
                     removeTitle={(role) => `Bỏ ${role}`}
                     dropdownMode="inline"
+                    disabled={readOnly}
                     onChange={(roles) => updateApprovalPolicy({ roles, stages: undefined })}
                   />
                   {approvalMode === 'quorum' ? (
@@ -230,16 +248,17 @@ export function NodeInspectorPanel({
                         max={Math.max(1, approvalRoles.length)}
                         className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm focus-ring"
                         value={Number(approvalPolicy.quorum ?? 1)}
+                        disabled={readOnly}
                         onChange={(event) => updateApprovalPolicy({ quorum: Number(event.target.value) })}
                       />
                     </label>
                   ) : null}
                   <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <input type="checkbox" checked={approvalPolicy.requester_cannot_approve !== false} onChange={(event) => updateApprovalPolicy({ requester_cannot_approve: event.target.checked })} />
+                    <input type="checkbox" checked={approvalPolicy.requester_cannot_approve !== false} disabled={readOnly} onChange={(event) => updateApprovalPolicy({ requester_cannot_approve: event.target.checked })} />
                     Người gửi không được tự duyệt
                   </label>
                   <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <input type="checkbox" checked={approvalPolicy.comment_required !== false} onChange={(event) => updateApprovalPolicy({ comment_required: event.target.checked })} />
+                    <input type="checkbox" checked={approvalPolicy.comment_required !== false} disabled={readOnly} onChange={(event) => updateApprovalPolicy({ comment_required: event.target.checked })} />
                     Bắt buộc nhập ý kiến duyệt
                   </label>
                 </>
@@ -267,7 +286,19 @@ export function NodeInspectorPanel({
                         'flex items-start justify-between gap-2 rounded-md border border-line px-2 py-2 transition',
                         draggedStepId === stepId && 'border-blue-200 bg-blue-50/50 opacity-60',
                         isDropTarget && 'border-blue-300 bg-blue-50/30',
+                        readOnly && 'cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 focus:outline-none focus:ring-2 focus:ring-blue-100',
                       )}
+                      role={readOnly ? 'button' : undefined}
+                      tabIndex={readOnly ? 0 : undefined}
+                      aria-label={readOnly ? `Xem chi tiết checklist ${step.name}` : undefined}
+                      onClick={() => {
+                        if (readOnly) onOpenViewStep(step);
+                      }}
+                      onKeyDown={(event) => {
+                        if (!readOnly || (event.key !== 'Enter' && event.key !== ' ')) return;
+                        event.preventDefault();
+                        onOpenViewStep(step);
+                      }}
                       onDragOver={(event) => {
                         if (stepId) handleStepDragOver(event, stepId);
                       }}
@@ -278,19 +309,21 @@ export function NodeInspectorPanel({
                         if (stepId) handleStepDrop(event, stepId);
                       }}
                     >
-                      <button
-                        type="button"
-                        title="Kéo để sắp xếp checklist"
-                        aria-label={`Kéo để sắp xếp ${step.name}`}
-                        className="mt-0.5 rounded-md p-1 text-slate-300 hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-30 enabled:cursor-grab enabled:active:cursor-grabbing"
-                        draggable={canDragStep}
-                        disabled={!canDragStep}
-                        onClick={(event) => event.preventDefault()}
-                        onDragStart={(event) => handleStepDragStart(event, stepId)}
-                        onDragEnd={resetStepDragState}
-                      >
-                        <GripVertical className="h-4 w-4" />
-                      </button>
+                      {!readOnly ? (
+                        <button
+                          type="button"
+                          title="Kéo để sắp xếp checklist"
+                          aria-label={`Kéo để sắp xếp ${step.name}`}
+                          className="mt-0.5 rounded-md p-1 text-slate-300 hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-30 enabled:cursor-grab enabled:active:cursor-grabbing"
+                          draggable={canDragStep}
+                          disabled={!canDragStep}
+                          onClick={(event) => event.preventDefault()}
+                          onDragStart={(event) => handleStepDragStart(event, stepId)}
+                          onDragEnd={resetStepDragState}
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </button>
+                      ) : null}
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-ink">{index + 1}. {step.name}</p>
                         <div className="mt-1 flex flex-wrap gap-1">
@@ -309,7 +342,9 @@ export function NodeInspectorPanel({
                           ) : null}
                         </div>
                       </div>
-                      {stepId ? (
+                      {readOnly ? (
+                        <span className="shrink-0 rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">Xem</span>
+                      ) : stepId ? (
                         <div className="flex shrink-0 gap-1">
                           <button title="Sửa checklist" className="rounded-md p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-600" onClick={() => onOpenEditStep(step)} disabled={stepActionPending}>
                             <Pencil className="h-4 w-4" />
@@ -329,32 +364,45 @@ export function NodeInspectorPanel({
                 </div>
               )}
             </div>
-            <button className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:opacity-50" onClick={onOpenAddStep} disabled={stepSavePending}>
-              <Plus className="h-4 w-4" />
-              Thêm
-            </button>
+            {!readOnly ? (
+              <button className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:opacity-50" onClick={onOpenAddStep} disabled={stepSavePending}>
+                <Plus className="h-4 w-4" />
+                Thêm
+              </button>
+            ) : null}
           </div>
         </div>
       </aside>
       <Dialog
-        open={Boolean(stepDialogMode)}
-        title={stepDialogMode === 'edit' ? 'Sửa Checklist / Step' : 'Thêm Checklist / Step'}
+        open={Boolean(stepDialogMode) && (!readOnly || stepDialogMode === 'view')}
+        title={stepDialogMode === 'view' ? 'Chi tiết Checklist / Step' : stepDialogMode === 'edit' ? 'Sửa Checklist / Step' : 'Thêm Checklist / Step'}
         onClose={onCloseStepDialog}
         size="sm"
         footer={
-          <div className="flex justify-end gap-2">
-            <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-white disabled:opacity-50" onClick={onCloseStepDialog} disabled={stepSavePending}>
-              Hủy
-            </button>
-            <button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={onSubmitStep} disabled={stepSavePending}>
-              {stepDialogMode === 'edit' ? 'Lưu' : 'Thêm'}
-            </button>
-          </div>
+          stepDialogReadOnly ? (
+            <div className="flex justify-end">
+              <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-white" onClick={onCloseStepDialog}>Đóng</button>
+            </div>
+          ) : (
+            <div className="flex justify-end gap-2">
+              <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-white disabled:opacity-50" onClick={onCloseStepDialog} disabled={stepSavePending}>
+                Hủy
+              </button>
+              <button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={onSubmitStep} disabled={stepSavePending}>
+                {stepDialogMode === 'edit' ? 'Lưu' : 'Thêm'}
+              </button>
+            </div>
+          )
         }
       >
         <div className="space-y-4">
-          <Field label="Tên" value={stepForm.name} onChange={(value) => onChangeStepField('name', value)} invalid={stepNameInvalid} />
-          <Select label="Loại" value={stepForm.step_type} options={enumOptions('step_type', stepTypes)} onChange={(value) => onChangeStepField('step_type', value)} />
+          {stepDialogReadOnly ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+              Revision đã phát hành là bất biến. Nội dung bên dưới chỉ để xem.
+            </div>
+          ) : null}
+          <Field label="Tên" value={stepForm.name} onChange={(value) => onChangeStepField('name', value)} invalid={stepNameInvalid} disabled={stepDialogReadOnly} />
+          <Select label="Loại" value={stepForm.step_type} options={enumOptions('step_type', stepTypes)} onChange={(value) => onChangeStepField('step_type', value)} disabled={stepDialogReadOnly} />
           <MultiSelect
             label="Role phụ trách"
             value={stepForm.required_role_ids}
@@ -369,6 +417,7 @@ export function NodeInspectorPanel({
             invalidText="Chọn ít nhất một role phụ trách"
             removeTitle={(role) => `Bỏ ${role}`}
             dropdownMode="inline"
+            disabled={stepDialogReadOnly}
             onChange={(value) => onChangeStepField('required_role_ids', value)}
           />
           <WorkflowFormSelect
@@ -379,6 +428,7 @@ export function NodeInspectorPanel({
             loading={workflowFormsLoading}
             error={workflowFormsError}
             selectedForm={selectedStepForm}
+            disabled={stepDialogReadOnly}
             onRequiredChange={(value) => onChangeStepField('form_required', value)}
             onChange={(value) => onChangeStepField('form_version_id', value)}
           />
@@ -396,26 +446,26 @@ function isRecord(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function Field({ label, value, onChange, textarea, invalid }: { label: string; value?: string; onChange: (value: string) => void; textarea?: boolean; invalid?: boolean }) {
-  const fieldClass = `mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring ${invalid ? 'border-rose-300 bg-rose-50' : 'border-line'}`;
+function Field({ label, value, onChange, textarea, invalid, disabled = false }: { label: string; value?: string; onChange: (value: string) => void; textarea?: boolean; invalid?: boolean; disabled?: boolean }) {
+  const fieldClass = `mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600 ${invalid ? 'border-rose-300 bg-rose-50' : 'border-line'}`;
   return (
     <label className="block">
       <span className="text-sm font-semibold text-slate-700">{label}</span>
       {textarea ? (
-        <textarea className={`${fieldClass} min-h-20`} value={value ?? ''} onChange={(event) => onChange(event.target.value)} />
+        <textarea className={`${fieldClass} min-h-20`} value={value ?? ''} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
       ) : (
-        <input className={fieldClass} value={value ?? ''} onChange={(event) => onChange(event.target.value)} />
+        <input className={fieldClass} value={value ?? ''} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
       )}
       {invalid ? <span className="mt-1 block text-xs font-medium text-rose-600">Tên checklist là bắt buộc</span> : null}
     </label>
   );
 }
 
-function Select({ label, value, options, onChange }: { label: string; value?: string; options: SelectOption[]; onChange: (value: string) => void }) {
+function Select({ label, value, options, onChange, disabled = false }: { label: string; value?: string; options: SelectOption[]; onChange: (value: string) => void; disabled?: boolean }) {
   return (
     <label className="block">
       <span className="text-sm font-semibold text-slate-700">{label}</span>
-      <select className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm focus-ring" value={value ?? ''} onChange={(event) => onChange(event.target.value)}>
+      <select className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm focus-ring disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600" value={value ?? ''} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
         {options.map((option) => {
           const normalized = typeof option === 'string' ? { label: option, value: option } : option;
           return <option key={normalized.value} value={normalized.value}>{normalized.label}</option>;
@@ -430,12 +480,14 @@ function PermissionSelect({
   value,
   options,
   loading,
+  disabled = false,
   onChange,
 }: {
   label: string;
   value: string[];
   options: SelectOption[];
   loading: boolean;
+  disabled?: boolean;
   onChange: (value: string[]) => void;
 }) {
   return (
@@ -444,6 +496,7 @@ function PermissionSelect({
       value={value}
       options={options}
       loading={loading}
+      disabled={disabled}
       emptyText="Không giới hạn permission riêng"
       loadingPlaceholder="Đang tải permissions..."
       searchPlaceholder="Gõ để tìm permission"
@@ -464,6 +517,7 @@ function WorkflowFormSelect({
   loading,
   error,
   selectedForm,
+  disabled = false,
   onRequiredChange,
   onChange,
 }: {
@@ -474,10 +528,11 @@ function WorkflowFormSelect({
   loading: boolean;
   error: boolean;
   selectedForm?: WorkflowFormCatalogItem;
+  disabled?: boolean;
   onRequiredChange: (value: boolean) => void;
   onChange: (value: string) => void;
 }) {
-  const disabled = loading || error || !forms.length;
+  const inputDisabled = disabled || loading || error || !forms.length;
   const requiredFields = requiredFieldLabels(selectedForm);
   return (
     <section className="rounded-md border border-line bg-slate-50 p-3">
@@ -486,7 +541,7 @@ function WorkflowFormSelect({
           <h3 className="text-sm font-semibold text-ink">Workflow Form</h3>
         </div>
         <label className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-700">
-          <input type="checkbox" className="h-4 w-4 rounded border-line" checked={required} onChange={(event) => onRequiredChange(event.target.checked)} />
+          <input type="checkbox" className="h-4 w-4 rounded border-line" checked={required} disabled={disabled} onChange={(event) => onRequiredChange(event.target.checked)} />
           Bắt buộc
         </label>
       </div>
@@ -498,7 +553,7 @@ function WorkflowFormSelect({
             invalid ? 'border-rose-300 bg-rose-50' : 'border-line bg-white',
           )}
           value={value ?? ''}
-          disabled={disabled}
+          disabled={inputDisabled}
           onChange={(event) => onChange(event.target.value)}
         >
           <option value="">{workflowFormEmptyLabel({ required, loading, error, hasForms: forms.length > 0 })}</option>
@@ -545,6 +600,7 @@ function MultiSelect({
   options,
   loading = false,
   invalid = false,
+  disabled = false,
   emptyText,
   loadingPlaceholder,
   searchPlaceholder,
@@ -561,6 +617,7 @@ function MultiSelect({
   options: SelectOption[];
   loading?: boolean;
   invalid?: boolean;
+  disabled?: boolean;
   emptyText: string;
   loadingPlaceholder: string;
   searchPlaceholder: string;
@@ -583,9 +640,9 @@ function MultiSelect({
     if (!normalizedQuery) return availableOptions;
     return availableOptions.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase('vi-VN').includes(normalizedQuery));
   }, [availableOptions, query]);
-  const canSearch = !loading && availableOptions.length > 0;
+  const canSearch = !disabled && !loading && availableOptions.length > 0;
   const chooseValue = (selectedValue: string) => {
-    if (!availableOptions.some((option) => option.value === selectedValue)) return;
+    if (disabled || !availableOptions.some((option) => option.value === selectedValue)) return;
     onChange([...value, selectedValue]);
     setQuery('');
     setOpen(false);
@@ -599,9 +656,11 @@ function MultiSelect({
           {value.length ? value.map((selectedValue) => (
             <span key={selectedValue} className="inline-flex max-w-full items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
               <span className="truncate">{labelByValue.get(selectedValue) ?? selectedValue}</span>
-              <button type="button" title={removeTitle(selectedValue)} className="rounded p-0.5 hover:bg-blue-100" onClick={() => onChange(value.filter((item) => item !== selectedValue))}>
-                <X className="h-3 w-3" />
-              </button>
+              {!disabled ? (
+                <button type="button" title={removeTitle(selectedValue)} className="rounded p-0.5 hover:bg-blue-100" onClick={() => onChange(value.filter((item) => item !== selectedValue))}>
+                  <X className="h-3 w-3" />
+                </button>
+              ) : null}
             </span>
           )) : <span className={clsx('px-1 py-1 text-xs font-medium', invalid ? 'text-rose-700' : 'text-slate-500')}>{emptyText}</span>}
         </div>

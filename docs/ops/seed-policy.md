@@ -34,6 +34,7 @@ Before changing `backend/seed/seed.sql`:
 2. Keep UUIDs deterministic when existing docs or tests refer to them.
 3. Avoid deleting demo rows that other demo flows depend on unless those flows are updated in the same change.
 4. Run the backend tests and frontend build after changes.
+5. The local/dev reset uses `TRUNCATE ... RESTART IDENTITY CASCADE` so domain tables introduced by later migrations cannot leave stale rows or block the seed. Never run the seed against production.
 
 ## Production Use
 

@@ -10,11 +10,13 @@ export function WorkItemCard({
   onOpen,
   compact = false,
   showWorkflowPrefix = false,
+  displayStatus,
 }: {
   item: WorkItem;
   onOpen: () => void;
   compact?: boolean;
   showWorkflowPrefix?: boolean;
+  displayStatus?: string;
 }) {
   const overdue = isWorkOverdue(item);
   const title = workItemTitle(item, showWorkflowPrefix);
@@ -23,7 +25,7 @@ export function WorkItemCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={overdue ? 'overdue' : item.status} />
+            <StatusBadge status={displayStatus ?? (overdue ? 'overdue' : item.status)} />
             {item.project_code ? <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{item.project_code}</span> : null}
             {item.department ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{departmentLabel(item.department)}</span> : null}
             {hasWorkflowFormSummary(item) ? (

@@ -73,7 +73,7 @@ export function PipelineBuilderPage() {
   const [templateNameForm, setTemplateNameForm] = useState('');
   const [templateNameSubmitAttempted, setTemplateNameSubmitAttempted] = useState(false);
   const [deleteTemplateDialog, setDeleteTemplateDialog] = useState<PipelineTemplate | null>(null);
-  const [stepDialog, setStepDialog] = useState<{ mode: 'add' | 'edit'; step?: Record<string, any> } | null>(null);
+  const [stepDialog, setStepDialog] = useState<{ mode: 'add' | 'edit' | 'view'; step?: Record<string, any> } | null>(null);
   const [stepForm, setStepForm] = useState<StepForm>({ name: '', step_type: 'task', required_role_ids: ['PM'], form_required: true, form_version_id: '' });
   const [stepSubmitAttempted, setStepSubmitAttempted] = useState(false);
   const [nodeForm, setNodeForm] = useState<Record<string, any>>({});
@@ -205,7 +205,7 @@ export function PipelineBuilderPage() {
   }, [detailsNode?.id]);
 
   useEffect(() => {
-    if (!stepDialog || !stepForm.form_required || stepForm.form_version_id || !workflowForms.data?.length) return;
+    if (!stepDialog || stepDialog.mode === 'view' || !stepForm.form_required || stepForm.form_version_id || !workflowForms.data?.length) return;
     setStepForm((current) => {
       if (!current.form_required || current.form_version_id) return current;
       return { ...current, form_version_id: defaultWorkflowFormVersionForStep(current.step_type, workflowForms.data ?? [], detailsNode?.type, current.name) };
@@ -583,6 +583,18 @@ export function PipelineBuilderPage() {
     setStepDialog({ mode: 'edit', step });
   };
 
+  const openViewStepDialog = (step: Record<string, any>) => {
+    setStepForm({
+      name: String(step.name ?? ''),
+      step_type: String(step.step_type ?? 'task'),
+      required_role_ids: normalizeRoleIds(step.required_role_ids),
+      form_required: boolValue(step.form_required, true),
+      form_version_id: cleanString(step.form_version_id),
+    });
+    setStepSubmitAttempted(false);
+    setStepDialog({ mode: 'view', step });
+  };
+
   const closeStepDialog = () => {
     setStepDialog(null);
     setStepForm({ name: '', step_type: 'task', required_role_ids: ['PM'], form_required: true, form_version_id: '' });
@@ -625,6 +637,7 @@ export function PipelineBuilderPage() {
   };
 
   const submitStepDialog = () => {
+    if (stepDialog?.mode === 'view') return;
     setStepSubmitAttempted(true);
     const invalidFields: string[] = [];
     if (!stepForm.name.trim()) invalidFields.push('Tên checklist');
@@ -837,9 +850,10 @@ export function PipelineBuilderPage() {
         onValidatePipeline={validatePipeline}
         onDeleteSelection={deleteSelection}
         inspector={
-          !isReadOnly && detailsNode ? (
+          detailsNode ? (
             <NodeInspectorPanel
               node={detailsNode}
+              readOnly={isReadOnly}
               nodeForm={nodeForm}
               permissionOptions={permissionOptions}
               permissionsLoading={permissions.isLoading}
@@ -856,16 +870,35 @@ export function PipelineBuilderPage() {
               workflowForms={workflowForms.data ?? []}
               workflowFormsLoading={workflowForms.isLoading}
               workflowFormsError={workflowForms.isError}
-              onChangeField={(field, value) => setNodeForm((current) => ({ ...current, [field]: value }))}
-              onChangeStepField={changeStepField}
-              onSave={() => saveNode.mutate()}
+              onChangeField={(field, value) => {
+                if (!isReadOnly) setNodeForm((current) => ({ ...current, [field]: value }));
+              }}
+              onChangeStepField={(field, value) => {
+                if (!isReadOnly) changeStepField(field, value);
+              }}
+              onSave={() => {
+                if (!isReadOnly) saveNode.mutate();
+              }}
               onClose={() => setDetailsNodeId('')}
-              onOpenAddStep={openAddStepDialog}
-              onOpenEditStep={openEditStepDialog}
+              onOpenAddStep={() => {
+                if (!isReadOnly) openAddStepDialog();
+              }}
+              onOpenEditStep={(step) => {
+                if (!isReadOnly) openEditStepDialog(step);
+              }}
+              onOpenViewStep={(step) => {
+                if (isReadOnly) openViewStepDialog(step);
+              }}
               onCloseStepDialog={closeStepDialog}
-              onSubmitStep={submitStepDialog}
-              onDeleteStep={(stepId) => deleteStep.mutate(stepId)}
-              onReorderSteps={(orderedStepIds) => reorderStep.mutate({ orderedStepIds })}
+              onSubmitStep={() => {
+                if (!isReadOnly) submitStepDialog();
+              }}
+              onDeleteStep={(stepId) => {
+                if (!isReadOnly) deleteStep.mutate(stepId);
+              }}
+              onReorderSteps={(orderedStepIds) => {
+                if (!isReadOnly) reorderStep.mutate({ orderedStepIds });
+              }}
             />
           ) : !isReadOnly && selectedConnector ? (
             <EdgeInspectorPanel

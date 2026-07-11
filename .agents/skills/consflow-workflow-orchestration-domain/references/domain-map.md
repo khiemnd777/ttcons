@@ -37,6 +37,7 @@
 - UAT for official template automation must invoke stable engine-v2 `domain_action_key` actions through the hard-automation gate; display-name automation is legacy engine-v1 compatibility only.
 - Engine v2 work items can mutate only inside the run's current node. Advancing a node requires all run steps/work items, exact forms, node approval, and mandatory automation events to be ready.
 - Branch transitions mark non-selected direct alternatives `skipped`, cancel their pending work/form instances, and exclude skipped nodes from progress.
+- Project Operations preserves those cancelled branch work items as read-only history and labels them as skipped; action queues and `CanActOnWorkItem` continue to exclude them. Runtime timeline completion treats `submitted` and `completed` steps as satisfied, while skipped/cancelled steps are counted separately and never inflate progress.
 - Engine v2 steps snapshot `surface_kind` and `domain_action_key`; work-item UI must route by this contract before any legacy text heuristic.
 - Official contract steps 24 and 29-31/33 use `surface_kind='contract'`; step 32 remains the approval surface. Pending runtime steps receive the new surface/permission snapshot, while completed historical steps are not rewritten.
 - Official quality steps 36-37 use `surface_kind='quality'` with `quality.create` and `quality.recurring_manage`; only pending runtime steps receive the new surface/permission snapshot.
@@ -56,3 +57,10 @@
 - Pair with the source business domain when workflow forms create or summarize planning, construction, commercial, material, acceptance, or finance records.
 - Check template authoring, runtime copies, work-item gates, activity, and frontend status labels together when changing workflow transitions.
 - Do not let convenience UI bypass approval, required-form, evidence, signature, PDF, material, receivable, or blocker gates.
+
+## Golden Sample
+
+- `GOLDEN-REAL-001` and `GOLDEN-NO-DESIGN-001` jointly cover all 12 official nodes, 52 steps and 51 form-bound steps. The flagship skips the no-design BOQ node; the companion skips the design nodes, preserving real branch semantics.
+- `backend/seed/validate_golden_project.sql` asserts exact form-version submission, required answers, accepted evidence and approval/PDF coverage.
+- `GOLDEN-LIVE-001` snapshots the same official engine-v2 contract at node `Khảo sát`: node 1 is `in_progress`, all 52 run steps are pending, six first-node work items are ready, 51 exact form instances are draft, and no completion evidence or domain ledger is pre-seeded.
+- Official seeded approval policies must use V46 keys (`roles`, `quorum`, `requester_cannot_approve`, `comment_required`, `signature_required`) and mode `any`; legacy aliases such as `required_roles` are invalid for runtime approval normalization.

@@ -281,8 +281,10 @@ function WorkflowSidebar({
     [timelineNodes],
   );
   const allSteps = nodes.flatMap((node) => asRecords(node.steps));
-  const completedSteps = allSteps.filter((step) => isCompletedStatus(step.status)).length;
-  const overallProgress = progressPercent(completedSteps, allSteps.length);
+  const skippedSteps = allSteps.filter((step) => isSkippedStatus(step.status)).length;
+  const executableSteps = allSteps.filter((step) => !isSkippedStatus(step.status));
+  const completedSteps = executableSteps.filter((step) => isCompletedStatus(step.status)).length;
+  const overallProgress = progressPercent(completedSteps, executableSteps.length);
   const hasData = nodes.length > 0;
   const activeNodeId = activeNodeIdForWorkItem(nodes, activeWorkItemId);
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([]);
@@ -333,11 +335,12 @@ function WorkflowSidebar({
           <div className="mt-3">
             <div className="mb-1.5 flex items-center justify-between gap-2 text-xs font-semibold">
               <span className="text-slate-600">Tiến độ</span>
-              <span className="text-blue-700">{overallProgress}% · {completedSteps}/{allSteps.length} step</span>
+              <span className="text-blue-700">{overallProgress}% · {completedSteps}/{executableSteps.length} step thực hiện</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-white ring-1 ring-inset ring-line">
               <div className="h-full rounded-full bg-blue-600" style={{ width: `${overallProgress}%` }} />
             </div>
+            {skippedSteps ? <p className="mt-1.5 text-right text-[11px] font-medium text-slate-500">{skippedSteps} step đã bỏ qua · {allSteps.length} step toàn workflow</p> : null}
           </div>
         </div>
 
@@ -419,7 +422,8 @@ function WorkflowNodeItem({
 }) {
   const nodeId = cleanText(node.id);
   const steps = asRecords(node.steps);
-  const completedSteps = steps.filter((step) => isCompletedStatus(step.status)).length;
+  const derivedCompletedSteps = steps.filter((step) => isCompletedStatus(step.status)).length;
+  const completedSteps = clampStepCount(Number(timelineNode?.completed_steps ?? derivedCompletedSteps), steps.length);
   const nodeProgress = clampPercent(Number(timelineNode?.progress_percent ?? progressPercent(completedSteps, steps.length)));
   const orderIndex = cleanText(node.order_index) || cleanText(timelineNode?.order_index) || String(fallbackIndex + 1);
   const isActiveNode = steps.some((step) => cleanText(step.work_item_id) === activeWorkItemId);
@@ -731,7 +735,16 @@ function cleanText(value: unknown) {
 }
 
 function isCompletedStatus(status: unknown) {
-  return cleanText(status) === 'completed';
+  return ['submitted', 'completed'].includes(cleanText(status));
+}
+
+function isSkippedStatus(status: unknown) {
+  return ['skipped', 'cancelled'].includes(cleanText(status));
+}
+
+function clampStepCount(value: number, total: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(total, Math.max(0, Math.round(value)));
 }
 
 function progressPercent(completed: number, total: number) {
@@ -750,7 +763,7 @@ function sortIndex(value: unknown) {
 }
 
 function stepStatusIcon(status: string, active: boolean) {
-  if (status === 'completed') return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
+  if (isCompletedStatus(status)) return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
   if (status === 'blocked') return <AlertTriangle className="h-4 w-4 text-rose-600" />;
   if (status === 'waiting_approval' || status === 'waiting_review') return <Clock3 className="h-4 w-4 text-amber-600" />;
   return <Circle className={clsx('h-4 w-4', active ? 'text-blue-700' : 'text-slate-400')} />;

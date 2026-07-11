@@ -46,3 +46,7 @@
 - Pair with commercial/procurement when payables, vendor invoices, advances, payment schedules, or procurement-linked source documents change.
 - Pair with quality/acceptance/handover when receivables, output invoices, client billing, or handover readiness depends on acceptance state.
 - Pair with admin/governance when partner catalog, tax codes, permissions, or audit semantics affect financial records.
+
+## Golden Sample
+
+- `GOLDEN-REAL-001` is the reconciled review fixture for four AP and five AR obligations, schedules, settled advances, nine terminal payments/receipts, allocations, verified input invoice, issued output invoice and released contract retention. AP/AR remaining balances are zero before handover.
