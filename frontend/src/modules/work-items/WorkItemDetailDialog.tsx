@@ -21,9 +21,10 @@ import { get, post } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import { useToast } from '../../components/ToastProvider';
-import type { ActivityPayload, EvidenceRecord, WorkItem, WorkItemActivity } from '../../lib/types/domain';
+import type { ActivityPayload, EvidenceRecord, ProjectActivityOptions, WorkItem, WorkItemActivity } from '../../lib/types/domain';
 import { ActivityAttachments } from './ActivityAttachments';
-import { ActivityComposer, type ActivityAttachmentOption } from './ActivityComposer';
+import { ActivityReactionBar, ActivityReplyQuote } from './ActivityConversationMeta';
+import { ActivityComposer, type ActivityAttachmentOption, type ActivityMentionOption } from './ActivityComposer';
 import { EvidencePanel } from './EvidencePanel';
 import {
   WorkItemPrimarySurface,
@@ -104,6 +105,21 @@ export function WorkItemDetailWorkspace({
     retry: false,
   });
   const detailItem = workDetail.data ?? item;
+  const activityOptions = useQuery({
+    queryKey: ['project-activity-options', detailItem?.project_id],
+    queryFn: () => get<ProjectActivityOptions>(`/projects/${detailItem?.project_id}/activity/options`),
+    enabled: Boolean(detailItem?.project_id),
+    retry: false,
+  });
+  const activityMentionOptions: ActivityMentionOption[] = [
+    ...(activityOptions.data?.members ?? []).map((member) => ({
+      type: 'staff' as const,
+      id: member.id,
+      label: member.label,
+      description: [member.position, member.department].filter(Boolean).join(' · '),
+    })),
+    ...(activityOptions.data?.roles ?? []).map((role) => ({ type: 'role' as const, id: role.id, label: role.label })),
+  ];
 
   const workAction = useMutation({
     mutationFn: ({ workItemId, action, comment }: { workItemId: string; action: WorkItemActionKey; comment: string }) =>
@@ -213,6 +229,7 @@ export function WorkItemDetailWorkspace({
                   evidence={evidence}
                   activities={activities}
                   attachmentOptions={attachmentOptions}
+                  mentionOptions={activityMentionOptions}
                   activitySubmitting={activityAction.isPending}
                   primarySurfaceKind={primarySurface.kind}
                   onSubmitActivity={(payload) => {
@@ -452,6 +469,7 @@ function WorkItemSupportingTabs({
   evidence,
   activities,
   attachmentOptions,
+  mentionOptions,
   activitySubmitting,
   primarySurfaceKind,
   onSubmitActivity,
@@ -460,6 +478,7 @@ function WorkItemSupportingTabs({
   evidence: EvidenceRecord[];
   activities: WorkItemActivity[];
   attachmentOptions: ActivityAttachmentOption[];
+  mentionOptions: ActivityMentionOption[];
   activitySubmitting: boolean;
   primarySurfaceKind: WorkItemPrimarySurfaceKind;
   onSubmitActivity: (payload: ActivityPayload) => Promise<void>;
@@ -543,6 +562,7 @@ function WorkItemSupportingTabs({
           <WorkItemActivityPanel
             activities={activities}
             attachmentOptions={attachmentOptions}
+            mentionOptions={mentionOptions}
             submitting={activitySubmitting}
             onSubmit={onSubmitActivity}
           />
@@ -568,11 +588,13 @@ function resolveSupportTabAction(activeTab: SupportTabKey, item: WorkItem, evide
 function WorkItemActivityPanel({
   activities,
   attachmentOptions,
+  mentionOptions,
   submitting,
   onSubmit,
 }: {
   activities: WorkItemActivity[];
   attachmentOptions: ActivityAttachmentOption[];
+  mentionOptions: ActivityMentionOption[];
   submitting: boolean;
   onSubmit: (payload: ActivityPayload) => Promise<void>;
 }) {
@@ -602,6 +624,8 @@ function WorkItemActivityPanel({
         <ActivityComposer
           mode="work_item"
           attachmentOptions={attachmentOptions}
+          mentionOptions={mentionOptions}
+          defaultExpanded
           submitting={submitting}
           onSubmit={(payload) => onSubmit(payload).then(() => setComposerOpen(false))}
         />
@@ -632,8 +656,10 @@ function ActivityTimelineItem({ activity }: { activity: WorkItemActivity }) {
         </div>
         {activity.visibility ? <span className="w-fit rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{visibilityLabel(activity.visibility)}</span> : null}
       </div>
-      {activity.comment ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-5 text-slate-700">{activity.comment}</p> : null}
+      <ActivityReplyQuote replyTo={activity.reply_to} />
+      {activity.withdrawn_at ? <p className="mt-2 text-sm italic text-slate-500">Tin nhắn đã được thu hồi</p> : activity.comment ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-5 text-slate-700">{activity.comment}</p> : null}
       <ActivityAttachments attachments={activity.attachments} />
+      {!activity.withdrawn_at && activity.reactions?.length ? <div className="mt-2"><ActivityReactionBar reactions={activity.reactions} /></div> : null}
     </article>
   );
 }

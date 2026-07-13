@@ -1,5 +1,34 @@
 export type AnyRecord = Record<string, any>;
 
+export type AuditLogRecord = AnyRecord & {
+  id: string;
+  project_id?: string;
+  project_code?: string;
+  project_name?: string;
+  actor_id?: string;
+  actor_name?: string;
+  event_type: string;
+  target_type?: string;
+  target_id?: string;
+  description: string;
+  metadata_json?: Record<string, unknown>;
+  created_at: string;
+};
+
+export type AuditLogPage = {
+  items: AuditLogRecord[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  options: {
+    event_types: string[];
+    target_types: string[];
+    actors: string[];
+    projects: Array<{ id: string; code: string; name: string }>;
+  };
+};
+
 export type User = {
   id: string;
   email: string;
@@ -18,6 +47,66 @@ export type Project = AnyRecord & {
   partner_tax_code?: string;
   status: string;
   progress_percent: number;
+};
+
+export type ProjectMemberAccessRole = {
+  id: string;
+  name: string;
+  display_name: string;
+  scope: 'global' | 'project';
+  description?: string;
+  grants_project_view?: boolean;
+};
+
+export type ProjectMember = {
+  id: string;
+  project_id: string;
+  staff_id: string;
+  user_id?: string;
+  full_name: string;
+  email?: string;
+  phone?: string;
+  department?: string;
+  position?: string;
+  role_ids: string[];
+  global_roles: ProjectMemberAccessRole[];
+  project_roles: ProjectMemberAccessRole[];
+  notes?: string;
+  active: boolean;
+  is_project_manager: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ProjectMemberStaffOption = {
+  id: string;
+  user_id: string;
+  full_name: string;
+  email?: string;
+  department?: string;
+  position?: string;
+  member_id?: string;
+  member_active?: boolean;
+  global_roles: ProjectMemberAccessRole[];
+};
+
+export type ProjectMembersResponse = {
+  items: ProjectMember[];
+  summary: {
+    active: number;
+    inactive: number;
+    departments: number;
+    roles: number;
+  };
+  options: {
+    staff: ProjectMemberStaffOption[];
+    access_roles: ProjectMemberAccessRole[];
+    role_labels: string[];
+  };
+  capabilities: {
+    can_manage: boolean;
+    can_view_inactive: boolean;
+  };
 };
 
 export type Partner = AnyRecord & {
@@ -512,6 +601,33 @@ export type WorkItemActivity = ProjectOperationsRecord & {
   is_unread?: boolean;
   queue_types?: string[];
   attachments?: ActivityAttachmentSummary[];
+  parent_activity_id?: string;
+  reply_to?: ActivityReplyPreview;
+  reply_count?: number;
+  reactions?: ActivityReactionSummary[];
+	edited_at?: string;
+	edited_by?: string;
+	withdrawn_at?: string;
+	withdrawn_by?: string;
+	message_revision_no?: number;
+	can_edit?: boolean;
+	can_withdraw?: boolean;
+};
+
+export type ActivityReplyPreview = {
+  id: string;
+  actor_id?: string;
+  actor_name?: string;
+  activity_type: string;
+  comment?: string;
+  created_at?: string;
+	withdrawn?: boolean;
+};
+
+export type ActivityReactionSummary = {
+  reaction: '👍' | '👀' | '🙏' | '🎉';
+  count: number;
+  reacted_by_me: boolean;
 };
 
 export type ActivityMentionPayload = {
@@ -542,9 +658,67 @@ export type ActivityPayload = {
   scope_type?: string;
   scope_id?: string;
   work_item_id?: string;
+  parent_activity_id?: string;
   mentions?: ActivityMentionPayload[];
   attachments?: ActivityAttachmentPayload[];
   metadata?: AnyRecord;
+};
+
+export type ProjectActivitySummary = {
+  total: number;
+  discussion: number;
+  system: number;
+  decisions: number;
+  unread: number;
+  mentioned: number;
+  questions: number;
+  blockers: number;
+  reminders: number;
+  attention: number;
+};
+
+export type ProjectActivityFeed = {
+  items: WorkItemActivity[];
+  summary: ProjectActivitySummary;
+  has_more: boolean;
+  next_cursor?: string;
+};
+
+export type ProjectActivityMemberOption = {
+  id: string;
+  user_id?: string;
+  label: string;
+  department?: string;
+  position?: string;
+};
+
+export type ProjectActivityRoleOption = {
+  id: string;
+  label: string;
+};
+
+export type ProjectActivityTargetOption = {
+  scope_type: string;
+  scope_id: string;
+  label: string;
+  work_item_id?: string;
+  status?: string;
+};
+
+export type ProjectActivityAttachmentOption = {
+  type: ActivityAttachmentPayload['type'];
+  id: string;
+  label: string;
+  status?: string;
+  visibility?: string;
+  work_item_id?: string;
+};
+
+export type ProjectActivityOptions = {
+  members: ProjectActivityMemberOption[];
+  roles: ProjectActivityRoleOption[];
+  targets: ProjectActivityTargetOption[];
+  attachments: ProjectActivityAttachmentOption[];
 };
 
 export type ActivityAttentionItem = WorkItemActivity & {
@@ -578,7 +752,37 @@ export type EvidenceRecord = ProjectOperationsRecord & {
   reviewed_by?: string;
   reviewed_by_name?: string;
   reviewed_at?: string;
+  work_item_title?: string;
+  work_item_status?: string;
+  run_node_name?: string;
+  can_review?: boolean;
   payload_json?: AnyRecord;
+};
+
+export type ProjectEvidenceSummary = {
+  total: number;
+  waiting: number;
+  accepted: number;
+  rejected: number;
+  photos: number;
+  documents: number;
+};
+
+export type ProjectEvidenceOption = {
+  id: string;
+  label: string;
+};
+
+export type ProjectEvidencePage = {
+  items: EvidenceRecord[];
+  summary: ProjectEvidenceSummary;
+  options: {
+    work_items: ProjectEvidenceOption[];
+    submitters: ProjectEvidenceOption[];
+  };
+  filtered_total: number;
+  has_more: boolean;
+  next_cursor?: string;
 };
 
 export type PayableRecord = ProjectOperationsRecord & {
@@ -1646,6 +1850,71 @@ export type Warehouse = ProjectOperationsRecord & {
   active?: boolean;
 };
 
+export type StockPosition = ProjectOperationsRecord & {
+  warehouse_id: string;
+  warehouse_name: string;
+  warehouse_type?: string;
+  location?: string;
+  material_id: string;
+  code: string;
+  name: string;
+  unit: string;
+  category?: string;
+  stock_quantity: number;
+};
+
+export type StockDocumentItem = ProjectOperationsRecord & {
+  document_id?: string;
+  material_id: string;
+  material_code?: string;
+  material_name?: string;
+  quantity: number;
+  unit: string;
+  reason?: string;
+  source_line_type?: string;
+  source_line_id?: string;
+  movement_code?: string;
+};
+
+export type StockDocument = ProjectOperationsRecord & {
+  document_code: string;
+  project_id?: string;
+  project_name?: string;
+  movement_type: 'receive' | 'issue' | 'transfer' | 'return_to_warehouse' | 'return_to_subcontractor' | string;
+  source_warehouse_id?: string;
+  source_warehouse_name?: string;
+  target_warehouse_id?: string;
+  target_warehouse_name?: string;
+  reference_type?: string;
+  reference_id?: string;
+  document_date: string;
+  note?: string;
+  status: string;
+  item_count?: number;
+  total_quantity?: number;
+  created_by_name?: string;
+  items?: StockDocumentItem[];
+};
+
+export type WarehouseReceiptOption = ProjectOperationsRecord & {
+  incoming_acceptance_id: string;
+  acceptance_code: string;
+  procurement_request_id?: string;
+  request_code?: string;
+  supplier_name?: string;
+  received_at?: string;
+  result?: string;
+  warehouse_id?: string;
+  incoming_acceptance_item_id: string;
+  material_id: string;
+  material_code?: string;
+  material_name: string;
+  accepted_quantity: number;
+  stock_received_quantity: number;
+  remaining_quantity: number;
+  unit: string;
+};
+
 export type SurplusHandlingRecord = ProjectOperationsRecord & {
   handling_code: string;
   work_item_id: string;
@@ -1940,6 +2209,7 @@ export type ProjectOperationsResponse = AnyRecord & {
   blockers: WorkItem[];
   approvals: ProjectOperationsRecord[];
   latest_evidence: EvidenceRecord[];
+  evidence_summary?: ProjectEvidenceSummary;
   activity_summary: AnyRecord;
   latest_activity: WorkItemActivity[];
   audit_summary: AnyRecord;

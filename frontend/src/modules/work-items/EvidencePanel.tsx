@@ -42,7 +42,10 @@ export function EvidencePanel({ workItemId, projectId, evidence }: EvidencePanel
       if (fileInputRef.current) fileInputRef.current.value = '';
       queryClient.invalidateQueries({ queryKey: ['work-item', workItemId] });
       queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
-      if (projectId) queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['project-evidence', projectId] });
+      }
       toast.success('Đã tải minh chứng');
     },
     onError: (error) => toast.error('Không tải được minh chứng', error),
@@ -54,7 +57,10 @@ export function EvidencePanel({ workItemId, projectId, evidence }: EvidencePanel
     onSuccess: (_record, variables) => {
       queryClient.invalidateQueries({ queryKey: ['work-item', workItemId] });
       queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
-      if (projectId) queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['project-evidence', projectId] });
+      }
       toast.success(variables.action === 'accept' ? 'Đã chấp nhận minh chứng' : 'Đã từ chối minh chứng');
     },
     onError: (error) => toast.error('Không rà soát được minh chứng', error),

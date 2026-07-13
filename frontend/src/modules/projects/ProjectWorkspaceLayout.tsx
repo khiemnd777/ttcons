@@ -56,13 +56,13 @@ const workspaceGroups: WorkspaceGroup[] = [
   },
   {
     key: 'planning',
-    label: 'Kế hoạch & Workflow',
+    label: 'Kế hoạch & Quy trình',
     to: 'planning',
     permissions: ['planning.view', 'pipeline.view', 'boq.view'],
     children: [
-      { label: 'Pipeline', to: 'pipeline', permissions: ['pipeline.view'] },
-      { label: 'Planning', to: 'planning', permissions: ['planning.view', 'pipeline.view'] },
-      { label: 'BOQ / Dự toán', to: 'boq', permissions: ['boq.view'] },
+      { label: 'Quy trình', to: 'pipeline', permissions: ['pipeline.view'] },
+      { label: 'Kế hoạch', to: 'planning', permissions: ['planning.view', 'pipeline.view'] },
+      { label: 'Dự toán khối lượng', to: 'boq', permissions: ['boq.view'] },
     ],
   },
   {
@@ -82,10 +82,8 @@ const workspaceGroups: WorkspaceGroup[] = [
     to: 'operations',
     permissions: ['operation.view', 'quality.view', 'acceptance.view', 'rework.view'],
     children: [
-      { label: 'Thi công', to: 'operations', permissions: ['operation.view'] },
-      { label: 'QA/QC · ITP/RFI/NCR', to: 'quality', permissions: ['quality.view'] },
+      { label: 'Thi công', to: 'operations', permissions: ['operation.view', 'quality.view', 'rework.view', 'replanning.view'] },
       { label: 'Nghiệm thu', to: 'acceptance', permissions: ['acceptance.view'] },
-      { label: 'Rework', to: 'rework', permissions: ['rework.view'] },
     ],
   },
   {
@@ -107,7 +105,7 @@ const workspaceGroups: WorkspaceGroup[] = [
     children: [
       { label: 'Thành viên', to: '?tab=members', permissions: ['project.view'] },
       { label: 'Hồ sơ', to: '?tab=files', permissions: ['project.view'] },
-      { label: 'Audit', to: 'audit', permissions: ['audit.view'] },
+      { label: 'Nhật ký', to: 'audit', permissions: ['audit.view'] },
     ],
   },
 ];
@@ -152,14 +150,14 @@ export function ProjectWorkspaceLayout() {
             </button>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink">
-                {project ? `${project.code} · ${project.name}` : operations.isLoading ? 'Đang tải công trình...' : 'Workspace công trình'}
+                {project ? `${project.code} · ${project.name}` : operations.isLoading ? 'Đang tải công trình...' : 'Không gian công trình'}
               </p>
               <p className="truncate text-xs text-slate-500">
                 {[
                   project?.client_name ? `Chủ đầu tư: ${project.client_name}` : null,
                   project?.pm_name ? `Phụ trách: ${project.pm_name}` : null,
                   project?.status ? `Trạng thái: ${statusLabel(project.status)}` : null,
-                ].filter(Boolean).join(' · ') || (showWorkflowSidebar ? 'Workflow là timeline xử lý đầu việc' : 'Cây nghiệp vụ là menu chính trong scope công trình')}
+                ].filter(Boolean).join(' · ') || (showWorkflowSidebar ? 'Quy trình là dòng thời gian xử lý công việc' : 'Cây nghiệp vụ là menu chính trong phạm vi công trình')}
               </p>
             </div>
           </div>
@@ -316,13 +314,13 @@ function WorkflowSidebar({
         <div className="flex items-start gap-2">
           <GitBranch className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-ink">Workflow</p>
-            <p className="mt-0.5 text-xs font-medium text-slate-500">Checklist / Step</p>
+            <p className="text-sm font-semibold text-ink">Quy trình</p>
+            <p className="mt-0.5 text-xs font-medium text-slate-500">Danh sách kiểm tra / Bước</p>
           </div>
         </div>
       </div>
 
-      <nav className="px-3 py-3" aria-label="Workflow runtime timeline">
+      <nav className="px-3 py-3" aria-label="Dòng thời gian quy trình vận hành">
         <div className="mb-3 rounded-md border border-line bg-slate-50 px-3 py-3">
           <div className="flex min-w-0 items-center gap-2">
             <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
@@ -335,12 +333,12 @@ function WorkflowSidebar({
           <div className="mt-3">
             <div className="mb-1.5 flex items-center justify-between gap-2 text-xs font-semibold">
               <span className="text-slate-600">Tiến độ</span>
-              <span className="text-blue-700">{overallProgress}% · {completedSteps}/{executableSteps.length} step thực hiện</span>
+              <span className="text-blue-700">{overallProgress}% · {completedSteps}/{executableSteps.length} bước thực hiện</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-white ring-1 ring-inset ring-line">
               <div className="h-full rounded-full bg-blue-600" style={{ width: `${overallProgress}%` }} />
             </div>
-            {skippedSteps ? <p className="mt-1.5 text-right text-[11px] font-medium text-slate-500">{skippedSteps} step đã bỏ qua · {allSteps.length} step toàn workflow</p> : null}
+            {skippedSteps ? <p className="mt-1.5 text-right text-[11px] font-medium text-slate-500">{skippedSteps} bước đã bỏ qua · {allSteps.length} bước toàn quy trình</p> : null}
           </div>
         </div>
 
@@ -348,19 +346,19 @@ function WorkflowSidebar({
 
         {error && !operations ? (
           <div className="rounded-md border border-rose-100 bg-rose-50 px-3 py-3 text-sm text-rose-700">
-            Không tải được workflow.
+            Không tải được quy trình.
           </div>
         ) : null}
 
         {!loading && !error && !hasData ? (
           <div className="rounded-md border border-line bg-white px-3 py-4 text-sm">
             <p className="font-semibold text-ink">Chưa có quy trình đang chạy</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Mở Planning để khởi động hoặc kiểm tra pipeline runtime.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Mở Kế hoạch để khởi động hoặc kiểm tra quy trình vận hành.</p>
             <Link
               to={`/projects/${projectId}/planning`}
               className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
             >
-              Mở Planning
+              Mở kế hoạch
             </Link>
           </div>
         ) : null}
@@ -392,7 +390,7 @@ function WorkflowSidebarLoading() {
     <div className="space-y-2 rounded-md border border-line bg-white px-3 py-3 text-sm text-slate-600">
       <div className="flex items-center gap-2 font-semibold">
         <Loader2 className="h-4 w-4 animate-spin text-blue-700" />
-        Đang tải workflow
+        Đang tải quy trình
       </div>
       <div className="h-2 rounded-full bg-slate-100" />
       <div className="h-2 w-4/5 rounded-full bg-slate-100" />
@@ -452,9 +450,9 @@ function WorkflowNodeItem({
             </span>
             <div className="min-w-0">
               <p className={clsx('truncate text-sm font-semibold', isActiveNode ? 'text-blue-800' : 'text-ink')}>
-                {orderIndex}. {cleanText(node.name) || 'Node workflow'}
+                {orderIndex}. {cleanText(node.name) || 'Giai đoạn quy trình'}
               </p>
-              <p className="mt-1 text-xs text-slate-500">{completedSteps}/{steps.length} step</p>
+              <p className="mt-1 text-xs text-slate-500">{completedSteps}/{steps.length} bước</p>
             </div>
           </div>
           <StatusBadge status={cleanText(node.status) || cleanText(timelineNode?.status) || 'pending'} />
@@ -475,7 +473,7 @@ function WorkflowNodeItem({
               activeStepRef={activeStepRef}
             />
           )) : (
-            <li className="px-3 py-3 text-xs text-slate-500">Node chưa có checklist/step.</li>
+            <li className="px-3 py-3 text-xs text-slate-500">Giai đoạn chưa có danh sách kiểm tra hoặc bước.</li>
           )}
         </ol>
       ) : null}
@@ -501,7 +499,7 @@ function WorkflowStepItem({
     <>
       <span className="mt-0.5 shrink-0">{stepStatusIcon(status, active)}</span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold">{cleanText(step.name) || 'Checklist / Step'}</span>
+        <span className="block truncate text-sm font-semibold">{cleanText(step.name) || 'Danh sách kiểm tra / Bước'}</span>
         <span className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-semibold">
           <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-slate-600">{statusLabel(status)}</span>
           {step.workflow_form_instance_id ? (
@@ -576,7 +574,7 @@ function buildWorkflowSidebarNodes(
     const firstItem = nodeWorkItems[0];
     mergedNodes.push({
       id: nodeId,
-      name: firstItem?.run_node_name ?? 'Node workflow',
+      name: firstItem?.run_node_name ?? 'Giai đoạn quy trình',
       status: firstItem?.status ?? 'pending',
       order_index: firstItem?.run_node_order_index,
       steps: [],

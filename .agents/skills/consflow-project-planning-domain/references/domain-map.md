@@ -10,10 +10,11 @@
 
 ## Routes
 
-- Projects: `/projects`, `/projects/:id`, `/projects/:id/operations`
+- Projects: `/projects`, `/projects/:id`, `/projects/:id/operations`, `/projects/:id/evidence`
+- Project members: `/projects/:id/members`, `/projects/:id/members/:memberId`
 - Planning: `/projects/:id/start-pipeline`, `/projects/:id/pipeline-run`, `/projects/:id/work-items`
 - Planning reports: `/planning/daily-reports`, `/planning/meeting-minutes`, `/planning/checklists`
-- Activity: `/projects/:id/activity`, `/projects/:id/activity/stream`, `/me/activity-attention`
+- Activity: `/projects/:id/activity`, `/projects/:id/activity/options`, `/projects/:id/activity/read-all`, `/projects/:id/activity/stream`, `/activities/:id/read|resolve|reactions|message|withdraw`, `/me/activity-attention`
 - Contract workspace: `/projects/:id/contracts`; activating the signed main-client contract updates the project-level `contract_amount` compatibility snapshot.
 
 ## Tables And Migrations
@@ -22,8 +23,8 @@
 - Commercial project master: `contracts`, signed `contract_versions`; `projects.contract_amount` is not the version history.
 - Runtime planning: `pipeline_runs`, `pipeline_run_nodes`, `pipeline_run_steps`, `work_items`
 - Form-backed planning: `workflow_form_instances`, `workflow_form_answers`, `workflow_form_events`
-- Activity: `work_item_activities`, `activity_mentions`, `activity_read_states`
-- Relevant migrations: `V1`, `V5`, `V6`, `V7`, `V8`, `V9`, `V10`, `V11`, `V12`, `V13`
+- Activity: `work_item_activities`, `activity_mentions`, `activity_read_states`, `activity_reactions`, `activity_message_revisions`
+- Relevant migrations: `V1`, `V5`, `V6`, `V7`, `V8`, `V9`, `V10`, `V11`, `V12`, `V13`, `V58`, `V60`
 
 ## Invariants
 
@@ -31,6 +32,13 @@
 - Meeting minutes action items and daily report next-plan outputs remain traceable.
 - Planning checklist evidence/status summaries do not replace the underlying submitted form history.
 - Project detail and global workspaces must agree on statuses and available actions.
+- Project Thành viên uses a dedicated typed API rather than the Operations payload. Active members with `project.view` see active membership; `project.member.manage` controls inactive history and mutations. Save/reactivate/deactivate synchronizes `project_members` with project-scoped `user_roles` transactionally, keeps global roles untouched, soft-deactivates history, audits changes and protects the current PM from removal.
+- Project `Kế hoạch` is an action-first queue over every ordered runtime step. Its default `Cần xử lý` view is derived from work-item runtime status, `waiting_approval`/`waiting_review` stay distinct, only `pending` is future work, and terminal/skipped work remains discoverable outside the actionable queue. The one next-work CTA stays blocker -> waiting approval/review -> other open work. Workflow-form draft/submitted/required state and evidence count are supporting metadata; rows only navigate to permission-gated work-item detail, while node transition/approval/block controls remain in `Quy trình`.
+- Project Tổng quan leads with one prioritized action ordered blocker -> waiting approval/review -> other open work, shows the current runtime stage beside it, keeps source-backed attention counts separate from budget/contract/schedule reference data, and uses Vietnamese system labels without translating user-entered project/work-item data.
+- Project Hồ sơ is a project-scoped work-item evidence workspace: summary/search/filter/cursor results use the same visibility and work-item scope, waiting review sorts first, rejected evidence remains discoverable as history, cancelled-work-item evidence stays excluded, and review controls appear only when backend `CanDecideWorkItem` yields `can_review=true`.
+- Project activity defaults to all visible activity and uses total visible count for the project-tab badge; attention counts remain inside `Cần chú ý`, and the `Quyết định` tab uses the dedicated source-backed `decisions` summary count. It uses server-backed search/filter/cursor pagination and permission-scoped picker options. Resolving a question, blocker, or reminder preserves history by appending a system event and audit record.
+- Project `Nhật ký` is a five-event preview backed by the paginated project Audit endpoint; the tab does not treat the preview length as the total and routes full investigation to `/projects/:id/audit`.
+- Project `Thảo luận` presents activity as chronological chat with a persistent composer and scroll anchoring. A reply is a new `comment` row linked by `parent_activity_id`; backend copies the parent project/target/work item/visibility and auto-mentions its actor. Reactions use `activity_reactions` active-state upserts, are visibility-gated, and never change read/resolution/workflow status or activity totals. Only the author may edit or withdraw a `comment` during the first 15 minutes; edits/withdrawals append `activity_message_revisions` and audit, withdrawal clears current content/attention/reactions but keeps a tombstone and existing replies. Typed operational activity is immutable.
 - Project Detail Workflow is the project history surface: default to all node work items, keep completed and skipped records discoverable with filters, and render skipped work-item detail read-only without weakening action permissions.
 
 ## Cross-Domain Checks

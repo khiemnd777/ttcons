@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   CheckCircle2,
+  ChevronRight,
   CircleDot,
   Clock3,
   FileText,
@@ -18,7 +19,6 @@ import {
   Search,
   ShieldAlert,
   TimerReset,
-  Users,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { get, post, ApiError } from '../../lib/api/client';
@@ -29,23 +29,25 @@ import { CurrencyText } from '../../components/CurrencyText';
 import { EmptyState } from '../../components/EmptyState';
 import { DataTable } from '../../components/DataTable';
 import { EnumChip } from '../../components/EnumChip';
-import { Timeline } from '../../components/Timeline';
 import { useToast } from '../../components/ToastProvider';
 import { dateText, percent } from '../../lib/utils/format';
-import { enumLabel, statusLabel } from '../../lib/utils/status';
+import { statusLabel } from '../../lib/utils/status';
 import type {
+  AuditLogPage,
+  AuditLogRecord,
   EvidenceRecord,
   ProjectOperationsRecord,
   ProjectOperationsResponse,
   ProjectOperationsTimelineNode,
+  ProjectMembersResponse,
   WorkItem,
-  WorkItemActivity,
 } from '../../lib/types/domain';
 import type { ActivityAttachmentOption } from '../work-items/ActivityComposer';
 import { ActivityThread } from '../work-items/ActivityThread';
-import { EvidenceGallery, type EvidenceReviewAction } from '../work-items/EvidenceGallery';
-import { WorkItemCard } from '../work-items/WorkItemCard';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
+import { ProjectEvidencePanel } from './ProjectEvidencePanel';
+import { ProjectMembersPanel } from './ProjectMembersPanel';
+import { ProjectWorkTab } from './ProjectWorkTab';
 import {
   asArray,
   compactDateTime,
@@ -55,20 +57,8 @@ import {
   prioritizeWorkItems,
 } from '../work-items/workItemPresentation';
 
-type DepartmentSurface = {
-  department?: string;
-  total?: number;
-  active?: number;
-  blocked?: number;
-  waiting_approval?: number;
-  work_items?: WorkItem[];
-};
-
 type ProjectDetailTab = 'overview' | 'workflow' | 'work' | 'activity' | 'files' | 'audit' | 'members';
 type WorkflowWorkFilter = 'all' | 'open' | 'waiting' | 'blocked' | 'completed' | 'skipped';
-
-const ALL_WORK_SURFACE = '__all__';
-const WORK_PAGE_SIZE = 10;
 
 function currentTimelineNode(nodes: ProjectOperationsTimelineNode[]) {
   return nodes.find((node) => node.status === 'in_progress')
@@ -77,12 +67,13 @@ function currentTimelineNode(nodes: ProjectOperationsTimelineNode[]) {
     ?? nodes[nodes.length - 1];
 }
 
-function nodeTone(status?: string) {
-  if (status === 'completed') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (status === 'blocked') return 'border-rose-200 bg-rose-50 text-rose-700';
-  if (status === 'waiting_approval') return 'border-amber-200 bg-amber-50 text-amber-800';
-  if (status === 'in_progress') return 'border-blue-200 bg-blue-50 text-blue-700';
-  return 'border-slate-200 bg-slate-50 text-slate-600';
+function nodeStatusDotTone(status?: string) {
+  if (status === 'completed') return 'bg-emerald-500';
+  if (status === 'blocked') return 'bg-rose-500';
+  if (status === 'waiting_approval') return 'bg-amber-500';
+  if (status === 'in_progress') return 'bg-blue-600';
+  if (status === 'skipped' || status === 'cancelled') return 'bg-slate-300';
+  return 'bg-slate-400';
 }
 
 function isOpenWorkItem(item: WorkItem) {
@@ -99,7 +90,6 @@ function workDueDate(item: WorkItem) {
 
 export function ProjectDetailPage() {
   const { id = '' } = useParams();
-  const [selectedDepartment, setSelectedDepartment] = useState(ALL_WORK_SURFACE);
   const [selectedTimelineNodeId, setSelectedTimelineNodeId] = useState('');
   const [activeTab, setActiveTab] = useState<ProjectDetailTab>('overview');
   const [searchParams] = useSearchParams();
@@ -114,22 +104,26 @@ export function ProjectDetailPage() {
     enabled: Boolean(id),
     retry: false,
   });
+  const members = useQuery({
+    queryKey: ['project-members', id],
+    queryFn: () => get<ProjectMembersResponse>(`/projects/${id}/members?include_inactive=true`),
+    enabled: Boolean(id),
+    retry: false,
+  });
   const startPipeline = useMutation({
     mutationFn: () => post(`/projects/${id}/start-pipeline`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
-      toast.success('Đã start pipeline');
+      toast.success('Đã khởi động quy trình');
     },
-    onError: (error) => toast.error('Không start được pipeline', error),
+    onError: (error) => toast.error('Không khởi động được quy trình', error),
   });
 
   const data = operations.data;
   const allWorkItems = useMemo(() => asArray<WorkItem>(data?.work_items), [data?.work_items]);
   const openWorkItems = useMemo(() => allWorkItems.filter(isOpenWorkItem), [allWorkItems]);
-  const workflowWork = useMemo(() => orderWorkItemsByWorkflow(openWorkItems), [openWorkItems]);
   const priorityWork = useMemo(() => prioritizeWorkItems(openWorkItems), [openWorkItems]);
   const blockers = useMemo(() => prioritizeWorkItems(asArray<WorkItem>(data?.blockers)), [data?.blockers]);
-  const departmentSurfaces = useMemo(() => asArray<DepartmentSurface>(data?.department_surfaces), [data?.department_surfaces]);
   const timeline = useMemo(() => asArray<ProjectOperationsTimelineNode>(data?.workflow_timeline), [data?.workflow_timeline]);
   const activityTargets = useMemo(() => allWorkItems.map((item) => ({
     scope_type: 'work_item',
@@ -138,6 +132,7 @@ export function ProjectDetailPage() {
     label: `${item.project_code ? `${item.project_code} · ` : ''}${item.title}`,
   })), [allWorkItems]);
   const currentNode = useMemo(() => currentTimelineNode(timeline), [timeline]);
+  const primaryWork = useMemo(() => selectProjectPriorityWork(priorityWork, blockers), [blockers, priorityWork]);
 
   useEffect(() => {
     if (!timeline.length) {
@@ -147,16 +142,6 @@ export function ProjectDetailPage() {
     const selectionExists = timeline.some((node) => node.id === selectedTimelineNodeId);
     if (!selectionExists) setSelectedTimelineNodeId(currentNode?.id ?? timeline[0].id);
   }, [currentNode?.id, selectedTimelineNodeId, timeline]);
-
-  useEffect(() => {
-    if (!departmentSurfaces.length) {
-      if (selectedDepartment !== ALL_WORK_SURFACE) setSelectedDepartment(ALL_WORK_SURFACE);
-      return;
-    }
-    const exists = selectedDepartment === ALL_WORK_SURFACE
-      || departmentSurfaces.some((surface) => (surface.department ?? 'unassigned') === selectedDepartment);
-    if (!exists) setSelectedDepartment(ALL_WORK_SURFACE);
-  }, [departmentSurfaces, selectedDepartment]);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -184,23 +169,18 @@ export function ProjectDetailPage() {
 
   const project = data.project_summary ?? data.project;
   const hasPipeline = Boolean(data.pipeline_run) || timeline.length > 0;
-  const visibleMembers = asArray<Record<string, any>>(data.project?.members);
   const latestEvidence = asArray<EvidenceRecord>(data.latest_evidence);
   const attachmentOptions = buildActivityAttachmentOptions(latestEvidence);
-  const latestActivity = asArray<WorkItemActivity>(data.latest_activity);
+  const activityTotalCount = numberValue(data.activity_summary?.total);
   const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
-  const selectedTimelineNode = timeline.find((node) => node.id === selectedTimelineNodeId) ?? currentNode ?? timeline[0];
-  const nodeWorkItems = selectedTimelineNode
-    ? orderWorkItemsByWorkflow(allWorkItems.filter((item) => item.run_node_id === selectedTimelineNode.id))
-    : orderWorkItemsByWorkflow(allWorkItems);
   const tabs: Array<{ id: ProjectDetailTab; label: string; count?: number }> = [
-    { id: 'overview', label: 'Tổng quan', count: numberValue(data.health_counts?.active) },
-    { id: 'workflow', label: 'Workflow', count: timeline.length },
+    { id: 'overview', label: 'Tổng quan' },
+    { id: 'workflow', label: 'Quy trình', count: timeline.length },
     { id: 'work', label: 'Công việc', count: allWorkItems.length },
-    { id: 'activity', label: 'Trao đổi', count: latestActivity.length },
-    { id: 'files', label: 'Hồ sơ', count: latestEvidence.length },
-    { id: 'audit', label: 'Audit', count: auditRecent.length },
-    { id: 'members', label: 'Thành viên', count: visibleMembers.length },
+    { id: 'activity', label: 'Trao đổi', count: activityTotalCount },
+    { id: 'files', label: 'Hồ sơ', count: numberValue(data.evidence_summary?.total ?? latestEvidence.length) },
+    { id: 'audit', label: 'Nhật ký' },
+    { id: 'members', label: 'Thành viên', count: members.data?.summary.active ?? 0 },
   ];
 
   return (
@@ -209,23 +189,22 @@ export function ProjectDetailPage() {
         title={`${project.code ?? data.project.code} · ${project.name ?? data.project.name}`}
         description={
           [
-            project.client_name ? `Client: ${project.client_name}` : null,
+            project.client_name ? `Chủ đầu tư: ${project.client_name}` : null,
             project.pm_name ? `Phụ trách: ${project.pm_name}` : null,
             project.status ? `Trạng thái: ${statusLabel(project.status)}` : null,
             project.planned_end_date ? `Kết thúc: ${dateText(project.planned_end_date)}` : null,
           ].filter(Boolean).join(' · ')
         }
-        actions={
+        actions={activeTab === 'workflow' ? undefined : (
           <HeaderActions
             hasPipeline={hasPipeline}
             startPending={startPipeline.isPending}
-            priorityWork={priorityWork}
-            blockers={blockers}
+            primaryWork={primaryWork}
             onStartPipeline={() => startPipeline.mutate()}
             onOpenWork={openWorkItem}
             projectId={id}
           />
-        }
+        )}
       />
 
       <ProjectDetailTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
@@ -233,43 +212,45 @@ export function ProjectDetailPage() {
       <div className="mt-5">
         {activeTab === 'overview' ? (
           <div className="space-y-4">
-            <ProjectSummaryBand project={project} currentNode={currentNode} visibility={data.visibility} />
-            <HealthStrip data={data} />
-            <ProjectOverviewWorkPanel
-              priorityWork={priorityWork}
-              blockers={blockers}
+            <ProjectOverviewActionBand
+              hasPipeline={hasPipeline}
+              startPending={startPipeline.isPending}
+              currentNode={currentNode}
+              primaryWork={primaryWork}
+              onStartPipeline={() => startPipeline.mutate()}
               onOpenWork={openWorkItem}
-              onShowAllWork={() => {
-                setSelectedDepartment(ALL_WORK_SURFACE);
-                setActiveTab('work');
-              }}
+              onShowWorkflow={() => setActiveTab('workflow')}
             />
+            <HealthStrip data={data} />
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <ProjectOverviewWorkPanel
+                priorityWork={priorityWork}
+                onOpenWork={openWorkItem}
+                onShowAllWork={() => {
+                  setActiveTab('work');
+                }}
+              />
+              <ProjectInformationPanel project={project} visibility={data.visibility} />
+            </div>
           </div>
         ) : null}
 
         {activeTab === 'workflow' ? (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-            <WorkflowTimeline
-              projectId={id}
-              nodes={timeline}
-              selectedNodeId={selectedTimelineNode?.id ?? ''}
-              hasPipeline={hasPipeline}
-              startPending={startPipeline.isPending}
-              onStartPipeline={() => startPipeline.mutate()}
-              onSelectNode={setSelectedTimelineNodeId}
-            />
-            <WorkflowWorkPanel rows={nodeWorkItems} selectedNode={selectedTimelineNode} onOpenWork={openWorkItem} />
-          </div>
+          <ProjectWorkflowWorkspace
+            projectId={id}
+            nodes={timeline}
+            workItems={allWorkItems}
+            selectedNodeId={selectedTimelineNodeId}
+            hasPipeline={hasPipeline}
+            startPending={startPipeline.isPending}
+            onSelectNode={setSelectedTimelineNodeId}
+            onStartPipeline={() => startPipeline.mutate()}
+            onOpenWork={openWorkItem}
+          />
         ) : null}
 
         {activeTab === 'work' ? (
-          <DepartmentSurfaces
-            surfaces={departmentSurfaces}
-            allRows={allWorkItems}
-            selectedDepartment={selectedDepartment}
-            onSelectDepartment={setSelectedDepartment}
-            onOpenWork={openWorkItem}
-          />
+          <ProjectWorkTab rows={allWorkItems} onOpenWork={openWorkItem} />
         ) : null}
 
         {activeTab === 'activity' ? (
@@ -283,12 +264,20 @@ export function ProjectDetailPage() {
           />
         ) : null}
 
-        {activeTab === 'files' ? <ProjectFilesPanel projectId={id} evidence={latestEvidence} /> : null}
+        {activeTab === 'files' ? <ProjectEvidencePanel projectId={id} /> : null}
 
         {activeTab === 'audit' ? <ProjectAuditPanel projectId={id} initialRows={auditRecent} /> : null}
 
         {activeTab === 'members' ? (
-          visibleMembers.length ? <ProjectMembers rows={visibleMembers} /> : <EmptyState title="Chưa có thành viên công trình" />
+          <ProjectMembersPanel
+            projectId={id}
+            data={members.data}
+            loading={members.isLoading}
+            error={members.error}
+            onRetry={() => {
+              void members.refetch();
+            }}
+          />
         ) : null}
       </div>
     </>
@@ -298,23 +287,18 @@ export function ProjectDetailPage() {
 function HeaderActions({
   hasPipeline,
   startPending,
-  priorityWork,
-  blockers,
+  primaryWork,
   onStartPipeline,
   onOpenWork,
   projectId,
 }: {
   hasPipeline: boolean;
   startPending: boolean;
-  priorityWork: WorkItem[];
-  blockers: WorkItem[];
+  primaryWork?: WorkItem;
   onStartPipeline: () => void;
   onOpenWork: (item: WorkItem) => void;
   projectId: string;
 }) {
-  const approvalWork = priorityWork.find((item) => item.status === 'waiting_approval' || item.status === 'waiting_review');
-  const primaryWork = blockers[0] ?? approvalWork ?? priorityWork[0];
-
   return (
     <>
       {!hasPipeline ? (
@@ -324,7 +308,7 @@ function HeaderActions({
           onClick={onStartPipeline}
         >
           {startPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-          Start pipeline
+          Khởi động quy trình
         </button>
       ) : primaryWork ? (
         <button
@@ -332,7 +316,7 @@ function HeaderActions({
           onClick={() => onOpenWork(primaryWork)}
         >
           {primaryWork.status === 'blocked' ? <AlertTriangle className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
-          {primaryWork.status === 'blocked' ? 'Mở blocker' : primaryWork.status === 'waiting_approval' ? 'Mở duyệt' : 'Mở work'}
+          {projectPriorityActionLabel(primaryWork)}
         </button>
       ) : null}
       <Link
@@ -340,7 +324,7 @@ function HeaderActions({
         className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
       >
         <GitBranch className="h-4 w-4" />
-        Planning
+        Mở kế hoạch
       </Link>
     </>
   );
@@ -389,48 +373,107 @@ function ProjectDetailTabs({
   );
 }
 
-function ProjectSummaryBand({
-  project,
+function ProjectOverviewActionBand({
+  hasPipeline,
+  startPending,
   currentNode,
-  visibility,
+  primaryWork,
+  onStartPipeline,
+  onOpenWork,
+  onShowWorkflow,
 }: {
-  project: Record<string, any>;
+  hasPipeline: boolean;
+  startPending: boolean;
   currentNode?: ProjectOperationsTimelineNode;
-  visibility: ProjectOperationsResponse['visibility'];
+  primaryWork?: WorkItem;
+  onStartPipeline: () => void;
+  onOpenWork: (item: WorkItem) => void;
+  onShowWorkflow: () => void;
 }) {
+  const currentProgress = Math.min(100, Math.max(0, numberValue(currentNode?.progress_percent)));
+
   return (
-    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={project.status} />
-            {visibility?.scoped ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Scoped view</span> : null}
-            {visibility?.department ? <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{departmentLabel(visibility.department)}</span> : null}
-          </div>
-          <div className="mt-3 grid gap-3 text-sm text-slate-700 sm:grid-cols-2 xl:grid-cols-4">
-            <SummaryMetric label="Ngân sách" value={<CurrencyText value={project.estimated_budget} />} />
-            <SummaryMetric label="Hợp đồng" value={<CurrencyText value={project.contract_amount} />} />
-            <SummaryMetric label="Tiến độ" value={percent(project.progress_percent)} />
-            <SummaryMetric label="Lịch" value={`${dateText(project.planned_start_date)} - ${dateText(project.planned_end_date)}`} />
-          </div>
+    <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
+      <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
+        <div className={clsx('min-w-0 p-5 lg:border-r lg:border-line', primaryWork?.status === 'blocked' && 'bg-rose-50/40')}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cần làm tiếp theo</p>
+          {!hasPipeline ? (
+            <div className="mt-3">
+              <h2 className="text-lg font-semibold text-ink">Khởi động quy trình công trình</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">Công trình chưa có quy trình vận hành để tạo và điều phối công việc.</p>
+              <button
+                type="button"
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                disabled={startPending}
+                onClick={onStartPipeline}
+              >
+                {startPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                Khởi động quy trình
+              </button>
+            </div>
+          ) : primaryWork ? (
+            <div className="mt-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge status={primaryWork.status} />
+                {primaryWork.status === 'blocked' ? <span className="text-xs font-semibold text-rose-700">Cần tháo gỡ vướng mắc</span> : null}
+              </div>
+              <h2 className="mt-3 text-lg font-semibold leading-7 text-ink">{primaryWork.title}</h2>
+              <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
+                <span>Phụ trách: <strong className="font-semibold text-slate-800">{workOwner(primaryWork)}</strong></span>
+                <span>Hạn: <strong className="font-semibold text-slate-800">{dateText(workDueDate(primaryWork))}</strong></span>
+              </div>
+              {primaryWork.blocked_reason ? <p className="mt-3 rounded-md bg-rose-100/70 px-3 py-2 text-sm text-rose-800">{primaryWork.blocked_reason}</p> : null}
+              <button
+                type="button"
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 sm:w-auto"
+                onClick={() => onOpenWork(primaryWork)}
+              >
+                {projectPriorityActionLabel(primaryWork)}
+                <ArrowUpRight className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+                <div>
+                  <h2 className="font-semibold text-emerald-900">Hiện không có công việc cần can thiệp</h2>
+                  <p className="mt-1 text-sm text-emerald-800">Có thể xem toàn bộ lịch sử và công việc sắp tới trong tab Công việc.</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="rounded-md border border-line bg-slate-50 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current workflow</p>
+
+        <div className="min-w-0 bg-slate-50/70 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Giai đoạn hiện tại</p>
           {currentNode ? (
             <>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <p className="min-w-0 truncate text-sm font-semibold text-ink">{currentNode.name}</p>
+              <div className="mt-3 flex items-start justify-between gap-3">
+                <h2 className="min-w-0 text-lg font-semibold text-ink">{currentNode.name}</h2>
                 <StatusBadge status={currentNode.status} />
               </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
-                <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, Math.max(0, numberValue(currentNode.progress_percent)))}%` }} />
+              <div className="mt-5 flex items-center justify-between gap-3 text-xs font-semibold">
+                <span className="text-slate-500">Tiến độ giai đoạn</span>
+                <span className="text-slate-700">{currentProgress}%</span>
               </div>
-              <p className="mt-2 text-xs text-slate-500">
-                {numberValue(currentNode.completed_steps)} / {numberValue(currentNode.step_count)} steps completed
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
+                <div className="h-full rounded-full bg-blue-600" style={{ width: `${currentProgress}%` }} />
+              </div>
+              <p className="mt-2 text-sm text-slate-600">
+                <strong className="font-semibold text-ink">{numberValue(currentNode.completed_steps)}/{numberValue(currentNode.step_count)}</strong> bước hoàn tất
               </p>
+              <button
+                type="button"
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                onClick={onShowWorkflow}
+              >
+                Xem toàn bộ quy trình
+                <ArrowUpRight className="h-4 w-4" />
+              </button>
             </>
           ) : (
-            <p className="mt-2 text-sm text-slate-600">Chưa có pipeline runtime.</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">Chưa có giai đoạn vận hành.</p>
           )}
         </div>
       </div>
@@ -438,7 +481,36 @@ function ProjectSummaryBand({
   );
 }
 
-function SummaryMetric({ label, value }: { label: string; value: ReactNode }) {
+function ProjectInformationPanel({
+  project,
+  visibility,
+}: {
+  project: Record<string, any>;
+  visibility: ProjectOperationsResponse['visibility'];
+}) {
+  return (
+    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin công trình</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <StatusBadge status={project.status} />
+        {visibility?.scoped ? (
+          <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Dữ liệu theo phạm vi phân quyền</span>
+        ) : null}
+        {visibility?.department ? (
+          <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{departmentLabel(visibility.department)}</span>
+        ) : null}
+      </div>
+      <div className="mt-4 grid gap-4 border-t border-line pt-4 sm:grid-cols-2 xl:grid-cols-1">
+        <ProjectInformationMetric label="Ngân sách" value={<CurrencyText value={project.estimated_budget} />} />
+        <ProjectInformationMetric label="Giá trị hợp đồng" value={<CurrencyText value={project.contract_amount} />} />
+        <ProjectInformationMetric label="Tiến độ công trình" value={percent(project.progress_percent)} />
+        <ProjectInformationMetric label="Thời gian" value={`${dateText(project.planned_start_date)} – ${dateText(project.planned_end_date)}`} />
+      </div>
+    </section>
+  );
+}
+
+function ProjectInformationMetric({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
@@ -451,54 +523,62 @@ function HealthStrip({ data }: { data: ProjectOperationsResponse }) {
   const health = data.health_counts ?? {};
   const items = [
     {
-      label: 'Need action',
+      label: 'Cần xử lý',
       value: numberValue(health.active),
       icon: <CircleDot className="h-4 w-4" />,
       className: 'text-blue-700',
     },
     {
-      label: 'Overdue',
+      label: 'Quá hạn',
       value: numberValue(health.overdue),
       icon: <Clock3 className="h-4 w-4" />,
       className: numberValue(health.overdue) ? 'text-red-700' : 'text-slate-600',
     },
     {
-      label: 'Blocked',
+      label: 'Bị chặn',
       value: numberValue(health.blocked),
       icon: <AlertTriangle className="h-4 w-4" />,
       className: numberValue(health.blocked) ? 'text-rose-700' : 'text-slate-600',
     },
     {
-      label: 'Approval',
+      label: 'Chờ duyệt',
       value: numberValue(health.waiting_approval),
       icon: <CheckCircle2 className="h-4 w-4" />,
       className: numberValue(health.waiting_approval) ? 'text-amber-700' : 'text-slate-600',
     },
     {
-      label: 'Evidence',
+      label: 'Chờ hồ sơ',
       value: numberValue(health.waiting_evidence),
       icon: <FileText className="h-4 w-4" />,
       className: numberValue(health.waiting_evidence) ? 'text-violet-700' : 'text-slate-600',
     },
     {
-      label: 'Material',
+      label: 'Rủi ro vật tư',
       value: numberValue(health.material_risks),
       icon: <PackageCheck className="h-4 w-4" />,
       className: numberValue(health.material_risks) ? 'text-orange-700' : 'text-slate-600',
     },
+    {
+      label: 'Đã hoàn tất',
+      value: numberValue(health.completed),
+      icon: <CheckCircle2 className="h-4 w-4" />,
+      className: 'text-emerald-700',
+    },
   ];
 
   return (
-    <section className="rounded-lg border border-line bg-white px-4 py-3 shadow-panel">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tình trạng cần chú ý</p>
+      <div className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-4 xl:grid-cols-7">
         {items.map((item) => (
-          <div key={item.label} className="inline-flex items-center gap-2 border-r border-line pr-5 last:border-r-0 last:pr-0">
-            <span className={item.className}>{item.icon}</span>
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</span>
-            <span className="text-sm font-semibold text-ink">{item.value}</span>
+          <div key={item.label} className="bg-white px-3 py-3">
+            <div className={clsx('flex items-center gap-2', item.className)}>
+              {item.icon}
+              <span className="text-xl font-bold tabular-nums">{item.value}</span>
+            </div>
+            <p className="mt-1 text-xs font-semibold text-slate-500">{item.label}</p>
           </div>
         ))}
-        <span className="text-xs text-slate-500">{numberValue(health.completed)} completed</span>
       </div>
     </section>
   );
@@ -506,25 +586,22 @@ function HealthStrip({ data }: { data: ProjectOperationsResponse }) {
 
 function ProjectOverviewWorkPanel({
   priorityWork,
-  blockers,
   onOpenWork,
   onShowAllWork,
 }: {
   priorityWork: WorkItem[];
-  blockers: WorkItem[];
   onOpenWork: (item: WorkItem) => void;
   onShowAllWork: () => void;
 }) {
-  const approvalCount = priorityWork.filter((item) => item.status === 'waiting_approval' || item.status === 'waiting_review').length;
-  const blockerCount = priorityWork.filter((item) => item.status === 'blocked').length;
+  const previewRows = priorityWork.slice(0, 5);
 
   return (
     <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="flex flex-col gap-3 border-b border-line pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tổng quan vận hành</p>
-          <h2 className="mt-1 text-base font-semibold text-ink">Hàng ưu tiên</h2>
-          <p className="mt-1 text-sm text-slate-600">Các việc cần can thiệp sớm, tách khỏi thứ tự workflow trong tab Workflow.</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Công việc ưu tiên</p>
+          <h2 className="mt-1 text-base font-semibold text-ink">Năm việc cần chú ý nhất</h2>
+          <p className="mt-1 text-sm text-slate-600">Sắp xếp theo vướng mắc, yêu cầu duyệt và mức độ cần xử lý.</p>
         </div>
         <button
           type="button"
@@ -532,187 +609,328 @@ function ProjectOverviewWorkPanel({
           onClick={onShowAllWork}
         >
           <TimerReset className="h-4 w-4" />
-          Mở danh sách việc
+          Xem toàn bộ {priorityWork.length} công việc
         </button>
       </div>
-
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line py-3 text-sm">
-        <span><span className="font-semibold text-ink">{priorityWork.length}</span> việc đang mở</span>
-        <span><span className="font-semibold text-rose-700">{blockerCount}</span> blocker</span>
-        <span><span className="font-semibold text-amber-700">{approvalCount}</span> chờ duyệt</span>
-        <span><span className="font-semibold text-slate-700">{blockers.length}</span> blocker toàn công trình</span>
-      </div>
-
-      <WorkspaceWorkTable rows={priorityWork.slice(0, 8)} onOpenWork={onOpenWork} />
+      <WorkspaceWorkTable rows={previewRows} onOpenWork={onOpenWork} />
     </section>
   );
 }
 
 function WorkspaceWorkTable({ rows, onOpenWork }: { rows: WorkItem[]; onOpenWork: (item: WorkItem) => void }) {
   if (!rows.length) {
-    return <div className="pt-5"><EmptyState title="Không có việc đang mở trong folder này" /></div>;
+    return <div className="pt-5"><EmptyState title="Hiện không có công việc cần can thiệp" /></div>;
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-line text-sm">
-        <thead className="bg-white">
-          <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <th className="px-0 py-3 pr-4">Việc</th>
-            <th className="px-3 py-3">Trạng thái</th>
-            <th className="px-3 py-3">Phụ trách</th>
-            <th className="px-3 py-3">Hạn</th>
-            <th className="px-0 py-3 pl-3 text-right">Mở</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">
-          {rows.map((item) => (
-            <tr key={item.id} className="hover:bg-slate-50">
-              <td className="max-w-md px-0 py-3 pr-4">
-                <p className="truncate font-semibold text-ink">{item.title}</p>
-                <p className="mt-1 truncate text-xs text-slate-500">{item.workflow_name ?? item.node_name ?? departmentLabel(item.department)}</p>
-              </td>
-              <td className="px-3 py-3"><StatusBadge status={item.status} /></td>
-              <td className="px-3 py-3 text-slate-700">{workOwner(item)}</td>
-              <td className="px-3 py-3 text-slate-600">{dateText(workDueDate(item))}</td>
-              <td className="px-0 py-3 pl-3 text-right">
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-md border border-line p-1.5 text-blue-700 hover:bg-blue-50"
-                  title="Mở việc"
-                  aria-label="Mở việc"
-                  onClick={() => onOpenWork(item)}
-                >
-                  <ArrowUpRight className="h-4 w-4" />
-                </button>
-              </td>
+    <>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="min-w-full divide-y divide-line text-sm">
+          <thead className="bg-white">
+            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-0 py-3 pr-4">Việc</th>
+              <th className="px-3 py-3">Trạng thái</th>
+              <th className="px-3 py-3">Phụ trách</th>
+              <th className="px-3 py-3">Hạn</th>
+              <th className="px-0 py-3 pl-3 text-right">Mở</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {rows.map((item) => (
+              <tr key={item.id} className="hover:bg-slate-50">
+                <td className="max-w-md px-0 py-3 pr-4">
+                  <p className="truncate font-semibold text-ink">{item.title}</p>
+                  <p className="mt-1 truncate text-xs text-slate-500">{item.workflow_name ?? item.node_name ?? departmentLabel(item.department)}</p>
+                </td>
+                <td className="px-3 py-3"><StatusBadge status={item.status} /></td>
+                <td className="px-3 py-3 text-slate-700">{workOwner(item)}</td>
+                <td className="px-3 py-3 text-slate-600">{dateText(workDueDate(item))}</td>
+                <td className="px-0 py-3 pl-3 text-right">
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-md border border-line p-1.5 text-blue-700 hover:bg-blue-50"
+                    title="Mở việc"
+                    aria-label="Mở việc"
+                    onClick={() => onOpenWork(item)}
+                  >
+                    <ArrowUpRight className="h-4 w-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="divide-y divide-line md:hidden">
+        {rows.map((item) => (
+          <article key={item.id} className="py-3 first:pt-4 last:pb-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold leading-6 text-ink">{item.title}</p>
+                <div className="mt-2"><StatusBadge status={item.status} /></div>
+              </div>
+              <button
+                type="button"
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-line px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                onClick={() => onOpenWork(item)}
+                aria-label={`Mở ${item.title}`}
+              >
+                Mở
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="mt-2 grid gap-1 text-xs text-slate-500">
+              <span>Phụ trách: {workOwner(item)}</span>
+              <span>Hạn: {dateText(workDueDate(item))}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </>
+  );
+}
+
+export function ProjectWorkflowWorkspace({
+  projectId,
+  nodes,
+  workItems,
+  selectedNodeId,
+  hasPipeline,
+  startPending,
+  onSelectNode,
+  onStartPipeline,
+  onOpenWork,
+  renderStageContext,
+}: {
+  projectId: string;
+  nodes: ProjectOperationsTimelineNode[];
+  workItems: WorkItem[];
+  selectedNodeId: string;
+  hasPipeline: boolean;
+  startPending: boolean;
+  onSelectNode: (nodeId: string) => void;
+  onStartPipeline: () => void;
+  onOpenWork: (item: WorkItem) => void;
+  renderStageContext?: (node: ProjectOperationsTimelineNode) => ReactNode;
+}) {
+  const currentNode = useMemo(() => currentTimelineNode(nodes), [nodes]);
+  const currentNodeWorkItems = useMemo(
+    () => currentNode ? workItems.filter((item) => item.run_node_id === currentNode.id) : [],
+    [currentNode, workItems],
+  );
+  const nextWork = useMemo(() => selectNextWorkflowWork(currentNodeWorkItems), [currentNodeWorkItems]);
+  const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? currentNode ?? nodes[0];
+  const nodeWorkItems = useMemo(
+    () => selectedNode
+      ? orderWorkItemsByWorkflow(workItems.filter((item) => item.run_node_id === selectedNode.id))
+      : orderWorkItemsByWorkflow(workItems),
+    [selectedNode, workItems],
+  );
+
+  if (!hasPipeline || !nodes.length) {
+    return (
+      <WorkflowEmptyState
+        startPending={startPending}
+        onStartPipeline={onStartPipeline}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <WorkflowExecutionSummary
+        projectId={projectId}
+        nodes={nodes}
+        rows={currentNodeWorkItems}
+        currentNode={currentNode}
+        nextWork={nextWork}
+        onOpenWork={onOpenWork}
+      />
+      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <WorkflowStageRail
+          nodes={nodes}
+          selectedNodeId={selectedNode?.id ?? ''}
+          onSelectNode={onSelectNode}
+        />
+        <WorkflowWorkPanel
+          rows={nodeWorkItems}
+          selectedNode={selectedNode}
+          onOpenWork={onOpenWork}
+          stageContext={selectedNode && renderStageContext ? renderStageContext(selectedNode) : undefined}
+        />
+      </div>
     </div>
   );
 }
 
-function NextWorkPanel({
-  rows,
-  onOpenWork,
-  onShowAll,
-}: {
-  rows: WorkItem[];
-  onOpenWork: (item: WorkItem) => void;
-  onShowAll: () => void;
-}) {
-  const previewRows = rows.slice(0, 6);
+function WorkflowEmptyState({ startPending, onStartPipeline }: { startPending: boolean; onStartPipeline: () => void }) {
   return (
     <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <TimerReset className="h-5 w-5 shrink-0 text-blue-700" />
-          <h2 className="truncate font-semibold text-ink">Next Work</h2>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
-            {previewRows.length} / {rows.length} việc phải làm
-          </span>
-          {rows.length > previewRows.length ? (
-            <button
-              type="button"
-              className="rounded-md border border-line px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
-              onClick={onShowAll}
-            >
-              Xem tất cả
-            </button>
-          ) : null}
-        </div>
-      </div>
-      {previewRows.length ? (
-        <div className="space-y-3">
-          {previewRows.map((item) => (
-            <WorkItemCard key={item.id} item={item} compact showWorkflowPrefix onOpen={() => onOpenWork(item)} />
-          ))}
-        </div>
-      ) : (
-        <EmptyState title="Không có work item đang mở" />
-      )}
+      <EmptyState
+        title="Chưa có quy trình vận hành"
+        action={
+          <button
+            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+            disabled={startPending}
+            onClick={onStartPipeline}
+          >
+            {startPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            Khởi động quy trình
+          </button>
+        }
+      />
     </section>
   );
 }
 
-function WorkflowTimeline({
+function WorkflowExecutionSummary({
   projectId,
   nodes,
-  selectedNodeId,
-  hasPipeline,
-  startPending,
-  onStartPipeline,
-  onSelectNode,
+  rows,
+  currentNode,
+  nextWork,
+  onOpenWork,
 }: {
   projectId: string;
   nodes: ProjectOperationsTimelineNode[];
+  rows: WorkItem[];
+  currentNode?: ProjectOperationsTimelineNode;
+  nextWork?: WorkItem;
+  onOpenWork: (item: WorkItem) => void;
+}) {
+  const progress = workflowProgressSummary(nodes);
+  const counts = workflowWorkCounts(rows);
+
+  return (
+    <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
+      <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+        <GitBranch className="h-5 w-5 text-blue-700" />
+        <h2 className="font-semibold text-ink">Quy trình công trình</h2>
+      </div>
+      <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-[minmax(180px,1.15fr)_minmax(210px,1.25fr)_110px_110px_110px_minmax(250px,1.3fr)] xl:items-center xl:gap-0 xl:p-0">
+        <div className="min-w-0 xl:border-r xl:border-line xl:px-5 xl:py-4">
+          <p className="text-xs font-semibold text-slate-500">Đang ở</p>
+          <p className="mt-1 truncate text-lg font-bold text-blue-700">
+            {currentNode?.order_index ? `${currentNode.order_index}. ` : ''}{currentNode?.name ?? 'Chưa xác định'}
+          </p>
+          {nextWork ? <p className="mt-1 truncate text-xs text-slate-500" title={nextWork.title}>Tiếp theo: {nextWork.title}</p> : null}
+        </div>
+
+        <div className="xl:border-r xl:border-line xl:px-5 xl:py-4">
+          <div className="flex items-center justify-between gap-3 text-xs font-semibold">
+            <span className="text-slate-500">Tiến độ tổng thể</span>
+            <span className="text-slate-700">{progress.completed}/{progress.total} bước · {progress.percent}%</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full rounded-full bg-blue-600" style={{ width: `${progress.percent}%` }} />
+          </div>
+          {progress.skipped ? <p className="mt-1.5 text-right text-[11px] text-slate-500">{progress.skipped} bước đã bỏ qua</p> : null}
+        </div>
+
+        <WorkflowSummaryMetric value={counts.open} label="cần xử lý" tone="amber" />
+        <WorkflowSummaryMetric value={counts.waiting} label="chờ duyệt" tone="slate" />
+        <WorkflowSummaryMetric value={counts.blocked} label="bị chặn" tone="rose" />
+
+        <div className="flex flex-col gap-2 sm:col-span-2 xl:col-span-1 xl:px-5 xl:py-4">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            disabled={!nextWork}
+            onClick={() => nextWork && onOpenWork(nextWork)}
+          >
+            Mở việc tiếp theo
+            <ArrowUpRight className="h-4 w-4" />
+          </button>
+          <Link
+            to={`/projects/${projectId}/planning`}
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <GitBranch className="h-4 w-4" />
+            Mở kế hoạch
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WorkflowSummaryMetric({ value, label, tone }: { value: number; label: string; tone: 'amber' | 'slate' | 'rose' }) {
+  const valueTone = tone === 'amber' ? 'text-amber-600' : tone === 'rose' ? 'text-rose-600' : 'text-slate-700';
+  return (
+    <div className="rounded-md border border-line bg-slate-50 px-3 py-3 text-center xl:rounded-none xl:border-y-0 xl:border-l-0 xl:bg-white xl:py-4">
+      <p className={clsx('text-2xl font-bold', valueTone)}>{value}</p>
+      <p className="mt-1 text-xs font-medium text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+function WorkflowStageRail({
+  nodes,
+  selectedNodeId,
+  onSelectNode,
+}: {
+  nodes: ProjectOperationsTimelineNode[];
   selectedNodeId: string;
-  hasPipeline: boolean;
-  startPending: boolean;
-  onStartPipeline: () => void;
   onSelectNode: (nodeId: string) => void;
 }) {
   return (
-    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <GitBranch className="h-5 w-5 text-blue-700" />
-          <h2 className="font-semibold text-ink">Workflow Timeline</h2>
-        </div>
-        <Link to={`/projects/${projectId}/planning`} className="text-sm font-semibold text-blue-700 hover:underline">Planning</Link>
+    <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
+      <div className="border-b border-line px-4 py-3">
+        <h2 className="text-sm font-semibold text-ink">Giai đoạn</h2>
       </div>
-      {!hasPipeline || !nodes.length ? (
-        <EmptyState
-          title="Chưa có pipeline runtime"
-          action={
-            <button
-              className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
-              disabled={startPending}
-              onClick={onStartPipeline}
-            >
-              {startPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              Start pipeline
-            </button>
-          }
-        />
-      ) : (
-        <ol className="space-y-3">
-          {nodes.map((node) => {
-            const selected = node.id === selectedNodeId;
-            return (
-              <li key={node.id}>
-                <button
-                  type="button"
-                  className={clsx(
-                    'block w-full rounded-md border p-3 text-left transition hover:border-blue-300 hover:shadow-sm focus-ring',
-                    nodeTone(node.status),
-                    selected && 'ring-2 ring-blue-500 ring-offset-1',
-                  )}
-                  aria-pressed={selected}
-                  onClick={() => onSelectNode(node.id)}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-ink">
-                        {node.order_index ? `${node.order_index}. ` : null}{node.name}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">{timelineStepSummary(node)}</p>
-                    </div>
-                    <StatusBadge status={node.status} />
-                  </div>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white">
-                    <div className="h-full rounded-full bg-current" style={{ width: `${Math.min(100, Math.max(0, numberValue(node.progress_percent)))}%` }} />
-                  </div>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+
+      <div className="p-3 xl:hidden">
+        <label className="block text-xs font-semibold text-slate-500" htmlFor="workflow-stage-select">Chọn giai đoạn quy trình</label>
+        <select
+          id="workflow-stage-select"
+          className="mt-2 w-full rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          value={selectedNodeId}
+          onChange={(event) => onSelectNode(event.target.value)}
+        >
+          {nodes.map((node) => (
+            <option key={node.id} value={node.id}>
+              {node.order_index ? `${node.order_index}. ` : ''}{node.name} · {numberValue(node.completed_steps)}/{numberValue(node.step_count)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <ol className="hidden divide-y divide-line xl:block">
+        {nodes.map((node) => {
+          const selected = node.id === selectedNodeId;
+          const progressPercent = Math.min(100, Math.max(0, numberValue(node.progress_percent)));
+          return (
+            <li key={node.id}>
+              <button
+                type="button"
+                className={clsx(
+                  'group block w-full border-l-2 px-3 py-2.5 text-left transition focus-ring',
+                  selected ? 'border-blue-600 bg-blue-50/80' : 'border-transparent hover:bg-slate-50',
+                )}
+                aria-current={selected ? 'step' : undefined}
+                onClick={() => onSelectNode(node.id)}
+                title={`${node.name} · ${statusLabel(node.status)}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={clsx('h-2 w-2 shrink-0 rounded-full', nodeStatusDotTone(node.status))} />
+                  <span className="w-5 shrink-0 text-xs font-semibold tabular-nums text-slate-500">
+                    {String(node.order_index ?? '').padStart(2, '0')}
+                  </span>
+                  <span className={clsx('min-w-0 flex-1 truncate text-sm font-semibold', selected ? 'text-blue-700' : 'text-slate-700')}>
+                    {node.name}
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500">
+                    {numberValue(node.completed_steps)}/{numberValue(node.step_count)}
+                  </span>
+                </div>
+                <div className="ml-12 mt-1.5 h-1 overflow-hidden rounded-full bg-slate-100">
+                  <div className={clsx('h-full rounded-full', selected ? 'bg-blue-600' : 'bg-slate-300')} style={{ width: `${progressPercent}%` }} />
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }
@@ -721,45 +939,64 @@ function WorkflowWorkPanel({
   rows,
   selectedNode,
   onOpenWork,
+  stageContext,
 }: {
   rows: WorkItem[];
   selectedNode?: ProjectOperationsTimelineNode;
   onOpenWork: (item: WorkItem) => void;
+  stageContext?: ReactNode;
 }) {
-  const [filter, setFilter] = useState<WorkflowWorkFilter>('all');
+  const [filter, setFilter] = useState<WorkflowWorkFilter>('open');
   const [search, setSearch] = useState('');
+  const selectedNodeSkipped = selectedNode?.status === 'skipped' || selectedNode?.status === 'cancelled';
+  const defaultFilter: WorkflowWorkFilter = selectedNodeSkipped ? 'skipped' : 'open';
   const counts = useMemo(() => workflowWorkCounts(rows), [rows]);
   const visibleRows = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('vi');
     return rows.filter((item) => {
       if (!matchesWorkflowWorkFilter(item, filter)) return false;
       if (!query) return true;
-      return [item.title, item.description, item.assignee_name, item.run_step_name, item.workflow_form_template_name]
+      return [
+        item.title,
+        item.description,
+        item.assignee_name,
+        item.owner_name,
+        item.responsible_name,
+        asArray<string>(item.role_ids).join(' '),
+        item.run_step_name,
+        item.workflow_form_template_name,
+      ]
         .some((value) => String(value ?? '').toLocaleLowerCase('vi').includes(query));
     });
   }, [filter, rows, search]);
-  const selectedNodeSkipped = selectedNode?.status === 'skipped' || selectedNode?.status === 'cancelled';
 
   useEffect(() => {
-    setFilter('all');
+    setFilter(defaultFilter);
     setSearch('');
-  }, [selectedNode?.id]);
+  }, [defaultFilter, selectedNode?.id]);
 
   return (
-    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <TimerReset className="h-5 w-5 shrink-0 text-blue-700" />
-          <h2 className="truncate font-semibold text-ink">
-            Công việc theo thứ tự workflow{selectedNode?.name ? ` · ${selectedNode.name}` : ''}
-          </h2>
+    <section className="min-w-0 rounded-lg border border-line bg-white p-4 shadow-panel">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h2 className="truncate text-lg font-semibold text-ink">
+              {selectedNode?.order_index ? `${selectedNode.order_index}. ` : ''}{selectedNode?.name ?? 'Công việc quy trình'}
+            </h2>
+            {selectedNode?.status ? <StatusBadge status={selectedNode.status} /> : null}
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            {selectedNode ? `${numberValue(selectedNode.completed_steps)}/${numberValue(selectedNode.step_count)} bước hoàn tất · ` : ''}{counts.open} việc cần xử lý
+          </p>
         </div>
-        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{rows.length} work item</span>
+        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{rows.length} công việc</span>
       </div>
+
+      {stageContext ? <div className="mb-4">{stageContext}</div> : null}
 
       {rows.length ? (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-2" aria-label="Lọc công việc workflow">
+          <div className="flex flex-wrap gap-2" aria-label="Lọc công việc quy trình">
             {workflowWorkFilterOptions(counts).map((option) => (
               <button
                 key={option.id}
@@ -782,48 +1019,202 @@ function WorkflowWorkPanel({
               className="w-full rounded-md border border-line bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm công việc, form, người thực hiện..."
+              placeholder="Tìm công việc, hồ sơ, người thực hiện..."
             />
           </label>
 
           {selectedNodeSkipped ? (
             <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
               <span className="font-semibold">Nhánh “{selectedNode?.name}” không được lựa chọn.</span>{' '}
-              {counts.skipped} work item được lưu ở chế độ chỉ đọc để truy vết quy trình.
+              {counts.skipped} công việc được lưu ở chế độ chỉ đọc để truy vết quy trình.
             </div>
           ) : null}
 
           {visibleRows.length ? (
-            <div className="space-y-3">
-              {visibleRows.map((item) => (
-                <WorkItemCard
-                  key={item.id}
-                  item={item}
-                  compact={item.status === 'completed' || item.status === 'cancelled'}
-                  displayStatus={item.status === 'cancelled' ? 'skipped' : undefined}
-                  onOpen={() => onOpenWork(item)}
-                />
-              ))}
-            </div>
+            <>
+              <div className="hidden overflow-x-auto rounded-md border border-line md:block">
+                <div className="min-w-[920px]">
+                  <div className="grid grid-cols-[minmax(260px,1.6fr)_120px_minmax(140px,0.8fr)_110px_minmax(170px,1fr)_72px] gap-3 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <span>Công việc</span>
+                    <span>Trạng thái</span>
+                    <span>Phụ trách</span>
+                    <span>Hạn</span>
+                    <span>Hồ sơ / Minh chứng</span>
+                    <span className="text-right">Thao tác</span>
+                  </div>
+                  <div className="divide-y divide-line">
+                    {visibleRows.map((item, index) => (
+                      <WorkflowWorkTableRow key={item.id} item={item} fallbackIndex={index} onOpen={() => onOpenWork(item)} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2 md:hidden">
+                {visibleRows.map((item, index) => (
+                  <WorkflowWorkMobileCard key={item.id} item={item} fallbackIndex={index} onOpen={() => onOpenWork(item)} />
+                ))}
+              </div>
+            </>
           ) : (
-            <EmptyState title="Không có công việc phù hợp bộ lọc" />
+            <EmptyState
+              title="Không có công việc phù hợp bộ lọc"
+              action={(filter !== defaultFilter || search) ? (
+                <button
+                  type="button"
+                  className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                  onClick={() => {
+                    setFilter(defaultFilter);
+                    setSearch('');
+                  }}
+                >
+                  Xóa bộ lọc
+                </button>
+              ) : undefined}
+            />
           )}
         </div>
       ) : (
-        <EmptyState title={selectedNode?.name ? `Node ${selectedNode.name} chưa phát sinh work item` : 'Chưa phát sinh work item'} />
+        <EmptyState title={selectedNode?.name ? `Giai đoạn ${selectedNode.name} chưa phát sinh công việc` : 'Chưa phát sinh công việc'} />
       )}
     </section>
   );
 }
 
-function timelineStepSummary(node: ProjectOperationsTimelineNode) {
-  const prefix = enumLabel('node_type', node.type);
-  const total = numberValue(node.step_count);
-  const skipped = numberValue(node.skipped_steps);
-  if (node.status === 'skipped' || node.status === 'cancelled') {
-    return `${prefix} · 0/${total} bước thực hiện · ${skipped || total} bước đã bỏ qua`;
-  }
-  return `${prefix} · ${numberValue(node.completed_steps)}/${total} bước hoàn tất`;
+function WorkflowWorkTableRow({
+  item,
+  fallbackIndex,
+  onOpen,
+}: {
+  item: WorkItem;
+  fallbackIndex: number;
+  onOpen: () => void;
+}) {
+  const displayStatus = item.status === 'cancelled' ? 'skipped' : item.status;
+  return (
+    <div className="grid grid-cols-[minmax(260px,1.6fr)_120px_minmax(140px,0.8fr)_110px_minmax(170px,1fr)_72px] items-start gap-3 px-3 py-3 text-sm hover:bg-slate-50/80">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="w-6 shrink-0 pt-0.5 text-xs font-semibold tabular-nums text-slate-500">
+          {String(item.run_step_order_index ?? fallbackIndex + 1).padStart(2, '0')}
+        </span>
+        <div className="min-w-0">
+          <p className="font-semibold text-ink">{item.title}</p>
+          {item.description ? <p className="mt-1 line-clamp-1 text-xs text-slate-500">{item.description}</p> : null}
+          {item.blocked_reason ? <p className="mt-1 line-clamp-2 text-xs font-medium text-rose-700">{item.blocked_reason}</p> : null}
+        </div>
+      </div>
+      <div><StatusBadge status={displayStatus} /></div>
+      <p className="text-sm text-slate-700">{workflowWorkOwnerLabel(item)}</p>
+      <p className="text-sm tabular-nums text-slate-600">{dateText(workDueDate(item))}</p>
+      <div className="text-xs text-slate-600">
+        <p className="font-medium text-slate-700">{workflowFormRequirementLabel(item)}</p>
+        <p className="mt-1">{numberValue(item.evidence_count)} minh chứng</p>
+      </div>
+      <button
+        type="button"
+        className="inline-flex items-center justify-end gap-1 rounded-md border border-line px-2 py-1.5 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+        onClick={onOpen}
+        aria-label={`Mở ${item.title}`}
+      >
+        Mở
+        <ArrowUpRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function WorkflowWorkMobileCard({
+  item,
+  fallbackIndex,
+  onOpen,
+}: {
+  item: WorkItem;
+  fallbackIndex: number;
+  onOpen: () => void;
+}) {
+  const displayStatus = item.status === 'cancelled' ? 'skipped' : item.status;
+  return (
+    <article className="rounded-md border border-line bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="w-6 shrink-0 pt-0.5 text-xs font-semibold tabular-nums text-slate-500">
+            {String(item.run_step_order_index ?? fallbackIndex + 1).padStart(2, '0')}
+          </span>
+          <div className="min-w-0">
+            <p className="font-semibold text-ink">{item.title}</p>
+            <div className="mt-2"><StatusBadge status={displayStatus} /></div>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-line px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+          onClick={onOpen}
+          aria-label={`Mở ${item.title}`}
+        >
+          Mở
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="mt-3 grid gap-1 text-xs text-slate-500 sm:grid-cols-2">
+        <span>Phụ trách: {workflowWorkOwnerLabel(item)}</span>
+        <span>Hạn: {dateText(workDueDate(item))}</span>
+        <span>{workflowFormRequirementLabel(item)}</span>
+        <span>{numberValue(item.evidence_count)} minh chứng</span>
+      </div>
+      {item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{item.blocked_reason}</p> : null}
+    </article>
+  );
+}
+
+function workflowWorkOwnerLabel(item: WorkItem) {
+  const roleLabels = asArray<string>(item.role_ids).filter(Boolean).join(', ');
+  return item.assignee_name
+    ?? item.owner_name
+    ?? item.responsible_name
+    ?? (roleLabels || item.department_name || departmentLabel(item.department) || '-');
+}
+
+function workflowFormRequirementLabel(item: WorkItem) {
+  if (item.workflow_form_required) return 'Hồ sơ bắt buộc';
+  if (item.workflow_form_instance_id || item.workflow_form_template_name) return 'Hồ sơ tùy chọn';
+  return 'Không yêu cầu hồ sơ';
+}
+
+function selectProjectPriorityWork(priorityWork: WorkItem[], blockers: WorkItem[]) {
+  return blockers[0]
+    ?? priorityWork.find((item) => item.status === 'waiting_approval' || item.status === 'waiting_review')
+    ?? priorityWork[0];
+}
+
+function projectPriorityActionLabel(item: WorkItem) {
+  if (item.status === 'blocked') return 'Xử lý vướng mắc';
+  if (item.status === 'waiting_approval' || item.status === 'waiting_review') return 'Mở yêu cầu duyệt';
+  return 'Xử lý việc ưu tiên';
+}
+
+function selectNextWorkflowWork(rows: WorkItem[]) {
+  const prioritized = prioritizeWorkItems(rows.filter(isOpenWorkItem));
+  return prioritized.find((item) => item.status === 'blocked')
+    ?? prioritized.find((item) => item.status === 'waiting_approval' || item.status === 'waiting_review')
+    ?? prioritized[0];
+}
+
+function workflowProgressSummary(nodes: ProjectOperationsTimelineNode[]) {
+  const summary = nodes.reduce((acc, node) => {
+    const total = numberValue(node.step_count);
+    const skipped = Math.min(total, numberValue(node.skipped_steps));
+    const executable = Math.max(0, total - skipped);
+    const completed = Math.min(executable, numberValue(node.completed_steps));
+    return {
+      total: acc.total + executable,
+      completed: acc.completed + completed,
+      skipped: acc.skipped + skipped,
+    };
+  }, { total: 0, completed: 0, skipped: 0 });
+
+  return {
+    ...summary,
+    percent: summary.total ? Math.round((summary.completed / summary.total) * 100) : 0,
+  };
 }
 
 function workflowWorkCounts(rows: WorkItem[]) {
@@ -839,12 +1230,12 @@ function workflowWorkCounts(rows: WorkItem[]) {
 
 function workflowWorkFilterOptions(counts: ReturnType<typeof workflowWorkCounts>): Array<{ id: WorkflowWorkFilter; label: string; count: number }> {
   return [
-    { id: 'all', label: 'Tất cả', count: counts.all },
     { id: 'open', label: 'Cần xử lý', count: counts.open },
     { id: 'waiting', label: 'Chờ duyệt', count: counts.waiting },
     { id: 'blocked', label: 'Bị chặn', count: counts.blocked },
     { id: 'completed', label: 'Hoàn tất', count: counts.completed },
     { id: 'skipped', label: 'Đã bỏ qua', count: counts.skipped },
+    { id: 'all', label: 'Tất cả', count: counts.all },
   ];
 }
 
@@ -855,70 +1246,6 @@ function matchesWorkflowWorkFilter(item: WorkItem, filter: WorkflowWorkFilter) {
   if (filter === 'blocked') return item.status === 'blocked';
   if (filter === 'completed') return item.status === 'completed';
   return item.status === 'cancelled';
-}
-
-function CommandCenter({
-  data,
-  blockers,
-  onOpenWork,
-}: {
-  data: ProjectOperationsResponse;
-  blockers: WorkItem[];
-  onOpenWork: (item: WorkItem) => void;
-}) {
-  const approvals = asArray<ProjectOperationsRecord>(data.approvals);
-  const workByApproval = new Map(asArray<WorkItem>(data.work_items).map((item) => [item.approval_request_id, item]));
-
-  return (
-    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
-      <div className="mb-4 flex items-center gap-2">
-        <AlertTriangle className="h-5 w-5 text-blue-700" />
-        <h2 className="font-semibold text-ink">Command Center</h2>
-      </div>
-      <div className="space-y-4">
-        <CommandSection title="Blockers" count={blockers.length}>
-          {blockers.length ? blockers.slice(0, 4).map((item) => (
-            <button key={item.id} className="block w-full rounded-md border border-rose-100 bg-rose-50 px-3 py-2 text-left hover:border-rose-200" onClick={() => onOpenWork(item)}>
-              <p className="text-sm font-semibold text-ink">{item.title}</p>
-              <p className="mt-1 line-clamp-2 text-xs text-rose-700">{item.blocked_reason ?? 'Đang bị chặn'}</p>
-            </button>
-          )) : <p className="text-sm text-slate-500">Không có blocker đang mở.</p>}
-        </CommandSection>
-
-        <CommandSection title="Approvals" count={approvals.length}>
-          {approvals.length ? approvals.slice(0, 4).map((approval) => {
-            const work = workByApproval.get(String(approval.id));
-            return (
-              <div key={approval.id} className="rounded-md border border-line px-3 py-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{approval.title ?? (approval.target_type ? enumLabel('target_type', approval.target_type) : 'Approval request')}</p>
-                    <p className="mt-1 text-xs text-slate-500">{approval.requested_by_name ?? 'Requester'} · {compactDateTime(approval.created_at)}</p>
-                  </div>
-                  <StatusBadge status={String(approval.status ?? 'pending')} />
-                </div>
-                {work ? (
-                  <button className="mt-2 text-xs font-semibold text-blue-700 hover:underline" onClick={() => onOpenWork(work)}>
-                    Open work item
-                  </button>
-                ) : null}
-              </div>
-            );
-          }) : <p className="text-sm text-slate-500">Không có approval trong scope hiện tại.</p>}
-        </CommandSection>
-
-        <CommandSection title="Material risks" count={numberValue(data.health_counts?.material_risks)}>
-          {numberValue(data.health_counts?.material_risks) ? (
-            <p className="rounded-md border border-orange-100 bg-orange-50 px-3 py-2 text-sm text-orange-800">
-              Có rủi ro vật tư cần kiểm tra trong các module Kho hoặc Mua sắm.
-            </p>
-          ) : (
-            <p className="text-sm text-slate-500">Không có rủi ro vật tư đang mở.</p>
-          )}
-        </CommandSection>
-      </div>
-    </section>
-  );
 }
 
 function ProjectActivityPanel({
@@ -936,92 +1263,66 @@ function ProjectActivityPanel({
     <div className="space-y-4">
       <div className="mb-4 flex items-center gap-2">
         <MessageSquare className="h-5 w-5 text-blue-700" />
-        <h2 className="font-semibold text-ink">Trao đổi</h2>
+        <div>
+          <h2 className="font-semibold text-ink">Trao đổi</h2>
+          <p className="mt-0.5 text-sm text-slate-500">Phối hợp, quyết định và theo dõi các vấn đề của công trình.</p>
+        </div>
       </div>
       <ActivityThread projectId={projectId} targetOptions={activityTargets} attachmentOptions={attachmentOptions} onChanged={onChanged} />
     </div>
   );
 }
 
-function ProjectFilesPanel({ projectId, evidence }: { projectId: string; evidence: EvidenceRecord[] }) {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const reviewEvidence = useMutation({
-    mutationFn: ({ record, action, comment }: { record: EvidenceRecord; action: EvidenceReviewAction; comment: string }) =>
-      post<EvidenceRecord>(`/evidence/${record.id}/${action}`, { comment, reason: action === 'reject' ? comment : undefined }),
-    onSuccess: (_record, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
-      toast.success(variables.action === 'accept' ? 'Đã accept evidence' : 'Đã reject evidence');
-    },
-    onError: (error) => toast.error('Không review được evidence', error),
-  });
-
-  return (
-    <div className="space-y-4">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-blue-700" />
-          <h2 className="font-semibold text-ink">Hồ sơ</h2>
-        </div>
-        <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{evidence.length}</span>
-      </div>
-      <EvidenceGallery
-        evidence={evidence}
-        emptyTitle="Chưa có evidence mới"
-        showWorkItem
-        onReview={(record, action, comment) => reviewEvidence.mutateAsync({ record, action, comment }).then(() => undefined)}
-      />
-    </div>
-  );
-}
-
 function ProjectAuditPanel({ projectId, initialRows }: { projectId: string; initialRows: ProjectOperationsRecord[] }) {
-  const path = `/projects/${projectId}/audit-logs`;
+  const path = `/projects/${projectId}/audit-logs?page=1&page_size=5`;
   const logs = useQuery({
     queryKey: ['audit', path],
-    queryFn: () => get<ProjectOperationsRecord[]>(path),
+    queryFn: () => get<AuditLogPage>(path),
     enabled: Boolean(projectId),
     retry: false,
   });
-  const rows = logs.data ?? initialRows;
+  const rows = logs.data?.items ?? initialRows.slice(0, 5) as AuditLogRecord[];
 
   return (
     <div className="space-y-4">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
           <ShieldAlert className="h-5 w-5 text-blue-700" />
-          <h2 className="font-semibold text-ink">Audit Log</h2>
+          <div>
+            <h2 className="font-semibold text-ink">Audit gần đây</h2>
+            <p className="mt-0.5 text-sm text-slate-500">{logs.data ? `${logs.data.total} sự kiện trong công trình` : 'Năm sự kiện gần nhất trong công trình'}</p>
+          </div>
         </div>
         <Link to={`/projects/${projectId}/audit`} className="text-sm font-semibold text-blue-700 hover:underline">
-          Mở trang Audit đầy đủ
+          Mở toàn bộ nhật ký
         </Link>
       </div>
 
-      {logs.isLoading ? <LoadingSpinner /> : null}
+      {logs.isLoading && !rows.length ? <LoadingSpinner /> : null}
       {logs.error ? (
         <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          Không tải được audit đầy đủ. Đang hiển thị audit summary gần nhất nếu có.
+          Không tải được toàn bộ nhật ký. Đang hiển thị các sự kiện gần nhất nếu có.
         </div>
       ) : null}
 
-      {!logs.isLoading && !rows.length ? <EmptyState title="Chưa có sự kiện audit" /> : null}
+      {!logs.isLoading && !rows.length ? <EmptyState title="Chưa có sự kiện hệ thống" /> : null}
       {rows.length ? (
-        <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <Timeline events={rows.slice(0, 20)} />
-          <DataTable
-            rows={rows}
-            columns={[
-              { key: 'created_at', header: 'Thời gian', render: (row) => compactDateTime(row.created_at) },
-              { key: 'event_type', header: 'Event', render: (row) => <EnumChip group="event_type" value={row.event_type} /> },
-              { key: 'actor_name', header: 'Actor' },
-              { key: 'target_type', header: 'Target', render: (row) => <EnumChip group="target_type" value={row.target_type} /> },
-              {
-                key: 'description',
-                header: 'Mô tả',
-                render: (row) => <p className="max-w-xl text-sm leading-5 text-slate-700">{row.description ?? '-'}</p>,
-              },
-            ]}
-          />
+        <div className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
+          <div className="hidden grid-cols-[120px_180px_minmax(140px,1fr)_150px_32px] gap-3 border-b border-line bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
+            <span>Thời gian</span><span>Sự kiện</span><span>Người thực hiện</span><span>Đối tượng</span><span />
+          </div>
+          <div className="divide-y divide-line">
+            {rows.map((row) => (
+              <Link key={row.id} to={`/projects/${projectId}/audit`} className="grid gap-2 px-4 py-3 hover:bg-slate-50 md:grid-cols-[120px_180px_minmax(140px,1fr)_150px_32px] md:items-center md:gap-3">
+                <span className="text-xs text-slate-500">{compactDateTime(row.created_at)}</span>
+                <span><EnumChip group="event_type" value={row.event_type} /></span>
+                <span className="text-sm text-slate-700">{row.actor_name ?? '-'}</span>
+                <span><EnumChip group="target_type" value={row.target_type} /></span>
+                <ChevronRight className="hidden h-4 w-4 text-blue-700 md:block" />
+                <p className="text-sm leading-5 text-slate-600 md:col-span-5">{row.description ?? '-'}</p>
+              </Link>
+            ))}
+          </div>
         </div>
       ) : null}
     </div>
@@ -1052,207 +1353,21 @@ function buildActivityAttachmentOptions(evidence: EvidenceRecord[]): ActivityAtt
   return options;
 }
 
-function CommandSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
-  return (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-ink">{title}</h3>
-        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{count}</span>
-      </div>
-      <div className="space-y-2">{children}</div>
-    </div>
-  );
-}
-
-function DepartmentSurfaces({
-  surfaces,
-  allRows,
-  selectedDepartment,
-  onSelectDepartment,
-  onOpenWork,
-}: {
-  surfaces: DepartmentSurface[];
-  allRows: WorkItem[];
-  selectedDepartment: string;
-  onSelectDepartment: (department: string) => void;
-  onOpenWork: (item: WorkItem) => void;
-}) {
-  const [page, setPage] = useState(1);
-  const selectedSurface = selectedDepartment === ALL_WORK_SURFACE
-    ? undefined
-    : surfaces.find((surface) => (surface.department ?? 'unassigned') === selectedDepartment);
-  const activeRows = useMemo(() => {
-    if (selectedDepartment === ALL_WORK_SURFACE) return allRows;
-    return orderWorkItemsByWorkflow(asArray<WorkItem>(selectedSurface?.work_items).filter(isOpenWorkItem));
-  }, [allRows, selectedDepartment, selectedSurface?.work_items]);
-  const totalPages = Math.max(1, Math.ceil(activeRows.length / WORK_PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pageStartIndex = (currentPage - 1) * WORK_PAGE_SIZE;
-  const pageRows = activeRows.slice(pageStartIndex, pageStartIndex + WORK_PAGE_SIZE);
-  const rangeStart = activeRows.length ? pageStartIndex + 1 : 0;
-  const rangeEnd = activeRows.length ? Math.min(pageStartIndex + pageRows.length, activeRows.length) : 0;
-  const selectedLabel = selectedDepartment === ALL_WORK_SURFACE
-    ? 'Tất cả'
-    : departmentLabel(selectedSurface?.department ?? selectedDepartment);
-  const selectedMetrics = selectedDepartment === ALL_WORK_SURFACE
-    ? {
-      total: allRows.length,
-      active: allRows.length,
-      blocked: allRows.filter((item) => item.status === 'blocked').length,
-      waiting_approval: allRows.filter((item) => item.status === 'waiting_approval' || item.status === 'waiting_review').length,
-    }
-    : {
-      total: numberValue(selectedSurface?.total),
-      active: numberValue(selectedSurface?.active),
-      blocked: numberValue(selectedSurface?.blocked),
-      waiting_approval: numberValue(selectedSurface?.waiting_approval),
-    };
-
-  useEffect(() => {
-    setPage(1);
-  }, [selectedDepartment]);
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
-
-  return (
-    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="font-semibold text-ink">Department Surfaces</h2>
-          <p className="mt-1 text-sm text-slate-600">Các bề mặt hiển thị theo scope mà server trả về cho người dùng hiện tại.</p>
-        </div>
-        <div className="flex overflow-x-auto rounded-md border border-line bg-slate-50 p-1">
-          <button
-            className={clsx(
-              'whitespace-nowrap rounded px-3 py-1.5 text-sm font-semibold',
-              selectedDepartment === ALL_WORK_SURFACE ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-white/70',
-            )}
-            onClick={() => onSelectDepartment(ALL_WORK_SURFACE)}
-          >
-            Tất cả
-          </button>
-          {surfaces.length ? surfaces.map((surface) => {
-            const department = surface.department ?? 'unassigned';
-            const selected = department === selectedDepartment;
-            return (
-              <button
-                key={department}
-                className={clsx(
-                  'whitespace-nowrap rounded px-3 py-1.5 text-sm font-semibold',
-                  selected ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-white/70',
-                )}
-                onClick={() => onSelectDepartment(department)}
-              >
-                {departmentLabel(department)}
-              </button>
-            );
-          }) : null}
-        </div>
-      </div>
-
-      {selectedDepartment === ALL_WORK_SURFACE || selectedSurface ? (
-        <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <div className="rounded-md border border-line bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{selectedLabel}</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <SurfaceMetric label="Total" value={selectedMetrics.total} />
-              <SurfaceMetric label="Active" value={selectedMetrics.active} />
-              <SurfaceMetric label="Blocked" value={selectedMetrics.blocked} />
-              <SurfaceMetric label="Approval" value={selectedMetrics.waiting_approval} />
-            </div>
-          </div>
-          <div>
-            <div className="space-y-3">
-              {activeRows.length ? (
-                pageRows.map((item) => (
-                  <WorkItemCard key={item.id} item={item} compact showWorkflowPrefix onOpen={() => onOpenWork(item)} />
-                ))
-              ) : (
-                <EmptyState title="Không có work item đang mở trong scope hiện tại" />
-              )}
-            </div>
-
-            {activeRows.length > WORK_PAGE_SIZE ? (
-              <div className="mt-4 flex flex-col gap-3 border-t border-line pt-3 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm font-semibold text-slate-600">{rangeStart}-{rangeEnd} / {activeRows.length}</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={currentPage <= 1}
-                    onClick={() => setPage((value) => Math.max(1, value - 1))}
-                  >
-                    Trước
-                  </button>
-                  <span className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-600">
-                    Trang {currentPage} / {totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={currentPage >= totalPages}
-                    onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  >
-                    Sau
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : (
-        <EmptyState title="Không có department surface trong scope hiện tại" />
-      )}
-    </section>
-  );
-}
-
-function SurfaceMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md bg-white p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-ink">{value}</p>
-    </div>
-  );
-}
-
-function ProjectMembers({ rows }: { rows: Record<string, any>[] }) {
-  return (
-    <section>
-      <div className="mb-3 flex items-center gap-2">
-        <Users className="h-5 w-5 text-blue-700" />
-        <h2 className="font-semibold text-ink">Thành viên công trình</h2>
-      </div>
-      <DataTable
-        rows={rows}
-        columns={[
-          { key: 'full_name', header: 'Nhân sự' },
-          { key: 'department', header: 'Phòng ban' },
-          { key: 'position', header: 'Chức vụ' },
-          { key: 'role_ids', header: 'Role', render: (row) => Array.isArray(row.role_ids) ? row.role_ids.join(', ') : '-' },
-        ]}
-      />
-    </section>
-  );
-}
-
 function ProjectOperationsSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-line bg-white p-5 shadow-panel">
-        <LoadingSpinner />
+      <div className="grid overflow-hidden rounded-lg border border-line bg-white shadow-panel lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
+        <div className="h-56 animate-pulse bg-white p-5 lg:border-r lg:border-line" />
+        <div className="h-56 animate-pulse bg-slate-50 p-5" />
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="h-28 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-4 xl:grid-cols-7">
+        {Array.from({ length: 7 }).map((_, index) => (
+          <div key={index} className="h-20 animate-pulse bg-white" />
         ))}
       </div>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)_360px]">
-        <div className="h-96 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
-        <div className="h-96 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
-        <div className="h-96 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="h-80 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
+        <div className="h-80 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
       </div>
     </div>
   );
@@ -1261,14 +1376,14 @@ function ProjectOperationsSkeleton() {
 function ProjectOperationsError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const apiError = error instanceof ApiError ? error : null;
   const forbidden = apiError?.status === 403;
-  const title = forbidden ? 'Bạn không có quyền xem điều hành công trình này' : 'Không tải được Project Operations';
+  const title = forbidden ? 'Bạn không có quyền xem điều hành công trình này' : 'Không tải được dữ liệu điều hành công trình';
   const description = error instanceof Error ? error.message : 'Vui lòng thử lại hoặc kiểm tra quyền truy cập.';
 
   return (
     <>
       <PageHeader
         title="Điều hành công trình"
-        description="Project Operations Dashboard"
+        description="Tổng quan vận hành và công việc cần xử lý"
         actions={
           <Link to="/projects" className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
             Quay lại công trình
@@ -1287,7 +1402,7 @@ function ProjectOperationsError({ error, onRetry }: { error: unknown; onRetry: (
                 onClick={onRetry}
               >
                 <RefreshCw className="h-4 w-4" />
-                Retry
+                Thử lại
               </button>
             ) : null}
           </div>

@@ -467,6 +467,147 @@ func TestActivityStreamHubPublishesEvents(t *testing.T) {
 	}
 }
 
+func TestProjectActivityFilterNormalizationAndCursor(t *testing.T) {
+	cursor := encodeActivityCursor(Record{
+		"id":         "10000000-0000-0000-0000-000000000001",
+		"created_at": "2026-07-11T08:30:00Z",
+	})
+	if cursor == "" {
+		t.Fatal("expected activity cursor")
+	}
+	filter, err := normalizeProjectActivityFilter(ProjectActivityFilter{
+		Kind:         " Discussion ",
+		Attention:    " Questions ",
+		ActivityType: " Question ",
+		Search:       "  định mức  ",
+		Cursor:       cursor,
+		Limit:        500,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filter.Kind != "discussion" || filter.Attention != "questions" || filter.ActivityType != "question" || filter.Search != "định mức" {
+		t.Fatalf("normalized filter = %#v", filter)
+	}
+	if filter.Limit != 30 || filter.CursorCreatedAt != "2026-07-11T08:30:00Z" || filter.CursorID != "10000000-0000-0000-0000-000000000001" {
+		t.Fatalf("normalized paging = %#v", filter)
+	}
+	if _, err := normalizeProjectActivityFilter(ProjectActivityFilter{Kind: "chat"}); err == nil {
+		t.Fatal("expected invalid kind to fail")
+	}
+	if _, err := normalizeProjectActivityFilter(ProjectActivityFilter{Cursor: "not-a-cursor"}); err == nil {
+		t.Fatal("expected invalid cursor to fail")
+	}
+}
+
+func TestProjectEvidenceFilterNormalizationAndCursor(t *testing.T) {
+	cursor := encodeEvidenceCursor(Record{
+		"id":              "10000000-0000-0000-0000-000000000001",
+		"created_at":      "2026-07-11T08:30:00Z",
+		"review_priority": 0,
+	})
+	if cursor == "" {
+		t.Fatal("expected evidence cursor")
+	}
+	filter, err := normalizeProjectEvidenceFilter(ProjectEvidenceFilter{
+		EvidenceType: " Document ",
+		Status:       " Pending ",
+		DateFrom:     "2026-07-01",
+		DateTo:       "2026-07-11",
+		Search:       "  biên bản  ",
+		Cursor:       cursor,
+		Limit:        500,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filter.EvidenceType != "document" || filter.Status != "waiting" || filter.Search != "biên bản" {
+		t.Fatalf("normalized evidence filter = %#v", filter)
+	}
+	if filter.Limit != 25 || filter.CursorPriority != 0 || filter.CursorCreatedAt != "2026-07-11T08:30:00Z" || filter.CursorID != "10000000-0000-0000-0000-000000000001" {
+		t.Fatalf("normalized evidence paging = %#v", filter)
+	}
+	if _, err := normalizeProjectEvidenceFilter(ProjectEvidenceFilter{Status: "archived"}); err == nil {
+		t.Fatal("expected invalid evidence status to fail")
+	}
+	if _, err := normalizeProjectEvidenceFilter(ProjectEvidenceFilter{DateFrom: "2026-07-12", DateTo: "2026-07-11"}); err == nil {
+		t.Fatal("expected invalid evidence date range to fail")
+	}
+	if _, err := normalizeProjectEvidenceFilter(ProjectEvidenceFilter{Cursor: "not-a-cursor"}); err == nil {
+		t.Fatal("expected invalid evidence cursor to fail")
+	}
+}
+
+func TestProjectEvidencePageScopeHistoryAndReviewCapability(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	operationViewID := ensurePermission(t, db, "operation.view", "Xem thi công", "operation")
+	pmRoleID := ensureRole(t, db, "pm", "PM")
+	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, pmRoleID, operationViewID)
+
+	submittedID := newID()
+	acceptedID := newID()
+	rejectedID := newID()
+	cancelledItemID := newID()
+	mustExec(t, db, `
+		INSERT INTO evidence_records
+			(id, work_item_id, project_id, evidence_type, name, mime_type, visibility, status, submitted_by, created_at)
+		VALUES
+			($1,$4,$5,'document','Biên bản kiểm tra','application/pdf','project','submitted',$6,now() - INTERVAL '1 hour'),
+			($2,$4,$5,'photo','Ảnh hoàn thiện','image/jpeg','project','accepted',$6,now() - INTERVAL '3 hours'),
+			($3,$4,$5,'document','Hồ sơ bị từ chối','application/pdf','project','rejected',$6,now() - INTERVAL '2 hours')
+	`, submittedID, acceptedID, rejectedID, fixture.itemID, fixture.projectID, fixture.workerID)
+	mustExec(t, db, `
+		INSERT INTO work_items
+			(id, project_id, source_type, source_id, title, work_type, status, role_ids, created_by, updated_by)
+		VALUES ($1,$2,'issue',$3,'Công việc đã hủy','task','cancelled','["PM"]'::jsonb,$4,$4)
+	`, cancelledItemID, fixture.projectID, newID(), fixture.pmID)
+	mustExec(t, db, `
+		INSERT INTO evidence_records
+			(work_item_id, project_id, evidence_type, name, mime_type, visibility, status, submitted_by)
+		VALUES ($1,$2,'document','Không được hiển thị','application/pdf','project','accepted',$3)
+	`, cancelledItemID, fixture.projectID, fixture.workerID)
+
+	page, err := service.ProjectEvidencePage(ctx, fixture.projectID, ProjectEvidenceFilter{Limit: 2}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, _ := page["items"].([]Record)
+	if len(items) != 2 || !boolValue(page["has_more"]) || cleanID(page["next_cursor"]) == "" {
+		t.Fatalf("evidence first page = %#v", page)
+	}
+	if cleanID(items[0]["id"]) != submittedID || !boolValue(items[0]["can_review"]) {
+		t.Fatalf("waiting evidence priority/capability = %#v", items[0])
+	}
+	summary := recordValue(page["summary"])
+	if number(summary["total"]) != 3 || number(summary["waiting"]) != 1 || number(summary["accepted"]) != 1 || number(summary["rejected"]) != 1 {
+		t.Fatalf("evidence summary = %#v", summary)
+	}
+	if number(page["filtered_total"]) != 3 {
+		t.Fatalf("filtered total = %#v", page["filtered_total"])
+	}
+
+	next, err := service.ProjectEvidencePage(ctx, fixture.projectID, ProjectEvidenceFilter{Limit: 2, Cursor: fmt.Sprint(page["next_cursor"])}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextItems, _ := next["items"].([]Record)
+	if len(nextItems) != 1 || cleanID(nextItems[0]["id"]) != acceptedID {
+		t.Fatalf("evidence next page = %#v", next)
+	}
+
+	rejected, err := service.ProjectEvidencePage(ctx, fixture.projectID, ProjectEvidenceFilter{Status: "rejected", Search: "bị từ chối"}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rejectedItems, _ := rejected["items"].([]Record)
+	if len(rejectedItems) != 1 || cleanID(rejectedItems[0]["id"]) != rejectedID || boolValue(rejectedItems[0]["can_review"]) {
+		t.Fatalf("rejected evidence history = %#v", rejected)
+	}
+}
+
 func TestActivityMentionsUnreadAndRoleScope(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
@@ -525,9 +666,49 @@ func TestActivityMentionsUnreadAndRoleScope(t *testing.T) {
 	if len(outsideAttention) != 0 {
 		t.Fatalf("outside attention = %#v", outsideAttention)
 	}
-
-	if _, err := service.MarkActivityRead(ctx, activityID, pmUserID); err != nil {
+	page, err := service.ProjectActivityPage(ctx, projectID, ProjectActivityFilter{
+		Attention: "questions",
+		Search:    "PM xác nhận",
+		Limit:     10,
+	}, pmUserID)
+	if err != nil {
 		t.Fatal(err)
+	}
+	pageItems, _ := page["items"].([]Record)
+	if len(pageItems) != 1 || pageItems[0]["id"] != activityID {
+		t.Fatalf("activity page = %#v", page)
+	}
+	summary, err := repo.ProjectActivitySummary(ctx, projectID, workItemAccessProfile{UserID: pmUserID, StaffID: pmStaffID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(summary["questions"]) != 1 || number(summary["unread"]) != 1 {
+		t.Fatalf("activity summary = %#v", summary)
+	}
+	options, err := service.ProjectActivityOptions(ctx, projectID, actorUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(anySlice(options["members"])) != 2 || len(anySlice(options["roles"])) != 2 {
+		t.Fatalf("activity options = %#v", options)
+	}
+	if _, err := service.ResolveActivity(ctx, activityID, ActivityResolutionRequest{}, pmUserID, "Mention PM"); err != nil {
+		t.Fatal(err)
+	}
+	questionAttention, err := service.MyActivityAttention(ctx, ActivityAttentionFilter{Queue: "questions"}, pmUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(questionAttention) != 0 {
+		t.Fatalf("questions after resolve = %#v", questionAttention)
+	}
+
+	readResult, err := service.MarkProjectActivityRead(ctx, projectID, pmUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(readResult["marked_count"]) != 1 {
+		t.Fatalf("mark all result = %#v", readResult)
 	}
 	unread, err := service.MyActivityAttention(ctx, ActivityAttentionFilter{Queue: "unread"}, pmUserID)
 	if err != nil {
@@ -774,7 +955,7 @@ func TestBatch7ProcurementTransitionsAreExplicit(t *testing.T) {
 		{name: "submit draft", action: "submit", status: "draft", wantStatus: "waiting_approval", wantEvent: "review_requested"},
 		{name: "approve waiting", action: "approve", status: "waiting_approval", wantStatus: "approved", wantEvent: "material_approved"},
 		{name: "order approved", action: "order", status: "approved", wantStatus: "ordered", wantEvent: "material_ordered"},
-		{name: "receive ordered", action: "receive", status: "ordered", wantStatus: "received", wantEvent: "warehouse_received"},
+		{name: "receive ordered", action: "receive", status: "ordered", wantStatus: "received", wantEvent: "procurement_acceptance_reconciled"},
 		{name: "block skipped order", action: "order", status: "draft", wantErr: true},
 		{name: "block skipped receive", action: "receive", status: "approved", wantErr: true},
 	}
@@ -1801,14 +1982,14 @@ func TestBusinessCoreOperationsServiceRecordsActorAndScope(t *testing.T) {
 	service := NewService(repo, "test-secret")
 	fixture := setupProjectScopeFixture(t, db, []string{"operation.view", "operation.report", "operation.issue_create", "operation.issue_update"})
 
-	report, err := service.CreateDailyReport(ctx, fixture.projectID, Record{
-		"report_date":            "2026-06-23",
-		"weather":                "Nắng",
-		"work_summary":           "Đổ bê tông sàn",
-		"manpower_summary":       "8 công nhân",
-		"material_usage_summary": "Bê tông M300",
-		"issues_summary":         "Không",
-		"progress_percent":       42,
+	report, err := service.CreateDailyReport(ctx, fixture.projectID, ConstructionDailyReportCreateRequest{
+		ReportDate:      "2026-06-23",
+		Weather:         "Nắng",
+		ProgressPercent: 42,
+		DoneItems:       []ConstructionDailyReportWorkItemRequest{{Title: "Đổ bê tông sàn"}},
+		FieldNotes:      "Không",
+		CrewItems:       []ConstructionDailyReportCrewRequest{{CrewName: "Tổ bê tông", WorkerCount: 8}},
+		MaterialItems:   []ConstructionDailyReportMaterialRequest{{MaterialName: "Bê tông M300", Quantity: 24, Unit: "m3"}},
 	}, fixture.userID, "Scoped User")
 	if err != nil {
 		t.Fatal(err)
@@ -1855,6 +2036,145 @@ func TestBusinessCoreOperationsServiceRecordsActorAndScope(t *testing.T) {
 		t.Fatalf("project issues = %#v, want created issue", issues)
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('daily_report_created','issue_created','issue_updated')`, 3, fixture.projectID)
+}
+
+func TestCreateDailyReportPersistsStructuredEvidenceAndRejectsMismatchedEvidence(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Ảnh báo cáo thi công",
+		FileURL:      "https://example.com/report-photo.jpg",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidenceID := cleanID(evidence["id"])
+	req := ConstructionDailyReportCreateRequest{
+		ReportDate:        "2026-07-13",
+		Weather:           "Nắng",
+		ProgressPercent:   68,
+		WorkItemID:        fixture.itemID,
+		DoneItems:         []ConstructionDailyReportWorkItemRequest{{Title: "Hoàn thiện trần khu A"}},
+		CurrentItems:      []ConstructionDailyReportWorkItemRequest{{Title: "Sơn lớp hai khu B"}},
+		NextItems:         []ConstructionDailyReportWorkItemRequest{{Title: "Vệ sinh và nghiệm thu nội bộ"}},
+		Blockers:          []ConstructionDailyReportBlockerRequest{{Content: "Chờ bổ sung mẫu màu"}},
+		FieldNotes:        "Không có sự cố an toàn.",
+		CrewItems:         []ConstructionDailyReportCrewRequest{{CrewName: "Tổ hoàn thiện", WorkerCount: 8, WorkHours: 8}},
+		MaterialItems:     []ConstructionDailyReportMaterialRequest{{MaterialName: "Sơn nội thất", Quantity: 12, Unit: "thùng"}},
+		EvidenceIDs:       []string{evidenceID},
+		PrimaryEvidenceID: evidenceID,
+	}
+	report, err := service.CreateDailyReport(ctx, fixture.projectID, req, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(report["work_item_id"]) != fixture.itemID || cleanID(report["primary_evidence_id"]) != evidenceID {
+		t.Fatalf("daily report source/evidence = %v/%v, want %s/%s", report["work_item_id"], report["primary_evidence_id"], fixture.itemID, evidenceID)
+	}
+	structured, ok := report["structured_json"].(map[string]any)
+	if !ok {
+		t.Fatalf("structured_json = %#v, want object", report["structured_json"])
+	}
+	if len(workflowAnswerRecordList(structured["completed_items"])) != 2 || len(workflowAnswerRecordList(structured["blockers"])) != 1 {
+		t.Fatalf("structured report = %#v, want completed and blocker rows", structured)
+	}
+	if fmt.Sprint(report["issues_summary"]) != "Không có sự cố an toàn." {
+		t.Fatalf("field note = %v, want neutral note", report["issues_summary"])
+	}
+
+	updatedReq := req
+	updatedReq.ProgressPercent = 74
+	updatedReq.DoneItems = []ConstructionDailyReportWorkItemRequest{{Title: "Hoàn thiện trần khu A và B"}}
+	updatedReq.ManpowerSummary = "Dữ liệu tóm tắt không được dùng khi đã có tổ đội"
+	updated, err := service.UpdateDailyReport(ctx, cleanID(report["id"]), updatedReq, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(updated["progress_percent"]) != 74 || cleanID(updated["reported_by"]) != fixture.workerID {
+		t.Fatalf("updated report progress/reporter = %v/%v, want 74/%s", updated["progress_percent"], updated["reported_by"], fixture.workerID)
+	}
+	if !strings.Contains(fmt.Sprint(updated["work_summary"]), "Hoàn thiện trần khu A và B") || strings.Contains(fmt.Sprint(updated["manpower_summary"]), "Dữ liệu tóm tắt") {
+		t.Fatalf("updated report summaries = work %q, manpower %q", updated["work_summary"], updated["manpower_summary"])
+	}
+
+	uploadDir := t.TempDir()
+	service.ConfigureUploads(uploadDir, 1024*1024)
+	content := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0, 'I', 'E', 'N', 'D'}
+	linked, err := service.AddDailyReportEvidenceUpload(ctx, cleanID(report["id"]), fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Ảnh chụp từ báo cáo",
+		Caption:      "Khu B",
+		Visibility:   "project",
+	}, testMultipartFileHeader(t, "file", "report-camera.png", content), fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	linkedPhotos := constructionReportStringList(linked["photos"])
+	if len(linkedPhotos) != 2 || cleanID(linked["primary_evidence_id"]) != evidenceID {
+		t.Fatalf("linked report photos/primary = %#v/%v, want two photos and primary %s", linkedPhotos, linked["primary_evidence_id"], evidenceID)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND target_id=$2 AND event_type='daily_report_updated'`, 1, fixture.projectID, report["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND target_id=$2 AND event_type='daily_report_evidence_added'`, 1, fixture.projectID, report["id"])
+
+	otherItemID := newID()
+	mustExec(t, db, `
+		INSERT INTO work_items
+			(id, project_id, source_type, source_id, title, work_type, status, role_ids, evidence_requirement_json, created_by, updated_by)
+		VALUES
+			($1,$2,'issue',$3,'Other report source','task','ready','["Đội thi công"]'::jsonb,'{"required_permission":"operation.report"}'::jsonb,$4,$4)
+	`, otherItemID, fixture.projectID, newID(), fixture.workerID)
+	otherEvidence, err := service.AddWorkItemEvidence(ctx, otherItemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Ảnh thuộc đầu việc khác",
+		FileURL:      "https://example.com/other-report-photo.jpg",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	invalid := req
+	invalid.ReportDate = "2026-07-14"
+	invalid.EvidenceIDs = []string{cleanID(otherEvidence["id"])}
+	invalid.PrimaryEvidenceID = ""
+	_, err = service.CreateDailyReport(ctx, fixture.projectID, invalid, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	_, err = service.AddDailyReportEvidenceUpload(ctx, cleanID(report["id"]), otherItemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Sai đầu việc",
+		Visibility:   "project",
+	}, testMultipartFileHeader(t, "file", "wrong-source.png", content), fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	var workflowFormInstanceID string
+	if err := db.QueryRowContext(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Read-only report source', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE t.code='builtin_construction_daily_report' AND v.status='published'
+		ORDER BY v.version_no DESC
+		LIMIT 1
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID).Scan(&workflowFormInstanceID); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, `UPDATE operation_daily_reports SET workflow_form_instance_id=$2 WHERE id=$1`, report["id"], workflowFormInstanceID)
+	_, err = service.UpdateDailyReport(ctx, cleanID(report["id"]), updatedReq, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+	_, err = service.AddDailyReportEvidenceUpload(ctx, cleanID(report["id"]), fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Workflow read-only",
+		Visibility:   "project",
+	}, testMultipartFileHeader(t, "file", "workflow-read-only.png", content), fixture.workerID, "Worker")
+	assertValidationError(t, err)
 }
 
 func TestBusinessCoreLifecycleServiceRecordsActors(t *testing.T) {
@@ -2325,6 +2645,225 @@ func TestClientOfficialWorkflowRoutesByDesignDecisionFormAnswer(t *testing.T) {
 		FROM pipeline_run_nodes
 		WHERE project_id=$1 AND name='Thiết kế' AND status='in_progress'
 	`, 0, projectID)
+}
+
+func TestActivityReplyAndReactionScope(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	operationViewID := ensurePermission(t, db, "operation.view", "Xem thi công", "operation")
+	pmRoleID := ensureRole(t, db, "pm", "PM")
+	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, pmRoleID, operationViewID)
+
+	root, err := service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{
+		ActivityType: "question",
+		Comment:      "Cần kiểm tra lại khối lượng",
+		Visibility:   "project",
+		ScopeType:    "project",
+		ScopeID:      fixture.projectID,
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootID := cleanID(root["id"])
+	otherProjectID := newID()
+	var workerStaffID string
+	if err := db.QueryRowContext(ctx, `SELECT id::text FROM staff WHERE user_id=$1`, fixture.workerID).Scan(&workerStaffID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, otherProjectID) })
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Reply Other',$2,'Client','planning')`, otherProjectID, "RPL-"+otherProjectID[:8])
+	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["Đội thi công"]'::jsonb,true)`, otherProjectID, workerStaffID)
+	otherRoot, err := service.AddProjectActivity(ctx, otherProjectID, WorkItemActivityRequest{ActivityType: "comment", Comment: "Khác công trình"}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{Comment: "Không được nối chéo", ParentActivityID: cleanID(otherRoot["id"])}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+
+	reply, err := service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{
+		ActivityType:     "blocker",
+		Comment:          "Đã cập nhật BOQ để kiểm tra",
+		Visibility:       "client",
+		ScopeType:        "work_item",
+		ScopeID:          fixture.itemID,
+		WorkItemID:       fixture.itemID,
+		ParentActivityID: rootID,
+	}, fixture.pmID, "PM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reply["activity_type"] != "comment" || reply["visibility"] != "project" || reply["scope_type"] != "project" || cleanID(reply["scope_id"]) != fixture.projectID || cleanID(reply["parent_activity_id"]) != rootID {
+		t.Fatalf("reply inheritance = %#v", reply)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_mentions WHERE activity_id=$1 AND recipient_user_id=$2`, 1, reply["id"], fixture.workerID)
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_read_states WHERE activity_id=$1 AND user_id=$2 AND read_at IS NULL`, 1, reply["id"], fixture.workerID)
+
+	if _, err := service.SetActivityReaction(ctx, rootID, ActivityReactionRequest{Reaction: "👍", Active: true}, fixture.workerID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SetActivityReaction(ctx, rootID, ActivityReactionRequest{Reaction: "👍", Active: true}, fixture.workerID); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_reactions WHERE activity_id=$1 AND user_id=$2 AND reaction='👍' AND active`, 1, rootID, fixture.workerID)
+	if _, err := service.SetActivityReaction(ctx, rootID, ActivityReactionRequest{Reaction: "✅", Active: true}, fixture.workerID); err == nil {
+		t.Fatal("expected invalid reaction to fail")
+	}
+	systemActivityID := newID()
+	mustExec(t, db, `
+		INSERT INTO work_item_activities (id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility)
+		VALUES ($1,$2,'project',$2,$3,'system_event','Sự kiện kiểm thử','project')
+	`, systemActivityID, fixture.projectID, fixture.workerID)
+	if _, err := service.SetActivityReaction(ctx, systemActivityID, ActivityReactionRequest{Reaction: "👍", Active: true}, fixture.workerID); err == nil {
+		t.Fatal("expected system event reaction to fail")
+	}
+
+	page, err := service.ProjectActivityPage(ctx, fixture.projectID, ProjectActivityFilter{Kind: "discussion", Limit: 20}, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, _ := page["items"].([]Record)
+	var rootRow, replyRow Record
+	for _, item := range items {
+		switch cleanID(item["id"]) {
+		case rootID:
+			rootRow = item
+		case cleanID(reply["id"]):
+			replyRow = item
+		}
+	}
+	if rootRow == nil || number(rootRow["reply_count"]) != 1 || len(anySlice(rootRow["reactions"])) != 1 {
+		t.Fatalf("root conversation fields = %#v", rootRow)
+	}
+	if replyRow == nil || cleanID(replyRow["parent_activity_id"]) != rootID || replyRow["reply_to"] == nil {
+		t.Fatalf("reply preview = %#v", replyRow)
+	}
+
+	if _, err := service.SetActivityReaction(ctx, rootID, ActivityReactionRequest{Reaction: "👍", Active: false}, fixture.workerID); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_reactions WHERE activity_id=$1 AND user_id=$2 AND reaction='👍' AND active`, 0, rootID, fixture.workerID)
+}
+
+func TestActivityMessageEditAndWithdrawScope(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	operationViewID := ensurePermission(t, db, "operation.view", "Xem thi công", "operation")
+	pmRoleID := ensureRole(t, db, "pm", "PM")
+	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, pmRoleID, operationViewID)
+
+	message, err := service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{
+		ActivityType: "comment",
+		Comment:      "Khối lượng ban đầu",
+		Visibility:   "project",
+		ScopeType:    "project",
+		ScopeID:      fixture.projectID,
+		Mentions:     []ActivityMentionRequest{{Type: "user", ID: fixture.pmID}},
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	messageID := cleanID(message["id"])
+	if _, err := service.UpdateActivityMessage(ctx, messageID, ActivityMessageUpdateRequest{Comment: "Không được sửa thay"}, fixture.pmID, "PM"); err == nil {
+		t.Fatal("expected non-author edit to fail")
+	}
+	updated, err := service.UpdateActivityMessage(ctx, messageID, ActivityMessageUpdateRequest{Comment: "Khối lượng đã cập nhật"}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated["comment"] != "Khối lượng đã cập nhật" || number(updated["message_revision_no"]) != 1 || cleanID(updated["edited_at"]) == "" {
+		t.Fatalf("updated message = %#v", updated)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_message_revisions WHERE activity_id=$1 AND revision_no=1 AND action='edited' AND previous_comment='Khối lượng ban đầu' AND new_comment='Khối lượng đã cập nhật'`, 1, messageID)
+
+	typed, err := service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{ActivityType: "question", Comment: "Câu hỏi bất biến"}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.UpdateActivityMessage(ctx, cleanID(typed["id"]), ActivityMessageUpdateRequest{Comment: "Không được sửa"}, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("expected typed operational activity edit to fail")
+	}
+	if _, err := service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{ActivityType: "decision", Comment: "Quyết định kiểm thử"}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+
+	expired, err := service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{ActivityType: "comment", Comment: "Tin đã hết hạn"}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, `UPDATE work_item_activities SET created_at=now() - INTERVAL '16 minutes' WHERE id=$1`, expired["id"])
+	if _, err := service.UpdateActivityMessage(ctx, cleanID(expired["id"]), ActivityMessageUpdateRequest{Comment: "Không được sửa trễ"}, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("expected expired message edit to fail")
+	}
+
+	reply, err := service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{Comment: "Phản hồi vẫn được giữ", ParentActivityID: messageID}, fixture.pmID, "PM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SetActivityReaction(ctx, messageID, ActivityReactionRequest{Reaction: "👍", Active: true}, fixture.pmID); err != nil {
+		t.Fatal(err)
+	}
+	withdrawn, err := service.WithdrawActivityMessage(ctx, messageID, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withdrawn["comment"] != nil || cleanID(withdrawn["withdrawn_at"]) == "" || number(withdrawn["message_revision_no"]) != 2 {
+		t.Fatalf("withdrawn message = %#v", withdrawn)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_message_revisions WHERE activity_id=$1 AND revision_no=2 AND action='withdrawn' AND previous_comment='Khối lượng đã cập nhật' AND new_comment IS NULL`, 1, messageID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_id=$1 AND event_type IN ('project_activity_comment_edited','project_activity_comment_withdrawn')`, 2, messageID)
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_reactions WHERE activity_id=$1 AND active`, 0, messageID)
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_read_states WHERE activity_id=$1 AND user_id=$2 AND read_at IS NULL`, 0, messageID, fixture.pmID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE parent_activity_id=$1`, 1, messageID)
+
+	if _, err := service.SetActivityReaction(ctx, messageID, ActivityReactionRequest{Reaction: "👍", Active: true}, fixture.pmID); err == nil {
+		t.Fatal("expected reaction on withdrawn message to fail")
+	}
+	if _, err := service.AddProjectActivity(ctx, fixture.projectID, WorkItemActivityRequest{Comment: "Không được phản hồi thêm", ParentActivityID: messageID}, fixture.pmID, "PM"); err == nil {
+		t.Fatal("expected reply to withdrawn message to fail")
+	}
+
+	page, err := service.ProjectActivityPage(ctx, fixture.projectID, ProjectActivityFilter{Kind: "discussion", Limit: 20}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, _ := page["items"].([]Record)
+	summary := recordValue(page["summary"])
+	var expectedDecisionCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM work_item_activities WHERE project_id=$1 AND activity_type='decision'`, fixture.projectID).Scan(&expectedDecisionCount); err != nil {
+		t.Fatal(err)
+	}
+	if number(summary["decisions"]) != float64(expectedDecisionCount) {
+		t.Fatalf("decision summary = %#v, want %d", summary["decisions"], expectedDecisionCount)
+	}
+	var messageRow, replyRow Record
+	for _, item := range items {
+		switch cleanID(item["id"]) {
+		case messageID:
+			messageRow = item
+		case cleanID(reply["id"]):
+			replyRow = item
+		}
+	}
+	if messageRow == nil || cleanID(messageRow["withdrawn_at"]) == "" || boolValue(messageRow["can_edit"]) || boolValue(messageRow["can_withdraw"]) || len(anySlice(messageRow["reactions"])) != 0 {
+		t.Fatalf("withdrawn conversation row = %#v", messageRow)
+	}
+	replyPreview := recordValue(replyRow["reply_to"])
+	if !boolValue(replyPreview["withdrawn"]) || cleanID(replyPreview["comment"]) != "" {
+		t.Fatalf("withdrawn reply preview = %#v", replyPreview)
+	}
+	attention, err := service.MyActivityAttention(ctx, ActivityAttentionFilter{ProjectID: fixture.projectID, Queue: "mentions", Limit: 20}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range attention {
+		if cleanID(item["id"]) == messageID {
+			t.Fatal("withdrawn message must not remain in attention queue")
+		}
+	}
 }
 
 func TestClientWorkflowAutomationRecordsBlockedBOQOnce(t *testing.T) {
@@ -5475,6 +6014,79 @@ func TestSiteSurplusHandlingCreatesStockMovementAndPartialStatus(t *testing.T) {
 		Condition:     "usable",
 	}, fixture.workerID, "Worker")
 	assertValidationError(t, err)
+}
+
+func TestStockDocumentTransferMovesBothWarehouseBalancesAtomically(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	actorID := newID()
+	projectID := newID()
+	sourceWarehouseID := newID()
+	targetWarehouseID := newID()
+	materialID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE project_id=$1 AND target_type IN ('stock_document','stock_movement')`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_movements WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_documents WHERE project_id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM materials WHERE id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM warehouses WHERE id IN ($1,$2)`, sourceWarehouseID, targetWarehouseID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Warehouse Document Actor','active')`, actorID, "warehouse-document-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status) VALUES ($1,'Warehouse Document Project',$2,'Client','active')`, projectID, "WDP-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO warehouses (id,name,location,type,active) VALUES ($1,'Source Warehouse','A','central',true),($2,'Target Warehouse','B','site',true)`, sourceWarehouseID, targetWarehouseID)
+	mustExec(t, db, `INSERT INTO materials (id,code,name,unit,category,active) VALUES ($1,$2,'Transfer Material','m','Test',true)`, materialID, "WDM-"+materialID[:8])
+
+	receipt, err := repo.CreateStockDocument(ctx, StockDocumentRequest{
+		ProjectID: projectID, MovementType: "receive", TargetWarehouseID: sourceWarehouseID,
+		DocumentDate: "2026-07-13", Note: "Initial receipt",
+		Items: []StockDocumentItemRequest{{MaterialID: materialID, Quantity: 10, Unit: "m"}},
+	}, actorID, "Warehouse Document Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt["movement_type"] != "receive" || len(receipt["items"].([]Record)) != 1 {
+		t.Fatalf("receipt = %#v, want one-line receive document", receipt)
+	}
+
+	transfer, err := repo.CreateStockDocument(ctx, StockDocumentRequest{
+		ProjectID: projectID, MovementType: "transfer", SourceWarehouseID: sourceWarehouseID, TargetWarehouseID: targetWarehouseID,
+		DocumentDate: "2026-07-13", Note: "Move stock",
+		Items: []StockDocumentItemRequest{{MaterialID: materialID, Quantity: 4, Unit: "m"}},
+	}, actorID, "Warehouse Document Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if transfer["movement_type"] != "transfer" {
+		t.Fatalf("transfer movement_type = %v, want transfer", transfer["movement_type"])
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceAvailable, err := warehouseMaterialAvailableTx(ctx, tx, sourceWarehouseID, materialID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetAvailable, err := warehouseMaterialAvailableTx(ctx, tx, targetWarehouseID, materialID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = tx.Rollback()
+	if sourceAvailable != 6 || targetAvailable != 4 {
+		t.Fatalf("warehouse balances = source %.3f target %.3f, want 6/4", sourceAvailable, targetAvailable)
+	}
+
+	_, err = repo.CreateStockDocument(ctx, StockDocumentRequest{
+		ProjectID: projectID, MovementType: "transfer", SourceWarehouseID: sourceWarehouseID, TargetWarehouseID: targetWarehouseID,
+		DocumentDate: "2026-07-13", Items: []StockDocumentItemRequest{{MaterialID: materialID, Quantity: 7, Unit: "m"}},
+	}, actorID, "Warehouse Document Actor")
+	assertValidationError(t, err)
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_documents WHERE project_id=$1 AND status='posted'`, 2, projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1`, 2, materialID)
 }
 
 func TestIncomingAcceptanceSubmitDoesNotCreateStockMovement(t *testing.T) {

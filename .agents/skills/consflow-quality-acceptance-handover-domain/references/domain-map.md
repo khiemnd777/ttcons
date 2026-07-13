@@ -10,10 +10,10 @@
 
 ## Routes
 
-- Quality workspace: `/projects/:id/quality`
-- ITP: `/projects/:id/quality/itp`, `/quality/itp/:id/revise|submit|approve|activate`
-- RFI: `/projects/:id/quality/rfi`, `/quality/rfi/:id/submit|schedule|inspect`
-- NCR: `/projects/:id/quality/ncr`, `/quality/ncr/:id/root-cause|corrective-action|reinspection|close`
+- Quality presentation: `/projects/:id/operations?tab=quality`; legacy `/projects/:id/quality` redirects to that tab while the data API remains `/projects/:id/quality`
+- ITP: `/projects/:id/quality/itp-plans`, `/quality/itp-plans/:id/revise|submit|approve|activate`
+- RFI: `/projects/:id/quality/rfis`, `/quality/rfis/:id/submit|schedule|inspect`
+- NCR: `/projects/:id/quality/ncrs`, `/quality/ncrs/:id/root-cause|corrective|reinspection|close`
 - Recurring execution: `/projects/:id/quality/recurring-plans`, `/quality/recurring-plans/:id/generate`, `/quality/recurring-occurrences/:id/complete|skip`
 - Incoming acceptance: `/projects/:id/incoming-acceptances`, `/incoming-acceptances/:id`, `/incoming-acceptances/:id/submit`, `/work-items/:id/incoming-acceptances`
 - Outgoing acceptance: `/projects/:id/acceptances`, `/acceptances/:id`, `/acceptances/:id/submit|pass|conditional-pass|fail|create-rework`, `/work-items/:id/outgoing-acceptance`
@@ -38,7 +38,10 @@
 - NCR follows `open -> root_cause -> corrective_action -> reinspection -> closed`; closure requires an accepted/conditional reinspection RFI and completed linked rework.
 - Quality recurring occurrences are idempotent per plan/date and evidence-gated when completed or skipped.
 - Incoming acceptance records deliveries and quality decisions but does not automatically create warehouse movement.
+- A submitted incoming-acceptance item can prefill an explicit multi-line stock receipt. Linked receipt movements are capped by its remaining accepted quantity, preserve the acceptance item as source and do not rewrite acceptance history.
 - Outgoing acceptance preserves final result, signature/document gates, punch list/rework history, and handover compatibility.
+- `AcceptanceEditor.tsx` is the shared checklist editor/validation owner for the project acceptance master-detail workspace and work-item outgoing acceptance panel. The project page exposes one state-driven CTA and one explicit conclusion dialog; it does not merge checklist rows with ITP criteria or auto-create rework after a failed acceptance.
+- Quality and remediation are visually grouped in Thi công, but ITP/RFI/NCR, issue, rework, and replanning permissions and action routes remain separate. The hidden legacy quality/rework navigation routes are compatibility redirects, not new persistence owners.
 - Rework completion does not erase acceptance history.
 - Handover completion requires a submitted package, the exact linked final acceptance to be completed/pass or conditional-pass, all required checklist items verified from accepted evidence/active documents or system sources, no open issue/NCR/rework/material-surplus/finance blockers, and a fresh readiness snapshot. Completion rechecks readiness before writing `handed_over` and `completed_at`.
 

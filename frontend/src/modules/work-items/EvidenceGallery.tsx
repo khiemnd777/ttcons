@@ -17,7 +17,9 @@ type EvidenceGalleryProps = {
   evidence: EvidenceRecord[];
   emptyTitle?: string;
   showWorkItem?: boolean;
+  showControls?: boolean;
   variant?: 'cards' | 'list';
+  listContext?: 'default' | 'project';
   onReview?: (record: EvidenceRecord, action: EvidenceReviewAction, comment: string) => Promise<void>;
 };
 
@@ -34,7 +36,9 @@ export function EvidenceGallery({
   evidence,
   emptyTitle = 'Chưa có minh chứng',
   showWorkItem = false,
+  showControls = true,
   variant = 'cards',
+  listContext = 'default',
   onReview,
 }: EvidenceGalleryProps) {
   const toast = useToast();
@@ -45,7 +49,10 @@ export function EvidenceGallery({
   const [reviewingAction, setReviewingAction] = useState<EvidenceReviewAction | null>(null);
   const previewUrls = useEvidencePreviewUrls(evidence);
   const filterCounts = useMemo(() => evidenceFilterCounts(evidence), [evidence]);
-  const rows = useMemo(() => filterEvidence(evidence, activeFilter, query), [activeFilter, evidence, query]);
+  const rows = useMemo(
+    () => showControls ? filterEvidence(evidence, activeFilter, query) : evidence,
+    [activeFilter, evidence, query, showControls],
+  );
 
   async function openEvidence(record: EvidenceRecord) {
     const previewUrl = previewUrls[record.id];
@@ -95,7 +102,7 @@ export function EvidenceGallery({
 
   return (
     <div className="space-y-3">
-      <div className="space-y-2">
+      {showControls ? <div className="space-y-2">
         <label className="relative block w-full">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
           <input
@@ -142,17 +149,27 @@ export function EvidenceGallery({
             })}
           </div>
         </div>
-      </div>
+      </div> : null}
 
       {rows.length && variant === 'list' ? (
         <div className="overflow-hidden rounded-md border border-line bg-white">
-          <div className="hidden grid-cols-[minmax(0,1.6fr)_8rem_8rem_7rem_8rem] gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-            <span>Minh chứng</span>
-            <span>Loại</span>
-            <span>Phạm vi hiển thị</span>
-            <span>Trạng thái</span>
-            <span className="text-right">Thao tác</span>
-          </div>
+          {listContext === 'project' ? (
+            <div className="hidden grid-cols-[minmax(0,1.7fr)_10rem_8.5rem_7rem_8rem] gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+              <span>Hồ sơ / nguồn</span>
+              <span>Người gửi</span>
+              <span>Thời gian</span>
+              <span>Trạng thái</span>
+              <span className="text-right">Thao tác</span>
+            </div>
+          ) : (
+            <div className="hidden grid-cols-[minmax(0,1.6fr)_8rem_8rem_7rem_8rem] gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+              <span>Minh chứng</span>
+              <span>Loại</span>
+              <span>Phạm vi hiển thị</span>
+              <span>Trạng thái</span>
+              <span className="text-right">Thao tác</span>
+            </div>
+          )}
           <div className="divide-y divide-line">
             {rows.map((record) => (
               <EvidenceListRow
@@ -160,6 +177,7 @@ export function EvidenceGallery({
                 record={record}
                 previewUrl={previewUrls[record.id]}
                 showWorkItem={showWorkItem}
+                listContext={listContext}
                 onOpen={() => void openEvidence(record)}
                 onSelect={() => {
                   setSelected(record);
@@ -193,7 +211,7 @@ export function EvidenceGallery({
         record={selected}
         previewUrl={selected ? previewUrls[selected.id] : undefined}
         showWorkItem={showWorkItem}
-        canReview={Boolean(onReview)}
+        canReview={Boolean(onReview) && (selected?.can_review ?? true)}
         reviewingAction={reviewingAction}
         reviewComment={reviewComment}
         onReviewCommentChange={setReviewComment}
@@ -212,44 +230,74 @@ function EvidenceListRow({
   record,
   previewUrl,
   showWorkItem,
+  listContext,
   onOpen,
   onSelect,
 }: {
   record: EvidenceRecord;
   previewUrl?: string;
   showWorkItem: boolean;
+  listContext: 'default' | 'project';
   onOpen: () => void;
   onSelect: () => void;
 }) {
   const title = evidenceTitle(record);
+  const fileCell = (
+    <button type="button" className="flex min-w-0 items-start gap-3 text-left" onClick={onSelect}>
+      <span className="grid h-12 w-14 shrink-0 place-items-center overflow-hidden rounded-md border border-line bg-slate-100 text-slate-400">
+        {previewUrl ? (
+          <img className="h-full w-full object-cover" src={previewUrl} alt={title} />
+        ) : isImageEvidence(record) ? (
+          <ImageIcon className="h-5 w-5" />
+        ) : (
+          <FileText className="h-5 w-5" />
+        )}
+      </span>
+      <span className="min-w-0">
+        <span className="block line-clamp-2 text-sm font-semibold leading-5 text-ink">{title}</span>
+        <span className="mt-1 block truncate text-xs text-slate-500">
+          {[
+            evidenceLabel(record.evidence_type),
+            visibilityLabel(record.visibility ?? 'project'),
+            record.mime_type,
+            record.file_size ? formatEvidenceFileSize(record.file_size) : undefined,
+          ].filter(Boolean).join(' · ') || compactDateTime(record.created_at)}
+        </span>
+        {showWorkItem ? <span className="mt-1 block line-clamp-1 text-xs text-slate-500">{record.run_node_name ? `${record.run_node_name} · ` : ''}{record.work_item_title ?? 'Đầu việc'}</span> : null}
+      </span>
+    </button>
+  );
   return (
-    <article className="grid gap-3 px-3 py-3 lg:grid-cols-[minmax(0,1.6fr)_8rem_8rem_7rem_8rem] lg:items-center">
-      <button type="button" className="flex min-w-0 items-start gap-3 text-left" onClick={onSelect}>
-        <span className="grid h-12 w-14 shrink-0 place-items-center overflow-hidden rounded-md border border-line bg-slate-100 text-slate-400">
-          {previewUrl ? (
-            <img className="h-full w-full object-cover" src={previewUrl} alt={title} />
-          ) : isImageEvidence(record) ? (
-            <ImageIcon className="h-5 w-5" />
-          ) : (
-            <FileText className="h-5 w-5" />
-          )}
-        </span>
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-ink">{title}</span>
-          <span className="mt-1 block truncate text-xs text-slate-500">
-            {[record.caption, record.mime_type, record.file_size ? formatEvidenceFileSize(record.file_size) : undefined].filter(Boolean).join(' · ') || compactDateTime(record.created_at)}
-          </span>
-          {showWorkItem ? <span className="mt-1 block truncate text-xs text-slate-500">{record.work_item_title ?? 'Đầu việc'}</span> : null}
-        </span>
-      </button>
-      <div className="text-xs font-semibold text-slate-600 lg:text-sm lg:font-medium">
-        <span className="mr-2 text-[11px] uppercase tracking-wide text-slate-400 lg:hidden">Loại</span>
-        {evidenceLabel(record.evidence_type)}
-      </div>
-      <div className="text-xs font-semibold text-slate-600 lg:text-sm lg:font-medium">
-        <span className="mr-2 text-[11px] uppercase tracking-wide text-slate-400 lg:hidden">Phạm vi</span>
-        {visibilityLabel(record.visibility ?? 'project')}
-      </div>
+    <article className={clsx(
+      'grid gap-3 px-3 py-3 lg:items-center',
+      listContext === 'project'
+        ? 'lg:grid-cols-[minmax(0,1.7fr)_10rem_8.5rem_7rem_8rem]'
+        : 'lg:grid-cols-[minmax(0,1.6fr)_8rem_8rem_7rem_8rem]',
+    )}>
+      {fileCell}
+      {listContext === 'project' ? (
+        <>
+          <div className="min-w-0 text-xs text-slate-600 lg:text-sm">
+            <span className="mr-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 lg:hidden">Người gửi</span>
+            <span className="line-clamp-2">{record.submitted_by_name ?? record.uploaded_by ?? '-'}</span>
+          </div>
+          <div className="text-xs text-slate-600 lg:text-sm">
+            <span className="mr-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 lg:hidden">Thời gian</span>
+            {compactDateTime(record.created_at)}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="text-xs font-semibold text-slate-600 lg:text-sm lg:font-medium">
+            <span className="mr-2 text-[11px] uppercase tracking-wide text-slate-400 lg:hidden">Loại</span>
+            {evidenceLabel(record.evidence_type)}
+          </div>
+          <div className="text-xs font-semibold text-slate-600 lg:text-sm lg:font-medium">
+            <span className="mr-2 text-[11px] uppercase tracking-wide text-slate-400 lg:hidden">Phạm vi</span>
+            {visibilityLabel(record.visibility ?? 'project')}
+          </div>
+        </>
+      )}
       <div>
         <StatusBadge status={record.status} />
       </div>
@@ -433,6 +481,7 @@ function EvidenceDetailDialog({
             <EvidenceMeta label="Loại" value={evidenceLabel(record.evidence_type)} />
             <EvidenceMeta label="Phạm vi hiển thị" value={visibilityLabel(record.visibility ?? 'project')} />
             {showWorkItem ? <EvidenceMeta label="Đầu việc" value={record.work_item_title ?? '-'} /> : null}
+            {showWorkItem && record.run_node_name ? <EvidenceMeta label="Giai đoạn" value={record.run_node_name} /> : null}
             <EvidenceMeta label="Người gửi" value={record.submitted_by_name ?? record.uploaded_by ?? '-'} />
             <EvidenceMeta label="Thời điểm gửi" value={compactDateTime(record.created_at)} />
             <EvidenceMeta label="Người rà soát" value={record.reviewed_by_name ?? record.reviewed_by ?? '-'} />

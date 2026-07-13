@@ -1,25 +1,27 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Ban, CheckCircle2, ClipboardList, FileCheck2, FileText, Play, Search, Send } from 'lucide-react';
-import { get, post } from '../../lib/api/client';
+import { ArrowRight, Ban, CheckCircle2, ChevronDown, ClipboardList, GitBranch, Play, Search, Send, Settings2 } from 'lucide-react';
+import { ApiError, get, post } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { StatusBadge } from '../../components/StatusBadge';
-import { Timeline } from '../../components/Timeline';
 import { useToast } from '../../components/ToastProvider';
 import { EnumChip } from '../../components/EnumChip';
+import { Dialog } from '../../components/Dialog';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
-import type { WorkItem } from '../../lib/types/domain';
+import type { ProjectOperationsResponse, ProjectOperationsTimelineNode, WorkItem } from '../../lib/types/domain';
+import { enumLabel, statusLabel } from '../../lib/utils/status';
+import { ProjectWorkflowWorkspace } from '../projects/ProjectDetailPage';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
 import {
+  asArray,
   hasWorkflowFormSummary,
   numberValue,
   workflowFormBusinessLabel,
   workflowFormChipText,
   workflowFormNextAction,
-  workflowFormTypeLabel,
 } from '../work-items/workItemPresentation';
 
 export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipeline' }) {
@@ -30,24 +32,28 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
   const toast = useToast();
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [blockReason, setBlockReason] = useState('');
-  const [formSearch, setFormSearch] = useState('');
-  const [formTypeFilter, setFormTypeFilter] = useState('all');
-  const [formStatusFilter, setFormStatusFilter] = useState('all');
-  const [formRequirementFilter, setFormRequirementFilter] = useState('all');
+  const [blockNodeId, setBlockNodeId] = useState('');
+  const [recreateOpen, setRecreateOpen] = useState(false);
+  const [workSearch, setWorkSearch] = useState('');
+  const [queueFilter, setQueueFilter] = useState<PlanningQueueFilter>('actionable');
+  const [workTypeFilter, setWorkTypeFilter] = useState('all');
+  const [workStatusFilter, setWorkStatusFilter] = useState('all');
+  const [workRequirementFilter, setWorkRequirementFilter] = useState('all');
   const run = useQuery({
     queryKey: ['pipeline-run', id],
     queryFn: () => get<Record<string, any>>(`/projects/${id}/pipeline-run`),
     enabled: Boolean(id),
     retry: false,
   });
-  const audit = useQuery({
-    queryKey: ['project-audit', id],
-    queryFn: () => get<Record<string, any>[]>(`/projects/${id}/audit-logs`),
-    enabled: Boolean(id),
+  const operations = useQuery({
+    queryKey: ['project-operations', id],
+    queryFn: () => get<ProjectOperationsResponse>(`/projects/${id}/operations`),
+    enabled: Boolean(id) && mode === 'pipeline' && Boolean(run.data),
+    retry: false,
   });
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['pipeline-run', id] });
-    queryClient.invalidateQueries({ queryKey: ['project-audit', id] });
+    queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
     queryClient.invalidateQueries({ queryKey: ['work-item'] });
     queryClient.invalidateQueries({ queryKey: ['work-item-form'] });
   };
@@ -55,17 +61,10 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
     mutationFn: () => post(`/projects/${id}/start-pipeline`, {}),
     onSuccess: () => {
       invalidate();
+      setRecreateOpen(false);
       toast.success('Đã khởi động quy trình đang chạy');
     },
     onError: (error) => toast.error('Không khởi động được quy trình đang chạy', error),
-  });
-  const submitStep = useMutation({
-    mutationFn: (stepId: string) => post(`/pipeline-run-steps/${stepId}/submit`, {}),
-    onSuccess: () => {
-      invalidate();
-      toast.success('Đã gửi bước');
-    },
-    onError: (error) => toast.error('Không gửi được bước', error),
   });
   const requestApproval = useMutation({
     mutationFn: (nodeId: string) => post(`/pipeline-run-nodes/${nodeId}/request-approval`, { reason: 'Yêu cầu rà soát/phê duyệt để chuyển node' }),
@@ -87,25 +86,28 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
     mutationFn: (nodeId: string) => post(`/pipeline-run-nodes/${nodeId}/block`, { reason: blockReason || 'Bị chặn bởi điều kiện vận hành' }),
     onSuccess: () => {
       invalidate();
+      setBlockNodeId('');
+      setBlockReason('');
       toast.success('Đã chặn node');
     },
     onError: (error) => toast.error('Không chặn được node', error),
   });
 
   const nodes = run.data?.nodes ?? [];
-  const selectedNode = nodes.find((node: Record<string, any>) => node.id === selectedNodeId) ?? nodes.find((node: Record<string, any>) => node.status === 'in_progress') ?? nodes[0];
-  const completed = nodes.filter((node: Record<string, any>) => node.status === 'completed').length;
-  const percent = nodes.length ? Math.round((completed / nodes.length) * 100) : 0;
-  const planningFormRows = useMemo(() => buildPlanningFormRows(nodes, run.data), [nodes, run.data]);
-  const planningFormMetrics = useMemo(() => buildPlanningFormMetrics(planningFormRows), [planningFormRows]);
-  const filteredPlanningFormRows = useMemo(() => (
-    planningFormRows.filter((row) => planningFormRowMatchesFilters(row, {
-      search: formSearch,
-      type: formTypeFilter,
-      status: formStatusFilter,
-      requirement: formRequirementFilter,
+  const currentNode = nodes.find((node: Record<string, any>) => node.status === 'in_progress') ?? nodes.find((node: Record<string, any>) => node.status === 'blocked') ?? nodes[0];
+  const planningWorkRows = useMemo(() => buildPlanningWorkRows(nodes, run.data), [nodes, run.data]);
+  const planningWorkMetrics = useMemo(() => buildPlanningWorkMetrics(planningWorkRows), [planningWorkRows]);
+  const planningProgress = useMemo(() => buildPlanningProgress(nodes), [nodes]);
+  const nextPlanningWork = useMemo(() => selectNextPlanningWork(planningWorkRows), [planningWorkRows]);
+  const filteredPlanningWorkRows = useMemo(() => (
+    planningWorkRows.filter((row) => planningWorkRowMatchesFilters(row, {
+      search: workSearch,
+      queue: queueFilter,
+      type: workTypeFilter,
+      status: workStatusFilter,
+      requirement: workRequirementFilter,
     }))
-  ), [formRequirementFilter, formSearch, formStatusFilter, formTypeFilter, planningFormRows]);
+  ), [planningWorkRows, queueFilter, workRequirementFilter, workSearch, workStatusFilter, workTypeFilter]);
 
   function openStepWorkItem(step: Record<string, any>) {
     const workItem = stepToWorkItem(step, run.data);
@@ -116,28 +118,60 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
     navigate(workItemDetailPath(workItem.id, currentReturnTo(location), workItem.project_id ?? id));
   }
 
-  if (run.isLoading) return <LoadingSpinner />;
+  if (run.isLoading) return mode === 'planning' ? <PlanningWorkspaceLoading /> : <LoadingSpinner />;
+
+  const runNotFound = run.error instanceof ApiError && run.error.status === 404;
+  const terminalRun = ['completed', 'cancelled'].includes(String(run.data?.status ?? ''));
 
   return (
     <>
       <PageHeader
-        title={mode === 'pipeline' ? 'Quy trình công trình' : 'Không gian kế hoạch'}
+        title={mode === 'pipeline' ? 'Quy trình công trình' : 'Kế hoạch'}
         description={run.data ? `${run.data.project_name} · Mẫu: ${run.data.template_name}` : 'Chưa có quy trình đang chạy cho công trình này.'}
         actions={
-          <>
-            <ProjectBackLink projectId={id} />
-            <button
-              className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={start.isPending}
-              onClick={() => start.mutate()}
-            >
-              <Play className="h-4 w-4" />
-              Khởi động / tạo lại quy trình
-            </button>
-          </>
+          mode === 'pipeline' ? (
+            run.data ? (
+              <PipelineManagementMenu onRecreate={() => setRecreateOpen(true)} />
+            ) : null
+          ) : (
+            <>
+              <ProjectBackLink projectId={id} />
+              {run.data ? (
+                <button
+                  className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+                  onClick={() => navigate(`/projects/${id}/pipeline`)}
+                >
+                  <GitBranch className="h-4 w-4" />
+                  Mở quy trình
+                </button>
+              ) : null}
+              {terminalRun ? (
+                <button
+                  className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={start.isPending}
+                  onClick={() => start.mutate()}
+                >
+                  <Play className="h-4 w-4" />
+                  Bắt đầu lượt quy trình mới
+                </button>
+              ) : null}
+            </>
+          )
         }
       />
-      {!run.data ? (
+      {run.isError && !runNotFound ? (
+        <EmptyState
+          title="Không tải được kế hoạch công trình."
+          action={
+            <button
+              className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+              onClick={() => run.refetch()}
+            >
+              Thử lại
+            </button>
+          }
+        />
+      ) : !run.data ? (
         <EmptyState
           title="Chưa có quy trình đang chạy. Khởi động quy trình để tạo bản vận hành từ mẫu."
           action={
@@ -152,495 +186,698 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
           }
         />
       ) : mode === 'planning' ? (
-        <div className="space-y-5">
-          <PlanningFormWorkspace
-            rows={planningFormRows}
-            filteredRows={filteredPlanningFormRows}
-            metrics={planningFormMetrics}
-            search={formSearch}
-            typeFilter={formTypeFilter}
-            statusFilter={formStatusFilter}
-            requirementFilter={formRequirementFilter}
-            onSearchChange={setFormSearch}
-            onTypeFilterChange={setFormTypeFilter}
-            onStatusFilterChange={setFormStatusFilter}
-            onRequirementFilterChange={setFormRequirementFilter}
-            onOpenRow={(row) => openStepWorkItem(row.step)}
-          />
-          <PipelineRuntimeSection
-            showHeading
-            nodes={nodes}
-            selectedNode={selectedNode}
-            completed={completed}
-            percent={percent}
-            auditEvents={audit.data?.slice(0, 8) ?? []}
-            blockReason={blockReason}
-            onSelectNode={setSelectedNodeId}
-            onOpenStepWorkItem={openStepWorkItem}
-            onSubmitStep={(stepId) => submitStep.mutate(stepId)}
-            onAdvance={(nodeId) => advance.mutate(nodeId)}
-            onRequestApproval={(nodeId) => requestApproval.mutate(nodeId)}
-            onBlock={(nodeId) => block.mutate(nodeId)}
-            onBlockReasonChange={setBlockReason}
-          />
-        </div>
+        <PlanningActionWorkspace
+          rows={planningWorkRows}
+          filteredRows={filteredPlanningWorkRows}
+          metrics={planningWorkMetrics}
+          progress={planningProgress}
+          currentNode={currentNode}
+          nextWork={nextPlanningWork}
+          search={workSearch}
+          queueFilter={queueFilter}
+          typeFilter={workTypeFilter}
+          statusFilter={workStatusFilter}
+          requirementFilter={workRequirementFilter}
+          onSearchChange={setWorkSearch}
+          onQueueFilterChange={setQueueFilter}
+          onTypeFilterChange={setWorkTypeFilter}
+          onStatusFilterChange={setWorkStatusFilter}
+          onRequirementFilterChange={setWorkRequirementFilter}
+          onOpenRow={(row) => openStepWorkItem(row.step)}
+          onOpenPipeline={() => navigate(`/projects/${id}/pipeline`)}
+        />
+      ) : operations.isLoading ? (
+        <PipelineWorkspaceLoading />
+      ) : operations.error ? (
+        <PipelineWorkspaceError onRetry={() => operations.refetch()} />
       ) : (
-        <PipelineRuntimeSection
-          nodes={nodes}
-          selectedNode={selectedNode}
-          completed={completed}
-          percent={percent}
-          auditEvents={audit.data?.slice(0, 8) ?? []}
-          blockReason={blockReason}
+        <ProjectWorkflowWorkspace
+          projectId={id}
+          nodes={asArray<ProjectOperationsTimelineNode>(operations.data?.workflow_timeline)}
+          workItems={asArray<WorkItem>(operations.data?.work_items)}
+          selectedNodeId={selectedNodeId}
+          hasPipeline={Boolean(run.data)}
+          startPending={start.isPending}
           onSelectNode={setSelectedNodeId}
-          onOpenStepWorkItem={openStepWorkItem}
-          onSubmitStep={(stepId) => submitStep.mutate(stepId)}
-          onAdvance={(nodeId) => advance.mutate(nodeId)}
-          onRequestApproval={(nodeId) => requestApproval.mutate(nodeId)}
-          onBlock={(nodeId) => block.mutate(nodeId)}
-          onBlockReasonChange={setBlockReason}
+          onStartPipeline={() => start.mutate()}
+          onOpenWork={(item) => navigate(workItemDetailPath(item.id, currentReturnTo(location), item.project_id ?? id))}
+          renderStageContext={(timelineNode) => {
+            const runNode = nodes.find((node: Record<string, any>) => String(node.id) === timelineNode.id);
+            return (
+              <PipelineStageContext
+                node={runNode ?? timelineNode}
+                actionPending={requestApproval.isPending || advance.isPending || block.isPending}
+                onRequestApproval={() => requestApproval.mutate(timelineNode.id)}
+                onAdvance={() => advance.mutate(timelineNode.id)}
+                onBlock={() => setBlockNodeId(timelineNode.id)}
+              />
+            );
+          }}
         />
       )}
+
+      <Dialog
+        open={recreateOpen}
+        title="Tạo lại quy trình công trình?"
+        description="Hành động này gọi lại quy trình khởi động hiện có. Các điều kiện bảo vệ runtime ở backend vẫn được giữ nguyên."
+        onClose={() => setRecreateOpen(false)}
+        size="sm"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              onClick={() => setRecreateOpen(false)}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+              disabled={start.isPending}
+              onClick={() => start.mutate()}
+            >
+              <Play className="h-4 w-4" />
+              Xác nhận tạo lại
+            </button>
+          </div>
+        )}
+      >
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+          Chỉ thực hiện khi anh muốn bắt đầu lại quy trình vận hành của công trình này.
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(blockNodeId)}
+        title="Chặn giai đoạn"
+        description="Ghi rõ nguyên nhân để người liên quan có thể xử lý và truy vết."
+        onClose={() => {
+          setBlockNodeId('');
+          setBlockReason('');
+        }}
+        size="sm"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              onClick={() => {
+                setBlockNodeId('');
+                setBlockReason('');
+              }}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+              disabled={!blockReason.trim() || block.isPending}
+              onClick={() => blockNodeId && block.mutate(blockNodeId)}
+            >
+              <Ban className="h-4 w-4" />
+              Xác nhận chặn
+            </button>
+          </div>
+        )}
+      >
+        <label className="block">
+          <span className="text-sm font-semibold text-slate-700">Lý do chặn <span className="text-rose-600">*</span></span>
+          <textarea
+            className="mt-2 min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            value={blockReason}
+            onChange={(event) => setBlockReason(event.target.value)}
+            placeholder="Ví dụ: Chưa đủ hồ sơ khảo sát để yêu cầu phê duyệt"
+          />
+        </label>
+      </Dialog>
     </>
   );
 }
 
-type PlanningFormRow = {
+function PipelineManagementMenu({ onRecreate }: { onRecreate: () => void }) {
+  return (
+    <details className="group relative">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 [&::-webkit-details-marker]:hidden">
+        <Settings2 className="h-4 w-4" />
+        Quản lý quy trình
+        <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+      </summary>
+      <div className="absolute right-0 z-20 mt-2 w-64 rounded-md border border-line bg-white p-1.5 shadow-xl">
+        <button
+          type="button"
+          className="flex w-full items-start gap-2 rounded px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50"
+          onClick={onRecreate}
+        >
+          <Play className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <span className="block font-semibold">Tạo lại quy trình…</span>
+            <span className="mt-0.5 block text-xs text-slate-500">Yêu cầu xác nhận trước khi thực hiện</span>
+          </span>
+        </button>
+      </div>
+    </details>
+  );
+}
+
+function PipelineStageContext({
+  node,
+  actionPending,
+  onRequestApproval,
+  onAdvance,
+  onBlock,
+}: {
+  node: Record<string, any>;
+  actionPending: boolean;
+  onRequestApproval: () => void;
+  onAdvance: () => void;
+  onBlock: () => void;
+}) {
+  const roleLabels = asArray<string>(node.responsible_role_ids).filter(Boolean).join(', ') || '-';
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-line bg-slate-50 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+      <dl className="flex min-w-0 flex-wrap gap-x-5 gap-y-2 text-xs">
+        <div>
+          <dt className="font-semibold text-slate-500">Vai trò</dt>
+          <dd className="mt-0.5 font-medium text-slate-700">{roleLabels}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Phê duyệt</dt>
+          <dd className="mt-0.5 font-medium text-slate-700">{node.approval_rule ?? '-'}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-500">Nhánh khi không đạt</dt>
+          <dd className="mt-0.5"><EnumChip group="fail_path" value={node.fail_path} /></dd>
+        </div>
+      </dl>
+
+      <details className="group relative shrink-0">
+        <summary className="inline-flex w-full cursor-pointer list-none items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 lg:w-auto [&::-webkit-details-marker]:hidden">
+          Thao tác giai đoạn
+          <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+        </summary>
+        <div className="right-0 z-20 mt-2 w-full rounded-md border border-line bg-white p-1.5 shadow-xl lg:absolute lg:w-64">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            disabled={actionPending}
+            onClick={onRequestApproval}
+          >
+            <Send className="h-4 w-4" />
+            Yêu cầu phê duyệt
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+            disabled={actionPending}
+            onClick={onAdvance}
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            Chuyển giai đoạn tiếp theo
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+            disabled={actionPending}
+            onClick={onBlock}
+          >
+            <Ban className="h-4 w-4" />
+            Chặn giai đoạn…
+          </button>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function PipelineWorkspaceLoading() {
+  return (
+    <div className="space-y-4" aria-label="Đang tải quy trình công trình">
+      <div className="h-36 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
+      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="h-96 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
+        <div className="h-96 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
+      </div>
+    </div>
+  );
+}
+
+function PipelineWorkspaceError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <section className="rounded-lg border border-rose-200 bg-white p-5 shadow-panel">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-rose-700">Không tải được dữ liệu quy trình</h2>
+          <p className="mt-1 text-sm text-slate-600">Vui lòng thử lại hoặc kiểm tra quyền truy cập công trình.</p>
+        </div>
+        <button
+          type="button"
+          className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+          onClick={onRetry}
+        >
+          Thử lại
+        </button>
+      </div>
+    </section>
+  );
+}
+
+type PlanningQueueFilter = 'actionable' | 'waiting' | 'future' | 'completed' | 'all';
+
+type PlanningWorkRow = {
   id: string;
   step: Record<string, any>;
   node: Record<string, any>;
   workItem: WorkItem | null;
-  formTitle: string;
-  formType: string;
-  formTypeLabel: string;
+  title: string;
+  formTitle?: string;
   formStatus: string;
+  workStatus: string;
+  workType: string;
+  workTypeLabel: string;
+  queue: PlanningQueueFilter;
   required: boolean;
-  hasInstance: boolean;
+  hasForm: boolean;
   missingInstance: boolean;
   blocked: boolean;
-  submitted: boolean;
-  needsSubmit: boolean;
   evidenceCount: number;
+  ownerLabel: string;
   nextAction: string;
   searchText: string;
+  workflowOrder: number;
 };
 
-type PlanningFormMetrics = {
+type PlanningWorkMetrics = {
   total: number;
-  required: number;
-  needsSubmit: number;
-  submitted: number;
+  actionable: number;
+  waiting: number;
+  future: number;
+  completed: number;
   blocked: number;
-  missing: number;
+  formsTotal: number;
+  submittedForms: number;
+  missingForms: number;
 };
 
-type PlanningFormFilters = {
+type PlanningProgress = {
+  total: number;
+  completed: number;
+  skipped: number;
+  percent: number;
+};
+
+type PlanningWorkFilters = {
   search: string;
+  queue: PlanningQueueFilter;
   type: string;
   status: string;
   requirement: string;
 };
 
-const planningFormTypeOptions = [
-  ['all', 'Tất cả loại'],
-  ['meeting_minutes', 'Biên bản họp'],
-  ['daily_report', 'Nhật ký'],
-  ['checklist', 'Checklist'],
-  ['generic_submission', 'Biểu mẫu gửi thông tin'],
-];
-
-const planningFormStatusOptions = [
-  ['all', 'Tất cả trạng thái'],
-  ['needs_submit', 'Cần gửi'],
-  ['draft', 'Nháp'],
-  ['submitted', 'Đã gửi'],
-  ['blocked', 'Bị chặn'],
-  ['missing', 'Thiếu biểu mẫu'],
-];
-
-const planningFormRequirementOptions = [
-  ['all', 'Bắt buộc + tùy chọn'],
+const planningWorkRequirementOptions = [
+  ['all', 'Mọi yêu cầu'],
   ['required', 'Chỉ bắt buộc'],
   ['optional', 'Chỉ tùy chọn'],
+  ['none', 'Không có biểu mẫu'],
 ];
 
-function PlanningFormWorkspace({
+function PlanningActionWorkspace({
   rows,
   filteredRows,
   metrics,
+  progress,
+  currentNode,
+  nextWork,
   search,
+  queueFilter,
   typeFilter,
   statusFilter,
   requirementFilter,
   onSearchChange,
+  onQueueFilterChange,
   onTypeFilterChange,
   onStatusFilterChange,
   onRequirementFilterChange,
   onOpenRow,
+  onOpenPipeline,
 }: {
-  rows: PlanningFormRow[];
-  filteredRows: PlanningFormRow[];
-  metrics: PlanningFormMetrics;
+  rows: PlanningWorkRow[];
+  filteredRows: PlanningWorkRow[];
+  metrics: PlanningWorkMetrics;
+  progress: PlanningProgress;
+  currentNode?: Record<string, any>;
+  nextWork?: PlanningWorkRow;
   search: string;
+  queueFilter: PlanningQueueFilter;
   typeFilter: string;
   statusFilter: string;
   requirementFilter: string;
   onSearchChange: (value: string) => void;
+  onQueueFilterChange: (value: PlanningQueueFilter) => void;
   onTypeFilterChange: (value: string) => void;
   onStatusFilterChange: (value: string) => void;
   onRequirementFilterChange: (value: string) => void;
-  onOpenRow: (row: PlanningFormRow) => void;
+  onOpenRow: (row: PlanningWorkRow) => void;
+  onOpenPipeline: () => void;
 }) {
-  const metricCards = [
-    { label: 'Biểu mẫu', value: metrics.total, sub: `${metrics.required} bắt buộc`, tone: 'text-blue-700', bg: 'bg-blue-50' },
-    { label: 'Cần gửi', value: metrics.needsSubmit, sub: 'Nháp / mở lại', tone: 'text-amber-800', bg: 'bg-amber-50' },
-    { label: 'Đã gửi', value: metrics.submitted, sub: 'Chờ ký / PDF / bước', tone: 'text-emerald-700', bg: 'bg-emerald-50' },
-    { label: 'Bị chặn / thiếu', value: metrics.blocked + metrics.missing, sub: `${metrics.blocked} bị chặn · ${metrics.missing} thiếu`, tone: 'text-rose-700', bg: 'bg-rose-50' },
+  const queueTabs: Array<{ id: PlanningQueueFilter; label: string; count: number }> = [
+    { id: 'actionable', label: 'Cần xử lý', count: metrics.actionable },
+    { id: 'waiting', label: 'Chờ duyệt', count: metrics.waiting },
+    { id: 'future', label: 'Sắp tới', count: metrics.future },
+    { id: 'completed', label: 'Hoàn tất', count: metrics.completed },
+    { id: 'all', label: 'Tất cả', count: metrics.total },
   ];
+  const workTypeOptions = [...new Set(rows.map((row) => row.workType).filter(Boolean))]
+    .map((value) => [value, enumLabel('step_type', value)] as const)
+    .sort((left, right) => left[1].localeCompare(right[1], 'vi'));
+  const workStatusOptions = [...new Set(rows.map((row) => row.workStatus).filter(Boolean))]
+    .map((value) => [value, statusLabel(value)] as const)
+    .sort((left, right) => left[1].localeCompare(right[1], 'vi'));
+  const nodeProgress = buildPlanningProgress(currentNode ? [currentNode] : []);
+  const hasExtraFilters = Boolean(search || typeFilter !== 'all' || statusFilter !== 'all' || requirementFilter !== 'all');
+
+  function resetFilters() {
+    onSearchChange('');
+    onTypeFilterChange('all');
+    onStatusFilterChange('all');
+    onRequirementFilterChange('all');
+  }
 
   return (
     <section className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {metricCards.map((card) => (
-          <div key={card.label} className="rounded-lg border border-line bg-white p-4 shadow-panel">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.label}</p>
-                <p className={`mt-2 text-2xl font-black ${card.tone}`}>{card.value}</p>
-              </div>
-              <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-md ${card.bg} ${card.tone}`}>
-                {card.label === 'Bị chặn / thiếu' ? <AlertTriangle className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-slate-500">{card.sub}</p>
-          </div>
-        ))}
-      </div>
-
       <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <ClipboardList className="h-5 w-5 shrink-0 text-blue-700" />
-            <div>
-              <h2 className="font-semibold text-ink">Biểu mẫu kế hoạch</h2>
-              <p className="mt-1 text-xs text-slate-500">{filteredRows.length}/{rows.length} biểu mẫu trong quy trình đang chạy</p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Giai đoạn hiện tại</p>
+              <StatusBadge status={currentNode?.status ?? 'pending'} />
             </div>
+            <h2 className="mt-2 text-lg font-bold text-ink">{currentNode?.name ?? 'Chưa có giai đoạn đang chạy'}</h2>
+            <p className="mt-1 line-clamp-2 text-sm text-slate-600">{currentNode?.description ?? 'Mở quy trình để kiểm tra trạng thái vận hành.'}</p>
+          </div>
+          <div className="w-full shrink-0 lg:w-80">
+            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold">
+              <span className="text-slate-600">Tiến độ giai đoạn</span>
+              <span className="text-blue-700">{nodeProgress.percent}% · {nodeProgress.completed}/{nodeProgress.total} bước</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-blue-600" style={{ width: `${nodeProgress.percent}%` }} />
+            </div>
+            <p className="mt-1.5 text-right text-[11px] text-slate-500">
+              Toàn quy trình: {progress.completed}/{progress.total} bước{progress.skipped ? ` · ${progress.skipped} bước đã bỏ qua` : ''}
+            </p>
           </div>
         </div>
 
-        <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px_180px]">
-          <label className="relative block">
-            <span className="sr-only">Tìm biểu mẫu kế hoạch</span>
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              className="w-full rounded-md border border-line py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Tìm biểu mẫu, node, bước"
-              value={search}
-              onChange={(event) => onSearchChange(event.target.value)}
-            />
-          </label>
-          <select
-            aria-label="Lọc loại biểu mẫu"
-            className="rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            value={typeFilter}
-            onChange={(event) => onTypeFilterChange(event.target.value)}
-          >
-            {planningFormTypeOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-          <select
-            aria-label="Lọc trạng thái biểu mẫu"
-            className="rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            value={statusFilter}
-            onChange={(event) => onStatusFilterChange(event.target.value)}
-          >
-            {planningFormStatusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-          <select
-            aria-label="Lọc mức bắt buộc"
-            className="rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            value={requirementFilter}
-            onChange={(event) => onRequirementFilterChange(event.target.value)}
-          >
-            {planningFormRequirementOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
+        <div className="mt-4 grid gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-2 xl:grid-cols-4">
+          <PlanningMetric label="Cần xử lý" value={metrics.actionable} tone="text-blue-700" />
+          <PlanningMetric label="Chờ duyệt" value={metrics.waiting} tone="text-amber-700" />
+          <PlanningMetric label="Bị chặn" value={metrics.blocked} tone="text-rose-700" />
+          <PlanningMetric label="Hồ sơ đã gửi" value={`${metrics.submittedForms}/${metrics.formsTotal}`} tone="text-emerald-700" />
         </div>
-
-        {!rows.length ? (
-          <EmptyState title="Quy trình này chưa có biểu mẫu kế hoạch." />
-        ) : filteredRows.length ? (
-          <div className="space-y-3">
-            {filteredRows.map((row) => <PlanningFormRowCard key={row.id} row={row} onOpen={() => onOpenRow(row)} />)}
-          </div>
-        ) : (
-          <EmptyState title="Không có biểu mẫu khớp bộ lọc hiện tại." />
-        )}
       </section>
-    </section>
-  );
-}
 
-function PlanningFormRowCard({ row, onOpen }: { row: PlanningFormRow; onOpen: () => void }) {
-  const rowTone = row.missingInstance || row.blocked
-    ? 'border-rose-200 bg-rose-50/40'
-    : row.needsSubmit
-      ? 'border-amber-200 bg-amber-50/30'
-      : 'border-line bg-white';
-  const disabled = !row.workItem || !row.hasInstance;
-
-  return (
-    <article className={`rounded-md border px-3 py-3 ${rowTone}`}>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {row.missingInstance ? (
-              <span className="rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">Thiếu biểu mẫu</span>
-            ) : row.blocked ? (
-              <StatusBadge status="blocked" />
-            ) : (
-              <StatusBadge status={row.formStatus} />
-            )}
-            <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{row.formTypeLabel}</span>
-            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{row.required ? 'Bắt buộc' : 'Tùy chọn'}</span>
-            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Minh chứng: {row.evidenceCount}</span>
-          </div>
-          <p className="mt-2 text-sm font-semibold text-ink">{row.formTitle}</p>
-          <p className="mt-1 text-xs text-slate-500">
-            Node: {row.node.name ?? '-'} · Bước: {row.step.name ?? '-'}
-          </p>
-          <p className="mt-2 text-xs font-medium text-slate-600">Bước tiếp theo: {row.nextAction}</p>
-          <p className="mt-1 text-xs text-slate-500">Đầu việc: {row.workItem?.title ?? 'Chưa có đầu việc'}</p>
-        </div>
-        <button
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-          disabled={disabled}
-          onClick={onOpen}
-          title={disabled ? 'Biểu mẫu chưa sẵn sàng để mở' : 'Mở biểu mẫu quy trình'}
-        >
-          <ClipboardList className="h-4 w-4" />
-          Mở biểu mẫu
-        </button>
-      </div>
-    </article>
-  );
-}
-
-function PipelineRuntimeSection({
-  showHeading = false,
-  nodes,
-  selectedNode,
-  completed,
-  percent,
-  auditEvents,
-  blockReason,
-  onSelectNode,
-  onOpenStepWorkItem,
-  onSubmitStep,
-  onAdvance,
-  onRequestApproval,
-  onBlock,
-  onBlockReasonChange,
-}: {
-  showHeading?: boolean;
-  nodes: Record<string, any>[];
-  selectedNode?: Record<string, any>;
-  completed: number;
-  percent: number;
-  auditEvents: Record<string, any>[];
-  blockReason: string;
-  onSelectNode: (nodeId: string) => void;
-  onOpenStepWorkItem: (step: Record<string, any>) => void;
-  onSubmitStep: (stepId: string) => void;
-  onAdvance: (nodeId: string) => void;
-  onRequestApproval: (nodeId: string) => void;
-  onBlock: (nodeId: string) => void;
-  onBlockReasonChange: (value: string) => void;
-}) {
-  return (
-    <section className="space-y-3">
-      {showHeading ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-base font-semibold text-ink">Quy trình đang chạy</h2>
-            <p className="mt-1 text-xs text-slate-500">Node, bước và hành động phê duyệt giữ nguyên để điều phối quy trình đang chạy.</p>
-          </div>
-        </div>
-      ) : null}
-      <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
-        <section className="space-y-4">
-          <div className="rounded-lg border border-line bg-white p-4 shadow-panel">
-            <div className="mb-2 flex items-center justify-between text-sm">
-              <span className="font-semibold text-ink">Tiến độ quy trình</span>
-              <span className="font-semibold text-blue-700">{percent}% · {completed}/{nodes.length} node</span>
+      {nextWork ? (
+        <section className={`rounded-lg border p-4 shadow-panel ${nextWork.blocked ? 'border-rose-200 bg-rose-50/50' : nextWork.queue === 'waiting' ? 'border-amber-200 bg-amber-50/40' : 'border-blue-200 bg-blue-50/40'}`}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Việc tiếp theo</p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <StatusBadge status={nextWork.workStatus} />
+                <EnumChip group="step_type" value={nextWork.workType} />
+                {nextWork.hasForm ? (
+                  <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">
+                    {nextWork.required ? 'Hồ sơ bắt buộc' : 'Hồ sơ tùy chọn'}
+                  </span>
+                ) : null}
+              </div>
+              <h2 className="mt-2 text-base font-bold text-ink">{nextWork.title}</h2>
+              <p className="mt-1 text-sm text-slate-600">{nextWork.node.name ?? '-'} · {nextWork.ownerLabel} · {nextWork.evidenceCount} minh chứng</p>
+              <p className="mt-2 text-sm font-medium text-slate-700">Tiếp theo: {nextWork.nextAction}</p>
             </div>
-            <div className="h-2 rounded-full bg-slate-100">
-              <div className="h-2 rounded-full bg-blue-600" style={{ width: `${percent}%` }} />
+            <button
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              onClick={() => onOpenRow(nextWork)}
+            >
+              {planningWorkActionLabel(nextWork)}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </section>
+      ) : (
+        <section className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold text-emerald-800">Không có việc cần xử lý ngay</p>
+              <p className="mt-1 text-sm text-emerald-700">Kiểm tra việc sắp tới hoặc mở quy trình để xem trạng thái giai đoạn.</p>
+            </div>
+            <button className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50" onClick={() => onQueueFilterChange('future')}>
+              Xem việc sắp tới
+            </button>
+          </div>
+        </section>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <section className="min-w-0 rounded-lg border border-line bg-white p-4 shadow-panel">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <ClipboardList className="h-5 w-5 shrink-0 text-blue-700" />
+              <div>
+                <h2 className="font-semibold text-ink">Hàng đợi công việc</h2>
+                <p className="mt-1 text-xs text-slate-500">{filteredRows.length}/{rows.length} đầu việc trong quy trình đang chạy</p>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 rounded-lg border border-line bg-white p-4 shadow-panel">
-            {nodes.map((node: Record<string, any>, index: number) => (
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-1" aria-label="Lọc hàng đợi công việc">
+            {queueTabs.map((tab) => (
               <button
-                key={node.id}
-                className={`w-56 rounded-lg border p-4 text-left hover:border-blue-300 hover:bg-blue-50 ${selectedNode?.id === node.id ? 'border-blue-400 bg-blue-50' : 'border-line'}`}
-                onClick={() => onSelectNode(String(node.id))}
+                key={tab.id}
+                aria-pressed={queueFilter === tab.id}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${queueFilter === tab.id ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-line bg-white text-slate-600 hover:bg-slate-50'}`}
+                onClick={() => onQueueFilterChange(tab.id)}
               >
-                <div className="mb-3 grid h-8 w-8 place-items-center rounded-md bg-slate-100 text-xs font-black text-slate-700">{index + 1}</div>
-                <p className="text-sm font-semibold text-ink">{node.name}</p>
-                <p className="mt-2 line-clamp-2 text-xs text-slate-500">{node.description}</p>
-                <div className="mt-3 flex flex-wrap gap-1">
-                  <StatusBadge status={node.status} />
-                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{node.steps?.filter((s: Record<string, any>) => s.status === 'completed').length ?? 0}/{node.steps?.length ?? 0} bước</span>
-                </div>
+                {tab.label} <span className="ml-1">{tab.count}</span>
               </button>
             ))}
           </div>
+
+          <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_170px_170px_180px]">
+            <label className="relative block">
+              <span className="sr-only">Tìm công việc kế hoạch</span>
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                className="w-full rounded-md border border-line py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Tìm công việc, node, bước"
+                value={search}
+                onChange={(event) => onSearchChange(event.target.value)}
+              />
+            </label>
+            <select aria-label="Lọc loại công việc" className="rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" value={typeFilter} onChange={(event) => onTypeFilterChange(event.target.value)}>
+              <option value="all">Tất cả loại</option>
+              {workTypeOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <select aria-label="Lọc trạng thái công việc" className="rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)}>
+              <option value="all">Tất cả trạng thái</option>
+              {workStatusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <select aria-label="Lọc yêu cầu biểu mẫu" className="rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" value={requirementFilter} onChange={(event) => onRequirementFilterChange(event.target.value)}>
+              {planningWorkRequirementOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </div>
+
+          {!rows.length ? (
+            <EmptyState title="Quy trình này chưa có đầu việc." />
+          ) : filteredRows.length ? (
+            <PlanningWorkList rows={filteredRows} onOpen={onOpenRow} />
+          ) : (
+            <EmptyState
+              title={queueFilter === 'actionable' && !hasExtraFilters ? 'Giai đoạn hiện tại chưa có việc cần xử lý.' : 'Không có công việc khớp bộ lọc hiện tại.'}
+              action={
+                queueFilter === 'actionable' && !hasExtraFilters ? (
+                  <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={() => onQueueFilterChange('future')}>Xem việc sắp tới</button>
+                ) : (
+                  <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={resetFilters}>Xóa bộ lọc</button>
+                )
+              }
+            />
+          )}
         </section>
 
-        <aside className="space-y-4">
-          <div className="rounded-lg border border-line bg-white p-4 shadow-panel">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-ink">{selectedNode?.name ?? 'Chưa chọn node'}</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-600">{selectedNode?.description}</p>
-              </div>
-              <StatusBadge status={selectedNode?.status} />
+        <aside className="h-fit rounded-lg border border-line bg-white p-4 shadow-panel xl:sticky xl:top-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Giai đoạn hiện tại</p>
+              <h2 className="mt-2 font-semibold text-ink">{currentNode?.name ?? 'Chưa có node'}</h2>
             </div>
-            <dl className="mb-4 grid gap-2 rounded-lg bg-slate-50 p-3 text-sm">
-              <div className="flex justify-between gap-3"><dt className="text-slate-500">Vai trò</dt><dd className="font-medium text-ink">{selectedNode?.responsible_role_ids?.join?.(', ') ?? '-'}</dd></div>
-              <div className="flex justify-between gap-3"><dt className="text-slate-500">Phê duyệt</dt><dd className="font-medium text-ink">{selectedNode?.approval_rule ?? '-'}</dd></div>
-              <div className="flex justify-between gap-3"><dt className="text-slate-500">Nhánh khi không đạt</dt><dd className="font-medium text-ink"><EnumChip group="fail_path" value={selectedNode?.fail_path} /></dd></div>
-            </dl>
-            <div className="space-y-2">
-              {(selectedNode?.steps ?? []).map((step: Record<string, any>) => {
-                const hasForm = Boolean(step.workflow_form_instance_id);
-                const hasFormSummary = hasWorkflowFormSummary(step);
-                const formRequired = Boolean(step.workflow_form_required);
-                const formSubmitted = step.workflow_form_status === 'submitted';
-                const completedStep = step.status === 'completed';
-                const canCompleteStep = !completedStep && (!formRequired || formSubmitted);
-                return (
-                  <div key={step.id} className="rounded-md border border-line px-3 py-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-ink">{step.name}</p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <EnumChip group="step_type" value={step.step_type} />
-                          <StatusBadge status={step.status} />
-                          {hasFormSummary ? (
-                            <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-                              {workflowFormChipText(step)}{formRequired ? ' · Bắt buộc' : ' · Tùy chọn'}
-                            </span>
-                          ) : null}
-                          {hasForm ? <StatusBadge status={step.workflow_form_status ?? 'draft'} /> : null}
-                          <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Minh chứng: {numberValue(step.evidence_count)}</span>
-                        </div>
-                        {hasFormSummary ? <p className="mt-2 text-xs font-medium text-slate-500">Bước tiếp theo: {workflowFormNextAction(step)}</p> : null}
-                      </div>
-                      {completedStep ? <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-600" /> : null}
-                    </div>
-                    {!completedStep ? (
-                      <div className="mt-3 flex flex-wrap justify-end gap-2">
-                        {hasForm ? (
-                          <button
-                            className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
-                            onClick={() => onOpenStepWorkItem(step)}
-                          >
-                            <ClipboardList className="h-3.5 w-3.5" />
-                            Mở biểu mẫu
-                          </button>
-                        ) : null}
-                        {canCompleteStep ? (
-                          <button
-                            className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                            onClick={() => onSubmitStep(String(step.id))}
-                          >
-                            <FileCheck2 className="h-3.5 w-3.5" />
-                            Hoàn tất bước
-                          </button>
-                        ) : null}
-                        {formRequired && hasForm && !formSubmitted ? (
-                          <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
-                            Cần gửi biểu mẫu
-                          </span>
-                        ) : null}
-                        {formRequired && !hasForm ? (
-                          <span className="inline-flex items-center rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">
-                            Thiếu biểu mẫu
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
+            <StatusBadge status={currentNode?.status ?? 'pending'} />
+          </div>
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between text-xs font-semibold">
+              <span className="text-slate-600">Bước trong giai đoạn</span>
+              <span className="text-blue-700">{nodeProgress.completed}/{nodeProgress.total}</span>
             </div>
-            <div className="mt-4 grid gap-2">
-              <button
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={!selectedNode?.id}
-                onClick={() => selectedNode?.id && onAdvance(String(selectedNode.id))}
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Chuyển node tiếp theo
-              </button>
-              <button
-                className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={!selectedNode?.id}
-                onClick={() => selectedNode?.id && onRequestApproval(String(selectedNode.id))}
-              >
-                <Send className="h-4 w-4" />
-                Yêu cầu phê duyệt
-              </button>
-              <div className="flex gap-2">
-                <input className="min-w-0 flex-1 rounded-md border border-line px-3 py-2 text-sm focus-ring" placeholder="Lý do chặn" value={blockReason} onChange={(event) => onBlockReasonChange(event.target.value)} />
-                <button
-                  className="rounded-md bg-rose-600 px-3 py-2 text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={!selectedNode?.id}
-                  onClick={() => selectedNode?.id && onBlock(String(selectedNode.id))}
-                  title="Chặn node"
-                >
-                  <Ban className="h-4 w-4" />
-                </button>
-              </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-blue-600" style={{ width: `${nodeProgress.percent}%` }} />
             </div>
           </div>
-          <div>
-            <h2 className="mb-3 text-base font-semibold text-ink">Nhật ký / Xem lại</h2>
-            <Timeline events={auditEvents} />
-          </div>
+          <dl className="mt-4 space-y-3 text-sm">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Vai trò</dt>
+              <dd className="mt-1 text-slate-700">{arrayText(currentNode?.responsible_role_ids)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Phê duyệt</dt>
+              <dd className="mt-1 text-slate-700">{String(currentNode?.approval_rule ?? '-')}</dd>
+            </div>
+            {metrics.missingForms ? (
+              <div className="rounded-md border border-rose-100 bg-rose-50 px-3 py-2 text-rose-700">
+                <dt className="text-xs font-semibold">Thiếu biểu mẫu</dt>
+                <dd className="mt-1">{metrics.missingForms} bước bắt buộc chưa có instance.</dd>
+              </div>
+            ) : null}
+          </dl>
+          <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50" onClick={onOpenPipeline}>
+            <GitBranch className="h-4 w-4" />
+            Xem toàn bộ quy trình
+          </button>
         </aside>
       </div>
     </section>
   );
 }
 
-function buildPlanningFormRows(nodes: Record<string, any>[], run?: Record<string, any>): PlanningFormRow[] {
-  const rows: PlanningFormRow[] = [];
+function PlanningMetric({ label, value, tone }: { label: string; value: string | number; tone: string }) {
+  return (
+    <div className="bg-white px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className={`mt-1 text-xl font-black ${tone}`}>{value}</p>
+    </div>
+  );
+}
+
+function PlanningWorkList({ rows, onOpen }: { rows: PlanningWorkRow[]; onOpen: (row: PlanningWorkRow) => void }) {
+  return (
+    <>
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full min-w-[840px] border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-line text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-3 py-2">Công việc</th>
+              <th className="px-3 py-2">Giai đoạn</th>
+              <th className="px-3 py-2">Loại</th>
+              <th className="px-3 py-2">Trạng thái</th>
+              <th className="px-3 py-2">Yêu cầu</th>
+              <th className="px-3 py-2 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-b border-line last:border-0 hover:bg-slate-50/70">
+                <td className="max-w-sm px-3 py-3 align-top">
+                  <p className="font-semibold text-ink">{row.title}</p>
+                  <p className="mt-1 line-clamp-1 text-xs text-slate-500">{row.formTitle ? `Hồ sơ: ${row.formTitle}` : row.nextAction}</p>
+                </td>
+                <td className="px-3 py-3 align-top">
+                  <p className="font-medium text-slate-700">{row.node.name ?? '-'}</p>
+                  <p className="mt-1 max-w-48 truncate text-xs text-slate-500">{row.ownerLabel}</p>
+                </td>
+                <td className="px-3 py-3 align-top"><EnumChip group="step_type" value={row.workType} /></td>
+                <td className="px-3 py-3 align-top"><PlanningWorkStatus row={row} /></td>
+                <td className="px-3 py-3 align-top">
+                  <p className="text-xs font-semibold text-slate-700">{planningWorkRequirementLabel(row)}</p>
+                  <p className="mt-1 text-xs text-slate-500">{row.evidenceCount} minh chứng</p>
+                </td>
+                <td className="px-3 py-3 text-right align-top"><PlanningWorkButton row={row} onOpen={() => onOpen(row)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="space-y-3 lg:hidden">
+        {rows.map((row) => (
+          <article key={row.id} className={`rounded-md border p-3 ${row.blocked || row.missingInstance ? 'border-rose-200 bg-rose-50/30' : 'border-line bg-white'}`}>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <PlanningWorkStatus row={row} />
+              <EnumChip group="step_type" value={row.workType} />
+            </div>
+            <h3 className="mt-2 text-sm font-semibold text-ink">{row.title}</h3>
+            <p className="mt-1 text-xs text-slate-500">{row.node.name ?? '-'} · {row.ownerLabel}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+              <span>{planningWorkRequirementLabel(row)}</span>
+              <span>{row.evidenceCount} minh chứng</span>
+            </div>
+            <div className="mt-3"><PlanningWorkButton row={row} onOpen={() => onOpen(row)} full /></div>
+          </article>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function PlanningWorkStatus({ row }: { row: PlanningWorkRow }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <StatusBadge status={row.workStatus} />
+      {row.missingInstance ? (
+        <span className="rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">Thiếu biểu mẫu</span>
+      ) : row.hasForm && row.formStatus ? <StatusBadge status={row.formStatus} /> : null}
+    </div>
+  );
+}
+
+function PlanningWorkButton({ row, onOpen, full = false }: { row: PlanningWorkRow; onOpen: () => void; full?: boolean }) {
+  const disabled = !row.workItem;
+
+  return (
+    <button
+      className={`inline-flex items-center justify-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${full ? 'w-full py-2 text-sm' : ''}`}
+      disabled={disabled}
+      onClick={onOpen}
+      title={disabled ? 'Đầu việc không còn khả dụng trong hàng đợi vận hành' : planningWorkActionLabel(row)}
+    >
+      {planningWorkActionLabel(row)}
+      <ArrowRight className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+function buildPlanningWorkRows(nodes: Record<string, any>[], run?: Record<string, any>): PlanningWorkRow[] {
+  const rows: PlanningWorkRow[] = [];
+  let workflowOrder = 0;
   nodes.forEach((node) => {
     (node.steps ?? []).forEach((step: Record<string, any>) => {
       const hasSummary = hasWorkflowFormSummary(step);
       const required = Boolean(step.workflow_form_required);
       const hasInstance = Boolean(step.workflow_form_instance_id);
-      if (!hasSummary && !required && !hasInstance) return;
-
       const workItem = stepToWorkItem(step, run);
-      const formType = String(step.workflow_form_type ?? step.step_type ?? 'generic_submission');
-      const formStatus = String(step.workflow_form_status ?? (hasInstance ? 'draft' : 'missing'));
+      const hasForm = hasSummary || required || hasInstance;
+      const formStatus = hasInstance ? String(step.workflow_form_status ?? 'draft') : required ? 'missing' : '';
       const missingInstance = required && !hasInstance;
-      const blocked = step.status === 'blocked' || workItem?.status === 'blocked';
-      const submitted = formStatus === 'submitted';
-      const needsSubmit = !missingInstance && !blocked && !submitted;
-      const formTitle = hasSummary ? workflowFormChipText(step) : workflowFormBusinessLabel(step);
-      const nextAction = missingInstance ? 'Kiểm tra việc gắn biểu mẫu trước khi hoàn tất bước' : workflowFormNextAction(step);
+      const workStatus = String(workItem?.status ?? step.status ?? 'pending');
+      const blocked = step.status === 'blocked' || workStatus === 'blocked';
+      const workType = String(step.step_type ?? workItem?.work_type ?? 'task');
+      const workTypeLabel = enumLabel('step_type', workType);
+      const formTitle = hasForm ? (hasSummary ? workflowFormChipText(step) : workflowFormBusinessLabel(step)) : undefined;
+      const ownerLabel = arrayText(workItem?.role_ids ?? step.required_role_ids);
+      const nextAction = planningWorkNextAction({ step, workStatus, hasForm, formStatus, missingInstance });
+      const queue = planningQueueForStatus(workStatus);
+      const title = String(workItem?.title ?? step.name ?? 'Đầu việc chưa đặt tên');
       const searchText = [
+        title,
         formTitle,
-        formType,
-        workflowFormTypeLabel(formType),
+        workType,
+        workTypeLabel,
+        workStatus,
+        statusLabel(workStatus),
         node.name,
         node.description,
         step.name,
         step.description,
-        workItem?.title,
+        ownerLabel,
       ].filter(Boolean).join(' ').toLowerCase();
 
       rows.push({
@@ -648,47 +885,155 @@ function buildPlanningFormRows(nodes: Record<string, any>[], run?: Record<string
         step,
         node,
         workItem,
+        title,
         formTitle,
-        formType,
-        formTypeLabel: workflowFormTypeLabel(formType),
         formStatus,
+        workStatus,
+        workType,
+        workTypeLabel,
+        queue,
         required,
-        hasInstance,
+        hasForm,
         missingInstance,
         blocked,
-        submitted,
-        needsSubmit,
         evidenceCount: numberValue(step.evidence_count),
+        ownerLabel,
         nextAction,
         searchText,
+        workflowOrder,
       });
+      workflowOrder += 1;
     });
   });
   return rows;
 }
 
-function buildPlanningFormMetrics(rows: PlanningFormRow[]): PlanningFormMetrics {
+function buildPlanningWorkMetrics(rows: PlanningWorkRow[]): PlanningWorkMetrics {
   return {
     total: rows.length,
-    required: rows.filter((row) => row.required).length,
-    needsSubmit: rows.filter((row) => row.needsSubmit).length,
-    submitted: rows.filter((row) => row.submitted).length,
+    actionable: rows.filter((row) => row.queue === 'actionable').length,
+    waiting: rows.filter((row) => row.queue === 'waiting').length,
+    future: rows.filter((row) => row.queue === 'future').length,
+    completed: rows.filter((row) => row.queue === 'completed').length,
     blocked: rows.filter((row) => row.blocked).length,
-    missing: rows.filter((row) => row.missingInstance).length,
+    formsTotal: rows.filter((row) => row.hasForm).length,
+    submittedForms: rows.filter((row) => row.formStatus === 'submitted').length,
+    missingForms: rows.filter((row) => row.missingInstance).length,
   };
 }
 
-function planningFormRowMatchesFilters(row: PlanningFormRow, filters: PlanningFormFilters) {
+function planningWorkRowMatchesFilters(row: PlanningWorkRow, filters: PlanningWorkFilters) {
   const search = filters.search.trim().toLowerCase();
   if (search && !row.searchText.includes(search)) return false;
-  if (filters.type !== 'all' && row.formType !== filters.type) return false;
+  if (filters.queue !== 'all' && row.queue !== filters.queue) return false;
+  if (filters.type !== 'all' && row.workType !== filters.type) return false;
+  if (filters.status !== 'all' && row.workStatus !== filters.status) return false;
   if (filters.requirement === 'required' && !row.required) return false;
-  if (filters.requirement === 'optional' && row.required) return false;
-  if (filters.status === 'all') return true;
-  if (filters.status === 'needs_submit') return row.needsSubmit;
-  if (filters.status === 'blocked') return row.blocked;
-  if (filters.status === 'missing') return row.missingInstance;
-  return row.formStatus === filters.status;
+  if (filters.requirement === 'optional' && (!row.hasForm || row.required)) return false;
+  if (filters.requirement === 'none' && row.hasForm) return false;
+  return true;
+}
+
+function planningQueueForStatus(workStatus: string): PlanningQueueFilter {
+  if (workStatus === 'waiting_approval' || workStatus === 'waiting_review') return 'waiting';
+  if (workStatus === 'pending') return 'future';
+  if (['completed', 'submitted', 'done', 'cancelled', 'skipped'].includes(workStatus)) return 'completed';
+  return 'actionable';
+}
+
+function planningWorkNextAction({
+  step,
+  workStatus,
+  hasForm,
+  formStatus,
+  missingInstance,
+}: {
+  step: Record<string, any>;
+  workStatus: string;
+  hasForm: boolean;
+  formStatus: string;
+  missingInstance: boolean;
+}) {
+  if (missingInstance) return 'Kiểm tra việc gắn biểu mẫu bắt buộc';
+  if (workStatus === 'blocked') return 'Xử lý vướng mắc trong đầu việc';
+  if (workStatus === 'waiting_approval' || workStatus === 'waiting_review') return 'Mở yêu cầu duyệt hoặc rà soát';
+  if (workStatus === 'pending') return 'Chưa tới lượt xử lý trong quy trình';
+  if (['completed', 'done'].includes(workStatus)) return 'Xem kết quả đã hoàn tất';
+  if (hasForm) return workflowFormNextAction({ ...step, workflow_form_status: formStatus });
+  if (step.photo_required || step.step_type === 'photo_upload') return 'Bổ sung ảnh minh chứng';
+  if (step.document_required || step.step_type === 'document_upload') return 'Bổ sung tài liệu yêu cầu';
+  return 'Mở đầu việc để tiếp tục';
+}
+
+function selectNextPlanningWork(rows: PlanningWorkRow[]) {
+  return [...rows]
+    .filter((row) => row.workItem && (row.queue === 'actionable' || row.queue === 'waiting'))
+    .sort((left, right) => {
+      const priorityDiff = planningWorkPriority(left) - planningWorkPriority(right);
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.workflowOrder - right.workflowOrder;
+    })[0];
+}
+
+function planningWorkPriority(row: PlanningWorkRow) {
+  if (row.blocked) return 0;
+  if (row.queue === 'waiting') return 1;
+  return 2;
+}
+
+function planningWorkActionLabel(row: PlanningWorkRow) {
+  if (row.blocked) return 'Xử lý vướng mắc';
+  if (row.queue === 'waiting') return 'Mở yêu cầu duyệt';
+  if (row.queue === 'future') return 'Xem việc';
+  if (row.queue === 'completed') return 'Xem kết quả';
+  if (row.step.photo_required || row.workType === 'photo_upload') return 'Tải minh chứng';
+  if (row.hasForm) return row.formStatus === 'submitted' ? 'Xem hồ sơ' : 'Tiếp tục hồ sơ';
+  return 'Mở việc';
+}
+
+function planningWorkRequirementLabel(row: PlanningWorkRow) {
+  if (!row.hasForm) return 'Không có biểu mẫu';
+  return row.required ? 'Hồ sơ bắt buộc' : 'Hồ sơ tùy chọn';
+}
+
+function buildPlanningProgress(nodes: Record<string, any>[]): PlanningProgress {
+  const steps = nodes.flatMap((node) => Array.isArray(node.steps) ? node.steps : []);
+  const skipped = steps.filter((step: Record<string, any>) => ['cancelled', 'skipped'].includes(String(step.status ?? ''))).length;
+  const executable = steps.filter((step: Record<string, any>) => !['cancelled', 'skipped'].includes(String(step.status ?? '')));
+  const completedSteps = executable.filter((step: Record<string, any>) => ['completed', 'submitted'].includes(String(step.status ?? ''))).length;
+  return {
+    total: executable.length,
+    completed: completedSteps,
+    skipped,
+    percent: executable.length ? Math.round((completedSteps / executable.length) * 100) : 0,
+  };
+}
+
+function arrayText(value: unknown) {
+  if (Array.isArray(value)) {
+    const text = value.map((item) => String(item).trim()).filter(Boolean).join(', ');
+    return text || '-';
+  }
+  const text = String(value ?? '').trim();
+  return text || '-';
+}
+
+function PlanningWorkspaceLoading() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      <div className="h-24 rounded-lg border border-line bg-white" />
+      <div className="h-36 rounded-lg border border-blue-100 bg-blue-50/40" />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="space-y-3 rounded-lg border border-line bg-white p-4">
+          <div className="h-9 rounded bg-slate-100" />
+          <div className="h-12 rounded bg-slate-100" />
+          <div className="h-12 rounded bg-slate-100" />
+          <div className="h-12 rounded bg-slate-100" />
+        </div>
+        <div className="h-64 rounded-lg border border-line bg-white" />
+      </div>
+    </div>
+  );
 }
 
 function stepToWorkItem(step: Record<string, any>, run?: Record<string, any>): WorkItem | null {

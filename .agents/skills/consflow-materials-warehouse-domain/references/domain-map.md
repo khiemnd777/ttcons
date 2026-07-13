@@ -10,23 +10,28 @@
 
 ## Routes
 
-- Catalog and stock: `/materials`, `/warehouses`, `/stock`
+- Catalog and stock: `/materials`, `/warehouses`, `/stock`, `/stock/positions`, `/stock/movements`
+- Multi-line stock documents: `/stock/documents`, `/stock/documents/:id`
 - Stock actions: `/stock/receive`, `/stock/issue`, `/stock/transfer`, `/stock/return-to-warehouse`, `/stock/return-to-subcontractor`
-- Site balances: `/projects/:id/material-balances`
+- Site balances and receipt sources: `/projects/:id/material-balances`, `/projects/:id/warehouse-receipt-options`
 - Work item material snapshots: `/work-items/:id/material-snapshot`
 - Surplus handling: `/work-items/:id/surplus-handlings`, `/surplus-handlings/:id`, `/surplus-handlings/:id/submit`
 
 ## Tables And Migrations
 
-- `materials`, `warehouses`, `stock_movements`, `site_material_balances`
+- `materials`, `warehouses`, `stock_documents`, `stock_document_items`, `stock_movements`, `site_material_balances`
 - `material_before_after_snapshots`, `material_before_after_snapshot_items`
 - `site_surplus_handlings`
 - Related evidence: `evidence_records`, `documents`
-- Relevant migrations: `V1`, `V6`, `V23`, `V24`, `V33`
+- Relevant migrations: `V1`, `V6`, `V23`, `V24`, `V33`, `V61`
 
 ## Invariants
 
 - Every stock operation keeps source, target, actor, quantity, material, and project traceability.
+- Posted stock documents are multi-line and atomic. Transfer documents require distinct active source/target warehouses, lock both balances in stable order and count the same quantity out of the source and into the target.
+- Submitted incoming acceptance is only a selectable receipt source. A linked receipt cannot exceed `accepted_quantity - previously linked receive movements`; acceptance never posts stock by itself.
+- Procurement accepted-vs-stocked progress also recognizes historical explicit receive movements linked to the originating `boq_item`; this compatibility source is capped at accepted quantity and blocks duplicate acceptance-linked receipts.
+- The stock workspace has four explicit sources of truth: warehouse positions, posted documents/ledger, project site/surplus balance and active material catalog.
 - Material snapshot submit applies site balance usage but does not create warehouse movement by itself.
 - Surplus handling can be partial and must keep remaining/handled state consistent.
 - Returning only part of the available site material leaves `surplus_status='partial'` when a positive surplus remains; it becomes `handled` only when no surplus remains. Stock SQL binds quantities explicitly as numeric to avoid PostgreSQL parameter type ambiguity.

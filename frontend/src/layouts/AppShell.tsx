@@ -38,7 +38,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { to: '/core-data', label: 'Dữ liệu lõi', icon: Database, permissions: ['catalog.view'] },
       { to: '/staff', label: 'Nhân sự', icon: Users, permissions: ['staff.view'] },
       { to: '/roles', label: 'Vai trò', icon: ShieldCheck, permissions: ['role.view'] },
-      { to: '/audit', label: 'Audit Log', icon: FileClock, permissions: ['audit.view'] },
+      { to: '/audit', label: 'Audit', icon: FileClock, permissions: ['audit.view'] },
       { to: '/settings', label: 'Cấu hình', icon: Settings, permissions: ['settings.view'] },
     ],
   },

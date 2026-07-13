@@ -2,7 +2,7 @@
 
 ## Owners
 
-- Frontend modules: `frontend/src/modules/accounting`, `frontend/src/modules/debt`, `frontend/src/modules/reports`
+- Frontend modules: `frontend/src/modules/accounting`, `frontend/src/modules/debt`, `frontend/src/modules/contracts`, `frontend/src/modules/reports`
 - Debt panels: `InputInvoicePanel.tsx`, `OutputInvoicePanel.tsx`, `InputPaymentPlanPanel.tsx`, `OutputBillingPlanPanel.tsx`, `PayableReconciliationPanel.tsx`, `ReceivableReconciliationPanel.tsx`
 - Report panels: `CashflowPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
@@ -39,6 +39,7 @@
 - Active signed contract versions are the commercial source of truth. `projects.contract_amount` is only the active main-client compatibility snapshot.
 - A milestone can open AP/AR only after the contract is active and the milestone is eligible; acceptance-required milestones must reference an approved pass/conditional-pass acceptance.
 - Retention held at milestone obligation time is reconciled through append-only release rows; each release creates a traceable AP/AR source record and cannot exceed outstanding retention.
+- The contract workspace presents milestone obligations as Vietnamese payable/receivable labels without exposing raw obligation identifiers; eligibility, obligation creation and retention release still use the existing permission and server transition gates.
 - Handover readiness reads AP/AR remaining balances and pending payment status; it snapshots those facts but never force-closes financial records.
 
 ## Cross-Domain Checks

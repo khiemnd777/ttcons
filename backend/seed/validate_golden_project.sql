@@ -167,6 +167,22 @@ BEGIN
   SELECT count(*) INTO actual FROM permissions
   WHERE key LIKE 'contract.%' OR key LIKE 'quality.%' OR key='handover.verify';
   IF actual <> 15 THEN RAISE EXCEPTION 'Product-grade RBAC permissions after seed: expected 15, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM role_permissions rp
+  JOIN roles r ON r.id=rp.role_id
+  JOIN permissions p ON p.id=rp.permission_id
+  WHERE p.key='project.member.manage' AND r.name IN ('admin','director','pm');
+  IF actual <> 3 THEN RAISE EXCEPTION 'Project member management role grants: expected 3, got %',actual; END IF;
+
+  SELECT
+    (SELECT count(*) FROM pipeline_template_steps WHERE name LIKE 'Trảo đổi%') +
+    (SELECT count(*) FROM pipeline_run_steps WHERE name LIKE 'Trảo đổi%') +
+    (SELECT count(*) FROM work_items WHERE title LIKE 'Trảo đổi%') +
+    (SELECT count(*) FROM workflow_form_instances WHERE title LIKE 'Trảo đổi%')
+  INTO actual;
+  IF actual <> 0 THEN RAISE EXCEPTION 'Incorrect workflow label Trảo đổi remains in % record(s)',actual; END IF;
+
   SELECT count(*) INTO actual
   FROM role_permissions rp
   JOIN roles r ON r.id=rp.role_id

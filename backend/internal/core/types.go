@@ -72,6 +72,13 @@ type PartnerFilter struct {
 	Status string
 }
 
+type ProjectMemberMutationRequest struct {
+	StaffID        string   `json:"staff_id"`
+	RoleIDs        []string `json:"role_ids"`
+	ProjectRoleIDs []string `json:"project_role_ids"`
+	Notes          string   `json:"notes"`
+}
+
 type InputInvoiceRequest struct {
 	InvoiceNumber        string  `json:"invoice_number"`
 	InvoiceSymbol        string  `json:"invoice_symbol"`
@@ -214,6 +221,46 @@ type WorkItemEvidenceRequest struct {
 	RevisionNo      string `json:"revision_no"`
 	Visibility      string `json:"visibility"`
 	Payload         Record `json:"payload"`
+}
+
+type ConstructionDailyReportCreateRequest struct {
+	ReportDate        string                                   `json:"report_date"`
+	Weather           string                                   `json:"weather"`
+	ProgressPercent   int                                      `json:"progress_percent"`
+	WorkItemID        string                                   `json:"work_item_id"`
+	DoneItems         []ConstructionDailyReportWorkItemRequest `json:"done_items"`
+	CurrentItems      []ConstructionDailyReportWorkItemRequest `json:"current_items"`
+	NextItems         []ConstructionDailyReportWorkItemRequest `json:"next_items"`
+	Blockers          []ConstructionDailyReportBlockerRequest  `json:"blockers"`
+	FieldNotes        string                                   `json:"field_notes"`
+	CrewItems         []ConstructionDailyReportCrewRequest     `json:"crew_items"`
+	MaterialItems     []ConstructionDailyReportMaterialRequest `json:"material_items"`
+	EvidenceIDs       []string                                 `json:"evidence_ids"`
+	PrimaryEvidenceID string                                   `json:"primary_evidence_id"`
+	ManpowerSummary   string                                   `json:"manpower_summary"`
+	MaterialSummary   string                                   `json:"material_usage_summary"`
+}
+
+type ConstructionDailyReportWorkItemRequest struct {
+	Title string `json:"title"`
+}
+
+type ConstructionDailyReportBlockerRequest struct {
+	Content string `json:"content"`
+}
+
+type ConstructionDailyReportCrewRequest struct {
+	CrewName    string  `json:"crew_name"`
+	WorkerCount int     `json:"worker_count"`
+	WorkHours   float64 `json:"work_hours"`
+	Note        string  `json:"note"`
+}
+
+type ConstructionDailyReportMaterialRequest struct {
+	MaterialName string  `json:"material_name"`
+	Quantity     float64 `json:"quantity"`
+	Unit         string  `json:"unit"`
+	Note         string  `json:"note"`
 }
 
 type WorkflowFormSaveRequest struct {
@@ -624,15 +671,25 @@ type StoredFileMetadata struct {
 }
 
 type WorkItemActivityRequest struct {
-	ActivityType string                      `json:"activity_type"`
-	Comment      string                      `json:"comment"`
-	Visibility   string                      `json:"visibility"`
-	ScopeType    string                      `json:"scope_type"`
-	ScopeID      string                      `json:"scope_id"`
-	WorkItemID   string                      `json:"work_item_id"`
-	Mentions     []ActivityMentionRequest    `json:"mentions"`
-	Attachments  []ActivityAttachmentRequest `json:"attachments"`
-	Metadata     Record                      `json:"metadata"`
+	ActivityType     string                      `json:"activity_type"`
+	Comment          string                      `json:"comment"`
+	Visibility       string                      `json:"visibility"`
+	ScopeType        string                      `json:"scope_type"`
+	ScopeID          string                      `json:"scope_id"`
+	WorkItemID       string                      `json:"work_item_id"`
+	ParentActivityID string                      `json:"parent_activity_id"`
+	Mentions         []ActivityMentionRequest    `json:"mentions"`
+	Attachments      []ActivityAttachmentRequest `json:"attachments"`
+	Metadata         Record                      `json:"metadata"`
+}
+
+type ActivityReactionRequest struct {
+	Reaction string `json:"reaction"`
+	Active   bool   `json:"active"`
+}
+
+type ActivityMessageUpdateRequest struct {
+	Comment string `json:"comment"`
 }
 
 type ActivityMentionRequest struct {
@@ -648,9 +705,50 @@ type ActivityAttachmentRequest struct {
 }
 
 type ProjectActivityFilter struct {
-	ScopeType string
-	ScopeID   string
-	Limit     int
+	ScopeType       string
+	ScopeID         string
+	ActivityType    string
+	ActorID         string
+	Visibility      string
+	Kind            string
+	Attention       string
+	Search          string
+	Cursor          string
+	CursorCreatedAt string
+	CursorID        string
+	Limit           int
+}
+
+type ProjectEvidenceFilter struct {
+	EvidenceType    string
+	Status          string
+	WorkItemID      string
+	SubmittedBy     string
+	Visibility      string
+	DateFrom        string
+	DateTo          string
+	Search          string
+	Cursor          string
+	CursorPriority  int
+	CursorCreatedAt string
+	CursorID        string
+	Limit           int
+}
+
+type AuditLogFilter struct {
+	ProjectID  string
+	EventType  string
+	TargetType string
+	ActorName  string
+	DateFrom   string
+	DateTo     string
+	Search     string
+	Page       int
+	PageSize   int
+}
+
+type ActivityResolutionRequest struct {
+	Comment string `json:"comment"`
 }
 
 type ProjectOperationsFilter struct {
@@ -664,13 +762,36 @@ type ActivityAttentionFilter struct {
 }
 
 type StockActionRequest struct {
-	ProjectID     string  `json:"project_id"`
-	WarehouseID   string  `json:"warehouse_id"`
-	MaterialID    string  `json:"material_id"`
-	MovementType  string  `json:"movement_type"`
-	Quantity      float64 `json:"quantity"`
-	Unit          string  `json:"unit"`
-	Reason        string  `json:"reason"`
-	ReferenceType string  `json:"reference_type"`
-	ReferenceID   string  `json:"reference_id"`
+	ProjectID         string  `json:"project_id"`
+	WarehouseID       string  `json:"warehouse_id"`
+	TargetWarehouseID string  `json:"target_warehouse_id"`
+	MaterialID        string  `json:"material_id"`
+	MovementType      string  `json:"movement_type"`
+	Quantity          float64 `json:"quantity"`
+	Unit              string  `json:"unit"`
+	Reason            string  `json:"reason"`
+	ReferenceType     string  `json:"reference_type"`
+	ReferenceID       string  `json:"reference_id"`
+	StockDocumentID   string  `json:"-"`
+}
+
+type StockDocumentItemRequest struct {
+	MaterialID     string  `json:"material_id"`
+	Quantity       float64 `json:"quantity"`
+	Unit           string  `json:"unit"`
+	Reason         string  `json:"reason"`
+	SourceLineType string  `json:"source_line_type"`
+	SourceLineID   string  `json:"source_line_id"`
+}
+
+type StockDocumentRequest struct {
+	ProjectID         string                     `json:"project_id"`
+	MovementType      string                     `json:"movement_type"`
+	SourceWarehouseID string                     `json:"source_warehouse_id"`
+	TargetWarehouseID string                     `json:"target_warehouse_id"`
+	ReferenceType     string                     `json:"reference_type"`
+	ReferenceID       string                     `json:"reference_id"`
+	DocumentDate      string                     `json:"document_date"`
+	Note              string                     `json:"note"`
+	Items             []StockDocumentItemRequest `json:"items"`
 }

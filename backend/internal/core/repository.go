@@ -216,7 +216,7 @@ func safeTable(table string) string {
 	switch table {
 	case "projects", "pipeline_templates", "pipeline_template_nodes", "pipeline_template_edges", "pipeline_template_steps",
 		"pipeline_runs", "pipeline_run_nodes", "pipeline_run_edges", "pipeline_run_steps", "approval_requests", "approval_actions",
-		"boq_items", "procurement_requests", "procurement_request_items", "warehouses", "materials", "stock_movements",
+		"boq_items", "procurement_requests", "procurement_request_items", "contracts", "warehouses", "materials", "stock_movements",
 		"site_material_balances", "operation_daily_reports", "issues", "acceptance_records", "acceptance_checklist_items",
 		"rework_requests", "replanning_requests", "handover_records", "accounting_budgets", "payables", "receivables",
 		"payments", "advance_requests", "documents", "audit_logs", "system_settings", "staff", "roles", "permissions",
@@ -304,7 +304,11 @@ func warehouseColumns() []ColumnSpec {
 }
 
 func dailyReportColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("report_date"), col("reported_by"), col("weather"), col("work_summary"), col("manpower_summary"), col("material_usage_summary"), col("issues_summary"), col("progress_percent"), jsonCol("photos")}
+	return []ColumnSpec{
+		col("project_id"), col("report_date"), col("reported_by"), col("weather"), col("work_summary"),
+		col("manpower_summary"), col("material_usage_summary"), col("issues_summary"), col("progress_percent"),
+		jsonCol("photos"), col("work_item_id"), jsonCol("structured_json"), col("primary_evidence_id"),
+	}
 }
 
 func issueColumns() []ColumnSpec {

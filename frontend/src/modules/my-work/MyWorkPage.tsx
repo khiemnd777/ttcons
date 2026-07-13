@@ -12,6 +12,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import type { ActivityAttentionItem, WorkItem } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { ActivityAttachments } from '../work-items/ActivityAttachments';
+import { ActivityReactionBar, ActivityReplyQuote } from '../work-items/ActivityConversationMeta';
 import { WorkItemCard } from '../work-items/WorkItemCard';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
 import {
@@ -424,8 +425,10 @@ function ActivityAttentionPanel({
                   </button>
                 ) : null}
               </div>
+              <ActivityReplyQuote replyTo={item.reply_to} />
               {item.comment ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-700">{item.comment}</p> : null}
               <ActivityAttachments attachments={item.attachments} compact />
+              {item.reactions?.length ? <div className="mt-2"><ActivityReactionBar reactions={item.reactions} /></div> : null}
               {item.project_id ? (
                 <Link to={`/projects/${item.project_id}`} className="mt-2 inline-flex text-xs font-semibold text-blue-700 hover:text-blue-800">
                   Open project

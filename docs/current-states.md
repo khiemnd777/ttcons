@@ -1,5 +1,605 @@
 # Current States
 
+## Contract Workspace Vietnamese Redesign
+
+Status: complete
+
+Mục đích chính:
+- Giúp người quản lý nhanh chóng chọn đúng hợp đồng, nhận ra tình trạng và việc cần xử lý, rồi đi sâu vào phiên bản, mốc thanh toán, phụ lục hoặc khoản giữ lại bằng giao diện hoàn toàn tiếng Việt.
+
+Will be done:
+- Giữ bố cục danh sách–chi tiết trên màn hình lớn; bổ sung tìm kiếm, lọc chiều công nợ/trạng thái và luồng danh sách–chi tiết rõ ràng trên màn hình nhỏ.
+- Đưa tình trạng, giá trị và một việc cần xử lý lên đầu chi tiết; chuyển bốn bảng dài thành các thẻ nội dung có số lượng.
+- Việt hóa toàn bộ nhãn hệ thống của trang, loại hợp đồng, mốc thanh toán, công nợ, trạng thái, biểu mẫu và phản hồi; giữ nguyên mã, tên riêng và dữ liệu người dùng nhập.
+- Dùng bảng dày trên màn hình rất rộng và thẻ dữ liệu trên màn hình hẹp để loại bỏ phụ thuộc vào bảng rộng 900px.
+- Giữ nguyên API, quyền và các cổng nghiệp vụ phiên bản/mốc/phụ lục/giữ lại; cập nhật central/frontend/commercial/accounting mappings.
+- Chạy `cd frontend && npm run build`, tìm chuỗi giao diện chưa Việt hóa và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai`.
+- Loaded the mandatory central/frontend/commercial/accounting mappings and inspected the overlapping dirty worktree before editing.
+- Confirmed the existing contract list/detail APIs, permission gates and financial transitions already support a frontend-only redesign.
+- Rebuilt the project contract workspace with a searchable/filterable master list, selected-contract summary, local Vietnamese contract/type/direction labels and mobile list-to-detail navigation.
+- Added one permission-aware next-action band ordered through version review/approval/signing, contract activation, milestone eligibility/obligation, variation lifecycle and retention release without changing server transitions.
+- Replaced four stacked 900px-minimum tables with count-bearing tabs, very-wide desktop tables and compact responsive record cards for versions, milestones, variations and retentions.
+- Removed raw obligation ID fragments from the presentation, localized gross/net/hash/AP-AR concepts, formatted dates with the Vietnamese locale and translated the remaining shared `review`/`incorporated` status labels.
+- Kept shared dialogs, inline form validation, dismissible mutation feedback, all current permission checks and the existing contract/AP/AR endpoints; no backend, migration, seed or response-contract change was required.
+- Updated central/frontend/commercial/accounting mappings with the new action-first contract workspace ownership and preserved financial/commercial invariants.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Ran focused user-facing English-label searches and `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Contract Detail Project Permission Allowlist Fix
+
+Status: complete
+
+Mục đích chính:
+- Khôi phục workspace chi tiết Hợp đồng cho người có quyền bằng cách cho phép helper phân quyền theo bản ghi phân giải `contracts.project_id`, không thay đổi UI, API contract hoặc nghiệp vụ AP/AR.
+
+Will be done:
+- Bổ sung `contracts` vào allowlist tên bảng an toàn mà `RecordProjectID` sử dụng.
+- Thêm regression test khóa cả trường hợp hợp lệ và tên bảng có nội dung injection.
+- Cập nhật backend function map và root-cause triage map cho lỗi `500 Bảng không hợp lệ`.
+- Chạy format, focused backend tests, authenticated API smoke test và kiểm tra quyền; không chạy browser verification.
+
+Done:
+- User approved the diagnosed backend-only fix with `OK triển khai`.
+- Reproduced `GET /api/contracts/65000000-0000-0000-0000-000000000201` returning HTTP 500 `INTERNAL_ERROR: Bảng không hợp lệ`, while the project contract list returned HTTP 200 and every contract-detail SQL query passed directly.
+- Confirmed `GetContract` calls `requireRecordProjectPermission(..., "contracts", ...)`, `RecordProjectID` rejects names absent from `safeTable`, and the allowlist omitted `contracts`.
+- Added `contracts` to the safe table allowlist and added a source-level regression test that preserves rejection of an unsafe table name.
+- Updated the backend function map with the `contracts`/`RecordProjectID` dependency and added a root-cause recipe for HTTP 500 `Bảng không hợp lệ`; central/frontend/domain maps did not require changes because routes, response shapes, UI and commercial/finance invariants are unchanged.
+- Ran the focused `TestSafeTableAllowsContractsForProjectRecordPermission`: pass.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...` under `backend`: pass.
+- Built the backend image and recreated only the backend container; no migration or seed changed.
+- Smoke-tested the authenticated Admin contract detail: HTTP 200 with 2 versions, 3 milestones, 1 variation and 2 retentions; the project contract list remains HTTP 200 with 3 records.
+- Smoke-tested Warehouse without `contract.view`: HTTP 403 `FORBIDDEN`, confirming project RBAC remains enforced.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Members Role Label SQL Correction
+
+Status: complete
+
+Mục đích chính:
+- Khôi phục workspace Thành viên cho người có quyền quản lý bằng cách sửa lỗi PostgreSQL `DISTINCT + ORDER BY` mà không đổi UI, permission hoặc contract API.
+
+Will be done:
+- Bọc tập nhãn distinct trong subquery và sắp xếp case-insensitive ở outer query.
+- Thêm DB-backed regression coverage gọi `ProjectMemberOptions` để khóa lỗi SQLSTATE 42P10.
+- Cập nhật backend mapping; chạy truy vấn pass/fail gốc, backend tests, build/recreate backend Docker và `git diff --check`.
+- Không thay frontend, migration, seed hoặc chạy browser verification.
+
+Done:
+- User approved the diagnosed fix with `OK triển khai sửa SQL thành viên`.
+- Reproduced the exact SQLSTATE 42P10 against PostgreSQL Docker and confirmed the subquery-wrapped candidate returns 13 distinct role labels.
+- Wrapped the distinct role-label projection in an inner query and applied `ORDER BY lower(label)` only in the outer query; response shape and ordering semantics remain unchanged.
+- Extended `TestProjectMemberLifecycleAndProjectManagerProtection` to call `ProjectMemberOptions`, require non-empty unique role labels and confirm the project operational role remains present.
+- Updated the backend function map with the distinct/outer-ordering ownership rule; no central/frontend/domain map change was required because routes, response contract, UI, permissions and business invariants are unchanged.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...`: pass.
+- Ran the DB-backed `TestProjectMemberLifecycleAndProjectManagerProtection` inside the Consflow Docker network: pass.
+- Built the production backend image and recreated only the backend container; V60 remained applied and no migration changed.
+- Smoke-tested the authenticated Admin member API: success, 12 items, 12 active, 13 role labels and `can_manage=true`.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Workflow Execution Workspace Redesign
+
+Status: complete
+
+Mục đích chính:
+- Giúp người điều phối nhận ra ngay giai đoạn hiện tại, tiến độ thực thi, việc ưu tiên tiếp theo và mở đúng đầu việc; giữ điều phối node là hành động phụ có kiểm soát.
+
+Will be done:
+- Dùng chung một workflow execution workspace cho route `/projects/:id/pipeline` và tab `Quy trình` trong tổng quan công trình.
+- Đưa current node, tiến độ bước loại trừ nhánh bỏ qua, count cần xử lý/chờ duyệt/bị chặn và một CTA `Mở việc tiếp theo` lên đầu.
+- Dùng stage rail 280px trên desktop, selector trên mobile, bảng công việc desktop và card mobile với bộ lọc trạng thái/tìm kiếm.
+- Chuyển request approval, advance và block vào khu vực `Thao tác giai đoạn`; chuyển `Tạo lại quy trình` vào menu phụ với dialog xác nhận.
+- Giữ nguyên API, permission và runtime gates; không thay backend, migration, status key hoặc work-item detail behavior.
+- Cập nhật central/frontend/workflow mappings; chạy `cd frontend && npm run build` và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai`.
+- Loaded the mandatory central/frontend/workflow mappings and inspected the overlapping dirty worktree plus the active Planning plan before editing.
+- Confirmed the route `/projects/:id/pipeline` still renders the legacy `PipelineRuntimeSection`, while `ProjectDetailPage` already contains the approved action-first workflow presentation over `/projects/:id/operations`.
+- Exported one `ProjectWorkflowWorkspace` and reused it in both the project Workflow tab and `/projects/:id/pipeline`, preserving the existing work-item detail navigation and backend runtime gates.
+- Replaced the 12 equal-weight node cards on `/pipeline` with current-node/next-work summary, executable step progress, attention counts, 280px desktop stage rail, responsive selector, filtered desktop work table and mobile work cards.
+- Moved request approval, advance and block into `Thao tác giai đoạn`; added required-reason block dialog and moved recreate into `Quản lý quy trình` with a confirmation dialog.
+- Added project-operations loading/error states and invalidated the shared operations query after runtime actions so summary, stages and work rows refresh together.
+- Updated central/frontend/workflow mappings for the shared workspace ownership, `/operations` presentation source and secondary node-control contract.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Planning Action-first Workspace
+
+Status: complete
+
+Mục đích chính:
+- Giúp người dùng mở trang `Kế hoạch` và nhận ra ngay giai đoạn hiện tại, việc nào phải xử lý tiếp theo, cùng hàng đợi công việc đúng trạng thái runtime mà không phải quét toàn bộ biểu mẫu tương lai.
+
+Will be done:
+- Chuyển `Kế hoạch` từ inventory 51 biểu mẫu sang hàng đợi 52 đầu việc, mặc định ưu tiên blocker -> chờ duyệt/rà soát -> việc đang mở theo thứ tự workflow.
+- Tách rõ `Cần xử lý`, `Chờ duyệt`, `Sắp tới`, `Hoàn tất` và `Tất cả`; giữ trạng thái hồ sơ, mức bắt buộc và minh chứng như metadata riêng.
+- Đưa một việc tiếp theo, trạng thái node hiện tại, tiến độ bước thực hiện và các count cần chú ý lên đầu màn hình.
+- Giữ node transition, phê duyệt, chặn node và audit đầy đủ trong route `Quy trình`; `Kế hoạch` chỉ liên kết sang đó.
+- Trong `Kế hoạch`, chỉ hiển thị CTA khởi động khi chưa có run. Việc tạo lại run đang hoạt động thuộc route `Quy trình`, nằm trong menu quản lý và bắt buộc qua dialog xác nhận theo review package mới nhất đã được duyệt.
+- Giữ nguyên API, route, permission và work-item detail gates; cập nhật central/frontend/project-planning/workflow mappings.
+- Chạy `cd frontend && npm run build` và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai`.
+- Loaded the mandatory central/frontend/project-planning/workflow mappings, confirmed `PlanningPage.tsx` ownership and inspected the overlapping dirty worktree before editing.
+- Confirmed the current `needsSubmit` classification ignores future `pending` work-item state, while the existing pipeline-run response already supplies all 52 ordered steps/work items and 51 form instances needed for a frontend-only redesign.
+- Rebuilt `Kế hoạch` as an action-first queue over all ordered runtime steps, with default actionable, waiting approval/review, future pending, completed/history and all-work views.
+- Added one next-work CTA ordered blocker -> waiting approval/review -> other open work, plus current-stage progress, actionable/waiting/blocked counts and submitted-form coverage.
+- Kept workflow-form status, requirement and evidence as supporting metadata; added dense desktop rows, responsive mobile cards, search/type/status/requirement filters and loading/error/empty/filter-empty states.
+- Kept planning rows navigation-only and routed node transition/approval/block operations to `Quy trình`; the active Planning header no longer presents `Khởi động / tạo lại quy trình` as its primary action.
+- Preserved work-item return navigation, permission-gated detail behavior, API routes and frontend domain contracts; no backend, migration or seed change was required.
+- Integrated the concurrent `/projects/:id/pipeline` execution-workspace redesign without restoring the removed legacy runtime section.
+- Updated central/frontend/project-planning/workflow mappings with the queue classification and navigation-only invariants.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Ran focused `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Members Governance Workspace
+
+Status: complete
+
+Mục đích chính:
+- Giúp thành viên công trình xem đúng danh bạ đang hoạt động; giúp người có quyền quản lý thêm, chỉnh vai trò/quyền và ngừng tham gia mà vẫn giữ lịch sử truy cập.
+
+Will be done:
+- Tách danh sách thành viên khỏi payload Operations thành API typed, permission-scoped và có capability quản lý rõ ràng.
+- Cho thành viên đang hoạt động xem danh bạ active; chỉ người có `project.member.manage` được xem lịch sử inactive và thực hiện thay đổi.
+- Thêm permission `project.member.manage`, unique membership theo công trình/nhân sự và luồng thêm/cập nhật/ngừng tham gia dạng transaction đồng bộ `project_members` với `user_roles` project scope.
+- Chặn ngừng tham gia PM hiện tại, dùng soft-deactivate, ghi audit cho mọi thay đổi và không hiển thị `assigned_nodes` chưa có runtime semantics.
+- Xây `ProjectMembersPanel` với tìm kiếm, bộ lọc, bảng/card responsive, dialog dùng chung, loading/empty/error/filter-empty và toast dismissible.
+- Đồng bộ tab/sidebar theo visibility/capability backend; cập nhật central/backend/frontend/project-planning/admin-governance mappings.
+- Chạy backend format/tests, migration check, frontend build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai theo review package này`.
+- Loaded the mandatory central/backend/frontend/project-planning/admin-governance mappings and inspected the dirty worktree before editing.
+- Confirmed current members are embedded in `/projects/:id/operations`, only Admin/Director receive them, the navigation still exposes the empty tab to project members, inactive rows are not filtered, and project-scoped `user_roles` are managed separately from `project_members`.
+- Added typed protected member routes for list/add/update/soft-deactivate with `project.view` directory access and server-computed `project.member.manage` capabilities.
+- Added migration V60 with member notes/updated timestamps, one-active-membership integrity, non-destructive duplicate normalization and the new permission granted to Admin/Director/PM.
+- Added transactional membership persistence that synchronizes project-scoped `user_roles`, preserves global roles, requires effective `project.view`, excludes Admin/Director from assignable project roles, audits every change and blocks removal of the current PM.
+- Removed members from the Operations payload/hidden-section contract and kept the legacy project detail member list active-only.
+- Replaced the flat four-column table with `ProjectMembersPanel`: summary, search/department/role/status filters, dense desktop table, mobile cards, detail/add/edit/deactivate dialogs, inline validation, loading/error/empty/filter-empty states and dismissible feedback.
+- Kept operational `role_ids`, project roles and global roles visually/contractually separate; left unused `assigned_nodes` out of the UI.
+- Added frontend domain types plus focused normalization and DB-backed lifecycle/PM-protection tests; updated central/backend/frontend/project-planning/admin-governance mappings.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...`: pass.
+- Ran `make migrate-check`: pass with 60 migrations.
+- Built the backend Docker image and applied V60 through `/app/consflow-migrate`: one migration applied, 59 skipped.
+- Ran `make seed-validate`: `GOLDEN_SAMPLE_VALIDATION_PASSED` for GOLDEN-LIVE, GOLDEN-NO-DESIGN and GOLDEN-REAL.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Audit Investigation Workspace
+
+Status: complete
+
+Mục đích chính:
+- Giúp người quản trị nhanh chóng xác định ai đã làm gì, vào lúc nào, trên đối tượng nào và dữ liệu chi tiết của thay đổi là gì.
+
+Will be done:
+- Chuyển trang Audit theo công trình và toàn hệ thống thành workspace điều tra với tìm kiếm, bộ lọc server-side, phân trang, chế độ danh sách/timeline và dialog chi tiết chỉ đọc.
+- Thu gọn tab Audit trong Tổng quan công trình thành preview năm sự kiện gần nhất, không lặp Timeline và bảng song song.
+- Giữ nguyên `audit.view`, `requirePermission`, `requireProjectPermission`, cách ghi `audit_logs` và phạm vi nhìn thấy theo công trình.
+- Thêm contract Audit có kiểu dữ liệu rõ ràng và response phân trang; trang toàn hệ thống hiển thị thông tin công trình nhưng vẫn áp `ProjectAccessFilter`.
+- Cập nhật central/backend/frontend/admin-governance mappings; chạy backend format/tests, frontend build và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu trong lượt này.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai theo review package này`.
+- Loaded the mandatory central/backend/frontend/admin-governance mappings and completed the cross-contract impact matrix.
+- Confirmed the only frontend consumers of `/audit-logs` and `/projects/:id/audit-logs` are `AuditPage` and `ProjectAuditPanel`.
+- Confirmed no migration, seed, permission, audit-write, report or export change is required for the approved scope.
+- Added typed `AuditLogFilter` and paginated Audit response with server-side project/event/target/actor/date/search filters, stable newest-first ordering and permission-scoped filter options.
+- Preserved global `ProjectAccessFilter`, project `requireProjectPermission`, route `audit.view` guards and all existing `AddAudit` write behavior.
+- Rebuilt `/audit` and `/projects/:id/audit` as a dense investigation workspace with global project context, list/timeline toggle, responsive cards, read-only metadata detail, refresh, empty/error states and server pagination.
+- Replaced the project Audit tab's duplicated timeline/table layout with a five-event preview and removed the misleading preview-length badge.
+- Updated Planning's audit timeline to consume `AuditLogPage.items` after the contract impact scan found it as a third endpoint consumer.
+- Updated central/backend/frontend/admin-governance/project-planning mappings for the new contract and UI ownership.
+- Added unit coverage for Audit filter normalization and a DB-backed query test that runs when `CONSFLOW_TEST_DATABASE_URL` is available.
+- Verified the generated count/list/filter-option SQL with read-only queries inside the Consflow PostgreSQL container.
+- Ran `cd backend && make test`, `cd frontend && npm run build`, and `git diff --check` successfully; Vite reported only the existing large-chunk advisory.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Overview Vietnamese Redesign
+
+Status: complete
+
+Mục đích chính:
+- Giúp người điều hành trong khoảng 10 giây nhận ra công trình đang ở đâu, việc nào phải xử lý tiếp theo và rủi ro nào cần can thiệp.
+
+Will be done:
+- Đưa một công việc cần làm tiếp theo và giai đoạn hiện tại lên đầu tab `Tổng quan`.
+- Tách cảnh báo cần chú ý khỏi thông tin tham khảo; rút danh sách ưu tiên còn năm việc và bổ sung bố cục thẻ trên màn hình nhỏ.
+- Việt hóa toàn bộ nhãn hệ thống trong tab, hành động và cây nghiệp vụ của không gian công trình; giữ nguyên mã, tên riêng và dữ liệu do người dùng nhập.
+- Giữ nguyên API `/projects/:id/operations`, quyền, trạng thái và thứ tự ưu tiên công việc.
+- Cập nhật frontend/project/workflow mapping; chạy frontend build, kiểm tra chuỗi tiếng Anh và `git diff --check`.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai`.
+- Confirmed the redesign is presentation-only and the existing project operations response already supplies project summary, health counts, workflow timeline and complete scoped work items.
+- Loaded the mandatory central/frontend/project-planning/workflow mappings and inspected the overlapping dirty worktree before editing.
+- Rebuilt `Tổng quan` around one prioritized next action, current runtime stage, a distinct attention strip, five-item priority preview and a separate project-information panel.
+- Added compact mobile work cards while preserving the dense desktop table and existing work-item detail navigation.
+- Localized project tab, action, empty/error, workflow and project-tree system labels into Vietnamese; preserved route keys, API status keys, project codes, names and user-entered work-item text.
+- Updated central/frontend/project-planning/workflow mappings for the new overview hierarchy and localization contract.
+- Ran `cd frontend && npm run build` successfully; Vite reported only its existing large-chunk advisory.
+- Ran focused `git diff --check` successfully and confirmed the remaining English search hits are internal identifiers, route/status keys or type names rather than user-facing labels.
+- Browser verification was skipped per repository rule because it was not explicitly requested in this turn.
+
+## Project Activity Emotion Button Contrast
+
+Status: complete
+
+Mục đích chính:
+- Làm nút thêm emotion luôn được nhận biết là hành động tương tác trên cả bubble xanh và nền sáng mà không cạnh tranh với reaction đã chọn.
+
+Will be done:
+- Thêm nền trắng, viền, shadow nhẹ và icon xanh đậm cho nút `SmilePlus`.
+- Thêm state hover, focus-visible, open và pending/disabled rõ ràng; giữ nguyên picker, emoji và API.
+- Cập nhật frontend mapping; chạy frontend build và `git diff --check`.
+
+Done:
+- User approved the focused review package and Mockup as Text with `OK triển khai nút emotion`.
+- Confirmed the root cause is the transparent `text-slate-500` icon button rendered on the own-message `bg-blue-600` bubble; reaction state and API remain healthy.
+- Replaced the transparent trigger with a bordered `bg-white/95` surface, blue icon and light shadow so it remains visible on both blue and light bubbles.
+- Added distinct hover, focus-visible and open styling, increased the icon to 16px and exposed `aria-expanded`.
+- Disabled the trigger while a reaction mutation is pending; the existing picker, emoji set, optimistic mutation and reaction pills remain unchanged.
+- Updated the frontend UI map for the shared interactive reaction trigger. Central/domain maps did not need updates because route, API contract, persistence, permission and activity invariants are unchanged.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Evidence Workspace Redesign
+
+Status: complete
+
+Mục đích chính:
+- Biến tab `Hồ sơ` thành trung tâm tra cứu và rà soát minh chứng công trình dạng danh sách dày, có dữ liệu đầy đủ, phân trang/lọc nguồn thật và hành động đúng quyền.
+
+Will be done:
+- Thêm API project evidence riêng với tìm kiếm, filter loại/trạng thái/đầu việc/người gửi/thời gian, cursor pagination, summary theo đúng project scope và `can_review` theo từng bản ghi.
+- Giữ hồ sơ của work item `cancelled` ngoài danh sách vận hành nhưng cho phép xem lịch sử `rejected` trong tab Hồ sơ.
+- Thay gallery PDF có preview lớn bằng project evidence workspace: KPI, filter dày, danh sách desktop, card compact mobile, loading/empty/error/filter-empty và dialog chi tiết dùng shared primitives.
+- Giữ upload trong work-item detail; tab Hồ sơ chỉ tra cứu, mở và rà soát, không gộp `documents` hoặc workflow PDF trong lượt này.
+- Cập nhật central/backend/frontend/project-planning/workflow mappings; chạy backend format/tests, frontend build và `git diff --check`.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai theo review package này`.
+- Confirmed current `/projects/:id/operations` exposes only 50 latest non-rejected evidence rows, while the project UI filters locally and presents a rejected filter that cannot return data.
+- Confirmed PostgreSQL direct-SQL repository ownership, existing `evidence_records` indexes/status model and backend `CanDecideWorkItem` enforcement; no migration is planned unless focused query validation proves an index is required.
+- Loaded mandatory central/backend/frontend/project-planning/workflow mappings and preserved the existing dirty worktree without reverting overlapping Activity/Workflow changes.
+- Added protected `GET /projects/:id/evidence` with validated search/type/status/work-item/sender/visibility/date filters, stable waiting-first cursor pagination, filtered totals, source-backed summary and scoped filter options.
+- Included rejected evidence as review history while keeping evidence from cancelled work items out of the project workspace; internal project users can see internal/project/client-visible evidence in their work scope, while client profiles remain restricted to client-visible evidence.
+- Added per-row `can_review` derived from the existing `CanDecideWorkItem` gate; the accept/reject endpoints remain the authoritative backend enforcement.
+- Added `ProjectEvidencePanel.tsx` with KPI filters, dense search/filter toolbar, compact desktop/mobile evidence rows, loading/error/empty/filter-empty states and cursor `Tải thêm`; upload remains in work-item detail.
+- Extended shared `EvidenceGallery` with externally controlled filters, a project list context, stage/source metadata and permission-aware review controls while preserving the existing work-item evidence list/gallery.
+- Changed the project Hồ sơ tab badge to use the full permission-scoped evidence summary instead of the capped `latest_evidence` slice.
+- Updated upload/review invalidation so project evidence queries refresh after work-item evidence changes.
+- Added unit coverage for evidence filter/cursor normalization and PostgreSQL integration coverage for waiting-first order, cursor continuation, summary parity, rejected history, cancelled-work-item exclusion and review capability.
+- Updated central/backend/frontend/project-planning/workflow mappings for the new route, contract, repository functions, UI owner and evidence-history invariants.
+- No migration or seed change was required because existing `evidence_records` status/visibility fields and project/work-item indexes support the new read contract.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...`: pass.
+- Ran focused PostgreSQL integration test `TestProjectEvidencePageScopeHistoryAndReviewCapability` against an isolated temporary PostgreSQL 17 database: pass; the temporary server was stopped afterward.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Activity Chat Edit UX Correction
+
+Status: complete
+
+Mục đích chính:
+- Làm cho chế độ chỉnh sửa tin nhắn chỉ phát request khi nội dung thực sự thay đổi, phản hồi validation gọn, không che workspace và giữ các điều khiển chat rõ ràng, nhất quán.
+
+Will be done:
+- Thêm dirty-state đã trim; khóa `Lưu chỉnh sửa` khi chưa thay đổi hoặc đang pending và không phát request/toast cho no-op.
+- Phân loại validation edit thành warning; deduplicate toast giống nhau toàn hệ thống và giới hạn ba toast khác nhau.
+- Đóng menu tin nhắn sau action, Escape hoặc click ngoài; giữ một menu duy nhất tại một thời điểm trong bubble.
+- Tăng tương phản metadata của bubble người dùng và thu gọn banner edit về thời gian/phạm vi thay vì lặp tên công trình dài.
+- Thêm `decisions` nguồn thật vào project activity summary và hiển thị count nhất quán trên tab `Quyết định`.
+- Cập nhật central/backend/frontend/project-planning mappings; chạy backend format/tests, focused integration test, frontend build và `git diff --check`.
+
+Done:
+- User approved all eight diagnosed corrections and the Mockup as Text with `OK triển khai gói sửa UX edit`.
+- Confirmed the winning frontend causes: no dirty comparison, generic error mapping, random-ID toast stacking, uncontrolled native `details`, fixed slate metadata on blue bubble, repeated long target context and a conditional that hides the decision badge.
+- Confirmed backend correctly rejects unchanged content and current project activity summary does not yet expose a dedicated decision count.
+- Added trimmed dirty-state comparison in the chat composer; unchanged edits show `Chưa có thay đổi`, keep the save button disabled and never call the API or create a toast.
+- Kept pending edit submissions disabled and mapped backend `VALIDATION_ERROR` responses to a warning toast while preserving unexpected failures as error toasts.
+- Updated the global toast provider to ignore identical active variant/title/description notifications and keep at most three distinct visible toasts.
+- Replaced the native message-action `details` with a controlled popover that closes on edit/withdraw action, Escape and outside click.
+- Added own-blue-bubble contrast tokens for visibility, target, compact time, edited state and work-item link metadata.
+- Compacted the edit banner to message time plus scope/visibility; removed the repeated long project target label.
+- Added source-backed `decisions` to `ProjectActivitySummary`, frontend domain/default state and the `Quyết định` badge; removed the conditional that hid that badge.
+- Extended the Pha 2B integration test to compare the returned decision summary against the project decision row count.
+- Updated central/backend/frontend/project-planning maps for dirty edit behavior, controlled menu, toast deduplication and decision summary ownership.
+- No migration or seed change was required because this correction changes response derivation and frontend interaction only.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...`: pass.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Ran `make restart`: pass; backend skipped all 59 already-applied migrations and listened on port 8080.
+- Ran Docker-network integration tests `TestActivityReplyAndReactionScope` and `TestActivityMessageEditAndWithdrawScope`: pass, including decision summary parity.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Activity Chat Edit And Withdraw Phase 2B
+
+Status: complete
+
+Mục đích chính:
+- Cho phép tác giả sửa hoặc thu hồi comment trong thời hạn ngắn mà vẫn giữ nguyên chuỗi trả lời, lịch sử phiên bản, audit và ranh giới giữa trao đổi với activity nghiệp vụ.
+
+Will be done:
+- Chỉ cho tác giả chỉnh sửa hoặc thu hồi activity loại `comment` trong 15 phút; kiểm tra quyền và thời hạn ở backend.
+- Chỉnh sửa chỉ thay đổi nội dung; scope, visibility, work item, mentions, attachments và liên kết reply giữ nguyên.
+- Thu hồi dùng tombstone, không xóa vật lý; giữ replies, ẩn reactions và chặn reply/reaction mới.
+- Thêm migration V59 cho metadata edit/withdraw và `activity_message_revisions` append-only ledger.
+- Loại nội dung đã thu hồi khỏi unread, mentions, attention và search nhưng vẫn giữ activity trong timeline/count lịch sử.
+- Thêm menu `Chỉnh sửa`/`Thu hồi`, composer edit mode, shared confirmation dialog và trạng thái tombstone trong Project Activity chat.
+- Giữ typed operational activities bất biến; không thêm manager override hoặc workflow transition.
+- Cập nhật central/backend/frontend/project-planning/workflow/admin mappings; chạy backend format/tests, migration check, frontend build và `git diff --check`.
+
+Done:
+- User approved the Phase 2B review package with `OK triển khai Pha 2B`.
+- Re-confirmed backend and UI currently support reply/reaction but have no edit, withdraw or message revision contract.
+- Re-confirmed `Dialog` is the shared modal primitive and the project chat composer is the correct edit surface.
+- Added migration `V59__activity_message_edit_withdraw.sql` with edit/withdraw actor timestamps, monotonic revision number and append-only `activity_message_revisions` ledger.
+- Added protected `PUT /activities/:id/message` and `POST /activities/:id/withdraw`; both reuse activity visibility, require exact author ownership, allow only `comment` and enforce the 15-minute server window.
+- Kept scope, visibility, target, work item, mentions, attachments and reply parent immutable during edit; typed operational activities remain immutable.
+- Made withdrawal transactional: preserve a tombstone and replies, clear current comment, deactivate reactions, close unread states and append revision plus audit without changing workflow state.
+- Blocked replies and reactions to withdrawn messages; conversation responses expose withdrawn parent previews, server-computed capabilities and no active reactions for tombstones.
+- Excluded withdrawn messages from My Work attention and project unread/mention counts while retaining them in project history, totals, pagination and reply counts.
+- Added the own-message `…` menu, sticky composer edit mode, shared withdrawal confirmation dialog, edited label and responsive tombstone rendering; work-item history and reply quotes render tombstones read-only.
+- Added focused integration coverage for author/type/time-window gates, revision/audit persistence, tombstone behavior, attention cleanup, reply preservation and reply/reaction rejection.
+- Updated central/backend/frontend/project-planning/workflow-orchestration/admin-governance maps for V59, routes, tables, UI ownership and communication-only invariants.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...`: pass.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Ran `make migrate-check`: pass with 59 migrations.
+- Ran `make restart`: pass; backend auto-applied V59 and started on port 8080.
+- Verified PostgreSQL Compose reports 59 applied migrations, the new columns and `activity_message_revisions` table.
+- Ran Docker-network integration tests `TestActivityReplyAndReactionScope` and `TestActivityMessageEditAndWithdrawScope`: pass.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Activity Chat Reply And Reactions Phase 2A
+
+Status: complete
+
+Mục đích chính:
+- Cho phép thành viên phản hồi trực tiếp một trao đổi và thể hiện phản ứng nhanh mà không làm mất tính truy vết, visibility, quyền theo công trình hoặc ranh giới giữa trao đổi và trạng thái nghiệp vụ.
+
+Will be done:
+- Thêm reply dạng quote trong luồng chat phẳng; reply luôn là `comment` và kế thừa project/target/work item/visibility của tin gốc.
+- Tự động tạo mention/unread cho tác giả tin gốc khi người khác reply.
+- Thêm reaction idempotent `👍`, `👀`, `🙏`, `🎉`; reaction không thay đổi read, resolve, work-item status hoặc activity summary.
+- Thêm migration `V58` cho `parent_activity_id` và `activity_reactions` active-state ledger; không sửa migration đã áp dụng.
+- Đồng bộ API response, Project Activity chat, Work Item activity timeline và My Work attention context.
+- Giữ edit/delete ngoài Pha 2A; giữ activity audit cho reply và không tạo audit/system event cho reaction.
+- Cập nhật central/backend/frontend/project-planning/workflow/admin mappings; chạy backend format/tests, migration check, frontend build và `git diff --check`.
+
+Done:
+- User approved the Phase 2A review package, inheritance rules and reaction set with `Đồng ý`.
+- Confirmed current persistence has no parent reference or reaction state and the existing activity table/query contract is shared by project chat, work-item detail and My Work attention.
+- Added migration `V58__activity_replies_reactions.sql` with nullable self-reference `parent_activity_id`, parent lookup index and active-state `activity_reactions` ledger for `👍`, `👀`, `🙏`, `🎉`.
+- Added protected `POST /activities/:id/reactions`; reaction upserts reuse `ActivityVisibleToUser`, reject system events and publish existing activity SSE invalidation without audit/system-event noise.
+- Added project reply normalization: backend forces `comment`, inherits the parent project/target/work item/visibility, rejects hidden/system/cross-project parents and auto-mentions the parent actor.
+- Extended activity query contracts with `reply_to`, `reply_count` and reaction summaries across project activity, work-item detail and My Work attention.
+- Added chat reply mode with parent quote, inherited/locked context, reply counts, optimistic reaction toggles and shared read-only reply/reaction metadata in operational activity surfaces.
+- Added focused integration coverage for inheritance, cross-project rejection, auto-mention/unread, reaction idempotency/whitelist, system-event rejection and response conversation fields.
+- Updated central/backend/frontend/project-planning/workflow-orchestration/admin-governance maps for V58, routes, tables, UI ownership and communication-only invariants.
+- Ran `make restart`: pass; backend auto-applied one migration and skipped 57, then listened successfully on port 8080.
+- Verified PostgreSQL Compose reports 58 applied migrations and smoke-tested project activity, My Work attention and work-item detail API contracts: all returned success.
+- Ran the focused PostgreSQL Compose integration test `TestActivityReplyAndReactionScope`: pass.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...`: pass.
+- Ran `make migrate-check`: pass with 58 migrations.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Activity Chat-like Discussion Phase 1
+
+Status: complete
+
+Mục đích chính:
+- Giúp thành viên công trình trao đổi theo nhịp hội thoại tự nhiên trong tab `Thảo luận`, đồng thời giữ `Tất cả` và `Nhật ký hệ thống` ở dạng activity feed phục vụ vận hành và truy vết.
+
+Will be done:
+- Chỉ chuyển tab `Thảo luận` sang luồng chat theo thứ tự cũ đến mới; tin của người hiện tại nằm bên phải, người khác nằm bên trái.
+- Hiển thị câu hỏi, quyết định, điểm chặn, nhắc việc và tệp dưới dạng bubble có nhận diện loại; giữ hành động đã đọc/đã xử lý và liên kết đầu việc.
+- Đặt composer chat cố định cuối luồng, tái sử dụng validation/payload hiện có và không tự thu gọn sau khi gửi.
+- Tải tin cũ ở đầu luồng, giữ vị trí cuộn, tự cuộn khi người dùng đang ở cuối và báo có tin mới khi họ đang đọc nội dung cũ.
+- Giữ nguyên API, RBAC, visibility, SSE, flat-message model và activity feed hiện có; chưa làm reply, reaction, edit hoặc delete trong Pha 1.
+- Cập nhật frontend/central/project-planning mappings; chạy `cd frontend && npm run build` và `git diff --check`; không chạy browser vì người dùng không yêu cầu.
+
+Done:
+- User approved the Phase 1 chat-like implementation with `OK triển khai chat-like Pha 1.`
+- Confirmed the existing activity contract already provides actor, typed activity, visibility, mentions, attachments, unread/resolution metadata and realtime invalidation required by this frontend-only phase.
+- Changed only the `Thảo luận` tab to a chronological chat surface with current-user messages aligned right, other participants aligned left, grouped authors and typed bubbles for operational messages.
+- Added top loading for older messages with scroll anchoring, initial/latest auto-scroll and a `Có tin nhắn mới` affordance when the reader is away from the bottom.
+- Added a persistent compact chat composer that shares the existing payload, validation, visibility, target, mention, attachment, owner and due-date logic; it remains open after successful send.
+- Kept `Tất cả`, `Quyết định` and `Nhật ký hệ thống` on the existing descending activity-card feed and retained read/resolve/work-item actions in chat bubbles.
+- Kept backend routes, database schema, RBAC, SSE and flat-message persistence unchanged; reply, reaction, edit and delete remain deferred.
+- Updated central routing, frontend UI and project-planning domain maps with the chat/feed split and Phase 1 boundary.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Activity Sample Visibility Correction
+
+Status: complete
+
+Mục đích chính:
+- Khi mở `Trao đổi`, người dùng nhìn thấy toàn bộ activity hiện có trước; thảo luận và nhật ký hệ thống là các bộ lọc chủ động, không làm sample project trông như thiếu dữ liệu.
+
+Will be done:
+- Đổi filter mặc định từ `Thảo luận` sang `Tất cả`.
+- Đổi badge tab `Trao đổi` từ attention count sang tổng activity nhìn thấy được; attention count tiếp tục nằm trong panel `Cần chú ý`.
+- Khi filter `Thảo luận` rỗng nhưng có system activity, hiển thị CTA mở `Nhật ký hệ thống`.
+- Giữ nguyên backend rule ẩn activity thuộc work item `cancelled` trong lượt sửa này.
+- Cập nhật frontend/project activity mappings và chạy `cd frontend && npm run build`, `git diff --check`; browser verification bỏ qua vì người dùng không yêu cầu.
+
+Done:
+- Reproduced against live `GOLDEN-REAL-001`: database has 52 activity rows, 0 discussion and 52 system rows; API exposes 48 system rows after excluding four cancelled-work-item rows.
+- User approved the focused diagnosis with `OK triển khai theo chuẩn đoán này`.
+- Changed project activity default from `Thảo luận` to `Tất cả` so seeded system history is visible immediately.
+- Changed the project-tab badge to the source-backed total visible activity count; attention remains in `Cần chú ý`.
+- Added a `Mở Nhật ký hệ thống` CTA when the discussion filter is empty but system history exists.
+- Updated frontend, central and project-planning maps with the corrected default/count semantics.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Activity Operational Redesign
+
+Status: complete
+
+Mục đích chính:
+- Biến tab `Trao đổi` thành trung tâm phối hợp công việc của công trình: ưu tiên nội dung cần phản hồi, gửi đúng người/đúng đối tượng và tách thảo luận khỏi nhật ký hệ thống.
+
+Will be done:
+- Thu gọn composer mặc định; chỉ hiện trường phụ theo loại ghi chú/câu hỏi/quyết định/điểm chặn/nhắc việc/tệp.
+- Thay nhập UUID bằng picker thành viên, vai trò, đầu việc và đối tượng nghiệp vụ được backend trả theo project scope/RBAC.
+- Mở rộng project activity API với tìm kiếm, filter, cursor pagination và summary count nguồn thật.
+- Thêm hành động đã trả lời/đã xử lý/hoàn tất nhắc việc cùng mark-all-read, lưu trạng thái trong `metadata_json` và giữ activity history append-only.
+- Tách thảo luận khỏi nhật ký hệ thống; thêm panel `Cần chú ý`, trạng thái loading/empty/error/filter-empty và responsive mobile.
+- Đổi badge tab từ số bản ghi latest bị giới hạn sang tổng activity nhìn thấy được; số cần chú ý nằm trong panel riêng.
+- Giữ nguyên visibility `internal/project/client`, project/work-item permission gates, SSE invalidation và auditability.
+- Không triển khai thread reply, reaction hoặc external notification trong pha này; không cần migration schema.
+- Cập nhật central/backend/frontend/project-planning/workflow-orchestration mappings trong cùng lượt.
+- Chạy backend format/tests, frontend build và `git diff --check`; browser verification bỏ qua vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai theo review package này`.
+- Confirmed current activity persistence already supports typed messages, visibility, mentions, unread states, attachments, arbitrary metadata and realtime SSE.
+- Confirmed existing project activity query only supports scope filters with a hard limit and the tab badge currently reflects the latest-activity slice rather than a total.
+- Confirmed schema migration is unnecessary while threaded replies remain deferred.
+- Added cursor-paginated project activity feed with server search/filter for kind, attention queue, scope, activity type, actor and visibility.
+- Added source-backed project activity summary, permission-scoped member/role/target/attachment options and a total-visible-activity tab badge; attention counts remain inside the attention panel.
+- Added mark-all-read and authorized question/blocker/reminder resolution; resolution metadata remains on the original activity while a system event and audit record preserve append-only history.
+- Rebuilt the project activity UI with a collapsed type-aware composer, no UUID inputs, discussion/decision/system tabs, desktop attention panel, mobile attention chips, filters, grouped activity cards, loading/filter-empty/error states and cursor loading.
+- Reused project activity options in work-item detail so the shared composer retains mention and owner pickers without technical IDs.
+- Updated central/backend/frontend/project-planning/workflow-orchestration maps for the new routes, contracts, UI surface and resolution invariant.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...` under `backend`: pass; DB-backed tests remain environment-gated by `CONSFLOW_TEST_DATABASE_URL`.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Work Tab Operational Queue Redesign
+
+Status: complete
+
+Mục đích chính:
+- Giúp PM/Admin nhìn thấy ngay công việc cần xử lý, công việc đang chờ hoặc bị chặn, người/vai trò phụ trách và mở đúng đầu việc trong phạm vi một công trình.
+
+Will be done:
+- Thay `Department Surfaces` bằng hàng đợi công việc theo mức độ hành động, mặc định `Cần xử lý`.
+- Tách rõ `Chờ duyệt`, `Bị chặn`, `Chưa đến lượt`, `Hoàn tất`, `Đã bỏ qua` và vẫn giữ `Tất cả` để truy vết.
+- Bổ sung tìm kiếm, lọc giai đoạn, người/vai trò phụ trách, trạng thái và sắp xếp ưu tiên/workflow/hạn.
+- Dùng bảng dày trên desktop và card gọn trên mobile; giữ một CTA `Mở` và điều hướng project-scoped hiện hữu.
+- Dùng toàn bộ `work_items` từ `/projects/:id/operations`, không dùng danh sách con tối đa 10 item của `department_surfaces` làm nguồn lọc.
+- Giữ nguyên backend contract, RBAC, transition, approval, evidence, workflow form và lịch sử cancelled read-only.
+- Cập nhật central/frontend/workflow mappings trong cùng lượt thay đổi.
+- Chạy `cd frontend && npm run build` và `git diff --check`; browser verification bỏ qua vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai`.
+- Confirmed the existing operations response already contains the status, node, assignee, role, due date, form and evidence fields required by the redesign.
+- Confirmed `department_surfaces.work_items` is capped at 10 records per department and cannot be used as the complete filtered list.
+- Confirmed no backend API or shared frontend type contract change is required.
+- Added `ProjectWorkTab.tsx` and replaced the system-facing `Department Surfaces` layout with an operational project work queue.
+- Added actionable/waiting/blocked/future/completed/skipped/all quick filters, accent-insensitive search, stage/owner-role/status filters and priority/workflow/due sorting.
+- Added a 20-row dense desktop table, responsive mobile cards and project-scoped `Mở` navigation without adding transition controls to the list.
+- Presenter now prioritizes direct assignee, then required roles, then department fallback; `Chưa phân công` appears only when those sources are absent.
+- Updated central, frontend UI and workflow orchestration maps with the new Work-tab ownership and complete-list invariant.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Project Workflow Execution Workspace Redesign
+
+Status: complete
+
+Mục đích chính:
+- Giúp người điều hành biết ngay workflow đang ở giai đoạn nào, việc nào cần xử lý tiếp theo và mở đúng đầu việc với ít thao tác nhất.
+
+Will be done:
+- Thay layout Workflow tab hai cột gần cân bằng bằng summary điều hành, stage rail 280px và vùng công việc chiếm phần lớn không gian.
+- Hiển thị tiến độ toàn workflow, giai đoạn hiện tại, số việc cần xử lý/chờ duyệt/bị chặn và CTA duy nhất `Mở việc tiếp theo` theo thứ tự blocker -> chờ duyệt -> việc sẵn sàng.
+- Đổi danh sách work item trong node sang bảng/row dày dữ liệu ở desktop và card gọn ở mobile.
+- Mặc định filter `Cần xử lý`; giữ `Tất cả` để truy vết lịch sử completed/skipped.
+- Bổ sung stage selector responsive, loading/empty/filter-empty/skipped state và giữ cancelled branch ở chế độ chỉ đọc.
+- Không đổi backend API, work-item transition, approval, workflow form, evidence hay orchestration invariant.
+- Cập nhật frontend UI map và workflow orchestration domain map trong cùng lượt thay đổi.
+- Chạy `cd frontend && npm run build` và `git diff --check`; browser verification tiếp tục bỏ qua vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and generated visual mockup with `OK, triển khai.`
+- Confirmed owner surface is `frontend/src/modules/projects/ProjectDetailPage.tsx` under `/projects/:id`.
+- Confirmed the existing `/projects/:id/operations` response already provides timeline, work-item status, owner, due date, form and evidence fields required by the redesign.
+- Confirmed no backend or shared frontend type contract change is required.
+- Replaced the balanced timeline/work-card layout with a workflow execution summary, 280px desktop stage rail and responsive stage selector.
+- Scoped summary counts and next-work selection to the current runtime node so future pending work does not inflate the actionable count.
+- Added next-work priority blocker -> waiting approval/review -> other current-node open work, with one primary CTA inside the Workflow tab.
+- Replaced node work cards with a dense desktop work table and compact mobile cards; retained owner, due date, form requirement, evidence count, status and blocker reason.
+- Changed active-node default filter to `Cần xử lý`; skipped/cancelled nodes automatically open `Đã bỏ qua` read-only history; `Tất cả` remains available.
+- Updated central, frontend UI and workflow orchestration maps for the new execution workspace behavior.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Pipeline Builder Back Navigation Target
+
+Status: complete
+
+Mục đích chính:
+- Make the Pipeline Builder `[← Quay lại]` control return to the `Công trình` list as a workflow navigation action, not as a browser-history back action.
+
+Will be done:
+- Change Pipeline Builder back handling from `navigate(-1)` history behavior to a fixed `/projects` navigation target.
+- Keep the visible button label `Quay lại`.
+- Change the button tooltip to `Về trang Công trình`.
+- Update the frontend UI map to record that Pipeline Builder sidebar back navigation targets `/projects`.
+- Keep backend APIs, template publish/clone/edit behavior, canvas/diagram interactions, workflow gates, and runtime copies unchanged.
+- Run `cd frontend && npm run build` and `git diff --check`; browser verification remains skipped unless explicitly requested.
+
+Done:
+- User approved the review package with `OK triển khai`.
+- Re-confirmed current code uses `window.history.state?.idx` and `navigate(-1)`, which behaves like browser back.
+- Re-confirmed `/projects` is the guarded project list route and current expected target.
+- Changed Pipeline Builder back handling to fixed `/projects` navigation.
+- Changed the button tooltip to `Về trang Công trình`.
+- Updated `frontend-ui-utility-map.md` to record that Pipeline Builder sidebar back navigation targets `/projects`.
+- Ran `cd frontend && npm run build`: pass; Vite reported the existing large chunk warning.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Official Workflow Text Correction — Trao đổi
+
+Status: complete
+
+Mục đích chính:
+- Sửa nhãn `Trảo đổi` thành `Trao đổi` ở mọi bề mặt dữ liệu workflow đang hiển thị cho người dùng, không thay đổi trạng thái hay lịch sử nghiệp vụ.
+
+Will be done:
+- Thêm migration V57 sửa ba Step template và các snapshot pipeline-run/work-item/workflow-form instance tương ứng.
+- Đồng bộ ba nhãn seed để lần seed sau không ghi đè lại bản sửa.
+- Bổ sung Golden validator chống tái phát, cập nhật mapping và chạy migration/check truy vấn cục bộ; không chạy `make seed` vì lệnh reset dữ liệu local.
+
+Done:
+- User approved the review package with `Approve`.
+- Confirmed the local database has 3 affected template steps, 9 run steps, 9 work items and 6 workflow-form instances.
+- Confirmed V40 is already applied but `seed.sql` runs afterward and upserts the three incorrect labels.
+- Added V57 to correct the three labels in template, pipeline-run, work-item and workflow-form snapshots without changing statuses, answers, approvals, audit records or PDF artifacts.
+- Corrected the three seed labels and added Golden validator coverage that rejects any remaining `Trảo đổi` label in those four data surfaces.
+- Applied V57 through the backend Docker custom migration runner: one migration applied and 56 skipped.
+- Verified locally: template/run/work-item/form-instance typo counts are all zero; all three configured Step labels now start with `Trao đổi`.
+- Validation passed: `make migrate-check`, `make seed-validate` (`GOLDEN_SAMPLE_VALIDATION_PASSED`) and `git diff --check`. `make seed` was intentionally skipped because it resets local data.
+
 ## Published Pipeline Node Inspector
 
 Status: complete
@@ -860,3 +1460,189 @@ Done:
 - Added impact-analysis pairing guidance to `consflow-module-memory`.
 - Added cross-feature collision routing to `consflow-repo-architect`.
 - Validated `SKILL.md` frontmatter and `openai.yaml` with Ruby YAML checks because the Python validator is missing `PyYAML` in this environment.
+
+## Procurement And Warehouse Operational Workspace Redesign
+
+Status: complete
+
+Mục đích chính:
+- Làm rõ chuỗi BOQ -> yêu cầu mua -> đặt hàng -> nghiệm thu đầu vào -> phiếu nhập kho -> xuất công trình -> xử lý vật tư dư, để người dùng luôn thấy đúng trạng thái và một hành động tiếp theo có thể thực hiện.
+
+Will be done:
+- Thiết kế lại Mua sắm thành workspace ưu tiên việc cần xử lý, có bộ lọc nghiệp vụ, tiến độ nghiệm thu/nhập kho, CTA chính theo trạng thái và action visibility khớp RBAC.
+- Thiết kế lại Kho thành bốn bề mặt: tồn theo kho, phiếu kho, tồn công trình/vật tư dư và danh mục vật tư.
+- Bổ sung tồn theo từng kho, ledger/phân trang phiếu kho, chứng từ nhiều dòng và liên kết rõ với nghiệm thu đầu vào mà không tự động tạo stock movement.
+- Hoàn thiện điều chuyển hai đầu với kho nguồn/kho đích trong một transaction; giữ kiểm tra không âm tồn và site balance/surplus hiện hữu.
+- Tách ý nghĩa audit đối soát nghiệm thu mua sắm khỏi event nhập kho thật; giữ lịch sử cũ không bị viết lại.
+- Cập nhật report query, frontend/backend contracts, integration tests và central/detail/domain mappings liên quan.
+- Chạy backend format/tests, frontend build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the full review package and Mockup as Text with `Duyệt, triển khai theo review package này`.
+- Loaded the mandatory central/backend/frontend mappings, commercial procurement, materials warehouse, quality acceptance, reporting, impact-analysis and database workflows.
+- Confirmed the PostgreSQL/custom SQL migration boundary, existing V60 maximum, current procurement acceptance-derived receive invariant and overlapping dirty worktree that must be preserved.
+- Added migration V61 with posted multi-line stock documents/items, movement document linkage and target warehouse linkage for two-ended transfers; applied it through the custom migration runner in Docker (`applied=1 skipped=60`).
+- Added source-backed per-warehouse positions, movement ledger, stock document list/detail/create and project warehouse-receipt-option endpoints with project visibility and warehouse permission gates.
+- Refactored stock posting through one transaction helper; transfer locks source/target in stable order, subtracts the source and adds the target, while issue/return continue updating site balances and surplus status.
+- Linked explicit receive movements to incoming-acceptance items, capped receipt quantity by remaining accepted quantity and preserved the invariant that submitting acceptance alone creates no stock movement.
+- Split procurement acceptance reconciliation audit events from real warehouse-receipt events and extended procurement list/detail data with accepted-vs-stocked quantities plus latest acceptance/work-item linkage.
+- Rebuilt Mua sắm as a permission-aware action-first queue with truthful acceptance/stock progress, dense desktop table, responsive cards, operational filters, one primary next action and enhanced detail dialog.
+- Rebuilt Kho as four tabs for per-warehouse stock, posted documents, project site/surplus and material catalog; added a shared responsive multi-line document dialog for receive/issue/transfer/return and acceptance-source prefill.
+- Updated frontend contracts/status mappings plus central/backend/frontend/commercial/materials/quality/reporting mappings for the new routes, tables, audit semantics and UI ownership.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...`: pass after updating the procurement event regression expectation.
+- Ran the DB-backed `TestStockDocumentTransferMovesBothWarehouseBalancesAtomically` in the Consflow Docker network: pass.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Preserved Golden Sample compatibility by recognizing historical explicit receipts linked to their source BOQ items; runtime smoke now reports both received procurement requests with accepted quantity equal to stocked quantity and no duplicate receipt options.
+- Rebuilt and recreated the local backend/admin containers, confirmed V61 remains applied, and smoke-tested health plus project-filtered procurement, per-warehouse positions, stock documents and receipt options successfully.
+- Ran `git diff --check`: pass; user-facing `Pending / Partial / Handled` labels are no longer present in the redesigned pages.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
+## Construction And Acceptance Focused Workspace
+
+Status: complete
+
+Mục đích chính:
+- Gom bốn bề mặt Thi công, Quản lý chất lượng, Nghiệm thu và Khắc phục sai lỗi thành hai không gian dễ hiểu: theo dõi thực thi hằng ngày tại `Thi công` và lập/kết luận biên bản tại `Nghiệm thu`.
+
+Will be done:
+- Rút gọn cây nghiệp vụ `Thi công & Chất lượng` còn `Thi công` và `Nghiệm thu`; giữ route cũ `/quality` và `/rework` bằng redirect tương thích.
+- Chuyển `Thi công` thành status cards và ba tab `Nhật ký & tiến độ`, `Checklist chất lượng`, `Vấn đề & khắc phục` với timeline báo cáo gồm đã làm, đang làm, sẽ làm và vấn đề.
+- Tái sử dụng các lifecycle ITP/RFI/NCR, issue, rework và replanning hiện hữu trong đúng tab, không gộp bảng dữ liệu hoặc thay đổi transition backend.
+- Chuyển `Nghiệm thu` thành master-detail, checklist rõ ràng, một CTA tiếp theo theo trạng thái và một dialog kết luận Đạt/Đạt có điều kiện/Không đạt.
+- Tách editor checklist nghiệm thu dùng chung cho project workspace và work-item outgoing acceptance.
+- Cập nhật central/frontend/construction/quality/workflow mappings; chạy frontend build, backend test phù hợp và `git diff --check`.
+
+Done:
+- User approved the complete review package with `Approve`.
+- Confirmed Release 1 can preserve the current API tables and lifecycle: failed RFI still creates NCR plus linked rework atomically; failed acceptance still creates an issue and exposes the explicit idempotent create-rework action.
+- Confirmed the implementation overlaps a dirty worktree; existing user changes will be preserved and target-file diffs reviewed before patching.
+- Reduced the project business tree to `Thi công` and `Nghiệm thu`; `/projects/:id/quality` and `/projects/:id/rework` now preserve old bookmarks through redirects to the matching construction tab.
+- Rebuilt `OperationsPage` around four status cards and the approved three tabs. The daily timeline reads workflow-form structured answers and legacy summary rows, keeps report blockers separate from official issues, and captures quick reports through distinct Đã/Đang/Sẽ làm/Vấn đề fields without a backend migration.
+- Embedded `QualityPage` as field checks plus advanced ITP configuration and as the NCR remediation section; embedded `ReworkPage` retains separate rework/replanning queries and RBAC-gated create/approve actions.
+- Rebuilt `AcceptancePage` as a responsive master-detail workspace with status cards, progress steps, explicit checklist/evidence table, one state-driven CTA, and one radio-based conclusion dialog with required comment.
+- Added shared `AcceptanceEditor.tsx` for checklist rows, evidence/required-action validation, draft payload mapping and submit gates; both the project acceptance workspace and `OutgoingAcceptancePanel` now use it.
+- Kept the existing backend/domain lifecycle unchanged: acceptance fail creates its issue first, `Mở yêu cầu khắc phục` calls the existing idempotent rework action, and RFI/NCR transitions remain owned by quality APIs.
+- Updated central/frontend/construction/quality/workflow mappings for the consolidated presentation routes, shared editor ownership, structured/legacy timeline mapping, permissions and compatibility redirects. No backend-function map or migration update was required because API contracts, handlers, repository logic and schema were unchanged.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Ran `cd backend && go test ./...`: pass.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because the user did not request it.
+
+## Construction Daily Report Create/Detail Contract Alignment
+
+Status: complete
+
+Mục đích chính:
+- Đảm bảo báo cáo được tạo tại `Thi công` lưu đúng cấu trúc mà form chi tiết trình bày, đồng thời minh chứng luôn có trạng thái rõ ràng và giữ nguyên permission/work-item evidence semantics.
+
+Will be done:
+- Thay form tạo generic bằng dialog chuyên biệt cho ngày/thời tiết/tiến độ, Đã làm, Đang làm, Sẽ làm, blocker, ghi chú, nhân công, vật tư, đầu việc nguồn và minh chứng.
+- Cho phép chọn minh chứng hiện hữu hoặc tải tệp mới sau khi chọn đầu việc nguồn; tái sử dụng work-item evidence APIs và không tạo project-level upload mới.
+- Mở rộng typed create contract của `/projects/:id/daily-reports` để lưu `work_item_id`, `structured_json`, `photos` và `primary_evidence_id`, với kiểm tra project/work-item/evidence/status.
+- Giữ workflow-form bridge idempotent hiện hữu, legacy report fallback, audit và schema V53; không thêm migration.
+- Luôn hiển thị trạng thái `Minh chứng · 0` trong chi tiết và đồng bộ CTA frontend với quyền `operation.report` của backend.
+- Cập nhật backend/frontend/central/construction/workflow mappings và focused regression tests.
+- Chạy backend format/tests, frontend build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved all three review points with `Approve`.
+- Confirmed root cause: the generic create form and repository whitelist persist only legacy summary fields, while the detail reads the richer V53/workflow-backed structure and hides evidence when no IDs exist.
+- Confirmed evidence upload remains work-item scoped (`evidence_records.work_item_id NOT NULL`, `CanActOnWorkItem`), so the approved create flow must select a source work item before uploading or linking evidence.
+- Completed cross-feature impact check: no workflow-form lifecycle, approval, stock, quality, acceptance, report export or migration behavior needs to change.
+- Added typed `ConstructionDailyReportCreateRequest` handling and expanded `dailyReportColumns()` to persist the existing V53 `work_item_id`, `structured_json` and `primary_evidence_id` columns together with legacy summaries and evidence IDs.
+- Added backend validation for report date/progress/work groups/resources, same-project and permission-visible source work item, same-work-item non-rejected evidence, client visibility and a maximum of 50 linked evidence records; audit metadata now records source and evidence count.
+- Replaced the generic create form with `ConstructionReportFormDialog.tsx`; its hierarchy matches the detail dialog and supports structured Đã/Đang/Sẽ làm, blockers, neutral notes, crew, materials, source work item, existing evidence selection and immediate work-item evidence upload.
+- Updated the shared report view model so manual structured reports are not labeled as workflow reports, and neutral notes are excluded from the red timeline problem card when canonical blockers exist.
+- The detail dialog now always shows `Minh chứng · N`; historical reports without linked IDs display the explicit `Minh chứng · 0` empty state instead of hiding the section. The create CTA now requires `operation.report`, matching backend enforcement.
+- Added focused backend regression coverage for structured/source/evidence persistence and mismatched work-item evidence rejection. No migration was added because V53 already owns all required columns; workflow-form bridge behavior remains unchanged and legacy summary rows remain readable.
+- Updated central/backend/frontend/root-cause/construction/workflow mapping references for the typed manual-report contract, component ownership, RBAC, evidence invariants and workflow boundary.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...`: pass.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Browser verification was skipped per repository rule because the user did not request it.
+
+## Construction Report Evidence Capture And Manual Edit
+
+Status: complete
+
+Mục đích chính:
+- Cho phép người dùng đính kèm minh chứng bằng tệp hoặc camera ngay trong tạo mới, xem chi tiết và chỉnh sửa báo cáo thi công thủ công, với một luồng nhất quán và truy vết về đầu việc nguồn.
+
+Will be done:
+- Luôn hiển thị `Chọn tệp` và `Mở camera`; tệp/ảnh được giữ trong hàng đợi cục bộ trước khi báo cáo có đầu việc nguồn.
+- Dùng camera thật qua `navigator.mediaDevices.getUserMedia`, có đổi camera, chụp lại, dùng ảnh và fallback sang file input có `capture` khi trình duyệt không cấp camera.
+- Thêm cập nhật báo cáo thủ công và upload minh chứng theo báo cáo; khi có tệp chờ tải, đầu việc nguồn là bắt buộc.
+- Cho phép `Sửa báo cáo` và `Thêm minh chứng` từ form chi tiết của báo cáo thủ công; báo cáo do workflow-form sinh ra tiếp tục chỉ đọc và phải chỉnh tại đầu việc nguồn.
+- Giữ work-item evidence permission, giới hạn 50 minh chứng, audit và schema V53; không thêm migration, không thay lifecycle workflow/quality/acceptance/stock/finance.
+- Cập nhật central/backend/frontend/root-cause/construction/workflow mappings; chạy backend format/tests, frontend build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `Approve`.
+- Confirmed create currently hides all upload controls until a source work item is selected, the camera icon is decorative, detail is read-only, and no daily-report update/report-evidence endpoint exists.
+- Confirmed existing evidence persistence remains work-item scoped and report rows already have `work_item_id`, `photos`, `structured_json` and `primary_evidence_id`; no database migration is required.
+- Added permission-scoped `PUT /daily-reports/:id` and `POST /daily-reports/:id/evidence/upload`; create/update share one normalizer, preserve project/reporter identity and legacy resource summaries, enforce same-project source/evidence plus the 50-record cap, and emit update/evidence-link audit events.
+- Kept report uploads on the existing work-item evidence storage/permission path. The report-scoped upload attaches the resulting evidence ID to `photos`, assigns the source/primary evidence when absent, and rejects direct update/upload for workflow-form-backed rows.
+- Added `ConstructionEvidenceCapture.tsx` with always-visible multi-file selection, local pre-save queue, image previews, editable names/captions, real `getUserMedia` camera, facing-mode switch, capture/retry/use flow and a mobile/system-camera `capture="environment"` fallback.
+- Reused the capture component in create, edit and the evidence-only quick-add dialog. Manual report detail now exposes `Sửa báo cáo` and `Thêm minh chứng`; workflow-backed detail remains read-only and points to its source work item.
+- Added a report edit model that preserves structured rows and legacy summaries, and kept explicit partial-upload feedback so a saved report is not duplicated when a later file upload fails.
+- Added focused DB-backed regression coverage for manual update, report/work-item evidence linking, audit events, source mismatch and workflow read-only gates. The focused test passed against the running Docker PostgreSQL instance via its LAN-bound port.
+- Updated central/backend/frontend/root-cause/construction/workflow mappings. No migration or other domain mapping was required because schema V53 and workflow/quality/acceptance/stock/finance lifecycles were unchanged.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...`: pass (DB-backed tests skip without `CONSFLOW_TEST_DATABASE_URL`).
+- Ran the focused DB-backed daily-report regression test with `CONSFLOW_TEST_DATABASE_URL`: pass.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because the user did not request it.
+
+## Construction Daily Report Detail Dialog
+
+Status: complete
+
+Mục đích chính:
+- Giúp người dùng hiểu trong 5–10 giây tình hình một ngày thi công: tiến độ, đã/đang/sẽ làm, blocker, ghi chú hiện trường, nguồn lực, minh chứng và nguồn báo cáo.
+
+Will be done:
+- Thay definition-list chung bằng dialog chi tiết báo cáo chuyên biệt, rộng trên desktop và một cột trên mobile.
+- Dùng chung một view-model cho timeline và dialog; tách blocker có cấu trúc khỏi ghi chú `issues_summary` tự do để không tô đỏ câu như `Không có sự cố an toàn`.
+- Hiển thị nhân công, vật tư, minh chứng và liên kết đầu việc nguồn khi dữ liệu hiện hữu; giữ dialog chỉ đọc.
+- Tái sử dụng `/projects/:id/evidence`, `/evidence/:id/file` và project operations cache; không thêm migration hoặc thay đổi lifecycle/API ghi báo cáo.
+- Cập nhật frontend/construction mappings, chạy frontend build, backend test phù hợp và `git diff --check`; không chạy browser verification nếu người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `Approve`.
+- Confirmed the current report detail is the generic `RecordDetailDialog` definition list, while the report row already carries structured answers, source IDs and evidence IDs.
+- Confirmed project evidence metadata/file routes and project operations work-item metadata already exist, so the approved detail can remain a frontend/read-model change.
+- Added `ConstructionReportDetailDialog.tsx` as a responsive 1080px read-only workspace with date/weather/source context, progress bar, four work cards, resources, neutral field notes, linked evidence and source work-item navigation.
+- Added `constructionReportViewModel.ts` and reused it from the timeline and detail dialog so structured and legacy daily reports share one parser; structured blocked items/blockers are separated from free-text `issues_summary` in the detail.
+- Reused the permission-scoped project evidence read, protected evidence gallery/file behavior, project operations cache and existing work-item return navigation; no API contract, backend handler, lifecycle, migration or database mapping changed.
+- Added the shared `Dialog` `report` width and updated central/frontend/construction mapping files for the new component ownership, read-model invariant and evidence/source behavior. No backend-function map update was required because backend behavior and contracts are unchanged.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Ran `cd backend && go test ./...`: pass.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because the user did not request it.
+
+## Construction Daily Report Related Work Wording
+
+Status: complete
+
+Mục đích chính:
+- Thay thuật ngữ kỹ thuật `Đầu việc nguồn` bằng wording người dùng dễ hiểu `Công việc liên quan` trong toàn bộ luồng Báo cáo thi công, đồng thời giữ nguyên liên kết `work_item_id`, evidence, permission và API.
+
+Will be done:
+- Đổi wording trong form tạo/sửa, dialog thêm minh chứng, chi tiết báo cáo và cảnh báo tải tệp của module `operations`.
+- Đồng bộ thông báo validation backend của riêng Báo cáo thi công để lỗi trả về không lộ lại wording cũ.
+- Giữ nguyên module Nghiệm thu, payload, route, trạng thái, persistence và workflow-form gates.
+- Cập nhật central/frontend/construction mappings với thuật ngữ UI mới.
+- Chạy tìm kiếm chuỗi, frontend build, backend tests và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `Duyệt, làm đi`.
+- Loaded the mandatory central/frontend/construction mappings and confirmed the change is wording-only over the existing source-work-item/evidence contract.
+- Confirmed the target files overlap a dirty worktree; patched only the approved user-facing strings and preserved unrelated changes.
+- Replaced `Đầu việc nguồn` and adjacent technical wording with `Công việc liên quan`, `Công việc`, `Chọn công việc` and `Không chọn công việc` across create/edit, evidence capture, evidence-only add and report detail states.
+- Updated the daily-report backend validation messages to use the same terminology while preserving `work_item_id`, permission checks, evidence ownership, the 50-record cap and workflow-form read-only gates.
+- Left the separate Acceptance wording unchanged as approved; no route, request/response type, migration, seed or domain lifecycle changed.
+- Updated central, frontend and construction-domain mappings with the user-facing terminology and unchanged internal contract.
+- Confirmed the Operations module has no remaining old source-work-item wording; the one remaining `Đầu việc liên kết` backend string belongs to a separate out-of-scope flow.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Ran `cd backend && make test`: pass.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because the user did not request it.

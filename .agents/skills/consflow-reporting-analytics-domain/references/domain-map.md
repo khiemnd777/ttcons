@@ -30,6 +30,7 @@
 - Cashflow is payment-ledger based unless changed deliberately.
 - Tax and profit are invoice-ledger based unless changed deliberately.
 - Warnings are part of the report contract, not decorative UI.
+- Warehouse aggregate reports treat a completed source/target transfer as net zero across all warehouses while per-warehouse position queries subtract from the source and add to the target; legacy transfer rows without a target remain outbound-only.
 
 ## Cross-Domain Checks
 

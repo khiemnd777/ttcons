@@ -22,7 +22,6 @@ import { ProcurementPage } from '../modules/procurement/ProcurementPage';
 import { ContractsPage } from '../modules/contracts/ContractsPage';
 import { WarehousePage } from '../modules/warehouse/WarehousePage';
 import { OperationsPage } from '../modules/operations/OperationsPage';
-import { QualityPage } from '../modules/quality/QualityPage';
 import { AcceptancePage } from '../modules/acceptance/AcceptancePage';
 import { ReworkPage } from '../modules/rework/ReworkPage';
 import { HandoverPage } from '../modules/handover/HandoverPage';
@@ -80,10 +79,10 @@ export const router = createBrowserRouter([
           { path: 'procurement', element: guarded(<ProcurementPage scoped />, ['procurement.view']) },
           { path: 'contracts', element: guarded(<ContractsPage />, ['contract.view']) },
           { path: 'warehouse', element: guarded(<WarehousePage scoped />, ['warehouse.view']) },
-          { path: 'operations', element: guarded(<OperationsPage />, ['operation.view']) },
-          { path: 'quality', element: guarded(<QualityPage />, ['quality.view']) },
+          { path: 'operations', element: guarded(<OperationsPage />, ['operation.view', 'quality.view', 'rework.view', 'replanning.view']) },
+          { path: 'quality', element: guarded(<Navigate to="../operations?tab=quality" replace />, ['quality.view']) },
           { path: 'acceptance', element: guarded(<AcceptancePage />, ['acceptance.view']) },
-          { path: 'rework', element: guarded(<ReworkPage />, ['rework.view']) },
+          { path: 'rework', element: guarded(<Navigate to="../operations?tab=issues" replace />, ['rework.view']) },
           { path: 'handover', element: guarded(<HandoverPage />, ['handover.view']) },
           { path: 'accounting', element: guarded(<AccountingPage />, ['accounting.view']) },
           { path: 'debt', element: guarded(<DebtPage kind="both" />, ['accounting.payable_view', 'accounting.receivable_view']) },
@@ -98,7 +97,7 @@ export const router = createBrowserRouter([
       { path: '/planning/checklists', element: guarded(<PlanningChecklistsPage />, ['planning.view', 'pipeline.view']) },
       { path: '/procurement', element: guarded(<ProcurementPage />, ['procurement.view']) },
       { path: '/warehouse', element: guarded(<WarehousePage />, ['warehouse.view']) },
-      { path: '/operations', element: guarded(<OperationsPage global />, ['operation.view']) },
+      { path: '/operations', element: guarded(<OperationsPage global />, ['operation.view', 'quality.view', 'rework.view', 'replanning.view']) },
       { path: '/acceptance', element: guarded(<AcceptancePage global />, ['acceptance.view']) },
       { path: '/rework', element: guarded(<ReworkPage />, ['rework.view']) },
       { path: '/handover', element: guarded(<HandoverPage />, ['handover.view']) },

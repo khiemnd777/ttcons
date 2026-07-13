@@ -13,6 +13,7 @@
 - Auth: `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me`
 - Core data: `/partners`
 - Staff/RBAC: `/staff`, `/roles`, `/permissions`, `/roles/:id/permissions`, `/users/:id/roles`
+- Project membership governance: `/projects/:id/members`, `/projects/:id/members/:memberId`
 - Audit/settings: `/audit-logs`, `/projects/:id/audit-logs`, `/settings`
 
 ## Tables And Migrations
@@ -21,13 +22,16 @@
 - `auth_sessions`
 - `partners`
 - `system_settings`, `audit_logs`
-- Relevant migrations: `V1`, `V36`, `V37`
+- Relevant migrations: `V1`, `V36`, `V37`, `V60`
 
 ## Invariants
 
 - Protected endpoints stay under auth middleware.
 - Backend permission helpers are the source of truth for authorization.
+- Audit read APIs are server-filtered and page-number paginated, return project labels plus permission-scoped filter options, use global `ProjectAccessFilter` or project `requireProjectPermission`, and expose metadata read-only without changing `AddAudit` or source-domain audit semantics.
+- Activity reply/reaction/edit/withdraw endpoints remain protected and reuse `ActivityVisibleToUser`; edit/withdraw additionally require exact author ownership, activity type `comment`, an unwithdrawn row and the 15-minute server window. UI capability flags never replace backend enforcement, managers receive no override, and no new global permission is introduced.
 - Frontend navigation and row actions mirror permissions but do not replace backend enforcement.
+- `project.member.manage` is granted to Admin/Director/PM and always combined with project scope. Project member responses expose server capabilities; mutation synchronizes only project-scoped `user_roles`, never removes global roles, never exposes Admin/Director as assignable project roles, and writes project audit.
 - Partner catalog updates preserve downstream snapshots for historical documents.
 - Session refresh/revoke lifecycle remains DB-backed and revocable.
 

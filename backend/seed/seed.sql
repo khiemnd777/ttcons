@@ -58,7 +58,7 @@ INSERT INTO roles (id, name, display_name, description, system_role) VALUES
 
 INSERT INTO permissions (id, key, name, module)
 SELECT gen_random_uuid(), key, name, module FROM (VALUES
-('project.view','Xem công trình','project'),('project.create','Tạo công trình','project'),('project.update','Cập nhật công trình','project'),('project.delete','Xóa công trình','project'),
+('project.view','Xem công trình','project'),('project.create','Tạo công trình','project'),('project.update','Cập nhật công trình','project'),('project.delete','Xóa công trình','project'),('project.member.manage','Quản lý thành viên công trình','project'),
 ('pipeline.view','Xem pipeline','pipeline'),('pipeline.create','Tạo pipeline','pipeline'),('pipeline.edit','Sửa pipeline','pipeline'),('pipeline.publish','Publish pipeline','pipeline'),('pipeline.run','Chạy pipeline','pipeline'),('pipeline.advance_node','Chuyển node','pipeline'),
 ('planning.view','Xem planning','planning'),('planning.edit','Sửa planning','planning'),
 ('boq.view','Xem BOQ','boq'),('boq.create','Tạo BOQ','boq'),('boq.update','Sửa BOQ','boq'),('boq.approve','Duyệt BOQ','boq'),
@@ -89,7 +89,7 @@ SELECT r.id, p.id
 FROM roles r
 JOIN permissions p ON (
   (r.name='director' AND p.key IN (
-    'project.view','pipeline.view','pipeline.run','pipeline.advance_node',
+    'project.view','project.member.manage','pipeline.view','pipeline.run','pipeline.advance_node',
     'boq.view','boq.approve',
     'procurement.view','procurement.approve',
     'warehouse.view','operation.view',
@@ -104,7 +104,7 @@ JOIN permissions p ON (
     'catalog.view','audit.view','report.view','report.finance.view'
   ))
   OR (r.name='pm' AND p.key IN (
-    'project.view','project.update',
+    'project.view','project.update','project.member.manage',
     'pipeline.view','pipeline.run','pipeline.advance_node',
     'boq.view','boq.create','boq.update','boq.approve',
     'procurement.view','procurement.create','procurement.approve','procurement.order',
@@ -397,9 +397,9 @@ step_seed(id, node_id, order_index, name, description, step_type, roles, permiss
     ('41500000-0000-0000-0000-000000000009'::uuid,'41400000-0000-0000-0000-000000000002'::uuid,3,'Thiết kế / Lên bảng vẽ 3D','Lên bản vẽ 3D sơ bộ nếu cần thiết kế.','task','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_generic_submission',true),
     ('41500000-0000-0000-0000-000000000010'::uuid,'41400000-0000-0000-0000-000000000002'::uuid,4,'Thiết kế / Lên bảng vẽ thi công','Lên bản vẽ thi công sơ bộ nếu cần thiết kế.','task','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_generic_submission',true),
     ('41500000-0000-0000-0000-000000000011'::uuid,'41400000-0000-0000-0000-000000000002'::uuid,5,'Biên bản cuộc họp','Chốt biên bản cuộc họp và nhánh xử lý tiếp theo.','meeting_minutes','["PM","QS","Giám sát"]'::jsonb,'planning.edit',true,false,false,'client_design_branch_decision',true),
-    ('41500000-0000-0000-0000-000000000012'::uuid,'41400000-0000-0000-0000-000000000003'::uuid,1,'Trảo đổi / Lên bảng vẽ bố trí mặt bằng','Trao đổi và lên bản vẽ bố trí mặt bằng.','design_review','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_generic_submission',true),
-    ('41500000-0000-0000-0000-000000000013'::uuid,'41400000-0000-0000-0000-000000000003'::uuid,2,'Trảo đổi / Lên bảng vẽ 3D','Trao đổi và lên bản vẽ 3D.','design_review','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_generic_submission',true),
-    ('41500000-0000-0000-0000-000000000014'::uuid,'41400000-0000-0000-0000-000000000003'::uuid,3,'Trảo đổi / Lên bảng vẽ thi công','Trao đổi và upload bản vẽ thi công.','document_upload','["PM"]'::jsonb,'planning.edit',true,true,false,'builtin_generic_submission',true),
+    ('41500000-0000-0000-0000-000000000012'::uuid,'41400000-0000-0000-0000-000000000003'::uuid,1,'Trao đổi / Lên bảng vẽ bố trí mặt bằng','Trao đổi và lên bản vẽ bố trí mặt bằng.','design_review','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_generic_submission',true),
+    ('41500000-0000-0000-0000-000000000013'::uuid,'41400000-0000-0000-0000-000000000003'::uuid,2,'Trao đổi / Lên bảng vẽ 3D','Trao đổi và lên bản vẽ 3D.','design_review','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_generic_submission',true),
+    ('41500000-0000-0000-0000-000000000014'::uuid,'41400000-0000-0000-0000-000000000003'::uuid,3,'Trao đổi / Lên bảng vẽ thi công','Trao đổi và upload bản vẽ thi công.','document_upload','["PM"]'::jsonb,'planning.edit',true,true,false,'builtin_generic_submission',true),
     ('41500000-0000-0000-0000-000000000015'::uuid,'41400000-0000-0000-0000-000000000003'::uuid,4,'Chốt với Sale / Chủ đầu tư','Chốt phương án với sale/chủ đầu tư.','approval','["PM","Chủ đầu tư"]'::jsonb,'planning.edit',true,false,false,'builtin_generic_submission',true),
     ('41500000-0000-0000-0000-000000000016'::uuid,'41400000-0000-0000-0000-000000000003'::uuid,5,'Đưa bảng vẽ qua bên QS.','Bàn giao bản vẽ cho QS để làm BOQ.','task','["PM","QS"]'::jsonb,'planning.edit',true,false,false,'builtin_generic_submission',true),
     ('41500000-0000-0000-0000-000000000017'::uuid,'41400000-0000-0000-0000-000000000004'::uuid,1,'QS Lấy giá từ thầu phụ / giá tổ đội / vật tư','Lấy giá từ thầu phụ, tổ đội và vật tư.','task','["QS"]'::jsonb,'boq.update',true,false,false,'builtin_generic_submission',true),

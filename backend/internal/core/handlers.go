@@ -163,6 +163,62 @@ func (h *Handler) DeleteProject(c *fiber.Ctx) error {
 	return response.OK(c, Record{"deleted": true})
 }
 
+func (h *Handler) ProjectMembers(c *fiber.Ctx) error {
+	projectID := c.Params("id")
+	if err := h.requireProjectPermission(c, projectID, []string{"project.view"}); err != nil {
+		return err
+	}
+	page, err := h.service.ProjectMembers(c.Context(), projectID, actorID(c), c.QueryBool("include_inactive", false))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, page)
+}
+
+func (h *Handler) CreateProjectMember(c *fiber.Ctx) error {
+	projectID := c.Params("id")
+	if err := h.requireProjectPermission(c, projectID, []string{"project.member.manage"}); err != nil {
+		return err
+	}
+	req := ProjectMemberMutationRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu thành viên không hợp lệ")
+	}
+	member, err := h.service.SaveProjectMember(c.Context(), projectID, "", req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, member)
+}
+
+func (h *Handler) UpdateProjectMember(c *fiber.Ctx) error {
+	projectID := c.Params("id")
+	if err := h.requireProjectPermission(c, projectID, []string{"project.member.manage"}); err != nil {
+		return err
+	}
+	req := ProjectMemberMutationRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu thành viên không hợp lệ")
+	}
+	member, err := h.service.SaveProjectMember(c.Context(), projectID, c.Params("memberId"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, member)
+}
+
+func (h *Handler) DeactivateProjectMember(c *fiber.Ctx) error {
+	projectID := c.Params("id")
+	if err := h.requireProjectPermission(c, projectID, []string{"project.member.manage"}); err != nil {
+		return err
+	}
+	member, err := h.service.DeactivateProjectMember(c.Context(), projectID, c.Params("memberId"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, member)
+}
+
 func (h *Handler) ListPartners(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"catalog.view"}); err != nil {
 		return err
@@ -669,16 +725,50 @@ func (h *Handler) ProjectOperations(c *fiber.Ctx) error {
 	return response.OK(c, operations)
 }
 
-func (h *Handler) ProjectActivity(c *fiber.Ctx) error {
-	rows, err := h.service.ProjectActivity(c.Context(), c.Params("id"), ProjectActivityFilter{
-		ScopeType: c.Query("scope_type"),
-		ScopeID:   c.Query("scope_id"),
-		Limit:     c.QueryInt("limit", 80),
+func (h *Handler) ProjectEvidence(c *fiber.Ctx) error {
+	page, err := h.service.ProjectEvidencePage(c.Context(), c.Params("id"), ProjectEvidenceFilter{
+		EvidenceType: c.Query("evidence_type"),
+		Status:       c.Query("status"),
+		WorkItemID:   c.Query("work_item_id"),
+		SubmittedBy:  c.Query("submitted_by"),
+		Visibility:   c.Query("visibility"),
+		DateFrom:     c.Query("date_from"),
+		DateTo:       c.Query("date_to"),
+		Search:       c.Query("search"),
+		Cursor:       c.Query("cursor"),
+		Limit:        c.QueryInt("limit", 25),
 	}, actorID(c))
 	if err != nil {
 		return err
 	}
-	return response.OK(c, rows)
+	return response.OK(c, page)
+}
+
+func (h *Handler) ProjectActivity(c *fiber.Ctx) error {
+	page, err := h.service.ProjectActivityPage(c.Context(), c.Params("id"), ProjectActivityFilter{
+		ScopeType:    c.Query("scope_type"),
+		ScopeID:      c.Query("scope_id"),
+		ActivityType: c.Query("activity_type"),
+		ActorID:      c.Query("actor_id"),
+		Visibility:   c.Query("visibility"),
+		Kind:         c.Query("kind"),
+		Attention:    c.Query("attention"),
+		Search:       c.Query("search"),
+		Cursor:       c.Query("cursor"),
+		Limit:        c.QueryInt("limit", 30),
+	}, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, page)
+}
+
+func (h *Handler) ProjectActivityOptions(c *fiber.Ctx) error {
+	options, err := h.service.ProjectActivityOptions(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, options)
 }
 
 func (h *Handler) AddProjectActivity(c *fiber.Ctx) error {
@@ -693,6 +783,14 @@ func (h *Handler) AddProjectActivity(c *fiber.Ctx) error {
 		return err
 	}
 	return response.Created(c, activity)
+}
+
+func (h *Handler) MarkProjectActivityRead(c *fiber.Ctx) error {
+	result, err := h.service.MarkProjectActivityRead(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result)
 }
 
 func (h *Handler) GetWorkItem(c *fiber.Ctx) error {
@@ -1020,6 +1118,52 @@ func (h *Handler) GenerateWorkflowFormPDFExport(c *fiber.Ctx) error {
 
 func (h *Handler) MarkActivityRead(c *fiber.Ctx) error {
 	item, err := h.service.MarkActivityRead(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
+}
+
+func (h *Handler) ResolveActivity(c *fiber.Ctx) error {
+	req := ActivityResolutionRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xử lý hoạt động không hợp lệ")
+		}
+	}
+	item, err := h.service.ResolveActivity(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
+}
+
+func (h *Handler) SetActivityReaction(c *fiber.Ctx) error {
+	req := ActivityReactionRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu phản ứng không hợp lệ")
+	}
+	item, err := h.service.SetActivityReaction(c.Context(), c.Params("id"), req, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
+}
+
+func (h *Handler) UpdateActivityMessage(c *fiber.Ctx) error {
+	req := ActivityMessageUpdateRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu chỉnh sửa tin nhắn không hợp lệ")
+	}
+	item, err := h.service.UpdateActivityMessage(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
+}
+
+func (h *Handler) WithdrawActivityMessage(c *fiber.Ctx) error {
+	item, err := h.service.WithdrawActivityMessage(c.Context(), c.Params("id"), actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -1887,28 +2031,63 @@ func (h *Handler) ListProcurement(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	projectFilter := "TRUE"
+	if projectID := cleanID(c.Query("project_id")); projectID != "" {
+		if err := h.requireProjectPermission(c, projectID, []string{"procurement.view"}); err != nil {
+			return err
+		}
+		projectFilter = fmt.Sprintf("pr.project_id=$%d", len(scopeArgs)+1)
+		scopeArgs = append(scopeArgs, projectID)
+	}
 	rows, err := h.service.repo.Query(c.Context(), fmt.Sprintf(`
 		SELECT pr.*, p.name AS project_name,
 			COALESCE(items.item_count,0) AS item_count,
 			COALESCE(items.quantity_requested,0) AS quantity_requested,
-			COALESCE(items.accepted_quantity,0) AS accepted_quantity
+			COALESCE(items.accepted_quantity,0) AS accepted_quantity,
+			COALESCE(items.stock_received_quantity,0) AS stock_received_quantity,
+			acceptance.id AS incoming_acceptance_id,
+			acceptance.work_item_id AS incoming_acceptance_work_item_id,
+			acceptance.status AS incoming_acceptance_status
 		FROM procurement_requests pr
 		JOIN projects p ON p.id=pr.project_id
 		LEFT JOIN LATERAL (
 			SELECT COUNT(*) AS item_count, SUM(pri.quantity_requested) AS quantity_requested,
-				SUM(COALESCE(received.accepted_quantity,0)) AS accepted_quantity
+				SUM(COALESCE(received.accepted_quantity,0)) AS accepted_quantity,
+				SUM(LEAST(COALESCE(received.accepted_quantity,0), COALESCE(received.stock_received_quantity,0)+COALESCE(legacy_stock.received_quantity,0))) AS stock_received_quantity
 			FROM procurement_request_items pri
 			LEFT JOIN LATERAL (
-				SELECT SUM(iai.accepted_quantity) AS accepted_quantity
+				SELECT SUM(iai.accepted_quantity) AS accepted_quantity,
+					SUM(COALESCE(stock.received_quantity,0)) AS stock_received_quantity
 				FROM incoming_acceptance_items iai
 				JOIN incoming_acceptance_records iar ON iar.id=iai.incoming_acceptance_id AND iar.status='submitted'
+				LEFT JOIN LATERAL (
+					SELECT SUM(sm.quantity) AS received_quantity
+					FROM stock_movements sm
+					WHERE sm.movement_type='receive'
+					  AND sm.reference_type='incoming_acceptance_item'
+					  AND sm.reference_id=iai.id
+				) stock ON true
 				WHERE iai.procurement_request_item_id=pri.id
 			) received ON true
+			LEFT JOIN LATERAL (
+				SELECT SUM(sm.quantity) AS received_quantity
+				FROM stock_movements sm
+				WHERE sm.movement_type='receive'
+				  AND sm.reference_type='boq_item'
+				  AND sm.reference_id=pri.boq_item_id
+			) legacy_stock ON true
 			WHERE pri.request_id=pr.id
 		) items ON true
-		WHERE pr.status <> 'cancelled' AND p.status <> 'cancelled' AND %s
+		LEFT JOIN LATERAL (
+			SELECT iar.id, iar.work_item_id, iar.status
+			FROM incoming_acceptance_records iar
+			WHERE iar.procurement_request_id=pr.id AND iar.status <> 'cancelled'
+			ORDER BY iar.created_at DESC, iar.id
+			LIMIT 1
+		) acceptance ON true
+		WHERE pr.status <> 'cancelled' AND p.status <> 'cancelled' AND %s AND %s
 		ORDER BY pr.created_at DESC
-	`, scopeSQL), scopeArgs...)
+	`, scopeSQL, projectFilter), scopeArgs...)
 	if err != nil {
 		return err
 	}
@@ -2044,7 +2223,8 @@ func (h *Handler) Stock(c *fiber.Ctx) error {
 		SELECT m.id AS material_id, m.code, m.name, m.unit, m.category,
 			COALESCE(SUM(CASE
 				WHEN sm.movement_type IN ('receive','return_to_warehouse') THEN sm.quantity
-				WHEN sm.movement_type IN ('issue','transfer','loss') THEN -sm.quantity
+				WHEN sm.movement_type IN ('issue','loss') THEN -sm.quantity
+				WHEN sm.movement_type='transfer' AND sm.target_warehouse_id IS NULL THEN -sm.quantity
 				ELSE 0
 			END),0) AS stock_quantity
 		FROM materials m
@@ -2065,6 +2245,93 @@ func (h *Handler) Stock(c *fiber.Ctx) error {
 		return err
 	}
 	return response.OK(c, rows)
+}
+
+func (h *Handler) StockPositions(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"warehouse.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.repo.StockPositions(c.Context(), actorID(c), cleanID(c.Query("warehouse_id")))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) StockMovements(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"warehouse.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.repo.StockMovements(c.Context(), actorID(c), cleanID(c.Query("project_id")), cleanID(c.Query("warehouse_id")))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) StockDocuments(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"warehouse.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.repo.ListStockDocuments(c.Context(), actorID(c), cleanID(c.Query("project_id")))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) GetStockDocument(c *fiber.Ctx) error {
+	document, err := h.service.repo.GetStockDocument(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	projectID := cleanID(document["project_id"])
+	if projectID != "" {
+		if err := h.requireProjectPermission(c, projectID, []string{"warehouse.view"}); err != nil {
+			return err
+		}
+	} else if err := h.requirePermission(c, []string{"warehouse.view"}); err != nil {
+		return err
+	}
+	return response.OK(c, document)
+}
+
+func (h *Handler) CreateStockDocument(c *fiber.Ctx) error {
+	var req StockDocumentRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu phiếu kho không hợp lệ")
+	}
+	permissions := map[string][]string{
+		"receive":                 {"warehouse.receive"},
+		"issue":                   {"warehouse.issue"},
+		"transfer":                {"warehouse.transfer"},
+		"return_to_warehouse":     {"warehouse.surplus_handle"},
+		"return_to_subcontractor": {"warehouse.surplus_handle"},
+	}[strings.TrimSpace(req.MovementType)]
+	if len(permissions) == 0 {
+		return validationError("Loại phiếu kho không hợp lệ")
+	}
+	projectID := cleanID(req.ProjectID)
+	if projectID == "" && strings.TrimSpace(req.ReferenceType) == "incoming_acceptance" && cleanID(req.ReferenceID) != "" {
+		source, err := h.service.repo.QueryOne(c.Context(), `SELECT project_id FROM incoming_acceptance_records WHERE id=$1 AND status='submitted'`, cleanID(req.ReferenceID))
+		if err != nil {
+			return err
+		}
+		projectID = cleanID(source["project_id"])
+		req.ProjectID = projectID
+	}
+	if projectID != "" {
+		if err := h.requireProjectPermission(c, projectID, permissions); err != nil {
+			return err
+		}
+	} else if err := h.requirePermission(c, permissions); err != nil {
+		return err
+	}
+	document, err := h.service.CreateStockDocument(c.Context(), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, document)
 }
 
 func (h *Handler) StockReceive(c *fiber.Ctx) error  { return h.stockAction(c, "receive") }
@@ -2109,6 +2376,17 @@ func (h *Handler) MaterialBalances(c *fiber.Ctx) error {
 		return err
 	}
 	rows, err := h.service.repo.ProjectMaterialBalances(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) WarehouseReceiptOptions(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"warehouse.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.repo.WarehouseReceiptOptions(c.Context(), c.Params("id"))
 	if err != nil {
 		return err
 	}
@@ -2181,11 +2459,49 @@ func (h *Handler) CreateDailyReport(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"operation.report"}); err != nil {
 		return err
 	}
-	body, err := bodyMap(c)
+	req := ConstructionDailyReportCreateRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu báo cáo thi công không hợp lệ")
+	}
+	row, err := h.service.CreateDailyReport(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
-	row, err := h.service.CreateDailyReport(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	return response.Created(c, row)
+}
+func (h *Handler) UpdateDailyReport(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "operation_daily_reports", c.Params("id"), []string{"operation.report"}); err != nil {
+		return err
+	}
+	req := ConstructionDailyReportCreateRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu báo cáo thi công không hợp lệ")
+	}
+	row, err := h.service.UpdateDailyReport(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+func (h *Handler) UploadDailyReportEvidence(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "operation_daily_reports", c.Params("id"), []string{"operation.report"}); err != nil {
+		return err
+	}
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Tệp minh chứng là bắt buộc")
+	}
+	req := WorkItemEvidenceRequest{
+		EvidenceType: c.FormValue("evidence_type"),
+		DocumentType: c.FormValue("document_type"),
+		Name:         c.FormValue("name"),
+		Title:        c.FormValue("title"),
+		Description:  c.FormValue("description"),
+		Caption:      c.FormValue("caption"),
+		RevisionNo:   c.FormValue("revision_no"),
+		Visibility:   c.FormValue("visibility"),
+	}
+	row, err := h.service.AddDailyReportEvidenceUpload(c.Context(), c.Params("id"), c.FormValue("work_item_id"), req, fileHeader, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -3447,21 +3763,35 @@ func (h *Handler) AuditLogs(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"audit.view"}); err != nil {
 		return err
 	}
-	rows, err := h.service.AuditLogs(c.Context(), "", actorID(c))
+	page, err := h.service.AuditLogs(c.Context(), "", actorID(c), auditLogFilterFromQuery(c))
 	if err != nil {
 		return err
 	}
-	return response.OK(c, rows)
+	return response.OK(c, page)
 }
 func (h *Handler) ProjectAuditLogs(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"audit.view"}); err != nil {
 		return err
 	}
-	rows, err := h.service.AuditLogs(c.Context(), c.Params("id"), actorID(c))
+	page, err := h.service.AuditLogs(c.Context(), c.Params("id"), actorID(c), auditLogFilterFromQuery(c))
 	if err != nil {
 		return err
 	}
-	return response.OK(c, rows)
+	return response.OK(c, page)
+}
+
+func auditLogFilterFromQuery(c *fiber.Ctx) AuditLogFilter {
+	return AuditLogFilter{
+		ProjectID:  c.Query("project_id"),
+		EventType:  c.Query("event_type"),
+		TargetType: c.Query("target_type"),
+		ActorName:  c.Query("actor_name"),
+		DateFrom:   c.Query("date_from"),
+		DateTo:     c.Query("date_to"),
+		Search:     c.Query("search"),
+		Page:       c.QueryInt("page", 1),
+		PageSize:   c.QueryInt("page_size", 25),
+	}
 }
 
 func (h *Handler) Dashboard(c *fiber.Ctx) error {

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1122,6 +1123,50 @@ func activityAttachmentJoinSQL() string {
 	`, uuidRegex, uuidRegex)
 }
 
+func activityConversationSelectSQL(userExpression string) string {
+	return fmt.Sprintf(`
+		CASE WHEN parent_wia.id IS NULL THEN NULL ELSE jsonb_build_object(
+			'id', parent_wia.id,
+			'actor_id', parent_wia.actor_id,
+			'actor_name', COALESCE(parent_actor.full_name, 'Hệ thống'),
+			'activity_type', parent_wia.activity_type,
+			'comment', CASE WHEN parent_wia.withdrawn_at IS NULL THEN parent_wia.comment ELSE NULL END,
+			'withdrawn', parent_wia.withdrawn_at IS NOT NULL,
+			'created_at', parent_wia.created_at
+		) END AS reply_to,
+		COALESCE(reply_state.reply_count, 0) AS reply_count,
+		COALESCE(reaction_state.reactions, '[]'::jsonb) AS reactions,
+		(wia.activity_type='comment' AND wia.actor_id=%s AND wia.withdrawn_at IS NULL AND wia.created_at >= now() - INTERVAL '15 minutes') AS can_edit,
+		(wia.activity_type='comment' AND wia.actor_id=%s AND wia.withdrawn_at IS NULL AND wia.created_at >= now() - INTERVAL '15 minutes') AS can_withdraw`, userExpression, userExpression)
+}
+
+func activityConversationJoinSQL(userExpression string) string {
+	return fmt.Sprintf(`
+		LEFT JOIN work_item_activities parent_wia ON parent_wia.id=wia.parent_activity_id
+		LEFT JOIN users parent_actor ON parent_actor.id=parent_wia.actor_id
+		LEFT JOIN LATERAL (
+			SELECT COUNT(*) AS reply_count
+			FROM work_item_activities replies
+			WHERE replies.parent_activity_id=wia.id
+		) reply_state ON true
+		LEFT JOIN LATERAL (
+			SELECT jsonb_agg(jsonb_build_object(
+				'reaction', grouped.reaction,
+				'count', grouped.reaction_count,
+				'reacted_by_me', grouped.reacted_by_me
+			) ORDER BY grouped.reaction) AS reactions
+			FROM (
+				SELECT ar.reaction,
+					COUNT(*) AS reaction_count,
+					COALESCE(bool_or(ar.user_id=%s), false) AS reacted_by_me
+				FROM activity_reactions ar
+				WHERE ar.activity_id=wia.id AND ar.active AND wia.withdrawn_at IS NULL
+				GROUP BY ar.reaction
+			) grouped
+		) reaction_state ON true
+	`, userExpression)
+}
+
 func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string, profile workItemAccessProfile, filter ActivityAttentionFilter) ([]Record, error) {
 	projectAccess := projectAccessSQL("p", 2)
 	workItemAccess := workItemScopeSQL("wi", 5)
@@ -1137,6 +1182,7 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 	conditions := []string{
 		"p.status <> 'cancelled'",
 		"(wi.id IS NULL OR wi.status <> 'cancelled')",
+		"wia.withdrawn_at IS NULL",
 		fmt.Sprintf("(%s)", projectAccess),
 		`EXISTS (
 			SELECT 1
@@ -1201,6 +1247,7 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 			COALESCE(mention_state.mentions, '[]'::jsonb) AS mentions,
 			COALESCE(mention_state.mentioned_me, false) AS mentioned_me,
 			%s,
+			%s,
 			ars.read_at,
 			%s AS is_unread,
 			COALESCE((
@@ -1219,6 +1266,7 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 		JOIN projects p ON p.id=wia.project_id
 		LEFT JOIN work_items wi ON wi.id=wia.work_item_id
 		LEFT JOIN users u ON u.id=wia.actor_id
+		%s
 		%s
 		LEFT JOIN activity_read_states ars ON ars.activity_id=wia.id AND ars.user_id=$1
 		LEFT JOIN LATERAL (
@@ -1254,7 +1302,7 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 			END,
 			wia.created_at DESC
 		LIMIT $%d
-	`, activityAttachmentSelectSQL(), unread, mentioned, openQuestion, openBlocker, dueReminder, unread, activityAttachmentJoinSQL(), strings.Join(conditions, " AND "), unread, mentioned, openQuestion, openBlocker, dueReminder, limitPlaceholder), args...)
+	`, activityAttachmentSelectSQL(), activityConversationSelectSQL("$1"), unread, mentioned, openQuestion, openBlocker, dueReminder, unread, activityAttachmentJoinSQL(), activityConversationJoinSQL("$1"), strings.Join(conditions, " AND "), unread, mentioned, openQuestion, openBlocker, dueReminder, limitPlaceholder), args...)
 }
 
 func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, clientVisibleOnly ...bool) (Record, error) {
@@ -1296,15 +1344,16 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 		visibilitySQL = "wia.visibility='client'"
 	}
 	activities, _ := r.Query(ctx, fmt.Sprintf(`
-		SELECT wia.*, u.full_name AS actor_name, %s
+		SELECT wia.*, u.full_name AS actor_name, %s, %s
 		FROM work_item_activities wia
 		LEFT JOIN users u ON u.id=wia.actor_id
+		%s
 		%s
 		WHERE wia.work_item_id=$1
 		  AND (%s)
 		ORDER BY wia.created_at DESC
 		LIMIT 100
-	`, activityAttachmentSelectSQL(), activityAttachmentJoinSQL(), visibilitySQL), workItemID)
+	`, activityAttachmentSelectSQL(), activityConversationSelectSQL("NULL::uuid"), activityAttachmentJoinSQL(), activityConversationJoinSQL("NULL::uuid"), visibilitySQL), workItemID)
 	evidence, _ := r.Query(ctx, `
 		SELECT er.*, u.full_name AS submitted_by_name, d.name AS document_name
 		FROM evidence_records er
@@ -5674,16 +5723,24 @@ func (r *Repository) AddWorkItemActivity(ctx context.Context, item Record, req W
 
 func (r *Repository) AddProjectActivity(ctx context.Context, projectID string, req WorkItemActivityRequest, actorID, actorName string) (Record, error) {
 	rawMetadata, _ := json.Marshal(req.Metadata)
+	auditMetadata := Record{}
+	for key, value := range req.Metadata {
+		auditMetadata[key] = value
+	}
+	if req.ParentActivityID != "" {
+		auditMetadata["parent_activity_id"] = req.ParentActivityID
+	}
+	rawAuditMetadata, _ := json.Marshal(auditMetadata)
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 	rows, err := queryTx(ctx, tx, `
-		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
-		VALUES (NULLIF($2,'')::uuid, $1, $3, $4, NULLIF($5,'')::uuid, $6, $7, $8, $9::jsonb)
+		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json, parent_activity_id)
+		VALUES (NULLIF($2,'')::uuid, $1, $3, $4, NULLIF($5,'')::uuid, $6, $7, $8, $9::jsonb, NULLIF($10,'')::uuid)
 		RETURNING *
-	`, projectID, req.WorkItemID, req.ScopeType, req.ScopeID, actorID, req.ActivityType, req.Comment, req.Visibility, string(rawMetadata))
+	`, projectID, req.WorkItemID, req.ScopeType, req.ScopeID, actorID, req.ActivityType, req.Comment, req.Visibility, string(rawMetadata), req.ParentActivityID)
 	if err != nil {
 		return nil, err
 	}
@@ -5696,13 +5753,156 @@ func (r *Repository) AddProjectActivity(ctx context.Context, projectID string, r
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
 		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, $8::jsonb)
-	`, projectID, actorID, actorName, "project_activity_"+req.ActivityType, req.ScopeType, req.ScopeID, projectActivityDescription(req.ActivityType, req.Comment), string(rawMetadata)); err != nil {
+	`, projectID, actorID, actorName, "project_activity_"+req.ActivityType, req.ScopeType, req.ScopeID, projectActivityDescription(req.ActivityType, req.Comment), string(rawAuditMetadata)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return rows[0], nil
+}
+
+func (r *Repository) SetActivityReaction(ctx context.Context, activity Record, reaction string, active bool, userID string) (Record, error) {
+	activityID := cleanID(activity["id"])
+	projectID := cleanID(activity["project_id"])
+	if err := r.Exec(ctx, `
+		INSERT INTO activity_reactions (activity_id, project_id, user_id, reaction, active)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (activity_id, user_id, reaction)
+		DO UPDATE SET active=EXCLUDED.active, updated_at=now()
+	`, activityID, projectID, userID, reaction, active); err != nil {
+		return nil, err
+	}
+	rows, err := r.Query(ctx, `
+		SELECT reaction, COUNT(*) AS count,
+			COALESCE(bool_or(user_id=$2), false) AS reacted_by_me
+		FROM activity_reactions
+		WHERE activity_id=$1 AND active
+		GROUP BY reaction
+		ORDER BY reaction
+	`, activityID, userID)
+	if err != nil {
+		return nil, err
+	}
+	return Record{"activity_id": activityID, "project_id": projectID, "reactions": rows}, nil
+}
+
+func (r *Repository) UpdateActivityMessage(ctx context.Context, activity Record, comment, actorID, actorName string) (Record, error) {
+	activityID := cleanID(activity["id"])
+	projectID := cleanID(activity["project_id"])
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	currentRows, err := queryTx(ctx, tx, `
+		SELECT *
+		FROM work_item_activities
+		WHERE id=$1 AND actor_id=$2 AND activity_type='comment'
+		  AND withdrawn_at IS NULL
+		  AND created_at >= now() - INTERVAL '15 minutes'
+		FOR UPDATE
+	`, activityID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(currentRows) == 0 {
+		return nil, validationError("Tin nhắn không còn đủ điều kiện chỉnh sửa")
+	}
+	current := currentRows[0]
+	revisionNo := int(number(current["message_revision_no"])) + 1
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO activity_message_revisions
+			(activity_id, project_id, revision_no, action, previous_comment, new_comment, actor_id, actor_name)
+		VALUES ($1, $2, $3, 'edited', $4, $5, $6, $7)
+	`, activityID, projectID, revisionNo, current["comment"], comment, actorID, actorName); err != nil {
+		return nil, err
+	}
+	updatedRows, err := queryTx(ctx, tx, `
+		UPDATE work_item_activities
+		SET comment=$2, edited_at=now(), edited_by=$3, message_revision_no=$4
+		WHERE id=$1
+		RETURNING *
+	`, activityID, comment, actorID, revisionNo)
+	if err != nil {
+		return nil, err
+	}
+	if len(updatedRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	auditMetadata, _ := json.Marshal(Record{"activity_id": activityID, "revision_no": revisionNo, "action": "edited"})
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
+		VALUES ($1, $2, $3, 'project_activity_comment_edited', 'activity', $4, 'Đã chỉnh sửa tin nhắn trao đổi', $5::jsonb)
+	`, projectID, actorID, actorName, activityID, string(auditMetadata)); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return updatedRows[0], nil
+}
+
+func (r *Repository) WithdrawActivityMessage(ctx context.Context, activity Record, actorID, actorName string) (Record, error) {
+	activityID := cleanID(activity["id"])
+	projectID := cleanID(activity["project_id"])
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	currentRows, err := queryTx(ctx, tx, `
+		SELECT *
+		FROM work_item_activities
+		WHERE id=$1 AND actor_id=$2 AND activity_type='comment'
+		  AND withdrawn_at IS NULL
+		  AND created_at >= now() - INTERVAL '15 minutes'
+		FOR UPDATE
+	`, activityID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(currentRows) == 0 {
+		return nil, validationError("Tin nhắn không còn đủ điều kiện thu hồi")
+	}
+	current := currentRows[0]
+	revisionNo := int(number(current["message_revision_no"])) + 1
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO activity_message_revisions
+			(activity_id, project_id, revision_no, action, previous_comment, new_comment, actor_id, actor_name)
+		VALUES ($1, $2, $3, 'withdrawn', $4, NULL, $5, $6)
+	`, activityID, projectID, revisionNo, current["comment"], actorID, actorName); err != nil {
+		return nil, err
+	}
+	updatedRows, err := queryTx(ctx, tx, `
+		UPDATE work_item_activities
+		SET comment=NULL, withdrawn_at=now(), withdrawn_by=$2, message_revision_no=$3
+		WHERE id=$1
+		RETURNING *
+	`, activityID, actorID, revisionNo)
+	if err != nil {
+		return nil, err
+	}
+	if len(updatedRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE activity_reactions SET active=false, updated_at=now() WHERE activity_id=$1 AND active`, activityID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE activity_read_states SET read_at=COALESCE(read_at, now()) WHERE activity_id=$1`, activityID); err != nil {
+		return nil, err
+	}
+	auditMetadata, _ := json.Marshal(Record{"activity_id": activityID, "revision_no": revisionNo, "action": "withdrawn"})
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
+		VALUES ($1, $2, $3, 'project_activity_comment_withdrawn', 'activity', $4, 'Đã thu hồi tin nhắn trao đổi', $5::jsonb)
+	`, projectID, actorID, actorName, activityID, string(auditMetadata)); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return updatedRows[0], nil
 }
 
 func (r *Repository) insertActivityAttentionTx(ctx context.Context, tx *sql.Tx, activity Record, req WorkItemActivityRequest, actorID string) error {
@@ -5967,7 +6167,7 @@ func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID st
 	if filter.View == projectOperationsViewWorkflowSidebar {
 		return r.ProjectOperationsWorkflowSidebar(ctx, projectID, userID)
 	}
-	project, err := r.GetProjectDetail(ctx, projectID)
+	project, err := r.GetProjectSummary(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -5979,9 +6179,6 @@ func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID st
 	if err != nil {
 		return nil, err
 	}
-	if !profile.IsManager {
-		delete(project, "members")
-	}
 	workItems, err := r.ListProjectOperationsWorkItems(ctx, projectID, userID)
 	if err != nil {
 		return nil, err
@@ -5992,11 +6189,19 @@ func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID st
 	if err != nil {
 		return nil, err
 	}
+	projectActivitySummary, err := r.ProjectActivitySummary(ctx, projectID, profile)
+	if err != nil {
+		return nil, err
+	}
 	approvals, err := r.ProjectOperationsApprovals(ctx, projectID, profile)
 	if err != nil {
 		return nil, err
 	}
 	latestEvidence, err := r.ProjectOperationsEvidence(ctx, projectID, profile)
+	if err != nil {
+		return nil, err
+	}
+	evidenceSummary, err := r.ProjectEvidenceSummary(ctx, projectID, profile)
 	if err != nil {
 		return nil, err
 	}
@@ -6030,7 +6235,8 @@ func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID st
 		"blockers":            blockers,
 		"approvals":           approvals,
 		"latest_evidence":     latestEvidence,
-		"activity_summary":    activitySummary(latestActivity),
+		"evidence_summary":    evidenceSummary,
+		"activity_summary":    projectActivitySummary,
 		"latest_activity":     latestActivity,
 		"audit_summary":       auditSummary(auditRows),
 		"department_surfaces": departmentSurfaces(workItems),
@@ -6143,6 +6349,92 @@ func (r *Repository) ActivityVisibleToUser(ctx context.Context, activityID strin
 	return r.CanViewWorkItem(ctx, workItemID, profile.UserID)
 }
 
+func (r *Repository) ActivityRecord(ctx context.Context, activityID string) (Record, error) {
+	return r.QueryOne(ctx, `SELECT * FROM work_item_activities WHERE id=$1`, activityID)
+}
+
+func (r *Repository) ActivityMentionedUser(ctx context.Context, activityID, userID string) (bool, error) {
+	row, err := r.QueryOne(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM activity_mentions WHERE activity_id=$1 AND recipient_user_id=$2
+		) AS allowed
+	`, activityID, userID)
+	if err != nil {
+		return false, err
+	}
+	return boolValue(row["allowed"]), nil
+}
+
+func (r *Repository) ResolveActivity(ctx context.Context, activity Record, comment, actorID, actorName string) (Record, error) {
+	activityID := cleanID(activity["id"])
+	projectID := cleanID(activity["project_id"])
+	activityType := strings.TrimSpace(fmt.Sprint(activity["activity_type"]))
+	timestampKey := ""
+	actorKey := ""
+	actionLabel := ""
+	switch activityType {
+	case "question":
+		timestampKey = "answered_at"
+		actorKey = "answered_by"
+		actionLabel = "Đã trả lời câu hỏi"
+	case "blocker":
+		timestampKey = "resolved_at"
+		actorKey = "resolved_by"
+		actionLabel = "Đã xử lý điểm chặn"
+	case "reminder":
+		timestampKey = "completed_at"
+		actorKey = "completed_by"
+		actionLabel = "Đã hoàn tất nhắc việc"
+	default:
+		return nil, validationError("Loại hoạt động này không có hành động hoàn tất", Record{"activity_type": activityType})
+	}
+	if comment == "" {
+		comment = actionLabel
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	rows, err := queryTx(ctx, tx, `
+		UPDATE work_item_activities
+		SET metadata_json=COALESCE(metadata_json, '{}'::jsonb) || jsonb_build_object(
+			$2::text, now(),
+			$3::text, NULLIF($4,'')::uuid,
+			'resolution_comment', $5::text
+		)
+		WHERE id=$1 AND COALESCE(metadata_json->>$2, metadata_json->>'closed_at', '')=''
+		RETURNING *
+	`, activityID, timestampKey, actorKey, actorID, comment)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, validationError("Hoạt động đã được xử lý trước đó", Record{"activity_id": activityID})
+	}
+	resolutionMetadata := Record{
+		"source_activity_id":   activityID,
+		"source_activity_type": activityType,
+		"resolution_action":    timestampKey,
+	}
+	rawMetadata, _ := json.Marshal(resolutionMetadata)
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO work_item_activities
+			(work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+		VALUES
+			(NULLIF($1,'')::uuid, $2, $3, $4, NULLIF($5,'')::uuid, 'system_event', $6, $7, $8::jsonb)
+	`, cleanID(activity["work_item_id"]), projectID, activity["scope_type"], activity["scope_id"], actorID, comment, activity["visibility"], string(rawMetadata)); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "activity_resolved", "work_item_activity", activityID, comment, resolutionMetadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return rows[0], nil
+}
+
 func (r *Repository) MarkActivityRead(ctx context.Context, activityID, userID string) (Record, error) {
 	return r.QueryOne(ctx, `
 		INSERT INTO activity_read_states (activity_id, project_id, user_id, read_at)
@@ -6153,6 +6445,156 @@ func (r *Repository) MarkActivityRead(ctx context.Context, activityID, userID st
 		DO UPDATE SET read_at=EXCLUDED.read_at
 		RETURNING *
 	`, activityID, userID)
+}
+
+func (r *Repository) MarkProjectActivityRead(ctx context.Context, projectID, userID string) (Record, error) {
+	rows, err := r.Query(ctx, `
+		UPDATE activity_read_states
+		SET read_at=now()
+		WHERE project_id=$1 AND user_id=$2 AND read_at IS NULL
+		RETURNING activity_id
+	`, projectID, userID)
+	if err != nil {
+		return nil, err
+	}
+	return Record{"project_id": projectID, "marked_count": len(rows)}, nil
+}
+
+func (r *Repository) ProjectActivitySummary(ctx context.Context, projectID string, profile workItemAccessProfile) (Record, error) {
+	args := append([]any{projectID, profile.UserID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	visibilitySQL := "TRUE"
+	if profileIsClient(profile) && !profile.IsManager {
+		visibilitySQL = "wia.visibility='client'"
+	}
+	unread := "(wia.withdrawn_at IS NULL AND ars.user_id IS NOT NULL AND ars.read_at IS NULL)"
+	mentioned := "(wia.withdrawn_at IS NULL AND COALESCE(mention_state.mentioned_me, false))"
+	openQuestion := "(wia.activity_type='question' AND COALESCE(wia.metadata_json->>'answered_at', wia.metadata_json->>'resolved_at', wia.metadata_json->>'closed_at', '')='')"
+	openBlocker := "(wia.activity_type='blocker' AND COALESCE(wia.metadata_json->>'resolved_at', wia.metadata_json->>'closed_at', '')='')"
+	dueReminder := "(wia.activity_type='reminder' AND COALESCE(wia.metadata_json->>'completed_at', wia.metadata_json->>'done_at', wia.metadata_json->>'closed_at', '')='' AND COALESCE(wia.metadata_json->>'due_at', '') ~ '^\\d{4}-\\d{2}-\\d{2}' AND left(wia.metadata_json->>'due_at', 10)::date <= current_date + INTERVAL '7 days')"
+	return r.QueryOne(ctx, fmt.Sprintf(`
+		SELECT
+			COUNT(*) AS total,
+			COUNT(*) FILTER (WHERE wia.activity_type IN ('comment','status','blocker','question','decision','reminder','file_note')) AS discussion,
+			COUNT(*) FILTER (WHERE wia.activity_type NOT IN ('comment','status','blocker','question','decision','reminder','file_note')) AS system,
+			COUNT(*) FILTER (WHERE wia.activity_type='decision') AS decisions,
+			COUNT(*) FILTER (WHERE %s) AS unread,
+			COUNT(*) FILTER (WHERE %s) AS mentioned,
+			COUNT(*) FILTER (WHERE %s) AS questions,
+			COUNT(*) FILTER (WHERE %s) AS blockers,
+			COUNT(*) FILTER (WHERE %s) AS reminders,
+			COUNT(*) FILTER (WHERE %s OR %s OR %s OR %s) AS attention
+		FROM work_item_activities wia
+		LEFT JOIN work_items wi ON wi.id=wia.work_item_id
+		LEFT JOIN activity_read_states ars ON ars.activity_id=wia.id AND ars.user_id=$2
+		LEFT JOIN LATERAL (
+			SELECT bool_or(am.recipient_user_id=$2) AS mentioned_me
+			FROM activity_mentions am
+			WHERE am.activity_id=wia.id
+		) mention_state ON true
+		WHERE wia.project_id=$1
+		  AND (wi.id IS NULL OR wi.status <> 'cancelled')
+		  AND (%s)
+		  AND (wia.scope_type <> 'work_item' OR (wi.id IS NOT NULL AND (%s)))
+	`, unread, mentioned, openQuestion, openBlocker, dueReminder, unread, openQuestion, openBlocker, dueReminder, visibilitySQL, workItemScopeSQL("wi", 3)), args...)
+}
+
+func (r *Repository) ProjectActivityOptions(ctx context.Context, projectID string, profile workItemAccessProfile) (Record, error) {
+	members, err := r.Query(ctx, `
+		SELECT s.id, s.user_id, s.full_name AS label, s.department, s.position
+		FROM project_members pm
+		JOIN staff s ON s.id=pm.staff_id
+		WHERE pm.project_id=$1 AND pm.active AND s.status='active' AND s.user_id IS NOT NULL
+		ORDER BY lower(s.full_name)
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := r.Query(ctx, `
+		SELECT DISTINCT role_name AS id, role_name AS label
+		FROM project_members pm
+		CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(pm.role_ids, '[]'::jsonb)) AS roles(role_name)
+		WHERE pm.project_id=$1 AND pm.active AND role_name <> ''
+		ORDER BY lower(role_name)
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	workArgs := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	workTargets, err := r.Query(ctx, fmt.Sprintf(`
+		SELECT 'work_item' AS scope_type, wi.id AS scope_id,
+			COALESCE(NULLIF(wi.title, ''), wi.id::text) AS label,
+			wi.id AS work_item_id, wi.status
+		FROM work_items wi
+		WHERE wi.project_id=$1 AND wi.status <> 'cancelled' AND (%s)
+		ORDER BY wi.created_at DESC
+		LIMIT 300
+	`, workItemScopeSQL("wi", 2)), workArgs...)
+	if err != nil {
+		return nil, err
+	}
+	domainTargets, err := r.Query(ctx, `
+		SELECT * FROM (
+			SELECT 'boq_item' AS scope_type, id AS scope_id, work_item_name AS label, NULL::uuid AS work_item_id, status FROM boq_items WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
+			UNION ALL
+			SELECT 'procurement_request', id, request_code || ' · ' || title, NULL::uuid, status FROM procurement_requests WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
+			UNION ALL
+			SELECT 'stock_movement', id, movement_code, NULL::uuid, NULL::text FROM stock_movements WHERE project_id=$1
+			UNION ALL
+			SELECT 'acceptance', id, title, NULL::uuid, status FROM acceptance_records WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
+			UNION ALL
+			SELECT 'rework', id, title, NULL::uuid, status FROM rework_requests WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
+			UNION ALL
+			SELECT 'handover', id, 'Bàn giao · ' || status, NULL::uuid, status FROM handover_records WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
+			UNION ALL
+			SELECT 'payable', id, payable_code || ' · ' || vendor_name, NULL::uuid, status FROM payables WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
+			UNION ALL
+			SELECT 'receivable', id, receivable_code || ' · ' || client_name, NULL::uuid, status FROM receivables WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
+			UNION ALL
+			SELECT 'payment', id, payment_code || ' · ' || payment_type, NULL::uuid, status FROM payments WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
+		) options
+		ORDER BY scope_type, lower(label)
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	targets := append(workTargets, domainTargets...)
+	evidenceVisibility := "er.visibility IN ('internal','project','client')"
+	if profileIsClient(profile) && !profile.IsManager {
+		evidenceVisibility = "er.visibility='client'"
+	}
+	attachmentArgs := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	attachments, err := r.Query(ctx, fmt.Sprintf(`
+		SELECT 'evidence' AS type, er.id, COALESCE(NULLIF(er.name,''), NULLIF(er.title,''), er.id::text) AS label,
+			er.status, er.visibility, er.work_item_id
+		FROM evidence_records er
+		JOIN work_items wi ON wi.id=er.work_item_id
+		WHERE er.project_id=$1 AND er.status <> 'rejected' AND wi.status <> 'cancelled'
+		  AND %s AND (%s)
+		ORDER BY er.created_at DESC
+		LIMIT 200
+	`, evidenceVisibility, workItemScopeSQL("wi", 2)), attachmentArgs...)
+	if err != nil {
+		return nil, err
+	}
+	if !profileIsClient(profile) || profile.IsManager {
+		documents, err := r.Query(ctx, `
+			SELECT 'document' AS type, d.id, d.name AS label, d.status, 'project' AS visibility, NULL::uuid AS work_item_id
+			FROM documents d
+			WHERE d.project_id=$1 AND d.status NOT IN ('cancelled','deleted')
+			ORDER BY d.created_at DESC
+			LIMIT 200
+		`, projectID)
+		if err != nil {
+			return nil, err
+		}
+		attachments = append(attachments, documents...)
+	}
+	return Record{
+		"members":     members,
+		"roles":       roles,
+		"targets":     targets,
+		"attachments": attachments,
+	}, nil
 }
 
 func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string, profile workItemAccessProfile, filter ProjectActivityFilter) ([]Record, error) {
@@ -6175,6 +6617,67 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 		args = append(args, filter.ScopeID)
 		conditions = append(conditions, fmt.Sprintf("wia.scope_id=$%d::uuid", len(args)))
 	}
+	if filter.ActivityType != "" {
+		args = append(args, filter.ActivityType)
+		conditions = append(conditions, fmt.Sprintf("wia.activity_type=$%d", len(args)))
+	}
+	if filter.ActorID != "" {
+		args = append(args, filter.ActorID)
+		conditions = append(conditions, fmt.Sprintf("wia.actor_id=$%d::uuid", len(args)))
+	}
+	if filter.Visibility != "" {
+		args = append(args, filter.Visibility)
+		conditions = append(conditions, fmt.Sprintf("wia.visibility=$%d", len(args)))
+	}
+	switch filter.Kind {
+	case "discussion":
+		conditions = append(conditions, "wia.activity_type IN ('comment','status','blocker','question','decision','reminder','file_note')")
+	case "system":
+		conditions = append(conditions, "wia.activity_type NOT IN ('comment','status','blocker','question','decision','reminder','file_note')")
+	case "decision":
+		conditions = append(conditions, "wia.activity_type='decision'")
+	}
+	unread := "(wia.withdrawn_at IS NULL AND ars.user_id IS NOT NULL AND ars.read_at IS NULL)"
+	mentioned := "(wia.withdrawn_at IS NULL AND COALESCE(mention_state.mentioned_me, false))"
+	openQuestion := "(wia.activity_type='question' AND COALESCE(wia.metadata_json->>'answered_at', wia.metadata_json->>'resolved_at', wia.metadata_json->>'closed_at', '')='')"
+	openBlocker := "(wia.activity_type='blocker' AND COALESCE(wia.metadata_json->>'resolved_at', wia.metadata_json->>'closed_at', '')='')"
+	dueReminder := "(wia.activity_type='reminder' AND COALESCE(wia.metadata_json->>'completed_at', wia.metadata_json->>'done_at', wia.metadata_json->>'closed_at', '')='' AND COALESCE(wia.metadata_json->>'due_at', '') ~ '^\\d{4}-\\d{2}-\\d{2}' AND left(wia.metadata_json->>'due_at', 10)::date <= current_date + INTERVAL '7 days')"
+	switch filter.Attention {
+	case "mentions":
+		conditions = append(conditions, mentioned)
+	case "questions":
+		conditions = append(conditions, openQuestion)
+	case "blockers":
+		conditions = append(conditions, openBlocker)
+	case "reminders":
+		conditions = append(conditions, dueReminder)
+	case "unread":
+		conditions = append(conditions, unread)
+	}
+	if filter.Search != "" {
+		args = append(args, "%"+filter.Search+"%")
+		placeholder := len(args)
+		conditions = append(conditions, fmt.Sprintf(`(
+			COALESCE(wia.comment, '') ILIKE $%d
+			OR COALESCE(u.full_name, '') ILIKE $%d
+			OR COALESCE(wi.title, '') ILIKE $%d
+			OR COALESCE(p.code, '') ILIKE $%d
+			OR COALESCE(p.name, '') ILIKE $%d
+			OR COALESCE(bi.work_item_name, '') ILIKE $%d
+			OR COALESCE(pr.request_code, '') ILIKE $%d
+			OR COALESCE(pr.title, '') ILIKE $%d
+			OR COALESCE(sm.movement_code, '') ILIKE $%d
+			OR COALESCE(ar.title, '') ILIKE $%d
+			OR COALESCE(rw.title, '') ILIKE $%d
+			OR COALESCE(pay.payable_code, '') ILIKE $%d
+			OR COALESCE(rec.receivable_code, '') ILIKE $%d
+			OR COALESCE(pm.payment_code, '') ILIKE $%d
+		)`, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder))
+	}
+	if filter.CursorCreatedAt != "" && filter.CursorID != "" {
+		args = append(args, filter.CursorCreatedAt, filter.CursorID)
+		conditions = append(conditions, fmt.Sprintf("(wia.created_at, wia.id) < ($%d::timestamptz, $%d::uuid)", len(args)-1, len(args)))
+	}
 	if filter.Limit <= 0 || filter.Limit > 200 {
 		filter.Limit = 80
 	}
@@ -6183,13 +6686,15 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT
 			wia.*,
+			to_char(wia.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
 			wi.title AS work_item_title,
 			u.full_name AS actor_name,
 			COALESCE(mention_state.mentions, '[]'::jsonb) AS mentions,
-			COALESCE(mention_state.mentioned_me, false) AS mentioned_me,
+				(wia.withdrawn_at IS NULL AND COALESCE(mention_state.mentioned_me, false)) AS mentioned_me,
+			%s,
 			%s,
 			ars.read_at,
-			(ars.user_id IS NOT NULL AND ars.read_at IS NULL) AS is_unread,
+				(wia.withdrawn_at IS NULL AND ars.user_id IS NOT NULL AND ars.read_at IS NULL) AS is_unread,
 			COALESCE(
 				CASE
 					WHEN wia.scope_type='project' THEN p.code || ' · ' || p.name
@@ -6211,6 +6716,7 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 		JOIN projects p ON p.id=wia.project_id
 		LEFT JOIN work_items wi ON wi.id=wia.work_item_id
 		LEFT JOIN users u ON u.id=wia.actor_id
+		%s
 		%s
 		LEFT JOIN activity_read_states ars ON ars.activity_id=wia.id AND ars.user_id=$2
 		LEFT JOIN LATERAL (
@@ -6235,9 +6741,9 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 		LEFT JOIN receivables rec ON rec.id=wia.scope_id AND wia.scope_type='receivable'
 		LEFT JOIN payments pm ON pm.id=wia.scope_id AND wia.scope_type='payment'
 		WHERE %s
-		ORDER BY wia.created_at DESC
+		ORDER BY wia.created_at DESC, wia.id DESC
 		LIMIT $%d
-	`, activityAttachmentSelectSQL(), activityAttachmentJoinSQL(), strings.Join(conditions, " AND "), limitPlaceholder), args...)
+		`, activityAttachmentSelectSQL(), activityConversationSelectSQL("$2"), activityAttachmentJoinSQL(), activityConversationJoinSQL("$2"), strings.Join(conditions, " AND "), limitPlaceholder), args...)
 }
 
 func profileIsClient(profile workItemAccessProfile) bool {
@@ -6297,6 +6803,171 @@ func (r *Repository) ProjectOperationsEvidence(ctx context.Context, projectID st
 		ORDER BY er.created_at DESC
 		LIMIT 50
 	`, workItemScopeSQL("wi", 2)), args...)
+}
+
+func projectEvidenceWhere(projectID string, profile workItemAccessProfile, filter ProjectEvidenceFilter, includeCursor bool) ([]string, []any) {
+	args := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	conditions := []string{
+		"er.project_id=$1",
+		"wi.status <> 'cancelled'",
+		fmt.Sprintf("(%s)", workItemScopeSQL("wi", 2)),
+	}
+	if profileIsClient(profile) && !profile.IsManager {
+		conditions = append(conditions, "er.visibility='client'")
+	} else {
+		conditions = append(conditions, "er.visibility IN ('internal','project','client')")
+	}
+	if filter.EvidenceType != "" {
+		args = append(args, filter.EvidenceType)
+		conditions = append(conditions, fmt.Sprintf("er.evidence_type=$%d", len(args)))
+	}
+	switch filter.Status {
+	case "waiting":
+		conditions = append(conditions, "er.status IN ('draft','submitted')")
+	case "accepted", "rejected":
+		args = append(args, filter.Status)
+		conditions = append(conditions, fmt.Sprintf("er.status=$%d", len(args)))
+	}
+	if filter.WorkItemID != "" {
+		args = append(args, filter.WorkItemID)
+		conditions = append(conditions, fmt.Sprintf("er.work_item_id=$%d::uuid", len(args)))
+	}
+	if filter.SubmittedBy != "" {
+		args = append(args, filter.SubmittedBy)
+		conditions = append(conditions, fmt.Sprintf("er.submitted_by=$%d::uuid", len(args)))
+	}
+	if filter.Visibility != "" {
+		args = append(args, filter.Visibility)
+		conditions = append(conditions, fmt.Sprintf("er.visibility=$%d", len(args)))
+	}
+	if filter.DateFrom != "" {
+		args = append(args, filter.DateFrom)
+		conditions = append(conditions, fmt.Sprintf("er.created_at >= $%d::date", len(args)))
+	}
+	if filter.DateTo != "" {
+		args = append(args, filter.DateTo)
+		conditions = append(conditions, fmt.Sprintf("er.created_at < $%d::date + INTERVAL '1 day'", len(args)))
+	}
+	if filter.Search != "" {
+		args = append(args, "%"+filter.Search+"%")
+		placeholder := len(args)
+		conditions = append(conditions, fmt.Sprintf(`(
+			er.name ILIKE $%d
+			OR COALESCE(er.title, '') ILIKE $%d
+			OR COALESCE(er.description, '') ILIKE $%d
+			OR COALESCE(er.caption, '') ILIKE $%d
+			OR COALESCE(er.file_url, '') ILIKE $%d
+			OR COALESCE(er.checksum_sha256, '') ILIKE $%d
+			OR COALESCE(er.payload_json->>'original_filename', '') ILIKE $%d
+			OR wi.title ILIKE $%d
+			OR COALESCE(d.name, '') ILIKE $%d
+			OR COALESCE(u.full_name, '') ILIKE $%d
+		)`, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder))
+	}
+	if includeCursor && filter.CursorCreatedAt != "" && filter.CursorID != "" {
+		priorityExpression := "CASE WHEN er.status IN ('draft','submitted') THEN 0 ELSE 1 END"
+		args = append(args, filter.CursorPriority, filter.CursorCreatedAt, filter.CursorID)
+		priorityPlaceholder := len(args) - 2
+		createdPlaceholder := len(args) - 1
+		idPlaceholder := len(args)
+		conditions = append(conditions, fmt.Sprintf(`(
+			%s > $%d
+			OR (%s=$%d AND (er.created_at, er.id) < ($%d::timestamptz, $%d::uuid))
+		)`, priorityExpression, priorityPlaceholder, priorityExpression, priorityPlaceholder, createdPlaceholder, idPlaceholder))
+	}
+	return conditions, args
+}
+
+func (r *Repository) ListProjectEvidence(ctx context.Context, projectID string, profile workItemAccessProfile, filter ProjectEvidenceFilter) ([]Record, error) {
+	conditions, args := projectEvidenceWhere(projectID, profile, filter, true)
+	args = append(args, filter.Limit)
+	return r.Query(ctx, fmt.Sprintf(`
+		SELECT er.*,
+			wi.title AS work_item_title,
+			wi.status AS work_item_status,
+			wi.role_ids AS work_item_role_ids,
+			wi.approval_request_id AS work_item_approval_request_id,
+			rn.name AS run_node_name,
+			u.full_name AS submitted_by_name,
+			reviewer.full_name AS reviewed_by_name,
+			d.name AS document_name,
+			CASE WHEN er.status IN ('draft','submitted') THEN 0 ELSE 1 END AS review_priority
+		FROM evidence_records er
+		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
+		LEFT JOIN pipeline_run_nodes rn ON rn.id=wi.run_node_id
+		LEFT JOIN users u ON u.id=er.submitted_by
+		LEFT JOIN users reviewer ON reviewer.id=er.reviewed_by
+		LEFT JOIN documents d ON d.id=er.document_id
+		WHERE %s
+		ORDER BY review_priority, er.created_at DESC, er.id DESC
+		LIMIT $%d
+	`, strings.Join(conditions, " AND "), len(args)), args...)
+}
+
+func (r *Repository) ProjectEvidenceCount(ctx context.Context, projectID string, profile workItemAccessProfile, filter ProjectEvidenceFilter) (int, error) {
+	conditions, args := projectEvidenceWhere(projectID, profile, filter, false)
+	row, err := r.QueryOne(ctx, fmt.Sprintf(`
+		SELECT COUNT(*) AS total
+		FROM evidence_records er
+		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
+		LEFT JOIN users u ON u.id=er.submitted_by
+		LEFT JOIN documents d ON d.id=er.document_id
+		WHERE %s
+	`, strings.Join(conditions, " AND ")), args...)
+	if err != nil {
+		return 0, err
+	}
+	return int(number(row["total"])), nil
+}
+
+func (r *Repository) ProjectEvidenceSummary(ctx context.Context, projectID string, profile workItemAccessProfile) (Record, error) {
+	conditions, args := projectEvidenceWhere(projectID, profile, ProjectEvidenceFilter{}, false)
+	return r.QueryOne(ctx, fmt.Sprintf(`
+		SELECT
+			COUNT(*) AS total,
+			COUNT(*) FILTER (WHERE er.status IN ('draft','submitted')) AS waiting,
+			COUNT(*) FILTER (WHERE er.status='accepted') AS accepted,
+			COUNT(*) FILTER (WHERE er.status='rejected') AS rejected,
+			COUNT(*) FILTER (WHERE er.evidence_type='photo' OR COALESCE(er.mime_type, '') LIKE 'image/%%') AS photos,
+			COUNT(*) FILTER (WHERE er.evidence_type='document' OR COALESCE(er.mime_type, '') ILIKE '%%pdf%%') AS documents
+		FROM evidence_records er
+		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
+		LEFT JOIN users u ON u.id=er.submitted_by
+		LEFT JOIN documents d ON d.id=er.document_id
+		WHERE %s
+	`, strings.Join(conditions, " AND ")), args...)
+}
+
+func (r *Repository) ProjectEvidenceOptions(ctx context.Context, projectID string, profile workItemAccessProfile) (Record, error) {
+	conditions, args := projectEvidenceWhere(projectID, profile, ProjectEvidenceFilter{}, false)
+	where := strings.Join(conditions, " AND ")
+	workItems, err := r.Query(ctx, fmt.Sprintf(`
+		SELECT wi.id, wi.title AS label
+		FROM evidence_records er
+		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
+		LEFT JOIN users u ON u.id=er.submitted_by
+		LEFT JOIN documents d ON d.id=er.document_id
+		WHERE %s
+		GROUP BY wi.id, wi.title
+		ORDER BY lower(wi.title), wi.id
+	`, where), args...)
+	if err != nil {
+		return nil, err
+	}
+	submitters, err := r.Query(ctx, fmt.Sprintf(`
+		SELECT u.id, u.full_name AS label
+		FROM evidence_records er
+		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
+		JOIN users u ON u.id=er.submitted_by
+		LEFT JOIN documents d ON d.id=er.document_id
+		WHERE %s
+		GROUP BY u.id, u.full_name
+		ORDER BY lower(u.full_name), u.id
+	`, where), args...)
+	if err != nil {
+		return nil, err
+	}
+	return Record{"work_items": workItems, "submitters": submitters}, nil
 }
 
 func (r *Repository) ProjectOperationsAudit(ctx context.Context, projectID string, profile workItemAccessProfile) ([]Record, error) {
@@ -6409,7 +7080,7 @@ func projectOperationsVisibility(profile workItemAccessProfile, permissions []st
 	}
 	hiddenSections := []string{}
 	if !profile.IsManager {
-		hiddenSections = append(hiddenSections, "members", "domain_counts", "project_audit", "unscoped_pipeline_steps")
+		hiddenSections = append(hiddenSections, "domain_counts", "project_audit", "unscoped_pipeline_steps")
 	}
 	return Record{
 		"scope":                scope,
@@ -6717,6 +7388,353 @@ func (r *Repository) ListProjects(ctx context.Context, userID string) ([]Record,
 	`, scopeSQL), scopeArgs...)
 }
 
+func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, includeInactive bool) ([]Record, error) {
+	activeFilter := "AND pm.active"
+	if includeInactive {
+		activeFilter = ""
+	}
+	return r.Query(ctx, fmt.Sprintf(`
+		SELECT pm.id::text, pm.project_id::text, pm.staff_id::text,
+			COALESCE(s.user_id::text, '') AS user_id,
+			s.full_name, s.email, s.phone, s.department, s.position,
+			pm.role_ids, pm.active, pm.notes, pm.created_at, pm.updated_at,
+			(pm.staff_id=p.pm_staff_id) AS is_project_manager,
+			COALESCE((
+				SELECT jsonb_agg(jsonb_build_object(
+					'id', r.id::text,
+					'name', r.name,
+					'display_name', r.display_name,
+					'scope', 'global',
+					'grants_project_view', EXISTS (
+						SELECT 1 FROM role_permissions rp
+						JOIN permissions p ON p.id=rp.permission_id
+						WHERE rp.role_id=r.id AND p.key='project.view'
+					)
+				) ORDER BY r.display_name)
+				FROM user_roles ur
+				JOIN roles r ON r.id=ur.role_id
+				WHERE ur.user_id=s.user_id AND ur.project_id IS NULL
+			), '[]'::jsonb) AS global_roles,
+			COALESCE((
+				SELECT jsonb_agg(jsonb_build_object(
+					'id', r.id::text,
+					'name', r.name,
+					'display_name', r.display_name,
+					'scope', 'project',
+					'grants_project_view', EXISTS (
+						SELECT 1 FROM role_permissions rp
+						JOIN permissions p ON p.id=rp.permission_id
+						WHERE rp.role_id=r.id AND p.key='project.view'
+					)
+				) ORDER BY r.display_name)
+				FROM user_roles ur
+				JOIN roles r ON r.id=ur.role_id
+				WHERE ur.user_id=s.user_id AND ur.project_id=pm.project_id
+			), '[]'::jsonb) AS project_roles
+		FROM project_members pm
+		JOIN projects p ON p.id=pm.project_id AND p.status <> 'cancelled'
+		JOIN staff s ON s.id=pm.staff_id AND s.status <> 'deleted'
+		WHERE pm.project_id=$1 %s
+		ORDER BY pm.active DESC, lower(s.full_name), pm.created_at DESC
+	`, activeFilter), projectID)
+}
+
+func (r *Repository) ProjectMemberOptions(ctx context.Context, projectID string) (Record, error) {
+	staff, err := r.Query(ctx, `
+		SELECT s.id::text, s.user_id::text, s.full_name, s.email, s.department, s.position,
+			latest_member.id AS member_id, COALESCE(latest_member.active, false) AS member_active,
+			COALESCE((
+				SELECT jsonb_agg(jsonb_build_object(
+					'id', r.id::text,
+					'name', r.name,
+					'display_name', r.display_name,
+					'scope', 'global',
+					'grants_project_view', EXISTS (
+						SELECT 1 FROM role_permissions rp
+						JOIN permissions p ON p.id=rp.permission_id
+						WHERE rp.role_id=r.id AND p.key='project.view'
+					)
+				) ORDER BY r.display_name)
+				FROM user_roles ur
+				JOIN roles r ON r.id=ur.role_id
+				WHERE ur.user_id=s.user_id AND ur.project_id IS NULL
+			), '[]'::jsonb) AS global_roles
+		FROM staff s
+		JOIN users u ON u.id=s.user_id AND u.status='active'
+		LEFT JOIN LATERAL (
+			SELECT pm.id::text AS id, pm.active
+			FROM project_members pm
+			WHERE pm.project_id=$1 AND pm.staff_id=s.id
+			ORDER BY pm.active DESC, pm.created_at DESC, pm.id DESC
+			LIMIT 1
+		) latest_member ON true
+		WHERE s.status='active'
+		ORDER BY lower(s.full_name)
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := r.Query(ctx, `
+		SELECT r.id::text, r.name, r.display_name, r.description,
+			EXISTS (
+				SELECT 1
+				FROM role_permissions rp
+				JOIN permissions p ON p.id=rp.permission_id
+				WHERE rp.role_id=r.id AND p.key='project.view'
+			) AS grants_project_view
+		FROM roles r
+		WHERE r.name NOT IN ('admin','director')
+		ORDER BY lower(r.display_name)
+	`)
+	if err != nil {
+		return nil, err
+	}
+	roleLabelRows, err := r.Query(ctx, `
+		SELECT label
+		FROM (
+			SELECT DISTINCT label
+			FROM (
+				SELECT r.display_name AS label FROM roles r
+				UNION ALL
+				SELECT jsonb_array_elements_text(COALESCE(pm.role_ids, '[]'::jsonb)) AS label
+				FROM project_members pm
+				WHERE pm.project_id=$1
+			) labels
+			WHERE NULLIF(trim(label), '') IS NOT NULL
+		) distinct_labels
+		ORDER BY lower(label)
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	roleLabels := make([]string, 0, len(roleLabelRows))
+	for _, row := range roleLabelRows {
+		roleLabels = append(roleLabels, strings.TrimSpace(fmt.Sprint(row["label"])))
+	}
+	return Record{"staff": staff, "access_roles": roles, "role_labels": roleLabels}, nil
+}
+
+func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID string, req ProjectMemberMutationRequest, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	projectRows, err := queryTx(ctx, tx, `
+		SELECT id::text, COALESCE(pm_staff_id::text, '') AS pm_staff_id
+		FROM projects
+		WHERE id=$1 AND status <> 'cancelled'
+		FOR UPDATE
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(projectRows) == 0 {
+		return nil, validationError("Công trình không tồn tại hoặc đã huỷ", Record{"project_id": projectID})
+	}
+	staffRows, err := queryTx(ctx, tx, `
+		SELECT s.id::text, s.full_name, COALESCE(s.user_id::text, '') AS user_id
+		FROM staff s
+		JOIN users u ON u.id=s.user_id AND u.status='active'
+		WHERE s.id=$1 AND s.status='active'
+		FOR UPDATE OF s
+	`, req.StaffID)
+	if err != nil {
+		return nil, err
+	}
+	if len(staffRows) == 0 || cleanID(staffRows[0]["user_id"]) == "" {
+		return nil, validationError("Nhân sự phải đang hoạt động và có tài khoản đăng nhập", Record{"staff_id": req.StaffID})
+	}
+	staffName := strings.TrimSpace(fmt.Sprint(staffRows[0]["full_name"]))
+	userID := cleanID(staffRows[0]["user_id"])
+
+	for _, roleID := range req.ProjectRoleIDs {
+		var exists int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM roles WHERE id=$1 AND name NOT IN ('admin','director')`, roleID).Scan(&exists); err != nil {
+			return nil, err
+		}
+		if exists == 0 {
+			return nil, validationError("Role phân quyền không tồn tại", Record{"role_id": roleID})
+		}
+	}
+
+	current := Record(nil)
+	if memberID != "" {
+		rows, err := queryTx(ctx, tx, `
+			SELECT * FROM project_members
+			WHERE id=$1 AND project_id=$2
+			FOR UPDATE
+		`, memberID, projectID)
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 {
+			return nil, validationError("Thành viên không thuộc công trình", Record{"member_id": memberID})
+		}
+		current = rows[0]
+		if current["active"] != true {
+			return nil, validationError("Thành viên đã ngừng tham gia; hãy dùng luồng thêm để kích hoạt lại", Record{"member_id": memberID})
+		}
+		if cleanID(current["staff_id"]) != req.StaffID {
+			return nil, validationError("Không thể đổi nhân sự của một membership đã tồn tại", Record{"member_id": memberID})
+		}
+	} else {
+		rows, err := queryTx(ctx, tx, `
+			SELECT * FROM project_members
+			WHERE project_id=$1 AND staff_id=$2
+			ORDER BY active DESC, created_at DESC, id DESC
+			FOR UPDATE
+		`, projectID, req.StaffID)
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) > 0 {
+			current = rows[0]
+			if current["active"] == true {
+				return nil, validationError("Nhân sự đã là thành viên đang hoạt động của công trình", Record{"staff_id": req.StaffID})
+			}
+			memberID = cleanID(current["id"])
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1 AND project_id=$2`, userID, projectID); err != nil {
+		return nil, err
+	}
+	for _, roleID := range req.ProjectRoleIDs {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO user_roles (user_id, role_id, project_id)
+			VALUES ($1,$2,$3)
+			ON CONFLICT DO NOTHING
+		`, userID, roleID, projectID); err != nil {
+			return nil, err
+		}
+	}
+	var canViewProject bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM user_roles ur
+			JOIN role_permissions rp ON rp.role_id=ur.role_id
+			JOIN permissions p ON p.id=rp.permission_id
+			WHERE ur.user_id=$1
+			  AND (ur.project_id IS NULL OR ur.project_id=$2)
+			  AND p.key='project.view'
+		)
+	`, userID, projectID).Scan(&canViewProject); err != nil {
+		return nil, err
+	}
+	if !canViewProject {
+		return nil, validationError("Role hiện tại không cấp quyền xem công trình; hãy chọn role có project.view", Record{"field": "project_role_ids"})
+	}
+
+	rawRoles, _ := json.Marshal(req.RoleIDs)
+	eventType := "project_member_updated"
+	description := fmt.Sprintf("Cập nhật thành viên %s", staffName)
+	if memberID == "" {
+		if err := tx.QueryRowContext(ctx, `
+			INSERT INTO project_members (project_id, staff_id, role_ids, notes, active, updated_at)
+			VALUES ($1,$2,$3::jsonb,NULLIF($4,''),true,now())
+			RETURNING id::text
+		`, projectID, req.StaffID, string(rawRoles), req.Notes).Scan(&memberID); err != nil {
+			return nil, err
+		}
+		eventType = "project_member_added"
+		description = fmt.Sprintf("Thêm thành viên %s", staffName)
+	} else if _, err := tx.ExecContext(ctx, `
+		UPDATE project_members
+		SET role_ids=$3::jsonb, notes=NULLIF($4,''), active=true, updated_at=now()
+		WHERE id=$1 AND project_id=$2
+	`, memberID, projectID, string(rawRoles), req.Notes); err != nil {
+		return nil, err
+	} else if current != nil && current["active"] != true {
+		eventType = "project_member_reactivated"
+		description = fmt.Sprintf("Kích hoạt lại thành viên %s", staffName)
+	}
+
+	metadata := Record{
+		"staff_id":         req.StaffID,
+		"role_ids":         req.RoleIDs,
+		"project_role_ids": req.ProjectRoleIDs,
+		"notes":            req.Notes,
+	}
+	if current != nil {
+		metadata["previous_role_ids"] = current["role_ids"]
+		metadata["previous_active"] = current["active"]
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "project_member", memberID, description, metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetProjectMember(ctx, projectID, memberID)
+}
+
+func (r *Repository) DeactivateProjectMember(ctx context.Context, projectID, memberID, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	rows, err := queryTx(ctx, tx, `
+		SELECT pm.*, s.full_name, COALESCE(s.user_id::text, '') AS user_id,
+			(pm.staff_id=p.pm_staff_id) AS is_project_manager
+		FROM project_members pm
+		JOIN projects p ON p.id=pm.project_id AND p.status <> 'cancelled'
+		JOIN staff s ON s.id=pm.staff_id
+		WHERE pm.id=$1 AND pm.project_id=$2
+		FOR UPDATE OF pm, p
+	`, memberID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, validationError("Thành viên không thuộc công trình", Record{"member_id": memberID})
+	}
+	member := rows[0]
+	if member["active"] != true {
+		return nil, validationError("Thành viên đã ngừng tham gia", Record{"member_id": memberID})
+	}
+	if member["is_project_manager"] == true {
+		return nil, validationError("Không thể ngừng tham gia PM hiện tại; hãy cập nhật PM thay thế trước", Record{"member_id": memberID})
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE project_members SET active=false, updated_at=now() WHERE id=$1`, memberID); err != nil {
+		return nil, err
+	}
+	userID := cleanID(member["user_id"])
+	if userID != "" {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1 AND project_id=$2`, userID, projectID); err != nil {
+			return nil, err
+		}
+	}
+	metadata := Record{
+		"staff_id":          cleanID(member["staff_id"]),
+		"previous_role_ids": member["role_ids"],
+		"active":            false,
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "project_member_deactivated", "project_member", memberID, fmt.Sprintf("Ngừng tham gia thành viên %s", member["full_name"]), metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetProjectMember(ctx, projectID, memberID)
+}
+
+func (r *Repository) GetProjectMember(ctx context.Context, projectID, memberID string) (Record, error) {
+	rows, err := r.ListProjectMembers(ctx, projectID, true)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		if cleanID(row["id"]) == memberID {
+			return row, nil
+		}
+	}
+	return nil, sql.ErrNoRows
+}
+
 func (r *Repository) GetProjectDetail(ctx context.Context, id string) (Record, error) {
 	project, err := r.GetProjectSummary(ctx, id)
 	if err != nil {
@@ -6726,7 +7744,7 @@ func (r *Repository) GetProjectDetail(ctx context.Context, id string) (Record, e
 		SELECT pm.*, s.full_name, s.department, s.position
 		FROM project_members pm
 		JOIN staff s ON s.id=pm.staff_id
-		WHERE pm.project_id=$1
+		WHERE pm.project_id=$1 AND pm.active
 		ORDER BY s.full_name
 	`, id)
 	project["members"] = members
@@ -9993,18 +11011,35 @@ func (r *Repository) GetProcurementDetail(ctx context.Context, requestID string)
 		SELECT pri.*, m.name AS material_name, b.work_item_name, b.price_waiver_reason,
 			q.quotation_code, q.quotation_date, q.valid_until, q.currency,
 			COALESCE(received.accepted_quantity,0) AS accepted_quantity,
-			GREATEST(pri.quantity_requested - COALESCE(received.accepted_quantity,0),0) AS remaining_quantity
+			LEAST(COALESCE(received.accepted_quantity,0), COALESCE(received.stock_received_quantity,0)+COALESCE(legacy_stock.received_quantity,0)) AS stock_received_quantity,
+			GREATEST(pri.quantity_requested - COALESCE(received.accepted_quantity,0),0) AS remaining_quantity,
+			GREATEST(COALESCE(received.accepted_quantity,0)-COALESCE(received.stock_received_quantity,0)-COALESCE(legacy_stock.received_quantity,0),0) AS awaiting_stock_quantity
 		FROM procurement_request_items pri
 		LEFT JOIN materials m ON m.id=pri.material_id
 		LEFT JOIN boq_items b ON b.id=pri.boq_item_id
 		LEFT JOIN supplier_quotation_items qi ON qi.id=pri.supplier_quotation_item_id
 		LEFT JOIN supplier_quotations q ON q.id=qi.quotation_id
 		LEFT JOIN LATERAL (
-			SELECT SUM(iai.accepted_quantity) AS accepted_quantity
+			SELECT SUM(iai.accepted_quantity) AS accepted_quantity,
+				SUM(COALESCE(stock.received_quantity,0)) AS stock_received_quantity
 			FROM incoming_acceptance_items iai
 			JOIN incoming_acceptance_records iar ON iar.id=iai.incoming_acceptance_id AND iar.status='submitted'
+			LEFT JOIN LATERAL (
+				SELECT SUM(sm.quantity) AS received_quantity
+				FROM stock_movements sm
+				WHERE sm.movement_type='receive'
+				  AND sm.reference_type='incoming_acceptance_item'
+				  AND sm.reference_id=iai.id
+			) stock ON true
 			WHERE iai.procurement_request_item_id=pri.id
 		) received ON true
+		LEFT JOIN LATERAL (
+			SELECT SUM(sm.quantity) AS received_quantity
+			FROM stock_movements sm
+			WHERE sm.movement_type='receive'
+			  AND sm.reference_type='boq_item'
+			  AND sm.reference_id=pri.boq_item_id
+		) legacy_stock ON true
 		WHERE pri.request_id=$1
 		ORDER BY pri.created_at
 	`, requestID)
@@ -10137,10 +11172,10 @@ func (r *Repository) ProcurementAction(ctx context.Context, id, action string, r
 			return nil, validationError("Chưa có khối lượng đạt nghiệm thu đầu vào để ghi nhận nhận hàng")
 		}
 		toStatus = "partially_received"
-		event = "warehouse_partially_received"
+		event = "procurement_acceptance_partially_reconciled"
 		if allReceived {
 			toStatus = "received"
-			event = "warehouse_received"
+			event = "procurement_acceptance_reconciled"
 		}
 	} else {
 		toStatus, event, err = procurementTransitionForAction(action, fromStatus)
@@ -10190,7 +11225,7 @@ func procurementTransitionForAction(action, fromStatus string) (string, string, 
 		}
 	case "receive":
 		if fromStatus == "ordered" {
-			return "received", "warehouse_received", nil
+			return "received", "procurement_acceptance_reconciled", nil
 		}
 	default:
 		return "", "", validationError("Hành động yêu cầu mua không hợp lệ", Record{"action": action})
@@ -11549,6 +12584,22 @@ func (r *Repository) RecurringOccurrenceAction(ctx context.Context, occurrenceID
 }
 
 func (r *Repository) CreateStockMovement(ctx context.Context, req StockActionRequest, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	movement, err := createStockMovementTx(ctx, tx, req, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return movement, nil
+}
+
+func createStockMovementTx(ctx context.Context, tx *sql.Tx, req StockActionRequest, actorID, actorName string) (Record, error) {
 	req.MovementType = strings.TrimSpace(req.MovementType)
 	if req.MovementType == "" {
 		req.MovementType = "receive"
@@ -11558,12 +12609,18 @@ func (r *Repository) CreateStockMovement(ctx context.Context, req StockActionReq
 	}
 	req.ProjectID = cleanID(req.ProjectID)
 	req.WarehouseID = cleanID(req.WarehouseID)
+	req.TargetWarehouseID = cleanID(req.TargetWarehouseID)
 	req.MaterialID = cleanID(req.MaterialID)
 	req.ReferenceID = cleanID(req.ReferenceID)
+	req.StockDocumentID = cleanID(req.StockDocumentID)
+	req.ReferenceType = strings.TrimSpace(req.ReferenceType)
 	req.Unit = strings.TrimSpace(req.Unit)
 	req.Reason = strings.TrimSpace(req.Reason)
 	if req.WarehouseID == "" {
 		return nil, validationError("Kho là bắt buộc")
+	}
+	if req.MovementType == "transfer" && (req.TargetWarehouseID == "" || req.TargetWarehouseID == req.WarehouseID) {
+		return nil, validationError("Điều chuyển cần kho đích khác kho nguồn")
 	}
 	if req.MaterialID == "" {
 		return nil, validationError("Vật tư là bắt buộc")
@@ -11575,27 +12632,32 @@ func (r *Repository) CreateStockMovement(ctx context.Context, req StockActionReq
 		return nil, validationError("Công trình là bắt buộc cho thao tác xuất/hoàn vật tư")
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "stock:"+req.WarehouseID+":"+req.MaterialID); err != nil {
-		return nil, err
+	lockKeys := []string{"stock:" + req.WarehouseID + ":" + req.MaterialID}
+	if req.TargetWarehouseID != "" {
+		lockKeys = append(lockKeys, "stock:"+req.TargetWarehouseID+":"+req.MaterialID)
 	}
 	if req.ProjectID != "" {
-		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "site-material:"+req.ProjectID+":"+req.MaterialID); err != nil {
+		lockKeys = append(lockKeys, "site-material:"+req.ProjectID+":"+req.MaterialID)
+	}
+	sort.Strings(lockKeys)
+	for _, lockKey := range lockKeys {
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, lockKey); err != nil {
 			return nil, err
 		}
 	}
 
-	warehouseRows, err := queryTx(ctx, tx, `SELECT id FROM warehouses WHERE id=$1 AND active`, req.WarehouseID)
-	if err != nil {
-		return nil, err
+	warehouseIDs := []string{req.WarehouseID}
+	if req.TargetWarehouseID != "" {
+		warehouseIDs = append(warehouseIDs, req.TargetWarehouseID)
 	}
-	if len(warehouseRows) == 0 {
-		return nil, validationError("Kho không tồn tại hoặc đã ngưng hoạt động", Record{"warehouse_id": req.WarehouseID})
+	for _, warehouseID := range warehouseIDs {
+		warehouseRows, err := queryTx(ctx, tx, `SELECT id FROM warehouses WHERE id=$1 AND active`, warehouseID)
+		if err != nil {
+			return nil, err
+		}
+		if len(warehouseRows) == 0 {
+			return nil, validationError("Kho không tồn tại hoặc đã ngưng hoạt động", Record{"warehouse_id": warehouseID})
+		}
 	}
 	materialRows, err := queryTx(ctx, tx, `SELECT id, unit FROM materials WHERE id=$1 AND active`, req.MaterialID)
 	if err != nil {
@@ -11609,6 +12671,44 @@ func (r *Repository) CreateStockMovement(ctx context.Context, req StockActionReq
 	}
 	if req.Unit == "" {
 		return nil, validationError("Đơn vị vật tư là bắt buộc")
+	}
+	if req.MovementType == "receive" && req.ReferenceType == "incoming_acceptance_item" && req.ReferenceID != "" {
+		sourceRows, err := queryTx(ctx, tx, `
+			SELECT iai.material_id, iai.project_id, iai.accepted_quantity,
+				COALESCE(received.received_quantity,0)+COALESCE(legacy_stock.received_quantity,0) AS received_quantity
+			FROM incoming_acceptance_items iai
+			JOIN incoming_acceptance_records iar ON iar.id=iai.incoming_acceptance_id AND iar.status='submitted'
+			LEFT JOIN procurement_request_items pri ON pri.id=iai.procurement_request_item_id
+			LEFT JOIN LATERAL (
+				SELECT SUM(sm.quantity) AS received_quantity
+				FROM stock_movements sm
+				WHERE sm.movement_type='receive'
+				  AND sm.reference_type='incoming_acceptance_item'
+				  AND sm.reference_id=iai.id
+			) received ON true
+			LEFT JOIN LATERAL (
+				SELECT SUM(sm.quantity) AS received_quantity
+				FROM stock_movements sm
+				WHERE sm.movement_type='receive'
+				  AND sm.reference_type='boq_item'
+				  AND sm.reference_id=pri.boq_item_id
+			) legacy_stock ON true
+			WHERE iai.id=$1
+			FOR UPDATE OF iai
+		`, req.ReferenceID)
+		if err != nil {
+			return nil, err
+		}
+		if len(sourceRows) == 0 || cleanID(sourceRows[0]["material_id"]) != req.MaterialID {
+			return nil, validationError("Dòng nghiệm thu đầu vào không tồn tại hoặc không khớp vật tư")
+		}
+		if req.ProjectID != "" && cleanID(sourceRows[0]["project_id"]) != req.ProjectID {
+			return nil, validationError("Dòng nghiệm thu đầu vào không thuộc công trình của phiếu nhập")
+		}
+		remaining := number(sourceRows[0]["accepted_quantity"]) - number(sourceRows[0]["received_quantity"])
+		if quantityExceedsAvailable(req.Quantity, remaining) {
+			return nil, validationError("Số lượng nhập vượt khối lượng đã đạt nghiệm thu còn lại", Record{"remaining": remaining, "quantity": req.Quantity})
+		}
 	}
 
 	if statusIn(req.MovementType, "issue", "transfer", "loss") {
@@ -11633,10 +12733,10 @@ func (r *Repository) CreateStockMovement(ctx context.Context, req StockActionReq
 	code := fmt.Sprintf("SM-%s-%d-%s", req.MovementType, timeNowUnix(), newID()[:8])
 	movements, err := queryTx(ctx, tx, `
 		INSERT INTO stock_movements
-			(movement_code, project_id, warehouse_id, material_id, movement_type, quantity, unit, reason, reference_type, reference_id, created_by, approved_by)
-		VALUES ($1,NULLIF($2,'')::uuid,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,'')::uuid,NULLIF($11,'')::uuid,NULLIF($11,'')::uuid)
+			(movement_code, project_id, warehouse_id, target_warehouse_id, material_id, movement_type, quantity, unit, reason, reference_type, reference_id, stock_document_id, created_by, approved_by)
+		VALUES ($1,NULLIF($2,'')::uuid,$3,NULLIF($4,'')::uuid,$5,$6,$7,$8,$9,$10,NULLIF($11,'')::uuid,NULLIF($12,'')::uuid,NULLIF($13,'')::uuid,NULLIF($13,'')::uuid)
 		RETURNING *
-	`, code, req.ProjectID, req.WarehouseID, req.MaterialID, req.MovementType, req.Quantity, req.Unit, req.Reason, req.ReferenceType, req.ReferenceID, actorID)
+	`, code, req.ProjectID, req.WarehouseID, req.TargetWarehouseID, req.MaterialID, req.MovementType, req.Quantity, req.Unit, req.Reason, req.ReferenceType, req.ReferenceID, req.StockDocumentID, actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -11648,13 +12748,13 @@ func (r *Repository) CreateStockMovement(ctx context.Context, req StockActionReq
 	if req.ProjectID != "" && statusIn(req.MovementType, "issue", "return_to_warehouse", "return_to_subcontractor") {
 		if req.MovementType == "issue" {
 			if _, err := tx.ExecContext(ctx, `
-			INSERT INTO site_material_balances (project_id, material_id, issued_quantity, surplus_quantity, surplus_status)
-			VALUES ($1,$2,$3::numeric,GREATEST($3::numeric,0::numeric),'pending')
-			ON CONFLICT (project_id, material_id)
-			DO UPDATE SET issued_quantity = site_material_balances.issued_quantity + EXCLUDED.issued_quantity,
-				surplus_quantity = GREATEST(site_material_balances.issued_quantity + EXCLUDED.issued_quantity - site_material_balances.used_quantity, 0),
-				updated_at=now()
-		`, req.ProjectID, req.MaterialID, req.Quantity); err != nil {
+				INSERT INTO site_material_balances (project_id, material_id, issued_quantity, surplus_quantity, surplus_status)
+				VALUES ($1,$2,$3::numeric,GREATEST($3::numeric,0::numeric),'pending')
+				ON CONFLICT (project_id, material_id)
+				DO UPDATE SET issued_quantity = site_material_balances.issued_quantity + EXCLUDED.issued_quantity,
+					surplus_quantity = GREATEST(site_material_balances.issued_quantity + EXCLUDED.issued_quantity - site_material_balances.used_quantity, 0),
+					updated_at=now()
+			`, req.ProjectID, req.MaterialID, req.Quantity); err != nil {
 				return nil, err
 			}
 		} else {
@@ -11679,11 +12779,9 @@ func (r *Repository) CreateStockMovement(ctx context.Context, req StockActionReq
 		}
 	}
 
-	metadata := Record{
-		"movement_type": req.MovementType,
-		"quantity":      req.Quantity,
-		"material_id":   req.MaterialID,
-		"warehouse_id":  req.WarehouseID,
+	metadata := Record{"movement_type": req.MovementType, "quantity": req.Quantity, "material_id": req.MaterialID, "warehouse_id": req.WarehouseID}
+	if req.TargetWarehouseID != "" {
+		metadata["target_warehouse_id"] = req.TargetWarehouseID
 	}
 	if req.ReferenceType != "" {
 		metadata["reference_type"] = req.ReferenceType
@@ -11691,10 +12789,10 @@ func (r *Repository) CreateStockMovement(ctx context.Context, req StockActionReq
 	if req.ReferenceID != "" {
 		metadata["reference_id"] = req.ReferenceID
 	}
-	if err := addAuditTx(ctx, tx, req.ProjectID, actorID, actorName, stockMovementEvent(req.MovementType), "stock_movement", fmt.Sprint(movement["id"]), stockMovementDescription(req), metadata); err != nil {
-		return nil, err
+	if req.StockDocumentID != "" {
+		metadata["stock_document_id"] = req.StockDocumentID
 	}
-	if err := tx.Commit(); err != nil {
+	if err := addAuditTx(ctx, tx, req.ProjectID, actorID, actorName, stockMovementEvent(req.MovementType), "stock_movement", fmt.Sprint(movement["id"]), stockMovementDescription(req), metadata); err != nil {
 		return nil, err
 	}
 	return movement, nil
@@ -11703,12 +12801,13 @@ func (r *Repository) CreateStockMovement(ctx context.Context, req StockActionReq
 func warehouseMaterialAvailableTx(ctx context.Context, tx *sql.Tx, warehouseID, materialID string) (float64, error) {
 	rows, err := queryTx(ctx, tx, `
 		SELECT COALESCE(SUM(CASE
-			WHEN movement_type IN ('receive','return_to_warehouse') THEN quantity
-			WHEN movement_type IN ('issue','transfer','loss') THEN -quantity
+			WHEN warehouse_id=$1 AND movement_type IN ('receive','return_to_warehouse') THEN quantity
+			WHEN warehouse_id=$1 AND movement_type IN ('issue','transfer','loss') THEN -quantity
+			WHEN target_warehouse_id=$1 AND movement_type='transfer' THEN quantity
 			ELSE 0
 		END),0) AS available
 		FROM stock_movements
-		WHERE warehouse_id=$1 AND material_id=$2
+		WHERE material_id=$2 AND (warehouse_id=$1 OR target_warehouse_id=$1)
 	`, warehouseID, materialID)
 	if err != nil {
 		return 0, err
@@ -11765,6 +12864,351 @@ func stockMovementDescription(req StockActionRequest) string {
 	return fmt.Sprintf("Ghi nhận %s %.3f %s", req.MovementType, req.Quantity, req.Unit)
 }
 
+func (r *Repository) CreateStockDocument(ctx context.Context, req StockDocumentRequest, actorID, actorName string) (Record, error) {
+	req.ProjectID = cleanID(req.ProjectID)
+	req.MovementType = strings.TrimSpace(req.MovementType)
+	req.SourceWarehouseID = cleanID(req.SourceWarehouseID)
+	req.TargetWarehouseID = cleanID(req.TargetWarehouseID)
+	req.ReferenceType = strings.TrimSpace(req.ReferenceType)
+	req.ReferenceID = cleanID(req.ReferenceID)
+	req.DocumentDate = strings.TrimSpace(req.DocumentDate)
+	req.Note = strings.TrimSpace(req.Note)
+	if !statusIn(req.MovementType, "receive", "issue", "transfer", "return_to_warehouse", "return_to_subcontractor") {
+		return nil, validationError("Loại phiếu kho không hợp lệ", Record{"movement_type": req.MovementType})
+	}
+	if len(req.Items) == 0 {
+		return nil, validationError("Phiếu kho cần ít nhất một dòng vật tư")
+	}
+	if req.DocumentDate == "" {
+		req.DocumentDate = time.Now().Format("2006-01-02")
+	}
+	if _, err := time.Parse("2006-01-02", req.DocumentDate); err != nil {
+		return nil, validationError("Ngày phiếu kho không hợp lệ")
+	}
+	if statusIn(req.MovementType, "issue", "transfer") && req.SourceWarehouseID == "" {
+		return nil, validationError("Kho nguồn là bắt buộc")
+	}
+	if statusIn(req.MovementType, "receive", "return_to_warehouse") && req.TargetWarehouseID == "" {
+		return nil, validationError("Kho nhận là bắt buộc")
+	}
+	if req.MovementType == "transfer" && (req.TargetWarehouseID == "" || req.TargetWarehouseID == req.SourceWarehouseID) {
+		return nil, validationError("Điều chuyển cần kho đích khác kho nguồn")
+	}
+	if statusIn(req.MovementType, "issue", "return_to_warehouse", "return_to_subcontractor") && req.ProjectID == "" {
+		return nil, validationError("Công trình là bắt buộc cho phiếu xuất/hoàn trả")
+	}
+	if req.MovementType == "return_to_subcontractor" && req.SourceWarehouseID == "" && req.TargetWarehouseID == "" {
+		return nil, validationError("Kho quản lý vật tư hoàn trả là bắt buộc")
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if req.ReferenceType == "incoming_acceptance" {
+		rows, err := queryTx(ctx, tx, `
+			SELECT id, project_id, status
+			FROM incoming_acceptance_records
+			WHERE id=$1
+			FOR UPDATE
+		`, req.ReferenceID)
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 || fmt.Sprint(rows[0]["status"]) != "submitted" {
+			return nil, validationError("Nghiệm thu đầu vào chưa được gửi hoặc không tồn tại")
+		}
+		if req.ProjectID == "" {
+			req.ProjectID = cleanID(rows[0]["project_id"])
+		}
+		if req.ProjectID != cleanID(rows[0]["project_id"]) {
+			return nil, validationError("Nghiệm thu đầu vào không thuộc công trình của phiếu kho")
+		}
+	}
+
+	prefix := map[string]string{"receive": "PNK", "issue": "PXK", "transfer": "PDC", "return_to_warehouse": "PHT", "return_to_subcontractor": "PTN"}[req.MovementType]
+	documentCode := fmt.Sprintf("%s-%d-%s", prefix, timeNowUnix(), newID()[:6])
+	documents, err := queryTx(ctx, tx, `
+		INSERT INTO stock_documents (
+			document_code, project_id, movement_type, source_warehouse_id, target_warehouse_id,
+			reference_type, reference_id, document_date, note, status, created_by, posted_by
+		) VALUES (
+			$1,NULLIF($2,'')::uuid,$3,NULLIF($4,'')::uuid,NULLIF($5,'')::uuid,
+			$6,NULLIF($7,'')::uuid,$8::date,$9,'posted',NULLIF($10,'')::uuid,NULLIF($10,'')::uuid
+		)
+		RETURNING *
+	`, documentCode, req.ProjectID, req.MovementType, req.SourceWarehouseID, req.TargetWarehouseID, req.ReferenceType, req.ReferenceID, req.DocumentDate, req.Note, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(documents) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	documentID := cleanID(documents[0]["id"])
+
+	for itemIndex, item := range req.Items {
+		item.MaterialID = cleanID(item.MaterialID)
+		item.Unit = strings.TrimSpace(item.Unit)
+		item.Reason = strings.TrimSpace(item.Reason)
+		item.SourceLineType = strings.TrimSpace(item.SourceLineType)
+		item.SourceLineID = cleanID(item.SourceLineID)
+		if item.MaterialID == "" || item.Quantity <= 0 {
+			return nil, validationError("Dòng vật tư phiếu kho không hợp lệ", Record{"item_index": itemIndex})
+		}
+		if req.ReferenceType == "incoming_acceptance" {
+			if item.SourceLineType != "incoming_acceptance_item" || item.SourceLineID == "" {
+				return nil, validationError("Dòng nhập kho cần liên kết dòng nghiệm thu đầu vào", Record{"item_index": itemIndex})
+			}
+			rows, err := queryTx(ctx, tx, `
+				SELECT iai.id, iai.incoming_acceptance_id, iai.material_id, iai.accepted_quantity,
+					COALESCE(received.received_quantity,0)+COALESCE(legacy_stock.received_quantity,0) AS received_quantity
+				FROM incoming_acceptance_items iai
+				LEFT JOIN procurement_request_items pri ON pri.id=iai.procurement_request_item_id
+				LEFT JOIN LATERAL (
+					SELECT SUM(sm.quantity) AS received_quantity
+					FROM stock_movements sm
+					WHERE sm.movement_type='receive'
+					  AND sm.reference_type='incoming_acceptance_item'
+					  AND sm.reference_id=iai.id
+				) received ON true
+				LEFT JOIN LATERAL (
+					SELECT SUM(sm.quantity) AS received_quantity
+					FROM stock_movements sm
+					WHERE sm.movement_type='receive'
+					  AND sm.reference_type='boq_item'
+					  AND sm.reference_id=pri.boq_item_id
+				) legacy_stock ON true
+				WHERE iai.id=$1
+				FOR UPDATE OF iai
+			`, item.SourceLineID)
+			if err != nil {
+				return nil, err
+			}
+			if len(rows) == 0 || cleanID(rows[0]["incoming_acceptance_id"]) != req.ReferenceID || cleanID(rows[0]["material_id"]) != item.MaterialID {
+				return nil, validationError("Dòng nghiệm thu đầu vào không khớp vật tư hoặc chứng từ nguồn", Record{"item_index": itemIndex})
+			}
+			remaining := number(rows[0]["accepted_quantity"]) - number(rows[0]["received_quantity"])
+			if quantityExceedsAvailable(item.Quantity, remaining) {
+				return nil, validationError("Số lượng nhập vượt khối lượng đã đạt nghiệm thu còn lại", Record{"item_index": itemIndex, "remaining": remaining, "quantity": item.Quantity})
+			}
+		}
+		itemRows, err := queryTx(ctx, tx, `
+			INSERT INTO stock_document_items (document_id, material_id, quantity, unit, reason, source_line_type, source_line_id)
+			VALUES ($1,$2,$3,$4,$5,$6,NULLIF($7,'')::uuid)
+			RETURNING id
+		`, documentID, item.MaterialID, item.Quantity, item.Unit, item.Reason, item.SourceLineType, item.SourceLineID)
+		if err != nil {
+			return nil, err
+		}
+		if len(itemRows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		warehouseID := req.SourceWarehouseID
+		if statusIn(req.MovementType, "receive", "return_to_warehouse") {
+			warehouseID = req.TargetWarehouseID
+		}
+		if req.MovementType == "return_to_subcontractor" && warehouseID == "" {
+			warehouseID = req.TargetWarehouseID
+		}
+		movementReferenceType := item.SourceLineType
+		movementReferenceID := item.SourceLineID
+		if movementReferenceType == "" {
+			movementReferenceType = "stock_document_item"
+			movementReferenceID = cleanID(itemRows[0]["id"])
+		}
+		movementTargetWarehouseID := ""
+		if req.MovementType == "transfer" {
+			movementTargetWarehouseID = req.TargetWarehouseID
+		}
+		if _, err := createStockMovementTx(ctx, tx, StockActionRequest{
+			ProjectID: req.ProjectID, WarehouseID: warehouseID, TargetWarehouseID: movementTargetWarehouseID,
+			MaterialID: item.MaterialID, MovementType: req.MovementType, Quantity: item.Quantity,
+			Unit: item.Unit, Reason: item.Reason, ReferenceType: movementReferenceType,
+			ReferenceID: movementReferenceID, StockDocumentID: documentID,
+		}, actorID, actorName); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := addAuditTx(ctx, tx, req.ProjectID, actorID, actorName, "stock_document_posted", "stock_document", documentID, "Ghi nhận phiếu kho "+documentCode, Record{
+		"document_code": documentCode, "movement_type": req.MovementType, "item_count": len(req.Items),
+		"source_warehouse_id": req.SourceWarehouseID, "target_warehouse_id": req.TargetWarehouseID,
+		"reference_type": req.ReferenceType, "reference_id": req.ReferenceID,
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetStockDocument(ctx, documentID)
+}
+
+func (r *Repository) StockPositions(ctx context.Context, userID, warehouseID string) ([]Record, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 2)
+	if err != nil {
+		return nil, err
+	}
+	args := append([]any{cleanID(warehouseID)}, scopeArgs...)
+	return r.Query(ctx, fmt.Sprintf(`
+		WITH visible_movements AS (
+			SELECT sm.*
+			FROM stock_movements sm
+			WHERE sm.project_id IS NULL OR EXISTS (
+				SELECT 1 FROM projects p
+				WHERE p.id=sm.project_id AND p.status <> 'cancelled' AND %s
+			)
+		), ledger AS (
+			SELECT warehouse_id, material_id,
+				CASE
+					WHEN movement_type IN ('receive','return_to_warehouse') THEN quantity
+					WHEN movement_type IN ('issue','transfer','loss') THEN -quantity
+					ELSE 0
+				END AS signed_quantity
+			FROM visible_movements
+			UNION ALL
+			SELECT target_warehouse_id, material_id, quantity
+			FROM visible_movements
+			WHERE movement_type='transfer' AND target_warehouse_id IS NOT NULL
+		)
+		SELECT w.id AS warehouse_id, w.name AS warehouse_name, w.type AS warehouse_type, w.location,
+			m.id AS material_id, m.code, m.name, m.unit, m.category,
+			COALESCE(SUM(ledger.signed_quantity),0) AS stock_quantity
+		FROM ledger
+		JOIN warehouses w ON w.id=ledger.warehouse_id AND w.active
+		JOIN materials m ON m.id=ledger.material_id AND m.active
+		WHERE ($1::text='' OR w.id=$1::uuid)
+		GROUP BY w.id, m.id
+		ORDER BY w.type, w.name, m.category, m.name
+	`, scopeSQL), args...)
+}
+
+func (r *Repository) StockMovements(ctx context.Context, userID, projectID, warehouseID string) ([]Record, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 3)
+	if err != nil {
+		return nil, err
+	}
+	args := append([]any{cleanID(projectID), cleanID(warehouseID)}, scopeArgs...)
+	return r.Query(ctx, fmt.Sprintf(`
+		SELECT sm.*, m.code AS material_code, m.name AS material_name,
+			w.name AS warehouse_name, tw.name AS target_warehouse_name,
+			p.name AS project_name, u.full_name AS created_by_name,
+			sd.document_code
+		FROM stock_movements sm
+		JOIN materials m ON m.id=sm.material_id AND m.active
+		JOIN warehouses w ON w.id=sm.warehouse_id
+		LEFT JOIN warehouses tw ON tw.id=sm.target_warehouse_id
+		LEFT JOIN projects p ON p.id=sm.project_id
+		LEFT JOIN users u ON u.id=sm.created_by
+		LEFT JOIN stock_documents sd ON sd.id=sm.stock_document_id
+		WHERE ($1::text='' OR sm.project_id=$1::uuid)
+		  AND ($2::text='' OR sm.warehouse_id=$2::uuid OR sm.target_warehouse_id=$2::uuid)
+		  AND (sm.project_id IS NULL OR (p.status <> 'cancelled' AND %s))
+		ORDER BY sm.created_at DESC, sm.id
+	`, scopeSQL), args...)
+}
+
+func (r *Repository) ListStockDocuments(ctx context.Context, userID, projectID string) ([]Record, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 2)
+	if err != nil {
+		return nil, err
+	}
+	args := append([]any{cleanID(projectID)}, scopeArgs...)
+	return r.Query(ctx, fmt.Sprintf(`
+		SELECT sd.*, sw.name AS source_warehouse_name, tw.name AS target_warehouse_name,
+			p.name AS project_name, u.full_name AS created_by_name,
+			COALESCE(items.item_count,0) AS item_count,
+			COALESCE(items.total_quantity,0) AS total_quantity
+		FROM stock_documents sd
+		LEFT JOIN warehouses sw ON sw.id=sd.source_warehouse_id
+		LEFT JOIN warehouses tw ON tw.id=sd.target_warehouse_id
+		LEFT JOIN projects p ON p.id=sd.project_id
+		LEFT JOIN users u ON u.id=sd.created_by
+		LEFT JOIN LATERAL (
+			SELECT COUNT(*) AS item_count, SUM(quantity) AS total_quantity
+			FROM stock_document_items sdi WHERE sdi.document_id=sd.id
+		) items ON true
+		WHERE sd.status <> 'cancelled'
+		  AND ($1::text='' OR sd.project_id=$1::uuid)
+		  AND (sd.project_id IS NULL OR (p.status <> 'cancelled' AND %s))
+		ORDER BY sd.document_date DESC, sd.created_at DESC, sd.id
+	`, scopeSQL), args...)
+}
+
+func (r *Repository) GetStockDocument(ctx context.Context, documentID string) (Record, error) {
+	document, err := r.QueryOne(ctx, `
+		SELECT sd.*, sw.name AS source_warehouse_name, tw.name AS target_warehouse_name,
+			p.name AS project_name, u.full_name AS created_by_name
+		FROM stock_documents sd
+		LEFT JOIN warehouses sw ON sw.id=sd.source_warehouse_id
+		LEFT JOIN warehouses tw ON tw.id=sd.target_warehouse_id
+		LEFT JOIN projects p ON p.id=sd.project_id
+		LEFT JOIN users u ON u.id=sd.created_by
+		WHERE sd.id=$1 AND sd.status <> 'cancelled'
+	`, documentID)
+	if err != nil {
+		return nil, err
+	}
+	items, err := r.Query(ctx, `
+		SELECT sdi.*, m.code AS material_code, m.name AS material_name,
+			sm.id AS movement_id, sm.movement_code
+		FROM stock_document_items sdi
+		JOIN materials m ON m.id=sdi.material_id
+		LEFT JOIN LATERAL (
+			SELECT candidate.id, candidate.movement_code
+			FROM stock_movements candidate
+			WHERE candidate.stock_document_id=sdi.document_id
+			  AND candidate.material_id=sdi.material_id
+			  AND (
+				(candidate.reference_type='stock_document_item' AND candidate.reference_id=sdi.id)
+				OR (sdi.source_line_id IS NOT NULL AND candidate.reference_id=sdi.source_line_id)
+			  )
+			ORDER BY candidate.created_at, candidate.id
+			LIMIT 1
+		) sm ON true
+		WHERE sdi.document_id=$1
+		ORDER BY sdi.created_at, sdi.id
+	`, documentID)
+	if err != nil {
+		return nil, err
+	}
+	document["items"] = items
+	return document, nil
+}
+
+func (r *Repository) WarehouseReceiptOptions(ctx context.Context, projectID string) ([]Record, error) {
+	return r.Query(ctx, `
+		SELECT iar.id AS incoming_acceptance_id, iar.acceptance_code, iar.procurement_request_id,
+			pr.request_code, iar.supplier_name, iar.received_at, iar.result, iar.warehouse_id,
+			iai.id AS incoming_acceptance_item_id, iai.material_id, iai.material_code, iai.material_name,
+			iai.accepted_quantity, iai.unit,
+			LEAST(iai.accepted_quantity,COALESCE(received.received_quantity,0)+COALESCE(legacy_stock.received_quantity,0)) AS stock_received_quantity,
+			GREATEST(iai.accepted_quantity-COALESCE(received.received_quantity,0)-COALESCE(legacy_stock.received_quantity,0),0) AS remaining_quantity
+		FROM incoming_acceptance_records iar
+		JOIN incoming_acceptance_items iai ON iai.incoming_acceptance_id=iar.id
+		LEFT JOIN procurement_request_items pri ON pri.id=iai.procurement_request_item_id
+		LEFT JOIN procurement_requests pr ON pr.id=iar.procurement_request_id
+		LEFT JOIN LATERAL (
+			SELECT SUM(sm.quantity) AS received_quantity
+			FROM stock_movements sm
+			WHERE sm.movement_type='receive'
+			  AND sm.reference_type='incoming_acceptance_item'
+			  AND sm.reference_id=iai.id
+		) received ON true
+		LEFT JOIN LATERAL (
+			SELECT SUM(sm.quantity) AS received_quantity
+			FROM stock_movements sm
+			WHERE sm.movement_type='receive'
+			  AND sm.reference_type='boq_item'
+			  AND sm.reference_id=pri.boq_item_id
+		) legacy_stock ON true
+		WHERE iar.project_id=$1 AND iar.status='submitted' AND iai.material_id IS NOT NULL
+		  AND iai.accepted_quantity-COALESCE(received.received_quantity,0)-COALESCE(legacy_stock.received_quantity,0) > 0.000001
+		ORDER BY iar.received_at DESC NULLS LAST, iar.created_at DESC, iai.item_index
+	`, projectID)
+}
+
 func (r *Repository) ProjectMaterialBalances(ctx context.Context, projectID string) ([]Record, error) {
 	return r.Query(ctx, `
 		SELECT smb.*, m.code, m.name AS material_name, m.unit, m.category
@@ -11811,6 +13255,10 @@ func (r *Repository) ListProjectDailyReports(ctx context.Context, projectID stri
 
 func (r *Repository) CreateDailyReport(ctx context.Context, body Record) (Record, error) {
 	return r.Insert(ctx, "operation_daily_reports", dailyReportColumns(), body)
+}
+
+func (r *Repository) UpdateDailyReport(ctx context.Context, id string, body Record) (Record, error) {
+	return r.Update(ctx, "operation_daily_reports", dailyReportColumns(), id, body)
 }
 
 func (r *Repository) ListProjectIssues(ctx context.Context, projectID string) ([]Record, error) {
@@ -15292,7 +16740,8 @@ func (r *Repository) Report(ctx context.Context, kind, userID string) ([]Record,
 			SELECT m.name, m.category,
 				COALESCE(SUM(CASE
 					WHEN sm.movement_type IN ('receive','return_to_warehouse') THEN sm.quantity
-					WHEN sm.movement_type IN ('issue','transfer','loss') THEN -sm.quantity
+					WHEN sm.movement_type IN ('issue','loss') THEN -sm.quantity
+					WHEN sm.movement_type='transfer' AND sm.target_warehouse_id IS NULL THEN -sm.quantity
 					ELSE 0
 				END),0) AS stock_quantity,
 				COALESCE(SUM(smb.surplus_quantity),0) AS surplus_quantity

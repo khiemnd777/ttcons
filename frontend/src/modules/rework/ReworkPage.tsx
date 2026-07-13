@@ -17,25 +17,34 @@ import { RecordFormDialog } from '../_shared/RecordFormDialog';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { EnumChip } from '../../components/EnumChip';
 import { enumOptions } from '../../lib/utils/status';
+import { useAuth } from '../../lib/auth/AuthContext';
 
 const reworkActionLabels: Record<string, string> = {
   complete: 'Đã hoàn tất sửa lỗi',
   approve: 'Đã duyệt lập kế hoạch lại',
 };
 
-export function ReworkPage() {
-  const { id } = useParams();
-  const [projectId, setProjectId] = useState(id ?? '');
+export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?: boolean; projectIdOverride?: string } = {}) {
+  const { id: routeId } = useParams();
+  const [projectId, setProjectId] = useState(projectIdOverride ?? routeId ?? '');
   const [reworkStatus, setReworkStatus] = useState('all');
   const [replanningStatus, setReplanningStatus] = useState('all');
   const [open, setOpen] = useState<'rework' | 'replanning' | null>(null);
   const [dialog, setDialog] = useState<{ type: 'rework' | 'replanning'; record: Record<string, any> } | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { hasAnyPermission } = useAuth();
+  const canViewReworks = hasAnyPermission(['rework.view']);
+  const canCreateRework = hasAnyPermission(['rework.create']);
+  const canApproveRework = hasAnyPermission(['rework.approve']);
+  const canViewReplanning = hasAnyPermission(['replanning.view']);
+  const canCreateReplanning = hasAnyPermission(['replanning.create']);
+  const canApproveReplanning = hasAnyPermission(['replanning.approve']);
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Record<string, any>[]>('/projects') });
   useEffect(() => { if (!projectId && projects.data?.[0]) setProjectId(projects.data[0].id); }, [projects.data, projectId]);
-  const reworks = useQuery({ queryKey: ['reworks', projectId], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/reworks`), enabled: Boolean(projectId) });
-  const replannings = useQuery({ queryKey: ['replannings', projectId], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/replannings`), enabled: Boolean(projectId) });
+  useEffect(() => { if (projectIdOverride && projectIdOverride !== projectId) setProjectId(projectIdOverride); }, [projectId, projectIdOverride]);
+  const reworks = useQuery({ queryKey: ['reworks', projectId], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/reworks`), enabled: Boolean(projectId) && canViewReworks });
+  const replannings = useQuery({ queryKey: ['replannings', projectId], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/replannings`), enabled: Boolean(projectId) && canViewReplanning });
   const reworkRows = reworks.data ?? [];
   const replanningRows = replannings.data ?? [];
   const filteredReworks = useMemo(() => reworkStatus === 'all' ? reworkRows : reworkRows.filter((row) => row.status === reworkStatus), [reworkRows, reworkStatus]);
@@ -86,49 +95,49 @@ export function ReworkPage() {
 
   return (
     <>
-      <PageHeader
+      {!embedded ? <PageHeader
         title="Sửa lỗi / Lập kế hoạch lại"
         description="Sửa lỗi khi xử lý trong phạm vi hiện tại; lập kế hoạch lại khi ảnh hưởng thiết kế, BOQ, ngân sách hoặc tiến độ."
         actions={
           <>
-            {id ? <ProjectBackLink projectId={projectId} /> : null}
-            {!id ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
-            <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setOpen('replanning')}><Plus className="h-4 w-4" />Lập kế hoạch lại</button>
-            <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setOpen('rework')}><Plus className="h-4 w-4" />Sửa lỗi</button>
+            {routeId ? <ProjectBackLink projectId={projectId} /> : null}
+            {!routeId ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
+            {canCreateReplanning ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setOpen('replanning')}><Plus className="h-4 w-4" />Lập kế hoạch lại</button> : null}
+            {canCreateRework ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setOpen('rework')}><Plus className="h-4 w-4" />Sửa lỗi</button> : null}
           </>
         }
-      />
-      <div className="mb-4 grid gap-3 xl:grid-cols-2">
-        <FilterBar label="Trạng thái sửa lỗi" value={reworkStatus} options={reworkFilterOptions} onChange={setReworkStatus} disabled={!projectId} />
-        <FilterBar label="Trạng thái lập kế hoạch lại" value={replanningStatus} options={replanningFilterOptions} onChange={setReplanningStatus} disabled={!projectId} />
+      /> : <div className="mb-4 flex flex-col gap-3 rounded-lg border border-line bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold text-ink">Yêu cầu khắc phục & lập kế hoạch lại</h2><p className="mt-1 text-xs text-slate-500">Thực hiện sửa lỗi trong phạm vi hiện tại hoặc trình duyệt thay đổi kế hoạch khi ảnh hưởng tiến độ/chi phí.</p></div><div className="flex flex-wrap gap-2">{canCreateReplanning ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:opacity-50" onClick={() => setOpen('replanning')}><Plus className="h-4 w-4" /> Lập kế hoạch lại</button> : null}{canCreateRework ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={() => setOpen('rework')}><Plus className="h-4 w-4" /> Yêu cầu sửa lỗi</button> : null}</div></div>}
+      <div className={`mb-4 grid gap-3 ${canViewReworks && canViewReplanning ? 'xl:grid-cols-2' : ''}`}>
+        {canViewReworks ? <FilterBar label="Trạng thái sửa lỗi" value={reworkStatus} options={reworkFilterOptions} onChange={setReworkStatus} disabled={!projectId} /> : null}
+        {canViewReplanning ? <FilterBar label="Trạng thái lập kế hoạch lại" value={replanningStatus} options={replanningFilterOptions} onChange={setReplanningStatus} disabled={!projectId} /> : null}
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <ListSection title="Bảng sửa lỗi">
+      <div className={`grid gap-4 ${canViewReworks && canViewReplanning ? 'xl:grid-cols-2' : ''}`}>
+        {canViewReworks ? <ListSection title="Bảng sửa lỗi">
           <DataTable rows={filteredReworks} loading={reworks.isLoading} error={reworks.error} onRetry={() => reworks.refetch()} searchPlaceholder="Tìm yêu cầu sửa lỗi, mô tả, hạn xử lý..." pageSize={10} defaultSort={{ key: 'due_date', direction: 'asc' }} columns={[
             { key: 'title', header: 'Sửa lỗi', sortable: true, filterValue: (row) => [row.title, row.description], render: (row) => <span className="font-semibold text-ink">{row.title}</span> },
             { key: 'due_date', header: 'Hạn xử lý', sortable: true },
             { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
-            { key: 'action', header: 'Thao tác', render: (row) => <RowActions onView={() => setDialog({ type: 'rework', record: row })}><button disabled={row.status === 'done'} className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400" onClick={() => action.mutate({ path: `reworks/${row.id}`, actionName: 'complete' })}>Hoàn tất</button></RowActions> },
-          ]} empty={projectId ? 'Không có yêu cầu sửa lỗi trong bộ lọc này' : 'Chọn công trình để xem yêu cầu sửa lỗi'} emptyAction={projectId ? (
+            { key: 'action', header: 'Thao tác', render: (row) => <RowActions onView={() => setDialog({ type: 'rework', record: row })}>{canApproveRework ? <button disabled={row.status === 'done'} className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400" onClick={() => action.mutate({ path: `reworks/${row.id}`, actionName: 'complete' })}>Hoàn tất</button> : null}</RowActions> },
+          ]} empty={projectId ? 'Không có yêu cầu sửa lỗi trong bộ lọc này' : 'Chọn công trình để xem yêu cầu sửa lỗi'} emptyAction={projectId && canCreateRework ? (
             <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen('rework')}>
               <Plus className="h-4 w-4" />Sửa lỗi
             </button>
           ) : undefined} />
-        </ListSection>
-        <ListSection title="Yêu cầu lập kế hoạch lại">
+        </ListSection> : null}
+        {canViewReplanning ? <ListSection title="Yêu cầu lập kế hoạch lại">
           <DataTable rows={filteredReplannings} loading={replannings.isLoading} error={replannings.error} onRetry={() => replannings.refetch()} searchPlaceholder="Tìm lý do, ảnh hưởng, trạng thái..." pageSize={10} defaultSort={{ key: 'timeline_impact', direction: 'desc' }} columns={[
             { key: 'reason', header: 'Lý do', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.reason}</span> },
             { key: 'impact_scope', header: 'Ảnh hưởng', sortable: true, render: (row) => <EnumChip group="impact_scope" value={row.impact_scope} /> },
             { key: 'budget_impact', header: 'Ngân sách', align: 'right', sortable: true, sortValue: (row) => Number(row.budget_impact ?? 0), render: (row) => <CurrencyText value={row.budget_impact} /> },
             { key: 'timeline_impact', header: 'Ngày', align: 'right', sortable: true, sortValue: (row) => Number(row.timeline_impact ?? 0) },
             { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
-            { key: 'action', header: 'Thao tác', render: (row) => <RowActions onView={() => setDialog({ type: 'replanning', record: row })}><button disabled={row.status === 'approved'} className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400" onClick={() => action.mutate({ path: `replannings/${row.id}`, actionName: 'approve' })}>Duyệt</button></RowActions> },
-          ]} empty={projectId ? 'Không có yêu cầu lập kế hoạch lại trong bộ lọc này' : 'Chọn công trình để xem yêu cầu lập kế hoạch lại'} emptyAction={projectId ? (
+            { key: 'action', header: 'Thao tác', render: (row) => <RowActions onView={() => setDialog({ type: 'replanning', record: row })}>{canApproveReplanning ? <button disabled={row.status === 'approved'} className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400" onClick={() => action.mutate({ path: `replannings/${row.id}`, actionName: 'approve' })}>Duyệt</button> : null}</RowActions> },
+          ]} empty={projectId ? 'Không có yêu cầu lập kế hoạch lại trong bộ lọc này' : 'Chọn công trình để xem yêu cầu lập kế hoạch lại'} emptyAction={projectId && canCreateReplanning ? (
             <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => setOpen('replanning')}>
               <Plus className="h-4 w-4" />Lập kế hoạch lại
             </button>
           ) : undefined} />
-        </ListSection>
+        </ListSection> : null}
       </div>
       <RecordFormDialog
         open={open === 'rework'}

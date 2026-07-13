@@ -61,7 +61,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       description: variant === 'error' ? content.description ?? errorDescription(error) : content.description,
     };
 
-    setToasts((current) => [toast, ...current].slice(0, 5));
+    setToasts((current) => {
+      const duplicate = current.some((item) => item.variant === toast.variant && item.title === toast.title && item.description === toast.description);
+      if (duplicate) return current;
+      return [toast, ...current].slice(0, 3);
+    });
     window.setTimeout(() => dismiss(id), toastLifetime[variant]);
   }, [dismiss]);
 

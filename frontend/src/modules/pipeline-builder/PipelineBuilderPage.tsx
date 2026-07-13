@@ -779,12 +779,7 @@ export function PipelineBuilderPage() {
   };
 
   const goBack = () => {
-    const historyIndex = Number(window.history.state?.idx ?? 0);
-    if (historyIndex > 0) {
-      navigate(-1);
-      return;
-    }
-    navigate('/');
+    navigate('/projects');
   };
 
   const connectorMutationPending = createEdge.isPending || updateEdge.isPending || deleteEdge.isPending || saveEdgeSettings.isPending;

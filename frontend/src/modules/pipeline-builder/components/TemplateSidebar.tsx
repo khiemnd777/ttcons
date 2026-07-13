@@ -39,7 +39,7 @@ export function TemplateSidebar({
         <div className="border-b border-line px-4 py-4">
           <button
             type="button"
-            title="Quay lại trang trước"
+            title="Về trang Công trình"
             className="inline-flex w-full items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
             onClick={onBack}
           >

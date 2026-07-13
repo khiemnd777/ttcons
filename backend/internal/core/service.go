@@ -58,6 +58,7 @@ const (
 	defaultAccessTokenTTL        = 15 * time.Minute
 	defaultRefreshTokenTTL       = 7 * 24 * time.Hour
 	defaultRefreshCookieSameSite = "Lax"
+	activityMessageEditWindow    = 15 * time.Minute
 )
 
 type evidenceUploadMimeSpec struct {
@@ -309,6 +310,127 @@ func (s *Service) DeleteProject(ctx context.Context, id string) error {
 	return s.repo.Exec(ctx, `UPDATE projects SET status='cancelled', updated_at=now() WHERE id=$1`, id)
 }
 
+func (s *Service) ProjectMembers(ctx context.Context, projectID, actorID string, includeInactive bool) (Record, error) {
+	canManage, err := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"project.member.manage"})
+	if err != nil {
+		return nil, err
+	}
+	includeInactive = includeInactive && canManage
+	items, err := s.repo.ListProjectMembers(ctx, projectID, includeInactive)
+	if err != nil {
+		return nil, err
+	}
+	options := Record{"staff": []Record{}, "access_roles": []Record{}, "role_labels": []string{}}
+	if canManage {
+		options, err = s.repo.ProjectMemberOptions(ctx, projectID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return Record{
+		"items":   items,
+		"summary": projectMemberSummary(items),
+		"options": options,
+		"capabilities": Record{
+			"can_manage":        canManage,
+			"can_view_inactive": canManage,
+		},
+	}, nil
+}
+
+func (s *Service) SaveProjectMember(ctx context.Context, projectID, memberID string, req ProjectMemberMutationRequest, actorID, actorName string) (Record, error) {
+	normalized, err := normalizeProjectMemberMutationRequest(projectID, memberID, req)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.SaveProjectMember(ctx, projectID, memberID, normalized, actorID, actorName)
+}
+
+func (s *Service) DeactivateProjectMember(ctx context.Context, projectID, memberID, actorID, actorName string) (Record, error) {
+	if _, err := uuid.Parse(strings.TrimSpace(projectID)); err != nil {
+		return nil, validationError("project_id không hợp lệ", Record{"project_id": projectID})
+	}
+	if _, err := uuid.Parse(strings.TrimSpace(memberID)); err != nil {
+		return nil, validationError("member_id không hợp lệ", Record{"member_id": memberID})
+	}
+	return s.repo.DeactivateProjectMember(ctx, strings.TrimSpace(projectID), strings.TrimSpace(memberID), actorID, actorName)
+}
+
+func normalizeProjectMemberMutationRequest(projectID, memberID string, req ProjectMemberMutationRequest) (ProjectMemberMutationRequest, error) {
+	projectID = strings.TrimSpace(projectID)
+	memberID = strings.TrimSpace(memberID)
+	req.StaffID = strings.TrimSpace(req.StaffID)
+	req.Notes = strings.TrimSpace(req.Notes)
+	if _, err := uuid.Parse(projectID); err != nil {
+		return req, validationError("project_id không hợp lệ", Record{"project_id": projectID})
+	}
+	if memberID != "" {
+		if _, err := uuid.Parse(memberID); err != nil {
+			return req, validationError("member_id không hợp lệ", Record{"member_id": memberID})
+		}
+	}
+	if _, err := uuid.Parse(req.StaffID); err != nil {
+		return req, validationError("Phải chọn nhân sự hợp lệ", Record{"staff_id": req.StaffID})
+	}
+	req.RoleIDs = normalizedRoleList(req.RoleIDs)
+	if len(req.RoleIDs) == 0 {
+		return req, validationError("Chọn ít nhất một vai trò vận hành", Record{"field": "role_ids"})
+	}
+	if len(req.RoleIDs) > 12 {
+		return req, validationError("Một thành viên không thể có quá 12 vai trò vận hành")
+	}
+	for _, role := range req.RoleIDs {
+		if len([]rune(role)) > 100 {
+			return req, validationError("Tên vai trò vận hành không được vượt quá 100 ký tự", Record{"role": role})
+		}
+	}
+	if len(req.Notes) > 1000 {
+		return req, validationError("Ghi chú phân công không được vượt quá 1000 ký tự")
+	}
+	seen := map[string]bool{}
+	projectRoleIDs := make([]string, 0, len(req.ProjectRoleIDs))
+	for _, roleID := range req.ProjectRoleIDs {
+		roleID = strings.TrimSpace(roleID)
+		if roleID == "" || seen[roleID] {
+			continue
+		}
+		if _, err := uuid.Parse(roleID); err != nil {
+			return req, validationError("Role phân quyền không hợp lệ", Record{"role_id": roleID})
+		}
+		seen[roleID] = true
+		projectRoleIDs = append(projectRoleIDs, roleID)
+	}
+	req.ProjectRoleIDs = projectRoleIDs
+	return req, nil
+}
+
+func projectMemberSummary(items []Record) Record {
+	departments := map[string]bool{}
+	roles := map[string]bool{}
+	active := 0
+	inactive := 0
+	for _, item := range items {
+		if item["active"] == true {
+			active++
+			department := strings.TrimSpace(fmt.Sprint(item["department"]))
+			if department != "" && department != "<nil>" {
+				departments[department] = true
+			}
+			for _, role := range stringSlice(item["role_ids"]) {
+				roles[role] = true
+			}
+		} else {
+			inactive++
+		}
+	}
+	return Record{
+		"active":      active,
+		"inactive":    inactive,
+		"departments": len(departments),
+		"roles":       len(roles),
+	}
+}
+
 func (s *Service) CreateMaterial(ctx context.Context, body Record) (Record, error) {
 	if err := s.applyPartnerSnapshot(ctx, body, "default_supplier_partner_id", "default_supplier", "", []string{"supplier", "service_provider", "other"}); err != nil {
 		return nil, err
@@ -329,17 +451,437 @@ func (s *Service) ProjectDailyReports(ctx context.Context, projectID string) ([]
 	return s.repo.ListProjectDailyReports(ctx, cleanID(projectID))
 }
 
-func (s *Service) CreateDailyReport(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
-	body["project_id"] = cleanID(projectID)
-	if cleanID(body["reported_by"]) == "" {
-		body["reported_by"] = actorID
+func (s *Service) CreateDailyReport(ctx context.Context, projectID string, req ConstructionDailyReportCreateRequest, actorID, actorName string) (Record, error) {
+	body, err := s.normalizeConstructionDailyReport(ctx, projectID, req, actorID, nil)
+	if err != nil {
+		return nil, err
 	}
 	row, err := s.repo.CreateDailyReport(ctx, body)
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "daily_report_created", "daily_report", cleanID(row["id"]), fmt.Sprintf("Tạo nhật ký ngày %s", row["report_date"]), Record{"progress_percent": row["progress_percent"]})
+	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "daily_report_created", "daily_report", cleanID(row["id"]), fmt.Sprintf("Tạo nhật ký ngày %s", row["report_date"]), Record{
+		"progress_percent": row["progress_percent"],
+		"work_item_id":     body["work_item_id"],
+		"evidence_count":   len(normalizeConstructionReportEvidenceIDs(req.EvidenceIDs, req.PrimaryEvidenceID)),
+	})
 	return row, nil
+}
+
+func (s *Service) normalizeConstructionDailyReport(ctx context.Context, projectID string, req ConstructionDailyReportCreateRequest, actorID string, existingEvidenceIDs map[string]bool) (Record, error) {
+	projectID = cleanID(projectID)
+	reportDate := strings.TrimSpace(req.ReportDate)
+	if _, err := time.Parse("2006-01-02", reportDate); err != nil {
+		return nil, validationError("Ngày báo cáo không hợp lệ", Record{"report_date": req.ReportDate})
+	}
+	weather := strings.TrimSpace(req.Weather)
+	if weather == "" {
+		return nil, validationError("Thời tiết là bắt buộc", Record{"weather": "required"})
+	}
+	if req.ProgressPercent < 0 || req.ProgressPercent > 100 {
+		return nil, validationError("Tiến độ báo cáo phải từ 0 đến 100", Record{"progress_percent": req.ProgressPercent})
+	}
+
+	doneItems, doneTitles, err := normalizeConstructionReportWorkItems(req.DoneItems, "done_items", "done", 250)
+	if err != nil {
+		return nil, err
+	}
+	if len(doneItems) == 0 {
+		return nil, validationError("Báo cáo cần ít nhất một hạng mục đã làm", Record{"done_items": "required"})
+	}
+	currentItems, currentTitles, err := normalizeConstructionReportWorkItems(req.CurrentItems, "current_items", "partial", 250)
+	if err != nil {
+		return nil, err
+	}
+	nextItems, nextTitles, err := normalizeConstructionReportNextItems(req.NextItems)
+	if err != nil {
+		return nil, err
+	}
+	blockers, err := normalizeConstructionReportBlockers(req.Blockers)
+	if err != nil {
+		return nil, err
+	}
+	crewItems, manpowerSummary, err := normalizeConstructionReportCrew(req.CrewItems)
+	if err != nil {
+		return nil, err
+	}
+	if manpowerSummary == "" {
+		manpowerSummary, err = normalizeConstructionLegacySummary(req.ManpowerSummary, "manpower_summary")
+		if err != nil {
+			return nil, err
+		}
+	}
+	materialItems, materialSummary, err := normalizeConstructionReportMaterials(req.MaterialItems)
+	if err != nil {
+		return nil, err
+	}
+	if materialSummary == "" {
+		materialSummary, err = normalizeConstructionLegacySummary(req.MaterialSummary, "material_usage_summary")
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	workItemID := cleanID(req.WorkItemID)
+	if workItemID != "" {
+		if !validActivityUUID(workItemID) {
+			return nil, validationError("Công việc liên quan không hợp lệ", Record{"work_item_id": req.WorkItemID})
+		}
+		item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, validationError("Không tìm thấy công việc liên quan", Record{"work_item_id": workItemID})
+		}
+		if err != nil {
+			return nil, err
+		}
+		if cleanID(item["project_id"]) != projectID || fmt.Sprint(item["status"]) == "cancelled" {
+			return nil, validationError("Công việc liên quan không thuộc công trình hoặc đã bị hủy", Record{"work_item_id": workItemID})
+		}
+		canView, err := s.repo.CanViewWorkItem(ctx, workItemID, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if !canView {
+			return nil, forbiddenError("Bạn không có quyền sử dụng công việc liên quan này")
+		}
+	}
+
+	evidenceIDs := normalizeConstructionReportEvidenceIDs(req.EvidenceIDs, req.PrimaryEvidenceID)
+	if len(evidenceIDs) > 50 {
+		return nil, validationError("Báo cáo chỉ được liên kết tối đa 50 minh chứng", Record{"evidence_ids": len(evidenceIDs), "max": 50})
+	}
+	if len(evidenceIDs) > 0 && workItemID == "" {
+		return nil, validationError("Chọn công việc liên quan trước khi liên kết minh chứng", Record{"work_item_id": "required"})
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	for _, evidenceID := range evidenceIDs {
+		if !validActivityUUID(evidenceID) {
+			return nil, validationError("Minh chứng không hợp lệ", Record{"evidence_id": evidenceID})
+		}
+		evidence, err := s.repo.GetEvidenceDetail(ctx, evidenceID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, validationError("Không tìm thấy minh chứng", Record{"evidence_id": evidenceID})
+		}
+		if err != nil {
+			return nil, err
+		}
+		if cleanID(evidence["project_id"]) != projectID || cleanID(evidence["work_item_id"]) != workItemID {
+			return nil, validationError("Minh chứng không thuộc công việc liên quan của báo cáo", Record{"evidence_id": evidenceID, "work_item_id": workItemID})
+		}
+		if fmt.Sprint(evidence["status"]) == "rejected" && !existingEvidenceIDs[evidenceID] {
+			return nil, validationError("Không thể liên kết minh chứng đã bị từ chối", Record{"evidence_id": evidenceID})
+		}
+		if profileIsClient(profile) && !profile.IsManager && fmt.Sprint(evidence["visibility"]) != "client" {
+			return nil, forbiddenError("Bạn không có quyền liên kết minh chứng này")
+		}
+	}
+	primaryEvidenceID := cleanID(req.PrimaryEvidenceID)
+	if primaryEvidenceID == "" && len(evidenceIDs) > 0 {
+		primaryEvidenceID = evidenceIDs[0]
+	}
+
+	completedItems := append(doneItems, currentItems...)
+	structured := Record{
+		"completed_items":      completedItems,
+		"next_plan_items":      nextItems,
+		"blockers":             blockers,
+		"crew_items":           crewItems,
+		"material_usage_items": materialItems,
+	}
+	if primaryEvidenceID != "" {
+		structured["site_photo_evidence_id"] = primaryEvidenceID
+	}
+	body := Record{
+		"project_id":             projectID,
+		"report_date":            reportDate,
+		"reported_by":            actorID,
+		"weather":                weather,
+		"work_summary":           constructionReportWorkSummary(doneTitles, currentTitles, nextTitles),
+		"manpower_summary":       manpowerSummary,
+		"material_usage_summary": materialSummary,
+		"issues_summary":         strings.TrimSpace(req.FieldNotes),
+		"progress_percent":       req.ProgressPercent,
+		"photos":                 evidenceIDs,
+		"work_item_id":           workItemID,
+		"structured_json":        structured,
+		"primary_evidence_id":    primaryEvidenceID,
+	}
+	return body, nil
+}
+
+func (s *Service) UpdateDailyReport(ctx context.Context, reportID string, req ConstructionDailyReportCreateRequest, actorID, actorName string) (Record, error) {
+	reportID = cleanID(reportID)
+	if !validActivityUUID(reportID) {
+		return nil, validationError("Báo cáo thi công không hợp lệ", Record{"report_id": reportID})
+	}
+	current, err := s.repo.GetByID(ctx, "operation_daily_reports", reportID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, validationError("Không tìm thấy báo cáo thi công", Record{"report_id": reportID})
+	}
+	if err != nil {
+		return nil, err
+	}
+	if cleanID(current["workflow_form_instance_id"]) != "" {
+		return nil, validationError("Báo cáo từ quy trình phải được cập nhật tại công việc liên quan", Record{"workflow_form_instance_id": current["workflow_form_instance_id"]})
+	}
+	existingEvidenceIDs := map[string]bool{}
+	for _, evidenceID := range constructionReportStringList(current["photos"]) {
+		existingEvidenceIDs[evidenceID] = true
+	}
+	body, err := s.normalizeConstructionDailyReport(ctx, cleanID(current["project_id"]), req, actorID, existingEvidenceIDs)
+	if err != nil {
+		return nil, err
+	}
+	delete(body, "project_id")
+	delete(body, "reported_by")
+	row, err := s.repo.UpdateDailyReport(ctx, reportID, body)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, cleanID(current["project_id"]), actorID, actorName, "daily_report_updated", "daily_report", reportID, fmt.Sprintf("Cập nhật nhật ký ngày %s", row["report_date"]), Record{
+		"progress_percent": row["progress_percent"],
+		"work_item_id":     row["work_item_id"],
+		"evidence_count":   len(constructionReportStringList(row["photos"])),
+	})
+	return row, nil
+}
+
+func (s *Service) AddDailyReportEvidenceUpload(ctx context.Context, reportID, requestedWorkItemID string, req WorkItemEvidenceRequest, fileHeader *multipart.FileHeader, actorID, actorName string) (Record, error) {
+	reportID = cleanID(reportID)
+	if !validActivityUUID(reportID) {
+		return nil, validationError("Báo cáo thi công không hợp lệ", Record{"report_id": reportID})
+	}
+	report, err := s.repo.GetByID(ctx, "operation_daily_reports", reportID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, validationError("Không tìm thấy báo cáo thi công", Record{"report_id": reportID})
+	}
+	if err != nil {
+		return nil, err
+	}
+	if cleanID(report["workflow_form_instance_id"]) != "" {
+		return nil, validationError("Báo cáo từ quy trình phải bổ sung minh chứng tại công việc liên quan", Record{"workflow_form_instance_id": report["workflow_form_instance_id"]})
+	}
+
+	workItemID := cleanID(report["work_item_id"])
+	requestedWorkItemID = cleanID(requestedWorkItemID)
+	if workItemID != "" && requestedWorkItemID != "" && requestedWorkItemID != workItemID {
+		return nil, validationError("Công việc liên quan không khớp với báo cáo", Record{"work_item_id": requestedWorkItemID, "expected_work_item_id": workItemID})
+	}
+	if workItemID == "" {
+		workItemID = requestedWorkItemID
+	}
+	if workItemID == "" || !validActivityUUID(workItemID) {
+		return nil, validationError("Chọn công việc liên quan trước khi tải minh chứng", Record{"work_item_id": "required"})
+	}
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, validationError("Không tìm thấy công việc liên quan", Record{"work_item_id": workItemID})
+	}
+	if err != nil {
+		return nil, err
+	}
+	projectID := cleanID(report["project_id"])
+	if cleanID(item["project_id"]) != projectID || fmt.Sprint(item["status"]) == "cancelled" {
+		return nil, validationError("Công việc liên quan không thuộc công trình hoặc đã bị hủy", Record{"work_item_id": workItemID})
+	}
+	photos := constructionReportStringList(report["photos"])
+	if len(photos) >= 50 {
+		return nil, validationError("Báo cáo chỉ được liên kết tối đa 50 minh chứng", Record{"evidence_ids": len(photos), "max": 50})
+	}
+	if strings.TrimSpace(req.Visibility) == "" {
+		req.Visibility = "project"
+	}
+	evidence, err := s.AddWorkItemEvidenceUpload(ctx, workItemID, req, fileHeader, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	evidenceID := cleanID(evidence["id"])
+	photos = normalizeConstructionReportEvidenceIDs(append(photos, evidenceID), "")
+	primaryEvidenceID := cleanID(report["primary_evidence_id"])
+	if primaryEvidenceID == "" {
+		primaryEvidenceID = evidenceID
+	}
+	structured := constructionReportRecord(report["structured_json"])
+	if cleanID(structured["site_photo_evidence_id"]) == "" {
+		structured["site_photo_evidence_id"] = primaryEvidenceID
+	}
+	updated, err := s.repo.UpdateDailyReport(ctx, reportID, Record{
+		"photos":              photos,
+		"work_item_id":        workItemID,
+		"structured_json":     structured,
+		"primary_evidence_id": primaryEvidenceID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	_ = s.repo.AddAudit(ctx, projectID, actorID, actorName, "daily_report_evidence_added", "daily_report", reportID, fmt.Sprintf("Thêm minh chứng %s vào nhật ký ngày %s", evidence["name"], report["report_date"]), Record{
+		"work_item_id": workItemID,
+		"evidence_id":  evidenceID,
+	})
+	return updated, nil
+}
+
+func normalizeConstructionLegacySummary(value, field string) (string, error) {
+	value = strings.TrimSpace(value)
+	if len([]rune(value)) > 4000 {
+		return "", validationError("Nội dung tóm tắt tối đa 4000 ký tự", Record{field: "too_long"})
+	}
+	return value, nil
+}
+
+func constructionReportRecord(value any) Record {
+	switch typed := value.(type) {
+	case Record:
+		return typed
+	case map[string]any:
+		return Record(typed)
+	case string:
+		row := Record{}
+		if json.Unmarshal([]byte(typed), &row) == nil {
+			return row
+		}
+	}
+	return Record{}
+}
+
+func constructionReportStringList(value any) []string {
+	values := []string{}
+	switch typed := value.(type) {
+	case []string:
+		values = append(values, typed...)
+	case []any:
+		for _, item := range typed {
+			values = append(values, fmt.Sprint(item))
+		}
+	case string:
+		_ = json.Unmarshal([]byte(typed), &values)
+	}
+	return normalizeConstructionReportEvidenceIDs(values, "")
+}
+
+func normalizeConstructionReportWorkItems(items []ConstructionDailyReportWorkItemRequest, field, result string, maxItems int) ([]Record, []string, error) {
+	rows := make([]Record, 0, len(items))
+	titles := make([]string, 0, len(items))
+	for _, item := range items {
+		title := strings.TrimSpace(item.Title)
+		if title == "" {
+			continue
+		}
+		if len([]rune(title)) > 180 {
+			return nil, nil, validationError("Tên hạng mục tối đa 180 ký tự", Record{field: title})
+		}
+		rows = append(rows, Record{"title": title, "result": result})
+		titles = append(titles, title)
+	}
+	if len(rows) > maxItems {
+		return nil, nil, validationError("Báo cáo có quá nhiều hạng mục", Record{field: len(rows), "max": maxItems})
+	}
+	return rows, titles, nil
+}
+
+func normalizeConstructionReportNextItems(items []ConstructionDailyReportWorkItemRequest) ([]Record, []string, error) {
+	rows, titles, err := normalizeConstructionReportWorkItems(items, "next_items", "", 120)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, row := range rows {
+		delete(row, "result")
+	}
+	return rows, titles, nil
+}
+
+func normalizeConstructionReportBlockers(items []ConstructionDailyReportBlockerRequest) ([]Record, error) {
+	rows := make([]Record, 0, len(items))
+	for _, item := range items {
+		content := strings.TrimSpace(item.Content)
+		if content == "" {
+			continue
+		}
+		if len([]rune(content)) > 1000 {
+			return nil, validationError("Nội dung blocker tối đa 1000 ký tự", Record{"blockers": content})
+		}
+		rows = append(rows, Record{"content": content})
+	}
+	if len(rows) > 120 {
+		return nil, validationError("Báo cáo có quá nhiều blocker", Record{"blockers": len(rows), "max": 120})
+	}
+	return rows, nil
+}
+
+func normalizeConstructionReportCrew(items []ConstructionDailyReportCrewRequest) ([]Record, string, error) {
+	rows := make([]Record, 0, len(items))
+	summaries := make([]string, 0, len(items))
+	for _, item := range items {
+		name := strings.TrimSpace(item.CrewName)
+		if name == "" && item.WorkerCount == 0 && item.WorkHours == 0 && strings.TrimSpace(item.Note) == "" {
+			continue
+		}
+		if name == "" || item.WorkerCount < 1 || item.WorkHours < 0 {
+			return nil, "", validationError("Nhân công cần tên tổ đội, số người lớn hơn 0 và giờ công không âm", Record{"crew_name": name, "worker_count": item.WorkerCount, "work_hours": item.WorkHours})
+		}
+		row := Record{"crew_name": name, "worker_count": item.WorkerCount, "work_hours": item.WorkHours, "note": strings.TrimSpace(item.Note)}
+		rows = append(rows, row)
+		summary := fmt.Sprintf("%s · %d người", name, item.WorkerCount)
+		if item.WorkHours > 0 {
+			summary += fmt.Sprintf(" · %s giờ", strconv.FormatFloat(item.WorkHours, 'f', -1, 64))
+		}
+		summaries = append(summaries, summary)
+	}
+	if len(rows) > 120 {
+		return nil, "", validationError("Báo cáo có quá nhiều tổ đội", Record{"crew_items": len(rows), "max": 120})
+	}
+	return rows, strings.Join(summaries, "; "), nil
+}
+
+func normalizeConstructionReportMaterials(items []ConstructionDailyReportMaterialRequest) ([]Record, string, error) {
+	rows := make([]Record, 0, len(items))
+	summaries := make([]string, 0, len(items))
+	for _, item := range items {
+		name := strings.TrimSpace(item.MaterialName)
+		unit := strings.TrimSpace(item.Unit)
+		if name == "" && item.Quantity == 0 && unit == "" && strings.TrimSpace(item.Note) == "" {
+			continue
+		}
+		if name == "" || item.Quantity < 0 || unit == "" {
+			return nil, "", validationError("Vật tư cần tên, số lượng không âm và đơn vị tính", Record{"material_name": name, "quantity": item.Quantity, "unit": unit})
+		}
+		row := Record{"material_name": name, "quantity": item.Quantity, "unit": unit, "source": "other", "note": strings.TrimSpace(item.Note)}
+		rows = append(rows, row)
+		summaries = append(summaries, fmt.Sprintf("%s · %s %s", name, strconv.FormatFloat(item.Quantity, 'f', -1, 64), unit))
+	}
+	if len(rows) > 200 {
+		return nil, "", validationError("Báo cáo có quá nhiều dòng vật tư", Record{"material_items": len(rows), "max": 200})
+	}
+	return rows, strings.Join(summaries, "; "), nil
+}
+
+func normalizeConstructionReportEvidenceIDs(ids []string, primaryID string) []string {
+	seen := map[string]bool{}
+	values := make([]string, 0, len(ids)+1)
+	add := func(value string) {
+		value = cleanID(value)
+		if value == "" || seen[value] {
+			return
+		}
+		seen[value] = true
+		values = append(values, value)
+	}
+	add(primaryID)
+	for _, id := range ids {
+		add(id)
+	}
+	return values
+}
+
+func constructionReportWorkSummary(done, current, next []string) string {
+	return strings.Join([]string{
+		"Đã làm:\n" + strings.Join(done, "\n"),
+		"Đang làm:\n" + strings.Join(current, "\n"),
+		"Sẽ làm:\n" + strings.Join(next, "\n"),
+	}, "\n\n")
 }
 
 func (s *Service) ProjectIssues(ctx context.Context, projectID string) ([]Record, error) {
@@ -1086,6 +1628,77 @@ func (s *Service) ProjectOperations(ctx context.Context, projectID, actorID stri
 	return s.repo.ProjectOperations(ctx, projectID, actorID, filter)
 }
 
+func (s *Service) ProjectEvidencePage(ctx context.Context, projectID string, filter ProjectEvidenceFilter, actorID string) (Record, error) {
+	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền xem hồ sơ của công trình này")
+	}
+	filter, err = normalizeProjectEvidenceFilter(filter)
+	if err != nil {
+		return nil, err
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	queryFilter := filter
+	queryFilter.Limit = filter.Limit + 1
+	rows, err := s.repo.ListProjectEvidence(ctx, projectID, profile, queryFilter)
+	if err != nil {
+		return nil, err
+	}
+	hasMore := len(rows) > filter.Limit
+	if hasMore {
+		rows = rows[:filter.Limit]
+	}
+	nextCursor := ""
+	if hasMore && len(rows) > 0 {
+		nextCursor = encodeEvidenceCursor(rows[len(rows)-1])
+	}
+	for _, row := range rows {
+		row["can_review"] = false
+		if statusIn(fmt.Sprint(row["status"]), "draft", "submitted") {
+			canReview, err := s.repo.CanDecideWorkItem(ctx, Record{
+				"id":                  row["work_item_id"],
+				"project_id":          projectID,
+				"status":              row["work_item_status"],
+				"role_ids":            row["work_item_role_ids"],
+				"approval_request_id": row["work_item_approval_request_id"],
+			}, actorID)
+			if err != nil {
+				return nil, err
+			}
+			row["can_review"] = canReview
+		}
+		delete(row, "review_priority")
+		delete(row, "work_item_role_ids")
+		delete(row, "work_item_approval_request_id")
+	}
+	filteredTotal, err := s.repo.ProjectEvidenceCount(ctx, projectID, profile, filter)
+	if err != nil {
+		return nil, err
+	}
+	summary, err := s.repo.ProjectEvidenceSummary(ctx, projectID, profile)
+	if err != nil {
+		return nil, err
+	}
+	options, err := s.repo.ProjectEvidenceOptions(ctx, projectID, profile)
+	if err != nil {
+		return nil, err
+	}
+	return Record{
+		"items":          rows,
+		"summary":        summary,
+		"options":        options,
+		"filtered_total": filteredTotal,
+		"has_more":       hasMore,
+		"next_cursor":    nextCursor,
+	}, nil
+}
+
 func (s *Service) ProjectActivity(ctx context.Context, projectID string, filter ProjectActivityFilter, actorID string) ([]Record, error) {
 	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
 	if err != nil {
@@ -1094,25 +1707,276 @@ func (s *Service) ProjectActivity(ctx context.Context, projectID string, filter 
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền xem hoạt động của công trình này")
 	}
-	filter.ScopeType = strings.TrimSpace(filter.ScopeType)
-	filter.ScopeID = cleanID(filter.ScopeID)
-	if filter.ScopeType != "" && !activityTargetScopes[filter.ScopeType] {
-		return nil, validationError("Phạm vi hoạt động không hợp lệ", Record{"scope_type": filter.ScopeType})
-	}
-	if filter.ScopeID != "" && filter.ScopeType == "" {
-		return nil, validationError("Cần scope_type khi lọc theo scope_id")
-	}
-	if filter.ScopeID != "" && !validActivityUUID(filter.ScopeID) {
-		return nil, validationError("scope_id không hợp lệ", Record{"scope_id": filter.ScopeID})
-	}
-	if filter.Limit <= 0 || filter.Limit > 200 {
-		filter.Limit = 80
+	filter, err = normalizeProjectActivityFilter(filter)
+	if err != nil {
+		return nil, err
 	}
 	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
 	if err != nil {
 		return nil, err
 	}
 	return s.repo.ProjectActivityThread(ctx, projectID, profile, filter)
+}
+
+func (s *Service) ProjectActivityPage(ctx context.Context, projectID string, filter ProjectActivityFilter, actorID string) (Record, error) {
+	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền xem hoạt động của công trình này")
+	}
+	filter, err = normalizeProjectActivityFilter(filter)
+	if err != nil {
+		return nil, err
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	queryFilter := filter
+	queryFilter.Limit = filter.Limit + 1
+	rows, err := s.repo.ProjectActivityThread(ctx, projectID, profile, queryFilter)
+	if err != nil {
+		return nil, err
+	}
+	hasMore := len(rows) > filter.Limit
+	if hasMore {
+		rows = rows[:filter.Limit]
+	}
+	nextCursor := ""
+	if hasMore && len(rows) > 0 {
+		nextCursor = encodeActivityCursor(rows[len(rows)-1])
+	}
+	summary, err := s.repo.ProjectActivitySummary(ctx, projectID, profile)
+	if err != nil {
+		return nil, err
+	}
+	return Record{
+		"items":       rows,
+		"summary":     summary,
+		"has_more":    hasMore,
+		"next_cursor": nextCursor,
+	}, nil
+}
+
+func (s *Service) ProjectActivityOptions(ctx context.Context, projectID, actorID string) (Record, error) {
+	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền xem tùy chọn trao đổi của công trình này")
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.ProjectActivityOptions(ctx, projectID, profile)
+}
+
+func normalizeProjectEvidenceFilter(filter ProjectEvidenceFilter) (ProjectEvidenceFilter, error) {
+	filter.EvidenceType = strings.ToLower(strings.TrimSpace(filter.EvidenceType))
+	if filter.EvidenceType == "all" {
+		filter.EvidenceType = ""
+	}
+	if filter.EvidenceType != "" && !statusIn(filter.EvidenceType, "document", "photo", "checklist", "link", "note", "other") {
+		return filter, validationError("Loại minh chứng lọc không hợp lệ", Record{"evidence_type": filter.EvidenceType})
+	}
+	filter.Status = strings.ToLower(strings.TrimSpace(filter.Status))
+	if filter.Status == "all" {
+		filter.Status = ""
+	}
+	if filter.Status == "pending" || filter.Status == "submitted" || filter.Status == "draft" {
+		filter.Status = "waiting"
+	}
+	if filter.Status != "" && !statusIn(filter.Status, "waiting", "accepted", "rejected") {
+		return filter, validationError("Trạng thái hồ sơ lọc không hợp lệ", Record{"status": filter.Status})
+	}
+	filter.WorkItemID = cleanID(filter.WorkItemID)
+	if filter.WorkItemID != "" && !validActivityUUID(filter.WorkItemID) {
+		return filter, validationError("Đầu việc lọc không hợp lệ", Record{"work_item_id": filter.WorkItemID})
+	}
+	filter.SubmittedBy = cleanID(filter.SubmittedBy)
+	if filter.SubmittedBy != "" && !validActivityUUID(filter.SubmittedBy) {
+		return filter, validationError("Người gửi lọc không hợp lệ", Record{"submitted_by": filter.SubmittedBy})
+	}
+	filter.Visibility = strings.ToLower(strings.TrimSpace(filter.Visibility))
+	if filter.Visibility != "" && !statusIn(filter.Visibility, "internal", "project", "client") {
+		return filter, validationError("Phạm vi hiển thị lọc không hợp lệ", Record{"visibility": filter.Visibility})
+	}
+	filter.DateFrom = strings.TrimSpace(filter.DateFrom)
+	filter.DateTo = strings.TrimSpace(filter.DateTo)
+	var dateFrom, dateTo time.Time
+	var err error
+	if filter.DateFrom != "" {
+		dateFrom, err = time.Parse("2006-01-02", filter.DateFrom)
+		if err != nil {
+			return filter, validationError("Ngày bắt đầu không hợp lệ", Record{"date_from": filter.DateFrom})
+		}
+	}
+	if filter.DateTo != "" {
+		dateTo, err = time.Parse("2006-01-02", filter.DateTo)
+		if err != nil {
+			return filter, validationError("Ngày kết thúc không hợp lệ", Record{"date_to": filter.DateTo})
+		}
+	}
+	if !dateFrom.IsZero() && !dateTo.IsZero() && dateFrom.After(dateTo) {
+		return filter, validationError("Khoảng thời gian hồ sơ không hợp lệ", Record{"date_from": filter.DateFrom, "date_to": filter.DateTo})
+	}
+	filter.Search = strings.TrimSpace(filter.Search)
+	if len([]rune(filter.Search)) > 200 {
+		return filter, validationError("Từ khóa tìm kiếm quá dài", Record{"max_length": 200})
+	}
+	filter.Cursor = strings.TrimSpace(filter.Cursor)
+	if filter.Cursor != "" {
+		priority, createdAt, evidenceID, err := parseEvidenceCursor(filter.Cursor)
+		if err != nil {
+			return filter, validationError("Con trỏ hồ sơ không hợp lệ")
+		}
+		filter.CursorPriority = priority
+		filter.CursorCreatedAt = createdAt
+		filter.CursorID = evidenceID
+	}
+	if filter.Limit <= 0 || filter.Limit > 50 {
+		filter.Limit = 25
+	}
+	return filter, nil
+}
+
+func encodeEvidenceCursor(evidence Record) string {
+	evidenceID := cleanID(evidence["id"])
+	priority := int(number(evidence["review_priority"]))
+	createdAt := ""
+	switch value := evidence["created_at"].(type) {
+	case time.Time:
+		createdAt = value.UTC().Format(time.RFC3339Nano)
+	case string:
+		if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+			createdAt = parsed.UTC().Format(time.RFC3339Nano)
+		}
+	}
+	if createdAt == "" || evidenceID == "" || (priority != 0 && priority != 1) {
+		return ""
+	}
+	return base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf("%d|%s|%s", priority, createdAt, evidenceID)))
+}
+
+func parseEvidenceCursor(cursor string) (int, string, string, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return 0, "", "", err
+	}
+	parts := strings.SplitN(string(raw), "|", 3)
+	if len(parts) != 3 || !validActivityUUID(parts[2]) {
+		return 0, "", "", errors.New("invalid evidence cursor")
+	}
+	priority, err := strconv.Atoi(parts[0])
+	if err != nil || (priority != 0 && priority != 1) {
+		return 0, "", "", errors.New("invalid evidence cursor priority")
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, parts[1])
+	if err != nil {
+		return 0, "", "", err
+	}
+	return priority, parsed.UTC().Format(time.RFC3339Nano), parts[2], nil
+}
+
+func normalizeProjectActivityFilter(filter ProjectActivityFilter) (ProjectActivityFilter, error) {
+	filter.ScopeType = strings.ToLower(strings.TrimSpace(filter.ScopeType))
+	filter.ScopeID = cleanID(filter.ScopeID)
+	if filter.ScopeType != "" && !activityTargetScopes[filter.ScopeType] {
+		return filter, validationError("Phạm vi hoạt động không hợp lệ", Record{"scope_type": filter.ScopeType})
+	}
+	if filter.ScopeID != "" && filter.ScopeType == "" {
+		return filter, validationError("Cần scope_type khi lọc theo scope_id")
+	}
+	if filter.ScopeID != "" && !validActivityUUID(filter.ScopeID) {
+		return filter, validationError("scope_id không hợp lệ", Record{"scope_id": filter.ScopeID})
+	}
+	filter.ActivityType = strings.ToLower(strings.TrimSpace(filter.ActivityType))
+	if filter.ActivityType != "" && !activityFilterTypes[filter.ActivityType] {
+		return filter, validationError("Loại hoạt động lọc không hợp lệ", Record{"activity_type": filter.ActivityType})
+	}
+	filter.ActorID = cleanID(filter.ActorID)
+	if filter.ActorID != "" && !validActivityUUID(filter.ActorID) {
+		return filter, validationError("Người gửi lọc không hợp lệ", Record{"actor_id": filter.ActorID})
+	}
+	filter.Visibility = strings.ToLower(strings.TrimSpace(filter.Visibility))
+	if filter.Visibility != "" && !activityVisibilities[filter.Visibility] {
+		return filter, validationError("Phạm vi hiển thị lọc không hợp lệ", Record{"visibility": filter.Visibility})
+	}
+	filter.Kind = strings.ToLower(strings.TrimSpace(filter.Kind))
+	if filter.Kind == "all" {
+		filter.Kind = ""
+	}
+	if filter.Kind != "" && filter.Kind != "discussion" && filter.Kind != "system" && filter.Kind != "decision" {
+		return filter, validationError("Nhóm hoạt động lọc không hợp lệ", Record{"kind": filter.Kind})
+	}
+	filter.Attention = strings.ToLower(strings.TrimSpace(filter.Attention))
+	if filter.Attention == "all" {
+		filter.Attention = ""
+	}
+	if filter.Attention != "" && !activityAttentionQueues[filter.Attention] {
+		return filter, validationError("Hàng đợi chú ý không hợp lệ", Record{"attention": filter.Attention})
+	}
+	filter.Search = strings.TrimSpace(filter.Search)
+	if len([]rune(filter.Search)) > 200 {
+		return filter, validationError("Từ khóa tìm kiếm quá dài", Record{"max_length": 200})
+	}
+	filter.Cursor = strings.TrimSpace(filter.Cursor)
+	if filter.Cursor != "" {
+		createdAt, activityID, err := parseActivityCursor(filter.Cursor)
+		if err != nil {
+			return filter, validationError("Con trỏ hoạt động không hợp lệ")
+		}
+		filter.CursorCreatedAt = createdAt
+		filter.CursorID = activityID
+	}
+	if filter.Limit <= 0 || filter.Limit > 50 {
+		filter.Limit = 30
+	}
+	return filter, nil
+}
+
+func encodeActivityCursor(activity Record) string {
+	activityID := cleanID(activity["id"])
+	createdAt := ""
+	if value := strings.TrimSpace(fmt.Sprint(activity["cursor_created_at"])); value != "" && value != "<nil>" {
+		if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+			createdAt = parsed.UTC().Format(time.RFC3339Nano)
+		}
+	}
+	if createdAt == "" {
+		switch value := activity["created_at"].(type) {
+		case time.Time:
+			createdAt = value.UTC().Format(time.RFC3339Nano)
+		case string:
+			if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+				createdAt = parsed.UTC().Format(time.RFC3339Nano)
+			}
+		}
+	}
+	if createdAt == "" || activityID == "" {
+		return ""
+	}
+	return base64.RawURLEncoding.EncodeToString([]byte(createdAt + "|" + activityID))
+}
+
+func parseActivityCursor(cursor string) (string, string, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return "", "", err
+	}
+	parts := strings.SplitN(string(raw), "|", 2)
+	if len(parts) != 2 || !validActivityUUID(parts[1]) {
+		return "", "", errors.New("invalid activity cursor")
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, parts[0])
+	if err != nil {
+		return "", "", err
+	}
+	return parsed.UTC().Format(time.RFC3339Nano), parts[1], nil
 }
 
 func (s *Service) WorkItemDetail(ctx context.Context, workItemID, actorID string) (Record, error) {
@@ -4357,6 +5221,9 @@ func (s *Service) AddWorkItemActivity(ctx context.Context, workItemID string, re
 	if err != nil {
 		return nil, err
 	}
+	if normalized.ParentActivityID != "" {
+		return nil, validationError("Phản hồi trực tiếp chỉ được tạo từ thảo luận công trình")
+	}
 	if err := s.requireActivityVisibility(ctx, normalized, actorID); err != nil {
 		return nil, err
 	}
@@ -4405,6 +5272,198 @@ func (s *Service) MarkActivityRead(ctx context.Context, activityID, actorID stri
 	return readState, nil
 }
 
+func (s *Service) MarkProjectActivityRead(ctx context.Context, projectID, actorID string) (Record, error) {
+	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền cập nhật hoạt động của công trình này")
+	}
+	result, err := s.repo.MarkProjectActivityRead(ctx, projectID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	s.publishActivityEvent(ActivityStreamEvent{Type: "activity_read", ProjectID: projectID, ActorID: actorID})
+	return result, nil
+}
+
+func (s *Service) ResolveActivity(ctx context.Context, activityID string, req ActivityResolutionRequest, actorID, actorName string) (Record, error) {
+	activityID = cleanID(activityID)
+	if !validActivityUUID(activityID) {
+		return nil, validationError("Mã hoạt động không hợp lệ", Record{"activity_id": activityID})
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	visible, err := s.repo.ActivityVisibleToUser(ctx, activityID, profile)
+	if err != nil {
+		return nil, err
+	}
+	if !visible {
+		return nil, forbiddenError("Bạn không có quyền xem hoạt động này")
+	}
+	activity, err := s.repo.ActivityRecord(ctx, activityID)
+	if err != nil {
+		return nil, err
+	}
+	projectID := cleanID(activity["project_id"])
+	workItemID := cleanID(activity["work_item_id"])
+	if workItemID != "" {
+		allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, forbiddenError("Bạn không có quyền xử lý hoạt động của đầu việc này")
+		}
+	} else {
+		allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, forbiddenError("Bạn không có quyền xử lý hoạt động của công trình này")
+		}
+		if !profile.IsManager && cleanID(activity["actor_id"]) != actorID {
+			mentioned, err := s.repo.ActivityMentionedUser(ctx, activityID, actorID)
+			if err != nil {
+				return nil, err
+			}
+			if !mentioned {
+				return nil, forbiddenError("Chỉ người tạo, người được nhắc hoặc quản lý công trình có thể xử lý hoạt động này")
+			}
+		}
+	}
+	activityType := strings.TrimSpace(fmt.Sprint(activity["activity_type"]))
+	if activityType != "question" && activityType != "blocker" && activityType != "reminder" {
+		return nil, validationError("Loại hoạt động này không có hành động hoàn tất", Record{"activity_type": activityType})
+	}
+	comment := strings.TrimSpace(req.Comment)
+	resolved, err := s.repo.ResolveActivity(ctx, activity, comment, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishActivityEvent(activityEventFromRecord("activity_changed", resolved, actorID))
+	return resolved, nil
+}
+
+func (s *Service) SetActivityReaction(ctx context.Context, activityID string, req ActivityReactionRequest, actorID string) (Record, error) {
+	activityID = cleanID(activityID)
+	if !validActivityUUID(activityID) {
+		return nil, validationError("Mã hoạt động không hợp lệ", Record{"activity_id": activityID})
+	}
+	reaction := strings.TrimSpace(req.Reaction)
+	if !activityReactions[reaction] {
+		return nil, validationError("Phản ứng không hợp lệ", Record{"reaction": reaction})
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	visible, err := s.repo.ActivityVisibleToUser(ctx, activityID, profile)
+	if err != nil {
+		return nil, err
+	}
+	if !visible {
+		return nil, forbiddenError("Bạn không có quyền xem hoạt động này")
+	}
+	activity, err := s.repo.ActivityRecord(ctx, activityID)
+	if err != nil {
+		return nil, err
+	}
+	if !userActivityTypes[strings.TrimSpace(fmt.Sprint(activity["activity_type"]))] {
+		return nil, validationError("Không thể phản ứng với sự kiện hệ thống")
+	}
+	if cleanID(activity["withdrawn_at"]) != "" {
+		return nil, validationError("Không thể phản ứng với tin nhắn đã được thu hồi")
+	}
+	result, err := s.repo.SetActivityReaction(ctx, activity, reaction, req.Active, actorID)
+	if err != nil {
+		return nil, err
+	}
+	s.publishActivityEvent(ActivityStreamEvent{
+		Type:       "activity_changed",
+		ProjectID:  cleanID(activity["project_id"]),
+		ActivityID: activityID,
+		ActorID:    actorID,
+	})
+	return result, nil
+}
+
+func (s *Service) UpdateActivityMessage(ctx context.Context, activityID string, req ActivityMessageUpdateRequest, actorID, actorName string) (Record, error) {
+	activity, err := s.activityMessageForMutation(ctx, activityID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	comment := strings.TrimSpace(req.Comment)
+	if comment == "" {
+		return nil, validationError("Nội dung tin nhắn là bắt buộc")
+	}
+	if comment == strings.TrimSpace(fmt.Sprint(activity["comment"])) {
+		return nil, validationError("Nội dung tin nhắn chưa thay đổi")
+	}
+	updated, err := s.repo.UpdateActivityMessage(ctx, activity, comment, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishActivityEvent(activityEventFromRecord("activity_changed", updated, actorID))
+	return updated, nil
+}
+
+func (s *Service) WithdrawActivityMessage(ctx context.Context, activityID, actorID, actorName string) (Record, error) {
+	activity, err := s.activityMessageForMutation(ctx, activityID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	withdrawn, err := s.repo.WithdrawActivityMessage(ctx, activity, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishActivityEvent(activityEventFromRecord("activity_changed", withdrawn, actorID))
+	return withdrawn, nil
+}
+
+func (s *Service) activityMessageForMutation(ctx context.Context, activityID, actorID string) (Record, error) {
+	activityID = cleanID(activityID)
+	if !validActivityUUID(activityID) {
+		return nil, validationError("Mã hoạt động không hợp lệ", Record{"activity_id": activityID})
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	visible, err := s.repo.ActivityVisibleToUser(ctx, activityID, profile)
+	if err != nil {
+		return nil, err
+	}
+	if !visible {
+		return nil, forbiddenError("Bạn không có quyền xem hoạt động này")
+	}
+	activity, err := s.repo.ActivityRecord(ctx, activityID)
+	if err != nil {
+		return nil, err
+	}
+	if cleanID(activity["actor_id"]) != cleanID(actorID) {
+		return nil, forbiddenError("Chỉ tác giả được chỉnh sửa hoặc thu hồi tin nhắn")
+	}
+	if strings.TrimSpace(fmt.Sprint(activity["activity_type"])) != "comment" {
+		return nil, validationError("Chỉ tin nhắn ghi chú mới có thể chỉnh sửa hoặc thu hồi")
+	}
+	if cleanID(activity["withdrawn_at"]) != "" {
+		return nil, validationError("Tin nhắn đã được thu hồi")
+	}
+	createdAt, err := time.Parse(time.RFC3339, cleanID(activity["created_at"]))
+	if err != nil {
+		return nil, err
+	}
+	if time.Since(createdAt) > activityMessageEditWindow {
+		return nil, validationError("Thời hạn chỉnh sửa hoặc thu hồi tin nhắn đã kết thúc")
+	}
+	return activity, nil
+}
+
 func (s *Service) AddProjectActivity(ctx context.Context, projectID string, req WorkItemActivityRequest, actorID, actorName string) (Record, error) {
 	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
 	if err != nil {
@@ -4413,7 +5472,17 @@ func (s *Service) AddProjectActivity(ctx context.Context, projectID string, req 
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền thêm hoạt động cho công trình này")
 	}
+	if strings.TrimSpace(req.ParentActivityID) != "" {
+		req.ActivityType = "comment"
+		req.Visibility = "project"
+		req.Attachments = nil
+		req.Metadata = Record{}
+	}
 	normalized, err := validateActivityRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	normalized, err = s.normalizeActivityReply(ctx, projectID, normalized, actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -4442,6 +5511,62 @@ func (s *Service) AddProjectActivity(ctx context.Context, projectID string, req 
 	return activity, nil
 }
 
+func (s *Service) normalizeActivityReply(ctx context.Context, projectID string, req WorkItemActivityRequest, actorID string) (WorkItemActivityRequest, error) {
+	parentActivityID := cleanID(req.ParentActivityID)
+	if parentActivityID == "" {
+		req.ParentActivityID = ""
+		return req, nil
+	}
+	if !validActivityUUID(parentActivityID) {
+		return req, validationError("Mã trao đổi được trả lời không hợp lệ", Record{"parent_activity_id": parentActivityID})
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return req, err
+	}
+	visible, err := s.repo.ActivityVisibleToUser(ctx, parentActivityID, profile)
+	if err != nil {
+		return req, err
+	}
+	if !visible {
+		return req, forbiddenError("Bạn không có quyền trả lời trao đổi này")
+	}
+	parent, err := s.repo.ActivityRecord(ctx, parentActivityID)
+	if err != nil {
+		return req, err
+	}
+	if cleanID(parent["project_id"]) != cleanID(projectID) {
+		return req, validationError("Trao đổi được trả lời không thuộc công trình này")
+	}
+	if !userActivityTypes[strings.TrimSpace(fmt.Sprint(parent["activity_type"]))] {
+		return req, validationError("Không thể trả lời sự kiện hệ thống")
+	}
+	if cleanID(parent["withdrawn_at"]) != "" {
+		return req, validationError("Không thể trả lời tin nhắn đã được thu hồi")
+	}
+	req.ParentActivityID = parentActivityID
+	req.ActivityType = "comment"
+	req.Visibility = strings.TrimSpace(fmt.Sprint(parent["visibility"]))
+	req.ScopeType = strings.TrimSpace(fmt.Sprint(parent["scope_type"]))
+	req.ScopeID = cleanID(parent["scope_id"])
+	req.WorkItemID = cleanID(parent["work_item_id"])
+	req.Attachments = nil
+	req.Metadata = Record{}
+	parentActorID := cleanID(parent["actor_id"])
+	if parentActorID != "" && parentActorID != actorID {
+		req.Mentions = append(req.Mentions, ActivityMentionRequest{Type: "user", ID: parentActorID})
+	}
+	mentions, err := normalizeActivityMentions(req.Mentions)
+	if err != nil {
+		return req, err
+	}
+	req.Mentions = mentions
+	if len(mentions) > 0 {
+		req.Metadata["mentions"] = mentions
+	}
+	return req, nil
+}
+
 var userActivityTypes = map[string]bool{
 	"comment":   true,
 	"status":    true,
@@ -4450,6 +5575,31 @@ var userActivityTypes = map[string]bool{
 	"decision":  true,
 	"reminder":  true,
 	"file_note": true,
+}
+
+var activityFilterTypes = map[string]bool{
+	"created":            true,
+	"started":            true,
+	"completed":          true,
+	"blocked":            true,
+	"blocker_resolved":   true,
+	"status_changed":     true,
+	"comment":            true,
+	"status":             true,
+	"blocker":            true,
+	"question":           true,
+	"decision":           true,
+	"reminder":           true,
+	"file_note":          true,
+	"system_event":       true,
+	"evidence_added":     true,
+	"evidence_accepted":  true,
+	"evidence_rejected":  true,
+	"review_requested":   true,
+	"approval_requested": true,
+	"approved":           true,
+	"rejected":           true,
+	"changes_requested":  true,
 }
 
 var activityVisibilities = map[string]bool{
@@ -4484,6 +5634,13 @@ var activityAttentionQueues = map[string]bool{
 var activityAttachmentTypes = map[string]bool{
 	"evidence": true,
 	"document": true,
+}
+
+var activityReactions = map[string]bool{
+	"👍": true,
+	"👀": true,
+	"🙏": true,
+	"🎉": true,
 }
 
 func validateActivityRequest(req WorkItemActivityRequest) (WorkItemActivityRequest, error) {
@@ -4537,6 +5694,7 @@ func validateActivityRequest(req WorkItemActivityRequest) (WorkItemActivityReque
 	req.ScopeType = strings.TrimSpace(req.ScopeType)
 	req.ScopeID = cleanID(req.ScopeID)
 	req.WorkItemID = cleanID(req.WorkItemID)
+	req.ParentActivityID = cleanID(req.ParentActivityID)
 	attachments, err := normalizeActivityAttachments(req.Attachments, metadata)
 	if err != nil {
 		return req, err
@@ -6634,6 +7792,10 @@ func (s *Service) CreateStockMovement(ctx context.Context, req StockActionReques
 	return s.repo.CreateStockMovement(ctx, req, actorID, actorName)
 }
 
+func (s *Service) CreateStockDocument(ctx context.Context, req StockDocumentRequest, actorID, actorName string) (Record, error) {
+	return s.repo.CreateStockDocument(ctx, req, actorID, actorName)
+}
+
 func (s *Service) ProjectAcceptances(ctx context.Context, projectID, actorID string) ([]Record, error) {
 	projectID = cleanID(projectID)
 	allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"acceptance.view", "operation.view"})
@@ -8639,25 +9801,178 @@ func normalizeTaxReportRequest(req TaxReportRequest) (TaxReportRequest, error) {
 	}, nil
 }
 
-func (s *Service) AuditLogs(ctx context.Context, projectID, actorID string) ([]Record, error) {
-	if projectID != "" {
-		return s.repo.Query(ctx, `
-			SELECT * FROM audit_logs
-			WHERE project_id=$1
-			ORDER BY created_at DESC
-			LIMIT 200
-		`, projectID)
-	}
-	scopeSQL, scopeArgs, err := s.repo.ProjectAccessFilter(ctx, actorID, "p", 1)
+func (s *Service) AuditLogs(ctx context.Context, projectID, actorID string, filter AuditLogFilter) (Record, error) {
+	filter, err := normalizeAuditLogFilter(filter)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.Query(ctx, fmt.Sprintf(`
-		SELECT al.*
-		FROM audit_logs al
-		JOIN projects p ON p.id=al.project_id
-		WHERE p.status <> 'cancelled' AND %s
-		ORDER BY al.created_at DESC
-		LIMIT 300
-	`, scopeSQL), scopeArgs...)
+
+	fromSQL := "FROM audit_logs al JOIN projects p ON p.id=al.project_id"
+	scopeConditions := make([]string, 0, 3)
+	scopeArgs := make([]any, 0, 3)
+	if projectID != "" {
+		scopeArgs = append(scopeArgs, projectID)
+		scopeConditions = append(scopeConditions, "p.id=$1")
+	} else {
+		scopeSQL, accessArgs, accessErr := s.repo.ProjectAccessFilter(ctx, actorID, "p", 1)
+		if accessErr != nil {
+			return nil, accessErr
+		}
+		scopeArgs = append(scopeArgs, accessArgs...)
+		scopeConditions = append(scopeConditions, "p.status <> 'cancelled'", scopeSQL)
+	}
+
+	conditions := append([]string(nil), scopeConditions...)
+	args := append([]any(nil), scopeArgs...)
+	addCondition := func(format string, value any) {
+		args = append(args, value)
+		conditions = append(conditions, fmt.Sprintf(format, len(args)))
+	}
+	if projectID == "" && filter.ProjectID != "" {
+		addCondition("p.id=$%d", filter.ProjectID)
+	}
+	if filter.EventType != "" {
+		addCondition("al.event_type=$%d", filter.EventType)
+	}
+	if filter.TargetType != "" {
+		addCondition("al.target_type=$%d", filter.TargetType)
+	}
+	if filter.ActorName != "" {
+		addCondition("LOWER(COALESCE(al.actor_name,''))=LOWER($%d)", filter.ActorName)
+	}
+	if filter.DateFrom != "" {
+		addCondition("al.created_at >= $%d::date", filter.DateFrom)
+	}
+	if filter.DateTo != "" {
+		addCondition("al.created_at < ($%d::date + INTERVAL '1 day')", filter.DateTo)
+	}
+	if filter.Search != "" {
+		args = append(args, "%"+filter.Search+"%")
+		placeholder := len(args)
+		conditions = append(conditions, fmt.Sprintf(`(
+			al.description ILIKE $%[1]d OR al.event_type ILIKE $%[1]d OR
+			COALESCE(al.actor_name,'') ILIKE $%[1]d OR COALESCE(al.target_type,'') ILIKE $%[1]d OR
+			COALESCE(al.target_id::text,'') ILIKE $%[1]d OR al.id::text ILIKE $%[1]d OR
+			p.code ILIKE $%[1]d OR p.name ILIKE $%[1]d
+		)`, placeholder))
+	}
+
+	whereSQL := strings.Join(conditions, " AND ")
+	countRow, err := s.repo.QueryOne(ctx, fmt.Sprintf("SELECT COUNT(*) AS total %s WHERE %s", fromSQL, whereSQL), args...)
+	if err != nil {
+		return nil, err
+	}
+	total := int(number(countRow["total"]))
+	offset := (filter.Page - 1) * filter.PageSize
+	itemArgs := append([]any(nil), args...)
+	itemArgs = append(itemArgs, filter.PageSize, offset)
+	items, err := s.repo.Query(ctx, fmt.Sprintf(`
+		SELECT al.*, p.code AS project_code, p.name AS project_name
+		%s
+		WHERE %s
+		ORDER BY al.created_at DESC, al.id DESC
+		LIMIT $%d OFFSET $%d
+	`, fromSQL, whereSQL, len(itemArgs)-1, len(itemArgs)), itemArgs...)
+	if err != nil {
+		return nil, err
+	}
+
+	options, err := s.auditLogOptions(ctx, fromSQL, scopeConditions, scopeArgs, projectID == "")
+	if err != nil {
+		return nil, err
+	}
+	totalPages := 0
+	if total > 0 {
+		totalPages = int(math.Ceil(float64(total) / float64(filter.PageSize)))
+	}
+	return Record{
+		"items":       items,
+		"total":       total,
+		"page":        filter.Page,
+		"page_size":   filter.PageSize,
+		"total_pages": totalPages,
+		"options":     options,
+	}, nil
+}
+
+func (s *Service) auditLogOptions(ctx context.Context, fromSQL string, conditions []string, args []any, includeProjects bool) (Record, error) {
+	row, err := s.repo.QueryOne(ctx, fmt.Sprintf(`
+		SELECT
+			COALESCE(jsonb_agg(DISTINCT al.event_type) FILTER (WHERE al.event_type <> ''), '[]'::jsonb) AS event_types,
+			COALESCE(jsonb_agg(DISTINCT al.target_type) FILTER (WHERE COALESCE(al.target_type,'') <> ''), '[]'::jsonb) AS target_types,
+			COALESCE(jsonb_agg(DISTINCT al.actor_name) FILTER (WHERE COALESCE(al.actor_name,'') <> ''), '[]'::jsonb) AS actors
+		%s
+		WHERE %s
+	`, fromSQL, strings.Join(conditions, " AND ")), args...)
+	if err != nil {
+		return nil, err
+	}
+	options := Record{
+		"event_types":  row["event_types"],
+		"target_types": row["target_types"],
+		"actors":       row["actors"],
+		"projects":     []Record{},
+	}
+	if !includeProjects {
+		return options, nil
+	}
+	projects, err := s.repo.Query(ctx, fmt.Sprintf(`
+		SELECT DISTINCT p.id, p.code, p.name
+		%s
+		WHERE %s
+		ORDER BY p.code, p.name
+	`, fromSQL, strings.Join(conditions, " AND ")), args...)
+	if err != nil {
+		return nil, err
+	}
+	options["projects"] = projects
+	return options, nil
+}
+
+func normalizeAuditLogFilter(filter AuditLogFilter) (AuditLogFilter, error) {
+	filter.ProjectID = cleanID(filter.ProjectID)
+	if filter.ProjectID != "" && !validActivityUUID(filter.ProjectID) {
+		return filter, validationError("Công trình lọc không hợp lệ", Record{"project_id": filter.ProjectID})
+	}
+	filter.EventType = strings.ToLower(strings.TrimSpace(filter.EventType))
+	filter.TargetType = strings.ToLower(strings.TrimSpace(filter.TargetType))
+	filter.ActorName = strings.TrimSpace(filter.ActorName)
+	filter.Search = strings.TrimSpace(filter.Search)
+	for field, value := range map[string]string{
+		"event_type":  filter.EventType,
+		"target_type": filter.TargetType,
+		"actor_name":  filter.ActorName,
+		"search":      filter.Search,
+	} {
+		if len([]rune(value)) > 200 {
+			return filter, validationError("Bộ lọc audit quá dài", Record{"field": field, "max_length": 200})
+		}
+	}
+	filter.DateFrom = strings.TrimSpace(filter.DateFrom)
+	filter.DateTo = strings.TrimSpace(filter.DateTo)
+	var dateFrom, dateTo time.Time
+	if filter.DateFrom != "" {
+		parsed, err := time.Parse("2006-01-02", filter.DateFrom)
+		if err != nil {
+			return filter, validationError("Ngày bắt đầu audit không hợp lệ", Record{"date_from": filter.DateFrom})
+		}
+		dateFrom = parsed
+	}
+	if filter.DateTo != "" {
+		parsed, err := time.Parse("2006-01-02", filter.DateTo)
+		if err != nil {
+			return filter, validationError("Ngày kết thúc audit không hợp lệ", Record{"date_to": filter.DateTo})
+		}
+		dateTo = parsed
+	}
+	if !dateFrom.IsZero() && !dateTo.IsZero() && dateFrom.After(dateTo) {
+		return filter, validationError("Khoảng thời gian audit không hợp lệ", Record{"date_from": filter.DateFrom, "date_to": filter.DateTo})
+	}
+	if filter.Page <= 0 {
+		filter.Page = 1
+	}
+	if filter.PageSize <= 0 || filter.PageSize > 100 {
+		filter.PageSize = 25
+	}
+	return filter, nil
 }
