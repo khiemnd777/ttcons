@@ -653,6 +653,79 @@ type ConstructionRecurringOccurrenceRequest struct {
 	Reason     string `json:"reason"`
 }
 
+type ConstructionCheckCriterion struct {
+	Title            string `json:"title"`
+	Criteria         string `json:"criteria"`
+	EvidenceRequired bool   `json:"evidence_required"`
+}
+
+type ConstructionCheckTemplateRequest struct {
+	Name        string                       `json:"name"`
+	Description string                       `json:"description"`
+	Criteria    []ConstructionCheckCriterion `json:"criteria"`
+}
+
+type ConstructionCheckRequest struct {
+	WorkItemID         string                       `json:"work_item_id"`
+	TemplateID         string                       `json:"template_id"`
+	Title              string                       `json:"title"`
+	Location           string                       `json:"location"`
+	ScheduledAt        string                       `json:"scheduled_at"`
+	Criteria           []ConstructionCheckCriterion `json:"criteria"`
+	ContextEvidenceIDs []string                     `json:"context_evidence_ids"`
+}
+
+type ConstructionCheckUpdateRequest struct {
+	WorkItemID         string                       `json:"work_item_id"`
+	TemplateID         string                       `json:"template_id"`
+	Title              string                       `json:"title"`
+	Location           string                       `json:"location"`
+	ScheduledAt        string                       `json:"scheduled_at"`
+	Criteria           []ConstructionCheckCriterion `json:"criteria"`
+	ContextEvidenceIDs []string                     `json:"context_evidence_ids"`
+}
+
+type ConstructionCheckCompleteRequest struct {
+	Result         string   `json:"result"`
+	Note           string   `json:"note"`
+	EvidenceID     string   `json:"evidence_id"`
+	EvidenceIDs    []string `json:"evidence_ids"`
+	ActionTitle    string   `json:"action_title"`
+	AssignedUserID string   `json:"assigned_user_id"`
+	DueAt          string   `json:"due_at"`
+	ImpactScope    string   `json:"impact_scope"`
+	Priority       string   `json:"priority"`
+}
+
+type ConstructionActionRequest struct {
+	WorkItemID     string `json:"work_item_id"`
+	Title          string `json:"title"`
+	Description    string `json:"description"`
+	Priority       string `json:"priority"`
+	AssignedUserID string `json:"assigned_user_id"`
+	DueAt          string `json:"due_at"`
+	ImpactScope    string `json:"impact_scope"`
+	EvidenceID     string `json:"evidence_id"`
+}
+
+type ConstructionActionUpdateRequest struct {
+	Title          string `json:"title"`
+	Description    string `json:"description"`
+	Priority       string `json:"priority"`
+	AssignedUserID string `json:"assigned_user_id"`
+	DueAt          string `json:"due_at"`
+}
+
+type ConstructionActionResolutionRequest struct {
+	EvidenceID string `json:"evidence_id"`
+	Note       string `json:"note"`
+}
+
+type ConstructionActionVerifyRequest struct {
+	Result  string `json:"result"`
+	Comment string `json:"comment"`
+}
+
 type WorkflowFormSignatureStroke struct {
 	Points []WorkflowFormSignaturePoint `json:"points"`
 }

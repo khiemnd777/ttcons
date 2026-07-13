@@ -175,6 +175,7 @@ func hasUpdatedAt(table string) bool {
 	switch table {
 	case "users", "staff", "projects", "pipeline_templates", "pipeline_template_nodes", "pipeline_run_nodes",
 		"procurement_requests", "boq_items", "issues", "acceptance_records", "rework_requests", "replanning_requests",
+		"construction_check_templates", "construction_checks", "construction_action_items",
 		"handover_records", "accounting_budgets", "payables", "receivables", "payments", "advance_requests",
 		"system_settings", "work_items", "evidence_records", "workflow_form_templates", "workflow_form_versions",
 		"workflow_form_instances", "workflow_form_signatures", "input_invoices", "output_invoices",
@@ -218,6 +219,7 @@ func safeTable(table string) string {
 		"pipeline_runs", "pipeline_run_nodes", "pipeline_run_edges", "pipeline_run_steps", "approval_requests", "approval_actions",
 		"boq_items", "procurement_requests", "procurement_request_items", "contracts", "warehouses", "materials", "stock_movements",
 		"site_material_balances", "operation_daily_reports", "issues", "acceptance_records", "acceptance_checklist_items",
+		"construction_check_templates", "construction_checks", "construction_action_items", "construction_action_events",
 		"rework_requests", "replanning_requests", "handover_records", "accounting_budgets", "payables", "receivables",
 		"payments", "advance_requests", "documents", "audit_logs", "system_settings", "staff", "roles", "permissions",
 		"role_permissions", "user_roles", "users", "work_items", "work_item_assignments", "work_item_activities",

@@ -100,10 +100,27 @@ BEGIN
   IF actual <> 1 THEN RAISE EXCEPTION 'Closed NCR/reinspection chain: expected 1, got %',actual; END IF;
   SELECT count(*) INTO actual FROM construction_recurring_occurrences WHERE project_id='30000000-0000-0000-0000-000000000020' AND status='completed';
   IF actual <> 3 THEN RAISE EXCEPTION 'Completed recurring QA occurrences: expected 3, got %',actual; END IF;
+  SELECT count(*) INTO actual FROM construction_check_templates WHERE project_id='30000000-0000-0000-0000-000000000020' AND status='active';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Simplified construction check templates: expected 1, got %',actual; END IF;
+  SELECT count(*) INTO actual FROM construction_checks WHERE project_id='30000000-0000-0000-0000-000000000020';
+  IF actual <> 4 THEN RAISE EXCEPTION 'Simplified construction checks: expected 4, got %',actual; END IF;
+  SELECT count(*) INTO actual
+  FROM construction_check_evidence ce
+  JOIN construction_checks c ON c.id=ce.check_id
+  JOIN evidence_records e ON e.id=ce.evidence_id
+  WHERE c.project_id='30000000-0000-0000-0000-000000000020'
+    AND e.project_id=c.project_id AND e.work_item_id=c.work_item_id;
+  IF actual <> 4 THEN RAISE EXCEPTION 'Construction check evidence links: expected 4 valid links, got %',actual; END IF;
+  SELECT count(*) INTO actual
+  FROM construction_check_evidence
+  WHERE check_id='86700000-0000-0000-0000-000000000204' AND evidence_role='context';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Pending construction check context evidence: expected 1, got %',actual; END IF;
+  SELECT count(*) INTO actual FROM construction_action_items WHERE project_id='30000000-0000-0000-0000-000000000020' AND status='done';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Completed simplified construction actions: expected 1, got %',actual; END IF;
 
   SELECT count(*) INTO actual FROM acceptance_records WHERE project_id='30000000-0000-0000-0000-000000000020' AND status='completed' AND result='pass';
   IF actual <> 1 THEN RAISE EXCEPTION 'Final acceptance pass: expected 1, got %',actual; END IF;
-  SELECT count(*) INTO actual FROM rework_requests WHERE project_id='30000000-0000-0000-0000-000000000020' AND status='completed';
+  SELECT count(*) INTO actual FROM rework_requests WHERE project_id='30000000-0000-0000-0000-000000000020' AND status IN ('done','completed');
   IF actual <> 1 THEN RAISE EXCEPTION 'Completed rework history: expected 1, got %',actual; END IF;
   SELECT count(*) INTO actual FROM subcontractor_checklist_reconciliations WHERE project_id='30000000-0000-0000-0000-000000000020' AND status='submitted';
   IF actual <> 1 THEN RAISE EXCEPTION 'Subcontractor reconciliation missing'; END IF;
@@ -145,7 +162,8 @@ BEGIN
   SELECT
     (SELECT count(*) FROM issues WHERE project_id='30000000-0000-0000-0000-000000000020' AND status NOT IN ('closed','cancelled')) +
     (SELECT count(*) FROM quality_ncrs WHERE project_id='30000000-0000-0000-0000-000000000020' AND status NOT IN ('closed','cancelled')) +
-    (SELECT count(*) FROM rework_requests WHERE project_id='30000000-0000-0000-0000-000000000020' AND status NOT IN ('completed','cancelled'))
+    (SELECT count(*) FROM rework_requests WHERE project_id='30000000-0000-0000-0000-000000000020' AND status NOT IN ('done','completed','cancelled')) +
+    (SELECT count(*) FROM construction_action_items WHERE project_id='30000000-0000-0000-0000-000000000020' AND status IN ('open','waiting_confirmation'))
   INTO actual;
   IF actual <> 0 THEN RAISE EXCEPTION 'Open quality/handover blockers: %',actual; END IF;
 
@@ -165,8 +183,8 @@ BEGIN
   IF actual <> 12 THEN RAISE EXCEPTION 'Official approval policy contract: expected 12 valid nodes, got %',actual; END IF;
 
   SELECT count(*) INTO actual FROM permissions
-  WHERE key LIKE 'contract.%' OR key LIKE 'quality.%' OR key='handover.verify';
-  IF actual <> 15 THEN RAISE EXCEPTION 'Product-grade RBAC permissions after seed: expected 15, got %',actual; END IF;
+  WHERE key LIKE 'contract.%' OR key LIKE 'quality.%' OR key LIKE 'construction.%' OR key='handover.verify';
+  IF actual <> 23 THEN RAISE EXCEPTION 'Product-grade RBAC permissions after seed: expected 23, got %',actual; END IF;
 
   SELECT count(*) INTO actual
   FROM role_permissions rp
@@ -192,6 +210,19 @@ BEGIN
     'quality.ncr_manage','quality.recurring_manage'
   );
   IF actual <> 6 THEN RAISE EXCEPTION 'QA/QC Golden Live permissions: expected 6, got %',actual; END IF;
+  SELECT count(*) INTO actual
+  FROM role_permissions rp
+  JOIN roles r ON r.id=rp.role_id
+  JOIN permissions p ON p.id=rp.permission_id
+  WHERE r.name='qa_qc' AND p.key LIKE 'construction.%';
+  IF actual <> 8 THEN RAISE EXCEPTION 'QA/QC simplified construction permissions: expected 8, got %',actual; END IF;
+  SELECT count(*) INTO actual
+  FROM role_permissions rp
+  JOIN roles r ON r.id=rp.role_id
+  JOIN permissions p ON p.id=rp.permission_id
+  WHERE r.name IN ('admin','pm','qa_qc','supervisor','construction_team')
+    AND p.key IN ('construction.check.edit','construction.action.edit');
+  IF actual <> 10 THEN RAISE EXCEPTION 'Construction edit role grants: expected 10, got %',actual; END IF;
   SELECT count(*) INTO actual
   FROM role_permissions rp
   JOIN roles r ON r.id=rp.role_id
@@ -271,6 +302,9 @@ BEGIN
     (SELECT count(*) FROM quality_itp_plans WHERE project_id='30000000-0000-0000-0000-000000000022') +
     (SELECT count(*) FROM quality_inspection_requests WHERE project_id='30000000-0000-0000-0000-000000000022') +
     (SELECT count(*) FROM quality_ncrs WHERE project_id='30000000-0000-0000-0000-000000000022') +
+    (SELECT count(*) FROM construction_check_templates WHERE project_id='30000000-0000-0000-0000-000000000022') +
+    (SELECT count(*) FROM construction_checks WHERE project_id='30000000-0000-0000-0000-000000000022') +
+    (SELECT count(*) FROM construction_action_items WHERE project_id='30000000-0000-0000-0000-000000000022') +
     (SELECT count(*) FROM incoming_acceptance_records WHERE project_id='30000000-0000-0000-0000-000000000022') +
     (SELECT count(*) FROM acceptance_records WHERE project_id='30000000-0000-0000-0000-000000000022') +
     (SELECT count(*) FROM rework_requests WHERE project_id='30000000-0000-0000-0000-000000000022') +

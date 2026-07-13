@@ -11928,6 +11928,698 @@ func (r *Repository) ReleaseContractRetention(ctx context.Context, retentionID s
 	return r.GetContractDetail(ctx, cleanID(retention["contract_id"]))
 }
 
+func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID string) (Record, error) {
+	templates, err := r.Query(ctx, `
+		SELECT t.*,u.full_name AS created_by_name
+		FROM construction_check_templates t
+		LEFT JOIN users u ON u.id=t.created_by
+		WHERE t.project_id=$1
+		ORDER BY CASE WHEN t.status='active' THEN 0 ELSE 1 END,t.updated_at DESC,t.name
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	checks, err := r.Query(ctx, `
+		SELECT c.*,t.name AS template_name,w.title AS work_item_title,
+			e.name AS evidence_name,e.evidence_type,
+			rq.full_name AS requested_by_name,ck.full_name AS checked_by_name
+		FROM construction_checks c
+		LEFT JOIN construction_check_templates t ON t.id=c.template_id
+		LEFT JOIN work_items w ON w.id=c.work_item_id
+		LEFT JOIN evidence_records e ON e.id=c.evidence_id
+		LEFT JOIN users rq ON rq.id=c.requested_by
+		LEFT JOIN users ck ON ck.id=c.checked_by
+		WHERE c.project_id=$1 AND c.status <> 'cancelled'
+		ORDER BY CASE WHEN c.status='pending' THEN 0 ELSE 1 END,c.scheduled_at NULLS LAST,c.created_at DESC
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	evidenceRows, err := r.Query(ctx, `
+		SELECT e.*,ce.check_id,ce.evidence_role,ce.sort_order
+		FROM construction_check_evidence ce
+		JOIN construction_checks c ON c.id=ce.check_id
+		JOIN evidence_records e ON e.id=ce.evidence_id
+		WHERE c.project_id=$1 AND c.status <> 'cancelled'
+		ORDER BY ce.check_id,ce.evidence_role,ce.sort_order,ce.created_at,ce.id
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	contextEvidenceByCheck := map[string][]Record{}
+	resultEvidenceByCheck := map[string][]Record{}
+	for _, evidence := range evidenceRows {
+		checkID := cleanID(evidence["check_id"])
+		if fmt.Sprint(evidence["evidence_role"]) == "context" {
+			contextEvidenceByCheck[checkID] = append(contextEvidenceByCheck[checkID], evidence)
+		} else {
+			resultEvidenceByCheck[checkID] = append(resultEvidenceByCheck[checkID], evidence)
+		}
+	}
+	for _, check := range checks {
+		checkID := cleanID(check["id"])
+		contextEvidence := contextEvidenceByCheck[checkID]
+		if contextEvidence == nil {
+			contextEvidence = []Record{}
+		}
+		resultEvidence := resultEvidenceByCheck[checkID]
+		if resultEvidence == nil {
+			resultEvidence = []Record{}
+		}
+		check["context_evidence"] = contextEvidence
+		check["result_evidence"] = resultEvidence
+	}
+	actions, err := r.Query(ctx, `
+		SELECT a.*,w.title AS work_item_title,c.title AS source_check_title,
+			u.full_name AS assigned_user_name,b.name AS before_evidence_name,re.name AS resolution_evidence_name,
+			rp.status AS impact_status
+		FROM construction_action_items a
+		LEFT JOIN work_items w ON w.id=a.work_item_id
+		LEFT JOIN construction_checks c ON c.id=a.source_check_id
+		LEFT JOIN users u ON u.id=a.assigned_user_id
+		LEFT JOIN evidence_records b ON b.id=a.before_evidence_id
+		LEFT JOIN evidence_records re ON re.id=a.resolution_evidence_id
+		LEFT JOIN replanning_requests rp ON rp.id=a.technical_replanning_id
+		WHERE a.project_id=$1 AND a.status <> 'cancelled'
+		ORDER BY CASE a.status WHEN 'open' THEN 0 WHEN 'waiting_confirmation' THEN 1 ELSE 2 END,
+			a.due_at NULLS LAST,a.created_at DESC
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	for _, action := range actions {
+		events, err := r.Query(ctx, `
+			SELECT ev.*,u.full_name AS actor_name,e.name AS evidence_name
+			FROM construction_action_events ev
+			LEFT JOIN users u ON u.id=ev.actor_id
+			LEFT JOIN evidence_records e ON e.id=ev.evidence_id
+			WHERE ev.action_id=$1 ORDER BY ev.created_at,ev.id
+		`, action["id"])
+		if err != nil {
+			return nil, err
+		}
+		action["events"] = events
+	}
+	workItems, err := r.Query(ctx, `
+		SELECT id,title,status,work_type
+		FROM work_items
+		WHERE project_id=$1 AND status <> 'cancelled'
+		ORDER BY CASE WHEN status IN ('ready','in_progress','needs_changes','blocked') THEN 0 ELSE 1 END,updated_at DESC
+		LIMIT 300
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	participants, err := r.Query(ctx, `
+		SELECT DISTINCT u.id,u.full_name,u.email
+		FROM project_members pm
+		JOIN staff s ON s.id=pm.staff_id
+		JOIN users u ON u.id=s.user_id
+		WHERE pm.project_id=$1 AND pm.active AND s.status='active' AND u.status='active'
+		ORDER BY u.full_name
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	return Record{"templates": templates, "checks": checks, "actions": actions, "work_items": workItems, "participants": participants}, nil
+}
+
+func (r *Repository) CreateConstructionCheckTemplate(ctx context.Context, projectID, name, description string, criteria []ConstructionCheckCriterion, actorID, actorName string) (Record, error) {
+	rawCriteria, _ := json.Marshal(criteria)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO construction_check_templates (project_id,name,description,criteria_jsonb,created_by)
+		VALUES ($1,$2,NULLIF($3,''),$4::jsonb,NULLIF($5,'')::uuid)
+		RETURNING *
+	`, projectID, name, description, string(rawCriteria), actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	row := rows[0]
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "construction_check_template_created", "construction_check_template", cleanID(row["id"]), "Tạo mẫu kiểm tra "+name, Record{"criteria_count": len(criteria)}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return row, nil
+}
+
+func (r *Repository) CreateConstructionCheck(ctx context.Context, projectID, workItemID, templateID, title, location, scheduledAt string, criteria []ConstructionCheckCriterion, criteriaProvided bool, contextEvidenceIDs []string, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	workItems, err := queryTx(ctx, tx, `SELECT id FROM work_items WHERE id=$1 AND project_id=$2 AND status <> 'cancelled'`, workItemID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(workItems) == 0 {
+		return nil, validationError("Công việc liên quan không thuộc công trình")
+	}
+	criteriaJSON, err := constructionCheckCriteriaJSONTx(ctx, tx, projectID, templateID, criteria, criteriaProvided)
+	if err != nil {
+		return nil, err
+	}
+	for _, evidenceID := range contextEvidenceIDs {
+		if err := validateConstructionEvidenceTx(ctx, tx, projectID, workItemID, evidenceID); err != nil {
+			return nil, err
+		}
+	}
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO construction_checks (project_id,work_item_id,template_id,title,location,criteria_jsonb,scheduled_at,requested_by)
+		VALUES ($1,$2,NULLIF($3,'')::uuid,$4,NULLIF($5,''),$6::jsonb,NULLIF($7,'')::timestamptz,NULLIF($8,'')::uuid)
+		RETURNING *
+	`, projectID, workItemID, templateID, title, location, criteriaJSON, scheduledAt, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	row := rows[0]
+	if err := replaceConstructionCheckEvidenceTx(ctx, tx, cleanID(row["id"]), "context", contextEvidenceIDs, actorID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "construction_check_created", "construction_check", cleanID(row["id"]), "Tạo kiểm tra "+title, Record{"work_item_id": workItemID, "template_id": templateID, "scheduled_at": scheduledAt, "criteria_count": len(criteria), "context_evidence_count": len(contextEvidenceIDs)}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return row, nil
+}
+
+func (r *Repository) UpdateConstructionCheck(ctx context.Context, checkID, workItemID, templateID, title, location, scheduledAt string, criteria []ConstructionCheckCriterion, criteriaProvided bool, contextEvidenceIDs []string, contextEvidenceProvided bool, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	checks, err := queryTx(ctx, tx, `SELECT * FROM construction_checks WHERE id=$1 FOR UPDATE`, checkID)
+	if err != nil {
+		return nil, err
+	}
+	if len(checks) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	check := checks[0]
+	if fmt.Sprint(check["status"]) != "pending" {
+		return nil, validationError("Chỉ được chỉnh sửa kiểm tra đang chờ", Record{"status": check["status"]})
+	}
+	if cleanID(check["technical_rfi_id"]) != "" {
+		return nil, validationError("Kiểm tra đồng bộ từ RFI chỉ được chỉnh sửa tại hồ sơ QA/QC")
+	}
+	projectID := cleanID(check["project_id"])
+	workItems, err := queryTx(ctx, tx, `SELECT id FROM work_items WHERE id=$1 AND project_id=$2 AND status <> 'cancelled'`, workItemID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(workItems) == 0 {
+		return nil, validationError("Công việc liên quan không thuộc công trình")
+	}
+	criteriaJSON, err := constructionCheckCriteriaJSONTx(ctx, tx, projectID, templateID, criteria, criteriaProvided)
+	if err != nil {
+		return nil, err
+	}
+	if !criteriaProvided {
+		raw, marshalErr := json.Marshal(check["criteria_jsonb"])
+		if marshalErr != nil {
+			return nil, marshalErr
+		}
+		criteriaJSON = string(raw)
+	}
+	if contextEvidenceProvided {
+		for _, evidenceID := range contextEvidenceIDs {
+			if err := validateConstructionEvidenceTx(ctx, tx, projectID, workItemID, evidenceID); err != nil {
+				return nil, err
+			}
+		}
+	} else if cleanID(check["work_item_id"]) != workItemID {
+		existingEvidence, err := queryTx(ctx, tx, `SELECT evidence_id FROM construction_check_evidence WHERE check_id=$1 AND evidence_role='context'`, checkID)
+		if err != nil {
+			return nil, err
+		}
+		for _, evidence := range existingEvidence {
+			if err := validateConstructionEvidenceTx(ctx, tx, projectID, workItemID, cleanID(evidence["evidence_id"])); err != nil {
+				return nil, validationError("Khi đổi công việc liên quan, cần cập nhật lại ảnh hiện trạng")
+			}
+		}
+	}
+	rows, err := queryTx(ctx, tx, `
+		UPDATE construction_checks
+		SET work_item_id=$2,template_id=NULLIF($3,'')::uuid,title=$4,location=NULLIF($5,''),
+			criteria_jsonb=$6::jsonb,scheduled_at=NULLIF($7,'')::timestamptz,updated_at=now()
+		WHERE id=$1 RETURNING *
+	`, checkID, workItemID, templateID, title, location, criteriaJSON, scheduledAt)
+	if err != nil {
+		return nil, err
+	}
+	if contextEvidenceProvided {
+		if err := replaceConstructionCheckEvidenceTx(ctx, tx, checkID, "context", contextEvidenceIDs, actorID); err != nil {
+			return nil, err
+		}
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "construction_check_updated", "construction_check", checkID, "Cập nhật kiểm tra "+title, Record{
+		"before": Record{"work_item_id": check["work_item_id"], "template_id": check["template_id"], "title": check["title"], "location": check["location"], "scheduled_at": check["scheduled_at"], "criteria": check["criteria_jsonb"]},
+		"after":  Record{"work_item_id": workItemID, "template_id": templateID, "title": title, "location": location, "scheduled_at": scheduledAt, "criteria": rows[0]["criteria_jsonb"], "context_evidence_updated": contextEvidenceProvided, "context_evidence_count": len(contextEvidenceIDs)},
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return rows[0], nil
+}
+
+func (r *Repository) CompleteConstructionCheck(ctx context.Context, checkID, result, note string, evidenceIDs []string, actionTitle, assignedUserID, dueAt, impactScope, priority, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	checks, err := queryTx(ctx, tx, `SELECT * FROM construction_checks WHERE id=$1 FOR UPDATE`, checkID)
+	if err != nil {
+		return nil, err
+	}
+	if len(checks) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	check := checks[0]
+	if fmt.Sprint(check["status"]) != "pending" {
+		return nil, validationError("Kiểm tra này đã có kết quả", Record{"status": check["status"]})
+	}
+	for _, evidenceID := range evidenceIDs {
+		if err := validateConstructionEvidenceTx(ctx, tx, cleanID(check["project_id"]), cleanID(check["work_item_id"]), evidenceID); err != nil {
+			return nil, err
+		}
+	}
+	primaryEvidenceID := evidenceIDs[0]
+	updated, err := queryTx(ctx, tx, `
+		UPDATE construction_checks
+		SET status='completed',result=$2,note=NULLIF($3,''),evidence_id=$4,checked_by=NULLIF($5,'')::uuid,checked_at=now(),updated_at=now()
+		WHERE id=$1 RETURNING *
+	`, checkID, result, note, primaryEvidenceID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if err := replaceConstructionCheckEvidenceTx(ctx, tx, checkID, "result", evidenceIDs, actorID); err != nil {
+		return nil, err
+	}
+	responseRow := Record{"check": updated[0]}
+	if result == "fail" {
+		if actionTitle == "" {
+			actionTitle = "Khắc phục: " + fmt.Sprint(check["title"])
+		}
+		action, err := createConstructionActionTx(ctx, tx, cleanID(check["project_id"]), cleanID(check["work_item_id"]), checkID, actionTitle, note, priority, assignedUserID, dueAt, impactScope, primaryEvidenceID, actorID, actorName)
+		if err != nil {
+			return nil, err
+		}
+		responseRow["action"] = action
+	}
+	if err := addAuditTx(ctx, tx, cleanID(check["project_id"]), actorID, actorName, "construction_check_completed", "construction_check", checkID, "Ghi nhận kiểm tra "+result, Record{"result": result, "evidence_id": primaryEvidenceID, "evidence_ids": evidenceIDs, "action_created": result == "fail"}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return responseRow, nil
+}
+
+func (r *Repository) CreateConstructionAction(ctx context.Context, projectID, workItemID, title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	action, err := createConstructionActionTx(ctx, tx, projectID, workItemID, "", title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return action, nil
+}
+
+func (r *Repository) UpdateConstructionAction(ctx context.Context, actionID, title, description, priority, assignedUserID, dueAt, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	actions, err := queryTx(ctx, tx, `SELECT * FROM construction_action_items WHERE id=$1 FOR UPDATE`, actionID)
+	if err != nil {
+		return nil, err
+	}
+	if len(actions) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	action := actions[0]
+	if fmt.Sprint(action["status"]) != "open" {
+		return nil, validationError("Chỉ được chỉnh sửa việc đang cần xử lý", Record{"status": action["status"]})
+	}
+	if !constructionActionEditable(action) {
+		return nil, validationError("Việc đồng bộ từ hồ sơ kỹ thuật chỉ được chỉnh sửa tại nguồn QA/QC")
+	}
+	projectID := cleanID(action["project_id"])
+	staffID, err := constructionProjectParticipantStaffIDTx(ctx, tx, projectID, assignedUserID)
+	if err != nil {
+		return nil, err
+	}
+	severity := "medium"
+	if priority == "urgent" {
+		severity = "high"
+	}
+	rows, err := queryTx(ctx, tx, `
+		UPDATE construction_action_items
+		SET title=$2,description=NULLIF($3,''),priority=$4,assigned_user_id=$5,due_at=$6::timestamptz,updated_at=now()
+		WHERE id=$1 RETURNING *
+	`, actionID, title, description, priority, assignedUserID, dueAt)
+	if err != nil {
+		return nil, err
+	}
+	if issueID := cleanID(action["technical_issue_id"]); issueID != "" {
+		if _, err := tx.ExecContext(ctx, `UPDATE issues SET title=$2,description=NULLIF($3,''),severity=$4,assigned_to=$5,updated_at=now() WHERE id=$1`, issueID, title, description, severity, staffID); err != nil {
+			return nil, err
+		}
+	}
+	if reworkID := cleanID(action["technical_rework_id"]); reworkID != "" {
+		if _, err := tx.ExecContext(ctx, `UPDATE rework_requests SET title=$2,description=NULLIF($3,''),assigned_to=$4,due_date=$5::timestamptz::date,updated_at=now() WHERE id=$1`, reworkID, title, description, staffID, dueAt); err != nil {
+			return nil, err
+		}
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "construction_action_updated", "construction_action", actionID, "Cập nhật việc cần xử lý "+title, Record{
+		"before": Record{"title": action["title"], "description": action["description"], "priority": action["priority"], "assigned_user_id": action["assigned_user_id"], "due_at": action["due_at"]},
+		"after":  Record{"title": title, "description": description, "priority": priority, "assigned_user_id": assignedUserID, "due_at": dueAt},
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return rows[0], nil
+}
+
+func constructionActionEditable(action Record) bool {
+	if cleanID(action["technical_ncr_id"]) != "" {
+		return false
+	}
+	issueID := cleanID(action["technical_issue_id"])
+	return issueID == "" || cleanID(action["id"]) != issueID
+}
+
+func createConstructionActionTx(ctx context.Context, tx *sql.Tx, projectID, workItemID, sourceCheckID, title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName string) (Record, error) {
+	workItems, err := queryTx(ctx, tx, `SELECT id,run_node_id FROM work_items WHERE id=$1 AND project_id=$2 AND status <> 'cancelled'`, workItemID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(workItems) == 0 {
+		return nil, validationError("Công việc liên quan không thuộc công trình")
+	}
+	if err := validateConstructionEvidenceTx(ctx, tx, projectID, workItemID, evidenceID); err != nil {
+		return nil, err
+	}
+	staffID, err := constructionProjectParticipantStaffIDTx(ctx, tx, projectID, assignedUserID)
+	if err != nil {
+		return nil, err
+	}
+	severity := "medium"
+	if priority == "urgent" {
+		severity = "high"
+	}
+	issues, err := queryTx(ctx, tx, `
+		INSERT INTO issues (project_id,node_id,title,description,severity,status,reported_by,assigned_to,requires_rework,requires_replanning)
+		VALUES ($1,NULLIF($2,'')::uuid,$3,NULLIF($4,''),$5,'open',NULLIF($6,'')::uuid,$7,true,$8)
+		RETURNING *
+	`, projectID, cleanID(workItems[0]["run_node_id"]), title, description, severity, actorID, staffID, impactScope != "none")
+	if err != nil {
+		return nil, err
+	}
+	issue := issues[0]
+	reworks, err := queryTx(ctx, tx, `
+		INSERT INTO rework_requests (project_id,issue_id,node_id,title,description,assigned_to,status,due_date,created_by)
+		VALUES ($1,$2,NULLIF($3,'')::uuid,$4,NULLIF($5,''),$6,'pending',$7::timestamptz::date,NULLIF($8,'')::uuid)
+		RETURNING *
+	`, projectID, issue["id"], cleanID(workItems[0]["run_node_id"]), title, description, staffID, dueAt, actorID)
+	if err != nil {
+		return nil, err
+	}
+	replanningID := ""
+	if impactScope != "none" {
+		replannings, err := queryTx(ctx, tx, `
+			INSERT INTO replanning_requests (project_id,issue_id,node_id,reason,impact_scope,budget_impact,timeline_impact,status,created_by)
+			VALUES ($1,$2,NULLIF($3,'')::uuid,$4,$5,$6,$7,'pending',NULLIF($8,'')::uuid)
+			RETURNING *
+		`, projectID, issue["id"], cleanID(workItems[0]["run_node_id"]), title, impactScope, 0, 0, actorID)
+		if err != nil {
+			return nil, err
+		}
+		replanningID = cleanID(replannings[0]["id"])
+	}
+	actions, err := queryTx(ctx, tx, `
+		INSERT INTO construction_action_items (
+			project_id,work_item_id,source_check_id,title,description,priority,assigned_user_id,due_at,status,
+			impact_scope,before_evidence_id,technical_issue_id,technical_rework_id,technical_replanning_id,created_by
+		) VALUES ($1,$2,NULLIF($3,'')::uuid,$4,NULLIF($5,''),$6,$7,$8::timestamptz,'open',$9,$10,$11,$12,NULLIF($13,'')::uuid,NULLIF($14,'')::uuid)
+		RETURNING *
+	`, projectID, workItemID, sourceCheckID, title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, issue["id"], reworks[0]["id"], replanningID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	action := actions[0]
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO construction_action_events (action_id,event_type,comment,evidence_id,actor_id)
+		VALUES ($1,'created',NULLIF($2,''),$3,NULLIF($4,'')::uuid)
+	`, action["id"], description, evidenceID, actorID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "construction_action_created", "construction_action", cleanID(action["id"]), "Tạo việc cần xử lý "+title, Record{"work_item_id": workItemID, "source_check_id": sourceCheckID, "impact_scope": impactScope, "technical_issue_id": issue["id"], "technical_rework_id": reworks[0]["id"], "technical_replanning_id": replanningID}); err != nil {
+		return nil, err
+	}
+	return action, nil
+}
+
+func constructionProjectParticipantStaffIDTx(ctx context.Context, tx *sql.Tx, projectID, assignedUserID string) (string, error) {
+	participants, err := queryTx(ctx, tx, `
+		SELECT s.id AS staff_id
+		FROM project_members pm JOIN staff s ON s.id=pm.staff_id JOIN users u ON u.id=s.user_id
+		WHERE pm.project_id=$1 AND pm.active AND s.status='active' AND u.status='active' AND u.id=$2
+		LIMIT 1
+	`, projectID, assignedUserID)
+	if err != nil {
+		return "", err
+	}
+	if len(participants) == 0 {
+		return "", validationError("Người phụ trách không phải thành viên đang hoạt động của công trình")
+	}
+	return cleanID(participants[0]["staff_id"]), nil
+}
+
+func constructionCheckCriteriaJSONTx(ctx context.Context, tx *sql.Tx, projectID, templateID string, criteria []ConstructionCheckCriterion, criteriaProvided bool) (string, error) {
+	templateCriteria := any([]any{})
+	if templateID != "" {
+		templates, err := queryTx(ctx, tx, `SELECT criteria_jsonb FROM construction_check_templates WHERE id=$1 AND project_id=$2 AND status='active'`, templateID, projectID)
+		if err != nil {
+			return "", err
+		}
+		if len(templates) == 0 {
+			return "", validationError("Mẫu kiểm tra không còn hoạt động trong công trình")
+		}
+		templateCriteria = templates[0]["criteria_jsonb"]
+	}
+	value := templateCriteria
+	if criteriaProvided {
+		value = criteria
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+func replaceConstructionCheckEvidenceTx(ctx context.Context, tx *sql.Tx, checkID, role string, evidenceIDs []string, actorID string) error {
+	if !statusIn(role, "context", "result") {
+		return validationError("Vai trò minh chứng kiểm tra không hợp lệ")
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM construction_check_evidence WHERE check_id=$1 AND evidence_role=$2`, checkID, role); err != nil {
+		return err
+	}
+	for index, evidenceID := range evidenceIDs {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO construction_check_evidence (check_id,evidence_id,evidence_role,sort_order,created_by)
+			VALUES ($1,$2,$3,$4,NULLIF($5,'')::uuid)
+		`, checkID, evidenceID, role, index, actorID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateConstructionEvidenceTx(ctx context.Context, tx *sql.Tx, projectID, workItemID, evidenceID string) error {
+	rows, err := queryTx(ctx, tx, `
+		SELECT id FROM evidence_records
+		WHERE id=$1 AND project_id=$2 AND work_item_id=$3 AND status <> 'rejected'
+	`, evidenceID, projectID, workItemID)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return validationError("Minh chứng phải thuộc cùng công việc và công trình")
+	}
+	return nil
+}
+
+func (r *Repository) SubmitConstructionActionResolution(ctx context.Context, actionID, evidenceID, note, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	actions, err := queryTx(ctx, tx, `SELECT * FROM construction_action_items WHERE id=$1 FOR UPDATE`, actionID)
+	if err != nil {
+		return nil, err
+	}
+	if len(actions) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	action := actions[0]
+	if fmt.Sprint(action["status"]) != "open" {
+		return nil, validationError("Việc này không ở trạng thái cần xử lý", Record{"status": action["status"]})
+	}
+	if err := validateConstructionEvidenceTx(ctx, tx, cleanID(action["project_id"]), cleanID(action["work_item_id"]), evidenceID); err != nil {
+		return nil, err
+	}
+	rows, err := queryTx(ctx, tx, `
+		UPDATE construction_action_items
+		SET status='waiting_confirmation',resolution_evidence_id=$2,resolution_note=NULLIF($3,''),
+			submitted_by=NULLIF($4,'')::uuid,submitted_at=now(),updated_at=now()
+		WHERE id=$1 RETURNING *
+	`, actionID, evidenceID, note, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if cleanID(action["technical_issue_id"]) != "" {
+		if _, err := tx.ExecContext(ctx, `UPDATE issues SET status='in_progress',updated_at=now() WHERE id=$1`, action["technical_issue_id"]); err != nil {
+			return nil, err
+		}
+	}
+	if cleanID(action["technical_rework_id"]) != "" {
+		if _, err := tx.ExecContext(ctx, `UPDATE rework_requests SET status='in_progress',updated_at=now() WHERE id=$1`, action["technical_rework_id"]); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO construction_action_events (action_id,event_type,comment,evidence_id,actor_id) VALUES ($1,'resolution_submitted',NULLIF($2,''),$3,NULLIF($4,'')::uuid)`, actionID, note, evidenceID, actorID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, cleanID(action["project_id"]), actorID, actorName, "construction_action_resolution_submitted", "construction_action", actionID, "Gửi kết quả khắc phục", Record{"evidence_id": evidenceID}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return rows[0], nil
+}
+
+func (r *Repository) VerifyConstructionAction(ctx context.Context, actionID, result, comment, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	actions, err := queryTx(ctx, tx, `SELECT * FROM construction_action_items WHERE id=$1 FOR UPDATE`, actionID)
+	if err != nil {
+		return nil, err
+	}
+	if len(actions) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	action := actions[0]
+	if fmt.Sprint(action["status"]) != "waiting_confirmation" {
+		return nil, validationError("Việc này chưa chờ xác nhận", Record{"status": action["status"]})
+	}
+	nextStatus := "done"
+	eventType := "verified_pass"
+	issueStatus := "closed"
+	reworkStatus := "completed"
+	if result == "fail" {
+		nextStatus = "open"
+		eventType = "verified_fail"
+		issueStatus = "in_progress"
+		reworkStatus = "in_progress"
+	}
+	rows, err := queryTx(ctx, tx, `
+		UPDATE construction_action_items
+		SET status=$2,verified_by=NULLIF($3,'')::uuid,verified_at=now(),retry_count=retry_count+CASE WHEN $2='open' THEN 1 ELSE 0 END,updated_at=now()
+		WHERE id=$1 RETURNING *
+	`, actionID, nextStatus, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if cleanID(action["technical_issue_id"]) != "" {
+		if _, err := tx.ExecContext(ctx, `UPDATE issues SET status=$2,updated_at=now() WHERE id=$1`, action["technical_issue_id"], issueStatus); err != nil {
+			return nil, err
+		}
+	}
+	if cleanID(action["technical_rework_id"]) != "" {
+		if _, err := tx.ExecContext(ctx, `UPDATE rework_requests SET status=$2,approved_by=COALESCE(approved_by,NULLIF($3,'')::uuid),updated_at=now() WHERE id=$1`, action["technical_rework_id"], reworkStatus, actorID); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO construction_action_events (action_id,event_type,comment,evidence_id,actor_id) VALUES ($1,$2,NULLIF($3,''),$4,NULLIF($5,'')::uuid)`, actionID, eventType, comment, action["resolution_evidence_id"], actorID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, cleanID(action["project_id"]), actorID, actorName, "construction_action_"+eventType, "construction_action", actionID, "Xác nhận kết quả khắc phục: "+result, Record{"result": result, "comment": comment, "retry_count": rows[0]["retry_count"]}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return rows[0], nil
+}
+
+func (r *Repository) ApproveConstructionActionImpact(ctx context.Context, actionID, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	actions, err := queryTx(ctx, tx, `SELECT * FROM construction_action_items WHERE id=$1 FOR UPDATE`, actionID)
+	if err != nil {
+		return nil, err
+	}
+	if len(actions) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	action := actions[0]
+	replanningID := cleanID(action["technical_replanning_id"])
+	if replanningID == "" {
+		return nil, validationError("Việc này không có ảnh hưởng cần duyệt")
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE replanning_requests SET status='approved',approved_by=NULLIF($2,'')::uuid,updated_at=now() WHERE id=$1 AND status <> 'approved'`, replanningID, actorID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO construction_action_events (action_id,event_type,comment,actor_id) VALUES ($1,'impact_approved','Đã xác nhận ảnh hưởng',NULLIF($2,'')::uuid)`, actionID, actorID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, cleanID(action["project_id"]), actorID, actorName, "construction_action_impact_approved", "construction_action", actionID, "Xác nhận ảnh hưởng của việc cần xử lý", Record{"impact_scope": action["impact_scope"], "technical_replanning_id": replanningID}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.QueryOne(ctx, `SELECT a.*,rp.status AS impact_status FROM construction_action_items a LEFT JOIN replanning_requests rp ON rp.id=a.technical_replanning_id WHERE a.id=$1`, actionID)
+}
+
 func (r *Repository) ProjectQualityWorkspace(ctx context.Context, projectID string) (Record, error) {
 	itps, err := r.Query(ctx, `
 		SELECT p.*,COALESCE(items.item_count,0) AS item_count
@@ -13764,6 +14456,9 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 	if err := checkCount("open_reworks", `SELECT COUNT(*) AS total FROM rework_requests WHERE project_id=$1 AND status NOT IN ('done','completed','cancelled','deleted')`, projectID); err != nil {
 		return nil, err
 	}
+	if err := checkCount("open_construction_actions", `SELECT COUNT(*) AS total FROM construction_action_items WHERE project_id=$1 AND status IN ('open','waiting_confirmation')`, projectID); err != nil {
+		return nil, err
+	}
 	if err := checkCount("pending_surplus", `SELECT COUNT(*) AS total FROM site_material_balances WHERE project_id=$1 AND surplus_quantity > 0 AND surplus_status <> 'handled'`, projectID); err != nil {
 		return nil, err
 	}
@@ -13809,6 +14504,9 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 	}
 	if number(counts["open_reworks"]) > 0 {
 		blockers = append(blockers, "Còn rework chưa hoàn tất")
+	}
+	if number(counts["open_construction_actions"]) > 0 {
+		blockers = append(blockers, "Còn việc cần xử lý tại công trường chưa hoàn tất")
 	}
 	if number(counts["pending_surplus"]) > 0 {
 		blockers = append(blockers, "Còn vật tư dư chưa xử lý")

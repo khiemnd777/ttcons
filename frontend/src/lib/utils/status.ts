@@ -68,6 +68,7 @@ export const statusLabels: LabelMap = {
   published: 'Đã phát hành',
   archived: 'Lưu trữ',
   open: 'Mở',
+  waiting_confirmation: 'Chờ xác nhận',
   resolved: 'Đã xử lý',
   closed: 'Đã đóng',
   planning: 'Đang lập kế hoạch',

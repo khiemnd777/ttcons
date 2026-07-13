@@ -10,7 +10,8 @@
 
 ## Routes
 
-- Quality presentation: `/projects/:id/operations?tab=quality`; legacy `/projects/:id/quality` redirects to that tab while the data API remains `/projects/:id/quality`
+- Primary quality presentation: `/projects/:id/operations?tab=checks`; legacy `/projects/:id/quality` redirects to that tab while technical quality APIs remain available
+- Simplified checks/actions: `/projects/:id/construction-workspace`, check-template/check creation, `PUT /construction-checks/:id`, check completion, action create, `PUT /construction-actions/:id`, resolution/verify/impact routes
 - ITP: `/projects/:id/quality/itp-plans`, `/quality/itp-plans/:id/revise|submit|approve|activate`
 - RFI: `/projects/:id/quality/rfis`, `/quality/rfis/:id/submit|schedule|inspect`
 - NCR: `/projects/:id/quality/ncrs`, `/quality/ncrs/:id/root-cause|corrective|reinspection|close`
@@ -22,14 +23,15 @@
 
 ## Tables And Migrations
 
-- `quality_itp_plans`, `quality_itp_items`, `quality_inspection_requests`, `quality_ncrs`
+- `construction_check_templates`, `construction_checks`, `construction_check_evidence`, `construction_action_items`, `construction_action_events`
+- Technical compatibility: `quality_itp_plans`, `quality_itp_items`, `quality_inspection_requests`, `quality_ncrs`, `issues`, `rework_requests`, `replanning_requests`
 - `construction_recurring_plans`, `construction_recurring_occurrences`
 - `incoming_acceptance_records`, `incoming_acceptance_items`
 - `acceptance_records`, `acceptance_checklist_items`
 - `rework_requests`, `replanning_requests`, `handover_records`
 - Product-grade handover package: `handover_checklist_items`, `handover_records.readiness_snapshot_json`, exact final-acceptance/form source, submit/check/complete actor timestamps
 - Related forms/artifacts: `workflow_form_instances`, `workflow_form_pdf_exports`, `workflow_form_signatures`, `evidence_records`
-- Relevant migrations: `V1`, `V25`, `V26`, `V51`, `V52`, `V54`-`V56`
+- Relevant migrations: `V1`, `V25`, `V26`, `V51`, `V52`, `V54`-`V56`, `V62`-`V64`
 
 ## Invariants
 
@@ -41,9 +43,12 @@
 - A submitted incoming-acceptance item can prefill an explicit multi-line stock receipt. Linked receipt movements are capped by its remaining accepted quantity, preserve the acceptance item as source and do not rewrite acceptance history.
 - Outgoing acceptance preserves final result, signature/document gates, punch list/rework history, and handover compatibility.
 - `AcceptanceEditor.tsx` is the shared checklist editor/validation owner for the project acceptance master-detail workspace and work-item outgoing acceptance panel. The project page exposes one state-driven CTA and one explicit conclusion dialog; it does not merge checklist rows with ITP criteria or auto-create rework after a failed acceptance.
-- Quality and remediation are visually grouped in Thi công, but ITP/RFI/NCR, issue, rework, and replanning permissions and action routes remain separate. The hidden legacy quality/rework navigation routes are compatibility redirects, not new persistence owners.
+- Field quality/remediation is reduced to `Kiểm tra` and `Cần xử lý`; ITP/RFI/NCR/issue/rework/replanning are hidden technical compatibility history, not additional user steps. Legacy project routes redirect to `tab=checks|actions` and original technical routes remain valid for audit/advanced consumers.
+- A simplified check owns its criteria snapshot independently of its optional template. `construction_check_evidence` separates pre-inspection current-state `context` from completion `result`; both roles preserve evidence ownership/history, and only the first result is mirrored into the legacy `construction_checks.evidence_id` field. Association removal never deletes the underlying evidence record.
+- Failed simplified checks create one action plus linked issue/rework and optional replanning atomically. Passing verification closes the technical issue/rework; failed verification reopens the action without deleting prior evidence/events.
+- Pending RFI-backed checks and technical NCR/legacy issue action backfills are view-only on the field surface. Editable canonical actions preserve immutable source/evidence/impact/status and synchronize safe metadata to linked issue/rework rows transactionally, so technical audit history and handover blocker semantics do not drift.
 - Rework completion does not erase acceptance history.
-- Handover completion requires a submitted package, the exact linked final acceptance to be completed/pass or conditional-pass, all required checklist items verified from accepted evidence/active documents or system sources, no open issue/NCR/rework/material-surplus/finance blockers, and a fresh readiness snapshot. Completion rechecks readiness before writing `handed_over` and `completed_at`.
+- Handover completion requires a submitted package, the exact linked final acceptance to be completed/pass or conditional-pass, all required checklist items verified from accepted evidence/active documents or system sources, no open simplified action/issue/NCR/rework/material-surplus/finance blockers, and a fresh readiness snapshot. Completion rechecks readiness before writing `handed_over` and `completed_at`.
 
 ## Cross-Domain Checks
 
@@ -53,4 +58,4 @@
 
 ## Golden Sample
 
-- `GOLDEN-REAL-001` preserves ITP Rev.01/Rev.02, pass/fail/reinspection RFI history, a closed NCR linked to completed rework, recurring QA occurrences, final pass acceptance and a handed-over package with 8/8 verified checklist items.
+- `GOLDEN-REAL-001` preserves technical ITP/RFI/NCR/rework history behind one optional active template, four checks, four role-based evidence associations and one resolved action; the remaining pending check has context evidence and is not a handover blocker, while open actions are. Final acceptance and the handed-over package remain complete with 8/8 verified checklist items.

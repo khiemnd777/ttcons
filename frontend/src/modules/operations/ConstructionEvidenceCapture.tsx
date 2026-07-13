@@ -19,9 +19,11 @@ type ConstructionEvidenceCaptureProps = {
   hasSource: boolean;
   disabled?: boolean;
   compact?: boolean;
+  hint?: string;
+  maxFiles?: number;
 };
 
-export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disabled = false, compact = false }: ConstructionEvidenceCaptureProps) {
+export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disabled = false, compact = false, hint, maxFiles }: ConstructionEvidenceCaptureProps) {
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fallbackCameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -41,7 +43,11 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
       }
       valid.push({ id: newDraftID(), file, evidenceType, name: file.name, caption: '' });
     });
-    if (valid.length) onChange([...drafts, ...valid]);
+    const available = maxFiles === undefined ? valid.length : Math.max(0, maxFiles - drafts.length);
+    if (valid.length > available) {
+      toast.warn({ title: 'Đã đạt giới hạn minh chứng', description: `Mỗi nhóm được đính kèm tối đa ${maxFiles} ảnh hoặc tệp.` });
+    }
+    if (available > 0) onChange([...drafts, ...valid.slice(0, available)]);
   }
 
   function updateDraft(id: string, patch: Partial<ConstructionEvidenceUploadDraft>) {
@@ -55,7 +61,7 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2"><Upload className="h-4 w-4 text-blue-600" /><h4 className="text-sm font-semibold text-ink">Tệp và ảnh hiện trường</h4></div>
-          <p className="mt-1 text-xs leading-5 text-slate-500">Tệp chỉ được tải lên sau khi lưu báo cáo và được lưu theo công việc liên quan đã chọn.</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{hint ?? 'Tệp chỉ được tải lên sau khi lưu báo cáo và được lưu theo công việc liên quan đã chọn.'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" disabled={disabled} className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" onClick={() => fileInputRef.current?.click()}><Upload className="h-4 w-4" /> Chọn tệp</button>

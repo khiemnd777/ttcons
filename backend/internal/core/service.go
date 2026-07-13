@@ -876,12 +876,256 @@ func normalizeConstructionReportEvidenceIDs(ids []string, primaryID string) []st
 	return values
 }
 
+func normalizeConstructionCheckCriteria(items []ConstructionCheckCriterion) ([]ConstructionCheckCriterion, error) {
+	criteria := make([]ConstructionCheckCriterion, 0, len(items))
+	for _, item := range items {
+		item.Title = strings.TrimSpace(item.Title)
+		item.Criteria = strings.TrimSpace(item.Criteria)
+		if item.Title == "" && item.Criteria == "" {
+			continue
+		}
+		if item.Title == "" {
+			item.Title = item.Criteria
+		}
+		if item.Criteria == "" {
+			item.Criteria = item.Title
+		}
+		criteria = append(criteria, item)
+	}
+	if len(criteria) > 30 {
+		return nil, validationError("Mỗi kiểm tra có tối đa 30 tiêu chí")
+	}
+	return criteria, nil
+}
+
+func normalizeConstructionCheckEvidenceIDs(ids []string, fallbackID string, required bool) ([]string, error) {
+	values := normalizeConstructionReportEvidenceIDs(ids, fallbackID)
+	if len(values) > 10 {
+		return nil, validationError("Mỗi nhóm minh chứng có tối đa 10 ảnh hoặc tệp")
+	}
+	for _, id := range values {
+		if !validActivityUUID(id) {
+			return nil, validationError("Minh chứng kiểm tra không hợp lệ")
+		}
+	}
+	if required && len(values) == 0 {
+		return nil, validationError("Kết quả kiểm tra cần ít nhất một minh chứng")
+	}
+	return values, nil
+}
+
 func constructionReportWorkSummary(done, current, next []string) string {
 	return strings.Join([]string{
 		"Đã làm:\n" + strings.Join(done, "\n"),
 		"Đang làm:\n" + strings.Join(current, "\n"),
 		"Sẽ làm:\n" + strings.Join(next, "\n"),
 	}, "\n\n")
+}
+
+func (s *Service) ProjectConstructionWorkspace(ctx context.Context, projectID string) (Record, error) {
+	projectID = cleanID(projectID)
+	if !validActivityUUID(projectID) {
+		return nil, validationError("Mã công trình không hợp lệ")
+	}
+	return s.repo.ProjectConstructionWorkspace(ctx, projectID)
+}
+
+func (s *Service) CreateConstructionCheckTemplate(ctx context.Context, projectID string, req ConstructionCheckTemplateRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	name := strings.TrimSpace(req.Name)
+	if !validActivityUUID(projectID) || name == "" {
+		return nil, validationError("Mẫu kiểm tra cần tên")
+	}
+	criteria := make([]ConstructionCheckCriterion, 0, len(req.Criteria))
+	for _, item := range req.Criteria {
+		item.Title = strings.TrimSpace(item.Title)
+		item.Criteria = strings.TrimSpace(item.Criteria)
+		if item.Title == "" && item.Criteria == "" {
+			continue
+		}
+		if item.Title == "" {
+			item.Title = item.Criteria
+		}
+		criteria = append(criteria, item)
+	}
+	if len(criteria) == 0 || len(criteria) > 30 {
+		return nil, validationError("Mẫu kiểm tra cần từ 1 đến 30 tiêu chí")
+	}
+	return s.repo.CreateConstructionCheckTemplate(ctx, projectID, name, strings.TrimSpace(req.Description), criteria, actorID, actorName)
+}
+
+func (s *Service) CreateConstructionCheck(ctx context.Context, projectID string, req ConstructionCheckRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	workItemID := cleanID(req.WorkItemID)
+	templateID := cleanID(req.TemplateID)
+	title := strings.TrimSpace(req.Title)
+	if !validActivityUUID(projectID) || !validActivityUUID(workItemID) || title == "" {
+		return nil, validationError("Kiểm tra cần công việc liên quan và nội dung ngắn gọn")
+	}
+	if templateID != "" && !validActivityUUID(templateID) {
+		return nil, validationError("Mẫu kiểm tra không hợp lệ")
+	}
+	scheduledAt, err := constructionOptionalTime(req.ScheduledAt, "Thời điểm kiểm tra")
+	if err != nil {
+		return nil, err
+	}
+	criteria, err := normalizeConstructionCheckCriteria(req.Criteria)
+	if err != nil {
+		return nil, err
+	}
+	contextEvidenceIDs, err := normalizeConstructionCheckEvidenceIDs(req.ContextEvidenceIDs, "", false)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.CreateConstructionCheck(ctx, projectID, workItemID, templateID, title, strings.TrimSpace(req.Location), scheduledAt, criteria, req.Criteria != nil, contextEvidenceIDs, actorID, actorName)
+}
+
+func (s *Service) UpdateConstructionCheck(ctx context.Context, checkID string, req ConstructionCheckUpdateRequest, actorID, actorName string) (Record, error) {
+	checkID = cleanID(checkID)
+	workItemID := cleanID(req.WorkItemID)
+	templateID := cleanID(req.TemplateID)
+	title := strings.TrimSpace(req.Title)
+	if !validActivityUUID(checkID) || !validActivityUUID(workItemID) || title == "" {
+		return nil, validationError("Kiểm tra cần công việc liên quan và nội dung ngắn gọn")
+	}
+	if templateID != "" && !validActivityUUID(templateID) {
+		return nil, validationError("Mẫu kiểm tra không hợp lệ")
+	}
+	scheduledAt, err := constructionOptionalTime(req.ScheduledAt, "Thời điểm kiểm tra")
+	if err != nil {
+		return nil, err
+	}
+	criteria, err := normalizeConstructionCheckCriteria(req.Criteria)
+	if err != nil {
+		return nil, err
+	}
+	contextEvidenceIDs, err := normalizeConstructionCheckEvidenceIDs(req.ContextEvidenceIDs, "", false)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.UpdateConstructionCheck(ctx, checkID, workItemID, templateID, title, strings.TrimSpace(req.Location), scheduledAt, criteria, req.Criteria != nil, contextEvidenceIDs, req.ContextEvidenceIDs != nil, actorID, actorName)
+}
+
+func (s *Service) CompleteConstructionCheck(ctx context.Context, checkID string, req ConstructionCheckCompleteRequest, actorID, actorName string) (Record, error) {
+	checkID = cleanID(checkID)
+	result := strings.TrimSpace(req.Result)
+	if !validActivityUUID(checkID) || !statusIn(result, "pass", "fail") {
+		return nil, validationError("Kết quả kiểm tra cần kết luận Đạt hoặc Không đạt")
+	}
+	evidenceIDs, err := normalizeConstructionCheckEvidenceIDs(req.EvidenceIDs, req.EvidenceID, true)
+	if err != nil {
+		return nil, err
+	}
+	priority := strings.TrimSpace(req.Priority)
+	if priority == "" {
+		priority = "normal"
+	}
+	impactScope := strings.TrimSpace(req.ImpactScope)
+	if impactScope == "" {
+		impactScope = "none"
+	}
+	dueAt := ""
+	if result == "fail" {
+		if !validActivityUUID(cleanID(req.AssignedUserID)) || !statusIn(priority, "normal", "urgent") || !statusIn(impactScope, "none", "timeline", "budget", "design_scope") {
+			return nil, validationError("Việc không đạt cần người phụ trách, mức ưu tiên và ảnh hưởng hợp lệ")
+		}
+		var err error
+		dueAt, err = constructionRequiredTime(req.DueAt, "Hạn xử lý")
+		if err != nil {
+			return nil, err
+		}
+	}
+	return s.repo.CompleteConstructionCheck(ctx, checkID, result, strings.TrimSpace(req.Note), evidenceIDs, strings.TrimSpace(req.ActionTitle), cleanID(req.AssignedUserID), dueAt, impactScope, priority, actorID, actorName)
+}
+
+func (s *Service) CreateConstructionAction(ctx context.Context, projectID string, req ConstructionActionRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	priority := strings.TrimSpace(req.Priority)
+	if priority == "" {
+		priority = "normal"
+	}
+	impactScope := strings.TrimSpace(req.ImpactScope)
+	if impactScope == "" {
+		impactScope = "none"
+	}
+	if !validActivityUUID(projectID) || !validActivityUUID(cleanID(req.WorkItemID)) || strings.TrimSpace(req.Title) == "" ||
+		!validActivityUUID(cleanID(req.AssignedUserID)) || !validActivityUUID(cleanID(req.EvidenceID)) ||
+		!statusIn(priority, "normal", "urgent") || !statusIn(impactScope, "none", "timeline", "budget", "design_scope") {
+		return nil, validationError("Việc cần xử lý cần nội dung, công việc, người phụ trách, ảnh và ảnh hưởng hợp lệ")
+	}
+	dueAt, err := constructionRequiredTime(req.DueAt, "Hạn xử lý")
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.CreateConstructionAction(ctx, projectID, cleanID(req.WorkItemID), strings.TrimSpace(req.Title), strings.TrimSpace(req.Description), priority, cleanID(req.AssignedUserID), dueAt, impactScope, cleanID(req.EvidenceID), actorID, actorName)
+}
+
+func (s *Service) UpdateConstructionAction(ctx context.Context, actionID string, req ConstructionActionUpdateRequest, actorID, actorName string) (Record, error) {
+	actionID = cleanID(actionID)
+	priority := strings.TrimSpace(req.Priority)
+	if priority == "" {
+		priority = "normal"
+	}
+	if !validActivityUUID(actionID) || strings.TrimSpace(req.Title) == "" || !validActivityUUID(cleanID(req.AssignedUserID)) || !statusIn(priority, "normal", "urgent") {
+		return nil, validationError("Việc cần xử lý cần nội dung, người phụ trách và mức ưu tiên hợp lệ")
+	}
+	dueAt, err := constructionRequiredTime(req.DueAt, "Hạn xử lý")
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.UpdateConstructionAction(ctx, actionID, strings.TrimSpace(req.Title), strings.TrimSpace(req.Description), priority, cleanID(req.AssignedUserID), dueAt, actorID, actorName)
+}
+
+func (s *Service) SubmitConstructionActionResolution(ctx context.Context, actionID string, req ConstructionActionResolutionRequest, actorID, actorName string) (Record, error) {
+	actionID = cleanID(actionID)
+	evidenceID := cleanID(req.EvidenceID)
+	if !validActivityUUID(actionID) || !validActivityUUID(evidenceID) {
+		return nil, validationError("Kết quả khắc phục cần một minh chứng")
+	}
+	return s.repo.SubmitConstructionActionResolution(ctx, actionID, evidenceID, strings.TrimSpace(req.Note), actorID, actorName)
+}
+
+func (s *Service) VerifyConstructionAction(ctx context.Context, actionID string, req ConstructionActionVerifyRequest, actorID, actorName string) (Record, error) {
+	actionID = cleanID(actionID)
+	result := strings.TrimSpace(req.Result)
+	comment := strings.TrimSpace(req.Comment)
+	if !validActivityUUID(actionID) || !statusIn(result, "pass", "fail") {
+		return nil, validationError("Kết quả xác nhận phải là Đạt hoặc Chưa đạt")
+	}
+	if result == "fail" && comment == "" {
+		return nil, validationError("Trả lại xử lý cần ghi rõ lý do")
+	}
+	return s.repo.VerifyConstructionAction(ctx, actionID, result, comment, actorID, actorName)
+}
+
+func (s *Service) ApproveConstructionActionImpact(ctx context.Context, actionID, actorID, actorName string) (Record, error) {
+	actionID = cleanID(actionID)
+	if !validActivityUUID(actionID) {
+		return nil, validationError("Việc cần xử lý không hợp lệ")
+	}
+	return s.repo.ApproveConstructionActionImpact(ctx, actionID, actorID, actorName)
+}
+
+func constructionOptionalTime(raw, label string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", nil
+	}
+	if _, err := time.Parse(time.RFC3339, value); err != nil {
+		return "", validationError(label + " không hợp lệ")
+	}
+	return value, nil
+}
+
+func constructionRequiredTime(raw, label string) (string, error) {
+	value, err := constructionOptionalTime(raw, label)
+	if err != nil {
+		return "", err
+	}
+	if value == "" {
+		return "", validationError(label + " là bắt buộc")
+	}
+	return value, nil
 }
 
 func (s *Service) ProjectIssues(ctx context.Context, projectID string) ([]Record, error) {

@@ -2507,6 +2507,149 @@ func (h *Handler) UploadDailyReportEvidence(c *fiber.Ctx) error {
 	}
 	return response.Created(c, row)
 }
+
+func (h *Handler) ProjectConstructionWorkspace(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"operation.view", "quality.view", "rework.view"}); err != nil {
+		return err
+	}
+	workspace, err := h.service.ProjectConstructionWorkspace(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, workspace)
+}
+
+func (h *Handler) CreateConstructionCheckTemplate(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"construction.template.manage"}); err != nil {
+		return err
+	}
+	req := ConstructionCheckTemplateRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu mẫu kiểm tra không hợp lệ")
+	}
+	row, err := h.service.CreateConstructionCheckTemplate(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) CreateConstructionCheck(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"construction.check.request"}); err != nil {
+		return err
+	}
+	req := ConstructionCheckRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu kiểm tra không hợp lệ")
+	}
+	row, err := h.service.CreateConstructionCheck(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) UpdateConstructionCheck(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "construction_checks", c.Params("id"), []string{"construction.check.edit"}); err != nil {
+		return err
+	}
+	req := ConstructionCheckUpdateRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu cập nhật kiểm tra không hợp lệ")
+	}
+	row, err := h.service.UpdateConstructionCheck(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) CompleteConstructionCheck(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "construction_checks", c.Params("id"), []string{"construction.check.perform"}); err != nil {
+		return err
+	}
+	req := ConstructionCheckCompleteRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Kết quả kiểm tra không hợp lệ")
+	}
+	row, err := h.service.CompleteConstructionCheck(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) CreateConstructionAction(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"construction.action.create"}); err != nil {
+		return err
+	}
+	req := ConstructionActionRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu việc cần xử lý không hợp lệ")
+	}
+	row, err := h.service.CreateConstructionAction(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) UpdateConstructionAction(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "construction_action_items", c.Params("id"), []string{"construction.action.edit"}); err != nil {
+		return err
+	}
+	req := ConstructionActionUpdateRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu cập nhật việc cần xử lý không hợp lệ")
+	}
+	row, err := h.service.UpdateConstructionAction(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) SubmitConstructionActionResolution(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "construction_action_items", c.Params("id"), []string{"construction.action.resolve"}); err != nil {
+		return err
+	}
+	req := ConstructionActionResolutionRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Kết quả khắc phục không hợp lệ")
+	}
+	row, err := h.service.SubmitConstructionActionResolution(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) VerifyConstructionAction(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "construction_action_items", c.Params("id"), []string{"construction.action.verify"}); err != nil {
+		return err
+	}
+	req := ConstructionActionVerifyRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Kết quả xác nhận không hợp lệ")
+	}
+	row, err := h.service.VerifyConstructionAction(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) ApproveConstructionActionImpact(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "construction_action_items", c.Params("id"), []string{"construction.action.verify", "replanning.approve"}); err != nil {
+		return err
+	}
+	row, err := h.service.ApproveConstructionActionImpact(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
 func (h *Handler) ProjectIssues(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"operation.view"}); err != nil {
 		return err

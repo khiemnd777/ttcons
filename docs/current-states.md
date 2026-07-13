@@ -1,5 +1,100 @@
 # Current States
 
+## Direct Construction Check Criteria And Evidence
+
+Status: complete
+
+Mục đích chính:
+- Cho phép người dùng tạo một kiểm tra hoàn chỉnh ngay trong một dialog bằng cách nhập tiêu chí trực tiếp và đính kèm ảnh hiện trạng, không bắt buộc tạo mẫu trước.
+
+Will be done:
+- Thêm migration V64 với liên kết nhiều evidence theo vai trò `context`/`result`, backfill evidence kết quả hiện hữu và giữ `construction_checks.evidence_id` làm primary compatibility field.
+- Mở rộng create/update check contract với tiêu chí trực tiếp và context evidence; complete check nhận nhiều result evidence, giữ validation cùng project/work item, status và actor/audit.
+- Đổi form Tạo/Sửa sang tiêu chí inline thêm/xóa, `Nạp từ mẫu` là lựa chọn phụ, ảnh hiện trạng tùy chọn; View tách gallery ảnh hiện trạng và minh chứng kết quả.
+- Giữ RFI-backed check read-only, quyền V63, fail-to-action và handover blocker không đổi.
+- Cập nhật seed/validator/tests và central/backend/frontend/construction/quality mappings; chạy backend format/tests/migration/seed validation, frontend build, API smoke và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu trong lượt triển khai này.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai theo review package này`.
+- Reloaded mandatory central/backend/frontend/construction/quality mappings plus impact-analysis and migration instructions.
+- Confirmed the existing worktree contains the approved V62/V63 construction workspace and will be preserved.
+- Added V64 `construction_check_evidence` with ordered `context`/`result` roles and legacy primary-result backfill; create/edit accepts direct criteria plus optional context evidence, while completion accepts up to 10 result evidence items.
+- Updated the check dialogs so criteria are entered inline, a template only preloads editable rows, create/edit can capture current-state images, and View renders separate current-state and result galleries.
+- Preserved pending RFI edit locks, same-project/work-item evidence validation, fail-to-action behavior and the legacy `construction_checks.evidence_id` primary result field.
+- Extended the Golden construction fixture with one pending current-state image and three result evidence associations; added validator checks and focused normalization tests.
+- Updated central/backend/frontend/root-cause plus construction/quality domain mappings for V64 contracts, ownership and troubleshooting paths.
+- Ran backend format/tests, 64-migration check, fixture check, frontend production build and `git diff --check`: pass; Vite reported only the existing large-chunk advisory.
+- Applied V64 through the custom migration runner (`applied=1 skipped=63`), reloaded only the Golden construction fixture, rebuilt/recreated backend and confirmed the final startup reports `applied=0 skipped=64`.
+- Golden validation returned `GOLDEN_SAMPLE_VALIDATION_PASSED`; authenticated API smoke returned 4 checks, 1 context link, 3 result links and 2 direct criteria on the pending sample, and the typed edit API preserved its criteria/context evidence.
+- Browser verification was skipped because the user did not explicitly request it in this turn.
+
+## Construction Check And Action UI Redesign
+
+Status: complete
+
+Mục đích chính:
+- Giúp người dùng tại công trường tìm nhanh kiểm tra hoặc việc cần xử lý, xem đầy đủ ngữ cảnh/minh chứng/lịch sử, thực hiện đúng hành động tiếp theo và sửa metadata an toàn mà không viết lại kết quả nghiệp vụ.
+
+Will be done:
+- Thiết kế lại List `Kiểm tra` và `Cần xử lý` thành bảng tác nghiệp dense trên desktop, card responsive trên mobile, có search, status queue, bộ lọc, row actions và đầy đủ loading/error/empty/no-result states.
+- Tách shared dialog cho Create/Edit/View; giữ transition `Ghi kết quả`, `Gửi khắc phục`, `Xác nhận` theo trạng thái và permission hiện hữu.
+- Thêm typed update API cho kiểm tra thủ công còn `pending` và action canonical còn `open`; khóa các trường nguồn/minh chứng/ảnh hưởng/trạng thái và các bản ghi technical backfill.
+- Đồng bộ action edit với compatibility issue/rework trong một transaction, ghi actor/audit, giữ nguyên handover blocker và evidence/work-item gates.
+- Thêm permission `construction.check.edit`, `construction.action.edit` bằng migration V63 và cấp cho cùng nhóm role đang có quyền request/create tương ứng.
+- Cập nhật focused tests, Golden validator, central/backend/frontend/construction/quality mappings; chạy backend format/tests, migration/seed validation, frontend build và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu trong lượt triển khai này.
+
+Done:
+- User approved the full review package and Mockup as Text with `OK triển khai`.
+- Reloaded the mandatory central/backend/frontend/construction/quality/workflow maps plus impact-analysis, migration and git workflow instructions.
+- Confirmed the current worktree already contains the approved V62 simplified construction workspace changes; unrelated/current user changes will be preserved.
+- Replaced the compact check/action card grids with operational status queues, search and domain filters, dense desktop tables, mobile cards, overdue/urgent emphasis, row actions and contextual empty/no-result states.
+- Added shared check dialogs for template creation, create/edit/view and evidence-gated pass/fail completion; check detail now shows criteria, context, protected evidence and its linked action.
+- Added shared action dialogs for create/edit/view, resolution submission and verification; action detail now shows immutable source context, before/after protected evidence, impact state and the complete event timeline.
+- Added typed `PUT /construction-checks/:id` and `PUT /construction-actions/:id` routes with project-scoped RBAC, request validation and audit. Pending RFI-backed checks and technical NCR/legacy issue backfills remain read-only.
+- Kept action source/work item/evidence/impact/status immutable; safe metadata changes synchronize linked issue/rework title, description, priority/severity, assignee and due date in one transaction.
+- Added migration V63 with `construction.check.edit` and `construction.action.edit`, restored both permissions in Golden seed resets and granted them to Admin, PM, QA/QC, Supervisor and Construction Team.
+- Added focused editability regression coverage and extended Golden validation for permission/grant counts; updated central/backend/frontend/construction/quality mappings for the new files, routes, helpers and invariants.
+- Ran `cd backend && make fmt`, `make test`, `make migrate-check`, `make seed-fixtures-check`, `make seed-validate`, `cd frontend && npm run build` and `git diff --check`: pass; Vite reported only the existing large-chunk advisory.
+- Built/recreated only the backend container; the custom migration runner reported `applied=1 skipped=62`, and Golden validation returned `GOLDEN_SAMPLE_VALIDATION_PASSED`.
+- Authenticated API smoke confirmed the workspace remains 1 template/4 checks/1 pending/1 completed action/0 active actions, pending manual check edit returns HTTP 200, completed action edit is rejected with `VALIDATION_ERROR`, and the Construction Team receives both new edit permissions.
+- Browser verification was skipped per repository rule because the user did not explicitly request it.
+
+## Simplified Construction Check And Action Workspace
+
+Status: complete
+
+Mục đích chính:
+- Giúp người dùng tại công trường ghi nhận kết quả kiểm tra và xử lý một việc chưa đạt bằng ít thao tác nhất, không phải hiểu hay vận hành trực tiếp ITP, RFI, NCR, rework hoặc replanning.
+
+Will be done:
+- Thay bề mặt chính của `Thi công` bằng ba tab `Nhật ký`, `Kiểm tra`, `Cần xử lý`; bỏ dashboard kỹ thuật và các form ITP/RFI/NCR/rework/replanning khỏi luồng người dùng hiện trường.
+- Thêm contract dữ liệu đơn giản cho mẫu kiểm tra, lần kiểm tra, việc cần xử lý và lịch sử xử lý; giữ liên kết kỹ thuật với dữ liệu cũ để bảo toàn audit và báo cáo.
+- Cho phép hoàn tất kiểm tra bằng `Đạt/Không đạt + ảnh + ghi chú`; kết quả không đạt tự tạo một việc cần xử lý và chỉ hỏi người phụ trách, hạn xử lý, ảnh hưởng.
+- Cho phép việc cần xử lý đi qua ba trạng thái `Cần xử lý -> Chờ xác nhận -> Đã xong`, gồm ảnh khắc phục, xác nhận đạt/không đạt và lịch sử thử lại.
+- Đồng bộ cờ ảnh hưởng với issue/rework/replanning kỹ thuật phía sau và bổ sung action đang mở vào điều kiện sẵn sàng bàn giao.
+- Thêm sample data cho project `30000000-0000-0000-0000-000000000020` với kiểm tra đạt, kiểm tra không đạt đã khắc phục, lịch sử hoàn tất và một kiểm tra đang chờ; không tạo blocker mở trên công trình đã bàn giao.
+- Cập nhật central/backend/frontend/construction/quality mappings; chạy migration check, backend tests, seed validation, frontend build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the full simplified review package and requested implementation plus sample data for project `30000000-0000-0000-0000-000000000020`.
+- Loaded the mandatory central/backend/frontend/construction/quality mappings plus repository architecture, backend, frontend, impact-analysis and database workflow instructions.
+- Confirmed the existing operations page directly exposes technical Quality and Rework workspaces, while legacy project quality/rework routes redirect into those tabs.
+- Confirmed legacy quality, issue, rework and replanning records can remain as technical compatibility links behind one new field-facing model without changing historical rows.
+- Confirmed the target Golden Real project is already handed over, so sample data must contain no open simplified action blocker.
+- Added migration V62 with canonical simplified check templates, checks, action items/events, `construction.*` permissions, technical-history backfill and open-action handover blocking.
+- Added protected workspace/template/check/action APIs with typed validation, same-project/work-item evidence ownership, active-project assignee validation, audit events and atomic compatibility issue/rework/optional replanning synchronization.
+- Replaced the operations quality/issues embeds and technical status cards with `Nhật ký`, `Kiểm tra`, `Cần xử lý`; all field create/result/resolution/verification interactions now use compact shared dialogs and camera/file evidence.
+- Kept legacy global quality/rework consumers and technical API routes available, while project compatibility routes now redirect to `tab=checks|actions`.
+- Added `golden_project_construction.sql` to the seed sequence and loaded project `30000000-0000-0000-0000-000000000020` with one active template, four checks, one resolved action and three action events; the only pending sample is a check, not an action blocker.
+- Updated seed validation for the simplified dataset, `construction.*` role grants, open-action handover invariant, Golden Live untouched state and both terminal rework status spellings used by current code.
+- Applied V62 through the custom migration runner in Docker, loaded only the dedicated construction seed, rebuilt/recreated only backend and confirmed the runner reports 62 migrations.
+- Ran the Golden validator: `GOLDEN_SAMPLE_VALIDATION_PASSED`; authenticated API smoke returned 1 template, 4 checks, 1 pending check, 1 action, 0 open actions and 7 participants.
+- Updated central/backend/frontend/construction/quality mappings for V62 ownership, field terminology, compatibility links and handover impact.
+- Ran `cd backend && make test`, `make migrate-check`, `cd frontend && npm run build`, focused legacy-label searches and `git diff --check`: pass; Vite reported only the existing large-chunk advisory.
+- Browser verification was skipped per repository rule because it was not explicitly requested.
+
 ## Contract Workspace Vietnamese Redesign
 
 Status: complete

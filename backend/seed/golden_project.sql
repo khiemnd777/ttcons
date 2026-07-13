@@ -99,8 +99,8 @@ SET approval_policy_json=jsonb_build_object(
 WHERE template_id='40000000-0000-0000-0000-000000000020';
 
 -- Base seed resets RBAC after migrations have already run. Restore the additive
--- product-grade permissions introduced by V48, V51 and V54 so Golden Live can
--- actually enter Contract, Quality and Handover workspaces.
+-- product-grade permissions introduced by V48, V51, V54, V62 and V63 so Golden Live can
+-- actually enter Contract, Quality, simplified Construction and Handover workspaces.
 INSERT INTO permissions (id,key,name,description,module)
 SELECT gen_random_uuid(),key,name,description,module
 FROM (VALUES
@@ -118,6 +118,14 @@ FROM (VALUES
   ('quality.inspect','Kiểm tra RFI','Thực hiện inspection và quyết định RFI','quality'),
   ('quality.ncr_manage','Quản lý NCR','Root cause, corrective action, reinspection và đóng NCR','quality'),
   ('quality.recurring_manage','Quản lý QA/QC lặp','Tạo lịch, sinh occurrence và hoàn tất occurrence','quality'),
+  ('construction.template.manage','Quản lý mẫu kiểm tra','Tạo và lưu mẫu kiểm tra đơn giản cho công trình','construction'),
+  ('construction.check.request','Tạo lịch kiểm tra','Tạo một lần kiểm tra từ mẫu hoặc nội dung ngắn','construction'),
+  ('construction.check.edit','Chỉnh sửa lịch kiểm tra','Chỉnh sửa kiểm tra thủ công khi chưa ghi nhận kết quả','construction'),
+  ('construction.check.perform','Ghi nhận kết quả kiểm tra','Kết luận đạt hoặc không đạt kèm minh chứng','construction'),
+  ('construction.action.create','Tạo việc cần xử lý','Ghi nhận một việc cần xử lý từ hiện trường','construction'),
+  ('construction.action.edit','Chỉnh sửa việc cần xử lý','Chỉnh sửa nội dung và phân công của việc đang mở','construction'),
+  ('construction.action.resolve','Gửi kết quả khắc phục','Gửi ảnh và ghi chú khắc phục để chờ xác nhận','construction'),
+  ('construction.action.verify','Xác nhận kết quả khắc phục','Xác nhận đạt hoặc trả lại việc cần xử lý','construction'),
   ('handover.verify','Xác minh hồ sơ bàn giao','Xác minh checklist, chứng từ và readiness trước bàn giao','handover')
 ) p(key,name,description,module)
 ON CONFLICT (key) DO UPDATE
@@ -125,7 +133,25 @@ SET name=EXCLUDED.name,description=EXCLUDED.description,module=EXCLUDED.module;
 
 INSERT INTO role_permissions (role_id,permission_id)
 SELECT r.id,p.id FROM roles r CROSS JOIN permissions p
-WHERE r.name='admin' AND p.module IN ('contract','quality')
+WHERE r.name='admin' AND p.module IN ('contract','quality','construction')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id,permission_id)
+SELECT r.id,p.id FROM roles r JOIN permissions p ON p.module='construction'
+WHERE
+  (r.name IN ('pm','qa_qc') AND p.key IN (
+    'construction.template.manage','construction.check.request','construction.check.edit','construction.check.perform',
+    'construction.action.create','construction.action.edit','construction.action.resolve','construction.action.verify'
+  )) OR
+  (r.name='director' AND p.key='construction.action.verify') OR
+  (r.name='supervisor' AND p.key IN (
+    'construction.check.request','construction.check.edit','construction.check.perform',
+    'construction.action.create','construction.action.edit','construction.action.resolve'
+  )) OR
+  (r.name='construction_team' AND p.key IN (
+    'construction.check.request','construction.check.edit',
+    'construction.action.create','construction.action.edit','construction.action.resolve'
+  ))
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id,permission_id)

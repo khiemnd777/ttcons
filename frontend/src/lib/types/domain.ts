@@ -581,6 +581,84 @@ export type QualityWorkspace = {
   participants: Array<{ id: string; full_name: string; email: string }>;
 };
 
+export type ConstructionCheckCriterion = {
+  title: string;
+  criteria?: string;
+  evidence_required?: boolean;
+};
+
+export type ConstructionCheckTemplate = ProjectOperationsRecord & {
+  name: string;
+  description?: string;
+  criteria_jsonb: ConstructionCheckCriterion[];
+  status: 'active' | 'archived';
+};
+
+export type ConstructionCheck = ProjectOperationsRecord & {
+  work_item_id: string;
+  work_item_title?: string;
+  template_id?: string;
+  template_name?: string;
+  title: string;
+  location?: string;
+  criteria_jsonb: ConstructionCheckCriterion[];
+  scheduled_at?: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  result?: 'pass' | 'fail';
+  note?: string;
+  evidence_id?: string;
+  evidence_name?: string;
+  context_evidence: Array<EvidenceRecord & { evidence_role?: 'context'; sort_order?: number }>;
+  result_evidence: Array<EvidenceRecord & { evidence_role?: 'result'; sort_order?: number }>;
+  requested_by_name?: string;
+  checked_by_name?: string;
+  checked_at?: string;
+  technical_rfi_id?: string;
+};
+
+export type ConstructionActionEvent = ProjectOperationsRecord & {
+  event_type: 'created' | 'resolution_submitted' | 'verified_pass' | 'verified_fail' | 'impact_approved';
+  comment?: string;
+  evidence_id?: string;
+  evidence_name?: string;
+  actor_name?: string;
+};
+
+export type ConstructionActionItem = ProjectOperationsRecord & {
+  work_item_id: string;
+  work_item_title?: string;
+  source_check_id?: string;
+  source_check_title?: string;
+  title: string;
+  description?: string;
+  priority: 'normal' | 'urgent';
+  assigned_user_id: string;
+  assigned_user_name?: string;
+  due_at?: string;
+  status: 'open' | 'waiting_confirmation' | 'done' | 'cancelled';
+  impact_scope: 'none' | 'timeline' | 'budget' | 'design_scope';
+  impact_status?: string;
+  before_evidence_id?: string;
+  before_evidence_name?: string;
+  resolution_evidence_id?: string;
+  resolution_evidence_name?: string;
+  resolution_note?: string;
+  retry_count: number;
+  technical_issue_id?: string;
+  technical_ncr_id?: string;
+  technical_rework_id?: string;
+  technical_replanning_id?: string;
+  events: ConstructionActionEvent[];
+};
+
+export type ConstructionWorkspace = {
+  templates: ConstructionCheckTemplate[];
+  checks: ConstructionCheck[];
+  actions: ConstructionActionItem[];
+  work_items: Array<ProjectOperationsRecord & { title: string; status: string; work_type: string }>;
+  participants: Array<{ id: string; full_name: string; email: string }>;
+};
+
 export type WorkItemActivity = ProjectOperationsRecord & {
   work_item_id?: string;
   scope_type?: string;

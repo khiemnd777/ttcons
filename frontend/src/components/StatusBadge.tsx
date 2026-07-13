@@ -9,6 +9,7 @@ const toneByStatus: Record<string, string> = {
   waiting_approval: 'bg-amber-50 text-amber-800 ring-amber-200',
   waiting_review: 'bg-amber-50 text-amber-800 ring-amber-200',
   waiting_evidence: 'bg-violet-50 text-violet-700 ring-violet-200',
+  waiting_confirmation: 'bg-amber-50 text-amber-800 ring-amber-200',
   pending: 'bg-amber-50 text-amber-800 ring-amber-200',
   approved: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   verified: 'bg-emerald-50 text-emerald-700 ring-emerald-200',

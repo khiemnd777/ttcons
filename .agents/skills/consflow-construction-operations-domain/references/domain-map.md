@@ -11,6 +11,7 @@
 ## Routes
 
 - Operations: `/projects/:id/daily-reports`, `/daily-reports/:id`, `/daily-reports/:id/evidence/upload`, `/projects/:id/issues`, `/issues/:id`
+- Simplified field checks/actions: `/projects/:id/construction-workspace`, check-template/check creation, `PUT /construction-checks/:id`, check completion, action create, `PUT /construction-actions/:id`, resolution/verify/impact routes
 - Quality field execution: `/projects/:id/quality`, quality ITP/RFI/NCR/recurring action routes
 - Work items: `/work-items/:id/*`, `/projects/:id/work-items`, `/me/work-items`
 - Evidence: `/work-items/:id/evidence`, `/work-items/:id/evidence/upload`, `/evidence/:id/file|accept|reject`
@@ -18,19 +19,24 @@
 
 ## Tables And Migrations
 
-- `operation_daily_reports`, `issues`, `work_items`, `work_item_activities`
+- `operation_daily_reports`, `construction_check_templates`, `construction_checks`, `construction_check_evidence`, `construction_action_items`, `construction_action_events`, compatibility `issues`/`rework_requests`/`replanning_requests`, `work_items`, `work_item_activities`
 - `quality_itp_plans`, `quality_itp_items`, `quality_inspection_requests`, `quality_ncrs`, `construction_recurring_plans`, `construction_recurring_occurrences`
 - `evidence_records`, `documents`
 - Form-backed site records: `workflow_form_instances`, `workflow_form_answers`, `workflow_form_events`
 - Checklist/report seed forms: `V18`, `V19`, `V20`
 - Evidence/storage migrations: `V6`, `V15`, `V16`
 - Product-grade QA/QC and daily-report bridge migrations: `V51`, `V52`, `V53`
+- Simplified construction migrations: `V62` canonical check/action model, `V63` scoped check/action edit permissions, and `V64` ordered multi-evidence roles for checks
 
 ## Invariants
 
 - Evidence records remain permissioned and checksum-backed.
 - Site daily reports preserve did/will, crew, actual quantity, material usage, and photo evidence when present.
-- The project construction UI is consolidated at `/projects/:id/operations`: status cards lead into `Nhật ký & tiến độ`, `Checklist chất lượng`, and `Vấn đề & khắc phục`. This is a presentation/read-model consolidation only; daily reports, issues, ITP/RFI/NCR, rework, and replanning keep their existing persistence and transitions.
+- The project construction UI at `/projects/:id/operations` is purpose-first: `Nhật ký`, `Kiểm tra`, and `Cần xử lý`. It must not expose ITP/RFI/NCR/rework/replanning forms in the primary field flow.
+- V62 makes the simplified model canonical for field interaction. A check snapshots zero to 30 criteria entered directly in its create/edit dialog; selecting a template only preloads editable rows and never remains a prerequisite. V64 associates up to 10 same-project/work-item, non-rejected evidence records per `context` or `result` role. Completion requires `pass|fail`, at least one result record and an optional note; the first result also remains in `construction_checks.evidence_id` for compatibility. A failed check atomically creates exactly one action from that primary result; manual actions use the same path.
+- Check edit is limited to pending records created in the simplified model; RFI-backed checks remain read-only and must be changed at their QA/QC source. Action edit is limited to open canonical actions; technical NCR/legacy issue backfills remain read-only. Action source, work item, evidence, impact and status are immutable, while title/description/priority/assignee/due date synchronize to linked issue/rework records transactionally and emit audit.
+- Actions transition `open -> waiting_confirmation -> done`. Verification failure returns to `open` and increments `retry_count`; events preserve every resolution/verification attempt. `impact_scope` is one flag and may create a hidden technical replanning link.
+- Technical issue/rework/replanning rows remain synchronized compatibility/audit records. They are not additional forms the field user must complete. Open simplified actions are handover blockers independently of technical rows.
 - The construction timeline maps structured `completed_items.result=done|partial|blocked`, `next_plan_items`, and `blockers` to Đã làm, Đang làm, Sẽ làm, and Vấn đề. Legacy quick reports encode the same three work groups in `work_summary` and must remain readable; an issue record is still distinct from a report blocker.
 - Direct construction report create/update is a typed operations command, not a workflow transition. It persists structured work/resource/blocker data plus legacy summaries, may reference one optional source work item, and may link at most 50 evidence records that belong to that same project/work item, are not rejected and are visible to the actor; it does not create a work item or workflow form instance. Update preserves project/reporter identity and emits audit.
 - The construction-report UI and its user-facing validation label the optional source work item as `Công việc liên quan`; persistence and API contracts continue to use `work_item_id` and the same work-item evidence semantics.
@@ -49,4 +55,4 @@
 
 ## Golden Sample
 
-- `GOLDEN-REAL-001` contains accepted evidence for every executed runtime step, three dated construction reports, subcontractor/client reconciliation, material before/after history and a resolved site issue.
+- `GOLDEN-REAL-001` contains accepted evidence for every executed runtime step, three dated construction reports, one active optional check template, pass/fail/recheck result evidence, one resolved simplified action, one pending check with current-state context evidence, subcontractor/client reconciliation, material before/after history and no open simplified action blocker.

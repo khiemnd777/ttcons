@@ -19,6 +19,7 @@ seed:
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_project.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_project_domains.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_project_closure.sql; \
+		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_project_construction.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_project_finance.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_live_project.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/validate_golden_project.sql; \
@@ -30,6 +31,7 @@ seed:
 			-f seed/golden_project.sql \
 			-f seed/golden_project_domains.sql \
 			-f seed/golden_project_closure.sql \
+			-f seed/golden_project_construction.sql \
 			-f seed/golden_project_finance.sql \
 			-f seed/golden_live_project.sql \
 			-f seed/validate_golden_project.sql; \
