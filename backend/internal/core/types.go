@@ -666,13 +666,14 @@ type ConstructionCheckTemplateRequest struct {
 }
 
 type ConstructionCheckRequest struct {
-	WorkItemID         string                       `json:"work_item_id"`
-	TemplateID         string                       `json:"template_id"`
-	Title              string                       `json:"title"`
-	Location           string                       `json:"location"`
-	ScheduledAt        string                       `json:"scheduled_at"`
-	Criteria           []ConstructionCheckCriterion `json:"criteria"`
-	ContextEvidenceIDs []string                     `json:"context_evidence_ids"`
+	WorkItemID          string                       `json:"work_item_id"`
+	SourceDailyReportID string                       `json:"source_daily_report_id"`
+	TemplateID          string                       `json:"template_id"`
+	Title               string                       `json:"title"`
+	Location            string                       `json:"location"`
+	ScheduledAt         string                       `json:"scheduled_at"`
+	Criteria            []ConstructionCheckCriterion `json:"criteria"`
+	ContextEvidenceIDs  []string                     `json:"context_evidence_ids"`
 }
 
 type ConstructionCheckUpdateRequest struct {
@@ -698,14 +699,15 @@ type ConstructionCheckCompleteRequest struct {
 }
 
 type ConstructionActionRequest struct {
-	WorkItemID     string `json:"work_item_id"`
-	Title          string `json:"title"`
-	Description    string `json:"description"`
-	Priority       string `json:"priority"`
-	AssignedUserID string `json:"assigned_user_id"`
-	DueAt          string `json:"due_at"`
-	ImpactScope    string `json:"impact_scope"`
-	EvidenceID     string `json:"evidence_id"`
+	WorkItemID          string `json:"work_item_id"`
+	SourceDailyReportID string `json:"source_daily_report_id"`
+	Title               string `json:"title"`
+	Description         string `json:"description"`
+	Priority            string `json:"priority"`
+	AssignedUserID      string `json:"assigned_user_id"`
+	DueAt               string `json:"due_at"`
+	ImpactScope         string `json:"impact_scope"`
+	EvidenceID          string `json:"evidence_id"`
 }
 
 type ConstructionActionUpdateRequest struct {

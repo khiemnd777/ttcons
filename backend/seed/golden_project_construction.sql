@@ -2,7 +2,17 @@
 
 BEGIN;
 
+CREATE TEMP TABLE golden_construction_action_cleanup AS
+SELECT technical_issue_id,technical_rework_id,technical_replanning_id
+FROM construction_action_items
+WHERE project_id='30000000-0000-0000-0000-000000000020'
+  AND technical_ncr_id IS NULL
+  AND (technical_issue_id IS NULL OR id <> technical_issue_id);
+
 DELETE FROM construction_action_items WHERE project_id='30000000-0000-0000-0000-000000000020';
+DELETE FROM replanning_requests WHERE id IN (SELECT technical_replanning_id FROM golden_construction_action_cleanup WHERE technical_replanning_id IS NOT NULL);
+DELETE FROM rework_requests WHERE id IN (SELECT technical_rework_id FROM golden_construction_action_cleanup WHERE technical_rework_id IS NOT NULL);
+DELETE FROM issues WHERE id IN (SELECT technical_issue_id FROM golden_construction_action_cleanup WHERE technical_issue_id IS NOT NULL);
 DELETE FROM construction_checks WHERE project_id='30000000-0000-0000-0000-000000000020';
 DELETE FROM construction_check_templates WHERE project_id='30000000-0000-0000-0000-000000000020';
 
@@ -19,7 +29,10 @@ SELECT
   sw.id AS work_item_id,
   evidence.id AS request_evidence_id,
   evidence.id AS inspection_evidence_id,
-  evidence.id AS corrective_evidence_id
+  evidence.id AS corrective_evidence_id,
+  (SELECT id FROM operation_daily_reports WHERE project_id='30000000-0000-0000-0000-000000000020' AND report_date='2026-03-15' ORDER BY created_at,id LIMIT 1) AS report_mep_id,
+  (SELECT id FROM operation_daily_reports WHERE project_id='30000000-0000-0000-0000-000000000020' AND report_date='2026-04-10' ORDER BY created_at,id LIMIT 1) AS report_quality_id,
+  (SELECT id FROM operation_daily_reports WHERE project_id='30000000-0000-0000-0000-000000000020' AND report_date='2026-05-20' ORDER BY created_at,id LIMIT 1) AS report_final_id
 FROM selected_work_item sw
 CROSS JOIN LATERAL (
   SELECT e.id
@@ -29,6 +42,20 @@ CROSS JOIN LATERAL (
   ORDER BY e.created_at,e.id
   LIMIT 1
 ) evidence;
+
+UPDATE operation_daily_reports r
+SET work_item_id=ctx.work_item_id,
+    primary_evidence_id=CASE r.report_date
+      WHEN '2026-05-20'::date THEN ctx.corrective_evidence_id
+      ELSE ctx.inspection_evidence_id
+    END,
+    photos=jsonb_build_array(CASE r.report_date
+      WHEN '2026-05-20'::date THEN ctx.corrective_evidence_id
+      ELSE ctx.inspection_evidence_id
+    END)
+FROM golden_construction_context ctx
+WHERE r.project_id='30000000-0000-0000-0000-000000000020'
+  AND r.report_date IN ('2026-03-15','2026-04-10','2026-05-20');
 
 INSERT INTO construction_check_templates (
   id,project_id,name,description,criteria_jsonb,status,technical_itp_id,created_by,created_at,updated_at
@@ -50,16 +77,17 @@ INSERT INTO construction_check_templates (
 );
 
 INSERT INTO construction_checks (
-  id,project_id,work_item_id,template_id,title,location,criteria_jsonb,scheduled_at,status,result,note,
+  id,project_id,work_item_id,source_daily_report_id,template_id,title,location,criteria_jsonb,scheduled_at,status,result,note,
   evidence_id,requested_by,checked_by,checked_at,technical_rfi_id,created_at,updated_at
 ) SELECT
   x.id,'30000000-0000-0000-0000-000000000020',ctx.work_item_id,
-  '86600000-0000-0000-0000-000000000201',x.title,x.location,x.criteria_jsonb,x.scheduled_at,
+  x.source_daily_report_id,'86600000-0000-0000-0000-000000000201',x.title,x.location,x.criteria_jsonb,x.scheduled_at,
   x.status,x.result,x.note,x.evidence_id,x.requested_by,x.checked_by,x.checked_at,x.technical_rfi_id,x.created_at,x.updated_at
 FROM golden_construction_context ctx
 CROSS JOIN LATERAL (VALUES
   (
     '86700000-0000-0000-0000-000000000201'::uuid,
+    ctx.report_mep_id,
     'Kiểm tra MEP trước đóng trần','Khu A',
     '[{"title":"MEP trước đóng trần","criteria":"Đúng bản vẽ và đủ test continuity","evidence_required":true}]'::jsonb,
     '2026-03-20 09:00+07'::timestamptz,'completed','pass','Đạt theo bản vẽ và test continuity.',
@@ -69,6 +97,7 @@ CROSS JOIN LATERAL (VALUES
   ),
   (
     '86700000-0000-0000-0000-000000000202'::uuid,
+    ctx.report_quality_id,
     'Kiểm tra cao độ trần','Khu B',
     '[{"title":"Cao độ và độ phẳng","criteria":"Sai số không quá 3mm","evidence_required":true}]'::jsonb,
     '2026-04-10 09:00+07'::timestamptz,'completed','fail','Không đạt: lệch cao độ 8mm.',
@@ -78,6 +107,7 @@ CROSS JOIN LATERAL (VALUES
   ),
   (
     '86700000-0000-0000-0000-000000000203'::uuid,
+    ctx.report_quality_id,
     'Tái kiểm cao độ trần sau khắc phục','Khu B',
     '[{"title":"Cao độ và độ phẳng","criteria":"Sai số không quá 3mm","evidence_required":true}]'::jsonb,
     '2026-04-16 09:00+07'::timestamptz,'completed','pass','Đạt: sai số còn 2mm, trong dung sai.',
@@ -87,6 +117,7 @@ CROSS JOIN LATERAL (VALUES
   ),
   (
     '86700000-0000-0000-0000-000000000204'::uuid,
+    ctx.report_final_id,
     'Kiểm tra hoàn thiện trần khu Pantry','Pantry tầng 12',
     '[
       {"title":"Cao độ và độ phẳng","criteria":"Sai số không quá 3mm","evidence_required":true},
@@ -96,7 +127,7 @@ CROSS JOIN LATERAL (VALUES
     NULL,'10000000-0000-0000-0000-000000000006'::uuid,NULL,NULL,NULL,
     '2026-06-11 16:00+07'::timestamptz,'2026-06-11 16:00+07'::timestamptz
   )
-) AS x(id,title,location,criteria_jsonb,scheduled_at,status,result,note,evidence_id,requested_by,checked_by,checked_at,technical_rfi_id,created_at,updated_at);
+) AS x(id,source_daily_report_id,title,location,criteria_jsonb,scheduled_at,status,result,note,evidence_id,requested_by,checked_by,checked_at,technical_rfi_id,created_at,updated_at);
 
 INSERT INTO construction_check_evidence (
   check_id,evidence_id,evidence_role,sort_order,created_by,created_at

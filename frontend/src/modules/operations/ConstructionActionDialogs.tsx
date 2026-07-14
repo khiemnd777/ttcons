@@ -1,17 +1,18 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, Pencil, ShieldCheck, Wrench } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckCircle2, Loader2, Pencil, ShieldCheck, Wrench } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 import { useToast } from '../../components/ToastProvider';
 import { post, put } from '../../lib/api/client';
-import type { ConstructionActionItem, ConstructionCheck, ConstructionWorkspace } from '../../lib/types/domain';
+import type { ConstructionActionItem, ConstructionCheck, ConstructionDailyReportSource, ConstructionWorkspace } from '../../lib/types/domain';
+import { dateText } from '../../lib/utils/format';
 import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
 import { ConstructionEvidenceButton } from './ConstructionEvidenceButton';
 import { FieldBlock, SectionTitle, controlClass, errorSummary, requiredErrors, type FormErrors } from './ConstructionFormControls';
-import { uploadConstructionEvidence } from './constructionWorkspaceApi';
+import { createConstructionAction, uploadConstructionEvidence } from './constructionWorkspaceApi';
 import { actionStatusLabel, dateTimeText, eventLabel, impactLabel, isConstructionActionEditable, optionalISO, toDateTimeInput } from './constructionWorkspaceUtils';
 
 export type ActionDialogState =
-  | { type: 'create' }
+  | { type: 'create'; sourceReport?: ConstructionDailyReportSource }
   | { type: 'edit'; action: ConstructionActionItem }
   | { type: 'view'; action: ConstructionActionItem }
   | { type: 'resolve'; action: ConstructionActionItem }
@@ -33,6 +34,7 @@ type Props = {
   onVerify: (action: ConstructionActionItem) => void;
   onApproveImpact: (action: ConstructionActionItem) => Promise<void>;
   onViewCheck: (check: ConstructionCheck) => void;
+  onViewReport?: (reportId: string) => void;
 };
 
 export function ConstructionActionDialogs(props: Props) {
@@ -43,23 +45,26 @@ export function ConstructionActionDialogs(props: Props) {
   return <ActionViewDialog {...props} action={props.state.action} />;
 }
 
-function ActionFormDialog({ state, projectId, workspace, onClose, onSaved }: Props & { state: { type: 'create' } | { type: 'edit'; action: ConstructionActionItem } }) {
+function ActionFormDialog({ state, projectId, workspace, onClose, onSaved }: Props & { state: { type: 'create'; sourceReport?: ConstructionDailyReportSource } | { type: 'edit'; action: ConstructionActionItem } }) {
   const toast = useToast();
   const action = state.type === 'edit' ? state.action : undefined;
+  const sourceReport = state.type === 'create' ? state.sourceReport : undefined;
   const [values, setValues] = useState({ work_item_id: '', title: '', description: '', assigned_user_id: '', due_at: '', priority: 'normal', impact_scope: 'none' });
+  const [sourceEvidenceId, setSourceEvidenceId] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [uploads, setUploads] = useState<ConstructionEvidenceUploadDraft[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setValues({ work_item_id: action?.work_item_id ?? '', title: action?.title ?? '', description: action?.description ?? '', assigned_user_id: action?.assigned_user_id ?? '', due_at: toDateTimeInput(action?.due_at), priority: action?.priority ?? 'normal', impact_scope: action?.impact_scope ?? 'none' });
+    setValues({ work_item_id: action?.work_item_id ?? sourceReport?.work_item_id ?? '', title: action?.title ?? sourceReport?.suggested_title ?? '', description: action?.description ?? '', assigned_user_id: action?.assigned_user_id ?? '', due_at: toDateTimeInput(action?.due_at), priority: action?.priority ?? 'normal', impact_scope: action?.impact_scope ?? 'none' });
+    setSourceEvidenceId(sourceReport?.primary_evidence_id || sourceReport?.evidence[0]?.id || '');
     setErrors({}); setUploads([]); setSaving(false);
-  }, [action]);
+  }, [action, sourceReport]);
 
   async function save() {
     const fields = [{ name: 'work_item_id', label: 'Công việc liên quan' }, { name: 'title', label: 'Việc cần xử lý' }, { name: 'assigned_user_id', label: 'Người xử lý' }, { name: 'due_at', label: 'Hạn xử lý' }];
     const next = requiredErrors(values, fields);
-    if (!action && !uploads.length) next.evidence = 'Cần ít nhất một ảnh hoặc tệp hiện trạng';
+    if (!action && !uploads.length && !sourceEvidenceId) next.evidence = 'Cần ít nhất một ảnh hoặc tệp hiện trạng';
     setErrors(next);
     if (Object.keys(next).length) {
       toast.warn({ title: 'Chưa đủ thông tin', description: errorSummary(next) });
@@ -71,8 +76,8 @@ function ActionFormDialog({ state, projectId, workspace, onClose, onSaved }: Pro
         await put(`/construction-actions/${action.id}`, { title: values.title.trim(), description: values.description.trim(), priority: values.priority, assigned_user_id: values.assigned_user_id, due_at: optionalISO(values.due_at) });
         toast.success('Đã cập nhật việc cần xử lý');
       } else {
-        const evidenceId = await uploadConstructionEvidence(values.work_item_id, uploads);
-        await post(`/projects/${projectId}/construction-actions`, { work_item_id: values.work_item_id, title: values.title.trim(), description: values.description.trim(), priority: values.priority, assigned_user_id: values.assigned_user_id, due_at: optionalISO(values.due_at), impact_scope: values.impact_scope, evidence_id: evidenceId });
+        const evidenceId = uploads.length ? await uploadConstructionEvidence(values.work_item_id, uploads) : sourceEvidenceId;
+        await createConstructionAction(projectId, { work_item_id: values.work_item_id, source_daily_report_id: sourceReport?.id ?? '', title: values.title.trim(), description: values.description.trim(), priority: values.priority as 'normal' | 'urgent', assigned_user_id: values.assigned_user_id, due_at: optionalISO(values.due_at), impact_scope: values.impact_scope as 'none' | 'timeline' | 'budget' | 'design_scope', evidence_id: evidenceId });
         toast.success('Đã tạo việc cần xử lý');
       }
       await onSaved();
@@ -83,10 +88,11 @@ function ActionFormDialog({ state, projectId, workspace, onClose, onSaved }: Pro
     }
   }
 
-  return <Dialog open title={action ? 'Chỉnh sửa việc cần xử lý' : 'Tạo việc cần xử lý'} description={action ? 'Nguồn phát sinh, công việc, ảnh hưởng và minh chứng được khóa để giữ lịch sử.' : 'Ghi rõ hiện trạng, giao đúng người và đặt hạn xử lý.'} size="xl" onClose={onClose} footer={<FormFooter saving={saving} submitLabel={action ? 'Lưu thay đổi' : 'Tạo việc'} onClose={onClose} onSave={save} />}>
+  return <Dialog open title={action ? 'Chỉnh sửa việc cần xử lý' : 'Tạo việc cần xử lý'} description={action ? 'Nguồn phát sinh, công việc, ảnh hưởng và minh chứng được khóa để giữ lịch sử.' : sourceReport ? 'Việc này sẽ được truy vết trực tiếp về báo cáo hiện trường nguồn.' : 'Ghi rõ hiện trạng, giao đúng người và đặt hạn xử lý.'} size="xl" onClose={onClose} footer={<FormFooter saving={saving} submitLabel={action ? 'Lưu thay đổi' : 'Tạo việc'} onClose={onClose} onSave={save} />}>
     <div className="space-y-5">
+      {sourceReport ? <SourceReportBanner report={sourceReport} /> : null}
       <div><SectionTitle>Thông tin xử lý</SectionTitle><div className="mt-3 grid gap-4 sm:grid-cols-2">
-        <FieldBlock label="Công việc liên quan" required error={errors.work_item_id} helper={action ? 'Không thể đổi sau khi đã tạo.' : undefined}><select disabled={Boolean(action)} className={controlClass(errors.work_item_id, Boolean(action))} value={values.work_item_id} onChange={(event) => change(setValues, setErrors, 'work_item_id', event.target.value)}><option value="">Chọn công việc</option>{workspace.work_items.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></FieldBlock>
+        <FieldBlock label="Công việc liên quan" required error={errors.work_item_id} helper={action ? 'Không thể đổi sau khi đã tạo.' : sourceReport?.work_item_id ? 'Được khóa theo báo cáo nguồn.' : undefined}><select disabled={Boolean(action || sourceReport?.work_item_id)} className={controlClass(errors.work_item_id, Boolean(action || sourceReport?.work_item_id))} value={values.work_item_id} onChange={(event) => change(setValues, setErrors, 'work_item_id', event.target.value)}><option value="">Chọn công việc</option>{workspace.work_items.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></FieldBlock>
         <FieldBlock label="Việc cần xử lý" required error={errors.title}><input className={controlClass(errors.title)} value={values.title} onChange={(event) => change(setValues, setErrors, 'title', event.target.value)} /></FieldBlock>
         <FieldBlock className="sm:col-span-2" label="Mô tả hiện trạng"><textarea rows={3} className={controlClass()} value={values.description} onChange={(event) => change(setValues, setErrors, 'description', event.target.value)} /></FieldBlock>
         <FieldBlock label="Người xử lý" required error={errors.assigned_user_id}><select className={controlClass(errors.assigned_user_id)} value={values.assigned_user_id} onChange={(event) => change(setValues, setErrors, 'assigned_user_id', event.target.value)}><option value="">Chọn người phụ trách</option>{workspace.participants.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}</select></FieldBlock>
@@ -94,12 +100,12 @@ function ActionFormDialog({ state, projectId, workspace, onClose, onSaved }: Pro
         <FieldBlock label="Mức ưu tiên"><select className={controlClass()} value={values.priority} onChange={(event) => change(setValues, setErrors, 'priority', event.target.value)}><option value="normal">Bình thường</option><option value="urgent">Gấp</option></select></FieldBlock>
         <FieldBlock label="Ảnh hưởng" helper={action ? 'Không thể đổi sau khi đã tạo.' : 'Ảnh hưởng sẽ tạo yêu cầu điều chỉnh tương ứng.'}><select disabled={Boolean(action)} className={controlClass(undefined, Boolean(action))} value={values.impact_scope} onChange={(event) => change(setValues, setErrors, 'impact_scope', event.target.value)}><option value="none">Không ảnh hưởng</option><option value="timeline">Tiến độ</option><option value="budget">Chi phí</option><option value="design_scope">Thiết kế / phạm vi</option></select></FieldBlock>
       </div></div>
-      {action ? <div><SectionTitle>Thông tin khóa</SectionTitle><div className="mt-3 grid gap-3 rounded-lg border border-line bg-slate-50 p-4 sm:grid-cols-3"><Detail label="Nguồn" value={action.source_check_title ? `Kiểm tra: ${action.source_check_title}` : 'Ghi nhận hiện trường'} /><Detail label="Ảnh hưởng" value={impactLabel(action.impact_scope)} /><Detail label="Minh chứng" value={action.before_evidence_name || 'Đã lưu theo việc'} /></div></div> : <FieldBlock label="Ảnh / tệp hiện trạng" required error={errors.evidence}><ConstructionEvidenceCapture drafts={uploads} onChange={(next) => { setUploads(next); setErrors((current) => ({ ...current, evidence: '' })); }} hasSource={Boolean(values.work_item_id)} disabled={saving} compact hint="Minh chứng hiện trạng được lưu theo công việc và không thay đổi trong form chỉnh sửa." /></FieldBlock>}
+      {action ? <div><SectionTitle>Thông tin khóa</SectionTitle><div className="mt-3 grid gap-3 rounded-lg border border-line bg-slate-50 p-4 sm:grid-cols-3"><Detail label="Nguồn" value={action.source_check_title ? `Kiểm tra: ${action.source_check_title}` : action.source_report_date ? `Báo cáo: ${dateText(action.source_report_date)}` : 'Ghi nhận hiện trường'} /><Detail label="Ảnh hưởng" value={impactLabel(action.impact_scope)} /><Detail label="Minh chứng" value={action.before_evidence_name || 'Đã lưu theo việc'} /></div></div> : <div className="space-y-4">{sourceReport?.evidence.length ? <FieldBlock label="Minh chứng hiện trạng từ báo cáo" helper="Có thể chọn một minh chứng đã có hoặc tải tệp mới ở bên dưới."><select className={controlClass()} value={sourceEvidenceId} onChange={(event) => { setSourceEvidenceId(event.target.value); setErrors((current) => ({ ...current, evidence: '' })); }}><option value="">Không dùng minh chứng báo cáo</option>{sourceReport.evidence.map((item) => <option key={item.id} value={item.id}>{item.name || item.caption || 'Minh chứng báo cáo'}</option>)}</select></FieldBlock> : null}<FieldBlock label={sourceEvidenceId ? 'Ảnh / tệp mới (tùy chọn)' : 'Ảnh / tệp hiện trạng'} required={!sourceEvidenceId} error={errors.evidence}><ConstructionEvidenceCapture drafts={uploads} onChange={(next) => { setUploads(next); setErrors((current) => ({ ...current, evidence: '' })); }} hasSource={Boolean(values.work_item_id)} disabled={saving} compact hint={sourceEvidenceId ? 'Nếu tải tệp mới, tệp đầu tiên sẽ thay minh chứng đã chọn từ báo cáo.' : 'Minh chứng hiện trạng được lưu theo công việc và không thay đổi trong form chỉnh sửa.'} /></FieldBlock></div>}
     </div>
   </Dialog>;
 }
 
-function ActionViewDialog({ action, workspace, canEdit, canResolve, canVerify, canApproveImpact, onClose, onEdit, onResolve, onVerify, onApproveImpact, onViewCheck }: Props & { action: ConstructionActionItem }) {
+function ActionViewDialog({ action, workspace, canEdit, canResolve, canVerify, canApproveImpact, onClose, onEdit, onResolve, onVerify, onApproveImpact, onViewCheck, onViewReport }: Props & { action: ConstructionActionItem }) {
   const sourceCheck = workspace.checks.find((item) => item.id === action.source_check_id);
   const editable = canEdit && isConstructionActionEditable(action);
   const needsImpactApproval = Boolean(action.technical_replanning_id && action.impact_status !== 'approved' && canApproveImpact);
@@ -114,6 +120,7 @@ function ActionViewDialog({ action, workspace, canEdit, canResolve, canVerify, c
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
       <div className="space-y-5">
         <div><SectionTitle>Mô tả hiện trạng</SectionTitle><p className="mt-3 whitespace-pre-wrap rounded-lg border border-line bg-slate-50 p-4 text-sm leading-6 text-slate-700">{action.description || 'Không có mô tả.'}</p></div>
+        {action.source_daily_report_id ? <div><SectionTitle>Nguồn báo cáo</SectionTitle><button type="button" className="mt-3 flex w-full items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-4 text-left hover:bg-blue-100" onClick={() => onViewReport?.(action.source_daily_report_id!)}><span><span className="block font-semibold text-blue-800">Báo cáo ngày {dateText(action.source_report_date)}</span><span className="mt-1 block text-sm text-blue-700">{action.source_report_link_kind === 'check' ? 'Truy vết qua kiểm tra không đạt' : 'Liên kết trực tiếp từ báo cáo'}</span></span><span className="text-sm font-semibold text-blue-700">Xem báo cáo</span></button></div> : null}
         {sourceCheck ? <div><SectionTitle>Nguồn phát sinh</SectionTitle><button type="button" className="mt-3 flex w-full items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-4 text-left hover:bg-blue-100" onClick={() => onViewCheck(sourceCheck)}><span><span className="block font-semibold text-blue-800">{sourceCheck.title}</span><span className="mt-1 block text-sm text-blue-700">Kết quả: Không đạt · {dateTimeText(sourceCheck.checked_at)}</span></span><span className="text-sm font-semibold text-blue-700">Xem kiểm tra</span></button></div> : null}
         <div><SectionTitle>Minh chứng</SectionTitle><div className="mt-3 grid gap-3 sm:grid-cols-2"><ConstructionEvidenceButton evidenceId={action.before_evidence_id} name={action.before_evidence_name} label="Hiện trạng ban đầu" /><ConstructionEvidenceButton evidenceId={action.resolution_evidence_id} name={action.resolution_evidence_name} label="Kết quả khắc phục" /></div>{action.resolution_note ? <p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">Ghi chú khắc phục: {action.resolution_note}</p> : null}</div>
         <div><SectionTitle>Lịch sử xử lý</SectionTitle><Timeline action={action} /></div>
@@ -130,6 +137,10 @@ function ActionViewDialog({ action, workspace, canEdit, canResolve, canVerify, c
       </aside>
     </div>
   </Dialog>;
+}
+
+function SourceReportBanner({ report }: { report: ConstructionDailyReportSource }) {
+  return <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-white text-blue-600"><CalendarDays className="h-5 w-5" /></span><div><p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Nguồn đã liên kết</p><p className="mt-1 font-semibold text-blue-900">Báo cáo ngày {dateText(report.report_date)}</p><p className="mt-1 text-xs text-blue-700">{report.weather || 'Chưa ghi thời tiết'}{report.evidence.length ? ` · Có ${report.evidence.length} minh chứng có thể tái sử dụng` : ''}</p></div></div>;
 }
 
 function ResolutionDialog({ action, onClose, onSaved }: Props & { action: ConstructionActionItem }) {

@@ -184,11 +184,11 @@ FROM boq_items b WHERE b.project_id='30000000-0000-0000-0000-000000000020';
 
 -- Construction diary shows a realistic time series rather than one summary row.
 INSERT INTO operation_daily_reports (
-  project_id,report_date,reported_by,weather,work_summary,manpower_summary,
+  id,project_id,report_date,reported_by,weather,work_summary,manpower_summary,
   material_usage_summary,issues_summary,progress_percent,photos,structured_json
 ) VALUES
-('30000000-0000-0000-0000-000000000020','2026-03-15','10000000-0000-0000-0000-000000000006','Nắng','Triển khai MEP âm trần khu A và B.','12 thợ MEP, 4 giám sát','Dây Cadivi 820m; ống PVC 160m','Không có sự cố an toàn.',42,'[]','{"areas":["A","B"],"safety":"pass"}'),
-('30000000-0000-0000-0000-000000000020','2026-04-10','10000000-0000-0000-0000-000000000006','Ít mây','Đóng trần, bả và sơn lớp một.','10 thợ trần, 8 thợ sơn','Tấm thạch cao 520 tấm; sơn 42 thùng','Phát hiện một vị trí trần không đạt cao độ, đã mở NCR.',68,'[]','{"areas":["A","B","pantry"],"ncr":"NCR-GOLD-001"}'),
-('30000000-0000-0000-0000-000000000020','2026-05-20','10000000-0000-0000-0000-000000000006','Nắng','Hoàn thiện, vệ sinh và nghiệm thu nội bộ.','6 thợ hoàn thiện, 4 QA/QC','Hoàn tất vật tư; vật tư dư chuyển về kho','NCR đã tái kiểm đạt, không còn blocker.',96,'[]','{"areas":["all"],"quality":"ready_for_acceptance"}');
+('86500000-0000-0000-0000-000000000201','30000000-0000-0000-0000-000000000020','2026-03-15','10000000-0000-0000-0000-000000000006','Nắng','Triển khai MEP âm trần khu A và B.','12 thợ MEP, 4 giám sát','Dây Cadivi 820m; ống PVC 160m','Không có sự cố an toàn.',42,'[]','{"areas":["A","B"],"safety":"pass"}'),
+('86500000-0000-0000-0000-000000000202','30000000-0000-0000-0000-000000000020','2026-04-10','10000000-0000-0000-0000-000000000006','Ít mây','Đóng trần, bả và sơn lớp một.','10 thợ trần, 8 thợ sơn','Tấm thạch cao 520 tấm; sơn 42 thùng','Phát hiện một vị trí trần không đạt cao độ, đã mở NCR.',68,'[]','{"areas":["A","B","pantry"],"ncr":"NCR-GOLD-001"}'),
+('86500000-0000-0000-0000-000000000203','30000000-0000-0000-0000-000000000020','2026-05-20','10000000-0000-0000-0000-000000000006','Nắng','Hoàn thiện, vệ sinh và nghiệm thu nội bộ.','6 thợ hoàn thiện, 4 QA/QC','Hoàn tất vật tư; vật tư dư chuyển về kho','NCR đã tái kiểm đạt, không còn blocker.',96,'[]','{"areas":["all"],"quality":"ready_for_acceptance"}');
 
 COMMIT;

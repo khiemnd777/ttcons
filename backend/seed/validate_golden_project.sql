@@ -105,6 +105,12 @@ BEGIN
   SELECT count(*) INTO actual FROM construction_checks WHERE project_id='30000000-0000-0000-0000-000000000020';
   IF actual <> 4 THEN RAISE EXCEPTION 'Simplified construction checks: expected 4, got %',actual; END IF;
   SELECT count(*) INTO actual
+  FROM construction_checks c
+  JOIN operation_daily_reports r ON r.id=c.source_daily_report_id AND r.project_id=c.project_id
+  WHERE c.project_id='30000000-0000-0000-0000-000000000020'
+    AND (r.work_item_id IS NULL OR r.work_item_id=c.work_item_id);
+  IF actual <> 4 THEN RAISE EXCEPTION 'Daily report to construction check links: expected 4 valid links, got %',actual; END IF;
+  SELECT count(*) INTO actual
   FROM construction_check_evidence ce
   JOIN construction_checks c ON c.id=ce.check_id
   JOIN evidence_records e ON e.id=ce.evidence_id
@@ -117,6 +123,12 @@ BEGIN
   IF actual <> 1 THEN RAISE EXCEPTION 'Pending construction check context evidence: expected 1, got %',actual; END IF;
   SELECT count(*) INTO actual FROM construction_action_items WHERE project_id='30000000-0000-0000-0000-000000000020' AND status='done';
   IF actual <> 1 THEN RAISE EXCEPTION 'Completed simplified construction actions: expected 1, got %',actual; END IF;
+  SELECT count(*) INTO actual
+  FROM construction_action_items a
+  JOIN construction_checks c ON c.id=a.source_check_id
+  JOIN operation_daily_reports r ON r.id=c.source_daily_report_id
+  WHERE a.project_id='30000000-0000-0000-0000-000000000020' AND a.status='done';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Resolved action report trace: expected 1 inherited link, got %',actual; END IF;
 
   SELECT count(*) INTO actual FROM acceptance_records WHERE project_id='30000000-0000-0000-0000-000000000020' AND status='completed' AND result='pass';
   IF actual <> 1 THEN RAISE EXCEPTION 'Final acceptance pass: expected 1, got %',actual; END IF;

@@ -1,19 +1,20 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, Pencil, PlayCircle, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckCircle2, Loader2, Pencil, PlayCircle, Plus, Trash2 } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 import { useToast } from '../../components/ToastProvider';
 import { post, put } from '../../lib/api/client';
-import type { ConstructionActionItem, ConstructionCheck, ConstructionWorkspace } from '../../lib/types/domain';
+import type { ConstructionActionItem, ConstructionCheck, ConstructionDailyReportSource, ConstructionWorkspace } from '../../lib/types/domain';
+import { dateText } from '../../lib/utils/format';
 import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
 import { ConstructionEvidenceButton } from './ConstructionEvidenceButton';
 import { FieldBlock, SectionTitle, controlClass, errorSummary, requiredErrors, type FormErrors } from './ConstructionFormControls';
-import { uploadConstructionEvidenceItems } from './constructionWorkspaceApi';
+import { createConstructionCheck, uploadConstructionEvidenceItems } from './constructionWorkspaceApi';
 import { checkStatusLabel, dateTimeText, optionalISO, toDateTimeInput } from './constructionWorkspaceUtils';
 import { EvidenceGallery } from '../work-items/EvidenceGallery';
 
 export type CheckDialogState =
   | { type: 'template' }
-  | { type: 'create' }
+  | { type: 'create'; sourceReport?: ConstructionDailyReportSource }
   | { type: 'edit'; check: ConstructionCheck }
   | { type: 'view'; check: ConstructionCheck }
   | { type: 'complete'; check: ConstructionCheck }
@@ -30,6 +31,7 @@ type Props = {
   onEdit: (check: ConstructionCheck) => void;
   onComplete: (check: ConstructionCheck) => void;
   onViewAction: (action: ConstructionActionItem) => void;
+  onViewReport?: (reportId: string) => void;
 };
 
 type EditableCriterion = { id: string; text: string };
@@ -78,28 +80,38 @@ function TemplateDialog({ projectId, onClose, onSaved }: Props) {
   </Dialog>;
 }
 
-function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Props & { state: { type: 'create' } | { type: 'edit'; check: ConstructionCheck } }) {
+function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Props & { state: { type: 'create'; sourceReport?: ConstructionDailyReportSource } | { type: 'edit'; check: ConstructionCheck } }) {
   const toast = useToast();
   const check = state.type === 'edit' ? state.check : undefined;
+  const sourceReport = state.type === 'create' ? state.sourceReport : undefined;
   const [values, setValues] = useState({ work_item_id: '', template_id: '', title: '', location: '', scheduled_at: '' });
   const [criteria, setCriteria] = useState<EditableCriterion[]>([]);
   const [existingContext, setExistingContext] = useState<ConstructionCheck['context_evidence']>([]);
+  const [fallbackSourceEvidenceIDs, setFallbackSourceEvidenceIDs] = useState<string[]>([]);
   const [uploads, setUploads] = useState<ConstructionEvidenceUploadDraft[]>([]);
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setValues({ work_item_id: check?.work_item_id ?? '', template_id: check?.template_id ?? '', title: check?.title ?? '', location: check?.location ?? '', scheduled_at: toDateTimeInput(check?.scheduled_at) });
+    setValues({
+      work_item_id: check?.work_item_id ?? sourceReport?.work_item_id ?? '',
+      template_id: check?.template_id ?? '',
+      title: check?.title ?? sourceReport?.suggested_title ?? '',
+      location: check?.location ?? '',
+      scheduled_at: toDateTimeInput(check?.scheduled_at),
+    });
     setCriteria(criteriaRows(check?.criteria_jsonb ?? [], !check));
-    setExistingContext(check?.context_evidence ?? []);
+    setExistingContext(check?.context_evidence ?? sourceReport?.evidence ?? []);
+    setFallbackSourceEvidenceIDs(!check && sourceReport?.primary_evidence_id && !sourceReport.evidence.length ? [sourceReport.primary_evidence_id] : []);
     setUploads([]);
     setErrors({});
     setSaving(false);
-  }, [check]);
+  }, [check, sourceReport]);
 
   function changeWorkItem(workItemID: string) {
-    if (values.work_item_id && values.work_item_id !== workItemID && existingContext.length) {
+    if (values.work_item_id && values.work_item_id !== workItemID && (existingContext.length || fallbackSourceEvidenceIDs.length)) {
       setExistingContext([]);
+      setFallbackSourceEvidenceIDs([]);
       toast.warn({ title: 'Đã gỡ ảnh hiện trạng cũ', description: 'Ảnh hiện trạng phải thuộc cùng công việc; hãy chọn hoặc chụp lại ảnh phù hợp.' });
     }
     change(setValues, setErrors, 'work_item_id', workItemID);
@@ -133,9 +145,10 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
     setSaving(true);
     try {
       const newEvidenceIDs = await uploadConstructionEvidenceItems(values.work_item_id, uploads);
-      const contextEvidenceIDs = [...existingContext.map((item) => item.id), ...newEvidenceIDs];
+      const contextEvidenceIDs = [...new Set([...existingContext.map((item) => item.id), ...fallbackSourceEvidenceIDs, ...newEvidenceIDs])];
       const body = {
         work_item_id: values.work_item_id,
+        source_daily_report_id: sourceReport?.id ?? '',
         template_id: values.template_id,
         title: values.title.trim(),
         location: values.location.trim(),
@@ -144,7 +157,7 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
         context_evidence_ids: contextEvidenceIDs,
       };
       if (check) await put(`/construction-checks/${check.id}`, body);
-      else await post(`/projects/${projectId}/construction-checks`, body);
+      else await createConstructionCheck(projectId, body);
       toast.success(check ? 'Đã cập nhật kiểm tra' : 'Đã tạo kiểm tra');
       await onSaved();
     } catch (error) {
@@ -154,10 +167,11 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
     }
   }
 
-  return <Dialog open title={check ? 'Chỉnh sửa kiểm tra' : 'Tạo kiểm tra'} description={check ? 'Chỉ kiểm tra đang chờ và được tạo tại màn hình này mới có thể chỉnh sửa.' : 'Đặt nội dung, công việc và thời điểm để đội hiện trường có thể thực hiện ngay.'} size="lg" onClose={onClose} footer={<FormFooter saving={saving} submitLabel={check ? 'Lưu thay đổi' : 'Tạo kiểm tra'} onClose={onClose} onSave={save} />}>
+  return <Dialog open title={check ? 'Chỉnh sửa kiểm tra' : 'Tạo kiểm tra'} description={check ? 'Chỉ kiểm tra đang chờ và được tạo tại màn hình này mới có thể chỉnh sửa.' : sourceReport ? 'Kiểm tra này sẽ được truy vết trực tiếp về báo cáo hiện trường nguồn.' : 'Đặt nội dung, công việc và thời điểm để đội hiện trường có thể thực hiện ngay.'} size="lg" onClose={onClose} footer={<FormFooter saving={saving} submitLabel={check ? 'Lưu thay đổi' : 'Tạo kiểm tra'} onClose={onClose} onSave={save} />}>
     <div className="space-y-5">
+      {sourceReport ? <SourceReportBanner report={sourceReport} /> : null}
       <div><SectionTitle>Thông tin kiểm tra</SectionTitle><div className="mt-3 grid gap-4 sm:grid-cols-2">
-        <FieldBlock label="Công việc liên quan" required error={errors.work_item_id}><select className={controlClass(errors.work_item_id)} value={values.work_item_id} onChange={(event) => changeWorkItem(event.target.value)}><option value="">Chọn công việc</option>{workspace.work_items.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></FieldBlock>
+        <FieldBlock label="Công việc liên quan" required error={errors.work_item_id} helper={sourceReport?.work_item_id ? 'Được khóa theo báo cáo nguồn.' : undefined}><select disabled={Boolean(sourceReport?.work_item_id)} className={controlClass(errors.work_item_id, Boolean(sourceReport?.work_item_id))} value={values.work_item_id} onChange={(event) => changeWorkItem(event.target.value)}><option value="">Chọn công việc</option>{workspace.work_items.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></FieldBlock>
         <FieldBlock label="Nội dung kiểm tra" required error={errors.title}><input className={controlClass(errors.title)} value={values.title} onChange={(event) => change(setValues, setErrors, 'title', event.target.value)} /></FieldBlock>
         <FieldBlock label="Vị trí"><input className={controlClass()} value={values.location} onChange={(event) => change(setValues, setErrors, 'location', event.target.value)} placeholder="Ví dụ: Pantry tầng 12" /></FieldBlock>
         <FieldBlock label="Thời điểm dự kiến"><input type="datetime-local" className={controlClass()} value={values.scheduled_at} onChange={(event) => change(setValues, setErrors, 'scheduled_at', event.target.value)} /></FieldBlock>
@@ -167,18 +181,19 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
         <div className="mt-3 space-y-2">{criteria.map((item, index) => <div key={item.id} className="flex items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">{index + 1}</span><input className={controlClass()} value={item.text} onChange={(event) => setCriteria((current) => current.map((row) => row.id === item.id ? { ...row, text: event.target.value } : row))} placeholder="Ví dụ: Cao độ và độ phẳng, sai số không quá 3mm" /><button type="button" className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setCriteria((current) => current.filter((row) => row.id !== item.id))} aria-label={`Xóa tiêu chí ${index + 1}`}><Trash2 className="h-4 w-4" /></button></div>)}</div>
         <button type="button" className="mt-3 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={addCriterion}><Plus className="h-4 w-4" /> Thêm tiêu chí</button>
       </div>
-      <div><SectionTitle>Hình ảnh hiện trạng</SectionTitle><p className="mt-1 text-xs text-slate-500">Không bắt buộc. Ảnh được lưu theo công việc và giúp người kiểm tra hiểu đúng bối cảnh.</p>{existingContext.length ? <ExistingContextEvidence evidence={existingContext} onRemove={(id) => setExistingContext((current) => current.filter((item) => item.id !== id))} /> : null}<div className="mt-3"><ConstructionEvidenceCapture drafts={uploads} onChange={setUploads} hasSource={Boolean(values.work_item_id)} disabled={saving || existingContext.length >= 10} compact maxFiles={10 - existingContext.length} hint="Chụp hoặc chọn tối đa 10 ảnh/tệp hiện trạng; có thể bổ sung hoặc gỡ trước khi lưu." /></div></div>
+      <div><SectionTitle>Hình ảnh hiện trạng</SectionTitle><p className="mt-1 text-xs text-slate-500">Không bắt buộc. Ảnh được lưu theo công việc và giúp người kiểm tra hiểu đúng bối cảnh.</p>{existingContext.length ? <ExistingContextEvidence evidence={existingContext} onRemove={(id) => setExistingContext((current) => current.filter((item) => item.id !== id))} /> : null}{fallbackSourceEvidenceIDs.length ? <div className="mt-3 flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700"><span>Đã dùng minh chứng chính từ báo cáo nguồn.</span><button type="button" className="font-semibold hover:underline" onClick={() => setFallbackSourceEvidenceIDs([])}>Gỡ</button></div> : null}<div className="mt-3"><ConstructionEvidenceCapture drafts={uploads} onChange={setUploads} hasSource={Boolean(values.work_item_id)} disabled={saving || existingContext.length + fallbackSourceEvidenceIDs.length >= 10} compact maxFiles={10 - existingContext.length - fallbackSourceEvidenceIDs.length} hint="Chụp hoặc chọn tối đa 10 ảnh/tệp hiện trạng; có thể bổ sung hoặc gỡ trước khi lưu." /></div></div>
     </div>
   </Dialog>;
 }
 
-function CheckViewDialog({ check, workspace, canEdit, canPerform, onClose, onEdit, onComplete, onViewAction }: Props & { check: ConstructionCheck }) {
+function CheckViewDialog({ check, workspace, canEdit, canPerform, onClose, onEdit, onComplete, onViewAction, onViewReport }: Props & { check: ConstructionCheck }) {
   const linkedAction = workspace.actions.find((item) => item.source_check_id === check.id);
   const canAct = check.status === 'pending' && canPerform;
   const canChange = check.status === 'pending' && !check.technical_rfi_id && canEdit;
   return <Dialog open title={check.title} description={`${checkStatusLabel(check)} · ${check.work_item_title || 'Công việc liên quan'}`} size="xl" onClose={onClose} footer={<div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between"><button type="button" className="rounded-md border border-line px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-white" onClick={onClose}>Đóng</button><div className="flex justify-end gap-2">{canChange ? <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onEdit(check)}><Pencil className="h-4 w-4" /> Chỉnh sửa</button> : null}{canAct ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onComplete(check)}><PlayCircle className="h-4 w-4" /> Ghi kết quả</button> : null}</div></div>}>
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
       <div className="space-y-5">
+        {check.source_daily_report_id ? <div><SectionTitle>Nguồn báo cáo</SectionTitle><button type="button" className="mt-3 flex w-full items-center justify-between rounded-lg border border-blue-200 bg-blue-50 p-4 text-left hover:bg-blue-100" onClick={() => onViewReport?.(check.source_daily_report_id!)}><span><span className="block font-semibold text-blue-800">Báo cáo ngày {dateText(check.source_report_date)}</span><span className="mt-1 block text-sm text-blue-700">{check.source_report_weather || 'Báo cáo hiện trường'} · Liên kết trực tiếp</span></span><span className="text-sm font-semibold text-blue-700">Xem báo cáo</span></button></div> : null}
         <div><SectionTitle>Tiêu chí kiểm tra</SectionTitle><CriteriaList criteria={check.criteria_jsonb} emptyText="Kiểm tra này không có tiêu chí định sẵn." /></div>
         <div><SectionTitle>Kết quả và ghi chú</SectionTitle><div className="mt-3 rounded-lg border border-line bg-slate-50 p-4"><p className="font-semibold text-ink">{checkStatusLabel(check)}</p><p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{check.note || (check.status === 'pending' ? 'Chưa ghi kết quả.' : 'Không có ghi chú.')}</p></div></div>
         <div><SectionTitle>Hình ảnh hiện trạng</SectionTitle><div className="mt-3"><EvidenceGallery evidence={check.context_evidence ?? []} emptyTitle="Chưa có ảnh hiện trạng" showControls={false} /></div></div>
@@ -197,6 +212,10 @@ function CheckViewDialog({ check, workspace, canEdit, canPerform, onClose, onEdi
       </aside>
     </div>
   </Dialog>;
+}
+
+function SourceReportBanner({ report }: { report: ConstructionDailyReportSource }) {
+  return <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-white text-blue-600"><CalendarDays className="h-5 w-5" /></span><div><p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Nguồn đã liên kết</p><p className="mt-1 font-semibold text-blue-900">Báo cáo ngày {dateText(report.report_date)}</p><p className="mt-1 text-xs text-blue-700">{report.weather || 'Chưa ghi thời tiết'}{report.evidence.length ? ` · Dùng lại ${report.evidence.length} minh chứng hiện trạng` : ''}</p></div></div>;
 }
 
 function CompleteCheckDialog({ check, workspace, onClose, onSaved }: Props & { check: ConstructionCheck }) {

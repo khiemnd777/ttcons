@@ -11942,13 +11942,15 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 	checks, err := r.Query(ctx, `
 		SELECT c.*,t.name AS template_name,w.title AS work_item_title,
 			e.name AS evidence_name,e.evidence_type,
-			rq.full_name AS requested_by_name,ck.full_name AS checked_by_name
+			rq.full_name AS requested_by_name,ck.full_name AS checked_by_name,
+			dr.report_date AS source_report_date,dr.weather AS source_report_weather
 		FROM construction_checks c
 		LEFT JOIN construction_check_templates t ON t.id=c.template_id
 		LEFT JOIN work_items w ON w.id=c.work_item_id
 		LEFT JOIN evidence_records e ON e.id=c.evidence_id
 		LEFT JOIN users rq ON rq.id=c.requested_by
 		LEFT JOIN users ck ON ck.id=c.checked_by
+		LEFT JOIN operation_daily_reports dr ON dr.id=c.source_daily_report_id
 		WHERE c.project_id=$1 AND c.status <> 'cancelled'
 		ORDER BY CASE WHEN c.status='pending' THEN 0 ELSE 1 END,c.scheduled_at NULLS LAST,c.created_at DESC
 	`, projectID)
@@ -11992,7 +11994,10 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 	actions, err := r.Query(ctx, `
 		SELECT a.*,w.title AS work_item_title,c.title AS source_check_title,
 			u.full_name AS assigned_user_name,b.name AS before_evidence_name,re.name AS resolution_evidence_name,
-			rp.status AS impact_status
+			rp.status AS impact_status,
+			COALESCE(a.source_daily_report_id,c.source_daily_report_id) AS source_daily_report_id,
+			CASE WHEN a.source_daily_report_id IS NOT NULL THEN 'direct' WHEN c.source_daily_report_id IS NOT NULL THEN 'check' ELSE NULL END AS source_report_link_kind,
+			dr.report_date AS source_report_date,dr.weather AS source_report_weather
 		FROM construction_action_items a
 		LEFT JOIN work_items w ON w.id=a.work_item_id
 		LEFT JOIN construction_checks c ON c.id=a.source_check_id
@@ -12000,6 +12005,7 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 		LEFT JOIN evidence_records b ON b.id=a.before_evidence_id
 		LEFT JOIN evidence_records re ON re.id=a.resolution_evidence_id
 		LEFT JOIN replanning_requests rp ON rp.id=a.technical_replanning_id
+		LEFT JOIN operation_daily_reports dr ON dr.id=COALESCE(a.source_daily_report_id,c.source_daily_report_id)
 		WHERE a.project_id=$1 AND a.status <> 'cancelled'
 		ORDER BY CASE a.status WHEN 'open' THEN 0 WHEN 'waiting_confirmation' THEN 1 ELSE 2 END,
 			a.due_at NULLS LAST,a.created_at DESC
@@ -12072,7 +12078,7 @@ func (r *Repository) CreateConstructionCheckTemplate(ctx context.Context, projec
 	return row, nil
 }
 
-func (r *Repository) CreateConstructionCheck(ctx context.Context, projectID, workItemID, templateID, title, location, scheduledAt string, criteria []ConstructionCheckCriterion, criteriaProvided bool, contextEvidenceIDs []string, actorID, actorName string) (Record, error) {
+func (r *Repository) CreateConstructionCheck(ctx context.Context, projectID, workItemID, sourceDailyReportID, templateID, title, location, scheduledAt string, criteria []ConstructionCheckCriterion, criteriaProvided bool, contextEvidenceIDs []string, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -12085,6 +12091,9 @@ func (r *Repository) CreateConstructionCheck(ctx context.Context, projectID, wor
 	if len(workItems) == 0 {
 		return nil, validationError("Công việc liên quan không thuộc công trình")
 	}
+	if err := validateConstructionSourceReportTx(ctx, tx, projectID, workItemID, sourceDailyReportID); err != nil {
+		return nil, err
+	}
 	criteriaJSON, err := constructionCheckCriteriaJSONTx(ctx, tx, projectID, templateID, criteria, criteriaProvided)
 	if err != nil {
 		return nil, err
@@ -12095,10 +12104,10 @@ func (r *Repository) CreateConstructionCheck(ctx context.Context, projectID, wor
 		}
 	}
 	rows, err := queryTx(ctx, tx, `
-		INSERT INTO construction_checks (project_id,work_item_id,template_id,title,location,criteria_jsonb,scheduled_at,requested_by)
-		VALUES ($1,$2,NULLIF($3,'')::uuid,$4,NULLIF($5,''),$6::jsonb,NULLIF($7,'')::timestamptz,NULLIF($8,'')::uuid)
+		INSERT INTO construction_checks (project_id,work_item_id,source_daily_report_id,template_id,title,location,criteria_jsonb,scheduled_at,requested_by)
+		VALUES ($1,$2,NULLIF($3,'')::uuid,NULLIF($4,'')::uuid,$5,NULLIF($6,''),$7::jsonb,NULLIF($8,'')::timestamptz,NULLIF($9,'')::uuid)
 		RETURNING *
-	`, projectID, workItemID, templateID, title, location, criteriaJSON, scheduledAt, actorID)
+	`, projectID, workItemID, sourceDailyReportID, templateID, title, location, criteriaJSON, scheduledAt, actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -12109,7 +12118,7 @@ func (r *Repository) CreateConstructionCheck(ctx context.Context, projectID, wor
 	if err := replaceConstructionCheckEvidenceTx(ctx, tx, cleanID(row["id"]), "context", contextEvidenceIDs, actorID); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "construction_check_created", "construction_check", cleanID(row["id"]), "Tạo kiểm tra "+title, Record{"work_item_id": workItemID, "template_id": templateID, "scheduled_at": scheduledAt, "criteria_count": len(criteria), "context_evidence_count": len(contextEvidenceIDs)}); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "construction_check_created", "construction_check", cleanID(row["id"]), "Tạo kiểm tra "+title, Record{"work_item_id": workItemID, "source_daily_report_id": sourceDailyReportID, "template_id": templateID, "scheduled_at": scheduledAt, "criteria_count": len(criteria), "context_evidence_count": len(contextEvidenceIDs)}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -12239,7 +12248,7 @@ func (r *Repository) CompleteConstructionCheck(ctx context.Context, checkID, res
 		if actionTitle == "" {
 			actionTitle = "Khắc phục: " + fmt.Sprint(check["title"])
 		}
-		action, err := createConstructionActionTx(ctx, tx, cleanID(check["project_id"]), cleanID(check["work_item_id"]), checkID, actionTitle, note, priority, assignedUserID, dueAt, impactScope, primaryEvidenceID, actorID, actorName)
+		action, err := createConstructionActionTx(ctx, tx, cleanID(check["project_id"]), cleanID(check["work_item_id"]), "", checkID, actionTitle, note, priority, assignedUserID, dueAt, impactScope, primaryEvidenceID, actorID, actorName)
 		if err != nil {
 			return nil, err
 		}
@@ -12254,13 +12263,13 @@ func (r *Repository) CompleteConstructionCheck(ctx context.Context, checkID, res
 	return responseRow, nil
 }
 
-func (r *Repository) CreateConstructionAction(ctx context.Context, projectID, workItemID, title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName string) (Record, error) {
+func (r *Repository) CreateConstructionAction(ctx context.Context, projectID, workItemID, sourceDailyReportID, title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	action, err := createConstructionActionTx(ctx, tx, projectID, workItemID, "", title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName)
+	action, err := createConstructionActionTx(ctx, tx, projectID, workItemID, sourceDailyReportID, "", title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName)
 	if err != nil {
 		return nil, err
 	}
@@ -12337,13 +12346,16 @@ func constructionActionEditable(action Record) bool {
 	return issueID == "" || cleanID(action["id"]) != issueID
 }
 
-func createConstructionActionTx(ctx context.Context, tx *sql.Tx, projectID, workItemID, sourceCheckID, title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName string) (Record, error) {
+func createConstructionActionTx(ctx context.Context, tx *sql.Tx, projectID, workItemID, sourceDailyReportID, sourceCheckID, title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName string) (Record, error) {
 	workItems, err := queryTx(ctx, tx, `SELECT id,run_node_id FROM work_items WHERE id=$1 AND project_id=$2 AND status <> 'cancelled'`, workItemID, projectID)
 	if err != nil {
 		return nil, err
 	}
 	if len(workItems) == 0 {
 		return nil, validationError("Công việc liên quan không thuộc công trình")
+	}
+	if err := validateConstructionSourceReportTx(ctx, tx, projectID, workItemID, sourceDailyReportID); err != nil {
+		return nil, err
 	}
 	if err := validateConstructionEvidenceTx(ctx, tx, projectID, workItemID, evidenceID); err != nil {
 		return nil, err
@@ -12387,11 +12399,11 @@ func createConstructionActionTx(ctx context.Context, tx *sql.Tx, projectID, work
 	}
 	actions, err := queryTx(ctx, tx, `
 		INSERT INTO construction_action_items (
-			project_id,work_item_id,source_check_id,title,description,priority,assigned_user_id,due_at,status,
+			project_id,work_item_id,source_daily_report_id,source_check_id,title,description,priority,assigned_user_id,due_at,status,
 			impact_scope,before_evidence_id,technical_issue_id,technical_rework_id,technical_replanning_id,created_by
-		) VALUES ($1,$2,NULLIF($3,'')::uuid,$4,NULLIF($5,''),$6,$7,$8::timestamptz,'open',$9,$10,$11,$12,NULLIF($13,'')::uuid,NULLIF($14,'')::uuid)
+		) VALUES ($1,$2,NULLIF($3,'')::uuid,NULLIF($4,'')::uuid,$5,NULLIF($6,''),$7,$8,$9::timestamptz,'open',$10,$11,$12,$13,NULLIF($14,'')::uuid,NULLIF($15,'')::uuid)
 		RETURNING *
-	`, projectID, workItemID, sourceCheckID, title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, issue["id"], reworks[0]["id"], replanningID, actorID)
+	`, projectID, workItemID, sourceDailyReportID, sourceCheckID, title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, issue["id"], reworks[0]["id"], replanningID, actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -12402,10 +12414,32 @@ func createConstructionActionTx(ctx context.Context, tx *sql.Tx, projectID, work
 	`, action["id"], description, evidenceID, actorID); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "construction_action_created", "construction_action", cleanID(action["id"]), "Tạo việc cần xử lý "+title, Record{"work_item_id": workItemID, "source_check_id": sourceCheckID, "impact_scope": impactScope, "technical_issue_id": issue["id"], "technical_rework_id": reworks[0]["id"], "technical_replanning_id": replanningID}); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "construction_action_created", "construction_action", cleanID(action["id"]), "Tạo việc cần xử lý "+title, Record{"work_item_id": workItemID, "source_daily_report_id": sourceDailyReportID, "source_check_id": sourceCheckID, "impact_scope": impactScope, "technical_issue_id": issue["id"], "technical_rework_id": reworks[0]["id"], "technical_replanning_id": replanningID}); err != nil {
 		return nil, err
 	}
 	return action, nil
+}
+
+func validateConstructionSourceReportTx(ctx context.Context, tx *sql.Tx, projectID, workItemID, sourceDailyReportID string) error {
+	if sourceDailyReportID == "" {
+		return nil
+	}
+	reports, err := queryTx(ctx, tx, `
+		SELECT id,work_item_id
+		FROM operation_daily_reports
+		WHERE id=$1 AND project_id=$2
+	`, sourceDailyReportID, projectID)
+	if err != nil {
+		return err
+	}
+	if len(reports) == 0 {
+		return validationError("Báo cáo nguồn không thuộc công trình")
+	}
+	reportWorkItemID := cleanID(reports[0]["work_item_id"])
+	if reportWorkItemID != "" && reportWorkItemID != workItemID {
+		return validationError("Báo cáo nguồn và bản ghi hiện trường phải cùng công việc")
+	}
+	return nil
 }
 
 func constructionProjectParticipantStaffIDTx(ctx context.Context, tx *sql.Tx, projectID, assignedUserID string) (string, error) {

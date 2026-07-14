@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CalendarDays,
@@ -10,40 +10,61 @@ import {
   ExternalLink,
   FileText,
   Hammer,
+  Link2,
   Package,
   Pencil,
   RefreshCw,
   Upload,
   Users,
+  Wrench,
 } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
+import { useToast } from '../../components/ToastProvider';
 import { get } from '../../lib/api/client';
-import type { ProjectEvidencePage, ProjectOperationsResponse, WorkItem } from '../../lib/types/domain';
+import type { ConstructionActionItem, ConstructionCheck, ConstructionWorkspace, EvidenceRecord, ProjectEvidencePage, ProjectOperationsResponse, WorkItem } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { EvidenceGallery } from '../work-items/EvidenceGallery';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
+import { ConstructionReportLinkedComposer, type ReportLinkedDraft } from './ConstructionReportLinkedComposer';
+import { createConstructionAction, createConstructionCheck, uploadConstructionEvidenceItems } from './constructionWorkspaceApi';
 import { constructionReportViewModel } from './constructionReportViewModel';
+import { actionStatusLabel, checkStatusLabel, dateTimeText, optionalISO } from './constructionWorkspaceUtils';
 
 type ConstructionReportDetailDialogProps = {
   open: boolean;
   projectId: string;
   record: Record<string, any> | null;
   canManage?: boolean;
+  canViewLinked?: boolean;
+  canCreateCheck?: boolean;
+  canCreateAction?: boolean;
+  initialLinkedDrafts?: ReportLinkedDraft[];
+  linkedNotice?: string;
   onEdit?: () => void;
   onAddEvidence?: () => void;
+  onOpenCheck?: (check: ConstructionCheck) => void;
+  onOpenAction?: (action: ConstructionActionItem) => void;
   onClose: () => void;
 };
 
-export function ConstructionReportDetailDialog({ open, projectId, record, canManage = false, onEdit, onAddEvidence, onClose }: ConstructionReportDetailDialogProps) {
+export function ConstructionReportDetailDialog({ open, projectId, record, canManage = false, canViewLinked = false, canCreateCheck = false, canCreateAction = false, initialLinkedDrafts, linkedNotice, onEdit, onAddEvidence, onOpenCheck, onOpenAction, onClose }: ConstructionReportDetailDialogProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [linkedDrafts, setLinkedDrafts] = useState<ReportLinkedDraft[]>([]);
   const report = useMemo(() => constructionReportViewModel(record ?? {}), [record]);
   const evidenceKey = report.evidenceIds.join(',');
   const sourceExists = Boolean(report.workItemId || report.workflowFormInstanceId);
   const manualReport = !report.workflowFormInstanceId;
+
+  useEffect(() => {
+    if (!open) return;
+    setLinkedDrafts(initialLinkedDrafts ?? []);
+  }, [initialLinkedDrafts, open, record?.id]);
 
   const operations = useQuery({
     queryKey: ['project-operations', projectId, 'full'],
@@ -69,6 +90,59 @@ export function ConstructionReportDetailDialog({ open, projectId, record, canMan
     enabled: open && Boolean(projectId) && report.evidenceIds.length > 0,
     retry: false,
   });
+  const workspace = useQuery({
+    queryKey: ['construction-workspace', projectId],
+    queryFn: () => get<ConstructionWorkspace>(`/projects/${projectId}/construction-workspace`),
+    enabled: open && Boolean(projectId) && canViewLinked,
+    retry: false,
+  });
+  const relatedChecks = useMemo(
+    () => (workspace.data?.checks ?? []).filter((item) => item.source_daily_report_id === record?.id),
+    [record?.id, workspace.data?.checks],
+  );
+  const relatedActions = useMemo(
+    () => (workspace.data?.actions ?? []).filter((item) => item.source_daily_report_id === record?.id),
+    [record?.id, workspace.data?.actions],
+  );
+  async function createLinkedDraft(draft: ReportLinkedDraft) {
+    const workItemId = report.workItemId || draft.work_item_id;
+    try {
+      const uploadedEvidenceIDs = draft.uploads.length ? await uploadConstructionEvidenceItems(workItemId, draft.uploads) : [];
+      const reportEvidenceIDs = report.evidenceIds;
+      if (draft.kind === 'check') {
+        await createConstructionCheck(projectId, {
+          work_item_id: workItemId,
+          source_daily_report_id: String(record?.id ?? ''),
+          title: draft.title.trim(),
+          location: draft.location.trim(),
+          scheduled_at: optionalISO(draft.scheduled_at),
+          criteria: draft.criteria_text.split('\n').map((line) => line.trim()).filter(Boolean).map((title) => ({ title, criteria: title, evidence_required: true })),
+          context_evidence_ids: [...new Set([...reportEvidenceIDs, ...uploadedEvidenceIDs])],
+        });
+        toast.success('Đã tạo kiểm tra ngay trong báo cáo');
+      } else {
+        const evidenceId = uploadedEvidenceIDs[0] || draft.evidence_id || String(record?.primary_evidence_id ?? '') || reportEvidenceIDs[0] || '';
+        if (!evidenceId) throw new Error('Việc xử lý chưa có minh chứng hiện trạng');
+        await createConstructionAction(projectId, {
+          work_item_id: workItemId,
+          source_daily_report_id: String(record?.id ?? ''),
+          title: draft.title.trim(),
+          description: draft.description.trim(),
+          priority: draft.priority,
+          assigned_user_id: draft.assigned_user_id,
+          due_at: optionalISO(draft.due_at),
+          impact_scope: draft.impact_scope,
+          evidence_id: evidenceId,
+        });
+        toast.success('Đã tạo việc xử lý ngay trong báo cáo');
+      }
+      await queryClient.invalidateQueries({ queryKey: ['construction-workspace', projectId] });
+      await workspace.refetch();
+    } catch (error) {
+      toast.error(draft.kind === 'check' ? 'Không tạo được kiểm tra' : 'Không tạo được việc xử lý', error);
+      throw error;
+    }
+  }
 
   function openSource() {
     if (!report.workItemId) return;
@@ -109,54 +183,85 @@ export function ConstructionReportDetailDialog({ open, projectId, record, canMan
           </div>
         </section>
 
-        <section aria-labelledby="report-work-heading">
-          <SectionHeading id="report-work-heading" icon={<Hammer className="h-4 w-4" />} title="Công việc trong ngày" description="Đọc từ trái sang phải để nắm kết quả và bước tiếp theo." />
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <WorkGroup title="Đã làm" items={report.done} tone="green" empty="Chưa ghi hạng mục hoàn tất" />
-            <WorkGroup title="Đang làm" items={report.current} tone="blue" empty="Không có hạng mục dở dang" />
-            <WorkGroup title="Sẽ làm" items={report.next} tone="slate" empty="Chưa ghi kế hoạch tiếp theo" />
-            <WorkGroup title="Blocker cần xử lý" items={report.blockers} tone="red" empty="Không có blocker cần xử lý" />
-          </div>
-        </section>
+        <div className={canViewLinked ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_23rem]' : ''}>
+          <div className="space-y-5">
+            <section aria-labelledby="report-work-heading">
+              <SectionHeading id="report-work-heading" icon={<Hammer className="h-4 w-4" />} title="Công việc trong ngày" description="Đọc từ trái sang phải để nắm kết quả và bước tiếp theo." />
+              <div className="mt-3 grid gap-3 md:grid-cols-2"><WorkGroup title="Đã làm" items={report.done} tone="green" empty="Chưa ghi hạng mục hoàn tất" /><WorkGroup title="Đang làm" items={report.current} tone="blue" empty="Không có hạng mục dở dang" /><WorkGroup title="Sẽ làm" items={report.next} tone="slate" empty="Chưa ghi kế hoạch tiếp theo" /><WorkGroup title="Blocker cần xử lý" items={report.blockers} tone="red" empty="Không có blocker cần xử lý" /></div>
+            </section>
 
-        <section aria-labelledby="report-resource-heading">
-          <SectionHeading id="report-resource-heading" icon={<Users className="h-4 w-4" />} title="Nguồn lực sử dụng" description="Nhân công và vật tư đã ghi nhận trong ca thi công." />
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <ResourceCard icon={<Users className="h-4 w-4" />} title="Nhân công / tổ đội" items={report.crew} empty="Chưa ghi nhân công hoặc tổ đội" />
-            <ResourceCard icon={<Package className="h-4 w-4" />} title="Vật tư sử dụng" items={report.materials} empty="Chưa ghi vật tư sử dụng" />
-          </div>
-        </section>
+            <section aria-labelledby="report-resource-heading"><SectionHeading id="report-resource-heading" icon={<Users className="h-4 w-4" />} title="Nguồn lực sử dụng" description="Nhân công và vật tư đã ghi nhận trong ca thi công." /><div className="mt-3 grid gap-3 md:grid-cols-2"><ResourceCard icon={<Users className="h-4 w-4" />} title="Nhân công / tổ đội" items={report.crew} empty="Chưa ghi nhân công hoặc tổ đội" /><ResourceCard icon={<Package className="h-4 w-4" />} title="Vật tư sử dụng" items={report.materials} empty="Chưa ghi vật tư sử dụng" /></div></section>
 
-        <section aria-labelledby="report-note-heading">
-          <SectionHeading id="report-note-heading" icon={<FileText className="h-4 w-4" />} title="Ghi chú hiện trường" description="Thông tin bổ sung; không được tính là blocker nếu báo cáo không khai báo blocker có cấu trúc." />
-          <div className="mt-3 rounded-lg border border-line bg-slate-50 p-4">
-            {report.fieldNotes.length ? <ItemList items={report.fieldNotes} bulletClass="bg-slate-400" /> : <p className="text-sm italic text-slate-500">Không có ghi chú hiện trường.</p>}
-          </div>
-        </section>
+            <section aria-labelledby="report-note-heading"><SectionHeading id="report-note-heading" icon={<FileText className="h-4 w-4" />} title="Ghi chú hiện trường" description="Thông tin bổ sung; không được tính là blocker nếu báo cáo không khai báo blocker có cấu trúc." /><div className="mt-3 rounded-lg border border-line bg-slate-50 p-4">{report.fieldNotes.length ? <ItemList items={report.fieldNotes} bulletClass="bg-slate-400" /> : <p className="text-sm italic text-slate-500">Không có ghi chú hiện trường.</p>}</div></section>
 
-        <section aria-labelledby="report-evidence-heading">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><SectionHeading id="report-evidence-heading" icon={<ClipboardList className="h-4 w-4" />} title={`Minh chứng · ${report.evidenceIds.length}`} description="Ảnh và tài liệu được liên kết trực tiếp với báo cáo." />{manualReport && canManage && onAddEvidence ? <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={onAddEvidence}><Upload className="h-4 w-4" /> Thêm minh chứng</button> : null}</div>
-          <div className="mt-3">
-            {!report.evidenceIds.length ? <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5"><EmptyState title="Chưa có minh chứng liên kết với báo cáo này" /></div> : null}
-            {report.evidenceIds.length && evidence.isLoading ? <LoadingSpinner label="Đang tải minh chứng báo cáo..." /> : null}
-            {report.evidenceIds.length && evidence.isError ? <InlineError message="Không tải được minh chứng đã liên kết." onRetry={() => evidence.refetch()} /> : null}
-            {report.evidenceIds.length && evidence.isSuccess ? <EvidenceGallery evidence={evidence.data} showControls={false} showWorkItem variant="cards" emptyTitle="Không tìm thấy minh chứng trong phạm vi truy cập" /> : null}
-          </div>
-        </section>
+            <section aria-labelledby="report-evidence-heading"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><SectionHeading id="report-evidence-heading" icon={<ClipboardList className="h-4 w-4" />} title={`Minh chứng · ${report.evidenceIds.length}`} description="Ảnh và tài liệu được liên kết trực tiếp với báo cáo." />{manualReport && canManage && onAddEvidence ? <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={onAddEvidence}><Upload className="h-4 w-4" /> Thêm minh chứng</button> : null}</div><div className="mt-3">{!report.evidenceIds.length ? <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5"><EmptyState title="Chưa có minh chứng liên kết với báo cáo này" /></div> : null}{report.evidenceIds.length && evidence.isLoading ? <LoadingSpinner label="Đang tải minh chứng báo cáo..." /> : null}{report.evidenceIds.length && evidence.isError ? <InlineError message="Không tải được minh chứng đã liên kết." onRetry={() => evidence.refetch()} /> : null}{report.evidenceIds.length && evidence.isSuccess ? <EvidenceGallery evidence={evidence.data} showControls={false} showWorkItem variant="cards" emptyTitle="Không tìm thấy minh chứng trong phạm vi truy cập" /> : null}</div></section>
 
-        {sourceExists ? (
-          <section aria-labelledby="report-source-heading">
-            <SectionHeading id="report-source-heading" icon={<ClipboardList className="h-4 w-4" />} title="Nguồn báo cáo" description="Truy vết báo cáo về đầu việc và biểu mẫu quy trình đã tạo ra dữ liệu." />
-            <div className="mt-3 rounded-lg border border-line bg-white p-4">
-              {report.workItemId && operations.isLoading ? <LoadingSpinner label="Đang tải công việc liên quan..." /> : null}
-              {report.workItemId && operations.isError ? <InlineError message="Không tải được thông tin công việc; vẫn có thể mở công việc bằng liên kết đã lưu." onRetry={() => operations.refetch()} /> : null}
-              {!operations.isLoading && !operations.isError ? <SourceSummary workItem={workItem} workItemId={report.workItemId} workflowFormInstanceId={report.workflowFormInstanceId} onOpen={report.workItemId ? openSource : undefined} /> : null}
-            </div>
-          </section>
-        ) : null}
+            {sourceExists ? <section aria-labelledby="report-source-heading"><SectionHeading id="report-source-heading" icon={<ClipboardList className="h-4 w-4" />} title="Nguồn báo cáo" description="Truy vết báo cáo về đầu việc và biểu mẫu quy trình đã tạo ra dữ liệu." /><div className="mt-3 rounded-lg border border-line bg-white p-4">{report.workItemId && operations.isLoading ? <LoadingSpinner label="Đang tải công việc liên quan..." /> : null}{report.workItemId && operations.isError ? <InlineError message="Không tải được thông tin công việc; vẫn có thể mở công việc bằng liên kết đã lưu." onRetry={() => operations.refetch()} /> : null}{!operations.isLoading && !operations.isError ? <SourceSummary workItem={workItem} workItemId={report.workItemId} workflowFormInstanceId={report.workflowFormInstanceId} onOpen={report.workItemId ? openSource : undefined} /> : null}</div></section> : null}
+          </div>
+
+          {canViewLinked ? <RelatedConstructionSection loading={workspace.isLoading} error={workspace.error} workspace={workspace.data} checks={relatedChecks} actions={relatedActions} blockers={report.blockers} drafts={linkedDrafts} sourceWorkItemId={report.workItemId} reportEvidence={evidence.data ?? []} reportEvidencePending={Boolean(report.evidenceIds.length && !evidence.data?.length)} primaryEvidenceId={String(record?.primary_evidence_id ?? '')} canCreateCheck={canCreateCheck} canCreateAction={canCreateAction} linkedNotice={linkedDrafts.length ? linkedNotice : undefined} onDraftsChange={setLinkedDrafts} onSubmitDraft={createLinkedDraft} onRetry={() => workspace.refetch()} onOpenCheck={(check) => onOpenCheck?.(check)} onOpenAction={(action) => onOpenAction?.(action)} /> : null}
+        </div>
       </div>
     </Dialog>
   );
+}
+
+function RelatedConstructionSection({ loading, error, workspace, checks, actions, blockers, drafts, sourceWorkItemId, reportEvidence, reportEvidencePending, primaryEvidenceId, canCreateCheck, canCreateAction, linkedNotice, onDraftsChange, onSubmitDraft, onRetry, onOpenCheck, onOpenAction }: {
+  loading: boolean;
+  error: unknown;
+  workspace?: ConstructionWorkspace;
+  checks: ConstructionCheck[];
+  actions: ConstructionActionItem[];
+  blockers: string[];
+  drafts: ReportLinkedDraft[];
+  sourceWorkItemId: string;
+  reportEvidence: EvidenceRecord[];
+  reportEvidencePending: boolean;
+  primaryEvidenceId: string;
+  canCreateCheck: boolean;
+  canCreateAction: boolean;
+  linkedNotice?: string;
+  onDraftsChange: Dispatch<SetStateAction<ReportLinkedDraft[]>>;
+  onSubmitDraft: (draft: ReportLinkedDraft) => Promise<void>;
+  onRetry: () => void;
+  onOpenCheck: (check: ConstructionCheck) => void;
+  onOpenAction: (action: ConstructionActionItem) => void;
+}) {
+  const checkIDs = new Set(checks.map((item) => item.id));
+  const directActions = actions.filter((item) => !item.source_check_id || !checkIDs.has(item.source_check_id));
+  return <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+    <section aria-labelledby="report-linked-construction-heading" className="rounded-lg border border-line bg-slate-50/70 p-4">
+      <SectionHeading id="report-linked-construction-heading" icon={<Link2 className="h-4 w-4" />} title="Chuỗi liên quan" description="Kiểm tra, xử lý và kết quả khắc phục của báo cáo." />
+      <div className="mt-3">
+      {loading ? <LoadingSpinner label="Đang tải kiểm tra và việc xử lý liên quan..." /> : null}
+      {error ? <InlineError message="Không tải được chuỗi kiểm tra và xử lý liên quan." onRetry={onRetry} /> : null}
+      {!loading && !error && !checks.length && !actions.length ? <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4"><EmptyState title="Chưa có kiểm tra hoặc việc xử lý" /></div> : null}
+      {!loading && !error && (checks.length || actions.length) ? <div className="space-y-3">
+        {checks.map((check) => {
+          const childActions = actions.filter((item) => item.source_check_id === check.id);
+          return <article key={check.id} className="overflow-hidden rounded-lg border border-blue-200 bg-white">
+            <button type="button" className="flex w-full items-start justify-between gap-4 bg-blue-50 px-4 py-3 text-left hover:bg-blue-100" onClick={() => onOpenCheck(check)}><span className="min-w-0"><span className="block font-semibold text-blue-900">{check.title}</span><span className="mt-1 block text-xs text-blue-700">{check.location || check.work_item_title || 'Kiểm tra hiện trường'} · {dateTimeText(check.scheduled_at || check.checked_at)}</span></span><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${check.result === 'fail' ? 'bg-rose-100 text-rose-700' : check.result === 'pass' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{checkStatusLabel(check)}</span></button>
+            {childActions.length ? <div className="space-y-2 border-t border-blue-100 p-3">{childActions.map((action) => <LinkedActionRow key={action.id} action={action} onOpen={() => onOpenAction(action)} nested />)}</div> : null}
+          </article>;
+        })}
+        {directActions.map((action) => <LinkedActionRow key={action.id} action={action} onOpen={() => onOpenAction(action)} />)}
+      </div> : null}
+      </div>
+    </section>
+    <ConstructionReportLinkedComposer mode="immediate" drafts={drafts} onChange={onDraftsChange} workspace={workspace} sourceWorkItemId={sourceWorkItemId} reportEvidence={reportEvidence} reportEvidencePending={reportEvidencePending} primaryEvidenceId={primaryEvidenceId} canCreateCheck={canCreateCheck} canCreateAction={canCreateAction} blockers={blockers} notice={linkedNotice} onSubmitDraft={onSubmitDraft} />
+  </aside>;
+}
+
+function LinkedActionRow({ action, onOpen, nested = false }: { action: ConstructionActionItem; onOpen: () => void; nested?: boolean }) {
+  return <button type="button" className={`flex w-full items-start justify-between gap-4 rounded-lg border p-3 text-left hover:bg-slate-50 ${nested ? 'border-slate-200 bg-slate-50/60' : 'border-amber-200 bg-white'}`} onClick={onOpen}><span className="flex min-w-0 gap-3"><span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-700"><Wrench className="h-4 w-4" /></span><span className="min-w-0"><span className="block font-semibold text-ink">{action.title}</span><span className="mt-1 block text-xs text-slate-500">{action.assigned_user_name || 'Chưa giao người xử lý'} · {resolutionState(action)}</span></span></span><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${action.status === 'done' ? 'bg-emerald-100 text-emerald-700' : action.status === 'waiting_confirmation' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{actionStatusLabel(action.status)}</span></button>;
+}
+
+function resolutionState(action: ConstructionActionItem) {
+  const latest = [...(action.events ?? [])].reverse().find((item) => ['resolution_submitted', 'verified_pass', 'verified_fail'].includes(item.event_type));
+  if (!latest) return 'Chưa gửi khắc phục';
+  if (latest.event_type === 'verified_pass') return 'Đã xác nhận khắc phục đạt';
+  if (latest.event_type === 'verified_fail') return 'Đã trả lại để khắc phục tiếp';
+  return 'Đã gửi minh chứng khắc phục';
 }
 
 function SectionHeading({ id, icon, title, description }: { id: string; icon: React.ReactNode; title: string; description: string }) {

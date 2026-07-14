@@ -2177,6 +2177,124 @@ func TestCreateDailyReportPersistsStructuredEvidenceAndRejectsMismatchedEvidence
 	assertValidationError(t, err)
 }
 
+func TestConstructionWorkspaceLinksDailyReportThroughChecksActionsAndResolution(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo",
+		Name:         "Hiện trạng từ báo cáo",
+		FileURL:      "https://example.com/construction-report-source.jpg",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidenceID := cleanID(evidence["id"])
+	report, err := service.CreateDailyReport(ctx, fixture.projectID, ConstructionDailyReportCreateRequest{
+		ReportDate:        "2026-07-14",
+		Weather:           "Nắng",
+		ProgressPercent:   70,
+		WorkItemID:        fixture.itemID,
+		DoneItems:         []ConstructionDailyReportWorkItemRequest{{Title: "Hoàn thiện trần"}},
+		Blockers:          []ConstructionDailyReportBlockerRequest{{Content: "Cao độ cần kiểm tra"}},
+		EvidenceIDs:       []string{evidenceID},
+		PrimaryEvidenceID: evidenceID,
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reportID := cleanID(report["id"])
+
+	check, err := service.CreateConstructionCheck(ctx, fixture.projectID, ConstructionCheckRequest{
+		WorkItemID:          fixture.itemID,
+		SourceDailyReportID: reportID,
+		Title:               "Kiểm tra cao độ từ báo cáo",
+		Location:            "Khu A",
+		ContextEvidenceIDs:  []string{evidenceID},
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(check["source_daily_report_id"]) != reportID {
+		t.Fatalf("check source report = %v, want %s", check["source_daily_report_id"], reportID)
+	}
+
+	directAction, err := service.CreateConstructionAction(ctx, fixture.projectID, ConstructionActionRequest{
+		WorkItemID:          fixture.itemID,
+		SourceDailyReportID: reportID,
+		Title:               "Xử lý blocker trực tiếp từ báo cáo",
+		Description:         "Cân chỉnh khu vực hiện trường",
+		AssignedUserID:      fixture.workerID,
+		DueAt:               "2026-07-16T17:00:00+07:00",
+		ImpactScope:         "none",
+		EvidenceID:          evidenceID,
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(directAction["source_daily_report_id"]) != reportID {
+		t.Fatalf("direct action source report = %v, want %s", directAction["source_daily_report_id"], reportID)
+	}
+
+	completed, err := service.CompleteConstructionCheck(ctx, cleanID(check["id"]), ConstructionCheckCompleteRequest{
+		Result:         "fail",
+		Note:           "Sai cao độ 8mm",
+		EvidenceIDs:    []string{evidenceID},
+		ActionTitle:    "Khắc phục cao độ từ kiểm tra",
+		AssignedUserID: fixture.workerID,
+		DueAt:          "2026-07-17T17:00:00+07:00",
+		ImpactScope:    "none",
+		Priority:       "urgent",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkAction, ok := completed["action"].(Record)
+	if !ok {
+		t.Fatalf("completed check action = %#v, want action record", completed["action"])
+	}
+	if cleanID(checkAction["source_check_id"]) != cleanID(check["id"]) || cleanID(checkAction["source_daily_report_id"]) != "" {
+		t.Fatalf("check action source = check %v/report %v, want inherited check only", checkAction["source_check_id"], checkAction["source_daily_report_id"])
+	}
+
+	workspace, err := service.ProjectConstructionWorkspace(ctx, fixture.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := workflowAnswerRecordList(workspace["checks"])
+	actions := workflowAnswerRecordList(workspace["actions"])
+	if len(checks) != 1 || len(actions) != 2 {
+		t.Fatalf("workspace linked rows = %d checks/%d actions, want 1/2", len(checks), len(actions))
+	}
+	linkKinds := map[string]bool{}
+	for _, action := range actions {
+		if cleanID(action["source_daily_report_id"]) != reportID {
+			t.Fatalf("workspace action source report = %v, want %s", action["source_daily_report_id"], reportID)
+		}
+		linkKinds[fmt.Sprint(action["source_report_link_kind"])] = true
+	}
+	if !linkKinds["direct"] || !linkKinds["check"] {
+		t.Fatalf("workspace action link kinds = %#v, want direct and check", linkKinds)
+	}
+
+	otherItemID := newID()
+	mustExec(t, db, `
+		INSERT INTO work_items
+			(id, project_id, source_type, source_id, title, work_type, status, role_ids, evidence_requirement_json, created_by, updated_by)
+		VALUES
+			($1,$2,'issue',$3,'Other construction source','task','ready','["Đội thi công"]'::jsonb,'{}'::jsonb,$4,$4)
+	`, otherItemID, fixture.projectID, newID(), fixture.workerID)
+	_, err = service.CreateConstructionCheck(ctx, fixture.projectID, ConstructionCheckRequest{
+		WorkItemID:          otherItemID,
+		SourceDailyReportID: reportID,
+		Title:               "Sai nguồn công việc",
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+}
+
 func TestBusinessCoreLifecycleServiceRecordsActors(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

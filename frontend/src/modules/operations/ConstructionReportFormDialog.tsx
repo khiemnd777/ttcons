@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Camera, Loader2, Package, Plus, RefreshCw, Trash2, Users } from 'lucide-react';
+import { AlertTriangle, Camera, ClipboardCheck, Loader2, Package, Plus, RefreshCw, Trash2, Users, Wrench } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog } from '../../components/Dialog';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { get } from '../../lib/api/client';
-import type { ProjectEvidencePage, ProjectOperationsResponse, WorkItem } from '../../lib/types/domain';
+import type { ConstructionWorkspace, ProjectEvidencePage, ProjectOperationsResponse, WorkItem } from '../../lib/types/domain';
 import { statusLabel } from '../../lib/utils/status';
 import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
+import { ConstructionReportLinkedComposer, createReportLinkedDraft, reportLinkedSubmitLabel, validateReportLinkedDrafts, type ReportLinkedDraft } from './ConstructionReportLinkedComposer';
 import { constructionReportEditModel } from './constructionReportViewModel';
 
 type CrewDraft = { crew_name: string; worker_count: string; work_hours: string; note: string };
 type MaterialDraft = { material_name: string; quantity: string; unit: string; note: string };
+type BlockerDraft = { id: string; content: string };
 export type ConstructionDailyReportCreatePayload = {
   report_date: string;
   weather: string;
@@ -37,11 +39,15 @@ type ConstructionReportFormDialogProps = {
   projectId: string;
   mode?: 'create' | 'edit';
   record?: Record<string, any> | null;
+  suggestion?: Record<string, any> | null;
+  workspace?: ConstructionWorkspace;
+  canCreateCheck?: boolean;
+  canCreateAction?: boolean;
   onClose: () => void;
-  onSubmit: (payload: ConstructionDailyReportCreatePayload, uploads: ConstructionEvidenceUploadDraft[]) => Promise<unknown>;
+  onSubmit: (payload: ConstructionDailyReportCreatePayload, uploads: ConstructionEvidenceUploadDraft[], linkedDrafts: ReportLinkedDraft[]) => Promise<unknown>;
 };
 
-export function ConstructionReportFormDialog({ open, projectId, mode = 'create', record = null, onClose, onSubmit }: ConstructionReportFormDialogProps) {
+export function ConstructionReportFormDialog({ open, projectId, mode = 'create', record = null, suggestion = null, workspace, canCreateCheck = false, canCreateAction = false, onClose, onSubmit }: ConstructionReportFormDialogProps) {
   const toast = useToast();
   const [reportDate, setReportDate] = useState(todayText());
   const [weather, setWeather] = useState('Nắng');
@@ -50,7 +56,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   const [doneItems, setDoneItems] = useState<string[]>(['']);
   const [currentItems, setCurrentItems] = useState<string[]>(['']);
   const [nextItems, setNextItems] = useState<string[]>(['']);
-  const [blockers, setBlockers] = useState<string[]>(['']);
+  const [blockers, setBlockers] = useState<BlockerDraft[]>([emptyBlocker()]);
   const [fieldNotes, setFieldNotes] = useState('');
   const [crewItems, setCrewItems] = useState<CrewDraft[]>([emptyCrew()]);
   const [materialItems, setMaterialItems] = useState<MaterialDraft[]>([emptyMaterial()]);
@@ -61,18 +67,22 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   const [uploads, setUploads] = useState<ConstructionEvidenceUploadDraft[]>([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [workGroup, setWorkGroup] = useState<'done' | 'current' | 'next'>('done');
+  const [linkedDrafts, setLinkedDrafts] = useState<ReportLinkedDraft[]>([]);
+  const [showLinkedErrors, setShowLinkedErrors] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     const initial = mode === 'edit' && record ? constructionReportEditModel(record) : null;
+    const suggested = mode === 'create' && suggestion ? constructionReportEditModel(suggestion) : null;
     setReportDate(initial?.reportDate || todayText());
-    setWeather(initial?.weather || 'Nắng');
-    setProgressPercent(initial?.progressPercent || '0');
+    setWeather(initial?.weather || suggested?.weather || 'Nắng');
+    setProgressPercent(initial?.progressPercent || suggested?.progressPercent || '0');
     setWorkItemId(initial?.workItemId || '');
     setDoneItems(initial?.done ?? ['']);
     setCurrentItems(initial?.current ?? ['']);
     setNextItems(initial?.next ?? ['']);
-    setBlockers(initial?.blockers ?? ['']);
+    setBlockers((initial?.blockers?.length ? initial.blockers : ['']).map((content) => emptyBlocker(content)));
     setFieldNotes(initial?.fieldNotes ?? '');
     setCrewItems(initial?.crewItems.length ? initial.crewItems : [emptyCrew()]);
     setMaterialItems(initial?.materialItems.length ? initial.materialItems : [emptyMaterial()]);
@@ -83,7 +93,10 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
     setUploads([]);
     setSaving(false);
     setErrors({});
-  }, [mode, open, record]);
+    setWorkGroup('done');
+    setLinkedDrafts([]);
+    setShowLinkedErrors(false);
+  }, [mode, open, record, suggestion]);
 
   const operations = useQuery({
     queryKey: ['project-operations', projectId, 'full'],
@@ -104,11 +117,13 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
     retry: false,
   });
   const evidenceOptions = useMemo(() => evidence.data?.items ?? [], [evidence.data?.items]);
+  const selectedEvidence = useMemo(() => evidenceOptions.filter((item) => selectedEvidenceIds.includes(item.id)), [evidenceOptions, selectedEvidenceIds]);
 
   function selectWorkItem(value: string) {
     setWorkItemId(value);
     setSelectedEvidenceIds([]);
     setPrimaryEvidenceId('');
+    setLinkedDrafts((current) => current.map((draft) => ({ ...draft, work_item_id: value, evidence_id: '', uploads: [] })));
     clearError('work_item_id');
   }
 
@@ -124,13 +139,35 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
     });
   }
 
+  function setBlockerContent(id: string, content: string) {
+    const previous = blockers.find((item) => item.id === id)?.content ?? '';
+    setBlockers((current) => current.map((item) => item.id === id ? { ...item, content } : item));
+    setLinkedDrafts((current) => current.map((draft) => draft.source_blocker_key === id && (draft.auto_title || draft.title === previous) ? { ...draft, title: content, source_label: content, auto_title: true } : draft));
+  }
+
+  function setBlockerRelation(blocker: BlockerDraft, kind: ReportLinkedDraft['kind'] | null) {
+    setLinkedDrafts((current) => {
+      const withoutCurrent = current.filter((draft) => draft.source_blocker_key !== blocker.id);
+      if (!kind) return withoutCurrent;
+      return [...withoutCurrent, createReportLinkedDraft(kind, { title: blocker.content, workItemId, sourceBlockerKey: blocker.id, sourceLabel: blocker.content })];
+    });
+  }
+
+  function removeBlocker(id: string) {
+    setBlockers((current) => current.length === 1 ? [emptyBlocker()] : current.filter((item) => item.id !== id));
+    setLinkedDrafts((current) => current.filter((draft) => draft.source_blocker_key !== id));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateReport({ reportDate, weather, progressPercent, doneItems, crewItems, materialItems });
     if (uploads.length && !workItemId) nextErrors.work_item_id = 'Công việc liên quan (bắt buộc khi có minh chứng)';
-    if (Object.keys(nextErrors).length) {
+    const linkedErrors = mode === 'create' ? validateReportLinkedDrafts(linkedDrafts, workItemId, selectedEvidenceIds.length + uploads.length > 0) : [];
+    if (linkedErrors.length) setShowLinkedErrors(true);
+    if (Object.keys(nextErrors).length || linkedErrors.length) {
       setErrors(nextErrors);
-      toast.warn({ title: 'Kiểm tra báo cáo', description: `Thiếu hoặc sai: ${Object.values(nextErrors).join(', ')}` });
+      const linkedSummary = linkedErrors.length ? `${linkedErrors.length} kiểm tra/việc xử lý chưa đủ thông tin` : '';
+      toast.warn({ title: 'Kiểm tra báo cáo', description: `Thiếu hoặc sai: ${[...Object.values(nextErrors), linkedSummary].filter(Boolean).join(', ')}` });
       return;
     }
     const payload: ConstructionDailyReportCreatePayload = {
@@ -141,7 +178,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
       done_items: textRows(doneItems, 'title'),
       current_items: textRows(currentItems, 'title'),
       next_items: textRows(nextItems, 'title'),
-      blockers: textRows(blockers, 'content'),
+      blockers: textRows(blockers.map((item) => item.content), 'content'),
       field_notes: fieldNotes.trim(),
       crew_items: crewItems.filter(hasCrewValue).map((item) => ({
         crew_name: item.crew_name.trim(),
@@ -162,7 +199,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
     };
     setSaving(true);
     try {
-      await onSubmit(payload, uploads);
+      await onSubmit(payload, uploads, mode === 'create' ? linkedDrafts : []);
     } catch {
       // Mutation handlers own the user-facing error toast.
     } finally {
@@ -182,21 +219,21 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
     <Dialog
       open={open}
       title={mode === 'edit' ? 'Chỉnh sửa báo cáo thi công' : 'Báo cáo thi công hôm nay'}
-      description="Ghi một lần, đọc nhất quán ở timeline và form chi tiết. Minh chứng luôn được lưu theo công việc liên quan đã chọn."
+      description={mode === 'edit' ? 'Cập nhật nội dung báo cáo; các liên kết đã tạo vẫn giữ nguyên lịch sử.' : 'Ghi hiện trường và tạo ngay kiểm tra hoặc việc xử lý trong một lần lưu.'}
       size="report"
       onClose={onClose}
       footer={(
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" disabled={saving} className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60" onClick={onClose}>Hủy</button>
           <button type="submit" form="construction-report-form" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{saving ? 'Đang lưu...' : mode === 'edit' ? 'Lưu thay đổi' : 'Lưu báo cáo'}
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{saving ? 'Đang lưu...' : mode === 'edit' ? 'Lưu thay đổi' : reportLinkedSubmitLabel(linkedDrafts)}
           </button>
         </div>
       )}
     >
       <form id="construction-report-form" className="space-y-5" onSubmit={handleSubmit}>
         <section className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Field label="Ngày báo cáo" required error={errors.report_date}>
               <input type="date" className={inputClass(Boolean(errors.report_date))} value={reportDate} onChange={(event) => { setReportDate(event.target.value); clearError('report_date'); }} />
             </Field>
@@ -208,76 +245,75 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
             <Field label="Tiến độ báo cáo (%)" required error={errors.progress_percent}>
               <input type="number" min={0} max={100} className={inputClass(Boolean(errors.progress_percent))} value={progressPercent} onChange={(event) => { setProgressPercent(event.target.value); clearError('progress_percent'); }} />
             </Field>
-          </div>
-        </section>
-
-        <section>
-          <SectionTitle title="Công việc liên quan" description="Chọn công việc khi báo cáo có minh chứng; lựa chọn này cũng giúp truy vết báo cáo." />
-          <div className="mt-3">
-            {operations.isLoading ? <LoadingSpinner label="Đang tải danh sách công việc..." /> : null}
-            {operations.isError ? <InlineError message="Không tải được danh sách công việc." onRetry={() => operations.refetch()} /> : null}
-            {operations.isSuccess ? <Field label="Công việc" error={errors.work_item_id} helper="Không bắt buộc nếu báo cáo không có minh chứng.">
-              <select className={inputClass(Boolean(errors.work_item_id))} value={workItemId} onChange={(event) => selectWorkItem(event.target.value)}>
-                <option value="">Không chọn công việc</option>
+            <Field label="Công việc liên quan" error={errors.work_item_id} helper={!workItemId ? 'Cần chọn khi có minh chứng hoặc liên kết.' : undefined}>
+              <select disabled={operations.isLoading || operations.isError} className={inputClass(Boolean(errors.work_item_id))} value={workItemId} onChange={(event) => selectWorkItem(event.target.value)}>
+                <option value="">{operations.isLoading ? 'Đang tải công việc...' : operations.isError ? 'Không tải được công việc' : 'Không chọn công việc'}</option>
                 {workItems.map((item) => <option key={item.id} value={item.id}>{item.title} · {statusLabel(item.status)}</option>)}
               </select>
-            </Field> : null}
+            </Field>
           </div>
+          {operations.isError ? <div className="mt-3"><InlineError message="Không tải được danh sách công việc." onRetry={() => operations.refetch()} /></div> : null}
         </section>
 
-        <section>
-          <SectionTitle title="Công việc trong ngày" description="Các nhóm này được giữ nguyên khi mở form chi tiết." />
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <TextListEditor title="Đã làm" required values={doneItems} onChange={(values) => { setDoneItems(values); clearError('done_items'); }} tone="green" error={errors.done_items} addLabel="Thêm hạng mục" />
-            <TextListEditor title="Đang làm" values={currentItems} onChange={setCurrentItems} tone="blue" addLabel="Thêm hạng mục" />
-            <TextListEditor title="Sẽ làm" values={nextItems} onChange={setNextItems} tone="slate" addLabel="Thêm kế hoạch" />
-            <TextListEditor title="Blocker cần xử lý" values={blockers} onChange={setBlockers} tone="red" addLabel="Thêm blocker" />
-          </div>
-        </section>
-
-        <section>
-          <SectionTitle title="Nguồn lực sử dụng" description="Nhân công và vật tư được lưu thành danh sách có cấu trúc." />
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <CrewEditor rows={crewItems} onChange={(rows) => { setCrewItems(rows); clearError('crew_items'); }} error={errors.crew_items} />
-            <MaterialEditor rows={materialItems} onChange={(rows) => { setMaterialItems(rows); clearError('material_items'); }} error={errors.material_items} />
-          </div>
-          {manpowerSummary || materialSummary ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800"><strong>Dữ liệu tóm tắt cũ được giữ nguyên:</strong>{manpowerSummary ? ` Nhân công: ${manpowerSummary}.` : ''}{materialSummary ? ` Vật tư: ${materialSummary}.` : ''} Thêm dòng có cấu trúc nếu cần chuẩn hóa báo cáo.</div> : null}
-        </section>
-
-        <section>
-          <SectionTitle title="Ghi chú hiện trường" description="Thông tin bổ sung, không được tự động tính là blocker." />
-          <textarea className={clsx(inputClass(false), 'mt-3 min-h-24')} value={fieldNotes} onChange={(event) => setFieldNotes(event.target.value)} placeholder="Ví dụ: Không có sự cố an toàn; khu vực đã được vệ sinh cuối ca." />
-        </section>
-
-        <section>
-          <SectionTitle title={`Minh chứng · ${selectedEvidenceIds.length + uploads.length}`} description="Chọn minh chứng đã có hoặc giữ ảnh/PDF trong hàng đợi; minh chứng sẽ được lưu theo công việc liên quan đã chọn." />
-          <div className="mt-3 space-y-3">
-            {!workItemId ? <InfoState title="Chưa chọn công việc liên quan" description="Bạn vẫn có thể chọn tệp hoặc chụp ảnh. Hệ thống sẽ yêu cầu chọn công việc liên quan khi lưu báo cáo có minh chứng." /> : null}
-            {workItemId && evidence.isLoading ? <LoadingSpinner label="Đang tải minh chứng của công việc..." /> : null}
-            {workItemId && evidence.isError ? <InlineError message="Không tải được minh chứng của công việc." onRetry={() => evidence.refetch()} /> : null}
-            {workItemId && evidence.isSuccess ? (
-              <div>
-                {evidenceOptions.length ? <div className="grid gap-2 sm:grid-cols-2">
-                  {evidenceOptions.map((record) => {
-                    const selected = selectedEvidenceIds.includes(record.id);
-                    const rejected = record.status === 'rejected';
-                    return <article key={record.id} className={clsx('rounded-lg border p-3', selected ? 'border-blue-300 bg-blue-50' : 'border-line bg-white')}>
-                      <div className="flex items-start gap-3">
-                        <input type="checkbox" className="mt-1 h-4 w-4 rounded border-line" checked={selected} disabled={rejected && !selected} onChange={() => toggleEvidence(record.id)} />
-                        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{record.name || record.title || 'Minh chứng'}</p><div className="mt-1 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} /><span className="text-xs text-slate-500">{record.evidence_type === 'photo' ? 'Ảnh' : 'Tài liệu'}</span></div></div>
-                        {selected ? <label className="flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-700"><input type="radio" name="primary-evidence" checked={primaryEvidenceId === record.id} onChange={() => setPrimaryEvidenceId(record.id)} /> Chính</label> : null}
-                      </div>
-                    </article>;
-                  })}
-                </div> : <InfoState title="Công việc này chưa có minh chứng" description="Có thể chọn tệp hoặc chụp ảnh mới ngay bên dưới." />}
+        <div className={clsx('grid gap-5', mode === 'create' && (canCreateCheck || canCreateAction) && 'xl:grid-cols-[minmax(0,1fr)_22rem]')}>
+          <div className="space-y-5">
+            <section>
+              <SectionTitle title="Công việc trong ngày" description="Chuyển nhóm bằng tab; dữ liệu đã nhập được giữ nguyên." />
+              <div className="mt-3 flex gap-1 overflow-x-auto rounded-lg border border-line bg-slate-50 p-1">
+                {([
+                  ['done', 'Đã làm', doneItems],
+                  ['current', 'Đang làm', currentItems],
+                  ['next', 'Sẽ làm', nextItems],
+                ] as const).map(([key, label, values]) => <button key={key} type="button" className={clsx('shrink-0 rounded-md px-3 py-2 text-sm font-semibold', workGroup === key ? 'bg-white text-blue-700 shadow-sm ring-1 ring-inset ring-line' : 'text-slate-500 hover:text-slate-700')} onClick={() => setWorkGroup(key)}>{label} <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px]">{values.filter((item) => item.trim()).length}</span></button>)}
               </div>
-            ) : null}
-            <ConstructionEvidenceCapture drafts={uploads} onChange={setUploads} hasSource={Boolean(workItemId)} disabled={saving} />
+              <div className="mt-3">
+                {workGroup === 'done' ? <TextListEditor title="Đã làm" required values={doneItems} onChange={(values) => { setDoneItems(values); clearError('done_items'); }} tone="green" error={errors.done_items} addLabel="Thêm hạng mục" /> : null}
+                {workGroup === 'current' ? <TextListEditor title="Đang làm" values={currentItems} onChange={setCurrentItems} tone="blue" addLabel="Thêm hạng mục" /> : null}
+                {workGroup === 'next' ? <TextListEditor title="Sẽ làm" values={nextItems} onChange={setNextItems} tone="slate" addLabel="Thêm kế hoạch" /> : null}
+              </div>
+            </section>
+
+            <section>
+              <SectionTitle title="Vấn đề phát sinh" description="Ghi nhận blocker và chọn ngay bước tiếp theo nếu cần." />
+              <BlockerEditor rows={blockers} drafts={linkedDrafts} canCreateCheck={mode === 'create' && canCreateCheck} canCreateAction={mode === 'create' && canCreateAction} disabled={!workspace} onChange={setBlockerContent} onRelation={setBlockerRelation} onRemove={removeBlocker} onAdd={() => setBlockers((current) => [...current, emptyBlocker()])} />
+            </section>
+
+            <section>
+              <SectionTitle title={`Minh chứng · ${selectedEvidenceIds.length + uploads.length}`} description="Chụp ảnh hoặc chọn tệp một lần; kiểm tra và việc xử lý sẽ dùng lại minh chứng này." />
+              <div className="mt-3 space-y-3">
+                {!workItemId ? <InfoState title="Chưa chọn công việc liên quan" description="Có thể chuẩn bị ảnh trước; khi lưu báo cáo có minh chứng hoặc liên kết, hệ thống sẽ yêu cầu chọn công việc." /> : null}
+                {workItemId && evidence.isLoading ? <LoadingSpinner label="Đang tải minh chứng của công việc..." /> : null}
+                {workItemId && evidence.isError ? <InlineError message="Không tải được minh chứng của công việc." onRetry={() => evidence.refetch()} /> : null}
+                {workItemId && evidence.isSuccess && evidenceOptions.length ? <details className="rounded-lg border border-line bg-slate-50 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Chọn từ minh chứng đã có · {selectedEvidenceIds.length} đã chọn</summary><div className="mt-3 grid gap-2 sm:grid-cols-2">{evidenceOptions.map((record) => {
+                  const selected = selectedEvidenceIds.includes(record.id);
+                  const rejected = record.status === 'rejected';
+                  return <article key={record.id} className={clsx('rounded-lg border p-3', selected ? 'border-blue-300 bg-blue-50' : 'border-line bg-white')}><div className="flex items-start gap-3"><input type="checkbox" className="mt-1 h-4 w-4 rounded border-line" checked={selected} disabled={rejected && !selected} onChange={() => toggleEvidence(record.id)} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{record.name || record.title || 'Minh chứng'}</p><div className="mt-1 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} /><span className="text-xs text-slate-500">{record.evidence_type === 'photo' ? 'Ảnh' : 'Tài liệu'}</span></div></div>{selected ? <label className="flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-700"><input type="radio" name="primary-evidence" checked={primaryEvidenceId === record.id} onChange={() => setPrimaryEvidenceId(record.id)} /> Chính</label> : null}</div></article>;
+                })}</div></details> : null}
+                <ConstructionEvidenceCapture drafts={uploads} onChange={setUploads} hasSource={Boolean(workItemId)} disabled={saving} />
+              </div>
+            </section>
+
+            <details className="rounded-lg border border-line bg-white p-4" open={mode === 'edit' || Boolean(errors.crew_items || errors.material_items)}>
+              <summary className="cursor-pointer font-semibold text-ink">Thông tin bổ sung <span className="ml-2 text-xs font-normal text-slate-500">Nhân công, vật tư và ghi chú</span></summary>
+              <div className="mt-4 space-y-5">
+                <section><SectionTitle title="Nguồn lực sử dụng" description="Nhân công và vật tư được lưu thành danh sách có cấu trúc." /><div className="mt-3 grid gap-3 lg:grid-cols-2"><CrewEditor rows={crewItems} onChange={(rows) => { setCrewItems(rows); clearError('crew_items'); }} error={errors.crew_items} /><MaterialEditor rows={materialItems} onChange={(rows) => { setMaterialItems(rows); clearError('material_items'); }} error={errors.material_items} /></div>{manpowerSummary || materialSummary ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800"><strong>Dữ liệu tóm tắt cũ được giữ nguyên:</strong>{manpowerSummary ? ` Nhân công: ${manpowerSummary}.` : ''}{materialSummary ? ` Vật tư: ${materialSummary}.` : ''}</div> : null}</section>
+                <section><SectionTitle title="Ghi chú hiện trường" description="Thông tin bổ sung, không tự động tính là blocker." /><textarea className={clsx(inputClass(false), 'mt-3 min-h-24')} value={fieldNotes} onChange={(event) => setFieldNotes(event.target.value)} placeholder="Ví dụ: Không có sự cố an toàn; khu vực đã được vệ sinh cuối ca." /></section>
+              </div>
+            </details>
           </div>
-        </section>
+
+          {mode === 'create' && (canCreateCheck || canCreateAction) ? <ConstructionReportLinkedComposer mode="batch" drafts={linkedDrafts} onChange={setLinkedDrafts} workspace={workspace} sourceWorkItemId={workItemId} reportEvidence={selectedEvidence} reportEvidencePending={uploads.length > 0} primaryEvidenceId={primaryEvidenceId} canCreateCheck={canCreateCheck} canCreateAction={canCreateAction} showValidation={showLinkedErrors} /> : null}
+        </div>
       </form>
     </Dialog>
   );
+}
+
+function BlockerEditor({ rows, drafts, canCreateCheck, canCreateAction, disabled, onChange, onRelation, onRemove, onAdd }: { rows: BlockerDraft[]; drafts: ReportLinkedDraft[]; canCreateCheck: boolean; canCreateAction: boolean; disabled: boolean; onChange: (id: string, content: string) => void; onRelation: (row: BlockerDraft, kind: ReportLinkedDraft['kind'] | null) => void; onRemove: (id: string) => void; onAdd: () => void }) {
+  return <div className="mt-3 space-y-3">{rows.map((row, index) => {
+    const linked = drafts.find((draft) => draft.source_blocker_key === row.id);
+    return <article key={row.id} className="rounded-lg border border-red-200 bg-red-50/30 p-3"><div className="flex items-start gap-2"><textarea rows={2} className={clsx(inputClass(false), 'mt-0 min-h-16 flex-1 resize-y')} value={row.content} placeholder={`Vấn đề ${index + 1}`} onChange={(event) => onChange(row.id, event.target.value)} /><button type="button" aria-label={`Xóa vấn đề ${index + 1}`} className="rounded-md p-2 text-slate-400 hover:bg-white hover:text-rose-600" onClick={() => onRemove(row.id)}><Trash2 className="h-4 w-4" /></button></div>{canCreateCheck || canCreateAction ? <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Bước tiếp theo</span><button type="button" className={clsx('rounded-md border px-2 py-1 text-[11px] font-semibold', !linked ? 'border-slate-300 bg-white text-slate-700' : 'border-transparent text-slate-500')} onClick={() => onRelation(row, null)}>Chỉ ghi nhận</button>{canCreateCheck ? <button type="button" disabled={disabled} className={clsx('inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40', linked?.kind === 'check' ? 'border-blue-500 bg-blue-600 text-white' : 'border-blue-200 bg-white text-blue-700')} onClick={() => onRelation(row, 'check')}><ClipboardCheck className="h-3 w-3" /> Tạo kiểm tra</button> : null}{canCreateAction ? <button type="button" disabled={disabled} className={clsx('inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40', linked?.kind === 'action' ? 'border-amber-700 bg-amber-700 text-white' : 'border-amber-300 bg-white text-amber-800')} onClick={() => onRelation(row, 'action')}><Wrench className="h-3 w-3" /> Giao xử lý</button> : null}</div> : null}</article>;
+  })}<button type="button" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700" onClick={onAdd}><Plus className="h-3.5 w-3.5" /> Thêm vấn đề</button></div>;
 }
 
 function TextListEditor({ title, required = false, values, onChange, tone, error, addLabel }: { title: string; required?: boolean; values: string[]; onChange: (values: string[]) => void; tone: 'green' | 'blue' | 'slate' | 'red'; error?: string; addLabel: string }) {
@@ -335,6 +371,7 @@ function updateRow<Row>(rows: Row[], index: number, patch: Partial<Row>) {
 
 function emptyCrew(): CrewDraft { return { crew_name: '', worker_count: '', work_hours: '', note: '' }; }
 function emptyMaterial(): MaterialDraft { return { material_name: '', quantity: '', unit: '', note: '' }; }
+function emptyBlocker(content = ''): BlockerDraft { return { id: globalThis.crypto?.randomUUID?.() ?? `blocker-${Date.now()}-${Math.random().toString(36).slice(2)}`, content }; }
 function hasCrewValue(item: CrewDraft) { return Boolean(item.crew_name.trim() || item.worker_count || item.work_hours || item.note.trim()); }
 function hasMaterialValue(item: MaterialDraft) { return Boolean(item.material_name.trim() || item.quantity || item.unit.trim() || item.note.trim()); }
 function todayText() { return new Date().toISOString().slice(0, 10); }

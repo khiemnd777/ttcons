@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClipboardCheck, Plus, Settings2, Wrench } from 'lucide-react';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -12,7 +12,11 @@ import { ConstructionActionList, ConstructionCheckList } from './ConstructionWor
 
 export type SimplifiedConstructionMode = 'checks' | 'actions';
 
-export function ConstructionWorkspacePanel({ projectId, mode }: { projectId: string; mode: SimplifiedConstructionMode }) {
+export type ConstructionWorkspaceDialogRequest =
+  | { mode: 'checks'; state: Exclude<CheckDialogState, null> }
+  | { mode: 'actions'; state: Exclude<ActionDialogState, null> };
+
+export function ConstructionWorkspacePanel({ projectId, mode, dialogRequest, onDialogRequestHandled, onViewReport }: { projectId: string; mode: SimplifiedConstructionMode; dialogRequest?: ConstructionWorkspaceDialogRequest | null; onDialogRequestHandled?: () => void; onViewReport?: (reportId: string) => void }) {
   const [checkDialog, setCheckDialog] = useState<CheckDialogState>(null);
   const [actionDialog, setActionDialog] = useState<ActionDialogState>(null);
   const queryClient = useQueryClient();
@@ -35,6 +39,18 @@ export function ConstructionWorkspacePanel({ projectId, mode }: { projectId: str
     enabled: Boolean(projectId),
     retry: false,
   });
+
+  useEffect(() => {
+    if (!dialogRequest || dialogRequest.mode !== mode) return;
+    if (dialogRequest.mode === 'checks') {
+      setActionDialog(null);
+      setCheckDialog(dialogRequest.state);
+    } else {
+      setCheckDialog(null);
+      setActionDialog(dialogRequest.state);
+    }
+    onDialogRequestHandled?.();
+  }, [dialogRequest, mode, onDialogRequestHandled]);
 
   async function refresh() {
     setCheckDialog(null);
@@ -61,6 +77,12 @@ export function ConstructionWorkspacePanel({ projectId, mode }: { projectId: str
   function viewAction(action: ConstructionActionItem) {
     setCheckDialog(null);
     setActionDialog({ type: 'view', action });
+  }
+
+  function viewReport(reportId: string) {
+    setCheckDialog(null);
+    setActionDialog(null);
+    onViewReport?.(reportId);
   }
 
   if (workspace.isLoading) return <LoadingSpinner label={mode === 'checks' ? 'Đang tải danh sách kiểm tra...' : 'Đang tải việc cần xử lý...'} />;
@@ -90,7 +112,7 @@ export function ConstructionWorkspacePanel({ projectId, mode }: { projectId: str
         {mode === 'checks' ? <ConstructionCheckList workspace={workspace.data} canCreate={permissions.requestCheck} canEdit={permissions.editCheck} canPerform={permissions.performCheck} onCreate={() => setCheckDialog({ type: 'create' })} onView={viewCheck} onEdit={(check) => setCheckDialog({ type: 'edit', check })} onComplete={(check) => setCheckDialog({ type: 'complete', check })} /> : <ConstructionActionList workspace={workspace.data} canCreate={permissions.createAction} canEdit={permissions.editAction} canResolve={permissions.resolveAction} canVerify={permissions.verifyAction} onCreate={() => setActionDialog({ type: 'create' })} onView={viewAction} onEdit={(action) => setActionDialog({ type: 'edit', action })} onResolve={(action) => setActionDialog({ type: 'resolve', action })} onVerify={(action) => setActionDialog({ type: 'verify', action })} />}
       </div>
     </section>
-    <ConstructionCheckDialogs state={checkDialog} projectId={projectId} workspace={workspace.data} canEdit={permissions.editCheck} canPerform={permissions.performCheck} onClose={() => setCheckDialog(null)} onSaved={refresh} onEdit={(check) => setCheckDialog({ type: 'edit', check })} onComplete={(check) => setCheckDialog({ type: 'complete', check })} onViewAction={viewAction} />
-    <ConstructionActionDialogs state={actionDialog} projectId={projectId} workspace={workspace.data} canEdit={permissions.editAction} canResolve={permissions.resolveAction} canVerify={permissions.verifyAction} canApproveImpact={permissions.approveImpact} onClose={() => setActionDialog(null)} onSaved={refresh} onEdit={(action) => setActionDialog({ type: 'edit', action })} onResolve={(action) => setActionDialog({ type: 'resolve', action })} onVerify={(action) => setActionDialog({ type: 'verify', action })} onApproveImpact={approveImpact} onViewCheck={viewCheck} />
+    <ConstructionCheckDialogs state={checkDialog} projectId={projectId} workspace={workspace.data} canEdit={permissions.editCheck} canPerform={permissions.performCheck} onClose={() => setCheckDialog(null)} onSaved={refresh} onEdit={(check) => setCheckDialog({ type: 'edit', check })} onComplete={(check) => setCheckDialog({ type: 'complete', check })} onViewAction={viewAction} onViewReport={onViewReport ? viewReport : undefined} />
+    <ConstructionActionDialogs state={actionDialog} projectId={projectId} workspace={workspace.data} canEdit={permissions.editAction} canResolve={permissions.resolveAction} canVerify={permissions.verifyAction} canApproveImpact={permissions.approveImpact} onClose={() => setActionDialog(null)} onSaved={refresh} onEdit={(action) => setActionDialog({ type: 'edit', action })} onResolve={(action) => setActionDialog({ type: 'resolve', action })} onVerify={(action) => setActionDialog({ type: 'verify', action })} onApproveImpact={approveImpact} onViewCheck={viewCheck} onViewReport={onViewReport ? viewReport : undefined} />
   </>;
 }

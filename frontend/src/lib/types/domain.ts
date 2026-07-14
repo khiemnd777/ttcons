@@ -597,6 +597,9 @@ export type ConstructionCheckTemplate = ProjectOperationsRecord & {
 export type ConstructionCheck = ProjectOperationsRecord & {
   work_item_id: string;
   work_item_title?: string;
+  source_daily_report_id?: string;
+  source_report_date?: string;
+  source_report_weather?: string;
   template_id?: string;
   template_name?: string;
   title: string;
@@ -627,6 +630,10 @@ export type ConstructionActionEvent = ProjectOperationsRecord & {
 export type ConstructionActionItem = ProjectOperationsRecord & {
   work_item_id: string;
   work_item_title?: string;
+  source_daily_report_id?: string;
+  source_report_date?: string;
+  source_report_weather?: string;
+  source_report_link_kind?: 'direct' | 'check';
   source_check_id?: string;
   source_check_title?: string;
   title: string;
@@ -649,6 +656,16 @@ export type ConstructionActionItem = ProjectOperationsRecord & {
   technical_rework_id?: string;
   technical_replanning_id?: string;
   events: ConstructionActionEvent[];
+};
+
+export type ConstructionDailyReportSource = {
+  id: string;
+  report_date: string;
+  weather?: string;
+  work_item_id?: string;
+  primary_evidence_id?: string;
+  evidence: EvidenceRecord[];
+  suggested_title?: string;
 };
 
 export type ConstructionWorkspace = {

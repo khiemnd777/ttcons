@@ -957,6 +957,7 @@ func (s *Service) CreateConstructionCheckTemplate(ctx context.Context, projectID
 func (s *Service) CreateConstructionCheck(ctx context.Context, projectID string, req ConstructionCheckRequest, actorID, actorName string) (Record, error) {
 	projectID = cleanID(projectID)
 	workItemID := cleanID(req.WorkItemID)
+	sourceDailyReportID := cleanID(req.SourceDailyReportID)
 	templateID := cleanID(req.TemplateID)
 	title := strings.TrimSpace(req.Title)
 	if !validActivityUUID(projectID) || !validActivityUUID(workItemID) || title == "" {
@@ -964,6 +965,9 @@ func (s *Service) CreateConstructionCheck(ctx context.Context, projectID string,
 	}
 	if templateID != "" && !validActivityUUID(templateID) {
 		return nil, validationError("Mẫu kiểm tra không hợp lệ")
+	}
+	if sourceDailyReportID != "" && !validActivityUUID(sourceDailyReportID) {
+		return nil, validationError("Báo cáo nguồn không hợp lệ")
 	}
 	scheduledAt, err := constructionOptionalTime(req.ScheduledAt, "Thời điểm kiểm tra")
 	if err != nil {
@@ -977,7 +981,7 @@ func (s *Service) CreateConstructionCheck(ctx context.Context, projectID string,
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.CreateConstructionCheck(ctx, projectID, workItemID, templateID, title, strings.TrimSpace(req.Location), scheduledAt, criteria, req.Criteria != nil, contextEvidenceIDs, actorID, actorName)
+	return s.repo.CreateConstructionCheck(ctx, projectID, workItemID, sourceDailyReportID, templateID, title, strings.TrimSpace(req.Location), scheduledAt, criteria, req.Criteria != nil, contextEvidenceIDs, actorID, actorName)
 }
 
 func (s *Service) UpdateConstructionCheck(ctx context.Context, checkID string, req ConstructionCheckUpdateRequest, actorID, actorName string) (Record, error) {
@@ -1040,6 +1044,7 @@ func (s *Service) CompleteConstructionCheck(ctx context.Context, checkID string,
 
 func (s *Service) CreateConstructionAction(ctx context.Context, projectID string, req ConstructionActionRequest, actorID, actorName string) (Record, error) {
 	projectID = cleanID(projectID)
+	sourceDailyReportID := cleanID(req.SourceDailyReportID)
 	priority := strings.TrimSpace(req.Priority)
 	if priority == "" {
 		priority = "normal"
@@ -1053,11 +1058,14 @@ func (s *Service) CreateConstructionAction(ctx context.Context, projectID string
 		!statusIn(priority, "normal", "urgent") || !statusIn(impactScope, "none", "timeline", "budget", "design_scope") {
 		return nil, validationError("Việc cần xử lý cần nội dung, công việc, người phụ trách, ảnh và ảnh hưởng hợp lệ")
 	}
+	if sourceDailyReportID != "" && !validActivityUUID(sourceDailyReportID) {
+		return nil, validationError("Báo cáo nguồn không hợp lệ")
+	}
 	dueAt, err := constructionRequiredTime(req.DueAt, "Hạn xử lý")
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.CreateConstructionAction(ctx, projectID, cleanID(req.WorkItemID), strings.TrimSpace(req.Title), strings.TrimSpace(req.Description), priority, cleanID(req.AssignedUserID), dueAt, impactScope, cleanID(req.EvidenceID), actorID, actorName)
+	return s.repo.CreateConstructionAction(ctx, projectID, cleanID(req.WorkItemID), sourceDailyReportID, strings.TrimSpace(req.Title), strings.TrimSpace(req.Description), priority, cleanID(req.AssignedUserID), dueAt, impactScope, cleanID(req.EvidenceID), actorID, actorName)
 }
 
 func (s *Service) UpdateConstructionAction(ctx context.Context, actionID string, req ConstructionActionUpdateRequest, actorID, actorName string) (Record, error) {

@@ -1,5 +1,60 @@
 # Current States
 
+## One-Flow Daily Report Field Actions
+
+Status: complete
+
+Mục đích chính:
+- Cho phép ghi báo cáo và chuyển phát sinh thành `Kiểm tra` hoặc `Cần xử lý` trong một dialog, một ngữ cảnh và một primary CTA; không đóng báo cáo hoặc đổi tab để tạo liên kết.
+
+Will be done:
+- Đổi form tạo báo cáo sang chế độ nhanh: nhóm công việc dạng tab gọn, blocker có lựa chọn xử lý, minh chứng ở luồng chính và nguồn lực/ghi chú mặc định thu gọn.
+- Thêm shared compact composer cho kiểm tra/việc xử lý, dùng trực tiếp trong form tạo và chi tiết báo cáo; tự kế thừa công việc, tiêu đề và minh chứng nguồn.
+- Lưu báo cáo rồi tạo các liên kết đã chuẩn bị bằng API V65 hiện hữu; nếu một liên kết lỗi, giữ báo cáo và chuyển đúng draft lỗi sang chi tiết để thử lại mà không tạo trùng.
+- Tạo kiểm tra/việc từ báo cáo hiện hữu ngay trong dialog báo cáo, refresh timeline liên quan tại chỗ và không đổi tab.
+- Giữ nguyên permission, evidence ownership, fail-to-action, action events, technical compatibility và handover blocker.
+- Cập nhật central/frontend/root-cause/construction/quality mappings; chạy frontend build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `Approve`.
+- Reloaded mandatory central/frontend/root-cause mappings plus frontend workflow, impact analysis and construction/quality domain guardrails.
+- Confirmed implementation remains frontend-only over the existing V65 create routes and canonical evidence/status transitions.
+- Added a shared compact composer for `Kiểm tra` and `Việc xử lý`; it reuses report work-item/evidence context, supports direct criteria, and keeps optional fields collapsed.
+- Reworked report creation into one flow: quick context defaults, tabbed work groups, blocker-level `Chỉ ghi nhận`/`Tạo kiểm tra`/`Giao xử lý`, primary evidence capture, collapsed supplementary data, and one summary CTA.
+- Orchestrated report plus linked records from one submit while keeping successful children idempotent; only failed drafts and failed evidence are retained for inline retry.
+- Embedded creation in report detail so new checks/actions refresh the related timeline in place without closing the report or changing tabs.
+- Reused the canonical construction create commands and preserved permission, evidence ownership, check-to-action transition, action events, technical compatibility, and handover blockers.
+- Updated central/frontend/root-cause/construction/quality mappings for the new composer, one-flow behavior and partial-retry path.
+- Validation passed with the frontend production build and `git diff --check`; browser verification was skipped because the user did not explicitly request it.
+
+## Daily Report To Construction Resolution Traceability
+
+Status: complete
+
+Mục đích chính:
+- Tạo chuỗi truy vết hiện trường có quan hệ nguồn rõ ràng `Nhật ký/Báo cáo -> Kiểm tra -> Cần xử lý -> Khắc phục/Xác nhận`, không suy luận theo ngày hoặc công việc.
+
+Will be done:
+- Thêm migration V65 với nguồn báo cáo tùy chọn cho kiểm tra và việc xử lý trực tiếp; việc sinh từ kiểm tra tiếp tục kế thừa nguồn qua `source_check_id` để tránh lưu trùng.
+- Mở rộng typed contract, service/repository validation và construction workspace response; nguồn phải cùng công trình, và phải cùng work item khi báo cáo đã khóa work item.
+- Bổ sung chi tiết báo cáo với trạng thái liên quan, CTA tạo kiểm tra/việc xử lý, form prefill nguồn/công việc/minh chứng và liên kết ngược trong View kiểm tra/việc xử lý.
+- Giữ nguyên fail-to-action atomic transition, technical issue/rework/replanning bridge, permission hiện hữu, lịch sử action events và evidence ownership.
+- Cập nhật Golden fixture, integration tests, central/backend/frontend/construction/quality mappings; chạy backend format/tests/migration checks, frontend build và `git diff --check`.
+- Không backfill production bằng ngày/work item và không chạy browser verification vì người dùng không yêu cầu trong lượt này.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai`.
+- Reloaded mandatory central/backend/frontend/root-cause mappings plus frontend/backend workflow, impact analysis and construction/quality domain guardrails.
+- Confirmed current storage only links `construction_action_items.source_check_id`; reports, checks and direct actions otherwise share contextual project/work-item fields without a causal report relation.
+- Added migration V65 with optional daily-report source foreign keys for checks and direct actions, same-project/work-item validation, indexes, and inherited report traceability for actions generated from failed checks.
+- Extended the construction workspace contracts to expose report date, weather and direct-versus-check linkage while preserving the existing issue, rework, replanning and action-event lifecycle.
+- Added report-list counters and a linked check/action/remediation timeline in report detail, with permission-aware create actions and navigation through the existing shared check/action dialogs.
+- Updated create/view flows so checks and actions can start from a daily report with locked work-item context and reusable report evidence; check/action detail links back to its source report.
+- Updated Golden fixtures and validators with a complete report -> check -> failed action -> resolved remediation chain; the construction fixture reload is idempotent and leaves no open quality/handover blockers.
+- Updated the central, backend, frontend, root-cause, construction-operations and quality/handover maps for the new relation and UI ownership.
+- Validation passed: backend formatting/full tests, focused database integration test, 65-migration check, Golden fixture and validator checks, authenticated construction-workspace API smoke check, frontend production build and `git diff --check`.
+- Browser verification was skipped because the user did not explicitly request it in this turn.
+
 ## Direct Construction Check Criteria And Evidence
 
 Status: complete
