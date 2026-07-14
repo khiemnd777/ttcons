@@ -541,7 +541,8 @@ func TestProjectEvidenceFilterNormalizationAndCursor(t *testing.T) {
 func TestProjectEvidencePageScopeHistoryAndReviewCapability(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
-	service := NewService(NewRepository(db), "test-secret")
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
 	fixture := setupWorkItemFlowFixture(t, db, false)
 	operationViewID := ensurePermission(t, db, "operation.view", "Xem thi công", "operation")
 	pmRoleID := ensureRole(t, db, "pm", "PM")
@@ -2293,6 +2294,276 @@ func TestConstructionWorkspaceLinksDailyReportThroughChecksActionsAndResolution(
 		Title:               "Sai nguồn công việc",
 	}, fixture.workerID, "Worker")
 	assertValidationError(t, err)
+}
+
+func TestPlanningConstructionHandoffIsIdempotentAndTracksCheckResolution(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	runID := newID()
+	planningNodeID := newID()
+	constructionNodeID := newID()
+	mustExec(t, db, `
+		INSERT INTO pipeline_runs (id,project_id,template_id,status,engine_version)
+		VALUES ($1,$2,'40000000-0000-0000-0000-000000000021','in_progress',2)
+	`, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (id,run_id,project_id,name,type,order_index,responsible_role_ids,status,started_at)
+		VALUES
+			($1,$3,$4,'Kế hoạch thi công','construction_planning',9,'["PM","QA/QC"]'::jsonb,'in_progress',now()),
+			($2,$3,$4,'Thi công','construction',10,'["QA/QC","Giám sát"]'::jsonb,'pending',NULL)
+	`, planningNodeID, constructionNodeID, runID, fixture.projectID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$2 WHERE id=$1`, runID, planningNodeID)
+	mustExec(t, db, `UPDATE projects SET current_pipeline_run_id=$2 WHERE id=$1`, fixture.projectID, runID)
+
+	beforeIssues, err := repo.NodeCompletionIssues(ctx, Record{"id": planningNodeID, "run_id": runID, "type": "construction_planning", "status": "in_progress"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !recordListHasCode(beforeIssues, "CONSTRUCTION_HANDOFF_REQUIRED") {
+		t.Fatalf("planning completion issues before handoff = %#v, want CONSTRUCTION_HANDOFF_REQUIRED", beforeIssues)
+	}
+
+	req := ConstructionHandoffActivateRequest{
+		Title:           "Bàn giao hoàn thiện khu A",
+		Notes:           "Giám sát theo hồ sơ đã duyệt",
+		SourceRunNodeID: planningNodeID,
+		Items: []ConstructionHandoffItemRequest{
+			{
+				SourceFieldKey: "inspection_items", SourceItemIndex: 0,
+				Title: "Kiểm tra cao độ trần", Location: "Khu A", ResponsibleRole: "QA/QC", AssignedUserID: fixture.workerID,
+				EvidenceRequired: true,
+				Criteria:         []ConstructionCheckCriterion{{Title: "Cao độ", Criteria: "Sai số không quá 3mm", EvidenceRequired: true}},
+			},
+			{
+				SourceFieldKey: "inspection_items", SourceItemIndex: 1,
+				Title: "Kiểm tra bề mặt sơn", Location: "Khu A", ResponsibleRole: "Giám sát", AssignedUserID: fixture.workerID,
+				EvidenceRequired: true,
+				Criteria:         []ConstructionCheckCriterion{{Title: "Bề mặt", Criteria: "Không nứt, phồng hoặc lệch màu", EvidenceRequired: true}},
+			},
+		},
+	}
+
+	first, err := service.ActivateConstructionHandoff(ctx, fixture.projectID, req, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.ActivateConstructionHandoff(ctx, fixture.projectID, req, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(first["id"]) != cleanID(second["id"]) || !boolValue(second["idempotent_replay"]) {
+		t.Fatalf("handoff replay = first %v/second %v/idempotent %v", first["id"], second["id"], second["idempotent_replay"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_handoffs WHERE project_id=$1`, 1, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_handoff_items WHERE project_id=$1`, 2, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='construction_handoff_item'`, 2, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_checks WHERE project_id=$1 AND source_handoff_item_id IS NOT NULL`, 2, fixture.projectID)
+	afterIssues, err := repo.NodeCompletionIssues(ctx, Record{"id": planningNodeID, "run_id": runID, "type": "construction_planning", "status": "in_progress"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recordListHasCode(afterIssues, "CONSTRUCTION_HANDOFF_REQUIRED") {
+		t.Fatalf("planning completion issues after handoff = %#v, handoff blocker should be cleared", afterIssues)
+	}
+	mustExec(t, db, `UPDATE pipeline_run_nodes SET status='completed',completed_at=now() WHERE id=$1`, planningNodeID)
+	mustExec(t, db, `UPDATE pipeline_run_nodes SET status='in_progress',started_at=now() WHERE id=$1`, constructionNodeID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$2 WHERE id=$1`, runID, constructionNodeID)
+	mustExec(t, db, `UPDATE work_items SET status='ready' WHERE project_id=$1 AND source_type='construction_handoff_item' AND status='pending'`, fixture.projectID)
+
+	items := workflowAnswerRecordList(first["items"])
+	if len(items) != 2 {
+		t.Fatalf("handoff items = %#v, want 2", first["items"])
+	}
+	checkIDs := []string{cleanID(items[0]["generated_check_id"]), cleanID(items[1]["generated_check_id"])}
+	workIDs := []string{cleanID(items[0]["generated_work_item_id"]), cleanID(items[1]["generated_work_item_id"])}
+	evidenceIDs := make([]string, 0, 3)
+	for index, workID := range workIDs {
+		evidence, addErr := service.AddWorkItemEvidence(ctx, workID, WorkItemEvidenceRequest{
+			EvidenceType: "photo", Name: fmt.Sprintf("Handoff result %d", index+1), FileURL: fmt.Sprintf("https://example.com/handoff-%d.jpg", index+1), Visibility: "project",
+		}, fixture.workerID, "Worker")
+		if addErr != nil {
+			t.Fatal(addErr)
+		}
+		evidenceIDs = append(evidenceIDs, cleanID(evidence["id"]))
+	}
+	manualAction, err := service.CreateConstructionAction(ctx, fixture.projectID, ConstructionActionRequest{
+		WorkItemID: workIDs[0], Title: "Dọn vật tư trước kiểm tra", Description: "Việc hiện trường độc lập với kết quả kiểm tra",
+		AssignedUserID: fixture.workerID, DueAt: "2026-07-19T17:00:00+07:00", ImpactScope: "none", Priority: "normal", EvidenceID: evidenceIDs[0],
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.SubmitConstructionActionResolution(ctx, cleanID(manualAction["id"]), ConstructionActionResolutionRequest{
+		EvidenceID: evidenceIDs[0], Note: "Đã dọn vật tư",
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.VerifyConstructionAction(ctx, cleanID(manualAction["id"]), ConstructionActionVerifyRequest{
+		Result: "pass", Comment: "Đạt",
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='ready'`, 1, workIDs[0])
+
+	if _, err = service.CompleteConstructionCheck(ctx, checkIDs[0], ConstructionCheckCompleteRequest{
+		Result: "pass", Note: "Đạt", EvidenceIDs: []string{evidenceIDs[0]},
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	failed, err := service.CompleteConstructionCheck(ctx, checkIDs[1], ConstructionCheckCompleteRequest{
+		Result: "fail", Note: "Lệch màu", EvidenceIDs: []string{evidenceIDs[1]}, ActionTitle: "Sơn dặm lại khu A",
+		AssignedUserID: fixture.workerID, DueAt: "2026-07-20T17:00:00+07:00", ImpactScope: "none", Priority: "normal",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	action := recordFromAny(failed["action"])
+	if cleanID(action["id"]) == "" {
+		t.Fatalf("failed check did not create action: %#v", failed)
+	}
+	resolutionEvidence, err := service.AddWorkItemEvidence(ctx, workIDs[1], WorkItemEvidenceRequest{
+		EvidenceType: "photo", Name: "Handoff resolution", FileURL: "https://example.com/handoff-resolution.jpg", Visibility: "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.SubmitConstructionActionResolution(ctx, cleanID(action["id"]), ConstructionActionResolutionRequest{
+		EvidenceID: cleanID(resolutionEvidence["id"]), Note: "Đã sơn dặm",
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.VerifyConstructionAction(ctx, cleanID(action["id"]), ConstructionActionVerifyRequest{
+		Result: "pass", Comment: "Đạt sau khắc phục",
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='construction_handoff_item' AND status='completed'`, 2, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_handoff_items WHERE project_id=$1 AND status='completed'`, 2, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_action_items WHERE id=$1 AND status='done'`, 1, action["id"])
+}
+
+func TestPlanningConstructionHandoffSupersedesOnlyUnstartedFormRevision(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	runID := newID()
+	planningNodeID := newID()
+	constructionNodeID := newID()
+	formID := newID()
+	mustExec(t, db, `
+		INSERT INTO pipeline_runs (id,project_id,template_id,status,engine_version)
+		VALUES ($1,$2,'40000000-0000-0000-0000-000000000021','in_progress',2)
+	`, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (id,run_id,project_id,name,type,order_index,responsible_role_ids,status,started_at)
+		VALUES
+			($1,$3,$4,'Kế hoạch thi công','construction_planning',9,'["PM","QA/QC"]'::jsonb,'in_progress',now()),
+			($2,$3,$4,'Thi công','construction',10,'["QA/QC","Giám sát"]'::jsonb,'pending',NULL)
+	`, planningNodeID, constructionNodeID, runID, fixture.projectID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$2 WHERE id=$1`, runID, planningNodeID)
+	mustExec(t, db, `UPDATE projects SET current_pipeline_run_id=$2 WHERE id=$1`, fixture.projectID, runID)
+	mustExec(t, db, `
+		INSERT INTO workflow_form_instances (
+			id,project_id,pipeline_run_id,run_node_id,form_template_id,form_version_id,form_type,title,status,
+			current_revision,answers_snapshot_json,created_by,submitted_by,submitted_at
+		)
+		SELECT $1,$2,$3,$4,t.id,v.id,'checklist','Kế hoạch bàn giao','submitted',1,
+			'{"handoff_title":"Đợt 1","inspection_items":[{"title":"Kiểm tra trần","criteria":"Sai số không quá 3mm"}]}'::jsonb,
+			$5,$5,now()
+		FROM workflow_form_templates t
+		JOIN workflow_form_versions v ON v.template_id=t.id AND v.version_no=1
+		WHERE t.code='client_construction_handoff_plan'
+	`, formID, fixture.projectID, runID, planningNodeID, fixture.workerID)
+
+	revisionOne := ConstructionHandoffActivateRequest{
+		Title:                "Bàn giao revision 1",
+		SourceRunNodeID:      planningNodeID,
+		SourceFormInstanceID: formID,
+		SourceFormRevisionNo: 1,
+		Items: []ConstructionHandoffItemRequest{{
+			SourceFieldKey: "inspection_items", SourceItemIndex: 0, Title: "Kiểm tra trần",
+			ResponsibleRole: "QA/QC", EvidenceRequired: true,
+			Criteria: []ConstructionCheckCriterion{{Title: "Cao độ", Criteria: "Sai số không quá 3mm", EvidenceRequired: true}},
+		}},
+	}
+	first, err := service.ActivateConstructionHandoff(ctx, fixture.projectID, revisionOne, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	replayed, err := service.ActivateConstructionHandoff(ctx, fixture.projectID, ConstructionHandoffActivateRequest{
+		Title:                "Nội dung client thay đổi nhưng cùng form revision",
+		SourceRunNodeID:      planningNodeID,
+		SourceFormInstanceID: formID,
+		SourceFormRevisionNo: 1,
+		Items:                revisionOne.Items,
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(replayed["id"]) != cleanID(first["id"]) || !boolValue(replayed["idempotent_replay"]) {
+		t.Fatalf("same form revision replay = first %v/replayed %v/idempotent %v", first["id"], replayed["id"], replayed["idempotent_replay"])
+	}
+
+	mustExec(t, db, `
+		UPDATE workflow_form_instances
+		SET current_revision=2,
+			answers_snapshot_json='{"handoff_title":"Đợt 2","inspection_items":[{"title":"Kiểm tra sơn","criteria":"Không lệch màu"}]}'::jsonb,
+			updated_at=now()
+		WHERE id=$1
+	`, formID)
+	_, err = service.ActivateConstructionHandoff(ctx, fixture.projectID, revisionOne, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_handoffs WHERE project_id=$1`, 1, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_handoff_items WHERE handoff_id=$1 AND status='activated'`, 1, first["id"])
+
+	revisionTwo := revisionOne
+	revisionTwo.Title = "Bàn giao revision 2"
+	revisionTwo.SourceFormRevisionNo = 2
+	revisionTwo.Items = []ConstructionHandoffItemRequest{{
+		SourceFieldKey: "inspection_items", SourceItemIndex: 0, Title: "Kiểm tra sơn",
+		ResponsibleRole: "Giám sát", EvidenceRequired: true,
+		Criteria: []ConstructionCheckCriterion{{Title: "Bề mặt", Criteria: "Không lệch màu", EvidenceRequired: true}},
+	}}
+	second, err := service.ActivateConstructionHandoff(ctx, fixture.projectID, revisionTwo, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(second["id"]) == cleanID(first["id"]) || int(number(second["source_form_revision_no"])) != 2 {
+		t.Fatalf("revision two handoff = id %v/form revision %v, want new id/revision 2", second["id"], second["source_form_revision_no"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_handoffs WHERE project_id=$1`, 2, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_handoff_items WHERE handoff_id=$1 AND status='cancelled'`, 1, first["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_checks c JOIN construction_handoff_items i ON i.id=c.source_handoff_item_id WHERE i.handoff_id=$1 AND c.status='cancelled'`, 1, first["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items w JOIN construction_handoff_items i ON i.generated_work_item_id=w.id WHERE i.handoff_id=$1 AND w.status='cancelled'`, 1, first["id"])
+
+	secondItems := workflowAnswerRecordList(second["items"])
+	if len(secondItems) != 1 {
+		t.Fatalf("revision two items = %#v, want one item", second["items"])
+	}
+	mustExec(t, db, `UPDATE work_items SET status='in_progress',started_at=now() WHERE id=$1`, secondItems[0]["generated_work_item_id"])
+	mustExec(t, db, `UPDATE workflow_form_instances SET current_revision=3,updated_at=now() WHERE id=$1`, formID)
+	revisionThree := revisionTwo
+	revisionThree.Title = "Bàn giao revision 3"
+	revisionThree.SourceFormRevisionNo = 3
+	_, err = service.ActivateConstructionHandoff(ctx, fixture.projectID, revisionThree, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_handoffs WHERE project_id=$1`, 2, fixture.projectID)
+}
+
+func recordListHasCode(rows []Record, code string) bool {
+	for _, row := range rows {
+		if fmt.Sprint(row["code"]) == code {
+			return true
+		}
+	}
+	return false
 }
 
 func TestBusinessCoreLifecycleServiceRecordsActors(t *testing.T) {

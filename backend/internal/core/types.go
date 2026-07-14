@@ -659,6 +659,27 @@ type ConstructionCheckCriterion struct {
 	EvidenceRequired bool   `json:"evidence_required"`
 }
 
+type ConstructionHandoffItemRequest struct {
+	SourceFieldKey   string                       `json:"source_field_key"`
+	SourceItemIndex  int                          `json:"source_item_index"`
+	Title            string                       `json:"title"`
+	Location         string                       `json:"location"`
+	ScheduledAt      string                       `json:"scheduled_at"`
+	ResponsibleRole  string                       `json:"responsible_role"`
+	AssignedUserID   string                       `json:"assigned_user_id"`
+	EvidenceRequired bool                         `json:"evidence_required"`
+	Criteria         []ConstructionCheckCriterion `json:"criteria"`
+}
+
+type ConstructionHandoffActivateRequest struct {
+	Title                string                           `json:"title"`
+	Notes                string                           `json:"notes"`
+	SourceRunNodeID      string                           `json:"source_run_node_id"`
+	SourceFormInstanceID string                           `json:"source_form_instance_id"`
+	SourceFormRevisionNo int                              `json:"source_form_revision_no"`
+	Items                []ConstructionHandoffItemRequest `json:"items"`
+}
+
 type ConstructionCheckTemplateRequest struct {
 	Name        string                       `json:"name"`
 	Description string                       `json:"description"`

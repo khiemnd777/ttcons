@@ -5,13 +5,13 @@
 - Frontend modules: `frontend/src/modules/operations`, `frontend/src/modules/quality`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
 - Work item panels: `WorkflowFormPanel.tsx`, `EvidencePanel.tsx`, `EvidenceGallery.tsx`, `ActivityThread.tsx`, `ActivityComposer.tsx`
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`
+- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `construction_handoff.go`, `types.go`
 - Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
 
 ## Routes
 
 - Operations: `/projects/:id/daily-reports`, `/daily-reports/:id`, `/daily-reports/:id/evidence/upload`, `/projects/:id/issues`, `/issues/:id`
-- Simplified field checks/actions: `/projects/:id/construction-workspace`, check-template/check creation, `PUT /construction-checks/:id`, check completion, action create, `PUT /construction-actions/:id`, resolution/verify/impact routes
+- Simplified field checks/actions: `/projects/:id/construction-workspace`, `/projects/:id/construction-handoff`, `/projects/:id/construction-handoff/activate`, check-template/check creation, `PUT /construction-checks/:id`, check completion, action create, `PUT /construction-actions/:id`, resolution/verify/impact routes
 - Quality field execution: `/projects/:id/quality`, quality ITP/RFI/NCR/recurring action routes
 - Work items: `/work-items/:id/*`, `/projects/:id/work-items`, `/me/work-items`
 - Evidence: `/work-items/:id/evidence`, `/work-items/:id/evidence/upload`, `/evidence/:id/file|accept|reject`
@@ -19,14 +19,14 @@
 
 ## Tables And Migrations
 
-- `operation_daily_reports`, `construction_check_templates`, `construction_checks`, `construction_check_evidence`, `construction_action_items`, `construction_action_events`, compatibility `issues`/`rework_requests`/`replanning_requests`, `work_items`, `work_item_activities`
+- `operation_daily_reports`, `construction_handoffs`, `construction_handoff_items`, `construction_check_templates`, `construction_checks`, `construction_check_evidence`, `construction_action_items`, `construction_action_events`, compatibility `issues`/`rework_requests`/`replanning_requests`, `work_items`, `work_item_activities`
 - `quality_itp_plans`, `quality_itp_items`, `quality_inspection_requests`, `quality_ncrs`, `construction_recurring_plans`, `construction_recurring_occurrences`
 - `evidence_records`, `documents`
 - Form-backed site records: `workflow_form_instances`, `workflow_form_answers`, `workflow_form_events`
 - Checklist/report seed forms: `V18`, `V19`, `V20`
 - Evidence/storage migrations: `V6`, `V15`, `V16`
 - Product-grade QA/QC and daily-report bridge migrations: `V51`, `V52`, `V53`
-- Simplified construction migrations: `V62` canonical check/action model, `V63` scoped check/action edit permissions, and `V64` ordered multi-evidence roles for checks
+- Simplified construction migrations: `V62` canonical check/action model, `V63` scoped edit permissions, `V64` ordered multi-evidence roles, `V65` daily-report source links and `V66` Planning-to-Construction handoff
 
 ## Invariants
 
@@ -35,6 +35,7 @@
 - The project construction UI at `/projects/:id/operations` is purpose-first: `Nhật ký`, `Kiểm tra`, and `Cần xử lý`. It must not expose ITP/RFI/NCR/rework/replanning forms in the primary field flow.
 - V62 makes the simplified model canonical for field interaction. A check snapshots zero to 30 criteria entered directly in its create/edit dialog; selecting a template only preloads editable rows and never remains a prerequisite. V64 associates up to 10 same-project/work-item, non-rejected evidence records per `context` or `result` role. Completion requires `pass|fail`, at least one result record and an optional note; the first result also remains in `construction_checks.evidence_id` for compatibility. A failed check atomically creates exactly one action from that primary result; manual actions use the same path.
 - V65 provides causal traceability from `operation_daily_reports` to field execution. Checks and actions created directly from a report may store an optional `source_daily_report_id`; it must belong to the same project and, when the report has a work item, that same work item. A failed-check action does not duplicate the report foreign key: it inherits the source through immutable `source_check_id`, and workspace reads expose the normalized report ID/link kind. Never infer or backfill this relation from matching dates or work items.
+- V66 makes Planning handoff the planned-execution source. One activated snapshot revision atomically/idempotently creates exactly one `construction_handoff_item`, target construction-node `work_item` and canonical `construction_check` per dedicated inspection item. The same submitted form revision always replays its existing handoff. A newer source-form revision may cancel and replace only rows whose work has not started and whose check has no evidence/action; once execution starts, the revision is rejected. Generated checks expose their plan revision, are read-only except through this guarded revision path, and cannot be performed while their generated work item remains `pending`. Pass completes the work item; fail blocks it and the failed-check action must be verified pass before completion. Manual checks remain the path for unplanned field conditions.
 - Check edit is limited to pending records created in the simplified model; RFI-backed checks remain read-only and must be changed at their QA/QC source. Action edit is limited to open canonical actions; technical NCR/legacy issue backfills remain read-only. Action source, work item, evidence, impact and status are immutable, while title/description/priority/assignee/due date synchronize to linked issue/rework records transactionally and emit audit.
 - Actions transition `open -> waiting_confirmation -> done`. Verification failure returns to `open` and increments `retry_count`; events preserve every resolution/verification attempt. `impact_scope` is one flag and may create a hidden technical replanning link.
 - `construction_action_events` remains the source of truth for every remediation submission and verification attempt. Report detail may summarize that timeline, but must open the canonical action View for the complete khắc phục history and evidence.

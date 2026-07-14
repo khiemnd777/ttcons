@@ -2519,6 +2519,32 @@ func (h *Handler) ProjectConstructionWorkspace(c *fiber.Ctx) error {
 	return response.OK(c, workspace)
 }
 
+func (h *Handler) ProjectConstructionHandoff(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"operation.view", "planning.view", "construction.handoff.manage"}); err != nil {
+		return err
+	}
+	result, err := h.service.ProjectConstructionHandoff(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result)
+}
+
+func (h *Handler) ActivateConstructionHandoff(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"construction.handoff.manage"}); err != nil {
+		return err
+	}
+	req := ConstructionHandoffActivateRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu bàn giao thi công không hợp lệ")
+	}
+	result, err := h.service.ActivateConstructionHandoff(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, result)
+}
+
 func (h *Handler) CreateConstructionCheckTemplate(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"construction.template.manage"}); err != nil {
 		return err

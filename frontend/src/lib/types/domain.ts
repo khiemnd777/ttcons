@@ -587,6 +587,76 @@ export type ConstructionCheckCriterion = {
   evidence_required?: boolean;
 };
 
+export type ConstructionHandoffCandidate = {
+  source_field_key: string;
+  source_item_index: number;
+  source_form_code?: string;
+  title: string;
+  location?: string;
+  scheduled_at?: string;
+  responsible_role: string;
+  assigned_user_id?: string;
+  evidence_required?: boolean;
+  criteria: ConstructionCheckCriterion[];
+};
+
+export type ConstructionHandoffItem = ProjectOperationsRecord & {
+  source_field_key: string;
+  source_item_index: number;
+  title: string;
+  location?: string;
+  scheduled_at?: string;
+  responsible_role_ids: string[];
+  assigned_user_id?: string;
+  assigned_user_name?: string;
+  evidence_required: boolean;
+  criteria_jsonb: ConstructionCheckCriterion[];
+  generated_work_item_id: string;
+  generated_check_id: string;
+  work_item_status?: string;
+  check_status?: string;
+  check_result?: 'pass' | 'fail';
+  status: 'activated' | 'completed' | 'cancelled';
+};
+
+export type ConstructionHandoff = ProjectOperationsRecord & {
+  pipeline_run_id: string;
+  source_run_node_id?: string;
+  source_node_name?: string;
+  target_run_node_id: string;
+  target_node_name?: string;
+  source_form_instance_id?: string;
+  source_form_revision_no?: number;
+  revision_no: number;
+  title: string;
+  notes?: string;
+  status: 'draft' | 'activated' | 'cancelled';
+  activated_by_name?: string;
+  activated_at?: string;
+  items: ConstructionHandoffItem[];
+  idempotent_replay?: boolean;
+};
+
+export type ConstructionHandoffWorkspace = {
+  available: boolean;
+  can_activate: boolean;
+  reason?: string;
+  pipeline_run_id?: string;
+  source_run_node_id?: string;
+  source_node_name?: string;
+  source_node_type?: string;
+  source_node_status?: string;
+  target_run_node_id?: string;
+  target_node_name?: string;
+  target_node_status?: string;
+  source_form_instance_id?: string;
+  source_form_revision_no?: number;
+  suggested_title?: string;
+  candidates: ConstructionHandoffCandidate[];
+  handoffs: ConstructionHandoff[];
+  participants: Array<{ id: string; full_name: string; email: string }>;
+};
+
 export type ConstructionCheckTemplate = ProjectOperationsRecord & {
   name: string;
   description?: string;
@@ -617,6 +687,13 @@ export type ConstructionCheck = ProjectOperationsRecord & {
   checked_by_name?: string;
   checked_at?: string;
   technical_rfi_id?: string;
+  source_handoff_item_id?: string;
+  handoff_id?: string;
+  handoff_title?: string;
+  handoff_revision_no?: number;
+  handoff_source_field_key?: string;
+  handoff_source_item_index?: number;
+  handoff_source_node_name?: string;
 };
 
 export type ConstructionActionEvent = ProjectOperationsRecord & {

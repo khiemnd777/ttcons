@@ -312,6 +312,22 @@ func (r *Repository) NodeCompletionIssues(ctx context.Context, node Record) ([]R
 	}
 	issues = append(issues, workItemIssues...)
 
+	if strings.TrimSpace(fmt.Sprint(node["type"])) == "construction_planning" {
+		handoffIssues, err := r.Query(ctx, `
+			SELECT 'CONSTRUCTION_HANDOFF_REQUIRED' AS code,
+				'Kế hoạch giám sát chưa được kích hoạt và bàn giao sang Thi công' AS message
+			WHERE NOT EXISTS (
+				SELECT 1
+				FROM construction_handoffs h
+				WHERE h.pipeline_run_id=$1 AND h.source_run_node_id=$2 AND h.status='activated'
+			)
+		`, node["run_id"], node["id"])
+		if err != nil {
+			return nil, err
+		}
+		issues = append(issues, handoffIssues...)
+	}
+
 	formIssues, err := r.Query(ctx, `
 		SELECT rs.id AS run_step_id, rs.name AS step_name, rs.form_version_id,
 			wfi.id AS workflow_form_instance_id, wfi.status AS workflow_form_status,

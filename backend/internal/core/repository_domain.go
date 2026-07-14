@@ -11943,7 +11943,10 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 		SELECT c.*,t.name AS template_name,w.title AS work_item_title,
 			e.name AS evidence_name,e.evidence_type,
 			rq.full_name AS requested_by_name,ck.full_name AS checked_by_name,
-			dr.report_date AS source_report_date,dr.weather AS source_report_weather
+			dr.report_date AS source_report_date,dr.weather AS source_report_weather,
+			hi.handoff_id,hi.source_field_key AS handoff_source_field_key,hi.source_item_index AS handoff_source_item_index,
+			h.title AS handoff_title,h.revision_no AS handoff_revision_no,h.source_run_node_id,h.target_run_node_id,
+			source_node.name AS handoff_source_node_name
 		FROM construction_checks c
 		LEFT JOIN construction_check_templates t ON t.id=c.template_id
 		LEFT JOIN work_items w ON w.id=c.work_item_id
@@ -11951,6 +11954,9 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 		LEFT JOIN users rq ON rq.id=c.requested_by
 		LEFT JOIN users ck ON ck.id=c.checked_by
 		LEFT JOIN operation_daily_reports dr ON dr.id=c.source_daily_report_id
+		LEFT JOIN construction_handoff_items hi ON hi.id=c.source_handoff_item_id
+		LEFT JOIN construction_handoffs h ON h.id=hi.handoff_id
+		LEFT JOIN pipeline_run_nodes source_node ON source_node.id=h.source_run_node_id
 		WHERE c.project_id=$1 AND c.status <> 'cancelled'
 		ORDER BY CASE WHEN c.status='pending' THEN 0 ELSE 1 END,c.scheduled_at NULLS LAST,c.created_at DESC
 	`, projectID)
@@ -12027,7 +12033,7 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 		action["events"] = events
 	}
 	workItems, err := r.Query(ctx, `
-		SELECT id,title,status,work_type
+		SELECT id,title,status,work_type,source_type,source_id,run_node_id
 		FROM work_items
 		WHERE project_id=$1 AND status <> 'cancelled'
 		ORDER BY CASE WHEN status IN ('ready','in_progress','needs_changes','blocked') THEN 0 ELSE 1 END,updated_at DESC
@@ -12147,6 +12153,9 @@ func (r *Repository) UpdateConstructionCheck(ctx context.Context, checkID, workI
 	if cleanID(check["technical_rfi_id"]) != "" {
 		return nil, validationError("Kiểm tra đồng bộ từ RFI chỉ được chỉnh sửa tại hồ sơ QA/QC")
 	}
+	if cleanID(check["source_handoff_item_id"]) != "" {
+		return nil, validationError("Kiểm tra từ kế hoạch chỉ được thay đổi bằng một revision bàn giao mới")
+	}
 	projectID := cleanID(check["project_id"])
 	workItems, err := queryTx(ctx, tx, `SELECT id FROM work_items WHERE id=$1 AND project_id=$2 AND status <> 'cancelled'`, workItemID, projectID)
 	if err != nil {
@@ -12226,6 +12235,15 @@ func (r *Repository) CompleteConstructionCheck(ctx context.Context, checkID, res
 	if fmt.Sprint(check["status"]) != "pending" {
 		return nil, validationError("Kiểm tra này đã có kết quả", Record{"status": check["status"]})
 	}
+	if cleanID(check["source_handoff_item_id"]) != "" {
+		workRows, queryErr := queryTx(ctx, tx, `SELECT status FROM work_items WHERE id=$1 AND project_id=$2`, check["work_item_id"], check["project_id"])
+		if queryErr != nil {
+			return nil, queryErr
+		}
+		if len(workRows) == 0 || !statusIn(fmt.Sprint(workRows[0]["status"]), "ready", "in_progress", "blocked", "needs_changes") {
+			return nil, validationError("Hạng mục này chưa tới giai đoạn thi công", Record{"work_item_status": firstRecordValue(workRows, "status")})
+		}
+	}
 	for _, evidenceID := range evidenceIDs {
 		if err := validateConstructionEvidenceTx(ctx, tx, cleanID(check["project_id"]), cleanID(check["work_item_id"]), evidenceID); err != nil {
 			return nil, err
@@ -12253,6 +12271,15 @@ func (r *Repository) CompleteConstructionCheck(ctx context.Context, checkID, res
 			return nil, err
 		}
 		responseRow["action"] = action
+	}
+	if cleanID(check["source_handoff_item_id"]) != "" {
+		workStatus := "completed"
+		if result == "fail" {
+			workStatus = "blocked"
+		}
+		if err := handoffWorkItemStatusTx(ctx, tx, cleanID(check["work_item_id"]), workStatus, actorID); err != nil {
+			return nil, err
+		}
 	}
 	if err := addAuditTx(ctx, tx, cleanID(check["project_id"]), actorID, actorName, "construction_check_completed", "construction_check", checkID, "Ghi nhận kiểm tra "+result, Record{"result": result, "evidence_id": primaryEvidenceID, "evidence_ids": evidenceIDs, "action_created": result == "fail"}); err != nil {
 		return nil, err
@@ -12607,6 +12634,21 @@ func (r *Repository) VerifyConstructionAction(ctx context.Context, actionID, res
 	if cleanID(action["technical_rework_id"]) != "" {
 		if _, err := tx.ExecContext(ctx, `UPDATE rework_requests SET status=$2,approved_by=COALESCE(approved_by,NULLIF($3,'')::uuid),updated_at=now() WHERE id=$1`, action["technical_rework_id"], reworkStatus, actorID); err != nil {
 			return nil, err
+		}
+	}
+	if sourceCheckID := cleanID(action["source_check_id"]); sourceCheckID != "" {
+		handoffChecks, queryErr := queryTx(ctx, tx, `SELECT source_handoff_item_id FROM construction_checks WHERE id=$1`, sourceCheckID)
+		if queryErr != nil {
+			return nil, queryErr
+		}
+		if len(handoffChecks) > 0 && cleanID(handoffChecks[0]["source_handoff_item_id"]) != "" {
+			workStatus := "blocked"
+			if result == "pass" {
+				workStatus = "completed"
+			}
+			if err := handoffWorkItemStatusTx(ctx, tx, cleanID(action["work_item_id"]), workStatus, actorID); err != nil {
+				return nil, err
+			}
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO construction_action_events (action_id,event_type,comment,evidence_id,actor_id) VALUES ($1,$2,NULLIF($3,''),$4,NULLIF($5,'')::uuid)`, actionID, eventType, comment, action["resolution_evidence_id"], actorID); err != nil {

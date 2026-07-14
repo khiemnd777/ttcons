@@ -7,10 +7,10 @@ export type DialogSize = 'sm' | 'md' | 'lg' | 'xl' | 'report' | 'workspace';
 const sizeClass: Record<DialogSize, string> = {
   sm: 'max-w-md',
   md: 'max-w-xl',
-  lg: 'max-w-2xl',
-  xl: 'max-w-4xl',
-  report: 'max-w-[min(1080px,calc(100vw-2rem))]',
-  workspace: 'max-w-[min(1280px,calc(100vw-2rem))]',
+  lg: 'max-w-[min(800px,calc(100vw-2rem))]',
+  xl: 'max-w-[min(1120px,calc(100vw-2rem))]',
+  report: 'max-w-[min(1320px,calc(100vw-2rem))]',
+  workspace: 'max-w-[min(1480px,calc(100vw-2rem))]',
 };
 
 export function Dialog({

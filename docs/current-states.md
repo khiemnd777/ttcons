@@ -1,5 +1,60 @@
 # Current States
 
+## Planning To Construction Handoff
+
+Status: complete
+
+Mục đích chính:
+- Bàn giao một lần các hạng mục giám sát đã được chuẩn bị trong Planning sang hàng đợi `Kiểm tra` để Giám sát viên chỉ thực hiện kiểm tra, xử lý/khắc phục và báo cáo tại hiện trường.
+
+Will be done:
+- Thêm contract `construction_handoffs`/`construction_handoff_items` với snapshot nguồn, actor/time audit, trạng thái và khóa idempotency; mỗi hạng mục được kích hoạt đúng một work item và một canonical construction check.
+- Tạo API đọc preview, lưu/activate handoff atomic và hỗ trợ runtime hiện hữu mà không viết lại lịch sử; nguồn kế hoạch và check được liên kết hai chiều.
+- Tách planning/pre-construction với execution trong official workflow revision mới; không mutate published template hoặc runtime copy lịch sử.
+- Đồng bộ check/action lifecycle với generated work item và chặn rời node Thi công khi check/action từ bàn giao chưa hoàn tất.
+- Thêm Planning handoff panel/dialog, trạng thái readiness và một CTA bàn giao; Thi công hiển thị nguồn `Từ kế hoạch` nhưng giữ manual check cho phát sinh ngoài kế hoạch.
+- Cập nhật Golden fixtures/tests và central/backend/frontend/root-cause/workflow/planning/construction mappings; chạy backend format/tests/migration/seed validation, frontend build và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the cross-domain review package and Mockup as Text with `OK triển khai theo review package này`.
+- Loaded mandatory central/backend/frontend/root-cause maps, workflow/planning/construction domain guardrails, impact analysis, backend/frontend workflow and custom database migration instructions.
+- Confirmed PostgreSQL through `database/sql`, custom checksum migration runner and a high-risk schema/transaction/API/UI change owned by `repository_domain.go`, service/handler/routes, workflow runtime, Planning and Operations.
+- Confirmed existing dirty files belong to the previous approved dialog-width change and will be preserved.
+- Added V66 with `construction_handoffs`/`construction_handoff_items`, snapshot hash/revision/actor audit, generated record links, `construction.handoff.manage`, the dedicated `client_construction_handoff_plan` form and published official workflow revision 2.
+- Revision 2 preserves the immutable revision-1 runtime and separates node 9 `Kế hoạch thi công` from node 10 `Thi công`; future project runs use revision 2 while active/historical runs keep their selected template snapshot.
+- Added typed read/activate routes and focused `construction_handoff.go` service/repository ownership. Preview prefers the dedicated submitted form and supports current revision-1 QA/assignment form imports; activation atomically/idempotently creates one handoff item, target-node work item and canonical check per source row. The client sends its previewed form revision and backend locks/rechecks it to reject stale-tab activation. Same-form-revision replay returns the existing handoff; a newer form revision replaces only unstarted rows and is rejected after work/evidence/action begins.
+- Added `CONSTRUCTION_HANDOFF_REQUIRED` to the engine-v2 planning completion gate. Generated work stays pending until the normal construction node advance; a generated check cannot run early.
+- Synchronized generated work lifecycle: check pass completes it, check fail blocks it and creates the canonical action, verification pass completes it, and verification fail keeps it blocked. Planning-generated checks are read-only snapshots; manual checks remain available for unplanned conditions.
+- Added `ConstructionHandoffPanel` to Planning with readiness metrics, one bulk CTA, report-width inline editor, participant assignment, inline validation, dismissible toasts and read-only revision view. Operations lists/detail show `Từ kế hoạch · rev n` and preserve the shared perform/remediation dialogs.
+- Added DB regression coverage for the planning completion blocker, atomic two-item generation, idempotent replay, guarded form-revision supersession and pass/fail/resolution/verification synchronization.
+- Updated central/backend/frontend/root-cause plus planning/workflow/construction domain mappings. The completed Golden historical fixture was intentionally not rewritten to revision 2; disposable DB coverage validates the new revision while preserving the fixture's historical runtime contract.
+- Validation passed: frontend production build; backend package tests; all 66 migrations on a fresh disposable PostgreSQL database; revision-2 schema check (`13` nodes, `53` steps, ordered `Kế hoạch thi công -> Thi công -> Nghiệm thu Đầu Vào`); focused DB regression; `git diff --check`.
+- Browser verification was skipped because the user did not explicitly request it.
+
+## Information-Dense Dialog Widths
+
+Status: complete
+
+Mục đích chính:
+- Cho các dialog chứa nhiều biểu mẫu, bảng, tiêu chí, minh chứng hoặc panel liên quan tận dụng tốt chiều rộng desktop trong khi dialog xác nhận đơn giản vẫn gọn và mobile vẫn responsive.
+
+Will be done:
+- Giữ `sm`/`md`; mở rộng semantic sizes dùng chung thành `lg` 800px, `xl` 1120px, `report` 1320px và `workspace` 1480px, luôn giới hạn theo viewport.
+- Chuyển form Tạo/Sửa Kiểm tra từ `lg` sang `xl`; giữ Báo cáo ở `report` và các workspace giàu thông tin ở tier hiện hữu để tự nhận chiều rộng mới.
+- Không đổi API, validation, trạng thái, permission, footer CTA hoặc responsive single-column behavior.
+- Cập nhật central/frontend mappings; chạy frontend build, rà soát Dialog usages và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `Approve`.
+- Reloaded the mandatory central/frontend mappings, frontend workflow skill and shared Dialog source before implementation.
+- Confirmed the root cause is the legacy fixed maxima (672/896/1080/1280px) remaining after information-heavy dialogs adopted multi-column layouts.
+- Expanded the shared responsive tiers to `lg` 800px, `xl` 1120px, `report` 1320px and `workspace` 1480px while preserving the existing viewport cap and compact `sm`/`md` tiers.
+- Promoted the information-heavy Tạo/Sửa Kiểm tra form from `lg` to `xl`; report create/edit/view and existing rich workspaces automatically receive their approved wider tiers.
+- Updated the central and frontend UI maps with the semantic size contract; no backend, API, permission, validation or business-domain mapping changed.
+- Validation passed: all explicit Dialog usages were inventoried, the four widths were emitted in the production CSS, frontend production build and `git diff --check` passed.
+- Browser verification was skipped because the user did not explicitly request it.
+
 ## One-Flow Daily Report Field Actions
 
 Status: complete

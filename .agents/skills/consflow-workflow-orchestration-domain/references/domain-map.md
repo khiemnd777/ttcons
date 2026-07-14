@@ -7,7 +7,7 @@
 - Frontend routes: `frontend/src/app/router.tsx`
 - Frontend modules: `frontend/src/modules/pipeline-builder`, `frontend/src/modules/planning`, `frontend/src/modules/workflow-forms`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
 - Shared frontend contracts: `frontend/src/lib/api/client.ts`, `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
-- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`
+- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`
 
 ## Routes
 
@@ -36,6 +36,7 @@
 - Runtime steps are deterministically ordered by `order_index,id`; do not reference a non-existent `pipeline_run_steps.created_at` column in run detail or completion-gate queries.
 - UAT for official template automation must invoke stable engine-v2 `domain_action_key` actions through the hard-automation gate; display-name automation is legacy engine-v1 compatibility only.
 - Engine v2 work items can mutate only inside the run's current node. Advancing a node requires all run steps/work items, exact forms, node approval, and mandatory automation events to be ready.
+- Official template revision 2 is a new immutable lineage revision that inserts `Kế hoạch thi công` before `Thi công`; existing runs retain revision 1 snapshots. `NodeCompletionIssues` adds `CONSTRUCTION_HANDOFF_REQUIRED` only to `construction_planning` nodes until an activated handoff exists. Generated target-node work items remain pending until normal node advance makes them ready, so handoff does not bypass engine-v2 current-node execution rules. Handoff idempotency is scoped to the submitted source-form revision; a later form revision atomically cancels/replaces only still-pending generated rows and is rejected after execution, evidence or remediation has begun.
 - Branch transitions mark non-selected direct alternatives `skipped`, cancel their pending work/form instances, and exclude skipped nodes from progress.
 - Project Operations preserves those cancelled branch work items as read-only history and labels them as skipped; action queues and `CanActOnWorkItem` continue to exclude them. Runtime timeline completion treats `submitted` and `completed` steps as satisfied, while skipped/cancelled steps are counted separately and never inflate progress.
 - The project Tổng quan presentation reuses runtime work-item priority and timeline data: next action order stays blocker -> waiting approval/review -> other open work, current-stage progress remains source-backed, and navigation labels may be Vietnamese without changing runtime status keys or gates.

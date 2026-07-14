@@ -2,7 +2,7 @@
 
 ## Owners
 
-- Frontend modules: `frontend/src/modules/projects`, `frontend/src/modules/planning`, `frontend/src/modules/planning-daily-reports`, `frontend/src/modules/meeting-minutes`, `frontend/src/modules/planning-checklists`
+- Frontend modules: `frontend/src/modules/projects`, `frontend/src/modules/planning` including `ConstructionHandoffPanel.tsx`, `frontend/src/modules/planning-daily-reports`, `frontend/src/modules/meeting-minutes`, `frontend/src/modules/planning-checklists`
 - Shared work item UI: `frontend/src/modules/work-items`
 - Backend routes: `backend/internal/core/routes.go`
 - Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`
@@ -12,7 +12,7 @@
 
 - Projects: `/projects`, `/projects/:id`, `/projects/:id/operations`, `/projects/:id/evidence`
 - Project members: `/projects/:id/members`, `/projects/:id/members/:memberId`
-- Planning: `/projects/:id/start-pipeline`, `/projects/:id/pipeline-run`, `/projects/:id/work-items`
+- Planning: `/projects/:id/start-pipeline`, `/projects/:id/pipeline-run`, `/projects/:id/work-items`, `/projects/:id/construction-handoff`, `/projects/:id/construction-handoff/activate`
 - Planning reports: `/planning/daily-reports`, `/planning/meeting-minutes`, `/planning/checklists`
 - Activity: `/projects/:id/activity`, `/projects/:id/activity/options`, `/projects/:id/activity/read-all`, `/projects/:id/activity/stream`, `/activities/:id/read|resolve|reactions|message|withdraw`, `/me/activity-attention`
 - Contract workspace: `/projects/:id/contracts`; activating the signed main-client contract updates the project-level `contract_amount` compatibility snapshot.
@@ -21,10 +21,10 @@
 
 - `projects`, `project_members`, `audit_logs`
 - Commercial project master: `contracts`, signed `contract_versions`; `projects.contract_amount` is not the version history.
-- Runtime planning: `pipeline_runs`, `pipeline_run_nodes`, `pipeline_run_steps`, `work_items`
+- Runtime planning: `pipeline_runs`, `pipeline_run_nodes`, `pipeline_run_steps`, `work_items`, `construction_handoffs`, `construction_handoff_items`
 - Form-backed planning: `workflow_form_instances`, `workflow_form_answers`, `workflow_form_events`
 - Activity: `work_item_activities`, `activity_mentions`, `activity_read_states`, `activity_reactions`, `activity_message_revisions`
-- Relevant migrations: `V1`, `V5`, `V6`, `V7`, `V8`, `V9`, `V10`, `V11`, `V12`, `V13`, `V58`, `V60`
+- Relevant migrations: `V1`, `V5`, `V6`, `V7`, `V8`, `V9`, `V10`, `V11`, `V12`, `V13`, `V58`, `V60`, `V66`
 
 ## Invariants
 
@@ -34,6 +34,7 @@
 - Project detail and global workspaces must agree on statuses and available actions.
 - Project Thành viên uses a dedicated typed API rather than the Operations payload. Active members with `project.view` see active membership; `project.member.manage` controls inactive history and mutations. Save/reactivate/deactivate synchronizes `project_members` with project-scoped `user_roles` transactionally, keeps global roles untouched, soft-deactivates history, audits changes and protects the current PM from removal.
 - Project `Kế hoạch` is an action-first queue over every ordered runtime step. Its default `Cần xử lý` view is derived from work-item runtime status, `waiting_approval`/`waiting_review` stay distinct, only `pending` is future work, and terminal/skipped work remains discoverable outside the actionable queue. The one next-work CTA stays blocker -> waiting approval/review -> other open work. Workflow-form draft/submitted/required state and evidence count are supporting metadata; rows only navigate to permission-gated work-item detail, while node transition/approval/block controls remain in `Quy trình`.
+- Official workflow revision 2 separates `Kế hoạch thi công` from field `Thi công`. The dedicated `client_construction_handoff_plan` form owns the inspection-item list; Planning exposes one bulk review/activation CTA. The planning node cannot complete until a handoff snapshot is activated. Each activation preserves source form/node, actor/time, form revision, handoff revision and hash; the request carries the previewed form revision and stale-tab activation is rejected after a locked recheck. Replaying the same submitted form revision returns the existing handoff. A newer form revision may supersede only generated rows that are still unstarted and have no evidence/action; otherwise activation is rejected so field history is never overwritten. Current revision-1 construction runs may import submitted QA/assignment data without mutating their runtime history.
 - Project Tổng quan leads with one prioritized action ordered blocker -> waiting approval/review -> other open work, shows the current runtime stage beside it, keeps source-backed attention counts separate from budget/contract/schedule reference data, and uses Vietnamese system labels without translating user-entered project/work-item data.
 - Project Hồ sơ is a project-scoped work-item evidence workspace: summary/search/filter/cursor results use the same visibility and work-item scope, waiting review sorts first, rejected evidence remains discoverable as history, cancelled-work-item evidence stays excluded, and review controls appear only when backend `CanDecideWorkItem` yields `can_review=true`.
 - Project activity defaults to all visible activity and uses total visible count for the project-tab badge; attention counts remain inside `Cần chú ý`, and the `Quyết định` tab uses the dedicated source-backed `decisions` summary count. It uses server-backed search/filter/cursor pagination and permission-scoped picker options. Resolving a question, blocker, or reminder preserves history by appending a system event and audit record.

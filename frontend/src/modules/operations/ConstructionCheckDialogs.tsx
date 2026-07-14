@@ -167,7 +167,7 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
     }
   }
 
-  return <Dialog open title={check ? 'Chỉnh sửa kiểm tra' : 'Tạo kiểm tra'} description={check ? 'Chỉ kiểm tra đang chờ và được tạo tại màn hình này mới có thể chỉnh sửa.' : sourceReport ? 'Kiểm tra này sẽ được truy vết trực tiếp về báo cáo hiện trường nguồn.' : 'Đặt nội dung, công việc và thời điểm để đội hiện trường có thể thực hiện ngay.'} size="lg" onClose={onClose} footer={<FormFooter saving={saving} submitLabel={check ? 'Lưu thay đổi' : 'Tạo kiểm tra'} onClose={onClose} onSave={save} />}>
+  return <Dialog open title={check ? 'Chỉnh sửa kiểm tra' : 'Tạo kiểm tra'} description={check ? 'Chỉ kiểm tra đang chờ và được tạo tại màn hình này mới có thể chỉnh sửa.' : sourceReport ? 'Kiểm tra này sẽ được truy vết trực tiếp về báo cáo hiện trường nguồn.' : 'Đặt nội dung, công việc và thời điểm để đội hiện trường có thể thực hiện ngay.'} size="xl" onClose={onClose} footer={<FormFooter saving={saving} submitLabel={check ? 'Lưu thay đổi' : 'Tạo kiểm tra'} onClose={onClose} onSave={save} />}>
     <div className="space-y-5">
       {sourceReport ? <SourceReportBanner report={sourceReport} /> : null}
       <div><SectionTitle>Thông tin kiểm tra</SectionTitle><div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -189,7 +189,7 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
 function CheckViewDialog({ check, workspace, canEdit, canPerform, onClose, onEdit, onComplete, onViewAction, onViewReport }: Props & { check: ConstructionCheck }) {
   const linkedAction = workspace.actions.find((item) => item.source_check_id === check.id);
   const canAct = check.status === 'pending' && canPerform;
-  const canChange = check.status === 'pending' && !check.technical_rfi_id && canEdit;
+  const canChange = check.status === 'pending' && !check.technical_rfi_id && !check.source_handoff_item_id && canEdit;
   return <Dialog open title={check.title} description={`${checkStatusLabel(check)} · ${check.work_item_title || 'Công việc liên quan'}`} size="xl" onClose={onClose} footer={<div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between"><button type="button" className="rounded-md border border-line px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-white" onClick={onClose}>Đóng</button><div className="flex justify-end gap-2">{canChange ? <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onEdit(check)}><Pencil className="h-4 w-4" /> Chỉnh sửa</button> : null}{canAct ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onComplete(check)}><PlayCircle className="h-4 w-4" /> Ghi kết quả</button> : null}</div></div>}>
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
       <div className="space-y-5">
@@ -201,6 +201,7 @@ function CheckViewDialog({ check, workspace, canEdit, canPerform, onClose, onEdi
         {linkedAction ? <div><SectionTitle>Việc phát sinh</SectionTitle><button type="button" className="mt-3 flex w-full items-center justify-between rounded-lg border border-rose-200 bg-rose-50 p-4 text-left hover:bg-rose-100" onClick={() => onViewAction(linkedAction)}><span><span className="block font-semibold text-rose-800">{linkedAction.title}</span><span className="mt-1 block text-sm text-rose-700">{linkedAction.assigned_user_name || 'Chưa giao người xử lý'} · {dateTimeText(linkedAction.due_at)}</span></span><span className="text-sm font-semibold text-rose-700">Xem việc</span></button></div> : null}
       </div>
       <aside className="space-y-4 rounded-lg border border-line bg-slate-50 p-4 lg:self-start">
+        {check.source_handoff_item_id ? <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2"><p className="text-xs font-semibold text-blue-800">Từ kế hoạch thi công · revision {check.handoff_revision_no ?? 1}</p><p className="mt-1 text-xs text-blue-700">{check.handoff_title || check.handoff_source_node_name || 'Bàn giao kế hoạch'}</p></div> : null}
         <Detail label="Công việc" value={check.work_item_title || '—'} />
         <Detail label="Vị trí" value={check.location || 'Chưa ghi'} />
         <Detail label="Mẫu" value={check.template_name || 'Không dùng mẫu'} />
@@ -209,6 +210,7 @@ function CheckViewDialog({ check, workspace, canEdit, canPerform, onClose, onEdi
         <Detail label="Người kiểm tra" value={check.checked_by_name || 'Chưa thực hiện'} />
         <Detail label="Thời điểm kết quả" value={dateTimeText(check.checked_at)} />
         {check.technical_rfi_id ? <p className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-700">Đồng bộ từ RFI QA/QC; chỉnh sửa tại hồ sơ nguồn.</p> : null}
+        {check.source_handoff_item_id ? <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">Kiểm tra được sinh từ snapshot Planning; thay đổi bằng revision bàn giao mới.</p> : null}
       </aside>
     </div>
   </Dialog>;

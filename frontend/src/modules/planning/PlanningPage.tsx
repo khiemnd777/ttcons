@@ -23,6 +23,7 @@ import {
   workflowFormChipText,
   workflowFormNextAction,
 } from '../work-items/workItemPresentation';
+import { ConstructionHandoffPanel } from './ConstructionHandoffPanel';
 
 export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipeline' }) {
   const { id = '' } = useParams();
@@ -186,26 +187,29 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
           }
         />
       ) : mode === 'planning' ? (
-        <PlanningActionWorkspace
-          rows={planningWorkRows}
-          filteredRows={filteredPlanningWorkRows}
-          metrics={planningWorkMetrics}
-          progress={planningProgress}
-          currentNode={currentNode}
-          nextWork={nextPlanningWork}
-          search={workSearch}
-          queueFilter={queueFilter}
-          typeFilter={workTypeFilter}
-          statusFilter={workStatusFilter}
-          requirementFilter={workRequirementFilter}
-          onSearchChange={setWorkSearch}
-          onQueueFilterChange={setQueueFilter}
-          onTypeFilterChange={setWorkTypeFilter}
-          onStatusFilterChange={setWorkStatusFilter}
-          onRequirementFilterChange={setWorkRequirementFilter}
-          onOpenRow={(row) => openStepWorkItem(row.step)}
-          onOpenPipeline={() => navigate(`/projects/${id}/pipeline`)}
-        />
+        <div className="space-y-4">
+          <ConstructionHandoffPanel projectId={id} currentNode={currentNode} />
+          <PlanningActionWorkspace
+            rows={planningWorkRows}
+            filteredRows={filteredPlanningWorkRows}
+            metrics={planningWorkMetrics}
+            progress={planningProgress}
+            currentNode={currentNode}
+            nextWork={nextPlanningWork}
+            search={workSearch}
+            queueFilter={queueFilter}
+            typeFilter={workTypeFilter}
+            statusFilter={workStatusFilter}
+            requirementFilter={workRequirementFilter}
+            onSearchChange={setWorkSearch}
+            onQueueFilterChange={setQueueFilter}
+            onTypeFilterChange={setWorkTypeFilter}
+            onStatusFilterChange={setWorkStatusFilter}
+            onRequirementFilterChange={setWorkRequirementFilter}
+            onOpenRow={(row) => openStepWorkItem(row.step)}
+            onOpenPipeline={() => navigate(`/projects/${id}/pipeline`)}
+          />
+        </div>
       ) : operations.isLoading ? (
         <PipelineWorkspaceLoading />
       ) : operations.error ? (

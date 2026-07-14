@@ -37,7 +37,7 @@ export function actionStatusLabel(status: ConstructionActionItem['status']) {
 }
 
 export function isConstructionCheckEditable(check: ConstructionCheck) {
-  return check.status === 'pending' && !check.technical_rfi_id;
+  return check.status === 'pending' && !check.technical_rfi_id && !check.source_handoff_item_id;
 }
 
 export function isConstructionActionEditable(action: ConstructionActionItem) {
