@@ -10,6 +10,7 @@ import { RowActions } from '../../components/RowActions';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { get, post } from '../../lib/api/client';
+import { useAuth } from '../../lib/auth/AuthContext';
 import type {
   OutputInvoiceRecord,
   ReceivableAdvanceReceiptRecord,
@@ -24,6 +25,7 @@ import { SimpleForm } from '../_shared/SimpleForm';
 type OutputBillingPlanPanelProps = {
   receivable: ReceivableRecord;
   onChanged?: () => void;
+  view?: 'all' | 'plan' | 'payments';
 };
 
 type OpenDialog =
@@ -33,10 +35,15 @@ type OpenDialog =
   | { type: 'settlement'; advance: ReceivableAdvanceReceiptRecord }
   | null;
 
-export function OutputBillingPlanPanel({ receivable, onChanged }: OutputBillingPlanPanelProps) {
+export function OutputBillingPlanPanel({ receivable, onChanged, view = 'all' }: OutputBillingPlanPanelProps) {
   const [openDialog, setOpenDialog] = useState<OpenDialog>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { hasAnyPermission } = useAuth();
+  const canCreatePlan = hasAnyPermission(['accounting.payment_create', 'accounting.receivable_approve']);
+  const canApprovePlan = hasAnyPermission(['accounting.receivable_approve', 'accounting.payment_approve']);
+  const canCreateReceipt = hasAnyPermission(['accounting.payment_create']);
+  const canApproveReceipt = hasAnyPermission(['accounting.payment_approve']);
 
   const schedules = useQuery({
     queryKey: ['receivable-payment-schedules', receivable.id],
@@ -153,35 +160,35 @@ export function OutputBillingPlanPanel({ receivable, onChanged }: OutputBillingP
 
   return (
     <section className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-4">
+      {view !== 'payments' ? <div className="grid gap-3 sm:grid-cols-4">
         <MetricTile label="Kế hoạch kỳ" value={<CurrencyText value={summary.planned} />} />
         <MetricTile label="Còn theo kỳ" value={<CurrencyText value={summary.scheduleRemaining} />} />
         <MetricTile label="Ứng trước duyệt" value={<CurrencyText value={summary.advanceApproved} />} />
         <MetricTile label="Đã quyết toán" value={<CurrencyText value={summary.advanceSettled} />} />
-      </div>
+      </div> : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-ink">Thanh toán kỳ / ứng trước đầu ra</h3>
-          <p className="mt-1 text-xs text-slate-500">Phiếu thu từng phần cập nhật phải thu khi được duyệt.</p>
+          <h3 className="text-sm font-semibold text-ink">{view === 'payments' ? 'Phiếu thu đầu ra' : 'Lịch thu và ứng trước'}</h3>
+          <p className="mt-1 text-xs text-slate-500">Phiếu chỉ cập nhật phải thu sau khi được duyệt và phân bổ đúng nguồn.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => void Promise.all([schedules.refetch(), advances.refetch(), receipts.refetch()])}>
             <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
             Tải lại
           </button>
-          <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => setOpenDialog({ type: 'schedule' })}>
+          {view !== 'payments' && canCreatePlan ? <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => setOpenDialog({ type: 'schedule' })}>
             <Plus className="h-4 w-4" />
             Kỳ
-          </button>
-          <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => setOpenDialog({ type: 'advance' })}>
+          </button> : null}
+          {view !== 'payments' && canCreatePlan ? <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => setOpenDialog({ type: 'advance' })}>
             <HandCoins className="h-4 w-4" />
             Ứng trước
-          </button>
-          <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpenDialog({ type: 'receipt' })}>
+          </button> : null}
+          {view !== 'plan' && canCreateReceipt ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpenDialog({ type: 'receipt' })}>
             <Plus className="h-4 w-4" />
             Thu tiền
-          </button>
+          </button> : null}
         </div>
       </div>
 
@@ -189,7 +196,7 @@ export function OutputBillingPlanPanel({ receivable, onChanged }: OutputBillingP
         <div className="rounded-md border border-rose-100 bg-rose-50 p-3 text-sm text-rose-700">Không tải được dữ liệu thanh toán đầu ra.</div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      {view !== 'payments' ? <div className="grid gap-4 xl:grid-cols-2">
         <div className="space-y-2">
           <h4 className="text-xs font-semibold uppercase text-slate-500">Lịch thu</h4>
           <DataTable
@@ -202,19 +209,19 @@ export function OutputBillingPlanPanel({ receivable, onChanged }: OutputBillingP
               { key: 'schedule_code', header: 'Mã', sortable: true },
               { key: 'schedule_type', header: 'Loại', render: (row) => <EnumChip group="payment_schedule_type" value={row.schedule_type} /> },
               { key: 'milestone_name', header: 'Kỳ', render: (row) => <span className="font-semibold text-ink">{row.milestone_name}</span> },
-              { key: 'due_date', header: 'Due', sortable: true, render: (row) => dateText(row.due_date) },
-              { key: 'planned_amount', header: 'Planned', align: 'right', render: (row) => <CurrencyText value={row.planned_amount} /> },
+              { key: 'due_date', header: 'Hạn', sortable: true, render: (row) => dateText(row.due_date) },
+              { key: 'planned_amount', header: 'Kế hoạch', align: 'right', render: (row) => <CurrencyText value={row.planned_amount} /> },
               { key: 'remaining_amount', header: 'Còn', align: 'right', render: (row) => <CurrencyText value={row.remaining_amount} /> },
-              { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+              { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
               {
                 key: 'actions',
-                header: 'Action',
+                header: 'Thao tác',
                 render: (row) => (
                   <RowActions>
-                    <button className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={row.status !== 'draft' || approveSchedule.isPending} onClick={() => approveSchedule.mutate(row.id)}>
+                    {canApprovePlan ? <button className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={row.status !== 'draft' || approveSchedule.isPending} onClick={() => approveSchedule.mutate(row.id)}>
                       <Check className="mr-1 inline h-4 w-4" />
                       Duyệt
-                    </button>
+                    </button> : null}
                   </RowActions>
                 ),
               },
@@ -232,31 +239,31 @@ export function OutputBillingPlanPanel({ receivable, onChanged }: OutputBillingP
             defaultSort={{ key: 'due_date', direction: 'asc' }}
             columns={[
               { key: 'receipt_code', header: 'Mã', sortable: true },
-              { key: 'amount', header: 'Amount', align: 'right', render: (row) => <CurrencyText value={row.amount} /> },
+              { key: 'amount', header: 'Số tiền', align: 'right', render: (row) => <CurrencyText value={row.amount} /> },
               { key: 'received_amount', header: 'Đã thu', align: 'right', render: (row) => <CurrencyText value={row.received_amount ?? 0} /> },
-              { key: 'settled_amount', header: 'Settled', align: 'right', render: (row) => <CurrencyText value={row.settled_amount ?? 0} /> },
-              { key: 'due_date', header: 'Due', sortable: true, render: (row) => dateText(row.due_date) },
-              { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+              { key: 'settled_amount', header: 'Đã quyết toán', align: 'right', render: (row) => <CurrencyText value={row.settled_amount ?? 0} /> },
+              { key: 'due_date', header: 'Hạn', sortable: true, render: (row) => dateText(row.due_date) },
+              { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
               {
                 key: 'actions',
-                header: 'Action',
+                header: 'Thao tác',
                 render: (row) => (
                   <RowActions>
-                    <button className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={row.status !== 'draft' || approveAdvance.isPending} onClick={() => approveAdvance.mutate(row.id)}>
+                    {canApprovePlan ? <button className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={row.status !== 'draft' || approveAdvance.isPending} onClick={() => approveAdvance.mutate(row.id)}>
                       Duyệt
-                    </button>
-                    <button className="text-sm font-semibold text-teal-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={!['approved', 'partially_received', 'received', 'partially_settled'].includes(row.status)} onClick={() => setOpenDialog({ type: 'settlement', advance: row })}>
+                    </button> : null}
+                    {canApprovePlan ? <button className="text-sm font-semibold text-teal-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={!['approved', 'partially_received', 'received', 'partially_settled'].includes(row.status)} onClick={() => setOpenDialog({ type: 'settlement', advance: row })}>
                       Quyết toán
-                    </button>
+                    </button> : null}
                   </RowActions>
                 ),
               },
             ]}
           />
         </div>
-      </div>
+      </div> : null}
 
-      <div className="space-y-2">
+      {view !== 'plan' ? <div className="space-y-2">
         <h4 className="text-xs font-semibold uppercase text-slate-500">Phiếu thu đầu ra</h4>
         {receiptRows.length || receipts.isLoading ? (
           <DataTable
@@ -268,20 +275,20 @@ export function OutputBillingPlanPanel({ receivable, onChanged }: OutputBillingP
             columns={[
               { key: 'payment_code', header: 'Mã', sortable: true },
               { key: 'payment_type', header: 'Loại', render: (row) => <EnumChip group="payment_type" value={row.payment_type} /> },
-              { key: 'allocation_type', header: 'Allocation', render: (row) => <EnumChip group="payment_allocation_type" value={row.allocation_type ?? 'receivable_receipt'} /> },
+              { key: 'allocation_type', header: 'Phân bổ', render: (row) => <EnumChip group="payment_allocation_type" value={row.allocation_type ?? 'receivable_receipt'} /> },
               { key: 'schedule_code', header: 'Kỳ/ứng trước', render: (row) => row.schedule_code ?? row.advance_receipt_code ?? '-' },
               { key: 'output_invoice_number', header: 'Hoá đơn', render: (row) => row.output_invoice_number ?? '-' },
-              { key: 'amount', header: 'Amount', align: 'right', render: (row) => <CurrencyText value={row.amount} /> },
-              { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+              { key: 'amount', header: 'Số tiền', align: 'right', render: (row) => <CurrencyText value={row.amount} /> },
+              { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
               {
                 key: 'actions',
-                header: 'Action',
+                header: 'Thao tác',
                 render: (row) => (
                   <RowActions>
-                    <button className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={!['draft', 'submitted', 'pending'].includes(row.status) || approveReceipt.isPending} onClick={() => approveReceipt.mutate(row.id)}>
+                    {canApproveReceipt ? <button className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={!['draft', 'submitted', 'pending'].includes(row.status) || approveReceipt.isPending} onClick={() => approveReceipt.mutate(row.id)}>
                       <Check className="mr-1 inline h-4 w-4" />
                       Duyệt
-                    </button>
+                    </button> : null}
                   </RowActions>
                 ),
               },
@@ -290,7 +297,7 @@ export function OutputBillingPlanPanel({ receivable, onChanged }: OutputBillingP
         ) : (
           <EmptyState title="Chưa có phiếu thu" />
         )}
-      </div>
+      </div> : null}
 
       <Dialog open={openDialog?.type === 'schedule'} title="Tạo kỳ thu đầu ra" onClose={() => setOpenDialog(null)} size="lg">
         <SimpleForm
@@ -300,7 +307,7 @@ export function OutputBillingPlanPanel({ receivable, onChanged }: OutputBillingP
             { name: 'schedule_type', label: 'Loại kỳ', type: 'select', defaultValue: 'progress', required: true, options: enumOptions('payment_schedule_type', ['advance', 'progress', 'final', 'retention', 'other']) },
             { name: 'milestone_name', label: 'Tên kỳ', defaultValue: 'Kỳ thu', required: true, fullWidth: true },
             { name: 'planned_amount', label: 'Số tiền kế hoạch', type: 'number', defaultValue: Number(receivable.remaining_amount ?? receivable.gross_amount ?? 0), required: true, min: 1 },
-            { name: 'due_date', label: 'Due date', type: 'date' },
+            { name: 'due_date', label: 'Hạn thu', type: 'date' },
             { name: 'notes', label: 'Ghi chú', type: 'textarea', fullWidth: true },
           ]}
           submitLabel="Tạo kỳ"
@@ -314,7 +321,7 @@ export function OutputBillingPlanPanel({ receivable, onChanged }: OutputBillingP
           fields={[
             { name: 'receipt_code', label: 'Mã ứng trước', defaultValue: `ADV-${Date.now().toString().slice(-5)}`, required: true },
             { name: 'amount', label: 'Số tiền', type: 'number', defaultValue: Number(receivable.remaining_amount ?? 0), required: true, min: 1 },
-            { name: 'due_date', label: 'Due date', type: 'date' },
+            { name: 'due_date', label: 'Hạn thu', type: 'date' },
             { name: 'reason', label: 'Lý do', type: 'textarea', fullWidth: true },
             { name: 'notes', label: 'Ghi chú', type: 'textarea', fullWidth: true },
           ]}

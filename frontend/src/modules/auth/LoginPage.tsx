@@ -39,7 +39,7 @@ export function LoginPage() {
       <div className="w-full max-w-md rounded-lg border border-line bg-white p-6 shadow-panel">
         <div className="mb-6">
           <div className="mb-4 grid h-11 w-11 place-items-center rounded-lg bg-blue-600 text-sm font-black text-white">CF</div>
-          <h1 className="text-2xl font-semibold text-ink">Đăng nhập Consflow</h1>
+          <h1 className="text-2xl font-semibold text-ink">Đăng nhập Thủ Thiêm Workflow</h1>
           <p className="mt-1 text-sm text-slate-600">Dùng tài khoản demo để vào hệ thống workflow công trình.</p>
         </div>
 

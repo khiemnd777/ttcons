@@ -18,6 +18,7 @@ import {
   acceptanceDraftFromRecord,
   acceptanceDraftPayload,
   createAcceptanceDraft,
+  uploadAcceptanceDraftEvidence,
   type AcceptanceDraft,
   type AcceptancePayload,
 } from '../acceptance/AcceptanceEditor';
@@ -81,8 +82,8 @@ export function OutgoingAcceptancePanel({
     }
   };
 
-  function buildPayload(requireComplete: boolean): AcceptancePayload | null {
-    const { payload, invalid } = acceptanceDraftPayload({ ...draft, work_item_id: workItemId }, requireComplete);
+  function buildPayload(sourceDraft: AcceptanceDraft, requireComplete: boolean): AcceptancePayload | null {
+    const { payload, invalid } = acceptanceDraftPayload({ ...sourceDraft, work_item_id: workItemId }, requireComplete);
     if (!projectId) invalid.unshift('Công trình');
     if (invalid.length) {
       toast.warn({ title: 'Dữ liệu nghiệm thu đầu ra chưa hợp lệ', description: invalid.slice(0, 8).join(', ') });
@@ -92,10 +93,13 @@ export function OutgoingAcceptancePanel({
   }
 
   async function saveDraftRecord(requireComplete: boolean) {
-    const payload = buildPayload(requireComplete);
-    if (!payload || !projectId) return null;
-    if (draft.id) {
-      return put<AcceptanceRecord>(`/acceptances/${draft.id}`, payload);
+    const initialPayload = buildPayload(draft, requireComplete);
+    if (!initialPayload || !projectId) return null;
+    const readyDraft = await uploadAcceptanceDraftEvidence({ ...draft, work_item_id: workItemId }, setDraft);
+    const payload = buildPayload(readyDraft, requireComplete);
+    if (!payload) return null;
+    if (readyDraft.id) {
+      return put<AcceptanceRecord>(`/acceptances/${readyDraft.id}`, payload);
     }
     return post<AcceptanceRecord>(`/projects/${projectId}/acceptances`, payload);
   }
@@ -186,6 +190,7 @@ export function OutgoingAcceptancePanel({
       <div className="space-y-4 rounded-md border border-line bg-white p-3">
         <AcceptanceEditor
           draft={draft}
+          projectId={projectId}
           evidence={evidenceOptions}
           formInstance={formInstance?.id ? { id: formInstance.id, title: formInstance.title } : undefined}
           pdfExports={pdfExports}

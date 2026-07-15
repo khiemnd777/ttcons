@@ -2220,6 +2220,8 @@ export type AcceptanceChecklistItem = ProjectOperationsRecord & {
   photo_required?: boolean;
   photo_url?: string;
   evidence_id?: string;
+  evidence_ids?: string[];
+  evidence_records?: EvidenceRecord[];
   evidence_name?: string;
   evidence_status?: string;
   decision: 'pending' | 'pass' | 'conditional_pass' | 'fail' | string;

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, ClipboardCheck, FileText, Loader2, Plus, Search, Send, Wrench } from 'lucide-react';
-import { get, post, put } from '../../lib/api/client';
+import { CheckCircle2, ClipboardCheck, ExternalLink, Eye, FileText, Loader2, Plus, Search, Send, Wrench } from 'lucide-react';
+import { downloadBlob, get, post, put } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
@@ -14,16 +14,18 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EnumChip } from '../../components/EnumChip';
 import { dateText } from '../../lib/utils/format';
 import { useAuth } from '../../lib/auth/AuthContext';
-import type { AcceptanceRecord, ProjectOperationsResponse } from '../../lib/types/domain';
+import type { AcceptanceChecklistItem, AcceptanceRecord, EvidenceRecord, ProjectOperationsResponse } from '../../lib/types/domain';
 import {
   AcceptanceEditor,
   acceptanceDraftFromRecord,
   acceptanceDraftPayload,
   createAcceptanceDraft,
+  uploadAcceptanceDraftEvidence,
   type AcceptanceDraft,
 } from './AcceptanceEditor';
 
 type ConclusionResult = 'pass' | 'conditional_pass' | 'fail';
+type SelectedChecklistItem = { item: AcceptanceChecklistItem; index: number } | null;
 
 const resultOptions: Array<{ value: ConclusionResult; label: string; description: string }> = [
   { value: 'pass', label: 'Đạt', description: 'Biên bản hoàn tất và không mở yêu cầu khắc phục.' },
@@ -41,6 +43,7 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
   const [conclusionOpen, setConclusionOpen] = useState(false);
   const [conclusionResult, setConclusionResult] = useState<ConclusionResult>('pass');
   const [conclusionComment, setConclusionComment] = useState('');
+  const [selectedChecklistItem, setSelectedChecklistItem] = useState<SelectedChecklistItem>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasAnyPermission } = useAuth();
@@ -100,13 +103,16 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
 
   const save = useMutation({
     mutationFn: async ({ submit }: { submit: boolean }) => {
-      const { payload, invalid } = acceptanceDraftPayload(draft, submit);
+      const initial = acceptanceDraftPayload(draft, submit);
+      const { invalid } = initial;
       if (invalid.length) {
         toast.warn({ title: 'Biên bản nghiệm thu chưa hợp lệ', description: invalid.slice(0, 8).join(', ') });
         return null;
       }
-      const record = draft.id
-        ? await put<AcceptanceRecord>(`/acceptances/${draft.id}`, payload)
+      const readyDraft = await uploadAcceptanceDraftEvidence(draft, setDraft);
+      const { payload } = acceptanceDraftPayload(readyDraft, submit);
+      const record = readyDraft.id
+        ? await put<AcceptanceRecord>(`/acceptances/${readyDraft.id}`, payload)
         : await post<AcceptanceRecord>(`/projects/${projectId}/acceptances`, payload);
       if (!submit) return record;
       return post<AcceptanceRecord>(`/acceptances/${record.id}/submit`, {});
@@ -170,52 +176,53 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
 
   return (
     <>
-      <PageHeader
-        title="Nghiệm thu"
-        description="Soạn, kiểm tra và kết luận biên bản nghiệm thu theo checklist; mỗi trạng thái chỉ hiển thị hành động tiếp theo cần làm."
-        actions={<>
-          {!global ? <ProjectBackLink projectId={projectId} /> : null}
-          {global ? <ProjectSelector value={projectId} onChange={(value) => { setProjectId(value); setSelectedId(''); }} /> : null}
-          {canCreate ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={openNewEditor}><Plus className="h-4 w-4" /> Tạo biên bản</button> : null}
-        </>}
-      />
+      <div className="mx-auto w-full max-w-[1180px]">
+        <PageHeader
+          title="Nghiệm thu"
+          description="Soạn, kiểm tra và kết luận biên bản nghiệm thu theo checklist; mỗi trạng thái chỉ hiển thị hành động tiếp theo cần làm."
+          actions={<>
+            {!global ? <ProjectBackLink projectId={projectId} /> : null}
+            {global ? <ProjectSelector value={projectId} onChange={(value) => { setProjectId(value); setSelectedId(''); }} /> : null}
+            {canCreate ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={openNewEditor}><Plus className="h-4 w-4" /> Tạo biên bản</button> : null}
+          </>}
+        />
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Nháp" value={summary.draft} detail="Cần hoàn thiện checklist" />
-        <MetricCard label="Chờ kết luận" value={summary.submitted} detail="Đã gửi biên bản" tone={summary.submitted ? 'blue' : 'slate'} />
-        <MetricCard label="Có điều kiện" value={summary.conditional} detail="Theo dõi phần việc còn lại" tone={summary.conditional ? 'amber' : 'slate'} />
-        <MetricCard label="Cần khắc phục" value={summary.failed} detail="Biên bản không đạt" tone={summary.failed ? 'red' : 'slate'} />
-      </div>
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Nháp" value={summary.draft} detail="Cần hoàn thiện checklist" />
+          <MetricCard label="Chờ kết luận" value={summary.submitted} detail="Đã gửi biên bản" tone={summary.submitted ? 'blue' : 'slate'} />
+          <MetricCard label="Có điều kiện" value={summary.conditional} detail="Theo dõi phần việc còn lại" tone={summary.conditional ? 'amber' : 'slate'} />
+          <MetricCard label="Cần khắc phục" value={summary.failed} detail="Biên bản không đạt" tone={summary.failed ? 'red' : 'slate'} />
+        </div>
 
-      <div className="grid min-h-[560px] overflow-hidden rounded-lg border border-line bg-white xl:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="border-b border-line xl:border-b-0 xl:border-r">
-          <div className="border-b border-line p-3">
-            <label className="flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm text-slate-500 focus-within:ring-2 focus-within:ring-blue-500">
-              <Search className="h-4 w-4" />
+        <section className="mb-4 overflow-hidden rounded-lg border border-line bg-white">
+          <div className="flex flex-col gap-3 border-b border-line p-3 sm:flex-row sm:items-center">
+            <label className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm text-slate-500 focus-within:ring-2 focus-within:ring-blue-500">
+              <Search className="h-4 w-4 shrink-0" />
               <input className="min-w-0 flex-1 outline-none" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm mã, tiêu đề, vị trí..." />
             </label>
-            <p className="mt-2 text-xs font-medium text-slate-500">{filteredRows.length} / {rows.length} biên bản</p>
+            <p className="shrink-0 text-xs font-semibold text-slate-500">{filteredRows.length} / {rows.length} biên bản</p>
           </div>
-          <div className="max-h-[660px] overflow-y-auto">
+          <div className="max-h-52 overflow-y-auto divide-y divide-line">
             {acceptances.isLoading ? <div className="p-5"><LoadingSpinner /></div> : null}
             {acceptances.error ? <ErrorPanel message="Không tải được danh sách nghiệm thu." onRetry={() => acceptances.refetch()} /> : null}
-            {!acceptances.isLoading && !acceptances.error && !filteredRows.length ? <div className="p-5"><EmptyState title={projectId ? 'Chưa có biên bản nghiệm thu' : 'Chọn công trình để xem nghiệm thu'} /></div> : null}
+            {!acceptances.isLoading && !acceptances.error && !filteredRows.length ? <div className="p-5"><EmptyState title={projectId ? (rows.length ? 'Không tìm thấy biên bản phù hợp' : 'Chưa có biên bản nghiệm thu') : 'Chọn công trình để xem nghiệm thu'} /></div> : null}
             {filteredRows.map((row) => (
-              <button key={row.id} type="button" className={`w-full border-b border-line px-4 py-3 text-left transition ${selectedId === row.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`} onClick={() => setSelectedId(String(row.id))}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+              <button key={row.id} type="button" className={`grid w-full gap-2 px-4 py-3 text-left transition sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${selectedId === row.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`} onClick={() => setSelectedId(String(row.id))}>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-semibold text-ink">{row.acceptance_code ?? 'Chưa có mã'}</p>
-                    <p className="mt-1 line-clamp-2 text-sm text-slate-700">{row.title}</p>
+                    <span className="text-xs text-slate-400">·</span>
+                    <p className="min-w-0 truncate text-sm text-slate-700">{row.title}</p>
                   </div>
-                  <StatusBadge status={row.result ?? row.status} />
+                  <p className="mt-1 truncate text-xs text-slate-500">{row.location || row.work_item_title || 'Chưa ghi vị trí'} · {row.acceptance_date ? dateText(row.acceptance_date) : 'Chưa chốt ngày'}</p>
                 </div>
-                <p className="mt-2 truncate text-xs text-slate-500">{row.location || row.work_item_title || 'Chưa ghi vị trí'} · {row.acceptance_date ? dateText(row.acceptance_date) : 'Chưa chốt ngày'}</p>
+                <StatusBadge status={row.result ?? row.status} />
               </button>
             ))}
           </div>
-        </aside>
+        </section>
 
-        <main className="min-w-0 bg-slate-50/50 p-4 lg:p-5">
+        <main className="min-w-0">
           {detail.isLoading && selectedId ? <div className="grid min-h-[420px] place-items-center"><LoadingSpinner /></div> : null}
           {detail.error ? <ErrorPanel message="Không tải được chi tiết biên bản nghiệm thu." onRetry={() => detail.refetch()} /> : null}
           {!selectedId && !detail.isLoading ? <div className="grid min-h-[420px] place-items-center"><EmptyState title="Chọn một biên bản để xem checklist" /></div> : null}
@@ -229,6 +236,7 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
               onEdit={openEditEditor}
               onConclude={openConclusion}
               onCreateRework={() => createRework.mutate()}
+              onViewChecklistItem={(item, index) => setSelectedChecklistItem({ item, index })}
             />
           ) : null}
         </main>
@@ -246,8 +254,8 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
           <button disabled={save.isPending} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={() => save.mutate({ submit: true })}>{save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Gửi nghiệm thu</button>
         </div>}
       >
-        <AcceptanceEditor draft={draft} evidence={operations.data?.latest_evidence ?? []} workItems={operations.data?.work_items ?? []} disabled={save.isPending} onChange={setDraft} />
-        {operations.error ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Không tải được danh sách đầu việc/minh chứng; anh vẫn có thể lưu biên bản không gắn nguồn.</p> : null}
+        <AcceptanceEditor draft={draft} projectId={projectId} evidence={operations.data?.latest_evidence ?? []} workItems={operations.data?.work_items ?? []} disabled={save.isPending} onChange={setDraft} />
+        {operations.error ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Không tải được danh sách công việc và minh chứng; anh vẫn có thể lưu biên bản chưa chọn Công việc liên quan.</p> : null}
       </Dialog>
 
       <Dialog
@@ -273,11 +281,17 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
           </label>
         </div>
       </Dialog>
+
+      <ChecklistItemDialog
+        selected={selectedChecklistItem}
+        record={selected}
+        onClose={() => setSelectedChecklistItem(null)}
+      />
     </>
   );
 }
 
-function AcceptanceDetail({ record, canCreate, canConclude, canCreateRework, busy, onEdit, onConclude, onCreateRework }: {
+function AcceptanceDetail({ record, canCreate, canConclude, canCreateRework, busy, onEdit, onConclude, onCreateRework, onViewChecklistItem }: {
   record: AcceptanceRecord;
   canCreate: boolean;
   canConclude: boolean;
@@ -286,6 +300,7 @@ function AcceptanceDetail({ record, canCreate, canConclude, canCreateRework, bus
   onEdit: () => void;
   onConclude: () => void;
   onCreateRework: () => void;
+  onViewChecklistItem: (item: AcceptanceChecklistItem, index: number) => void;
 }) {
   const checklist = record.checklist ?? [];
   const passed = checklist.filter((item) => item.decision === 'pass').length;
@@ -303,11 +318,11 @@ function AcceptanceDetail({ record, canCreate, canConclude, canCreateRework, bus
           </div>
           <NextAction record={record} canCreate={canCreate} canConclude={canConclude} canCreateRework={canCreateRework} busy={busy} onEdit={onEdit} onConclude={onConclude} onCreateRework={onCreateRework} />
         </div>
-        <ProgressSteps record={record} />
+        <AcceptanceStatusSummary record={record} />
         <div className="mt-4 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
           <Info label="Đại diện chủ đầu tư" value={record.client_representative} />
           <Info label="Đại diện nhà thầu" value={record.contractor_representative} />
-          <Info label="Đầu việc nguồn" value={record.work_item_title} />
+          <Info label="Công việc liên quan" value={record.work_item_title} />
           <Info label="Hồ sơ / PDF" value={record.pdf_file_name || record.workflow_form_title || record.document_status} />
         </div>
         {record.scope_summary ? <div className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700"><span className="font-semibold">Phạm vi: </span>{record.scope_summary}</div> : null}
@@ -315,16 +330,37 @@ function AcceptanceDetail({ record, canCreate, canConclude, canCreateRework, bus
 
       <section className="overflow-hidden rounded-lg border border-line bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
-          <div><h3 className="flex items-center gap-2 font-semibold text-ink"><ClipboardCheck className="h-4 w-4 text-blue-600" /> Checklist nghiệm thu</h3><p className="mt-1 text-xs text-slate-500">{checklist.length} tiêu chí · Đạt {passed} · Có điều kiện {conditional} · Không đạt {failed} · Chờ {pending}</p></div>
+          <div>
+            <h3 className="flex items-center gap-2 font-semibold text-ink"><ClipboardCheck className="h-4 w-4 text-blue-600" /> Checklist nghiệm thu</h3>
+            <p className="mt-1 text-xs text-slate-500">{checklist.length} tiêu chí · Đạt {passed} · Có điều kiện {conditional} · Không đạt {failed} · Chờ {pending}</p>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">Nguồn checklist: các tiêu chí được lập trực tiếp trong biên bản này; công việc liên quan, hồ sơ và PDF chỉ là liên kết tham chiếu.</p>
+          </div>
           <div className="flex flex-wrap gap-2"><SummaryChip label="Đạt" value={passed} tone="green" /><SummaryChip label="Có điều kiện" value={conditional} tone="amber" /><SummaryChip label="Không đạt" value={failed} tone="red" /></div>
         </div>
         {checklist.length ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-[900px] w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Hạng mục / tiêu chí</th><th className="px-4 py-3">Kết quả</th><th className="px-4 py-3">Minh chứng</th><th className="px-4 py-3">Yêu cầu xử lý</th><th className="px-4 py-3">Hạn</th></tr></thead>
-              <tbody className="divide-y divide-line">{checklist.map((item, index) => <tr key={item.id ?? index}><td className="px-4 py-3 text-slate-500">{index + 1}</td><td className="px-4 py-3"><p className="font-semibold text-ink">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.description || 'Không có mô tả bổ sung'}</p></td><td className="px-4 py-3"><EnumChip group="result" value={item.decision} /></td><td className="px-4 py-3">{item.evidence_name ? <div><p className="font-medium text-ink">{item.evidence_name}</p><StatusBadge status={item.evidence_status ?? 'submitted'} /></div> : item.photo_url ? 'Ảnh đính kèm' : '-'}</td><td className="px-4 py-3 text-slate-700">{item.required_action || '-'}</td><td className="px-4 py-3 text-slate-600">{item.due_date ? dateText(item.due_date) : '-'}</td></tr>)}</tbody>
-            </table>
-          </div>
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="min-w-[980px] w-full text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Hạng mục / tiêu chí</th><th className="px-4 py-3">Kết quả</th><th className="px-4 py-3">Minh chứng</th><th className="px-4 py-3">Yêu cầu xử lý</th><th className="px-4 py-3">Hạn</th><th className="px-4 py-3 text-right">Thao tác</th></tr></thead>
+                <tbody className="divide-y divide-line">{checklist.map((item, index) => <tr key={item.id ?? index} className="hover:bg-slate-50"><td className="px-4 py-3 text-slate-500">{index + 1}</td><td className="px-4 py-3"><p className="font-semibold text-ink">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.description || 'Không có mô tả bổ sung'}</p></td><td className="px-4 py-3"><EnumChip group="result" value={item.decision} /></td><td className="px-4 py-3">{checklistEvidenceCount(item) ? <div><p className="font-medium text-ink">{checklistEvidenceCount(item)} minh chứng</p>{item.evidence_status ? <StatusBadge status={item.evidence_status} /> : null}</div> : item.photo_url ? 'Ảnh đính kèm' : '-'}</td><td className="px-4 py-3 text-slate-700">{item.required_action || '-'}</td><td className="px-4 py-3 text-slate-600">{item.due_date ? dateText(item.due_date) : '-'}</td><td className="px-4 py-3 text-right"><button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" onClick={() => onViewChecklistItem(item, index)}><Eye className="h-3.5 w-3.5" /> Xem</button></td></tr>)}</tbody>
+              </table>
+            </div>
+            <div className="divide-y divide-line md:hidden">
+              {checklist.map((item, index) => (
+                <article key={item.id ?? index} className="space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0"><p className="text-xs font-semibold text-slate-500">Tiêu chí #{index + 1}</p><h4 className="mt-1 font-semibold text-ink">{item.title}</h4><p className="mt-1 text-xs leading-5 text-slate-500">{item.description || 'Không có mô tả bổ sung'}</p></div>
+                    <EnumChip group="result" value={item.decision} />
+                  </div>
+                  <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                    <p><span className="font-semibold text-slate-500">Minh chứng: </span>{checklistEvidenceCount(item) ? `${checklistEvidenceCount(item)} minh chứng` : (item.photo_url ? 'Ảnh đính kèm' : '-')}</p>
+                    <p><span className="font-semibold text-slate-500">Hạn xử lý: </span>{item.due_date ? dateText(item.due_date) : '-'}</p>
+                  </div>
+                  <button type="button" className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" onClick={() => onViewChecklistItem(item, index)}><Eye className="h-4 w-4" /> Xem chi tiết</button>
+                </article>
+              ))}
+            </div>
+          </>
         ) : <div className="p-5"><EmptyState title="Biên bản chưa có checklist" /></div>}
       </section>
 
@@ -343,11 +379,140 @@ function NextAction({ record, canCreate, canConclude, canCreateRework, busy, onE
   return <span className="inline-flex items-center gap-2 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600"><CheckCircle2 className="h-4 w-4" /> Không còn thao tác</span>;
 }
 
-function ProgressSteps({ record }: { record: AcceptanceRecord }) {
-  const steps = ['Soạn biên bản', 'Đã gửi', 'Kết luận'];
-  if (record.result === 'fail' || record.result === 'conditional_pass') steps.push('Khắc phục');
-  const activeIndex = record.status === 'draft' ? 0 : record.status === 'submitted' ? 1 : record.status === 'completed' ? 2 : 0;
-  return <ol className="mt-5 grid gap-2 sm:grid-cols-3 lg:grid-cols-4">{steps.map((step, index) => <li key={step} className={`flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold ${index <= activeIndex ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-line bg-white text-slate-500'}`}><span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] ${index <= activeIndex ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>{index + 1}</span>{step}</li>)}</ol>;
+function AcceptanceStatusSummary({ record }: { record: AcceptanceRecord }) {
+  const status = acceptanceStatusText(record);
+  return (
+    <div className={`mt-4 flex flex-col gap-1 rounded-md border px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3 ${status.tone}`}>
+      <span className="shrink-0 text-xs font-semibold uppercase tracking-wide opacity-70">Trạng thái xử lý</span>
+      <span className="text-sm font-semibold">{status.label}</span>
+      <span className="hidden text-slate-300 sm:inline">·</span>
+      <span className="text-sm opacity-80">{status.description}</span>
+    </div>
+  );
+}
+
+function acceptanceStatusText(record: AcceptanceRecord) {
+  if (record.status === 'draft') {
+    return { label: 'Đang soạn', description: 'Hoàn thiện checklist và gửi biên bản để chờ kết luận.', tone: 'border-slate-200 bg-slate-50 text-slate-700' };
+  }
+  if (record.status === 'submitted') {
+    return { label: 'Đã gửi', description: 'Biên bản đang chờ người có quyền ghi nhận kết luận.', tone: 'border-blue-200 bg-blue-50 text-blue-800' };
+  }
+  if (record.status === 'completed' && record.result === 'pass') {
+    return { label: 'Đã kết luận: Đạt', description: 'Biên bản đã hoàn tất và không còn phần việc nghiệm thu cần xử lý.', tone: 'border-emerald-200 bg-emerald-50 text-emerald-800' };
+  }
+  if (record.status === 'completed' && record.result === 'conditional_pass') {
+    return { label: 'Đã kết luận: Đạt có điều kiện', description: 'Theo dõi phần việc còn lại hoặc mở yêu cầu khắc phục.', tone: 'border-amber-200 bg-amber-50 text-amber-800' };
+  }
+  if (record.status === 'completed' && record.result === 'fail') {
+    return { label: 'Đã kết luận: Không đạt', description: 'Cần mở hoặc theo dõi yêu cầu khắc phục.', tone: 'border-red-200 bg-red-50 text-red-800' };
+  }
+  return { label: `Trạng thái: ${record.status}`, description: 'Biên bản không có thao tác tiếp theo tại màn hình này.', tone: 'border-slate-200 bg-slate-50 text-slate-700' };
+}
+
+function ChecklistItemDialog({ selected, record, onClose }: { selected: SelectedChecklistItem; record: AcceptanceRecord | null; onClose: () => void }) {
+  const toast = useToast();
+  const [openingEvidence, setOpeningEvidence] = useState('');
+  const item = selected?.item;
+  const evidenceRecords = checklistEvidenceRecords(item);
+  const supplemental = Object.entries(item?.payload_json ?? {}).filter(([key]) => key !== 'evidence_required');
+  const evidenceRequired = Boolean(item?.photo_required || item?.payload_json?.evidence_required || item?.decision === 'conditional_pass' || item?.decision === 'fail');
+
+  async function openEvidence(evidence?: EvidenceRecord) {
+    if (!item) return;
+    const evidenceId = String(evidence?.id ?? item.evidence_id ?? '');
+    if (!evidenceId && item.photo_url) {
+      window.open(item.photo_url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (!evidenceId) return;
+    const viewer = window.open('', '_blank', 'noopener,noreferrer');
+    setOpeningEvidence(evidenceId);
+    try {
+      const blob = await downloadBlob(`/evidence/${evidenceId}/file`);
+      const url = URL.createObjectURL(blob);
+      if (viewer) viewer.location.href = url;
+      else window.open(url, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      viewer?.close();
+      toast.error('Không mở được minh chứng', error);
+    } finally {
+      setOpeningEvidence('');
+    }
+  }
+
+  return (
+    <Dialog
+      open={Boolean(selected)}
+      title={selected ? `Chi tiết tiêu chí #${selected.index + 1}` : 'Chi tiết tiêu chí'}
+      description={record ? `${record.acceptance_code ?? record.id} · ${record.title}` : undefined}
+      size="lg"
+      onClose={onClose}
+      footer={<div className="flex justify-end"><button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>Đóng</button></div>}
+    >
+      {item ? (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 rounded-md border border-line bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0"><h3 className="text-lg font-semibold text-ink">{item.title}</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{item.description || 'Không có mô tả bổ sung.'}</p></div>
+            <div className="flex shrink-0 flex-wrap gap-2"><EnumChip group="result" value={item.decision} /><EnumChip group="severity" value={item.severity ?? 'medium'} /></div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DetailField label="Yêu cầu xử lý" value={item.required_action || '-'} />
+            <DetailField label="Hạn xử lý" value={item.due_date ? dateText(item.due_date) : '-'} />
+            <DetailField label="Yêu cầu ảnh" value={item.photo_required ? 'Có' : 'Không'} />
+            <DetailField label="Minh chứng bắt buộc" value={evidenceRequired ? 'Có' : 'Không'} />
+          </div>
+
+          <section className="rounded-md border border-line p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Minh chứng · {evidenceRecords.length || (item.photo_url ? 1 : 0)}</p>
+            {evidenceRecords.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{evidenceRecords.map((evidence) => <article key={String(evidence.id)} className="flex min-w-0 items-start gap-3 rounded-md border border-line p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{evidence.name || evidence.title || evidence.id}</p><p className="mt-1 truncate text-xs text-slate-500">{evidence.work_item_title || 'Hồ sơ công trình'}</p><div className="mt-2"><StatusBadge status={evidence.status} /></div></div><button type="button" disabled={Boolean(openingEvidence)} className="inline-flex shrink-0 items-center gap-2 rounded-md border border-line bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-60" onClick={() => openEvidence(evidence)}>{openingEvidence === String(evidence.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />} Xem</button></article>)}</div> : item.photo_url ? <button type="button" className="mt-3 inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => openEvidence()}><ExternalLink className="h-4 w-4" /> Xem ảnh dữ liệu cũ</button> : <p className="mt-2 text-sm text-slate-500">Chưa có minh chứng.</p>}
+          </section>
+
+          <DetailField label="Ghi chú tiêu chí" value={item.note || '-'} full />
+
+          {supplemental.length ? (
+            <section className="rounded-md border border-line p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin bổ sung</p><dl className="mt-3 grid gap-3 sm:grid-cols-2">{supplemental.map(([key, value]) => <div key={key}><dt className="text-xs font-semibold text-slate-500">{supplementalLabel(key)}</dt><dd className="mt-1 break-words text-sm text-ink">{supplementalValue(value)}</dd></div>)}</dl></section>
+          ) : null}
+
+          <p className="text-xs leading-5 text-slate-500">Nguồn: tiêu chí được lập và lưu trong biên bản {record?.acceptance_code ?? record?.id ?? ''}; Công việc liên quan, hồ sơ và PDF chỉ là liên kết tham chiếu.</p>
+        </div>
+      ) : null}
+    </Dialog>
+  );
+}
+
+function DetailField({ label, value, full = false }: { label: string; value: string; full?: boolean }) {
+  return <div className={full ? 'rounded-md border border-line p-4' : ''}><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-ink">{value}</p></div>;
+}
+
+function supplementalLabel(key: string) {
+  const labels: Record<string, string> = { verified: 'Đã xác minh', history: 'Lịch sử', ncr: 'NCR liên quan' };
+  return labels[key] ?? key.replace(/_/g, ' ');
+}
+
+function supplementalValue(value: unknown) {
+  if (typeof value === 'boolean') return value ? 'Có' : 'Không';
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  return JSON.stringify(value);
+}
+
+function checklistEvidenceRecords(item?: AcceptanceChecklistItem): EvidenceRecord[] {
+  if (!item) return [];
+  if (item.evidence_records?.length) return item.evidence_records;
+  if (!item.evidence_id) return [];
+  return [{
+    id: item.evidence_id,
+    work_item_id: '',
+    evidence_type: 'other',
+    name: item.evidence_name || item.evidence_id,
+    status: item.evidence_status || 'submitted',
+  } as EvidenceRecord];
+}
+
+function checklistEvidenceCount(item: AcceptanceChecklistItem) {
+  return item.evidence_records?.length || item.evidence_ids?.length || (item.evidence_id ? 1 : 0);
 }
 
 function MetricCard({ label, value, detail, tone = 'slate' }: { label: string; value: number; detail: string; tone?: 'slate' | 'blue' | 'amber' | 'red' }) {

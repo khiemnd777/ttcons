@@ -2,7 +2,7 @@
 
 ## Owners
 
-- Frontend modules: `frontend/src/modules/operations`, `frontend/src/modules/quality`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
+- Frontend modules: `frontend/src/modules/operations`, shared `frontend/src/modules/_shared/EvidenceCapture.tsx`, `frontend/src/modules/quality`, `frontend/src/modules/acceptance`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
 - Work item panels: `WorkflowFormPanel.tsx`, `EvidencePanel.tsx`, `EvidenceGallery.tsx`, `ActivityThread.tsx`, `ActivityComposer.tsx`
 - Backend routes: `backend/internal/core/routes.go`
 - Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `construction_handoff.go`, `types.go`
@@ -31,6 +31,7 @@
 ## Invariants
 
 - Evidence records remain permissioned and checksum-backed.
+- `modules/_shared/EvidenceCapture.tsx` owns the reusable local file queue and real/system camera flow. Operations keeps a compatibility re-export; Acceptance reuses the same client validation but still uploads through the canonical work-item evidence endpoint, so moving the component does not change storage, permissions or audit ownership.
 - Site daily reports preserve did/will, crew, actual quantity, material usage, and photo evidence when present.
 - The project construction UI at `/projects/:id/operations` is purpose-first: `Nhật ký`, `Kiểm tra`, and `Cần xử lý`. It must not expose ITP/RFI/NCR/rework/replanning forms in the primary field flow.
 - V62 makes the simplified model canonical for field interaction. A check snapshots zero to 30 criteria entered directly in its create/edit dialog; selecting a template only preloads editable rows and never remains a prerequisite. V64 associates up to 10 same-project/work-item, non-rejected evidence records per `context` or `result` role. Completion requires `pass|fail`, at least one result record and an optional note; the first result also remains in `construction_checks.evidence_id` for compatibility. A failed check atomically creates exactly one action from that primary result; manual actions use the same path.

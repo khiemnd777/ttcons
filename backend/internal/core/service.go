@@ -1285,8 +1285,21 @@ func (s *Service) ProjectBudget(ctx context.Context, projectID string) ([]Record
 	return s.repo.ListProjectBudget(ctx, cleanID(projectID))
 }
 
-func (s *Service) CreateBudget(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
-	body["project_id"] = cleanID(projectID)
+func (s *Service) CreateBudget(ctx context.Context, projectID string, req BudgetCreateRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	budgetCode := strings.TrimSpace(req.BudgetCode)
+	name := strings.TrimSpace(req.Name)
+	if !validActivityUUID(projectID) || budgetCode == "" || name == "" || req.PlannedAmount <= 0 {
+		return nil, validationError("Ngân sách cần mã, tên và giá trị kế hoạch lớn hơn 0", Record{"project_id": projectID, "budget_code": budgetCode, "planned_amount": req.PlannedAmount})
+	}
+	if len([]rune(budgetCode)) > 100 || len([]rune(name)) > 255 {
+		return nil, validationError("Mã hoặc tên ngân sách vượt quá độ dài cho phép")
+	}
+	body := Record{
+		"project_id": projectID, "budget_code": budgetCode, "name": name,
+		"planned_amount": req.PlannedAmount, "approved_amount": 0, "used_amount": 0,
+		"remaining_amount": 0, "status": "draft",
+	}
 	row, err := s.repo.CreateBudget(ctx, body)
 	if err != nil {
 		return nil, err
@@ -8066,7 +8079,7 @@ func (s *Service) WorkItemOutgoingAcceptance(ctx context.Context, workItemID, ac
 		return nil, err
 	}
 	if !canView {
-		return nil, forbiddenError("Bạn không có quyền xem đầu việc này")
+		return nil, forbiddenError("Bạn không có quyền xem công việc liên quan này")
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
@@ -8121,7 +8134,7 @@ func (s *Service) GetAcceptance(ctx context.Context, acceptanceID, actorID strin
 			return nil, err
 		}
 		if !canView {
-			return nil, forbiddenError("Bạn không có quyền xem đầu việc này")
+			return nil, forbiddenError("Bạn không có quyền xem công việc liên quan này")
 		}
 	}
 	return record, nil
@@ -8222,14 +8235,14 @@ func (s *Service) requireAcceptanceWriteAccess(ctx context.Context, projectID, w
 		return nil, err
 	}
 	if !canAct {
-		return nil, forbiddenError("Bạn không có quyền thao tác đầu việc này")
+		return nil, forbiddenError("Bạn không có quyền thao tác công việc liên quan này")
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
 		return nil, err
 	}
 	if cleanID(item["project_id"]) != projectID {
-		return nil, validationError("Đầu việc không thuộc công trình nghiệm thu", Record{"work_item_id": workItemID, "project_id": projectID})
+		return nil, validationError("Công việc liên quan không thuộc công trình nghiệm thu", Record{"work_item_id": workItemID, "project_id": projectID})
 	}
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
 		return nil, err
@@ -8255,7 +8268,7 @@ func (s *Service) normalizeAcceptanceRequest(ctx context.Context, projectID stri
 			item = workItem
 		}
 		if cleanID(item["project_id"]) != projectID {
-			return nil, nil, validationError("Đầu việc không thuộc công trình nghiệm thu", Record{"work_item_id": workItemID, "project_id": projectID})
+			return nil, nil, validationError("Công việc liên quan không thuộc công trình nghiệm thu", Record{"work_item_id": workItemID, "project_id": projectID})
 		}
 	}
 
@@ -8314,7 +8327,7 @@ func (s *Service) normalizeAcceptanceRequest(ctx context.Context, projectID stri
 			return nil, nil, validationError("Biểu mẫu quy trình không thuộc công trình nghiệm thu", Record{"form_instance_id": formInstanceID})
 		}
 		if workItemID != "" && cleanID(instance["work_item_id"]) != workItemID {
-			return nil, nil, validationError("Biểu mẫu quy trình không thuộc đầu việc nghiệm thu", Record{"form_instance_id": formInstanceID})
+			return nil, nil, validationError("Biểu mẫu quy trình không thuộc công việc liên quan", Record{"form_instance_id": formInstanceID})
 		}
 		if submit && fmt.Sprint(instance["status"]) != "submitted" {
 			return nil, nil, validationError("Biểu mẫu quy trình cần gửi trước nghiệm thu đầu ra", Record{"form_instance_id": formInstanceID})
@@ -8333,7 +8346,7 @@ func (s *Service) normalizeAcceptanceRequest(ctx context.Context, projectID stri
 			return nil, nil, validationError("PDF biểu mẫu quy trình không thuộc công trình nghiệm thu", Record{"pdf_export_id": pdfExportID})
 		}
 		if workItemID != "" && cleanID(export["work_item_id"]) != workItemID {
-			return nil, nil, validationError("PDF biểu mẫu quy trình không thuộc đầu việc nghiệm thu", Record{"pdf_export_id": pdfExportID})
+			return nil, nil, validationError("PDF biểu mẫu quy trình không thuộc công việc liên quan", Record{"pdf_export_id": pdfExportID})
 		}
 		if formInstanceID != "" && cleanID(export["form_instance_id"]) != formInstanceID {
 			return nil, nil, validationError("PDF biểu mẫu quy trình không thuộc biểu mẫu quy trình đã chọn", Record{"pdf_export_id": pdfExportID, "form_instance_id": formInstanceID})
@@ -8467,8 +8480,11 @@ func (s *Service) normalizeAcceptanceChecklistItem(ctx context.Context, projectI
 	if len([]rune(photoURL)) > 1000 {
 		return nil, validationError("URL ảnh checklist nghiệm thu không được vượt quá 1000 ký tự", Record{"item_index": itemIndex})
 	}
-	evidenceID := cleanID(req.EvidenceID)
-	if evidenceID != "" {
+	evidenceIDs := normalizeAcceptanceEvidenceIDs(req.EvidenceIDs, req.EvidenceID)
+	if err := validateAcceptanceEvidenceLimit(evidenceIDs, itemIndex); err != nil {
+		return nil, err
+	}
+	for _, evidenceID := range evidenceIDs {
 		evidence, err := s.repo.GetEvidenceDetail(ctx, evidenceID)
 		if err != nil {
 			return nil, validationError("Minh chứng checklist nghiệm thu không hợp lệ", Record{"item_index": itemIndex, "evidence_id": evidenceID})
@@ -8477,11 +8493,11 @@ func (s *Service) normalizeAcceptanceChecklistItem(ctx context.Context, projectI
 			return nil, validationError("Minh chứng checklist nghiệm thu không thuộc công trình", Record{"item_index": itemIndex, "evidence_id": evidenceID})
 		}
 		if workItemID != "" && cleanID(evidence["work_item_id"]) != workItemID {
-			return nil, validationError("Minh chứng checklist nghiệm thu không thuộc đầu việc", Record{"item_index": itemIndex, "evidence_id": evidenceID})
+			return nil, validationError("Minh chứng checklist nghiệm thu không thuộc công việc liên quan", Record{"item_index": itemIndex, "evidence_id": evidenceID})
 		}
 	}
 	evidenceRequired := req.PhotoRequired || decision == "conditional_pass" || decision == "fail"
-	if submit && evidenceRequired && evidenceID == "" && photoURL == "" {
+	if submit && evidenceRequired && len(evidenceIDs) == 0 && photoURL == "" {
 		return nil, validationError("Checklist nghiệm thu cần minh chứng/ảnh", Record{"item_index": itemIndex})
 	}
 	if submit && statusIn(decision, "conditional_pass", "fail") && requiredAction == "" {
@@ -8495,7 +8511,8 @@ func (s *Service) normalizeAcceptanceChecklistItem(ctx context.Context, projectI
 		"severity":        severity,
 		"required_action": requiredAction,
 		"due_date":        dueDate,
-		"evidence_id":     evidenceID,
+		"evidence_id":     firstString(evidenceIDs),
+		"evidence_ids":    evidenceIDs,
 		"note":            note,
 		"photo_required":  req.PhotoRequired,
 		"photo_url":       photoURL,
@@ -8534,6 +8551,7 @@ func acceptanceRequestFromRecord(record Record) AcceptanceRequest {
 				RequiredAction: cleanOptionalText(item["required_action"]),
 				DueDate:        dateOnly(item["due_date"]),
 				EvidenceID:     cleanID(item["evidence_id"]),
+				EvidenceIDs:    normalizeAcceptanceEvidenceIDs(stringSlice(item["evidence_ids"]), cleanID(item["evidence_id"])),
 				Note:           cleanOptionalText(item["note"]),
 				PhotoRequired:  boolValue(item["photo_required"]),
 				PhotoURL:       cleanOptionalText(item["photo_url"]),
@@ -8541,6 +8559,38 @@ func acceptanceRequestFromRecord(record Record) AcceptanceRequest {
 		}
 	}
 	return req
+}
+
+func normalizeAcceptanceEvidenceIDs(ids []string, primaryID string) []string {
+	seen := map[string]bool{}
+	values := make([]string, 0, len(ids)+1)
+	add := func(value string) {
+		value = cleanID(value)
+		if value == "" || seen[value] {
+			return
+		}
+		seen[value] = true
+		values = append(values, value)
+	}
+	add(primaryID)
+	for _, id := range ids {
+		add(id)
+	}
+	return values
+}
+
+func validateAcceptanceEvidenceLimit(ids []string, itemIndex int) error {
+	if len(ids) <= 10 {
+		return nil
+	}
+	return validationError("Mỗi tiêu chí nghiệm thu được chọn tối đa 10 minh chứng", Record{"item_index": itemIndex, "evidence_count": len(ids), "max": 10})
+}
+
+func firstString(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
 }
 
 func acceptanceSummary(items []Record) Record {
@@ -9815,17 +9865,17 @@ func (s *Service) ReceivableAction(ctx context.Context, id, action string, req A
 	return s.repo.ReceivableAction(ctx, id, action, req, actorID, actorName)
 }
 
-func (s *Service) CreatePayment(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
-	projectID := cleanID(body["project_id"])
-	paymentCode := strings.TrimSpace(fmt.Sprint(body["payment_code"]))
-	paymentType := strings.TrimSpace(fmt.Sprint(body["payment_type"]))
-	paymentMethod := strings.TrimSpace(fmt.Sprint(body["payment_method"]))
-	amount := number(body["amount"])
+func (s *Service) CreatePayment(ctx context.Context, req PaymentCreateRequest, actorID, actorName string) (Record, error) {
+	projectID := cleanID(req.ProjectID)
+	paymentCode := strings.TrimSpace(req.PaymentCode)
+	paymentType := strings.TrimSpace(req.PaymentType)
+	paymentMethod := strings.TrimSpace(req.PaymentMethod)
+	amount := req.Amount
 	if !validActivityUUID(projectID) || paymentCode == "" || amount <= 0 {
 		return nil, validationError("Phiếu thu/chi cần công trình, mã và số tiền lớn hơn 0", Record{"project_id": projectID, "payment_code": paymentCode, "amount": amount})
 	}
-	if !statusIn(paymentType, "supplier_payment", "subcontractor_payment", "client_receipt", "outbound", "inbound", "advance", "advance_settlement", "other") {
-		return nil, validationError("Loại phiếu thu/chi không hợp lệ", Record{"payment_type": paymentType})
+	if !statusIn(paymentType, "outbound", "inbound", "other") {
+		return nil, validationError("Phiếu gắn công nợ phải được tạo tại Phải trả/Phải thu để giữ đúng phân bổ", Record{"payment_type": paymentType, "allowed_types": []string{"outbound", "inbound", "other"}})
 	}
 	if paymentMethod == "" {
 		paymentMethod = "bank_transfer"
@@ -9833,13 +9883,14 @@ func (s *Service) CreatePayment(ctx context.Context, body Record, actorID, actor
 	if !statusIn(paymentMethod, "bank_transfer", "cash") {
 		return nil, validationError("Phương thức thanh toán không hợp lệ", Record{"payment_method": paymentMethod})
 	}
-	targetType := strings.TrimSpace(fmt.Sprint(body["target_type"]))
-	if targetType == "<nil>" {
-		targetType = ""
+	targetType := strings.TrimSpace(req.TargetType)
+	targetID := cleanID(req.TargetID)
+	if (targetType == "") != (targetID == "") || (targetID != "" && !validActivityUUID(targetID)) {
+		return nil, validationError("Nguồn liên kết phiếu thu/chi không hợp lệ", Record{"target_type": targetType, "target_id": targetID})
 	}
 	normalized := Record{
 		"project_id": projectID, "payment_code": paymentCode, "payment_type": paymentType,
-		"target_type": targetType, "target_id": cleanID(body["target_id"]),
+		"target_type": targetType, "target_id": targetID,
 		"amount": amount, "payment_method": paymentMethod, "status": "draft", "created_by": actorID,
 	}
 	row, err := s.repo.CreatePayment(ctx, normalized)

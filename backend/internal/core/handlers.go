@@ -2984,11 +2984,11 @@ func (h *Handler) CreateBudget(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"accounting.budget_approve"}); err != nil {
 		return err
 	}
-	body, err := bodyMap(c)
-	if err != nil {
-		return err
+	var req BudgetCreateRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return validationError("Dữ liệu ngân sách không hợp lệ")
 	}
-	row, err := h.service.CreateBudget(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	row, err := h.service.CreateBudget(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -3380,12 +3380,24 @@ func parseFormFloat(value string) (float64, error) {
 }
 
 func (h *Handler) ListReceivables(c *fiber.Ctx) error {
-	if err := h.requirePermission(c, []string{"accounting.view", "accounting.receivable_view"}); err != nil {
+	permissions := []string{"accounting.view", "accounting.receivable_view"}
+	if err := h.requirePermission(c, permissions); err != nil {
 		return err
 	}
 	scopeSQL, scopeArgs, err := h.projectAccessFilter(c, "p", 1)
 	if err != nil {
 		return err
+	}
+	projectID := cleanID(c.Query("project_id"))
+	if projectID != "" {
+		if !validActivityUUID(projectID) {
+			return validationError("project_id không hợp lệ", Record{"project_id": projectID})
+		}
+		if err := h.requireProjectPermission(c, projectID, permissions); err != nil {
+			return err
+		}
+		scopeSQL = fmt.Sprintf("(%s) AND rec.project_id=$%d::uuid", scopeSQL, len(scopeArgs)+1)
+		scopeArgs = append(scopeArgs, projectID)
 	}
 	return h.list(c, fmt.Sprintf(`
 		SELECT
@@ -3752,14 +3764,14 @@ func (h *Handler) ListPayments(c *fiber.Ctx) error {
 	return h.list(c, fmt.Sprintf(`SELECT pay.*, p.name AS project_name FROM payments pay JOIN projects p ON p.id=pay.project_id WHERE pay.status <> 'cancelled' AND p.status <> 'cancelled' AND %s ORDER BY pay.created_at DESC`, scopeSQL), scopeArgs...)
 }
 func (h *Handler) CreatePayment(c *fiber.Ctx) error {
-	body, err := bodyMap(c)
-	if err != nil {
+	var req PaymentCreateRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return validationError("Dữ liệu phiếu thu/chi không hợp lệ")
+	}
+	if err := h.requireProjectPermission(c, cleanID(req.ProjectID), []string{"accounting.payment_create"}); err != nil {
 		return err
 	}
-	if err := h.requireProjectPermission(c, cleanID(body["project_id"]), []string{"accounting.payment_create"}); err != nil {
-		return err
-	}
-	row, err := h.service.CreatePayment(c.Context(), body, actorID(c), actorName(c))
+	row, err := h.service.CreatePayment(c.Context(), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}

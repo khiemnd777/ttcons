@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, RefreshCw } from 'lucide-react';
 import { CurrencyText } from '../../components/CurrencyText';
@@ -12,14 +12,20 @@ import { dateText } from '../../lib/utils/format';
 
 type CashflowPanelProps = {
   projectId?: string;
+  initialFrom?: string;
 };
 
-export function CashflowPanel({ projectId }: CashflowPanelProps) {
-  const [from, setFrom] = useState(() => firstDayOfMonth());
+export function CashflowPanel({ projectId, initialFrom }: CashflowPanelProps) {
+  const [from, setFrom] = useState(() => initialFrom || firstDayOfMonth());
   const [to, setTo] = useState(() => todayText());
   const [groupBy, setGroupBy] = useState<'day' | 'week' | 'month'>('day');
   const [status, setStatus] = useState<'approved' | 'all'>('approved');
   const toast = useToast();
+
+  useEffect(() => {
+    setFrom(initialFrom || firstDayOfMonth());
+    setTo(todayText());
+  }, [initialFrom, projectId]);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -61,13 +67,13 @@ export function CashflowPanel({ projectId }: CashflowPanelProps) {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-ink">Dòng tiền thu/chi</h2>
-          <p className="mt-1 text-xs text-slate-500">Cash-basis theo payment đã duyệt; phiếu chờ duyệt được tách riêng trong summary.</p>
+          <p className="mt-1 text-xs text-slate-500">Cơ sở tiền theo phiếu đã duyệt; phiếu chờ duyệt, chưa phân loại và không tiền mặt được tách riêng.</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end lg:justify-end">
           <DateField label="Từ ngày" value={from} onChange={setFrom} />
           <DateField label="Đến ngày" value={to} onChange={setTo} />
           <SelectField label="Nhóm" value={groupBy} onChange={(value) => setGroupBy(value as 'day' | 'week' | 'month')} options={[['day', 'Ngày'], ['week', 'Tuần'], ['month', 'Tháng']]} />
-          <SelectField label="Status" value={status} onChange={(value) => setStatus(value as 'approved' | 'all')} options={[['approved', 'Approved'], ['all', 'All non-cancelled']]} />
+          <SelectField label="Trạng thái" value={status} onChange={(value) => setStatus(value as 'approved' | 'all')} options={[['approved', 'Đã duyệt'], ['all', 'Tất cả chưa hủy']]} />
           <button
             type="button"
             className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -95,7 +101,10 @@ export function CashflowPanel({ projectId }: CashflowPanelProps) {
         <MetricTile label="Tổng chi" value={<CurrencyText value={summary?.total_outflow ?? 0} />} />
         <MetricTile label="Net flow" value={<CurrencyText value={summary?.net_flow ?? 0} />} />
         <MetricTile label="Cuối kỳ" value={<CurrencyText value={summary?.closing_balance ?? 0} />} />
-        <MetricTile label="Chờ duyệt" value={`${Number(summary?.pending_payment_count ?? 0)} phiếu`} />
+        <MetricTile label="Tổng phiếu" value={`${Number(summary?.payment_count ?? 0)} phiếu`} />
+        <MetricTile label="Chờ duyệt" value={<><span>{Number(summary?.pending_payment_count ?? 0)} phiếu · </span><CurrencyText value={summary?.pending_payment_total ?? 0} /></>} />
+        <MetricTile label="Chưa phân loại" value={`${Number(summary?.unclassified_count ?? 0)} phiếu`} />
+        <MetricTile label="Không tiền mặt" value={`${Number(summary?.non_cash_count ?? 0)} phiếu`} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -120,16 +129,16 @@ export function CashflowPanel({ projectId }: CashflowPanelProps) {
         </div>
 
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase text-slate-500">Theo category</h3>
+          <h3 className="text-xs font-semibold uppercase text-slate-500">Theo nhóm</h3>
           <DataTable<CashflowCategoryRow>
             rows={categories}
             loading={report.isLoading}
             error={report.error}
             onRetry={() => void report.refetch()}
-            empty="Chưa có category dòng tiền"
+            empty="Chưa có nhóm dòng tiền"
             pageSize={6}
             columns={[
-              { key: 'category', header: 'Category', render: (row) => <span className="font-semibold text-ink">{row.category}</span> },
+              { key: 'category', header: 'Nhóm', render: (row) => <span className="font-semibold text-ink">{row.category}</span> },
               { key: 'direction', header: 'Hướng', render: (row) => <span className={directionClass(row.direction)}>{directionLabel(row.direction)}</span> },
               { key: 'payment_count', header: 'Phiếu', align: 'right' },
               { key: 'inflow_amount', header: 'Thu', align: 'right', render: (row) => <CurrencyText value={row.inflow_amount} /> },
@@ -140,27 +149,27 @@ export function CashflowPanel({ projectId }: CashflowPanelProps) {
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase text-slate-500">Ledger</h3>
+        <h3 className="text-xs font-semibold uppercase text-slate-500">Sổ dòng tiền</h3>
         <DataTable<CashflowLedgerRow>
           rows={ledger}
           loading={report.isLoading}
           error={report.error}
           onRetry={() => void report.refetch()}
           empty="Chưa có dòng tiền trong khoảng lọc"
-          searchPlaceholder="Tìm mã phiếu, công trình, category..."
+          searchPlaceholder="Tìm mã phiếu, công trình, nhóm..."
           pageSize={10}
           defaultSort={{ key: 'occurred_at', direction: 'desc' }}
           columns={[
             { key: 'occurred_at', header: 'Ngày', sortable: true, render: (row) => dateText(row.occurred_at) },
             { key: 'payment_code', header: 'Mã phiếu', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.payment_code}</span> },
             { key: 'project_name', header: 'Công trình' },
-            { key: 'category', header: 'Category' },
+            { key: 'category', header: 'Nhóm' },
             { key: 'payment_type', header: 'Loại', render: (row) => <EnumChip group="payment_type" value={row.payment_type} /> },
-            { key: 'payment_method', header: 'Method', render: (row) => <EnumChip group="payment_method" value={row.payment_method} /> },
-            { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+            { key: 'payment_method', header: 'Phương thức', render: (row) => <EnumChip group="payment_method" value={row.payment_method} /> },
+            { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
             { key: 'inflow_amount', header: 'Thu', align: 'right', render: (row) => <CurrencyText value={row.inflow_amount} /> },
             { key: 'outflow_amount', header: 'Chi', align: 'right', render: (row) => <CurrencyText value={row.outflow_amount} /> },
-            { key: 'target_type', header: 'Target' },
+            { key: 'target_type', header: 'Nguồn liên kết' },
           ]}
         />
       </div>
@@ -209,8 +218,8 @@ function MetricTile({ label, value }: { label: string; value: ReactNode }) {
 function directionLabel(direction?: string) {
   if (direction === 'inflow') return 'Thu';
   if (direction === 'outflow') return 'Chi';
-  if (direction === 'non_cash') return 'Không cash';
-  return 'Unclassified';
+  if (direction === 'non_cash') return 'Không tiền mặt';
+  return 'Chưa phân loại';
 }
 
 function directionClass(direction?: string) {

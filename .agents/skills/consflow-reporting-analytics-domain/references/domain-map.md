@@ -28,6 +28,7 @@
 - Report APIs enforce project/user visibility.
 - UI filters and CSV exports use the same query semantics.
 - Cashflow is payment-ledger based unless changed deliberately.
+- `CashflowPanel` keeps report/export query parity. Project Accounting defaults the date range to the project start date (or full-history fallback), while global Accounting defaults to the current month; pending amount, unclassified count and non-cash count are visible report-contract warnings rather than frontend-derived guesses.
 - Tax and profit are invoice-ledger based unless changed deliberately.
 - Warnings are part of the report contract, not decorative UI.
 - Warehouse aggregate reports treat a completed source/target transfer as net zero across all warehouses while per-warehouse position queries subtract from the source and add to the target; legacy transfer rows without a target remain outbound-only.

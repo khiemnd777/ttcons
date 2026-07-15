@@ -1213,6 +1213,9 @@ func TestReceivableListUsesProjectScopeAndAging(t *testing.T) {
 	repo := NewRepository(db)
 	handler := NewHandler(NewService(repo, "test-secret"))
 	fixture := setupProjectScopeFixture(t, db, []string{"accounting.view", "accounting.receivable_view"})
+	// Give the actor visibility to both projects so this test proves the explicit
+	// project_id query filter instead of passing only because of membership scope.
+	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["Member"]'::jsonb,true)`, fixture.otherProjectID, fixture.staffID)
 	mustExec(t, db, `
 		INSERT INTO receivables (project_id, receivable_code, client_name, source_type, gross_amount, received_amount, remaining_amount, due_date, status, created_by)
 		VALUES ($1,$2,'Scoped Client','manual',100,0,100,'2000-01-01','approved',$3),
@@ -2656,9 +2659,12 @@ func TestBusinessCoreLifecycleServiceRecordsActors(t *testing.T) {
 		t.Fatalf("handover created_by = %v, want %s", handover["created_by"], fixture.userID)
 	}
 
-	budget, err := service.CreateBudget(ctx, fixture.projectID, Record{"budget_code": "BUD-CORE-" + suffix, "name": "Core budget", "planned_amount": 1200}, fixture.userID, "Scoped User")
+	budget, err := service.CreateBudget(ctx, fixture.projectID, BudgetCreateRequest{BudgetCode: "BUD-CORE-" + suffix, Name: "Core budget", PlannedAmount: 1200}, fixture.userID, "Scoped User")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if budget["status"] != "draft" || number(budget["approved_amount"]) != 0 || number(budget["used_amount"]) != 0 || number(budget["remaining_amount"]) != 0 {
+		t.Fatalf("budget derived state = status %v approved %v used %v remaining %v, want draft/0/0/0", budget["status"], budget["approved_amount"], budget["used_amount"], budget["remaining_amount"])
 	}
 	budget, err = service.ApproveBudget(ctx, cleanID(budget["id"]), fixture.userID, "Scoped User")
 	if err != nil {
@@ -2667,15 +2673,14 @@ func TestBusinessCoreLifecycleServiceRecordsActors(t *testing.T) {
 	if budget["status"] != "approved" || cleanID(budget["approved_by"]) != fixture.userID {
 		t.Fatalf("budget approval = status %v approved_by %v", budget["status"], budget["approved_by"])
 	}
+	if number(budget["approved_amount"]) != 1200 || number(budget["remaining_amount"]) != 1200 {
+		t.Fatalf("budget approved amounts = approved %v remaining %v, want 1200/1200", budget["approved_amount"], budget["remaining_amount"])
+	}
 
-	payment, err := service.CreatePayment(ctx, Record{
-		"project_id":     fixture.projectID,
-		"payment_code":   "PMT-CORE-" + suffix,
-		"payment_type":   "outbound",
-		"target_type":    "issue",
-		"target_id":      cleanID(issue["id"]),
-		"amount":         450,
-		"payment_method": "bank_transfer",
+	payment, err := service.CreatePayment(ctx, PaymentCreateRequest{
+		ProjectID: fixture.projectID, PaymentCode: "PMT-CORE-" + suffix,
+		PaymentType: "outbound", TargetType: "issue", TargetID: cleanID(issue["id"]),
+		Amount: 450, PaymentMethod: "bank_transfer",
 	}, fixture.userID, "Scoped User")
 	if err != nil {
 		t.Fatal(err)
@@ -4347,15 +4352,21 @@ func TestFinancialCreationIgnoresClientDerivedStateAndAuditsActor(t *testing.T) 
 		t.Fatalf("receivable derived state = status %v received %v remaining %v, want draft/0/600", receivable["status"], receivable["received_amount"], receivable["remaining_amount"])
 	}
 
-	payment, err := service.CreatePayment(ctx, Record{
-		"project_id": fixture.projectID, "payment_code": "PMT-HARD-" + suffix, "payment_type": "other",
-		"amount": 200, "payment_method": "bank_transfer", "status": "approved", "approved_by": fixture.userID,
+	payment, err := service.CreatePayment(ctx, PaymentCreateRequest{
+		ProjectID: fixture.projectID, PaymentCode: "PMT-HARD-" + suffix, PaymentType: "other",
+		Amount: 200, PaymentMethod: "bank_transfer",
 	}, fixture.userID, "Scoped User")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if payment["status"] != "draft" || payment["approved_by"] != nil {
 		t.Fatalf("payment client state leaked = status %v approved_by %v, want draft/nil", payment["status"], payment["approved_by"])
+	}
+	if _, err := service.CreatePayment(ctx, PaymentCreateRequest{
+		ProjectID: fixture.projectID, PaymentCode: "PMT-AR-" + suffix,
+		PaymentType: "client_receipt", Amount: 100, PaymentMethod: "bank_transfer",
+	}, fixture.userID, "Scoped User"); err == nil {
+		t.Fatal("expected generic AP/AR-linked payment type to be rejected")
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND actor_id=$2 AND event_type IN ('payable_created','receivable_created','payment_created')`, 3, fixture.projectID, fixture.userID)
 }
@@ -6598,6 +6609,16 @@ func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
 		t.Fatal(err)
 	}
 	evidenceID := fmt.Sprint(evidence["id"])
+	secondEvidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "document",
+		Name:         "Outgoing inspection record",
+		FileURL:      "/evidence/outgoing-inspection.pdf",
+		Visibility:   "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondEvidenceID := fmt.Sprint(secondEvidence["id"])
 
 	draft, err := service.CreateAcceptance(ctx, fixture.projectID, AcceptanceRequest{
 		WorkItemID:               fixture.itemID,
@@ -6611,7 +6632,7 @@ func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
 		Notes:                    "Có lỗi cần sửa trước khi bàn giao",
 		Checklist: []AcceptanceChecklistItemRequest{
 			{ItemIndex: 0, Title: "Bề mặt hoàn thiện", Decision: "pass"},
-			{ItemIndex: 1, Title: "Vệ sinh khu vực", Decision: "fail", Severity: "high", EvidenceID: evidenceID, RequiredAction: "Dọn lại khu vực nghiệm thu"},
+			{ItemIndex: 1, Title: "Vệ sinh khu vực", Decision: "fail", Severity: "high", EvidenceID: evidenceID, EvidenceIDs: []string{evidenceID, secondEvidenceID}, RequiredAction: "Dọn lại khu vực nghiệm thu"},
 		},
 	}, fixture.workerID, "Worker")
 	if err != nil {
@@ -6619,6 +6640,23 @@ func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
 	}
 	if draft["status"] != "draft" {
 		t.Fatalf("draft status = %v, want draft", draft["status"])
+	}
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM acceptance_checklist_item_evidence link
+		JOIN acceptance_checklist_items item ON item.id=link.checklist_item_id
+		WHERE item.acceptance_id=$1 AND item.item_index=1
+	`, 2, draft["id"])
+	checklist, ok := draft["checklist"].([]Record)
+	if !ok || len(checklist) != 2 {
+		t.Fatalf("draft checklist = %#v, want two items", draft["checklist"])
+	}
+	linkedEvidence, ok := checklist[1]["evidence_records"].([]Record)
+	if !ok || len(linkedEvidence) != 2 {
+		t.Fatalf("linked evidence = %#v, want two records", checklist[1]["evidence_records"])
+	}
+	if cleanID(checklist[1]["evidence_id"]) != evidenceID {
+		t.Fatalf("compatibility evidence_id = %v, want %s", checklist[1]["evidence_id"], evidenceID)
 	}
 
 	submitted, err := service.SubmitAcceptance(ctx, fmt.Sprint(draft["id"]), fixture.workerID, "Worker")

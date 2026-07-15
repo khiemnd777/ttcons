@@ -2545,6 +2545,47 @@ func (r *Repository) GetAcceptanceDetail(ctx context.Context, acceptanceID strin
 	if err != nil {
 		return nil, err
 	}
+	evidenceRows, err := r.Query(ctx, `
+		SELECT
+			link.checklist_item_id,
+			link.sort_order,
+			er.id,
+			er.work_item_id,
+			er.evidence_type,
+			er.name,
+			er.caption,
+			er.file_url,
+			er.mime_type,
+			er.file_size,
+			er.visibility,
+			er.status,
+			er.created_at,
+			wi.title AS work_item_title
+		FROM acceptance_checklist_item_evidence link
+		JOIN acceptance_checklist_items item ON item.id=link.checklist_item_id
+		JOIN evidence_records er ON er.id=link.evidence_id
+		LEFT JOIN work_items wi ON wi.id=er.work_item_id
+		WHERE item.acceptance_id=$1
+		ORDER BY link.checklist_item_id, link.sort_order, link.created_at, er.id
+	`, acceptanceID)
+	if err != nil {
+		return nil, err
+	}
+	evidenceByItem := map[string][]Record{}
+	for _, evidence := range evidenceRows {
+		itemID := cleanID(evidence["checklist_item_id"])
+		delete(evidence, "checklist_item_id")
+		evidenceByItem[itemID] = append(evidenceByItem[itemID], evidence)
+	}
+	for _, item := range items {
+		records := evidenceByItem[cleanID(item["id"])]
+		ids := make([]string, 0, len(records))
+		for _, evidence := range records {
+			ids = append(ids, cleanID(evidence["id"]))
+		}
+		item["evidence_ids"] = ids
+		item["evidence_records"] = records
+	}
 	record["checklist"] = items
 	record["checklist_count"] = len(items)
 	return record, nil
@@ -2648,7 +2689,7 @@ func (r *Repository) SaveAcceptance(ctx context.Context, acceptanceID string, he
 	for _, item := range items {
 		rawPayload, _ := json.Marshal(item["payload_json"])
 		isPassed := cleanOptionalText(item["decision"]) == "pass"
-		if _, err := tx.ExecContext(ctx, `
+		rows, err := queryTx(ctx, tx, `
 			INSERT INTO acceptance_checklist_items (
 				acceptance_id, item_index, title, description, is_passed, note,
 				photo_required, photo_url, evidence_id, decision, severity, required_action, due_date, payload_json
@@ -2657,10 +2698,30 @@ func (r *Repository) SaveAcceptance(ctx context.Context, acceptanceID string, he
 				$1, $2, $3, NULLIF($4,''), $5, NULLIF($6,''),
 				$7, NULLIF($8,''), NULLIF($9,'')::uuid, $10, $11, NULLIF($12,''), NULLIF($13,'')::date, $14::jsonb
 			)
+			RETURNING id
 		`, acceptanceID, item["item_index"], item["title"], item["description"], isPassed, item["note"],
 			item["photo_required"], item["photo_url"], cleanID(item["evidence_id"]), item["decision"], item["severity"],
-			item["required_action"], item["due_date"], string(rawPayload)); err != nil {
+			item["required_action"], item["due_date"], string(rawPayload))
+		if err != nil {
 			return nil, err
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		checklistItemID := cleanID(rows[0]["id"])
+		evidenceIDs := stringSlice(item["evidence_ids"])
+		if len(evidenceIDs) == 0 && cleanID(item["evidence_id"]) != "" {
+			evidenceIDs = []string{cleanID(item["evidence_id"])}
+		}
+		for sortOrder, evidenceID := range evidenceIDs {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO acceptance_checklist_item_evidence (
+					checklist_item_id, evidence_id, sort_order, created_by
+				)
+				VALUES ($1, $2, $3, NULLIF($4,'')::uuid)
+			`, checklistItemID, evidenceID, sortOrder, actorID); err != nil {
+				return nil, err
+			}
 		}
 	}
 	rawMetadata, _ := json.Marshal(Record{
@@ -14240,8 +14301,12 @@ func (r *Repository) CreateBudget(ctx context.Context, body Record) (Record, err
 func (r *Repository) ApproveBudget(ctx context.Context, id, actorID string) (Record, error) {
 	return r.QueryOne(ctx, `
 		UPDATE accounting_budgets
-		SET status='approved', approved_by=NULLIF($2,'')::uuid, updated_at=now()
-		WHERE id=$1
+		SET status='approved',
+			approved_amount=planned_amount,
+			remaining_amount=GREATEST(planned_amount-used_amount, 0),
+			approved_by=NULLIF($2,'')::uuid,
+			updated_at=now()
+		WHERE id=$1 AND status IN ('draft','submitted')
 		RETURNING *
 	`, id, actorID)
 }

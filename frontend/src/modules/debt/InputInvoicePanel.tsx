@@ -9,6 +9,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, get, post, postForm } from '../../lib/api/client';
+import { useAuth } from '../../lib/auth/AuthContext';
 import type { InputInvoiceRecord, Partner, PayableRecord } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { partnerOptions, vendorPartnerTypes } from '../core-data/partnerUtils';
@@ -41,6 +42,8 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { hasAnyPermission } = useAuth();
+  const canManage = hasAnyPermission(['accounting.payable_approve']);
   const invoices = useQuery({
     queryKey: ['input-invoices', payable.id],
     queryFn: () => get<InputInvoiceRecord[]>(`/payables/${payable.id}/input-invoices`),
@@ -158,14 +161,14 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
             <RefreshCw className={invoices.isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
             Tải lại
           </button>
-          <button
+          {canManage ? <button
             type="button"
             className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
             onClick={() => setDialogOpen(true)}
           >
             <Plus className="h-4 w-4" />
             Upload PDF
-          </button>
+          </button> : null}
         </div>
       </div>
 
@@ -198,18 +201,18 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
             { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
             {
               key: 'actions',
-              header: 'Action',
+              header: 'Thao tác',
               render: (row) => (
                 <div className="flex justify-end gap-1">
                   <IconButton label="Mở PDF" onClick={() => void openInvoice(row)}>
                     <ExternalLink className="h-4 w-4" />
                   </IconButton>
-                  <IconButton label="Xác thực" disabled={row.status === 'verified' || action.isPending} onClick={() => action.mutate({ invoiceID: row.id, actionName: 'verify' })}>
+                  {canManage ? <IconButton label="Xác thực" disabled={row.status === 'verified' || action.isPending} onClick={() => action.mutate({ invoiceID: row.id, actionName: 'verify' })}>
                     <Check className="h-4 w-4" />
-                  </IconButton>
-                  <IconButton label="Từ chối" disabled={row.status === 'rejected' || action.isPending} onClick={() => action.mutate({ invoiceID: row.id, actionName: 'reject' })}>
+                  </IconButton> : null}
+                  {canManage ? <IconButton label="Từ chối" disabled={row.status === 'rejected' || action.isPending} onClick={() => action.mutate({ invoiceID: row.id, actionName: 'reject' })}>
                     <X className="h-4 w-4" />
-                  </IconButton>
+                  </IconButton> : null}
                 </div>
               ),
             },

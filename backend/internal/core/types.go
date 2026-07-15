@@ -109,6 +109,22 @@ type OutputInvoiceRequest struct {
 	Notes           string  `json:"notes"`
 }
 
+type BudgetCreateRequest struct {
+	BudgetCode    string  `json:"budget_code"`
+	Name          string  `json:"name"`
+	PlannedAmount float64 `json:"planned_amount"`
+}
+
+type PaymentCreateRequest struct {
+	ProjectID     string  `json:"project_id"`
+	PaymentCode   string  `json:"payment_code"`
+	PaymentType   string  `json:"payment_type"`
+	TargetType    string  `json:"target_type"`
+	TargetID      string  `json:"target_id"`
+	Amount        float64 `json:"amount"`
+	PaymentMethod string  `json:"payment_method"`
+}
+
 type PayablePaymentScheduleRequest struct {
 	ScheduleCode  string  `json:"schedule_code"`
 	MilestoneName string  `json:"milestone_name"`
@@ -441,17 +457,18 @@ type AcceptanceRequest struct {
 }
 
 type AcceptanceChecklistItemRequest struct {
-	ItemIndex      int    `json:"item_index"`
-	Title          string `json:"title"`
-	Description    string `json:"description"`
-	Decision       string `json:"decision"`
-	Severity       string `json:"severity"`
-	RequiredAction string `json:"required_action"`
-	DueDate        string `json:"due_date"`
-	EvidenceID     string `json:"evidence_id"`
-	Note           string `json:"note"`
-	PhotoRequired  bool   `json:"photo_required"`
-	PhotoURL       string `json:"photo_url"`
+	ItemIndex      int      `json:"item_index"`
+	Title          string   `json:"title"`
+	Description    string   `json:"description"`
+	Decision       string   `json:"decision"`
+	Severity       string   `json:"severity"`
+	RequiredAction string   `json:"required_action"`
+	DueDate        string   `json:"due_date"`
+	EvidenceID     string   `json:"evidence_id"`
+	EvidenceIDs    []string `json:"evidence_ids"`
+	Note           string   `json:"note"`
+	PhotoRequired  bool     `json:"photo_required"`
+	PhotoURL       string   `json:"photo_url"`
 }
 
 type WorkflowFormSignRequest struct {

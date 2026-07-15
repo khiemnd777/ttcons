@@ -27,11 +27,11 @@
 - Technical compatibility: `quality_itp_plans`, `quality_itp_items`, `quality_inspection_requests`, `quality_ncrs`, `issues`, `rework_requests`, `replanning_requests`
 - `construction_recurring_plans`, `construction_recurring_occurrences`
 - `incoming_acceptance_records`, `incoming_acceptance_items`
-- `acceptance_records`, `acceptance_checklist_items`
+- `acceptance_records`, `acceptance_checklist_items`, ordered `acceptance_checklist_item_evidence`
 - `rework_requests`, `replanning_requests`, `handover_records`
 - Product-grade handover package: `handover_checklist_items`, `handover_records.readiness_snapshot_json`, exact final-acceptance/form source, submit/check/complete actor timestamps
 - Related forms/artifacts: `workflow_form_instances`, `workflow_form_pdf_exports`, `workflow_form_signatures`, `evidence_records`
-- Relevant migrations: `V1`, `V25`, `V26`, `V51`, `V52`, `V54`-`V56`, `V62`-`V64`
+- Relevant migrations: `V1`, `V25`, `V26`, `V51`, `V52`, `V54`-`V56`, `V62`-`V64`, `V67`
 
 ## Invariants
 
@@ -42,7 +42,7 @@
 - Incoming acceptance records deliveries and quality decisions but does not automatically create warehouse movement.
 - A submitted incoming-acceptance item can prefill an explicit multi-line stock receipt. Linked receipt movements are capped by its remaining accepted quantity, preserve the acceptance item as source and do not rewrite acceptance history.
 - Outgoing acceptance preserves final result, signature/document gates, punch list/rework history, and handover compatibility.
-- `AcceptanceEditor.tsx` is the shared checklist editor/validation owner for the project acceptance master-detail workspace and work-item outgoing acceptance panel. The project page exposes one state-driven CTA and one explicit conclusion dialog; it does not merge checklist rows with ITP criteria or auto-create rework after a failed acceptance.
+- `AcceptanceEditor.tsx` is the shared checklist editor/validation owner for the project acceptance workspace and work-item outgoing acceptance panel. Runtime checklist criteria are authored directly in the acceptance; `Công việc liên quan`, workflow forms and PDFs are references and do not auto-generate criteria. Create/edit uses a criterion list plus selected-criterion editor. V67 associates at most 10 ordered, non-rejected, same-project evidence records per criterion; when the acceptance has a related work item every evidence record must belong to it. The first association remains mirrored into legacy `acceptance_checklist_items.evidence_id`, and deletion of an association never deletes the evidence record. Existing project evidence may be linked without a related work item; new camera/file uploads remain work-item scoped and therefore require one. The page retains one state-driven CTA and one explicit conclusion dialog; it does not merge checklist rows with ITP criteria or auto-create rework after a failed acceptance.
 - Field quality/remediation is reduced to `Kiểm tra` and `Cần xử lý`; ITP/RFI/NCR/issue/rework/replanning are hidden technical compatibility history, not additional user steps. Legacy project routes redirect to `tab=checks|actions` and original technical routes remain valid for audit/advanced consumers.
 - A simplified check owns its criteria snapshot independently of its optional template. `construction_check_evidence` separates pre-inspection current-state `context` from completion `result`; both roles preserve evidence ownership/history, and only the first result is mirrored into the legacy `construction_checks.evidence_id` field. Association removal never deletes the underlying evidence record.
 - Failed simplified checks create one action plus linked issue/rework and optional replanning atomically. Passing verification closes the technical issue/rework; failed verification reopens the action without deleting prior evidence/events.
@@ -51,6 +51,7 @@
 - Pending RFI-backed checks and technical NCR/legacy issue action backfills are view-only on the field surface. Editable canonical actions preserve immutable source/evidence/impact/status and synchronize safe metadata to linked issue/rework rows transactionally, so technical audit history and handover blocker semantics do not drift.
 - Rework completion does not erase acceptance history.
 - Handover completion requires a submitted package, the exact linked final acceptance to be completed/pass or conditional-pass, all required checklist items verified from accepted evidence/active documents or system sources, no open simplified action/issue/NCR/rework/material-surplus/finance blockers, and a fresh readiness snapshot. Completion rechecks readiness before writing `handed_over` and `completed_at`.
+- The project handover page is an inline readiness workspace for the selected/newest available package: it leads with the state-derived next action, groups checklist items, and maps snapshot blocker text to navigation links for Acceptance, Operations, Warehouse, Debt or Accounting. These links are presentation-only; P1 does not enforce a single active package or mutate blocker sources.
 
 ## Cross-Domain Checks
 

@@ -1,5 +1,34 @@
 # Current States
 
+## P0 + P1 Bàn giao, Kế toán và Công nợ
+
+Status: complete
+
+Mục đích chính:
+- Biến ba màn hình tài chính cuối dự án thành các workspace hành động rõ ràng: Công nợ xử lý AP/AR và đối soát, Kế toán xử lý ngân sách/phiếu/dòng tiền, Bàn giao điều phối readiness và dẫn người dùng về đúng nguồn đang chặn.
+
+Will be done:
+- P0: khóa project scope của receivables bằng regression test; server sở hữu trạng thái/số dư ngân sách mới; generic payment không thay thế allocation AP/AR; đồng bộ permission affordance và đủ bucket 61–90 ngày.
+- P1: Công nợ hiển thị một tab AP hoặc AR toàn chiều rộng, hàng đợi ưu tiên và workspace chi tiết theo tab nghiệp vụ.
+- P1: Kế toán tách Tổng quan/Ngân sách/Phiếu thu chi/Dòng tiền, dùng CTA theo việc cần xử lý và giữ report/export cùng query semantics.
+- P1: Bàn giao hiển thị package đang chọn trực tiếp, ưu tiên next action/blocker và liên kết về module nguồn; không thêm ràng buộc một package active ở P1.
+- Cập nhật central/backend/frontend/root-cause/accounting/handover/reporting mappings; không thêm migration hoặc thay đổi P2.
+- Chạy Go format/tests, frontend production build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved implementation with `Duyệt, triển khai P0 + P1 theo review package này`.
+- Loaded mandatory central/backend/frontend/root-cause maps plus backend/frontend workflow, accounting-finance, handover-quality, warehouse, reporting and impact guardrails.
+- Confirmed existing dirty Acceptance/V67/branding changes are outside this plan; overlapping shared Go/map/state files will be edited only in targeted sections and preserved.
+- Fixed `ListReceivables` so validated `project_id` is combined with actor project visibility exactly like Payables. Strengthened the DB regression by making the actor a member of both fixture projects, so the old missing filter now fails deterministically.
+- Added typed `BudgetCreateRequest` and `PaymentCreateRequest`. New budgets ignore client-derived state, start draft with zero approved/used/available balance, and approval derives approved/remaining values from planned/used. Generic `/payments` now accepts only `outbound|inbound|other`; AP/AR types must use dedicated allocation endpoints.
+- Rebuilt Công nợ as one full-width Phải trả/Phải thu workspace with action queues, project-aware columns, complete 61–90 aging, shared create dialogs, permission-aware nested actions and five detail tabs for overview, invoices, schedule/advance, payments and reconciliation.
+- Rebuilt Kế toán into Tổng quan/Ngân sách/Phiếu thu chi/Dòng tiền tabs. The overview prioritizes pending approvals, budget forms expose only client-owned inputs, generic phiếu forms explain AP/AR ownership, and Cashflow surfaces pending amount/unclassified/non-cash warnings while preserving report/export query parity.
+- Rebuilt Bàn giao as an inline selected-package readiness workspace with state-derived next action, grouped checklist, source-module links for each blocker and secondary package history. P1 adds no one-active-package constraint and no source mutation.
+- Updated central/backend/frontend/root-cause plus accounting, handover and reporting mappings. Warehouse behavior was read as a downstream invariant but its mapping did not change because blocker links are navigation-only.
+- Validation passed: `cd backend && make test`, `cd backend && make migrate-check` (67 migrations), `cd frontend && npm run build`, and `git diff --check`. Vite reported only the existing large-chunk advisory.
+- The focused DB-backed finance tests compile and are present, but the test harness skipped execution because `CONSFLOW_TEST_DATABASE_URL` is not configured; the Docker daemon was unavailable from the sandbox, so no application database was touched.
+- Browser verification was skipped because the user did not explicitly request it.
+
 ## Planning To Construction Handoff
 
 Status: complete
@@ -1733,6 +1762,31 @@ Done:
 - Ran `git diff --check`: pass.
 - Browser verification was skipped per repository rule because the user did not request it.
 
+## Thủ Thiêm Workflow App Display Name
+
+Status: complete
+
+Mục đích chính:
+- Đổi tên sản phẩm hiển thị từ `Consflow` sang `Thủ Thiêm Workflow` trên app shell, trang đăng nhập và tiêu đề trình duyệt trước khi chốt thiết kế logo.
+
+Will be done:
+- Đổi tên hiển thị ở sidebar, heading đăng nhập và browser title.
+- Giữ nguyên mark `CF` như placeholder tạm thời và giữ subtitle `Construction Workflow OS`.
+- Giữ nguyên package/database/Docker identifiers, backend app name và email demo `@consflow.local`.
+- Cập nhật central/frontend mappings cho owner branding dùng chung.
+- Chạy frontend build và tìm kiếm chuỗi mục tiêu; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User explicitly asked to skip logo design and implement the app display-name change first.
+- Loaded the mandatory central/frontend mappings, frontend workflow guidance, router, app shell, login page and browser metadata.
+- Confirmed the user-facing name is owned by `AppShell.tsx`, `LoginPage.tsx` and `frontend/index.html`; no API, database or domain lifecycle change is required.
+- Changed the sidebar product name to `Thủ Thiêm Workflow`, the login heading to `Đăng nhập Thủ Thiêm Workflow`, and the browser title to `Thủ Thiêm Workflow - Construction Workflow OS`.
+- Preserved the existing `CF` mark as a temporary placeholder, kept the `Construction Workflow OS` subtitle, and left internal `consflow` package/database/Docker identifiers plus `@consflow.local` demo accounts unchanged.
+- Updated the central and frontend UI mappings with the branding owner files and the intentional display-name-only scope. No backend, database, route, contract, status, permission or domain mapping update was required.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Confirmed the built `dist/index.html` carries the new browser title and the target user-facing frontend files contain no remaining capitalized `Consflow` display label.
+- Browser verification was skipped per repository rule because the user did not request it.
+
 ## Construction Daily Report Create/Detail Contract Alignment
 
 Status: complete
@@ -1849,5 +1903,101 @@ Done:
 - Confirmed the Operations module has no remaining old source-work-item wording; the one remaining `Đầu việc liên kết` backend string belongs to a separate out-of-scope flow.
 - Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
 - Ran `cd backend && make test`: pass.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because the user did not request it.
+
+## Acceptance Centered Detail And Checklist Inspection
+
+Status: complete
+
+Mục đích chính:
+- Đặt nội dung biên bản nghiệm thu ở giữa vùng làm việc, giải thích rõ trạng thái hiện tại và cho phép xem đầy đủ từng tiêu chí checklist mà không làm thay đổi lifecycle nghiệm thu.
+
+Will be done:
+- Thay master-detail có cột danh sách cố định 360px bằng bố cục một cột căn giữa; danh sách biên bản trở thành bộ chọn gọn phía trên nội dung chi tiết.
+- Bỏ ba ô tiến trình dễ bị hiểu nhầm là thao tác; thay bằng mô tả trạng thái và hành động tiếp theo theo `draft`, `submitted`, `completed` và kết quả nghiệm thu.
+- Thêm thao tác `Xem` mở shared dialog chứa đầy đủ chi tiết checklist item và cho phép mở minh chứng liên kết khi có.
+- Giải thích rõ checklist được lập trong chính biên bản; công việc, biểu mẫu và PDF chỉ là liên kết tham chiếu, không tự động sinh tiêu chí.
+- Giữ nguyên API, schema, payload, RBAC, audit, acceptance/rework/handover lifecycle và shared outgoing-acceptance editor contract.
+- Cập nhật central/frontend/quality mappings; chạy frontend build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved all four review points with `OK triển khai`.
+- Loaded the mandatory central/backend/frontend/root-cause mappings, quality/acceptance domain guidance, frontend workflow, impact analysis and git workflow.
+- Confirmed the worktree is clean on `main`; no existing user changes overlap the target files.
+- Confirmed the layout shift is caused by the nested 360px acceptance list, the progress boxes are presentation-only, and checklist rows have no detail interaction despite the detail API already returning all item fields.
+- Confirmed runtime checklist rows are authored through `AcceptanceEditor` and persisted in `acceptance_checklist_items`; work item/form/PDF links do not auto-generate criteria. The Golden Project rows are explicit seed fixtures.
+- Replaced the nested 360px master-detail grid with a centered 1180px single-column workspace. Searchable acceptance records now sit in a compact bounded selector above the selected detail, so the record content no longer starts after a second left rail.
+- Replaced the non-interactive `Soạn biên bản` / `Đã gửi` / `Kết luận` stepper with state-specific guidance for draft, submitted, pass, conditional-pass and fail while preserving the existing single next-action CTA and permission checks.
+- Added responsive checklist inspection: desktop rows expose `Xem`, mobile uses stacked cards, and a shared `lg` dialog displays result, severity, required action, due date, photo/evidence requirements, note, supplemental metadata and the acceptance source.
+- Added protected linked-evidence opening through the existing `downloadBlob` client and `/evidence/:id/file`; photo URL fallback remains available when the checklist stores only a photo URL.
+- Added source guidance in both the read-only checklist and shared editor so project and work-item acceptance flows explain that checklist criteria are authored in the acceptance while work item/form/PDF links remain references.
+- Updated central/frontend/quality mappings for the centered workspace, status guidance, checklist detail dialog, evidence opening and checklist-source invariant. No backend-function, root-cause or migration mapping change was required because routes, contracts, persistence and lifecycle behavior are unchanged.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because the user did not request it.
+
+## Acceptance Selector And Detail Width Alignment
+
+Status: complete
+
+Mục đích chính:
+- Canh mép trái/phải của nội dung biên bản và checklist trùng với bộ chọn/search list phía trên trên mọi breakpoint.
+
+Will be done:
+- Bỏ responsive outer padding khỏi wrapper nội dung chính; giữ nguyên padding nội bộ của từng card.
+- Áp dụng cùng hành vi cho project route và global route đang dùng chung `AcceptancePage`.
+- Giữ nguyên API, schema, payload, RBAC, audit và acceptance/rework/handover lifecycle.
+- Cập nhật frontend mapping; chạy frontend build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved all three review points with `OK triển khai`.
+- Confirmed the selector and detail already share the same 1180px parent; the detail-only `p-3 sm:p-4 lg:p-5` wrapper is the exact source of the unequal outer width.
+- Confirmed both `/projects/:id/acceptance` and `/acceptance` render the same `AcceptancePage`, so one scoped presentation change covers both routes.
+- Removed the detail wrapper's responsive outer padding while retaining every card's own internal spacing and borders.
+- Updated the frontend ownership map to record that the selector and selected-detail sections share one outer width.
+- No central, backend, root-cause, quality-domain or migration mapping update was required because route ownership, domain invariants, contracts, persistence and lifecycle behavior are unchanged.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because the user did not request it.
+
+## Acceptance Editor And Multi-Evidence Criteria
+
+Status: complete
+
+Mục đích chính:
+- Giúp người lập biên bản nghiệm thu nhập thông tin theo đúng thứ tự công việc, tập trung vào từng tiêu chí và đính kèm minh chứng ngay tại tiêu chí bằng camera, tệp mới hoặc hồ sơ công trình đã có.
+
+Will be done:
+- Đổi wording riêng của Nghiệm thu từ `Đầu việc nguồn` thành `Công việc liên quan` trong UI và validation backend, giữ nguyên field `work_item_id`.
+- Thay checklist dạng bảng ngang bằng danh sách tiêu chí và vùng chỉnh sửa tiêu chí đang chọn; giữ một CTA chính `Gửi nghiệm thu` cùng `Lưu nháp` phụ.
+- Cho phép mỗi tiêu chí có tối đa 10 minh chứng; giữ `evidence_id` làm minh chứng chính tương thích và thêm association table bằng migration V67.
+- Cho phép chụp ảnh, chọn PNG/JPG/WebP/PDF hoặc chọn minh chứng hiện hữu qua `/projects/:id/evidence` với search/filter/cursor pagination.
+- Tệp chờ được giữ cục bộ; phải chọn `Công việc liên quan` trước khi upload qua route work-item evidence hiện hữu. Minh chứng hiện hữu có thể chọn khi chưa chọn công việc, nhưng phải cùng công việc nếu biên bản đã chọn một công việc.
+- Giữ nguyên lifecycle draft/submitted/completed, signature/PDF gates, RBAC, audit, rework và handover.
+- Cập nhật central/backend/frontend/root-cause/quality/construction mappings; chạy backend format/tests, frontend build, migration directory check và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai`.
+- Loaded the mandatory central/backend/frontend/root-cause mappings plus frontend, backend, database, quality/acceptance, construction, impact-analysis and git workflows.
+- Confirmed the current contract stores only one `acceptance_checklist_items.evidence_id`, validates evidence against the project/optional work item and renders the editor as a 1120px horizontal grid.
+- Confirmed `/projects/:id/evidence` already supports permission-scoped server search/filter/cursor pagination and `/work-items/:id/evidence/upload` already owns camera/file persistence and permission checks.
+- Confirmed migration V66 is the current maximum; the new association schema will be additive V67 and will backfill every legacy `evidence_id`.
+- Confirmed unrelated dirty changes in app branding files are outside this plan and will be preserved untouched.
+- Replaced the horizontal 1120px checklist grid with compact record metadata, a responsive criterion list and a focused selected-criterion editor. Conditional/fail remediation fields appear in context, while signature/PDF/form/notes remain available under supporting details.
+- Renamed Acceptance user-facing source wording to `Công việc liên quan` and `Không chọn công việc` in the shared project/work-item editor, read-only detail and acceptance-specific backend validation while preserving `work_item_id`.
+- Moved the existing PNG/JPG/WebP/PDF validation, local queue and real/system camera implementation into shared `modules/_shared/EvidenceCapture.tsx`; Operations keeps a compatibility re-export and Acceptance reuses the same implementation without changing upload storage.
+- Added `AcceptanceEvidencePicker.tsx` backed by permission-scoped `/projects/:id/evidence` search/type/status filters and cursor pagination. Rejected evidence is excluded; selecting a related work item scopes the picker and frontend/backend validation to that work item.
+- Added partial-upload-safe orchestration: queued files require a related work item, upload sequentially through `/work-items/:id/evidence/upload`, update local draft progress after each success and never recreate evidence that already uploaded when a later file fails.
+- Added V67 `acceptance_checklist_item_evidence` with ordered associations, legacy backfill and cascade only from checklist item to association. Service/repository contracts now accept/return `evidence_ids` and `evidence_records`, enforce 10 unique records per criterion, validate same project/optional same work item/non-rejected status and mirror the first association into legacy `acceptance_checklist_items.evidence_id`.
+- Extended the read-only checklist table/cards and item-detail dialog to show counts and open every protected linked evidence record while retaining legacy `photo_url` fallback.
+- Added focused unit coverage for ordered de-duplication/10-record limit and extended the DB regression to persist/read two evidence records while preserving the primary compatibility ID through submit, fail/rework and handover behavior.
+- Updated central/backend/frontend/root-cause/quality/construction mappings for V67, editor/picker/shared-capture ownership, wording, API reuse and evidence invariants.
+- Ran `go run ./cmd/migrate -check`: pass with 67 migrations.
+- Ran `GOCACHE="$PWD/.gocache" go test ./...`: pass.
+- Applied all V1-V67 migrations to a fresh disposable PostgreSQL database: 67 applied, 0 skipped.
+- Ran focused DB-backed `TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover`: pass; the disposable database/container was removed afterward.
+- Applying V67 to the existing local Compose database was skipped after the custom runner proved the pre-existing volume lacks its configured `consflow` role; no role/database mutation was attempted.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
 - Ran `git diff --check`: pass.
 - Browser verification was skipped per repository rule because the user did not request it.
