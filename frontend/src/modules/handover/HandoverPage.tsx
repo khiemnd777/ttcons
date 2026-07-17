@@ -1,7 +1,7 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, FileCheck2, Loader2, Plus, RefreshCw, Send } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Loader2, Plus, RefreshCw, Send } from 'lucide-react';
 import { DataTable } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
 import { FilterBar, type FilterOption } from '../../components/FilterBar';
@@ -15,50 +15,13 @@ import { get, post, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { dateText } from '../../lib/utils/format';
 import { ProjectSelector } from '../_shared/ProjectSelector';
-import { RecordFormDialog } from '../_shared/RecordFormDialog';
 import { SimpleForm } from '../_shared/SimpleForm';
+import { HandoverChecklistSourceDialog } from './HandoverChecklistSourceDialog';
+import { HandoverCreateDialog } from './HandoverCreateDialog';
+import { HandoverWorkspace } from './HandoverWorkspace';
+import type { ChecklistItem, FinalAcceptanceOption, HandoverDetail, HandoverRow } from './handoverTypes';
 
-type HandoverRow = {
-  id: string;
-  project_id: string;
-  handover_code: string;
-  status: string;
-  final_acceptance_id?: string;
-  final_acceptance_title?: string;
-  handover_date?: string;
-  client_representative: string;
-  company_representative: string;
-  checklist_total?: number;
-  checklist_verified?: number;
-  checklist_pending_required?: number;
-  readiness_snapshot_json?: { ready?: boolean; blockers?: string[]; counts?: Record<string, number>; checked_at?: string };
-  completed_at?: string;
-};
-
-type ChecklistItem = {
-  id: string;
-  item_code: string;
-  category: string;
-  title: string;
-  required: boolean;
-  status: string;
-  source_type?: string;
-  evidence_id?: string;
-  evidence_name?: string;
-  document_id?: string;
-  document_name?: string;
-  notes?: string;
-};
-
-type HandoverDetail = HandoverRow & {
-  final_acceptance_status?: string;
-  final_acceptance_result?: string;
-  checklist_items: ChecklistItem[];
-  evidence_options: { id: string; name: string; evidence_type: string }[];
-  document_options: { id: string; name: string; document_type?: string }[];
-};
-
-type HandoverAction = { type: 'checklist'; item: ChecklistItem } | { type: 'complete'; record: HandoverDetail } | null;
+type HandoverAction = { type: 'checklist'; item: ChecklistItem } | { type: 'source'; item: ChecklistItem } | { type: 'complete'; record: HandoverDetail } | null;
 
 export function HandoverPage() {
   const { id } = useParams();
@@ -67,6 +30,7 @@ export function HandoverPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedID, setSelectedID] = useState('');
   const [action, setAction] = useState<HandoverAction>(null);
+  const workspaceRef = useRef<HTMLElement>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasAnyPermission } = useAuth();
@@ -76,7 +40,7 @@ export function HandoverPage() {
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Record<string, any>[]>('/projects') });
   useEffect(() => { if (!projectId && projects.data?.[0]) setProjectId(projects.data[0].id); }, [projects.data, projectId]);
   const handovers = useQuery({ queryKey: ['handover', projectId], queryFn: () => get<HandoverRow[]>(`/projects/${projectId}/handover`), enabled: Boolean(projectId) });
-  const options = useQuery({ queryKey: ['handover-options', projectId], queryFn: () => get<{ final_acceptances: Record<string, any>[] }>(`/projects/${projectId}/handover/options`), enabled: Boolean(projectId) });
+  const options = useQuery({ queryKey: ['handover-options', projectId], queryFn: () => get<{ final_acceptances: FinalAcceptanceOption[] }>(`/projects/${projectId}/handover/options`), enabled: Boolean(projectId) });
   const rows = handovers.data ?? [];
   useEffect(() => {
     if (!rows.length) { setSelectedID(''); return; }
@@ -91,8 +55,8 @@ export function HandoverPage() {
   };
   const create = useMutation({
     mutationFn: (values: Record<string, any>) => post<HandoverDetail>(`/projects/${projectId}/handover`, values),
-    onSuccess: async (row) => { setCreateOpen(false); setSelectedID(row.id); await invalidate(); toast.success('Đã tạo gói hồ sơ bàn giao'); },
-    onError: (error) => toast.error('Không tạo được gói hồ sơ bàn giao', error),
+    onSuccess: async (row) => { setCreateOpen(false); setSelectedID(row.id); await invalidate(); toast.success('Đã tạo hồ sơ bàn giao'); },
+    onError: (error) => toast.error('Không tạo được hồ sơ bàn giao', error),
   });
   const transition = useMutation({
     mutationFn: ({ endpoint, values }: { endpoint: string; values?: Record<string, any> }) => post<HandoverDetail>(endpoint, values ?? {}),
@@ -114,58 +78,76 @@ export function HandoverPage() {
     { value: 'blocked', label: 'Đang chặn', count: countStatus(rows, 'blocked') },
     { value: 'handed_over', label: 'Đã bàn giao', count: countStatus(rows, 'handed_over') },
   ], [rows]);
-  const finalAcceptanceOptions = (options.data?.final_acceptances ?? []).map((row) => ({ value: row.id, label: `${row.title} · ${row.result}` }));
   const summary = useMemo(() => ({
     total: rows.length,
     pending: rows.filter((row) => ['draft', 'submitted', 'ready', 'blocked'].includes(row.status)).length,
     blocked: countStatus(rows, 'blocked'),
     completed: countStatus(rows, 'handed_over'),
   }), [rows]);
+  const openHandoverDetail = (handoverID: string) => {
+    setSelectedID(handoverID);
+    window.requestAnimationFrame(() => {
+      workspaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      workspaceRef.current?.focus({ preventScroll: true });
+    });
+  };
 
   return <>
     <PageHeader
       title="Bàn giao"
-      description="Hoàn tất gói bàn giao bằng readiness thật; mỗi điểm chặn dẫn về đúng module nguồn để xử lý."
-      actions={<>{id ? <ProjectBackLink projectId={projectId} /> : <ProjectSelector value={projectId} onChange={(value) => { setProjectId(value); setSelectedID(''); }} />}{canCreate ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" />Gói bàn giao</button> : null}</>}
+      description="Hoàn tất hồ sơ bàn giao bằng readiness thật; mỗi điểm chặn dẫn về đúng module nguồn để xử lý."
+      actions={<>{id ? <ProjectBackLink projectId={projectId} /> : <ProjectSelector value={projectId} onChange={(value) => { setProjectId(value); setSelectedID(''); }} />}{canCreate ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" />Tạo hồ sơ</button> : null}</>}
     />
 
-    <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Metric label="Tổng gói" value={summary.total} /><Metric label="Đang xử lý" value={summary.pending} /><Metric label="Đang bị chặn" value={summary.blocked} tone={summary.blocked ? 'amber' : 'slate'} /><Metric label="Đã bàn giao" value={summary.completed} tone="green" /></div>
+    <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Metric label="Tổng hồ sơ" value={summary.total} /><Metric label="Đang xử lý" value={summary.pending} /><Metric label="Đang bị chặn" value={summary.blocked} tone={summary.blocked ? 'amber' : 'slate'} /><Metric label="Đã bàn giao" value={summary.completed} tone="green" /></div>
 
-    {rows.length > 1 ? <label className="mb-4 block max-w-xl"><span className="text-xs font-semibold uppercase text-slate-500">Gói đang xem</span><select className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm" value={selectedID} onChange={(event) => setSelectedID(event.target.value)}>{rows.map((row) => <option key={row.id} value={row.id}>{row.handover_code} · {handoverStatusLabel(row.status)}</option>)}</select></label> : null}
+    <div className="mb-3"><FilterBar label="Lịch sử bàn giao" value={statusFilter} options={statusOptions} onChange={setStatusFilter} disabled={!projectId} /></div>
+    <ListSection title="Danh sách hồ sơ" className="mb-6">
+      <DataTable rows={filteredRows} loading={handovers.isLoading} error={handovers.error} onRetry={() => handovers.refetch()} searchPlaceholder="Tìm mã, đại diện, trạng thái..." pageSize={10} defaultSort={{ key: 'created_at', direction: 'desc' }} columns={[
+        { key: 'handover_code', header: 'Mã hồ sơ', render: (row) => <div><div className="font-semibold text-ink">{row.handover_code}</div><div className="text-xs text-slate-500">{row.client_representative} ↔ {row.company_representative}</div></div> },
+        { key: 'final_acceptance_id', header: 'Nghiệm thu cuối', render: (row) => row.final_acceptance_id ? 'Đã khóa nguồn' : <span className="text-red-600">Chưa liên kết</span> },
+        { key: 'checklist', header: 'Checklist', render: (row) => <span className={Number(row.checklist_pending_required ?? 0) ? 'font-semibold text-amber-700' : 'font-semibold text-emerald-700'}>{Number(row.checklist_verified ?? 0)}/{Number(row.checklist_total ?? 0)}</span> },
+        { key: 'handover_date', header: 'Ngày bàn giao', render: (row) => dateText(row.handover_date) },
+        { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
+        { key: 'action', header: 'Thao tác', render: (row) => <RowActions onView={() => openHandoverDetail(row.id)}>{canVerify && ['draft', 'blocked'].includes(row.status) ? <SmallButton label="Gửi" icon={<Send className="h-3.5 w-3.5" />} onClick={() => transition.mutate({ endpoint: `/handover/${row.id}/submit`, values: { comment: 'Gửi kiểm tra readiness' } })} /> : null}</RowActions> },
+      ]} empty={projectId ? 'Chưa có hồ sơ bàn giao' : 'Chọn công trình để xem bàn giao'} />
+    </ListSection>
 
-    <section className="mb-6">
+    {rows.length > 1 ? <label className="mb-4 block max-w-xl"><span className="text-xs font-semibold uppercase text-slate-500">Hồ sơ đang xem</span><select className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm" value={selectedID} onChange={(event) => openHandoverDetail(event.target.value)}>{rows.map((row) => <option key={row.id} value={row.id}>{row.handover_code} · {handoverStatusLabel(row.status)}</option>)}</select></label> : null}
+
+    <section ref={workspaceRef} tabIndex={-1} aria-label="Chi tiết hồ sơ bàn giao" className="mb-6 scroll-mt-4 focus:outline-none">
       {handovers.isLoading || detail.isLoading ? <Loading /> : handovers.error || detail.error ? <ErrorState onRetry={() => { void handovers.refetch(); void detail.refetch(); }} /> : detail.data ? <HandoverWorkspace
         detail={detail.data}
         canVerify={canVerify}
         canApprove={canApprove}
         pending={transition.isPending}
         onChecklist={(item) => setAction({ type: 'checklist', item })}
-        onSubmit={() => transition.mutate({ endpoint: `/handover/${detail.data.id}/submit`, values: { comment: 'Gửi gói hồ sơ bàn giao' } })}
+        onViewSource={(item) => setAction({ type: 'source', item })}
+        onSubmit={() => transition.mutate({ endpoint: `/handover/${detail.data.id}/submit`, values: { comment: 'Gửi hồ sơ bàn giao' } })}
         onCheck={() => transition.mutate({ endpoint: `/handover/${detail.data.id}/check` })}
         onComplete={() => setAction({ type: 'complete', record: detail.data })}
-      /> : <div className="rounded-lg border border-dashed border-line p-8 text-center text-sm text-slate-500">Chưa có gói bàn giao cho công trình này.</div>}
+      /> : <div className="rounded-lg border border-dashed border-line p-8 text-center text-sm text-slate-500">Chưa có hồ sơ bàn giao cho công trình này.</div>}
     </section>
 
-    <div className="mb-3"><FilterBar label="Lịch sử gói bàn giao" value={statusFilter} options={statusOptions} onChange={setStatusFilter} disabled={!projectId} /></div>
-    <ListSection title="Danh sách gói">
-      <DataTable rows={filteredRows} loading={handovers.isLoading} error={handovers.error} onRetry={() => handovers.refetch()} searchPlaceholder="Tìm mã, đại diện, trạng thái..." pageSize={10} defaultSort={{ key: 'created_at', direction: 'desc' }} columns={[
-        { key: 'handover_code', header: 'Gói hồ sơ', render: (row) => <div><div className="font-semibold text-ink">{row.handover_code}</div><div className="text-xs text-slate-500">{row.client_representative} ↔ {row.company_representative}</div></div> },
-        { key: 'final_acceptance_id', header: 'Nghiệm thu cuối', render: (row) => row.final_acceptance_id ? 'Đã khóa nguồn' : <span className="text-red-600">Chưa liên kết</span> },
-        { key: 'checklist', header: 'Checklist', render: (row) => <span className={Number(row.checklist_pending_required ?? 0) ? 'font-semibold text-amber-700' : 'font-semibold text-emerald-700'}>{Number(row.checklist_verified ?? 0)}/{Number(row.checklist_total ?? 0)}</span> },
-        { key: 'handover_date', header: 'Ngày bàn giao', render: (row) => dateText(row.handover_date) },
-        { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-        { key: 'action', header: 'Thao tác', render: (row) => <RowActions onView={() => setSelectedID(row.id)}>{canVerify && ['draft', 'blocked'].includes(row.status) ? <SmallButton label="Gửi" icon={<Send className="h-3.5 w-3.5" />} onClick={() => transition.mutate({ endpoint: `/handover/${row.id}/submit`, values: { comment: 'Gửi kiểm tra readiness' } })} /> : null}</RowActions> },
-      ]} empty={projectId ? 'Chưa có gói hồ sơ bàn giao' : 'Chọn công trình để xem bàn giao'} />
-    </ListSection>
+    <HandoverCreateDialog
+      open={createOpen}
+      projectId={projectId}
+      acceptances={options.data?.final_acceptances ?? []}
+      loading={options.isLoading}
+      error={options.error}
+      onRetry={() => void options.refetch()}
+      onClose={() => setCreateOpen(false)}
+      onCreate={(values) => create.mutateAsync(values)}
+    />
 
-    <RecordFormDialog open={createOpen} title="Tạo gói hồ sơ bàn giao" submitLabel="Tạo hồ sơ nháp" onClose={() => setCreateOpen(false)} fields={[
-      { name: 'handover_code', label: 'Mã bàn giao', defaultValue: `HO-${Date.now().toString().slice(-6)}` },
-      { name: 'final_acceptance_id', label: 'Nghiệm thu cuối đạt', type: 'select', required: true, options: finalAcceptanceOptions, helperText: 'Chỉ chọn nghiệm thu cuối đã đạt hoặc đạt có điều kiện.' },
-      { name: 'handover_date', label: 'Ngày dự kiến bàn giao', type: 'date' },
-      { name: 'client_representative', label: 'Đại diện chủ đầu tư', required: true },
-      { name: 'company_representative', label: 'Đại diện nhà thầu', required: true },
-      { name: 'notes', label: 'Ghi chú', type: 'textarea' },
-    ]} onSubmit={(values) => create.mutateAsync(values)} />
+    <HandoverChecklistSourceDialog
+      open={action?.type === 'source'}
+      item={action?.type === 'source' ? action.item : null}
+      detail={detail.data ?? null}
+      canEdit={Boolean(canVerify && detail.data && !['handed_over', 'cancelled', 'deleted'].includes(detail.data.status))}
+      onEdit={action?.type === 'source' ? () => setAction({ type: 'checklist', item: action.item }) : undefined}
+      onClose={() => setAction(null)}
+    />
 
     <Dialog open={action?.type === 'checklist'} title="Xác minh mục checklist" description={action?.type === 'checklist' ? action.item.title : undefined} onClose={() => setAction(null)} size="lg">
       {action?.type === 'checklist' && detail.data ? <SimpleForm submitLabel="Lưu xác minh" fields={[
@@ -182,54 +164,9 @@ export function HandoverPage() {
   </>;
 }
 
-function HandoverWorkspace({ detail, canVerify, canApprove, pending, onChecklist, onSubmit, onCheck, onComplete }: { detail: HandoverDetail; canVerify: boolean; canApprove: boolean; pending: boolean; onChecklist: (item: ChecklistItem) => void; onSubmit: () => void; onCheck: () => void; onComplete: () => void }) {
-  const snapshot = detail.readiness_snapshot_json ?? {};
-  const blockers = snapshot.blockers ?? [];
-  const groups = groupChecklist(detail.checklist_items);
-  const action = nextAction(detail.status, blockers.length);
-  return <div className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
-    <div className={`border-b p-4 ${action.tone === 'green' ? 'border-emerald-200 bg-emerald-50' : action.tone === 'amber' ? 'border-amber-200 bg-amber-50' : 'border-line bg-slate-50'}`}>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-ink">{detail.handover_code}</h2><StatusBadge status={detail.status} /></div><p className="mt-1 text-sm text-slate-600">{action.description}</p></div><div className="flex flex-wrap gap-2">{canVerify && ['draft', 'blocked'].includes(detail.status) ? <SmallButton label="Gửi kiểm tra" icon={<Send className="h-3.5 w-3.5" />} onClick={onSubmit} /> : null}{canVerify && ['submitted', 'ready', 'blocked'].includes(detail.status) ? <SmallButton label="Kiểm tra lại" icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={onCheck} /> : null}{canApprove && detail.status === 'ready' ? <button disabled={pending} className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={onComplete}><CheckCircle2 className="h-4 w-4" />Hoàn tất bàn giao</button> : null}</div></div>
-    </div>
-    <div className="space-y-5 p-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Metric label="Nghiệm thu cuối" value={detail.final_acceptance_result || '-'} /><Metric label="Checklist" value={`${detail.checklist_items.filter((item) => item.status === 'verified').length}/${detail.checklist_items.length}`} /><Metric label="Readiness" value={snapshot.ready ? 'Đạt' : detail.status === 'draft' ? 'Chưa kiểm tra' : 'Chưa đạt'} tone={snapshot.ready ? 'green' : blockers.length ? 'amber' : 'slate'} /><Metric label="Ngày bàn giao" value={dateText(detail.handover_date)} /></div>
-      {blockers.length ? <div className="rounded-md border border-amber-200 bg-amber-50 p-4"><div className="font-semibold text-amber-900">{blockers.length} điểm chặn cần xử lý</div><div className="mt-3 divide-y divide-amber-200">{blockers.map((blocker) => { const target = blockerTarget(detail.project_id, blocker); return <div key={blocker} className="flex flex-col gap-2 py-2 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"><span className="text-sm text-amber-900">{blocker}</span><Link className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700" to={target.path}>{target.label}<ArrowRight className="h-3.5 w-3.5" /></Link></div>; })}</div></div> : snapshot.ready ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">Không còn điểm chặn trong snapshot readiness gần nhất.</div> : <div className="rounded-md border border-line bg-slate-50 p-4 text-sm text-slate-600">Chưa có snapshot readiness. Hoàn thiện checklist rồi gửi hoặc chạy kiểm tra.</div>}
-      <div className="space-y-4"><div><h3 className="font-semibold text-ink">Checklist bàn giao</h3><p className="mt-1 text-xs text-slate-500">Các mục hệ thống được xác minh từ nguồn; mục thủ công cần minh chứng hoặc tài liệu hợp lệ.</p></div>{groups.map(([category, items]) => <ChecklistGroup key={category} category={category} items={items} canVerify={canVerify} onChecklist={onChecklist} />)}</div>
-    </div>
-  </div>;
-}
-
-function ChecklistGroup({ category, items, canVerify, onChecklist }: { category: string; items: ChecklistItem[]; canVerify: boolean; onChecklist: (item: ChecklistItem) => void }) {
-  return <section><h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{category || 'Khác'} · {items.filter((item) => item.status === 'verified').length}/{items.length}</h4><div className="overflow-x-auto rounded-md border border-line"><table className="min-w-[760px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Nội dung</th><th className="px-3 py-2">Nguồn xác minh</th><th className="px-3 py-2">Trạng thái</th><th className="px-3 py-2"></th></tr></thead><tbody className="divide-y divide-line">{items.map((item) => <tr key={item.id}><td className="px-3 py-2"><div className="font-semibold text-ink">{item.title}</div><div className="text-xs text-slate-500">{item.item_code}{item.required ? ' · bắt buộc' : ''}</div></td><td className="px-3 py-2 text-slate-600">{item.evidence_name || item.document_name || item.source_type || '-'}</td><td className="px-3 py-2"><StatusBadge status={item.status} /></td><td className="px-3 py-2 text-right">{canVerify && !item.source_type ? <SmallButton label="Xác minh" icon={<FileCheck2 className="h-3.5 w-3.5" />} onClick={() => onChecklist(item)} /> : <span className="text-xs text-slate-400">Tự động</span>}</td></tr>)}</tbody></table></div></section>;
-}
-
-function blockerTarget(projectId: string, blocker: string) {
-  const value = blocker.toLocaleLowerCase('vi');
-  if (value.includes('công nợ')) return { path: `/projects/${projectId}/debt`, label: 'Mở Công nợ' };
-  if (value.includes('phiếu chi') || value.includes('phiếu thu')) return { path: `/projects/${projectId}/accounting`, label: 'Mở Kế toán' };
-  if (value.includes('vật tư') || value.includes('kho')) return { path: `/projects/${projectId}/warehouse`, label: 'Mở Kho vật tư' };
-  if (value.includes('nghiệm thu')) return { path: `/projects/${projectId}/acceptance`, label: 'Mở Nghiệm thu' };
-  if (value.includes('lỗi') || value.includes('ncr') || value.includes('rework') || value.includes('công trường')) return { path: `/projects/${projectId}/operations`, label: 'Mở Thi công' };
-  return { path: `/projects/${projectId}?tab=files`, label: 'Mở Hồ sơ' };
-}
-
-function nextAction(status: string, blockerCount: number) {
-  if (status === 'handed_over') return { tone: 'green', description: 'Gói đã hoàn tất và được khóa theo readiness tại thời điểm bàn giao.' };
-  if (status === 'ready') return { tone: 'green', description: 'Readiness đã đạt. Bước tiếp theo là xác nhận hoàn tất bàn giao.' };
-  if (status === 'submitted') return { tone: 'slate', description: 'Gói đã gửi. Bước tiếp theo là chạy kiểm tra readiness.' };
-  if (status === 'blocked') return { tone: 'amber', description: `Xử lý ${blockerCount} điểm chặn rồi kiểm tra lại readiness.` };
-  return { tone: 'slate', description: 'Hoàn thiện checklist và gửi kiểm tra readiness khi hồ sơ sẵn sàng.' };
-}
-
-function groupChecklist(items: ChecklistItem[]) {
-  const groups = new Map<string, ChecklistItem[]>();
-  items.forEach((item) => groups.set(item.category || 'Khác', [...(groups.get(item.category || 'Khác') ?? []), item]));
-  return Array.from(groups.entries());
-}
-
 function handoverStatusLabel(status: string) { return ({ draft: 'Nháp', submitted: 'Đã gửi', ready: 'Sẵn sàng', blocked: 'Đang chặn', handed_over: 'Đã bàn giao' } as Record<string, string>)[status] ?? status; }
 function countStatus(rows: HandoverRow[], status: string) { return rows.filter((row) => row.status === status).length; }
 function Metric({ label, value, tone = 'slate' }: { label: string; value: ReactNode; tone?: 'slate' | 'amber' | 'green' }) { const color = tone === 'amber' ? 'border-amber-200 bg-amber-50 text-amber-800' : tone === 'green' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-line bg-white text-ink'; return <div className={`rounded-md border px-3 py-2 ${color}`}><div className="text-xs font-semibold uppercase tracking-wide opacity-70">{label}</div><div className="mt-1 text-lg font-semibold">{value}</div></div>; }
 function SmallButton({ label, icon, onClick }: { label: string; icon?: ReactNode; onClick: () => void }) { return <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-100" onClick={onClick}>{icon}{label}</button>; }
-function Loading() { return <div className="flex items-center gap-2 rounded-md border border-dashed border-line p-6 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Đang tải gói hồ sơ bàn giao...</div>; }
-function ErrorState({ onRetry }: { onRetry: () => void }) { return <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"><span>Không tải được gói hồ sơ bàn giao.</span><button className="inline-flex items-center gap-1 font-semibold underline" onClick={onRetry}><RefreshCw className="h-3.5 w-3.5" />Thử lại</button></div>; }
+function Loading() { return <div className="flex items-center gap-2 rounded-md border border-dashed border-line p-6 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Đang tải hồ sơ bàn giao...</div>; }
+function ErrorState({ onRetry }: { onRetry: () => void }) { return <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"><span>Không tải được hồ sơ bàn giao.</span><button className="inline-flex items-center gap-1 font-semibold underline" onClick={onRetry}><RefreshCw className="h-3.5 w-3.5" />Thử lại</button></div>; }

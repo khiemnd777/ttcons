@@ -1,5 +1,181 @@
 # Current States
 
+## Handover Linked Checklist Source Viewing
+
+Status: complete
+
+Mục đích chính:
+- Cho phép người dùng mở và kiểm tra nguồn tài liệu/minh chứng đã liên kết của từng checklist Bàn giao, kể cả khi hồ sơ đã bàn giao và bị khóa.
+
+Will be done:
+- Bổ sung metadata nguồn chính xác vào từng checklist item trong Handover detail mà không đổi route, schema, trạng thái, readiness hoặc audit.
+- Thay nhãn tĩnh `Đã liên kết` bằng `Xem nguồn`; mở dialog đọc-only có metadata nguồn và hành động mở tệp/URL khi khả dụng.
+- Giữ quyền tải minh chứng qua `/evidence/:id/file`; chỉ cho cập nhật liên kết khi hồ sơ chưa khóa và người dùng có quyền xác minh.
+- Cảnh báo rõ khi URL demo/nguồn không có tệp mở được; không tạo PDF giả hoặc thay seed trong scope này.
+- Bổ sung regression tests, cập nhật central/backend/frontend/root-cause/handover mappings, chạy backend/frontend validation và `git diff --check`.
+
+Done:
+- User approved all three review points with `OK triển khai`.
+- Loaded mandatory central/backend/frontend/root-cause/handover mappings plus backend/frontend/diagnose/impact guardrails.
+- Reproduced the bug with a stable source-level signal: linked rows render static `Đã liên kết`; automatic rows alone receive `Xem nguồn`.
+- Confirmed `HO-GOLD-001` has four linked active documents with source IDs/names and placeholder `example.com` URLs; backend data linkage is intact.
+- Confirmed the existing protected evidence file endpoint remains the authorization owner for local evidence files.
+- Enriched each Handover checklist item with its exact linked evidence metadata and document metadata/file URL; the detail contract no longer depends on the capped source-option lists.
+- Replaced the locked/static linked-source action with `Xem nguồn` on desktop and mobile, including handed-over hồ sơ. The dialog shows source type/status, verification notes/time and opens only active safe document URLs or protected local evidence files.
+- Added explicit warnings for placeholder `example.com`, inactive documents and sources without an openable file. Mutable hồ sơ with `handover.verify` can continue from source inspection to the shared `Cập nhật liên kết` flow; locked hồ sơ remain read-only.
+- Added frontend regression coverage for linked document/evidence presentation and backend integration assertions for exact evidence/document metadata. Updated central, backend, frontend, root-cause and quality/handover mappings.
+- Validation passed: handover source tests 7/7, project navigation tests 2/2, frontend lint/build, backend test suite and `git diff --check`. Vite reported only the existing large-chunk advisory.
+- Browser verification was skipped because the user did not explicitly request it.
+
+## Handover Checklist Item Vietnamese Labels
+
+Status: complete
+
+Mục đích chính:
+- Hiển thị loại checklist Bàn giao bằng nhãn nghiệp vụ tiếng Việt nhất quán thay cho các mã kỹ thuật như `operation_manuals`, đồng thời vẫn giữ mã gốc trong tooltip để hỗ trợ kỹ thuật.
+
+Will be done:
+- Tạo helper ánh xạ đủ 8 `item_code` hiện hành sang nhãn tiếng Việt đã được duyệt, với fallback `Nội dung khác` cho mã chưa biết.
+- Áp dụng helper tại bảng desktop, thẻ mobile và dialog nguồn; không thay đổi API, database, readiness hoặc trạng thái checklist.
+- Bổ sung regression test cho đủ 8 mapping và fallback; cập nhật central/frontend/handover mappings; chạy focused tests, frontend build và `git diff --check`.
+
+Done:
+- User approved the exact label mapping and tooltip-only technical code behavior with `OK triển khai`.
+- Loaded mandatory central/frontend mappings plus frontend workflow UI expectations and quality/acceptance/handover guardrails.
+- Confirmed the backend currently creates exactly eight handover checklist item codes and the frontend directly renders the raw code in desktop, mobile and source-dialog surfaces.
+- Added one shared presentation mapping for all eight current checklist codes, with `Nội dung khác` as the safe label for an unknown future code and the original code retained only in the `Mã kỹ thuật` tooltip.
+- Applied the Vietnamese business label consistently to the desktop checklist table, responsive mobile cards and automatic-source detail dialog without changing the primary checklist title, API/database values, readiness checks or verification state.
+- Added regression coverage for all eight exact mappings, fallback behavior and technical tooltip; updated central/frontend/handover mappings for the presentation invariant. Backend mapping did not require an update because no route, contract, repository or readiness behavior changed.
+- Validation passed: `npm run test:handover-source` (5/5), `npm run test:project-navigation` (2/2), `npm run lint`, `npm run build` and `git diff --check`. Vite reported only the existing large-chunk advisory.
+- Browser verification was skipped because the user did not explicitly request it.
+
+## Handover Automatic Checklist Source Transparency
+
+Status: complete
+
+Mục đích chính:
+- Cho phép người dùng mở và hiểu nguồn của từng checklist Bàn giao được hệ thống xác minh tự động: module nguồn, tiêu chí, kết quả snapshot và thời điểm kiểm tra; thao tác xem không được thay đổi readiness hay dữ liệu nguồn.
+
+Will be done:
+- Thay nhãn tĩnh `Tự động` bằng hành động `Xem nguồn` cho nghiệm thu cuối, kho/vật tư dư, công nợ phải trả và công nợ phải thu.
+- Thêm dialog đọc-only dùng dữ liệu checklist/readiness hiện có, phân biệt snapshot lịch sử với dữ liệu hiện tại và chỉ hiện CTA mở module khi người dùng có quyền.
+- Deep-link nghiệm thu đúng bản ghi, Công nợ đúng Phải trả/Phải thu và Kho đúng tab `Tại công trình & dư`; giữ nguyên xác minh thủ công, readiness, ledger và trạng thái bàn giao.
+- Tách helper ánh xạ nguồn có regression test; cập nhật central/frontend/handover/accounting mappings; chạy frontend tests/build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved implementation with `OK triển khai` after reviewing the source dialog mockup and aggregate-snapshot limitation.
+- Loaded mandatory central/backend/frontend maps plus frontend workflow, impact-analysis, quality/handover, accounting/finance and materials/warehouse guardrails.
+- Confirmed the backend detail already returns checklist source IDs and readiness aggregate counts; no API, schema or migration change is required for the approved scope.
+- Replaced the passive automatic label with a responsive `Xem nguồn` action for the exact final acceptance, site surplus, payable and receivable readiness checks; evidence/document-linked items remain user-linked manual verification sources.
+- Added a read-only, permission-aware source dialog showing the backend criterion, stored result/count/amount/check time and a clear warning that the source module may have changed since the last readiness snapshot.
+- Added presentation-only deep links that select the exact Acceptance record, the Warehouse site/surplus tab and the permitted Debt payables/receivables kind with the `all` queue; no source or financial mutation is triggered by navigation.
+- Added a pure source-presentation helper and four regression tests covering classification, linked documents/evidence, all source targets and snapshot metrics/result states.
+- Updated central/frontend/handover/accounting mappings for source transparency and query-driven navigation. Backend and warehouse mappings did not require changes because API/readiness queries and Warehouse tab behavior were unchanged.
+- Validation passed: `npm run test:handover-source`, `npm run test:project-navigation`, `npm run build` and `git diff --check`. Vite reported only the existing large-chunk advisory.
+- Browser verification was skipped because the user did not explicitly request it.
+
+## Handover List-First Workspace And Accounting Debt Label
+
+Status: complete
+
+Mục đích chính:
+- Cho phép người dùng tìm và chọn hồ sơ bàn giao trước khi đọc chi tiết dài; dùng nhãn điều hướng Công nợ ngắn gọn, đúng ngữ cảnh trong chi tiết phiếu Kế toán.
+
+Will be done:
+- Đưa bộ lọc lịch sử và `Danh sách hồ sơ` lên trên workspace chi tiết Bàn giao.
+- Giữ hành vi `Xem chi tiết` chọn đúng hồ sơ rồi cuộn/focus workspace inline bên dưới danh sách.
+- Đổi nhãn `Mở công nợ nguồn` thành `Mở công nợ`, giữ nguyên route và quan hệ phân bổ.
+- Cập nhật central/frontend/accounting/handover mappings; chạy frontend build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the combined UI implementation with `Duyệt, triển khai`.
+- Loaded mandatory central/frontend maps plus frontend workflow, accounting-finance and quality-handover guardrails.
+- Confirmed the Handover detail currently renders before its history/list and the existing `openHandoverDetail` already selects then scrolls/focuses the inline workspace.
+- Confirmed `Mở công nợ nguồn` has one frontend owner in `AccountingDetailDialog.tsx`; its target remains the project Debt route.
+- Moved the Handover status/history filters and `Danh sách hồ sơ` above the selected inline detail, with explicit spacing before the selector/detail block.
+- Preserved the shared `openHandoverDetail` path so history `Xem chi tiết` and the multi-record selector still select and scroll/focus the workspace now located below the list.
+- Changed the linked Accounting payment action from `Mở công nợ nguồn` to `Mở công nợ` without changing its project Debt route or any allocation/reconciliation behavior.
+- Updated central/frontend/accounting/handover mappings for the list-first handover hierarchy and concise Debt navigation label.
+- Validation passed: `cd frontend && npm run build` and `git diff --check`. Vite reported only the existing large-chunk advisory.
+- Browser verification was skipped because the user did not explicitly request it.
+
+## Handover Detail Navigation And Vietnamese Terms
+
+Status: complete
+
+Mục đích chính:
+- Khi người dùng chọn `Xem chi tiết`, luôn đưa đúng hồ sơ bàn giao vào tầm nhìn; toàn bộ bề mặt liên quan dùng thuật ngữ nghiệp vụ tiếng Việt rõ ràng thay cho `Gói` và `AP/AR`.
+
+Will be done:
+- Sửa hành vi `Xem chi tiết` trong lịch sử bàn giao để chọn đúng hồ sơ rồi cuộn/focus vùng chi tiết, kể cả khi hồ sơ đó đang được chọn.
+- Đổi thuật ngữ người dùng từ `Gói` sang `Hồ sơ bàn giao` trên trang, dialog tạo, workspace chi tiết, work-item surface và thông báo/audit phát sinh mới.
+- Đổi `AP`, `AR`, `AP/AR` trên các bề mặt người dùng liên quan thành `công nợ phải trả`, `công nợ phải thu`, `công nợ phải trả và phải thu`; giữ nguyên API, key kỹ thuật và nghiệp vụ đối soát.
+- Cập nhật Golden seed và bản ghi local `HO-GOLD-001` có mục tiêu, không viết lại ghi chú do người dùng tạo.
+- Cập nhật central/frontend/accounting/handover mappings; chạy frontend build, focused backend test phù hợp và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the combined implementation plan with `OK duyệt`.
+- Loaded mandatory central/backend/frontend/root-cause maps plus frontend/backend workflow, accounting-finance and quality-handover guardrails.
+- Confirmed the detail API already succeeds; the row action only reassigned the already-selected ID and had no scroll/focus effect. Confirmed the visible `AP/AR` note for `HO-GOLD-001` comes from `backend/seed/golden_project_finance.sql` while additional user guidance is owned by Accounting and `WorkItemPrimarySurface`.
+- Added one `openHandoverDetail` path for the history row and multi-record selector. It always selects the requested record and scrolls/focuses the inline detail section, including when the same record is already active; loading, error and loaded content share that focus target.
+- Replaced user-facing `Gói` terminology with `Hồ sơ bàn giao` across list metrics/history, create dialog, inline detail, work-item guidance, generated checklist/blocker text and new audit descriptions without changing routes, statuses, API fields or package lifecycle functions.
+- Replaced user-facing AP/AR/đầu-vào/đầu-ra wording with `công nợ phải trả` and `công nợ phải thu` across Accounting, Debt reconciliation, shared finance/handover work-item surfaces, backend automation/blockers/audit and the Golden finance seed. Internal AP/AR keys and reconciliation behavior remain unchanged.
+- Updated the running local `HO-GOLD-001` note plus its two finance checklist items and Golden closure audit through targeted SQL; verified the three displayed values directly and did not reseed or rewrite other/user-authored notes.
+- Updated central/backend/frontend/root-cause/accounting/handover mappings for the navigation invariant, Vietnamese terminology convention and generated message ownership.
+- Validation passed: `cd frontend && npm run build`, `cd backend && make test`, targeted local SQL verification and `git diff --check`. Vite reported only the existing large-chunk advisory.
+- `cd backend && make seed-validate` was attempted but the current local database has zero of the two Golden projects in the validator's expected completed/100% official-template state. This fixture drift predates and is independent of the targeted text updates; no destructive reseed/reset was performed.
+- Browser verification was skipped because the user did not explicitly request it.
+
+## Project Explorer Navigation
+
+Status: complete
+
+Mục đích chính:
+- Mỗi nhóm trong cây Công trình mở đúng workspace nghiệp vụ đầu tiên mà người dùng có quyền xem, thay vì tất cả cùng quay về Tổng quan.
+
+Will be done:
+- Dùng chung một cấu hình nhóm/mục con/quyền/route giữa `ProjectsPage` và `ProjectWorkspaceLayout`.
+- Route mặc định theo nhóm phải khớp cây nghiệp vụ hiện hữu và tự fallback theo quyền để không dẫn người dùng vào trang 403.
+- Thêm regression test cho Admin và vai trò có quyền hạn chế; cập nhật central/frontend/project-planning mappings.
+- Chạy focused navigation test, frontend production build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved implementation with `OK triển khai`.
+- Loaded mandatory central/frontend/root-cause/project-planning mappings and confirmed the bug is frontend-only: all six explorer folders used an empty path even though the nested project routes already exist.
+- Built the failing source-level signal showing five non-overview groups resolve to the project index.
+- Added `projectWorkspaceNavigation.ts` as the single group/child/permission/route source for both the expanded project explorer and project workspace sidebar.
+- Changed group landing behavior to the first child visible under the current permission set, with a group-level fallback; Admin routes now open Overview, Pipeline, Contracts, Operations, Handover and Members respectively.
+- Added dependency-free Node regression coverage for the Admin mapping and a restricted role that must fall back to BOQ, Warehouse, Acceptance and Debt.
+- Updated central/frontend/root-cause/project-planning mappings for the shared owner, landing invariant and triage search path.
+- Validation passed: focused navigation tests, frontend production build and `git diff --check`. Vite reported only the existing large-chunk advisory.
+- Browser verification was skipped because the user did not explicitly request it.
+
+## Create And Detail Redesign For Debt, Accounting And Handover
+
+Status: complete
+
+Mục đích chính:
+- Giúp người dùng tạo đúng chứng từ ngay lần đầu và khi mở chi tiết luôn thấy trạng thái hiện tại, số liệu quan trọng, việc tiếp theo và nguồn nghiệp vụ liên quan; giữ Công nợ sở hữu AP/AR allocation, Kế toán sở hữu budget/generic phiếu và Bàn giao chỉ điều phối readiness.
+
+Will be done:
+- Thiết kế lại create Công nợ thành dialog có switch Phải trả/Phải thu, form theo nhóm và live summary; detail có header hành động theo trạng thái, tab có số đếm và tổng quan cân đối nghĩa vụ.
+- Thiết kế lại create Kế toán thành dialog có switch Ngân sách/Phiếu thu chi khác; detail riêng cho ngân sách và phiếu, chỉ dùng generic `outbound|inbound|other` và dẫn AP/AR về Công nợ.
+- Thiết kế lại create Bàn giao với preview nghiệm thu cuối, đại diện hai bên và summary sau tạo; detail giữ inline workspace, tách Việc cần làm/Checklist/Thông tin hồ sơ và một primary CTA theo trạng thái.
+- Giữ backend/API/schema hiện hữu; chỉ thêm UI cho transition đã tồn tại và không tạo nguồn dữ liệu mới.
+- Cập nhật central/frontend/accounting/handover mappings; chạy frontend build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `Approve`.
+- Loaded mandatory central/backend/frontend/root-cause maps plus frontend workflow, accounting-finance, quality-handover and impact-analysis guardrails.
+- Confirmed typed backend contracts already cover all approved create/detail actions; no migration or API contract change is required.
+- Extended the shared `SimpleForm` contract with optional grouped sections, a responsive sticky live-summary aside and linked field derivation while preserving all existing flat-form consumers and inline validation/toasts.
+- Replaced Công nợ create/detail with dedicated dialogs: permission-aware Phải trả/Phải thu switching, locked project context, obligation summaries, issue-aware default tabs, tab counters and one approve/reconcile/pay-or-receive next action that continues to use canonical allocation panels.
+- Replaced Kế toán create/detail with dedicated budget/generic-phiếu dialogs: server-owned budget values remain read-only/derived, generic creation remains limited to `outbound|inbound|other`, and AP/AR-linked work is directed back to Công nợ.
+- Reworked Bàn giao create/detail with final-acceptance source preview and representative prefill, plus a responsive three-tab inline workspace for `Việc cần làm`, `Checklist` and `Thông tin hồ sơ` with one state-derived primary action.
+- Updated central/frontend/accounting/handover mappings. Backend and root-cause mappings did not change because no route, API contract, service behavior, schema, diagnostic path or failure mode changed.
+- Validation passed: frontend TypeScript lint, frontend production build and `git diff --check`. Vite reported only the existing large-chunk advisory.
+- Browser verification was skipped because the user did not explicitly request it.
+
 ## P0 + P1 Bàn giao, Kế toán và Công nợ
 
 Status: complete

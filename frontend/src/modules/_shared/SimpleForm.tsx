@@ -1,11 +1,11 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { ChevronDown, X } from 'lucide-react';
 import { useToast } from '../../components/ToastProvider';
 
 type FieldType = 'text' | 'number' | 'date' | 'textarea' | 'select' | 'multi-select' | 'checkbox';
 type FieldOption = { label: string; value: string };
-type FormValues = Record<string, any>;
+export type FormValues = Record<string, any>;
 
 export type FieldDef = {
   name: string;
@@ -26,6 +26,11 @@ export type FieldDef = {
 
 type FormErrors = Record<string, string>;
 export type FormLayout = 'single' | 'two-column';
+export type FormSectionDef = {
+  title: string;
+  description?: string;
+  fields: string[];
+};
 
 function fieldInitialValue(field: FieldDef) {
   if (field.defaultValue !== undefined) return field.defaultValue;
@@ -52,6 +57,9 @@ export function SimpleForm({
   submitLabel = 'Lưu',
   cancelLabel = 'Hủy',
   layout = 'single',
+  sections,
+  renderAside,
+  onFieldChange,
   resetOnSubmit = false,
   onSubmit,
   onCancel,
@@ -60,6 +68,9 @@ export function SimpleForm({
   submitLabel?: string;
   cancelLabel?: string;
   layout?: FormLayout;
+  sections?: FormSectionDef[];
+  renderAside?: (values: FormValues) => ReactNode;
+  onFieldChange?: (name: string, value: any, values: FormValues) => Partial<FormValues> | void;
   resetOnSubmit?: boolean;
   onSubmit: (values: FormValues) => Promise<unknown> | unknown;
   onCancel?: () => void;
@@ -107,12 +118,95 @@ export function SimpleForm({
 
   function setFieldValue(field: FieldDef, rawValue: string | boolean | string[]) {
     const value = field.type === 'number' && rawValue !== '' ? Number(rawValue) : rawValue;
-    setValues((current) => ({ ...current, [field.name]: value }));
+    const nextValues = { ...values, [field.name]: value };
+    const linkedValues = onFieldChange?.(field.name, value, nextValues) ?? {};
+    setValues((current) => ({ ...current, [field.name]: value, ...linkedValues }));
     setErrors((current) => {
-      if (!current[field.name]) return current;
-      const { [field.name]: _removed, ...rest } = current;
-      return rest;
+      const cleared = new Set([field.name, ...Object.keys(linkedValues)]);
+      if (![...cleared].some((name) => current[name])) return current;
+      return Object.fromEntries(Object.entries(current).filter(([name]) => !cleared.has(name)));
     });
+  }
+
+  function renderFieldGrid(sectionFields: FieldDef[]) {
+    return (
+      <div className={clsx('grid gap-4', layout === 'two-column' ? 'md:grid-cols-2' : 'grid-cols-1')}>
+        {sectionFields.map((field) => {
+          const error = errors[field.name];
+          const disabled = saving || Boolean(field.disabledWhen?.(values));
+          const controlClassName = clsx(
+            'mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring',
+            error ? 'border-rose-300 bg-rose-50' : 'border-line',
+            disabled && 'cursor-not-allowed bg-slate-100 text-slate-500',
+          );
+
+          return (
+            <label key={field.name} className={clsx('block', layout === 'two-column' && (field.fullWidth || field.type === 'textarea') && 'md:col-span-2')}>
+              <span className="text-sm font-semibold text-slate-700">{field.label}</span>
+              {field.required ? <span className="ml-1 text-rose-600">*</span> : null}
+              {field.type === 'textarea' ? (
+                <textarea
+                  className={clsx(controlClassName, 'min-h-24')}
+                  placeholder={field.placeholder}
+                  value={values[field.name] ?? ''}
+                  onChange={(event) => setFieldValue(field, event.target.value)}
+                  aria-invalid={Boolean(error)}
+                  disabled={disabled}
+                />
+              ) : field.type === 'select' ? (
+                <select
+                  className={controlClassName}
+                  value={values[field.name] ?? ''}
+                  onChange={(event) => setFieldValue(field, event.target.value)}
+                  aria-invalid={Boolean(error)}
+                  disabled={disabled}
+                >
+                  <option value="">Chọn</option>
+                  {field.options?.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : field.type === 'multi-select' ? (
+                <MultiSelectControl
+                  value={Array.isArray(values[field.name]) ? values[field.name] : []}
+                  options={field.options ?? []}
+                  placeholder={field.placeholder ?? 'Gõ để tìm'}
+                  disabled={disabled}
+                  invalid={Boolean(error)}
+                  onChange={(value) => setFieldValue(field, value)}
+                />
+              ) : field.type === 'checkbox' ? (
+                <span className="mt-2 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className={clsx('h-4 w-4 rounded', error ? 'border-rose-300 bg-rose-50' : 'border-line', disabled && 'cursor-not-allowed opacity-60')}
+                    checked={Boolean(values[field.name])}
+                    onChange={(event) => setFieldValue(field, event.target.checked)}
+                    aria-invalid={Boolean(error)}
+                    disabled={disabled}
+                  />
+                  {field.helperText ? <span className="text-xs text-slate-500">{field.helperText}</span> : null}
+                </span>
+              ) : (
+                <input
+                  type={field.type ?? 'text'}
+                  className={controlClassName}
+                  placeholder={field.placeholder}
+                  value={values[field.name] ?? ''}
+                  onChange={(event) => setFieldValue(field, event.target.value)}
+                  aria-invalid={Boolean(error)}
+                  disabled={disabled}
+                />
+              )}
+              {field.type !== 'checkbox' && field.helperText ? <p className="mt-1 text-xs text-slate-500">{field.helperText}</p> : null}
+              {error ? <p className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}
+            </label>
+          );
+        })}
+      </div>
+    );
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -141,81 +235,29 @@ export function SimpleForm({
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      <div className={clsx('grid gap-4', layout === 'two-column' ? 'md:grid-cols-2' : 'grid-cols-1')}>
-      {visibleFields.map((field) => {
-        const error = errors[field.name];
-        const disabled = saving || Boolean(field.disabledWhen?.(values));
-        const controlClassName = clsx(
-          'mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring',
-          error ? 'border-rose-300 bg-rose-50' : 'border-line',
-          disabled && 'cursor-not-allowed bg-slate-100 text-slate-500',
-        );
-
-        return (
-        <label key={field.name} className={clsx('block', layout === 'two-column' && (field.fullWidth || field.type === 'textarea') && 'md:col-span-2')}>
-          <span className="text-sm font-semibold text-slate-700">{field.label}</span>
-          {field.required ? <span className="ml-1 text-rose-600">*</span> : null}
-          {field.type === 'textarea' ? (
-            <textarea
-              className={clsx(controlClassName, 'min-h-24')}
-              placeholder={field.placeholder}
-              value={values[field.name] ?? ''}
-              onChange={(event) => setFieldValue(field, event.target.value)}
-              aria-invalid={Boolean(error)}
-              disabled={disabled}
-            />
-          ) : field.type === 'select' ? (
-            <select
-              className={controlClassName}
-              value={values[field.name] ?? ''}
-              onChange={(event) => setFieldValue(field, event.target.value)}
-              aria-invalid={Boolean(error)}
-              disabled={disabled}
-            >
-              <option value="">Chọn</option>
-              {field.options?.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          ) : field.type === 'multi-select' ? (
-            <MultiSelectControl
-              value={Array.isArray(values[field.name]) ? values[field.name] : []}
-              options={field.options ?? []}
-              placeholder={field.placeholder ?? 'Gõ để tìm'}
-              disabled={disabled}
-              invalid={Boolean(error)}
-              onChange={(value) => setFieldValue(field, value)}
-            />
-          ) : field.type === 'checkbox' ? (
-            <span className="mt-2 flex items-center gap-2">
-              <input
-                type="checkbox"
-                className={clsx('h-4 w-4 rounded', error ? 'border-rose-300 bg-rose-50' : 'border-line', disabled && 'cursor-not-allowed opacity-60')}
-                checked={Boolean(values[field.name])}
-                onChange={(event) => setFieldValue(field, event.target.checked)}
-                aria-invalid={Boolean(error)}
-                disabled={disabled}
-              />
-              {field.helperText ? <span className="text-xs text-slate-500">{field.helperText}</span> : null}
-            </span>
-          ) : (
-            <input
-              type={field.type ?? 'text'}
-              className={controlClassName}
-              placeholder={field.placeholder}
-              value={values[field.name] ?? ''}
-              onChange={(event) => setFieldValue(field, event.target.value)}
-              aria-invalid={Boolean(error)}
-              disabled={disabled}
-            />
-          )}
-          {field.type !== 'checkbox' && field.helperText ? <p className="mt-1 text-xs text-slate-500">{field.helperText}</p> : null}
-          {error ? <p className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}
-        </label>
-        );
-      })}
+      <div className={clsx(renderAside && 'grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]')}>
+        <div className="space-y-4">
+          {sections?.length ? sections.map((section) => {
+            const names = new Set(section.fields);
+            const sectionFields = visibleFields.filter((field) => names.has(field.name));
+            if (!sectionFields.length) return null;
+            return (
+              <section key={section.title} className="rounded-lg border border-line bg-white p-4">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-ink">{section.title}</h3>
+                  {section.description ? <p className="mt-1 text-xs leading-5 text-slate-500">{section.description}</p> : null}
+                </div>
+                {renderFieldGrid(sectionFields)}
+              </section>
+            );
+          }) : renderFieldGrid(visibleFields)}
+          {sections?.length ? (() => {
+            const sectioned = new Set(sections.flatMap((section) => section.fields));
+            const remaining = visibleFields.filter((field) => !sectioned.has(field.name));
+            return remaining.length ? renderFieldGrid(remaining) : null;
+          })() : null}
+        </div>
+        {renderAside ? <aside className="h-fit rounded-lg border border-line bg-slate-50 p-4 lg:sticky lg:top-0">{renderAside(values)}</aside> : null}
       </div>
       <div className={clsx('flex flex-wrap gap-2', onCancel ? 'justify-end' : 'justify-start')}>
         {onCancel ? (

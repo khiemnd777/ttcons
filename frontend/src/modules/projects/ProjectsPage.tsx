@@ -24,23 +24,11 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { SimpleForm } from '../_shared/SimpleForm';
 import type { Partner, Project } from '../../lib/types/domain';
 import { partnerOptions } from '../core-data/partnerUtils';
-
-type ProjectFolder = {
-  key: string;
-  label: string;
-  description: string;
-  path: string;
-  permissions?: string[];
-};
-
-const projectFolders: ProjectFolder[] = [
-  { key: 'overview', label: 'Tổng quan', description: 'Tình trạng, việc cần xử lý, blocker', path: '', permissions: ['project.view'] },
-  { key: 'planning', label: 'Kế hoạch & Workflow', description: 'Pipeline, planning, BOQ / dự toán', path: '', permissions: ['planning.view', 'pipeline.view', 'boq.view'] },
-  { key: 'materials', label: 'Thương mại & Vật tư', description: 'Hợp đồng, mua sắm, kho vật tư, cân đối vật tư', path: '', permissions: ['contract.view', 'procurement.view', 'warehouse.view'] },
-  { key: 'quality', label: 'Thi công & Chất lượng', description: 'Thi công, ITP/RFI/NCR, nghiệm thu, rework', path: '', permissions: ['operation.view', 'quality.view', 'acceptance.view', 'rework.view'] },
-  { key: 'finance', label: 'Bàn giao & Tài chính', description: 'Bàn giao, kế toán, công nợ', path: '', permissions: ['handover.view', 'accounting.view', 'accounting.payable_view', 'accounting.receivable_view'] },
-  { key: 'governance', label: 'Quản trị công trình', description: 'Thành viên, hồ sơ, audit', path: '', permissions: ['audit.view', 'project.view'] },
-];
+import {
+  projectWorkspaceGroupPath,
+  visibleProjectWorkspaceGroups,
+  type ProjectWorkspaceGroup,
+} from './projectWorkspaceNavigation';
 
 export function ProjectsPage() {
   const [open, setOpen] = useState(false);
@@ -108,7 +96,7 @@ export function ProjectsPage() {
   ];
 
   const visibleFolders = useMemo(
-    () => projectFolders.filter((folder) => hasAnyPermission(folder.permissions)),
+    () => visibleProjectWorkspaceGroups(hasAnyPermission),
     [hasAnyPermission],
   );
   const statusOptions = useMemo(() => {
@@ -362,8 +350,8 @@ function ProjectExplorerRow({
   );
 }
 
-function ProjectFolderRow({ project, folder }: { project: Project; folder: ProjectFolder }) {
-  const href = folder.path ? `/projects/${project.id}/${folder.path}` : `/projects/${project.id}`;
+function ProjectFolderRow({ project, folder }: { project: Project; folder: ProjectWorkspaceGroup }) {
+  const href = projectWorkspaceGroupPath(project.id, folder);
   return (
     <Link
       to={href}
@@ -372,7 +360,7 @@ function ProjectFolderRow({ project, folder }: { project: Project; folder: Proje
       <div className="ml-8 flex min-w-0 items-start gap-3 border-l border-slate-200 pl-4">
         <Folder className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-700">{folder.label}</p>
+          <p className="truncate text-sm font-semibold text-slate-700">{folder.explorerLabel ?? folder.label}</p>
           <p className="mt-0.5 truncate text-xs text-slate-500">{folder.description}</p>
         </div>
       </div>

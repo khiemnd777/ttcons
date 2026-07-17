@@ -269,12 +269,12 @@ function configuredPrimarySurface(item: WorkItem): WorkItemPrimarySurfaceDefinit
     finance: {
       kind: 'finance',
       title: 'Hóa đơn, công nợ và thu/chi',
-      description: 'Xử lý AP/AR, hóa đơn PDF, kỳ thanh toán, ứng trước, phân bổ thu/chi và đối soát trong sổ tài chính công trình.',
+      description: 'Xử lý công nợ phải trả và phải thu, hóa đơn PDF, kỳ thanh toán, ứng trước, phân bổ thu/chi và đối soát trong sổ tài chính công trình.',
     },
     handover: {
       kind: 'handover',
       title: 'Đóng tài chính & bàn giao',
-      description: 'Hoàn thiện checklist chứng từ, kiểm tra readiness và khóa gói hồ sơ bàn giao công trình.',
+      description: 'Hoàn thiện checklist chứng từ, kiểm tra readiness và khóa hồ sơ bàn giao công trình.',
     },
     generic: {
       kind: 'generic',
@@ -332,7 +332,7 @@ function ContractPrimaryPanel({ item }: { item: WorkItem }) {
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div>
         <h3 className="text-sm font-semibold text-ink">Workspace hợp đồng của công trình</h3>
-        <p className="mt-1 text-sm leading-6 text-slate-700">Xử lý hợp đồng trong domain workspace để giữ version, phê duyệt, milestone AP/AR, variation và retention có truy vết. Hồ sơ biểu mẫu/PDF của bước vẫn nằm ở tab hỗ trợ bên dưới.</p>
+        <p className="mt-1 text-sm leading-6 text-slate-700">Xử lý hợp đồng trong domain workspace để giữ version, phê duyệt, nghĩa vụ phải trả/phải thu theo mốc, phụ lục và khoản giữ lại có truy vết. Hồ sơ biểu mẫu/PDF của bước vẫn nằm ở tab hỗ trợ bên dưới.</p>
       </div>
       <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700" to={`/projects/${item.project_id}/contracts`}><ScrollText className="h-4 w-4" /> Mở hợp đồng</Link>
     </div>
@@ -354,7 +354,7 @@ function QualityPrimaryPanel({ item }: { item: WorkItem }) {
 function FinancePrimaryPanel({ item }: { item: WorkItem }) {
   return <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <div><h3 className="text-sm font-semibold text-ink">Sổ công nợ và chứng từ công trình</h3><p className="mt-1 text-sm leading-6 text-slate-700">Tạo/duyệt AP/AR, tải và xác minh hóa đơn PDF, lập kỳ, ứng trước, thu/chi và kiểm tra reconciliation. Biểu mẫu/PDF của bước vẫn nằm ở tab hỗ trợ.</p></div>
+      <div><h3 className="text-sm font-semibold text-ink">Sổ công nợ và chứng từ công trình</h3><p className="mt-1 text-sm leading-6 text-slate-700">Tạo/duyệt công nợ phải trả và phải thu, tải và xác minh hóa đơn PDF, lập kỳ, ứng trước, thu/chi và kiểm tra đối soát. Biểu mẫu/PDF của bước vẫn nằm ở tab hỗ trợ.</p></div>
       <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800" to={`/projects/${item.project_id}/debt`}><FileText className="h-4 w-4" /> Mở công nợ</Link>
     </div>
   </section>;
@@ -363,7 +363,7 @@ function FinancePrimaryPanel({ item }: { item: WorkItem }) {
 function HandoverPrimaryPanel({ item }: { item: WorkItem }) {
   return <section className="rounded-md border border-teal-200 bg-teal-50 p-4">
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <div><h3 className="text-sm font-semibold text-ink">Gói hồ sơ đóng tài chính & bàn giao</h3><p className="mt-1 text-sm leading-6 text-slate-700">Khóa nghiệm thu cuối, xác minh checklist/evidence, kiểm tra QA–kho–AP/AR–thu chi và hoàn tất bàn giao có snapshot/audit.</p></div>
+      <div><h3 className="text-sm font-semibold text-ink">Hồ sơ đóng tài chính và bàn giao</h3><p className="mt-1 text-sm leading-6 text-slate-700">Khóa nghiệm thu cuối, xác minh checklist/minh chứng, kiểm tra chất lượng, kho, công nợ phải trả/phải thu và thu chi trước khi hoàn tất bàn giao có lưu dấu vết.</p></div>
       <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800" to={`/projects/${item.project_id}/handover`}><PackageCheck className="h-4 w-4" /> Mở bàn giao</Link>
     </div>
   </section>;

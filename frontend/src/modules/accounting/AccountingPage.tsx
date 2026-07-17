@@ -9,15 +9,14 @@ import { FilterBar, type FilterOption } from '../../components/FilterBar';
 import { ListSection } from '../../components/ListSection';
 import { PageHeader } from '../../components/PageHeader';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
-import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { get, post } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
-import { enumOptions } from '../../lib/utils/status';
 import { ProjectSelector } from '../_shared/ProjectSelector';
-import { RecordFormDialog } from '../_shared/RecordFormDialog';
+import { AccountingCreateDialog, type AccountingCreateMode } from './AccountingCreateDialog';
+import { AccountingDetailDialog, type AccountingDetail } from './AccountingDetailDialog';
 import { CashflowPanel } from './CashflowPanel';
 
 type AccountingTab = 'overview' | 'budgets' | 'payments' | 'cashflow';
@@ -38,8 +37,8 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
   const [budgetStatus, setBudgetStatus] = useState('all');
   const [paymentStatus, setPaymentStatus] = useState('all');
   const [paymentType, setPaymentType] = useState('all');
-  const [open, setOpen] = useState<'budget' | 'payment' | null>(null);
-  const [dialog, setDialog] = useState<{ type: 'budget' | 'payment'; record: Record<string, any> } | null>(null);
+  const [open, setOpen] = useState<AccountingCreateMode | null>(null);
+  const [dialog, setDialog] = useState<AccountingDetail | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
   const canViewBudget = hasAnyPermission(['accounting.budget_view']);
@@ -49,6 +48,7 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Record<string, any>[]>('/projects') });
   useEffect(() => { if (!projectId && projects.data?.[0]) setProjectId(projects.data[0].id); }, [projects.data, projectId]);
   const selectedProject = (projects.data ?? []).find((project) => project.id === projectId);
+  const projectOptions = useMemo(() => (projects.data ?? []).map((project) => ({ id: project.id, name: project.name })), [projects.data]);
   const budgets = useQuery({ queryKey: ['budget', projectId], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/budget`), enabled: Boolean(projectId) && canViewBudget });
   const payments = useQuery({ queryKey: ['payments'], queryFn: () => get<Record<string, any>[]>('/payments') });
   const invalidate = () => {
@@ -67,13 +67,13 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
     onError: (error) => toast.error('Không tạo được phiếu thu/chi', error),
   });
   const approveBudget = useMutation({
-    mutationFn: (budgetId: string) => post(`/budgets/${budgetId}/approve`, {}),
-    onSuccess: () => { invalidate(); toast.success('Đã duyệt ngân sách'); },
+    mutationFn: (budgetId: string) => post<Record<string, any>>(`/budgets/${budgetId}/approve`, {}),
+    onSuccess: (row) => { invalidate(); setDialog((current) => current?.type === 'budget' && current.record.id === row.id ? { ...current, record: { ...current.record, ...row } } : current); toast.success('Đã duyệt ngân sách'); },
     onError: (error) => toast.error('Không duyệt được ngân sách', error),
   });
   const approvePayment = useMutation({
-    mutationFn: (paymentId: string) => post(`/payments/${paymentId}/approve`, {}),
-    onSuccess: () => { invalidate(); toast.success('Đã duyệt phiếu thu/chi'); },
+    mutationFn: (paymentId: string) => post<Record<string, any>>(`/payments/${paymentId}/approve`, {}),
+    onSuccess: (row) => { invalidate(); setDialog((current) => current?.type === 'payment' && current.record.id === row.id ? { ...current, record: { ...current.record, ...row } } : current); toast.success('Đã duyệt phiếu thu/chi'); },
     onError: (error) => toast.error('Không duyệt được phiếu thu/chi', error),
   });
 
@@ -119,7 +119,7 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
     <>
       <PageHeader
         title="Kế toán"
-        description="Kiểm soát ngân sách, duyệt phiếu và theo dõi dòng tiền; công nợ AP/AR được xử lý tại màn Công nợ."
+        description="Kiểm soát ngân sách, duyệt phiếu và theo dõi dòng tiền; công nợ phải trả và phải thu được xử lý tại màn Công nợ."
         actions={<>{!global ? <ProjectBackLink projectId={projectId} /> : null}{global ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}{canApprovePayment && pendingPayments.length ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => { setPaymentStatus('all'); setTab('payments'); }}><Check className="h-4 w-4" />Duyệt {pendingPayments.length} phiếu</button> : canCreatePayment ? <button disabled={!projectId} type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={() => setOpen('payment')}><Plus className="h-4 w-4" />Phiếu thu/chi khác</button> : null}</>}
       />
 
@@ -159,34 +159,29 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
 
       {tab === 'cashflow' ? <CashflowPanel projectId={projectId} initialFrom={!global ? selectedProject?.start_date ?? '2000-01-01' : undefined} /> : null}
 
-      <RecordFormDialog open={open === 'budget'} title="Tạo ngân sách" submitLabel="Tạo bản nháp" onClose={() => setOpen(null)} fields={[
-        { name: 'budget_code', label: 'Mã ngân sách', defaultValue: `BUD-${Date.now().toString().slice(-5)}`, required: true },
-        { name: 'name', label: 'Tên ngân sách', defaultValue: 'Ngân sách công trình', required: true },
-        { name: 'planned_amount', label: 'Giá trị kế hoạch', type: 'number', defaultValue: 100000000, required: true, min: 1, helperText: 'Số đã duyệt, đã dùng và còn lại do hệ thống quản lý.' },
-      ]} onSubmit={(values) => createBudget.mutateAsync(values)} />
+      <AccountingCreateDialog
+        open={Boolean(open)}
+        initialMode={open ?? 'payment'}
+        projectId={projectId}
+        projects={projectOptions}
+        canCreateBudget={canManageBudget}
+        canCreatePayment={canCreatePayment}
+        onClose={() => setOpen(null)}
+        onCreateBudget={(values) => createBudget.mutateAsync(values)}
+        onCreatePayment={(values) => createPayment.mutateAsync(values)}
+      />
 
-      <RecordFormDialog open={open === 'payment'} title="Tạo phiếu thu/chi khác" description="Phiếu gắn phải trả/phải thu phải được tạo từ màn Công nợ để giữ đúng phân bổ." submitLabel="Tạo bản nháp" onClose={() => setOpen(null)} fields={[
-        { name: 'project_id', label: 'Công trình', type: 'select', defaultValue: projectId, required: true, options: (projects.data ?? []).map((p) => ({ label: p.name, value: p.id })) },
-        { name: 'payment_code', label: 'Mã phiếu', defaultValue: `PMT-${Date.now().toString().slice(-5)}`, required: true },
-        { name: 'payment_type', label: 'Loại phiếu', type: 'select', defaultValue: 'outbound', required: true, options: enumOptions('payment_type', ['outbound', 'inbound', 'other']) },
-        { name: 'amount', label: 'Số tiền', type: 'number', defaultValue: 10000000, required: true, min: 1 },
-        { name: 'payment_method', label: 'Phương thức', type: 'select', defaultValue: 'bank_transfer', required: true, options: enumOptions('payment_method', ['bank_transfer', 'cash']) },
-      ]} onSubmit={(values) => createPayment.mutateAsync(values)} />
-
-      <RecordDetailDialog open={dialog?.type === 'budget'} title="Chi tiết ngân sách" record={dialog?.record ?? null} onClose={() => setDialog(null)} fields={[
-        { key: 'budget_code', label: 'Mã' }, { key: 'name', label: 'Tên ngân sách' },
-        { key: 'planned_amount', label: 'Kế hoạch', render: (row) => <CurrencyText value={row.planned_amount} /> },
-        { key: 'approved_amount', label: 'Đã duyệt', render: (row) => <CurrencyText value={row.approved_amount} /> },
-        { key: 'used_amount', label: 'Đã dùng', render: (row) => <CurrencyText value={row.used_amount} /> },
-        { key: 'remaining_amount', label: 'Còn lại', render: (row) => <CurrencyText value={row.remaining_amount} /> },
-        { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-      ]} />
-      <RecordDetailDialog open={dialog?.type === 'payment'} title="Chi tiết phiếu thu/chi" record={dialog?.record ?? null} onClose={() => setDialog(null)} fields={[
-        { key: 'payment_code', label: 'Mã' }, { key: 'payment_type', label: 'Loại', render: (row) => <EnumChip group="payment_type" value={row.payment_type} /> },
-        { key: 'project_name', label: 'Công trình' }, { key: 'amount', label: 'Số tiền', render: (row) => <CurrencyText value={row.amount} /> },
-        { key: 'payment_method', label: 'Phương thức', render: (row) => <EnumChip group="payment_method" value={row.payment_method} /> },
-        { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-      ]} />
+      <AccountingDetailDialog
+        detail={dialog}
+        canApprove={dialog?.type === 'budget' ? canManageBudget : canApprovePayment}
+        approving={dialog?.type === 'budget' ? approveBudget.isPending : approvePayment.isPending}
+        onClose={() => setDialog(null)}
+        onApprove={() => {
+          if (!dialog) return;
+          if (dialog.type === 'budget') approveBudget.mutate(dialog.record.id);
+          else approvePayment.mutate(dialog.record.id);
+        }}
+      />
     </>
   );
 }

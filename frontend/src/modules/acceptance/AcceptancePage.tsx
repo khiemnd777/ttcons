@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ClipboardCheck, ExternalLink, Eye, FileText, Loader2, Plus, Search, Send, Wrench } from 'lucide-react';
 import { downloadBlob, get, post, put } from '../../lib/api/client';
@@ -35,6 +35,9 @@ const resultOptions: Array<{ value: ConclusionResult; label: string; description
 
 export function AcceptancePage({ global = false }: { global?: boolean }) {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const requestedRecordId = searchParams.get('record')?.trim() ?? '';
+  const appliedRecordId = useRef('');
   const [projectId, setProjectId] = useState(id ?? '');
   const [selectedId, setSelectedId] = useState('');
   const [search, setSearch] = useState('');
@@ -72,8 +75,15 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
       setSelectedId('');
       return;
     }
+    if (requestedRecordId && appliedRecordId.current !== requestedRecordId) {
+      appliedRecordId.current = requestedRecordId;
+      if (rows.some((row) => String(row.id) === requestedRecordId)) {
+        setSelectedId(requestedRecordId);
+        return;
+      }
+    }
     if (!selectedId || !rows.some((row) => row.id === selectedId)) setSelectedId(String(rows[0].id));
-  }, [rows, selectedId]);
+  }, [requestedRecordId, rows, selectedId]);
 
   const detail = useQuery({
     queryKey: ['acceptance', selectedId],

@@ -275,7 +275,7 @@ INSERT INTO handover_records (
 SELECT '73000000-0000-0000-0000-000000000201','30000000-0000-0000-0000-000000000020',
        'handed_over','71000000-0000-0000-0000-000000000201','2026-06-30',
        'Anh Bình – Công ty An Phát','Nguyễn Minh PM',true,true,true,true,
-       'Đã bàn giao, tất toán AP/AR, đóng kho site và kích hoạt bảo hành.',
+       'Đã bàn giao, tất toán công nợ phải trả và phải thu, đóng kho công trình và kích hoạt bảo hành.',
        '10000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000007',
        'HO-GOLD-001',form_instance_id,
        '{"ready":true,"acceptance":"pass","open_issues":0,"open_ncrs":0,"open_reworks":0,"material_surplus":0,"ap_remaining":0,"ar_remaining":0,"pending_payments":0,"checklist_pending":0}'::jsonb,
@@ -289,8 +289,8 @@ INSERT INTO handover_checklist_items (
 ) VALUES
 ('73000000-0000-0000-0000-000000000201','30000000-0000-0000-0000-000000000020','final_acceptance','quality','Biên bản nghiệm thu cuối đạt',true,'verified','acceptance','71000000-0000-0000-0000-000000000201',NULL,NULL,'Final acceptance pass.','10000000-0000-0000-0000-000000000007','2026-06-29 09:00+07'),
 ('73000000-0000-0000-0000-000000000201','30000000-0000-0000-0000-000000000020','warehouse_closure','operation','Kho công trình và vật tư dư đã đóng',true,'verified','system_check','73000000-0000-0000-0000-000000000201',NULL,NULL,'Site balances bằng 0, surplus handled.','10000000-0000-0000-0000-000000000007','2026-06-29 09:00+07'),
-('73000000-0000-0000-0000-000000000201','30000000-0000-0000-0000-000000000020','ap_reconciliation','finance','Công nợ đầu vào đã tất toán',true,'verified','system_check','73000000-0000-0000-0000-000000000201',NULL,NULL,'AP remaining bằng 0.','10000000-0000-0000-0000-000000000007','2026-06-29 09:00+07'),
-('73000000-0000-0000-0000-000000000201','30000000-0000-0000-0000-000000000020','ar_reconciliation','finance','Công nợ đầu ra đã tất toán',true,'verified','system_check','73000000-0000-0000-0000-000000000201',NULL,NULL,'AR remaining bằng 0.','10000000-0000-0000-0000-000000000007','2026-06-29 09:00+07'),
+('73000000-0000-0000-0000-000000000201','30000000-0000-0000-0000-000000000020','ap_reconciliation','finance','Công nợ phải trả đã tất toán',true,'verified','system_check','73000000-0000-0000-0000-000000000201',NULL,NULL,'Số dư phải trả bằng 0.','10000000-0000-0000-0000-000000000007','2026-06-29 09:00+07'),
+('73000000-0000-0000-0000-000000000201','30000000-0000-0000-0000-000000000020','ar_reconciliation','finance','Công nợ phải thu đã tất toán',true,'verified','system_check','73000000-0000-0000-0000-000000000201',NULL,NULL,'Số dư phải thu bằng 0.','10000000-0000-0000-0000-000000000007','2026-06-29 09:00+07'),
 ('73000000-0000-0000-0000-000000000201','30000000-0000-0000-0000-000000000020','as_built_documents','as_built','Bản vẽ và hồ sơ hoàn công',true,'verified','document','46000000-0000-0000-0000-000000000201',NULL,'46000000-0000-0000-0000-000000000201','Bản vẽ hoàn công active.','10000000-0000-0000-0000-000000000007','2026-06-29 09:00+07'),
 ('73000000-0000-0000-0000-000000000201','30000000-0000-0000-0000-000000000020','operation_manuals','operation','Hướng dẫn vận hành/bảo trì',true,'verified','document','46000000-0000-0000-0000-000000000203',NULL,'46000000-0000-0000-0000-000000000203','Đã bàn giao khách hàng.','10000000-0000-0000-0000-000000000007','2026-06-29 09:00+07'),
 ('73000000-0000-0000-0000-000000000201','30000000-0000-0000-0000-000000000020','warranty_documents','warranty','Cam kết và hồ sơ bảo hành',true,'verified','document','46000000-0000-0000-0000-000000000204',NULL,'46000000-0000-0000-0000-000000000204','Bảo hành 365 ngày.','10000000-0000-0000-0000-000000000007','2026-06-29 09:00+07'),
@@ -304,7 +304,7 @@ INSERT INTO accounting_budgets (
 INSERT INTO audit_logs (
   project_id,actor_id,actor_name,event_type,target_type,target_id,description,metadata_json,created_at
 ) VALUES
-('30000000-0000-0000-0000-000000000020','10000000-0000-0000-0000-000000000007','Lê Hoàng Giám đốc','golden_financial_closure','project','30000000-0000-0000-0000-000000000020','Đã đối soát hợp đồng, hóa đơn, AP/AR, retention và phê duyệt đóng tài chính.','{"ap_remaining":0,"ar_remaining":0,"pending_payments":0,"golden_sample":true}','2026-06-29 10:00+07'),
+('30000000-0000-0000-0000-000000000020','10000000-0000-0000-0000-000000000007','Lê Hoàng Giám đốc','golden_financial_closure','project','30000000-0000-0000-0000-000000000020','Đã đối soát hợp đồng, hóa đơn, công nợ phải trả/phải thu, khoản giữ lại và phê duyệt đóng tài chính.','{"ap_remaining":0,"ar_remaining":0,"pending_payments":0,"golden_sample":true}','2026-06-29 10:00+07'),
 ('30000000-0000-0000-0000-000000000020','10000000-0000-0000-0000-000000000007','Lê Hoàng Giám đốc','golden_handover_completed','handover','73000000-0000-0000-0000-000000000201','Golden Project đã bàn giao và hoàn tất.','{"readiness":"ready","checklist_verified":8,"golden_sample":true}','2026-06-30 16:00+07');
 
 COMMIT;

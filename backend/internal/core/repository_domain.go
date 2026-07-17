@@ -8735,7 +8735,7 @@ func (r *Repository) automateClientIncomingAcceptanceFinance(ctx context.Context
 			return automationBlockedWithTarget("incoming_acceptance_finance_scaffold", "Cần tải lên và xác minh hóa đơn đầu vào thật", "payable", payableID, metadata), nil
 		}
 	} else {
-		return automationBlockedWithTarget("incoming_acceptance_finance_scaffold", "Cần mở công nợ đầu vào trước khi lập lịch thanh toán và hóa đơn thật", "incoming_acceptance", acceptanceID, metadata), nil
+		return automationBlockedWithTarget("incoming_acceptance_finance_scaffold", "Cần mở công nợ phải trả trước khi lập lịch thanh toán và hóa đơn thật", "incoming_acceptance", acceptanceID, metadata), nil
 	}
 	return automationSucceeded("incoming_acceptance_finance_scaffold", "Đã mở hồ sơ nghiệm thu đầu vào, công nợ và lịch thanh toán dạng nháp", "incoming_acceptance", acceptanceID, metadata), nil
 }
@@ -8827,11 +8827,11 @@ func (r *Repository) ensureIncomingAcceptanceFinanceScaffoldTx(ctx context.Conte
 		payableID = cleanID(rows[0]["id"])
 		metadata["payable_created"] = true
 		metadata["payable_amount"] = amount
-		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "payable_created", "payable", payableID, "Tự động mở công nợ đầu vào dạng nháp từ yêu cầu mua", metadata); err != nil {
+		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "payable_created", "payable", payableID, "Tự động mở công nợ phải trả dạng nháp từ yêu cầu mua", metadata); err != nil {
 			return "", "", nil, err
 		}
 	} else {
-		metadata["payable_blocker"] = "Yêu cầu mua chưa có giá trị dự toán để mở công nợ đầu vào"
+		metadata["payable_blocker"] = "Yêu cầu mua chưa có giá trị dự toán để mở công nợ phải trả"
 	}
 	if payableID != "" {
 		if err := r.ensurePayablePaymentScheduleScaffoldTx(ctx, tx, projectID, payableID, actorID, actorName, metadata); err != nil {
@@ -8865,7 +8865,7 @@ func (r *Repository) automateClientOutgoingAcceptanceFinance(ctx context.Context
 			return automationBlockedWithTarget("outgoing_acceptance_finance_scaffold", "Cần tải lên và phát hành hóa đơn đầu ra thật", "receivable", receivableID, metadata), nil
 		}
 	} else {
-		return automationBlockedWithTarget("outgoing_acceptance_finance_scaffold", "Cần mở công nợ đầu ra trước khi lập lịch thu tiền và hóa đơn thật", "acceptance", acceptanceID, metadata), nil
+		return automationBlockedWithTarget("outgoing_acceptance_finance_scaffold", "Cần mở công nợ phải thu trước khi lập lịch thu tiền và hóa đơn thật", "acceptance", acceptanceID, metadata), nil
 	}
 	return automationSucceeded("outgoing_acceptance_finance_scaffold", "Đã mở hồ sơ nghiệm thu đầu ra, công nợ và lịch thu tiền dạng nháp", "acceptance", acceptanceID, metadata), nil
 }
@@ -8975,11 +8975,11 @@ func (r *Repository) ensureOutgoingAcceptanceFinanceScaffoldTx(ctx context.Conte
 		receivableID = cleanID(rows[0]["id"])
 		metadata["receivable_created"] = true
 		metadata["receivable_amount"] = contractAmount
-		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "receivable_created", "receivable", receivableID, "Tự động mở công nợ đầu ra dạng nháp từ nghiệm thu", metadata); err != nil {
+		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "receivable_created", "receivable", receivableID, "Tự động mở công nợ phải thu dạng nháp từ nghiệm thu", metadata); err != nil {
 			return "", "", nil, err
 		}
 	} else {
-		metadata["receivable_blocker"] = "Công trình chưa có giá trị hợp đồng để mở công nợ đầu ra"
+		metadata["receivable_blocker"] = "Công trình chưa có giá trị hợp đồng để mở công nợ phải thu"
 	}
 	if receivableID != "" {
 		if err := r.ensureReceivablePaymentScheduleScaffoldTx(ctx, tx, projectID, receivableID, actorID, actorName, metadata); err != nil {
@@ -9011,7 +9011,7 @@ func (r *Repository) automateClientHandoverClosure(ctx context.Context, contextR
 		return workflowAutomationOutcome{}, err
 	}
 	if fmt.Sprint(handover["status"]) == "draft" {
-		metadata["handover_blockers"] = []string{"Cần hoàn thiện và gửi gói hồ sơ bàn giao trước khi kiểm tra readiness"}
+		metadata["handover_blockers"] = []string{"Cần hoàn thiện và gửi hồ sơ bàn giao trước khi kiểm tra readiness"}
 		return automationBlockedWithTarget("handover_financial_closure_check", "Hồ sơ bàn giao chưa được gửi kiểm tra", "handover", handoverID, metadata), nil
 	}
 	check, err := r.HandoverCheck(ctx, handoverID, actorID, actorName)
@@ -9038,7 +9038,7 @@ func (r *Repository) ensurePayablePaymentScheduleScaffoldTx(ctx context.Context,
 		return err
 	}
 	if len(rows) == 0 {
-		metadata["payment_schedule_blocker"] = "Không tìm thấy công nợ đầu vào để lập lịch thanh toán"
+		metadata["payment_schedule_blocker"] = "Không tìm thấy công nợ phải trả để lập lịch thanh toán"
 		return nil
 	}
 	amount := number(rows[0]["remaining_amount"])
@@ -9046,7 +9046,7 @@ func (r *Repository) ensurePayablePaymentScheduleScaffoldTx(ctx context.Context,
 		amount = number(rows[0]["gross_amount"])
 	}
 	if amount <= 0 {
-		metadata["payment_schedule_blocker"] = "Công nợ đầu vào không có số tiền để lập lịch thanh toán"
+		metadata["payment_schedule_blocker"] = "Công nợ phải trả không có số tiền để lập lịch thanh toán"
 		return nil
 	}
 	const scheduleCode = "LICH-THANH-TOAN-001"
@@ -9099,7 +9099,7 @@ func (r *Repository) ensureReceivablePaymentScheduleScaffoldTx(ctx context.Conte
 		return err
 	}
 	if len(rows) == 0 {
-		metadata["billing_schedule_blocker"] = "Không tìm thấy công nợ đầu ra để lập lịch thu tiền"
+		metadata["billing_schedule_blocker"] = "Không tìm thấy công nợ phải thu để lập lịch thu tiền"
 		return nil
 	}
 	amount := number(rows[0]["remaining_amount"])
@@ -9107,7 +9107,7 @@ func (r *Repository) ensureReceivablePaymentScheduleScaffoldTx(ctx context.Conte
 		amount = number(rows[0]["gross_amount"])
 	}
 	if amount <= 0 {
-		metadata["billing_schedule_blocker"] = "Công nợ đầu ra không có số tiền để lập lịch thu tiền"
+		metadata["billing_schedule_blocker"] = "Công nợ phải thu không có số tiền để lập lịch thu tiền"
 		return nil
 	}
 	const scheduleCode = "LICH-THU-TIEN-001"
@@ -9223,8 +9223,8 @@ func (r *Repository) ensureHandoverScaffoldTx(ctx context.Context, tx *sql.Tx, c
 	items := []Record{
 		{"item_code": "final_acceptance", "category": "quality", "title": "Biên bản nghiệm thu cuối đạt", "source_type": "acceptance", "source_id": finalAcceptanceID},
 		{"item_code": "warehouse_closure", "category": "operation", "title": "Kho công trình và vật tư dư đã đóng", "source_type": "system_check", "source_id": handoverID},
-		{"item_code": "ap_reconciliation", "category": "finance", "title": "Công nợ đầu vào đã đối soát/tất toán", "source_type": "system_check", "source_id": handoverID},
-		{"item_code": "ar_reconciliation", "category": "finance", "title": "Công nợ đầu ra đã đối soát/tất toán", "source_type": "system_check", "source_id": handoverID},
+		{"item_code": "ap_reconciliation", "category": "finance", "title": "Công nợ phải trả đã đối soát/tất toán", "source_type": "system_check", "source_id": handoverID},
+		{"item_code": "ar_reconciliation", "category": "finance", "title": "Công nợ phải thu đã đối soát/tất toán", "source_type": "system_check", "source_id": handoverID},
 		{"item_code": "as_built_documents", "category": "as_built", "title": "Bản vẽ và hồ sơ hoàn công"},
 		{"item_code": "operation_manuals", "category": "operation", "title": "Hướng dẫn vận hành/bảo trì"},
 		{"item_code": "warranty_documents", "category": "warranty", "title": "Cam kết và hồ sơ bảo hành"},
@@ -14216,8 +14216,8 @@ func (r *Repository) CreateHandoverPackage(ctx context.Context, body Record, act
 	items := []Record{
 		{"item_code": "final_acceptance", "category": "quality", "title": "Biên bản nghiệm thu cuối đạt", "source_type": "acceptance", "source_id": cleanID(body["final_acceptance_id"])},
 		{"item_code": "warehouse_closure", "category": "operation", "title": "Kho công trình và vật tư dư đã đóng", "source_type": "system_check", "source_id": handover["id"]},
-		{"item_code": "ap_reconciliation", "category": "finance", "title": "Công nợ đầu vào đã đối soát/tất toán", "source_type": "system_check", "source_id": handover["id"]},
-		{"item_code": "ar_reconciliation", "category": "finance", "title": "Công nợ đầu ra đã đối soát/tất toán", "source_type": "system_check", "source_id": handover["id"]},
+		{"item_code": "ap_reconciliation", "category": "finance", "title": "Công nợ phải trả đã đối soát/tất toán", "source_type": "system_check", "source_id": handover["id"]},
+		{"item_code": "ar_reconciliation", "category": "finance", "title": "Công nợ phải thu đã đối soát/tất toán", "source_type": "system_check", "source_id": handover["id"]},
 		{"item_code": "as_built_documents", "category": "as_built", "title": "Bản vẽ và hồ sơ hoàn công"},
 		{"item_code": "operation_manuals", "category": "operation", "title": "Hướng dẫn vận hành/bảo trì"},
 		{"item_code": "warranty_documents", "category": "warranty", "title": "Cam kết và hồ sơ bảo hành"},
@@ -14231,7 +14231,7 @@ func (r *Repository) CreateHandoverPackage(ctx context.Context, body Record, act
 			return nil, err
 		}
 	}
-	if err := addAuditTx(ctx, tx, cleanID(handover["project_id"]), actorID, actorName, "handover_created", "handover", cleanID(handover["id"]), "Tạo gói hồ sơ bàn giao", Record{"handover_code": handover["handover_code"], "final_acceptance_id": handover["final_acceptance_id"], "checklist_items": len(items)}); err != nil {
+	if err := addAuditTx(ctx, tx, cleanID(handover["project_id"]), actorID, actorName, "handover_created", "handover", cleanID(handover["id"]), "Tạo hồ sơ bàn giao", Record{"handover_code": handover["handover_code"], "final_acceptance_id": handover["final_acceptance_id"], "checklist_items": len(items)}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -14251,7 +14251,17 @@ func (r *Repository) GetHandoverDetail(ctx context.Context, id string) (Record, 
 		return nil, err
 	}
 	items, err := r.Query(ctx, `
-		SELECT i.*, e.name AS evidence_name, e.status AS evidence_status, d.name AS document_name
+		SELECT i.*,
+			e.name AS evidence_name,
+			e.status AS evidence_status,
+			e.evidence_type,
+			e.mime_type AS evidence_mime_type,
+			e.file_size AS evidence_file_size,
+			e.storage_provider AS evidence_storage_provider,
+			d.name AS document_name,
+			d.status AS document_status,
+			d.document_type,
+			d.file_url AS document_file_url
 		FROM handover_checklist_items i
 		LEFT JOIN evidence_records e ON e.id=i.evidence_id
 		LEFT JOIN documents d ON d.id=i.document_id
@@ -14480,7 +14490,7 @@ func (r *Repository) SubmitHandover(ctx context.Context, id string, req ActionRe
 		return nil, err
 	}
 	comment := actionComment(req)
-	if err := addAuditTx(ctx, tx, cleanID(handover["project_id"]), actorID, actorName, "handover_submitted", "handover", id, "Gửi gói hồ sơ bàn giao để kiểm tra", Record{"comment": comment, "final_acceptance_id": handover["final_acceptance_id"]}); err != nil {
+	if err := addAuditTx(ctx, tx, cleanID(handover["project_id"]), actorID, actorName, "handover_submitted", "handover", id, "Gửi hồ sơ bàn giao để kiểm tra", Record{"comment": comment, "final_acceptance_id": handover["final_acceptance_id"]}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -14653,10 +14663,10 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 		blockers = append(blockers, "Còn vật tư dư chưa xử lý")
 	}
 	if number(counts["open_payables"]) > 0 {
-		blockers = append(blockers, "Còn công nợ đầu vào chưa tất toán")
+		blockers = append(blockers, "Còn công nợ phải trả chưa tất toán")
 	}
 	if number(counts["open_receivables"]) > 0 {
-		blockers = append(blockers, "Còn công nợ đầu ra chưa thu")
+		blockers = append(blockers, "Còn công nợ phải thu chưa tất toán")
 	}
 	if number(counts["pending_payments"]) > 0 {
 		blockers = append(blockers, "Còn phiếu chi/thu chưa duyệt")
@@ -14687,7 +14697,7 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 	if !ready {
 		event = "handover_blocked"
 	}
-	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, event, "handover", id, "Kiểm tra readiness gói hồ sơ bàn giao", snapshot); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, event, "handover", id, "Kiểm tra readiness hồ sơ bàn giao", snapshot); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

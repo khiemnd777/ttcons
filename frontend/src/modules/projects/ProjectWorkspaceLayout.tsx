@@ -29,86 +29,14 @@ import type {
 } from '../../lib/types/domain';
 import { statusLabel } from '../../lib/utils/status';
 import { workItemDetailPath } from '../work-items/workItemNavigation';
+import {
+  projectWorkspaceGroupPath,
+  projectWorkspacePath,
+  visibleProjectWorkspaceGroups,
+  type ProjectWorkspaceGroup,
+} from './projectWorkspaceNavigation';
 
 type ProjectWorkspaceOperations = ProjectOperationsResponse | ProjectOperationsSidebarResponse;
-
-type WorkspaceChild = {
-  label: string;
-  to: string;
-  permissions?: string[];
-};
-
-type WorkspaceGroup = {
-  key: string;
-  label: string;
-  to: string;
-  permissions?: string[];
-  children: WorkspaceChild[];
-};
-
-const workspaceGroups: WorkspaceGroup[] = [
-  {
-    key: 'overview',
-    label: 'Tổng quan',
-    to: '',
-    permissions: ['project.view'],
-    children: [],
-  },
-  {
-    key: 'planning',
-    label: 'Kế hoạch & Quy trình',
-    to: 'planning',
-    permissions: ['planning.view', 'pipeline.view', 'boq.view'],
-    children: [
-      { label: 'Quy trình', to: 'pipeline', permissions: ['pipeline.view'] },
-      { label: 'Kế hoạch', to: 'planning', permissions: ['planning.view', 'pipeline.view'] },
-      { label: 'Dự toán khối lượng', to: 'boq', permissions: ['boq.view'] },
-    ],
-  },
-  {
-    key: 'materials',
-    label: 'Thương mại & Vật tư',
-    to: 'procurement',
-    permissions: ['procurement.view', 'warehouse.view', 'contract.view'],
-    children: [
-      { label: 'Hợp đồng', to: 'contracts', permissions: ['contract.view'] },
-      { label: 'Mua sắm', to: 'procurement', permissions: ['procurement.view'] },
-      { label: 'Kho vật tư', to: 'warehouse', permissions: ['warehouse.view'] },
-    ],
-  },
-  {
-    key: 'quality',
-    label: 'Thi công & Chất lượng',
-    to: 'operations',
-    permissions: ['operation.view', 'quality.view', 'acceptance.view', 'rework.view'],
-    children: [
-      { label: 'Thi công', to: 'operations', permissions: ['operation.view', 'quality.view', 'rework.view', 'replanning.view'] },
-      { label: 'Nghiệm thu', to: 'acceptance', permissions: ['acceptance.view'] },
-    ],
-  },
-  {
-    key: 'finance',
-    label: 'Bàn giao & Tài chính',
-    to: 'handover',
-    permissions: ['handover.view', 'accounting.view', 'accounting.payable_view', 'accounting.receivable_view'],
-    children: [
-      { label: 'Bàn giao', to: 'handover', permissions: ['handover.view'] },
-      { label: 'Kế toán', to: 'accounting', permissions: ['accounting.view'] },
-      { label: 'Công nợ', to: 'debt', permissions: ['accounting.payable_view', 'accounting.receivable_view'] },
-    ],
-  },
-  {
-    key: 'governance',
-    label: 'Quản trị công trình',
-    to: '',
-    permissions: ['project.view', 'audit.view'],
-    children: [
-      { label: 'Thành viên', to: '?tab=members', permissions: ['project.view'] },
-      { label: 'Hồ sơ', to: '?tab=files', permissions: ['project.view'] },
-      { label: 'Nhật ký', to: 'audit', permissions: ['audit.view'] },
-    ],
-  },
-];
 
 export function ProjectWorkspaceLayout() {
   const { id = '' } = useParams();
@@ -127,12 +55,7 @@ export function ProjectWorkspaceLayout() {
   });
 
   const project = operations.data?.project_summary ?? operations.data?.project;
-  const visibleGroups = workspaceGroups
-    .map((group) => ({
-      ...group,
-      children: group.children.filter((child) => hasAnyPermission(child.permissions)),
-    }))
-    .filter((group) => hasAnyPermission(group.permissions) || group.children.length > 0);
+  const visibleGroups = visibleProjectWorkspaceGroups(hasAnyPermission);
   const activeWorkItemId = showWorkflowSidebar ? activeWorkItemIdFromPath(location.pathname) : '';
 
   return (
@@ -218,7 +141,7 @@ function ProjectNavigationSidebar({
   projectId: string;
   projectName: string;
   projectCode: string;
-  visibleGroups: WorkspaceGroup[];
+  visibleGroups: ProjectWorkspaceGroup[];
 }) {
   return (
     <>
@@ -660,9 +583,9 @@ function activeNodeIdForWorkItem(nodes: Record<string, any>[], activeWorkItemId:
   return '';
 }
 
-function WorkspaceGroupNode({ group, projectId }: { group: WorkspaceGroup; projectId: string }) {
+function WorkspaceGroupNode({ group, projectId }: { group: ProjectWorkspaceGroup; projectId: string }) {
   const location = useLocation();
-  const groupTarget = projectWorkspacePath(projectId, group.children[0]?.to ?? group.to);
+  const groupTarget = projectWorkspaceGroupPath(projectId, group);
   const currentTarget = `${location.pathname}${location.search}`;
   const groupActive = group.children.length
     ? group.children.some((child) => {
@@ -706,12 +629,6 @@ function WorkspaceGroupNode({ group, projectId }: { group: WorkspaceGroup; proje
       ) : null}
     </div>
   );
-}
-
-function projectWorkspacePath(projectId: string, target: string) {
-  if (!target) return `/projects/${projectId}`;
-  if (target.startsWith('?')) return `/projects/${projectId}${target}`;
-  return `/projects/${projectId}/${target}`;
 }
 
 function isProjectWorkItemDetailPath(pathname: string) {

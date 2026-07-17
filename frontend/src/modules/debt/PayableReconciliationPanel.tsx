@@ -27,7 +27,7 @@ export function PayableReconciliationPanel({ payable }: PayableReconciliationPan
     <section className="space-y-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-ink">Đối soát công nợ đầu vào</h3>
+          <h3 className="text-sm font-semibold text-ink">Đối soát công nợ phải trả</h3>
           <p className="mt-1 text-xs text-slate-500">Aging, hóa đơn, lịch kỳ, ứng trước và payment allocations theo payable này.</p>
         </div>
         <button
@@ -42,7 +42,7 @@ export function PayableReconciliationPanel({ payable }: PayableReconciliationPan
       </div>
 
       {snapshot.error ? (
-        <div className="rounded-md border border-rose-100 bg-rose-50 p-3 text-sm text-rose-700">Không tải được đối soát công nợ đầu vào.</div>
+        <div className="rounded-md border border-rose-100 bg-rose-50 p-3 text-sm text-rose-700">Không tải được đối soát công nợ phải trả.</div>
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

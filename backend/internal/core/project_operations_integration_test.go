@@ -4240,7 +4240,7 @@ func TestBatch7HandoverBlockedAuditIncludesAccountingBlockers(t *testing.T) {
 		t.Fatalf("handover = status %v ready %v, want blocked/false", blocked["status"], blocked["ready"])
 	}
 	blockers, _ := blocked["blockers"].([]string)
-	if !containsString(blockers, "Còn công nợ đầu vào chưa tất toán") {
+	if !containsString(blockers, "Còn công nợ phải trả chưa tất toán") {
 		t.Fatalf("blockers = %#v, want payable blocker", blockers)
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='handover_blocked'`, 1, projectID)
@@ -6591,6 +6591,7 @@ func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
 
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM handover_records WHERE project_id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM documents WHERE project_id=$1`, fixture.projectID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM rework_requests WHERE project_id=$1`, fixture.projectID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM issues WHERE project_id=$1`, fixture.projectID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM acceptance_records WHERE project_id=$1`, fixture.projectID)
@@ -6742,12 +6743,52 @@ func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
 		t.Fatal(err)
 	}
 	handoverID := cleanID(handover["id"])
+	linkedDocumentID := newID()
+	mustExec(t, db, `INSERT INTO documents (id, project_id, name, file_url, document_type, status, uploaded_by) VALUES ($1,$2,'Approved as-built drawing','/documents/as-built.pdf','drawing','active',$3)`, linkedDocumentID, fixture.projectID, fixture.workerID)
+	manualItemIndex := 0
 	for _, raw := range handover["checklist_items"].([]Record) {
 		if raw["source_type"] == nil || strings.TrimSpace(fmt.Sprint(raw["source_type"])) == "" {
-			if _, err := repo.UpdateHandoverChecklistItem(ctx, cleanID(raw["id"]), Record{"status": "verified", "evidence_id": acceptedEvidence["id"]}, fixture.workerID, "Worker"); err != nil {
+			values := Record{"status": "verified", "evidence_id": acceptedEvidence["id"]}
+			if manualItemIndex == 0 {
+				values = Record{"status": "verified", "document_id": linkedDocumentID}
+			}
+			if _, err := repo.UpdateHandoverChecklistItem(ctx, cleanID(raw["id"]), values, fixture.workerID, "Worker"); err != nil {
 				t.Fatal(err)
 			}
+			manualItemIndex++
 		}
+	}
+	linkedDetail, err := repo.GetHandoverDetail(ctx, handoverID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	linkedSourceFound := false
+	for _, raw := range linkedDetail["checklist_items"].([]Record) {
+		if cleanID(raw["evidence_id"]) != evidenceID {
+			continue
+		}
+		linkedSourceFound = true
+		if raw["evidence_name"] != "Outgoing defect photo" || raw["evidence_type"] != "photo" || raw["evidence_status"] != "accepted" {
+			t.Fatalf("handover linked source metadata = name %v type %v status %v, want accepted photo evidence", raw["evidence_name"], raw["evidence_type"], raw["evidence_status"])
+		}
+		break
+	}
+	if !linkedSourceFound {
+		t.Fatal("handover detail did not expose the exact linked evidence source")
+	}
+	linkedDocumentFound := false
+	for _, raw := range linkedDetail["checklist_items"].([]Record) {
+		if cleanID(raw["document_id"]) != linkedDocumentID {
+			continue
+		}
+		linkedDocumentFound = true
+		if raw["document_name"] != "Approved as-built drawing" || raw["document_type"] != "drawing" || raw["document_status"] != "active" || raw["document_file_url"] != "/documents/as-built.pdf" {
+			t.Fatalf("handover linked document metadata = name %v type %v status %v url %v, want active drawing source", raw["document_name"], raw["document_type"], raw["document_status"], raw["document_file_url"])
+		}
+		break
+	}
+	if !linkedDocumentFound {
+		t.Fatal("handover detail did not expose the exact linked document source")
 	}
 	if _, err := repo.SubmitHandover(ctx, handoverID, ActionRequest{Comment: "Gửi kiểm tra"}, fixture.workerID, "Worker"); err != nil {
 		t.Fatal(err)

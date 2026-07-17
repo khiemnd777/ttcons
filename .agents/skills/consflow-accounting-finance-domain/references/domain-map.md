@@ -2,7 +2,7 @@
 
 ## Owners
 
-- Frontend modules: `frontend/src/modules/accounting`, `frontend/src/modules/debt`, `frontend/src/modules/contracts`, `frontend/src/modules/reports`
+- Frontend modules: `frontend/src/modules/accounting` (`AccountingPage.tsx`, `AccountingCreateDialog.tsx`, `AccountingDetailDialog.tsx`), `frontend/src/modules/debt` (`DebtPage.tsx`, `DebtCreateDialog.tsx`, `DebtDetailDialog.tsx`), `frontend/src/modules/contracts`, `frontend/src/modules/reports`
 - Debt panels: `InputInvoicePanel.tsx`, `OutputInvoicePanel.tsx`, `InputPaymentPlanPanel.tsx`, `OutputBillingPlanPanel.tsx`, `PayableReconciliationPanel.tsx`, `ReceivableReconciliationPanel.tsx`
 - Report panels: `CashflowPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
@@ -36,7 +36,10 @@
 - Budget creation is typed and server-owned: clients provide only code/name/planned amount; draft approved/used/remaining amounts start at zero, and approval derives approved amount from planned amount plus remaining from approved minus used.
 - Generic `/payments` creation is reserved for non-AP/AR `outbound`, `inbound`, and `other` records. Supplier/subcontractor/client/advance payment types must be created from the dedicated payable/receivable endpoints with allocation context.
 - Payable and receivable list handlers both combine actor project visibility with a validated explicit `project_id` filter; project-scoped UI must not rely on client filtering.
-- The Debt UI owns AP/AR work queues, complete aging (`not_due`, `1_30`, `31_60`, `61_90`, `90_plus`, `settled`) and invoice/schedule/advance/payment/reconciliation detail. Accounting owns budget, generic phiếu approval/list and cashflow presentation.
+- The Debt UI owns AP/AR work queues, complete aging (`not_due`, `1_30`, `31_60`, `61_90`, `90_plus`, `settled`) and invoice/schedule/advance/payment/reconciliation detail. User-facing text spells these out as `công nợ phải trả` and `công nợ phải thu`; AP/AR remains technical shorthand in code/contracts/maps. Accounting owns budget, generic phiếu approval/list and cashflow presentation.
+- The project Debt page accepts presentation-only `?kind=payables|receivables&queue=...` source-navigation queries. It applies only a kind the user may view and never turns query parameters into an API mutation, allocation, approval or reconciliation action; Handover uses this to disclose the current module behind stored readiness counts.
+- Debt create/detail presentation may derive live opening balances and promote one state-aware next action, but approval and pay/receive actions still call canonical routes; allocations, invoices, advances, schedules and reconciliation remain owned by their existing debt panels and server calculations.
+- Accounting create/detail presentation may combine budget and generic phiếu entry into one permission-aware dialog, but it must keep `supplier|subcontractor|client_receipt|advance` out of generic payment creation and direct AP/AR work to Debt. A linked payable/receivable phiếu uses `Mở công nợ` to navigate to the Debt workspace without mutating allocation or reconciliation state.
 - Input invoice PDFs belong to payables; output invoice PDFs belong to receivables.
 - Cashflow, tax, and profit reports must stay source-backed and permission-scoped.
 - CSV exports must use the same filters and source logic as UI reports.

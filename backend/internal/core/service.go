@@ -8800,7 +8800,7 @@ func (s *Service) PayableInputInvoices(ctx context.Context, payableID, actorID s
 }
 
 func (s *Service) PayableReconciliation(ctx context.Context, payableID, actorID string) (Record, error) {
-	payable, err := s.requirePayableAccess(ctx, payableID, actorID, []string{"accounting.view", "accounting.payable_view"}, "Bạn không có quyền xem đối soát công nợ đầu vào")
+	payable, err := s.requirePayableAccess(ctx, payableID, actorID, []string{"accounting.view", "accounting.payable_view"}, "Bạn không có quyền xem đối soát công nợ phải trả")
 	if err != nil {
 		return nil, err
 	}
@@ -9649,7 +9649,7 @@ func (s *Service) ReceivableOutputInvoices(ctx context.Context, receivableID, ac
 }
 
 func (s *Service) ReceivableReconciliation(ctx context.Context, receivableID, actorID string) (Record, error) {
-	receivable, err := s.requireReceivableAccess(ctx, receivableID, actorID, []string{"accounting.view", "accounting.receivable_view"}, "Bạn không có quyền xem đối soát công nợ đầu ra")
+	receivable, err := s.requireReceivableAccess(ctx, receivableID, actorID, []string{"accounting.view", "accounting.receivable_view"}, "Bạn không có quyền xem đối soát công nợ phải thu")
 	if err != nil {
 		return nil, err
 	}
