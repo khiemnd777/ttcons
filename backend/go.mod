@@ -3,6 +3,7 @@ module consflow/backend
 go 1.23
 
 require (
+	codeberg.org/go-pdf/fpdf v0.11.0
 	entgo.io/ent v0.14.5
 	github.com/gofiber/fiber/v2 v2.52.6
 	github.com/golang-jwt/jwt/v5 v5.2.2

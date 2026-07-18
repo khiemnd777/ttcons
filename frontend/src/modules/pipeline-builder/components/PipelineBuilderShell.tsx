@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
-import { CheckCircle2, Copy, Pencil, Send, Trash2, Wand2 } from 'lucide-react';
+import { CheckCircle2, Copy, Download, Pencil, Send, Trash2, Wand2 } from 'lucide-react';
 import { StatusBadge } from '../../../components/StatusBadge';
 
 type PipelineBuilderShellProps = {
@@ -12,17 +12,22 @@ type PipelineBuilderShellProps = {
   templateDescription?: string;
   selectedTemplateId: string;
   isReadOnly: boolean;
+  isPublished: boolean;
+  canEditLayout: boolean;
   canDeleteSelection: boolean;
   deleteSelectionLabel: string;
   nodeCount: number;
   validationIssueCount: number;
   autoLayoutPending: boolean;
+  canExportPDF: boolean;
+  exportPDFPending: boolean;
   deleteSelectionPending: boolean;
   onRenameTemplate: () => void;
   onCloneTemplate: () => void;
   onPublishTemplate: () => void;
   onAutoLayout: () => void;
   onValidatePipeline: () => void;
+  onExportPDF: () => void;
   onDeleteSelection: () => void;
 };
 
@@ -35,17 +40,22 @@ export function PipelineBuilderShell({
   templateDescription,
   selectedTemplateId,
   isReadOnly,
+  isPublished,
+  canEditLayout,
   canDeleteSelection,
   deleteSelectionLabel,
   nodeCount,
   validationIssueCount,
   autoLayoutPending,
+  canExportPDF,
+  exportPDFPending,
   deleteSelectionPending,
   onRenameTemplate,
   onCloneTemplate,
   onPublishTemplate,
   onAutoLayout,
   onValidatePipeline,
+  onExportPDF,
   onDeleteSelection,
 }: PipelineBuilderShellProps) {
   return (
@@ -80,13 +90,22 @@ export function PipelineBuilderShell({
                 <Send className="h-4 w-4" />
                 Phát hành
               </button>
-              <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50" onClick={onAutoLayout} disabled={!nodeCount || autoLayoutPending || isReadOnly}>
+              <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50" onClick={onAutoLayout} disabled={!nodeCount || autoLayoutPending || !canEditLayout}>
                 <Wand2 className="h-4 w-4" />
                 Tự sắp xếp
               </button>
               <button className={clsx('inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold', validationIssueCount ? 'border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100')} onClick={onValidatePipeline} disabled={!selectedTemplateId}>
                 <CheckCircle2 className="h-4 w-4" />
                 Kiểm tra
+              </button>
+              <button
+                title="Xuất mô tả node và checklist/step thành PDF"
+                className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={onExportPDF}
+                disabled={!canExportPDF || exportPDFPending}
+              >
+                <Download className={clsx('h-4 w-4', exportPDFPending && 'animate-pulse')} />
+                {exportPDFPending ? 'Đang xuất...' : 'Xuất PDF'}
               </button>
               <button className="inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50" onClick={onDeleteSelection} disabled={!canDeleteSelection || deleteSelectionPending || isReadOnly}>
                 <Trash2 className="h-4 w-4" />
@@ -96,9 +115,17 @@ export function PipelineBuilderShell({
           </div>
         </div>
 
-        {isReadOnly ? (
+        {isPublished && canEditLayout ? (
+          <div className="border-b border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-900">
+            Revision đã phát hành khóa nội dung workflow. Vẫn có thể kéo node, <strong>Tự sắp xếp</strong> và đổi cạnh bám của connector trên chính node hiện tại.
+          </div>
+        ) : isPublished ? (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
             Revision đã phát hành đang ở chế độ chỉ đọc. Chọn <strong>Tạo revision</strong> để chỉnh sửa mà không làm thay đổi các công trình lịch sử.
+          </div>
+        ) : isReadOnly ? (
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700">
+            Tài khoản hiện có quyền xem workflow. Cần quyền <strong>pipeline.edit</strong> để thay đổi nội dung hoặc bố cục.
           </div>
         ) : null}
 

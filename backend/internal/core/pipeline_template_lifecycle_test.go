@@ -63,6 +63,121 @@ func TestTemplateDefinitionHashIgnoresLifecycleTimestamps(t *testing.T) {
 	}
 }
 
+func TestTemplateDefinitionHashIgnoresDiagramPresentationMetadata(t *testing.T) {
+	first := Record{
+		"id":    "template-1",
+		"nodes": []Record{{"id": "node-1", "name": "Start", "position_x": 100, "position_y": 200}},
+		"edges": []Record{{
+			"id": "edge-1", "from_node_id": "node-1", "to_node_id": "node-2",
+			"condition_type": "workflow_form_answer_equals",
+			"condition_config": Record{
+				"field_key": "execution_route",
+				"value":     "subcontractor",
+				"diagram": Record{
+					"portMode": "manual",
+					"source":   Record{"nodeId": "node-1", "side": "right"},
+					"target":   Record{"nodeId": "node-2", "side": "left"},
+				},
+			},
+		}},
+	}
+	second := Record{
+		"id":    "template-1",
+		"nodes": []Record{{"id": "node-1", "name": "Start", "position_x": 900, "position_y": -400}},
+		"edges": []Record{{
+			"id": "edge-1", "from_node_id": "node-1", "to_node_id": "node-2",
+			"condition_type": "workflow_form_answer_equals",
+			"condition_config": Record{
+				"field_key": "execution_route",
+				"value":     "subcontractor",
+				"diagram": Record{
+					"portMode": "manual",
+					"source":   Record{"nodeId": "node-1", "side": "bottom"},
+					"target":   Record{"nodeId": "node-2", "side": "top"},
+				},
+			},
+		}},
+	}
+	firstHash, err := templateDefinitionHash(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondHash, err := templateDefinitionHash(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstHash != secondHash {
+		t.Fatalf("expected layout-only changes to preserve definition hash: %s != %s", firstHash, secondHash)
+	}
+
+	secondEdges := second["edges"].([]Record)
+	secondConfig := secondEdges[0]["condition_config"].(Record)
+	secondConfig["value"] = "direct"
+	changedHash, err := templateDefinitionHash(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstHash == changedHash {
+		t.Fatal("expected workflow condition changes to change definition hash")
+	}
+
+	secondConfig["value"] = "subcontractor"
+	secondConfig["position_x"] = 99
+	changedHash, err = templateDefinitionHash(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstHash == changedHash {
+		t.Fatal("expected a business condition key named position_x to remain in the definition hash")
+	}
+}
+
+func TestNormalizePipelineTemplateLayoutRequest(t *testing.T) {
+	req := PipelineTemplateLayoutRequest{
+		Nodes: []PipelineTemplateNodeLayoutRequest{{
+			ID:        "41400000-0000-0000-0000-000000000001",
+			PositionX: 120,
+			PositionY: -48,
+		}},
+		Edges: []PipelineTemplateEdgeLayoutRequest{{
+			ID:         "41600000-0000-0000-0000-000000000001",
+			SourceSide: " Bottom ",
+			TargetSide: "TOP",
+		}},
+	}
+	normalized, err := normalizePipelineTemplateLayoutRequest(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if normalized.Edges[0].SourceSide != "bottom" || normalized.Edges[0].TargetSide != "top" {
+		t.Fatalf("expected normalized port sides, got %#v", normalized.Edges[0])
+	}
+}
+
+func TestNormalizePipelineTemplateLayoutRequestRejectsInvalidPresentationData(t *testing.T) {
+	tests := []PipelineTemplateLayoutRequest{
+		{},
+		{Nodes: []PipelineTemplateNodeLayoutRequest{
+			{ID: "41400000-0000-0000-0000-000000000001"},
+			{ID: "41400000-0000-0000-0000-000000000001"},
+		}},
+		{Nodes: []PipelineTemplateNodeLayoutRequest{{
+			ID:        "41400000-0000-0000-0000-000000000001",
+			PositionX: maxPipelineDiagramCoordinate + 1,
+		}}},
+		{Edges: []PipelineTemplateEdgeLayoutRequest{{
+			ID:         "41600000-0000-0000-0000-000000000001",
+			SourceSide: "center",
+			TargetSide: "left",
+		}}},
+	}
+	for index, req := range tests {
+		if _, err := normalizePipelineTemplateLayoutRequest(req); err == nil {
+			t.Fatalf("case %d: expected invalid layout request to be rejected", index)
+		}
+	}
+}
+
 func TestEngineV2AutomationUsesStableDomainActionKey(t *testing.T) {
 	contextRow := Record{
 		"engine_version":    2,

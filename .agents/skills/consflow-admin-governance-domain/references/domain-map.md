@@ -22,7 +22,7 @@
 - `auth_sessions`
 - `partners`
 - `system_settings`, `audit_logs`
-- Relevant migrations: `V1`, `V36`, `V37`, `V60`
+- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`
 
 ## Invariants
 
@@ -34,6 +34,7 @@
 - `project.member.manage` is granted to Admin/Director/PM and always combined with project scope. Project member responses expose server capabilities; mutation synchronizes only project-scoped `user_roles`, never removes global roles, never exposes Admin/Director as assignable project roles, and writes project audit.
 - Partner catalog updates preserve downstream snapshots for historical documents.
 - Session refresh/revoke lifecycle remains DB-backed and revocable.
+- V68 adds the system roles `Thiết kế`, `Sale`, `Pháp lý` with the minimum permission sets needed by their official-workflow steps and grants existing `Đội thi công` pipeline/planning access. The migration does not auto-assign users or project memberships and does not broaden existing runtime role snapshots.
 
 ## Cross-Domain Checks
 

@@ -2977,6 +2977,150 @@ func TestClientOfficialWorkflowTemplateMigrationShape(t *testing.T) {
 	`, 1, templateID)
 }
 
+func TestOfficialWorkflowRevisionTwoWordingAndRoles(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	templateID := "40000000-0000-0000-0000-000000000021"
+
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_templates WHERE id=$1 AND status='published'`, 1, templateID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_template_nodes WHERE template_id=$1`, 13, templateID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_template_steps step
+		JOIN pipeline_template_nodes node ON node.id=step.node_id
+		WHERE node.template_id=$1
+	`, 53, templateID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_template_nodes
+		WHERE template_id=$1
+			AND name='Đầu Vào'
+			AND exit_conditions->>'mandatory_gate'='true'
+	`, 1, templateID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_template_steps step
+		JOIN pipeline_template_nodes node ON node.id=step.node_id
+		WHERE node.template_id=$1
+			AND (
+				position('[' in step.name)>0 OR position(']' in step.name)>0 OR
+				position('(' in step.name)>0 OR position(')' in step.name)>0 OR
+				position('/' in step.name)>0
+			)
+	`, 0, templateID)
+
+	wordingCases := []struct {
+		stepID string
+		name   string
+		roles  string
+	}{
+		{"42500000-0000-0000-0000-000000000003", "Nắm phong cách thiết kế", `["Thiết kế"]`},
+		{"42500000-0000-0000-0000-000000000005", "Xác định rủi ro mặt bằng", `["QS","Đội thi công"]`},
+		{"42500000-0000-0000-0000-000000000009", "Lên bản vẽ 3D", `["Thiết kế"]`},
+		{"42500000-0000-0000-0000-000000000019", "Review định mức quản lý", `["Giám đốc"]`},
+		{"42500000-0000-0000-0000-000000000021", "Gửi BOQ cho chủ đầu tư", `["QS","Sale","PM"]`},
+		{"42500000-0000-0000-0000-000000000030", "Kiểm tra hợp đồng", `["Kế toán","Pháp lý"]`},
+		{"42500000-0000-0000-0000-000000000034", "Họp và phân công thi công", `["QS","PM","Thiết kế","QA/QC"]`},
+	}
+	for _, tc := range wordingCases {
+		assertCount(t, db, `
+			SELECT COUNT(*)
+			FROM pipeline_template_steps step
+			JOIN pipeline_template_nodes node ON node.id=step.node_id
+			WHERE node.template_id=$1
+				AND step.id=$2
+				AND step.name=$3
+				AND step.required_role_ids=$4::jsonb
+		`, 1, templateID, tc.stepID, tc.name, tc.roles)
+	}
+
+	inputTerminologyCases := []struct {
+		stepID      string
+		name        string
+		description string
+	}{
+		{"42500000-0000-0000-0000-000000000017", "Lấy giá đầu vào", "Thu thập giá đầu vào."},
+		{"42500000-0000-0000-0000-000000000023", "Mua hàng đầu vào", "Thực hiện mua hàng đầu vào."},
+		{"42500000-0000-0000-0000-000000000024", "Ký hợp đồng và lập hồ sơ tạm ứng đầu vào", "Ký hợp đồng và chuẩn bị hồ sơ tạm ứng đầu vào."},
+	}
+	for _, tc := range inputTerminologyCases {
+		assertCount(t, db, `
+			SELECT COUNT(*)
+			FROM pipeline_template_steps step
+			JOIN pipeline_template_nodes node ON node.id=step.node_id
+			WHERE node.template_id=$1
+				AND step.id=$2
+				AND step.name=$3
+				AND step.description=$4
+		`, 1, templateID, tc.stepID, tc.name, tc.description)
+	}
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_template_nodes
+		WHERE template_id=$1
+			AND id='42400000-0000-0000-0000-000000000006'
+			AND description='Bước bắt buộc để chốt khối lượng, mua hàng, hợp đồng/tạm ứng và rà soát đầu vào.'
+			AND exit_conditions->>'text'='Đầu vào đã được rà soát và kiểm tra'
+	`, 1, templateID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_template_edges
+		WHERE template_id=$1
+			AND id='42600000-0000-0000-0000-000000000007'
+			AND label='Đầu vào đã được kiểm tra'
+	`, 1, templateID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM workflow_form_templates
+		WHERE (code='client_boq_supplier_price_collection' AND name='Thu thập giá đầu vào')
+			OR (
+				code='client_procurement_sourcing'
+				AND name='Mua hàng đầu vào'
+				AND description='Ghi nhận nguồn đầu vào, phạm vi mua hàng, so sánh báo giá, lead time và phương án lựa chọn.'
+			)
+	`, 2)
+
+	explicitEntityCases := []struct {
+		stepID string
+		name   string
+	}{
+		{"42500000-0000-0000-0000-000000000026", "Đàm phán với thầu phụ để chốt giá hợp lý"},
+		{"42500000-0000-0000-0000-000000000038", "Nghiệm thu thầu phụ và tổ đội"},
+		{"42500000-0000-0000-0000-000000000039", "Nghiệm thu vật tư đầu vào và đầu ra"},
+		{"42500000-0000-0000-0000-000000000040", "Lập hồ sơ kiểm tra khối lượng thầu phụ"},
+		{"42500000-0000-0000-0000-000000000042", "Lập hồ sơ thanh toán cho thầu phụ"},
+		{"42500000-0000-0000-0000-000000000045", "Thanh toán cho thầu phụ theo đợt"},
+		{"42500000-0000-0000-0000-000000000051", "Ghi nhận hóa đơn thầu phụ xuất về công ty"},
+	}
+	for _, tc := range explicitEntityCases {
+		assertCount(t, db, `
+			SELECT COUNT(*)
+			FROM pipeline_template_steps step
+			JOIN pipeline_template_nodes node ON node.id=step.node_id
+			WHERE node.template_id=$1 AND step.id=$2 AND step.name=$3
+		`, 1, templateID, tc.stepID, tc.name)
+	}
+
+	roleCases := []struct {
+		name        string
+		displayName string
+		permissions []string
+	}{
+		{"design", "Thiết kế", []string{"project.view", "pipeline.view", "planning.view", "planning.edit", "operation.view", "operation.report"}},
+		{"sales", "Sale", []string{"project.view", "pipeline.view", "planning.view", "planning.edit", "boq.view", "boq.update", "boq.approve", "contract.view", "contract.review"}},
+		{"legal", "Pháp lý", []string{"project.view", "pipeline.view", "contract.view", "contract.review"}},
+	}
+	for _, tc := range roleCases {
+		assertCount(t, db, `SELECT COUNT(*) FROM roles WHERE name=$1 AND display_name=$2 AND system_role=true`, 1, tc.name, tc.displayName)
+		assertCount(t, db, `
+			SELECT COUNT(*)
+			FROM role_permissions role_permission
+			JOIN roles role ON role.id=role_permission.role_id
+			JOIN permissions permission ON permission.id=role_permission.permission_id
+			WHERE role.name=$1 AND permission.key=ANY($2)
+		`, len(tc.permissions), tc.name, tc.permissions)
+	}
+}
+
 func TestClientOfficialWorkflowRoutesByDesignDecisionFormAnswer(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

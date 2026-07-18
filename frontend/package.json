@@ -7,8 +7,9 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "test:handover-source": "node --experimental-strip-types --test tests/handoverSourcePresentation.test.ts",
+    "test:node-type-presentation": "node --experimental-strip-types --test tests/nodeTypePresentation.test.ts",
     "test:project-navigation": "node --experimental-strip-types --test tests/projectWorkspaceNavigation.test.ts",
-    "check:pipeline-builder": "npm run build && node scripts/check-pipeline-builder-diagram.mjs",
+    "check:pipeline-builder": "npm run build && npm run test:node-type-presentation && node scripts/check-pipeline-builder-diagram.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "lint": "tsc --noEmit"
   },

@@ -18,6 +18,7 @@ import type {
   ConnectorEndpoint,
   ConnectorEndpointRole,
   ConnectorModel,
+  DiagramEditingMode,
   DiagramNodeRect,
   DragState,
   NodePosition,
@@ -72,6 +73,8 @@ type DiagramCanvasProps = {
   nodes: PipelineNode[];
   edges: PipelineTemplateEdge[];
   selectedNodeId: string;
+  editingMode: DiagramEditingMode;
+  positionResetToken: number;
   connectorMutationPending: boolean;
   onSelectNode: (nodeId: string) => void;
   onSelectedConnectorChange: (connectorId: string) => void;
@@ -79,6 +82,7 @@ type DiagramCanvasProps = {
   onSaveNodePosition: (nodeId: string, position: NodePosition) => void;
   onCreateConnector: (input: ConnectorCreateInput) => void;
   onReconnectConnector: (input: ConnectorReconnectInput) => void;
+  onReconnectConstraintViolation: () => void;
   onDeleteConnector: (connectorId: string) => void;
   onDeleteNode: (nodeId: string) => void;
 };
@@ -87,6 +91,8 @@ export function DiagramCanvas({
   nodes,
   edges,
   selectedNodeId,
+  editingMode,
+  positionResetToken,
   connectorMutationPending,
   onSelectNode,
   onSelectedConnectorChange,
@@ -94,6 +100,7 @@ export function DiagramCanvas({
   onSaveNodePosition,
   onCreateConnector,
   onReconnectConnector,
+  onReconnectConstraintViolation,
   onDeleteConnector,
   onDeleteNode,
 }: DiagramCanvasProps) {
@@ -104,6 +111,7 @@ export function DiagramCanvas({
   const reconnectDraftRef = useRef<ConnectorReconnectDraft | null>(null);
   const interactionRef = useRef(initialDiagramInteractionState);
   const persistedPositionsRef = useRef<Record<string, NodePosition>>({});
+  const positionResetTokenRef = useRef(positionResetToken);
   const resizeObserversRef = useRef<Record<string, ResizeObserver>>({});
   const settledNodeRectsRef = useRef<DiagramNodeRect[]>([]);
   const nodePositionsRef = useRef<Record<string, NodePosition>>({});
@@ -196,6 +204,7 @@ export function DiagramCanvas({
   useEffect(() => {
     const previousPersisted = persistedPositionsRef.current;
     const nextPersisted: Record<string, NodePosition> = {};
+    const forceReset = positionResetTokenRef.current !== positionResetToken;
 
     nodes.forEach((node, index) => {
       nextPersisted[node.id] = initialNodePosition(node, index);
@@ -209,7 +218,7 @@ export function DiagramCanvas({
         const persisted = nextPersisted[node.id];
         const persistedChanged = !samePoint(previousPersisted[node.id], persisted);
         const currentPosition = current[node.id];
-        const nextPosition = !currentPosition || persistedChanged ? persisted : currentPosition;
+        const nextPosition = forceReset || !currentPosition || persistedChanged ? persisted : currentPosition;
         next[node.id] = nextPosition;
         if (!samePoint(currentPosition, nextPosition)) changed = true;
       });
@@ -217,7 +226,8 @@ export function DiagramCanvas({
       return changed ? next : current;
     });
     persistedPositionsRef.current = nextPersisted;
-  }, [nodes]);
+    positionResetTokenRef.current = positionResetToken;
+  }, [nodes, positionResetToken]);
 
   useEffect(() => {
     const nodeIds = new Set(nodes.map((node) => node.id));
@@ -418,7 +428,7 @@ export function DiagramCanvas({
   };
 
   const startConnectorDrag = (port: PortRef, event: PointerEvent<HTMLButtonElement>) => {
-    if (connectorMutationPending) return;
+    if (editingMode !== 'full' || connectorMutationPending) return;
     const pointer = canvasPointFromEvent(event);
     if (!pointer) return;
 
@@ -460,7 +470,7 @@ export function DiagramCanvas({
     connectorDraftRef.current = null;
     dispatchInteraction({ type: 'finish-connector-drag' });
 
-    if (!connectorMutationPending && nextDraft.target && nextDraft.validTarget) {
+    if (editingMode === 'full' && !connectorMutationPending && nextDraft.target && nextDraft.validTarget) {
       onCreateConnector({ source: nextDraft.source, target: nextDraft.target });
     }
   };
@@ -493,7 +503,7 @@ export function DiagramCanvas({
   const nextReconnectDraftFromEvent = useCallback((event: PointerEvent<Element>, draft: ConnectorReconnectDraft): ConnectorReconnectDraft | null => {
     const pointer = canvasPointFromEvent(event);
     if (!pointer) return null;
-    const target = reconnectTargetFromPoint(draft, pointer, nodeRectsRef.current, edgeIdsByKeyRef.current);
+    const target = reconnectTargetFromPoint(draft, pointer, nodeRectsRef.current, edgeIdsByKeyRef.current, editingMode === 'layout');
     return {
       ...draft,
       pointer,
@@ -501,14 +511,14 @@ export function DiagramCanvas({
       validTarget: target.validTarget,
       invalidReason: target.invalidReason,
     };
-  }, [canvasPointFromEvent]);
+  }, [canvasPointFromEvent, editingMode]);
 
   const startConnectorReconnect = useCallback((
     connector: ConnectorModel,
     endpoint: ConnectorEndpointRole,
     event: PointerEvent<SVGCircleElement>,
   ) => {
-    if (connectorMutationPending) return;
+    if (editingMode === 'view' || connectorMutationPending) return;
     const pointer = canvasPointFromEvent(event);
     if (!pointer) return;
 
@@ -538,7 +548,7 @@ export function DiagramCanvas({
       originalTarget,
       pointer,
     });
-  }, [canvasPointFromEvent, closeContextMenu, connectorMutationPending, focusCanvas, onSelectNode]);
+  }, [canvasPointFromEvent, closeContextMenu, connectorMutationPending, editingMode, focusCanvas, onSelectNode]);
 
   const moveConnectorReconnect = useCallback((event: PointerEvent<SVGCircleElement>) => {
     const draft = reconnectDraftRef.current;
@@ -568,8 +578,10 @@ export function DiagramCanvas({
     const reconnectInput = reconnectInputFromDraft(nextDraft);
     if (!connectorMutationPending && reconnectInput) {
       onReconnectConnector(reconnectInput);
+    } else if (nextDraft.invalidReason === 'locked-node') {
+      onReconnectConstraintViolation();
     }
-  }, [connectorMutationPending, nextReconnectDraftFromEvent, onReconnectConnector]);
+  }, [connectorMutationPending, nextReconnectDraftFromEvent, onReconnectConnector, onReconnectConstraintViolation]);
 
   const cancelConnectorReconnect = useCallback(() => {
     reconnectDraftRef.current = null;
@@ -587,7 +599,7 @@ export function DiagramCanvas({
   };
 
   const handleNodePointerDown = useCallback((event: PointerEvent<HTMLDivElement>, node: PipelineNode, index: number) => {
-    if (event.button !== 0) return;
+    if (editingMode === 'view' || connectorMutationPending || event.button !== 0) return;
     const point = canvasPointFromEvent(event);
     if (!point) return;
     event.preventDefault();
@@ -610,7 +622,7 @@ export function DiagramCanvas({
       lastY: position.y,
       moved: false,
     };
-  }, [canvasPointFromEvent, closeContextMenu, focusCanvas]);
+  }, [canvasPointFromEvent, closeContextMenu, connectorMutationPending, editingMode, focusCanvas]);
 
   const handleNodePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
@@ -650,27 +662,29 @@ export function DiagramCanvas({
   const handleNodeContextMenu = useCallback((event: MouseEvent<HTMLDivElement>, node: PipelineNode) => {
     event.preventDefault();
     event.stopPropagation();
+    if (editingMode !== 'full') return;
     const point = contextMenuPointFromEvent(event);
     if (!point) return;
     focusCanvas();
     dispatchInteraction({ type: 'clear-selected-connector' });
     onSelectNode(node.id);
     setContextMenu({ type: 'node', id: node.id, ...point });
-  }, [contextMenuPointFromEvent, focusCanvas, onSelectNode]);
+  }, [contextMenuPointFromEvent, editingMode, focusCanvas, onSelectNode]);
 
   const handleConnectorContextMenu = useCallback((connectorId: string, event: MouseEvent<SVGPathElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    if (editingMode !== 'full') return;
     const point = contextMenuPointFromEvent(event);
     if (!point) return;
     focusCanvas();
     onSelectNode('');
     dispatchInteraction({ type: 'select-connector', connectorId });
     setContextMenu({ type: 'connector', id: connectorId, ...point });
-  }, [contextMenuPointFromEvent, focusCanvas, onSelectNode]);
+  }, [contextMenuPointFromEvent, editingMode, focusCanvas, onSelectNode]);
 
   const handleContextMenuAction = useCallback(() => {
-    if (!contextMenu) return;
+    if (!contextMenu || editingMode !== 'full') return;
     const { type, id } = contextMenu;
     closeContextMenu();
     if (type === 'node') {
@@ -678,7 +692,7 @@ export function DiagramCanvas({
       return;
     }
     if (!connectorMutationPending) onDeleteConnector(id);
-  }, [closeContextMenu, connectorMutationPending, contextMenu, onDeleteConnector, onDeleteNode]);
+  }, [closeContextMenu, connectorMutationPending, contextMenu, editingMode, onDeleteConnector, onDeleteNode]);
 
   const handleCanvasContextMenu = useCallback((event: MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -723,7 +737,7 @@ export function DiagramCanvas({
       event.stopPropagation();
 
       const selectedConnectorId = interactionRef.current.selectedConnectorId;
-      if (connectorMutationPending || connectorDraftRef.current || reconnectDraftRef.current || dragRef.current) return;
+      if (editingMode !== 'full' || connectorMutationPending || connectorDraftRef.current || reconnectDraftRef.current || dragRef.current) return;
       if (selectedConnectorId) {
         closeContextMenu();
         onDeleteConnector(selectedConnectorId);
@@ -734,7 +748,7 @@ export function DiagramCanvas({
         onDeleteNode(selectedNodeId);
       }
     },
-    [closeContextMenu, connectorMutationPending, contextMenu, onDeleteConnector, onDeleteNode, onSelectNode, selectedNodeId],
+    [closeContextMenu, connectorMutationPending, contextMenu, editingMode, onDeleteConnector, onDeleteNode, onSelectNode, selectedNodeId],
   );
 
   const handleCanvasKeyDownCapture = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
@@ -790,7 +804,7 @@ export function DiagramCanvas({
           liveNodeRects={nodeRects}
           draggingNodeId={draggingNodeId}
           selectedConnectorId={interaction.selectedConnectorId}
-          reconnectDisabled={connectorMutationPending}
+          reconnectDisabled={connectorMutationPending || editingMode === 'view'}
           onSelectConnector={selectConnector}
           onConnectorContextMenu={handleConnectorContextMenu}
           onReconnectEndpointStart={startConnectorReconnect}
@@ -809,6 +823,7 @@ export function DiagramCanvas({
           nodes={nodes}
           positions={nodePositions}
           selectedNodeId={selectedNodeId}
+          nodeDragEnabled={editingMode !== 'view' && !connectorMutationPending}
           onSelectNode={selectNode}
           onToggleNodeDetails={onToggleNodeDetails}
           onNodePointerDown={handleNodePointerDown}
@@ -822,7 +837,7 @@ export function DiagramCanvas({
           rect={adornerRect}
           mode={adornerMode}
           activePort={connectorDraft?.source ?? null}
-          connectorDragDisabled={connectorMutationPending}
+          connectorDragDisabled={connectorMutationPending || editingMode !== 'full'}
           onConnectorDragStart={startConnectorDrag}
           onConnectorDragMove={moveConnectorDrag}
           onConnectorDragEnd={finishConnectorDrag}
@@ -970,9 +985,15 @@ function reconnectTargetFromPoint(
   pointer: NodePosition,
   nodeRects: DiagramNodeRect[],
   edgeIdsByKey: Map<string, Set<string>>,
+  lockEndpointNode: boolean,
 ): { port: PortRef | null; validTarget: boolean; invalidReason?: ConnectorInvalidReason } {
   const hit = nearestPortHit(pointer, nodeRects, CONNECTOR_SNAP_RADIUS);
   if (!hit) return { port: null, validTarget: false };
+
+  const originalEndpoint = draft.endpoint === 'source' ? draft.originalSource : draft.originalTarget;
+  if (lockEndpointNode && hit.port.nodeId !== originalEndpoint.nodeId) {
+    return { port: hit.port, validTarget: false, invalidReason: 'locked-node' };
+  }
 
   const source = draft.endpoint === 'source' ? hit.port : draft.fixed;
   const target = draft.endpoint === 'target' ? hit.port : draft.fixed;

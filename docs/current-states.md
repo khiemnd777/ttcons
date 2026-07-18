@@ -1,5 +1,407 @@
 # Current States
 
+## AppShell Header Alignment And 35px Logo Restore
+
+Status: complete
+
+Mục đích chính:
+- Căn khối logo sidebar và application header thành một hàng desktop thống nhất, lấy header bên phải làm chuẩn, đồng thời khôi phục tỷ lệ chữ `Workflow` 35px trong logo.
+
+Will be done:
+- Đặt header logo trái và application header phải cùng chiều cao 64px; dùng logo desktop 48px căn giữa.
+- Đồng bộ top inset sidebar từ 16px lên 20px để `LÀM VIỆC` bắt đầu cùng cao độ với vùng `Công trình` dùng main inset 20px.
+- Khôi phục `Workflow` trong SVG từ 29px về 35px; giữ logo mobile 40px và Login 112px.
+- Không đổi route, API, auth, database, permission, nội dung navigation hoặc internal `consflow` identifiers.
+- Cập nhật central/frontend/root-cause mappings; chạy source-level contract, SVG XML, frontend lint/build và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- Screenshot người dùng cung cấp đã xác nhận divider dưới logo trái thấp hơn divider header phải và sidebar content bắt đầu thấp hơn vùng `Công trình`.
+- Code evidence xác nhận header trái khoảng 137px (`96px + py-5 + border`), trong khi header phải khoảng 64px; sidebar dùng `py-4` còn main dùng `py-5`.
+- Root cause đã xác nhận là hai contract sizing/inset độc lập trong `AppShell.tsx`, không phải typography hoặc border nội bộ của logo.
+- Pre-fix source contract đã fail vì chưa có shared 64px row, logo desktop vẫn 96px và SVG `Workflow` đang 29px.
+- Người dùng đã duyệt Mockup as Text, mockup PNG và xác nhận triển khai bằng `OK triển khai`; yêu cầu bổ sung khôi phục logo 35px đã được đưa vào cùng scope.
+- Đã tải mandatory central/frontend/root-cause mappings cùng frontend/diagnosis guardrails; owner chính là `AppShell.tsx` và `brand-logo.svg`.
+- Worktree đang có thay đổi hiện hữu ở các owner/mapping files; implementation chỉ chỉnh đúng các dòng mục tiêu và giữ nguyên thay đổi không liên quan.
+- Đã đặt brand cell trái và application header phải cùng `h-16` (64px), dùng logo desktop 48px căn giữa và giữ nguyên header phải làm chuẩn trực quan.
+- Đã đổi sidebar navigation từ `py-4` sang `py-5`, đồng bộ 20px top inset với main để `LÀM VIỆC` và vùng `Công trình` bắt đầu cùng cao độ.
+- Đã khôi phục dòng `Workflow` trong SVG từ 29px về 35px; logo mobile 40px và Login 112px giữ nguyên.
+- Đã cập nhật central/frontend mappings cho branding/AppShell contract và root-cause map cho đường chẩn đoán divider/inset lệch; không cần backend/domain map vì route, API, auth, database, permission và runtime không đổi.
+- Validation đạt: source-level contract kiểm đủ 64px/48px/20px, mobile 40px, Login 112px và SVG 35px; SVG XML, `npm run lint`, `npm run build`, asset trong `dist` và `git diff --check` đều pass. Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Không thêm browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai; mockup PNG đã được duyệt trước khi sửa code.
+
+## Project Explorer Thi công & Chất lượng Description
+
+Status: complete
+
+Mục đích chính:
+- Đồng bộ mô tả nhóm `Thi công & Chất lượng` trong cây công trình với các không gian người dùng hiện thấy: Nhật ký, Kiểm tra, Cần xử lý và Nghiệm thu.
+
+Will be done:
+- Đổi description tĩnh từ `Thi công, ITP/RFI/NCR, nghiệm thu, rework` thành `Nhật ký, kiểm tra, cần xử lý, nghiệm thu`.
+- Giữ nguyên nhãn nhóm, nhóm con, route, permission, API, database và toàn bộ chuyển trạng thái Thi công/Chất lượng.
+- Cập nhật central/frontend mappings cho copy điều hướng dùng chung.
+- Chạy source-level contract, frontend production build và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User đã duyệt review package và Mockup as Text bằng `OK triển khai`.
+- Đã tải mandatory central/frontend/construction/quality mappings cùng frontend và domain guardrails.
+- Đã xác nhận owner chính là `frontend/src/modules/projects/projectWorkspaceNavigation.ts`; `ProjectsPage.tsx` chỉ render `folder.description` từ cấu hình dùng chung.
+- Đã xác nhận UI Thi công hiện chỉ có `Nhật ký`, `Kiểm tra`, `Cần xử lý`; Nghiệm thu là nhóm con còn lại, còn ITP/RFI/NCR/rework là lịch sử tương thích kỹ thuật.
+- Worktree đang có thay đổi hiện hữu ở nhiều module và mapping files; implementation chỉ chỉnh đúng các dòng mục tiêu và giữ nguyên thay đổi không liên quan.
+- Đã đổi description dùng chung thành `Nhật ký, kiểm tra, cần xử lý, nghiệm thu`; nhãn nhóm, nhóm con, route và permission giữ nguyên.
+- Đã cập nhật central/frontend mappings cho copy điều hướng mới; construction/quality domain maps không cần sửa vì các invariant đã ghi đúng luồng `Nhật ký`/`Kiểm tra`/`Cần xử lý`, Acceptance và lịch sử tương thích kỹ thuật.
+- Source-level contract đạt: description mới tồn tại đúng owner file và chuỗi cũ không còn trong `frontend/src`.
+- Frontend production build đạt; Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Browser verification được bỏ qua đúng quy định vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+## Thủ Thiêm Workflow Logo Safe Right Padding
+
+Status: complete
+
+Mục đích chính:
+- Thu nhỏ riêng dòng `Workflow` trong logo navy để tạo khoảng trống an toàn bên phải, đồng thời giữ nguyên kích thước ô và hai dòng tên chính.
+
+Will be done:
+- Giảm cỡ chữ SVG của `Workflow` từ 35px xuống 29px; giữ nguyên vị trí, màu, độ đậm, ô navy và hai dòng `Thủ`/`Thiêm`.
+- Giữ nguyên kích thước hiển thị 96px/40px trong AppShell, 112px trên Login và cùng asset cho favicon.
+- Không đổi route, API, auth, database, permission hoặc internal `consflow` identifiers.
+- Cập nhật central/frontend mappings; chạy source-level contract, SVG XML, frontend lint/build và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- Screenshot người dùng cung cấp đã xác nhận dòng `Workflow` 35px nằm quá sát giới hạn bên phải trong Microsoft Edge.
+- Root cause đã được xác nhận tại `frontend/public/brand-logo.svg`: cỡ chữ cố định 35px không chừa đủ khoảng an toàn với font fallback thực tế.
+- Pre-fix contract đã fail tại 35px; mockup PNG 35px/29px đã được người dùng xem và duyệt bằng `OK triển khai thu nhỏ Workflow`.
+- Đã tải mandatory central/frontend/root-cause mappings cùng frontend/diagnosis guardrails và xác nhận owner chính là SVG branding dùng chung.
+- Worktree đang có thay đổi hiện hữu ở nhiều module; implementation chỉ chỉnh các dòng mục tiêu và giữ nguyên thay đổi không liên quan.
+- Đã giảm riêng dòng `Workflow` từ 35px xuống 29px; giữ nguyên tọa độ, màu, độ đậm, hai dòng `Thủ`/`Thiêm` và toàn bộ kích thước hiển thị của component.
+- Đã cập nhật central/frontend mappings với contract 29px và safe right padding; không cần backend/domain map vì route, API, auth, database, permission và runtime không đổi.
+- Validation đạt: source-level 29px contract, SVG XML, `npm run lint`, `npm run build`, asset trong `dist` và `git diff --check` đều pass; Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Browser verification được bỏ qua đúng quy định vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+## Thủ Thiêm Workflow Square Navy Logo
+
+Status: complete
+
+Mục đích chính:
+- Thay placeholder `CF` bằng logo chữ `Thủ Thiêm Workflow` dạng ô vuông nền navy đã được duyệt, giúp nhận diện thương hiệu nhất quán tại sidebar, trang đăng nhập và favicon.
+
+Will be done:
+- Tạo SVG 1:1 nền `#172033`, chữ `Thủ`/`Thiêm` màu trắng và `Workflow` màu `#60A5FA`, bo góc và giữ dấu tiếng Việt bằng text vector code-native.
+- Thêm component `BrandLogo` dùng chung; hiển thị 96px trong sidebar và 112px trên trang đăng nhập.
+- Xóa placeholder `CF`, wordmark/subtitle lặp trong sidebar và đổi login heading còn `Đăng nhập`; đăng ký SVG làm favicon.
+- Không đổi route, API, auth, database, permission, demo account hoặc internal `consflow` identifiers.
+- Cập nhật central/frontend mappings; chạy kiểm tra SVG, frontend production build và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User đã chọn phương án 2 ô nền navy và duyệt triển khai bằng `OK triển khai phương án 2`.
+- Đã tải mandatory central/frontend mappings, frontend workflow/UI guardrails và xác nhận owner files.
+- Đã xác nhận current UI dùng placeholder `CF` 40/44px tại AppShell/Login, sidebar lặp product name/subtitle và browser chưa đăng ký favicon.
+- Worktree đang có thay đổi hiện hữu ở nhiều module, gồm `AppShell.tsx` và mapping files; implementation sẽ chỉnh mục tiêu và giữ nguyên các thay đổi không liên quan.
+- Đã tạo `brand-logo.svg` 1:1 nền navy, chữ trắng/xanh đúng wording và component `BrandLogo` dùng chung có alt text tiếng Việt.
+- Đã thay placeholder/sidebar wordmark bằng logo 96px, thêm logo compact 40px cho header hẹp, dùng logo 112px tại Login và rút heading còn `Đăng nhập`.
+- Đã đăng ký cùng SVG làm favicon, rút browser title còn `Thủ Thiêm Workflow` và xóa `Construction Workflow OS` khỏi frontend presentation.
+- Đã cập nhật central/frontend mappings cho asset, component, kích thước và owner contract mới; không cần backend/domain map vì route, API, auth, database, permission và runtime không đổi.
+- Validation đạt: SVG XML hợp lệ, production build copy đúng favicon/asset, `npm run lint`, `npm run build` và `git diff --check` đều pass; Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Browser verification được bỏ qua đúng quy định vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+## Pipeline Template PDF Single Diagram
+
+Status: complete
+
+Mục đích chính:
+- Mở đầu PDF bằng một sơ đồ workflow đầy đủ, tránh lặp lại hai phiên bản tổng quan/chi tiết của cùng topology.
+
+Will be done:
+- Bỏ trang `SƠ ĐỒ TỔNG QUAN`; đưa renderer chi tiết lên trang đầu và đổi tiêu đề thành `1. SƠ ĐỒ`.
+- Giữ card hai dòng `Tên node` + `Loại | N steps.` và toàn bộ nhãn connector tối đa hai dòng.
+- Đổi bảng Node thành section 2, Checklist/Step thành section 3; giữ no-node/no-edge/dangling/cycle fallback.
+- Xóa code/test chỉ phục vụ overview và cập nhật central/backend/frontend/workflow mappings cho contract một diagram.
+- Không đổi endpoint, frontend, database, permission, audit, runtime, dependency hoặc migration.
+- Chạy focused/full backend tests, module verification, Pipeline Builder contract check, `git diff --check` và render Poppler kiểm tra toàn bộ PDF.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User đã duyệt review package và Mockup as Text bằng `OK triển khai`.
+- Đã tải mandatory central/backend/workflow mappings cùng backend/PDF guardrails; matched feature là `Pipeline Template PDF Export`, lớp artifact generation.
+- Đã xác nhận owner chính là `pipeline_template_pdf.go`, `pipeline_template_pdf_diagram.go` và tests; API/frontend download contract không đổi.
+- Đã bỏ hoàn toàn page/style/renderer tổng quan; trang đầu dùng renderer topology đầy đủ với tiêu đề `1. SƠ ĐỒ`.
+- Đã giữ card hai dòng `Tên node` + `Loại | N steps.` và toàn bộ nhãn connector tối đa hai dòng; empty/no-edge/dangling/cycle fallback không đổi.
+- Đã đổi bảng Node thành section 2 và Checklist/Step thành section 3; fixture 13 node giảm từ 6 còn 5 trang.
+- Đã thay overview-label regression bằng kiểm tra một diagram hiển thị mọi connector label và cập nhật central/backend/frontend/workflow mappings.
+- Không đổi route, handler/service contract, frontend, database, permission, audit, runtime, dependency hoặc migration.
+- Validation đạt: focused/full backend tests, `go mod verify`, Pipeline Builder production build/regression check, `git diff --check` và Poppler visual QA toàn bộ 5 trang A4 ngang.
+- Browser verification được bỏ qua đúng guardrail vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+## Pipeline Template PDF Overview + Detail
+
+Status: complete
+
+Mục đích chính:
+- Tách sơ đồ tổng quan dễ đọc khỏi sơ đồ chi tiết đầy đủ để PDF trình bày rõ tuyến chính, nhánh quyết định và toàn bộ nhãn connector mà không nhồi nội dung vào một trang.
+
+Will be done:
+- Trang 1 dùng topology document-first với card một dòng, chỉ hiển thị nhãn tại node phân nhánh và lời dẫn sang trang chi tiết.
+- Trang 2 dùng topology document-first với compact card hai dòng `Tên node` và `Loại | N steps.`, toàn bộ nhãn connector tối đa hai dòng.
+- Bỏ phụ thuộc tọa độ/connector-side của canvas trong PDF; source/target/label vẫn lấy đúng revision template hiện tại.
+- Đổi bảng Node thành section 3 và Checklist/Step thành section 4; giữ empty/no-edge/dangling/cycle fallback rõ ràng.
+- Không đổi endpoint, frontend, database, permission, audit hoặc runtime; không thêm dependency hay migration.
+- Bổ sung topology/overview/detail/label regression tests, cập nhật central/backend/frontend/workflow mappings, chạy backend checks và render Poppler kiểm tra toàn bộ PDF.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User đã chọn phương án `Overview + Detail` và duyệt review package/Mockup as Text bằng `OK triển khai`.
+- Đã tải mandatory central/backend/workflow mappings cùng backend/PDF guardrails; owner chính là `pipeline_template_pdf_diagram.go`, route/handler/service và frontend download contract giữ nguyên.
+- Đã xác nhận root cause hiện hữu: PDF dùng card canvas `236x136`, auto-layout theo lưới `order_index` không đọc topology và label fallback có thể rút xuống 10mm.
+- Đã tách PDF thành trang 1 `SƠ ĐỒ TỔNG QUAN`, trang 2 `SƠ ĐỒ CHI TIẾT`, rồi section 3 Node và section 4 Checklist/Step; trường hợp không có node không tạo trang chi tiết rỗng.
+- Đã thay renderer bằng topology phân tầng 5 cột, lane riêng cho nhánh và gutter cho connector chuyển hàng; cả hai diagram không phụ thuộc tọa độ/connector-side canvas.
+- Overview dùng card một dòng và chỉ hiện nhãn ở node quyết định; Detail dùng card hai dòng `Tên node` + `Loại | N steps.` và hiển thị đủ nhãn connector tối đa hai dòng.
+- Đã bổ sung fallback no-edge/cycle theo thứ tự node ổn định, bỏ dangling edge kèm cảnh báo, và regression tests cho topology, nhánh/merge, band wrap, cycle, compact card cùng label placement.
+- Đã cập nhật central/backend/frontend/workflow mappings; không cần cập nhật API, frontend, database, permission, audit, runtime, dependency hoặc migration.
+- Validation đạt: focused backend test, full backend test, module verification, Pipeline Builder contract check, `git diff --check` và render Poppler A4 ngang 6 trang; đã kiểm tra trực quan toàn bộ trang, trong đó hai trang diagram có 13 node/13 connector và nhãn nhánh bám đúng cạnh.
+- Browser verification được bỏ qua đúng guardrail vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+## Pipeline Template PDF Diagram
+
+Status: complete
+
+Mục đích chính:
+- Thêm sơ đồ vector của revision Workflow đang chọn vào trang đầu PDF để người đọc nắm luồng Node/Connector trước khi xem bảng cấu hình chi tiết.
+
+Will be done:
+- Mở rộng PDF document model với node ID/vị trí và connector source/target/label/diagram metadata từ template detail hiện hữu.
+- Vẽ diagram vector A4 ngang: dùng vị trí đã lưu khi đủ rõ, tự sắp xếp khi thiếu/quá giãn, giữ connector-side thủ công, route trực giao và nhãn connector.
+- Đặt `1. SƠ ĐỒ WORKFLOW` ở trang đầu; đổi bảng Node thành section 2 và Checklist/Step thành section 3.
+- Hiển thị trạng thái không có node, không có connector và cảnh báo connector thiếu source/target; không làm hỏng toàn bộ PDF draft.
+- Không đổi endpoint, frontend button, database, permission, audit hoặc runtime; không thêm dependency.
+- Bổ sung unit/regression tests, cập nhật central/backend/frontend/workflow mappings, chạy format/test/build và render Poppler kiểm tra mẫu phân nhánh nhiều trang.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User đã duyệt review package và Mockup as Text bằng `OK triển khai`.
+- Đã tải mandatory central/backend/frontend/workflow mappings cùng impact/PDF guardrails và xác nhận owner chính là backend PDF renderer.
+- Đã xác nhận template detail đã trả `edges`, node có tọa độ đã lưu và connector-side thủ công nằm trong `condition_config.diagram`; không cần API hoặc schema mới.
+- Đã ghi nhận routing tương tác đầy đủ hiện chạy ở frontend; PDF sẽ dùng renderer vector riêng, không xuất grid/zoom/selection/editor chrome và không thay đổi canvas/runtime.
+- Đã mở rộng document mapper với node ID/tọa độ, edge source/target/label/priority và connector-side metadata; giữ nguyên API, permission và frontend download flow.
+- Đã thêm renderer vector trang đầu với node card, connector trực giao, mũi tên, nhãn cạnh, saved-layout/fitted-auto-layout và trạng thái rỗng/cạnh treo; bảng Node/Checklist chuyển thành section 2/3.
+- Đã bổ sung regression test cho saved layout, manual connector sides, auto-layout fallback, dangling edge và alias metadata; focused backend test đang đạt.
+- Đã cập nhật central/backend/frontend/workflow mappings cho diagram export contract.
+- Đã bổ sung kiểm tra saved-layout không chồng node và bộ đặt nhãn connector tránh node/nhãn khác; sơ đồ giữ nhãn rõ ràng kể cả khoảng nối ngắn.
+- Validation đạt: focused `go test ./internal/core`, full `go test ./...`, `go mod verify`, `npm run check:pipeline-builder` và `git diff --check`; Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Đã render mẫu cuối bằng Poppler: PDF A4 ngang 5 trang, trang 1 có 13 node/13 connector phân nhánh, Unicode/metadata/footer đúng và toàn bộ nhãn connector hiển thị không bị node che. Browser verification được bỏ qua đúng guardrail vì người dùng không yêu cầu.
+
+## Workflow Forms UI Redesign
+
+Status: complete
+
+Mục đích chính:
+- Giúp quản trị viên tìm đúng biểu mẫu, nhận biết rõ template/version đang dùng và chỉnh draft rồi phát hành an toàn mà không nhầm với phiên bản lịch sử.
+
+Will be done:
+- Tổ chức lại `/workflow-forms` thành thư viện biểu mẫu gọn bên trái và workspace template/version có thứ bậc rõ bên phải; màn hình hẹp dùng bộ chọn template phía trên.
+- Việt hóa nhãn nghiệp vụ, ưu tiên tên field trước khóa kỹ thuật và giữ nguyên số liệu field/pipeline step/instance từ API hiện hữu.
+- Thu gọn draft field thành danh sách mở rộng, đưa JSON vào cấu hình nâng cao và giữ nguyên validation/payload hiện có.
+- Thêm trạng thái draft chưa lưu, cảnh báo trước khi chuyển template/version hoặc rời trang và dialog xác nhận publish/archive.
+- Giữ published version bất biến; không đổi route, API, database, permission hoặc workflow runtime.
+- Cập nhật central/frontend/workflow mappings, chạy frontend build, lint và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User đã duyệt review package và Mockup as Text bằng `OK triển khai`.
+- Đã tải mandatory central/frontend/workflow mappings cùng frontend UI và workflow orchestration guardrails.
+- Đã xác nhận thư viện/detail API hiện hữu cung cấp đủ template status/type, version status, field count, step usage count và instance count; không cần backend contract mới.
+- Đã xác nhận owner chính là `frontend/src/modules/workflow-forms/WorkflowFormsPage.tsx`; các thay đổi khác trong worktree thuộc công việc hiện hữu và sẽ được giữ nguyên.
+- Đã tái cấu trúc trang thành thư viện/workspace có thứ bậc rõ: desktop dùng thư viện sticky 320px với danh sách gọn, màn hình hẹp dùng bộ chọn template đã lọc; loading, lỗi, không có kết quả và chưa có version đều có trạng thái riêng.
+- Đã Việt hóa nhãn thao tác/loại form/loại field, ưu tiên tên nghiệp vụ trước khóa kỹ thuật và hiển thị đúng field/step/instance metrics từ managed-template contract hiện hữu.
+- Đã thay bảng published thành desktop table/mobile cards chỉ đọc; draft dùng field accordion, cấu hình JSON nâng cao thu gọn, inline validation và CTA theo trạng thái.
+- Đã thêm dirty-state fingerprint, badge `Chưa lưu`, `beforeunload`, React Router blocker và cảnh báo trước khi chuyển template/version/tạo template hoặc rời route; editor khóa trong lúc mutation đang chạy.
+- Đã thêm shared confirmation dialogs cho publish, archive template và archive version; publish nhắc rõ phiên bản trở thành bất biến. Đường metadata chỉ cho khôi phục template đã lưu trữ, không cho bypass archive confirmation.
+- Đã giữ nguyên API, route, database, permission và runtime; không có backend/domain type/migration change.
+- Đã cập nhật central/frontend/workflow mappings cho UI contract và published/draft invariant.
+- Validation đạt: `npm run lint`, production `npm run build` và `git diff --check`. Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Browser verification được bỏ qua đúng quy định vì người dùng không yêu cầu điều khiển browser trong turn này.
+
+## Pipeline Template PDF Export
+
+Status: complete
+
+Mục đích chính:
+- Cho phép người có `pipeline.view` tải tài liệu PDF mô tả chính xác revision Pipeline Builder đang chọn mà không thay đổi template hoặc runtime lịch sử.
+
+Will be done:
+- Thêm `GET /pipeline-templates/:id/pdf` chỉ đọc, dùng dữ liệu template-detail hiện hữu và bảo vệ bằng `pipeline.view`.
+- Sinh PDF A4 ngang với font Unicode tiếng Việt nhúng trong backend; phần node gồm tên, mô tả, loại, phân quyền, role duyệt, yêu cầu ý kiến và cấm người gửi tự duyệt; phần step gồm tên, loại và role phụ trách theo từng node.
+- Thêm nút `Xuất PDF` sau `Kiểm tra`, hỗ trợ loading/disabled, tải file tự động và toast thành công/lỗi; giữ toolbar responsive và published revision chỉ đọc.
+- Không thêm migration, không lưu artifact và không ghi audit; export là snapshot tải trực tiếp tương tự báo cáo.
+- Bổ sung backend/frontend regression checks, cập nhật central/backend/frontend/workflow mappings, chạy format/test/build và render PDF sang PNG để kiểm tra bố cục.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User đã duyệt review package và Mockup as Text bằng `OK triển khai`.
+- Đã tải mandatory central/backend/frontend/workflow mappings cùng impact/PDF guardrails và xác nhận owner files.
+- Đã xác nhận worktree đang có thay đổi chưa commit ở các owner files; implementation sẽ chèn thay đổi có mục tiêu và không ghi đè công việc hiện hữu.
+- Đã thêm protected `GET /pipeline-templates/:id/pdf`, `GetTemplatePDF`, service/repository lookup và generator A4 ngang nhúng Noto Sans theo SIL OFL; phiên bản `codeberg.org/go-pdf/fpdf v0.11.0` giữ tương thích module Go 1.23.
+- Đã xuất đầy đủ metadata revision/status, bảng node với permission/approval policy và bảng checklist/step theo node; empty state, row wrapping, repeated header, node continuation và footer nhiều trang đều được xử lý.
+- Đã thêm nút `Xuất PDF` sau `Kiểm tra`, tải bằng `downloadBlob`, đặt tên `workflow-<slug>-rev-<n>.pdf`, khóa khi template/loading đang chờ và hiển thị toast thành công/lỗi.
+- Đã bổ sung unit test mapping/generation và frontend source regression check; `go test ./...`, `go mod verify`, `npm run check:pipeline-builder` và `git diff --check` đều pass.
+- Đã render kiểm tra mẫu Unicode cuối với Poppler: A4 ngang, metadata đúng múi giờ, tiếng Việt/empty state đúng; stress test 13 node ngắt 4 trang đúng. Browser verification được bỏ qua đúng theo guardrail.
+- Đã cập nhật central/backend/frontend/workflow mappings; không có migration vì export chỉ đọc, không lưu artifact và không ghi audit.
+
+## Workflow Navigation Group
+
+Status: complete
+
+Mục đích chính:
+- Tách công cụ cấu hình workflow khỏi nhóm tác nghiệp `Làm việc` và đưa Pipeline Builder cùng Workflow Forms vào một nhóm điều hướng dễ tìm.
+
+Will be done:
+- Xóa mục `Workflow` cũ khỏi `Làm việc`; thêm nhóm `Workflow` giữa `Làm việc` và `Quản trị`.
+- Thêm `Pipeline builder` trỏ tới `/pipeline-builder` và `Workflow Forms` trỏ tới `/workflow-forms`, cùng giữ quyền `pipeline.view`.
+- Giữ Pipeline Builder ở chế độ toàn màn hình và giữ responsive sidebar hiện tại; không đổi route, API, database hoặc workflow runtime.
+- Cập nhật central/frontend mappings, chạy frontend build và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User đã duyệt review package và Mockup as Text bằng `OK triển khai`.
+- Đã tải mandatory central/frontend/workflow mappings và frontend UI guardrails.
+- Đã xác nhận `/workflow-forms` đã có route với `pipeline.view`; thiếu sót chỉ nằm ở cấu hình sidebar `navGroups`.
+- Đã xóa mục `Workflow` khỏi `Làm việc`, thêm nhóm `Workflow` giữa `Làm việc` và `Quản trị`, đồng thời thêm `Pipeline builder` và `Workflow Forms` với icon và active state hiện hữu.
+- Đã giữ nguyên `pipeline.view`, cơ chế ẩn group rỗng, Pipeline Builder toàn màn hình và sidebar responsive hiện tại; không đổi route, API, database, runtime hoặc frontend domain contract.
+- Đã cập nhật central/frontend mappings cho navigation mới. Workflow domain map không cần cập nhật vì không có invariant template/runtime/form nào thay đổi.
+- Frontend production build đạt; Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Browser verification được bỏ qua đúng quy định vì người dùng không yêu cầu điều khiển browser trong turn này.
+
+## Published Connector Inspector Read-Only View
+
+Status: complete
+
+Mục đích chính:
+- Cho phép mở xem đầy đủ cấu hình connector trên revision Pipeline Builder đã phát hành mà không mở đường ghi vào cấu trúc workflow.
+
+Will be done:
+- Render Connector Inspector khi connector được chọn ở draft hoặc published; published và người chỉ có quyền xem dùng mode read-only.
+- Ẩn nút Lưu, khóa label/condition/config/priority và giữ source/target/edge metadata cùng trạng thái loading/error có thể đọc được.
+- Giữ thay đổi port cùng node ở canvas tách biệt với cấu hình connector; không đổi backend, API, database, definition hash hoặc runtime copy.
+- Bổ sung focused regression check, cập nhật central/frontend/workflow mappings và chạy Pipeline Builder check, lint, `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User đã duyệt review package và Mockup as Text bằng `OK triển khai`.
+- Đã tải mandatory central/frontend/root-cause/workflow mappings cùng frontend/diagnosis guardrails.
+- Đã xác nhận connector selection và edge form hoạt động; root cause là điều kiện `!isReadOnly && selectedConnector` loại Inspector khỏi published, trong khi `EdgeInspectorPanel` chưa có read-only mode.
+- Trước triển khai, source-level pass/fail signal thất bại đúng triệu chứng: `published connector selection is gated out by !isReadOnly`.
+- Đã render Connector Inspector cho mọi connector được chọn; draft có `pipeline.edit` giữ mode chỉnh sửa, còn published/người chỉ xem nhận mode read-only với badge phù hợp.
+- Đã ẩn Save, khóa label/condition/config/priority, thêm callback defense guards và giữ raw condition/form-field keys có thể đọc khi catalog phụ trợ thiếu hoặc lỗi.
+- Đã bổ sung source-level regression check và cập nhật central/frontend/root-cause/workflow mappings; không cần backend, API contract, migration hoặc shared domain type change.
+- Feedback loop đã chuyển sang PASS: `published connector selection can render the read-only inspector`.
+- Validation đạt: `npm run check:pipeline-builder`, `npm run lint` và `git diff --check`. Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Browser verification được bỏ qua đúng quy định vì người dùng không yêu cầu điều khiển browser trong turn này.
+
+## Published Pipeline Builder Layout Editing
+
+Status: complete
+
+Mục đích chính:
+- Cho phép người có `pipeline.edit` chỉnh bố cục của revision Pipeline Builder đã phát hành mà không thay đổi cấu trúc, điều kiện chuyển bước hoặc runtime lịch sử.
+
+Will be done:
+- Thêm API layout nguyên tử cho vị trí node và cạnh bám source/target của connector; endpoint chỉ nhận metadata trình bày, giữ nguyên node liên kết và ghi audit.
+- Tách UI thành ba mode `full`/`layout`/`view`: published cho kéo node, tự sắp xếp vị trí và đổi port trên đúng node hiện tại; mọi structural edit vẫn khóa.
+- Giữ `order_index`, `from_node_id`, `to_node_id`, điều kiện, label, step/form và `definition_hash` đã phát hành không đổi; metadata bố cục không tham gia definition hash mới.
+- Bổ sung focused backend/frontend regression checks; cập nhật central/backend/frontend/workflow mappings; chạy backend tests, Pipeline Builder check và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User đã duyệt review package và Mockup as Text bằng `OK triển khai`.
+- Đã tải mandatory central/backend/frontend/workflow mappings cùng backend/frontend/impact guardrails.
+- Đã xác nhận runtime không snapshot vị trí node và edge condition engine bỏ qua `condition_config.diagram`; thay đổi được giới hạn an toàn ở lớp template presentation.
+- Đã xác nhận code hiện tại khóa published bằng một `isReadOnly` chung ở frontend và `ensureDraftTemplate` chung ở backend, khiến node kéo tạm thời nhưng không được lưu và endpoint connector bị khóa hoàn toàn.
+- Đã thêm `PUT /pipeline-templates/:id/layout` với `pipeline.edit`, validation, transaction và audit; payload chỉ nhận tọa độ node cùng source/target side, còn endpoint node được lấy từ connector hiện hữu.
+- Đã loại tọa độ node và `condition_config.diagram` khỏi definition hash mới nhưng vẫn giữ các business condition keys trong hash.
+- Đã tách Pipeline Builder thành `full`/`layout`/`view`; published có quyền edit layout cho kéo node, Auto Layout nguyên tử và reconnect port trên đúng endpoint node, trong khi toàn bộ structural controls vẫn khóa.
+- Đã bổ sung backend unit tests và source-level Pipeline Builder regression checks cho layout contract.
+- Đã cập nhật central/backend/frontend/workflow mappings; không cần migration vì tái sử dụng `position_x`, `position_y` và `condition_config.diagram` hiện hữu.
+- Validation đạt: `go test ./...`, `npm run check:pipeline-builder`, `npm run lint` và `git diff --check`. Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Browser verification được bỏ qua đúng quy định vì người dùng không yêu cầu điều khiển browser trong turn này.
+
+## Pipeline Builder Node Type Vietnamese Labels
+
+Status: complete
+
+Mục đích chính:
+- Hiển thị nhãn nghiệp vụ tiếng Việt cho toàn bộ node type chính thức trong Pipeline Builder, đặc biệt `contract`, `construction_planning` và `incoming_acceptance`, trong khi vẫn giữ nguyên enum kỹ thuật ở API/database.
+
+Will be done:
+- Dùng một danh sách node type dùng chung cho Node Inspector và regression test; bổ sung ba nhãn đã duyệt cùng màu chip tương ứng.
+- Không đổi API, database, migration, template/runtime state hoặc kích thước/bố cục node card.
+- Bổ sung focused presentation test; cập nhật central/frontend/root-cause/workflow mappings; chạy frontend test, lint, build, pipeline-builder check và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User đã duyệt review package với mapping `contract` → `Hợp đồng`, `construction_planning` → `Kế hoạch thi công`, `incoming_acceptance` → `Nghiệm thu đầu vào`.
+- Đã tải central/frontend/root-cause/workflow mappings và frontend/diagnose/workflow guardrails.
+- Đã tái hiện bằng feedback loop: `enumLabel('node_type', value)` trả nguyên ba enum trên, trong khi `construction` và `acceptance` đã trả nhãn tiếng Việt.
+- Root cause đã xác nhận: `NodeCard` dùng đúng shared `EnumChip`, nhưng `status.ts`, tone map và danh sách Node Inspector đều thiếu ba node type chính thức.
+- Đã thêm `nodeTypeValues` làm danh sách dùng chung, bổ sung ba nhãn tiếng Việt và tone chip; Node Inspector dùng trực tiếp cùng danh sách nên thẻ node và trường chọn không còn lệch nhau.
+- Đã giữ nguyên API/database enum và raw fallback cho node type tương lai; không đổi layout, template/runtime state hoặc backend contract.
+- Đã thêm focused test cho ba mapping, shared Inspector options và fallback; tích hợp test vào `check:pipeline-builder`.
+- Đã cập nhật central/frontend/root-cause/workflow mappings cho presentation contract và đường chẩn đoán raw enum. Backend mapping không cần cập nhật vì không có route, handler, service, repository hoặc API contract nào thay đổi.
+- Validation đạt: focused node-type tests `3/3`, `npm run lint`, production build và Pipeline Builder diagram regression check. Vite chỉ báo lại cảnh báo chunk-size hiện có; `git diff --check` sạch.
+- Browser verification được bỏ qua vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+## Official Workflow “Đầu Vào” Terminology
+
+Status: complete
+
+Mục đích chính:
+- Dùng `đầu vào` làm tên gọi chung cho tổ đội, thầu phụ và nhà cung cấp vật tư trong các nhãn tổng hợp của workflow `40000000-0000-0000-0000-000000000021`, đồng thời giữ tên đối tượng cụ thể tại các nghiệp vụ cần phân biệt.
+
+Will be done:
+- Thêm migration additive V69; không sửa V68 đã áp dụng và không thay đổi checksum migration lịch sử.
+- Rút gọn ba checklist tổng hợp, tên hai form template, mô tả/điều kiện thoát của node `Đầu Vào` và nhãn cạnh chuyển bước theo wording đã duyệt.
+- Đồng bộ các snapshot hiển thị của revision 2 hiện có mà không đổi role, trạng thái, form schema/answer, approval, audit hoặc PDF.
+- Đồng bộ seed, regression tests và central/backend/workflow mappings; chạy migration check, backend tests và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- User xác nhận `tổ đội, thầu phụ và nhà cung cấp vật tư` được gọi chung là `đầu vào` và đã duyệt review package triển khai.
+- Đã tải mandatory central/backend/workflow mappings cùng backend/custom migration guardrails; xác nhận Pipeline Builder lấy wording từ template/backend data, không cần đổi frontend component hoặc API contract.
+- Đã xác nhận các nhãn nghiệp vụ cần giữ đối tượng cụ thể: đàm phán thầu phụ, nghiệm thu thầu phụ/tổ đội, nghiệm thu vật tư, hồ sơ/thanh toán/hóa đơn thầu phụ.
+- Đã thêm additive V69, giữ nguyên checksum V68: chuẩn hóa ba checklist tổng hợp, hai form-template title, mô tả/exit text của node `Đầu Vào`, edge label và các snapshot hiển thị revision 2 hiện có; không đổi role, assignment, trạng thái, form schema/answer, approval, audit hoặc PDF.
+- Đã đồng bộ resettable seed cho revision-1 source steps/node/edge; V66 clone và V69 tiếp tục đảm bảo revision 2 nhận cùng wording trên fresh database.
+- Đã bổ sung regression assertions cho wording tổng hợp, wording đối tượng cụ thể cần giữ, node/edge và form template; cập nhật central/backend/workflow mappings. Không cần cập nhật frontend/admin mapping cho V69 vì không có UI/API/RBAC behavior nào thay đổi.
+- Validation đạt: migration checker nhận đủ 69 migration, clean PostgreSQL chạy V1–V69, focused DB regression test pass, seed chạy thành công và trả đúng `3` step + `1` node + `1` edge, full backend test suite pass, `gofmt` và `git diff --check` sạch.
+- Đã áp dụng V69 vào database local đang phục vụ UI (`1` applied, `68` skipped) và đọc lại đúng ba step, node/exit, edge cùng hai form-template title. Database và Docker images kiểm thử tạm đã được xóa.
+- Browser verification được bỏ qua vì người dùng không yêu cầu điều khiển browser; thay vào đó đã xác minh trực tiếp dữ liệu mà Pipeline Builder đọc.
+
+## Official Workflow Revision 2 Wording And Responsibility Roles
+
+Status: complete
+
+Mục đích chính:
+- Làm tên node/checklist của workflow `40000000-0000-0000-0000-000000000021` ngắn, hành động-trước; tách vai trò/phụ trách khỏi title mà vẫn giữ đúng quyền thao tác work item.
+
+Will be done:
+- Đổi node `Đầu Vào: Tổ Đội / Thầu Phụ / Cung cấp vật tư` thành `Đầu Vào` và chuẩn hóa đủ 53 step đã duyệt, chuyển chi tiết note cần thiết xuống description.
+- Thêm các role `Thiết kế`, `Sale`, `Pháp lý`; ánh xạ wording `Đội kỹ thuật` sang role hiện có `Đội thi công`; cấp đúng các permission tối thiểu cần cho các step được gán.
+- Dùng migration additive V68 để cập nhật template revision 2 và các snapshot hiển thị liên quan mà không đổi trạng thái, form answer, approval, audit hay PDF.
+- Đồng bộ seed, regression tests và central/backend/workflow/admin mappings; chạy migration check, backend tests, seed validation phù hợp và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu trong turn triển khai.
+
+Done:
+- User approved the wording review package, then explicitly approved creating `Thiết kế`, `Sale`, `Pháp lý` and mapping `Đội kỹ thuật` to `Đội thi công`.
+- Loaded mandatory central/backend/workflow/admin mappings plus backend and custom database migration guardrails.
+- Confirmed V66 owns revision 2 with 13 nodes and 53 steps; step roles are copied into runtime steps, work items, assignments and form instances, so role updates must preserve actionability.
+- Added additive V68 with all 53 approved action-first titles, node `Đầu Vào`, structured template responsibility roles and display-snapshot wording updates for existing revision-2 runs, work items and form instances. Existing runtime role/assignment snapshots, statuses, answers, approvals, audit and PDF artifacts remain unchanged.
+- Added system roles `Thiết kế`, `Sale`, `Pháp lý` with self-contained minimum permission keys/grants; mapped the reviewed technical responsibility to `Đội thi công` and added its pipeline/planning permissions without auto-assigning users or project members.
+- Synchronized the resettable base seed for all 52 revision-1 source steps, the input node, contract permissions and role grants so a later V66/V68 migration path and a fresh local seed present the same wording model.
+- Added DB regression coverage for revision 2: published 13-node/53-step shape, zero note/role punctuation in titles, representative exact title/role mappings, new roles and their minimum permission grants.
+- Updated central/backend/workflow/admin mappings for V68 ownership, action-first wording, responsibility-role handling and the runtime-role preservation invariant. No frontend mapping update was required because no UI route, component, client contract or presentation helper changed.
+- Validation passed: migration checker (`68` migrations), clean PostgreSQL V1–V68 execution, focused DB regression test, full backend test suite, disposable seed execution (`52` source steps, `0` unclean titles, `3` new roles, `Đội thi công` has `planning.edit`) and `git diff --check`. All disposable databases/image were removed; the main local database was not migrated or reseeded.
+- Browser verification was skipped because the user did not explicitly request it and this change has no frontend code.
+
 ## Handover Linked Checklist Source Viewing
 
 Status: complete

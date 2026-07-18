@@ -25,6 +25,23 @@ type ActionRequest struct {
 	Reason  string `json:"reason"`
 }
 
+type PipelineTemplateLayoutRequest struct {
+	Nodes []PipelineTemplateNodeLayoutRequest `json:"nodes"`
+	Edges []PipelineTemplateEdgeLayoutRequest `json:"edges"`
+}
+
+type PipelineTemplateNodeLayoutRequest struct {
+	ID        string `json:"id"`
+	PositionX int    `json:"position_x"`
+	PositionY int    `json:"position_y"`
+}
+
+type PipelineTemplateEdgeLayoutRequest struct {
+	ID         string `json:"id"`
+	SourceSide string `json:"source_side"`
+	TargetSide string `json:"target_side"`
+}
+
 type PayableCreateRequest struct {
 	ProjectID       string  `json:"project_id"`
 	PayableCode     string  `json:"payable_code"`

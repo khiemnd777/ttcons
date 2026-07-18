@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { del, get, post, put } from '../../lib/api/client';
+import { del, downloadBlob, get, post, put } from '../../lib/api/client';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { useToast } from '../../components/ToastProvider';
 import { Dialog } from '../../components/Dialog';
+import { useAuth } from '../../lib/auth/AuthContext';
 import type { PipelineEdgeConditionDefinition, PipelineNode, PipelineTemplate, PipelineTemplateEdge, WorkflowFormCatalogItem } from '../../lib/types/domain';
 import { PipelineBuilderShell } from './components/PipelineBuilderShell';
 import { TemplateSidebar } from './components/TemplateSidebar';
@@ -15,9 +16,10 @@ import { NodeInspectorPanel } from './components/NodeInspectorPanel';
 import { EdgeInspectorPanel } from './components/EdgeInspectorPanel';
 import { DiagramCanvas } from './components/diagram/DiagramCanvas';
 import { autoLayoutPosition, nextNodePosition } from './components/diagram/diagramConstants';
-import type { NodePosition } from './components/diagram/diagramTypes';
+import type { DiagramEditingMode, NodePosition } from './components/diagram/diagramTypes';
 import {
   buildCreateEdgePayload,
+  buildUpdateEdgeLayoutPayload,
   buildUpdateEdgePayload,
   type ConnectorCreateInput,
   type ConnectorReconnectInput,
@@ -64,10 +66,12 @@ export function PipelineBuilderPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { hasPermission } = useAuth();
   const [selectedTemplateId, setSelectedTemplateId] = useState(id ?? '');
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [selectedConnectorId, setSelectedConnectorId] = useState('');
   const [detailsNodeId, setDetailsNodeId] = useState('');
+  const [nodePositionResetToken, setNodePositionResetToken] = useState(0);
   const [templatesExpanded, setTemplatesExpanded] = useState(true);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [templateNameForm, setTemplateNameForm] = useState('');
@@ -128,7 +132,13 @@ export function PipelineBuilderPage() {
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const selectedNode = selectedNodeId ? nodeById.get(selectedNodeId) : undefined;
   const selectedConnector = selectedConnectorId ? rawEdges.find((edge) => String(edge.id) === selectedConnectorId) : undefined;
-  const isReadOnly = Boolean(template.data && template.data.status !== 'draft');
+  const templateStatus = String(template.data?.status ?? '');
+  const isPublished = templateStatus === 'published';
+  const hasPipelineEditPermission = hasPermission('pipeline.edit');
+  const canEditLayout = Boolean(template.data && hasPipelineEditPermission && (templateStatus === 'draft' || templateStatus === 'published'));
+  const canEditStructure = Boolean(template.data && hasPipelineEditPermission && templateStatus === 'draft');
+  const isReadOnly = Boolean(template.data && !canEditStructure);
+  const diagramEditingMode: DiagramEditingMode = canEditStructure ? 'full' : canEditLayout ? 'layout' : 'view';
   const answerFieldOptions = useMemo(() => {
     if (!selectedConnector) return [];
     const sourceNode = nodeById.get(String(selectedConnector.from_node_id));
@@ -276,6 +286,26 @@ export function PipelineBuilderPage() {
     onError: (error) => toast.error('Không clone được template', error),
   });
 
+  const exportPDF = useMutation({
+    mutationFn: async () => {
+      if (!selectedTemplateId || !template.data) throw new Error('Chưa tải xong workflow template');
+      const blob = await downloadBlob(`/pipeline-templates/${selectedTemplateId}/pdf`);
+      return { blob, filename: pipelineTemplatePDFDownloadName(template.data) };
+    },
+    onSuccess: ({ blob, filename }) => {
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      toast.success('Đã xuất PDF workflow');
+    },
+    onError: (error) => toast.error('Không xuất được PDF workflow', error),
+  });
+
   const updateTemplateName = useMutation({
     mutationFn: () => {
       if (!selectedTemplateId) throw new Error('Chưa chọn template');
@@ -360,15 +390,24 @@ export function PipelineBuilderPage() {
   });
 
   const saveNodePosition = useMutation({
-    mutationFn: ({ nodeId, position }: { nodeId: string; position: NodePosition }) =>
-      put(`/pipeline-nodes/${nodeId}`, {
-        position_x: Math.round(position.x),
-        position_y: Math.round(position.y),
+    mutationFn: ({ templateId, nodeId, position }: { templateId: string; nodeId: string; position: NodePosition }) =>
+      put<PipelineTemplate>(`/pipeline-templates/${templateId}/layout`, {
+        nodes: [{
+          id: nodeId,
+          position_x: Math.round(position.x),
+          position_y: Math.round(position.y),
+        }],
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline-template', selectedTemplateId] });
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['pipeline-template', updated.id], updated);
+      queryClient.invalidateQueries({ queryKey: ['pipeline-templates'] });
+      toast.success('Đã lưu vị trí node');
     },
-    onError: (error) => toast.error('Không lưu được vị trí node', error),
+    onError: (error, variables) => {
+      setNodePositionResetToken((current) => current + 1);
+      queryClient.invalidateQueries({ queryKey: ['pipeline-template', variables.templateId] });
+      toast.error('Không lưu được vị trí node', error);
+    },
   });
 
   const createEdge = useMutation({
@@ -413,6 +452,22 @@ export function PipelineBuilderPage() {
       toast.success('Đã cập nhật connector');
     },
     onError: (error) => toast.error('Không cập nhật được connector', error),
+  });
+
+  const updateEdgeLayout = useMutation({
+    mutationFn: ({ templateId, input }: { templateId: string; input: ConnectorReconnectInput }) =>
+      put<PipelineTemplate>(`/pipeline-templates/${templateId}/layout`, {
+        edges: [buildUpdateEdgeLayoutPayload(input)],
+      }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['pipeline-template', updated.id], updated);
+      queryClient.invalidateQueries({ queryKey: ['pipeline-templates'] });
+      toast.success('Đã lưu điểm nối connector');
+    },
+    onError: (error, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['pipeline-template', variables.templateId] });
+      toast.error('Không lưu được điểm nối connector', error);
+    },
   });
 
   const saveEdgeSettings = useMutation({
@@ -695,44 +750,30 @@ export function PipelineBuilderPage() {
 
   const autoLayout = useMutation({
     mutationFn: async () => {
+      const templateId = selectedTemplateId;
+      if (!templateId) throw new Error('Chưa chọn template');
       const updates = nodes.map((node, index) => ({
         nodeId: node.id,
         position: autoLayoutPosition(index),
-        orderIndex: index + 1,
       }));
-      await Promise.all(
-        updates.map((update) =>
-          put(`/pipeline-nodes/${update.nodeId}`, {
-            position_x: update.position.x,
-            position_y: update.position.y,
-            order_index: update.orderIndex,
-          }),
-        ),
-      );
-      return updates;
-    },
-    onSuccess: (updates) => {
-      const updateById = new Map(updates.map((update) => [update.nodeId, update]));
-      queryClient.setQueryData<PipelineTemplate>(['pipeline-template', selectedTemplateId], (current) => {
-        if (!current?.nodes) return current;
-        return {
-          ...current,
-          nodes: current.nodes.map((node) => {
-            const update = updateById.get(node.id);
-            if (!update) return node;
-            return {
-              ...node,
-              position_x: update.position.x,
-              position_y: update.position.y,
-              order_index: update.orderIndex,
-            };
-          }),
-        };
+      const updated = await put<PipelineTemplate>(`/pipeline-templates/${templateId}/layout`, {
+        nodes: updates.map((update) => ({
+          id: update.nodeId,
+          position_x: update.position.x,
+          position_y: update.position.y,
+        })),
       });
-      invalidate();
+      return { updated, templateId };
+    },
+    onSuccess: ({ updated, templateId }) => {
+      queryClient.setQueryData(['pipeline-template', templateId], updated);
+      queryClient.invalidateQueries({ queryKey: ['pipeline-templates'] });
       toast.success('Đã tự sắp xếp node');
     },
-    onError: (error) => toast.error('Không tự sắp xếp được node', error),
+    onError: (error) => {
+      if (selectedTemplateId) queryClient.invalidateQueries({ queryKey: ['pipeline-template', selectedTemplateId] });
+      toast.error('Không tự sắp xếp được node', error);
+    },
   });
 
   const selectTemplate = (item: PipelineTemplate) => {
@@ -782,16 +823,42 @@ export function PipelineBuilderPage() {
     navigate('/projects');
   };
 
-  const connectorMutationPending = createEdge.isPending || updateEdge.isPending || deleteEdge.isPending || saveEdgeSettings.isPending;
-  const canDeleteSelection = Boolean(selectedConnector || selectedNode);
+  const connectorMutationPending =
+    createEdge.isPending ||
+    updateEdge.isPending ||
+    updateEdgeLayout.isPending ||
+    deleteEdge.isPending ||
+    saveEdgeSettings.isPending ||
+    saveNodePosition.isPending ||
+    autoLayout.isPending;
+  const canDeleteSelection = canEditStructure && Boolean(selectedConnector || selectedNode);
   const deleteSelectionLabel = selectedConnector ? 'Xóa connector' : 'Xóa node';
   const deleteSelectionPending = selectedConnector ? deleteEdge.isPending : deleteNode.isPending;
   const deleteSelection = () => {
+    if (!canEditStructure) return;
     if (selectedConnector) {
       deleteEdge.mutate(String(selectedConnector.id));
       return;
     }
     if (selectedNodeId) deleteNode.mutate(selectedNodeId);
+  };
+
+  const reconnectConnector = (input: ConnectorReconnectInput) => {
+    if (diagramEditingMode === 'full') {
+      updateEdge.mutate(input);
+      return;
+    }
+    if (diagramEditingMode !== 'layout' || !selectedTemplateId) return;
+
+    const edge = rawEdges.find((candidate) => String(candidate.id) === input.connectorId);
+    if (!edge || String(edge.from_node_id) !== input.source.nodeId || String(edge.to_node_id) !== input.target.nodeId) {
+      toast.warn({
+        title: 'Không thể đổi node liên kết',
+        description: 'Revision đã phát hành chỉ cho phép đổi cạnh bám của connector trên chính source/target node hiện tại.',
+      });
+      return;
+    }
+    updateEdgeLayout.mutate({ templateId: selectedTemplateId, input });
   };
 
   if (templates.isLoading) {
@@ -821,7 +888,7 @@ export function PipelineBuilderPage() {
           >
             <NodeLibraryPanel
               presets={nodeLibrary}
-              canAddNode={Boolean(selectedTemplateId) && !isReadOnly}
+              canAddNode={Boolean(selectedTemplateId) && canEditStructure}
               addNodePending={addNode.isPending}
               onAddNode={(preset) => addNode.mutate(preset)}
             />
@@ -832,23 +899,29 @@ export function PipelineBuilderPage() {
         templateDescription={template.data?.description}
         selectedTemplateId={selectedTemplateId}
         isReadOnly={isReadOnly}
+        isPublished={isPublished}
+        canEditLayout={canEditLayout}
         canDeleteSelection={canDeleteSelection}
         deleteSelectionLabel={deleteSelectionLabel}
         nodeCount={nodes.length}
         validationIssueCount={validationIssues.length}
         autoLayoutPending={autoLayout.isPending}
+        canExportPDF={Boolean(selectedTemplateId && template.data) && !template.isLoading}
+        exportPDFPending={exportPDF.isPending}
         deleteSelectionPending={deleteSelectionPending}
         onRenameTemplate={openRenameDialog}
         onCloneTemplate={() => clone.mutate()}
         onPublishTemplate={() => publish.mutate()}
-        onAutoLayout={() => autoLayout.mutate()}
+        onAutoLayout={() => { if (canEditLayout) autoLayout.mutate(); }}
         onValidatePipeline={validatePipeline}
+        onExportPDF={() => exportPDF.mutate()}
         onDeleteSelection={deleteSelection}
         inspector={
           detailsNode ? (
             <NodeInspectorPanel
               node={detailsNode}
               readOnly={isReadOnly}
+              readOnlyLabel={isPublished ? 'Đã phát hành · Chỉ xem' : 'Chỉ xem'}
               nodeForm={nodeForm}
               permissionOptions={permissionOptions}
               permissionsLoading={permissions.isLoading}
@@ -895,11 +968,13 @@ export function PipelineBuilderPage() {
                 if (!isReadOnly) reorderStep.mutate({ orderedStepIds });
               }}
             />
-          ) : !isReadOnly && selectedConnector ? (
+          ) : selectedConnector ? (
             <EdgeInspectorPanel
               edge={selectedConnector}
               fromNode={selectedConnectorSource}
               toNode={selectedConnectorTarget}
+              readOnly={isReadOnly}
+              readOnlyLabel={isPublished ? 'Đã phát hành · Chỉ xem' : 'Chỉ xem'}
               conditions={edgeConditions.data ?? []}
               conditionsLoading={edgeConditions.isLoading}
               conditionLoadError={edgeConditions.isError}
@@ -909,9 +984,15 @@ export function PipelineBuilderPage() {
               answerConfigInvalid={edgeSubmitAttempted && edgeForm.condition_type === 'workflow_form_answer_equals' && (!String(edgeForm.condition_config.field_key ?? '').trim() || String(edgeForm.condition_config.value ?? '').trim() === '')}
               answerFieldOptions={answerFieldOptions}
               savePending={saveEdgeSettings.isPending}
-              onChangeField={(field, value) => setEdgeForm((current) => ({ ...current, [field]: value }))}
-              onChangeConditionConfig={(field, value) => setEdgeForm((current) => ({ ...current, condition_config: { ...current.condition_config, [field]: value } }))}
-              onSave={submitEdgeSettings}
+              onChangeField={(field, value) => {
+                if (!isReadOnly) setEdgeForm((current) => ({ ...current, [field]: value }));
+              }}
+              onChangeConditionConfig={(field, value) => {
+                if (!isReadOnly) setEdgeForm((current) => ({ ...current, condition_config: { ...current.condition_config, [field]: value } }));
+              }}
+              onSave={() => {
+                if (!isReadOnly) submitEdgeSettings();
+              }}
               onClose={() => setSelectedConnectorId('')}
             />
           ) : null
@@ -930,7 +1011,9 @@ export function PipelineBuilderPage() {
             nodes={nodes}
             edges={rawEdges}
             selectedNodeId={selectedNodeId}
-            connectorMutationPending={connectorMutationPending || isReadOnly}
+            editingMode={diagramEditingMode}
+            positionResetToken={nodePositionResetToken}
+            connectorMutationPending={connectorMutationPending}
             onSelectNode={(nodeId) => {
               setSelectedNodeId(nodeId);
               setSelectedConnectorId('');
@@ -947,11 +1030,19 @@ export function PipelineBuilderPage() {
               setSelectedConnectorId('');
               setDetailsNodeId((current) => (current === nodeId ? '' : nodeId));
             }}
-            onSaveNodePosition={(nodeId, position) => { if (!isReadOnly) saveNodePosition.mutate({ nodeId, position }); }}
-            onCreateConnector={(input) => { if (!isReadOnly) createEdge.mutate(input); }}
-            onReconnectConnector={(input) => { if (!isReadOnly) updateEdge.mutate(input); }}
-            onDeleteConnector={(connectorId) => { if (!isReadOnly) deleteEdge.mutate(connectorId); }}
-            onDeleteNode={(nodeId) => { if (!isReadOnly) deleteNode.mutate(nodeId); }}
+            onSaveNodePosition={(nodeId, position) => {
+              if (diagramEditingMode !== 'view' && selectedTemplateId) {
+                saveNodePosition.mutate({ templateId: selectedTemplateId, nodeId, position });
+              }
+            }}
+            onCreateConnector={(input) => { if (diagramEditingMode === 'full') createEdge.mutate(input); }}
+            onReconnectConnector={reconnectConnector}
+            onReconnectConstraintViolation={() => toast.warn({
+              title: 'Không thể đổi node liên kết',
+              description: 'Chỉ được đổi cạnh bám của đầu connector trên chính node hiện tại.',
+            })}
+            onDeleteConnector={(connectorId) => { if (diagramEditingMode === 'full') deleteEdge.mutate(connectorId); }}
+            onDeleteNode={(nodeId) => { if (diagramEditingMode === 'full') deleteNode.mutate(nodeId); }}
           />
         )}
       </PipelineBuilderShell>
@@ -1176,6 +1267,15 @@ function normalizedSearchText(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd');
+}
+
+function pipelineTemplatePDFDownloadName(template: PipelineTemplate) {
+  const slug = normalizedSearchText(template.name ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'template';
+  const revision = Math.max(1, Number(template.revision_no ?? template.version ?? 1) || 1);
+  return `workflow-${slug}-rev-${revision}.pdf`;
 }
 
 function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdge[], conditionTypes: Set<string>, workflowFormVersionIds: Set<string>) {

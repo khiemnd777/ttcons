@@ -1,6 +1,6 @@
 import type { ConnectorEndpointRole, NodePosition, PortRef } from './diagramTypes';
 
-export type ConnectorInvalidReason = 'self' | 'duplicate';
+export type ConnectorInvalidReason = 'self' | 'duplicate' | 'locked-node';
 
 export type ConnectorDraft = {
   source: PortRef;

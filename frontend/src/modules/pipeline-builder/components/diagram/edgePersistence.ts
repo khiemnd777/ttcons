@@ -77,6 +77,14 @@ export function buildUpdateEdgePayload(edge: PipelineTemplateEdge | undefined, i
   };
 }
 
+export function buildUpdateEdgeLayoutPayload(input: ConnectorReconnectInput) {
+  return {
+    id: input.connectorId,
+    source_side: input.source.side,
+    target_side: input.target.side,
+  };
+}
+
 export function buildConnectorModels(edges: PipelineTemplateEdge[], nodeRects: DiagramNodeRect[]): ConnectorModel[] {
   const rectById = new Map(nodeRects.map((rect) => [rect.nodeId, rect]));
 

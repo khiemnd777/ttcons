@@ -13,6 +13,9 @@ const files = {
   nodeLayer: 'src/modules/pipeline-builder/components/diagram/NodeLayer.tsx',
   nodeCard: 'src/modules/pipeline-builder/components/diagram/NodeCard.tsx',
   nodeInspector: 'src/modules/pipeline-builder/components/NodeInspectorPanel.tsx',
+  edgeInspector: 'src/modules/pipeline-builder/components/EdgeInspectorPanel.tsx',
+  shell: 'src/modules/pipeline-builder/components/PipelineBuilderShell.tsx',
+  edgePersistence: 'src/modules/pipeline-builder/components/diagram/edgePersistence.ts',
   geometry: 'src/modules/pipeline-builder/components/diagram/geometry.ts',
   hitTesting: 'src/modules/pipeline-builder/components/diagram/hitTesting.ts',
   router: 'src/modules/pipeline-builder/components/diagram/router.ts',
@@ -29,6 +32,16 @@ check('PipelineBuilderPage composes DiagramCanvas', () => {
   expectIncludes(source.page, '<DiagramCanvas', files.page);
 });
 
+check('Pipeline Builder exports the selected revision as PDF', () => {
+  expectIncludes(source.page, 'downloadBlob', files.page);
+  expectIncludes(source.page, '/pipeline-templates/${selectedTemplateId}/pdf', files.page);
+  expectIncludes(source.page, 'pipelineTemplatePDFDownloadName', files.page);
+  expectIncludes(source.page, 'exportPDFPending={exportPDF.isPending}', files.page);
+  expectIncludes(source.shell, 'Xuất PDF', files.shell);
+  expectIncludes(source.shell, 'Đang xuất...', files.shell);
+  expectIncludes(source.shell, 'disabled={!canExportPDF || exportPDFPending}', files.shell);
+});
+
 check('Published templates expose a read-only node inspector', () => {
   expectIncludes(source.page, 'detailsNode ? (', files.page);
   expectIncludes(source.page, 'readOnly={isReadOnly}', files.page);
@@ -40,6 +53,50 @@ check('Published templates expose a read-only node inspector', () => {
   expectIncludes(source.nodeInspector, "open={Boolean(stepDialogMode) && (!readOnly || stepDialogMode === 'view')}", files.nodeInspector);
   expectIncludes(source.nodeInspector, 'disabled={stepDialogReadOnly}', files.nodeInspector);
   expectIncludes(source.nodeInspector, 'Nội dung bên dưới chỉ để xem.', files.nodeInspector);
+});
+
+check('Published templates expose a read-only connector inspector', () => {
+  expectIncludes(source.page, ') : selectedConnector ? (', files.page);
+  expectNotIncludes(source.page, ') : !isReadOnly && selectedConnector ? (', files.page);
+  expectIncludes(source.page, '<EdgeInspectorPanel', files.page);
+  expectIncludes(source.page, 'readOnly={isReadOnly}', files.page);
+  expectIncludes(source.page, 'if (!isReadOnly) submitEdgeSettings();', files.page);
+  expectIncludes(source.edgeInspector, 'readOnly: boolean', files.edgeInspector);
+  expectIncludes(source.edgeInspector, 'Đã phát hành · Chỉ xem', files.edgeInspector);
+  expectIncludes(source.edgeInspector, '!readOnly ? (', files.edgeInspector);
+  expectIncludes(source.edgeInspector, 'disabled={readOnly}', files.edgeInspector);
+  expectIncludes(source.edgeInspector, 'disabled={readOnly || conditionsLoading || conditionLoadError}', files.edgeInspector);
+});
+
+check('Published templates keep presentation-only layout editing', () => {
+  expectIncludes(source.page, "const diagramEditingMode: DiagramEditingMode = canEditStructure ? 'full' : canEditLayout ? 'layout' : 'view'", files.page);
+  expectIncludes(source.page, '/pipeline-templates/${templateId}/layout', files.page);
+  expectIncludes(source.page, 'buildUpdateEdgeLayoutPayload(input)', files.page);
+  expectIncludes(source.shell, 'isPublished && canEditLayout', files.shell);
+  expectIncludes(source.shell, 'đổi cạnh bám của connector trên chính node hiện tại', files.shell);
+  expectIncludes(source.canvas, "editingMode === 'layout'", files.canvas);
+  expectIncludes(source.canvas, "invalidReason: 'locked-node'", files.canvas);
+  expectIncludes(source.canvas, "editingMode !== 'full'", files.canvas);
+
+  const layoutPayloadStart = source.edgePersistence.indexOf('export function buildUpdateEdgeLayoutPayload');
+  const connectorModelsStart = source.edgePersistence.indexOf('export function buildConnectorModels', layoutPayloadStart);
+  if (layoutPayloadStart < 0 || connectorModelsStart < 0) {
+    throw new Error(`${files.edgePersistence} must keep a dedicated layout payload builder`);
+  }
+  const layoutPayload = source.edgePersistence.slice(layoutPayloadStart, connectorModelsStart);
+  expectIncludes(layoutPayload, 'source_side', files.edgePersistence);
+  expectIncludes(layoutPayload, 'target_side', files.edgePersistence);
+  expectNotIncludes(layoutPayload, 'from_node_id', files.edgePersistence);
+  expectNotIncludes(layoutPayload, 'to_node_id', files.edgePersistence);
+
+  const autoLayoutStart = source.page.indexOf('const autoLayout = useMutation');
+  const selectTemplateStart = source.page.indexOf('const selectTemplate', autoLayoutStart);
+  if (autoLayoutStart < 0 || selectTemplateStart < 0) {
+    throw new Error(`${files.page} must keep the auto-layout mutation isolated`);
+  }
+  const autoLayoutMutation = source.page.slice(autoLayoutStart, selectTemplateStart);
+  expectIncludes(autoLayoutMutation, '/pipeline-templates/${templateId}/layout', files.page);
+  expectNotIncludes(autoLayoutMutation, 'order_index', files.page);
 });
 
 check('PipelineBuilderPage does not own diagram layers or geometry', () => {

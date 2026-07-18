@@ -7,16 +7,16 @@
 - Frontend routes: `frontend/src/app/router.tsx`
 - Frontend modules: `frontend/src/modules/pipeline-builder`, `frontend/src/modules/planning`, `frontend/src/modules/workflow-forms`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
 - Shared frontend contracts: `frontend/src/lib/api/client.ts`, `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
-- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`
+- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`
 
 ## Routes
 
-- Template builder: `/pipeline-templates`, `/pipeline-nodes`, `/pipeline-steps`, `/pipeline-edges`, `/pipeline-edge-conditions`
+- Template builder: `/pipeline-templates`, `GET /pipeline-templates/:id/pdf`, `/pipeline-nodes`, `/pipeline-steps`, `/pipeline-edges`, `/pipeline-edge-conditions`
 - Runtime: `/projects/:id/start-pipeline`, `/projects/:id/pipeline-run`, `/pipeline-run-nodes/:id/*`, `/pipeline-run-steps/:id/submit`
 - Work items: `/work-items/:id`, `/work-items/:id/start|complete|block|resolve-blocker|request-review|request-approval|approve|reject|request-change`
 - Activity/evidence: `/work-items/:id/activity`, `/projects/:id/activity|activity/options|activity/read-all`, `/projects/:id/evidence`, `/activities/:id/read|resolve|reactions|message|withdraw`, `/work-items/:id/evidence`, `/evidence/:id/file|accept|reject`
 - Workflow forms: `/workflow-form-templates`, `/workflow-form-template-library`, `/workflow-form-versions/:id/publish|archive`, `/workflow-form-instances/:id/draft|submit|sign|pdf-exports`
-- Artifacts: `/workflow-form-signatures/:id/visual`, `/workflow-form-pdf-exports/:id/file`
+- Artifacts: `/workflow-form-signatures/:id/visual`, `/workflow-form-pdf-exports/:id/file`; pipeline-template PDF is generated on demand by `GET /pipeline-templates/:id/pdf` and is not stored
 
 ## Tables
 
@@ -29,7 +29,7 @@
 
 ## Invariants
 
-- Published pipeline template revisions are immutable; structural edits require a new draft revision in the same `template_family_id` lineage.
+- Published pipeline template revisions are structurally immutable; structural edits require a new draft revision in the same `template_family_id` lineage. Node, Step and Connector inspectors remain available for read-only inspection; Connector Inspector must hide Save and disable stored label, condition/config and priority fields. Presentation-only layout remains mutable for actors with `pipeline.edit`: node coordinates and stored connector port sides may change atomically, but connector endpoint node IDs, ordering, conditions, steps/forms, definition semantics and runtime copies may not. The layout route derives endpoint node IDs from the stored edge and writes an audit event.
 - Publish records `definition_hash`, `published_at`, and `published_by`; project runtime starts only from an exact published revision.
 - `pipeline_runs.engine_version` and `pipeline_runs.template_definition_hash` snapshot the selected execution contract and are not refreshed from later revisions.
 - Engine v2 run steps snapshot `form_required` and exact `form_version_id`; a submitted different form or synthetic legacy checklist cannot satisfy the gate.
@@ -52,9 +52,14 @@
 - Engine v2 hard `domain_action_key` automation runs before work-item completion. Blocked/failed outcomes are recorded idempotently and leave the work item incomplete; display-name dispatch remains legacy-only.
 - Engine v2 node approvals snapshot structured `approval_policy_json` into the run and request. Supported modes are `any`, `all`, `quorum`, and `ordered`; stage, actor role, requester separation, comments, actions, and audit remain traceable.
 - Publish validation covers graph reachability/root/sink/cycle, required published form versions, answer-condition configuration, and permission-key existence.
-- Template edits do not mutate existing run copies.
+- Template layout edits do not mutate existing run copies, and node coordinates plus `condition_config.diagram` are excluded from new definition hashes while all business condition keys remain hashed.
+- Pipeline node `type` remains a technical template/runtime key. Pipeline Builder node cards and Node Inspector options share the frontend `nodeTypeValues`/`enumLabel` presentation contract: known official types render Vietnamese labels, while an unknown future key remains visibly readable through the raw fallback rather than being discarded.
+- Pipeline-template PDF export requires `pipeline.view` and reads the exact selected draft/published revision. It emits an on-demand A4 landscape Unicode snapshot whose page 1 contains one document-first topology diagram derived from edge source/target, independent of canvas coordinates and connector sides. Every two-line card shows node name plus `Loại | N steps.`, every connector label uses at most two lines, node configuration follows as section 2 and nested checklist/steps as section 3. No-edge/cycle graphs fall back to stable node order and dangling edges are omitted with a warning. Export never changes template/runtime state, persists an artifact or writes audit.
 - Cosmetic official-step text corrections require an additive migration and matching seed correction across template, runtime, work-item and form-instance display snapshots; they do not change statuses, answers, approvals, audit records or PDF artifacts.
+- V68 keeps official revision-2 titles action-first and moves responsibility labels into template `required_role_ids`. It adds `Thiết kế`, `Sale`, `Pháp lý`, maps the reviewed technical-team responsibility to existing `Đội thi công`, updates existing display snapshots, and preserves runtime role/assignment snapshots so active and historical authorization does not change unexpectedly.
+- V69 uses `đầu vào` as the collective workflow term for tổ đội, thầu phụ and material suppliers in aggregate step/form/node/edge labels. Entity-specific wording remains mandatory where negotiation, acceptance, payable settlement or supplier invoices identify a concrete party/material. Existing revision-2 updates are display-only: roles, assignments, statuses, answers, approvals, audit records, PDFs and published form schemas remain unchanged.
 - Published workflow form versions are immutable runtime references.
+- The `/workflow-forms` authoring UI must keep published versions read-only and make draft state explicit. Template/version switching or page unload warns when local draft fields differ from the loaded snapshot; publish and archive actions require deliberate confirmation. UI field/step/instance metrics must remain source-backed by the existing managed-template contract and must not imply a detailed usage list that the API does not provide.
 - `required_role_ids` remains an array everywhere.
 - Work item completion respects required forms, evidence, signatures, approvals, and blockers.
 - Project evidence listing is read/review presentation only: server-filtered history may include rejected evidence but excludes cancelled-work-item evidence; `can_review` mirrors the existing decision gate and never replaces backend enforcement or satisfies completion/form/approval gates.

@@ -301,6 +301,20 @@ func (h *Handler) GetTemplate(c *fiber.Ctx) error {
 	return response.OK(c, template)
 }
 
+func (h *Handler) GetTemplatePDF(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.view"}); err != nil {
+		return err
+	}
+	file, err := h.service.PipelineTemplatePDF(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, file.MIMEType)
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf("attachment; filename=%q; filename*=UTF-8''%s", "workflow-template.pdf", url.PathEscape(file.Filename)))
+	c.Set(fiber.HeaderXContentTypeOptions, "nosniff")
+	return c.Send(file.Data)
+}
+
 func (h *Handler) UpdateTemplate(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
 		return err
@@ -310,6 +324,21 @@ func (h *Handler) UpdateTemplate(c *fiber.Ctx) error {
 		return err
 	}
 	template, err := h.service.UpdateTemplate(c.Context(), c.Params("id"), body)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, template)
+}
+
+func (h *Handler) UpdateTemplateLayout(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
+		return err
+	}
+	req := PipelineTemplateLayoutRequest{}
+	if err := c.BodyParser(&req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu bố cục workflow không hợp lệ")
+	}
+	template, err := h.service.UpdateTemplateLayout(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}

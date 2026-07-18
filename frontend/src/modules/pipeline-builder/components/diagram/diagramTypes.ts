@@ -19,6 +19,8 @@ export type PortRef = {
 
 export type DiagramPortMode = 'auto' | 'manual';
 
+export type DiagramEditingMode = 'full' | 'layout' | 'view';
+
 export type ConnectorEndpoint = {
   port: PortRef;
   point?: NodePosition;

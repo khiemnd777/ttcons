@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="brand-logo-title brand-logo-description">
+  <title id="brand-logo-title">Thủ Thiêm Workflow</title>
+  <desc id="brand-logo-description">Logo chữ dạng ô vuông nền navy của Thủ Thiêm Workflow</desc>
+  <rect x="4" y="4" width="248" height="248" rx="36" fill="#172033" />
+  <g
+    font-family="Inter, 'Segoe UI', Arial, sans-serif"
+    font-weight="800"
+    letter-spacing="-1.5"
+  >
+    <text x="28" y="82" font-size="65" fill="#FFFFFF">Thủ</text>
+    <text x="28" y="154" font-size="65" fill="#FFFFFF">Thiêm</text>
+    <text x="29" y="211" font-size="35" letter-spacing="-1" fill="#60A5FA">Workflow</text>
+  </g>
+</svg>

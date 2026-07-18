@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LogIn } from 'lucide-react';
+import { BrandLogo } from '../../components/BrandLogo';
 import { useAuth } from '../../lib/auth/AuthContext';
 
 const loginSchema = z.object({
@@ -38,9 +39,9 @@ export function LoginPage() {
     <div className="grid min-h-screen place-items-center bg-surface px-4">
       <div className="w-full max-w-md rounded-lg border border-line bg-white p-6 shadow-panel">
         <div className="mb-6">
-          <div className="mb-4 grid h-11 w-11 place-items-center rounded-lg bg-blue-600 text-sm font-black text-white">CF</div>
-          <h1 className="text-2xl font-semibold text-ink">Đăng nhập Thủ Thiêm Workflow</h1>
-          <p className="mt-1 text-sm text-slate-600">Dùng tài khoản demo để vào hệ thống workflow công trình.</p>
+          <BrandLogo size={112} className="mb-5" />
+          <h1 className="text-2xl font-semibold text-ink">Đăng nhập</h1>
+          <p className="mt-1 text-sm text-slate-600">Dùng tài khoản demo để vào Thủ Thiêm Workflow.</p>
         </div>
 
         <form

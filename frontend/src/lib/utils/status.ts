@@ -30,6 +30,25 @@ export type EnumLabelGroup =
   | 'mention_type'
   | 'event_type';
 
+export const nodeTypeValues = [
+  'survey',
+  'design',
+  'boq',
+  'budget_approval',
+  'procurement',
+  'warehouse_issue',
+  'contract',
+  'construction_planning',
+  'construction',
+  'incoming_acceptance',
+  'acceptance',
+  'rework',
+  'replanning',
+  'handover',
+  'financial_closure',
+  'custom',
+] as const;
+
 export const statusLabels: LabelMap = {
   active: 'Kích hoạt',
   inactive: 'Ngừng hoạt động',
@@ -275,7 +294,10 @@ export const enumLabels: Record<EnumLabelGroup, LabelMap> = {
     budget_approval: 'Duyệt ngân sách',
     procurement: 'Mua vật tư',
     warehouse_issue: 'Xuất kho',
+    contract: 'Hợp đồng',
+    construction_planning: 'Kế hoạch thi công',
     construction: 'Thi công',
+    incoming_acceptance: 'Nghiệm thu đầu vào',
     acceptance: 'Nghiệm thu',
     rework: 'Sửa lỗi',
     replanning: 'Lập kế hoạch lại',
@@ -414,7 +436,7 @@ export function enumLabel(group: EnumLabelGroup, value?: unknown) {
   return enumLabels[group][key] ?? key;
 }
 
-export function enumOptions(group: EnumLabelGroup, values: string[]) {
+export function enumOptions(group: EnumLabelGroup, values: readonly string[]) {
   return values.map((value) => ({ label: enumLabel(group, value), value }));
 }
 

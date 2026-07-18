@@ -4,10 +4,9 @@ import { ChevronDown, GripVertical, Pencil, Plus, Save, Trash2, X } from 'lucide
 import { Dialog } from '../../../components/Dialog';
 import { EnumChip } from '../../../components/EnumChip';
 import type { PipelineNode, WorkflowFormCatalogItem } from '../../../lib/types/domain';
-import { enumOptions } from '../../../lib/utils/status';
+import { enumOptions, nodeTypeValues } from '../../../lib/utils/status';
 
 const roleOptions = ['PM', 'QS', 'Thiết kế', 'Giám sát', 'Kế toán', 'Thủ kho', 'QA/QC', 'Giám đốc', 'Chủ đầu tư', 'Mua hàng', 'Đội thi công'];
-const nodeTypes = ['survey', 'design', 'boq', 'budget_approval', 'procurement', 'warehouse_issue', 'construction', 'acceptance', 'rework', 'replanning', 'handover', 'financial_closure', 'custom'];
 const stepTypes = ['task', 'checklist', 'approval', 'document_upload', 'photo_upload', 'budget_check', 'material_check', 'daily_report', 'meeting_minutes', 'acceptance_check', 'handover_check', 'accounting_check'];
 
 type SelectOption = string | { label: string; value: string };
@@ -25,6 +24,7 @@ type StepForm = {
 type NodeInspectorPanelProps = {
   node: PipelineNode;
   readOnly: boolean;
+  readOnlyLabel?: string;
   nodeForm: Record<string, any>;
   permissionOptions: SelectOption[];
   permissionsLoading: boolean;
@@ -57,6 +57,7 @@ type NodeInspectorPanelProps = {
 export function NodeInspectorPanel({
   node,
   readOnly,
+  readOnlyLabel = 'Đã phát hành · Chỉ xem',
   nodeForm,
   permissionOptions,
   permissionsLoading,
@@ -172,7 +173,7 @@ export function NodeInspectorPanel({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold text-ink">Cấu hình Node</h2>
-              {readOnly ? <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Đã phát hành · Chỉ xem</span> : null}
+              {readOnly ? <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">{readOnlyLabel}</span> : null}
             </div>
             <p className="mt-1 text-xs text-slate-500">{node.name}</p>
           </div>
@@ -195,7 +196,7 @@ export function NodeInspectorPanel({
         <div className="space-y-3">
           <Field label="Tên node" value={nodeForm.name} onChange={(value) => onChangeField('name', value)} disabled={readOnly} />
           <Field label="Mô tả" value={nodeForm.description} onChange={(value) => onChangeField('description', value)} textarea disabled={readOnly} />
-          <Select label="Node type" value={nodeForm.type} options={enumOptions('node_type', nodeTypes)} onChange={(value) => onChangeField('type', value)} disabled={readOnly} />
+          <Select label="Node type" value={nodeForm.type} options={enumOptions('node_type', nodeTypeValues)} onChange={(value) => onChangeField('type', value)} disabled={readOnly} />
           <PermissionSelect
             label="Permissions"
             value={Array.isArray(nodeForm.permissions) ? nodeForm.permissions : []}

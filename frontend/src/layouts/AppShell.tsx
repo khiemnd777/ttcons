@@ -3,6 +3,7 @@ import {
   BarChart3,
   BriefcaseBusiness,
   Building2,
+  ClipboardList,
   Database,
   FileClock,
   GitBranch,
@@ -13,6 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { BrandLogo } from '../components/BrandLogo';
 import { useAuth } from '../lib/auth/AuthContext';
 
 type NavItem = {
@@ -29,7 +31,13 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
       { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
       { to: '/reports', label: 'Báo cáo', icon: BarChart3, permissions: ['report.view', 'report.finance.view'] },
-      { to: '/pipeline-builder', label: 'Workflow', icon: GitBranch, permissions: ['pipeline.view'] },
+    ],
+  },
+  {
+    title: 'Workflow',
+    items: [
+      { to: '/pipeline-builder', label: 'Pipeline builder', icon: GitBranch, permissions: ['pipeline.view'] },
+      { to: '/workflow-forms', label: 'Workflow Forms', icon: ClipboardList, permissions: ['pipeline.view'] },
     ],
   },
   {
@@ -69,16 +77,10 @@ export function AppShell() {
     <div className="min-h-screen bg-surface">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-line bg-white lg:block">
         <div className="flex h-full flex-col">
-          <div className="border-b border-line px-5 py-5">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-lg bg-blue-600 text-sm font-black text-white">CF</div>
-              <div>
-                <p className="text-sm font-semibold text-ink">Thủ Thiêm Workflow</p>
-                <p className="text-xs text-slate-500">Construction Workflow OS</p>
-              </div>
-            </div>
+          <div className="flex h-16 items-center justify-center border-b border-line px-5">
+            <BrandLogo size={48} />
           </div>
-          <nav className="flex-1 overflow-auto px-3 py-4">
+          <nav className="flex-1 overflow-auto px-3 py-5">
             {visibleNavGroups.map((group) => (
               <div key={group.title} className="mb-5">
                 <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">{group.title}</p>
@@ -106,10 +108,10 @@ export function AppShell() {
       </aside>
 
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-20 border-b border-line bg-white/95 px-4 py-3 backdrop-blur md:px-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Construction Workflow OS</p>
+        <header className="sticky top-0 z-20 flex h-16 items-center border-b border-line bg-white/95 px-4 backdrop-blur md:px-6">
+          <div className="flex w-full items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <BrandLogo size={40} className="lg:hidden" />
               <p className="text-sm font-medium text-ink">Bắt đầu từ công trình, xử lý nghiệp vụ theo cấu trúc rõ ràng</p>
             </div>
             <div className="flex items-center gap-3">

@@ -51,7 +51,7 @@ export const PROJECT_WORKSPACE_GROUPS: ProjectWorkspaceGroup[] = [
   {
     key: 'quality',
     label: 'Thi công & Chất lượng',
-    description: 'Thi công, ITP/RFI/NCR, nghiệm thu, rework',
+    description: 'Nhật ký, kiểm tra, cần xử lý, nghiệm thu',
     to: 'operations',
     permissions: ['operation.view', 'quality.view', 'acceptance.view', 'rework.view'],
     children: [

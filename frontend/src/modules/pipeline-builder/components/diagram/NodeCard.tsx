@@ -11,6 +11,7 @@ type NodeCardProps = {
   index: number;
   position: NodePosition;
   selected: boolean;
+  draggable: boolean;
   onSelectNode: (nodeId: string) => void;
   onToggleDetails: (nodeId: string) => void;
   onPointerDown: (event: PointerEvent<HTMLDivElement>, node: PipelineNode, index: number) => void;
@@ -26,6 +27,7 @@ export const NodeCard = memo(function NodeCard({
   index,
   position,
   selected,
+  draggable,
   onSelectNode,
   onToggleDetails,
   onPointerDown,
@@ -42,7 +44,7 @@ export const NodeCard = memo(function NodeCard({
       tabIndex={0}
       className={clsx(
         'pointer-events-auto absolute z-10 select-none rounded-lg border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-panel focus:outline-none',
-        'cursor-grab active:cursor-grabbing',
+        draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
         selected && 'border-blue-400 bg-blue-50 shadow-panel ring-4 ring-blue-100',
         !selected && 'border-line',
       )}
@@ -92,6 +94,7 @@ function areNodeCardPropsEqual(previous: NodeCardProps, next: NodeCardProps) {
     previous.node === next.node &&
     previous.index === next.index &&
     previous.selected === next.selected &&
+    previous.draggable === next.draggable &&
     previous.position.x === next.position.x &&
     previous.position.y === next.position.y &&
     previous.onSelectNode === next.onSelectNode &&

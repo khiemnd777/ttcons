@@ -8,6 +8,7 @@ type NodeLayerProps = {
   nodes: PipelineNode[];
   positions: Record<string, NodePosition>;
   selectedNodeId: string;
+  nodeDragEnabled: boolean;
   onSelectNode: (nodeId: string) => void;
   onToggleNodeDetails: (nodeId: string) => void;
   onNodePointerDown: (event: PointerEvent<HTMLDivElement>, node: PipelineNode, index: number) => void;
@@ -22,6 +23,7 @@ export const NodeLayer = memo(function NodeLayer({
   nodes,
   positions,
   selectedNodeId,
+  nodeDragEnabled,
   onSelectNode,
   onToggleNodeDetails,
   onNodePointerDown,
@@ -40,6 +42,7 @@ export const NodeLayer = memo(function NodeLayer({
           index={index}
           position={nodePosition(node, index, positions)}
           selected={selectedNodeId === node.id}
+          draggable={nodeDragEnabled}
           onSelectNode={onSelectNode}
           onToggleDetails={onToggleNodeDetails}
           onPointerDown={onNodePointerDown}

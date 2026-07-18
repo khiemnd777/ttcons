@@ -263,7 +263,15 @@ func validateTemplateGraph(nodes, edges []Record) []Record {
 }
 
 func templateDefinitionHash(detail Record) (string, error) {
-	canonical := stripTemplateVolatileFields(detail)
+	definition := Record{}
+	for key, value := range detail {
+		if key == "nodes" {
+			definition[key] = stripTemplateNodePositions(value)
+			continue
+		}
+		definition[key] = value
+	}
+	canonical := stripTemplateVolatileFields(definition)
 	raw, err := json.Marshal(canonical)
 	if err != nil {
 		return "", err
@@ -391,17 +399,27 @@ func stripTemplateVolatileFields(value any) any {
 	case Record:
 		out := Record{}
 		for key, item := range typed {
-			if !volatile[key] {
-				out[key] = stripTemplateVolatileFields(item)
+			if volatile[key] {
+				continue
 			}
+			if key == "condition_config" {
+				out[key] = stripTemplateDiagramMetadata(item)
+				continue
+			}
+			out[key] = stripTemplateVolatileFields(item)
 		}
 		return out
 	case map[string]any:
 		out := map[string]any{}
 		for key, item := range typed {
-			if !volatile[key] {
-				out[key] = stripTemplateVolatileFields(item)
+			if volatile[key] {
+				continue
 			}
+			if key == "condition_config" {
+				out[key] = stripTemplateDiagramMetadata(item)
+				continue
+			}
+			out[key] = stripTemplateVolatileFields(item)
 		}
 		return out
 	case []Record:
@@ -418,5 +436,64 @@ func stripTemplateVolatileFields(value any) any {
 		return out
 	default:
 		return value
+	}
+}
+
+func stripTemplateNodePositions(value any) any {
+	switch typed := value.(type) {
+	case []Record:
+		out := make([]Record, 0, len(typed))
+		for _, node := range typed {
+			out = append(out, stripTemplateNodePosition(node))
+		}
+		return out
+	case []any:
+		out := make([]any, 0, len(typed))
+		for _, item := range typed {
+			switch node := item.(type) {
+			case Record:
+				out = append(out, stripTemplateNodePosition(node))
+			case map[string]any:
+				out = append(out, stripTemplateNodePosition(node))
+			default:
+				out = append(out, item)
+			}
+		}
+		return out
+	default:
+		return value
+	}
+}
+
+func stripTemplateNodePosition(node map[string]any) map[string]any {
+	out := map[string]any{}
+	for key, value := range node {
+		if key != "position_x" && key != "position_y" {
+			out[key] = value
+		}
+	}
+	return out
+}
+
+func stripTemplateDiagramMetadata(value any) any {
+	switch typed := value.(type) {
+	case Record:
+		out := Record{}
+		for key, item := range typed {
+			if key != "diagram" {
+				out[key] = stripTemplateVolatileFields(item)
+			}
+		}
+		return out
+	case map[string]any:
+		out := map[string]any{}
+		for key, item := range typed {
+			if key != "diagram" {
+				out[key] = stripTemplateVolatileFields(item)
+			}
+		}
+		return out
+	default:
+		return stripTemplateVolatileFields(value)
 	}
 }
