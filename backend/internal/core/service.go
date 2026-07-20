@@ -7388,6 +7388,14 @@ func (s *Service) ProjectBOQ(ctx context.Context, projectID string) ([]Record, e
 	return s.repo.ListProjectBOQ(ctx, projectID)
 }
 
+func (s *Service) GetBOQ(ctx context.Context, itemID string) (Record, error) {
+	itemID = cleanID(itemID)
+	if itemID == "" {
+		return nil, validationError("Mã dòng BOQ không hợp lệ", Record{"boq_item_id": itemID})
+	}
+	return s.repo.GetBOQItemDetail(ctx, itemID)
+}
+
 func (s *Service) BOQProjectAction(ctx context.Context, projectID, action, actorID, actorName string) (Record, error) {
 	projectID = cleanID(projectID)
 	if projectID == "" {
@@ -7413,6 +7421,21 @@ func (s *Service) UpdateBOQ(ctx context.Context, itemID string, body Record, act
 		return nil, err
 	}
 	return s.repo.UpdateBOQItem(ctx, itemID, normalized, actorID, actorName)
+}
+
+func (s *Service) ReviseBOQ(ctx context.Context, itemID string, req BOQReviseRequest, actorID, actorName string) (Record, error) {
+	itemID = cleanID(itemID)
+	if itemID == "" {
+		return nil, validationError("Mã dòng BOQ không hợp lệ", Record{"boq_item_id": itemID})
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, validationError("Yêu cầu chỉnh sửa BOQ cần nêu lý do")
+	}
+	if len([]rune(reason)) > 2000 {
+		return nil, validationError("Lý do chỉnh sửa BOQ không được vượt quá 2000 ký tự")
+	}
+	return s.repo.ReviseBOQItem(ctx, itemID, reason, actorID, actorName)
 }
 
 func (s *Service) UpdateBOQExpectedUnitPrice(ctx context.Context, itemID string, req BOQUnitPriceRequest, actorID, actorName string) (Record, error) {
@@ -7667,32 +7690,20 @@ func normalizeBOQItemRequest(projectID string, body Record, create bool) (Record
 	} else if create {
 		out["expected_unit_price"] = float64(0)
 	}
-	for _, field := range []string{"material_id", "node_id", "approved_by"} {
+	for _, field := range []string{"material_id", "node_id"} {
 		if value, ok := body[field]; ok {
 			out[field] = cleanID(value)
 		}
 	}
-	if value, ok := body["status"]; ok {
-		status := strings.TrimSpace(fmt.Sprint(value))
-		if !statusIn(status, "draft", "submitted", "approved", "revised", "deleted") {
-			return nil, validationError("Trạng thái BOQ không hợp lệ", Record{"status": status})
-		}
-		out["status"] = status
-	} else if create {
+	if create {
 		out["status"] = "draft"
 	}
 	return out, nil
 }
 
 func (s *Service) GenerateProcurementFromBOQ(ctx context.Context, projectID, actorID, actorName string) (Record, error) {
-	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
-	if err != nil {
-		return nil, err
-	}
-	if !allowed {
-		return nil, forbiddenError("Bạn không có quyền thao tác mua sắm của công trình này")
-	}
-	canGenerate, err := s.repo.UserHasAnyProjectPermission(ctx, actorID, projectID, []string{"procurement.create", "procurement.approve", "boq.approve"})
+	projectID = cleanID(projectID)
+	canGenerate, err := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"procurement.create", "procurement.approve", "boq.approve"})
 	if err != nil {
 		return nil, err
 	}

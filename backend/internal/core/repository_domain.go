@@ -10223,6 +10223,11 @@ func (r *Repository) ListProjectBOQ(ctx context.Context, projectID string) ([]Re
 			selected_quote.supplier_partner_id AS selected_supplier_partner_id,
 			selected_quote.supplier_name AS selected_supplier_name,
 			selected_quote.quoted_unit_price,
+			active_procurement.request_id AS procurement_request_id,
+			active_procurement.request_code AS procurement_request_code,
+			active_procurement.status AS procurement_request_status,
+			COALESCE(active_procurement.request_count, 0) AS active_procurement_count,
+			(active_procurement.request_id IS NOT NULL) AS has_active_procurement,
 			COALESCE(b.final_unit_price, b.norm_unit_price, b.expected_unit_price, b.unit_price, 0) AS effective_unit_price,
 			(b.quantity * COALESCE(b.final_unit_price, b.norm_unit_price, b.expected_unit_price, b.unit_price, 0))::numeric(18,2) AS effective_total_amount,
 			CASE
@@ -10239,7 +10244,9 @@ func (r *Repository) ListProjectBOQ(ctx context.Context, projectID string) ([]Re
 					ORDER BY created_at DESC
 					LIMIT 5
 				) price_events
-			), '[]'::jsonb) AS price_events
+			), '[]'::jsonb) AS price_events,
+			(SELECT COUNT(*) FROM boq_unit_price_events WHERE boq_item_id=b.id) AS price_event_count,
+			((SELECT COUNT(*) FROM boq_unit_price_events WHERE boq_item_id=b.id) > 5) AS price_events_truncated
 		FROM boq_items b
 		LEFT JOIN materials m ON m.id=b.material_id
 		LEFT JOIN LATERAL (
@@ -10248,6 +10255,17 @@ func (r *Repository) ListProjectBOQ(ctx context.Context, projectID string) ([]Re
 			JOIN supplier_quotations q ON q.id=qi.quotation_id
 			WHERE qi.id=b.selected_quotation_item_id
 		) selected_quote ON true
+		LEFT JOIN LATERAL (
+			SELECT linked.request_id, linked.request_code, linked.status, COUNT(*) OVER() AS request_count
+			FROM (
+				SELECT DISTINCT pr.id AS request_id, pr.request_code, pr.status, pr.created_at
+				FROM procurement_request_items pri
+				JOIN procurement_requests pr ON pr.id=pri.request_id
+				WHERE pri.boq_item_id=b.id AND pr.status <> 'cancelled'
+			) linked
+			ORDER BY linked.created_at DESC, linked.request_id DESC
+			LIMIT 1
+		) active_procurement ON true
 		WHERE b.project_id=$1 AND b.status <> 'deleted'
 		ORDER BY b.category, b.created_at
 	`, projectID)
@@ -10259,6 +10277,11 @@ func (r *Repository) GetBOQItemDetail(ctx context.Context, itemID string) (Recor
 			selected_quote.supplier_partner_id AS selected_supplier_partner_id,
 			selected_quote.supplier_name AS selected_supplier_name,
 			selected_quote.quoted_unit_price,
+			active_procurement.request_id AS procurement_request_id,
+			active_procurement.request_code AS procurement_request_code,
+			active_procurement.status AS procurement_request_status,
+			COALESCE(active_procurement.request_count, 0) AS active_procurement_count,
+			(active_procurement.request_id IS NOT NULL) AS has_active_procurement,
 			COALESCE(b.final_unit_price, b.norm_unit_price, b.expected_unit_price, b.unit_price, 0) AS effective_unit_price,
 			(b.quantity * COALESCE(b.final_unit_price, b.norm_unit_price, b.expected_unit_price, b.unit_price, 0))::numeric(18,2) AS effective_total_amount,
 			CASE
@@ -10275,7 +10298,9 @@ func (r *Repository) GetBOQItemDetail(ctx context.Context, itemID string) (Recor
 					ORDER BY created_at DESC
 					LIMIT 20
 				) price_events
-			), '[]'::jsonb) AS price_events
+			), '[]'::jsonb) AS price_events,
+			(SELECT COUNT(*) FROM boq_unit_price_events WHERE boq_item_id=b.id) AS price_event_count,
+			((SELECT COUNT(*) FROM boq_unit_price_events WHERE boq_item_id=b.id) > 20) AS price_events_truncated
 		FROM boq_items b
 		LEFT JOIN materials m ON m.id=b.material_id
 		LEFT JOIN LATERAL (
@@ -10284,6 +10309,17 @@ func (r *Repository) GetBOQItemDetail(ctx context.Context, itemID string) (Recor
 			JOIN supplier_quotations q ON q.id=qi.quotation_id
 			WHERE qi.id=b.selected_quotation_item_id
 		) selected_quote ON true
+		LEFT JOIN LATERAL (
+			SELECT linked.request_id, linked.request_code, linked.status, COUNT(*) OVER() AS request_count
+			FROM (
+				SELECT DISTINCT pr.id AS request_id, pr.request_code, pr.status, pr.created_at
+				FROM procurement_request_items pri
+				JOIN procurement_requests pr ON pr.id=pri.request_id
+				WHERE pri.boq_item_id=b.id AND pr.status <> 'cancelled'
+			) linked
+			ORDER BY linked.created_at DESC, linked.request_id DESC
+			LIMIT 1
+		) active_procurement ON true
 		WHERE b.id=$1 AND b.status <> 'deleted'
 	`, itemID)
 }
@@ -10294,23 +10330,41 @@ func (r *Repository) BOQProjectAction(ctx context.Context, projectID, action, ac
 		return nil, err
 	}
 	defer tx.Rollback()
-	fromStatus := ""
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "boq_lifecycle:"+projectID); err != nil {
+		return nil, err
+	}
+	fromStatuses := []string{}
 	toStatus := ""
 	eventType := ""
 	switch action {
 	case "submit":
-		fromStatus, toStatus, eventType = "draft", "submitted", "boq_submitted"
+		fromStatuses, toStatus, eventType = []string{"draft", "revised"}, "submitted", "boq_submitted"
 	case "approve":
-		fromStatus, toStatus, eventType = "submitted", "approved", "boq_approved"
+		fromStatuses, toStatus, eventType = []string{"submitted"}, "approved", "boq_approved"
 	default:
 		return nil, validationError("Hành động BOQ không hợp lệ", Record{"action": action})
+	}
+	if action == "approve" {
+		blockers, err := queryTx(ctx, tx, `
+			SELECT id, work_item_name, status, norm_price_locked
+			FROM boq_items
+			WHERE project_id=$1 AND status='submitted' AND NOT norm_price_locked
+			ORDER BY category, created_at
+		`, projectID)
+		if err != nil {
+			return nil, err
+		}
+		if len(blockers) > 0 {
+			return nil, validationError("Chỉ phê duyệt BOQ sau khi mọi dòng đã khóa đơn giá định mức", Record{"items": blockers})
+		}
 	}
 	result, err := tx.ExecContext(ctx, `
 		UPDATE boq_items SET status=$3,
 			approved_by=CASE WHEN $4='approve' THEN NULLIF($5,'')::uuid ELSE approved_by END,
 			updated_at=now()
-		WHERE project_id=$1 AND status=$2
-	`, projectID, fromStatus, toStatus, action, actorID)
+		WHERE project_id=$1
+		  AND (($2='submit' AND status IN ('draft','revised')) OR ($2='approve' AND status='submitted'))
+	`, projectID, action, toStatus, action, actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -10319,15 +10373,15 @@ func (r *Repository) BOQProjectAction(ctx context.Context, projectID, action, ac
 		return nil, err
 	}
 	if count == 0 {
-		return nil, validationError("Không có dòng BOQ ở trạng thái phù hợp để thực hiện", Record{"action": action, "expected_status": fromStatus})
+		return nil, validationError("Không có dòng BOQ ở trạng thái phù hợp để thực hiện", Record{"action": action, "expected_statuses": fromStatuses})
 	}
-	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "project_boq", projectID, fmt.Sprintf("Chuyển %d dòng BOQ từ %s sang %s", count, fromStatus, toStatus), Record{"action": action, "from_status": fromStatus, "to_status": toStatus, "item_count": count}); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "project_boq", projectID, fmt.Sprintf("Chuyển %d dòng BOQ sang %s", count, toStatus), Record{"action": action, "from_statuses": fromStatuses, "to_status": toStatus, "item_count": count}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return Record{"action": action, "from_status": fromStatus, "to_status": toStatus, "item_count": count}, nil
+	return Record{"action": action, "from_status": fromStatuses[0], "from_statuses": fromStatuses, "to_status": toStatus, "item_count": count}, nil
 }
 
 func (r *Repository) CreateBOQItem(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
@@ -10379,14 +10433,17 @@ func (r *Repository) UpdateBOQItem(ctx context.Context, itemID string, body Reco
 		return nil, sql.ErrNoRows
 	}
 	current := currentRows[0]
+	if !statusIn(fmt.Sprint(current["status"]), "draft", "revised") {
+		return nil, validationError("Chỉ có thể cập nhật nội dung BOQ ở trạng thái nháp hoặc cần chỉnh sửa", Record{"boq_item_id": itemID, "status": current["status"]})
+	}
 	if boolValue(current["final_price_locked"]) && boqBodyChangesAny(current, body, finalLockedBOQProtectedFields...) {
 		return nil, validationError("Dòng BOQ đã khóa đơn giá cuối, không thể sửa khối lượng/vật tư/đơn giá", Record{"boq_item_id": itemID})
 	}
-	if boolValue(current["norm_price_locked"]) && boqBodyChangesAny(current, body, "expected_unit_price") {
-		return nil, validationError("Dòng BOQ đã khóa đơn giá định mức, không thể sửa đơn giá dự kiến", Record{"boq_item_id": itemID})
+	if boolValue(current["norm_price_locked"]) && boqBodyChangesAny(current, body, "expected_unit_price", "unit", "quantity", "material_id") {
+		return nil, validationError("Dòng BOQ đã khóa đơn giá định mức, không thể sửa đơn giá dự kiến, đơn vị, khối lượng hoặc vật tư", Record{"boq_item_id": itemID})
 	}
 
-	specs := []string{"category", "work_item_name", "description", "unit", "quantity", "expected_unit_price", "material_id", "node_id", "status", "approved_by"}
+	specs := []string{"category", "work_item_name", "description", "unit", "quantity", "expected_unit_price", "material_id", "node_id"}
 	sets := make([]string, 0, len(specs)+2)
 	args := make([]any, 0, len(specs)+1)
 	for _, key := range specs {
@@ -10435,6 +10492,65 @@ func (r *Repository) UpdateBOQItem(ctx context.Context, itemID string, body Reco
 	return r.GetBOQItemDetail(ctx, itemID)
 }
 
+func (r *Repository) ReviseBOQItem(ctx context.Context, itemID, reason, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var projectID string
+	if err := tx.QueryRowContext(ctx, `SELECT project_id::text FROM boq_items WHERE id=$1 AND status <> 'deleted'`, itemID).Scan(&projectID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "boq_lifecycle:"+projectID); err != nil {
+		return nil, err
+	}
+	rows, err := queryTx(ctx, tx, `SELECT * FROM boq_items WHERE id=$1 AND status <> 'deleted' FOR UPDATE`, itemID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	current := rows[0]
+	fromStatus := fmt.Sprint(current["status"])
+	if !statusIn(fromStatus, "submitted", "approved") {
+		return nil, validationError("Chỉ BOQ đã gửi hoặc đã phê duyệt mới có thể yêu cầu chỉnh sửa", Record{"boq_item_id": itemID, "status": fromStatus})
+	}
+	if boolValue(current["final_price_locked"]) {
+		return nil, validationError("Dòng BOQ đã khóa đơn giá cuối, không thể yêu cầu chỉnh sửa", Record{"boq_item_id": itemID})
+	}
+	var hasActiveProcurement bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM procurement_request_items pri
+			JOIN procurement_requests pr ON pr.id=pri.request_id
+			WHERE pri.boq_item_id=$1 AND pr.status <> 'cancelled'
+		)
+	`, itemID).Scan(&hasActiveProcurement); err != nil {
+		return nil, err
+	}
+	if hasActiveProcurement {
+		return nil, validationError("Dòng BOQ đã sinh yêu cầu mua, không thể yêu cầu chỉnh sửa", Record{"boq_item_id": itemID})
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE boq_items
+		SET status='revised', approved_by=NULL, updated_at=now()
+		WHERE id=$1
+	`, itemID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "boq_revision_requested", "boq_item", itemID, "Yêu cầu chỉnh sửa dòng BOQ", Record{"from_status": fromStatus, "to_status": "revised", "reason": reason}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetBOQItemDetail(ctx, itemID)
+}
+
 func (r *Repository) UpdateBOQExpectedUnitPrice(ctx context.Context, itemID string, unitPrice float64, comment, actorID, actorName string) (Record, error) {
 	return r.changeBOQUnitPrice(ctx, itemID, "expected_updated", unitPrice, comment, actorID, actorName)
 }
@@ -10462,6 +10578,15 @@ func (r *Repository) changeBOQUnitPrice(ctx context.Context, itemID, eventType s
 		return nil, sql.ErrNoRows
 	}
 	current := currentRows[0]
+	if eventType == "expected_updated" && !statusIn(fmt.Sprint(current["status"]), "draft", "revised") {
+		return nil, validationError("Chỉ có thể cập nhật đơn giá dự kiến ở trạng thái nháp hoặc cần chỉnh sửa", Record{"boq_item_id": itemID, "status": current["status"]})
+	}
+	if eventType == "norm_locked" && fmt.Sprint(current["status"]) != "submitted" {
+		return nil, validationError("Chỉ có thể khóa đơn giá định mức khi dòng BOQ đã được gửi duyệt", Record{"boq_item_id": itemID, "status": current["status"]})
+	}
+	if eventType == "final_locked" && fmt.Sprint(current["status"]) != "approved" {
+		return nil, validationError("Chỉ có thể khóa đơn giá cuối khi dòng BOQ đã được phê duyệt", Record{"boq_item_id": itemID, "status": current["status"]})
+	}
 	var updatedRows []Record
 	var source string
 	var fromPrice *float64
@@ -10890,7 +11015,7 @@ func (r *Repository) SelectSupplierQuote(ctx context.Context, quotationItemID, r
 
 func (r *Repository) SupplierQuoteComparison(ctx context.Context, projectID string) ([]Record, error) {
 	return r.Query(ctx, `
-		SELECT b.id AS boq_item_id, b.category, b.work_item_name, b.unit, b.quantity, b.expected_unit_price,
+		SELECT b.id AS boq_item_id, b.category, b.work_item_name, b.unit, b.quantity, b.status, b.expected_unit_price,
 			b.norm_unit_price, b.final_unit_price, b.norm_price_locked, b.final_price_locked,
 			b.selected_quotation_item_id, b.price_waiver_reason,
 			COALESCE((
@@ -10919,7 +11044,7 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 		return nil, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "generate_procurement:"+projectID); err != nil {
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "boq_lifecycle:"+projectID); err != nil {
 		return nil, err
 	}
 

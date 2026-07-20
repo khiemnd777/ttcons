@@ -10,7 +10,7 @@
 
 ## Routes
 
-- BOQ: `/projects/:id/boq`, `/boq-items/:id`, `/boq-items/:id/unit-price/expected|lock-norm|lock-final`, `/projects/:id/boq/submit|approve|generate-procurement`
+- BOQ: `/projects/:id/boq`, `GET|PUT /boq-items/:id`, `POST /boq-items/:id/revise`, `/boq-items/:id/unit-price/expected|lock-norm|lock-final`, `/projects/:id/boq/submit|approve|generate-procurement`
 - Supplier quotation: `/projects/:id/supplier-quotations`, `/projects/:id/supplier-quote-comparison`, `/supplier-quotations/:id`, `/supplier-quotations/:id/submit|qualify`, `/supplier-quotation-items/:id/select`
 - Procurement: `/procurement-requests`, `/procurement-requests/:id`, `/procurement-requests/:id/submit|approve|order|receive`
 - Reconciliation: `/work-items/:id/subcontractor-reconciliation`, `/work-items/:id/owner-client-reconciliation`
@@ -29,8 +29,10 @@
 ## Invariants
 
 - Approved and final-locked BOQ prices drive procurement values; final price traces to a selected qualified quote or an explicit manual waiver reason.
+- BOQ lifecycle fields are server-owned: create always starts at draft; content and expected price change only in draft/revised; norm lock requires submitted; approval requires every submitted line norm-locked; final lock requires approved. A revise request needs an audit reason, clears the approver, and is blocked after final lock or while any non-cancelled procurement request is linked. A norm-locked revised line keeps its commercial fields immutable and permits descriptive metadata only.
 - Submitted quotation items and selection decisions are commercial history; selection locks the BOQ final price and is blocked after procurement exists.
-- Procurement generation groups eligible BOQ lines by selected supplier and snapshots quotation item, supplier, price revision, and final-price event.
+- BOQ list/detail expose the newest non-cancelled procurement request plus `active_procurement_count`; count greater than one is an integrity warning, not proof of uniqueness. Price history is bounded and paired with total/truncation metadata.
+- Procurement generation is permission-gated and serialized with BOQ lifecycle transitions, excludes lines already linked to active procurement, groups eligible BOQ lines by selected supplier and snapshots quotation item, supplier, price revision, and final-price event. Generation does not create stock movements, payables or receivables.
 - Ordering requires supplier, order reference, and expected delivery date. Partial/full receive status is derived from submitted incoming acceptance quantities and does not implicitly create stock movement.
 - Procurement receive is auditable and stock-aware: its acceptance-reconciliation audit event is distinct from the later warehouse receipt event, and list/detail contracts expose accepted quantity separately from explicitly stocked quantity.
 - The procurement workspace is action-first and permission-aware. It may link to the incoming-acceptance work item or create an explicit receipt from a submitted acceptance, but it must not label acceptance-derived `received` as already stocked.

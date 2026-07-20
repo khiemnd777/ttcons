@@ -2515,6 +2515,39 @@ Done:
 - Ran `git diff --check`: pass.
 - Browser verification was skipped per repository rule because the user did not request it.
 
+## BOQ / Dự Toán Workspace Redesign
+
+Status: complete
+
+Mục đích chính:
+- Giúp QS/PM/Giám đốc đưa từng dòng dự toán qua đúng chuỗi đơn giá dự kiến -> định mức -> phê duyệt -> so sánh báo giá -> giá chốt -> yêu cầu mua sắm, luôn thấy rõ việc cần làm và nguồn gốc quyết định giá.
+
+Will be done:
+- Tổ chức lại `/projects/:id/boq` thành ba tab `Dòng dự toán`, `Báo giá nhà cung cấp`, `So sánh & chốt giá`, với một CTA chính theo trạng thái và UI tiếng Việt nhất quán.
+- Chuyển tạo/xem/sửa dòng BOQ sang shared dialog, bỏ status khỏi form, thêm chi tiết dòng gồm tổng quan, đơn giá/lịch sử, báo giá và liên kết mua sắm.
+- Làm chi tiết báo giá, đánh giá, so sánh và preview sinh yêu cầu mua responsive, permission-aware, có loading/empty/error/readonly states.
+- Siết backend lifecycle: tạo luôn draft, chỉ sửa draft/revised, submit nhận draft/revised, approve yêu cầu submitted + norm lock, revise là action có lý do/audit.
+- Bổ sung API/response additive cho chi tiết BOQ và liên kết procurement đang hiệu lực; không sinh lại dòng đã chuyển mua sắm, không tạo stock movement hoặc AP/AR side effect.
+- Cập nhật central/backend/frontend/commercial mappings và shared plan state; không dự kiến migration.
+- Chạy backend format/tests, focused BOQ tests, Golden seed validation khi khả dụng, frontend build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the complete review package with `OK triển khai theo review package này` and explicitly requested subagent coordination.
+- Loaded the mandatory central/backend/frontend mappings, repo architect, backend/frontend workflow, commercial/procurement, impact-analysis and git workflow guidance.
+- Confirmed the worktree was clean on `main` before implementation; no user edits overlap the target files.
+- Confirmed current code exposes client-owned BOQ status, submit excludes revised rows, UI ignores action permissions, quote statuses leak English, and Golden BOQ rows already linked to two procurement requests are still presented as ready to generate.
+- Rebuilt the BOQ page as a responsive Vietnamese workspace with three tabs: `Dòng dự toán`, `Báo giá nhà cung cấp`, and `So sánh & chốt giá`; create/edit/view/revise/result interactions use shared dialogs, detail has overview/price/quote/procurement tabs, and catalog/action controls follow permissions.
+- Added inline required/invalid highlighting plus warning-toast summaries for supplier quotation editing and quote selection; loading, error, empty, read-only and truncated-price-history states are explicit.
+- Added record-scoped `GET /boq-items/:id` and `POST /boq-items/:id/revise`; create is server-owned draft, update/expected price are limited to draft/revised, submit accepts draft/revised, norm lock requires submitted, approval requires every submitted row norm-locked, and final lock requires approved.
+- Kept approved-to-revised safe without a migration: revise requires an audited reason, clears the approver, blocks final-locked or active-procurement rows, retains norm lock, and allows descriptive metadata only while unit, quantity, material and expected price remain immutable.
+- Serialized submit/approve/revise/generate with one project lifecycle advisory lock. Generation is project-scope and union-permission guarded, excludes BOQ lines with active procurement, preserves quotation/final-price snapshots, and has regression assertions for no stock movement, payable or receivable side effects.
+- Added BOQ list/detail procurement linkage (`request id/code/status`, active count and warning state) plus bounded price history count/truncation. Frontend readiness excludes linked lines, invalidates BOQ/procurement caches after writes and exposes procurement navigation only with `procurement.view`.
+- Updated the central keyword map, backend function map, frontend UI/utility map and commercial/procurement domain map. No root-cause-triage map update was required because search ownership/diagnostic routing did not change.
+- No migration was added or modified. Residual non-blocking scale risk: active-procurement linkage currently lacks a dedicated `procurement_request_items.boq_item_id` index, so a future performance-only migration should be considered for very large projects.
+- Ran `env GOCACHE="$PWD/.gocache" go test ./...` in `backend`: pass. DB-backed integration cases compile but skip without `CONSFLOW_TEST_DATABASE_URL`; Golden seed/database validation was therefore unavailable.
+- Ran `npm run build` and `npm run lint` in `frontend`: pass; Vite reported only the existing large-chunk advisory.
+- Ran `git diff --check`: pass. Browser verification was skipped per repository rule because the user did not request it.
+
 ## Thủ Thiêm Workflow App Display Name
 
 Status: complete

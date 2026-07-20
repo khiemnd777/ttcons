@@ -518,6 +518,10 @@ type BOQUnitPriceRequest struct {
 	Comment   string  `json:"comment"`
 }
 
+type BOQReviseRequest struct {
+	Reason string `json:"reason"`
+}
+
 type SupplierQuotationRequest struct {
 	QuotationCode     string                         `json:"quotation_code"`
 	SupplierPartnerID string                         `json:"supplier_partner_id"`

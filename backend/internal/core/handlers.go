@@ -1424,6 +1424,17 @@ func (h *Handler) CreateBOQ(c *fiber.Ctx) error {
 	return response.Created(c, item)
 }
 
+func (h *Handler) GetBOQ(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "boq_items", c.Params("id"), []string{"boq.view"}); err != nil {
+		return err
+	}
+	item, err := h.service.GetBOQ(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
+}
+
 func (h *Handler) UpdateBOQ(c *fiber.Ctx) error {
 	if err := h.requireRecordProjectPermission(c, "boq_items", c.Params("id"), []string{"boq.update"}); err != nil {
 		return err
@@ -1433,6 +1444,21 @@ func (h *Handler) UpdateBOQ(c *fiber.Ctx) error {
 		return err
 	}
 	item, err := h.service.UpdateBOQ(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, item)
+}
+
+func (h *Handler) ReviseBOQ(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "boq_items", c.Params("id"), []string{"boq.update"}); err != nil {
+		return err
+	}
+	var req BOQReviseRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu yêu cầu chỉnh sửa BOQ không hợp lệ")
+	}
+	item, err := h.service.ReviseBOQ(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -1507,6 +1533,9 @@ func (h *Handler) ApproveBOQ(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GenerateProcurementFromBOQ(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"procurement.create", "procurement.approve", "boq.approve"}); err != nil {
+		return err
+	}
 	req, err := h.service.GenerateProcurementFromBOQ(c.Context(), c.Params("id"), actorID(c), actorName(c))
 	if err != nil {
 		return err

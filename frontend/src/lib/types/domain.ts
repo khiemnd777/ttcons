@@ -303,12 +303,27 @@ export type BOQItem = ProjectOperationsRecord & {
   final_price_comment?: string;
   price_revision_no?: number;
   price_events?: BOQUnitPriceEvent[];
+  price_event_count?: number;
+  price_events_truncated?: boolean;
   selected_quotation_item_id?: string;
   selected_quotation_code?: string;
   selected_supplier_partner_id?: string;
   selected_supplier_name?: string;
   quoted_unit_price?: number;
   price_waiver_reason?: string;
+  procurement_request_id?: string;
+  procurement_request_code?: string;
+  procurement_request_status?: string;
+  has_active_procurement?: boolean;
+  active_procurement_count?: number;
+};
+
+export type BOQProcurementResult = {
+  id?: string;
+  request_code?: string;
+  status?: string;
+  requests?: Array<{ id: string; request_code?: string; status?: string; supplier_name?: string }>;
+  created_requests?: Array<{ id: string; request_code?: string; status?: string; supplier_name?: string }>;
 };
 
 export type SupplierQuotationItem = ProjectOperationsRecord & {
@@ -354,6 +369,7 @@ export type SupplierQuotation = ProjectOperationsRecord & {
 
 export type SupplierQuoteComparison = {
   boq_item_id: string;
+  status: string;
   category: string;
   work_item_name: string;
   unit: string;

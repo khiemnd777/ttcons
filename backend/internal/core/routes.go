@@ -142,7 +142,9 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, _ *redis.Client, cfg config.Conf
 
 	protected.Get("/projects/:id/boq", h.ProjectBOQ)
 	protected.Post("/projects/:id/boq", h.CreateBOQ)
+	protected.Get("/boq-items/:id", h.GetBOQ)
 	protected.Put("/boq-items/:id", h.UpdateBOQ)
+	protected.Post("/boq-items/:id/revise", h.ReviseBOQ)
 	protected.Post("/boq-items/:id/unit-price/expected", h.UpdateBOQExpectedUnitPrice)
 	protected.Post("/boq-items/:id/unit-price/lock-norm", h.LockBOQNormUnitPrice)
 	protected.Post("/boq-items/:id/unit-price/lock-final", h.LockBOQFinalUnitPrice)

@@ -271,9 +271,19 @@ func TestBOQUnitPriceValidation(t *testing.T) {
 	}
 	_, _, err = normalizeBOQUnitPriceRequest(BOQUnitPriceRequest{UnitPrice: 0}, true)
 	assertValidationError(t, err)
-	_, err = normalizeBOQItemRequest("project-id", Record{"category": "A", "work_item_name": "Item", "unit": "m2", "quantity": "2.5", "unit_price": "100"}, true)
+	normalized, err := normalizeBOQItemRequest("project-id", Record{"category": "A", "work_item_name": "Item", "unit": "m2", "quantity": "2.5", "unit_price": "100", "status": "approved", "approved_by": "client-owned"}, true)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if normalized["status"] != "draft" || normalized["approved_by"] != nil {
+		t.Fatalf("create BOQ server-owned fields = %#v, want draft status without approved_by", normalized)
+	}
+	normalized, err = normalizeBOQItemRequest("", Record{"work_item_name": "Updated", "status": "approved", "approved_by": "client-owned"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if normalized["status"] != nil || normalized["approved_by"] != nil {
+		t.Fatalf("update BOQ accepted server-owned fields: %#v", normalized)
 	}
 	_, err = normalizeBOQItemRequest("project-id", Record{"category": "A", "work_item_name": "Item", "unit": "m2", "quantity": -1}, true)
 	assertValidationError(t, err)
@@ -3938,6 +3948,198 @@ func TestPublishTemplateRejectsRequiredStepWithoutPublishedForm(t *testing.T) {
 	}
 }
 
+func TestBOQLifecycleHardeningAndProcurementLink(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+
+	actorID := newID()
+	projectID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','BOQ Actor','active')`, actorID, "boq-lifecycle-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'BOQ Lifecycle',$2,'Client','planning')`, projectID, "BQL-"+projectID[:8])
+
+	draft, err := service.CreateBOQ(ctx, projectID, Record{
+		"category": "A", "work_item_name": "Server draft", "unit": "m2", "quantity": 2, "unit_price": 10,
+		"status": "approved", "approved_by": actorID,
+	}, actorID, "boq@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if draft["status"] != "draft" || draft["approved_by"] != nil {
+		t.Fatalf("created BOQ = %#v, want server-owned draft", draft)
+	}
+	draftID := cleanID(draft["id"])
+	second, err := service.CreateBOQ(ctx, projectID, Record{
+		"category": "A", "work_item_name": "Revised row", "unit": "m", "quantity": 3, "unit_price": 20,
+	}, actorID, "boq@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondID := cleanID(second["id"])
+	mustExec(t, db, `UPDATE boq_items SET status='revised' WHERE id=$1`, secondID)
+	_, err = service.LockBOQNormUnitPrice(ctx, draftID, BOQUnitPriceRequest{UnitPrice: 11, Comment: "must be submitted"}, actorID, "boq@test.local")
+	assertValidationError(t, err)
+
+	updated, err := service.UpdateBOQ(ctx, draftID, Record{"work_item_name": "Updated draft", "status": "approved"}, actorID, "boq@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated["status"] != "draft" || updated["work_item_name"] != "Updated draft" {
+		t.Fatalf("updated draft = %#v", updated)
+	}
+	submitted, err := service.BOQProjectAction(ctx, projectID, "submit", actorID, "boq@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(submitted["item_count"]) != 2 {
+		t.Fatalf("submit result = %#v, want both draft and revised rows", submitted)
+	}
+	_, err = service.UpdateBOQ(ctx, draftID, Record{"work_item_name": "Bypass submitted"}, actorID, "boq@test.local")
+	assertValidationError(t, err)
+	_, err = service.BOQProjectAction(ctx, projectID, "approve", actorID, "boq@test.local")
+	assertValidationError(t, err)
+	if _, err := service.LockBOQNormUnitPrice(ctx, draftID, BOQUnitPriceRequest{UnitPrice: 11, Comment: "norm"}, actorID, "boq@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.LockBOQNormUnitPrice(ctx, secondID, BOQUnitPriceRequest{UnitPrice: 21, Comment: "norm"}, actorID, "boq@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.LockBOQFinalUnitPrice(ctx, draftID, BOQUnitPriceRequest{UnitPrice: 12, Comment: "must still be approved"}, actorID, "boq@test.local")
+	assertValidationError(t, err)
+	approved, err := service.BOQProjectAction(ctx, projectID, "approve", actorID, "boq@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(approved["item_count"]) != 2 {
+		t.Fatalf("approve result = %#v, want two norm-locked submitted rows", approved)
+	}
+	_, err = service.ReviseBOQ(ctx, draftID, BOQReviseRequest{}, actorID, "boq@test.local")
+	assertValidationError(t, err)
+	revised, err := service.ReviseBOQ(ctx, draftID, BOQReviseRequest{Reason: "  Bổ sung diễn giải theo hiện trường  "}, actorID, "boq@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revised["status"] != "revised" || revised["approved_by"] != nil || !boolValue(revised["norm_price_locked"]) {
+		t.Fatalf("revised approved BOQ = %#v, want revised, cleared approver and retained norm lock", revised)
+	}
+	revised, err = service.UpdateBOQ(ctx, draftID, Record{"description": "Bổ sung diễn giải sau khi yêu cầu chỉnh sửa"}, actorID, "boq@test.local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revised["description"] != "Bổ sung diễn giải sau khi yêu cầu chỉnh sửa" || number(revised["price_revision_no"]) != 2 {
+		t.Fatalf("metadata-only revision = %#v, want description update without price revision change", revised)
+	}
+	_, err = service.UpdateBOQ(ctx, draftID, Record{"unit": "kg"}, actorID, "boq@test.local")
+	assertValidationError(t, err)
+	_, err = service.UpdateBOQ(ctx, draftID, Record{"quantity": 4}, actorID, "boq@test.local")
+	assertValidationError(t, err)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='boq_revision_requested' AND target_id=$2 AND metadata_json->>'from_status'='approved' AND metadata_json->>'reason'='Bổ sung diễn giải theo hiện trường'`, 1, projectID, draftID)
+
+	if _, err := service.BOQProjectAction(ctx, projectID, "submit", actorID, "boq@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.BOQProjectAction(ctx, projectID, "approve", actorID, "boq@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	requestID := newID()
+	mustExec(t, db, `INSERT INTO procurement_requests (id, project_id, request_code, title, status) VALUES ($1,$2,$3,'Linked request','waiting_approval')`, requestID, projectID, "PR-LINK-"+requestID[:8])
+	mustExec(t, db, `INSERT INTO procurement_request_items (request_id, boq_item_id, quantity_planned, quantity_requested, unit, estimated_unit_price) VALUES ($1,$2,2,2,'m2',11)`, requestID, draftID)
+	detail, err := service.GetBOQ(ctx, draftID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(detail["procurement_request_id"]) != requestID || detail["procurement_request_code"] != "PR-LINK-"+requestID[:8] || detail["procurement_request_status"] != "waiting_approval" || number(detail["active_procurement_count"]) != 1 || !boolValue(detail["has_active_procurement"]) {
+		t.Fatalf("BOQ procurement link = %#v", detail)
+	}
+	list, err := service.ProjectBOQ(ctx, projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var linked Record
+	for _, row := range list {
+		if cleanID(row["id"]) == draftID {
+			linked = row
+		}
+	}
+	if linked == nil || cleanID(linked["procurement_request_id"]) != requestID || number(linked["active_procurement_count"]) != 1 {
+		t.Fatalf("BOQ list missing active procurement link: %#v", linked)
+	}
+	_, err = service.ReviseBOQ(ctx, draftID, BOQReviseRequest{Reason: "Should be blocked by procurement"}, actorID, "boq@test.local")
+	assertValidationError(t, err)
+
+	if _, err := service.LockBOQFinalUnitPrice(ctx, secondID, BOQUnitPriceRequest{UnitPrice: 22, Comment: "manual waiver"}, actorID, "boq@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.ReviseBOQ(ctx, secondID, BOQReviseRequest{Reason: "Should be blocked by final lock"}, actorID, "boq@test.local")
+	assertValidationError(t, err)
+}
+
+func TestBOQRecordRoutesEnforceScopedPermissions(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	repo := NewRepository(db)
+	handler := NewHandler(NewService(repo, "test-secret"))
+	fixture := setupProjectScopeFixture(t, db, []string{"boq.view"})
+	boqID := newID()
+	mustExec(t, db, `INSERT INTO boq_items (id, project_id, category, work_item_name, unit, quantity, unit_price, status, created_by) VALUES ($1,$2,'A','Scoped BOQ','m2',1,10,'submitted',$3)`, boqID, fixture.projectID, fixture.userID)
+	app := batch4TestApp(fixture.userID, func(app *fiber.App, h *Handler) {
+		app.Get("/boq-items/:id", h.GetBOQ)
+		app.Post("/boq-items/:id/revise", h.ReviseBOQ)
+	}, handler)
+
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/boq-items/"+boqID, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET BOQ status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/boq-items/"+boqID+"/revise", strings.NewReader(`{"reason":"Need correction"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("revise BOQ status = %d, want %d", resp.StatusCode, http.StatusForbidden)
+	}
+}
+
+func TestGenerateProcurementFromBOQRouteEnforcesScopedPermissions(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	handler := NewHandler(service)
+	fixture := setupProjectScopeFixture(t, db, []string{"boq.view"})
+	app := batch4TestApp(fixture.userID, func(app *fiber.App, h *Handler) {
+		app.Post("/projects/:id/boq/generate-procurement", h.GenerateProcurementFromBOQ)
+	}, handler)
+
+	resp, err := app.Test(httptest.NewRequest(http.MethodPost, "/projects/"+fixture.projectID+"/boq/generate-procurement", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("generate procurement status = %d, want %d", resp.StatusCode, http.StatusForbidden)
+	}
+
+	authorized := setupProjectScopeFixture(t, db, []string{"procurement.create"})
+	app = batch4TestApp(authorized.userID, func(app *fiber.App, h *Handler) {
+		app.Post("/projects/:id/boq/generate-procurement", h.GenerateProcurementFromBOQ)
+	}, handler)
+	resp, err = app.Test(httptest.NewRequest(http.MethodPost, "/projects/"+authorized.projectID+"/boq/generate-procurement", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode == http.StatusForbidden {
+		t.Fatal("generate procurement rejected a project-scoped procurement.create actor")
+	}
+}
+
 func TestGenerateProcurementFromBOQRequiresFinalLockedApprovedItems(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
@@ -3959,16 +4161,17 @@ func TestGenerateProcurementFromBOQRequiresFinalLockedApprovedItems(t *testing.T
 	`, projectID, "BOQ-"+projectID[:8])
 	mustExec(t, db, `
 		INSERT INTO boq_items (id, project_id, category, work_item_name, unit, quantity, unit_price, status, created_by)
-		VALUES ($1,$2,'A','Approved item','m2',2,10,'approved',$3),
+		VALUES ($1,$2,'A','Approved item','m2',2,10,'submitted',$3),
 		       ($4,$2,'A','Submitted item','m2',100,10,'submitted',$3)
 	`, approvedBOQID, projectID, actorID, submittedBOQID)
-
-	_, err := repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, "actor@test.local")
-	assertValidationError(t, err)
 
 	if _, err := repo.LockBOQNormUnitPrice(ctx, approvedBOQID, 11, "norm locked", actorID, "actor@test.local"); err != nil {
 		t.Fatal(err)
 	}
+	mustExec(t, db, `UPDATE boq_items SET status='approved', approved_by=$2 WHERE id=$1`, approvedBOQID, actorID)
+	_, err := repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, "actor@test.local")
+	assertValidationError(t, err)
+
 	if _, err := repo.LockBOQFinalUnitPrice(ctx, approvedBOQID, 12, "final locked", actorID, "actor@test.local"); err != nil {
 		t.Fatal(err)
 	}
@@ -3982,6 +4185,21 @@ func TestGenerateProcurementFromBOQRequiresFinalLockedApprovedItems(t *testing.T
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND boq_item_id=$2`, 1, requestID, approvedBOQID)
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND boq_item_id=$2`, 0, requestID, submittedBOQID)
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND boq_item_id=$2 AND estimated_unit_price=12 AND boq_price_source='final' AND boq_price_revision_no=2 AND boq_price_event_id IS NOT NULL`, 1, requestID, approvedBOQID)
+	detail, err := repo.GetBOQItemDetail(ctx, approvedBOQID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(detail["procurement_request_id"]) != cleanID(requestID) || detail["procurement_request_status"] != "waiting_approval" || number(detail["active_procurement_count"]) != 1 || !boolValue(detail["has_active_procurement"]) {
+		t.Fatalf("generated procurement link = %#v", detail)
+	}
+	if _, err := repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, "actor@test.local"); err == nil {
+		t.Fatal("expected duplicate procurement generation to report no eligible BOQ rows")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM procurement_requests WHERE project_id=$1`, 1, projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE boq_item_id=$1`, 1, approvedBOQID)
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE project_id=$1`, 0, projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM payables WHERE project_id=$1`, 0, projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM receivables WHERE project_id=$1`, 0, projectID)
 }
 
 func TestSupplierQuotationSelectionLocksBOQAndSnapshotsProcurement(t *testing.T) {
@@ -4005,9 +4223,12 @@ func TestSupplierQuotationSelectionLocksBOQAndSnapshotsProcurement(t *testing.T)
 	mustExec(t, db, `INSERT INTO partners (id, partner_code, name, partner_types, active) VALUES ($1,$2,'Qualified Supplier','["supplier"]'::jsonb,true)`, partnerID, "SUP-"+partnerID[:8])
 	mustExec(t, db, `
 		INSERT INTO boq_items (id, project_id, category, work_item_name, unit, quantity, unit_price, expected_unit_price, status, created_by)
-		VALUES ($1,$2,'A','Concrete supply','m3',10,100,100,'approved',$3)
+		VALUES ($1,$2,'A','Concrete supply','m3',10,100,100,'submitted',$3)
 	`, boqID, projectID, actorID)
 	if _, err := repo.LockBOQNormUnitPrice(ctx, boqID, 105, "Approved norm", actorID, "commercial@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.BOQProjectAction(ctx, projectID, "approve", actorID, "commercial@test.local"); err != nil {
 		t.Fatal(err)
 	}
 
