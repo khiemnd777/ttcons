@@ -205,6 +205,10 @@ type ReceivableAdvanceSettlementRequest struct {
 	Comment         string  `json:"comment"`
 }
 
+type OperationalReportRequest struct {
+	ProjectID string `json:"project_id"`
+}
+
 type CashflowReportRequest struct {
 	ProjectID string `json:"project_id"`
 	FromDate  string `json:"from"`
@@ -235,6 +239,20 @@ type WorkItemActionRequest struct {
 	Reason            string   `json:"reason"`
 	CompletionPayload Record   `json:"completion_payload"`
 	RequiredRoles     []string `json:"required_roles"`
+}
+
+type MyWorkItemsFilter struct {
+	Queue     string
+	ProjectID string
+	Status    string
+	Deadline  string
+	WorkType  string
+	Priority  string
+	Search    string
+	Sort      string
+	Bucket    string
+	Cursor    string
+	Limit     int
 }
 
 type WorkItemEvidenceRequest struct {

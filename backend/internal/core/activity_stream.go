@@ -14,6 +14,7 @@ import (
 type ActivityStreamEvent struct {
 	Type       string `json:"type"`
 	ProjectID  string `json:"project_id,omitempty"`
+	WorkItemID string `json:"work_item_id,omitempty"`
 	ActivityID string `json:"activity_id,omitempty"`
 	ScopeType  string `json:"scope_type,omitempty"`
 	ScopeID    string `json:"scope_id,omitempty"`
@@ -111,6 +112,9 @@ func (h *Handler) ProjectActivityStream(c *fiber.Ctx) error {
 		if event.ProjectID != projectID {
 			return "", ActivityStreamEvent{}, false
 		}
+		if event.Type == "work_item_changed" {
+			return "", ActivityStreamEvent{}, false
+		}
 		return event.Type, event, true
 	})
 	return nil
@@ -125,13 +129,25 @@ func (h *Handler) MyActivityAttentionStream(c *fiber.Ctx) error {
 				return "", ActivityStreamEvent{}, false
 			}
 		}
-		return "attention_changed", ActivityStreamEvent{
-			Type:      "attention_changed",
-			ProjectID: event.ProjectID,
-			At:        time.Now().UTC().Format(time.RFC3339),
-		}, true
+		eventName, output := myActivityAttentionStreamEvent(event)
+		return eventName, output, true
 	})
 	return nil
+}
+
+func myActivityAttentionStreamEvent(event ActivityStreamEvent) (string, ActivityStreamEvent) {
+	if event.Type == "work_item_changed" {
+		return "work_queue_changed", ActivityStreamEvent{
+			Type:      "work_queue_changed",
+			ProjectID: event.ProjectID,
+			At:        time.Now().UTC().Format(time.RFC3339),
+		}
+	}
+	return "attention_changed", ActivityStreamEvent{
+		Type:      "attention_changed",
+		ProjectID: event.ProjectID,
+		At:        time.Now().UTC().Format(time.RFC3339),
+	}
 }
 
 func (h *Handler) writeActivityStream(c *fiber.Ctx, filter func(ActivityStreamEvent) (string, ActivityStreamEvent, bool)) {

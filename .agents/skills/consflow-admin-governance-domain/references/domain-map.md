@@ -15,6 +15,7 @@
 - Staff/RBAC: `/staff`, `/roles`, `/permissions`, `/roles/:id/permissions`, `/users/:id/roles`
 - Project membership governance: `/projects/:id/members`, `/projects/:id/members/:memberId`
 - Audit/settings: `/audit-logs`, `/projects/:id/audit-logs`, `/settings`
+- Reports governance: `/reports/options`, `/reports/staff` and `/reports/staff/export`
 
 ## Tables And Migrations
 
@@ -31,6 +32,9 @@
 - Audit read APIs are server-filtered and page-number paginated, return project labels plus permission-scoped filter options, use global `ProjectAccessFilter` or project `requireProjectPermission`, and expose metadata read-only without changing `AddAudit` or source-domain audit semantics.
 - Activity reply/reaction/edit/withdraw endpoints remain protected and reuse `ActivityVisibleToUser`; edit/withdraw additionally require exact author ownership, activity type `comment`, an unwithdrawn row and the 15-minute server window. UI capability flags never replace backend enforcement, managers receive no override, and no new global permission is introduced.
 - Frontend navigation and row actions mirror permissions but do not replace backend enforcement.
+- My Work list/detail capabilities and `available_actions` are actor-specific presentation hints only. `pending_approval` must retain requester separation, required decision roles and project scope; department includes role scope; the authenticated SSE exposes invalidation-only `work_queue_changed` rather than unverified work-item metadata. No new global permission or manager override is introduced.
+- Reports navigation is visible for any of `report.view`, `report.finance.view`, or `accounting.view`, but its catalog filters each report independently. Finance-only actors do not trigger operational report APIs, operational-only actors do not trigger finance APIs, and backend handlers remain authoritative.
+- Staff report is a project-allocation view: only active staff memberships in accessible non-cancelled projects are returned and distinct accessible projects are counted. Full-company staff is available only through the `staff.view` Staff module.
 - `project.member.manage` is granted to Admin/Director/PM and always combined with project scope. Project member responses expose server capabilities; mutation synchronizes only project-scoped `user_roles`, never removes global roles, never exposes Admin/Director as assignable project roles, and writes project audit.
 - Partner catalog updates preserve downstream snapshots for historical documents.
 - Session refresh/revoke lifecycle remains DB-backed and revocable.

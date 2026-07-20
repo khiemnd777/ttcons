@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -725,7 +726,27 @@ func (h *Handler) ProjectWorkItems(c *fiber.Ctx) error {
 }
 
 func (h *Handler) MyWorkItems(c *fiber.Ctx) error {
-	items, err := h.service.MyWorkItems(c.Context(), actorID(c))
+	limit := 0
+	if rawLimit := strings.TrimSpace(c.Query("limit")); rawLimit != "" {
+		parsed, err := strconv.Atoi(rawLimit)
+		if err != nil {
+			return validationError("limit không hợp lệ", Record{"limit": rawLimit})
+		}
+		limit = parsed
+	}
+	items, err := h.service.MyWorkItems(c.Context(), MyWorkItemsFilter{
+		Queue:     c.Query("queue"),
+		ProjectID: c.Query("project_id"),
+		Status:    c.Query("status"),
+		Deadline:  c.Query("deadline"),
+		WorkType:  c.Query("work_type"),
+		Priority:  c.Query("priority"),
+		Search:    c.Query("search"),
+		Sort:      c.Query("sort"),
+		Bucket:    c.Query("bucket"),
+		Cursor:    c.Query("cursor"),
+		Limit:     limit,
+	}, actorID(c))
 	if err != nil {
 		return err
 	}
@@ -4014,6 +4035,18 @@ func (h *Handler) Dashboard(c *fiber.Ctx) error {
 	}
 	return response.OK(c, data)
 }
+
+func (h *Handler) ReportOptions(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"report.view", "report.finance.view", "accounting.view"}); err != nil {
+		return err
+	}
+	data, err := h.service.ReportOptions(c.Context(), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, data)
+}
+
 func (h *Handler) CashflowReport(c *fiber.Ctx) error {
 	permissions := []string{"report.finance.view", "accounting.view"}
 	if err := h.requirePermission(c, permissions); err != nil {
@@ -4157,19 +4190,72 @@ func (h *Handler) WarehouseReport(c *fiber.Ctx) error   { return h.report(c, "wa
 func (h *Handler) ProcurementReport(c *fiber.Ctx) error { return h.report(c, "procurement") }
 func (h *Handler) AccountingReport(c *fiber.Ctx) error  { return h.report(c, "accounting") }
 func (h *Handler) StaffReport(c *fiber.Ctx) error       { return h.report(c, "staff") }
+func (h *Handler) ProjectReportCSV(c *fiber.Ctx) error  { return h.reportCSV(c, "projects") }
+func (h *Handler) WarehouseReportCSV(c *fiber.Ctx) error {
+	return h.reportCSV(c, "warehouse")
+}
+func (h *Handler) ProcurementReportCSV(c *fiber.Ctx) error {
+	return h.reportCSV(c, "procurement")
+}
+func (h *Handler) AccountingReportCSV(c *fiber.Ctx) error {
+	return h.reportCSV(c, "accounting")
+}
+func (h *Handler) StaffReportCSV(c *fiber.Ctx) error { return h.reportCSV(c, "staff") }
+
 func (h *Handler) report(c *fiber.Ctx, kind string) error {
-	permissions := []string{"report.view"}
-	if kind == "accounting" {
-		permissions = []string{"report.finance.view", "accounting.view"}
-	}
+	permissions := operationalReportPermissions(kind)
 	if err := h.requirePermission(c, permissions); err != nil {
 		return err
 	}
-	rows, err := h.service.Report(c.Context(), kind, actorID(c))
+	req, err := operationalReportRequest(c)
+	if err != nil {
+		return err
+	}
+	if req.ProjectID != "" {
+		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
+			return err
+		}
+	}
+	rows, err := h.service.Report(c.Context(), kind, req, actorID(c))
 	if err != nil {
 		return err
 	}
 	return response.OK(c, rows)
+}
+
+func (h *Handler) reportCSV(c *fiber.Ctx, kind string) error {
+	permissions := operationalReportPermissions(kind)
+	if err := h.requirePermission(c, permissions); err != nil {
+		return err
+	}
+	req, err := operationalReportRequest(c)
+	if err != nil {
+		return err
+	}
+	if req.ProjectID != "" {
+		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
+			return err
+		}
+	}
+	rows, err := h.service.Report(c.Context(), kind, req, actorID(c))
+	if err != nil {
+		return err
+	}
+	payload, err := operationalReportCSV(kind, rows)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, "text/csv; charset=utf-8")
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="%s-report.csv"`, kind))
+	return c.Send(payload)
+}
+
+func operationalReportRequest(c *fiber.Ctx) (OperationalReportRequest, error) {
+	projectID := cleanID(c.Query("project_id"))
+	if projectID != "" && !validActivityUUID(projectID) {
+		return OperationalReportRequest{}, validationError("project_id không hợp lệ", Record{"project_id": projectID})
+	}
+	return OperationalReportRequest{ProjectID: projectID}, nil
 }
 
 func cashflowReportRequest(c *fiber.Ctx) CashflowReportRequest {
@@ -4225,6 +4311,39 @@ func cashflowCSV(data Record) ([]byte, error) {
 			fmt.Sprint(row["net_amount"]),
 			fmt.Sprint(row["target_type"]),
 		}); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func operationalReportCSV(kind string, rows []Record) ([]byte, error) {
+	columns := map[string][]string{
+		"projects":    {"project_id", "name", "status", "progress_percent", "open_issues", "pending_approvals"},
+		"warehouse":   {"material_id", "name", "category", "stock_quantity", "surplus_quantity"},
+		"procurement": {"status", "budget_status", "total", "amount"},
+		"accounting":  {"project_id", "name", "payable_remaining", "receivable_remaining", "used_budget"},
+		"staff":       {"staff_id", "full_name", "department", "position", "project_count"},
+	}
+	keys, ok := columns[kind]
+	if !ok || len(keys) == 0 {
+		return nil, errors.New("Báo cáo không hợp lệ")
+	}
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	if err := writer.Write(keys); err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		values := make([]string, len(keys))
+		for index, key := range keys {
+			values[index] = fmt.Sprint(row[key])
+		}
+		if err := writer.Write(values); err != nil {
 			return nil, err
 		}
 	}

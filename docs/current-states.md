@@ -1,5 +1,180 @@
 # Current States
 
+## My Work Action-First Redesign
+
+Status: complete
+
+Mục đích chính:
+- Biến `/my-work` thành hộp công việc hành động: người dùng nhìn thấy ngay việc thực sự cần xử lý, lý do ưu tiên, hạn, ngữ cảnh và một CTA mở workspace chi tiết; trao đổi cần phản hồi giữ realtime nhưng là luồng phụ tách biệt.
+
+Will be done:
+- Tái cấu trúc UI thành hai chế độ `Công việc` và `Trao đổi cần phản hồi`; mặc định action-first, Việt hóa nhãn, compact empty/error/loading/offline states và responsive desktop/tablet/mobile.
+- Bổ sung chọn work item thật sự, preview `Việc tiếp theo`, filter/search/sort, query-state trên URL, xóa filter, KPI tương tác, một nút làm mới và tái sử dụng `WorkItemDetailDialog` cho xử lý chi tiết.
+- Mở rộng `GET /me/work-items` thành contract phân trang/cursor có server filters, source-backed summary/facets và capability theo actor; giữ cancelled/project-cancelled ngoài queue.
+- Bổ sung capability cho work-item detail để UI action khớp `CanActOnWorkItem`/`CanDecideWorkItem`; backend gates vẫn authoritative.
+- Bổ sung invalidation realtime `work_queue_changed` cho direct `WorkItemAction`; giữ evidence/form/runtime theo refresh contract hiện hữu và activity read/resolve tách biệt workflow transition.
+- Không thêm bulk approve/complete, snooze, saved views, migration, permission hay thay đổi template/runtime/form/evidence/approval gate.
+- Cập nhật central/frontend/backend/workflow/admin mappings theo contract mới.
+- Chạy focused source/tests, backend tests, frontend build và `git diff --check`; browser verification bỏ qua vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- Người dùng đã duyệt toàn bộ review package/Mockup as Text và yêu cầu delegate subagents bằng `Approve for all with delegate subagents`.
+- Đã tải mandatory central/frontend/backend mappings, frontend/backend workflows, workflow-orchestration, impact-analysis và admin-governance guardrails.
+- Đã xác nhận owner frontend là `MyWorkPage.tsx`, shared work-item presentation/detail và `domain.ts`; owner backend là route/handler/service/repository/types của `/me/work-items`, work-item detail/action và activity SSE.
+- Đã xác nhận current queue filter/count chạy client-side trên tối đa 200 rows, context luôn lấy dòng đầu, attention tối đa 120 rows/chỉ render 8 và UI action hiện suy từ status trong khi backend tách `CanActOnWorkItem`/`CanDecideWorkItem`.
+- Đã khóa ownership: backend và frontend do hai subagent riêng triển khai; root giữ plan, mapping, integration và validation cuối.
+- Đã tái cấu trúc `/my-work` thành hai chế độ `Công việc` và `Trao đổi cần phản hồi`, bổ sung URL-backed KPI/queue/search/filter/sort, cursor load-more có dedupe, selected-item preview, shared `WorkItemDetailDialog`, source-local loading/error/empty states và responsive layout.
+- Đã đổi `/me/work-items` sang page object với server SQL filtering/count/summary/facets, opaque cursor, cancelled exclusion, role-aware Department, requester-separated Pending Approval và actor-scoped `capabilities`/`available_actions`; không thêm migration, permission, seed hoặc route mới.
+- Đã làm detail action fail-closed, giữ backend mutation gates authoritative, sửa parity watcher/decision role/project scope/empty approval roles và dùng timezone `Asia/Ho_Chi_Minh` cho `done_today`.
+- Đã bổ sung invalidation-only `work_queue_changed` cho successful direct `WorkItemAction`; project activity stream không forward work-item event và communication vẫn dùng `attention_changed`.
+- Đã cập nhật central/frontend/backend/workflow/admin mappings và thu hẹp realtime claim đúng phạm vi direct work-item transition.
+- Frontend `npm run lint` và `npm run build` pass; backend `go test ./...` và focused My Work tests pass; `git diff --check` pass. DB-backed My Work pagination/RBAC test đã được thêm nhưng skip khi không có `CONSFLOW_TEST_DATABASE_URL`; browser verification bỏ qua theo repo instruction vì người dùng không yêu cầu.
+- Post-implementation reviewer xác nhận không còn blocking finding sau khi sửa decision parity, KPI queue alignment, capability fail-closed, reset queue và business timezone.
+
+## Reports Analytics Workspace Redesign
+
+Status: complete
+
+Mục đích chính:
+- Biến `/reports` từ một trang cuộn dài tải đồng thời mọi nguồn thành workspace phân tích permission-aware, mỗi lần hiển thị một báo cáo với phạm vi, cảnh báo, bảng nguồn và CSV nhất quán.
+
+Will be done:
+- Sửa query aggregate công trình, kho và kế toán để loại bỏ nhân bản/thiếu số; scope báo cáo nhân sự theo các công trình người dùng được phép xem.
+- Thêm `project_id` filter và CSV export parity cho năm báo cáo vận hành; giữ P&L/VAT theo invoice ledger và Cashflow theo payment ledger.
+- Tổ chức lại frontend thành danh mục báo cáo tài chính/vận hành/nguồn lực, chỉ gọi query của báo cáo đang mở và ẩn mục không có quyền.
+- Tái sử dụng `CashflowPanel`, chuẩn hóa nhãn tiếng Việt, loading/error/empty/permission, deep-link `/reports/:reportKey`, bộ lọc áp dụng rõ ràng và điều hướng nguồn nghiệp vụ.
+- Cập nhật route, types, report tests và central/frontend/backend/reporting/source-domain mappings trong cùng turn.
+- Chạy focused/full backend tests khi khả dụng, frontend test/build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- Người dùng đã duyệt review package và Mockup as Text bằng `Approve`.
+- Đã tải mandatory central/frontend/backend/root-cause/reporting mappings cùng frontend, backend, diagnosis, impact-analysis và source-domain guardrails.
+- Đã xác nhận root cause query: join issue×approval trước COUNT, join stock movement×site balance trước SUM, và `SUM(DISTINCT amount)` trong accounting; staff report bỏ qua project scope.
+- Đã xác nhận route `/reports` dùng any-permission nhưng trang hiện gọi mọi endpoint; finance ProjectSelector gọi `/projects` ngoài contract báo cáo.
+- Worktree đang chứa thay đổi người dùng ở AppShell, Dashboard, Projects, domain types, mappings và docs; implementation sẽ chỉnh hẹp và bảo toàn các thay đổi đó.
+- Backend đã thêm `/reports/options`, optional `project_id` và CSV parity cho năm báo cáo vận hành; handler và service cùng kiểm tra permission/project scope.
+- Aggregate đã được tách đúng nguồn: project dùng subquery issue/approval độc lập; kho dùng CTE movement/site balance; accounting dùng CTE AP/AR/budget với `SUM` thường; staff chỉ join active membership của accessible project.
+- Frontend đã chuyển thành workspace `/reports/:reportKey` với catalog theo quyền, desktop rail/mobile selector, lazy-load một panel, project options scoped và điều hướng nguồn nghiệp vụ theo permission.
+- P&L, VAT, Cashflow và operational reports dùng shared apply/reset/CSV controls; applied filters được phản ánh trên URL, nhãn chính được Việt hóa và DataTable giữ loading/error/retry/empty/search/paging.
+- Warning có dòng nguồn trong P&L/VAT có thể bấm để lọc ledger theo exact backend warning flag; warning aggregate hoặc dòng bị loại vẫn giữ trạng thái thông tin trung thực.
+- Đã tái sử dụng `CashflowPanel` trong report workspace, mở quyền route/nav cho `accounting.view`, đồng thời giữ module Staff là nơi xem toàn công ty bằng `staff.view`.
+- Đã bổ sung regression tests cho project cross-join, warehouse cross-join, accounting equal-amount totals, staff scope, report options, operational CSV và frontend report catalog permissions.
+- Đã cập nhật central frontend/backend/root-cause mappings cùng reporting, project, materials, procurement, accounting và admin domain maps cho contract mới.
+- Validation đạt: `GOCACHE=/tmp/ttcons-go-cache go test ./...`, `npm run test:reports`, `npm run lint`, production `npm run build` và `git diff --check`; Vite chỉ còn cảnh báo chunk-size hiện hữu.
+- Browser verification được bỏ qua đúng guardrail vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+## AppShell Horizontal Brand Lockup
+
+Status: complete
+
+Mục đích chính:
+- Biến khu vực logo thành điểm nhận diện rõ ràng và lối quay về trang mặc định, đồng thời giữ AppShell gọn và không làm lệch hàng header 64px.
+
+Will be done:
+- Đổi logo desktop 48px căn giữa thành lockup ngang gồm mark 40px và wordmark hai dòng `Thủ Thiêm` / `WORKFLOW`, căn trái trong sidebar 288px.
+- Biến toàn bộ lockup desktop và mark mobile thành liên kết về `/`, tiếp tục dùng `HomeRedirect` permission-aware hiện hữu.
+- Giữ nguyên SVG, favicon, Login 112px, header 64px, sidebar/navigation, route, API, backend, database và permission.
+- Cập nhật central/frontend mappings cho branding/AppShell contract.
+- Chạy source-level contract, frontend lint/build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- Người dùng đã duyệt review package, Mockup as Text và mockup PNG bằng `Approve`.
+- Đã tải mandatory central/frontend mappings cùng frontend workflow/UI guardrails; owner chính là `BrandLogo.tsx` và `AppShell.tsx`.
+- Đã xác nhận `/` dùng `HomeRedirect` để đưa người có `project.view` tới `/projects`, người còn lại tới `/my-work`; không cần thay đổi router.
+- Đã xác nhận worktree đang có thay đổi navigation đã duyệt trong `AppShell.tsx`; implementation sẽ bảo toàn các thay đổi đó.
+- Đã mở rộng `BrandLogo` bằng hai biến thể `mark` và `lockup`; lockup giữ mark SVG 40px, thêm wordmark `Thủ Thiêm` / `WORKFLOW` bằng text HTML để tên vẫn đọc được nếu asset ảnh lỗi.
+- Đã thay logo desktop 48px căn giữa bằng lockup ngang căn trái trong sidebar 288px, giữ nguyên hàng header 64px và không thay đổi navigation.
+- Đã biến toàn bộ lockup desktop và mark mobile thành liên kết keyboard-focusable về `/`; `HomeRedirect` hiện hữu tiếp tục quyết định landing route theo permission.
+- Đã giữ nguyên SVG, favicon, Login 112px, router, API, backend, database và permission.
+- Đã cập nhật central/frontend mappings cho variant, kích thước, responsive treatment và hành vi điều hướng branding; không cần backend/domain map vì không đổi route contract hoặc nghiệp vụ.
+- Validation đạt: source-level contract, `npm run lint`, production `npm run build` và `git diff --check`; Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Browser verification được bỏ qua đúng guardrail vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+## Project Explorer Light Dashboard
+
+Status: complete
+
+Mục đích chính:
+- Khi mở rộng một công trình, người dùng vừa chọn nhanh phân hệ nghiệp vụ ở cột trái, vừa nắm tình trạng công trình qua dashboard nhẹ ở cột phải mà không rời danh sách.
+
+Will be done:
+- Chia vùng con của project đang mở rộng thành hai cột desktop 58/42; mobile xếp folder trước và dashboard sau.
+- Giữ nguyên cấu hình folder, permission và group landing route dùng chung; dashboard hiển thị `Tiến độ`, `Vướng mắc`, `Chờ phê duyệt`, `Hạn dự kiến`.
+- Chỉ dùng dữ liệu source-backed hiện có từ `/projects`: `progress_percent`, `open_issues`, `pending_approvals`, `planned_start_date`, `planned_end_date`; không thêm request, API, backend hoặc migration.
+- Bổ sung typed project-list fields và cập nhật central/frontend/project-planning mappings.
+- Chạy frontend production build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- Người dùng đã duyệt review package và Mockup as Text bằng `OK triển khai`; wording `VẤN ĐỀ MỞ` đã được đổi thành `VƯỚNG MẮC` trước khi triển khai.
+- Đã tải mandatory central/frontend/project-planning mappings cùng frontend UI guardrails; owner chính là `ProjectsPage.tsx` và `domain.ts`.
+- Đã xác nhận `/projects` đã trả các metric cần dùng và áp dụng project visibility scope; implementation không cần thay đổi backend.
+- Đã chia vùng mở rộng thành hai cột desktop 58/42, giữ folder/permission/landing route ở cột trái và đặt `Tổng quan nhanh` ở cột phải; dưới `lg` hai vùng tự xếp dọc với folder trước.
+- Dashboard nhẹ hiển thị `Tiến độ`, `Vướng mắc`, `Chờ phê duyệt`, `Hạn dự kiến`; số 0 dùng trạng thái trung tính, ngày thiếu hiển thị `Chưa thiết lập`, tiến độ được giới hạn 0-100%.
+- Đã bổ sung typed list fields `pm_name`, planned dates, `open_issues`, `pending_approvals`; không thêm request, API, backend, database, route, permission hoặc migration.
+- Đã cập nhật central/frontend/project-planning mappings cho layout, wording, nguồn metric và responsive contract; reporting map không cần đổi vì không thay metric/report semantics.
+- Validation đạt: `npm run build`, `npm run test:project-navigation`, source-level wording/field check và `git diff --check`; Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Browser verification được bỏ qua đúng guardrail vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+## Dashboard Sidebar Entry And Công việc Group
+
+Status: complete
+
+Mục đích chính:
+- Đưa Dashboard thành lối vào đầu tiên của nhóm tác nghiệp chính và đổi tên nhóm từ `Làm việc` thành `Công việc`.
+
+Will be done:
+- Thêm item `Dashboard` đầu nhóm, route `/dashboard`, icon `LayoutDashboard`, permission `report.view`.
+- Đổi tiêu đề nhóm `Làm việc` thành `Công việc`; giữ nguyên thứ tự Công trình, Việc của tôi và Báo cáo sau Dashboard.
+- Giữ nguyên `HomeRedirect`, route, API, backend, database, permission definition và Dashboard content.
+- Cập nhật central/frontend mappings cho navigation contract.
+- Chạy source-level contract, frontend lint/build và `git diff --check`.
+- Không chạy browser verification vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- Người dùng đã duyệt review package và Mockup as Text bằng `OK triển khai`.
+- Đã tải mandatory central/frontend mappings cùng frontend UI guardrails.
+- Đã xác nhận `/dashboard` tồn tại và dùng `report.view`; owner thay đổi là `frontend/src/layouts/AppShell.tsx`.
+- Đã xác nhận worktree đang chứa thay đổi Dashboard đã duyệt từ plan trước; implementation sẽ chỉ chèn thay đổi điều hướng và không ghi đè các thay đổi hiện hữu.
+- Đã đổi nhóm `Làm việc` thành `Công việc` và thêm `Dashboard` ở vị trí đầu tiên với icon `LayoutDashboard`, route `/dashboard`, permission `report.view`.
+- Đã giữ nguyên thứ tự Công trình, Việc của tôi, Báo cáo sau Dashboard; active state và permission filtering tiếp tục dùng `NavLink`/`hasAnyPermission` hiện hữu.
+- Đã giữ nguyên `HomeRedirect`, router, DashboardPage, API, backend, database và permission definitions.
+- Đã cập nhật central/frontend mappings cho group label, Dashboard nav entry, thứ tự và quyền; reporting domain map không cần đổi vì metric/report semantics không thay đổi.
+- Validation đạt: source-level navigation contract, `npm run lint`, production `npm run build`, router no-diff và `git diff --check`; Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Browser verification được bỏ qua đúng guardrail vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
+## Dashboard Tổng quan điều hành
+
+Status: complete
+
+Mục đích chính:
+- Biến Dashboard từ lưới KPI đồng hạng thành màn hình điều hành ưu tiên việc cần xử lý, công trình cần chú ý và tình hình tài chính trong phạm vi người dùng được phép xem.
+
+Will be done:
+- Đổi tiêu đề thành `Tổng quan điều hành`, Việt hóa toàn bộ nhãn Dashboard và ba nhãn điều hướng `Pipeline builder`, `Workflow Forms`, `Audit`.
+- Tổ chức lại `/dashboard` theo thứ bậc: Cần xử lý -> Việc chờ phê duyệt/Công trình cần theo dõi -> Tình trạng công trình/Tài chính tổng hợp.
+- Giữ nguyên route, API và công thức backend; dùng đúng dữ liệu `/reports/dashboard`, `/approvals/pending`, `/projects` hiện hữu.
+- Chỉ gọi `/projects` khi người dùng có `project.view`; hiển thị loading/error/empty/permission riêng thay vì biến lỗi thành số 0 hoặc danh sách rỗng.
+- Lọc danh sách cần theo dõi từ dữ liệu đã được backend scope, theo `blocked`, `open_issues` hoặc `pending_approvals`; không thêm chuyển trạng thái hoặc hành động duyệt tại Dashboard.
+- Cập nhật central/frontend/reporting mappings; chạy frontend lint/build và `git diff --check`.
+- Không chạy browser verification vì người dùng chưa yêu cầu điều khiển browser trong turn triển khai.
+
+Done:
+- Người dùng đã duyệt review package và Mockup as Text bằng `Approve`; phạm vi được hiểu là duyệt cả frontend-only và Việt hóa ba nhãn điều hướng toàn cục.
+- Đã tải mandatory central/frontend/backend/reporting mappings cùng frontend UI và reporting guardrails.
+- Đã xác nhận owner chính là `frontend/src/modules/dashboard/DashboardPage.tsx` và `frontend/src/layouts/AppShell.tsx`; không sửa `StatCard` vì Warehouse và Procurement đang dùng chung.
+- Đã xác nhận API Dashboard dùng payment-ledger cho dòng tiền, áp dụng `ProjectAccessFilter`, và metric `active_projects` bao gồm planning/in-progress/acceptance/handover nên nhãn mới là `Đang triển khai`.
+- Đã xác nhận `/dashboard` yêu cầu `report.view` nhưng `/projects` yêu cầu `project.view`; implementation sẽ điều kiện hóa query và hiển thị permission state.
+- Đã tái cấu trúc Dashboard đúng thứ bậc đã duyệt: `Cần xử lý`, `Việc chờ phê duyệt`, `Công trình cần theo dõi`, `Tình trạng công trình`, `Tài chính tổng hợp`; loại bỏ lưới KPI và khối công nợ lặp.
+- Đã thêm `Làm mới` cho toàn bộ query đang được phép chạy; mỗi nguồn có loading skeleton, lỗi với `Thử lại`, empty state và permission state riêng, không còn biến lỗi API thành số 0 hoặc danh sách rỗng.
+- Đã điều kiện hóa `/projects` bằng `project.view`; attention list chỉ dùng các dòng non-cancelled đã được backend scope và sắp xếp blocked -> pending approval -> open issue -> tiến độ thấp.
+- Đã giữ phê duyệt chỉ đọc trên Dashboard: work item có thể mở nguồn, các loại khác chỉ mở công trình khi có quyền; không thêm mutation hoặc bypass audit/permission.
+- Đã thay thanh trạng thái bằng tỷ trọng thật trên tổng trạng thái trả về, hiển thị tối đa một chữ số thập phân; nhãn `Đang triển khai` phản ánh đúng tập trạng thái backend.
+- Đã hợp nhất tài chính thành phải thu còn lại, phải trả còn lại và dòng tiền ròng tháng hiện tại; không thay đổi metric, API, route, backend, database hoặc permission.
+- Đã Việt hóa AppShell thành `Trình thiết kế quy trình`, `Biểu mẫu quy trình`, `Nhật ký hệ thống`; cấu trúc nhóm, route và permission giữ nguyên.
+- Đã cập nhật central/frontend/reporting mappings cho Dashboard và nhãn điều hướng mới; backend map không cần đổi vì không có route, handler, service, repository hoặc contract thay đổi.
+- Validation đạt: source-level contract, `npm run lint`, production `npm run build` và `git diff --check`; Vite chỉ báo lại cảnh báo chunk-size hiện có.
+- Browser verification được bỏ qua đúng guardrail vì người dùng không yêu cầu điều khiển browser trong turn triển khai.
+
 ## AppShell Header Alignment And 35px Logo Restore
 
 Status: complete

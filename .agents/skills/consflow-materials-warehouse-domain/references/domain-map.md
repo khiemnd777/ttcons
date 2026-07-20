@@ -35,7 +35,7 @@
 - Material snapshot submit applies site balance usage but does not create warehouse movement by itself.
 - Surplus handling can be partial and must keep remaining/handled state consistent.
 - Returning only part of the available site material leaves `surplus_status='partial'` when a positive surplus remains; it becomes `handled` only when no surplus remains. Stock SQL binds quantities explicitly as numeric to avoid PostgreSQL parameter type ambiguity.
-- Warehouse report and stock list must agree on active material and movement state.
+- Warehouse report and stock list must agree on active material and movement state. Report stock movement totals and site-surplus totals are aggregated separately before joining active materials so multiple movements cannot multiply multiple site balances; optional project filtering and CSV use the same actor scope.
 
 ## Cross-Domain Checks
 

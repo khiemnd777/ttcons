@@ -1,52 +1,82 @@
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, RefreshCw } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { CurrencyText } from '../../components/CurrencyText';
 import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, get } from '../../lib/api/client';
-import type { TaxCounterpartyRow, TaxLedgerRow, TaxPeriodRow, TaxReport, TaxReportWarning } from '../../lib/types/domain';
+import type { ReportProjectOption, TaxCounterpartyRow, TaxLedgerRow, TaxPeriodRow, TaxReport, TaxReportWarning } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
-import { ProjectSelector } from '../_shared/ProjectSelector';
+import { ReportDateField, ReportFilterActions, ReportProjectField, ReportSelectField } from './ReportFilters';
 
-export function TaxReportPanel() {
-  const [projectId, setProjectId] = useState('');
-  const [from, setFrom] = useState(() => firstDayOfMonth());
-  const [to, setTo] = useState(() => todayText());
-  const [groupBy, setGroupBy] = useState<'month' | 'quarter'>('month');
-  const [source, setSource] = useState<'all' | 'input' | 'output'>('all');
-  const [status, setStatus] = useState<'posted' | 'all'>('posted');
+type TaxFilters = {
+  projectId: string;
+  from: string;
+  to: string;
+  groupBy: 'month' | 'quarter';
+  source: 'all' | 'input' | 'output';
+  status: 'posted' | 'all';
+};
+
+export function TaxReportPanel({ projectOptions = [] }: { projectOptions?: ReportProjectOption[] }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilters = useMemo(() => taxFiltersFromParams(searchParams), []);
+  const [filters, setFilters] = useState<TaxFilters>(initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState<TaxFilters>(initialFilters);
+  const [ledgerQuery, setLedgerQuery] = useState('');
+  const [exporting, setExporting] = useState(false);
   const toast = useToast();
+
+  useEffect(() => {
+    const nextFilters = taxFiltersFromParams(searchParams);
+    setFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+  }, [searchParams]);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
-    if (projectId) params.set('project_id', projectId);
-    params.set('from', from);
-    params.set('to', to);
-    params.set('group_by', groupBy);
-    params.set('source', source);
-    params.set('status', status);
+    if (appliedFilters.projectId) params.set('project_id', appliedFilters.projectId);
+    params.set('from', appliedFilters.from);
+    params.set('to', appliedFilters.to);
+    params.set('group_by', appliedFilters.groupBy);
+    params.set('source', appliedFilters.source);
+    params.set('status', appliedFilters.status);
     return params.toString();
-  }, [from, groupBy, projectId, source, status, to]);
+  }, [appliedFilters]);
 
   const report = useQuery({
-    queryKey: ['tax-report', projectId || 'all', from, to, groupBy, source, status],
+    queryKey: ['tax-report', appliedFilters],
     queryFn: () => get<TaxReport>(`/reports/tax?${queryString}`),
   });
 
+  function applyFilters() {
+    setAppliedFilters(filters);
+    setSearchParams(taxFiltersToParams(filters), { replace: true });
+  }
+
+  function resetFilters() {
+    const nextFilters = defaultTaxFilters();
+    setFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+    setSearchParams(taxFiltersToParams(nextFilters), { replace: true });
+  }
+
   async function exportCSV() {
+    setExporting(true);
     try {
       const blob = await downloadBlob(`/reports/tax/export?${queryString}`);
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = objectUrl;
-      anchor.download = `tax-report-${from}-${to}.csv`;
+      anchor.download = `bao-cao-thue-${appliedFilters.from}-${appliedFilters.to}.csv`;
       anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
       toast.success('Đã xuất CSV báo cáo thuế');
     } catch (error) {
       toast.error('Không xuất được CSV báo cáo thuế', error);
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -61,40 +91,23 @@ export function TaxReportPanel() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-ink">Báo cáo thuế / VAT</h2>
-          <p className="mt-1 text-xs text-slate-500">Theo kỳ hoá đơn và nguồn chứng từ; mặc định chỉ tính input verified và output issued.</p>
+          <p className="mt-1 text-xs text-slate-500">Theo ngày và nguồn hóa đơn; mặc định chỉ tính đầu vào đã xác minh và đầu ra đã phát hành.</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap xl:items-end xl:justify-end">
-          <ProjectField value={projectId} onChange={setProjectId} />
-          <DateField label="Từ ngày" value={from} onChange={setFrom} />
-          <DateField label="Đến ngày" value={to} onChange={setTo} />
-          <SelectField label="Kỳ" value={groupBy} onChange={(value) => setGroupBy(value as 'month' | 'quarter')} options={[['month', 'Tháng'], ['quarter', 'Quý']]} />
-          <SelectField label="Nguồn" value={source} onChange={(value) => setSource(value as 'all' | 'input' | 'output')} options={[['all', 'All'], ['input', 'Đầu vào'], ['output', 'Đầu ra']]} />
-          <SelectField label="Status" value={status} onChange={(value) => setStatus(value as 'posted' | 'all')} options={[['posted', 'Posted'], ['all', 'All non-deleted']]} />
-          <button
-            type="button"
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={() => void report.refetch()}
-            disabled={report.isFetching}
-          >
-            <RefreshCw className={report.isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-            Tải lại
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={() => void exportCSV()}
-            disabled={report.isLoading}
-          >
-            <Download className="h-4 w-4" />
-            CSV
-          </button>
+          <ReportProjectField value={filters.projectId} options={projectOptions} onChange={(projectId) => setFilters((current) => ({ ...current, projectId }))} />
+          <ReportDateField label="Từ ngày" value={filters.from} onChange={(from) => setFilters((current) => ({ ...current, from }))} />
+          <ReportDateField label="Đến ngày" value={filters.to} onChange={(to) => setFilters((current) => ({ ...current, to }))} />
+          <ReportSelectField label="Kỳ" value={filters.groupBy} onChange={(groupBy) => setFilters((current) => ({ ...current, groupBy: groupBy as TaxFilters['groupBy'] }))} options={[['month', 'Tháng'], ['quarter', 'Quý']]} />
+          <ReportSelectField label="Nguồn" value={filters.source} onChange={(source) => setFilters((current) => ({ ...current, source: source as TaxFilters['source'] }))} options={[['all', 'Tất cả'], ['input', 'Đầu vào'], ['output', 'Đầu ra']]} />
+          <ReportSelectField label="Trạng thái" value={filters.status} onChange={(status) => setFilters((current) => ({ ...current, status: status as TaxFilters['status'] }))} options={[['posted', 'Đã ghi nhận'], ['all', 'Tất cả chưa xóa']]} />
+          <ReportFilterActions applying={report.isFetching} exporting={exporting || report.isLoading} onApply={applyFilters} onReset={resetFilters} onExport={() => void exportCSV()} />
         </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <MetricTile label="VAT đầu vào" value={<CurrencyText value={summary?.input_vat_amount ?? 0} />} />
         <MetricTile label="VAT đầu ra" value={<CurrencyText value={summary?.output_vat_amount ?? 0} />} />
-        <MetricTile label="Net VAT" value={<span className={netVATClass(summary?.net_vat_amount)}><CurrencyText value={summary?.net_vat_amount ?? 0} /></span>} />
+        <MetricTile label="VAT thuần" value={<span className={netVATClass(summary?.net_vat_amount)}><CurrencyText value={summary?.net_vat_amount ?? 0} /></span>} />
         <MetricTile label="HĐ đầu vào" value={Number(summary?.input_invoice_count ?? 0)} />
         <MetricTile label="HĐ đầu ra" value={Number(summary?.output_invoice_count ?? 0)} />
         <MetricTile label="Cảnh báo" value={Number(summary?.warning_count ?? 0)} />
@@ -103,7 +116,11 @@ export function TaxReportPanel() {
       {warnings.length ? (
         <div className="grid gap-2 lg:grid-cols-3">
           {warnings.map((warning) => (
-            <WarningItem key={warning.code} warning={warning} />
+            <WarningItem
+              key={warning.code}
+              warning={warning}
+              onFilter={warning.code === 'missing_tax_code' || warning.code === 'vat_math_mismatch' ? () => setLedgerQuery(warning.code) : undefined}
+            />
           ))}
         </div>
       ) : null}
@@ -123,7 +140,7 @@ export function TaxReportPanel() {
               { key: 'period_start', header: 'Kỳ', sortable: true, render: (row) => dateText(row.period_start) },
               { key: 'input_vat_amount', header: 'VAT vào', align: 'right', render: (row) => <CurrencyText value={row.input_vat_amount} /> },
               { key: 'output_vat_amount', header: 'VAT ra', align: 'right', render: (row) => <CurrencyText value={row.output_vat_amount} /> },
-              { key: 'net_vat_amount', header: 'Net VAT', align: 'right', render: (row) => <span className={netVATClass(row.net_vat_amount)}><CurrencyText value={row.net_vat_amount} /></span> },
+              { key: 'net_vat_amount', header: 'VAT thuần', align: 'right', render: (row) => <span className={netVATClass(row.net_vat_amount)}><CurrencyText value={row.net_vat_amount} /></span> },
               { key: 'invoice_count', header: 'Số HĐ', align: 'right' },
             ]}
           />
@@ -150,7 +167,7 @@ export function TaxReportPanel() {
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase text-slate-500">Ledger hoá đơn</h3>
+        <h3 className="text-xs font-semibold uppercase text-slate-500">Sổ hóa đơn</h3>
         <DataTable<TaxLedgerRow>
           rows={ledger}
           loading={report.isLoading}
@@ -158,6 +175,8 @@ export function TaxReportPanel() {
           onRetry={() => void report.refetch()}
           empty="Chưa có hoá đơn VAT trong khoảng lọc"
           searchPlaceholder="Tìm số hoá đơn, công trình, đối tác, MST..."
+          searchQuery={ledgerQuery}
+          onSearchQueryChange={setLedgerQuery}
           pageSize={10}
           defaultSort={{ key: 'invoice_date', direction: 'desc' }}
           columns={[
@@ -170,53 +189,13 @@ export function TaxReportPanel() {
             { key: 'amount_before_vat', header: 'Trước VAT', align: 'right', render: (row) => <CurrencyText value={row.amount_before_vat} /> },
             { key: 'vat_amount', header: 'VAT', align: 'right', render: (row) => <CurrencyText value={row.vat_amount} /> },
             { key: 'total_amount', header: 'Tổng', align: 'right', render: (row) => <CurrencyText value={row.total_amount} /> },
-            { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-            { key: 'source_code', header: 'Source' },
-            { key: 'warning_flags', header: 'Flags', render: (row) => row.warning_flags || '-' },
+            { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
+            { key: 'source_code', header: 'Nguồn' },
+            { key: 'warning_flags', header: 'Cảnh báo', render: (row) => row.warning_flags || '-' },
           ]}
         />
       </div>
     </section>
-  );
-}
-
-function ProjectField({ value, onChange }: { value?: string; onChange: (value: string) => void }) {
-  return (
-    <label className="block min-w-44">
-      <span className="text-xs font-semibold text-slate-600">Công trình</span>
-      <div className="mt-1">
-        <ProjectSelector value={value} onChange={onChange} placeholder="Tất cả công trình" />
-      </div>
-    </label>
-  );
-}
-
-function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <label className="block min-w-36">
-      <span className="text-xs font-semibold text-slate-600">{label}</span>
-      <input
-        type="date"
-        className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
-
-function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: [string, string][] }) {
-  return (
-    <label className="block min-w-32">
-      <span className="text-xs font-semibold text-slate-600">{label}</span>
-      <select
-        className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map(([optionValue, labelText]) => <option key={optionValue} value={optionValue}>{labelText}</option>)}
-      </select>
-    </label>
   );
 }
 
@@ -229,12 +208,25 @@ function MetricTile({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function WarningItem({ warning }: { warning: TaxReportWarning }) {
+function WarningItem({ warning, onFilter }: { warning: TaxReportWarning; onFilter?: () => void }) {
   const tone = warning.severity === 'info' ? 'border-blue-100 bg-blue-50 text-blue-700' : 'border-amber-100 bg-amber-50 text-amber-800';
-  return (
-    <div className={`rounded-md border px-3 py-2 text-xs ${tone}`}>
+  const content = (
+    <>
       <p className="font-semibold">{warning.message}</p>
       <p className="mt-1">{Number(warning.count ?? 0)} dòng{warning.amount ? ` / ${Number(warning.amount).toLocaleString('vi-VN')} VND` : ''}</p>
+      {onFilter ? <p className="mt-1 font-semibold underline">Lọc sổ hóa đơn</p> : null}
+    </>
+  );
+  if (onFilter) {
+    return (
+      <button type="button" className={`rounded-md border px-3 py-2 text-left text-xs ${tone}`} onClick={onFilter}>
+        {content}
+      </button>
+    );
+  }
+  return (
+    <div className={`rounded-md border px-3 py-2 text-xs ${tone}`}>
+      {content}
     </div>
   );
 }
@@ -260,6 +252,43 @@ function todayText() {
 function firstDayOfMonth() {
   const now = new Date();
   return dateInputText(new Date(now.getFullYear(), now.getMonth(), 1));
+}
+
+function defaultTaxFilters(): TaxFilters {
+  return {
+    projectId: '',
+    from: firstDayOfMonth(),
+    to: todayText(),
+    groupBy: 'month',
+    source: 'all',
+    status: 'posted',
+  };
+}
+
+function taxFiltersFromParams(params: URLSearchParams): TaxFilters {
+  const defaults = defaultTaxFilters();
+  const groupBy = params.get('group_by');
+  const source = params.get('source');
+  const status = params.get('status');
+  return {
+    projectId: params.get('project_id') ?? '',
+    from: params.get('from') ?? defaults.from,
+    to: params.get('to') ?? defaults.to,
+    groupBy: groupBy === 'quarter' ? 'quarter' : 'month',
+    source: source === 'input' || source === 'output' ? source : 'all',
+    status: status === 'all' ? 'all' : 'posted',
+  };
+}
+
+function taxFiltersToParams(filters: TaxFilters) {
+  const params = new URLSearchParams();
+  if (filters.projectId) params.set('project_id', filters.projectId);
+  params.set('from', filters.from);
+  params.set('to', filters.to);
+  params.set('group_by', filters.groupBy);
+  params.set('source', filters.source);
+  params.set('status', filters.status);
+  return params;
 }
 
 function dateInputText(date: Date) {

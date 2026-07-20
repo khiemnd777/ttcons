@@ -1835,8 +1835,36 @@ func (s *Service) ProjectWorkItems(ctx context.Context, projectID, actorID strin
 	return s.repo.ListProjectWorkItems(ctx, projectID, actorID)
 }
 
-func (s *Service) MyWorkItems(ctx context.Context, actorID string) ([]Record, error) {
-	return s.repo.ListMyWorkItems(ctx, actorID)
+func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, actorID string) (Record, error) {
+	filter, offset, err := normalizeMyWorkItemsFilter(filter)
+	if err != nil {
+		return nil, err
+	}
+	page, err := s.repo.MyWorkItemsPage(ctx, actorID, filter, offset)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range page.Items {
+		canAct := boolValue(item["can_act"])
+		canDecide := boolValue(item["can_decide"])
+		item["capabilities"] = Record{"can_act": canAct, "can_decide": canDecide}
+		item["queue_scopes"] = myWorkItemQueueScopes(item, canDecide)
+		item["available_actions"] = myWorkItemAvailableActions(item)
+		for _, internalKey := range []string{
+			"action_scope", "decision_required_roles", "decision_requested_by",
+			"pipeline_current_node_id", "run_node_status", "is_mine", "is_department", "is_watching",
+		} {
+			delete(item, internalKey)
+		}
+	}
+	return Record{
+		"items":       page.Items,
+		"summary":     page.Summary,
+		"facets":      page.Facets,
+		"total":       page.Total,
+		"has_more":    page.HasMore,
+		"next_cursor": page.NextCursor,
+	}, nil
 }
 
 func (s *Service) MyActivityAttention(ctx context.Context, filter ActivityAttentionFilter, actorID string) ([]Record, error) {
@@ -2256,7 +2284,32 @@ func (s *Service) WorkItemDetail(ctx context.Context, workItemID, actorID string
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.GetWorkItemDetail(ctx, workItemID, profileIsClient(profile) && !profile.IsManager)
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID, profileIsClient(profile) && !profile.IsManager)
+	if err != nil {
+		return nil, err
+	}
+	canAct, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	canAct, err = s.myWorkItemCanActNow(ctx, item, actorID, canAct)
+	if err != nil {
+		return nil, err
+	}
+	canDecide := false
+	if statusIn(fmt.Sprint(item["status"]), "waiting_review", "waiting_approval") {
+		canDecide, err = s.repo.CanDecideWorkItem(ctx, item, actorID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	item["capabilities"] = Record{"can_act": canAct, "can_decide": canDecide}
+	item["can_act"] = canAct
+	item["can_decide"] = canDecide
+	item["available_actions"] = myWorkItemAvailableActions(item)
+	delete(item, "pipeline_current_node_id")
+	delete(item, "run_node_status")
+	return item, nil
 }
 
 func (s *Service) WorkItemForm(ctx context.Context, workItemID, actorID string) (Record, error) {
@@ -4849,10 +4902,20 @@ func (s *Service) WorkItemAction(ctx context.Context, workItemID, action string,
 		}
 	}
 	if plan.Decision {
-		return s.repo.ApplyWorkItemDecision(ctx, item, action, plan.ToStatus, plan.ActivityType, req, actorID, actorName)
+		updated, err := s.repo.ApplyWorkItemDecision(ctx, item, action, plan.ToStatus, plan.ActivityType, req, actorID, actorName)
+		if err != nil {
+			return nil, err
+		}
+		s.publishWorkItemChanged(updated, actorID)
+		return updated, nil
 	}
 	if plan.CreatesApproval {
-		return s.repo.RequestWorkItemApproval(ctx, item, req, actorID, actorName)
+		updated, err := s.repo.RequestWorkItemApproval(ctx, item, req, actorID, actorName)
+		if err != nil {
+			return nil, err
+		}
+		s.publishWorkItemChanged(updated, actorID)
+		return updated, nil
 	}
 	updated, err := s.repo.ApplyWorkItemTransition(ctx, item, plan.ToStatus, plan.ActivityType, req, actorID, actorName)
 	if err != nil {
@@ -4861,7 +4924,17 @@ func (s *Service) WorkItemAction(ctx context.Context, workItemID, action string,
 	if plan.ToStatus == "completed" {
 		_ = s.repo.RunClientWorkflowAutomationForWorkItem(ctx, cleanID(updated["id"]), actorID, actorName)
 	}
+	s.publishWorkItemChanged(updated, actorID)
 	return updated, nil
+}
+
+func (s *Service) publishWorkItemChanged(item Record, actorID string) {
+	s.publishActivityEvent(ActivityStreamEvent{
+		Type:       "work_item_changed",
+		ProjectID:  cleanID(item["project_id"]),
+		WorkItemID: cleanID(item["id"]),
+		ActorID:    actorID,
+	})
 }
 
 func (s *Service) requireActivePipelineWorkItem(ctx context.Context, item Record) error {
@@ -9909,8 +9982,33 @@ func (s *Service) Dashboard(ctx context.Context, actorID string) (Record, error)
 	return s.repo.DashboardReport(ctx, actorID)
 }
 
-func (s *Service) Report(ctx context.Context, kind, actorID string) ([]Record, error) {
-	return s.repo.Report(ctx, kind, actorID)
+func (s *Service) ReportOptions(ctx context.Context, actorID string) (Record, error) {
+	projects, err := s.repo.ReportProjectOptions(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	return Record{"projects": projects}, nil
+}
+
+func (s *Service) Report(ctx context.Context, kind string, req OperationalReportRequest, actorID string) ([]Record, error) {
+	req.ProjectID = cleanID(req.ProjectID)
+	if req.ProjectID != "" {
+		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, req.ProjectID, operationalReportPermissions(kind))
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, forbiddenError("Bạn không có quyền xem báo cáo của công trình này", Record{"permissions": operationalReportPermissions(kind)})
+		}
+	}
+	return s.repo.Report(ctx, kind, actorID, req.ProjectID)
+}
+
+func operationalReportPermissions(kind string) []string {
+	if kind == "accounting" {
+		return []string{"report.finance.view", "accounting.view"}
+	}
+	return []string{"report.view"}
 }
 
 func (s *Service) CashflowReport(ctx context.Context, req CashflowReportRequest, actorID string) (Record, error) {

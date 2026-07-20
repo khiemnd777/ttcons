@@ -27,6 +27,8 @@ export function DataTable<T extends Record<string, any>>({
   error,
   onRetry,
   searchPlaceholder,
+  searchQuery,
+  onSearchQueryChange,
   pageSize,
   pageSizeOptions,
   defaultSort,
@@ -40,12 +42,15 @@ export function DataTable<T extends Record<string, any>>({
   error?: unknown;
   onRetry?: () => void;
   searchPlaceholder?: string;
+  searchQuery?: string;
+  onSearchQueryChange?: (value: string) => void;
   pageSize?: number;
   pageSizeOptions?: number[];
   defaultSort?: { key: string; direction?: SortDirection };
   getRowKey?: (row: T, index: number) => string | number;
 }) {
-  const [query, setQuery] = useState('');
+  const [internalQuery, setInternalQuery] = useState('');
+  const query = searchQuery ?? internalQuery;
   const [sort, setSort] = useState<{ key: string; direction: SortDirection } | null>(
     defaultSort ? { key: defaultSort.key, direction: defaultSort.direction ?? 'asc' } : null,
   );
@@ -100,7 +105,11 @@ export function DataTable<T extends Record<string, any>>({
                 className="w-full rounded-md border border-line py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
                 placeholder={searchPlaceholder}
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (onSearchQueryChange) onSearchQueryChange(value);
+                  else setInternalQuery(value);
+                }}
               />
             </label>
           ) : <span />}

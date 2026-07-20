@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Check, Plus } from 'lucide-react';
@@ -7,6 +7,7 @@ import { DataTable } from '../../components/DataTable';
 import { EnumChip } from '../../components/EnumChip';
 import { FilterBar, type FilterOption } from '../../components/FilterBar';
 import { ListSection } from '../../components/ListSection';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { RowActions } from '../../components/RowActions';
@@ -17,7 +18,8 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { AccountingCreateDialog, type AccountingCreateMode } from './AccountingCreateDialog';
 import { AccountingDetailDialog, type AccountingDetail } from './AccountingDetailDialog';
-import { CashflowPanel } from './CashflowPanel';
+
+const CashflowPanel = lazy(() => import('./CashflowPanel').then((module) => ({ default: module.CashflowPanel })));
 
 type AccountingTab = 'overview' | 'budgets' | 'payments' | 'cashflow';
 type BudgetTotals = { planned: number; approved: number; used: number; remaining: number };
@@ -157,7 +159,11 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
         ]} empty="Chưa có phiếu thu/chi trong bộ lọc này" /></ListSection>
       </div> : null}
 
-      {tab === 'cashflow' ? <CashflowPanel projectId={projectId} initialFrom={!global ? selectedProject?.start_date ?? '2000-01-01' : undefined} /> : null}
+      {tab === 'cashflow' ? (
+        <Suspense fallback={<div className="rounded-lg border border-line bg-white p-8"><LoadingSpinner /></div>}>
+          <CashflowPanel projectId={projectId} initialFrom={!global ? selectedProject?.start_date ?? '2000-01-01' : undefined} />
+        </Suspense>
+      ) : null}
 
       <AccountingCreateDialog
         open={Boolean(open)}

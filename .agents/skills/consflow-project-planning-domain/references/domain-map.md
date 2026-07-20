@@ -29,6 +29,7 @@
 ## Invariants
 
 - Planning reports are project-scoped and permission-filtered.
+- The operational project report counts open issues and pending approvals in independent correlated subqueries per accessible non-cancelled project; it must not join both one-to-many sources before counting. Optional `project_id` and CSV export retain the same scope.
 - Meeting minutes action items and daily report next-plan outputs remain traceable.
 - Planning checklist evidence/status summaries do not replace the underlying submitted form history.
 - Project detail and global workspaces must agree on statuses and available actions.
@@ -41,7 +42,7 @@
 - Project `Nhật ký` is a five-event preview backed by the paginated project Audit endpoint; the tab does not treat the preview length as the total and routes full investigation to `/projects/:id/audit`.
 - Project `Thảo luận` presents activity as chronological chat with a persistent composer and scroll anchoring. A reply is a new `comment` row linked by `parent_activity_id`; backend copies the parent project/target/work item/visibility and auto-mentions its actor. Reactions use `activity_reactions` active-state upserts, are visibility-gated, and never change read/resolution/workflow status or activity totals. Only the author may edit or withdraw a `comment` during the first 15 minutes; edits/withdrawals append `activity_message_revisions` and audit, withdrawal clears current content/attention/reactions but keeps a tombstone and existing replies. Typed operational activity is immutable.
 - Project Detail Workflow is the project history surface: default to all node work items, keep completed and skipped records discoverable with filters, and render skipped work-item detail read-only without weakening action permissions.
-- The expanded `/projects` explorer and the project workspace sidebar share one group/child/permission route config. A group landing resolves to its first visible child, with its own target as fallback, so Admin reaches the canonical first workspace while restricted roles stay within their permitted project surface.
+- The expanded `/projects` explorer and the project workspace sidebar share one group/child/permission route config. A group landing resolves to its first visible child, with its own target as fallback, so Admin reaches the canonical first workspace while restricted roles stay within their permitted project surface. The expanded list row keeps folders primary in a desktop 58/42 split and stacks them before a compact dashboard on narrow screens; progress, `Vướng mắc`, pending approvals and planned schedule remain presentation of the already-scoped `/projects` response rather than a new report query.
 
 ## Cross-Domain Checks
 

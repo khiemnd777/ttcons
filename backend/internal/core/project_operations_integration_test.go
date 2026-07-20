@@ -148,6 +148,24 @@ func TestProfitCSVIncludesLedgerRows(t *testing.T) {
 	}
 }
 
+func TestOperationalReportCSVIncludesExactlyReturnedRows(t *testing.T) {
+	payload, err := operationalReportCSV("projects", []Record{{
+		"project_id":        "project-1",
+		"name":              "CSV Project",
+		"status":            "in_progress",
+		"progress_percent":  42,
+		"open_issues":       2,
+		"pending_approvals": 1,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(payload)
+	if !strings.Contains(text, "project_id,name,status") || !strings.Contains(text, "project-1,CSV Project,in_progress,42,2,1") {
+		t.Fatalf("operational csv payload missing header or row: %s", text)
+	}
+}
+
 func TestLegacyStepSubmitFillsChecklistPayload(t *testing.T) {
 	item := Record{"evidence_requirement_json": map[string]any{"checklist_required": true}}
 	req := withLegacyChecklistCompletion(item, WorkItemActionRequest{})
@@ -1542,6 +1560,118 @@ func TestProfitReportSummarizesScopedInvoices(t *testing.T) {
 	if len(ledger) != 3 {
 		t.Fatalf("ledger rows = %d, want 3 scoped posted P&L rows", len(ledger))
 	}
+}
+
+func TestOperationalReportsAggregateWithoutJoinMultiplicationAndRespectScope(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupProjectScopeFixture(t, db, []string{"report.view", "report.finance.view", "accounting.view"})
+	suffix := newID()
+	materialID := newID()
+	warehouseID := newID()
+	outsideStaffID := newID()
+	outsideUserID := newID()
+
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_movements WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM site_material_balances WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM materials WHERE id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM warehouses WHERE id=$1`, warehouseID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM project_members WHERE staff_id=$1`, outsideStaffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, outsideStaffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, outsideUserID)
+	})
+
+	mustExec(t, db, `
+		INSERT INTO issues (id, project_id, title, status, reported_by)
+		VALUES ($1,$2,'Issue one','open',$3),($4,$2,'Issue two','in_progress',$3)
+	`, newID(), fixture.projectID, fixture.userID, newID())
+	mustExec(t, db, `
+		INSERT INTO approval_requests (id, target_type, project_id, requested_by, status, reason)
+		VALUES ($1,'work_item',$2,$3,'pending','Approval one'),($4,'work_item',$2,$3,'pending','Approval two')
+	`, newID(), fixture.projectID, fixture.userID, newID())
+
+	projectRows, err := service.Report(ctx, "projects", OperationalReportRequest{}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectRow := recordByID(projectRows, "project_id", fixture.projectID)
+	if projectRow == nil || number(projectRow["open_issues"]) != 2 || number(projectRow["pending_approvals"]) != 2 {
+		t.Fatalf("project report row = %#v, want two issues and two approvals", projectRow)
+	}
+
+	mustExec(t, db, `
+		INSERT INTO payables (id, project_id, payable_code, vendor_type, vendor_name, gross_amount, remaining_amount, status, created_by)
+		VALUES ($1,$2,$3,'supplier','Vendor one',100,100,'approved',$4),($5,$2,$6,'supplier','Vendor two',100,100,'approved',$4)
+	`, newID(), fixture.projectID, "PAY-RPT-1-"+suffix[:8], fixture.userID, newID(), "PAY-RPT-2-"+suffix[:8])
+	mustExec(t, db, `
+		INSERT INTO receivables (id, project_id, receivable_code, client_name, gross_amount, remaining_amount, status, created_by)
+		VALUES ($1,$2,$3,'Client one',50,50,'approved',$4),($5,$2,$6,'Client two',50,50,'approved',$4)
+	`, newID(), fixture.projectID, "REC-RPT-1-"+suffix[:8], fixture.userID, newID(), "REC-RPT-2-"+suffix[:8])
+	mustExec(t, db, `
+		INSERT INTO accounting_budgets (id, project_id, budget_code, name, used_amount, status)
+		VALUES ($1,$2,$3,'Budget one',25,'approved'),($4,$2,$5,'Budget two',25,'approved')
+	`, newID(), fixture.projectID, "BUD-RPT-1-"+suffix[:8], newID(), "BUD-RPT-2-"+suffix[:8])
+
+	accountingRows, err := service.Report(ctx, "accounting", OperationalReportRequest{ProjectID: fixture.projectID}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(accountingRows) != 1 || number(accountingRows[0]["payable_remaining"]) != 200 || number(accountingRows[0]["receivable_remaining"]) != 100 || number(accountingRows[0]["used_budget"]) != 50 {
+		t.Fatalf("accounting report = %#v, want payable/receivable/budget 200/100/50", accountingRows)
+	}
+
+	mustExec(t, db, `INSERT INTO materials (id, code, name, unit, category, active) VALUES ($1,$2,'Report Material','m','Test',true)`, materialID, "MAT-RPT-"+suffix[:8])
+	mustExec(t, db, `INSERT INTO warehouses (id, name, location, type, active) VALUES ($1,'Report Warehouse','Test','central',true)`, warehouseID)
+	mustExec(t, db, `
+		INSERT INTO stock_movements (id, movement_code, project_id, warehouse_id, material_id, movement_type, quantity, unit, created_by)
+		VALUES ($1,$2,$3,$4,$5,'receive',10,'m',$6),($7,$8,$3,$4,$5,'receive',20,'m',$6)
+	`, newID(), "SM-RPT-1-"+suffix[:8], fixture.projectID, warehouseID, materialID, fixture.userID, newID(), "SM-RPT-2-"+suffix[:8])
+	mustExec(t, db, `
+		INSERT INTO site_material_balances (id, project_id, material_id, surplus_quantity)
+		VALUES ($1,$2,$3,7)
+	`, newID(), fixture.projectID, materialID)
+
+	warehouseRows, err := service.Report(ctx, "warehouse", OperationalReportRequest{ProjectID: fixture.projectID}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	warehouseRow := recordByID(warehouseRows, "material_id", materialID)
+	if warehouseRow == nil || number(warehouseRow["stock_quantity"]) != 30 || number(warehouseRow["surplus_quantity"]) != 7 {
+		t.Fatalf("warehouse report row = %#v, want stock/surplus 30/7", warehouseRow)
+	}
+
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Outside Staff','active')`, outsideUserID, "outside-report-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id, user_id, full_name, email, department, position, status) VALUES ($1,$2,'Outside Staff',$3,'Other','Worker','active')`, outsideStaffID, outsideUserID, "outside-report-staff-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["Worker"]'::jsonb,true)`, fixture.otherProjectID, outsideStaffID)
+
+	staffRows, err := service.Report(ctx, "staff", OperationalReportRequest{}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recordByID(staffRows, "staff_id", outsideStaffID) != nil || recordByID(staffRows, "staff_id", fixture.staffID) == nil {
+		t.Fatalf("staff report leaked out-of-scope staff or omitted scoped staff: %#v", staffRows)
+	}
+
+	options, err := service.ReportOptions(ctx, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects, _ := options["projects"].([]Record)
+	if recordByID(projects, "id", fixture.otherProjectID) != nil || recordByID(projects, "id", fixture.projectID) == nil {
+		t.Fatalf("report options scope = %#v", projects)
+	}
+}
+
+func recordByID(rows []Record, key, id string) Record {
+	for _, row := range rows {
+		if cleanID(row[key]) == id {
+			return row
+		}
+	}
+	return nil
 }
 
 func TestInputInvoicePDFUploadLinksPayableDocumentAndStatus(t *testing.T) {

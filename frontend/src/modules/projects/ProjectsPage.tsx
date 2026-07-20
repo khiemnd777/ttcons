@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
+  CircleDot,
   Eye,
   Folder,
   FolderOpen,
@@ -23,6 +27,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { SimpleForm } from '../_shared/SimpleForm';
 import type { Partner, Project } from '../../lib/types/domain';
+import { dateText } from '../../lib/utils/format';
 import { partnerOptions } from '../core-data/partnerUtils';
 import {
   projectWorkspaceGroupPath,
@@ -207,11 +212,7 @@ export function ProjectsPage() {
                     onEdit={() => setDialog({ mode: 'edit', record: project })}
                   />
                   {expanded ? (
-                    <div className="border-t border-slate-100 bg-slate-50/70 py-2">
-                      {visibleFolders.map((folder) => (
-                        <ProjectFolderRow key={folder.key} project={project} folder={folder} />
-                      ))}
-                    </div>
+                    <ProjectExpandedWorkspace project={project} folders={visibleFolders} />
                   ) : null}
                 </div>
               );
@@ -259,6 +260,123 @@ export function ProjectsPage() {
       </FormDrawer>
     </>
   );
+}
+
+function ProjectExpandedWorkspace({ project, folders }: { project: Project; folders: ProjectWorkspaceGroup[] }) {
+  return (
+    <div className="border-t border-slate-100 bg-slate-50/70 p-3 sm:p-4">
+      <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(320px,5fr)]">
+        <section className="min-w-0" aria-label="Phân hệ nghiệp vụ">
+          <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Phân hệ nghiệp vụ</p>
+          <div className="mt-2 divide-y divide-slate-100 overflow-hidden rounded-lg border border-line bg-white">
+            {folders.map((folder) => (
+              <ProjectFolderRow key={folder.key} project={project} folder={folder} />
+            ))}
+          </div>
+        </section>
+
+        <ProjectQuickDashboard project={project} />
+      </div>
+    </div>
+  );
+}
+
+function ProjectQuickDashboard({ project }: { project: Project }) {
+  const progress = boundedPercent(project.progress_percent);
+  const openIssues = nonNegativeCount(project.open_issues);
+  const pendingApprovals = nonNegativeCount(project.pending_approvals);
+  const hasPlannedEnd = Boolean(project.planned_end_date);
+
+  return (
+    <aside className="flex min-w-0 flex-col" aria-label={`Tổng quan nhanh ${project.code}`}>
+      <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Tổng quan nhanh</p>
+      <div className="mt-2 grid flex-1 grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line">
+        <ProjectQuickMetric
+          label="Tiến độ"
+          value={`${progress}%`}
+          sub="Tiến độ tổng thể"
+          icon={<CircleDot className="h-4 w-4" />}
+          tone="blue"
+          progress={progress}
+        />
+        <ProjectQuickMetric
+          label="Vướng mắc"
+          value={openIssues}
+          sub={openIssues > 0 ? 'Cần xử lý' : 'Không có'}
+          icon={<AlertTriangle className="h-4 w-4" />}
+          tone={openIssues > 0 ? 'rose' : 'slate'}
+        />
+        <ProjectQuickMetric
+          label="Chờ phê duyệt"
+          value={pendingApprovals}
+          sub={pendingApprovals > 0 ? 'Đang chờ' : 'Không có'}
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          tone={pendingApprovals > 0 ? 'amber' : 'slate'}
+        />
+        <ProjectQuickMetric
+          label="Hạn dự kiến"
+          value={hasPlannedEnd ? dateText(project.planned_end_date) : 'Chưa thiết lập'}
+          sub={project.planned_start_date ? `Bắt đầu ${dateText(project.planned_start_date)}` : 'Chưa có mốc bắt đầu'}
+          icon={<CalendarDays className="h-4 w-4" />}
+          tone="slate"
+        />
+      </div>
+    </aside>
+  );
+}
+
+type ProjectQuickMetricTone = 'blue' | 'rose' | 'amber' | 'slate';
+
+const projectQuickMetricToneClasses: Record<ProjectQuickMetricTone, { icon: string; value: string; progress: string }> = {
+  blue: { icon: 'bg-blue-50 text-blue-700', value: 'text-blue-700', progress: 'bg-blue-600' },
+  rose: { icon: 'bg-rose-50 text-rose-700', value: 'text-rose-700', progress: 'bg-rose-600' },
+  amber: { icon: 'bg-amber-50 text-amber-700', value: 'text-amber-700', progress: 'bg-amber-600' },
+  slate: { icon: 'bg-slate-100 text-slate-600', value: 'text-ink', progress: 'bg-slate-500' },
+};
+
+function ProjectQuickMetric({
+  label,
+  value,
+  sub,
+  icon,
+  tone,
+  progress,
+}: {
+  label: string;
+  value: ReactNode;
+  sub: string;
+  icon: ReactNode;
+  tone: ProjectQuickMetricTone;
+  progress?: number;
+}) {
+  const toneClasses = projectQuickMetricToneClasses[tone];
+  return (
+    <div className="min-w-0 bg-white p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+        <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-md ${toneClasses.icon}`}>{icon}</span>
+      </div>
+      <div className={`mt-2 break-words text-lg font-bold leading-tight tabular-nums sm:text-xl ${toneClasses.value}`}>{value}</div>
+      {progress !== undefined ? (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
+          <div className={`h-full rounded-full ${toneClasses.progress}`} style={{ width: `${progress}%` }} />
+        </div>
+      ) : null}
+      <p className="mt-2 truncate text-xs text-slate-500">{sub}</p>
+    </div>
+  );
+}
+
+function boundedPercent(value: unknown) {
+  const parsed = Number(value ?? 0);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(100, Math.max(0, Math.round(parsed)));
+}
+
+function nonNegativeCount(value: unknown) {
+  const parsed = Number(value ?? 0);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.round(parsed));
 }
 
 function ProjectExplorerHeader() {
@@ -355,19 +473,16 @@ function ProjectFolderRow({ project, folder }: { project: Project; folder: Proje
   return (
     <Link
       to={href}
-      className="grid gap-3 px-4 py-2 hover:bg-white lg:grid-cols-[minmax(0,1.6fr)_160px_150px_120px_140px] lg:items-center"
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 hover:bg-slate-50"
     >
-      <div className="ml-8 flex min-w-0 items-start gap-3 border-l border-slate-200 pl-4">
+      <div className="ml-3 flex min-w-0 items-start gap-3 border-l border-slate-200 pl-3 sm:ml-6 sm:pl-4">
         <Folder className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-700">{folder.explorerLabel ?? folder.label}</p>
           <p className="mt-0.5 truncate text-xs text-slate-500">{folder.description}</p>
         </div>
       </div>
-      <span className="hidden text-xs text-slate-400 lg:block" />
-      <span className="hidden text-xs text-slate-400 lg:block" />
-      <span className="hidden text-xs text-slate-400 lg:block" />
-      <span className="hidden text-right text-xs font-semibold text-blue-700 lg:block">Mở</span>
+      <span className="text-right text-xs font-semibold text-blue-700">Mở</span>
     </Link>
   );
 }

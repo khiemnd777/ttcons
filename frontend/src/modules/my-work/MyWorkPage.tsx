@@ -1,9 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, AtSign, Bell, BriefcaseBusiness, CheckCircle2, Clock3, MessageSquare, RefreshCw, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  AlertCircle,
+  AtSign,
+  Bell,
+  BriefcaseBusiness,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  MessageSquare,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react';
 import clsx from 'clsx';
-import { ApiError, get, post, streamSSE, type StreamStatus } from '../../lib/api/client';
+import { get, post, streamSSE, type StreamStatus } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -11,9 +25,11 @@ import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import type { ActivityAttentionItem, WorkItem } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
+import { statusLabel } from '../../lib/utils/status';
 import { ActivityAttachments } from '../work-items/ActivityAttachments';
 import { ActivityReactionBar, ActivityReplyQuote } from '../work-items/ActivityConversationMeta';
 import { WorkItemCard } from '../work-items/WorkItemCard';
+import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
 import {
   asArray,
@@ -23,68 +39,128 @@ import {
   isWorkOverdue,
   numberValue,
   priorityLabel,
-  prioritizeWorkItems,
   scopeTypeLabel,
   workTypeLabel,
 } from '../work-items/workItemPresentation';
 
+type ModeKey = 'work' | 'attention';
 type QueueKey = 'mine' | 'department' | 'pending_approval' | 'watching' | 'all';
 type AttentionQueueKey = 'all' | 'mentions' | 'questions' | 'blockers' | 'reminders' | 'unread';
+type SummaryBucket = 'need_action' | 'overdue' | 'blocked' | 'waiting_decision' | 'done_today';
+
+type FacetOption = string | {
+  id?: string;
+  value?: string;
+  label?: string;
+  code?: string;
+  name?: string;
+  project_id?: string;
+  project_code?: string;
+  project_name?: string;
+};
+type MyWorkFacets = {
+  projects?: FacetOption[];
+  statuses?: FacetOption[];
+  work_types?: FacetOption[];
+  priorities?: FacetOption[];
+};
+type MyWorkSummary = {
+  total: number;
+  need_action: number;
+  overdue: number;
+  blocked: number;
+  waiting_decision: number;
+  waiting_approval: number;
+  done_today: number;
+};
+type MyWorkPageResponse = {
+  items: WorkItem[];
+  summary: MyWorkSummary;
+  facets: MyWorkFacets;
+  total: number;
+  has_more: boolean;
+  next_cursor?: string;
+};
 
 const queues: Array<{ key: QueueKey; label: string; description: string }> = [
-  { key: 'mine', label: 'Mine', description: 'Công việc gắn trực tiếp với tôi' },
-  { key: 'department', label: 'Department', description: 'Queue theo phòng ban / role scope' },
-  { key: 'pending_approval', label: 'Pending approval', description: 'Việc đang chờ review hoặc duyệt' },
-  { key: 'watching', label: 'Watching', description: 'Việc đang theo dõi' },
-  { key: 'all', label: 'All visible', description: 'Tất cả work item trong scope của tôi' },
-];
-
-const statusOptions = [
-  { value: 'all', label: 'Tất cả trạng thái' },
-  { value: 'ready', label: 'Sẵn sàng' },
-  { value: 'in_progress', label: 'Đang xử lý' },
-  { value: 'blocked', label: 'Bị chặn' },
-  { value: 'waiting_review', label: 'Chờ review' },
-  { value: 'waiting_approval', label: 'Chờ duyệt' },
-  { value: 'waiting_evidence', label: 'Chờ evidence' },
-  { value: 'completed', label: 'Hoàn tất' },
+  { key: 'mine', label: 'Của tôi', description: 'Được giao trực tiếp' },
+  { key: 'department', label: 'Phòng ban', description: 'Theo phòng ban hoặc vai trò' },
+  { key: 'pending_approval', label: 'Chờ tôi duyệt', description: 'Tôi có quyền quyết định' },
+  { key: 'watching', label: 'Đang theo dõi', description: 'Việc tôi đang quan sát' },
+  { key: 'all', label: 'Tất cả', description: 'Toàn bộ việc trong phạm vi' },
 ];
 
 const attentionQueues: Array<{ key: AttentionQueueKey; label: string; icon: typeof MessageSquare }> = [
-  { key: 'all', label: 'All', icon: MessageSquare },
-  { key: 'mentions', label: 'Mentions', icon: AtSign },
-  { key: 'questions', label: 'Questions', icon: MessageSquare },
-  { key: 'blockers', label: 'Blockers', icon: AlertCircle },
-  { key: 'reminders', label: 'Reminders', icon: Bell },
-  { key: 'unread', label: 'Unread', icon: CheckCircle2 },
+  { key: 'all', label: 'Tất cả', icon: MessageSquare },
+  { key: 'mentions', label: 'Nhắc đến', icon: AtSign },
+  { key: 'questions', label: 'Câu hỏi', icon: MessageSquare },
+  { key: 'blockers', label: 'Điểm chặn', icon: AlertCircle },
+  { key: 'reminders', label: 'Nhắc hạn', icon: Bell },
+  { key: 'unread', label: 'Chưa đọc', icon: CheckCircle2 },
+];
+
+const statusOptions = [
+  { value: 'ready', label: 'Sẵn sàng' },
+  { value: 'in_progress', label: 'Đang xử lý' },
+  { value: 'blocked', label: 'Bị chặn' },
+  { value: 'waiting_review', label: 'Chờ rà soát' },
+  { value: 'waiting_approval', label: 'Chờ duyệt' },
+  { value: 'waiting_evidence', label: 'Chờ minh chứng' },
+  { value: 'completed', label: 'Hoàn tất' },
+];
+
+const deadlineOptions = [
+  { value: 'overdue', label: 'Quá hạn' },
+  { value: 'due_7_days', label: 'Đến hạn trong 7 ngày' },
+  { value: 'no_due', label: 'Chưa có hạn' },
+];
+
+const sortOptions = [
+  { value: 'priority', label: 'Ưu tiên xử lý' },
+  { value: 'due_asc', label: 'Hạn gần nhất' },
+  { value: 'newest', label: 'Mới cập nhật' },
 ];
 
 export function MyWorkPage() {
   const { user } = useAuth();
-  const [selectedQueue, setSelectedQueue] = useState<QueueKey>('mine');
-  const [selectedProject, setSelectedProject] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedDeadline, setSelectedDeadline] = useState('all');
-  const [selectedWorkType, setSelectedWorkType] = useState('all');
-  const [selectedPriority, setSelectedPriority] = useState('all');
-  const [selectedAttentionQueue, setSelectedAttentionQueue] = useState<AttentionQueueKey>('all');
-  const [attentionStreamStatus, setAttentionStreamStatus] = useState<StreamStatus>('reconnecting');
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const workItems = useQuery({
-    queryKey: ['my-work-items'],
-    queryFn: () => get<WorkItem[]>('/me/work-items'),
+  const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null);
+  const [dialogItem, setDialogItem] = useState<WorkItem | null>(null);
+  const [searchDraft, setSearchDraft] = useState(searchParams.get('search') ?? '');
+  const [streamStatus, setStreamStatus] = useState<StreamStatus>('reconnecting');
+
+  const mode = validValue<ModeKey>(searchParams.get('mode'), ['work', 'attention'], 'work');
+  const queue = validValue<QueueKey>(searchParams.get('queue'), ['mine', 'department', 'pending_approval', 'watching', 'all'], 'mine');
+  const attentionQueue = validValue<AttentionQueueKey>(searchParams.get('attention'), ['all', 'mentions', 'questions', 'blockers', 'reminders', 'unread'], 'all');
+  const bucket = validOptionalValue<SummaryBucket>(searchParams.get('bucket'), ['need_action', 'overdue', 'blocked', 'waiting_decision', 'done_today']);
+  const project = searchParams.get('project') ?? '';
+  const status = searchParams.get('status') ?? '';
+  const deadline = searchParams.get('deadline') ?? '';
+  const workType = searchParams.get('type') ?? '';
+  const priority = searchParams.get('priority') ?? '';
+  const search = searchParams.get('search') ?? '';
+  const sort = searchParams.get('sort') ?? 'priority';
+
+  useEffect(() => setSearchDraft(search), [search]);
+
+  const filterKey = useMemo(() => ({ queue, bucket, project, status, deadline, workType, priority, search, sort }), [bucket, deadline, priority, project, queue, search, sort, status, workType]);
+  const workItems = useInfiniteQuery({
+    queryKey: ['my-work-items', filterKey],
+    initialPageParam: '',
+    queryFn: ({ pageParam }) => get<MyWorkPageResponse>(buildWorkPath(filterKey, String(pageParam ?? ''))),
+    getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor : undefined,
     retry: false,
   });
+
   const attentionPath = useMemo(() => {
-    const params = new URLSearchParams();
-    params.set('limit', '120');
-    if (selectedProject !== 'all') params.set('project_id', selectedProject);
+    const params = new URLSearchParams({ limit: '120' });
+    if (project) params.set('project_id', project);
     return `/me/activity-attention?${params.toString()}`;
-  }, [selectedProject]);
+  }, [project]);
   const activityAttention = useQuery({
-    queryKey: ['activity-attention', selectedProject],
+    queryKey: ['activity-attention', project],
     queryFn: () => get<ActivityAttentionItem[]>(attentionPath),
     retry: false,
   });
@@ -98,512 +174,367 @@ export function MyWorkPage() {
     },
   });
 
-  const rows = useMemo(() => prioritizeWorkItems(asArray<WorkItem>(workItems.data)), [workItems.data]);
-  const projectOptions = useMemo(() => {
-    const index = new Map<string, string>();
-    rows.forEach((item) => {
-      if (item.project_id) index.set(item.project_id, item.project_code ? `${item.project_code} · ${item.project_name ?? 'Project'}` : item.project_name ?? item.project_id);
-    });
-    return Array.from(index.entries()).map(([value, label]) => ({ value, label }));
-  }, [rows]);
-  const workTypeOptions = useMemo(() => uniqueOptionValues(rows.map((item) => item.work_type)), [rows]);
-  const priorityOptions = useMemo(() => uniqueOptionValues(rows.map((item) => item.priority)), [rows]);
-
-  const queueCounts = useMemo(() => {
-    return queues.reduce<Record<QueueKey, number>>((acc, queue) => {
-      acc[queue.key] = rows.filter((item) => inQueue(item, queue.key)).length;
-      return acc;
-    }, { mine: 0, department: 0, pending_approval: 0, watching: 0, all: 0 });
-  }, [rows]);
-
-  const filteredRows = useMemo(() => {
-    return rows.filter((item) => {
-      if (!inQueue(item, selectedQueue)) return false;
-      if (selectedProject !== 'all' && item.project_id !== selectedProject) return false;
-      if (selectedStatus !== 'all' && item.status !== selectedStatus) return false;
-      if (selectedDeadline !== 'all' && !inDeadlineBucket(item, selectedDeadline)) return false;
-      if (selectedWorkType !== 'all' && item.work_type !== selectedWorkType) return false;
-      if (selectedPriority !== 'all' && item.priority !== selectedPriority) return false;
-      return true;
-    });
-  }, [rows, selectedDeadline, selectedPriority, selectedProject, selectedQueue, selectedStatus, selectedWorkType]);
-
-  const selectedContext = filteredRows[0] ?? null;
-  const summary = useMemo(() => buildSummary(rows), [rows]);
+  const firstPage = workItems.data?.pages[0];
+  const rows = useMemo(() => dedupeWorkItems(workItems.data?.pages.flatMap((page) => page.items) ?? []), [workItems.data]);
+  const summary = firstPage?.summary ?? emptySummary;
+  const facets = firstPage?.facets ?? {};
   const attentionRows = useMemo(() => asArray<ActivityAttentionItem>(activityAttention.data), [activityAttention.data]);
+  const selectedItem = rows.find((item) => item.id === selectedWorkId) ?? rows[0] ?? null;
 
   useEffect(() => {
-    return streamSSE('/me/activity-attention/stream', {
-      onStatus: setAttentionStreamStatus,
-      onEvent: (message) => {
-        if (message.event === 'attention_changed') {
-          queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
-        }
-      },
-    });
-  }, [queryClient]);
+    if (!rows.length) setSelectedWorkId(null);
+    else if (!selectedWorkId || !rows.some((item) => item.id === selectedWorkId)) setSelectedWorkId(rows[0].id);
+  }, [rows, selectedWorkId]);
 
-  if (workItems.isLoading) return <MyWorkSkeleton />;
-  if (workItems.error) {
-    return (
-      <MyWorkError
-        error={workItems.error}
-        onRetry={() => {
-          void workItems.refetch();
-        }}
-      />
-    );
+  useEffect(() => streamSSE('/me/activity-attention/stream', {
+    onStatus: setStreamStatus,
+    onEvent: (message) => {
+      if (message.event === 'attention_changed') queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
+      if (message.event === 'work_queue_changed' || message.event === 'work_item_changed') {
+        queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
+      }
+    },
+  }), [queryClient]);
+
+  function updateParams(changes: Record<string, string | null>) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      Object.entries(changes).forEach(([key, value]) => {
+        if (!value || (key === 'mode' && value === 'work') || (key === 'queue' && value === 'mine') || (key === 'sort' && value === 'priority')) next.delete(key);
+        else next.set(key, value);
+      });
+      return next;
+    });
   }
+
+  function resetFilters() {
+    setSearchDraft('');
+    updateParams({ queue: null, bucket: null, project: null, status: null, deadline: null, type: null, priority: null, search: null, sort: null });
+  }
+
+  function selectBucket(nextBucket: SummaryBucket) {
+    updateParams({
+      mode: 'work',
+      queue: nextBucket === 'waiting_decision' ? 'pending_approval' : 'all',
+      bucket: bucket === nextBucket ? null : nextBucket,
+      status: null,
+      deadline: null,
+      type: null,
+      priority: null,
+      search: null,
+    });
+  }
+
+  function refreshAll() {
+    void workItems.refetch();
+    void activityAttention.refetch();
+  }
+
+  const hasFilters = Boolean(bucket || project || status || deadline || workType || priority || search || sort !== 'priority');
+  const total = firstPage?.total ?? summary.total ?? rows.length;
 
   return (
     <>
       <PageHeader
         title="Việc của tôi"
-        description={`${user?.full_name ?? 'Current user'} · ${user?.roles?.join(', ') || 'Operational inbox'} · Cross-project work queue`}
-        actions={
-          <button
-            className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-            onClick={() => {
-              void workItems.refetch();
-            }}
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </button>
-        }
-      />
-
-      <SummaryStrip summary={summary} />
-
-      <ActivityAttentionPanel
-        rows={attentionRows}
-        loading={activityAttention.isLoading}
-        error={activityAttention.error}
-        selectedQueue={selectedAttentionQueue}
-        streamStatus={attentionStreamStatus}
-        markingId={markAttentionRead.isPending ? markAttentionRead.variables : undefined}
-        onSelectQueue={setSelectedAttentionQueue}
-        onRefresh={() => {
-          void activityAttention.refetch();
-        }}
-        onMarkRead={(activityId) => markAttentionRead.mutate(activityId)}
-      />
-
-      <section className="mt-5 rounded-lg border border-line bg-white p-4 shadow-panel">
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        description={`${user?.full_name ?? 'Người dùng'} · Công việc cần xử lý trên các công trình được phân quyền`}
+        actions={(
           <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-5 w-5 text-blue-700" />
-            <h2 className="font-semibold text-ink">Queue filters</h2>
+            <LiveStatusBadge status={streamStatus} />
+            <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={refreshAll}>
+              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || activityAttention.isFetching) && 'animate-spin')} />
+              Làm mới
+            </button>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-            <select
-              className="rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700"
-              value={selectedProject}
-              onChange={(event) => setSelectedProject(event.target.value)}
-            >
-              <option value="all">Tất cả công trình</option>
-              {projectOptions.map((project) => <option key={project.value} value={project.value}>{project.label}</option>)}
-            </select>
-            <select
-              className="rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700"
-              value={selectedStatus}
-              onChange={(event) => setSelectedStatus(event.target.value)}
-            >
-              {statusOptions.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
-            </select>
-            <select
-              className="rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700"
-              value={selectedDeadline}
-              onChange={(event) => setSelectedDeadline(event.target.value)}
-            >
-              <option value="all">Tất cả hạn việc</option>
-              <option value="overdue">Quá hạn</option>
-              <option value="due_7_days">Đến hạn 7 ngày</option>
-              <option value="no_due">Chưa có hạn</option>
-            </select>
-            <select
-              className="rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700"
-              value={selectedWorkType}
-              onChange={(event) => setSelectedWorkType(event.target.value)}
-            >
-              <option value="all">Tất cả loại việc</option>
-              {workTypeOptions.map((workType) => <option key={workType} value={workType}>{workTypeLabel(workType)}</option>)}
-            </select>
-            <select
-              className="rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700"
-              value={selectedPriority}
-              onChange={(event) => setSelectedPriority(event.target.value)}
-            >
-              <option value="all">Tất cả ưu tiên</option>
-              {priorityOptions.map((priority) => <option key={priority} value={priority}>{priorityLabel(priority)}</option>)}
-            </select>
-          </div>
-        </div>
+        )}
+      />
 
-        <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)_340px]">
-          <QueueTabs selectedQueue={selectedQueue} counts={queueCounts} onSelect={setSelectedQueue} />
-          <WorkQueueList
-            rows={filteredRows}
-            onOpen={(item) => navigate(workItemDetailPath(item.id, currentReturnTo(location), item.project_id))}
+      <SummaryStrip summary={summary} selected={bucket} onSelect={selectBucket} />
+
+      <div className="mt-4 flex gap-1 border-b border-line">
+        <ModeTab active={mode === 'work'} label="Công việc" count={summary.total} onClick={() => updateParams({ mode: 'work' })} />
+        <ModeTab active={mode === 'attention'} label="Trao đổi cần phản hồi" count={attentionRows.length} onClick={() => updateParams({ mode: 'attention' })} />
+      </div>
+
+      {mode === 'work' ? (
+        <section className="mt-4 rounded-lg border border-line bg-white p-4 shadow-panel">
+          <FilterBar
+            searchDraft={searchDraft}
+            project={project}
+            status={status}
+            deadline={deadline}
+            workType={workType}
+            priority={priority}
+            sort={sort}
+            facets={facets}
+            hasFilters={hasFilters}
+            onSearchDraft={setSearchDraft}
+            onSearch={() => updateParams({ search: searchDraft.trim() || null, bucket: null })}
+            onChange={(key, value) => updateParams({ [key]: value || null, bucket: null })}
+            onReset={resetFilters}
           />
-          <ContextPanel item={selectedContext} />
-        </div>
-      </section>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_320px]">
+            <QueueRail selected={queue} total={total} onSelect={(value) => updateParams({ queue: value })} />
+            <WorkList
+              rows={rows}
+              selectedId={selectedItem?.id}
+              loading={workItems.isLoading}
+              fetchingMore={workItems.isFetchingNextPage}
+              error={workItems.error}
+              total={total}
+              hasMore={Boolean(workItems.hasNextPage)}
+              filtered={hasFilters || queue !== 'mine'}
+              onSelect={setSelectedWorkId}
+              onOpen={setDialogItem}
+              onLoadMore={() => void workItems.fetchNextPage()}
+              onReset={resetFilters}
+              onRetry={() => void workItems.refetch()}
+            />
+            <NextWorkPanel item={selectedItem} onOpen={setDialogItem} />
+          </div>
+        </section>
+      ) : (
+        <ActivityAttentionPanel
+          rows={attentionRows}
+          loading={activityAttention.isLoading}
+          error={activityAttention.error}
+          selectedQueue={attentionQueue}
+          streamStatus={streamStatus}
+          returnTo={currentReturnTo(location)}
+          markingId={markAttentionRead.isPending ? markAttentionRead.variables : undefined}
+          onSelectQueue={(value) => updateParams({ attention: value === 'all' ? null : value })}
+          onMarkRead={(activityId) => markAttentionRead.mutate(activityId)}
+        />
+      )}
+
+      <WorkItemDetailDialog
+        open={Boolean(dialogItem)}
+        item={dialogItem}
+        onClose={() => setDialogItem(null)}
+        onChanged={(updated) => {
+          setDialogItem(updated);
+          void queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
+        }}
+      />
     </>
   );
 }
 
-function inQueue(item: WorkItem, queue: QueueKey) {
-  if (queue === 'all') return true;
-  const scopes = asArray<string>(item.queue_scopes);
-  if (scopes.includes(queue)) return true;
-  if (queue === 'pending_approval') return item.status === 'waiting_approval' || item.status === 'waiting_review';
-  return false;
+function buildWorkPath(filters: {
+  queue: QueueKey;
+  bucket?: SummaryBucket;
+  project: string;
+  status: string;
+  deadline: string;
+  workType: string;
+  priority: string;
+  search: string;
+  sort: string;
+}, cursor: string) {
+  const params = new URLSearchParams({ queue: filters.queue, sort: filters.sort, limit: '30' });
+  if (filters.bucket) params.set('bucket', filters.bucket);
+  if (filters.project) params.set('project_id', filters.project);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.deadline) params.set('deadline', filters.deadline);
+  if (filters.workType) params.set('work_type', filters.workType);
+  if (filters.priority) params.set('priority', filters.priority);
+  if (filters.search) params.set('search', filters.search);
+  if (cursor) params.set('cursor', cursor);
+  return `/me/work-items?${params.toString()}`;
 }
 
-function attentionQueueLabel(queue: string) {
-  return attentionQueues.find((item) => item.key === queue)?.label ?? queue;
+function dedupeWorkItems(rows: WorkItem[]) {
+  return Array.from(new Map(rows.map((item) => [item.id, item])).values());
 }
 
-function uniqueOptionValues(values: Array<string | undefined>) {
-  return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b));
+function validValue<T extends string>(value: string | null, values: readonly T[], fallback: T): T {
+  return value && values.includes(value as T) ? value as T : fallback;
 }
 
-function inDeadlineBucket(item: WorkItem, bucket: string) {
-  if (bucket === 'overdue') return isWorkOverdue(item);
-  if (bucket === 'no_due') return !item.due_at;
-  if (bucket === 'due_7_days') {
-    if (!item.due_at || ['completed', 'cancelled'].includes(item.status)) return false;
-    const due = new Date(item.due_at);
-    if (Number.isNaN(due.getTime())) return false;
-    const now = Date.now();
-    const sevenDays = 7 * 24 * 60 * 60 * 1000;
-    return due.getTime() >= now && due.getTime() <= now + sevenDays;
-  }
-  return true;
+function validOptionalValue<T extends string>(value: string | null, values: readonly T[]): T | undefined {
+  return value && values.includes(value as T) ? value as T : undefined;
 }
 
-function buildSummary(rows: WorkItem[]) {
-  const today = new Date().toISOString().slice(0, 10);
-  return {
-    needAction: rows.filter((item) => !['completed', 'cancelled'].includes(item.status)).length,
-    overdue: rows.filter(isWorkOverdue).length,
-    blocked: rows.filter((item) => item.status === 'blocked').length,
-    waitingApproval: rows.filter((item) => item.status === 'waiting_approval' || item.status === 'waiting_review').length,
-    doneToday: rows.filter((item) => item.status === 'completed' && String(item.completed_at ?? '').slice(0, 10) === today).length,
-  };
-}
+const emptySummary: MyWorkSummary = { total: 0, need_action: 0, overdue: 0, blocked: 0, waiting_decision: 0, waiting_approval: 0, done_today: 0 };
 
-function SummaryStrip({ summary }: { summary: ReturnType<typeof buildSummary> }) {
-  const cards = [
-    { label: 'Need action', value: summary.needAction, tone: 'border-blue-200 bg-blue-50', icon: <BriefcaseBusiness className="h-4 w-4" /> },
-    { label: 'Overdue', value: summary.overdue, tone: summary.overdue > 0 ? 'border-red-200 bg-red-50' : 'border-line bg-white', icon: <Clock3 className="h-4 w-4" /> },
-    { label: 'Blocked', value: summary.blocked, tone: summary.blocked > 0 ? 'border-rose-200 bg-rose-50' : 'border-line bg-white', icon: <AlertCircle className="h-4 w-4" /> },
-    { label: 'Approval', value: summary.waitingApproval, tone: summary.waitingApproval > 0 ? 'border-amber-200 bg-amber-50' : 'border-line bg-white', icon: <ShieldAlert className="h-4 w-4" /> },
-    { label: 'Done today', value: summary.doneToday, tone: 'border-emerald-200 bg-emerald-50', icon: <CheckCircle2 className="h-4 w-4" /> },
+function SummaryStrip({ summary, selected, onSelect }: { summary: MyWorkSummary; selected?: SummaryBucket; onSelect: (bucket: SummaryBucket) => void }) {
+  const cards: Array<{ bucket: SummaryBucket; label: string; value: number; icon: typeof BriefcaseBusiness; activeClass: string }> = [
+    { bucket: 'need_action', label: 'Cần tôi xử lý', value: summary.need_action, icon: BriefcaseBusiness, activeClass: 'border-blue-300 bg-blue-50 ring-blue-200' },
+    { bucket: 'overdue', label: 'Quá hạn', value: summary.overdue, icon: Clock3, activeClass: 'border-red-300 bg-red-50 ring-red-200' },
+    { bucket: 'blocked', label: 'Bị chặn', value: summary.blocked, icon: AlertCircle, activeClass: 'border-rose-300 bg-rose-50 ring-rose-200' },
+    { bucket: 'waiting_decision', label: 'Chờ tôi duyệt', value: summary.waiting_decision, icon: ShieldAlert, activeClass: 'border-amber-300 bg-amber-50 ring-amber-200' },
+    { bucket: 'done_today', label: 'Xong hôm nay', value: summary.done_today, icon: CheckCircle2, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
   ];
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      {cards.map((card) => (
-        <div key={card.label} className={clsx('rounded-lg border p-4 shadow-panel', card.tone)}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.label}</p>
-              <p className="mt-2 text-2xl font-semibold text-ink">{card.value}</p>
-            </div>
-            <div className="rounded-md bg-white/75 p-2 text-slate-700">{card.icon}</div>
-          </div>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function ActivityAttentionPanel({
-  rows,
-  loading,
-  error,
-  selectedQueue,
-  streamStatus,
-  markingId,
-  onSelectQueue,
-  onRefresh,
-  onMarkRead,
-}: {
-  rows: ActivityAttentionItem[];
-  loading: boolean;
-  error: unknown;
-  selectedQueue: AttentionQueueKey;
-  streamStatus: StreamStatus;
-  markingId?: string;
-  onSelectQueue: (queue: AttentionQueueKey) => void;
-  onRefresh: () => void;
-  onMarkRead: (activityId: string) => void;
-}) {
-  const counts = useMemo(() => {
-    return attentionQueues.reduce<Record<AttentionQueueKey, number>>((acc, queue) => {
-      acc[queue.key] = rows.filter((item) => inAttentionQueue(item, queue.key)).length;
-      return acc;
-    }, { all: 0, mentions: 0, questions: 0, blockers: 0, reminders: 0, unread: 0 });
-  }, [rows]);
-  const visibleRows = useMemo(() => rows.filter((item) => inAttentionQueue(item, selectedQueue)), [rows, selectedQueue]);
-
-  return (
-    <section className="mt-5 rounded-lg border border-line bg-white p-4 shadow-panel">
-      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="font-semibold text-ink">Communication attention</h2>
-          <p className="mt-1 text-sm text-slate-500">Mentions, open questions, blockers, and due reminders</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <LiveStatusBadge status={streamStatus} />
-          <button
-            className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-            onClick={onRefresh}
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-3 flex gap-2 overflow-x-auto">
-        {attentionQueues.map((queue) => {
-          const Icon = queue.icon;
-          const active = selectedQueue === queue.key;
-          return (
-            <button
-              key={queue.key}
-              className={clsx(
-                'inline-flex min-w-fit items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold',
-                active ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-line bg-white text-slate-700 hover:bg-slate-50',
-              )}
-              onClick={() => onSelectQueue(queue.key)}
-            >
-              <Icon className="h-4 w-4" />
-              {queue.label}
-              <span className="rounded-md bg-white px-2 py-0.5 text-xs text-slate-600">{counts[queue.key]}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {loading ? <LoadingSpinner /> : null}
-      {error ? (
-        <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-          Không tải được communication attention.
-        </div>
-      ) : null}
-      {!loading && !error && !visibleRows.length ? <EmptyState title="Không có communication attention trong queue này" /> : null}
-
-      {visibleRows.length ? (
-        <div className="grid gap-2 xl:grid-cols-2">
-          {visibleRows.slice(0, 8).map((item) => (
-            <div key={item.id} className={clsx('rounded-md border p-3', item.is_unread ? 'border-blue-200 bg-blue-50' : 'border-line bg-slate-50')}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-1">
-                    {item.is_unread ? <span className="rounded-md bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">Unread</span> : null}
-                    {item.mentioned_me ? <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">@you</span> : null}
-                    {asArray<string>(item.queue_types).slice(0, 3).map((queue) => (
-                      <span key={queue} className="rounded-md bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{attentionQueueLabel(queue)}</span>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-sm font-semibold text-ink">{activityLabel(item.activity_type)}</p>
-                  <p className="mt-1 line-clamp-1 text-xs text-slate-500">
-                    {item.actor_name ?? 'System'} · {item.target_label ?? item.work_item_title ?? (item.scope_type ? scopeTypeLabel(item.scope_type) : 'Công trình')} · {compactDateTime(item.created_at)}
-                  </p>
-                </div>
-                {item.is_unread ? (
-                  <button
-                    className="inline-flex shrink-0 items-center gap-1 rounded-md border border-blue-200 bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60"
-                    disabled={markingId === item.id}
-                    onClick={() => onMarkRead(item.id)}
-                  >
-                    <CheckCircle2 className="h-3 w-3" />
-                    Read
-                  </button>
-                ) : null}
-              </div>
-              <ActivityReplyQuote replyTo={item.reply_to} />
-              {item.comment ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-700">{item.comment}</p> : null}
-              <ActivityAttachments attachments={item.attachments} compact />
-              {item.reactions?.length ? <div className="mt-2"><ActivityReactionBar reactions={item.reactions} /></div> : null}
-              {item.project_id ? (
-                <Link to={`/projects/${item.project_id}`} className="mt-2 inline-flex text-xs font-semibold text-blue-700 hover:text-blue-800">
-                  Open project
-                </Link>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function LiveStatusBadge({ status }: { status: StreamStatus }) {
-  const label = status === 'connected' ? 'Live connected' : status === 'reconnecting' ? 'Reconnecting' : 'Offline';
-  const tone = status === 'connected' ? 'bg-emerald-50 text-emerald-700' : status === 'reconnecting' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600';
-  const dot = status === 'connected' ? 'bg-emerald-500' : status === 'reconnecting' ? 'bg-amber-500' : 'bg-slate-400';
-  return (
-    <span className={clsx('inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold', tone)}>
-      <span className={clsx('h-2 w-2 rounded-full', dot)} />
-      {label}
-    </span>
-  );
-}
-
-function inAttentionQueue(item: ActivityAttentionItem, queue: AttentionQueueKey) {
-  if (queue === 'all') return true;
-  if (queue === 'unread') return Boolean(item.is_unread);
-  return asArray<string>(item.queue_types).includes(queue);
-}
-
-function QueueTabs({
-  selectedQueue,
-  counts,
-  onSelect,
-}: {
-  selectedQueue: QueueKey;
-  counts: Record<QueueKey, number>;
-  onSelect: (queue: QueueKey) => void;
-}) {
-  return (
-    <nav className="flex gap-2 overflow-x-auto xl:block xl:space-y-2 xl:overflow-visible">
-      {queues.map((queue) => {
-        const active = selectedQueue === queue.key;
+    <section className="flex gap-2 overflow-x-auto pb-1" aria-label="Tóm tắt công việc">
+      {cards.map((card) => {
+        const Icon = card.icon;
+        const active = selected === card.bucket;
         return (
           <button
-            key={queue.key}
+            key={card.bucket}
             className={clsx(
-              'min-w-44 rounded-md border px-3 py-2 text-left xl:w-full',
-              active ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-line bg-white text-slate-700 hover:bg-slate-50',
+              'flex min-w-[10.5rem] flex-1 items-center justify-between gap-3 rounded-lg border bg-white px-3 py-3 text-left shadow-panel transition',
+              active ? `ring-1 ${card.activeClass}` : 'border-line hover:border-blue-200 hover:bg-slate-50',
             )}
-            onClick={() => onSelect(queue.key)}
+            onClick={() => onSelect(card.bucket)}
           >
-            <span className="flex items-center justify-between gap-3">
-              <span className="text-sm font-semibold">{queue.label}</span>
-              <span className="rounded-md bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{counts[queue.key]}</span>
-            </span>
-            <span className="mt-1 block text-xs leading-5 text-slate-500">{queue.description}</span>
+            <span><span className="block text-xs font-semibold text-slate-500">{card.label}</span><span className="mt-1 block text-xl font-semibold text-ink">{card.value}</span></span>
+            <Icon className={clsx('h-4 w-4', active ? 'text-blue-700' : 'text-slate-400')} />
           </button>
         );
       })}
+    </section>
+  );
+}
+
+function ModeTab({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) {
+  return (
+    <button className={clsx('border-b-2 px-4 py-3 text-sm font-semibold', active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800')} onClick={onClick}>
+      {label} <span className="ml-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{count}</span>
+    </button>
+  );
+}
+
+function FilterBar({ searchDraft, project, status, deadline, workType, priority, sort, facets, hasFilters, onSearchDraft, onSearch, onChange, onReset }: {
+  searchDraft: string; project: string; status: string; deadline: string; workType: string; priority: string; sort: string; facets: MyWorkFacets; hasFilters: boolean;
+  onSearchDraft: (value: string) => void; onSearch: () => void; onChange: (key: string, value: string) => void; onReset: () => void;
+}) {
+  const projects = normalizeFacetOptions(facets.projects, 'Công trình');
+  const statuses = normalizeFacetOptions(facets.statuses, 'Trạng thái');
+  const workTypes = normalizeFacetOptions(facets.work_types, 'Loại việc');
+  const priorities = normalizeFacetOptions(facets.priorities, 'Ưu tiên');
+  return (
+    <div className="space-y-3 border-b border-line pb-4">
+      <div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-blue-700" /><h2 className="text-sm font-semibold text-ink">Tìm và lọc công việc</h2></div>
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1.5fr)_repeat(6,minmax(8rem,1fr))_auto]">
+        <form className="flex min-w-0" onSubmit={(event) => { event.preventDefault(); onSearch(); }}>
+          <div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input className="w-full rounded-l-md border border-line py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400" value={searchDraft} onChange={(event) => onSearchDraft(event.target.value)} placeholder="Tên việc, công trình..." /></div>
+          <button className="rounded-r-md border border-l-0 border-line px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50" type="submit">Tìm</button>
+        </form>
+        <FilterSelect value={project} label="Tất cả công trình" options={projects} onChange={(value) => onChange('project', value)} />
+        <FilterSelect value={status} label="Tất cả trạng thái" options={statuses.length ? statuses.map((item) => ({ ...item, label: statusLabel(item.value) })) : statusOptions} onChange={(value) => onChange('status', value)} />
+        <FilterSelect value={deadline} label="Tất cả hạn việc" options={deadlineOptions} onChange={(value) => onChange('deadline', value)} />
+        <FilterSelect value={workType} label="Tất cả loại việc" options={workTypes.map((item) => ({ ...item, label: workTypeLabel(item.value) }))} onChange={(value) => onChange('type', value)} />
+        <FilterSelect value={priority} label="Tất cả ưu tiên" options={priorities.map((item) => ({ ...item, label: priorityLabel(item.value) }))} onChange={(value) => onChange('priority', value)} />
+        <FilterSelect value={sort} label="Sắp xếp" options={sortOptions} onChange={(value) => onChange('sort', value)} />
+        {hasFilters ? <button className="inline-flex items-center justify-center gap-1 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50" onClick={onReset}><X className="h-4 w-4" />Xóa lọc</button> : null}
+      </div>
+    </div>
+  );
+}
+
+function normalizeFacetOptions(values: FacetOption[] | undefined, fallback: string) {
+  return asArray<FacetOption>(values).map((item) => {
+    if (typeof item === 'string') return { value: item, label: item };
+    const value = item.value ?? item.id ?? item.project_id ?? '';
+    return { value, label: item.label ?? ([item.code ?? item.project_code, item.name ?? item.project_name].filter(Boolean).join(' · ') || fallback) };
+  }).filter((item) => item.value);
+}
+
+function FilterSelect({ value, label, options, onChange }: { value: string; label: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
+  return <select className="min-w-0 rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700" value={value} onChange={(event) => onChange(event.target.value)}><option value="">{label}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
+}
+
+function QueueRail({ selected, total, onSelect }: { selected: QueueKey; total: number; onSelect: (queue: QueueKey) => void }) {
+  return (
+    <nav className="flex gap-2 overflow-x-auto xl:block xl:space-y-1 xl:overflow-visible" aria-label="Phạm vi công việc">
+      {queues.map((item) => (
+        <button key={item.key} className={clsx('min-w-44 rounded-md border px-3 py-2 text-left xl:w-full', selected === item.key ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-transparent text-slate-700 hover:bg-slate-50')} onClick={() => onSelect(item.key)}>
+          <span className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{item.label}</span>{selected === item.key ? <span className="rounded-md bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{total}</span> : null}</span>
+          <span className="mt-0.5 block text-xs text-slate-500">{item.description}</span>
+        </button>
+      ))}
     </nav>
   );
 }
 
-function WorkQueueList({
-  rows,
-  onOpen,
-}: {
-  rows: WorkItem[];
-  onOpen: (item: WorkItem) => void;
+function WorkList({ rows, selectedId, loading, fetchingMore, error, total, hasMore, filtered, onSelect, onOpen, onLoadMore, onReset, onRetry }: {
+  rows: WorkItem[]; selectedId?: string; loading: boolean; fetchingMore: boolean; error: unknown; total: number; hasMore: boolean; filtered: boolean;
+  onSelect: (id: string) => void; onOpen: (item: WorkItem) => void; onLoadMore: () => void; onReset: () => void; onRetry: () => void;
 }) {
-  if (!rows.length) return <EmptyState title="Không có work item trong queue này" />;
+  if (loading) return <div className="rounded-md border border-line p-8"><LoadingSpinner /></div>;
+  if (error && !rows.length) return <SourceError title="Không tải được danh sách công việc" onRetry={onRetry} />;
+  if (!rows.length) return <EmptyState title={filtered ? 'Không có công việc khớp bộ lọc' : 'Không có việc cần xử lý trong phạm vi này'} action={filtered ? <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700" onClick={onReset}>Xóa bộ lọc</button> : undefined} />;
   return (
-    <div className="max-h-[720px] space-y-3 overflow-y-auto pr-1">
-      {rows.map((item) => (
-        <div key={item.id}>
-          <WorkItemCard item={item} onOpen={() => onOpen(item)} />
-        </div>
-      ))}
+    <div className="min-w-0">
+      <div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold text-ink">{total} việc</p>{error ? <span className="text-xs font-semibold text-rose-600">Chưa cập nhật được dữ liệu mới</span> : null}</div>
+      <div className="max-h-[720px] space-y-2 overflow-y-auto pr-1">
+        {rows.map((item) => (
+          <div key={item.id} role="button" tabIndex={0} className={clsx('rounded-lg outline-none ring-offset-1', selectedId === item.id && 'ring-2 ring-blue-400')} onClick={() => onSelect(item.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelect(item.id); }}>
+            <WorkItemCard item={item} onOpen={() => onOpen(item)} />
+          </div>
+        ))}
+      </div>
+      {hasMore ? <button className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" disabled={fetchingMore} onClick={onLoadMore}>{fetchingMore ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}Tải thêm · Đã hiển thị {rows.length}/{total}</button> : <p className="mt-3 text-center text-xs text-slate-500">Đã hiển thị {rows.length}/{total}</p>}
     </div>
   );
 }
 
-function ContextPanel({ item }: { item: WorkItem | null }) {
-  if (!item) {
-    return (
-      <aside className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
-        <p className="text-sm font-semibold text-ink">Context / Activity</p>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Chọn một work item để xem project context, evidence và activity.</p>
-      </aside>
-    );
-  }
-
+function NextWorkPanel({ item, onOpen }: { item: WorkItem | null; onOpen: (item: WorkItem) => void }) {
+  if (!item) return <aside className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4"><p className="text-sm font-semibold text-ink">Việc tiếp theo</p><p className="mt-2 text-sm text-slate-600">Chọn một công việc để xem ngữ cảnh xử lý.</p></aside>;
   return (
-    <aside className="rounded-lg border border-line bg-slate-50 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Project context</p>
-          <p className="mt-1 truncate text-sm font-semibold text-ink">{item.project_code ? `${item.project_code} · ` : ''}{item.project_name ?? 'Project'}</p>
-        </div>
-        <StatusBadge status={isWorkOverdue(item) ? 'overdue' : item.status} />
-      </div>
-      <div className="mt-4 space-y-3 text-sm">
-        <ContextRow label="Node" value={item.run_node_name ?? '-'} />
-        <ContextRow label="Step" value={item.run_step_name ?? '-'} />
-        <ContextRow label="Department" value={departmentLabel(item.department)} />
-        <ContextRow label="Due" value={dateText(item.due_at)} />
-        <ContextRow label="Evidence" value={numberValue(item.evidence_count)} />
-      </div>
-      {item.blocked_reason ? <p className="mt-4 rounded-md bg-rose-50 p-3 text-sm leading-6 text-rose-700">{item.blocked_reason}</p> : null}
-      {item.project_id ? (
-        <Link
-          to={`/projects/${item.project_id}`}
-          className="mt-4 inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-        >
-          Open project dashboard
-        </Link>
-      ) : null}
+    <aside className="rounded-lg border border-line bg-slate-50 p-4 xl:sticky xl:top-4 xl:self-start">
+      <div className="flex flex-wrap items-center gap-2"><StatusBadge status={isWorkOverdue(item) ? 'overdue' : item.status} />{item.priority ? <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600">{priorityLabel(item.priority)}</span> : null}</div>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Việc tiếp theo</p>
+      <h3 className="mt-1 text-base font-semibold text-ink">{item.title}</h3>
+      <p className="mt-1 text-sm text-slate-600">{item.project_code ? `${item.project_code} · ` : ''}{item.project_name ?? 'Công trình'}</p>
+      {item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-700">{item.blocked_reason}</p> : <p className="mt-3 text-sm leading-6 text-slate-600">{nextActionCopy(item)}</p>}
+      <div className="mt-4 space-y-2 text-sm"><ContextRow label="Giai đoạn" value={item.run_node_name ?? '-'} /><ContextRow label="Bước" value={item.run_step_name ?? '-'} /><ContextRow label="Phụ trách" value={item.assignee_name ?? departmentLabel(item.department)} /><ContextRow label="Hạn" value={dateText(item.due_at)} /><ContextRow label="Minh chứng" value={numberValue(item.evidence_count)} /></div>
+      <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onOpen(item)}>Mở xử lý <ChevronRight className="h-4 w-4" /></button>
+      {item.project_id ? <Link className="mt-2 inline-flex w-full justify-center rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${item.project_id}`}>Mở công trình</Link> : null}
     </aside>
   );
 }
 
-function ContextRow({ label, value }: { label: string; value: string | number }) {
+function nextActionCopy(item: WorkItem) {
+  if (item.status === 'waiting_approval' || item.status === 'waiting_review') return (item.capabilities?.can_decide ?? item.can_decide) ? 'Rà soát hồ sơ và đưa ra quyết định.' : 'Theo dõi phản hồi từ người có thẩm quyền.';
+  if (item.status === 'waiting_evidence') return 'Bổ sung đủ minh chứng trước khi hoàn tất.';
+  if (item.status === 'completed') return 'Công việc đã hoàn tất. Có thể xem lại hồ sơ và lịch sử.';
+  return 'Mở không gian xử lý để thực hiện bước tiếp theo.';
+}
+
+function ActivityAttentionPanel({ rows, loading, error, selectedQueue, streamStatus, returnTo, markingId, onSelectQueue, onMarkRead }: {
+  rows: ActivityAttentionItem[]; loading: boolean; error: unknown; selectedQueue: AttentionQueueKey; streamStatus: StreamStatus; returnTo: string; markingId?: string;
+  onSelectQueue: (queue: AttentionQueueKey) => void; onMarkRead: (activityId: string) => void;
+}) {
+  const counts = useMemo(() => attentionQueues.reduce<Record<AttentionQueueKey, number>>((acc, item) => { acc[item.key] = rows.filter((row) => inAttentionQueue(row, item.key)).length; return acc; }, { all: 0, mentions: 0, questions: 0, blockers: 0, reminders: 0, unread: 0 }), [rows]);
+  const visibleRows = rows.filter((item) => inAttentionQueue(item, selectedQueue));
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-line pb-2 last:border-0 last:pb-0">
-      <span className="text-slate-500">{label}</span>
-      <span className="min-w-0 truncate font-semibold text-ink">{value}</span>
-    </div>
+    <section className="mt-4 rounded-lg border border-line bg-white p-4 shadow-panel">
+      <div className="flex flex-col gap-3 border-b border-line pb-4 md:flex-row md:items-center md:justify-between"><div><h2 className="font-semibold text-ink">Trao đổi cần phản hồi</h2><p className="mt-1 text-sm text-slate-500">Nhắc đến, câu hỏi, điểm chặn và nhắc hạn</p></div><LiveStatusBadge status={streamStatus} /></div>
+      <div className="my-3 flex gap-2 overflow-x-auto">{attentionQueues.map((item) => { const Icon = item.icon; return <button key={item.key} className={clsx('inline-flex min-w-fit items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold', selectedQueue === item.key ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-line text-slate-700 hover:bg-slate-50')} onClick={() => onSelectQueue(item.key)}><Icon className="h-4 w-4" />{item.label}<span className="rounded-md bg-white px-2 py-0.5 text-xs text-slate-600">{counts[item.key]}</span></button>; })}</div>
+      {loading ? <LoadingSpinner /> : null}
+      {error ? <SourceError title="Không tải được trao đổi cần phản hồi" /> : null}
+      {!loading && !error && !visibleRows.length ? <EmptyState title="Không có trao đổi cần phản hồi trong nhóm này" /> : null}
+      {visibleRows.length ? <div className="grid gap-2 xl:grid-cols-2">{visibleRows.map((item) => <AttentionCard key={item.id} item={item} returnTo={returnTo} marking={markingId === item.id} onMarkRead={onMarkRead} />)}</div> : null}
+    </section>
   );
 }
 
-function MyWorkSkeleton() {
+function AttentionCard({ item, returnTo, marking, onMarkRead }: { item: ActivityAttentionItem; returnTo: string; marking: boolean; onMarkRead: (id: string) => void }) {
+  const target = item.work_item_id ? workItemDetailPath(item.work_item_id, returnTo, item.project_id) : item.project_id ? `/projects/${item.project_id}` : '';
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-line bg-white p-5 shadow-panel">
-        <LoadingSpinner />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="h-28 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
-        ))}
-      </div>
-      <div className="h-[520px] animate-pulse rounded-lg border border-line bg-white shadow-panel" />
-    </div>
+    <article className={clsx('rounded-md border p-3', item.is_unread ? 'border-blue-200 bg-blue-50' : 'border-line bg-slate-50')}>
+      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap gap-1">{item.is_unread ? <span className="rounded-md bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">Chưa đọc</span> : null}{item.mentioned_me ? <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">@tôi</span> : null}{asArray<string>(item.queue_types).slice(0, 3).map((queue) => <span key={queue} className="rounded-md bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{attentionQueueLabel(queue)}</span>)}</div><p className="mt-2 text-sm font-semibold text-ink">{activityLabel(item.activity_type)}</p><p className="mt-1 text-xs text-slate-500">{item.actor_name ?? 'Hệ thống'} · {item.target_label ?? item.work_item_title ?? (item.scope_type ? scopeTypeLabel(item.scope_type) : 'Công trình')} · {compactDateTime(item.created_at)}</p></div>{item.is_unread ? <button className="shrink-0 rounded-md border border-blue-200 bg-white px-2 py-1 text-xs font-semibold text-blue-700 disabled:opacity-60" disabled={marking} onClick={() => onMarkRead(item.id)}>Đã đọc</button> : null}</div>
+      <ActivityReplyQuote replyTo={item.reply_to} />
+      {item.comment ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{item.comment}</p> : null}
+      <ActivityAttachments attachments={item.attachments} compact />
+      {item.reactions?.length ? <div className="mt-2"><ActivityReactionBar reactions={item.reactions} /></div> : null}
+      {target ? <Link to={target} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-800">{item.work_item_id ? 'Mở đúng công việc' : 'Mở công trình'} <ChevronRight className="h-3.5 w-3.5" /></Link> : null}
+    </article>
   );
 }
 
-function MyWorkError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  const apiError = error instanceof ApiError ? error : null;
-  const forbidden = apiError?.status === 403;
-  const title = forbidden ? 'Bạn không có quyền xem inbox công việc' : 'Không tải được việc của tôi';
-  const description = error instanceof Error ? error.message : 'Vui lòng thử lại hoặc kiểm tra quyền truy cập.';
+function attentionQueueLabel(queue: string) { return attentionQueues.find((item) => item.key === queue)?.label ?? queue; }
+function inAttentionQueue(item: ActivityAttentionItem, queue: AttentionQueueKey) { if (queue === 'all') return true; if (queue === 'unread') return Boolean(item.is_unread); return asArray<string>(item.queue_types).includes(queue); }
 
-  return (
-    <>
-      <PageHeader title="Việc của tôi" description="Cross-project operational inbox" />
-      <section className="rounded-lg border border-line bg-white p-6 shadow-panel">
-        <div className="flex items-start gap-3">
-          {forbidden ? <ShieldAlert className="mt-0.5 h-6 w-6 text-amber-600" /> : <AlertCircle className="mt-0.5 h-6 w-6 text-rose-600" />}
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold text-ink">{title}</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
-            {!forbidden ? (
-              <button
-                className="mt-4 inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                onClick={onRetry}
-              >
-                <RefreshCw className="h-4 w-4" />
-                Retry
-              </button>
-            ) : null}
-          </div>
-        </div>
-      </section>
-    </>
-  );
+function LiveStatusBadge({ status }: { status: StreamStatus }) {
+  const label = status === 'connected' ? 'Đang trực tuyến' : status === 'reconnecting' ? 'Đang kết nối lại' : 'Mất kết nối · Làm mới thủ công';
+  return <span className={clsx('inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-semibold', status === 'connected' ? 'bg-emerald-50 text-emerald-700' : status === 'reconnecting' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600')}><span className={clsx('h-2 w-2 rounded-full', status === 'connected' ? 'bg-emerald-500' : status === 'reconnecting' ? 'bg-amber-500' : 'bg-slate-400')} />{label}</span>;
 }
+
+function ContextRow({ label, value }: { label: string; value: string | number }) { return <div className="flex items-center justify-between gap-3 border-b border-line pb-2 last:border-0 last:pb-0"><span className="text-slate-500">{label}</span><span className="min-w-0 truncate text-right font-semibold text-ink">{value}</span></div>; }
+
+function SourceError({ title, onRetry }: { title: string; onRetry?: () => void }) { return <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"><p className="font-semibold">{title}</p>{onRetry ? <button className="mt-3 rounded-md border border-rose-200 bg-white px-3 py-2 font-semibold" onClick={onRetry}>Thử lại</button> : null}</div>; }

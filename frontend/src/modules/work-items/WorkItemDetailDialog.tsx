@@ -170,7 +170,7 @@ export function WorkItemDetailWorkspace({
     onClose?.();
   }
 
-  const actions = availableActions(detailItem?.status);
+  const actions = permittedActions(detailItem);
   const evidence = asArray<EvidenceRecord>(detailItem?.evidence);
   const activities = asArray<WorkItemActivity>(detailItem?.activities);
   const attachmentOptions = buildActivityAttachmentOptions(evidence);
@@ -257,6 +257,24 @@ export function WorkItemDetailWorkspace({
       ) : null}
     </>
   );
+}
+
+const decisionActions = new Set<WorkItemActionKey>(['approve', 'reject', 'request-change']);
+
+function permittedActions(item?: WorkItem | null): WorkItemActionKey[] {
+  if (!item || ['completed', 'cancelled'].includes(item.status)) return [];
+
+  const statusActions = availableActions(item.status);
+  const serverActions = asArray<string>(item.available_actions);
+  if (Array.isArray(item.available_actions)) {
+    const allowed = new Set(serverActions);
+    return statusActions.filter((action) => allowed.has(action));
+  }
+
+  return statusActions.filter((action) => {
+    if (decisionActions.has(action)) return (item.capabilities?.can_decide ?? item.can_decide) === true;
+    return (item.capabilities?.can_act ?? item.can_act) === true;
+  });
 }
 
 function SkippedWorkItemHistory({ activities, evidence }: { activities: WorkItemActivity[]; evidence: EvidenceRecord[] }) {

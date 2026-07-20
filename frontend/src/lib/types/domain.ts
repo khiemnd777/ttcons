@@ -45,8 +45,13 @@ export type Project = AnyRecord & {
   client_name: string;
   partner_name?: string;
   partner_tax_code?: string;
+  pm_name?: string;
   status: string;
   progress_percent: number;
+  planned_start_date?: string | null;
+  planned_end_date?: string | null;
+  open_issues?: number;
+  pending_approvals?: number;
 };
 
 export type ProjectMemberAccessRole = {
@@ -1401,6 +1406,55 @@ export type CashflowReport = AnyRecord & {
   ledger: CashflowLedgerRow[];
 };
 
+export type ReportProjectOption = {
+  id: string;
+  name: string;
+};
+
+export type ReportOptions = {
+  projects: ReportProjectOption[];
+};
+
+export type ProjectReportRow = AnyRecord & {
+  project_id: string;
+  name: string;
+  status: string;
+  progress_percent: number;
+  open_issues: number;
+  pending_approvals: number;
+};
+
+export type WarehouseReportRow = AnyRecord & {
+  material_id: string;
+  name: string;
+  category?: string;
+  stock_quantity: number;
+  surplus_quantity: number;
+};
+
+export type ProcurementReportRow = AnyRecord & {
+  status: string;
+  budget_status: string;
+  total: number;
+  amount: number;
+};
+
+export type AccountingReportRow = AnyRecord & {
+  project_id: string;
+  name: string;
+  payable_remaining: number;
+  receivable_remaining: number;
+  used_budget: number;
+};
+
+export type StaffReportRow = AnyRecord & {
+  staff_id: string;
+  full_name: string;
+  department?: string;
+  position?: string;
+  project_count: number;
+};
+
 export type TaxReportSummary = AnyRecord & {
   from: string;
   to: string;
@@ -2284,6 +2338,13 @@ export type WorkItem = ProjectOperationsRecord & {
   project_name?: string;
   project_code?: string;
   queue_scopes?: string[];
+  can_act?: boolean;
+  can_decide?: boolean;
+  capabilities?: {
+    can_act?: boolean;
+    can_decide?: boolean;
+  };
+  available_actions?: string[];
   priority?: string;
   department?: string;
   role_ids?: string[];

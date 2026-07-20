@@ -15,7 +15,7 @@
 - Payables: `/payables`, `/payables/:id/approve|pay`, `/payables/:id/payment-schedules`, `/payment-schedules/:id/approve`, `/payables/:id/advance-requests`, `/advance-requests/:id/approve|settle`, `/payables/:id/payments`, `/payables/:id/input-invoices/upload`, `/payables/:id/reconciliation`
 - Receivables: `/receivables`, `/receivables/:id/approve|receive`, `/receivables/:id/payment-schedules`, `/receivable-payment-schedules/:id/approve`, `/receivables/:id/advance-receipts`, `/client-advance-receipts/:id/approve|settle`, `/receivables/:id/payments`, `/receivables/:id/output-invoices/upload`, `/receivables/:id/reconciliation`
 - Invoice files/actions: `/projects/:id/input-invoices`, `/input-invoices/:id/file|verify|reject`, `/projects/:id/output-invoices`, `/output-invoices/:id/file|issue|void`
-- Reports: `/reports/cashflow`, `/reports/tax`, `/reports/profit` and export routes
+- Reports: `/reports/cashflow`, `/reports/tax`, `/reports/profit`, `/reports/accounting` and matching export routes
 - Contract sources: `/projects/:id/contracts`, contract version/milestone/variation/retention actions; milestones and retention releases materialize draft AP/AR records.
 - Handover closure: `/projects/:id/handover`, `/projects/:id/handover/options`, handover submit/check/complete and checklist verification routes consume finance readiness without rewriting the finance ledger.
 
@@ -42,6 +42,7 @@
 - Accounting create/detail presentation may combine budget and generic phiếu entry into one permission-aware dialog, but it must keep `supplier|subcontractor|client_receipt|advance` out of generic payment creation and direct AP/AR work to Debt. A linked payable/receivable phiếu uses `Mở công nợ` to navigate to the Debt workspace without mutating allocation or reconciliation state.
 - Input invoice PDFs belong to payables; output invoice PDFs belong to receivables.
 - Cashflow, tax, and profit reports must stay source-backed and permission-scoped.
+- Accounting report totals payables, receivables and budgets independently per accessible project before joining them. Equal monetary amounts are separate obligations and must all count; never use `SUM(DISTINCT amount)` as a join-deduplication technique. Optional project filtering and CSV reuse the same query.
 - CSV exports must use the same filters and source logic as UI reports.
 - Active signed contract versions are the commercial source of truth. `projects.contract_amount` is only the active main-client compatibility snapshot.
 - A milestone can open AP/AR only after the contract is active and the milestone is eligible; acceptance-required milestones must reference an approved pass/conditional-pass acceptance.

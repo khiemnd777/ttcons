@@ -1309,6 +1309,8 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 	item, err := r.QueryOne(ctx, `
 		SELECT wi.*, p.name AS project_name, p.code AS project_code, rn.name AS run_node_name, rs.name AS run_step_name,
 			s.full_name AS assignee_name,
+			pr.current_node_id AS pipeline_current_node_id,
+			rn.status AS run_node_status,
 			wfi.id AS workflow_form_instance_id,
 			wfi.status AS workflow_form_status,
 			wfi.form_type AS workflow_form_type,
@@ -17567,83 +17569,126 @@ func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record
 	return data, nil
 }
 
-func (r *Repository) Report(ctx context.Context, kind, userID string) ([]Record, error) {
+func (r *Repository) ReportProjectOptions(ctx context.Context, userID string) ([]Record, error) {
 	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
 	if err != nil {
 		return nil, err
 	}
+	return r.Query(ctx, fmt.Sprintf(`
+		SELECT p.id, p.name
+		FROM projects p
+		WHERE p.status <> 'cancelled' AND %s
+		ORDER BY p.name
+	`, scopeSQL), scopeArgs...)
+}
+
+func (r *Repository) Report(ctx context.Context, kind, userID, projectID string) ([]Record, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
+	if err != nil {
+		return nil, err
+	}
+	args := append([]any{}, scopeArgs...)
+	projectFilter := ""
+	if projectID != "" {
+		args = append(args, projectID)
+		projectFilter = fmt.Sprintf(" AND p.id=$%d", len(args))
+	}
 	switch kind {
 	case "projects":
 		return r.Query(ctx, fmt.Sprintf(`
-			SELECT p.name, p.status, p.progress_percent, COUNT(i.id) FILTER (WHERE i.status IN ('open','in_progress')) AS open_issues,
-				COUNT(ar.id) FILTER (WHERE ar.status='pending') AS pending_approvals
+			SELECT p.id AS project_id, p.name, p.status, p.progress_percent,
+				(SELECT COUNT(*) FROM issues i WHERE i.project_id=p.id AND i.status IN ('open','in_progress')) AS open_issues,
+				(SELECT COUNT(*) FROM approval_requests ar WHERE ar.project_id=p.id AND ar.status='pending') AS pending_approvals
 			FROM projects p
-			LEFT JOIN issues i ON i.project_id=p.id
-			LEFT JOIN approval_requests ar ON ar.project_id=p.id
-			WHERE p.status <> 'cancelled' AND %s
-			GROUP BY p.id
+			WHERE p.status <> 'cancelled' AND %s%s
 			ORDER BY p.created_at DESC
-		`, scopeSQL), scopeArgs...)
+		`, scopeSQL, projectFilter), args...)
 	case "warehouse":
+		movementScope := fmt.Sprintf(`(
+			sm.project_id IS NULL
+			OR EXISTS (
+				SELECT 1 FROM projects p
+				WHERE p.id=sm.project_id AND p.status <> 'cancelled' AND %s
+			)
+		)`, scopeSQL)
+		balanceProjectFilter := ""
+		if projectID != "" {
+			projectPlaceholder := fmt.Sprintf("$%d", len(args))
+			movementScope = fmt.Sprintf(`EXISTS (
+				SELECT 1 FROM projects p
+				WHERE p.id=sm.project_id AND p.id=%s AND p.status <> 'cancelled' AND %s
+			)`, projectPlaceholder, scopeSQL)
+			balanceProjectFilter = fmt.Sprintf(" AND p.id=%s", projectPlaceholder)
+		}
 		return r.Query(ctx, fmt.Sprintf(`
-			SELECT m.name, m.category,
-				COALESCE(SUM(CASE
+			WITH stock_totals AS (
+				SELECT sm.material_id, COALESCE(SUM(CASE
 					WHEN sm.movement_type IN ('receive','return_to_warehouse') THEN sm.quantity
 					WHEN sm.movement_type IN ('issue','loss') THEN -sm.quantity
 					WHEN sm.movement_type='transfer' AND sm.target_warehouse_id IS NULL THEN -sm.quantity
 					ELSE 0
-				END),0) AS stock_quantity,
-				COALESCE(SUM(smb.surplus_quantity),0) AS surplus_quantity
+				END),0) AS stock_quantity
+				FROM stock_movements sm
+				WHERE %s
+				GROUP BY sm.material_id
+			), site_totals AS (
+				SELECT smb.material_id, COALESCE(SUM(smb.surplus_quantity),0) AS surplus_quantity
+				FROM site_material_balances smb
+				JOIN projects p ON p.id=smb.project_id
+				WHERE p.status <> 'cancelled' AND %s%s
+				GROUP BY smb.material_id
+			)
+			SELECT m.id AS material_id, m.name, m.category,
+				COALESCE(st.stock_quantity,0) AS stock_quantity,
+				COALESCE(site.surplus_quantity,0) AS surplus_quantity
 			FROM materials m
-			LEFT JOIN stock_movements sm ON sm.material_id=m.id
-				AND (
-					sm.project_id IS NULL
-					OR EXISTS (
-						SELECT 1 FROM projects p
-						WHERE p.id=sm.project_id AND p.status <> 'cancelled' AND %s
-					)
-				)
-			LEFT JOIN site_material_balances smb ON smb.material_id=m.id
-				AND EXISTS (
-					SELECT 1 FROM projects p
-					WHERE p.id=smb.project_id AND p.status <> 'cancelled' AND %s
-				)
+			LEFT JOIN stock_totals st ON st.material_id=m.id
+			LEFT JOIN site_totals site ON site.material_id=m.id
 			WHERE m.active
-			GROUP BY m.id
 			ORDER BY m.category, m.name
-		`, scopeSQL, scopeSQL), scopeArgs...)
+		`, movementScope, scopeSQL, balanceProjectFilter), args...)
 	case "procurement":
 		return r.Query(ctx, fmt.Sprintf(`
 			SELECT pr.status, pr.budget_status, COUNT(*) AS total, COALESCE(SUM(pr.total_estimated_amount),0) AS amount
 			FROM procurement_requests pr
 			JOIN projects p ON p.id=pr.project_id
-			WHERE pr.status <> 'cancelled' AND p.status <> 'cancelled' AND %s
+			WHERE pr.status <> 'cancelled' AND p.status <> 'cancelled' AND %s%s
 			GROUP BY pr.status, pr.budget_status
 			ORDER BY pr.status
-		`, scopeSQL), scopeArgs...)
+		`, scopeSQL, projectFilter), args...)
 	case "accounting":
 		return r.Query(ctx, fmt.Sprintf(`
-			SELECT p.name,
-				COALESCE(SUM(DISTINCT pay.remaining_amount),0) AS payable_remaining,
-				COALESCE(SUM(DISTINCT rec.remaining_amount),0) AS receivable_remaining,
-				COALESCE(MAX(b.used_amount),0) AS used_budget
+			WITH payable_totals AS (
+				SELECT project_id, COALESCE(SUM(remaining_amount),0) AS payable_remaining
+				FROM payables WHERE status <> 'cancelled' GROUP BY project_id
+			), receivable_totals AS (
+				SELECT project_id, COALESCE(SUM(remaining_amount),0) AS receivable_remaining
+				FROM receivables WHERE status <> 'cancelled' GROUP BY project_id
+			), budget_totals AS (
+				SELECT project_id, COALESCE(SUM(used_amount),0) AS used_budget
+				FROM accounting_budgets WHERE status <> 'cancelled' GROUP BY project_id
+			)
+			SELECT p.id AS project_id, p.name,
+				COALESCE(pay.payable_remaining,0) AS payable_remaining,
+				COALESCE(rec.receivable_remaining,0) AS receivable_remaining,
+				COALESCE(b.used_budget,0) AS used_budget
 			FROM projects p
-			LEFT JOIN payables pay ON pay.project_id=p.id AND pay.status <> 'cancelled'
-			LEFT JOIN receivables rec ON rec.project_id=p.id AND rec.status <> 'cancelled'
-			LEFT JOIN accounting_budgets b ON b.project_id=p.id AND b.status <> 'cancelled'
-			WHERE p.status <> 'cancelled' AND %s
-			GROUP BY p.id
+			LEFT JOIN payable_totals pay ON pay.project_id=p.id
+			LEFT JOIN receivable_totals rec ON rec.project_id=p.id
+			LEFT JOIN budget_totals b ON b.project_id=p.id
+			WHERE p.status <> 'cancelled' AND %s%s
 			ORDER BY p.name
-		`, scopeSQL), scopeArgs...)
+		`, scopeSQL, projectFilter), args...)
 	case "staff":
-		return r.Query(ctx, `
-			SELECT s.full_name, s.department, s.position, COUNT(pm.project_id) AS project_count
+		return r.Query(ctx, fmt.Sprintf(`
+			SELECT s.id AS staff_id, s.full_name, s.department, s.position, COUNT(DISTINCT p.id) AS project_count
 			FROM staff s
-			LEFT JOIN project_members pm ON pm.staff_id=s.id AND pm.active
-			WHERE s.status <> 'deleted'
+			JOIN project_members pm ON pm.staff_id=s.id AND pm.active
+			JOIN projects p ON p.id=pm.project_id
+			WHERE s.status <> 'deleted' AND p.status <> 'cancelled' AND %s%s
 			GROUP BY s.id
 			ORDER BY s.full_name
-		`)
+		`, scopeSQL, projectFilter), args...)
 	default:
 		return nil, errors.New("Báo cáo không hợp lệ")
 	}

@@ -1,50 +1,80 @@
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, RefreshCw } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { CurrencyText } from '../../components/CurrencyText';
 import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, get } from '../../lib/api/client';
-import type { ProfitCostBreakdownRow, ProfitLedgerRow, ProfitPeriodRow, ProfitProjectRow, ProfitReport, ProfitReportWarning } from '../../lib/types/domain';
+import type { ProfitCostBreakdownRow, ProfitLedgerRow, ProfitPeriodRow, ProfitProjectRow, ProfitReport, ProfitReportWarning, ReportProjectOption } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
-import { ProjectSelector } from '../_shared/ProjectSelector';
+import { ReportDateField, ReportFilterActions, ReportProjectField, ReportSelectField } from './ReportFilters';
 
-export function ProfitReportPanel() {
-  const [projectId, setProjectId] = useState('');
-  const [from, setFrom] = useState(() => firstDayOfMonth());
-  const [to, setTo] = useState(() => todayText());
-  const [groupBy, setGroupBy] = useState<'month' | 'quarter'>('month');
-  const [status, setStatus] = useState<'posted' | 'all'>('posted');
+type ProfitFilters = {
+  projectId: string;
+  from: string;
+  to: string;
+  groupBy: 'month' | 'quarter';
+  status: 'posted' | 'all';
+};
+
+export function ProfitReportPanel({ projectOptions = [] }: { projectOptions?: ReportProjectOption[] }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilters = useMemo(() => profitFiltersFromParams(searchParams), []);
+  const [filters, setFilters] = useState<ProfitFilters>(initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState<ProfitFilters>(initialFilters);
+  const [ledgerQuery, setLedgerQuery] = useState('');
+  const [exporting, setExporting] = useState(false);
   const toast = useToast();
+
+  useEffect(() => {
+    const nextFilters = profitFiltersFromParams(searchParams);
+    setFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+  }, [searchParams]);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
-    if (projectId) params.set('project_id', projectId);
-    params.set('from', from);
-    params.set('to', to);
-    params.set('group_by', groupBy);
-    params.set('status', status);
+    if (appliedFilters.projectId) params.set('project_id', appliedFilters.projectId);
+    params.set('from', appliedFilters.from);
+    params.set('to', appliedFilters.to);
+    params.set('group_by', appliedFilters.groupBy);
+    params.set('status', appliedFilters.status);
     return params.toString();
-  }, [from, groupBy, projectId, status, to]);
+  }, [appliedFilters]);
 
   const report = useQuery({
-    queryKey: ['profit-report', projectId || 'all', from, to, groupBy, status],
+    queryKey: ['profit-report', appliedFilters],
     queryFn: () => get<ProfitReport>(`/reports/profit?${queryString}`),
   });
 
+  function applyFilters() {
+    setAppliedFilters(filters);
+    setSearchParams(profitFiltersToParams(filters), { replace: true });
+  }
+
+  function resetFilters() {
+    const nextFilters = defaultProfitFilters();
+    setFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+    setSearchParams(profitFiltersToParams(nextFilters), { replace: true });
+  }
+
   async function exportCSV() {
+    setExporting(true);
     try {
       const blob = await downloadBlob(`/reports/profit/export?${queryString}`);
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = objectUrl;
-      anchor.download = `profit-report-${from}-${to}.csv`;
+      anchor.download = `bao-cao-loi-nhuan-${appliedFilters.from}-${appliedFilters.to}.csv`;
       anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
       toast.success('Đã xuất CSV báo cáo lợi nhuận');
     } catch (error) {
       toast.error('Không xuất được CSV báo cáo lợi nhuận', error);
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -60,48 +90,35 @@ export function ProfitReportPanel() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-ink">Báo cáo lợi nhuận / P&amp;L</h2>
-          <p className="mt-1 text-xs text-slate-500">Accrual theo hoá đơn: revenue từ output issued, cost từ input verified, không tính VAT.</p>
+          <p className="mt-1 text-xs text-slate-500">Dồn tích theo hóa đơn: doanh thu từ đầu ra đã phát hành, chi phí từ đầu vào đã xác minh, không gồm VAT.</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap xl:items-end xl:justify-end">
-          <ProjectField value={projectId} onChange={setProjectId} />
-          <DateField label="Từ ngày" value={from} onChange={setFrom} />
-          <DateField label="Đến ngày" value={to} onChange={setTo} />
-          <SelectField label="Kỳ" value={groupBy} onChange={(value) => setGroupBy(value as 'month' | 'quarter')} options={[['month', 'Tháng'], ['quarter', 'Quý']]} />
-          <SelectField label="Status" value={status} onChange={(value) => setStatus(value as 'posted' | 'all')} options={[['posted', 'Posted'], ['all', 'All non-deleted']]} />
-          <button
-            type="button"
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={() => void report.refetch()}
-            disabled={report.isFetching}
-          >
-            <RefreshCw className={report.isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-            Tải lại
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={() => void exportCSV()}
-            disabled={report.isLoading}
-          >
-            <Download className="h-4 w-4" />
-            CSV
-          </button>
+          <ReportProjectField value={filters.projectId} options={projectOptions} onChange={(projectId) => setFilters((current) => ({ ...current, projectId }))} />
+          <ReportDateField label="Từ ngày" value={filters.from} onChange={(from) => setFilters((current) => ({ ...current, from }))} />
+          <ReportDateField label="Đến ngày" value={filters.to} onChange={(to) => setFilters((current) => ({ ...current, to }))} />
+          <ReportSelectField label="Kỳ" value={filters.groupBy} onChange={(groupBy) => setFilters((current) => ({ ...current, groupBy: groupBy as ProfitFilters['groupBy'] }))} options={[['month', 'Tháng'], ['quarter', 'Quý']]} />
+          <ReportSelectField label="Trạng thái" value={filters.status} onChange={(status) => setFilters((current) => ({ ...current, status: status as ProfitFilters['status'] }))} options={[['posted', 'Đã ghi nhận'], ['all', 'Tất cả chưa xóa']]} />
+          <ReportFilterActions applying={report.isFetching} exporting={exporting || report.isLoading} onApply={applyFilters} onReset={resetFilters} onExport={() => void exportCSV()} />
         </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <MetricTile label="Revenue" value={<CurrencyText value={summary?.revenue_amount ?? 0} />} />
-        <MetricTile label="Direct cost" value={<CurrencyText value={summary?.direct_cost_amount ?? 0} />} />
-        <MetricTile label="Gross profit" value={<span className={profitClass(summary?.gross_profit)}><CurrencyText value={summary?.gross_profit ?? 0} /></span>} />
-        <MetricTile label="Indirect cost" value={<CurrencyText value={summary?.indirect_cost_amount ?? 0} />} />
-        <MetricTile label="Net profit" value={<span className={profitClass(summary?.net_profit)}><CurrencyText value={summary?.net_profit ?? 0} /></span>} />
-        <MetricTile label="Net margin" value={marginText(summary?.net_margin_percent)} />
+        <MetricTile label="Doanh thu" value={<CurrencyText value={summary?.revenue_amount ?? 0} />} />
+        <MetricTile label="Chi phí trực tiếp" value={<CurrencyText value={summary?.direct_cost_amount ?? 0} />} />
+        <MetricTile label="Lợi nhuận gộp" value={<span className={profitClass(summary?.gross_profit)}><CurrencyText value={summary?.gross_profit ?? 0} /></span>} />
+        <MetricTile label="Chi phí gián tiếp" value={<CurrencyText value={summary?.indirect_cost_amount ?? 0} />} />
+        <MetricTile label="Lợi nhuận ròng" value={<span className={profitClass(summary?.net_profit)}><CurrencyText value={summary?.net_profit ?? 0} /></span>} />
+        <MetricTile label="Biên lợi nhuận" value={marginText(summary?.net_margin_percent)} />
       </div>
 
       {warnings.length ? (
         <div className="grid gap-2 lg:grid-cols-3">
           {warnings.map((warning) => (
-            <WarningItem key={warning.code} warning={warning} />
+            <WarningItem
+              key={warning.code}
+              warning={warning}
+              onFilter={warning.code === 'indirect_or_unclassified_cost' ? () => setLedgerQuery(warning.code) : undefined}
+            />
           ))}
         </div>
       ) : null}
@@ -119,11 +136,11 @@ export function ProfitReportPanel() {
             defaultSort={{ key: 'net_profit', direction: 'desc' }}
             columns={[
               { key: 'project_name', header: 'Công trình', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.project_name}</span> },
-              { key: 'revenue_amount', header: 'Revenue', align: 'right', render: (row) => <CurrencyText value={row.revenue_amount} /> },
-              { key: 'direct_cost_amount', header: 'Direct', align: 'right', render: (row) => <CurrencyText value={row.direct_cost_amount} /> },
-              { key: 'indirect_cost_amount', header: 'Indirect', align: 'right', render: (row) => <CurrencyText value={row.indirect_cost_amount} /> },
-              { key: 'net_profit', header: 'Net', align: 'right', render: (row) => <span className={profitClass(row.net_profit)}><CurrencyText value={row.net_profit} /></span> },
-              { key: 'net_margin_percent', header: 'Margin', align: 'right', render: (row) => marginText(row.net_margin_percent) },
+              { key: 'revenue_amount', header: 'Doanh thu', align: 'right', render: (row) => <CurrencyText value={row.revenue_amount} /> },
+              { key: 'direct_cost_amount', header: 'Chi phí trực tiếp', align: 'right', render: (row) => <CurrencyText value={row.direct_cost_amount} /> },
+              { key: 'indirect_cost_amount', header: 'Chi phí gián tiếp', align: 'right', render: (row) => <CurrencyText value={row.indirect_cost_amount} /> },
+              { key: 'net_profit', header: 'Lợi nhuận ròng', align: 'right', render: (row) => <span className={profitClass(row.net_profit)}><CurrencyText value={row.net_profit} /></span> },
+              { key: 'net_margin_percent', header: 'Biên lợi nhuận', align: 'right', render: (row) => marginText(row.net_margin_percent) },
             ]}
           />
         </div>
@@ -140,10 +157,10 @@ export function ProfitReportPanel() {
             defaultSort={{ key: 'period_start', direction: 'asc' }}
             columns={[
               { key: 'period_start', header: 'Kỳ', sortable: true, render: (row) => dateText(row.period_start) },
-              { key: 'revenue_amount', header: 'Revenue', align: 'right', render: (row) => <CurrencyText value={row.revenue_amount} /> },
-              { key: 'direct_cost_amount', header: 'Direct', align: 'right', render: (row) => <CurrencyText value={row.direct_cost_amount} /> },
-              { key: 'indirect_cost_amount', header: 'Indirect', align: 'right', render: (row) => <CurrencyText value={row.indirect_cost_amount} /> },
-              { key: 'net_profit', header: 'Net', align: 'right', render: (row) => <span className={profitClass(row.net_profit)}><CurrencyText value={row.net_profit} /></span> },
+              { key: 'revenue_amount', header: 'Doanh thu', align: 'right', render: (row) => <CurrencyText value={row.revenue_amount} /> },
+              { key: 'direct_cost_amount', header: 'Chi phí trực tiếp', align: 'right', render: (row) => <CurrencyText value={row.direct_cost_amount} /> },
+              { key: 'indirect_cost_amount', header: 'Chi phí gián tiếp', align: 'right', render: (row) => <CurrencyText value={row.indirect_cost_amount} /> },
+              { key: 'net_profit', header: 'Lợi nhuận ròng', align: 'right', render: (row) => <span className={profitClass(row.net_profit)}><CurrencyText value={row.net_profit} /></span> },
             ]}
           />
         </div>
@@ -151,7 +168,7 @@ export function ProfitReportPanel() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase text-slate-500">Cost breakdown</h3>
+          <h3 className="text-xs font-semibold uppercase text-slate-500">Cơ cấu chi phí</h3>
           <DataTable<ProfitCostBreakdownRow>
             rows={costBreakdown}
             loading={report.isLoading}
@@ -164,7 +181,7 @@ export function ProfitReportPanel() {
               { key: 'cost_group', header: 'Nhóm', render: (row) => <span className="font-semibold text-ink">{row.cost_group}</span> },
               { key: 'classification_reason', header: 'Nguồn phân loại' },
               { key: 'invoice_count', header: 'HĐ', align: 'right' },
-              { key: 'cost_amount', header: 'Cost', align: 'right', render: (row) => <CurrencyText value={row.cost_amount} /> },
+              { key: 'cost_amount', header: 'Chi phí', align: 'right', render: (row) => <CurrencyText value={row.cost_amount} /> },
             ]}
           />
         </div>
@@ -178,6 +195,8 @@ export function ProfitReportPanel() {
             onRetry={() => void report.refetch()}
             empty="Chưa có chứng từ P&L trong khoảng lọc"
             searchPlaceholder="Tìm số hoá đơn, công trình, đối tác..."
+            searchQuery={ledgerQuery}
+            onSearchQueryChange={setLedgerQuery}
             pageSize={8}
             defaultSort={{ key: 'invoice_date', direction: 'desc' }}
             columns={[
@@ -187,57 +206,17 @@ export function ProfitReportPanel() {
               { key: 'cost_type', header: 'P&L', render: (row) => <CostTypePill costType={row.cost_type} /> },
               { key: 'project_name', header: 'Công trình' },
               { key: 'counterparty_name', header: 'Đối tác' },
-              { key: 'revenue_amount', header: 'Revenue', align: 'right', render: (row) => <CurrencyText value={row.revenue_amount} /> },
-              { key: 'direct_cost_amount', header: 'Direct', align: 'right', render: (row) => <CurrencyText value={row.direct_cost_amount} /> },
-              { key: 'indirect_cost_amount', header: 'Indirect', align: 'right', render: (row) => <CurrencyText value={row.indirect_cost_amount} /> },
-              { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-              { key: 'source_code', header: 'Source' },
-              { key: 'warning_flags', header: 'Flags', render: (row) => row.warning_flags || '-' },
+              { key: 'revenue_amount', header: 'Doanh thu', align: 'right', render: (row) => <CurrencyText value={row.revenue_amount} /> },
+              { key: 'direct_cost_amount', header: 'Chi phí trực tiếp', align: 'right', render: (row) => <CurrencyText value={row.direct_cost_amount} /> },
+              { key: 'indirect_cost_amount', header: 'Chi phí gián tiếp', align: 'right', render: (row) => <CurrencyText value={row.indirect_cost_amount} /> },
+              { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
+              { key: 'source_code', header: 'Nguồn' },
+              { key: 'warning_flags', header: 'Cảnh báo', render: (row) => row.warning_flags || '-' },
             ]}
           />
         </div>
       </div>
     </section>
-  );
-}
-
-function ProjectField({ value, onChange }: { value?: string; onChange: (value: string) => void }) {
-  return (
-    <label className="block min-w-44">
-      <span className="text-xs font-semibold text-slate-600">Công trình</span>
-      <div className="mt-1">
-        <ProjectSelector value={value} onChange={onChange} placeholder="Tất cả công trình" />
-      </div>
-    </label>
-  );
-}
-
-function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <label className="block min-w-36">
-      <span className="text-xs font-semibold text-slate-600">{label}</span>
-      <input
-        type="date"
-        className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
-
-function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: [string, string][] }) {
-  return (
-    <label className="block min-w-32">
-      <span className="text-xs font-semibold text-slate-600">{label}</span>
-      <select
-        className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map(([optionValue, labelText]) => <option key={optionValue} value={optionValue}>{labelText}</option>)}
-      </select>
-    </label>
   );
 }
 
@@ -250,28 +229,41 @@ function MetricTile({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function WarningItem({ warning }: { warning: ProfitReportWarning }) {
+function WarningItem({ warning, onFilter }: { warning: ProfitReportWarning; onFilter?: () => void }) {
   const tone = warning.severity === 'info' ? 'border-blue-100 bg-blue-50 text-blue-700' : 'border-amber-100 bg-amber-50 text-amber-800';
-  return (
-    <div className={`rounded-md border px-3 py-2 text-xs ${tone}`}>
+  const content = (
+    <>
       <p className="font-semibold">{warning.message}</p>
       <p className="mt-1">{warning.count ? `${Number(warning.count)} dòng` : ''}{warning.amount ? ` / ${Number(warning.amount).toLocaleString('vi-VN')} VND` : ''}</p>
+      {onFilter ? <p className="mt-1 font-semibold underline">Lọc sổ chứng từ</p> : null}
+    </>
+  );
+  if (onFilter) {
+    return (
+      <button type="button" className={`rounded-md border px-3 py-2 text-left text-xs ${tone}`} onClick={onFilter}>
+        {content}
+      </button>
+    );
+  }
+  return (
+    <div className={`rounded-md border px-3 py-2 text-xs ${tone}`}>
+      {content}
     </div>
   );
 }
 
 function DirectionPill({ direction }: { direction?: string }) {
   const base = 'inline-flex whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold';
-  if (direction === 'revenue') return <span className={`${base} bg-blue-50 text-blue-700`}>Revenue</span>;
-  if (direction === 'cost') return <span className={`${base} bg-rose-50 text-rose-700`}>Cost</span>;
+  if (direction === 'revenue') return <span className={`${base} bg-blue-50 text-blue-700`}>Doanh thu</span>;
+  if (direction === 'cost') return <span className={`${base} bg-rose-50 text-rose-700`}>Chi phí</span>;
   return <span className={`${base} bg-slate-100 text-slate-600`}>{direction || '-'}</span>;
 }
 
 function CostTypePill({ costType }: { costType?: string }) {
   const base = 'inline-flex whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold';
-  if (costType === 'direct') return <span className={`${base} bg-emerald-50 text-emerald-700`}>Direct</span>;
-  if (costType === 'indirect') return <span className={`${base} bg-amber-50 text-amber-800`}>Indirect</span>;
-  if (costType === 'revenue') return <span className={`${base} bg-blue-50 text-blue-700`}>Revenue</span>;
+  if (costType === 'direct') return <span className={`${base} bg-emerald-50 text-emerald-700`}>Trực tiếp</span>;
+  if (costType === 'indirect') return <span className={`${base} bg-amber-50 text-amber-800`}>Gián tiếp</span>;
+  if (costType === 'revenue') return <span className={`${base} bg-blue-50 text-blue-700`}>Doanh thu</span>;
   return <span className={`${base} bg-slate-100 text-slate-600`}>{costType || '-'}</span>;
 }
 
@@ -295,6 +287,39 @@ function todayText() {
 function firstDayOfMonth() {
   const now = new Date();
   return dateInputText(new Date(now.getFullYear(), now.getMonth(), 1));
+}
+
+function defaultProfitFilters(): ProfitFilters {
+  return {
+    projectId: '',
+    from: firstDayOfMonth(),
+    to: todayText(),
+    groupBy: 'month',
+    status: 'posted',
+  };
+}
+
+function profitFiltersFromParams(params: URLSearchParams): ProfitFilters {
+  const defaults = defaultProfitFilters();
+  const groupBy = params.get('group_by');
+  const status = params.get('status');
+  return {
+    projectId: params.get('project_id') ?? '',
+    from: params.get('from') ?? defaults.from,
+    to: params.get('to') ?? defaults.to,
+    groupBy: groupBy === 'quarter' ? 'quarter' : 'month',
+    status: status === 'all' ? 'all' : 'posted',
+  };
+}
+
+function profitFiltersToParams(filters: ProfitFilters) {
+  const params = new URLSearchParams();
+  if (filters.projectId) params.set('project_id', filters.projectId);
+  params.set('from', filters.from);
+  params.set('to', filters.to);
+  params.set('group_by', filters.groupBy);
+  params.set('status', filters.status);
+  return params;
 }
 
 function dateInputText(date: Date) {

@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -7,6 +7,7 @@ import {
   Database,
   FileClock,
   GitBranch,
+  LayoutDashboard,
   LogOut,
   Settings,
   ShieldCheck,
@@ -26,18 +27,19 @@ type NavItem = {
 
 const navGroups: { title: string; items: NavItem[] }[] = [
   {
-    title: 'Làm việc',
+    title: 'Công việc',
     items: [
+      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permissions: ['report.view'] },
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
       { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
-      { to: '/reports', label: 'Báo cáo', icon: BarChart3, permissions: ['report.view', 'report.finance.view'] },
+      { to: '/reports', label: 'Báo cáo', icon: BarChart3, permissions: ['report.view', 'report.finance.view', 'accounting.view'] },
     ],
   },
   {
     title: 'Workflow',
     items: [
-      { to: '/pipeline-builder', label: 'Pipeline builder', icon: GitBranch, permissions: ['pipeline.view'] },
-      { to: '/workflow-forms', label: 'Workflow Forms', icon: ClipboardList, permissions: ['pipeline.view'] },
+      { to: '/pipeline-builder', label: 'Trình thiết kế quy trình', icon: GitBranch, permissions: ['pipeline.view'] },
+      { to: '/workflow-forms', label: 'Biểu mẫu quy trình', icon: ClipboardList, permissions: ['pipeline.view'] },
     ],
   },
   {
@@ -46,7 +48,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { to: '/core-data', label: 'Dữ liệu lõi', icon: Database, permissions: ['catalog.view'] },
       { to: '/staff', label: 'Nhân sự', icon: Users, permissions: ['staff.view'] },
       { to: '/roles', label: 'Vai trò', icon: ShieldCheck, permissions: ['role.view'] },
-      { to: '/audit', label: 'Audit', icon: FileClock, permissions: ['audit.view'] },
+      { to: '/audit', label: 'Nhật ký hệ thống', icon: FileClock, permissions: ['audit.view'] },
       { to: '/settings', label: 'Cấu hình', icon: Settings, permissions: ['settings.view'] },
     ],
   },
@@ -77,8 +79,14 @@ export function AppShell() {
     <div className="min-h-screen bg-surface">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-line bg-white lg:block">
         <div className="flex h-full flex-col">
-          <div className="flex h-16 items-center justify-center border-b border-line px-5">
-            <BrandLogo size={48} />
+          <div className="h-16 border-b border-line">
+            <Link
+              to="/"
+              aria-label="Về trang mặc định"
+              className="flex h-full w-full items-center px-4 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+            >
+              <BrandLogo size={40} variant="lockup" />
+            </Link>
           </div>
           <nav className="flex-1 overflow-auto px-3 py-5">
             {visibleNavGroups.map((group) => (
@@ -111,7 +119,13 @@ export function AppShell() {
         <header className="sticky top-0 z-20 flex h-16 items-center border-b border-line bg-white/95 px-4 backdrop-blur md:px-6">
           <div className="flex w-full items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
-              <BrandLogo size={40} className="lg:hidden" />
+              <Link
+                to="/"
+                aria-label="Về trang mặc định"
+                className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 lg:hidden"
+              >
+                <BrandLogo size={40} />
+              </Link>
               <p className="text-sm font-medium text-ink">Bắt đầu từ công trình, xử lý nghiệp vụ theo cấu trúc rõ ràng</p>
             </div>
             <div className="flex items-center gap-3">
