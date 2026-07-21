@@ -136,6 +136,17 @@ func (h *Handler) ListProjects(c *fiber.Ctx) error {
 	return response.OK(c, rows)
 }
 
+func (h *Handler) ProjectProgressBoard(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"project.view"}); err != nil {
+		return err
+	}
+	board, err := h.service.ProjectProgressBoard(c.Context(), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, board)
+}
+
 func (h *Handler) CreateProject(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"project.create"}); err != nil {
 		return err

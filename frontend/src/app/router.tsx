@@ -7,6 +7,7 @@ import { PermissionDenied } from '../components/PermissionDenied';
 import { LoginPage } from '../modules/auth/LoginPage';
 import { DashboardPage } from '../modules/dashboard/DashboardPage';
 import { ProjectsPage } from '../modules/projects/ProjectsPage';
+import { ProjectProgressPage } from '../modules/projects/ProjectProgressPage';
 import { ProjectDetailPage } from '../modules/projects/ProjectDetailPage';
 import { ProjectWorkspaceLayout } from '../modules/projects/ProjectWorkspaceLayout';
 import { MyWorkPage } from '../modules/my-work/MyWorkPage';
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomeRedirect /> },
       { path: '/dashboard', element: guarded(<DashboardPage />, ['report.view']) },
+      { path: '/progress', element: guarded(<ProjectProgressPage />, ['project.view']) },
       { path: '/my-work', element: <MyWorkPage /> },
       { path: '/work-items/:id', element: <WorkItemDetailPage /> },
       { path: '/projects', element: guarded(<ProjectsPage />, ['project.view']) },

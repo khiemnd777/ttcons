@@ -7,6 +7,7 @@ import {
   Database,
   FileClock,
   GitBranch,
+  Kanban,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -30,6 +31,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
     title: 'Công việc',
     items: [
       { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permissions: ['report.view'] },
+      { to: '/progress', label: 'Tiến trình', icon: Kanban, permissions: ['project.view'] },
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
       { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
       { to: '/reports', label: 'Báo cáo', icon: BarChart3, permissions: ['report.view', 'report.finance.view', 'accounting.view'] },

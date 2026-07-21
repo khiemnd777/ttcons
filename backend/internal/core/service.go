@@ -249,6 +249,52 @@ func (s *Service) ListProjects(ctx context.Context, actorID string) ([]Record, e
 	return s.repo.ListProjects(ctx, actorID)
 }
 
+func (s *Service) ProjectProgressBoard(ctx context.Context, actorID string) (Record, error) {
+	items, err := s.repo.ProjectProgressBoard(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		item["stage_key"] = projectProgressStageKey(
+			strings.TrimSpace(fmt.Sprint(item["project_status"])),
+			cleanID(item["pipeline_run_id"]),
+			strings.TrimSpace(fmt.Sprint(item["pipeline_run_status"])),
+			strings.TrimSpace(fmt.Sprint(item["current_node_type"])),
+		)
+	}
+	return Record{
+		"items":        items,
+		"generated_at": time.Now().UTC().Format(time.RFC3339),
+	}, nil
+}
+
+func projectProgressStageKey(projectStatus, runID, runStatus, nodeType string) string {
+	if statusIn(projectStatus, "completed", "complete") || runStatus == "completed" {
+		return "completed"
+	}
+	if runID == "" {
+		return "not_started"
+	}
+	switch nodeType {
+	case "survey":
+		return "survey"
+	case "design":
+		return "design"
+	case "boq", "budget_approval", "procurement", "warehouse_issue", "contract":
+		return "commercial"
+	case "construction_planning":
+		return "planning"
+	case "construction":
+		return "construction"
+	case "incoming_acceptance", "acceptance", "rework", "replanning":
+		return "acceptance"
+	case "handover", "financial_closure":
+		return "handover_finance"
+	default:
+		return "other"
+	}
+}
+
 func (s *Service) ListPartners(ctx context.Context, filter PartnerFilter) ([]Record, error) {
 	filter.Query = strings.TrimSpace(filter.Query)
 	filter.Type = strings.TrimSpace(filter.Type)
@@ -298,14 +344,24 @@ func (s *Service) CreateProject(ctx context.Context, body Record) (Record, error
 	if err := s.applyPartnerSnapshot(ctx, body, "partner_id", "client_name", "", []string{"client"}); err != nil {
 		return nil, err
 	}
-	return s.repo.Insert(ctx, "projects", projectColumns(), body)
+	project, err := s.repo.Insert(ctx, "projects", projectColumns(), body)
+	if err != nil {
+		return nil, err
+	}
+	s.publishProjectProgressChanged("")
+	return project, nil
 }
 
 func (s *Service) UpdateProject(ctx context.Context, id string, body Record) (Record, error) {
 	if err := s.applyPartnerSnapshot(ctx, body, "partner_id", "client_name", "", []string{"client"}); err != nil {
 		return nil, err
 	}
-	return s.repo.Update(ctx, "projects", projectColumns(), id, body)
+	project, err := s.repo.Update(ctx, "projects", projectColumns(), id, body)
+	if err != nil {
+		return nil, err
+	}
+	s.publishProjectProgressChanged(cleanID(project["id"]))
+	return project, nil
 }
 
 func (s *Service) ProjectDetail(ctx context.Context, id string) (Record, error) {
@@ -313,7 +369,11 @@ func (s *Service) ProjectDetail(ctx context.Context, id string) (Record, error) 
 }
 
 func (s *Service) DeleteProject(ctx context.Context, id string) error {
-	return s.repo.Exec(ctx, `UPDATE projects SET status='cancelled', updated_at=now() WHERE id=$1`, id)
+	if err := s.repo.Exec(ctx, `UPDATE projects SET status='cancelled', updated_at=now() WHERE id=$1`, id); err != nil {
+		return err
+	}
+	s.publishProjectProgressChanged(cleanID(id))
+	return nil
 }
 
 func (s *Service) ProjectMembers(ctx context.Context, projectID, actorID string, includeInactive bool) (Record, error) {
@@ -1156,6 +1216,7 @@ func (s *Service) CreateIssue(ctx context.Context, projectID string, body Record
 		return nil, err
 	}
 	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "issue_created", "issue", cleanID(row["id"]), fmt.Sprintf("Tạo vấn đề %s", row["title"]), Record{"severity": row["severity"], "status": row["status"]})
+	s.publishProjectProgressChanged(cleanID(row["project_id"]))
 	return row, nil
 }
 
@@ -1166,6 +1227,7 @@ func (s *Service) UpdateIssue(ctx context.Context, id string, body Record, actor
 		return nil, err
 	}
 	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "issue_updated", "issue", cleanID(row["id"]), fmt.Sprintf("Cập nhật vấn đề %s", row["title"]), Record{"status": row["status"], "severity": row["severity"]})
+	s.publishProjectProgressChanged(cleanID(row["project_id"]))
 	return row, nil
 }
 
@@ -1827,7 +1889,12 @@ func (s *Service) StartPipeline(ctx context.Context, projectID, templateID, acto
 	if !canRun {
 		return nil, forbiddenError("Bạn không có quyền chạy quy trình", Record{"permissions": []string{"pipeline.run"}})
 	}
-	return s.repo.StartPipeline(ctx, projectID, templateID, actorID, actorName)
+	run, err := s.repo.StartPipeline(ctx, projectID, templateID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishProjectProgressChanged(cleanID(projectID))
+	return run, nil
 }
 
 func (s *Service) ProjectWorkItems(ctx context.Context, projectID, actorID string) ([]Record, error) {
@@ -7284,6 +7351,7 @@ func (s *Service) SubmitRunStep(ctx context.Context, stepID string, req WorkItem
 	if workItemID != "" {
 		_ = s.repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, actorID, actorName)
 	}
+	s.publishProjectProgressChanged(cleanID(step["project_id"]))
 	return step, nil
 }
 
@@ -7292,7 +7360,12 @@ func canCompleteWorkItemStatus(status string) bool {
 }
 
 func (s *Service) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorName string) (Record, error) {
-	return s.repo.AdvanceRunNode(ctx, nodeID, actorID, actorName)
+	node, err := s.repo.AdvanceRunNode(ctx, nodeID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishProjectProgressChanged(cleanID(node["project_id"]))
+	return node, nil
 }
 
 func (s *Service) RequestNodeApproval(ctx context.Context, nodeID, actorID, actorName, reason string) (Record, error) {
@@ -7313,11 +7386,21 @@ func (s *Service) RequestNodeApproval(ctx context.Context, nodeID, actorID, acto
 	if len(blocking) > 0 {
 		return nil, validationError("Node chưa đủ điều kiện gửi phê duyệt", Record{"issues": blocking})
 	}
-	return s.repo.RequestNodeApproval(ctx, nodeID, actorID, actorName, reason)
+	request, err := s.repo.RequestNodeApproval(ctx, nodeID, actorID, actorName, reason)
+	if err != nil {
+		return nil, err
+	}
+	s.publishProjectProgressChanged(cleanID(request["project_id"]))
+	return request, nil
 }
 
 func (s *Service) BlockRunNode(ctx context.Context, nodeID, reason, actorID, actorName string) (Record, error) {
-	return s.repo.BlockRunNode(ctx, nodeID, reason, actorID, actorName)
+	node, err := s.repo.BlockRunNode(ctx, nodeID, reason, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishProjectProgressChanged(cleanID(node["project_id"]))
+	return node, nil
 }
 
 func (s *Service) ApprovalAction(ctx context.Context, id, action, comment, actorID, actorName string) (Record, error) {
@@ -7350,7 +7433,12 @@ func (s *Service) ApprovalAction(ctx context.Context, id, action, comment, actor
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền duyệt yêu cầu này")
 	}
-	return s.repo.ApplyApprovalPolicyAction(ctx, request, action, comment, actorID, actorName)
+	updated, err := s.repo.ApplyApprovalPolicyAction(ctx, request, action, comment, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishProjectProgressChanged(cleanID(updated["project_id"]))
+	return updated, nil
 }
 
 func normalizeApprovalAction(action string) string {

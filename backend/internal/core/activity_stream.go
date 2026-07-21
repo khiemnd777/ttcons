@@ -337,6 +337,13 @@ func (s *Service) publishActivityEvent(event ActivityStreamEvent) {
 	s.streamHub.Publish(event)
 }
 
+func (s *Service) publishProjectProgressChanged(projectID string) {
+	s.publishActivityEvent(ActivityStreamEvent{
+		Type:      "project_progress_changed",
+		ProjectID: cleanID(projectID),
+	})
+}
+
 func activityEventFromRecord(eventType string, activity Record, actorID string) ActivityStreamEvent {
 	return ActivityStreamEvent{
 		Type:       eventType,
@@ -382,6 +389,43 @@ func (h *Handler) ProjectActivityStream(c *fiber.Ctx) error {
 		return event.Type, projectActivityInvalidation(event), true
 	})
 	return nil
+}
+
+func (h *Handler) ProjectProgressBoardStream(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"project.view"}); err != nil {
+		return err
+	}
+	release, ok := h.acquireActivityStream(c)
+	if !ok {
+		return activityStreamCapacityExceeded(c)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), h.service.streamVisibilityTimeout)
+	visibleProjects, err := h.service.repo.ProjectVisibleProjectIDs(ctx, actorID(c))
+	cancel()
+	if err != nil {
+		release()
+		return err
+	}
+	h.writeActivityStream(c, release, func(event ActivityStreamEvent) (string, ActivityStreamEvent, bool) {
+		return projectProgressBoardStreamEvent(event, visibleProjects)
+	})
+	return nil
+}
+
+func projectProgressBoardStreamEvent(event ActivityStreamEvent, visibleProjects map[string]struct{}) (string, ActivityStreamEvent, bool) {
+	if event.Type != "project_progress_changed" && event.Type != "work_item_changed" {
+		return "", ActivityStreamEvent{}, false
+	}
+	if event.ProjectID != "" {
+		if _, visible := visibleProjects[event.ProjectID]; !visible {
+			return "", ActivityStreamEvent{}, false
+		}
+	}
+	return "project_progress_changed", ActivityStreamEvent{
+		Type:      "project_progress_changed",
+		ProjectID: event.ProjectID,
+		At:        event.At,
+	}, true
 }
 
 func projectActivityInvalidation(event ActivityStreamEvent) ActivityStreamEvent {

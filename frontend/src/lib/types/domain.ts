@@ -54,6 +54,48 @@ export type Project = AnyRecord & {
   pending_approvals?: number;
 };
 
+export type ProjectProgressStageKey =
+  | 'not_started'
+  | 'survey'
+  | 'design'
+  | 'commercial'
+  | 'planning'
+  | 'construction'
+  | 'acceptance'
+  | 'handover_finance'
+  | 'completed'
+  | 'other';
+
+export type ProjectProgressItem = {
+  id: string;
+  code: string;
+  name: string;
+  client_name?: string;
+  project_status: string;
+  progress_percent: number;
+  planned_start_date?: string | null;
+  planned_end_date?: string | null;
+  pm_name?: string;
+  pipeline_run_id?: string;
+  pipeline_run_status?: string;
+  current_node_id?: string;
+  current_node_name?: string;
+  current_node_type?: string;
+  current_node_status?: string;
+  current_node_order?: number;
+  current_node_block_reason?: string;
+  open_issues: number;
+  pending_approvals: number;
+  blocked_items: number;
+  overdue_items: number;
+  stage_key: ProjectProgressStageKey;
+};
+
+export type ProjectProgressBoardResponse = {
+  items: ProjectProgressItem[];
+  generated_at: string;
+};
+
 export type ProjectMemberAccessRole = {
   id: string;
   name: string;

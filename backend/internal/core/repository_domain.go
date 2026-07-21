@@ -7503,6 +7503,84 @@ func (r *Repository) ListProjects(ctx context.Context, userID string) ([]Record,
 	`, scopeSQL), scopeArgs...)
 }
 
+func (r *Repository) ProjectProgressBoard(ctx context.Context, userID string) ([]Record, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
+	if err != nil {
+		return nil, err
+	}
+	return r.Query(ctx, fmt.Sprintf(`
+		SELECT
+			p.id::text AS id,
+			p.code,
+			p.name,
+			p.client_name,
+			p.status AS project_status,
+			p.progress_percent,
+			p.planned_start_date,
+			p.planned_end_date,
+			COALESCE(s.full_name, '') AS pm_name,
+			COALESCE(pr.id::text, '') AS pipeline_run_id,
+			COALESCE(pr.status, '') AS pipeline_run_status,
+			COALESCE(rn.id::text, '') AS current_node_id,
+			COALESCE(rn.name, '') AS current_node_name,
+			COALESCE(rn.type, '') AS current_node_type,
+			COALESCE(rn.status, '') AS current_node_status,
+			COALESCE(rn.order_index, 0) AS current_node_order,
+			COALESCE(rn.block_reason, '') AS current_node_block_reason,
+			COALESCE((
+				SELECT COUNT(*)
+				FROM issues i
+				WHERE i.project_id=p.id AND i.status IN ('open','in_progress')
+			), 0) AS open_issues,
+			COALESCE((
+				SELECT COUNT(*)
+				FROM approval_requests ar
+				WHERE ar.project_id=p.id AND ar.status='pending'
+			), 0) AS pending_approvals,
+			COALESCE((
+				SELECT COUNT(*)
+				FROM work_items wi
+				WHERE wi.project_id=p.id AND wi.status='blocked'
+			), 0) AS blocked_items,
+			COALESCE((
+				SELECT COUNT(*)
+				FROM work_items wi
+				WHERE wi.project_id=p.id
+				  AND wi.status NOT IN ('completed','cancelled')
+				  AND wi.due_at IS NOT NULL
+				  AND wi.due_at < now()
+			), 0) AS overdue_items
+		FROM projects p
+		LEFT JOIN staff s ON s.id=p.pm_staff_id
+		LEFT JOIN pipeline_runs pr ON pr.id=p.current_pipeline_run_id AND pr.project_id=p.id
+		LEFT JOIN pipeline_run_nodes rn ON rn.id=pr.current_node_id AND rn.project_id=p.id
+		WHERE p.status <> 'cancelled' AND %s
+		ORDER BY p.created_at DESC
+	`, scopeSQL), scopeArgs...)
+}
+
+func (r *Repository) ProjectVisibleProjectIDs(ctx context.Context, userID string) (map[string]struct{}, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := r.Query(ctx, fmt.Sprintf(`
+		SELECT p.id::text AS id
+		FROM projects p
+		WHERE p.status <> 'cancelled' AND %s
+	`, scopeSQL), scopeArgs...)
+	if err != nil {
+		return nil, err
+	}
+	projectIDs := make(map[string]struct{}, len(rows))
+	for _, row := range rows {
+		if projectID := cleanID(row["id"]); projectID != "" {
+			projectIDs[projectID] = struct{}{}
+		}
+	}
+	return projectIDs, nil
+}
+
 func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, includeInactive bool) ([]Record, error) {
 	activeFilter := "AND pm.active"
 	if includeInactive {
