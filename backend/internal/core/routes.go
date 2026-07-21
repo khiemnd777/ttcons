@@ -10,20 +10,37 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func RegisterRoutes(app *fiber.App, db *sql.DB, _ *redis.Client, cfg config.Config) {
+func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg config.Config) func() {
 	repo := NewRepository(db)
 	service := NewService(repo, cfg.JWTSecret)
 	service.ConfigureUploads(cfg.UploadDir, cfg.MaxUploadBytes)
 	service.ConfigureAuth(cfg.AuthAccessTokenMinutes, cfg.AuthRefreshTokenHours, cfg.AuthRefreshCookieSecure, cfg.AuthRefreshCookieSameSite)
+	service.ConfigureActivityStreaming(redisClient, cfg.SSEBrokerChannel, cfg.RedisOperationTimeout, cfg.SSEMaxConnections, cfg.SSEMaxConnectionsPerIP, cfg.SSEMaxConnectionsPerActor, cfg.SSEVisibilityTimeout, cfg.SSEMaxConnectionLifetime)
 	h := NewHandler(service)
+	h.ConfigureReadiness(cfg.ReadinessTimeout, db.PingContext)
 
-	api := app.Group("/api")
+	rateLimiter := middleware.NewRateLimiter(redisClient, middleware.RateLimiterConfig{
+		Enabled:          cfg.RateLimitEnabled,
+		Enforce:          cfg.RateLimitMode == "enforce",
+		RedisTimeout:     cfg.RedisOperationTimeout,
+		RedisMaxInFlight: cfg.RateLimitRedisMaxInFlight,
+		LocalMaxKeys:     cfg.RateLimitLocalMaxKeys,
+	})
+	concurrencyGuards := middleware.NewConcurrencyGuards(cfg.UploadConcurrency, cfg.ExportConcurrency, cfg.ReportConcurrency)
+
+	api := app.Group("/api", rateLimiter.LimitIP(rateLimitPolicies(cfg.RateLimitIP)))
 	api.Get("/health", h.Health)
+	api.Get("/ready", h.Ready)
 	api.Post("/auth/login", h.Login)
 	api.Post("/auth/refresh", h.Refresh)
 	api.Post("/auth/logout", h.Logout)
 
-	protected := api.Group("", middleware.AuthRequired(cfg.JWTSecret, repo))
+	protected := api.Group("",
+		middleware.AuthClaimsRequired(cfg.JWTSecret),
+		rateLimiter.LimitActor(rateLimitPolicies(cfg.RateLimitActor)),
+		middleware.AuthSessionRequired(repo),
+		concurrencyGuards.Middleware(),
+	)
 	protected.Get("/auth/me", h.Me)
 
 	protected.Get("/projects", h.ListProjects)
@@ -354,4 +371,20 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, _ *redis.Client, cfg config.Conf
 	protected.Get("/reports/staff", h.StaffReport)
 	protected.Get("/reports/staff/export", h.StaffReportCSV)
 	protected.Get("/settings", h.Settings)
+
+	return service.CloseActivityStreaming
+}
+
+func rateLimitPolicies(values config.RateLimitPolicies) middleware.RateLimitPolicies {
+	return middleware.RateLimitPolicies{
+		middleware.RequestClassAuth:    rateLimitPolicy(values.Auth),
+		middleware.RequestClassGeneral: rateLimitPolicy(values.General),
+		middleware.RequestClassUpload:  rateLimitPolicy(values.Upload),
+		middleware.RequestClassExport:  rateLimitPolicy(values.Export),
+		middleware.RequestClassSSE:     rateLimitPolicy(values.SSE),
+	}
+}
+
+func rateLimitPolicy(value config.RateLimitPolicy) middleware.RateLimitPolicy {
+	return middleware.RateLimitPolicy{Limit: value.Limit, Burst: value.Burst, Window: value.Window}
 }

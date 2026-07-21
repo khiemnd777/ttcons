@@ -17,6 +17,7 @@ backend/uploads/
 .env
 .env.*
 !.env.example
+!.env.prod.example
 
 # go
 backend/.gocache/

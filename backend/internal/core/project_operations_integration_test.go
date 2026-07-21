@@ -1013,39 +1013,89 @@ func TestProjectOperationsAccessPolicy(t *testing.T) {
 	suffix := newID()
 	projectID := newID()
 	cancelledProjectID := newID()
+	adminUserID := newID()
 	directorUserID := newID()
 	pmUserID := newID()
 	pmStaffID := newID()
 	noScopeUserID := newID()
 	projectRoleNoPermissionUserID := newID()
+	projectRolePermissionUserID := newID()
+	var projectPermissionRoleID string
 
 	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id IN ($1,$2,$3,$4,$5,$6)`, adminUserID, directorUserID, pmUserID, noScopeUserID, projectRoleNoPermissionUserID, projectRolePermissionUserID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id IN ($1,$2)`, projectID, cancelledProjectID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, pmStaffID)
-		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id IN ($1,$2,$3,$4)`, directorUserID, pmUserID, noScopeUserID, projectRoleNoPermissionUserID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id IN ($1,$2,$3,$4,$5,$6)`, adminUserID, directorUserID, pmUserID, noScopeUserID, projectRoleNoPermissionUserID, projectRolePermissionUserID)
+		if projectPermissionRoleID != "" {
+			_, _ = db.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, projectPermissionRoleID)
+			_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, projectPermissionRoleID)
+		}
 	})
 
 	operationViewID := ensurePermission(t, db, "operation.view", "Xem thi công", "operation")
+	adminRoleID := ensureRole(t, db, "admin", "Quản trị")
 	directorRoleID := ensureRole(t, db, "director", "Giám đốc")
 	pmRoleID := ensureRole(t, db, "pm", "PM")
 	noPermissionRoleID := ensureRole(t, db, "batch2_viewer_"+suffix[:8], "Batch2 Viewer")
-	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2),($3,$2) ON CONFLICT DO NOTHING`, directorRoleID, operationViewID, pmRoleID)
+	projectPermissionRoleID = ensureRole(t, db, "batch2_project_viewer_"+suffix[:8], "Batch2 Project Viewer")
+	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2),($3,$2),($4,$2) ON CONFLICT DO NOTHING`, directorRoleID, operationViewID, pmRoleID, projectPermissionRoleID)
 
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Admin','active')`, adminUserID, "admin-"+suffix+"@test.local")
 	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Director','active')`, directorUserID, "director-"+suffix+"@test.local")
 	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','PM','active')`, pmUserID, "pm-"+suffix+"@test.local")
 	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','No Scope','active')`, noScopeUserID, "noscope-"+suffix+"@test.local")
 	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Project Role No Permission','active')`, projectRoleNoPermissionUserID, "project-role-no-perm-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Project Role Permission','active')`, projectRolePermissionUserID, "project-role-perm-"+suffix+"@test.local")
 	mustExec(t, db, `INSERT INTO staff (id, user_id, full_name, email, department, position, status) VALUES ($1,$2,'PM',$3,'Dự án','PM','active')`, pmStaffID, pmUserID, "pm-staff-"+suffix+"@test.local")
 	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Ops Access',$2,'Client','planning'),($3,'Ops Cancelled',$4,'Client','cancelled')`, projectID, "OPA-"+suffix[:8], cancelledProjectID, "OPC-"+suffix[:8])
 	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["PM"]'::jsonb,true)`, projectID, pmStaffID)
-	mustExec(t, db, `INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2),($3,$4),($5,$4)`, directorUserID, directorRoleID, pmUserID, pmRoleID, noScopeUserID)
+	mustExec(t, db, `INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2),($3,$4),($5,$6),($7,$6)`, adminUserID, adminRoleID, directorUserID, directorRoleID, pmUserID, pmRoleID, noScopeUserID)
 	mustExec(t, db, `INSERT INTO user_roles (user_id, role_id, project_id) VALUES ($1,$2,$3)`, projectRoleNoPermissionUserID, noPermissionRoleID, projectID)
+	mustExec(t, db, `INSERT INTO user_roles (user_id, role_id, project_id) VALUES ($1,$2,$3)`, projectRolePermissionUserID, projectPermissionRoleID, projectID)
 
+	assertCanViewProjectOperations(t, repo, ctx, projectID, adminUserID, true)
 	assertCanViewProjectOperations(t, repo, ctx, projectID, directorUserID, true)
 	assertCanViewProjectOperations(t, repo, ctx, projectID, pmUserID, true)
 	assertCanViewProjectOperations(t, repo, ctx, projectID, noScopeUserID, false)
 	assertCanViewProjectOperations(t, repo, ctx, projectID, projectRoleNoPermissionUserID, false)
+	assertCanViewProjectOperations(t, repo, ctx, projectID, projectRolePermissionUserID, true)
 	assertCanViewProjectOperations(t, repo, ctx, cancelledProjectID, directorUserID, false)
+
+	visibilityCases := []struct {
+		name   string
+		userID string
+		want   bool
+	}{
+		{name: "admin", userID: adminUserID, want: true},
+		{name: "director", userID: directorUserID, want: true},
+		{name: "member", userID: pmUserID, want: true},
+		{name: "project role", userID: projectRolePermissionUserID, want: true},
+		{name: "no project scope", userID: noScopeUserID, want: false},
+		{name: "project role without permission", userID: projectRoleNoPermissionUserID, want: false},
+	}
+	for _, test := range visibilityCases {
+		t.Run("snapshot parity "+test.name, func(t *testing.T) {
+			visibleProjects, err := repo.ProjectOperationsVisibleProjectIDs(ctx, test.userID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, visible := visibleProjects[projectID]
+			if visible != test.want {
+				t.Fatalf("active project snapshot visibility=%v, want %v", visible, test.want)
+			}
+			if _, visible := visibleProjects[cancelledProjectID]; visible {
+				t.Fatal("cancelled project leaked into activity visibility snapshot")
+			}
+			canView, err := repo.CanViewProjectOperations(ctx, projectID, test.userID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if visible != canView {
+				t.Fatalf("snapshot visibility=%v differs from CanViewProjectOperations=%v", visible, canView)
+			}
+		})
+	}
 }
 
 func TestBatch4ProjectListIsScopedByMembership(t *testing.T) {

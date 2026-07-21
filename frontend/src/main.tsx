@@ -5,13 +5,14 @@ import { RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './lib/auth/AuthContext';
 import { router } from './app/router';
 import { ToastProvider } from './components/ToastProvider';
+import { shouldRetryQuery } from './lib/api/backpressure';
 import './index.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      retry: 1,
+      retry: shouldRetryQuery,
     },
   },
 });

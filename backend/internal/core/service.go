@@ -28,27 +28,33 @@ import (
 )
 
 type Service struct {
-	repo                  *Repository
-	jwtSecret             string
-	streamHub             *ActivityStreamHub
-	uploadDir             string
-	maxUploadBytes        int64
-	accessTokenTTL        time.Duration
-	refreshTokenTTL       time.Duration
-	refreshCookieSecure   bool
-	refreshCookieSameSite string
+	repo                        *Repository
+	jwtSecret                   string
+	streamHub                   *ActivityStreamHub
+	streamCapacity              *ActivityStreamCapacity
+	streamVisibilityTimeout     time.Duration
+	streamMaxConnectionLifetime time.Duration
+	uploadDir                   string
+	maxUploadBytes              int64
+	accessTokenTTL              time.Duration
+	refreshTokenTTL             time.Duration
+	refreshCookieSecure         bool
+	refreshCookieSameSite       string
 }
 
 func NewService(repo *Repository, jwtSecret string) *Service {
 	return &Service{
-		repo:                  repo,
-		jwtSecret:             jwtSecret,
-		streamHub:             NewActivityStreamHub(),
-		uploadDir:             defaultUploadDir,
-		maxUploadBytes:        defaultMaxUploadBytes,
-		accessTokenTTL:        defaultAccessTokenTTL,
-		refreshTokenTTL:       defaultRefreshTokenTTL,
-		refreshCookieSameSite: defaultRefreshCookieSameSite,
+		repo:                        repo,
+		jwtSecret:                   jwtSecret,
+		streamHub:                   NewActivityStreamHub(),
+		streamCapacity:              NewActivityStreamCapacity(500, 20, 2),
+		streamVisibilityTimeout:     2 * time.Second,
+		streamMaxConnectionLifetime: 5 * time.Minute,
+		uploadDir:                   defaultUploadDir,
+		maxUploadBytes:              defaultMaxUploadBytes,
+		accessTokenTTL:              defaultAccessTokenTTL,
+		refreshTokenTTL:             defaultRefreshTokenTTL,
+		refreshCookieSameSite:       defaultRefreshCookieSameSite,
 	}
 }
 

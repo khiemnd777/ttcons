@@ -66,6 +66,13 @@ export function BOQPage() {
   const submittedRows = rows.filter((row) => row.status === 'submitted');
   const canApproveSubmitted = submittedRows.length > 0 && submittedRows.every((row) => row.norm_price_locked);
   const canOpenComparison = !hasEditableRows && submittedRows.length === 0 && priceReadiness.approvedPendingFinal.length > 0;
+  const estimatePrimaryAction = hasEditableRows && hasPermission('boq.update')
+    ? 'submit'
+    : canApproveSubmitted && hasPermission('boq.approve')
+      ? 'approve'
+      : canOpenComparison
+        ? 'compare'
+        : null;
 
   useEffect(() => {
     if (!priceDialog) {
@@ -242,17 +249,19 @@ export function BOQPage() {
       </div>
 
       {activeTab === 'estimate' ? <>
-        <div className="mb-4 rounded-lg border border-line bg-white p-3 shadow-panel">
+        {estimatePrimaryAction ? (
+          <div className="mb-4 rounded-lg border border-line bg-white p-3 shadow-panel">
             <div className="flex flex-wrap justify-end gap-2">
-              {hasEditableRows && hasPermission('boq.update') ? (
+              {estimatePrimaryAction === 'submit' ? (
                 <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={submit.isPending} onClick={() => submit.mutate()}>{submit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Gửi duyệt</button>
-              ) : canApproveSubmitted && hasPermission('boq.approve') ? (
+              ) : estimatePrimaryAction === 'approve' ? (
                 <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={approve.isPending} onClick={() => approve.mutate()}>{approve.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ThumbsUp className="h-4 w-4" />}Duyệt dự toán</button>
-              ) : canOpenComparison ? (
+              ) : (
                 <button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => setActiveTab('compare')}>Mở so sánh giá</button>
-              ) : null}
+              )}
+            </div>
           </div>
-        </div>
+        ) : null}
         <UnitPriceReadinessPanel readiness={priceReadiness} onOpenItem={setPriceDialog} />
         <DataTable
         rows={rows}
@@ -402,7 +411,7 @@ function MetricCard({ label, value, tone }: { label: string; value: number; tone
 }
 
 function UnitPriceReadinessPanel({ readiness, onOpenItem }: { readiness: BOQPriceReadiness; onOpenItem: (item: BOQItem) => void }) {
-  const blocked = readiness.approvedPendingFinal.length > 0 || readiness.approvedFinalCount === 0;
+  const blocked = !readiness.procurementComplete && (readiness.approvedPendingFinal.length > 0 || readiness.approvedFinalCount === 0);
   return (
     <section className={clsx('mb-4 rounded-md border p-3', blocked ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50')}>
       <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -411,7 +420,9 @@ function UnitPriceReadinessPanel({ readiness, onOpenItem }: { readiness: BOQPric
             {blocked ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-ink">Việc tiếp theo: {readiness.nextAction}</p>
+            <p className="text-sm font-semibold text-ink">
+              {readiness.procurementComplete ? 'Trạng thái' : 'Việc tiếp theo'}: {readiness.nextAction}
+            </p>
             <p className="mt-1 text-xs leading-5 text-slate-600">
               {readiness.generateDisabledReason || 'Các dòng đã duyệt đã sẵn sàng sinh mua sắm bằng đơn giá cuối.'}
             </p>
@@ -422,7 +433,11 @@ function UnitPriceReadinessPanel({ readiness, onOpenItem }: { readiness: BOQPric
           <ReadinessPill label="Đã khóa định mức" value={`${readiness.normLockedCount} dòng`} active={readiness.normLockedCount > 0} />
           <ReadinessPill label="Đã chốt giá cuối" value={`${readiness.finalLockedCount} dòng`} active={false} />
           <ReadinessPill label="Đã duyệt" value={`${readiness.approvedCount} dòng`} active={readiness.approvedCount === 0} />
-          <ReadinessPill label="Đang chặn" value={`${readiness.approvedPendingFinal.length} dòng`} active={readiness.approvedPendingFinal.length > 0} />
+          <ReadinessPill
+            label={readiness.procurementComplete ? 'Đã chuyển mua sắm' : 'Đang chặn'}
+            value={`${readiness.procurementComplete ? readiness.procuredCount : readiness.approvedPendingFinal.length} dòng`}
+            active={!readiness.procurementComplete && readiness.approvedPendingFinal.length > 0}
+          />
         </div>
       </div>
       {readiness.approvedPendingFinal.length ? (
@@ -734,6 +749,8 @@ type BOQPriceReadiness = {
   approvedCount: number;
   approvedFinalCount: number;
   approvedPendingFinal: BOQItem[];
+  procuredCount: number;
+  procurementComplete: boolean;
   generateDisabled: boolean;
   generateDisabledReason: string;
   nextAction: string;
@@ -744,14 +761,18 @@ function boqPriceReadiness(rows: BOQItem[]): BOQPriceReadiness {
   const normLockedCount = rows.filter((item) => item.norm_price_locked && !item.final_price_locked).length;
   const finalLockedCount = rows.filter((item) => item.final_price_locked).length;
   const approved = rows.filter((item) => item.status === 'approved');
-  const eligibleApproved = approved.filter((item) => !item.has_active_procurement && !item.procurement_request_id && Number(item.active_procurement_count ?? 0) === 0);
+  const procuredCount = rows.filter(hasActiveBOQProcurement).length;
+  const procurementComplete = rows.length > 0 && rows.every((item) => item.status === 'approved' && item.final_price_locked && hasActiveBOQProcurement(item));
+  const eligibleApproved = approved.filter((item) => !hasActiveBOQProcurement(item));
   const approvedFinal = eligibleApproved.filter((item) => item.final_price_locked);
   const approvedPendingFinal = eligibleApproved.filter((item) => !item.final_price_locked || (!item.selected_quotation_item_id && !item.price_waiver_reason));
   const generateDisabledReason = approvedPendingFinal.length
     ? `${approvedPendingFinal.length} dòng đã duyệt chưa khóa giá cuối hoặc chưa có báo giá/lý do miễn báo giá.`
-    : approvedFinal.length === 0
-      ? 'Chưa có dòng đã duyệt và chốt giá cuối để sinh mua sắm.'
-      : '';
+    : procurementComplete
+      ? `${procuredCount} dòng dự toán đã liên kết với yêu cầu mua sắm hoạt động.`
+      : approvedFinal.length === 0
+        ? 'Chưa có dòng đã duyệt và chốt giá cuối để sinh mua sắm.'
+        : '';
 
   return {
     expectedCount,
@@ -760,14 +781,21 @@ function boqPriceReadiness(rows: BOQItem[]): BOQPriceReadiness {
     approvedCount: approved.length,
     approvedFinalCount: approvedFinal.length,
     approvedPendingFinal,
+    procuredCount,
+    procurementComplete,
     generateDisabled: Boolean(generateDisabledReason),
     generateDisabledReason,
-    nextAction: boqNextAction(rows, approvedPendingFinal, approvedFinal.length),
+    nextAction: boqNextAction(rows, approvedPendingFinal, approvedFinal.length, procurementComplete),
   };
 }
 
-function boqNextAction(rows: BOQItem[], approvedPendingFinal: BOQItem[], approvedFinalCount: number) {
+function hasActiveBOQProcurement(item: BOQItem) {
+  return Boolean(item.has_active_procurement || item.procurement_request_id || Number(item.active_procurement_count ?? 0) > 0);
+}
+
+function boqNextAction(rows: BOQItem[], approvedPendingFinal: BOQItem[], approvedFinalCount: number, procurementComplete: boolean) {
   if (!rows.length) return 'Thêm dòng BOQ';
+  if (procurementComplete) return 'Đã chuyển sang mua sắm';
   if (approvedPendingFinal.length) return 'Hoàn tất chọn báo giá hoặc ghi lý do miễn báo giá';
   if (approvedFinalCount > 0) return 'Sinh yêu cầu mua sắm';
   if (rows.some((item) => item.status === 'draft' || item.status === 'revised')) return 'Gửi dự toán để duyệt';

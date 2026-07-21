@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
@@ -17,7 +18,9 @@ import (
 )
 
 type Handler struct {
-	service *Service
+	service          *Service
+	readinessTimeout time.Duration
+	readinessCheck   func(context.Context) error
 }
 
 const refreshCookieName = "consflow_refresh_token"
@@ -28,6 +31,26 @@ func NewHandler(service *Service) *Handler {
 
 func (h *Handler) Health(c *fiber.Ctx) error {
 	return response.OK(c, Record{"status": "ok", "service": "consflow"})
+}
+
+func (h *Handler) ConfigureReadiness(timeout time.Duration, check func(context.Context) error) {
+	if timeout <= 0 {
+		timeout = 2 * time.Second
+	}
+	h.readinessTimeout = timeout
+	h.readinessCheck = check
+}
+
+func (h *Handler) Ready(c *fiber.Ctx) error {
+	if h.readinessCheck == nil {
+		return response.Fail(c, fiber.StatusServiceUnavailable, "NOT_READY", "Dịch vụ chưa sẵn sàng")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), h.readinessTimeout)
+	defer cancel()
+	if err := h.readinessCheck(ctx); err != nil {
+		return response.Fail(c, fiber.StatusServiceUnavailable, "NOT_READY", "Cơ sở dữ liệu chưa sẵn sàng")
+	}
+	return response.OK(c, Record{"status": "ready", "service": "consflow", "database": "ok"})
 }
 
 func (h *Handler) Login(c *fiber.Ctx) error {
@@ -4086,9 +4109,6 @@ func (h *Handler) CashflowReport(c *fiber.Ctx) error {
 		if !validActivityUUID(req.ProjectID) {
 			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
 		}
-		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
-			return err
-		}
 	}
 	data, err := h.service.CashflowReport(c.Context(), req, actorID(c))
 	if err != nil {
@@ -4105,9 +4125,6 @@ func (h *Handler) CashflowReportCSV(c *fiber.Ctx) error {
 	if req.ProjectID != "" {
 		if !validActivityUUID(req.ProjectID) {
 			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
-		}
-		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
-			return err
 		}
 	}
 	data, err := h.service.CashflowReport(c.Context(), req, actorID(c))
@@ -4132,9 +4149,6 @@ func (h *Handler) TaxReport(c *fiber.Ctx) error {
 		if !validActivityUUID(req.ProjectID) {
 			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
 		}
-		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
-			return err
-		}
 	}
 	data, err := h.service.TaxReport(c.Context(), req, actorID(c))
 	if err != nil {
@@ -4151,9 +4165,6 @@ func (h *Handler) TaxReportCSV(c *fiber.Ctx) error {
 	if req.ProjectID != "" {
 		if !validActivityUUID(req.ProjectID) {
 			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
-		}
-		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
-			return err
 		}
 	}
 	data, err := h.service.TaxReport(c.Context(), req, actorID(c))
@@ -4178,9 +4189,6 @@ func (h *Handler) ProfitReport(c *fiber.Ctx) error {
 		if !validActivityUUID(req.ProjectID) {
 			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
 		}
-		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
-			return err
-		}
 	}
 	data, err := h.service.ProfitReport(c.Context(), req, actorID(c))
 	if err != nil {
@@ -4197,9 +4205,6 @@ func (h *Handler) ProfitReportCSV(c *fiber.Ctx) error {
 	if req.ProjectID != "" {
 		if !validActivityUUID(req.ProjectID) {
 			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
-		}
-		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
-			return err
 		}
 	}
 	data, err := h.service.ProfitReport(c.Context(), req, actorID(c))
@@ -4240,11 +4245,6 @@ func (h *Handler) report(c *fiber.Ctx, kind string) error {
 	if err != nil {
 		return err
 	}
-	if req.ProjectID != "" {
-		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
-			return err
-		}
-	}
 	rows, err := h.service.Report(c.Context(), kind, req, actorID(c))
 	if err != nil {
 		return err
@@ -4260,11 +4260,6 @@ func (h *Handler) reportCSV(c *fiber.Ctx, kind string) error {
 	req, err := operationalReportRequest(c)
 	if err != nil {
 		return err
-	}
-	if req.ProjectID != "" {
-		if err := h.requireProjectPermission(c, req.ProjectID, permissions); err != nil {
-			return err
-		}
 	}
 	rows, err := h.service.Report(c.Context(), kind, req, actorID(c))
 	if err != nil {

@@ -561,6 +561,58 @@ func (r *Repository) CanViewProjectOperations(ctx context.Context, projectID, us
 	return len(rows) > 0 && number(rows[0]["total"]) > 0, nil
 }
 
+func (r *Repository) ProjectOperationsVisibleProjectIDs(ctx context.Context, userID string) (map[string]struct{}, error) {
+	profile, err := r.WorkItemAccessProfile(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := r.Query(ctx, `
+		SELECT p.id::text AS id
+		FROM projects p
+		WHERE p.status <> 'cancelled'
+		  AND (
+			$1::boolean
+			OR (
+				EXISTS (
+					SELECT 1
+					FROM user_roles ur
+					JOIN role_permissions rp ON rp.role_id=ur.role_id
+					JOIN permissions permission ON permission.id=rp.permission_id
+					WHERE ur.user_id=$3
+					  AND (ur.project_id IS NULL OR ur.project_id=p.id)
+					  AND permission.key IN ('operation.view', 'project.view', 'pipeline.view')
+				)
+				AND (
+					$2::boolean
+					OR EXISTS (
+						SELECT 1
+						FROM project_members pm
+						WHERE pm.project_id=p.id
+						  AND pm.staff_id=NULLIF($4,'')::uuid
+						  AND pm.active
+					)
+					OR EXISTS (
+						SELECT 1
+						FROM user_roles project_role
+						WHERE project_role.user_id=$3
+						  AND project_role.project_id=p.id
+					)
+				)
+			)
+		  )
+	`, profile.IsAdmin, profile.IsDirector, profile.UserID, profile.StaffID)
+	if err != nil {
+		return nil, err
+	}
+	projectIDs := make(map[string]struct{}, len(rows))
+	for _, row := range rows {
+		if projectID := cleanID(row["id"]); projectID != "" {
+			projectIDs[projectID] = struct{}{}
+		}
+	}
+	return projectIDs, nil
+}
+
 func hasAnyString(values []string, required []string) bool {
 	if len(required) == 0 {
 		return true
@@ -17638,29 +17690,37 @@ func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record
 	if err != nil {
 		return nil, err
 	}
-	data := Record{}
-	scalars := map[string]string{
-		"total_projects":       `SELECT COUNT(*) FROM projects p WHERE p.status <> 'cancelled' AND %s`,
-		"active_projects":      `SELECT COUNT(*) FROM projects p WHERE p.status IN ('planning','in_progress','acceptance','handover') AND %s`,
-		"blocked_projects":     `SELECT COUNT(*) FROM projects p WHERE p.status='blocked' AND %s`,
-		"pending_approvals":    `SELECT COUNT(*) FROM approval_requests ar JOIN projects p ON p.id=ar.project_id WHERE ar.status='pending' AND p.status <> 'cancelled' AND %s`,
-		"receivable_remaining": `SELECT COALESCE(SUM(rec.remaining_amount),0) FROM receivables rec JOIN projects p ON p.id=rec.project_id WHERE rec.status <> 'cancelled' AND p.status <> 'cancelled' AND %s`,
-		"payable_remaining":    `SELECT COALESCE(SUM(pay.remaining_amount),0) FROM payables pay JOIN projects p ON p.id=pay.project_id WHERE pay.status <> 'cancelled' AND p.status <> 'cancelled' AND %s`,
-		"missing_materials":    `SELECT COUNT(*) FROM site_material_balances smb JOIN materials m ON m.id=smb.material_id JOIN projects p ON p.id=smb.project_id WHERE smb.issued_quantity < smb.planned_quantity AND m.active AND p.status <> 'cancelled' AND %s`,
-		"failed_acceptances":   `SELECT COUNT(*) FROM acceptance_records ar JOIN projects p ON p.id=ar.project_id WHERE ar.result='fail' AND p.status <> 'cancelled' AND %s`,
-		"pending_reworks":      `SELECT COUNT(*) FROM rework_requests rw JOIN projects p ON p.id=rw.project_id WHERE rw.status IN ('draft','approved','in_progress') AND p.status <> 'cancelled' AND %s`,
-		"cashflow_month":       `SELECT COALESCE(SUM(CASE WHEN pay.payment_type='client_receipt' THEN pay.amount ELSE -pay.amount END),0) FROM payments pay JOIN projects p ON p.id=pay.project_id WHERE pay.status <> 'cancelled' AND p.status <> 'cancelled' AND date_trunc('month', pay.created_at)=date_trunc('month', now()) AND %s`,
-	}
-	for key, query := range scalars {
-		var value any
-		if err := r.db.QueryRowContext(ctx, fmt.Sprintf(query, scopeSQL), scopeArgs...).Scan(&value); err != nil {
-			return nil, err
-		}
-		data[key] = normalizeValue(value)
+	data, err := r.QueryOne(ctx, fmt.Sprintf(`
+		WITH scoped_projects AS MATERIALIZED (
+			SELECT p.id, p.status
+			FROM projects p
+			WHERE p.status <> 'cancelled' AND %s
+		)
+		SELECT
+			(SELECT COUNT(*) FROM scoped_projects) AS total_projects,
+			(SELECT COUNT(*) FROM scoped_projects WHERE status IN ('planning','in_progress','acceptance','handover')) AS active_projects,
+			(SELECT COUNT(*) FROM scoped_projects WHERE status='blocked') AS blocked_projects,
+			(SELECT COUNT(*) FROM approval_requests ar JOIN scoped_projects sp ON sp.id=ar.project_id WHERE ar.status='pending') AS pending_approvals,
+			(SELECT COALESCE(SUM(rec.remaining_amount),0) FROM receivables rec JOIN scoped_projects sp ON sp.id=rec.project_id WHERE rec.status <> 'cancelled') AS receivable_remaining,
+			(SELECT COALESCE(SUM(pay.remaining_amount),0) FROM payables pay JOIN scoped_projects sp ON sp.id=pay.project_id WHERE pay.status <> 'cancelled') AS payable_remaining,
+			(SELECT COUNT(*) FROM site_material_balances smb JOIN materials m ON m.id=smb.material_id JOIN scoped_projects sp ON sp.id=smb.project_id WHERE smb.issued_quantity < smb.planned_quantity AND m.active) AS missing_materials,
+			(SELECT COUNT(*) FROM acceptance_records ar JOIN scoped_projects sp ON sp.id=ar.project_id WHERE ar.result='fail') AS failed_acceptances,
+			(SELECT COUNT(*) FROM rework_requests rw JOIN scoped_projects sp ON sp.id=rw.project_id WHERE rw.status IN ('draft','approved','in_progress')) AS pending_reworks,
+			(SELECT COALESCE(SUM(CASE WHEN pay.payment_type='client_receipt' THEN pay.amount ELSE -pay.amount END),0)
+			 FROM payments pay
+			 JOIN scoped_projects sp ON sp.id=pay.project_id
+			 WHERE pay.status <> 'cancelled'
+			   AND date_trunc('month', pay.created_at)=date_trunc('month', now())) AS cashflow_month
+	`, scopeSQL), scopeArgs...)
+	if err != nil {
+		return nil, err
 	}
 	charts := Record{}
-	statusRows, _ := r.Query(ctx, fmt.Sprintf(`SELECT p.status, COUNT(*) AS total FROM projects p WHERE p.status <> 'cancelled' AND %s GROUP BY p.status ORDER BY p.status`, scopeSQL), scopeArgs...)
-	debtRows, _ := r.Query(ctx, fmt.Sprintf(`
+	statusRows, err := r.Query(ctx, fmt.Sprintf(`SELECT p.status, COUNT(*) AS total FROM projects p WHERE p.status <> 'cancelled' AND %s GROUP BY p.status ORDER BY p.status`, scopeSQL), scopeArgs...)
+	if err != nil {
+		return nil, err
+	}
+	debtRows, err := r.Query(ctx, fmt.Sprintf(`
 		SELECT 'Phải thu' AS type, COALESCE(SUM(rec.remaining_amount),0) AS amount
 		FROM receivables rec
 		JOIN projects p ON p.id=rec.project_id
@@ -17671,14 +17731,20 @@ func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record
 		JOIN projects p ON p.id=pay.project_id
 		WHERE pay.status <> 'cancelled' AND p.status <> 'cancelled' AND %s
 	`, scopeSQL, scopeSQL), scopeArgs...)
-	costRows, _ := r.Query(ctx, fmt.Sprintf(`
+	if err != nil {
+		return nil, err
+	}
+	costRows, err := r.Query(ctx, fmt.Sprintf(`
 		SELECT p.name, COALESCE(b.used_amount,0) AS used_amount, COALESCE(b.remaining_amount,0) AS remaining_amount
 		FROM projects p
 		LEFT JOIN accounting_budgets b ON b.project_id=p.id
 		WHERE p.status <> 'cancelled' AND %s
 		ORDER BY p.created_at
 	`, scopeSQL), scopeArgs...)
-	approvalRows, _ := r.Query(ctx, fmt.Sprintf(`
+	if err != nil {
+		return nil, err
+	}
+	approvalRows, err := r.Query(ctx, fmt.Sprintf(`
 		SELECT ar.target_type, COUNT(*) AS total
 		FROM approval_requests ar
 		JOIN projects p ON p.id=ar.project_id
@@ -17686,6 +17752,9 @@ func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record
 		GROUP BY ar.target_type
 		ORDER BY ar.target_type
 	`, scopeSQL), scopeArgs...)
+	if err != nil {
+		return nil, err
+	}
 	charts["project_status"] = statusRows
 	charts["debt"] = debtRows
 	charts["cost_by_project"] = costRows

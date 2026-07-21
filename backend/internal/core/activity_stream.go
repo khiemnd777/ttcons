@@ -3,12 +3,20 @@ package core
 import (
 	"bufio"
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
+	"log"
+	"math/big"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"consflow/backend/internal/shared/response"
+
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 )
 
 type ActivityStreamEvent struct {
@@ -23,18 +31,36 @@ type ActivityStreamEvent struct {
 }
 
 type ActivityStreamHub struct {
-	mu          sync.RWMutex
-	nextID      int
-	subscribers map[int]chan ActivityStreamEvent
+	mu                    sync.RWMutex
+	nextID                int
+	subscribers           map[int]chan ActivityStreamEvent
+	closed                bool
+	redisClient           *redis.Client
+	redisTimeout          time.Duration
+	brokerChannel         string
+	instanceID            string
+	brokerCancel          context.CancelFunc
+	brokerDone            chan struct{}
+	closeOnce             sync.Once
+	redisUnavailableUntil atomic.Int64
+	brokerUnavailable     atomic.Bool
 }
 
 func NewActivityStreamHub() *ActivityStreamHub {
-	return &ActivityStreamHub{subscribers: map[int]chan ActivityStreamEvent{}}
+	return &ActivityStreamHub{
+		subscribers: map[int]chan ActivityStreamEvent{},
+		instanceID:  uuid.NewString(),
+	}
 }
 
 func (h *ActivityStreamHub) Subscribe() (int, <-chan ActivityStreamEvent) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if h.closed {
+		ch := make(chan ActivityStreamEvent)
+		close(ch)
+		return 0, ch
+	}
 	h.nextID++
 	id := h.nextID
 	ch := make(chan ActivityStreamEvent, 16)
@@ -63,13 +89,244 @@ func (h *ActivityStreamHub) Publish(event ActivityStreamEvent) {
 	if event.At == "" {
 		event.At = time.Now().UTC().Format(time.RFC3339)
 	}
+	h.broadcast(event)
+
+	h.mu.RLock()
+	client := h.redisClient
+	channel := h.brokerChannel
+	instanceID := h.instanceID
+	timeout := h.redisTimeout
+	closed := h.closed
+	h.mu.RUnlock()
+	if closed || client == nil || channel == "" {
+		return
+	}
+	now := time.Now()
+	if now.UnixNano() < h.redisUnavailableUntil.Load() {
+		return
+	}
+	payload, err := json.Marshal(activityBrokerMessage{Source: instanceID, Event: event})
+	if err != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if err := client.Publish(ctx, channel, payload).Err(); err != nil {
+		h.redisUnavailableUntil.Store(now.Add(5 * time.Second).UnixNano())
+		return
+	}
+	h.redisUnavailableUntil.Store(0)
+}
+
+func (h *ActivityStreamHub) broadcast(event ActivityStreamEvent) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	if h.closed {
+		return
+	}
 	for _, ch := range h.subscribers {
 		select {
 		case ch <- event:
 		default:
 		}
+	}
+}
+
+type activityBrokerMessage struct {
+	Source string              `json:"source"`
+	Event  ActivityStreamEvent `json:"event"`
+}
+
+func (h *ActivityStreamHub) ConfigureRedis(client *redis.Client, channel string, operationTimeout time.Duration) {
+	if h == nil || client == nil || channel == "" {
+		return
+	}
+	if operationTimeout <= 0 {
+		operationTimeout = 250 * time.Millisecond
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	h.mu.Lock()
+	h.redisClient = client
+	h.redisTimeout = operationTimeout
+	h.brokerChannel = channel
+	h.brokerCancel = cancel
+	h.brokerDone = make(chan struct{})
+	done := h.brokerDone
+	h.mu.Unlock()
+	go h.consumeRedis(ctx, client, channel, operationTimeout, done)
+}
+
+func (h *ActivityStreamHub) consumeRedis(ctx context.Context, client *redis.Client, channel string, receiveTimeout time.Duration, done chan struct{}) {
+	defer close(done)
+	for ctx.Err() == nil {
+		pubsub := client.Subscribe(ctx, channel)
+		if _, err := pubsub.ReceiveTimeout(ctx, receiveTimeout); err != nil {
+			_ = pubsub.Close()
+			if ctx.Err() != nil {
+				return
+			}
+			h.markBrokerDisconnected(err)
+			if !waitForBrokerRetry(ctx) {
+				return
+			}
+			continue
+		}
+		h.markBrokerRecovered()
+		messages := pubsub.Channel()
+		consume := true
+		for consume {
+			select {
+			case <-ctx.Done():
+				_ = pubsub.Close()
+				return
+			case message, ok := <-messages:
+				if !ok {
+					consume = false
+					continue
+				}
+				var payload activityBrokerMessage
+				if json.Unmarshal([]byte(message.Payload), &payload) != nil || payload.Source == h.instanceID {
+					continue
+				}
+				h.broadcast(payload.Event)
+			}
+		}
+		_ = pubsub.Close()
+		if ctx.Err() == nil {
+			h.markBrokerDisconnected(fmt.Errorf("subscription channel closed"))
+		}
+		if !waitForBrokerRetry(ctx) {
+			return
+		}
+	}
+}
+
+func (h *ActivityStreamHub) markBrokerDisconnected(err error) {
+	if !h.brokerUnavailable.Swap(true) {
+		log.Printf("activity stream redis broker disconnected; local delivery remains active: %v", err)
+	}
+}
+
+func (h *ActivityStreamHub) markBrokerRecovered() {
+	if h.brokerUnavailable.Swap(false) {
+		log.Printf("activity stream redis broker recovered; cross-replica delivery restored")
+	}
+}
+
+func waitForBrokerRetry(ctx context.Context) bool {
+	timer := time.NewTimer(2 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+func (h *ActivityStreamHub) Close() {
+	if h == nil {
+		return
+	}
+	h.closeOnce.Do(func() {
+		h.mu.Lock()
+		h.closed = true
+		cancel := h.brokerCancel
+		done := h.brokerDone
+		for id, ch := range h.subscribers {
+			delete(h.subscribers, id)
+			close(ch)
+		}
+		h.mu.Unlock()
+		if cancel != nil {
+			cancel()
+		}
+		if done != nil {
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+			}
+		}
+	})
+}
+
+type ActivityStreamCapacity struct {
+	mu          sync.Mutex
+	maxTotal    int
+	maxPerIP    int
+	maxPerActor int
+	total       int
+	byIP        map[string]int
+	byActor     map[string]int
+}
+
+func NewActivityStreamCapacity(maxTotal, maxPerIP, maxPerActor int) *ActivityStreamCapacity {
+	if maxTotal <= 0 {
+		maxTotal = 500
+	}
+	if maxPerIP <= 0 {
+		maxPerIP = 20
+	}
+	if maxPerActor <= 0 {
+		maxPerActor = 2
+	}
+	return &ActivityStreamCapacity{
+		maxTotal:    maxTotal,
+		maxPerIP:    maxPerIP,
+		maxPerActor: maxPerActor,
+		byIP:        map[string]int{},
+		byActor:     map[string]int{},
+	}
+}
+
+func (l *ActivityStreamCapacity) Acquire(ip, actorID string) (func(), bool) {
+	if l == nil {
+		return func() {}, true
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.total >= l.maxTotal || l.byIP[ip] >= l.maxPerIP || l.byActor[actorID] >= l.maxPerActor {
+		return nil, false
+	}
+	l.total++
+	l.byIP[ip]++
+	l.byActor[actorID]++
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			l.mu.Lock()
+			defer l.mu.Unlock()
+			l.total--
+			decrementStreamCount(l.byIP, ip)
+			decrementStreamCount(l.byActor, actorID)
+		})
+	}, true
+}
+
+func decrementStreamCount(values map[string]int, key string) {
+	if values[key] <= 1 {
+		delete(values, key)
+		return
+	}
+	values[key]--
+}
+
+func (s *Service) ConfigureActivityStreaming(client *redis.Client, channel string, redisTimeout time.Duration, maxTotal, maxPerIP, maxPerActor int, visibilityTimeout, maxConnectionLifetime time.Duration) {
+	if s.streamHub != nil {
+		s.streamHub.ConfigureRedis(client, channel, redisTimeout)
+	}
+	s.streamCapacity = NewActivityStreamCapacity(maxTotal, maxPerIP, maxPerActor)
+	if visibilityTimeout > 0 {
+		s.streamVisibilityTimeout = visibilityTimeout
+	}
+	if maxConnectionLifetime > 0 {
+		s.streamMaxConnectionLifetime = maxConnectionLifetime
+	}
+}
+
+func (s *Service) CloseActivityStreaming() {
+	if s != nil && s.streamHub != nil {
+		s.streamHub.Close()
 	}
 }
 
@@ -100,39 +357,70 @@ func (s *Service) CanStreamProjectActivity(ctx context.Context, projectID, actor
 }
 
 func (h *Handler) ProjectActivityStream(c *fiber.Ctx) error {
+	release, ok := h.acquireActivityStream(c)
+	if !ok {
+		return activityStreamCapacityExceeded(c)
+	}
 	projectID := c.Params("id")
-	allowed, err := h.service.CanStreamProjectActivity(c.Context(), projectID, actorID(c))
+	userID := actorID(c)
+	allowed, err := h.service.CanStreamProjectActivity(c.Context(), projectID, userID)
 	if err != nil {
+		release()
 		return err
 	}
 	if !allowed {
+		release()
 		return forbiddenError("Bạn không có quyền xem hoạt động của công trình này")
 	}
-	h.writeActivityStream(c, func(event ActivityStreamEvent) (string, ActivityStreamEvent, bool) {
+	h.writeActivityStream(c, release, func(event ActivityStreamEvent) (string, ActivityStreamEvent, bool) {
 		if event.ProjectID != projectID {
 			return "", ActivityStreamEvent{}, false
 		}
 		if event.Type == "work_item_changed" {
 			return "", ActivityStreamEvent{}, false
 		}
-		return event.Type, event, true
+		return event.Type, projectActivityInvalidation(event), true
 	})
 	return nil
 }
 
+func projectActivityInvalidation(event ActivityStreamEvent) ActivityStreamEvent {
+	return ActivityStreamEvent{
+		Type:      event.Type,
+		ProjectID: event.ProjectID,
+		At:        event.At,
+	}
+}
+
 func (h *Handler) MyActivityAttentionStream(c *fiber.Ctx) error {
+	release, ok := h.acquireActivityStream(c)
+	if !ok {
+		return activityStreamCapacityExceeded(c)
+	}
 	userID := actorID(c)
-	h.writeActivityStream(c, func(event ActivityStreamEvent) (string, ActivityStreamEvent, bool) {
-		if event.ProjectID != "" {
-			allowed, err := h.service.CanStreamProjectActivity(context.Background(), event.ProjectID, userID)
-			if err != nil || !allowed {
-				return "", ActivityStreamEvent{}, false
-			}
+	ctx, cancel := context.WithTimeout(context.Background(), h.service.streamVisibilityTimeout)
+	visibleProjects, err := h.service.repo.ProjectOperationsVisibleProjectIDs(ctx, userID)
+	cancel()
+	if err != nil {
+		release()
+		return err
+	}
+	h.writeActivityStream(c, release, func(event ActivityStreamEvent) (string, ActivityStreamEvent, bool) {
+		if !activityAttentionEventVisible(event, visibleProjects) {
+			return "", ActivityStreamEvent{}, false
 		}
 		eventName, output := myActivityAttentionStreamEvent(event)
 		return eventName, output, true
 	})
 	return nil
+}
+
+func activityAttentionEventVisible(event ActivityStreamEvent, visibleProjects map[string]struct{}) bool {
+	if event.ProjectID == "" {
+		return true
+	}
+	_, visible := visibleProjects[event.ProjectID]
+	return visible
 }
 
 func myActivityAttentionStreamEvent(event ActivityStreamEvent) (string, ActivityStreamEvent) {
@@ -150,12 +438,23 @@ func myActivityAttentionStreamEvent(event ActivityStreamEvent) (string, Activity
 	}
 }
 
-func (h *Handler) writeActivityStream(c *fiber.Ctx, filter func(ActivityStreamEvent) (string, ActivityStreamEvent, bool)) {
+func (h *Handler) acquireActivityStream(c *fiber.Ctx) (func(), bool) {
+	return h.service.streamCapacity.Acquire(c.IP(), actorID(c))
+}
+
+func activityStreamCapacityExceeded(c *fiber.Ctx) error {
+	const retrySeconds = 5
+	c.Set("Retry-After", fmt.Sprint(retrySeconds))
+	return response.Fail(c, fiber.StatusTooManyRequests, "RATE_LIMITED", "Đã đạt giới hạn kết nối cập nhật trực tiếp", Record{"retry_after_seconds": retrySeconds, "request_class": "sse"})
+}
+
+func (h *Handler) writeActivityStream(c *fiber.Ctx, release func(), filter func(ActivityStreamEvent) (string, ActivityStreamEvent, bool)) {
 	c.Set("Content-Type", "text/event-stream")
 	c.Set("Cache-Control", "no-cache, no-transform")
 	c.Set("Connection", "keep-alive")
 	c.Set("X-Accel-Buffering", "no")
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		defer release()
 		subID, events := h.service.streamHub.Subscribe()
 		defer h.service.streamHub.Unsubscribe(subID)
 		if err := writeSSE(w, "connected", ActivityStreamEvent{Type: "connected", At: time.Now().UTC().Format(time.RFC3339)}); err != nil {
@@ -163,8 +462,12 @@ func (h *Handler) writeActivityStream(c *fiber.Ctx, filter func(ActivityStreamEv
 		}
 		heartbeat := time.NewTicker(20 * time.Second)
 		defer heartbeat.Stop()
+		lifetime := time.NewTimer(jitteredSSEConnectionLifetime(h.service.streamMaxConnectionLifetime, cryptoRandomOffset))
+		defer lifetime.Stop()
 		for {
 			select {
+			case <-lifetime.C:
+				return
 			case event, ok := <-events:
 				if !ok {
 					return
@@ -183,6 +486,32 @@ func (h *Handler) writeActivityStream(c *fiber.Ctx, filter func(ActivityStreamEv
 			}
 		}
 	})
+}
+
+type sseRandomOffset func(maxExclusive uint64) (uint64, error)
+
+func cryptoRandomOffset(maxExclusive uint64) (uint64, error) {
+	value, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetUint64(maxExclusive))
+	if err != nil {
+		return 0, err
+	}
+	return value.Uint64(), nil
+}
+
+func jitteredSSEConnectionLifetime(maxLifetime time.Duration, randomOffset sseRandomOffset) time.Duration {
+	if maxLifetime <= 0 {
+		return maxLifetime
+	}
+	minimum := maxLifetime - maxLifetime/5
+	width := uint64(maxLifetime-minimum) + 1
+	if randomOffset == nil {
+		return maxLifetime
+	}
+	offset, err := randomOffset(width)
+	if err != nil || offset >= width {
+		return maxLifetime
+	}
+	return minimum + time.Duration(offset)
 }
 
 func writeSSE(w *bufio.Writer, eventName string, payload any) error {

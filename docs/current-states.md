@@ -1,5 +1,40 @@
 # Current States
 
+## DDoS And Production Runtime Hardening
+
+Status: complete
+
+Mục đích chính:
+- Đưa Consflow từ cấu hình local/dev sang trạng thái có thể đặt sau managed CDN/WAF một cách an toàn: origin chỉ công khai HTTPS, request bị giới hạn trước khi chạm auth/DB, tác vụ nặng và SSE có ngân sách tài nguyên riêng, và quá tải phải suy giảm có kiểm soát thay vì kéo sập backend/PostgreSQL.
+
+Will be done:
+- Giữ nguyên workflow local `make up`/`make restart` và service `admin`; bổ sung production Compose/frontend static proxy riêng, internalize backend/PostgreSQL/Redis, healthcheck, restart/resource/log limits và tài liệu origin/WAF/firewall.
+- Bổ sung cấu hình validated cho trusted proxy, Redis-backed rate limiting có bounded in-memory fallback, route policy cho auth/general/upload/export/SSE, concurrency guards, recovery và response `429` có `Retry-After`.
+- Giữ auth session/RBAC backend-authoritative; limiter IP phải chạy trước DB session validation, limiter actor chạy sau auth, và request bị chặn không được ghi audit DB.
+- Bổ sung readiness DB-aware, timeout/DB pool settings và graceful shutdown mà không đổi `/api/health` liveness contract.
+- Giới hạn SSE theo process/IP/actor, dùng shared Redis Pub/Sub cho multi-replica, phát payload invalidation tối thiểu và lọc personal stream bằng snapshot project visibility theo kết nối; thời hạn kết nối có jitter buộc reconnect/revalidate định kỳ. Frontend đổi reconnect cố định thành exponential backoff+jitter và không retry 4xx/429.
+- Tối ưu Dashboard/report an toàn không đổi metric/filter/CSV semantics; server-side report pagination và mọi thay đổi UI được hoãn sang review package + Mockup as Text riêng.
+- Thêm focused unit/integration/load-test artifacts, metrics/runbook và rollout observe -> enforce; không chạy flood test trên production và không chạy browser verification nếu người dùng không yêu cầu.
+- Cập nhật central/backend/frontend/root-cause mappings cùng admin/reporting/project-planning domain maps cho các behavior/owner mới.
+
+Done:
+- Người dùng đã duyệt kế hoạch bằng `Approve implement with delegation` và yêu cầu triển khai có delegation.
+- Đã tải mandatory central/backend/frontend/root-cause mappings, backend/frontend/Docker workflows, impact analysis và admin/reporting/project-planning domain maps.
+- Đã xác nhận current stack không có edge/rate limiter/timeout/concurrency guard, publish host ports 5173/8080/5432/6379, Redis chưa tham gia runtime, protected request kiểm tra session DB, SSE không có connection cap và frontend reconnect mỗi 2 giây.
+- Đã khóa phạm vi không đổi UI trực quan và không làm report pagination trong lượt này; root giữ plan, integration, mapping và validation cuối, các agent được chia ownership không chồng lấn.
+- Đã bổ sung production Compose và Nginx static/API gateway: chỉ `admin` publish port; backend/PostgreSQL/Redis ở internal network; local Compose bind loopback; origin có timeout/body/rate/connection policy, protected download dùng heavy budget, log rotation/resource/read-only settings và DB-aware readiness.
+- Đã đặt Nginx `worker_connections=4096`, `worker_rlimit_nofile=8192`, Compose nofile 8192 và global SSE cap 300; production backend cap tương ứng 300, giữ headroom theo công thức hai gateway connections cho mỗi proxied SSE.
+- Đã bổ sung cấu hình runtime production fail-fast cho secret/origin/trusted proxy, Redis URL, timeout/pool/quota/concurrency/SSE; Redis URL sai không còn fallback localhost. Migration dùng pool riêng, còn runtime pool nhận statement/lock timeout và lifetime/idle settings.
+- Đã triển khai thứ tự IP limiter -> JWT claims -> actor limiter -> authoritative DB session -> heavy concurrency. Missing/invalid JWT và inactive session dừng trước handler; `429 RATE_LIMITED`/`503 SERVER_BUSY` có envelope và `Retry-After`, request bị chặn không chạm business/audit handler.
+- Redis limiter dùng server time, bounded admission, circuit breaker open/half-open/closed và local fallback có fixed-cardinality overflow quota theo scope/class. Stress/race review đã sửa publication ordering để không tạo probe đồng thời khi outage.
+- Đã giới hạn upload/export/protected-download/report concurrency, hợp nhất mười Dashboard scalar query thành một scoped statement, propagate lỗi bốn chart query và bỏ duplicate project permission check ở handler trong khi service vẫn authoritative. Không thêm index/migration khi chưa có production-like `EXPLAIN`.
+- Project SSE chỉ phát invalidation tối thiểu; personal attention xây project-visibility snapshot một lần mỗi connection. Process/IP/actor/global gateway caps, Redis Pub/Sub fanout, graceful close và lifetime jitter 80-100% cận trên buộc reconnect/revalidate mà không tạo reconnect herd.
+- Frontend API client đọc `Retry-After`, không retry 4xx/429, chỉ retry một transient network/5xx; SSE dùng exponential backoff+jitter/offline threshold, abortable wait và không xem bootstrap `connected` là bằng chứng ổn định.
+- Đã thêm production runbook, staging k6 artifacts có production safety guard, healthy/capacity SSE modes, controlled `429/503` contract checks, companion SSE envelope probe và soak lifetime guard. Không chạy k6/flood test vì môi trường chưa cài k6 và không có staging target được phê duyệt.
+- Đã cập nhật central/backend/frontend/root-cause mappings cùng admin/reporting/project-planning domain maps. Không cần migration; reporting map được cập nhật cho query/concurrency behavior.
+- Validation đạt: backend full tests, `go vet`, focused race/stress; frontend lint, 6 backpressure tests và production build; sáu load-script syntax checks; local/production Compose validation; production image/nginx config smoke; `git diff --check`. DB parity integration tự skip vì thiếu `CONSFLOW_TEST_DATABASE_URL`; browser verification được bỏ qua đúng repo guardrail.
+- Đã xóa các Go cache tạm sinh bởi stress/race validation; các artifact này có thể tái tạo và không thuộc source tree.
+
 ## My Work Action-First Redesign
 
 Status: complete
@@ -2784,6 +2819,31 @@ Done:
 - Applied all V1-V67 migrations to a fresh disposable PostgreSQL database: 67 applied, 0 skipped.
 - Ran focused DB-backed `TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover`: pass; the disposable database/container was removed afterward.
 - Applying V67 to the existing local Compose database was skipped after the custom runner proved the pre-existing volume lacks its configured `consflow` role; no role/database mutation was attempted.
+- Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
+- Ran `git diff --check`: pass.
+- Browser verification was skipped per repository rule because the user did not request it.
+
+## BOQ Completed Procurement Presentation Fix
+
+Status: complete
+
+Mục đích chính:
+- Hiển thị đúng trạng thái hoàn tất của màn hình Dự toán khi toàn bộ dòng đã duyệt, chốt giá cuối và đã liên kết với yêu cầu mua sắm hoạt động.
+
+Will be done:
+- Không render khung hành động chính khi không có hành động phù hợp với trạng thái hiện tại.
+- Thay hướng dẫn sai `Kiểm tra vòng đời đơn giá` bằng trạng thái hoàn tất `Đã chuyển sang mua sắm` và số dòng đã chuyển.
+- Giữ nguyên API, schema, payload, RBAC, audit và điều kiện sinh mua sắm từ BOQ.
+- Cập nhật central/frontend mappings; chạy frontend lint, build và `git diff --check`; không chạy browser verification vì người dùng không yêu cầu.
+
+Done:
+- User approved the review package and Mockup as Text with `OK triển khai`.
+- Confirmed the empty section is an always-rendered action wrapper whose inner action resolves to `null` after all BOQ rows complete their lifecycle.
+- Confirmed readiness currently excludes rows linked to active procurement from generation eligibility but does not distinguish that completed state from having no eligible approved/final-locked rows.
+- Derived one primary estimate action and render its wrapper only when that action exists, removing the empty white section without changing action permissions or lifecycle ordering.
+- Added an explicit completed state when every row is approved, final-locked and linked to active procurement; the panel now shows `Đã chuyển sang mua sắm`, the transferred-row count and a green success treatment.
+- Updated the central and frontend BOQ ownership mappings. No backend, database, root-cause or commercial-domain mapping change was required because API contracts, persistence and procurement invariants are unchanged.
+- Ran `cd frontend && npm run lint`: pass.
 - Ran `cd frontend && npm run build`: pass; Vite reported only the existing large-chunk advisory.
 - Ran `git diff --check`: pass.
 - Browser verification was skipped per repository rule because the user did not request it.

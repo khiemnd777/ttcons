@@ -1,3 +1,12 @@
+import {
+  isStableSSEEvent,
+  nextSSEFailureCount,
+  reconnectDelayMs,
+  parseRetryAfter,
+  SSE_STABLE_CONNECTION_MS,
+  streamStatusAfterFailure,
+} from './backpressure';
+
 export type ApiEnvelope<T> = {
   success: boolean;
   data: T;
@@ -23,11 +32,14 @@ export type SSEMessage<T = any> = {
 export class ApiError extends Error {
   code: string;
   status: number;
+  retryAfterMs?: number;
 
-  constructor(message: string, code = 'API_ERROR', status = 500) {
+  constructor(message: string, code = 'API_ERROR', status = 500, retryAfterMs?: number) {
     super(message);
+    this.name = 'ApiError';
     this.code = code;
     this.status = status;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -67,7 +79,12 @@ async function request<T>(path: string, init: RequestInit = {}, allowRefresh: bo
       const refreshedToken = await refreshAccessToken();
       if (refreshedToken) return request<T>(path, init, false);
     }
-    throw new ApiError(json?.error?.message ?? 'Không gọi được API', json?.error?.code, res.status);
+    throw new ApiError(
+      json?.error?.message ?? 'Không gọi được API',
+      json?.error?.code,
+      res.status,
+      parseRetryAfter(res.headers.get('Retry-After')),
+    );
   }
   return json.data;
 }
@@ -137,10 +154,20 @@ async function downloadBlobRequest(path: string, allowRefresh: boolean) {
     const contentType = res.headers.get('Content-Type') ?? '';
     if (contentType.includes('application/json')) {
       const json = (await res.json().catch(() => null)) as ApiEnvelope<unknown> | null;
-      throw new ApiError(json?.error?.message ?? 'Không tải được file', json?.error?.code, res.status);
+      throw new ApiError(
+        json?.error?.message ?? 'Không tải được file',
+        json?.error?.code,
+        res.status,
+        parseRetryAfter(res.headers.get('Retry-After')),
+      );
     }
     const text = await res.text().catch(() => '');
-    throw new ApiError(text || 'Không tải được file', 'DOWNLOAD_ERROR', res.status);
+    throw new ApiError(
+      text || 'Không tải được file',
+      'DOWNLOAD_ERROR',
+      res.status,
+      parseRetryAfter(res.headers.get('Retry-After')),
+    );
   }
   return res.blob();
 }
@@ -154,25 +181,37 @@ export function streamSSE<T = any>(
 ) {
   let stopped = false;
   const controller = new AbortController();
+  let failedAttempts = 0;
 
   async function run() {
     while (!stopped) {
+      let connectionWasStable = false;
+      let stableTimeoutID: number | undefined;
+
+      const markConnectionStable = () => {
+        connectionWasStable = true;
+        if (stableTimeoutID !== undefined) {
+          window.clearTimeout(stableTimeoutID);
+          stableTimeoutID = undefined;
+        }
+      };
+
       try {
-        const token = getToken();
-        const headers = new Headers();
-        headers.set('Accept', 'text/event-stream');
-        if (token) headers.set('Authorization', `Bearer ${token}`);
-        const res = await fetch(`${API_URL}${path}`, { headers, signal: controller.signal, credentials: 'include' });
-        if (!res.ok || !res.body) throw new ApiError('Không mở được realtime stream', 'STREAM_ERROR', res.status);
+        const res = await openSSE(path, controller.signal, true);
         handlers.onStatus?.('connected');
-        await readSSEStream<T>(res.body, handlers.onEvent);
+        stableTimeoutID = window.setTimeout(markConnectionStable, SSE_STABLE_CONNECTION_MS);
+        await readSSEStream<T>(res.body, handlers.onEvent, markConnectionStable);
+        if (!stopped) throw new ApiError('Realtime stream đã ngắt kết nối', 'STREAM_DISCONNECTED', 0);
       } catch (error) {
+        if (stableTimeoutID !== undefined) window.clearTimeout(stableTimeoutID);
         if (stopped || controller.signal.aborted) break;
-        handlers.onStatus?.('reconnecting');
-        await wait(2000);
+        failedAttempts = nextSSEFailureCount(failedAttempts, connectionWasStable);
+        handlers.onStatus?.(streamStatusAfterFailure(failedAttempts));
+        const retryAfterMs = error instanceof ApiError ? error.retryAfterMs : undefined;
+        const delayMs = reconnectDelayMs(failedAttempts - 1, retryAfterMs);
+        await wait(delayMs, controller.signal);
       }
     }
-    if (!stopped) handlers.onStatus?.('offline');
   }
 
   void run();
@@ -182,7 +221,33 @@ export function streamSSE<T = any>(
   };
 }
 
-async function readSSEStream<T>(body: ReadableStream<Uint8Array>, onEvent: (message: SSEMessage<T>) => void) {
+async function openSSE(path: string, signal: AbortSignal, allowRefresh: boolean): Promise<Response & { body: ReadableStream<Uint8Array> }> {
+  const token = getToken();
+  const headers = new Headers();
+  headers.set('Accept', 'text/event-stream');
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const res = await fetch(`${API_URL}${path}`, { headers, signal, credentials: 'include' });
+  if (allowRefresh && shouldRefresh(path, res.status)) {
+    const refreshedToken = await refreshAccessToken();
+    if (refreshedToken) return openSSE(path, signal, false);
+  }
+  if (!res.ok || !res.body) {
+    throw new ApiError(
+      'Không mở được realtime stream',
+      'STREAM_ERROR',
+      res.status,
+      parseRetryAfter(res.headers.get('Retry-After')),
+    );
+  }
+  return res as Response & { body: ReadableStream<Uint8Array> };
+}
+
+async function readSSEStream<T>(
+  body: ReadableStream<Uint8Array>,
+  onEvent: (message: SSEMessage<T>) => void,
+  onFrame: () => void,
+) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -194,7 +259,10 @@ async function readSSEStream<T>(body: ReadableStream<Uint8Array>, onEvent: (mess
     buffer = frames.pop() ?? '';
     frames.forEach((frame) => {
       const message = parseSSEFrame<T>(frame);
-      if (message) onEvent(message);
+      if (message) {
+        if (isStableSSEEvent(message.event)) onFrame();
+        onEvent(message);
+      }
     });
   }
 }
@@ -215,8 +283,19 @@ function parseSSEFrame<T>(frame: string): SSEMessage<T> | null {
   }
 }
 
-function wait(ms: number) {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
+function wait(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve) => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    const timeoutID = window.setTimeout(finish, ms);
+    signal.addEventListener('abort', finish, { once: true });
+
+    function finish() {
+      window.clearTimeout(timeoutID);
+      signal.removeEventListener('abort', finish);
+      resolve();
+    }
   });
 }

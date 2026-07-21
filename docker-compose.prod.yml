@@ -1,0 +1,219 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "${LOG_MAX_SIZE:-10m}"
+    max-file: "${LOG_MAX_FILES:-5}"
+
+x-common-runtime: &common-runtime
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging: *default-logging
+
+services:
+  postgres:
+    <<: *common-runtime
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:?POSTGRES_DB is required}"
+      POSTGRES_USER: "${POSTGRES_USER:?POSTGRES_USER is required}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+    volumes:
+      - consflow_postgres:/var/lib/postgresql/data
+    networks:
+      - app_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 30s
+    shm_size: "${POSTGRES_SHM_SIZE:-256m}"
+    mem_limit: "${POSTGRES_MEMORY_LIMIT:-1g}"
+    cpus: "${POSTGRES_CPU_LIMIT:-1.5}"
+    pids_limit: 256
+
+  redis:
+    <<: *common-runtime
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
+    command:
+      - /bin/sh
+      - -ec
+      - exec redis-server --appendonly yes --save 60 1000 --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - consflow_redis:/data
+    networks:
+      - app_internal
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    stop_grace_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    mem_limit: "${REDIS_MEMORY_LIMIT:-256m}"
+    cpus: "${REDIS_CPU_LIMIT:-0.5}"
+    pids_limit: 128
+
+  backend:
+    <<: *common-runtime
+    build:
+      context: ./backend
+    environment:
+      APP_ENV: "production"
+      PORT: "8080"
+      DATABASE_URL: "${DATABASE_URL:?DATABASE_URL is required}"
+      REDIS_URL: "${REDIS_URL:?REDIS_URL is required}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
+      FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is required}"
+      MIGRATIONS_DIR: /app/migrations
+      AUTO_MIGRATE: "${AUTO_MIGRATE:-true}"
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:-10485760}"
+      AUTH_ACCESS_TOKEN_MINUTES: "${AUTH_ACCESS_TOKEN_MINUTES:-15}"
+      AUTH_REFRESH_TOKEN_HOURS: "${AUTH_REFRESH_TOKEN_HOURS:-168}"
+      AUTH_REFRESH_COOKIE_SECURE: "true"
+      AUTH_REFRESH_COOKIE_SAME_SITE: "${AUTH_REFRESH_COOKIE_SAME_SITE:-Lax}"
+      TRUSTED_PROXY_CIDRS: "${APP_INTERNAL_SUBNET:?APP_INTERNAL_SUBNET is required}"
+      HTTP_READ_TIMEOUT: "${HTTP_READ_TIMEOUT:-15s}"
+      HTTP_WRITE_TIMEOUT: "${HTTP_WRITE_TIMEOUT:-0s}"
+      HTTP_IDLE_TIMEOUT: "${HTTP_IDLE_TIMEOUT:-60s}"
+      SHUTDOWN_TIMEOUT: "${SHUTDOWN_TIMEOUT:-15s}"
+      READINESS_TIMEOUT: "${READINESS_TIMEOUT:-2s}"
+      DB_STATEMENT_TIMEOUT: "${DB_STATEMENT_TIMEOUT:-15s}"
+      DB_LOCK_TIMEOUT: "${DB_LOCK_TIMEOUT:-5s}"
+      DB_MAX_OPEN_CONNS: "${DB_MAX_OPEN_CONNS:-20}"
+      DB_MAX_IDLE_CONNS: "${DB_MAX_IDLE_CONNS:-10}"
+      DB_CONN_MAX_LIFETIME: "${DB_CONN_MAX_LIFETIME:-30m}"
+      DB_CONN_MAX_IDLE_TIME: "${DB_CONN_MAX_IDLE_TIME:-5m}"
+      REDIS_OPERATION_TIMEOUT: "${REDIS_OPERATION_TIMEOUT:-250ms}"
+      RATE_LIMIT_REDIS_MAX_IN_FLIGHT: "${RATE_LIMIT_REDIS_MAX_IN_FLIGHT:-32}"
+      RATE_LIMIT_ENABLED: "${RATE_LIMIT_ENABLED:-true}"
+      RATE_LIMIT_MODE: "${RATE_LIMIT_MODE:-observe}"
+      RATE_LIMIT_LOCAL_MAX_KEYS: "${RATE_LIMIT_LOCAL_MAX_KEYS:-10000}"
+      RATE_LIMIT_IP_AUTH_LIMIT: "${RATE_LIMIT_IP_AUTH_LIMIT:-10}"
+      RATE_LIMIT_IP_AUTH_BURST: "${RATE_LIMIT_IP_AUTH_BURST:-10}"
+      RATE_LIMIT_IP_AUTH_WINDOW: "${RATE_LIMIT_IP_AUTH_WINDOW:-1m}"
+      RATE_LIMIT_IP_GENERAL_LIMIT: "${RATE_LIMIT_IP_GENERAL_LIMIT:-300}"
+      RATE_LIMIT_IP_GENERAL_BURST: "${RATE_LIMIT_IP_GENERAL_BURST:-60}"
+      RATE_LIMIT_IP_GENERAL_WINDOW: "${RATE_LIMIT_IP_GENERAL_WINDOW:-1m}"
+      RATE_LIMIT_IP_UPLOAD_LIMIT: "${RATE_LIMIT_IP_UPLOAD_LIMIT:-20}"
+      RATE_LIMIT_IP_UPLOAD_BURST: "${RATE_LIMIT_IP_UPLOAD_BURST:-5}"
+      RATE_LIMIT_IP_UPLOAD_WINDOW: "${RATE_LIMIT_IP_UPLOAD_WINDOW:-1m}"
+      RATE_LIMIT_IP_EXPORT_LIMIT: "${RATE_LIMIT_IP_EXPORT_LIMIT:-30}"
+      RATE_LIMIT_IP_EXPORT_BURST: "${RATE_LIMIT_IP_EXPORT_BURST:-5}"
+      RATE_LIMIT_IP_EXPORT_WINDOW: "${RATE_LIMIT_IP_EXPORT_WINDOW:-1m}"
+      RATE_LIMIT_IP_SSE_LIMIT: "${RATE_LIMIT_IP_SSE_LIMIT:-30}"
+      RATE_LIMIT_IP_SSE_BURST: "${RATE_LIMIT_IP_SSE_BURST:-5}"
+      RATE_LIMIT_IP_SSE_WINDOW: "${RATE_LIMIT_IP_SSE_WINDOW:-1m}"
+      RATE_LIMIT_ACTOR_AUTH_LIMIT: "${RATE_LIMIT_ACTOR_AUTH_LIMIT:-30}"
+      RATE_LIMIT_ACTOR_AUTH_BURST: "${RATE_LIMIT_ACTOR_AUTH_BURST:-10}"
+      RATE_LIMIT_ACTOR_AUTH_WINDOW: "${RATE_LIMIT_ACTOR_AUTH_WINDOW:-1m}"
+      RATE_LIMIT_ACTOR_GENERAL_LIMIT: "${RATE_LIMIT_ACTOR_GENERAL_LIMIT:-600}"
+      RATE_LIMIT_ACTOR_GENERAL_BURST: "${RATE_LIMIT_ACTOR_GENERAL_BURST:-120}"
+      RATE_LIMIT_ACTOR_GENERAL_WINDOW: "${RATE_LIMIT_ACTOR_GENERAL_WINDOW:-1m}"
+      RATE_LIMIT_ACTOR_UPLOAD_LIMIT: "${RATE_LIMIT_ACTOR_UPLOAD_LIMIT:-30}"
+      RATE_LIMIT_ACTOR_UPLOAD_BURST: "${RATE_LIMIT_ACTOR_UPLOAD_BURST:-5}"
+      RATE_LIMIT_ACTOR_UPLOAD_WINDOW: "${RATE_LIMIT_ACTOR_UPLOAD_WINDOW:-1m}"
+      RATE_LIMIT_ACTOR_EXPORT_LIMIT: "${RATE_LIMIT_ACTOR_EXPORT_LIMIT:-60}"
+      RATE_LIMIT_ACTOR_EXPORT_BURST: "${RATE_LIMIT_ACTOR_EXPORT_BURST:-10}"
+      RATE_LIMIT_ACTOR_EXPORT_WINDOW: "${RATE_LIMIT_ACTOR_EXPORT_WINDOW:-1m}"
+      RATE_LIMIT_ACTOR_SSE_LIMIT: "${RATE_LIMIT_ACTOR_SSE_LIMIT:-20}"
+      RATE_LIMIT_ACTOR_SSE_BURST: "${RATE_LIMIT_ACTOR_SSE_BURST:-4}"
+      RATE_LIMIT_ACTOR_SSE_WINDOW: "${RATE_LIMIT_ACTOR_SSE_WINDOW:-1m}"
+      UPLOAD_CONCURRENCY: "${UPLOAD_CONCURRENCY:-4}"
+      EXPORT_CONCURRENCY: "${EXPORT_CONCURRENCY:-4}"
+      REPORT_CONCURRENCY: "${REPORT_CONCURRENCY:-6}"
+      SSE_MAX_CONNECTIONS: "${SSE_MAX_CONNECTIONS:-300}"
+      SSE_MAX_CONNECTIONS_PER_IP: "${SSE_MAX_CONNECTIONS_PER_IP:-20}"
+      SSE_MAX_CONNECTIONS_PER_ACTOR: "${SSE_MAX_CONNECTIONS_PER_ACTOR:-2}"
+      SSE_VISIBILITY_TIMEOUT: "${SSE_VISIBILITY_TIMEOUT:-2s}"
+      SSE_MAX_CONNECTION_LIFETIME: "${SSE_MAX_CONNECTION_LIFETIME:-5m}"
+      SSE_BROKER_CHANNEL: "${SSE_BROKER_CHANNEL:-consflow:activity:v1}"
+    expose:
+      - "8080"
+    volumes:
+      - consflow_uploads:/app/uploads
+    networks:
+      - app_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    mem_limit: "${BACKEND_MEMORY_LIMIT:-1g}"
+    cpus: "${BACKEND_CPU_LIMIT:-2.0}"
+    pids_limit: 256
+    init: true
+
+  admin:
+    <<: *common-runtime
+    container_name: admin
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    environment:
+      NGINX_ENVSUBST_FILTER: "^(SERVER_NAME|TRUSTED_PROXY_CIDR|REAL_IP_HEADER)$"
+      SERVER_NAME: "${SERVER_NAME:?SERVER_NAME is required}"
+      TRUSTED_PROXY_CIDR: "${TRUSTED_PROXY_CIDR:?TRUSTED_PROXY_CIDR is required}"
+      REAL_IP_HEADER: "${REAL_IP_HEADER:-X-Forwarded-For}"
+    ports:
+      - "${ADMIN_BIND_ADDRESS:?ADMIN_BIND_ADDRESS is required}:${ADMIN_PORT:-8080}:8080"
+    networks:
+      - edge
+      - app_internal
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/gateway-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    stop_grace_period: 20s
+    read_only: true
+    tmpfs:
+      - /etc/nginx/conf.d:rw,noexec,nosuid,size=1m
+      - /var/cache/nginx:rw,noexec,nosuid,size=64m
+      - /var/run:rw,noexec,nosuid,size=1m
+      - /tmp:rw,noexec,nosuid,size=16m
+    mem_limit: "${ADMIN_MEMORY_LIMIT:-256m}"
+    cpus: "${ADMIN_CPU_LIMIT:-1.0}"
+    pids_limit: 128
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 8192
+    init: true
+
+networks:
+  edge:
+  app_internal:
+    internal: true
+    ipam:
+      config:
+        - subnet: "${APP_INTERNAL_SUBNET:?APP_INTERNAL_SUBNET is required}"
+
+volumes:
+  consflow_postgres:
+  consflow_redis:
+  consflow_uploads:

@@ -28,6 +28,7 @@
 ## Invariants
 
 - Protected endpoints stay under auth middleware.
+- The shared IP rate limiter runs before JWT/session work. `AuthClaimsRequired` must stop on missing/invalid JWT; only verified claims supply the actor key, so actor rate limiting runs before authoritative `AuthSessionRequired`/`AuthSessionActive` DB validation. Heavy-route concurrency runs after the session gate. Rejected `401`/`429`/`503` requests never reach business/audit handlers; backpressure responses use the shared envelope with `Retry-After`. Trusted proxy CIDRs must identify only the immediate Nginx/internal proxy network.
 - Backend permission helpers are the source of truth for authorization.
 - Audit read APIs are server-filtered and page-number paginated, return project labels plus permission-scoped filter options, use global `ProjectAccessFilter` or project `requireProjectPermission`, and expose metadata read-only without changing `AddAudit` or source-domain audit semantics.
 - Activity reply/reaction/edit/withdraw endpoints remain protected and reuse `ActivityVisibleToUser`; edit/withdraw additionally require exact author ownership, activity type `comment`, an unwithdrawn row and the 15-minute server window. UI capability flags never replace backend enforcement, managers receive no override, and no new global permission is introduced.
@@ -38,6 +39,7 @@
 - `project.member.manage` is granted to Admin/Director/PM and always combined with project scope. Project member responses expose server capabilities; mutation synchronizes only project-scoped `user_roles`, never removes global roles, never exposes Admin/Director as assignable project roles, and writes project audit.
 - Partner catalog updates preserve downstream snapshots for historical documents.
 - Session refresh/revoke lifecycle remains DB-backed and revocable.
+- `AuthSessionActive` is never cached: immediate session revoke remains authoritative even when Redis supplies distributed rate limiting and SSE Pub/Sub.
 - V68 adds the system roles `Thiết kế`, `Sale`, `Pháp lý` with the minimum permission sets needed by their official-workflow steps and grants existing `Đội thi công` pipeline/planning access. The migration does not auto-assign users or project memberships and does not broaden existing runtime role snapshots.
 
 ## Cross-Domain Checks
