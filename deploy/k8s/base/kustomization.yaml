@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: consflow
+resources:
+  - namespace.yaml
+  - service-account.yaml
+  - configmap.yaml
+  - backend-deployment.yaml
+  - admin-deployment.yaml
+  - services.yaml
+  - pod-disruption-budgets.yaml
+  - network-policies.yaml

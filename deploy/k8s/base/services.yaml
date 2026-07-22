@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: consflow
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/instance: consflow
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: consflow
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: /metrics
+    prometheus.io/port: "8080"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/instance: consflow
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin
+  namespace: consflow
+  labels:
+    app.kubernetes.io/name: admin
+    app.kubernetes.io/instance: consflow
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: consflow
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: admin
+    app.kubernetes.io/instance: consflow
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

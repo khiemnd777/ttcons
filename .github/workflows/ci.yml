@@ -11,6 +11,21 @@ jobs:
     name: Validate
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: consflow_test
+          POSTGRES_USER: consflow_test
+          POSTGRES_PASSWORD: consflow_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U consflow_test -d consflow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,15 +52,25 @@ jobs:
 
       - name: Test backend
         working-directory: backend
+        env:
+          CONSFLOW_TEST_DATABASE_URL: postgres://consflow_test:consflow_test_password@127.0.0.1:5432/consflow_test?sslmode=disable
         run: make test
 
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
 
+      - name: Test frontend
+        working-directory: frontend
+        run: npm test
+
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+      - name: Check frontend bundle budget
+        working-directory: frontend
+        run: npm run check:bundle-budget
 
       - name: Check whitespace
         run: git diff --check

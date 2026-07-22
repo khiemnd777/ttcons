@@ -5,7 +5,6 @@ import (
 	"flag"
 	"log"
 	"os"
-	"time"
 
 	"consflow/backend/internal/shared/config"
 	"consflow/backend/internal/shared/db"
@@ -28,17 +27,25 @@ func main() {
 		}
 		return
 	}
+	if err := cfg.ValidateMigration(); err != nil {
+		log.Fatalf("invalid migration configuration: %v", err)
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.MigrationTimeout)
 	defer cancel()
 
-	conn, err := db.Connect(ctx, cfg.DatabaseURL)
+	conn, err := db.Connect(ctx, cfg.DatabaseURL, db.Options{
+		MaxOpenConns: 1,
+		MaxIdleConns: 1,
+	})
 	if err != nil {
 		log.Fatalf("connect postgres: %v", err)
 	}
 	defer conn.Close()
 
-	result, err := migrations.Run(ctx, conn, cfg.MigrationsDir)
+	result, err := migrations.RunWithOptions(ctx, conn, cfg.MigrationsDir, migrations.Options{
+		LockTimeout: cfg.MigrationLockTimeout,
+	})
 	if err != nil {
 		log.Fatalf("run migrations: %v", err)
 	}

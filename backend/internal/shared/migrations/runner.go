@@ -33,21 +33,62 @@ type CheckResult struct {
 	Migrations []string
 }
 
+type Options struct {
+	LockTimeout time.Duration
+}
+
+const (
+	defaultLockTimeout = 30 * time.Second
+	// "Consflow" encoded as a positive int64. The key is intentionally stable so
+	// every application version coordinates on the same PostgreSQL session lock.
+	migrationAdvisoryLockKey int64 = 4859223964874731383
+)
+
 func Run(ctx context.Context, db *sql.DB, dir string) (Result, error) {
+	return RunWithOptions(ctx, db, dir, Options{LockTimeout: defaultLockTimeout})
+}
+
+func RunWithOptions(ctx context.Context, db *sql.DB, dir string, options Options) (result Result, runErr error) {
 	if strings.TrimSpace(dir) == "" {
 		return Result{}, errors.New("migrations directory is required")
+	}
+	if db == nil {
+		return Result{}, errors.New("migration database is required")
+	}
+	if options.LockTimeout <= 0 {
+		return Result{}, errors.New("migration lock timeout must be positive")
 	}
 	migrations, err := load(dir)
 	if err != nil {
 		return Result{}, err
 	}
-	if err := ensureTable(ctx, db); err != nil {
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return Result{}, fmt.Errorf("pin migration database connection: %w", err)
+	}
+	defer conn.Close()
+
+	if err := acquireAdvisoryLock(ctx, conn, options.LockTimeout); err != nil {
+		return Result{}, err
+	}
+	defer func() {
+		unlockContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if err := releaseAdvisoryLock(unlockContext, conn); err != nil {
+			runErr = errors.Join(runErr, err)
+		}
+	}()
+
+	if err := ensureTable(ctx, conn); err != nil {
+		return Result{}, err
+	}
+	if err := validateAppliedManifest(ctx, conn, migrations); err != nil {
 		return Result{}, err
 	}
 
-	result := Result{}
+	result = Result{}
 	for _, migration := range migrations {
-		applied, err := applyOne(ctx, db, migration)
+		applied, err := applyOne(ctx, conn, migration)
 		if err != nil {
 			return result, err
 		}
@@ -59,6 +100,70 @@ func Run(ctx context.Context, db *sql.DB, dir string) (Result, error) {
 		}
 	}
 	return result, nil
+}
+
+func validateAppliedManifest(ctx context.Context, conn *sql.Conn, manifest []Migration) error {
+	knownVersions := make(map[string]struct{}, len(manifest))
+	for _, migration := range manifest {
+		knownVersions[migration.Version] = struct{}{}
+	}
+	rows, err := conn.QueryContext(ctx, `SELECT version FROM schema_migrations ORDER BY version`)
+	if err != nil {
+		return fmt.Errorf("read applied migration manifest: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var version string
+		if err := rows.Scan(&version); err != nil {
+			return fmt.Errorf("scan applied migration manifest: %w", err)
+		}
+		if _, exists := knownVersions[version]; !exists {
+			return fmt.Errorf("migration history contains version %s absent from the image migration manifest", version)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read applied migration manifest: %w", err)
+	}
+	return nil
+}
+
+func acquireAdvisoryLock(ctx context.Context, conn *sql.Conn, timeout time.Duration) error {
+	lockContext, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var acquired bool
+		if err := conn.QueryRowContext(lockContext, `SELECT pg_try_advisory_lock($1)`, migrationAdvisoryLockKey).Scan(&acquired); err != nil {
+			if errors.Is(lockContext.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
+				return fmt.Errorf("migration advisory lock timeout after %s", timeout)
+			}
+			return fmt.Errorf("acquire migration advisory lock: %w", err)
+		}
+		if acquired {
+			return nil
+		}
+		select {
+		case <-lockContext.Done():
+			if errors.Is(lockContext.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
+				return fmt.Errorf("migration advisory lock timeout after %s", timeout)
+			}
+			return fmt.Errorf("acquire migration advisory lock: %w", lockContext.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
+func releaseAdvisoryLock(ctx context.Context, conn *sql.Conn) error {
+	var released bool
+	if err := conn.QueryRowContext(ctx, `SELECT pg_advisory_unlock($1)`, migrationAdvisoryLockKey).Scan(&released); err != nil {
+		return fmt.Errorf("release migration advisory lock: %w", err)
+	}
+	if !released {
+		return errors.New("release migration advisory lock: lock was not held by the pinned session")
+	}
+	return nil
 }
 
 func CheckDir(dir string) (CheckResult, error) {
@@ -163,8 +268,8 @@ func compareVersion(a, b string) int {
 	return strings.Compare(a, b)
 }
 
-func ensureTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, `
+func ensureTable(ctx context.Context, conn *sql.Conn) error {
+	_, err := conn.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
@@ -176,8 +281,8 @@ func ensureTable(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
-func applyOne(ctx context.Context, db *sql.DB, migration Migration) (bool, error) {
-	tx, err := db.BeginTx(ctx, nil)
+func applyOne(ctx context.Context, conn *sql.Conn, migration Migration) (bool, error) {
+	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
 	}

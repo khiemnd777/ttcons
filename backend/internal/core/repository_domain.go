@@ -439,23 +439,6 @@ func (r *Repository) RunStepPermissionGate(ctx context.Context, userID, stepID s
 	return r.RunNodePermissionGate(ctx, userID, fmt.Sprint(step["run_node_id"]))
 }
 
-func (r *Repository) AddAudit(ctx context.Context, projectID, actorID, actorName, eventType, targetType, targetID, description string, metadata any) error {
-	raw, _ := json.Marshal(metadata)
-	var p any = nil
-	var t any = nil
-	if projectID != "" {
-		p = projectID
-	}
-	if targetID != "" {
-		t = targetID
-	}
-	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, $8::jsonb)
-	`, p, actorID, actorName, eventType, targetType, t, description, string(raw))
-	return err
-}
-
 func (r *Repository) ListPartners(ctx context.Context, filter PartnerFilter) ([]Record, error) {
 	conditions := []string{"1=1"}
 	args := make([]any, 0)
@@ -486,23 +469,6 @@ func (r *Repository) ListPartners(ctx context.Context, filter PartnerFilter) ([]
 		WHERE %s
 		ORDER BY active DESC, lower(name), partner_code
 	`, strings.Join(conditions, " AND ")), args...)
-}
-
-func addAuditTx(ctx context.Context, tx *sql.Tx, projectID, actorID, actorName, eventType, targetType, targetID, description string, metadata any) error {
-	raw, _ := json.Marshal(metadata)
-	var p any = nil
-	var t any = nil
-	if projectID != "" {
-		p = projectID
-	}
-	if targetID != "" {
-		t = targetID
-	}
-	_, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, $8::jsonb)
-	`, p, actorID, actorName, eventType, targetType, t, description, string(raw))
-	return err
 }
 
 func (r *Repository) CanViewProjectOperations(ctx context.Context, projectID, userID string) (bool, error) {
@@ -1488,7 +1454,11 @@ func (r *Repository) WorkItemEvidenceCounts(ctx context.Context, workItemID stri
 }
 
 func (r *Repository) GetEvidenceDetail(ctx context.Context, evidenceID string) (Record, error) {
-	return r.QueryOne(ctx, `
+	return getEvidenceDetail(ctx, r.db, evidenceID)
+}
+
+func getEvidenceDetail(ctx context.Context, db queryContext, evidenceID string) (Record, error) {
+	return queryOneRecord(ctx, db, `
 		SELECT er.*, wi.title AS work_item_title, wi.status AS work_item_status, u.full_name AS submitted_by_name, reviewer.full_name AS reviewed_by_name, d.name AS document_name
 		FROM evidence_records er
 		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
@@ -2232,7 +2202,11 @@ func (r *Repository) PlanningChecklists(ctx context.Context, filter PlanningChec
 }
 
 func (r *Repository) GetWorkflowFormInstanceDetail(ctx context.Context, instanceID string) (Record, error) {
-	instance, err := r.QueryOne(ctx, `
+	return getWorkflowFormInstanceDetail(ctx, r.db, instanceID)
+}
+
+func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanceID string) (Record, error) {
+	instance, err := queryOneRecord(ctx, db, `
 		SELECT
 			wfi.*,
 			wft.code AS form_code,
@@ -2251,7 +2225,7 @@ func (r *Repository) GetWorkflowFormInstanceDetail(ctx context.Context, instance
 	if err != nil {
 		return nil, err
 	}
-	fields, err := r.Query(ctx, `
+	fields, err := queryRecords(ctx, db, `
 		SELECT id, form_version_id, field_key, label, field_type, required, options_json, validation_json, help_text, order_index, visibility_condition_json
 		FROM workflow_form_fields
 		WHERE form_version_id=$1
@@ -2260,7 +2234,7 @@ func (r *Repository) GetWorkflowFormInstanceDetail(ctx context.Context, instance
 	if err != nil {
 		return nil, err
 	}
-	answerRows, err := r.Query(ctx, `
+	answerRows, err := queryRecords(ctx, db, `
 		SELECT field_key, value_json, revision_no, updated_by, updated_at
 		FROM workflow_form_answers
 		WHERE instance_id=$1
@@ -2273,7 +2247,7 @@ func (r *Repository) GetWorkflowFormInstanceDetail(ctx context.Context, instance
 	for _, row := range answerRows {
 		answers[fmt.Sprint(row["field_key"])] = row["value_json"]
 	}
-	events, err := r.Query(ctx, `
+	events, err := queryRecords(ctx, db, `
 		SELECT wfe.*, u.full_name AS actor_name
 		FROM workflow_form_events wfe
 		LEFT JOIN users u ON u.id=wfe.actor_id
@@ -2284,7 +2258,7 @@ func (r *Repository) GetWorkflowFormInstanceDetail(ctx context.Context, instance
 	if err != nil {
 		return nil, err
 	}
-	signatures, err := r.Query(ctx, `
+	signatures, err := queryRecords(ctx, db, `
 		SELECT *
 		FROM workflow_form_signatures
 		WHERE form_instance_id=$1
@@ -2293,7 +2267,7 @@ func (r *Repository) GetWorkflowFormInstanceDetail(ctx context.Context, instance
 	if err != nil {
 		return nil, err
 	}
-	pdfExports, err := r.Query(ctx, `
+	pdfExports, err := queryRecords(ctx, db, `
 		SELECT *
 		FROM workflow_form_pdf_exports
 		WHERE form_instance_id=$1
@@ -4311,16 +4285,30 @@ func workflowFormVersionDetailSQL(where string) string {
 }
 
 func (r *Repository) CreateWorkflowFormTemplate(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
-	row, err := r.QueryOne(ctx, `
-		INSERT INTO workflow_form_templates (code, name, description, form_type, status, created_by)
-		VALUES ($1, $2, $3, $4, $5, NULLIF($6,'')::uuid)
-		RETURNING id
-	`, body["code"], body["name"], body["description"], body["form_type"], body["status"], actorID)
+	row, err := r.withAuditTransaction(ctx, func(tx *sql.Tx) (Record, error) {
+		rows, queryErr := queryTx(ctx, tx, `
+			INSERT INTO workflow_form_templates (code, name, description, form_type, status, created_by)
+			VALUES ($1, $2, $3, $4, $5, NULLIF($6,'')::uuid)
+			RETURNING id
+		`, body["code"], body["name"], body["description"], body["form_type"], body["status"], actorID)
+		if queryErr != nil {
+			return nil, queryErr
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		return rows[0], nil
+	}, func(row Record) auditEvent {
+		return auditEvent{
+			ActorID: actorID, ActorName: actorName, EventType: "workflow_form_template_created",
+			TargetType: "workflow_form_template", Description: fmt.Sprintf("Tạo mẫu biểu mẫu quy trình %s", body["name"]),
+			Metadata: Record{"code": body["code"], "form_type": body["form_type"]},
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
 	templateID := cleanID(row["id"])
-	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_created", "workflow_form_template", templateID, fmt.Sprintf("Tạo mẫu biểu mẫu quy trình %s", body["name"]), Record{"code": body["code"], "form_type": body["form_type"]})
 	return r.WorkflowFormTemplateDetail(ctx, templateID)
 }
 
@@ -4339,19 +4327,33 @@ func (r *Repository) UpdateWorkflowFormTemplate(ctx context.Context, templateID 
 			return nil, validationError("Không thể lưu trữ mẫu biểu mẫu quy trình đang được bước quy trình sử dụng", Record{"step_usage_count": usageRows[0]["total"]})
 		}
 	}
-	row, err := r.QueryOne(ctx, `
-		UPDATE workflow_form_templates
-		SET name=$2,
-			description=$3,
-			status=$4,
-			updated_at=now()
-		WHERE id=$1
-		RETURNING id, name
-	`, templateID, body["name"], body["description"], body["status"])
+	_, err := r.withAuditTransaction(ctx, func(tx *sql.Tx) (Record, error) {
+		rows, queryErr := queryTx(ctx, tx, `
+			UPDATE workflow_form_templates
+			SET name=$2,
+				description=$3,
+				status=$4,
+				updated_at=now()
+			WHERE id=$1
+			RETURNING id, name
+		`, templateID, body["name"], body["description"], body["status"])
+		if queryErr != nil {
+			return nil, queryErr
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		return rows[0], nil
+	}, func(row Record) auditEvent {
+		return auditEvent{
+			ActorID: actorID, ActorName: actorName, EventType: "workflow_form_template_updated",
+			TargetType: "workflow_form_template", TargetID: templateID,
+			Description: fmt.Sprintf("Cập nhật mẫu biểu mẫu quy trình %s", row["name"]), Metadata: Record{"status": body["status"]},
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
-	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_updated", "workflow_form_template", templateID, fmt.Sprintf("Cập nhật mẫu biểu mẫu quy trình %s", row["name"]), Record{"status": body["status"]})
 	return r.WorkflowFormTemplateDetail(ctx, templateID)
 }
 
@@ -4368,16 +4370,30 @@ func (r *Repository) ArchiveWorkflowFormTemplate(ctx context.Context, templateID
 	if len(usageRows) > 0 && number(usageRows[0]["total"]) > 0 {
 		return nil, validationError("Không thể lưu trữ mẫu biểu mẫu quy trình đang được bước quy trình sử dụng", Record{"step_usage_count": usageRows[0]["total"]})
 	}
-	row, err := r.QueryOne(ctx, `
-		UPDATE workflow_form_templates
-		SET status='archived', updated_at=now()
-		WHERE id=$1
-		RETURNING name
-	`, templateID)
+	_, err = r.withAuditTransaction(ctx, func(tx *sql.Tx) (Record, error) {
+		rows, queryErr := queryTx(ctx, tx, `
+			UPDATE workflow_form_templates
+			SET status='archived', updated_at=now()
+			WHERE id=$1
+			RETURNING name
+		`, templateID)
+		if queryErr != nil {
+			return nil, queryErr
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		return rows[0], nil
+	}, func(row Record) auditEvent {
+		return auditEvent{
+			ActorID: actorID, ActorName: actorName, EventType: "workflow_form_template_archived",
+			TargetType: "workflow_form_template", TargetID: templateID,
+			Description: fmt.Sprintf("Lưu trữ mẫu biểu mẫu quy trình %s", row["name"]), Metadata: Record{},
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
-	_ = r.AddAudit(ctx, "", actorID, actorName, "workflow_form_template_archived", "workflow_form_template", templateID, fmt.Sprintf("Lưu trữ mẫu biểu mẫu quy trình %s", row["name"]), Record{})
 	return r.WorkflowFormTemplateDetail(ctx, templateID)
 }
 
@@ -5019,7 +5035,9 @@ func workflowAnswerRecordList(value any) []Record {
 	}
 }
 
-func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, comment string, visualFile StoredFileMetadata, strokes []WorkflowFormSignatureStroke, actorID, actorName string) (Record, error) {
+func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, comment string, visualFile StoredFileMetadata, strokes []WorkflowFormSignatureStroke, actorID, actorName string) (result Record, err error) {
+	tracker := storedMutationTracker{}
+	defer tracker.wrap(&err)
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -5169,13 +5187,14 @@ func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, 
 	}); err != nil {
 		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return r.GetWorkflowFormInstanceDetail(ctx, instanceID)
+	return finalizeStoredMutation(&tracker, func() (Record, error) {
+		return getWorkflowFormInstanceDetail(ctx, tx, instanceID)
+	}, tx.Commit)
 }
 
-func (r *Repository) CreateWorkflowFormPDFExport(ctx context.Context, instanceID, fileName, title string, pdfFile StoredFileMetadata, payloadHash, actorID, actorName string) (Record, error) {
+func (r *Repository) CreateWorkflowFormPDFExport(ctx context.Context, instanceID, fileName, title string, pdfFile StoredFileMetadata, payloadHash, actorID, actorName string) (result Record, err error) {
+	tracker := storedMutationTracker{}
+	defer tracker.wrap(&err)
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -5263,10 +5282,9 @@ func (r *Repository) CreateWorkflowFormPDFExport(ctx context.Context, instanceID
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_pdf_exported", "workflow_form_pdf_export", exportID, "Xuất PDF biểu mẫu quy trình", eventMetadata); err != nil {
 		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return r.GetWorkflowFormInstanceDetail(ctx, instanceID)
+	return finalizeStoredMutation(&tracker, func() (Record, error) {
+		return getWorkflowFormInstanceDetail(ctx, tx, instanceID)
+	}, tx.Commit)
 }
 
 func (r *Repository) GetWorkflowFormSignatureDetail(ctx context.Context, signatureID string) (Record, error) {
@@ -5583,10 +5601,7 @@ func (r *Repository) RequestWorkItemApproval(ctx context.Context, item Record, r
 	`, workItemID, projectID, actorID, comment, fromStatus, string(rawMetadata)); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, 'work_item_approval_requested', 'work_item', $4, $5, $6::jsonb)
-	`, projectID, actorID, actorName, workItemID, workItemAuditDescription("approval_requested", item, comment), string(rawMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "work_item_approval_requested", "work_item", workItemID, workItemAuditDescription("approval_requested", item, comment), json.RawMessage(rawMetadata)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -5648,10 +5663,7 @@ func (r *Repository) ApplyWorkItemTransition(ctx context.Context, item Record, t
 	`, workItemID, projectID, actorID, activityType, comment, fromStatus, toStatus, string(rawMetadata)); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, 'work_item', $5, $6, $7::jsonb)
-	`, projectID, actorID, actorName, "work_item_"+activityType, workItemID, workItemAuditDescription(activityType, item, comment), string(rawMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "work_item_"+activityType, "work_item", workItemID, workItemAuditDescription(activityType, item, comment), json.RawMessage(rawMetadata)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -5729,10 +5741,7 @@ func (r *Repository) ApplyWorkItemDecision(ctx context.Context, item Record, act
 	`, workItemID, projectID, actorID, activityType, comment, fromStatus, toStatus, string(rawMetadata)); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, 'work_item', $5, $6, $7::jsonb)
-	`, projectID, actorID, actorName, "work_item_"+activityType, workItemID, workItemAuditDescription(activityType, item, comment), string(rawMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "work_item_"+activityType, "work_item", workItemID, workItemAuditDescription(activityType, item, comment), json.RawMessage(rawMetadata)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -5741,7 +5750,9 @@ func (r *Repository) ApplyWorkItemDecision(ctx context.Context, item Record, act
 	return r.GetWorkItemDetail(ctx, workItemID)
 }
 
-func (r *Repository) AddWorkItemEvidence(ctx context.Context, item Record, req WorkItemEvidenceRequest, actorID, actorName string) (Record, error) {
+func (r *Repository) AddWorkItemEvidence(ctx context.Context, item Record, req WorkItemEvidenceRequest, actorID, actorName string) (result Record, err error) {
+	tracker := storedMutationTracker{}
+	defer tracker.wrap(&err)
 	workItemID := fmt.Sprint(item["id"])
 	projectID := fmt.Sprint(item["project_id"])
 	payload := req.Payload
@@ -5786,16 +5797,12 @@ func (r *Repository) AddWorkItemEvidence(ctx context.Context, item Record, req W
 	`, workItemID, projectID, actorID, comment, string(rawMetadata)); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, 'work_item_evidence_added', 'work_item', $4, $5, $6::jsonb)
-	`, projectID, actorID, actorName, workItemID, fmt.Sprintf("Thêm minh chứng %s cho đầu việc %s", req.Name, item["title"]), string(rawMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "work_item_evidence_added", "work_item", workItemID, fmt.Sprintf("Thêm minh chứng %s cho đầu việc %s", req.Name, item["title"]), json.RawMessage(rawMetadata)); err != nil {
 		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return r.GetEvidenceDetail(ctx, fmt.Sprint(evidence["id"]))
+	return finalizeStoredMutation(&tracker, func() (Record, error) {
+		return getEvidenceDetail(ctx, tx, fmt.Sprint(evidence["id"]))
+	}, tx.Commit)
 }
 
 func (r *Repository) AddWorkItemActivity(ctx context.Context, item Record, req WorkItemActivityRequest, actorID, actorName string) (Record, error) {
@@ -5824,10 +5831,7 @@ func (r *Repository) AddWorkItemActivity(ctx context.Context, item Record, req W
 	if _, err := tx.ExecContext(ctx, `UPDATE work_items SET updated_by=NULLIF($2,'')::uuid, updated_at=now() WHERE id=$1`, workItemID, actorID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, 'work_item', $5, $6, $7::jsonb)
-	`, projectID, actorID, actorName, workItemActivityEvent(req.ActivityType), workItemID, workItemActivityDescription(req.ActivityType, item, req.Comment), string(rawMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, workItemActivityEvent(req.ActivityType), "work_item", workItemID, workItemActivityDescription(req.ActivityType, item, req.Comment), json.RawMessage(rawMetadata)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -5865,10 +5869,7 @@ func (r *Repository) AddProjectActivity(ctx context.Context, projectID string, r
 	if err := r.insertActivityAttentionTx(ctx, tx, rows[0], req, actorID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, $8::jsonb)
-	`, projectID, actorID, actorName, "project_activity_"+req.ActivityType, req.ScopeType, req.ScopeID, projectActivityDescription(req.ActivityType, req.Comment), string(rawAuditMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "project_activity_"+req.ActivityType, req.ScopeType, req.ScopeID, projectActivityDescription(req.ActivityType, req.Comment), json.RawMessage(rawAuditMetadata)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -5945,11 +5946,7 @@ func (r *Repository) UpdateActivityMessage(ctx context.Context, activity Record,
 	if len(updatedRows) == 0 {
 		return nil, sql.ErrNoRows
 	}
-	auditMetadata, _ := json.Marshal(Record{"activity_id": activityID, "revision_no": revisionNo, "action": "edited"})
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, $2, $3, 'project_activity_comment_edited', 'activity', $4, 'Đã chỉnh sửa tin nhắn trao đổi', $5::jsonb)
-	`, projectID, actorID, actorName, activityID, string(auditMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "project_activity_comment_edited", "activity", activityID, "Đã chỉnh sửa tin nhắn trao đổi", Record{"activity_id": activityID, "revision_no": revisionNo, "action": "edited"}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -6007,11 +6004,7 @@ func (r *Repository) WithdrawActivityMessage(ctx context.Context, activity Recor
 	if _, err := tx.ExecContext(ctx, `UPDATE activity_read_states SET read_at=COALESCE(read_at, now()) WHERE activity_id=$1`, activityID); err != nil {
 		return nil, err
 	}
-	auditMetadata, _ := json.Marshal(Record{"activity_id": activityID, "revision_no": revisionNo, "action": "withdrawn"})
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, $2, $3, 'project_activity_comment_withdrawn', 'activity', $4, 'Đã thu hồi tin nhắn trao đổi', $5::jsonb)
-	`, projectID, actorID, actorName, activityID, string(auditMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "project_activity_comment_withdrawn", "activity", activityID, "Đã thu hồi tin nhắn trao đổi", Record{"activity_id": activityID, "revision_no": revisionNo, "action": "withdrawn"}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -6211,10 +6204,7 @@ func (r *Repository) EvidenceAction(ctx context.Context, evidence Record, item R
 		return nil, err
 	}
 	actionLabel := evidenceReviewActionLabel(action)
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, 'evidence_record', $5, $6, $7::jsonb)
-	`, projectID, actorID, actorName, "work_item_"+activityType, evidenceID, fmt.Sprintf("%s minh chứng %s", actionLabel, evidence["name"]), string(rawMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "work_item_"+activityType, "evidence_record", evidenceID, fmt.Sprintf("%s minh chứng %s", actionLabel, evidence["name"]), json.RawMessage(rawMetadata)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -6625,11 +6615,14 @@ func (r *Repository) ProjectActivityOptions(ctx context.Context, projectID strin
 		return nil, err
 	}
 	roles, err := r.Query(ctx, `
-		SELECT DISTINCT role_name AS id, role_name AS label
-		FROM project_members pm
-		CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(pm.role_ids, '[]'::jsonb)) AS roles(role_name)
-		WHERE pm.project_id=$1 AND pm.active AND role_name <> ''
-		ORDER BY lower(role_name)
+		SELECT role_name AS id, role_name AS label
+		FROM (
+			SELECT DISTINCT role_name
+			FROM project_members pm
+			CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(pm.role_ids, '[]'::jsonb)) AS roles(role_name)
+			WHERE pm.project_id=$1 AND pm.active AND role_name <> ''
+		) role_options
+		ORDER BY lower(role_name), role_name
 	`, projectID)
 	if err != nil {
 		return nil, err
@@ -8411,10 +8404,7 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 	if _, err := tx.ExecContext(ctx, `UPDATE projects SET current_pipeline_run_id=$1, status='planning', progress_percent=0, updated_at=now() WHERE id=$2`, runID, projectID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, 'node_started', 'pipeline_run', $4, 'Tạo Pipeline Run và mở node đầu tiên')
-	`, projectID, actorID, actorName, runID); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "node_started", "pipeline_run", runID, "Tạo Pipeline Run và mở node đầu tiên", Record{}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -8564,11 +8554,7 @@ func (r *Repository) SubmitRunStep(ctx context.Context, stepID string, req WorkI
 			return nil, err
 		}
 	}
-	rawMetadata, _ := json.Marshal(Record{"step": step["name"]})
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, 'step_completed', 'pipeline_run_step', $4, $5, $6::jsonb)
-	`, step["project_id"], actorID, actorName, stepID, fmt.Sprintf("Hoàn tất step %s", step["name"]), string(rawMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, cleanID(step["project_id"]), actorID, actorName, "step_completed", "pipeline_run_step", stepID, fmt.Sprintf("Hoàn tất step %s", step["name"]), Record{"step": step["name"]}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -9607,24 +9593,43 @@ func (r *Repository) RequestNodeApproval(ctx context.Context, nodeID, actorID, a
 		policyRecord = Record{"mode": "any", "roles": roles, "quorum": 1, "requester_cannot_approve": true, "comment_required": true, "signature_required": false}
 		policy = approvalPolicyFromValue(policyRecord)
 	}
-	request, err := r.Insert(ctx, "approval_requests", []ColumnSpec{
-		col("target_type"), col("target_id"), col("project_id"), col("requested_by"), col("status"), col("reason"), jsonCol("required_roles"), jsonCol("policy_json"), col("current_stage"),
-	}, Record{
-		"target_type":    "pipeline_run_node",
-		"target_id":      nodeID,
-		"project_id":     node["project_id"],
-		"requested_by":   actorID,
-		"status":         "pending",
-		"reason":         reason,
-		"required_roles": policy.Roles,
-		"policy_json":    policyRecord,
-		"current_stage":  0,
+	request, err := r.withAuditTransaction(ctx, func(tx *sql.Tx) (Record, error) {
+		created, mutationErr := insertRecord(ctx, tx, "approval_requests", []ColumnSpec{
+			col("target_type"), col("target_id"), col("project_id"), col("requested_by"), col("status"), col("reason"), jsonCol("required_roles"), jsonCol("policy_json"), col("current_stage"),
+		}, Record{
+			"target_type":    "pipeline_run_node",
+			"target_id":      nodeID,
+			"project_id":     node["project_id"],
+			"requested_by":   actorID,
+			"status":         "pending",
+			"reason":         reason,
+			"required_roles": policy.Roles,
+			"policy_json":    policyRecord,
+			"current_stage":  0,
+		})
+		if mutationErr != nil {
+			return nil, mutationErr
+		}
+		result, mutationErr := tx.ExecContext(ctx, `UPDATE pipeline_run_nodes SET status='waiting_approval' WHERE id=$1`, nodeID)
+		if mutationErr != nil {
+			return nil, mutationErr
+		}
+		if affected, rowsErr := result.RowsAffected(); rowsErr != nil {
+			return nil, rowsErr
+		} else if affected != 1 {
+			return nil, sql.ErrNoRows
+		}
+		return created, nil
+	}, func(request Record) auditEvent {
+		return auditEvent{
+			ProjectID: fmt.Sprint(node["project_id"]), ActorID: actorID, ActorName: actorName,
+			EventType: "review_requested", TargetType: "pipeline_run_node", TargetID: nodeID,
+			Description: fmt.Sprintf("Yêu cầu duyệt node %s", node["name"]), Metadata: Record{"approval_request_id": request["id"]},
+		}
 	})
 	if err != nil {
 		return nil, err
 	}
-	_, _ = r.QueryOne(ctx, `UPDATE pipeline_run_nodes SET status='waiting_approval' WHERE id=$1 RETURNING *`, nodeID)
-	_ = r.AddAudit(ctx, fmt.Sprint(node["project_id"]), actorID, actorName, "review_requested", "pipeline_run_node", nodeID, fmt.Sprintf("Yêu cầu duyệt node %s", node["name"]), Record{"approval_request_id": request["id"]})
 	return request, nil
 }
 
@@ -9642,11 +9647,25 @@ func (r *Repository) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorN
 	}
 	if blockers := r.nodeBlockers(ctx, node); len(blockers) > 0 {
 		reason := stringsJoin(blockers)
-		blocked, err := r.QueryOne(ctx, `UPDATE pipeline_run_nodes SET status='blocked', block_reason=$2 WHERE id=$1 RETURNING *`, nodeID, reason)
+		blocked, err := r.withAuditTransaction(ctx, func(tx *sql.Tx) (Record, error) {
+			rows, mutationErr := queryTx(ctx, tx, `UPDATE pipeline_run_nodes SET status='blocked', block_reason=$2 WHERE id=$1 RETURNING *`, nodeID, reason)
+			if mutationErr != nil {
+				return nil, mutationErr
+			}
+			if len(rows) == 0 {
+				return nil, sql.ErrNoRows
+			}
+			return rows[0], nil
+		}, func(Record) auditEvent {
+			return auditEvent{
+				ProjectID: fmt.Sprint(node["project_id"]), ActorID: actorID, ActorName: actorName,
+				EventType: "node_blocked", TargetType: "pipeline_run_node", TargetID: nodeID,
+				Description: reason, Metadata: Record{"blockers": blockers},
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
-		_ = r.AddAudit(ctx, fmt.Sprint(node["project_id"]), actorID, actorName, "node_blocked", "pipeline_run_node", nodeID, reason, Record{"blockers": blockers})
 		return blocked, nil
 	}
 
@@ -9665,14 +9684,16 @@ func (r *Repository) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorN
 		if err != nil {
 			return nil, err
 		}
-		if err := tx.Commit(); err != nil {
-			return nil, err
-		}
 		metadata := Record{"blockers": transitionBlockers}
 		if transition != nil {
 			metadata["transition"] = transition
 		}
-		_ = r.AddAudit(ctx, fmt.Sprint(node["project_id"]), actorID, actorName, "node_blocked", "pipeline_run_node", nodeID, reason, metadata)
+		if err := addAuditTx(ctx, tx, fmt.Sprint(node["project_id"]), actorID, actorName, "node_blocked", "pipeline_run_node", nodeID, reason, metadata); err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
 		if len(blockedRows) > 0 {
 			return blockedRows[0], nil
 		}
@@ -9713,9 +9734,6 @@ func (r *Repository) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorN
 	`, node["project_id"], node["run_id"]); err != nil {
 		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
 	metadata := Record{"node": node["name"]}
 	description := fmt.Sprintf("Hoàn tất node %s", node["name"])
 	if transition != nil {
@@ -9724,7 +9742,12 @@ func (r *Repository) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorN
 			description = fmt.Sprintf("Hoàn tất node %s -> %s", node["name"], targetName)
 		}
 	}
-	_ = r.AddAudit(ctx, fmt.Sprint(node["project_id"]), actorID, actorName, "node_completed", "pipeline_run_node", nodeID, description, metadata)
+	if err := addAuditTx(ctx, tx, fmt.Sprint(node["project_id"]), actorID, actorName, "node_completed", "pipeline_run_node", nodeID, description, metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return r.GetPipelineRun(ctx, fmt.Sprint(node["project_id"]))
 }
 
@@ -10285,11 +10308,25 @@ func (r *Repository) nodeBlockers(ctx context.Context, node Record) []string {
 }
 
 func (r *Repository) BlockRunNode(ctx context.Context, nodeID, reason, actorID, actorName string) (Record, error) {
-	node, err := r.QueryOne(ctx, `UPDATE pipeline_run_nodes SET status='blocked', block_reason=$2 WHERE id=$1 RETURNING *`, nodeID, reason)
+	node, err := r.withAuditTransaction(ctx, func(tx *sql.Tx) (Record, error) {
+		rows, mutationErr := queryTx(ctx, tx, `UPDATE pipeline_run_nodes SET status='blocked', block_reason=$2 WHERE id=$1 RETURNING *`, nodeID, reason)
+		if mutationErr != nil {
+			return nil, mutationErr
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		return rows[0], nil
+	}, func(node Record) auditEvent {
+		return auditEvent{
+			ProjectID: fmt.Sprint(node["project_id"]), ActorID: actorID, ActorName: actorName,
+			EventType: "node_blocked", TargetType: "pipeline_run_node", TargetID: nodeID,
+			Description: reason, Metadata: Record{},
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
-	_ = r.AddAudit(ctx, fmt.Sprint(node["project_id"]), actorID, actorName, "node_blocked", "pipeline_run_node", nodeID, reason, Record{})
 	return node, nil
 }
 
@@ -10311,15 +10348,6 @@ func (r *Repository) ApprovalAction(ctx context.Context, approvalID, action, com
 	projectID := cleanID(request["project_id"])
 	targetID := cleanID(request["target_id"])
 	targetType := strings.TrimSpace(fmt.Sprint(request["target_type"]))
-	var projectParam any
-	if projectID != "" {
-		projectParam = projectID
-	}
-	var targetParam any
-	if targetID != "" {
-		targetParam = targetID
-	}
-	rawMetadata, _ := json.Marshal(Record{"approval_request_id": approvalID, "action": action})
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -10335,10 +10363,7 @@ func (r *Repository) ApprovalAction(ctx context.Context, approvalID, action, com
 		return nil, err
 	}
 	actionLabel := approvalAuditActionLabel(action)
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES ($1, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, $8::jsonb)
-	`, projectParam, actorID, actorName, event, targetType, targetParam, fmt.Sprintf("%s phê duyệt: %s", actionLabel, comment), string(rawMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, event, targetType, targetID, fmt.Sprintf("%s phê duyệt: %s", actionLabel, comment), Record{"approval_request_id": approvalID, "action": action}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -11295,11 +11320,7 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 				return nil, err
 			}
 		}
-		rawMetadata, _ := json.Marshal(Record{"total": total, "boq_price_source": "final", "supplier_partner_id": key, "item_count": len(groupRows)})
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-			VALUES ($1, NULLIF($2,'')::uuid, $3, 'material_requested', 'procurement_request', $4, 'Sinh yêu cầu mua từ BOQ theo nhà cung cấp', $5::jsonb)
-		`, projectID, actorID, actorName, requestID, string(rawMetadata)); err != nil {
+		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "material_requested", "procurement_request", requestID, "Sinh yêu cầu mua từ BOQ theo nhà cung cấp", Record{"total": total, "boq_price_source": "final", "supplier_partner_id": key, "item_count": len(groupRows)}); err != nil {
 			return nil, err
 		}
 	}
@@ -13548,7 +13569,7 @@ func (r *Repository) CreateRecurringPlan(ctx context.Context, projectID string, 
 		return nil, err
 	}
 	planID := cleanID(rows[0]["id"])
-	_ = r.AddAudit(ctx, projectID, actorID, actorName, "recurring_plan_created", "recurring_plan", planID, "Tạo lịch QA/QC lặp", Record{"plan_code": body["plan_code"], "recurrence_type": body["recurrence_type"], "interval_value": body["interval_value"]})
+	r.AddAuditBestEffort(ctx, projectID, actorID, actorName, "recurring_plan_created", "recurring_plan", planID, "Tạo lịch QA/QC lặp", Record{"plan_code": body["plan_code"], "recurrence_type": body["recurrence_type"], "interval_value": body["interval_value"]})
 	return r.ProjectQualityWorkspace(ctx, projectID)
 }
 
@@ -14360,8 +14381,25 @@ func (r *Repository) CreateIssue(ctx context.Context, body Record) (Record, erro
 	return r.Insert(ctx, "issues", issueColumns(), body)
 }
 
-func (r *Repository) UpdateIssue(ctx context.Context, id string, body Record) (Record, error) {
-	return r.Update(ctx, "issues", issueColumns(), id, body)
+func (r *Repository) UpdateIssue(ctx context.Context, id string, body Record, actorID, actorName string) (Record, error) {
+	eventFor := func(row Record) auditEvent {
+		return auditEvent{
+			ProjectID: cleanID(row["project_id"]), ActorID: actorID, ActorName: actorName,
+			EventType: "issue_updated", TargetType: "issue", TargetID: cleanID(row["id"]),
+			Description: fmt.Sprintf("Cập nhật vấn đề %s", row["title"]),
+			Metadata:    Record{"status": row["status"], "severity": row["severity"]},
+		}
+	}
+	if _, changesStatus := body["status"]; changesStatus {
+		return r.updateWithAudit(ctx, "issues", issueColumns(), id, body, eventFor)
+	}
+	row, err := r.Update(ctx, "issues", issueColumns(), id, body)
+	if err != nil {
+		return nil, err
+	}
+	event := eventFor(row)
+	r.AddAuditBestEffort(ctx, event.ProjectID, event.ActorID, event.ActorName, event.EventType, event.TargetType, event.TargetID, event.Description, event.Metadata)
+	return row, nil
 }
 
 func (r *Repository) ListProjectReworks(ctx context.Context, projectID string) ([]Record, error) {
@@ -14377,19 +14415,38 @@ func (r *Repository) CreateRework(ctx context.Context, body Record) (Record, err
 	return r.Insert(ctx, "rework_requests", reworkColumns(), body)
 }
 
-func (r *Repository) UpdateReworkStatus(ctx context.Context, id, status, actorID string) (Record, error) {
-	return r.QueryOne(ctx, `
-		UPDATE rework_requests
-		SET status=$2,
-			approved_by=CASE
-				WHEN $2='approved' THEN NULLIF($3,'')::uuid
-				WHEN $2='done' THEN COALESCE(approved_by, NULLIF($3,'')::uuid)
-				ELSE approved_by
-			END,
-			updated_at=now()
-		WHERE id=$1
-		RETURNING *
-	`, id, status, actorID)
+func (r *Repository) UpdateReworkStatus(ctx context.Context, id, status, actorID, actorName string) (Record, error) {
+	eventType := "rework_approved"
+	if status == "done" {
+		eventType = "rework_completed"
+	}
+	return r.withAuditTransaction(ctx, func(tx *sql.Tx) (Record, error) {
+		rows, err := queryTx(ctx, tx, `
+			UPDATE rework_requests
+			SET status=$2,
+				approved_by=CASE
+					WHEN $2='approved' THEN NULLIF($3,'')::uuid
+					WHEN $2='done' THEN COALESCE(approved_by, NULLIF($3,'')::uuid)
+					ELSE approved_by
+				END,
+				updated_at=now()
+			WHERE id=$1
+			RETURNING *
+		`, id, status, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		return rows[0], nil
+	}, func(row Record) auditEvent {
+		return auditEvent{
+			ProjectID: cleanID(row["project_id"]), ActorID: actorID, ActorName: actorName,
+			EventType: eventType, TargetType: "rework",
+			Description: fmt.Sprintf("Cập nhật sửa lỗi sang %s", status), Metadata: Record{"status": status},
+		}
+	})
 }
 
 func (r *Repository) ListProjectReplannings(ctx context.Context, projectID string) ([]Record, error) {
@@ -14405,13 +14462,28 @@ func (r *Repository) CreateReplanning(ctx context.Context, body Record) (Record,
 	return r.Insert(ctx, "replanning_requests", replanningColumns(), body)
 }
 
-func (r *Repository) ApproveReplanning(ctx context.Context, id, actorID string) (Record, error) {
-	return r.QueryOne(ctx, `
-		UPDATE replanning_requests
-		SET status='approved', approved_by=NULLIF($2,'')::uuid, updated_at=now()
-		WHERE id=$1
-		RETURNING *
-	`, id, actorID)
+func (r *Repository) ApproveReplanning(ctx context.Context, id, actorID, actorName string) (Record, error) {
+	return r.withAuditTransaction(ctx, func(tx *sql.Tx) (Record, error) {
+		rows, err := queryTx(ctx, tx, `
+			UPDATE replanning_requests
+			SET status='approved', approved_by=NULLIF($2,'')::uuid, updated_at=now()
+			WHERE id=$1
+			RETURNING *
+		`, id, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		return rows[0], nil
+	}, func(row Record) auditEvent {
+		return auditEvent{
+			ProjectID: cleanID(row["project_id"]), ActorID: actorID, ActorName: actorName,
+			EventType: "replanning_approved", TargetType: "replanning",
+			Description: "Duyệt yêu cầu lập kế hoạch lại", Metadata: Record{"status": row["status"]},
+		}
+	})
 }
 
 func (r *Repository) ListProjectHandover(ctx context.Context, projectID string) ([]Record, error) {
@@ -14561,25 +14633,55 @@ func (r *Repository) ListProjectBudget(ctx context.Context, projectID string) ([
 	`, projectID)
 }
 
-func (r *Repository) CreateBudget(ctx context.Context, body Record) (Record, error) {
-	return r.Insert(ctx, "accounting_budgets", budgetColumns(), body)
+func (r *Repository) CreateBudget(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+	return r.insertWithAudit(ctx, "accounting_budgets", budgetColumns(), body, func(row Record) auditEvent {
+		return auditEvent{
+			ProjectID: cleanID(row["project_id"]), ActorID: actorID, ActorName: actorName,
+			EventType: "budget_created", TargetType: "budget",
+			Description: fmt.Sprintf("Tạo ngân sách %s", row["budget_code"]),
+			Metadata:    Record{"status": row["status"], "planned_amount": row["planned_amount"]},
+		}
+	})
 }
 
-func (r *Repository) ApproveBudget(ctx context.Context, id, actorID string) (Record, error) {
-	return r.QueryOne(ctx, `
-		UPDATE accounting_budgets
-		SET status='approved',
-			approved_amount=planned_amount,
-			remaining_amount=GREATEST(planned_amount-used_amount, 0),
-			approved_by=NULLIF($2,'')::uuid,
-			updated_at=now()
-		WHERE id=$1 AND status IN ('draft','submitted')
-		RETURNING *
-	`, id, actorID)
+func (r *Repository) ApproveBudget(ctx context.Context, id, actorID, actorName string) (Record, error) {
+	return r.withAuditTransaction(ctx, func(tx *sql.Tx) (Record, error) {
+		rows, err := queryTx(ctx, tx, `
+			UPDATE accounting_budgets
+			SET status='approved',
+				approved_amount=planned_amount,
+				remaining_amount=GREATEST(planned_amount-used_amount, 0),
+				approved_by=NULLIF($2,'')::uuid,
+				updated_at=now()
+			WHERE id=$1 AND status IN ('draft','submitted')
+			RETURNING *
+		`, id, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		return rows[0], nil
+	}, func(row Record) auditEvent {
+		return auditEvent{
+			ProjectID: cleanID(row["project_id"]), ActorID: actorID, ActorName: actorName,
+			EventType: "budget_approved", TargetType: "budget",
+			Description: fmt.Sprintf("Duyệt ngân sách %s", row["budget_code"]),
+			Metadata:    Record{"status": row["status"], "approved_amount": row["approved_amount"]},
+		}
+	})
 }
 
-func (r *Repository) CreatePayment(ctx context.Context, body Record) (Record, error) {
-	return r.Insert(ctx, "payments", paymentColumns(), body)
+func (r *Repository) CreatePayment(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+	return r.insertWithAudit(ctx, "payments", paymentColumns(), body, func(row Record) auditEvent {
+		return auditEvent{
+			ProjectID: cleanID(row["project_id"]), ActorID: actorID, ActorName: actorName,
+			EventType: "payment_created", TargetType: "payment",
+			Description: fmt.Sprintf("Tạo phiếu thanh toán %s", row["payment_code"]),
+			Metadata:    Record{"status": row["status"], "payment_type": row["payment_type"], "amount": row["amount"]},
+		}
+	})
 }
 
 func (r *Repository) AcceptanceAction(ctx context.Context, id, result string, req ActionRequest, actorID, actorName string) (Record, error) {
@@ -16024,7 +16126,11 @@ func (r *Repository) ListInputInvoicesForProject(ctx context.Context, projectID 
 }
 
 func (r *Repository) GetInputInvoiceDetail(ctx context.Context, invoiceID string) (Record, error) {
-	return r.QueryOne(ctx, `
+	return getInputInvoiceDetail(ctx, r.db, invoiceID)
+}
+
+func getInputInvoiceDetail(ctx context.Context, db queryContext, invoiceID string) (Record, error) {
+	return queryOneRecord(ctx, db, `
 		SELECT
 			ii.*,
 			p.name AS project_name,
@@ -16053,7 +16159,9 @@ func (r *Repository) GetInputInvoiceDetail(ctx context.Context, invoiceID string
 	`, invoiceID)
 }
 
-func (r *Repository) CreateInputInvoice(ctx context.Context, payable Record, body Record, file StoredFileMetadata, actorID, actorName string) (Record, error) {
+func (r *Repository) CreateInputInvoice(ctx context.Context, payable Record, body Record, file StoredFileMetadata, actorID, actorName string) (result Record, err error) {
+	tracker := storedMutationTracker{}
+	defer tracker.wrap(&err)
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -16134,10 +16242,9 @@ func (r *Repository) CreateInputInvoice(ctx context.Context, payable Record, bod
 	}); err != nil {
 		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return r.GetInputInvoiceDetail(ctx, invoiceID)
+	return finalizeStoredMutation(&tracker, func() (Record, error) {
+		return getInputInvoiceDetail(ctx, tx, invoiceID)
+	}, tx.Commit)
 }
 
 func (r *Repository) InputInvoiceAction(ctx context.Context, invoiceID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
@@ -17150,7 +17257,11 @@ func (r *Repository) ListOutputInvoicesForProject(ctx context.Context, projectID
 }
 
 func (r *Repository) GetOutputInvoiceDetail(ctx context.Context, invoiceID string) (Record, error) {
-	return r.QueryOne(ctx, `
+	return getOutputInvoiceDetail(ctx, r.db, invoiceID)
+}
+
+func getOutputInvoiceDetail(ctx context.Context, db queryContext, invoiceID string) (Record, error) {
+	return queryOneRecord(ctx, db, `
 		SELECT
 			oi.*,
 			p.name AS project_name,
@@ -17179,7 +17290,9 @@ func (r *Repository) GetOutputInvoiceDetail(ctx context.Context, invoiceID strin
 	`, invoiceID)
 }
 
-func (r *Repository) CreateOutputInvoice(ctx context.Context, receivable Record, body Record, file StoredFileMetadata, actorID, actorName string) (Record, error) {
+func (r *Repository) CreateOutputInvoice(ctx context.Context, receivable Record, body Record, file StoredFileMetadata, actorID, actorName string) (result Record, err error) {
+	tracker := storedMutationTracker{}
+	defer tracker.wrap(&err)
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -17260,10 +17373,9 @@ func (r *Repository) CreateOutputInvoice(ctx context.Context, receivable Record,
 	}); err != nil {
 		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return r.GetOutputInvoiceDetail(ctx, invoiceID)
+	return finalizeStoredMutation(&tracker, func() (Record, error) {
+		return getOutputInvoiceDetail(ctx, tx, invoiceID)
+	}, tx.Commit)
 }
 
 func (r *Repository) OutputInvoiceAction(ctx context.Context, invoiceID, action string, req ActionRequest, actorID, actorName string) (Record, error) {
@@ -17761,1227 +17873,6 @@ func clientAdvanceReceiptStatusAfterReceipt(total, received, settled float64) st
 		return "received"
 	}
 	return "partially_received"
-}
-
-func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record, error) {
-	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
-	if err != nil {
-		return nil, err
-	}
-	data, err := r.QueryOne(ctx, fmt.Sprintf(`
-		WITH scoped_projects AS MATERIALIZED (
-			SELECT p.id, p.status
-			FROM projects p
-			WHERE p.status <> 'cancelled' AND %s
-		)
-		SELECT
-			(SELECT COUNT(*) FROM scoped_projects) AS total_projects,
-			(SELECT COUNT(*) FROM scoped_projects WHERE status IN ('planning','in_progress','acceptance','handover')) AS active_projects,
-			(SELECT COUNT(*) FROM scoped_projects WHERE status='blocked') AS blocked_projects,
-			(SELECT COUNT(*) FROM approval_requests ar JOIN scoped_projects sp ON sp.id=ar.project_id WHERE ar.status='pending') AS pending_approvals,
-			(SELECT COALESCE(SUM(rec.remaining_amount),0) FROM receivables rec JOIN scoped_projects sp ON sp.id=rec.project_id WHERE rec.status <> 'cancelled') AS receivable_remaining,
-			(SELECT COALESCE(SUM(pay.remaining_amount),0) FROM payables pay JOIN scoped_projects sp ON sp.id=pay.project_id WHERE pay.status <> 'cancelled') AS payable_remaining,
-			(SELECT COUNT(*) FROM site_material_balances smb JOIN materials m ON m.id=smb.material_id JOIN scoped_projects sp ON sp.id=smb.project_id WHERE smb.issued_quantity < smb.planned_quantity AND m.active) AS missing_materials,
-			(SELECT COUNT(*) FROM acceptance_records ar JOIN scoped_projects sp ON sp.id=ar.project_id WHERE ar.result='fail') AS failed_acceptances,
-			(SELECT COUNT(*) FROM rework_requests rw JOIN scoped_projects sp ON sp.id=rw.project_id WHERE rw.status IN ('draft','approved','in_progress')) AS pending_reworks,
-			(SELECT COALESCE(SUM(CASE WHEN pay.payment_type='client_receipt' THEN pay.amount ELSE -pay.amount END),0)
-			 FROM payments pay
-			 JOIN scoped_projects sp ON sp.id=pay.project_id
-			 WHERE pay.status <> 'cancelled'
-			   AND date_trunc('month', pay.created_at)=date_trunc('month', now())) AS cashflow_month
-	`, scopeSQL), scopeArgs...)
-	if err != nil {
-		return nil, err
-	}
-	charts := Record{}
-	statusRows, err := r.Query(ctx, fmt.Sprintf(`SELECT p.status, COUNT(*) AS total FROM projects p WHERE p.status <> 'cancelled' AND %s GROUP BY p.status ORDER BY p.status`, scopeSQL), scopeArgs...)
-	if err != nil {
-		return nil, err
-	}
-	debtRows, err := r.Query(ctx, fmt.Sprintf(`
-		SELECT 'Phải thu' AS type, COALESCE(SUM(rec.remaining_amount),0) AS amount
-		FROM receivables rec
-		JOIN projects p ON p.id=rec.project_id
-		WHERE rec.status <> 'cancelled' AND p.status <> 'cancelled' AND %s
-		UNION ALL
-		SELECT 'Phải trả' AS type, COALESCE(SUM(pay.remaining_amount),0) AS amount
-		FROM payables pay
-		JOIN projects p ON p.id=pay.project_id
-		WHERE pay.status <> 'cancelled' AND p.status <> 'cancelled' AND %s
-	`, scopeSQL, scopeSQL), scopeArgs...)
-	if err != nil {
-		return nil, err
-	}
-	costRows, err := r.Query(ctx, fmt.Sprintf(`
-		SELECT p.name, COALESCE(b.used_amount,0) AS used_amount, COALESCE(b.remaining_amount,0) AS remaining_amount
-		FROM projects p
-		LEFT JOIN accounting_budgets b ON b.project_id=p.id
-		WHERE p.status <> 'cancelled' AND %s
-		ORDER BY p.created_at
-	`, scopeSQL), scopeArgs...)
-	if err != nil {
-		return nil, err
-	}
-	approvalRows, err := r.Query(ctx, fmt.Sprintf(`
-		SELECT ar.target_type, COUNT(*) AS total
-		FROM approval_requests ar
-		JOIN projects p ON p.id=ar.project_id
-		WHERE p.status <> 'cancelled' AND %s
-		GROUP BY ar.target_type
-		ORDER BY ar.target_type
-	`, scopeSQL), scopeArgs...)
-	if err != nil {
-		return nil, err
-	}
-	charts["project_status"] = statusRows
-	charts["debt"] = debtRows
-	charts["cost_by_project"] = costRows
-	charts["approvals_by_type"] = approvalRows
-	data["charts"] = charts
-	return data, nil
-}
-
-func (r *Repository) ReportProjectOptions(ctx context.Context, userID string) ([]Record, error) {
-	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
-	if err != nil {
-		return nil, err
-	}
-	return r.Query(ctx, fmt.Sprintf(`
-		SELECT p.id, p.name
-		FROM projects p
-		WHERE p.status <> 'cancelled' AND %s
-		ORDER BY p.name
-	`, scopeSQL), scopeArgs...)
-}
-
-func (r *Repository) Report(ctx context.Context, kind, userID, projectID string) ([]Record, error) {
-	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
-	if err != nil {
-		return nil, err
-	}
-	args := append([]any{}, scopeArgs...)
-	projectFilter := ""
-	if projectID != "" {
-		args = append(args, projectID)
-		projectFilter = fmt.Sprintf(" AND p.id=$%d", len(args))
-	}
-	switch kind {
-	case "projects":
-		return r.Query(ctx, fmt.Sprintf(`
-			SELECT p.id AS project_id, p.name, p.status, p.progress_percent,
-				(SELECT COUNT(*) FROM issues i WHERE i.project_id=p.id AND i.status IN ('open','in_progress')) AS open_issues,
-				(SELECT COUNT(*) FROM approval_requests ar WHERE ar.project_id=p.id AND ar.status='pending') AS pending_approvals
-			FROM projects p
-			WHERE p.status <> 'cancelled' AND %s%s
-			ORDER BY p.created_at DESC
-		`, scopeSQL, projectFilter), args...)
-	case "warehouse":
-		movementScope := fmt.Sprintf(`(
-			sm.project_id IS NULL
-			OR EXISTS (
-				SELECT 1 FROM projects p
-				WHERE p.id=sm.project_id AND p.status <> 'cancelled' AND %s
-			)
-		)`, scopeSQL)
-		balanceProjectFilter := ""
-		if projectID != "" {
-			projectPlaceholder := fmt.Sprintf("$%d", len(args))
-			movementScope = fmt.Sprintf(`EXISTS (
-				SELECT 1 FROM projects p
-				WHERE p.id=sm.project_id AND p.id=%s AND p.status <> 'cancelled' AND %s
-			)`, projectPlaceholder, scopeSQL)
-			balanceProjectFilter = fmt.Sprintf(" AND p.id=%s", projectPlaceholder)
-		}
-		return r.Query(ctx, fmt.Sprintf(`
-			WITH stock_totals AS (
-				SELECT sm.material_id, COALESCE(SUM(CASE
-					WHEN sm.movement_type IN ('receive','return_to_warehouse') THEN sm.quantity
-					WHEN sm.movement_type IN ('issue','loss') THEN -sm.quantity
-					WHEN sm.movement_type='transfer' AND sm.target_warehouse_id IS NULL THEN -sm.quantity
-					ELSE 0
-				END),0) AS stock_quantity
-				FROM stock_movements sm
-				WHERE %s
-				GROUP BY sm.material_id
-			), site_totals AS (
-				SELECT smb.material_id, COALESCE(SUM(smb.surplus_quantity),0) AS surplus_quantity
-				FROM site_material_balances smb
-				JOIN projects p ON p.id=smb.project_id
-				WHERE p.status <> 'cancelled' AND %s%s
-				GROUP BY smb.material_id
-			)
-			SELECT m.id AS material_id, m.name, m.category,
-				COALESCE(st.stock_quantity,0) AS stock_quantity,
-				COALESCE(site.surplus_quantity,0) AS surplus_quantity
-			FROM materials m
-			LEFT JOIN stock_totals st ON st.material_id=m.id
-			LEFT JOIN site_totals site ON site.material_id=m.id
-			WHERE m.active
-			ORDER BY m.category, m.name
-		`, movementScope, scopeSQL, balanceProjectFilter), args...)
-	case "procurement":
-		return r.Query(ctx, fmt.Sprintf(`
-			SELECT pr.status, pr.budget_status, COUNT(*) AS total, COALESCE(SUM(pr.total_estimated_amount),0) AS amount
-			FROM procurement_requests pr
-			JOIN projects p ON p.id=pr.project_id
-			WHERE pr.status <> 'cancelled' AND p.status <> 'cancelled' AND %s%s
-			GROUP BY pr.status, pr.budget_status
-			ORDER BY pr.status
-		`, scopeSQL, projectFilter), args...)
-	case "accounting":
-		return r.Query(ctx, fmt.Sprintf(`
-			WITH payable_totals AS (
-				SELECT project_id, COALESCE(SUM(remaining_amount),0) AS payable_remaining
-				FROM payables WHERE status <> 'cancelled' GROUP BY project_id
-			), receivable_totals AS (
-				SELECT project_id, COALESCE(SUM(remaining_amount),0) AS receivable_remaining
-				FROM receivables WHERE status <> 'cancelled' GROUP BY project_id
-			), budget_totals AS (
-				SELECT project_id, COALESCE(SUM(used_amount),0) AS used_budget
-				FROM accounting_budgets WHERE status <> 'cancelled' GROUP BY project_id
-			)
-			SELECT p.id AS project_id, p.name,
-				COALESCE(pay.payable_remaining,0) AS payable_remaining,
-				COALESCE(rec.receivable_remaining,0) AS receivable_remaining,
-				COALESCE(b.used_budget,0) AS used_budget
-			FROM projects p
-			LEFT JOIN payable_totals pay ON pay.project_id=p.id
-			LEFT JOIN receivable_totals rec ON rec.project_id=p.id
-			LEFT JOIN budget_totals b ON b.project_id=p.id
-			WHERE p.status <> 'cancelled' AND %s%s
-			ORDER BY p.name
-		`, scopeSQL, projectFilter), args...)
-	case "staff":
-		return r.Query(ctx, fmt.Sprintf(`
-			SELECT s.id AS staff_id, s.full_name, s.department, s.position, COUNT(DISTINCT p.id) AS project_count
-			FROM staff s
-			JOIN project_members pm ON pm.staff_id=s.id AND pm.active
-			JOIN projects p ON p.id=pm.project_id
-			WHERE s.status <> 'deleted' AND p.status <> 'cancelled' AND %s%s
-			GROUP BY s.id
-			ORDER BY s.full_name
-		`, scopeSQL, projectFilter), args...)
-	default:
-		return nil, errors.New("Báo cáo không hợp lệ")
-	}
-}
-
-func (r *Repository) CashflowReport(ctx context.Context, req CashflowReportRequest, userID string) (Record, error) {
-	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
-	if err != nil {
-		return nil, err
-	}
-	statusFilter := cashflowStatusFilter(req.Status)
-
-	openingArgs := append([]any{}, scopeArgs...)
-	openingFromIdx := len(openingArgs) + 1
-	openingArgs = append(openingArgs, req.FromDate)
-	openingProjectFilter := cashflowProjectFilter(&openingArgs, req.ProjectID)
-	openingRows, err := r.Query(ctx, cashflowRowsCTE(
-		scopeSQL,
-		openingProjectFilter,
-		fmt.Sprintf(" AND %s < $%d::date", cashflowOccurredAtSQL(), openingFromIdx),
-		statusFilter,
-	)+`
-		SELECT COALESCE(SUM(net_amount), 0) AS opening_balance
-		FROM cashflow_rows
-	`, openingArgs...)
-	if err != nil {
-		return nil, err
-	}
-	openingBalance := 0.0
-	if len(openingRows) > 0 {
-		openingBalance = number(openingRows[0]["opening_balance"])
-	}
-
-	rangeArgs := append([]any{}, scopeArgs...)
-	fromIdx := len(rangeArgs) + 1
-	rangeArgs = append(rangeArgs, req.FromDate)
-	toIdx := len(rangeArgs) + 1
-	rangeArgs = append(rangeArgs, req.ToDate)
-	rangeProjectFilter := cashflowProjectFilter(&rangeArgs, req.ProjectID)
-	rangeDateFilter := fmt.Sprintf(" AND %s >= $%d::date AND %s < ($%d::date + INTERVAL '1 day')", cashflowOccurredAtSQL(), fromIdx, cashflowOccurredAtSQL(), toIdx)
-	rangeCTE := cashflowRowsCTE(scopeSQL, rangeProjectFilter, rangeDateFilter, statusFilter)
-
-	summaryRows, err := r.Query(ctx, rangeCTE+`
-		SELECT
-			COUNT(*) AS payment_count,
-			COUNT(*) FILTER (WHERE direction='unclassified') AS unclassified_count,
-			COUNT(*) FILTER (WHERE direction='non_cash') AS non_cash_count,
-			COALESCE(SUM(inflow_amount), 0) AS total_inflow,
-			COALESCE(SUM(outflow_amount), 0) AS total_outflow,
-			COALESCE(SUM(net_amount), 0) AS net_flow
-		FROM cashflow_rows
-	`, rangeArgs...)
-	if err != nil {
-		return nil, err
-	}
-	summary := Record{
-		"from":                  req.FromDate,
-		"to":                    req.ToDate,
-		"group_by":              req.GroupBy,
-		"status":                req.Status,
-		"project_id":            req.ProjectID,
-		"opening_balance":       openingBalance,
-		"payment_count":         0,
-		"unclassified_count":    0,
-		"non_cash_count":        0,
-		"total_inflow":          0,
-		"total_outflow":         0,
-		"net_flow":              0,
-		"closing_balance":       openingBalance,
-		"pending_payment_count": 0,
-		"pending_payment_total": 0,
-	}
-	if len(summaryRows) > 0 {
-		row := summaryRows[0]
-		netFlow := number(row["net_flow"])
-		summary["payment_count"] = row["payment_count"]
-		summary["unclassified_count"] = row["unclassified_count"]
-		summary["non_cash_count"] = row["non_cash_count"]
-		summary["total_inflow"] = row["total_inflow"]
-		summary["total_outflow"] = row["total_outflow"]
-		summary["net_flow"] = row["net_flow"]
-		summary["closing_balance"] = openingBalance + netFlow
-	}
-
-	pendingArgs := append([]any{}, scopeArgs...)
-	pendingFromIdx := len(pendingArgs) + 1
-	pendingArgs = append(pendingArgs, req.FromDate)
-	pendingToIdx := len(pendingArgs) + 1
-	pendingArgs = append(pendingArgs, req.ToDate)
-	pendingProjectFilter := cashflowProjectFilter(&pendingArgs, req.ProjectID)
-	pendingDateFilter := fmt.Sprintf(" AND %s >= $%d::date AND %s < ($%d::date + INTERVAL '1 day')", cashflowOccurredAtSQL(), pendingFromIdx, cashflowOccurredAtSQL(), pendingToIdx)
-	pendingRows, err := r.Query(ctx, cashflowRowsCTE(scopeSQL, pendingProjectFilter, pendingDateFilter, " AND pay.status NOT IN ('approved','cancelled')")+`
-		SELECT COUNT(*) AS pending_payment_count, COALESCE(SUM(amount), 0) AS pending_payment_total
-		FROM cashflow_rows
-	`, pendingArgs...)
-	if err != nil {
-		return nil, err
-	}
-	if len(pendingRows) > 0 {
-		summary["pending_payment_count"] = pendingRows[0]["pending_payment_count"]
-		summary["pending_payment_total"] = pendingRows[0]["pending_payment_total"]
-	}
-
-	periodExpr := cashflowPeriodExpr(req.GroupBy)
-	seriesRows, err := r.Query(ctx, rangeCTE+fmt.Sprintf(`
-		SELECT
-			%s AS period_start,
-			COALESCE(SUM(inflow_amount), 0) AS inflow_amount,
-			COALESCE(SUM(outflow_amount), 0) AS outflow_amount,
-			COALESCE(SUM(net_amount), 0) AS net_amount,
-			COUNT(*) AS payment_count
-		FROM cashflow_rows
-		GROUP BY period_start
-		ORDER BY period_start
-	`, periodExpr), rangeArgs...)
-	if err != nil {
-		return nil, err
-	}
-	runningBalance := openingBalance
-	for _, row := range seriesRows {
-		runningBalance += number(row["net_amount"])
-		row["running_balance"] = runningBalance
-	}
-
-	categoryRows, err := r.Query(ctx, rangeCTE+`
-		SELECT
-			category,
-			direction,
-			COUNT(*) AS payment_count,
-			COALESCE(SUM(inflow_amount), 0) AS inflow_amount,
-			COALESCE(SUM(outflow_amount), 0) AS outflow_amount,
-			COALESCE(SUM(net_amount), 0) AS net_amount
-		FROM cashflow_rows
-		GROUP BY category, direction
-		ORDER BY direction, category
-	`, rangeArgs...)
-	if err != nil {
-		return nil, err
-	}
-
-	ledgerRows, err := r.Query(ctx, rangeCTE+`
-		SELECT
-			occurred_at,
-			id,
-			project_id,
-			project_name,
-			payment_code,
-			payment_type,
-			payment_method,
-			status,
-			direction,
-			category,
-			amount,
-			inflow_amount,
-			outflow_amount,
-			net_amount,
-			target_type,
-			target_id,
-			created_by_name,
-			approved_by_name
-		FROM cashflow_rows
-		ORDER BY occurred_at DESC, created_at DESC, id DESC
-	`, rangeArgs...)
-	if err != nil {
-		return nil, err
-	}
-
-	return Record{
-		"summary":    summary,
-		"series":     seriesRows,
-		"categories": categoryRows,
-		"ledger":     ledgerRows,
-	}, nil
-}
-
-func (r *Repository) TaxReport(ctx context.Context, req TaxReportRequest, userID string) (Record, error) {
-	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
-	if err != nil {
-		return nil, err
-	}
-	args := append([]any{}, scopeArgs...)
-	fromIdx := len(args) + 1
-	args = append(args, req.FromDate)
-	toIdx := len(args) + 1
-	args = append(args, req.ToDate)
-	projectFilter := taxProjectFilter(&args, req.ProjectID)
-	inputDateFilter := fmt.Sprintf(" AND ii.invoice_date >= $%d::date AND ii.invoice_date <= $%d::date", fromIdx, toIdx)
-	outputDateFilter := fmt.Sprintf(" AND oi.invoice_date >= $%d::date AND oi.invoice_date <= $%d::date", fromIdx, toIdx)
-	sourceFilter := taxSourceFilter(req.Source)
-	statusFilter := taxStatusFilter(req.Status)
-	baseCTE := taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter)
-	filteredCTE := baseCTE + fmt.Sprintf(`
-		, filtered_tax_rows AS (
-			SELECT * FROM tax_rows
-			WHERE 1=1
-			%s
-			%s
-		)
-	`, sourceFilter, statusFilter)
-
-	summaryRows, err := r.Query(ctx, filteredCTE+`
-		SELECT
-			COUNT(*) AS invoice_count,
-			COUNT(*) FILTER (WHERE direction='input') AS input_invoice_count,
-			COUNT(*) FILTER (WHERE direction='output') AS output_invoice_count,
-			COALESCE(SUM(amount_before_vat) FILTER (WHERE direction='input'), 0) AS input_taxable_amount,
-			COALESCE(SUM(vat_amount) FILTER (WHERE direction='input'), 0) AS input_vat_amount,
-			COALESCE(SUM(total_amount) FILTER (WHERE direction='input'), 0) AS input_total_amount,
-			COALESCE(SUM(amount_before_vat) FILTER (WHERE direction='output'), 0) AS output_taxable_amount,
-			COALESCE(SUM(vat_amount) FILTER (WHERE direction='output'), 0) AS output_vat_amount,
-			COALESCE(SUM(total_amount) FILTER (WHERE direction='output'), 0) AS output_total_amount,
-			COALESCE(SUM(vat_amount) FILTER (WHERE direction='output'), 0) - COALESCE(SUM(vat_amount) FILTER (WHERE direction='input'), 0) AS net_vat_amount,
-			COUNT(*) FILTER (WHERE missing_tax_code) AS missing_tax_code_count,
-			COUNT(*) FILTER (WHERE vat_math_mismatch) AS vat_math_mismatch_count
-		FROM filtered_tax_rows
-	`, args...)
-	if err != nil {
-		return nil, err
-	}
-	summary := Record{
-		"from":                    req.FromDate,
-		"to":                      req.ToDate,
-		"group_by":                req.GroupBy,
-		"source":                  req.Source,
-		"status":                  req.Status,
-		"project_id":              req.ProjectID,
-		"invoice_count":           0,
-		"input_invoice_count":     0,
-		"output_invoice_count":    0,
-		"input_taxable_amount":    0,
-		"input_vat_amount":        0,
-		"input_total_amount":      0,
-		"output_taxable_amount":   0,
-		"output_vat_amount":       0,
-		"output_total_amount":     0,
-		"net_vat_amount":          0,
-		"net_vat_status":          "neutral",
-		"missing_tax_code_count":  0,
-		"vat_math_mismatch_count": 0,
-		"excluded_unposted_count": 0,
-		"excluded_unposted_total": 0,
-		"warning_count":           0,
-	}
-	if len(summaryRows) > 0 {
-		for key, value := range summaryRows[0] {
-			summary[key] = value
-		}
-	}
-
-	excludedRows, err := r.Query(ctx, baseCTE+fmt.Sprintf(`
-		SELECT COUNT(*) AS excluded_unposted_count, COALESCE(SUM(total_amount), 0) AS excluded_unposted_total
-		FROM tax_rows
-		WHERE 1=1
-		%s
-		AND NOT posted
-	`, sourceFilter), args...)
-	if err != nil {
-		return nil, err
-	}
-	if len(excludedRows) > 0 {
-		summary["excluded_unposted_count"] = excludedRows[0]["excluded_unposted_count"]
-		summary["excluded_unposted_total"] = excludedRows[0]["excluded_unposted_total"]
-	}
-
-	netVAT := number(summary["net_vat_amount"])
-	if netVAT > 1 {
-		summary["net_vat_status"] = "payable"
-	} else if netVAT < -1 {
-		summary["net_vat_status"] = "credit"
-	}
-	warnings := taxReportWarnings(summary, req.Status)
-	summary["warning_count"] = len(warnings)
-
-	periodRows, err := r.Query(ctx, filteredCTE+fmt.Sprintf(`
-		SELECT
-			%s AS period_start,
-			COUNT(*) AS invoice_count,
-			COUNT(*) FILTER (WHERE direction='input') AS input_invoice_count,
-			COUNT(*) FILTER (WHERE direction='output') AS output_invoice_count,
-			COALESCE(SUM(amount_before_vat) FILTER (WHERE direction='input'), 0) AS input_taxable_amount,
-			COALESCE(SUM(vat_amount) FILTER (WHERE direction='input'), 0) AS input_vat_amount,
-			COALESCE(SUM(total_amount) FILTER (WHERE direction='input'), 0) AS input_total_amount,
-			COALESCE(SUM(amount_before_vat) FILTER (WHERE direction='output'), 0) AS output_taxable_amount,
-			COALESCE(SUM(vat_amount) FILTER (WHERE direction='output'), 0) AS output_vat_amount,
-			COALESCE(SUM(total_amount) FILTER (WHERE direction='output'), 0) AS output_total_amount,
-			COALESCE(SUM(vat_amount) FILTER (WHERE direction='output'), 0) - COALESCE(SUM(vat_amount) FILTER (WHERE direction='input'), 0) AS net_vat_amount
-		FROM filtered_tax_rows
-		GROUP BY period_start
-		ORDER BY period_start
-	`, taxPeriodExpr(req.GroupBy)), args...)
-	if err != nil {
-		return nil, err
-	}
-
-	counterpartyRows, err := r.Query(ctx, filteredCTE+`
-		SELECT
-			direction,
-			tax_code,
-			counterparty_name,
-			COUNT(*) AS invoice_count,
-			COALESCE(SUM(amount_before_vat), 0) AS taxable_amount,
-			COALESCE(SUM(vat_amount), 0) AS vat_amount,
-			COALESCE(SUM(total_amount), 0) AS total_amount,
-			COUNT(*) FILTER (WHERE missing_tax_code OR vat_math_mismatch) AS warning_count
-		FROM filtered_tax_rows
-		GROUP BY direction, tax_code, counterparty_name
-		ORDER BY direction, vat_amount DESC, counterparty_name
-	`, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	ledgerRows, err := r.Query(ctx, filteredCTE+`
-		SELECT
-			invoice_date,
-			id,
-			direction,
-			project_id,
-			project_name,
-			invoice_number,
-			invoice_symbol,
-			counterparty_name,
-			tax_code,
-			amount_before_vat,
-			vat_amount,
-			total_amount,
-			currency,
-			status,
-			source_type,
-			source_id,
-			source_code,
-			secondary_source_type,
-			secondary_source_id,
-			secondary_source_code,
-			document_id,
-			document_name,
-			missing_tax_code,
-			vat_math_mismatch,
-			CONCAT_WS('; ',
-				CASE WHEN missing_tax_code THEN 'missing_tax_code' END,
-				CASE WHEN vat_math_mismatch THEN 'vat_math_mismatch' END
-			) AS warning_flags
-		FROM filtered_tax_rows
-		ORDER BY invoice_date DESC, created_at DESC, id DESC
-	`, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return Record{
-		"summary":        summary,
-		"periods":        periodRows,
-		"counterparties": counterpartyRows,
-		"ledger":         ledgerRows,
-		"warnings":       warnings,
-	}, nil
-}
-
-func (r *Repository) ProfitReport(ctx context.Context, req ProfitReportRequest, userID string) (Record, error) {
-	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
-	if err != nil {
-		return nil, err
-	}
-	args := append([]any{}, scopeArgs...)
-	fromIdx := len(args) + 1
-	args = append(args, req.FromDate)
-	toIdx := len(args) + 1
-	args = append(args, req.ToDate)
-	projectFilter := profitProjectFilter(&args, req.ProjectID)
-	inputDateFilter := fmt.Sprintf(" AND ii.invoice_date >= $%d::date AND ii.invoice_date <= $%d::date", fromIdx, toIdx)
-	outputDateFilter := fmt.Sprintf(" AND oi.invoice_date >= $%d::date AND oi.invoice_date <= $%d::date", fromIdx, toIdx)
-	statusFilter := profitStatusFilter(req.Status)
-	baseCTE := profitRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter)
-	filteredCTE := baseCTE + fmt.Sprintf(`
-		, filtered_profit_rows AS (
-			SELECT * FROM profit_rows
-			WHERE 1=1
-			%s
-		)
-	`, statusFilter)
-
-	summaryRows, err := r.Query(ctx, filteredCTE+`
-		SELECT
-			COUNT(*) AS ledger_count,
-			COUNT(*) FILTER (WHERE direction='revenue') AS revenue_invoice_count,
-			COUNT(*) FILTER (WHERE direction='cost') AS cost_invoice_count,
-			COALESCE(SUM(revenue_amount), 0) AS revenue_amount,
-			COALESCE(SUM(direct_cost_amount), 0) AS direct_cost_amount,
-			COALESCE(SUM(indirect_cost_amount), 0) AS indirect_cost_amount,
-			COALESCE(SUM(direct_cost_amount + indirect_cost_amount), 0) AS total_cost_amount,
-			COALESCE(SUM(revenue_amount - direct_cost_amount), 0) AS gross_profit,
-			COALESCE(SUM(revenue_amount - direct_cost_amount - indirect_cost_amount), 0) AS net_profit,
-			COUNT(*) FILTER (WHERE unclassified_cost) AS unclassified_cost_count
-		FROM filtered_profit_rows
-	`, args...)
-	if err != nil {
-		return nil, err
-	}
-	summary := Record{
-		"from":                    req.FromDate,
-		"to":                      req.ToDate,
-		"group_by":                req.GroupBy,
-		"status":                  req.Status,
-		"project_id":              req.ProjectID,
-		"ledger_count":            0,
-		"revenue_invoice_count":   0,
-		"cost_invoice_count":      0,
-		"revenue_amount":          0,
-		"direct_cost_amount":      0,
-		"indirect_cost_amount":    0,
-		"total_cost_amount":       0,
-		"gross_profit":            0,
-		"net_profit":              0,
-		"gross_margin_percent":    0,
-		"net_margin_percent":      0,
-		"unclassified_cost_count": 0,
-		"excluded_unposted_count": 0,
-		"excluded_unposted_total": 0,
-		"warning_count":           0,
-	}
-	if len(summaryRows) > 0 {
-		for key, value := range summaryRows[0] {
-			summary[key] = value
-		}
-	}
-	profitApplyMargins(summary)
-
-	excludedRows, err := r.Query(ctx, baseCTE+`
-		SELECT COUNT(*) AS excluded_unposted_count, COALESCE(SUM(amount_before_vat), 0) AS excluded_unposted_total
-		FROM profit_rows
-		WHERE NOT posted
-	`, args...)
-	if err != nil {
-		return nil, err
-	}
-	if len(excludedRows) > 0 {
-		summary["excluded_unposted_count"] = excludedRows[0]["excluded_unposted_count"]
-		summary["excluded_unposted_total"] = excludedRows[0]["excluded_unposted_total"]
-	}
-	warnings := profitReportWarnings(summary, req.Status)
-	summary["warning_count"] = len(warnings)
-
-	periodRows, err := r.Query(ctx, filteredCTE+fmt.Sprintf(`
-		SELECT
-			%s AS period_start,
-			COUNT(*) AS ledger_count,
-			COUNT(*) FILTER (WHERE direction='revenue') AS revenue_invoice_count,
-			COUNT(*) FILTER (WHERE direction='cost') AS cost_invoice_count,
-			COALESCE(SUM(revenue_amount), 0) AS revenue_amount,
-			COALESCE(SUM(direct_cost_amount), 0) AS direct_cost_amount,
-			COALESCE(SUM(indirect_cost_amount), 0) AS indirect_cost_amount,
-			COALESCE(SUM(direct_cost_amount + indirect_cost_amount), 0) AS total_cost_amount,
-			COALESCE(SUM(revenue_amount - direct_cost_amount), 0) AS gross_profit,
-			COALESCE(SUM(revenue_amount - direct_cost_amount - indirect_cost_amount), 0) AS net_profit
-		FROM filtered_profit_rows
-		GROUP BY period_start
-		ORDER BY period_start
-	`, profitPeriodExpr(req.GroupBy)), args...)
-	if err != nil {
-		return nil, err
-	}
-	for _, row := range periodRows {
-		profitApplyMargins(row)
-	}
-
-	projectRows, err := r.Query(ctx, filteredCTE+`
-		SELECT
-			project_id,
-			project_name,
-			COUNT(*) AS ledger_count,
-			COUNT(*) FILTER (WHERE direction='revenue') AS revenue_invoice_count,
-			COUNT(*) FILTER (WHERE direction='cost') AS cost_invoice_count,
-			COALESCE(SUM(revenue_amount), 0) AS revenue_amount,
-			COALESCE(SUM(direct_cost_amount), 0) AS direct_cost_amount,
-			COALESCE(SUM(indirect_cost_amount), 0) AS indirect_cost_amount,
-			COALESCE(SUM(direct_cost_amount + indirect_cost_amount), 0) AS total_cost_amount,
-			COALESCE(SUM(revenue_amount - direct_cost_amount), 0) AS gross_profit,
-			COALESCE(SUM(revenue_amount - direct_cost_amount - indirect_cost_amount), 0) AS net_profit,
-			COUNT(*) FILTER (WHERE unclassified_cost) AS warning_count
-		FROM filtered_profit_rows
-		GROUP BY project_id, project_name
-		ORDER BY net_profit DESC, project_name
-	`, args...)
-	if err != nil {
-		return nil, err
-	}
-	for _, row := range projectRows {
-		profitApplyMargins(row)
-	}
-
-	breakdownRows, err := r.Query(ctx, filteredCTE+`
-		SELECT
-			cost_type,
-			cost_group,
-			classification_reason,
-			COUNT(*) AS invoice_count,
-			COALESCE(SUM(amount_before_vat), 0) AS cost_amount,
-			COALESCE(SUM(vat_amount), 0) AS vat_amount,
-			COALESCE(SUM(total_amount), 0) AS total_amount,
-			COUNT(*) FILTER (WHERE unclassified_cost) AS warning_count
-		FROM filtered_profit_rows
-		WHERE direction='cost'
-		GROUP BY cost_type, cost_group, classification_reason
-		ORDER BY cost_type, cost_amount DESC, cost_group
-	`, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	ledgerRows, err := r.Query(ctx, filteredCTE+`
-		SELECT
-			invoice_date,
-			id,
-			direction,
-			cost_type,
-			cost_group,
-			classification_reason,
-			project_id,
-			project_name,
-			invoice_number,
-			invoice_symbol,
-			counterparty_name,
-			tax_code,
-			amount_before_vat,
-			vat_amount,
-			total_amount,
-			revenue_amount,
-			direct_cost_amount,
-			indirect_cost_amount,
-			currency,
-			status,
-			source_type,
-			source_id,
-			source_code,
-			secondary_source_type,
-			secondary_source_id,
-			secondary_source_code,
-			document_id,
-			document_name,
-			unclassified_cost,
-			CASE WHEN unclassified_cost THEN 'indirect_or_unclassified_cost' ELSE '' END AS warning_flags
-		FROM filtered_profit_rows
-		ORDER BY invoice_date DESC, created_at DESC, id DESC
-	`, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return Record{
-		"summary":        summary,
-		"periods":        periodRows,
-		"projects":       projectRows,
-		"cost_breakdown": breakdownRows,
-		"ledger":         ledgerRows,
-		"warnings":       warnings,
-	}, nil
-}
-
-func profitApplyMargins(row Record) {
-	revenue := number(row["revenue_amount"])
-	row["gross_margin_percent"] = profitMarginPercent(revenue, number(row["gross_profit"]))
-	row["net_margin_percent"] = profitMarginPercent(revenue, number(row["net_profit"]))
-}
-
-func profitMarginPercent(revenue, profit float64) float64 {
-	if math.Abs(revenue) <= 1 {
-		return 0
-	}
-	return profit / revenue * 100
-}
-
-func profitReportWarnings(summary Record, status string) []Record {
-	warnings := []Record{}
-	if count := number(summary["unclassified_cost_count"]); count > 0 {
-		warnings = append(warnings, Record{
-			"code":     "indirect_or_unclassified_cost",
-			"severity": "warning",
-			"message":  "Có chi phí chưa đủ nguồn phân loại trực tiếp nên được đưa vào chi phí gián tiếp",
-			"count":    count,
-		})
-	}
-	if status == "posted" {
-		if count := number(summary["excluded_unposted_count"]); count > 0 {
-			warnings = append(warnings, Record{
-				"code":     "unposted_excluded",
-				"severity": "info",
-				"message":  "Có chứng từ chưa ghi nhận bị loại khỏi báo cáo mặc định",
-				"count":    count,
-				"amount":   summary["excluded_unposted_total"],
-			})
-		}
-	}
-	if number(summary["revenue_amount"]) > 0 && number(summary["net_profit"]) < 0 {
-		warnings = append(warnings, Record{
-			"code":     "negative_net_profit",
-			"severity": "warning",
-			"message":  "Lợi nhuận ròng đang âm trong khoảng lọc",
-			"amount":   summary["net_profit"],
-		})
-	}
-	return warnings
-}
-
-func taxReportWarnings(summary Record, status string) []Record {
-	warnings := []Record{}
-	if count := number(summary["missing_tax_code_count"]); count > 0 {
-		warnings = append(warnings, Record{
-			"code":     "missing_tax_code",
-			"severity": "warning",
-			"message":  "Có hoá đơn thiếu mã số thuế đối tác",
-			"count":    count,
-		})
-	}
-	if count := number(summary["vat_math_mismatch_count"]); count > 0 {
-		warnings = append(warnings, Record{
-			"code":     "vat_math_mismatch",
-			"severity": "warning",
-			"message":  "Có hoá đơn lệch phép tính trước VAT + VAT = tổng tiền",
-			"count":    count,
-		})
-	}
-	if status == "posted" {
-		if count := number(summary["excluded_unposted_count"]); count > 0 {
-			warnings = append(warnings, Record{
-				"code":     "unposted_excluded",
-				"severity": "info",
-				"message":  "Có hóa đơn chưa ghi nhận bị loại khỏi báo cáo mặc định",
-				"count":    count,
-				"amount":   summary["excluded_unposted_total"],
-			})
-		}
-	}
-	return warnings
-}
-
-func taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter string) string {
-	return fmt.Sprintf(`
-		WITH tax_rows AS (
-			SELECT
-				'input'::text AS direction,
-				ii.id::text AS id,
-				ii.project_id::text AS project_id,
-				p.name AS project_name,
-				ii.invoice_number,
-				COALESCE(ii.invoice_symbol, '') AS invoice_symbol,
-				ii.invoice_date,
-				ii.vendor_name AS counterparty_name,
-				COALESCE(ii.vendor_tax_code, '') AS tax_code,
-				ii.amount_before_vat,
-				ii.vat_amount,
-				ii.total_amount,
-				ii.currency,
-				ii.status,
-				(ii.status='verified') AS posted,
-				'payable'::text AS source_type,
-				ii.payable_id::text AS source_id,
-				COALESCE(payable.payable_code, '') AS source_code,
-				'procurement_request'::text AS secondary_source_type,
-				ii.procurement_request_id::text AS secondary_source_id,
-				COALESCE(procurement.request_code, '') AS secondary_source_code,
-				ii.document_id::text AS document_id,
-				COALESCE(doc.name, '') AS document_name,
-				(COALESCE(ii.vendor_tax_code, '') = '') AS missing_tax_code,
-				(ABS((COALESCE(ii.amount_before_vat, 0) + COALESCE(ii.vat_amount, 0)) - COALESCE(ii.total_amount, 0)) > 1) AS vat_math_mismatch,
-				ii.created_at
-			FROM input_invoices ii
-			JOIN projects p ON p.id=ii.project_id
-			LEFT JOIN payables payable ON payable.id=ii.payable_id
-			LEFT JOIN procurement_requests procurement ON procurement.id=ii.procurement_request_id
-			LEFT JOIN documents doc ON doc.id=ii.document_id
-			WHERE ii.status <> 'deleted'
-			  AND p.status <> 'cancelled'
-			  AND %s
-			  %s
-			  %s
-			UNION ALL
-			SELECT
-				'output'::text AS direction,
-				oi.id::text AS id,
-				oi.project_id::text AS project_id,
-				p.name AS project_name,
-				oi.invoice_number,
-				COALESCE(oi.invoice_symbol, '') AS invoice_symbol,
-				oi.invoice_date,
-				oi.client_name AS counterparty_name,
-				COALESCE(oi.client_tax_code, '') AS tax_code,
-				oi.amount_before_vat,
-				oi.vat_amount,
-				oi.total_amount,
-				oi.currency,
-				oi.status,
-				(oi.status='issued') AS posted,
-				'receivable'::text AS source_type,
-				oi.receivable_id::text AS source_id,
-				COALESCE(receivable.receivable_code, '') AS source_code,
-				'payment'::text AS secondary_source_type,
-				oi.payment_id::text AS secondary_source_id,
-				COALESCE(payment.payment_code, '') AS secondary_source_code,
-				oi.document_id::text AS document_id,
-				COALESCE(doc.name, '') AS document_name,
-				(COALESCE(oi.client_tax_code, '') = '') AS missing_tax_code,
-				(ABS((COALESCE(oi.amount_before_vat, 0) + COALESCE(oi.vat_amount, 0)) - COALESCE(oi.total_amount, 0)) > 1) AS vat_math_mismatch,
-				oi.created_at
-			FROM output_invoices oi
-			JOIN projects p ON p.id=oi.project_id
-			LEFT JOIN receivables receivable ON receivable.id=oi.receivable_id
-			LEFT JOIN payments payment ON payment.id=oi.payment_id
-			LEFT JOIN documents doc ON doc.id=oi.document_id
-			WHERE oi.status <> 'deleted'
-			  AND p.status <> 'cancelled'
-			  AND %s
-			  %s
-			  %s
-		)
-	`, scopeSQL, projectFilter, inputDateFilter, scopeSQL, projectFilter, outputDateFilter)
-}
-
-func taxSourceFilter(source string) string {
-	switch source {
-	case "input":
-		return " AND direction='input'"
-	case "output":
-		return " AND direction='output'"
-	default:
-		return ""
-	}
-}
-
-func taxStatusFilter(status string) string {
-	if status == "posted" {
-		return " AND posted"
-	}
-	return ""
-}
-
-func taxProjectFilter(args *[]any, projectID string) string {
-	projectID = cleanID(projectID)
-	if projectID == "" {
-		return ""
-	}
-	*args = append(*args, projectID)
-	return fmt.Sprintf(" AND p.id=$%d::uuid", len(*args))
-}
-
-func taxPeriodExpr(groupBy string) string {
-	if groupBy == "quarter" {
-		return "date_trunc('quarter', invoice_date)::date"
-	}
-	return "date_trunc('month', invoice_date)::date"
-}
-
-func profitRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter string) string {
-	directExpr := `
-		ii.procurement_request_id IS NOT NULL
-		OR lower(COALESCE(payable.source_type, '')) IN ('procurement','boq','boq_item','work_item','acceptance','incoming_acceptance','outgoing_acceptance','operation','rework')
-		OR lower(COALESCE(payable.vendor_type, '')) IN ('supplier','subcontractor')
-	`
-	return fmt.Sprintf(`
-		WITH input_rows AS (
-			SELECT
-				ii.id::text AS id,
-				ii.project_id::text AS project_id,
-				p.name AS project_name,
-				ii.invoice_number,
-				COALESCE(ii.invoice_symbol, '') AS invoice_symbol,
-				ii.invoice_date,
-				ii.vendor_name AS counterparty_name,
-				COALESCE(ii.vendor_tax_code, '') AS tax_code,
-				ii.amount_before_vat,
-				ii.vat_amount,
-				ii.total_amount,
-				ii.currency,
-				ii.status,
-				(ii.status='verified') AS posted,
-				'payable'::text AS source_type,
-				ii.payable_id::text AS source_id,
-				COALESCE(payable.payable_code, '') AS source_code,
-				'procurement_request'::text AS secondary_source_type,
-				ii.procurement_request_id::text AS secondary_source_id,
-				COALESCE(procurement.request_code, '') AS secondary_source_code,
-				ii.document_id::text AS document_id,
-				COALESCE(doc.name, '') AS document_name,
-				(%s) AS direct_cost,
-				CASE
-					WHEN ii.procurement_request_id IS NOT NULL OR lower(COALESCE(payable.source_type, '')) IN ('procurement','boq','boq_item') THEN 'Procurement / BOQ'
-					WHEN lower(COALESCE(payable.vendor_type, ''))='subcontractor' THEN 'Thầu phụ'
-					WHEN lower(COALESCE(payable.vendor_type, ''))='supplier' THEN 'Nhà cung cấp'
-					WHEN COALESCE(payable.source_type, '') <> '' THEN 'Source khác'
-					ELSE 'Chi phí gián tiếp'
-				END AS cost_group,
-				CASE
-					WHEN ii.procurement_request_id IS NOT NULL THEN 'linked_procurement_invoice'
-					WHEN lower(COALESCE(payable.source_type, '')) IN ('procurement','boq','boq_item','work_item','acceptance','incoming_acceptance','outgoing_acceptance','operation','rework') THEN 'payable_source_direct'
-					WHEN lower(COALESCE(payable.vendor_type, '')) IN ('supplier','subcontractor') THEN 'vendor_type_direct'
-					WHEN COALESCE(payable.source_type, '') <> '' THEN 'payable_source_indirect'
-					ELSE 'indirect_fallback'
-				END AS classification_reason,
-				ii.created_at
-			FROM input_invoices ii
-			JOIN projects p ON p.id=ii.project_id
-			LEFT JOIN payables payable ON payable.id=ii.payable_id
-			LEFT JOIN procurement_requests procurement ON procurement.id=ii.procurement_request_id
-			LEFT JOIN documents doc ON doc.id=ii.document_id
-			WHERE ii.status <> 'deleted'
-			  AND p.status <> 'cancelled'
-			  AND %s
-			  %s
-			  %s
-		),
-		output_rows AS (
-			SELECT
-				oi.id::text AS id,
-				oi.project_id::text AS project_id,
-				p.name AS project_name,
-				oi.invoice_number,
-				COALESCE(oi.invoice_symbol, '') AS invoice_symbol,
-				oi.invoice_date,
-				oi.client_name AS counterparty_name,
-				COALESCE(oi.client_tax_code, '') AS tax_code,
-				oi.amount_before_vat,
-				oi.vat_amount,
-				oi.total_amount,
-				oi.currency,
-				oi.status,
-				(oi.status='issued') AS posted,
-				'receivable'::text AS source_type,
-				oi.receivable_id::text AS source_id,
-				COALESCE(receivable.receivable_code, '') AS source_code,
-				'payment'::text AS secondary_source_type,
-				oi.payment_id::text AS secondary_source_id,
-				COALESCE(payment.payment_code, '') AS secondary_source_code,
-				oi.document_id::text AS document_id,
-				COALESCE(doc.name, '') AS document_name,
-				oi.created_at
-			FROM output_invoices oi
-			JOIN projects p ON p.id=oi.project_id
-			LEFT JOIN receivables receivable ON receivable.id=oi.receivable_id
-			LEFT JOIN payments payment ON payment.id=oi.payment_id
-			LEFT JOIN documents doc ON doc.id=oi.document_id
-			WHERE oi.status <> 'deleted'
-			  AND p.status <> 'cancelled'
-			  AND %s
-			  %s
-			  %s
-		),
-		profit_rows AS (
-			SELECT
-				'revenue'::text AS direction,
-				'revenue'::text AS cost_type,
-				'Revenue'::text AS cost_group,
-				'issued_output_invoice'::text AS classification_reason,
-				id,
-				project_id,
-				project_name,
-				invoice_number,
-				invoice_symbol,
-				invoice_date,
-				counterparty_name,
-				tax_code,
-				amount_before_vat,
-				vat_amount,
-				total_amount,
-				amount_before_vat AS revenue_amount,
-				0::numeric AS direct_cost_amount,
-				0::numeric AS indirect_cost_amount,
-				currency,
-				status,
-				posted,
-				source_type,
-				source_id,
-				source_code,
-				secondary_source_type,
-				secondary_source_id,
-				secondary_source_code,
-				document_id,
-				document_name,
-				false AS unclassified_cost,
-				created_at
-			FROM output_rows
-			UNION ALL
-			SELECT
-				'cost'::text AS direction,
-				CASE WHEN direct_cost THEN 'direct' ELSE 'indirect' END AS cost_type,
-				cost_group,
-				classification_reason,
-				id,
-				project_id,
-				project_name,
-				invoice_number,
-				invoice_symbol,
-				invoice_date,
-				counterparty_name,
-				tax_code,
-				amount_before_vat,
-				vat_amount,
-				total_amount,
-				0::numeric AS revenue_amount,
-				CASE WHEN direct_cost THEN amount_before_vat ELSE 0 END AS direct_cost_amount,
-				CASE WHEN direct_cost THEN 0 ELSE amount_before_vat END AS indirect_cost_amount,
-				currency,
-				status,
-				posted,
-				source_type,
-				source_id,
-				source_code,
-				secondary_source_type,
-				secondary_source_id,
-				secondary_source_code,
-				document_id,
-				document_name,
-				NOT direct_cost AS unclassified_cost,
-				created_at
-			FROM input_rows
-		)
-	`, directExpr, scopeSQL, projectFilter, inputDateFilter, scopeSQL, projectFilter, outputDateFilter)
-}
-
-func profitStatusFilter(status string) string {
-	if status == "posted" {
-		return " AND posted"
-	}
-	return ""
-}
-
-func profitProjectFilter(args *[]any, projectID string) string {
-	projectID = cleanID(projectID)
-	if projectID == "" {
-		return ""
-	}
-	*args = append(*args, projectID)
-	return fmt.Sprintf(" AND p.id=$%d::uuid", len(*args))
-}
-
-func profitPeriodExpr(groupBy string) string {
-	if groupBy == "quarter" {
-		return "date_trunc('quarter', invoice_date)::date"
-	}
-	return "date_trunc('month', invoice_date)::date"
-}
-
-func cashflowRowsCTE(scopeSQL, projectFilter, dateFilter, statusFilter string) string {
-	return fmt.Sprintf(`
-		WITH classified AS (
-			SELECT
-				pay.*,
-				p.name AS project_name,
-				COALESCE(created.full_name, '') AS created_by_name,
-				COALESCE(approved.full_name, '') AS approved_by_name,
-				%s AS occurred_at,
-				CASE
-					WHEN pay.payment_type IN ('client_receipt','inbound') OR (pay.payment_type='advance' AND pay.target_type='receivable') THEN 'inflow'
-					WHEN pay.payment_type IN ('supplier_payment','subcontractor_payment','outbound') OR (pay.payment_type='advance' AND pay.target_type='payable') THEN 'outflow'
-					WHEN pay.payment_type='advance_settlement' THEN 'non_cash'
-					ELSE 'unclassified'
-				END AS direction,
-				CASE
-					WHEN pay.payment_type='client_receipt' THEN 'Thu khách hàng'
-					WHEN pay.payment_type='inbound' THEN 'Thu khác'
-					WHEN pay.payment_type='advance' AND pay.target_type='receivable' THEN 'Thu ứng trước khách hàng'
-					WHEN pay.payment_type='supplier_payment' THEN 'Thanh toán nhà cung cấp'
-					WHEN pay.payment_type='subcontractor_payment' THEN 'Thanh toán thầu phụ'
-					WHEN pay.payment_type='outbound' THEN 'Phiếu chi'
-					WHEN pay.payment_type='advance' AND pay.target_type='payable' THEN 'Chi ứng trước'
-					WHEN pay.payment_type='advance_settlement' THEN 'Quyết toán tạm ứng'
-					ELSE 'Unclassified'
-				END AS category
-			FROM payments pay
-			JOIN projects p ON p.id=pay.project_id
-			LEFT JOIN users created ON created.id=pay.created_by
-			LEFT JOIN users approved ON approved.id=pay.approved_by
-			WHERE pay.status <> 'cancelled'
-			  AND p.status <> 'cancelled'
-			  AND %s
-			  %s
-			  %s
-			  %s
-		),
-		cashflow_rows AS (
-			SELECT
-				classified.*,
-				CASE WHEN direction='inflow' THEN COALESCE(amount,0) ELSE 0 END AS inflow_amount,
-				CASE WHEN direction='outflow' THEN COALESCE(amount,0) ELSE 0 END AS outflow_amount,
-				CASE
-					WHEN direction='inflow' THEN COALESCE(amount,0)
-					WHEN direction='outflow' THEN -COALESCE(amount,0)
-					ELSE 0
-				END AS net_amount
-			FROM classified
-		)
-	`, cashflowOccurredAtSQL(), scopeSQL, projectFilter, dateFilter, statusFilter)
-}
-
-func cashflowOccurredAtSQL() string {
-	return "COALESCE(pay.paid_at, pay.updated_at, pay.created_at)"
-}
-
-func cashflowStatusFilter(status string) string {
-	if status == "approved" {
-		return " AND pay.status='approved'"
-	}
-	return ""
-}
-
-func cashflowProjectFilter(args *[]any, projectID string) string {
-	projectID = cleanID(projectID)
-	if projectID == "" {
-		return ""
-	}
-	*args = append(*args, projectID)
-	return fmt.Sprintf(" AND p.id=$%d::uuid", len(*args))
-}
-
-func cashflowPeriodExpr(groupBy string) string {
-	switch groupBy {
-	case "week":
-		return "date_trunc('week', occurred_at)::date"
-	case "month":
-		return "date_trunc('month', occurred_at)::date"
-	default:
-		return "date_trunc('day', occurred_at)::date"
-	}
 }
 
 func queryTx(ctx context.Context, tx *sql.Tx, query string, args ...any) ([]Record, error) {

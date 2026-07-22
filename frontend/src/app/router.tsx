@@ -1,40 +1,42 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { lazy, type ReactNode } from 'react';
 import { AppShell } from '../layouts/AppShell';
 import { useAuth } from '../lib/auth/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { PermissionDenied } from '../components/PermissionDenied';
 import { LoginPage } from '../modules/auth/LoginPage';
-import { DashboardPage } from '../modules/dashboard/DashboardPage';
-import { ProjectsPage } from '../modules/projects/ProjectsPage';
-import { ProjectProgressPage } from '../modules/projects/ProjectProgressPage';
-import { ProjectDetailPage } from '../modules/projects/ProjectDetailPage';
-import { ProjectWorkspaceLayout } from '../modules/projects/ProjectWorkspaceLayout';
-import { MyWorkPage } from '../modules/my-work/MyWorkPage';
-import { WorkItemDetailPage } from '../modules/work-items/WorkItemDetailPage';
-import { PipelineBuilderPage } from '../modules/pipeline-builder/PipelineBuilderPage';
-import { WorkflowFormsPage } from '../modules/workflow-forms/WorkflowFormsPage';
-import { PlanningDailyReportsPage } from '../modules/planning-daily-reports/PlanningDailyReportsPage';
-import { MeetingMinutesPage } from '../modules/meeting-minutes/MeetingMinutesPage';
-import { PlanningChecklistsPage } from '../modules/planning-checklists/PlanningChecklistsPage';
-import { PlanningPage } from '../modules/planning/PlanningPage';
-import { BOQPage } from '../modules/boq/BOQPage';
-import { ProcurementPage } from '../modules/procurement/ProcurementPage';
-import { ContractsPage } from '../modules/contracts/ContractsPage';
-import { WarehousePage } from '../modules/warehouse/WarehousePage';
-import { OperationsPage } from '../modules/operations/OperationsPage';
-import { AcceptancePage } from '../modules/acceptance/AcceptancePage';
-import { ReworkPage } from '../modules/rework/ReworkPage';
-import { HandoverPage } from '../modules/handover/HandoverPage';
-import { AccountingPage } from '../modules/accounting/AccountingPage';
-import { DebtPage } from '../modules/debt/DebtPage';
-import { CoreDataPage } from '../modules/core-data/CoreDataPage';
-import { StaffPage } from '../modules/staff/StaffPage';
-import { RolesPage } from '../modules/rbac/RolesPage';
-import { PermissionsPage } from '../modules/rbac/PermissionsPage';
-import { AuditPage } from '../modules/audit/AuditPage';
-import { ReportsPage } from '../modules/reports/ReportsPage';
-import { SettingsPage } from '../modules/settings/SettingsPage';
+import { RouteModuleBoundary } from './RouteModuleBoundary';
+
+const DashboardPage = lazy(() => import('../modules/dashboard/DashboardPage').then(({ DashboardPage }) => ({ default: DashboardPage })));
+const ProjectsPage = lazy(() => import('../modules/projects/ProjectsPage').then(({ ProjectsPage }) => ({ default: ProjectsPage })));
+const ProjectProgressPage = lazy(() => import('../modules/projects/ProjectProgressPage').then(({ ProjectProgressPage }) => ({ default: ProjectProgressPage })));
+const ProjectDetailPage = lazy(() => import('../modules/projects/ProjectDetailPage').then(({ ProjectDetailPage }) => ({ default: ProjectDetailPage })));
+const ProjectWorkspaceLayout = lazy(() => import('../modules/projects/ProjectWorkspaceLayout').then(({ ProjectWorkspaceLayout }) => ({ default: ProjectWorkspaceLayout })));
+const MyWorkPage = lazy(() => import('../modules/my-work/MyWorkPage').then(({ MyWorkPage }) => ({ default: MyWorkPage })));
+const WorkItemDetailPage = lazy(() => import('../modules/work-items/WorkItemDetailPage').then(({ WorkItemDetailPage }) => ({ default: WorkItemDetailPage })));
+const PipelineBuilderPage = lazy(() => import('../modules/pipeline-builder/PipelineBuilderPage').then(({ PipelineBuilderPage }) => ({ default: PipelineBuilderPage })));
+const WorkflowFormsPage = lazy(() => import('../modules/workflow-forms/WorkflowFormsPage').then(({ WorkflowFormsPage }) => ({ default: WorkflowFormsPage })));
+const PlanningDailyReportsPage = lazy(() => import('../modules/planning-daily-reports/PlanningDailyReportsPage').then(({ PlanningDailyReportsPage }) => ({ default: PlanningDailyReportsPage })));
+const MeetingMinutesPage = lazy(() => import('../modules/meeting-minutes/MeetingMinutesPage').then(({ MeetingMinutesPage }) => ({ default: MeetingMinutesPage })));
+const PlanningChecklistsPage = lazy(() => import('../modules/planning-checklists/PlanningChecklistsPage').then(({ PlanningChecklistsPage }) => ({ default: PlanningChecklistsPage })));
+const PlanningPage = lazy(() => import('../modules/planning/PlanningPage').then(({ PlanningPage }) => ({ default: PlanningPage })));
+const BOQPage = lazy(() => import('../modules/boq/BOQPage').then(({ BOQPage }) => ({ default: BOQPage })));
+const ProcurementPage = lazy(() => import('../modules/procurement/ProcurementPage').then(({ ProcurementPage }) => ({ default: ProcurementPage })));
+const ContractsPage = lazy(() => import('../modules/contracts/ContractsPage').then(({ ContractsPage }) => ({ default: ContractsPage })));
+const WarehousePage = lazy(() => import('../modules/warehouse/WarehousePage').then(({ WarehousePage }) => ({ default: WarehousePage })));
+const OperationsPage = lazy(() => import('../modules/operations/OperationsPage').then(({ OperationsPage }) => ({ default: OperationsPage })));
+const AcceptancePage = lazy(() => import('../modules/acceptance/AcceptancePage').then(({ AcceptancePage }) => ({ default: AcceptancePage })));
+const ReworkPage = lazy(() => import('../modules/rework/ReworkPage').then(({ ReworkPage }) => ({ default: ReworkPage })));
+const HandoverPage = lazy(() => import('../modules/handover/HandoverPage').then(({ HandoverPage }) => ({ default: HandoverPage })));
+const AccountingPage = lazy(() => import('../modules/accounting/AccountingPage').then(({ AccountingPage }) => ({ default: AccountingPage })));
+const DebtPage = lazy(() => import('../modules/debt/DebtPage').then(({ DebtPage }) => ({ default: DebtPage })));
+const CoreDataPage = lazy(() => import('../modules/core-data/CoreDataPage').then(({ CoreDataPage }) => ({ default: CoreDataPage })));
+const StaffPage = lazy(() => import('../modules/staff/StaffPage').then(({ StaffPage }) => ({ default: StaffPage })));
+const RolesPage = lazy(() => import('../modules/rbac/RolesPage').then(({ RolesPage }) => ({ default: RolesPage })));
+const PermissionsPage = lazy(() => import('../modules/rbac/PermissionsPage').then(({ PermissionsPage }) => ({ default: PermissionsPage })));
+const AuditPage = lazy(() => import('../modules/audit/AuditPage').then(({ AuditPage }) => ({ default: AuditPage })));
+const ReportsPage = lazy(() => import('../modules/reports/ReportsPage').then(({ ReportsPage }) => ({ default: ReportsPage })));
+const SettingsPage = lazy(() => import('../modules/settings/SettingsPage').then(({ SettingsPage }) => ({ default: SettingsPage })));
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -54,8 +56,12 @@ function HomeRedirect() {
   return <Navigate to={hasAnyPermission(['project.view']) ? '/projects' : '/my-work'} replace />;
 }
 
-function guarded(element: ReactNode, permissions?: string[]) {
-  return <RequirePermission permissions={permissions}>{element}</RequirePermission>;
+function guarded(element: ReactNode, permissions?: string[], focus = false) {
+  return (
+    <RequirePermission permissions={permissions}>
+      <RouteModuleBoundary focus={focus}>{element}</RouteModuleBoundary>
+    </RequirePermission>
+  );
 }
 
 export const router = createBrowserRouter([
@@ -66,15 +72,15 @@ export const router = createBrowserRouter([
       { index: true, element: <HomeRedirect /> },
       { path: '/dashboard', element: guarded(<DashboardPage />, ['report.view']) },
       { path: '/progress', element: guarded(<ProjectProgressPage />, ['project.view']) },
-      { path: '/my-work', element: <MyWorkPage /> },
-      { path: '/work-items/:id', element: <WorkItemDetailPage /> },
+      { path: '/my-work', element: guarded(<MyWorkPage />) },
+      { path: '/work-items/:id', element: guarded(<WorkItemDetailPage />) },
       { path: '/projects', element: guarded(<ProjectsPage />, ['project.view']) },
       {
         path: '/projects/:id',
-        element: guarded(<ProjectWorkspaceLayout />, ['project.view']),
+        element: guarded(<ProjectWorkspaceLayout />, ['project.view'], true),
         children: [
-          { index: true, element: <ProjectDetailPage /> },
-          { path: 'work-items/:workItemId', element: <WorkItemDetailPage /> },
+          { index: true, element: guarded(<ProjectDetailPage />) },
+          { path: 'work-items/:workItemId', element: guarded(<WorkItemDetailPage />) },
           { path: 'pipeline', element: guarded(<PlanningPage mode="pipeline" />, ['pipeline.view']) },
           { path: 'planning', element: guarded(<PlanningPage />, ['planning.view', 'pipeline.view']) },
           { path: 'boq', element: guarded(<BOQPage />, ['boq.view']) },
@@ -91,8 +97,8 @@ export const router = createBrowserRouter([
           { path: 'audit', element: guarded(<AuditPage scoped />, ['audit.view']) },
         ],
       },
-      { path: '/pipeline-builder', element: guarded(<PipelineBuilderPage />, ['pipeline.view']) },
-      { path: '/pipeline-builder/:id', element: guarded(<PipelineBuilderPage />, ['pipeline.view']) },
+      { path: '/pipeline-builder', element: guarded(<PipelineBuilderPage />, ['pipeline.view'], true) },
+      { path: '/pipeline-builder/:id', element: guarded(<PipelineBuilderPage />, ['pipeline.view'], true) },
       { path: '/workflow-forms', element: guarded(<WorkflowFormsPage />, ['pipeline.view']) },
       { path: '/planning/daily-reports', element: guarded(<PlanningDailyReportsPage />, ['planning.view', 'pipeline.view']) },
       { path: '/planning/meeting-minutes', element: guarded(<MeetingMinutesPage />, ['planning.view', 'pipeline.view']) },

@@ -26,21 +26,21 @@
 - `payable_payment_schedules`, `receivable_payment_schedules`, `client_advance_receipts`
 - `contracts`, `contract_versions`, `contract_milestones`, `contract_variations`, `contract_retentions`, `contract_retention_releases`
 - Related documents: `documents`, `evidence_records`, `partners`
-- Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`
+- Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`, `V70`, `V71`
 
 ## Invariants
 
 - AP/AR records reconcile to invoices, payments/receipts, advances, settlements, and source documents.
-- API creation of manual AP/AR is server-owned: new records start `draft`, paid/received amounts start at zero, remaining balance is computed from normalized obligation fields, and the actor/audit trail is recorded. Client-supplied status or derived balances are ignored by typed contracts.
-- Generic payment/receipt creation always starts `draft`; approval is the only path that sets approval actor/time. AP/AR-linked payments should use the dedicated allocation endpoints so reconciliation stays correct.
-- Budget creation is typed and server-owned: clients provide only code/name/planned amount; draft approved/used/remaining amounts start at zero, and approval derives approved amount from planned amount plus remaining from approved minus used.
+- API creation of manual AP/AR is server-owned: new records start `draft`, paid/received amounts start at zero, remaining balance is computed from normalized obligation fields, and the actor/audit trail is recorded in the same fail-closed transaction. Client-supplied status or derived balances are ignored by typed contracts.
+- Generic payment/receipt creation always starts `draft` and is atomic with its audit event; approval is the only path that sets approval actor/time. AP/AR-linked payments should use the dedicated allocation endpoints so reconciliation stays correct.
+- Budget creation is typed and server-owned: clients provide only code/name/planned amount; draft approved/used/remaining amounts start at zero, and approval derives approved amount from planned amount plus remaining from approved minus used. Both creation and approval write audit in the same transaction and roll back on audit failure.
 - Generic `/payments` creation is reserved for non-AP/AR `outbound`, `inbound`, and `other` records. Supplier/subcontractor/client/advance payment types must be created from the dedicated payable/receivable endpoints with allocation context.
 - Payable and receivable list handlers both combine actor project visibility with a validated explicit `project_id` filter; project-scoped UI must not rely on client filtering.
 - The Debt UI owns AP/AR work queues, complete aging (`not_due`, `1_30`, `31_60`, `61_90`, `90_plus`, `settled`) and invoice/schedule/advance/payment/reconciliation detail. User-facing text spells these out as `công nợ phải trả` and `công nợ phải thu`; AP/AR remains technical shorthand in code/contracts/maps. Accounting owns budget, generic phiếu approval/list and cashflow presentation.
 - The project Debt page accepts presentation-only `?kind=payables|receivables&queue=...` source-navigation queries. It applies only a kind the user may view and never turns query parameters into an API mutation, allocation, approval or reconciliation action; Handover uses this to disclose the current module behind stored readiness counts.
 - Debt create/detail presentation may derive live opening balances and promote one state-aware next action, but approval and pay/receive actions still call canonical routes; allocations, invoices, advances, schedules and reconciliation remain owned by their existing debt panels and server calculations.
 - Accounting create/detail presentation may combine budget and generic phiếu entry into one permission-aware dialog, but it must keep `supplier|subcontractor|client_receipt|advance` out of generic payment creation and direct AP/AR work to Debt. A linked payable/receivable phiếu uses `Mở công nợ` to navigate to the Debt workspace without mutating allocation or reconciliation state.
-- Input invoice PDFs belong to payables; output invoice PDFs belong to receivables.
+- Input invoice PDFs belong to payables; output invoice PDFs belong to receivables. Both persist opaque `local|s3` storage provider/key metadata through the shared storage registry under V70. V71 adds `NOT VALID` future-write checks requiring invoice keys to be non-null, nonblank and equal to `btrim(storage_key)` without rewriting legacy invalid rows. Both load detail before transaction commit, delete a newly written object only on a typed pre-commit failure, preserve it when commit outcome is unknown, enforce deleted-record guards, and authorize project/accounting access before opening and streaming a protected file.
 - Cashflow, tax, and profit reports must stay source-backed and permission-scoped.
 - Accounting report totals payables, receivables and budgets independently per accessible project before joining them. Equal monetary amounts are separate obligations and must all count; never use `SUM(DISTINCT amount)` as a join-deduplication technique. Optional project filtering and CSV reuse the same query.
 - CSV exports must use the same filters and source logic as UI reports.

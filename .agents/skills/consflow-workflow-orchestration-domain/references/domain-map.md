@@ -7,7 +7,7 @@
 - Frontend routes: `frontend/src/app/router.tsx`
 - Frontend modules: `frontend/src/modules/pipeline-builder`, `frontend/src/modules/planning`, `frontend/src/modules/workflow-forms`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
 - Shared frontend contracts: `frontend/src/lib/api/client.ts`, `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
-- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`
+- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`, `V70`, `V71`
 
 ## Routes
 
@@ -30,7 +30,7 @@
 ## Invariants
 
 - Published pipeline template revisions are structurally immutable; structural edits require a new draft revision in the same `template_family_id` lineage. Node, Step and Connector inspectors remain available for read-only inspection; Connector Inspector must hide Save and disable stored label, condition/config and priority fields. Presentation-only layout remains mutable for actors with `pipeline.edit`: node coordinates and stored connector port sides may change atomically, but connector endpoint node IDs, ordering, conditions, steps/forms, definition semantics and runtime copies may not. The layout route derives endpoint node IDs from the stored edge and writes an audit event.
-- Publish records `definition_hash`, `published_at`, and `published_by`; project runtime starts only from an exact published revision.
+- Publish records `definition_hash`, `published_at`, and `published_by` together with its audit event in one fail-closed transaction; project runtime starts only from an exact published revision.
 - `pipeline_runs.engine_version` and `pipeline_runs.template_definition_hash` snapshot the selected execution contract and are not refreshed from later revisions.
 - Engine v2 run steps snapshot `form_required` and exact `form_version_id`; a submitted different form or synthetic legacy checklist cannot satisfy the gate.
 - Runtime steps are deterministically ordered by `order_index,id`; do not reference a non-existent `pipeline_run_steps.created_at` column in run detail or completion-gate queries.
@@ -51,6 +51,7 @@
 - The operations timeline consumes that bridge's structured daily-report answers without changing workflow completion semantics. Direct manual reports use their own typed create/update and report-evidence-upload contract, but still do not create work items, workflow form instances, approvals or completion events; new files remain normal work-item evidence. Any report with `workflow_form_instance_id` is read-only in Operations and rejects direct update/upload, preserving the source form as authoritative. Legacy summary rows remain readable. Outgoing work-item acceptance and the project acceptance workspace share `AcceptanceEditor.tsx`, while form/signature/PDF gates and work-item action permissions remain authoritative.
 - Engine v2 hard `domain_action_key` automation runs before work-item completion. Blocked/failed outcomes are recorded idempotently and leave the work item incomplete; display-name dispatch remains legacy-only.
 - Engine v2 node approvals snapshot structured `approval_policy_json` into the run and request. Supported modes are `any`, `all`, `quorum`, and `ordered`; stage, actor role, requester separation, comments, actions, and audit remain traceable.
+- Workflow-form template create/update/archive, node approval request and node block/complete transitions persist their audit event in the same transaction; an audit serialization/insert failure rolls back the state transition.
 - Publish validation covers graph reachability/root/sink/cycle, required published form versions, answer-condition configuration, and permission-key existence.
 - Template layout edits do not mutate existing run copies, and node coordinates plus `condition_config.diagram` are excluded from new definition hashes while all business condition keys remain hashed.
 - Pipeline node `type` remains a technical template/runtime key. Pipeline Builder node cards and Node Inspector options share the frontend `nodeTypeValues`/`enumLabel` presentation contract: known official types render Vietnamese labels, while an unknown future key remains visibly readable through the raw fallback rather than being discarded.
@@ -68,7 +69,7 @@
 - Project activity resolution is separate from work-item transitions: question/blocker/reminder metadata may be closed only by an authorized actor, and each resolution appends a system activity plus audit without bypassing work-item blocker or completion gates.
 - Project activity replies and reactions are communication-only: replies inherit the parent context/visibility and reactions are active-state acknowledgements; neither can satisfy work-item evidence, form, approval, blocker, completion or runtime-node gates.
 - Project activity comment edits and withdrawals are communication-only and author-scoped within 15 minutes. They append revisions/audit and never satisfy, reopen or bypass work-item evidence, form, approval, blocker, completion or runtime-node gates; typed operational activity is not mutable through these endpoints.
-- Signatures and PDFs preserve revision, actor, hash, checksum, and protected file access.
+- Signatures and PDFs preserve revision, actor, hash, checksum, opaque storage provider/key and protected file access. V70 permits `s3` metadata but keeps artifact history immutable: the only accepted update is a same-key, provider-only `local -> s3` relocation; every other update and every delete still fail. V71 adds `NOT VALID` future-write checks requiring internal visual/PDF keys to be non-null, nonblank and canonical while preserving legacy invalid rows for operator inventory; it does not redefine the V70 triggers. Their generated objects use the shared storage registry; detail is loaded inside the mutation transaction before commit. A typed pre-commit failure deletes the new object, but an outcome-unknown commit error preserves it to avoid deleting a committed reference. Files are opened only after work-item view authorization before streaming.
 
 ## Cross-Domain Checks
 

@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "check:bundle-budget": "node scripts/check-bundle-budget.mjs",
+    "build:budget": "npm run build && npm run check:bundle-budget",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:handover-source": "node --experimental-strip-types --test tests/handoverSourcePresentation.test.ts",
     "test:node-type-presentation": "node --experimental-strip-types --test tests/nodeTypePresentation.test.ts",
     "test:project-navigation": "node --experimental-strip-types --test tests/projectWorkspaceNavigation.test.ts",

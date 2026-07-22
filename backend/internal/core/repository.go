@@ -21,7 +21,11 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 func (r *Repository) Query(ctx context.Context, query string, args ...any) ([]Record, error) {
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	return queryRecords(ctx, r.db, query, args...)
+}
+
+func queryRecords(ctx context.Context, db queryContext, query string, args ...any) ([]Record, error) {
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +34,11 @@ func (r *Repository) Query(ctx context.Context, query string, args ...any) ([]Re
 }
 
 func (r *Repository) QueryOne(ctx context.Context, query string, args ...any) (Record, error) {
-	rows, err := r.Query(ctx, query, args...)
+	return queryOneRecord(ctx, r.db, query, args...)
+}
+
+func queryOneRecord(ctx context.Context, db queryContext, query string, args ...any) (Record, error) {
+	rows, err := queryRecords(ctx, db, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +103,46 @@ type queryContext interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }
 
+type storedMutationError struct {
+	err         error
+	cleanupSafe bool
+}
+
+func (e *storedMutationError) Error() string { return e.err.Error() }
+func (e *storedMutationError) Unwrap() error { return e.err }
+
+type storedMutationTracker struct {
+	commitAttempted bool
+}
+
+func (t *storedMutationTracker) wrap(err *error) {
+	if err == nil || *err == nil {
+		return
+	}
+	*err = &storedMutationError{err: *err, cleanupSafe: !t.commitAttempted}
+}
+
+func (t *storedMutationTracker) commit(commit func() error) error {
+	t.commitAttempted = true
+	return commit()
+}
+
+func storedMutationCleanupSafe(err error) bool {
+	var mutationErr *storedMutationError
+	return errors.As(err, &mutationErr) && mutationErr.cleanupSafe
+}
+
+func finalizeStoredMutation(tracker *storedMutationTracker, loadDetail func() (Record, error), commit func() error) (Record, error) {
+	detail, err := loadDetail()
+	if err != nil {
+		return nil, err
+	}
+	if err := tracker.commit(commit); err != nil {
+		return nil, err
+	}
+	return detail, nil
+}
+
 func insertRecord(ctx context.Context, db queryContext, table string, specs []ColumnSpec, body Record) (Record, error) {
 	table = safeTable(table)
 	if table == "" {
@@ -139,6 +187,10 @@ func insertRecord(ctx context.Context, db queryContext, table string, specs []Co
 }
 
 func (r *Repository) Update(ctx context.Context, table string, specs []ColumnSpec, id string, body Record) (Record, error) {
+	return updateRecord(ctx, r.db, table, specs, id, body)
+}
+
+func updateRecord(ctx context.Context, db queryContext, table string, specs []ColumnSpec, id string, body Record) (Record, error) {
 	table = safeTable(table)
 	if table == "" {
 		return nil, errors.New("invalid table")
@@ -161,14 +213,38 @@ func (r *Repository) Update(ctx context.Context, table string, specs []ColumnSpe
 		sets = append(sets, fmt.Sprintf("%s=%s", spec.Name, holder))
 	}
 	if len(sets) == 0 {
-		return r.GetByID(ctx, table, id)
+		rows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT * FROM %s WHERE id=$1", table), id)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		records, err := scanRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		if len(records) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		return records[0], nil
 	}
 	if hasUpdatedAt(table) {
 		sets = append(sets, "updated_at=now()")
 	}
 	args = append(args, id)
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE id=$%d RETURNING *", table, strings.Join(sets, ","), len(args))
-	return r.QueryOne(ctx, query, args...)
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	records, err := scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return records[0], nil
 }
 
 func hasUpdatedAt(table string) bool {

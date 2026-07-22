@@ -12,15 +12,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	sharedstorage "consflow/backend/internal/shared/storage"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -36,6 +39,10 @@ type Service struct {
 	streamMaxConnectionLifetime time.Duration
 	uploadDir                   string
 	maxUploadBytes              int64
+	storageMu                   sync.Mutex
+	storageRegistry             *sharedstorage.Registry
+	storageWriteProvider        string
+	storageConfigErr            error
 	accessTokenTTL              time.Duration
 	refreshTokenTTL             time.Duration
 	refreshCookieSecure         bool
@@ -52,6 +59,7 @@ func NewService(repo *Repository, jwtSecret string) *Service {
 		streamMaxConnectionLifetime: 5 * time.Minute,
 		uploadDir:                   defaultUploadDir,
 		maxUploadBytes:              defaultMaxUploadBytes,
+		storageWriteProvider:        sharedstorage.LocalProvider,
 		accessTokenTTL:              defaultAccessTokenTTL,
 		refreshTokenTTL:             defaultRefreshTokenTTL,
 		refreshCookieSameSite:       defaultRefreshCookieSameSite,
@@ -87,8 +95,88 @@ func (s *Service) ConfigureUploads(uploadDir string, maxUploadBytes int64) {
 	if maxUploadBytes <= 0 {
 		maxUploadBytes = defaultMaxUploadBytes
 	}
+	localStore, err := sharedstorage.NewLocal(uploadDir)
+	if err != nil {
+		s.storageMu.Lock()
+		s.uploadDir = uploadDir
+		s.maxUploadBytes = maxUploadBytes
+		s.storageRegistry = nil
+		s.storageConfigErr = err
+		s.storageMu.Unlock()
+		return
+	}
+	registry, err := sharedstorage.NewRegistry(localStore)
+	if err == nil {
+		err = s.ConfigureStorage(registry, sharedstorage.LocalProvider, maxUploadBytes)
+	}
+	s.storageMu.Lock()
 	s.uploadDir = uploadDir
+	if err != nil {
+		s.storageRegistry = nil
+	}
+	s.storageConfigErr = err
+	s.storageMu.Unlock()
+}
+
+func (s *Service) ConfigureStorage(registry *sharedstorage.Registry, writeProvider string, maxUploadBytes int64) error {
+	if registry == nil {
+		return errors.New("storage registry is nil")
+	}
+	writeProvider = strings.ToLower(strings.TrimSpace(writeProvider))
+	if writeProvider == "" {
+		writeProvider = sharedstorage.LocalProvider
+	}
+	if _, err := registry.Store(writeProvider); err != nil {
+		return err
+	}
+	if maxUploadBytes <= 0 {
+		maxUploadBytes = defaultMaxUploadBytes
+	}
+	s.storageMu.Lock()
+	s.storageRegistry = registry
+	s.storageWriteProvider = writeProvider
 	s.maxUploadBytes = maxUploadBytes
+	s.storageConfigErr = nil
+	s.storageMu.Unlock()
+	return nil
+}
+
+func (s *Service) storageBackend() (*sharedstorage.Registry, error) {
+	s.storageMu.Lock()
+	defer s.storageMu.Unlock()
+	if s.storageConfigErr != nil {
+		return nil, s.storageConfigErr
+	}
+	if s.storageRegistry != nil {
+		return s.storageRegistry, nil
+	}
+	localStore, err := sharedstorage.NewLocal(s.uploadDir)
+	if err != nil {
+		s.storageConfigErr = err
+		return nil, err
+	}
+	registry, err := sharedstorage.NewRegistry(localStore)
+	if err != nil {
+		s.storageConfigErr = err
+		return nil, err
+	}
+	s.storageRegistry = registry
+	s.storageWriteProvider = sharedstorage.LocalProvider
+	return registry, nil
+}
+
+func (s *Service) storageWriter() (*sharedstorage.Registry, string, error) {
+	registry, err := s.storageBackend()
+	if err != nil {
+		return nil, "", err
+	}
+	s.storageMu.Lock()
+	provider := s.storageWriteProvider
+	s.storageMu.Unlock()
+	if strings.TrimSpace(provider) == "" {
+		provider = sharedstorage.LocalProvider
+	}
+	return registry, provider, nil
 }
 
 func (s *Service) ConfigureAuth(accessTokenMinutes int64, refreshTokenHours int64, refreshCookieSecure bool, refreshCookieSameSite string) {
@@ -313,11 +401,16 @@ func (s *Service) CreatePartner(ctx context.Context, body Record, actorID, actor
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.repo.Insert(ctx, "partners", partnerColumns(), normalized)
+	row, err := s.repo.insertWithAudit(ctx, "partners", partnerColumns(), normalized, func(row Record) auditEvent {
+		return auditEvent{
+			ActorID: actorID, ActorName: actorName, EventType: "partner_created", TargetType: "partner",
+			Description: fmt.Sprintf("Create partner %s", row["name"]),
+			Metadata:    Record{"partner_code": row["partner_code"], "partner_types": row["partner_types"]},
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, "", actorID, actorName, "partner_created", "partner", cleanID(row["id"]), fmt.Sprintf("Create partner %s", row["name"]), Record{"partner_code": row["partner_code"], "partner_types": row["partner_types"]})
 	return row, nil
 }
 
@@ -326,11 +419,16 @@ func (s *Service) UpdatePartner(ctx context.Context, id string, body Record, act
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.repo.Update(ctx, "partners", partnerColumns(), id, normalized)
+	row, err := s.repo.updateWithAudit(ctx, "partners", partnerColumns(), id, normalized, func(row Record) auditEvent {
+		return auditEvent{
+			ActorID: actorID, ActorName: actorName, EventType: "partner_updated", TargetType: "partner",
+			Description: fmt.Sprintf("Update partner %s", row["name"]),
+			Metadata:    Record{"partner_code": row["partner_code"], "partner_types": row["partner_types"]},
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, "", actorID, actorName, "partner_updated", "partner", cleanID(row["id"]), fmt.Sprintf("Update partner %s", row["name"]), Record{"partner_code": row["partner_code"], "partner_types": row["partner_types"]})
 	return row, nil
 }
 
@@ -509,7 +607,7 @@ func (s *Service) CreateWarehouse(ctx context.Context, body Record, actorID, act
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, "", actorID, actorName, "warehouse_created", "warehouse", cleanID(row["id"]), fmt.Sprintf("Tạo kho %s", row["name"]), Record{"type": row["type"]})
+	s.repo.AddAuditBestEffort(ctx, "", actorID, actorName, "warehouse_created", "warehouse", cleanID(row["id"]), fmt.Sprintf("Tạo kho %s", row["name"]), Record{"type": row["type"]})
 	return row, nil
 }
 
@@ -526,7 +624,7 @@ func (s *Service) CreateDailyReport(ctx context.Context, projectID string, req C
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "daily_report_created", "daily_report", cleanID(row["id"]), fmt.Sprintf("Tạo nhật ký ngày %s", row["report_date"]), Record{
+	s.repo.AddAuditBestEffort(ctx, cleanID(row["project_id"]), actorID, actorName, "daily_report_created", "daily_report", cleanID(row["id"]), fmt.Sprintf("Tạo nhật ký ngày %s", row["report_date"]), Record{
 		"progress_percent": row["progress_percent"],
 		"work_item_id":     body["work_item_id"],
 		"evidence_count":   len(normalizeConstructionReportEvidenceIDs(req.EvidenceIDs, req.PrimaryEvidenceID)),
@@ -707,7 +805,7 @@ func (s *Service) UpdateDailyReport(ctx context.Context, reportID string, req Co
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(current["project_id"]), actorID, actorName, "daily_report_updated", "daily_report", reportID, fmt.Sprintf("Cập nhật nhật ký ngày %s", row["report_date"]), Record{
+	s.repo.AddAuditBestEffort(ctx, cleanID(current["project_id"]), actorID, actorName, "daily_report_updated", "daily_report", reportID, fmt.Sprintf("Cập nhật nhật ký ngày %s", row["report_date"]), Record{
 		"progress_percent": row["progress_percent"],
 		"work_item_id":     row["work_item_id"],
 		"evidence_count":   len(constructionReportStringList(row["photos"])),
@@ -783,7 +881,7 @@ func (s *Service) AddDailyReportEvidenceUpload(ctx context.Context, reportID, re
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, projectID, actorID, actorName, "daily_report_evidence_added", "daily_report", reportID, fmt.Sprintf("Thêm minh chứng %s vào nhật ký ngày %s", evidence["name"], report["report_date"]), Record{
+	s.repo.AddAuditBestEffort(ctx, projectID, actorID, actorName, "daily_report_evidence_added", "daily_report", reportID, fmt.Sprintf("Thêm minh chứng %s vào nhật ký ngày %s", evidence["name"], report["report_date"]), Record{
 		"work_item_id": workItemID,
 		"evidence_id":  evidenceID,
 	})
@@ -1215,18 +1313,17 @@ func (s *Service) CreateIssue(ctx context.Context, projectID string, body Record
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "issue_created", "issue", cleanID(row["id"]), fmt.Sprintf("Tạo vấn đề %s", row["title"]), Record{"severity": row["severity"], "status": row["status"]})
+	s.repo.AddAuditBestEffort(ctx, cleanID(row["project_id"]), actorID, actorName, "issue_created", "issue", cleanID(row["id"]), fmt.Sprintf("Tạo vấn đề %s", row["title"]), Record{"severity": row["severity"], "status": row["status"]})
 	s.publishProjectProgressChanged(cleanID(row["project_id"]))
 	return row, nil
 }
 
 func (s *Service) UpdateIssue(ctx context.Context, id string, body Record, actorID, actorName string) (Record, error) {
 	delete(body, "project_id")
-	row, err := s.repo.UpdateIssue(ctx, cleanID(id), body)
+	row, err := s.repo.UpdateIssue(ctx, cleanID(id), body, actorID, actorName)
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "issue_updated", "issue", cleanID(row["id"]), fmt.Sprintf("Cập nhật vấn đề %s", row["title"]), Record{"status": row["status"], "severity": row["severity"]})
 	s.publishProjectProgressChanged(cleanID(row["project_id"]))
 	return row, nil
 }
@@ -1244,7 +1341,7 @@ func (s *Service) CreateRework(ctx context.Context, projectID string, body Recor
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "rework_created", "rework", cleanID(row["id"]), fmt.Sprintf("Tạo yêu cầu sửa lỗi %s", row["title"]), Record{"status": row["status"], "issue_id": cleanID(row["issue_id"]), "acceptance_id": cleanID(row["acceptance_id"])})
+	s.repo.AddAuditBestEffort(ctx, cleanID(row["project_id"]), actorID, actorName, "rework_created", "rework", cleanID(row["id"]), fmt.Sprintf("Tạo yêu cầu sửa lỗi %s", row["title"]), Record{"status": row["status"], "issue_id": cleanID(row["issue_id"]), "acceptance_id": cleanID(row["acceptance_id"])})
 	return row, nil
 }
 
@@ -1253,15 +1350,10 @@ func (s *Service) UpdateReworkStatus(ctx context.Context, id, status string, act
 	if !statusIn(status, "approved", "done") {
 		return nil, validationError("Trạng thái sửa lỗi không hợp lệ", Record{"status": status})
 	}
-	row, err := s.repo.UpdateReworkStatus(ctx, cleanID(id), status, actorID)
+	row, err := s.repo.UpdateReworkStatus(ctx, cleanID(id), status, actorID, actorName)
 	if err != nil {
 		return nil, err
 	}
-	event := "rework_approved"
-	if status == "done" {
-		event = "rework_completed"
-	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, event, "rework", cleanID(row["id"]), fmt.Sprintf("Cập nhật sửa lỗi sang %s", status), Record{"status": status})
 	return row, nil
 }
 
@@ -1278,16 +1370,15 @@ func (s *Service) CreateReplanning(ctx context.Context, projectID string, body R
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "replanning_created", "replanning", cleanID(row["id"]), "Tạo yêu cầu lập kế hoạch lại", Record{"status": row["status"], "issue_id": cleanID(row["issue_id"]), "node_id": cleanID(row["node_id"])})
+	s.repo.AddAuditBestEffort(ctx, cleanID(row["project_id"]), actorID, actorName, "replanning_created", "replanning", cleanID(row["id"]), "Tạo yêu cầu lập kế hoạch lại", Record{"status": row["status"], "issue_id": cleanID(row["issue_id"]), "node_id": cleanID(row["node_id"])})
 	return row, nil
 }
 
 func (s *Service) ApproveReplanning(ctx context.Context, id string, actorID, actorName string) (Record, error) {
-	row, err := s.repo.ApproveReplanning(ctx, cleanID(id), actorID)
+	row, err := s.repo.ApproveReplanning(ctx, cleanID(id), actorID, actorName)
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "replanning_approved", "replanning", cleanID(row["id"]), "Duyệt yêu cầu lập kế hoạch lại", Record{"status": row["status"]})
 	return row, nil
 }
 
@@ -1368,20 +1459,18 @@ func (s *Service) CreateBudget(ctx context.Context, projectID string, req Budget
 		"planned_amount": req.PlannedAmount, "approved_amount": 0, "used_amount": 0,
 		"remaining_amount": 0, "status": "draft",
 	}
-	row, err := s.repo.CreateBudget(ctx, body)
+	row, err := s.repo.CreateBudget(ctx, body, actorID, actorName)
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "budget_created", "budget", cleanID(row["id"]), fmt.Sprintf("Tạo ngân sách %s", row["budget_code"]), Record{"status": row["status"], "planned_amount": row["planned_amount"]})
 	return row, nil
 }
 
 func (s *Service) ApproveBudget(ctx context.Context, id string, actorID, actorName string) (Record, error) {
-	row, err := s.repo.ApproveBudget(ctx, cleanID(id), actorID)
+	row, err := s.repo.ApproveBudget(ctx, cleanID(id), actorID, actorName)
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "budget_approved", "budget", cleanID(row["id"]), fmt.Sprintf("Duyệt ngân sách %s", row["budget_code"]), Record{"status": row["status"], "approved_amount": row["approved_amount"]})
 	return row, nil
 }
 
@@ -1416,11 +1505,16 @@ func (s *Service) CreatePayable(ctx context.Context, req PayableCreateRequest, a
 	if err := s.applyPartnerSnapshot(ctx, body, "vendor_partner_id", "vendor_name", "", vendorPartnerTypes()); err != nil {
 		return nil, err
 	}
-	row, err := s.repo.Insert(ctx, "payables", payableColumns(), body)
+	row, err := s.repo.insertWithAudit(ctx, "payables", payableColumns(), body, func(row Record) auditEvent {
+		return auditEvent{
+			ProjectID: projectID, ActorID: actorID, ActorName: actorName,
+			EventType: "payable_created", TargetType: "payable", Description: "Tạo phải trả ở trạng thái nháp",
+			Metadata: Record{"payable_code": code, "gross_amount": req.GrossAmount, "remaining_amount": row["remaining_amount"]},
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, projectID, actorID, actorName, "payable_created", "payable", cleanID(row["id"]), "Tạo phải trả ở trạng thái nháp", Record{"payable_code": code, "gross_amount": req.GrossAmount, "remaining_amount": row["remaining_amount"]})
 	return row, nil
 }
 
@@ -1445,11 +1539,16 @@ func (s *Service) CreateReceivable(ctx context.Context, req ReceivableCreateRequ
 	if err := s.applyPartnerSnapshot(ctx, body, "client_partner_id", "client_name", "", []string{"client"}); err != nil {
 		return nil, err
 	}
-	row, err := s.repo.Insert(ctx, "receivables", receivableColumns(), body)
+	row, err := s.repo.insertWithAudit(ctx, "receivables", receivableColumns(), body, func(row Record) auditEvent {
+		return auditEvent{
+			ProjectID: projectID, ActorID: actorID, ActorName: actorName,
+			EventType: "receivable_created", TargetType: "receivable", Description: "Tạo phải thu ở trạng thái nháp",
+			Metadata: Record{"receivable_code": code, "gross_amount": req.GrossAmount, "remaining_amount": row["remaining_amount"]},
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, projectID, actorID, actorName, "receivable_created", "receivable", cleanID(row["id"]), "Tạo phải thu ở trạng thái nháp", Record{"receivable_code": code, "gross_amount": req.GrossAmount, "remaining_amount": row["remaining_amount"]})
 	return row, nil
 }
 
@@ -1520,16 +1619,30 @@ func (s *Service) PublishTemplate(ctx context.Context, id, actorID, actorName st
 	if err != nil {
 		return nil, err
 	}
-	template, err = s.repo.QueryOne(ctx, `
-		UPDATE pipeline_templates
-		SET status='published', definition_hash=$2, published_at=now(), published_by=NULLIF($3,'')::uuid, updated_at=now()
-		WHERE id=$1 AND status='draft'
-		RETURNING *
-	`, id, definitionHash, actorID)
+	template, err = s.repo.withAuditTransaction(ctx, func(tx *sql.Tx) (Record, error) {
+		rows, queryErr := queryTx(ctx, tx, `
+			UPDATE pipeline_templates
+			SET status='published', definition_hash=$2, published_at=now(), published_by=NULLIF($3,'')::uuid, updated_at=now()
+			WHERE id=$1 AND status='draft'
+			RETURNING *
+		`, id, definitionHash, actorID)
+		if queryErr != nil {
+			return nil, queryErr
+		}
+		if len(rows) == 0 {
+			return nil, sql.ErrNoRows
+		}
+		return rows[0], nil
+	}, func(row Record) auditEvent {
+		return auditEvent{
+			ActorID: actorID, ActorName: actorName, EventType: "pipeline_template_published",
+			TargetType: "pipeline_template", TargetID: id,
+			Description: fmt.Sprintf("Phát hành mẫu %s", row["name"]), Metadata: Record{},
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, "", actorID, actorName, "pipeline_template_published", "pipeline_template", id, fmt.Sprintf("Phát hành mẫu %s", template["name"]), Record{})
 	return s.repo.GetTemplateDetail(ctx, id)
 }
 
@@ -4770,14 +4883,13 @@ func (s *Service) SignWorkflowForm(ctx context.Context, instanceID string, req W
 		return nil, err
 	}
 	storageKey := path.Join("workflow-signatures", cleanID(instance["project_id"]), instanceID, uuid.NewString()+".png")
-	visualFile, storedPath, err := s.storeGeneratedFile(storageKey, imageBytes, imageMIME)
+	visualFile, storedObject, err := s.storeGeneratedFile(ctx, storageKey, imageBytes, imageMIME)
 	if err != nil {
 		return nil, err
 	}
 	signedForm, err := s.repo.SignWorkflowForm(ctx, instanceID, purpose, comment, visualFile, strokes, actorID, actorName)
 	if err != nil {
-		_ = os.Remove(storedPath)
-		return nil, err
+		return nil, s.cleanupStoredObjectAfterError(storedObject, err)
 	}
 	return signedForm, nil
 }
@@ -4824,14 +4936,13 @@ func (s *Service) GenerateWorkflowFormPDFExport(ctx context.Context, instanceID,
 	revisionNo := int(number(instance["current_revision"]))
 	fileName := workflowFormPDFFileName(form, revisionNo)
 	storageKey := path.Join("workflow-form-pdfs", projectID, instanceID, uuid.NewString()+".pdf")
-	pdfFile, storedPath, err := s.storeGeneratedFile(storageKey, pdfBytes, "application/pdf")
+	pdfFile, storedObject, err := s.storeGeneratedFile(ctx, storageKey, pdfBytes, "application/pdf")
 	if err != nil {
 		return nil, err
 	}
 	exportedForm, err := s.repo.CreateWorkflowFormPDFExport(ctx, instanceID, fileName, fmt.Sprint(instance["title"]), pdfFile, payloadHash, actorID, actorName)
 	if err != nil {
-		_ = os.Remove(storedPath)
-		return nil, err
+		return nil, s.cleanupStoredObjectAfterError(storedObject, err)
 	}
 	return exportedForm, nil
 }
@@ -4852,7 +4963,7 @@ func (s *Service) WorkflowFormSignatureVisual(ctx context.Context, signatureID, 
 	if !allowed {
 		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem chữ ký này")
 	}
-	return s.storedFileResult(signature, "visual_storage_key", "visual_mime_type", signatureVisualFilename(signature))
+	return s.storedFileResult(ctx, signature, "visual_storage_provider", "visual_storage_key", "visual_mime_type", signatureVisualFilename(signature))
 }
 
 func (s *Service) WorkflowFormPDFExportFile(ctx context.Context, exportID, actorID string) (EvidenceFileResult, error) {
@@ -4871,7 +4982,7 @@ func (s *Service) WorkflowFormPDFExportFile(ctx context.Context, exportID, actor
 	if !allowed {
 		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem PDF biểu mẫu quy trình này")
 	}
-	return s.storedFileResult(export, "storage_key", "mime_type", fmt.Sprint(export["file_name"]))
+	return s.storedFileResult(ctx, export, "storage_provider", "storage_key", "mime_type", fmt.Sprint(export["file_name"]))
 }
 
 func (s *Service) saveWorkflowForm(ctx context.Context, instanceID string, req WorkflowFormSaveRequest, submit bool, actorID, actorName string) (Record, error) {
@@ -5146,20 +5257,20 @@ func (s *Service) AddWorkItemEvidenceUpload(ctx context.Context, workItemID stri
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
 		return nil, err
 	}
-	storedPath, normalized, err := s.storeEvidenceUpload(item, req, fileHeader)
+	storedObject, normalized, err := s.storeEvidenceUpload(ctx, item, req, fileHeader)
 	if err != nil {
 		return nil, err
 	}
 	evidence, err := s.repo.AddWorkItemEvidence(ctx, item, normalized, actorID, actorName)
 	if err != nil {
-		_ = os.Remove(storedPath)
-		return nil, err
+		return nil, s.cleanupStoredObjectAfterError(storedObject, err)
 	}
 	return evidence, nil
 }
 
 type EvidenceFileResult struct {
-	Path     string
+	Reader   io.ReadCloser
+	Size     int64
 	MIMEType string
 	Filename string
 }
@@ -5180,67 +5291,66 @@ func (s *Service) EvidenceFile(ctx context.Context, evidenceID, actorID string) 
 	if !allowed {
 		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem tệp minh chứng này")
 	}
-	if fmt.Sprint(evidence["storage_provider"]) != "local" || cleanID(evidence["storage_key"]) == "" {
+	provider := strings.TrimSpace(fmt.Sprint(evidence["storage_provider"]))
+	storageKey := strings.TrimSpace(fmt.Sprint(evidence["storage_key"]))
+	if provider == "" || provider == "<nil>" || storageKey == "" || storageKey == "<nil>" {
 		return EvidenceFileResult{}, validationError("Minh chứng này chưa có tệp nội bộ được bảo vệ", Record{"evidence_id": evidenceID})
 	}
-	root, err := filepath.Abs(s.uploadDir)
+	registry, err := s.storageBackend()
 	if err != nil {
 		return EvidenceFileResult{}, err
 	}
-	filePath, err := safeStoragePath(root, fmt.Sprint(evidence["storage_key"]))
+	object, err := registry.Open(ctx, provider, storageKey)
 	if err != nil {
-		return EvidenceFileResult{}, err
-	}
-	info, err := os.Stat(filePath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, sharedstorage.ErrNotFound) {
 			return EvidenceFileResult{}, validationError("Tệp minh chứng không còn tồn tại trong kho lưu trữ", Record{"evidence_id": evidenceID})
 		}
 		return EvidenceFileResult{}, err
 	}
-	if info.IsDir() {
-		return EvidenceFileResult{}, validationError("Đường dẫn minh chứng không hợp lệ", Record{"evidence_id": evidenceID})
-	}
 	mimeType := strings.TrimSpace(fmt.Sprint(evidence["mime_type"]))
-	if mimeType == "" {
+	if mimeType == "" || mimeType == "<nil>" {
+		mimeType = object.Info.ContentType
+	}
+	if strings.TrimSpace(mimeType) == "" {
 		mimeType = "application/octet-stream"
 	}
 	return EvidenceFileResult{
-		Path:     filePath,
+		Reader:   object.Reader,
+		Size:     object.Info.Size,
 		MIMEType: mimeType,
 		Filename: evidenceDownloadName(evidence),
 	}, nil
 }
 
-func (s *Service) storeEvidenceUpload(item Record, req WorkItemEvidenceRequest, fileHeader *multipart.FileHeader) (string, WorkItemEvidenceRequest, error) {
+func (s *Service) storeEvidenceUpload(ctx context.Context, item Record, req WorkItemEvidenceRequest, fileHeader *multipart.FileHeader) (storedObjectRef, WorkItemEvidenceRequest, error) {
 	if fileHeader == nil {
-		return "", req, validationError("Tệp minh chứng là bắt buộc")
+		return storedObjectRef{}, req, validationError("Tệp minh chứng là bắt buộc")
 	}
 	if fileHeader.Size <= 0 {
-		return "", req, validationError("Tệp minh chứng không được rỗng")
+		return storedObjectRef{}, req, validationError("Tệp minh chứng không được rỗng")
 	}
 	if fileHeader.Size > s.maxUploadBytes {
-		return "", req, validationError("Tệp minh chứng vượt quá dung lượng cho phép", Record{"max_bytes": s.maxUploadBytes})
+		return storedObjectRef{}, req, validationError("Tệp minh chứng vượt quá dung lượng cho phép", Record{"max_bytes": s.maxUploadBytes})
 	}
 	source, err := fileHeader.Open()
 	if err != nil {
-		return "", req, err
+		return storedObjectRef{}, req, err
 	}
 	defer source.Close()
 
 	header := make([]byte, 512)
 	n, readErr := io.ReadFull(source, header)
 	if readErr != nil && !errors.Is(readErr, io.ErrUnexpectedEOF) && !errors.Is(readErr, io.EOF) {
-		return "", req, readErr
+		return storedObjectRef{}, req, readErr
 	}
 	detectedMIME := http.DetectContentType(header[:n])
 	spec, ok := allowedEvidenceUploadMIMEs[detectedMIME]
 	if !ok {
-		return "", req, validationError("Định dạng minh chứng không được hỗ trợ", Record{"mime_type": detectedMIME})
+		return storedObjectRef{}, req, validationError("Định dạng minh chứng không được hỗ trợ", Record{"mime_type": detectedMIME})
 	}
 	requestedType := strings.TrimSpace(req.EvidenceType)
 	if requestedType != "" && requestedType != spec.EvidenceType {
-		return "", req, validationError("Loại minh chứng không khớp với định dạng tệp", Record{"evidence_type": requestedType, "mime_type": detectedMIME})
+		return storedObjectRef{}, req, validationError("Loại minh chứng không khớp với định dạng tệp", Record{"evidence_type": requestedType, "mime_type": detectedMIME})
 	}
 	if requestedType == "" {
 		req.EvidenceType = spec.EvidenceType
@@ -5254,7 +5364,11 @@ func (s *Service) storeEvidenceUpload(item Record, req WorkItemEvidenceRequest, 
 	}
 	req.MIMEType = detectedMIME
 	req.FileSize = fileHeader.Size
-	req.StorageProvider = "local"
+	registry, writeProvider, err := s.storageWriter()
+	if err != nil {
+		return storedObjectRef{}, req, err
+	}
+	req.StorageProvider = writeProvider
 	req.StorageKey = path.Join("evidence", cleanID(item["project_id"]), cleanID(item["id"]), uuid.NewString()+spec.Extension)
 	if req.Payload == nil {
 		req.Payload = Record{}
@@ -5262,71 +5376,46 @@ func (s *Service) storeEvidenceUpload(item Record, req WorkItemEvidenceRequest, 
 	req.Payload["original_filename"] = originalName
 	req.Payload["detected_mime_type"] = detectedMIME
 
-	normalized, err := validateWorkItemEvidenceRequest(req)
+	normalized, err := validateWorkItemEvidenceRequestForStorage(req, true)
 	if err != nil {
-		return "", req, err
+		return storedObjectRef{}, req, err
 	}
-	root, err := filepath.Abs(s.uploadDir)
+	object, err := registry.Put(ctx, normalized.StorageProvider, normalized.StorageKey, io.MultiReader(bytes.NewReader(header[:n]), source), sharedstorage.PutOptions{
+		ContentType:  detectedMIME,
+		ExpectedSize: fileHeader.Size,
+	})
 	if err != nil {
-		return "", req, err
+		return storedObjectRef{}, normalized, err
 	}
-	fullPath, err := safeStoragePath(root, normalized.StorageKey)
-	if err != nil {
-		return "", normalized, err
-	}
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0o750); err != nil {
-		return "", normalized, err
-	}
-	destination, err := os.OpenFile(fullPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
-	if err != nil {
-		return "", normalized, err
-	}
-	cleanup := true
-	defer func() {
-		_ = destination.Close()
-		if cleanup {
-			_ = os.Remove(fullPath)
-		}
-	}()
-
-	hasher := sha256.New()
-	reader := io.MultiReader(bytes.NewReader(header[:n]), source)
-	written, err := io.Copy(io.MultiWriter(destination, hasher), reader)
-	if err != nil {
-		return "", normalized, err
-	}
-	if written != fileHeader.Size {
-		return "", normalized, validationError("Kích thước tệp minh chứng không khớp dữ liệu tải lên", Record{"expected": fileHeader.Size, "written": written})
-	}
-	normalized.ChecksumSHA256 = hex.EncodeToString(hasher.Sum(nil))
-	cleanup = false
-	return fullPath, normalized, nil
+	normalized.FileSize = object.Size
+	normalized.ChecksumSHA256 = object.ChecksumSHA256
+	return storedObjectRef{Provider: object.Provider, Key: object.Key}, normalized, nil
 }
 
-func (s *Service) storeInputInvoicePDF(projectID, payableID string, fileHeader *multipart.FileHeader) (StoredFileMetadata, string, string, error) {
+func (s *Service) storeInputInvoicePDF(ctx context.Context, projectID, payableID string, fileHeader *multipart.FileHeader) (StoredFileMetadata, storedObjectRef, string, error) {
 	if fileHeader == nil {
-		return StoredFileMetadata{}, "", "", validationError("File PDF hoá đơn là bắt buộc")
+		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn là bắt buộc")
 	}
 	if fileHeader.Size <= 0 {
-		return StoredFileMetadata{}, "", "", validationError("File PDF hoá đơn không được rỗng")
+		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn không được rỗng")
 	}
 	if fileHeader.Size > s.maxUploadBytes {
-		return StoredFileMetadata{}, "", "", validationError("File PDF hoá đơn vượt quá dung lượng cho phép", Record{"max_bytes": s.maxUploadBytes})
+		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn vượt quá dung lượng cho phép", Record{"max_bytes": s.maxUploadBytes})
 	}
 	source, err := fileHeader.Open()
 	if err != nil {
-		return StoredFileMetadata{}, "", "", err
+		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}
 	defer source.Close()
 
 	header := make([]byte, 512)
 	n, readErr := io.ReadFull(source, header)
 	if readErr != nil && !errors.Is(readErr, io.ErrUnexpectedEOF) && !errors.Is(readErr, io.EOF) {
-		return StoredFileMetadata{}, "", "", readErr
+		return StoredFileMetadata{}, storedObjectRef{}, "", readErr
 	}
 	detectedMIME := http.DetectContentType(header[:n])
 	if detectedMIME != "application/pdf" {
-		return StoredFileMetadata{}, "", "", validationError("Hoá đơn đầu vào chỉ hỗ trợ PDF", Record{"mime_type": detectedMIME})
+		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("Hoá đơn đầu vào chỉ hỗ trợ PDF", Record{"mime_type": detectedMIME})
 	}
 	originalName := cleanUploadFilename(fileHeader.Filename)
 	if originalName == "minh-chung" || originalName == "evidence-file" {
@@ -5336,72 +5425,47 @@ func (s *Service) storeInputInvoicePDF(projectID, payableID string, fileHeader *
 		originalName += ".pdf"
 	}
 	storageKey := path.Join("input-invoices", cleanID(projectID), cleanID(payableID), uuid.NewString()+".pdf")
-	root, err := filepath.Abs(s.uploadDir)
+	registry, writeProvider, err := s.storageWriter()
 	if err != nil {
-		return StoredFileMetadata{}, "", "", err
+		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}
-	fullPath, err := safeStoragePath(root, storageKey)
+	object, err := registry.Put(ctx, writeProvider, storageKey, io.MultiReader(bytes.NewReader(header[:n]), source), sharedstorage.PutOptions{ContentType: "application/pdf", ExpectedSize: fileHeader.Size})
 	if err != nil {
-		return StoredFileMetadata{}, "", "", err
+		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0o750); err != nil {
-		return StoredFileMetadata{}, "", "", err
-	}
-	destination, err := os.OpenFile(fullPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
-	if err != nil {
-		return StoredFileMetadata{}, "", "", err
-	}
-	cleanup := true
-	defer func() {
-		_ = destination.Close()
-		if cleanup {
-			_ = os.Remove(fullPath)
-		}
-	}()
-
-	hasher := sha256.New()
-	reader := io.MultiReader(bytes.NewReader(header[:n]), source)
-	written, err := io.Copy(io.MultiWriter(destination, hasher), reader)
-	if err != nil {
-		return StoredFileMetadata{}, "", "", err
-	}
-	if written != fileHeader.Size {
-		return StoredFileMetadata{}, "", "", validationError("Kích thước file hoá đơn không khớp dữ liệu upload", Record{"expected": fileHeader.Size, "written": written})
-	}
-	cleanup = false
 	return StoredFileMetadata{
-		StorageProvider: "local",
-		StorageKey:      storageKey,
+		StorageProvider: object.Provider,
+		StorageKey:      object.Key,
 		MIMEType:        "application/pdf",
-		FileSize:        fileHeader.Size,
-		ChecksumSHA256:  hex.EncodeToString(hasher.Sum(nil)),
-	}, fullPath, originalName, nil
+		FileSize:        object.Size,
+		ChecksumSHA256:  object.ChecksumSHA256,
+	}, storedObjectRef{Provider: object.Provider, Key: object.Key}, originalName, nil
 }
 
-func (s *Service) storeOutputInvoicePDF(projectID, receivableID string, fileHeader *multipart.FileHeader) (StoredFileMetadata, string, string, error) {
+func (s *Service) storeOutputInvoicePDF(ctx context.Context, projectID, receivableID string, fileHeader *multipart.FileHeader) (StoredFileMetadata, storedObjectRef, string, error) {
 	if fileHeader == nil {
-		return StoredFileMetadata{}, "", "", validationError("File PDF hoá đơn là bắt buộc")
+		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn là bắt buộc")
 	}
 	if fileHeader.Size <= 0 {
-		return StoredFileMetadata{}, "", "", validationError("File PDF hoá đơn không được rỗng")
+		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn không được rỗng")
 	}
 	if fileHeader.Size > s.maxUploadBytes {
-		return StoredFileMetadata{}, "", "", validationError("File PDF hoá đơn vượt quá dung lượng cho phép", Record{"max_bytes": s.maxUploadBytes})
+		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn vượt quá dung lượng cho phép", Record{"max_bytes": s.maxUploadBytes})
 	}
 	source, err := fileHeader.Open()
 	if err != nil {
-		return StoredFileMetadata{}, "", "", err
+		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}
 	defer source.Close()
 
 	header := make([]byte, 512)
 	n, readErr := io.ReadFull(source, header)
 	if readErr != nil && !errors.Is(readErr, io.ErrUnexpectedEOF) && !errors.Is(readErr, io.EOF) {
-		return StoredFileMetadata{}, "", "", readErr
+		return StoredFileMetadata{}, storedObjectRef{}, "", readErr
 	}
 	detectedMIME := http.DetectContentType(header[:n])
 	if detectedMIME != "application/pdf" {
-		return StoredFileMetadata{}, "", "", validationError("Hoá đơn đầu ra chỉ hỗ trợ PDF", Record{"mime_type": detectedMIME})
+		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("Hoá đơn đầu ra chỉ hỗ trợ PDF", Record{"mime_type": detectedMIME})
 	}
 	originalName := cleanUploadFilename(fileHeader.Filename)
 	if originalName == "minh-chung" || originalName == "evidence-file" {
@@ -5411,120 +5475,102 @@ func (s *Service) storeOutputInvoicePDF(projectID, receivableID string, fileHead
 		originalName += ".pdf"
 	}
 	storageKey := path.Join("output-invoices", cleanID(projectID), cleanID(receivableID), uuid.NewString()+".pdf")
-	root, err := filepath.Abs(s.uploadDir)
+	registry, writeProvider, err := s.storageWriter()
 	if err != nil {
-		return StoredFileMetadata{}, "", "", err
+		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}
-	fullPath, err := safeStoragePath(root, storageKey)
+	object, err := registry.Put(ctx, writeProvider, storageKey, io.MultiReader(bytes.NewReader(header[:n]), source), sharedstorage.PutOptions{ContentType: "application/pdf", ExpectedSize: fileHeader.Size})
 	if err != nil {
-		return StoredFileMetadata{}, "", "", err
+		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0o750); err != nil {
-		return StoredFileMetadata{}, "", "", err
-	}
-	destination, err := os.OpenFile(fullPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
-	if err != nil {
-		return StoredFileMetadata{}, "", "", err
-	}
-	cleanup := true
-	defer func() {
-		_ = destination.Close()
-		if cleanup {
-			_ = os.Remove(fullPath)
-		}
-	}()
-
-	hasher := sha256.New()
-	reader := io.MultiReader(bytes.NewReader(header[:n]), source)
-	written, err := io.Copy(io.MultiWriter(destination, hasher), reader)
-	if err != nil {
-		return StoredFileMetadata{}, "", "", err
-	}
-	if written != fileHeader.Size {
-		return StoredFileMetadata{}, "", "", validationError("Kích thước file hoá đơn không khớp dữ liệu upload", Record{"expected": fileHeader.Size, "written": written})
-	}
-	cleanup = false
 	return StoredFileMetadata{
-		StorageProvider: "local",
-		StorageKey:      storageKey,
+		StorageProvider: object.Provider,
+		StorageKey:      object.Key,
 		MIMEType:        "application/pdf",
-		FileSize:        fileHeader.Size,
-		ChecksumSHA256:  hex.EncodeToString(hasher.Sum(nil)),
-	}, fullPath, originalName, nil
+		FileSize:        object.Size,
+		ChecksumSHA256:  object.ChecksumSHA256,
+	}, storedObjectRef{Provider: object.Provider, Key: object.Key}, originalName, nil
 }
 
-func (s *Service) storeGeneratedFile(storageKey string, content []byte, mimeType string) (StoredFileMetadata, string, error) {
+type storedObjectRef struct {
+	Provider string
+	Key      string
+}
+
+func (s *Service) storeGeneratedFile(ctx context.Context, storageKey string, content []byte, mimeType string) (StoredFileMetadata, storedObjectRef, error) {
 	if len(content) == 0 {
-		return StoredFileMetadata{}, "", validationError("File generated không được rỗng")
+		return StoredFileMetadata{}, storedObjectRef{}, validationError("File generated không được rỗng")
 	}
-	root, err := filepath.Abs(s.uploadDir)
+	registry, writeProvider, err := s.storageWriter()
 	if err != nil {
-		return StoredFileMetadata{}, "", err
+		return StoredFileMetadata{}, storedObjectRef{}, err
 	}
-	fullPath, err := safeStoragePath(root, storageKey)
+	object, err := registry.Put(ctx, writeProvider, storageKey, bytes.NewReader(content), sharedstorage.PutOptions{ContentType: mimeType, ExpectedSize: int64(len(content))})
 	if err != nil {
-		return StoredFileMetadata{}, "", err
+		return StoredFileMetadata{}, storedObjectRef{}, err
 	}
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0o750); err != nil {
-		return StoredFileMetadata{}, "", err
-	}
-	destination, err := os.OpenFile(fullPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
-	if err != nil {
-		return StoredFileMetadata{}, "", err
-	}
-	cleanup := true
-	defer func() {
-		_ = destination.Close()
-		if cleanup {
-			_ = os.Remove(fullPath)
-		}
-	}()
-	hasher := sha256.New()
-	written, err := io.Copy(io.MultiWriter(destination, hasher), bytes.NewReader(content))
-	if err != nil {
-		return StoredFileMetadata{}, "", err
-	}
-	if written != int64(len(content)) {
-		return StoredFileMetadata{}, "", validationError("Kích thước generated file không khớp dữ liệu ghi", Record{"expected": len(content), "written": written})
-	}
-	cleanup = false
 	return StoredFileMetadata{
-		StorageProvider: "local",
-		StorageKey:      storageKey,
+		StorageProvider: object.Provider,
+		StorageKey:      object.Key,
 		MIMEType:        mimeType,
-		FileSize:        int64(len(content)),
-		ChecksumSHA256:  hex.EncodeToString(hasher.Sum(nil)),
-	}, fullPath, nil
+		FileSize:        object.Size,
+		ChecksumSHA256:  object.ChecksumSHA256,
+	}, storedObjectRef{Provider: object.Provider, Key: object.Key}, nil
 }
 
-func (s *Service) storedFileResult(record Record, storageKeyField, mimeField, filename string) (EvidenceFileResult, error) {
+func (s *Service) deleteStoredObject(object storedObjectRef) {
+	if strings.TrimSpace(object.Provider) == "" || strings.TrimSpace(object.Key) == "" {
+		return
+	}
+	registry, err := s.storageBackend()
+	if err != nil {
+		log.Printf("level=error component=storage operation=cleanup provider=%q key=%q orphan_risk=true error=%q", object.Provider, object.Key, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := registry.Delete(ctx, object.Provider, object.Key); err != nil {
+		log.Printf("level=error component=storage operation=cleanup provider=%q key=%q orphan_risk=true error=%q", object.Provider, object.Key, err)
+	}
+}
+
+func (s *Service) cleanupStoredObjectAfterError(object storedObjectRef, originalErr error) error {
+	if originalErr == nil {
+		return nil
+	}
+	if !storedMutationCleanupSafe(originalErr) {
+		log.Printf("level=error component=storage operation=cleanup_skipped provider=%q key=%q commit_state=unknown orphan_risk=true error=%q", object.Provider, object.Key, originalErr)
+		return originalErr
+	}
+	s.deleteStoredObject(object)
+	return originalErr
+}
+
+func (s *Service) storedFileResult(ctx context.Context, record Record, providerField, storageKeyField, mimeField, filename string) (EvidenceFileResult, error) {
+	provider := strings.TrimSpace(fmt.Sprint(record[providerField]))
 	storageKey := strings.TrimSpace(fmt.Sprint(record[storageKeyField]))
-	if storageKey == "" || storageKey == "<nil>" {
+	if provider == "" || provider == "<nil>" || storageKey == "" || storageKey == "<nil>" {
 		return EvidenceFileResult{}, validationError("Tệp được bảo vệ chưa có khóa lưu trữ")
 	}
-	root, err := filepath.Abs(s.uploadDir)
+	registry, err := s.storageBackend()
 	if err != nil {
 		return EvidenceFileResult{}, err
 	}
-	filePath, err := safeStoragePath(root, storageKey)
+	object, err := registry.Open(ctx, provider, storageKey)
 	if err != nil {
-		return EvidenceFileResult{}, err
-	}
-	info, err := os.Stat(filePath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, sharedstorage.ErrNotFound) {
 			return EvidenceFileResult{}, validationError("Tệp được bảo vệ không còn tồn tại trong kho lưu trữ")
 		}
 		return EvidenceFileResult{}, err
 	}
-	if info.IsDir() {
-		return EvidenceFileResult{}, validationError("Đường dẫn tệp được bảo vệ không hợp lệ")
-	}
 	mimeType := strings.TrimSpace(fmt.Sprint(record[mimeField]))
 	if mimeType == "" || mimeType == "<nil>" {
+		mimeType = object.Info.ContentType
+	}
+	if strings.TrimSpace(mimeType) == "" {
 		mimeType = "application/octet-stream"
 	}
-	return EvidenceFileResult{Path: filePath, MIMEType: mimeType, Filename: cleanUploadFilename(filename)}, nil
+	return EvidenceFileResult{Reader: object.Reader, Size: object.Info.Size, MIMEType: mimeType, Filename: cleanUploadFilename(filename)}, nil
 }
 
 func parseSignatureImageDataURL(value string) ([]byte, string, error) {
@@ -6418,6 +6464,10 @@ func (s *Service) EvidenceAction(ctx context.Context, evidenceID, action string,
 }
 
 func validateWorkItemEvidenceRequest(req WorkItemEvidenceRequest) (WorkItemEvidenceRequest, error) {
+	return validateWorkItemEvidenceRequestForStorage(req, false)
+}
+
+func validateWorkItemEvidenceRequestForStorage(req WorkItemEvidenceRequest, allowS3 bool) (WorkItemEvidenceRequest, error) {
 	req.EvidenceType = strings.TrimSpace(req.EvidenceType)
 	req.DocumentType = strings.TrimSpace(req.DocumentType)
 	req.Name = strings.TrimSpace(req.Name)
@@ -6449,11 +6499,14 @@ func validateWorkItemEvidenceRequest(req WorkItemEvidenceRequest) (WorkItemEvide
 	if !validVisibility[req.Visibility] {
 		return req, validationError("Phạm vi hiển thị minh chứng không hợp lệ", Record{"visibility": req.Visibility})
 	}
-	validStorageProvider := map[string]bool{"external": true, "local": true}
+	validStorageProvider := map[string]bool{"external": true, sharedstorage.LocalProvider: true}
+	if allowS3 {
+		validStorageProvider[sharedstorage.S3Provider] = true
+	}
 	if !validStorageProvider[req.StorageProvider] {
 		return req, validationError("Nơi lưu minh chứng không hợp lệ", Record{"storage_provider": req.StorageProvider})
 	}
-	if req.StorageKey != "" && req.StorageProvider != "local" {
+	if req.StorageKey != "" && req.StorageProvider != sharedstorage.LocalProvider && (!allowS3 || req.StorageProvider != sharedstorage.S3Provider) {
 		return req, validationError("Khóa lưu trữ chỉ hợp lệ với kho lưu trữ nội bộ", Record{"storage_provider": req.StorageProvider})
 	}
 	if req.ChecksumSHA256 != "" && !validSHA256Hex(req.ChecksumSHA256) {
@@ -6487,28 +6540,6 @@ func validSHA256Hex(value string) bool {
 		}
 	}
 	return true
-}
-
-func safeStoragePath(root, storageKey string) (string, error) {
-	if strings.TrimSpace(storageKey) == "" {
-		return "", validationError("Khóa lưu trữ minh chứng là bắt buộc")
-	}
-	if filepath.IsAbs(storageKey) {
-		return "", validationError("Khóa lưu trữ minh chứng không hợp lệ")
-	}
-	cleanKey := filepath.Clean(filepath.FromSlash(storageKey))
-	if cleanKey == "." || cleanKey == ".." || strings.HasPrefix(cleanKey, ".."+string(os.PathSeparator)) {
-		return "", validationError("Khóa lưu trữ minh chứng không hợp lệ")
-	}
-	fullPath := filepath.Join(root, cleanKey)
-	absPath, err := filepath.Abs(fullPath)
-	if err != nil {
-		return "", err
-	}
-	if absPath != root && !strings.HasPrefix(absPath, root+string(os.PathSeparator)) {
-		return "", validationError("Khóa lưu trữ minh chứng vượt khỏi thư mục lưu trữ")
-	}
-	return absPath, nil
 }
 
 func cleanUploadFilename(filename string) string {
@@ -7818,7 +7849,7 @@ func (s *Service) CreateProcurement(ctx context.Context, body Record, actorID, a
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "procurement_created", "procurement_request", cleanID(row["id"]), "Tạo yêu cầu mua", Record{"request_code": row["request_code"]})
+	s.repo.AddAuditBestEffort(ctx, cleanID(row["project_id"]), actorID, actorName, "procurement_created", "procurement_request", cleanID(row["id"]), "Tạo yêu cầu mua", Record{"request_code": row["request_code"]})
 	return row, nil
 }
 
@@ -7842,7 +7873,7 @@ func (s *Service) UpdateProcurement(ctx context.Context, id string, body Record,
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "procurement_updated", "procurement_request", cleanID(row["id"]), "Cập nhật yêu cầu mua", Record{"request_code": row["request_code"]})
+	s.repo.AddAuditBestEffort(ctx, cleanID(row["project_id"]), actorID, actorName, "procurement_updated", "procurement_request", cleanID(row["id"]), "Cập nhật yêu cầu mua", Record{"request_code": row["request_code"]})
 	return row, nil
 }
 
@@ -9006,15 +9037,14 @@ func (s *Service) CreateInputInvoice(ctx context.Context, payableID string, req 
 	if err != nil {
 		return nil, err
 	}
-	fileMeta, storedPath, originalName, err := s.storeInputInvoicePDF(cleanID(payable["project_id"]), cleanID(payable["id"]), fileHeader)
+	fileMeta, storedObject, originalName, err := s.storeInputInvoicePDF(ctx, cleanID(payable["project_id"]), cleanID(payable["id"]), fileHeader)
 	if err != nil {
 		return nil, err
 	}
 	body["file_name"] = originalName
 	record, err := s.repo.CreateInputInvoice(ctx, payable, body, fileMeta, actorID, actorName)
 	if err != nil {
-		_ = os.Remove(storedPath)
-		return nil, err
+		return nil, s.cleanupStoredObjectAfterError(storedObject, err)
 	}
 	return record, nil
 }
@@ -9055,7 +9085,7 @@ func (s *Service) InputInvoiceFile(ctx context.Context, invoiceID, actorID strin
 	if fmt.Sprint(invoice["status"]) == "deleted" {
 		return EvidenceFileResult{}, validationError("Hoá đơn đầu vào đã bị xoá", Record{"invoice_id": invoiceID})
 	}
-	return s.storedFileResult(invoice, "storage_key", "mime_type", fmt.Sprint(invoice["file_name"]))
+	return s.storedFileResult(ctx, invoice, "storage_provider", "storage_key", "mime_type", fmt.Sprint(invoice["file_name"]))
 }
 
 func (s *Service) requirePayableAccess(ctx context.Context, payableID, actorID string, permissions []string, message string) (Record, error) {
@@ -9855,15 +9885,14 @@ func (s *Service) CreateOutputInvoice(ctx context.Context, receivableID string, 
 	if err != nil {
 		return nil, err
 	}
-	fileMeta, storedPath, originalName, err := s.storeOutputInvoicePDF(cleanID(receivable["project_id"]), cleanID(receivable["id"]), fileHeader)
+	fileMeta, storedObject, originalName, err := s.storeOutputInvoicePDF(ctx, cleanID(receivable["project_id"]), cleanID(receivable["id"]), fileHeader)
 	if err != nil {
 		return nil, err
 	}
 	body["file_name"] = originalName
 	record, err := s.repo.CreateOutputInvoice(ctx, receivable, body, fileMeta, actorID, actorName)
 	if err != nil {
-		_ = os.Remove(storedPath)
-		return nil, err
+		return nil, s.cleanupStoredObjectAfterError(storedObject, err)
 	}
 	return record, nil
 }
@@ -9901,7 +9930,10 @@ func (s *Service) OutputInvoiceFile(ctx context.Context, invoiceID, actorID stri
 	if !allowed {
 		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem file hoá đơn đầu ra")
 	}
-	return s.storedFileResult(invoice, "storage_key", "mime_type", fmt.Sprint(invoice["file_name"]))
+	if fmt.Sprint(invoice["status"]) == "deleted" {
+		return EvidenceFileResult{}, validationError("Hoá đơn đầu ra đã bị xoá", Record{"invoice_id": invoiceID})
+	}
+	return s.storedFileResult(ctx, invoice, "storage_provider", "storage_key", "mime_type", fmt.Sprint(invoice["file_name"]))
 }
 
 func (s *Service) requireReceivableAccess(ctx context.Context, receivableID, actorID string, permissions []string, message string) (Record, error) {
@@ -10071,240 +10103,15 @@ func (s *Service) CreatePayment(ctx context.Context, req PaymentCreateRequest, a
 		"target_type": targetType, "target_id": targetID,
 		"amount": amount, "payment_method": paymentMethod, "status": "draft", "created_by": actorID,
 	}
-	row, err := s.repo.CreatePayment(ctx, normalized)
+	row, err := s.repo.CreatePayment(ctx, normalized, actorID, actorName)
 	if err != nil {
 		return nil, err
 	}
-	_ = s.repo.AddAudit(ctx, cleanID(row["project_id"]), actorID, actorName, "payment_created", "payment", cleanID(row["id"]), fmt.Sprintf("Tạo phiếu thanh toán %s", row["payment_code"]), Record{"status": row["status"], "payment_type": row["payment_type"], "amount": row["amount"]})
 	return row, nil
 }
 
 func (s *Service) PaymentAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
 	return s.repo.PaymentAction(ctx, id, action, req, actorID, actorName)
-}
-
-func (s *Service) Dashboard(ctx context.Context, actorID string) (Record, error) {
-	return s.repo.DashboardReport(ctx, actorID)
-}
-
-func (s *Service) ReportOptions(ctx context.Context, actorID string) (Record, error) {
-	projects, err := s.repo.ReportProjectOptions(ctx, actorID)
-	if err != nil {
-		return nil, err
-	}
-	return Record{"projects": projects}, nil
-}
-
-func (s *Service) Report(ctx context.Context, kind string, req OperationalReportRequest, actorID string) ([]Record, error) {
-	req.ProjectID = cleanID(req.ProjectID)
-	if req.ProjectID != "" {
-		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, req.ProjectID, operationalReportPermissions(kind))
-		if err != nil {
-			return nil, err
-		}
-		if !allowed {
-			return nil, forbiddenError("Bạn không có quyền xem báo cáo của công trình này", Record{"permissions": operationalReportPermissions(kind)})
-		}
-	}
-	return s.repo.Report(ctx, kind, actorID, req.ProjectID)
-}
-
-func operationalReportPermissions(kind string) []string {
-	if kind == "accounting" {
-		return []string{"report.finance.view", "accounting.view"}
-	}
-	return []string{"report.view"}
-}
-
-func (s *Service) CashflowReport(ctx context.Context, req CashflowReportRequest, actorID string) (Record, error) {
-	normalized, err := normalizeCashflowReportRequest(req)
-	if err != nil {
-		return nil, err
-	}
-	if normalized.ProjectID != "" {
-		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, normalized.ProjectID, []string{"report.finance.view", "accounting.view"})
-		if err != nil {
-			return nil, err
-		}
-		if !allowed {
-			return nil, forbiddenError("Bạn không có quyền xem dòng tiền của công trình này", Record{"permissions": []string{"report.finance.view", "accounting.view"}})
-		}
-	}
-	return s.repo.CashflowReport(ctx, normalized, actorID)
-}
-
-func (s *Service) TaxReport(ctx context.Context, req TaxReportRequest, actorID string) (Record, error) {
-	normalized, err := normalizeTaxReportRequest(req)
-	if err != nil {
-		return nil, err
-	}
-	if normalized.ProjectID != "" {
-		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, normalized.ProjectID, []string{"report.finance.view", "accounting.view"})
-		if err != nil {
-			return nil, err
-		}
-		if !allowed {
-			return nil, forbiddenError("Bạn không có quyền xem báo cáo thuế của công trình này", Record{"permissions": []string{"report.finance.view", "accounting.view"}})
-		}
-	}
-	return s.repo.TaxReport(ctx, normalized, actorID)
-}
-
-func (s *Service) ProfitReport(ctx context.Context, req ProfitReportRequest, actorID string) (Record, error) {
-	normalized, err := normalizeProfitReportRequest(req)
-	if err != nil {
-		return nil, err
-	}
-	if normalized.ProjectID != "" {
-		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, normalized.ProjectID, []string{"report.finance.view", "accounting.view"})
-		if err != nil {
-			return nil, err
-		}
-		if !allowed {
-			return nil, forbiddenError("Bạn không có quyền xem báo cáo lợi nhuận của công trình này", Record{"permissions": []string{"report.finance.view", "accounting.view"}})
-		}
-	}
-	return s.repo.ProfitReport(ctx, normalized, actorID)
-}
-
-func normalizeCashflowReportRequest(req CashflowReportRequest) (CashflowReportRequest, error) {
-	now := time.Now()
-	from := strings.TrimSpace(req.FromDate)
-	to := strings.TrimSpace(req.ToDate)
-	if from == "" {
-		from = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
-	}
-	if to == "" {
-		to = now.Format("2006-01-02")
-	}
-	fromDate, err := time.Parse("2006-01-02", from)
-	if err != nil {
-		return CashflowReportRequest{}, validationError("Ngày bắt đầu không hợp lệ", Record{"from": from})
-	}
-	toDate, err := time.Parse("2006-01-02", to)
-	if err != nil {
-		return CashflowReportRequest{}, validationError("Ngày kết thúc không hợp lệ", Record{"to": to})
-	}
-	if toDate.Before(fromDate) {
-		return CashflowReportRequest{}, validationError("Ngày kết thúc phải sau ngày bắt đầu", Record{"from": from, "to": to})
-	}
-	groupBy := strings.TrimSpace(req.GroupBy)
-	if groupBy == "" {
-		groupBy = "day"
-	}
-	if !statusIn(groupBy, "day", "week", "month") {
-		return CashflowReportRequest{}, validationError("Nhóm thời gian dòng tiền không hợp lệ", Record{"group_by": groupBy})
-	}
-	status := strings.TrimSpace(req.Status)
-	if status == "" {
-		status = "approved"
-	}
-	if !statusIn(status, "approved", "all") {
-		return CashflowReportRequest{}, validationError("Bộ lọc trạng thái dòng tiền không hợp lệ", Record{"status": status})
-	}
-	return CashflowReportRequest{
-		ProjectID: cleanID(req.ProjectID),
-		FromDate:  from,
-		ToDate:    to,
-		GroupBy:   groupBy,
-		Status:    status,
-	}, nil
-}
-
-func normalizeProfitReportRequest(req ProfitReportRequest) (ProfitReportRequest, error) {
-	now := time.Now()
-	from := strings.TrimSpace(req.FromDate)
-	to := strings.TrimSpace(req.ToDate)
-	if from == "" {
-		from = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
-	}
-	if to == "" {
-		to = now.Format("2006-01-02")
-	}
-	fromDate, err := time.Parse("2006-01-02", from)
-	if err != nil {
-		return ProfitReportRequest{}, validationError("Ngày bắt đầu không hợp lệ", Record{"from": from})
-	}
-	toDate, err := time.Parse("2006-01-02", to)
-	if err != nil {
-		return ProfitReportRequest{}, validationError("Ngày kết thúc không hợp lệ", Record{"to": to})
-	}
-	if toDate.Before(fromDate) {
-		return ProfitReportRequest{}, validationError("Ngày kết thúc phải sau ngày bắt đầu", Record{"from": from, "to": to})
-	}
-	groupBy := strings.TrimSpace(req.GroupBy)
-	if groupBy == "" {
-		groupBy = "month"
-	}
-	if !statusIn(groupBy, "month", "quarter") {
-		return ProfitReportRequest{}, validationError("Nhóm kỳ báo cáo lợi nhuận không hợp lệ", Record{"group_by": groupBy})
-	}
-	status := strings.TrimSpace(req.Status)
-	if status == "" {
-		status = "posted"
-	}
-	if !statusIn(status, "posted", "all") {
-		return ProfitReportRequest{}, validationError("Bộ lọc trạng thái báo cáo lợi nhuận không hợp lệ", Record{"status": status})
-	}
-	return ProfitReportRequest{
-		ProjectID: cleanID(req.ProjectID),
-		FromDate:  from,
-		ToDate:    to,
-		GroupBy:   groupBy,
-		Status:    status,
-	}, nil
-}
-
-func normalizeTaxReportRequest(req TaxReportRequest) (TaxReportRequest, error) {
-	now := time.Now()
-	from := strings.TrimSpace(req.FromDate)
-	to := strings.TrimSpace(req.ToDate)
-	if from == "" {
-		from = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
-	}
-	if to == "" {
-		to = now.Format("2006-01-02")
-	}
-	fromDate, err := time.Parse("2006-01-02", from)
-	if err != nil {
-		return TaxReportRequest{}, validationError("Ngày bắt đầu không hợp lệ", Record{"from": from})
-	}
-	toDate, err := time.Parse("2006-01-02", to)
-	if err != nil {
-		return TaxReportRequest{}, validationError("Ngày kết thúc không hợp lệ", Record{"to": to})
-	}
-	if toDate.Before(fromDate) {
-		return TaxReportRequest{}, validationError("Ngày kết thúc phải sau ngày bắt đầu", Record{"from": from, "to": to})
-	}
-	groupBy := strings.TrimSpace(req.GroupBy)
-	if groupBy == "" {
-		groupBy = "month"
-	}
-	if !statusIn(groupBy, "month", "quarter") {
-		return TaxReportRequest{}, validationError("Nhóm kỳ báo cáo thuế không hợp lệ", Record{"group_by": groupBy})
-	}
-	source := strings.TrimSpace(req.Source)
-	if source == "" {
-		source = "all"
-	}
-	if !statusIn(source, "all", "input", "output") {
-		return TaxReportRequest{}, validationError("Nguồn hoá đơn báo cáo thuế không hợp lệ", Record{"source": source})
-	}
-	status := strings.TrimSpace(req.Status)
-	if status == "" {
-		status = "posted"
-	}
-	if !statusIn(status, "posted", "all") {
-		return TaxReportRequest{}, validationError("Bộ lọc trạng thái báo cáo thuế không hợp lệ", Record{"status": status})
-	}
-	return TaxReportRequest{
-		ProjectID: cleanID(req.ProjectID),
-		FromDate:  from,
-		ToDate:    to,
-		GroupBy:   groupBy,
-		Source:    source,
-		Status:    status,
-	}, nil
 }
 
 func (s *Service) AuditLogs(ctx context.Context, projectID, actorID string, filter AuditLogFilter) (Record, error) {

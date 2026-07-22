@@ -1,0 +1,189 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin
+  namespace: consflow
+  labels:
+    app.kubernetes.io/name: admin
+    app.kubernetes.io/instance: consflow
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: consflow
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Required hostname anti-affinity deliberately permits only one admin pod
+      # per node. Replacing one pod at a time avoids requiring a third node
+      # during a rollout of the two-replica baseline.
+      maxUnavailable: 1
+      maxSurge: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: admin
+      app.kubernetes.io/instance: consflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: admin
+        app.kubernetes.io/instance: consflow
+        app.kubernetes.io/component: gateway
+        app.kubernetes.io/part-of: consflow
+    spec:
+      serviceAccountName: consflow-workload
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 25
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: admin
+                  app.kubernetes.io/instance: consflow
+              topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: admin
+              app.kubernetes.io/instance: consflow
+      initContainers:
+        - name: render-kubernetes-nginx-config
+          image: registry.example.invalid/consflow/admin:replace-me
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SERVER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: consflow-runtime
+                  key: SERVER_NAME
+            - name: TRUSTED_PROXY_CIDR
+              valueFrom:
+                configMapKeyRef:
+                  name: consflow-runtime
+                  key: TRUSTED_PROXY_CIDR
+            - name: REAL_IP_HEADER
+              valueFrom:
+                configMapKeyRef:
+                  name: consflow-runtime
+                  key: REAL_IP_HEADER
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              source=/etc/nginx/templates/default.conf.template
+              patched=/work/default.conf.template
+              rendered=/conf/default.conf
+              grep -Fq 'resolver 127.0.0.11 ipv6=off valid=10s;' "$source"
+              grep -Fq 'set $backend_upstream http://backend:8080;' "$source"
+              sed \
+                -e '/^[[:space:]]*resolver 127\.0\.0\.11 ipv6=off valid=10s;$/d' \
+                -e '/^[[:space:]]*set \$backend_upstream http:\/\/backend:8080;$/d' \
+                -e 's#proxy_pass \$backend_upstream;#proxy_pass http://backend:8080;#g' \
+                "$source" > "$patched"
+              ! grep -Fq '$backend_upstream' "$patched"
+              envsubst '${SERVER_NAME} ${TRUSTED_PROXY_CIDR} ${REAL_IP_HEADER}' \
+                < "$patched" > "$rendered"
+              grep -Fq 'proxy_pass http://backend:8080;' "$rendered"
+              chmod 0444 "$rendered"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: nginx-template-work
+              mountPath: /work
+            - name: nginx-conf
+              mountPath: /conf
+      containers:
+        - name: admin
+          image: registry.example.invalid/consflow/admin:replace-me
+          imagePullPolicy: IfNotPresent
+          command: ["/usr/sbin/nginx"]
+          args: ["-g", "daemon off;"]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /gateway-health
+              port: http
+            periodSeconds: 2
+            timeoutSeconds: 1
+            failureThreshold: 15
+          livenessProbe:
+            httpGet:
+              path: /gateway-health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /gateway-health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-ec", "sleep 5"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: nginx-template-work
+          emptyDir:
+            sizeLimit: 1Mi
+        - name: nginx-conf
+          emptyDir:
+            sizeLimit: 1Mi
+        - name: nginx-cache
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: nginx-run
+          emptyDir:
+            sizeLimit: 1Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi

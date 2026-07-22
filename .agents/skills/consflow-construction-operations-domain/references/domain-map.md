@@ -24,13 +24,13 @@
 - `evidence_records`, `documents`
 - Form-backed site records: `workflow_form_instances`, `workflow_form_answers`, `workflow_form_events`
 - Checklist/report seed forms: `V18`, `V19`, `V20`
-- Evidence/storage migrations: `V6`, `V15`, `V16`
+- Evidence/storage migrations: `V6`, `V15`, `V16`, `V70`, `V71`
 - Product-grade QA/QC and daily-report bridge migrations: `V51`, `V52`, `V53`
 - Simplified construction migrations: `V62` canonical check/action model, `V63` scoped edit permissions, `V64` ordered multi-evidence roles, `V65` daily-report source links and `V66` Planning-to-Construction handoff
 
 ## Invariants
 
-- Evidence records remain permissioned and checksum-backed.
+- Evidence records remain permissioned and checksum-backed. Storage uses the concurrency-safe provider registry with opaque `external|local|s3` provider/key metadata; V70 preserves the external-null-key contract while allowing opaque keys for local/S3 objects. V71 adds a `NOT VALID` future-write check requiring local/S3 keys to be non-null, nonblank and equal to `btrim(storage_key)`; legacy invalid rows remain queryable for operator inventory and block validation until repaired. Local writes are exclusive and descriptor-relative/no-follow on macOS/Linux. Protected downloads authorize the evidence/work item before opening and streaming the object. Evidence detail is read before transaction commit; only a typed pre-commit failure deletes the new object, while an outcome-unknown commit error preserves it to avoid breaking a committed reference.
 - `modules/_shared/EvidenceCapture.tsx` owns the reusable local file queue and real/system camera flow. Operations keeps a compatibility re-export; Acceptance reuses the same client validation but still uploads through the canonical work-item evidence endpoint, so moving the component does not change storage, permissions or audit ownership.
 - Site daily reports preserve did/will, crew, actual quantity, material usage, and photo evidence when present.
 - The project construction UI at `/projects/:id/operations` is purpose-first: `Nhật ký`, `Kiểm tra`, and `Cần xử lý`. It must not expose ITP/RFI/NCR/rework/replanning forms in the primary field flow.
@@ -41,6 +41,7 @@
 - Actions transition `open -> waiting_confirmation -> done`. Verification failure returns to `open` and increments `retry_count`; events preserve every resolution/verification attempt. `impact_scope` is one flag and may create a hidden technical replanning link.
 - `construction_action_events` remains the source of truth for every remediation submission and verification attempt. Report detail may summarize that timeline, but must open the canonical action View for the complete khắc phục history and evidence.
 - Technical issue/rework/replanning rows remain synchronized compatibility/audit records. They are not additional forms the field user must complete. Open simplified actions are handover blockers independently of technical rows.
+- Issue update audit policy is key-sensitive. A request body containing `status` writes the mutation and its one `issue_updated` event atomically and fails closed; a request without `status` persists title/description/severity/assignment metadata first and attempts the same single event best-effort, with a structured audit-failure log. The route and response contract do not change.
 - The construction timeline maps structured `completed_items.result=done|partial|blocked`, `next_plan_items`, and `blockers` to Đã làm, Đang làm, Sẽ làm, and Vấn đề. Legacy quick reports encode the same three work groups in `work_summary` and must remain readable; an issue record is still distinct from a report blocker.
 - Direct construction report create/update is a typed operations command, not a workflow transition. It persists structured work/resource/blocker data plus legacy summaries, may reference one optional source work item, and may link at most 50 evidence records that belong to that same project/work item, are not rejected and are visible to the actor; it does not create a work item or workflow form instance. Update preserves project/reporter identity and emits audit.
 - The manual report create UI is one field flow rather than a sequence of screens: required report context and work groups stay primary, resource/note fields use progressive disclosure, each blocker may remain informational or prepare one check/action draft, and one save first persists the report/evidence then calls the existing canonical V65 create commands. Successful child drafts are never retried; partial child failures keep the saved report and only failed drafts reopen in the same report detail dialog. Existing report detail uses the same compact composer and refreshes linked history in place without changing tabs.

@@ -6,14 +6,18 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow ./cmd/server
 RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-migrate ./cmd/migrate
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-storage-migrate ./cmd/storage-migrate
 
 FROM alpine:3.20
 WORKDIR /app
-RUN adduser -D -g '' appuser
-RUN mkdir -p /app/uploads && chown -R appuser:appuser /app/uploads
+RUN addgroup -S -g 10001 appgroup \
+    && adduser -S -D -H -u 10001 -G appgroup appuser \
+    && mkdir -p /app/uploads \
+    && chown -R 10001:10001 /app/uploads
 COPY --from=build /bin/consflow /app/consflow
 COPY --from=build /bin/consflow-migrate /app/consflow-migrate
+COPY --from=build /bin/consflow-storage-migrate /app/consflow-storage-migrate
 COPY --from=build /src/migrations /app/migrations
-USER appuser
+USER 10001:10001
 EXPOSE 8080
 CMD ["/app/consflow"]

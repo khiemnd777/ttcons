@@ -1,0 +1,31 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+  namespace: consflow
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/instance: consflow
+    app.kubernetes.io/part-of: consflow
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+      app.kubernetes.io/instance: consflow
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: admin
+  namespace: consflow
+  labels:
+    app.kubernetes.io/name: admin
+    app.kubernetes.io/instance: consflow
+    app.kubernetes.io/part-of: consflow
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: admin
+      app.kubernetes.io/instance: consflow

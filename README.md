@@ -25,6 +25,7 @@ frontend/
   src/layouts/AppShell.tsx
   src/components
   src/modules
+deploy/k8s                     # portable multi-node application baseline
 docker-compose.yml
 AGENTS.md
 .agents/skills                 # Repo-scoped Codex skills
@@ -52,6 +53,8 @@ Sau khi stack chạy:
 - Admin frontend: http://localhost:5173
 - Backend API: http://localhost:8080/api
 - PostgreSQL: localhost:5432, database `consflow`, user/password `consflow`
+
+Production Compose là topology single-host có kiểm soát. Baseline Kubernetes cho hai replica `admin`/`backend`, external managed PostgreSQL/Redis/S3, migration Job và các rollout gate nằm tại [`deploy/k8s/README.md`](deploy/k8s/README.md); manifests cố ý fail-closed và không tự deploy cluster.
 
 Seed data thủ công nếu cần reset dữ liệu:
 

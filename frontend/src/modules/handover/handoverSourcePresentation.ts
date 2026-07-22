@@ -1,4 +1,5 @@
 import type { ChecklistItem, HandoverDetail } from './handoverTypes';
+import { isProtectedStorageProvider } from '../../lib/utils/protectedStorage.ts';
 
 export type ChecklistSourceMode = 'automatic' | 'linked' | 'manual';
 export type SourceResult = 'passed' | 'failed' | 'unchecked';
@@ -96,7 +97,7 @@ export function linkedSourcePresentations(item: ChecklistItem): LinkedSourcePres
       name: item.evidence_name || 'Minh chứng liên kết',
       typeLabel: evidenceTypeLabel(item.evidence_type),
       status: item.evidence_status,
-      openMode: item.evidence_storage_provider === 'local' ? 'protected_evidence' : 'none',
+      openMode: isProtectedStorageProvider(item.evidence_storage_provider) ? 'protected_evidence' : 'none',
       placeholderUrl: false,
       mimeType: item.evidence_mime_type,
       fileSize: item.evidence_file_size,

@@ -258,11 +258,7 @@ func (r *Repository) ApplyApprovalPolicyAction(ctx context.Context, request Reco
 	`, request["id"], status, nextStage, resolved); err != nil {
 		return nil, err
 	}
-	rawMetadata, _ := json.Marshal(Record{"approval_request_id": request["id"], "action": action, "role_label": roleLabel, "stage": currentStage, "next_stage": nextStage, "status": status})
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json)
-		VALUES (NULLIF($1,'')::uuid, NULLIF($2,'')::uuid, $3, $4, $5, NULLIF($6,'')::uuid, $7, $8::jsonb)
-	`, projectID, actorID, actorName, "approval_"+strings.ReplaceAll(action, "-", "_"), request["target_type"], cleanID(request["target_id"]), fmt.Sprintf("%s phê duyệt stage %d", action, currentStage+1), string(rawMetadata)); err != nil {
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "approval_"+strings.ReplaceAll(action, "-", "_"), fmt.Sprint(request["target_type"]), cleanID(request["target_id"]), fmt.Sprintf("%s phê duyệt stage %d", action, currentStage+1), Record{"approval_request_id": request["id"], "action": action, "role_label": roleLabel, "stage": currentStage, "next_stage": nextStage, "status": status}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

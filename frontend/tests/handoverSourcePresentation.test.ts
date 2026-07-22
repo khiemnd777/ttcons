@@ -98,7 +98,7 @@ test('builds an openable presentation for a linked document including placeholde
   assert.equal(linkedSourcePresentations({ ...item, document_status: 'deleted' })[0].openMode, 'none');
 });
 
-test('keeps local linked evidence behind the protected evidence file endpoint', () => {
+test('keeps local and s3 linked evidence behind the protected evidence file endpoint', () => {
   const item = checklistItem({
     evidence_id: 'evidence-1',
     evidence_name: 'Ảnh nghiệm thu hoàn công',
@@ -120,6 +120,11 @@ test('keeps local linked evidence behind the protected evidence file endpoint', 
     mimeType: 'image/jpeg',
     fileSize: 2048,
   }]);
+
+  assert.equal(linkedSourcePresentations({ ...item, evidence_storage_provider: 's3' })[0].openMode, 'protected_evidence');
+  assert.equal(linkedSourcePresentations({ ...item, evidence_storage_provider: 'external' })[0].openMode, 'none');
+  assert.equal(linkedSourcePresentations({ ...item, evidence_storage_provider: 'none' })[0].openMode, 'none');
+  assert.equal(linkedSourcePresentations({ ...item, evidence_storage_provider: 'future-provider' })[0].openMode, 'none');
 });
 
 test('builds precise source targets for acceptance, warehouse and both debt kinds', () => {

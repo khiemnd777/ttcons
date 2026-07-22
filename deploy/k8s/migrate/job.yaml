@@ -1,0 +1,82 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # A production migration overlay must add a release-unique nameSuffix before
+  # `kubectl create -k`; never reuse this base Job name across releases.
+  name: consflow-migrate
+  namespace: consflow
+  labels:
+    app.kubernetes.io/name: migrate
+    app.kubernetes.io/instance: consflow
+    app.kubernetes.io/component: migration
+    app.kubernetes.io/part-of: consflow
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migrate
+        app.kubernetes.io/instance: consflow
+        app.kubernetes.io/component: migration
+        app.kubernetes.io/part-of: consflow
+    spec:
+      serviceAccountName: consflow-workload
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+        fsGroup: 2000
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: migrate
+          image: registry.example.invalid/consflow/backend:replace-me
+          imagePullPolicy: IfNotPresent
+          command: ["/app/consflow-migrate"]
+          env:
+            - name: APP_ENV
+              value: production
+            - name: DATABASE_URL_FILE
+              value: /var/run/secrets/consflow/migration_database_url
+            - name: MIGRATIONS_DIR
+              value: /app/migrations
+            - name: MIGRATION_LOCK_TIMEOUT
+              value: 30s
+            - name: MIGRATION_TIMEOUT
+              value: 5m
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: runtime-secrets
+              mountPath: /var/run/secrets/consflow
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: runtime-secrets
+          secret:
+            secretName: consflow-runtime-secrets
+            optional: false
+            defaultMode: 0440
+            items:
+              - key: migration_database_url
+                path: migration_database_url
+        - name: tmp
+          emptyDir:
+            sizeLimit: 128Mi

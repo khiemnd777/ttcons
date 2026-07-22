@@ -1,0 +1,27 @@
+# Provider-specific IngressClass, TLS issuer, managed WAF/DDoS policy and source
+# firewall rules must be supplied by the production platform. This example is
+# deliberately excluded from the base and uses an unroutable example domain.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: admin
+  namespace: consflow
+  labels:
+    app.kubernetes.io/part-of: consflow
+spec:
+  ingressClassName: replace-with-managed-ingress-class
+  tls:
+    - hosts:
+        - workflow.example.invalid
+      secretName: replace-with-managed-tls-secret
+  rules:
+    - host: workflow.example.invalid
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: admin
+                port:
+                  name: http

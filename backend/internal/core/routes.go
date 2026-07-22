@@ -5,15 +5,18 @@ import (
 
 	"consflow/backend/internal/shared/config"
 	"consflow/backend/internal/shared/middleware"
+	sharedstorage "consflow/backend/internal/shared/storage"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/redis/go-redis/v9"
 )
 
-func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg config.Config) func() {
+func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg config.Config, storageRegistry *sharedstorage.Registry) (func(), error) {
 	repo := NewRepository(db)
 	service := NewService(repo, cfg.JWTSecret)
-	service.ConfigureUploads(cfg.UploadDir, cfg.MaxUploadBytes)
+	if err := service.ConfigureStorage(storageRegistry, cfg.StorageProvider, cfg.MaxUploadBytes); err != nil {
+		return nil, err
+	}
 	service.ConfigureAuth(cfg.AuthAccessTokenMinutes, cfg.AuthRefreshTokenHours, cfg.AuthRefreshCookieSecure, cfg.AuthRefreshCookieSameSite)
 	service.ConfigureActivityStreaming(redisClient, cfg.SSEBrokerChannel, cfg.RedisOperationTimeout, cfg.SSEMaxConnections, cfg.SSEMaxConnectionsPerIP, cfg.SSEMaxConnectionsPerActor, cfg.SSEVisibilityTimeout, cfg.SSEMaxConnectionLifetime)
 	h := NewHandler(service)
@@ -374,7 +377,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg c
 	protected.Get("/reports/staff/export", h.StaffReportCSV)
 	protected.Get("/settings", h.Settings)
 
-	return service.CloseActivityStreaming
+	return service.CloseActivityStreaming, nil
 }
 
 func rateLimitPolicies(values config.RateLimitPolicies) middleware.RateLimitPolicies {

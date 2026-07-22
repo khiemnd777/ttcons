@@ -17,7 +17,9 @@ services:
     environment:
       POSTGRES_DB: "${POSTGRES_DB:?POSTGRES_DB is required}"
       POSTGRES_USER: "${POSTGRES_USER:?POSTGRES_USER is required}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
     volumes:
       - consflow_postgres:/var/lib/postgresql/data
     networks:
@@ -37,18 +39,18 @@ services:
   redis:
     <<: *common-runtime
     image: redis:7-alpine
-    environment:
-      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
+    secrets:
+      - redis_password
     command:
       - /bin/sh
       - -ec
-      - exec redis-server --appendonly yes --save 60 1000 --requirepass "$$REDIS_PASSWORD"
+      - exec redis-server --appendonly yes --save 60 1000 --requirepass "$$(cat /run/secrets/redis_password)"
     volumes:
       - consflow_redis:/data
     networks:
       - app_internal
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(cat /run/secrets/redis_password)\" ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -61,6 +63,33 @@ services:
     cpus: "${REDIS_CPU_LIMIT:-0.5}"
     pids_limit: 128
 
+  migrate:
+    <<: *common-runtime
+    restart: "no"
+    build:
+      context: ./backend
+    command: ["/app/consflow-migrate"]
+    environment:
+      APP_ENV: "production"
+      DATABASE_URL_FILE: /run/secrets/database_url
+      MIGRATIONS_DIR: /app/migrations
+      MIGRATION_LOCK_TIMEOUT: "${MIGRATION_LOCK_TIMEOUT:-30s}"
+      MIGRATION_TIMEOUT: "${MIGRATION_TIMEOUT:-5m}"
+    secrets:
+      - database_url
+    networks:
+      - app_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    mem_limit: "${MIGRATE_MEMORY_LIMIT:-256m}"
+    cpus: "${MIGRATE_CPU_LIMIT:-0.5}"
+    pids_limit: 64
+    init: true
+
   backend:
     <<: *common-runtime
     build:
@@ -68,12 +97,12 @@ services:
     environment:
       APP_ENV: "production"
       PORT: "8080"
-      DATABASE_URL: "${DATABASE_URL:?DATABASE_URL is required}"
-      REDIS_URL: "${REDIS_URL:?REDIS_URL is required}"
-      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
+      DATABASE_URL_FILE: /run/secrets/database_url
+      REDIS_URL_FILE: /run/secrets/redis_url
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is required}"
       MIGRATIONS_DIR: /app/migrations
-      AUTO_MIGRATE: "${AUTO_MIGRATE:-true}"
+      AUTO_MIGRATE: "false"
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:-10485760}"
       AUTH_ACCESS_TOKEN_MINUTES: "${AUTH_ACCESS_TOKEN_MINUTES:-15}"
@@ -136,6 +165,10 @@ services:
       SSE_VISIBILITY_TIMEOUT: "${SSE_VISIBILITY_TIMEOUT:-2s}"
       SSE_MAX_CONNECTION_LIFETIME: "${SSE_MAX_CONNECTION_LIFETIME:-5m}"
       SSE_BROKER_CHANNEL: "${SSE_BROKER_CHANNEL:-consflow:activity:v1}"
+    secrets:
+      - database_url
+      - redis_url
+      - jwt_secret
     expose:
       - "8080"
     volumes:
@@ -145,6 +178,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_started
     healthcheck:
@@ -212,6 +247,18 @@ networks:
     ipam:
       config:
         - subnet: "${APP_INTERNAL_SUBNET:?APP_INTERNAL_SUBNET is required}"
+
+secrets:
+  postgres_password:
+    file: "${POSTGRES_PASSWORD_FILE:?POSTGRES_PASSWORD_FILE is required}"
+  database_url:
+    file: "${DATABASE_URL_FILE:?DATABASE_URL_FILE is required}"
+  redis_password:
+    file: "${REDIS_PASSWORD_FILE:?REDIS_PASSWORD_FILE is required}"
+  redis_url:
+    file: "${REDIS_URL_FILE:?REDIS_URL_FILE is required}"
+  jwt_secret:
+    file: "${JWT_SECRET_FILE:?JWT_SECRET_FILE is required}"
 
 volumes:
   consflow_postgres:

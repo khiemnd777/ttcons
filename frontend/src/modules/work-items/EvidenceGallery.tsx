@@ -7,6 +7,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob } from '../../lib/api/client';
 import type { EvidenceRecord } from '../../lib/types/domain';
+import { isProtectedStorageProvider } from '../../lib/utils/protectedStorage.ts';
 import { compactDateTime, evidenceLabel, visibilityLabel } from './workItemPresentation';
 
 export type EvidenceReviewAction = 'accept' | 'reject';
@@ -60,7 +61,7 @@ export function EvidenceGallery({
       window.open(previewUrl, '_blank', 'noopener,noreferrer');
       return;
     }
-    if (record.storage_provider === 'local' && record.storage_key) {
+    if (isProtectedStorageProvider(record.storage_provider) && record.storage_key) {
       const viewer = window.open('', '_blank', 'noopener,noreferrer');
       try {
         const blob = await downloadBlob(`/evidence/${record.id}/file`);
@@ -361,8 +362,8 @@ function EvidenceCard({
         </div>
       </button>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className={clsx('rounded-md px-2 py-0.5 text-xs font-semibold', record.storage_provider === 'local' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>
-          {record.storage_provider === 'local' ? 'Tệp được bảo vệ' : 'Liên kết ngoài'}
+        <span className={clsx('rounded-md px-2 py-0.5 text-xs font-semibold', isProtectedStorageProvider(record.storage_provider) ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>
+          {isProtectedStorageProvider(record.storage_provider) ? 'Tệp được bảo vệ' : 'Liên kết ngoài'}
         </span>
         <div className="flex flex-wrap justify-end gap-2">
           <button type="button" className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100" onClick={onSelect}>
@@ -486,7 +487,7 @@ function EvidenceDetailDialog({
             <EvidenceMeta label="Thời điểm gửi" value={compactDateTime(record.created_at)} />
             <EvidenceMeta label="Người rà soát" value={record.reviewed_by_name ?? record.reviewed_by ?? '-'} />
             <EvidenceMeta label="Thời điểm rà soát" value={compactDateTime(record.reviewed_at)} />
-            <EvidenceMeta label="Nơi lưu trữ" value={record.storage_provider === 'local' ? 'Tệp nội bộ được bảo vệ' : (record.file_url ? 'Liên kết ngoài' : '-')} />
+            <EvidenceMeta label="Nơi lưu trữ" value={isProtectedStorageProvider(record.storage_provider) ? 'Tệp nội bộ được bảo vệ' : (record.file_url ? 'Liên kết ngoài' : '-')} />
             <EvidenceMeta label="MIME / Dung lượng" value={[record.mime_type, record.file_size ? formatEvidenceFileSize(record.file_size) : undefined].filter(Boolean).join(' · ') || '-'} />
             <EvidenceMeta label="Tên tệp gốc" value={originalFilename(record) ?? '-'} />
           </div>
@@ -571,7 +572,7 @@ function useEvidencePreviewUrls(evidence: EvidenceRecord[]) {
     setUrls({});
 
     async function loadPreviews() {
-      const imageRecords = evidence.filter((record) => record.storage_provider === 'local' && record.storage_key && isImageEvidence(record));
+      const imageRecords = evidence.filter((record) => isProtectedStorageProvider(record.storage_provider) && record.storage_key && isImageEvidence(record));
       const entries = await Promise.all(imageRecords.map(async (record) => {
         try {
           const blob = await downloadBlob(`/evidence/${record.id}/file`);

@@ -5,7 +5,7 @@
 - Frontend modules: `frontend/src/modules/dashboard`, `frontend/src/modules/reports`, `frontend/src/modules/accounting/CashflowPanel.tsx`
 - Report workspace/panels: `ReportsPage.tsx`, `reportRegistry.ts`, `ReportFilters.tsx`, `OperationalReportPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`, `CashflowPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`
+- Backend logic: `backend/internal/core/handlers_reports.go`, `service_reports.go`, `repository_reports.go`, `types_reports.go` (same `package core`); shared route registration remains in `routes.go`
 - Shared UI/contracts: `frontend/src/components/DataTable.tsx`, `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/format.ts`, `frontend/src/lib/utils/status.ts`
 
 ## Routes
