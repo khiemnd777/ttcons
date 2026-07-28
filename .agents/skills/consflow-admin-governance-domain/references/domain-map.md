@@ -23,7 +23,7 @@
 - `auth_sessions`
 - `partners`
 - `system_settings`, `audit_logs`
-- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`
+- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, accounting RBAC additions in `V73`
 
 ## Invariants
 
@@ -41,6 +41,8 @@
 - Session refresh/revoke lifecycle remains DB-backed and revocable.
 - `AuthSessionActive` is never cached: immediate session revoke remains authoritative even when Redis supplies distributed rate limiting and SSE Pub/Sub.
 - V68 adds the system roles `Thiết kế`, `Sale`, `Pháp lý` with the minimum permission sets needed by their official-workflow steps and grants existing `Đội thi công` pipeline/planning access. The migration does not auto-assign users or project memberships and does not broaden existing runtime role snapshots.
+- Accounting ledger permissions are independent capability gates: `accounting.journal_view`, `accounting.journal_post`, `accounting.journal_reverse`, `accounting.period_close`, `accounting.period_reopen`, `accounting.tax_view`, and `accounting.tax_manage`. Seed parity grants the accountant all seven; Director receives read/reversal/period/tax visibility but not manual posting or tax master-data management. Every record action still combines the permission with project scope.
+- Manual posting, source posting, reversal, period close/reopen and migration-reconciliation resolution write actor/time/reason audit in the same transaction. Reconciliation resolution is one-way: a second resolution returns conflict and cannot overwrite the original conclusion.
 
 ## Cross-Domain Checks
 
@@ -50,5 +52,7 @@
 
 ## Golden Live Accounts
 
-- Local/dev seed includes dedicated users for procurement, QA/QC, construction team, subcontractor and client roles (`procurement@`, `qaqc@`, `construction@`, `subcontractor@`, `client@consflow.local`), all documented in `backend/seed/GOLDEN_LIVE_RUNBOOK.md`.
-- `GOLDEN-LIVE-001` has twelve active project members so role-scoped work, requester/approver separation and external client/subcontractor participation can be exercised without weakening backend RBAC.
+- The canonical local/dev display identities are `Ngân Kế Toán` for `accounting@consflow.local` and `Hoàng Long` for `director@consflow.local`; `users.full_name` and the linked `staff.full_name` must remain aligned, while historical audit/activity actor-name snapshots are not rewritten by an account rename.
+- Local/dev seed includes dedicated users for procurement, QA/QC, construction team, subcontractor, client, design, sales and legal roles (`procurement@consflow.local`, `qaqc@consflow.local`, `construction@consflow.local`, `subcontractor@consflow.local`, `client@consflow.local`, `design@consflow.local`, `sales@consflow.local`, `legal@consflow.local`), all documented in `backend/seed/GOLDEN_LIVE_RUNBOOK.md`.
+- `GOLDEN-LIVE-001` has fifteen active project members, including dedicated `Thiết kế`, `Sale` and `Pháp lý` demo actors, so role-scoped work, requester/approver separation and external client/subcontractor participation can be exercised without substituting Admin.
+- V72 grants `planning.view` and `planning.edit` to PM because the official workflow assigns PM to planning-gated steps. This does not bypass project scope or work-item role assignment: `CanActOnWorkItem` remains the first mutation gate.

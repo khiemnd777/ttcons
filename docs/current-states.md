@@ -1,10 +1,32 @@
 # Current States
 
+## [Active] Reliable CTGS Tooltip Regression Fix
+
+### Will be done
+
+- Obtain one direct Edge/manual pointer-hover acceptance signal against the rebuilt source. The in-app Browser session could not produce a CSS `:hover` state from its pointer-move control, so mouse hover remains `NOT UX ACCEPTED` even though the implemented handler and the shared rendered tooltip path are present.
+- Close this plan only when the user says `Đóng plan`.
+
+### Done
+
+- User confirmed that hovering the compact CTGS number did not display the approved full-number tooltip.
+- Root cause was proven: the served Vite source contained only an HTML `title` attribute, no rendered `role="tooltip"` element; the previous build/tests did not exercise hover behavior.
+- User approved points 1–4 and explicitly authorized implementation plus Browser UAT.
+- Replaced native `title` with a portalled application tooltip, kept the full immutable CTGS in the accessible label/raw data, and added mouse-hover, keyboard-focus, Escape, touch/pen and outside-pointer handling.
+- Rebuilt and restarted the local Docker runtime after the final source change; PostgreSQL and Redis were healthy and backend/admin started successfully.
+- Browser UAT passed desktop focus/full-value/viewport placement and Escape closure; at 390×844 it passed tap/click, full-value rendering, outside closure and no horizontal overflow. No browser console warnings/errors were recorded.
+- The same Browser session could not synthesize a pointer hover: moving over the proven visible CTGS element left `element.matches(':hover') === false`. This criterion is recorded as skipped by tool limitation, not passed.
+- User required click-to-copy for `BF-PAY-ffd22b…58faeb` and approved review points 1–4, including implementation and Browser UAT.
+- Made every non-empty CTGS a copy control with an explicit copy icon and accessible label. Click, Enter and Space copy the full immutable CTGS value, while compact display text remains presentation-only; clipboard rejection produces an error toast without changing any journal entry.
+- Added focused clipboard and keyboard-key regression coverage. The complete frontend suite passed 31/31 tests, the production build passed, and the bundle-budget gate passed on the final source state.
+- Rebuilt and restarted the Docker stack after the final keyboard change; PostgreSQL and Redis became healthy and backend/admin started successfully.
+- Browser UAT against the rebuilt `Golden Project – Hoàn thiện Văn phòng An Phát` Sổ Nhật ký chung passed desktop click, Enter, Space, exact full-value clipboard content, success toast, tooltip text and Escape closure. At 390×844 it passed click-to-copy, success toast, tooltip containment and zero document-level horizontal overflow. No browser console warnings/errors were recorded.
+
 ## [Active] Production Readiness And Maintainability Program
 
 ### Will be done
 
-- Resolve the Golden Sample Browser UAT blockers: align the PM actor with the `planning.edit` work-item contract, add dedicated `Thiết kế`/`Sale`/`Pháp lý` coverage, then rerun C1 and C2 J0-J9 in an isolated disposable environment.
+- Rerun C1 and C2 J0-J9 with the 15-role Golden Sample matrix in an isolated disposable environment when Browser verification is explicitly authorized in a future turn.
 - Provision the selected production S3-compatible provider and migrate existing local objects with inventory, checksum and cross-replica validation before enabling multiple application replicas.
 - Select the managed Kubernetes/edge vendor, production cluster/network CIDRs, managed PostgreSQL/Redis/S3 instances and external secret controller; Compose remains the controlled single-host topology until the reviewed Kubernetes overlay and cross-replica gates pass.
 - Continue decomposing oversized backend core owners after the reporting slice, without changing public API, schema, RBAC or workflow behavior.
@@ -28,23 +50,6 @@
 - Converted authenticated page modules to route-level lazy loading below auth/permission guards while keeping Login, guards and AppShell eager; added standard/focus-shell loading and recoverable error states plus a CI gzip budget of 250 KiB for the entry and every JavaScript chunk. The production entry is now 119.9 KiB gzip and the largest lazy chunk is 35.8 KiB gzip.
 - Corrected the production runbook: Redis Pub/Sub already provides shared SSE fanout, while shared object storage, deployment/runtime choices and cross-replica validation remain required before scaling.
 - Updated central, backend, root-cause and affected domain maps for the new owners and operational contracts.
-- Passed the full backend suite against an isolated PostgreSQL database, storage/core race checks, `go vet ./...`, all 71 migration manifest checks, 23 frontend tests, the production frontend build and bundle budget, Kubernetes render validation, agent mapping validation and diff hygiene checks; browser verification was not run by policy.
+- Passed the full backend suite against an isolated PostgreSQL database, storage/core race checks, `go vet ./...`, all 72 migration manifest checks, 23 frontend tests, the production frontend build and bundle budget, Kubernetes render validation, agent mapping validation and diff hygiene checks; browser verification was not run by policy.
 - Ran the authorized Golden Sample Browser UAT in isolated DB `consflow_uat_20260722_115155`: all 12 demo actors authenticated and saw Golden Live, completed fixtures remained unchanged, but C1 failed at J1 because PM lacks the required `planning.edit` permission for draft/evidence mutations; C2 and J2-J9 remain blocked by that shared prerequisite and missing dedicated `Thiết kế`/`Sale`/`Pháp lý` actors. Evidence is stored outside the repo at `/private/tmp/consflow-uat-evidence/20260722_115155`.
-
-## [Active] Global Project Progress Board
-
-### Will be done
-
-- Optional browser/UAT walkthrough when the user explicitly requests browser verification.
-
-### Done
-
-- Review package and Mockup as Text approved by the user.
-- Matched Project Planning, Workflow Orchestration, global navigation, project-list, runtime-node and activity-stream owners through the mandatory mapping bootstrap.
-- Confirmed no database migration is required.
-- Added the permission-gated global `/progress` route and `Tiến trình` AppShell item directly below `Dashboard`; `/projects` remains unchanged.
-- Added the read-only responsive board with search/PM/status filters, stage columns, project attention badges, loading/error/empty states, manual refresh, explicit connection state and 60-second disconnected polling.
-- Added scoped `GET /projects/progress-board` and invalidation-only `GET /projects/progress-board/stream` before `/projects/:id`, plus the production Nginx no-buffer SSE whitelist.
-- Derived normalized presentation stages from each project's snapshotted current pipeline run/node without mutating templates, runs, work items or approvals.
-- Added focused stage/stream tests and updated central, frontend, backend, Project Planning and Workflow Orchestration maps.
-- Passed `go test ./...`, `npm run build`, `docker compose config`, a read-only PostgreSQL snapshot query against current local data, and `git diff --check`; browser verification was not run by policy.
+- Resolved the confirmed Golden Sample UAT blockers: V72 and seed parity grant PM `planning.view`/`planning.edit` while preserving project/work-item scope; dedicated `Thiết kế`, `Sale` and `Pháp lý` users/staff/roles raise Golden Live membership to 15; validators, runbooks, UAT matrix and maps now cover all actors and rate-limit-safe evidence capture. Migration/seed validation and the full backend suite pass on disposable PostgreSQL databases; Browser rerun remains explicitly pending.

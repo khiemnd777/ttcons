@@ -4,6 +4,7 @@ import {
   BriefcaseBusiness,
   Building2,
   ClipboardList,
+  Calculator,
   Database,
   FileClock,
   GitBranch,
@@ -35,6 +36,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
       { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
       { to: '/reports', label: 'Báo cáo', icon: BarChart3, permissions: ['report.view', 'report.finance.view', 'accounting.view'] },
+      { to: '/accounting', label: 'Kế toán', icon: Calculator, permissions: ['accounting.view'] },
     ],
   },
   {

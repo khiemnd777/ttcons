@@ -184,7 +184,7 @@ export function CashflowPanel({ projectId, initialFrom, reportMode = false, proj
             { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
             { key: 'inflow_amount', header: 'Thu', align: 'right', render: (row) => <CurrencyText value={row.inflow_amount} /> },
             { key: 'outflow_amount', header: 'Chi', align: 'right', render: (row) => <CurrencyText value={row.outflow_amount} /> },
-            { key: 'target_type', header: 'Nguồn liên kết' },
+            { key: 'target_type', header: 'Nguồn liên kết', render: (row) => row.target_type ? <EnumChip group="target_type" value={row.target_type} /> : 'Không gắn nguồn' },
           ]}
         />
       </div>

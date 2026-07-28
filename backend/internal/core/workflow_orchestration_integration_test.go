@@ -431,7 +431,7 @@ func TestBusinessCoreLifecycleServiceRecordsActors(t *testing.T) {
 	payment, err := service.CreatePayment(ctx, PaymentCreateRequest{
 		ProjectID: fixture.projectID, PaymentCode: "PMT-CORE-" + suffix,
 		PaymentType: "outbound", TargetType: "issue", TargetID: cleanID(issue["id"]),
-		Amount: 450, PaymentMethod: "bank_transfer",
+		BudgetID: cleanID(budget["id"]), Amount: 450, PaymentMethod: "bank_transfer",
 	}, fixture.userID, "Scoped User")
 	if err != nil {
 		t.Fatal(err)

@@ -40,6 +40,8 @@
 - Subcontractor reconciliation maps confirmed quantity and variance to BOQ/work item evidence.
 - Owner/client reconciliation maps client decision and required action to acceptance/work item evidence.
 - The contract workspace may reorganize and localize lifecycle records, but must keep signed-version immutability, variation-to-draft-version behavior and existing capability gates visible in the available actions.
+- An approved payable with an approved budget creates an accounting commitment. A verified procurement/vendor input invoice recognizes actual cost and reduces that commitment in the append-only budget movement ledger; payment is a separate cash event and must not recognize the same cost again.
+- Procurement, contract and invoice source IDs remain traceable on journals and budget movements. Commercial code must not insert or update posted journal lines, static budget actuals or paid balances outside the canonical accounting posting transaction.
 
 ## Cross-Domain Checks
 

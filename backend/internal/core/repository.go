@@ -253,6 +253,8 @@ func hasUpdatedAt(table string) bool {
 		"procurement_requests", "boq_items", "issues", "acceptance_records", "rework_requests", "replanning_requests",
 		"construction_check_templates", "construction_checks", "construction_action_items",
 		"handover_records", "accounting_budgets", "payables", "receivables", "payments", "advance_requests",
+		"accounting_books", "accounting_accounts", "accounting_periods", "journal_entries", "accounting_posting_rules",
+		"tax_codes", "tax_periods", "invoice_tax_lines",
 		"system_settings", "work_items", "evidence_records", "workflow_form_templates", "workflow_form_versions",
 		"workflow_form_instances", "workflow_form_signatures", "input_invoices", "output_invoices",
 		"payable_payment_schedules", "receivable_payment_schedules", "client_advance_receipts", "partners":
@@ -303,7 +305,9 @@ func safeTable(table string) string {
 		"workflow_form_instances", "workflow_form_answers", "workflow_form_events", "workflow_form_signatures",
 		"workflow_form_pdf_exports", "boq_unit_price_events", "input_invoices", "output_invoices",
 		"payable_payment_schedules", "payment_allocations", "receivable_payment_schedules", "client_advance_receipts",
-		"receipt_allocations", "partners":
+		"receipt_allocations", "partners", "accounting_books", "accounting_accounts", "accounting_periods",
+		"journal_entries", "journal_entry_lines", "accounting_posting_rules", "budget_movements", "tax_codes",
+		"tax_periods", "invoice_tax_lines", "tax_adjustments", "accounting_backfill_issues":
 		return table
 	default:
 		return ""
@@ -416,19 +420,19 @@ func handoverColumns() []ColumnSpec {
 }
 
 func budgetColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("budget_code"), col("name"), col("planned_amount"), col("approved_amount"), col("used_amount"), col("remaining_amount"), col("status"), col("approved_by")}
+	return []ColumnSpec{col("project_id"), col("accounting_book_id"), col("budget_code"), col("name"), col("planned_amount"), col("approved_amount"), col("used_amount"), col("remaining_amount"), col("status"), col("approved_by")}
 }
 
 func payableColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("payable_code"), col("vendor_type"), col("vendor_partner_id"), col("vendor_name"), col("source_type"), col("source_id"), col("gross_amount"), col("advance_amount"), col("retention_amount"), col("deduction_amount"), col("paid_amount"), col("remaining_amount"), col("due_date"), col("status"), col("created_by"), col("approved_by")}
+	return []ColumnSpec{col("project_id"), col("accounting_book_id"), col("budget_id"), col("cost_account_id"), col("payable_code"), col("vendor_type"), col("vendor_partner_id"), col("vendor_name"), col("source_type"), col("source_id"), col("gross_amount"), col("advance_amount"), col("retention_amount"), col("deduction_amount"), col("paid_amount"), col("remaining_amount"), col("due_date"), col("status"), col("created_by"), col("approved_by")}
 }
 
 func receivableColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("receivable_code"), col("client_partner_id"), col("client_name"), col("source_type"), col("source_id"), col("contract_amount"), col("milestone_name"), col("gross_amount"), col("received_amount"), col("remaining_amount"), col("due_date"), col("status"), col("created_by"), col("approved_by")}
+	return []ColumnSpec{col("project_id"), col("accounting_book_id"), col("revenue_account_id"), col("receivable_code"), col("client_partner_id"), col("client_name"), col("source_type"), col("source_id"), col("contract_amount"), col("milestone_name"), col("gross_amount"), col("received_amount"), col("remaining_amount"), col("due_date"), col("status"), col("created_by"), col("approved_by")}
 }
 
 func paymentColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("payment_code"), col("payment_type"), col("target_type"), col("target_id"), col("amount"), col("payment_method"), col("status"), col("paid_at"), col("created_by"), col("approved_by")}
+	return []ColumnSpec{col("project_id"), col("accounting_book_id"), col("budget_id"), col("cash_account_id"), col("payment_code"), col("payment_type"), col("target_type"), col("target_id"), col("tax_period_id"), col("amount"), col("payment_method"), col("status"), col("paid_at"), col("created_by"), col("approved_by")}
 }
 
 func staffColumns() []ColumnSpec {

@@ -32,7 +32,8 @@ WHERE u.email IN (
   'admin@consflow.local','pm@consflow.local','qs@consflow.local',
   'accounting@consflow.local','warehouse@consflow.local','supervisor@consflow.local',
   'director@consflow.local','procurement@consflow.local','qaqc@consflow.local',
-  'construction@consflow.local','subcontractor@consflow.local','client@consflow.local'
+  'construction@consflow.local','subcontractor@consflow.local','client@consflow.local',
+  'design@consflow.local','sales@consflow.local','legal@consflow.local'
 );
 
 INSERT INTO pipeline_runs (
@@ -178,5 +179,7 @@ INSERT INTO audit_logs (
   'Tạo Golden Live Pipeline Run và mở node Khảo sát.',
   '{"golden_live":true,"untouched":true,"current_node_order":1}'::jsonb
 );
+
+SELECT backfill_accounting_ledger();
 
 COMMIT;

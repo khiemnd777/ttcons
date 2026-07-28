@@ -57,10 +57,11 @@ func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record
 		return nil, err
 	}
 	costRows, err := r.Query(ctx, fmt.Sprintf(`
-		SELECT p.name, COALESCE(b.used_amount,0) AS used_amount, COALESCE(b.remaining_amount,0) AS remaining_amount
+		SELECT p.name, COALESCE(SUM(b.actual_amount),0) AS used_amount, COALESCE(SUM(b.remaining_amount),0) AS remaining_amount
 		FROM projects p
-		LEFT JOIN accounting_budgets b ON b.project_id=p.id
+		LEFT JOIN accounting_budget_balances b ON b.project_id=p.id AND b.status <> 'cancelled'
 		WHERE p.status <> 'cancelled' AND %s
+		GROUP BY p.id
 		ORDER BY p.created_at
 	`, scopeSQL), scopeArgs...)
 	if err != nil {
@@ -181,13 +182,20 @@ func (r *Repository) Report(ctx context.Context, kind, userID, projectID string)
 				SELECT project_id, COALESCE(SUM(remaining_amount),0) AS receivable_remaining
 				FROM receivables WHERE status <> 'cancelled' GROUP BY project_id
 			), budget_totals AS (
-				SELECT project_id, COALESCE(SUM(used_amount),0) AS used_budget
-				FROM accounting_budgets WHERE status <> 'cancelled' GROUP BY project_id
+				SELECT project_id,
+					COALESCE(SUM(committed_amount),0) AS committed_budget,
+					COALESCE(SUM(actual_amount),0) AS used_budget,
+					COALESCE(SUM(paid_amount),0) AS paid_budget,
+					COALESCE(SUM(available_amount),0) AS available_budget
+				FROM accounting_budget_balances WHERE status <> 'cancelled' GROUP BY project_id
 			)
 			SELECT p.id AS project_id, p.name,
 				COALESCE(pay.payable_remaining,0) AS payable_remaining,
 				COALESCE(rec.receivable_remaining,0) AS receivable_remaining,
-				COALESCE(b.used_budget,0) AS used_budget
+				COALESCE(b.committed_budget,0) AS committed_budget,
+				COALESCE(b.used_budget,0) AS used_budget,
+				COALESCE(b.paid_budget,0) AS paid_budget,
+				COALESCE(b.available_budget,0) AS available_budget
 			FROM projects p
 			LEFT JOIN payable_totals pay ON pay.project_id=p.id
 			LEFT JOIN receivable_totals rec ON rec.project_id=p.id
@@ -393,9 +401,10 @@ func (r *Repository) TaxReport(ctx context.Context, req TaxReportRequest, userID
 	projectFilter := taxProjectFilter(&args, req.ProjectID)
 	inputDateFilter := fmt.Sprintf(" AND ii.invoice_date >= $%d::date AND ii.invoice_date <= $%d::date", fromIdx, toIdx)
 	outputDateFilter := fmt.Sprintf(" AND oi.invoice_date >= $%d::date AND oi.invoice_date <= $%d::date", fromIdx, toIdx)
+	adjustmentDateFilter := fmt.Sprintf(" AND adjustment.entry_date >= $%d::date AND adjustment.entry_date <= $%d::date", fromIdx, toIdx)
 	sourceFilter := taxSourceFilter(req.Source)
 	statusFilter := taxStatusFilter(req.Status)
-	baseCTE := taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter)
+	baseCTE := taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter, adjustmentDateFilter)
 	filteredCTE := baseCTE + fmt.Sprintf(`
 		, filtered_tax_rows AS (
 			SELECT * FROM tax_rows
@@ -840,25 +849,25 @@ func taxReportWarnings(summary Record, status string) []Record {
 	return warnings
 }
 
-func taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter string) string {
+func taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter, adjustmentDateFilter string) string {
 	return fmt.Sprintf(`
 		WITH tax_rows AS (
 			SELECT
 				'input'::text AS direction,
-				ii.id::text AS id,
+				line.id::text AS id,
 				ii.project_id::text AS project_id,
 				p.name AS project_name,
 				ii.invoice_number,
 				COALESCE(ii.invoice_symbol, '') AS invoice_symbol,
 				ii.invoice_date,
 				ii.vendor_name AS counterparty_name,
-				COALESCE(ii.vendor_tax_code, '') AS tax_code,
-				ii.amount_before_vat,
-				ii.vat_amount,
-				ii.total_amount,
+				COALESCE(ii.vendor_tax_code,'') AS tax_code,
+				line.taxable_amount AS amount_before_vat,
+				line.vat_amount,
+				line.taxable_amount+line.vat_amount AS total_amount,
 				ii.currency,
 				ii.status,
-				(ii.status='verified') AS posted,
+				(original.id IS NOT NULL AND reversal.id IS NULL) AS posted,
 				'payable'::text AS source_type,
 				ii.payable_id::text AS source_id,
 				COALESCE(payable.payable_code, '') AS source_code,
@@ -867,11 +876,16 @@ func taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter strin
 				COALESCE(procurement.request_code, '') AS secondary_source_code,
 				ii.document_id::text AS document_id,
 				COALESCE(doc.name, '') AS document_name,
-				(COALESCE(ii.vendor_tax_code, '') = '') AS missing_tax_code,
-				(ABS((COALESCE(ii.amount_before_vat, 0) + COALESCE(ii.vat_amount, 0)) - COALESCE(ii.total_amount, 0)) > 1) AS vat_math_mismatch,
+				(NULLIF(btrim(ii.vendor_tax_code),'') IS NULL) AS missing_tax_code,
+				(ABS((COALESCE(line.taxable_amount, 0) + COALESCE(line.vat_amount, 0)) - COALESCE(ii.total_amount, 0)) > 1) AS vat_math_mismatch,
 				ii.created_at
-			FROM input_invoices ii
+			FROM invoice_tax_lines line
+			JOIN input_invoices ii ON ii.id=line.input_invoice_id
 			JOIN projects p ON p.id=ii.project_id
+			JOIN tax_codes tax ON tax.id=line.tax_code_id
+			LEFT JOIN journal_entries original ON original.source_type='input_invoice' AND original.source_id=ii.id
+				AND original.source_event='input_invoice_verified' AND original.status='posted'
+			LEFT JOIN journal_entries reversal ON reversal.reversal_of_id=original.id AND reversal.status='posted'
 			LEFT JOIN payables payable ON payable.id=ii.payable_id
 			LEFT JOIN procurement_requests procurement ON procurement.id=ii.procurement_request_id
 			LEFT JOIN documents doc ON doc.id=ii.document_id
@@ -883,20 +897,20 @@ func taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter strin
 			UNION ALL
 			SELECT
 				'output'::text AS direction,
-				oi.id::text AS id,
+				line.id::text AS id,
 				oi.project_id::text AS project_id,
 				p.name AS project_name,
 				oi.invoice_number,
 				COALESCE(oi.invoice_symbol, '') AS invoice_symbol,
 				oi.invoice_date,
 				oi.client_name AS counterparty_name,
-				COALESCE(oi.client_tax_code, '') AS tax_code,
-				oi.amount_before_vat,
-				oi.vat_amount,
-				oi.total_amount,
+				COALESCE(oi.client_tax_code,'') AS tax_code,
+				line.taxable_amount AS amount_before_vat,
+				line.vat_amount,
+				line.taxable_amount+line.vat_amount AS total_amount,
 				oi.currency,
 				oi.status,
-				(oi.status='issued') AS posted,
+				(original.id IS NOT NULL AND reversal.id IS NULL) AS posted,
 				'receivable'::text AS source_type,
 				oi.receivable_id::text AS source_id,
 				COALESCE(receivable.receivable_code, '') AS source_code,
@@ -905,11 +919,16 @@ func taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter strin
 				COALESCE(payment.payment_code, '') AS secondary_source_code,
 				oi.document_id::text AS document_id,
 				COALESCE(doc.name, '') AS document_name,
-				(COALESCE(oi.client_tax_code, '') = '') AS missing_tax_code,
-				(ABS((COALESCE(oi.amount_before_vat, 0) + COALESCE(oi.vat_amount, 0)) - COALESCE(oi.total_amount, 0)) > 1) AS vat_math_mismatch,
+				(NULLIF(btrim(oi.client_tax_code),'') IS NULL) AS missing_tax_code,
+				(ABS((COALESCE(line.taxable_amount, 0) + COALESCE(line.vat_amount, 0)) - COALESCE(oi.total_amount, 0)) > 1) AS vat_math_mismatch,
 				oi.created_at
-			FROM output_invoices oi
+			FROM invoice_tax_lines line
+			JOIN output_invoices oi ON oi.id=line.output_invoice_id
 			JOIN projects p ON p.id=oi.project_id
+			JOIN tax_codes tax ON tax.id=line.tax_code_id
+			LEFT JOIN journal_entries original ON original.source_type='output_invoice' AND original.source_id=oi.id
+				AND original.source_event='output_invoice_issued' AND original.status='posted'
+			LEFT JOIN journal_entries reversal ON reversal.reversal_of_id=original.id AND reversal.status='posted'
 			LEFT JOIN receivables receivable ON receivable.id=oi.receivable_id
 			LEFT JOIN payments payment ON payment.id=oi.payment_id
 			LEFT JOIN documents doc ON doc.id=oi.document_id
@@ -918,8 +937,45 @@ func taxRowsCTE(scopeSQL, projectFilter, inputDateFilter, outputDateFilter strin
 			  AND %s
 			  %s
 			  %s
+			UNION ALL
+			SELECT
+				adjustment.direction,
+				adjustment.id::text,
+				adjustment.project_id::text,
+				p.name,
+				COALESCE(adjustment.source_document_no,'ĐCT-' || left(adjustment.id::text,8)),
+				''::text,
+				adjustment.entry_date,
+				adjustment.reason,
+				tax.tax_code,
+				adjustment.taxable_delta,
+				adjustment.vat_delta,
+				adjustment.taxable_delta+adjustment.vat_delta,
+				'VND'::text,
+				'posted'::text,
+				true,
+				'tax_adjustment'::text,
+				adjustment.id::text,
+				COALESCE(adjustment.source_document_no,''),
+				''::text,
+				NULL::text,
+				''::text,
+				NULL::text,
+				''::text,
+				false,
+				false,
+				adjustment.created_at
+			FROM tax_adjustments adjustment
+			JOIN projects p ON p.id=adjustment.project_id
+			JOIN tax_codes tax ON tax.id=adjustment.tax_code_id
+			JOIN journal_entries adjustment_journal ON adjustment_journal.id=adjustment.journal_entry_id AND adjustment_journal.status='posted'
+			WHERE p.status <> 'cancelled'
+			  AND %s
+			  %s
+			  %s
 		)
-	`, scopeSQL, projectFilter, inputDateFilter, scopeSQL, projectFilter, outputDateFilter)
+	`, scopeSQL, projectFilter, inputDateFilter, scopeSQL, projectFilter, outputDateFilter,
+		scopeSQL, projectFilter, adjustmentDateFilter)
 }
 
 func taxSourceFilter(source string) string {
@@ -1156,7 +1212,7 @@ func cashflowRowsCTE(scopeSQL, projectFilter, dateFilter, statusFilter string) s
 				%s AS occurred_at,
 				CASE
 					WHEN pay.payment_type IN ('client_receipt','inbound') OR (pay.payment_type='advance' AND pay.target_type='receivable') THEN 'inflow'
-					WHEN pay.payment_type IN ('supplier_payment','subcontractor_payment','outbound') OR (pay.payment_type='advance' AND pay.target_type='payable') THEN 'outflow'
+					WHEN pay.payment_type IN ('supplier_payment','subcontractor_payment','outbound','tax_payment') OR (pay.payment_type='advance' AND pay.target_type='payable') THEN 'outflow'
 					WHEN pay.payment_type='advance_settlement' THEN 'non_cash'
 					ELSE 'unclassified'
 				END AS direction,
@@ -1167,6 +1223,7 @@ func cashflowRowsCTE(scopeSQL, projectFilter, dateFilter, statusFilter string) s
 					WHEN pay.payment_type='supplier_payment' THEN 'Thanh toán nhà cung cấp'
 					WHEN pay.payment_type='subcontractor_payment' THEN 'Thanh toán thầu phụ'
 					WHEN pay.payment_type='outbound' THEN 'Phiếu chi'
+					WHEN pay.payment_type='tax_payment' THEN 'Nộp thuế GTGT'
 					WHEN pay.payment_type='advance' AND pay.target_type='payable' THEN 'Chi ứng trước'
 					WHEN pay.payment_type='advance_settlement' THEN 'Quyết toán tạm ứng'
 					ELSE 'Unclassified'

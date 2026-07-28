@@ -31,15 +31,19 @@ INSERT INTO users (id, email, password_hash, full_name, status) VALUES
 ('10000000-0000-0000-0000-000000000001','admin@consflow.local','demo:123456','Admin hệ thống','active'),
 ('10000000-0000-0000-0000-000000000002','pm@consflow.local','demo:123456','Nguyễn Minh PM','active'),
 ('10000000-0000-0000-0000-000000000003','qs@consflow.local','demo:123456','Trần Hà QS','active'),
-('10000000-0000-0000-0000-000000000004','accounting@consflow.local','demo:123456','Lê Mai Kế toán','active'),
+('10000000-0000-0000-0000-000000000004','accounting@consflow.local','demo:123456','Ngân Kế Toán','active'),
 ('10000000-0000-0000-0000-000000000005','warehouse@consflow.local','demo:123456','Phạm Long Thủ kho','active'),
 ('10000000-0000-0000-0000-000000000006','supervisor@consflow.local','demo:123456','Đặng Khoa Giám sát','active'),
-('10000000-0000-0000-0000-000000000007','director@consflow.local','demo:123456','Võ An Giám đốc','active'),
+('10000000-0000-0000-0000-000000000007','director@consflow.local','demo:123456','Hoàng Long','active'),
 ('10000000-0000-0000-0000-000000000008','procurement@consflow.local','demo:123456','Ngô Lan Mua hàng','active'),
 ('10000000-0000-0000-0000-000000000009','qaqc@consflow.local','demo:123456','Phan Huy QA/QC','active'),
 ('10000000-0000-0000-0000-000000000010','construction@consflow.local','demo:123456','Đội trưởng Nguyễn Tín','active'),
 ('10000000-0000-0000-0000-000000000011','subcontractor@consflow.local','demo:123456','Đại diện Thầu phụ An Tâm','active'),
-('10000000-0000-0000-0000-000000000012','client@consflow.local','demo:123456','Anh Bình Chủ đầu tư','active');
+('10000000-0000-0000-0000-000000000012','client@consflow.local','demo:123456','Anh Bình Chủ đầu tư','active'),
+('10000000-0000-0000-0000-000000000013','design@consflow.local','demo:123456','Nguyễn Hà Thiết kế','active'),
+('10000000-0000-0000-0000-000000000014','sales@consflow.local','demo:123456','Trần Vy Sale','active'),
+('10000000-0000-0000-0000-000000000015','legal@consflow.local','demo:123456','Lê Quang Pháp lý','active'),
+('79900000-0000-0000-0000-000000000001','accounting.backfill@system.local','system-disabled','Hệ thống chuyển đổi sổ kế toán','inactive');
 
 INSERT INTO roles (id, name, display_name, description, system_role) VALUES
 ('20000000-0000-0000-0000-000000000001','admin','Admin','Quản trị toàn hệ thống',true),
@@ -73,6 +77,7 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('replanning.view','Xem replanning','replanning'),('replanning.create','Tạo replanning','replanning'),('replanning.approve','Duyệt replanning','replanning'),
 ('handover.view','Xem bàn giao','handover'),('handover.create','Tạo bàn giao','handover'),('handover.approve','Duyệt bàn giao','handover'),
 ('accounting.view','Xem kế toán','accounting'),('accounting.budget_view','Xem ngân sách','accounting'),('accounting.budget_approve','Duyệt ngân sách','accounting'),('accounting.payable_view','Xem phải trả','accounting'),('accounting.payable_approve','Duyệt phải trả','accounting'),('accounting.receivable_view','Xem phải thu','accounting'),('accounting.receivable_approve','Duyệt phải thu','accounting'),('accounting.payment_create','Tạo thanh toán','accounting'),('accounting.payment_approve','Duyệt thanh toán','accounting'),
+('accounting.journal_view','Xem sổ kế toán','accounting'),('accounting.journal_post','Ghi sổ chứng từ kế toán','accounting'),('accounting.journal_reverse','Lập bút toán đảo','accounting'),('accounting.period_close','Khóa kỳ kế toán','accounting'),('accounting.period_reopen','Mở lại kỳ kế toán','accounting'),('accounting.tax_view','Xem sổ thuế','accounting'),('accounting.tax_manage','Quản lý thuế','accounting'),
 ('contract.view','Xem hợp đồng','contract'),('contract.review','Review hợp đồng','contract'),
 ('catalog.view','Xem dữ liệu lõi','catalog'),('catalog.manage','Quản lý dữ liệu lõi','catalog'),
 ('staff.view','Xem nhân sự','staff'),('staff.create','Tạo nhân sự','staff'),('staff.update','Sửa nhân sự','staff'),('role.view','Xem role','rbac'),('role.create','Tạo role','rbac'),('role.update','Sửa role','rbac'),('permission.view','Xem permission','rbac'),('permission.assign','Gán quyền','rbac'),
@@ -105,11 +110,13 @@ JOIN permissions p ON (
     'accounting.payable_view','accounting.payable_approve',
     'accounting.receivable_view','accounting.receivable_approve',
     'accounting.payment_approve',
+    'accounting.journal_view','accounting.journal_reverse',
+    'accounting.period_close','accounting.period_reopen','accounting.tax_view',
     'catalog.view','audit.view','report.view','report.finance.view'
   ))
   OR (r.name='pm' AND p.key IN (
     'project.view','project.update','project.member.manage',
-    'pipeline.view','pipeline.run','pipeline.advance_node',
+    'pipeline.view','pipeline.run','pipeline.advance_node','planning.view','planning.edit',
     'boq.view','boq.create','boq.update','boq.approve',
     'procurement.view','procurement.create','procurement.approve','procurement.order',
     'warehouse.view',
@@ -132,6 +139,8 @@ JOIN permissions p ON (
     'accounting.payable_view','accounting.payable_approve',
     'accounting.receivable_view','accounting.receivable_approve',
     'accounting.payment_create','accounting.payment_approve',
+    'accounting.journal_view','accounting.journal_post','accounting.journal_reverse',
+    'accounting.period_close','accounting.period_reopen','accounting.tax_view','accounting.tax_manage',
     'catalog.view','catalog.manage','audit.view','report.view','report.finance.view'
   ))
   OR (r.name='procurement' AND p.key IN (
@@ -182,15 +191,18 @@ INSERT INTO staff (id, user_id, full_name, email, phone, department, position, s
 ('21000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Admin hệ thống','admin@consflow.local','0900000001','Công nghệ','Admin','active'),
 ('21000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002','Nguyễn Minh PM','pm@consflow.local','0900000002','Dự án','Project Manager','active'),
 ('21000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000003','Trần Hà QS','qs@consflow.local','0900000003','QS','Quantity Surveyor','active'),
-('21000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000004','Lê Mai Kế toán','accounting@consflow.local','0900000004','Kế toán','Accountant','active'),
+('21000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000004','Ngân Kế Toán','accounting@consflow.local','0900000004','Kế toán','Accountant','active'),
 ('21000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000005','Phạm Long Thủ kho','warehouse@consflow.local','0900000005','Kho','Warehouse Lead','active'),
 ('21000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000006','Đặng Khoa Giám sát','supervisor@consflow.local','0900000006','Thi công','Site Supervisor','active'),
-('21000000-0000-0000-0000-000000000007','10000000-0000-0000-0000-000000000007','Võ An Giám đốc','director@consflow.local','0900000007','Ban giám đốc','Director','active'),
+('21000000-0000-0000-0000-000000000007','10000000-0000-0000-0000-000000000007','Hoàng Long','director@consflow.local','0900000007','Ban giám đốc','Director','active'),
 ('21000000-0000-0000-0000-000000000008','10000000-0000-0000-0000-000000000008','Ngô Lan Mua hàng','procurement@consflow.local','0900000008','Mua hàng','Procurement Lead','active'),
 ('21000000-0000-0000-0000-000000000009','10000000-0000-0000-0000-000000000009','Phan Huy QA/QC','qaqc@consflow.local','0900000009','QA/QC','Quality Engineer','active'),
 ('21000000-0000-0000-0000-000000000010','10000000-0000-0000-0000-000000000010','Đội trưởng Nguyễn Tín','construction@consflow.local','0900000010','Thi công','Construction Team Lead','active'),
 ('21000000-0000-0000-0000-000000000011','10000000-0000-0000-0000-000000000011','Đại diện Thầu phụ An Tâm','subcontractor@consflow.local','0900000011','Thầu phụ','Subcontractor Representative','active'),
-('21000000-0000-0000-0000-000000000012','10000000-0000-0000-0000-000000000012','Anh Bình Chủ đầu tư','client@consflow.local','0900000012','Chủ đầu tư','Client Representative','active');
+('21000000-0000-0000-0000-000000000012','10000000-0000-0000-0000-000000000012','Anh Bình Chủ đầu tư','client@consflow.local','0900000012','Chủ đầu tư','Client Representative','active'),
+('21000000-0000-0000-0000-000000000013','10000000-0000-0000-0000-000000000013','Nguyễn Hà Thiết kế','design@consflow.local','0900000013','Thiết kế','Design Lead','active'),
+('21000000-0000-0000-0000-000000000014','10000000-0000-0000-0000-000000000014','Trần Vy Sale','sales@consflow.local','0900000014','Kinh doanh','Sales Lead','active'),
+('21000000-0000-0000-0000-000000000015','10000000-0000-0000-0000-000000000015','Lê Quang Pháp lý','legal@consflow.local','0900000015','Pháp lý','Legal Reviewer','active');
 
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id FROM users u JOIN roles r ON
@@ -205,7 +217,10 @@ SELECT u.id, r.id FROM users u JOIN roles r ON
   (u.email='qaqc@consflow.local' AND r.name='qa_qc') OR
   (u.email='construction@consflow.local' AND r.name='construction_team') OR
   (u.email='subcontractor@consflow.local' AND r.name='subcontractor') OR
-  (u.email='client@consflow.local' AND r.name='client');
+  (u.email='client@consflow.local' AND r.name='client') OR
+  (u.email='design@consflow.local' AND r.name='design') OR
+  (u.email='sales@consflow.local' AND r.name='sales') OR
+  (u.email='legal@consflow.local' AND r.name='legal');
 
 INSERT INTO pipeline_templates (
   id, name, description, project_type, version, status, created_by,
@@ -622,8 +637,8 @@ INSERT INTO receivables (project_id, receivable_code, client_partner_id, client_
 ('30000000-0000-0000-0000-000000000003','REC-MA-001','90000000-0000-0000-0000-000000000003','Chị Hạnh','handover',390000000,'Sau bàn giao',390000000,0,390000000,CURRENT_DATE + INTERVAL '40 day','recorded','10000000-0000-0000-0000-000000000004');
 
 INSERT INTO payments (project_id, payment_code, payment_type, target_type, amount, payment_method, status, paid_at, created_by, approved_by) VALUES
-('30000000-0000-0000-0000-000000000001','PMT-Q1-001','supplier_payment','payable',60000000,'bank_transfer','paid',now() - INTERVAL '2 day','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007'),
-('30000000-0000-0000-0000-000000000001','RCV-Q1-001','client_receipt','receivable',360000000,'bank_transfer','received',now() - INTERVAL '8 day','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007');
+('30000000-0000-0000-0000-000000000001','PMT-Q1-001','supplier_payment',NULL,60000000,'bank_transfer','approved',now() - INTERVAL '2 day','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007'),
+('30000000-0000-0000-0000-000000000001','RCV-Q1-001','client_receipt',NULL,360000000,'bank_transfer','approved',now() - INTERVAL '8 day','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007');
 
 INSERT INTO approval_requests (id, target_type, target_id, project_id, requested_by, status, reason, required_roles) VALUES
 ('80000000-0000-0000-0000-000000000001','procurement_request','60000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','pending','Duyệt mua vật tư điện nước đợt 1','["PM","Kế toán"]'),
@@ -1098,8 +1113,8 @@ INSERT INTO receivables (
 ('82000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','REC-FULL-001','90000000-0000-0000-0000-000000000001','Công ty An Phát','acceptance','71000000-0000-0000-0000-000000000010',1450000000,'Nghiệm thu khu A',420000000,180000000,240000000,CURRENT_DATE + INTERVAL '14 day','partially_received','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007');
 
 INSERT INTO payments (id, project_id, payment_code, payment_type, target_type, target_id, amount, payment_method, status, paid_at, created_by, approved_by) VALUES
-('83000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','PMT-FULL-001','supplier_payment','payable','81000000-0000-0000-0000-000000000010',60000000,'bank_transfer','paid',now() - INTERVAL '2 day','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007'),
-('83000000-0000-0000-0000-000000000011','30000000-0000-0000-0000-000000000010','RCV-FULL-001','client_receipt','receivable','82000000-0000-0000-0000-000000000010',180000000,'bank_transfer','received',now() - INTERVAL '1 day','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007');
+('83000000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','PMT-FULL-001','supplier_payment','payable','81000000-0000-0000-0000-000000000010',60000000,'bank_transfer','approved',now() - INTERVAL '2 day','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007'),
+('83000000-0000-0000-0000-000000000011','30000000-0000-0000-0000-000000000010','RCV-FULL-001','client_receipt','receivable','82000000-0000-0000-0000-000000000010',180000000,'bank_transfer','approved',now() - INTERVAL '1 day','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007');
 
 INSERT INTO payable_payment_schedules (id, project_id, payable_id, schedule_code, milestone_name, schedule_type, planned_amount, paid_amount, remaining_amount, due_date, status, notes, created_by, approved_by) VALUES
 ('81100000-0000-0000-0000-000000000010','30000000-0000-0000-0000-000000000010','81000000-0000-0000-0000-000000000010','SCH-FULL-PAY-001','Tạm ứng vật tư demo','advance',30000000,30000000,0,CURRENT_DATE - INTERVAL '2 day','paid','Đã thanh toán tạm ứng.','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000007'),
@@ -1161,3 +1176,5 @@ VALUES
 
 INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json) VALUES
 ('30000000-0000-0000-0000-000000000010','10000000-0000-0000-0000-000000000001','Admin hệ thống','seed_full_workflow_demo','project','30000000-0000-0000-0000-000000000010','Seed demo project covering all current work item types and forms','{"template_id":"40000000-0000-0000-0000-000000000010","work_items":24,"workflow_form_instances":16}'::jsonb);
+
+SELECT backfill_accounting_ledger();

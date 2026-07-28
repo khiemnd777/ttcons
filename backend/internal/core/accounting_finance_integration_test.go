@@ -210,11 +210,11 @@ func TestInputInvoicePDFUploadLinksPayableDocumentAndStatus(t *testing.T) {
 	if verified["status"] != "verified" || cleanID(verified["verified_by"]) != fixture.userID {
 		t.Fatalf("verified invoice = %#v", verified)
 	}
-	rejected, err := service.InputInvoiceAction(ctx, invoiceID, "reject", ActionRequest{}, fixture.userID, "Scoped User")
+	rejected, err := service.InputInvoiceAction(ctx, invoiceID, "reject", ActionRequest{Reason: "Hóa đơn sai thông tin thuế, lập chứng từ thay thế"}, fixture.userID, "Scoped User")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rejected["status"] != "rejected" || cleanID(rejected["rejected_by"]) != fixture.userID || cleanID(rejected["verified_by"]) != "" {
+	if rejected["status"] != "rejected" || cleanID(rejected["rejected_by"]) != fixture.userID || cleanID(rejected["verified_by"]) != fixture.userID {
 		t.Fatalf("rejected invoice = %#v", rejected)
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND target_id=$2 AND event_type IN ('input_invoice_verified','input_invoice_rejected')`, 2, fixture.projectID, invoiceID)
@@ -247,11 +247,11 @@ func TestOutputInvoicePDFUploadLinksReceivablePaymentDocumentAndStatus(t *testin
 	`, receivableID, fixture.projectID, "REC-OUT-"+receivableID[:8], fixture.userID)
 	mustExec(t, db, `
 		INSERT INTO payments (id, project_id, payment_code, payment_type, target_type, target_id, amount, payment_method, status, created_by)
-		VALUES ($1,$2,$3,'client_receipt','receivable',$4,2200000,'bank_transfer','received',$5)
+		VALUES ($1,$2,$3,'client_receipt','receivable',$4,2200000,'bank_transfer','approved',$5)
 	`, paymentID, fixture.projectID, "RCV-OUT-"+paymentID[:8], receivableID, fixture.userID)
 	mustExec(t, db, `
 		INSERT INTO payments (id, project_id, payment_code, payment_type, target_type, target_id, amount, payment_method, status, created_by)
-		VALUES ($1,$2,$3,'client_receipt','receivable',$4,2200000,'bank_transfer','received',$5)
+		VALUES ($1,$2,$3,'client_receipt','receivable',$4,2200000,'bank_transfer','approved',$5)
 	`, otherPaymentID, fixture.otherProjectID, "RCV-OTH-"+otherPaymentID[:8], receivableID, fixture.userID)
 
 	pdfContent := []byte("%PDF-1.4\n% test output invoice\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n")
@@ -335,7 +335,7 @@ func TestOutputInvoicePDFUploadLinksReceivablePaymentDocumentAndStatus(t *testin
 	if issued["status"] != "issued" || cleanID(issued["issued_by"]) != fixture.userID {
 		t.Fatalf("issued invoice = %#v", issued)
 	}
-	voided, err := service.OutputInvoiceAction(ctx, invoiceID, "void", ActionRequest{}, fixture.userID, "Scoped User")
+	voided, err := service.OutputInvoiceAction(ctx, invoiceID, "void", ActionRequest{Reason: "Hóa đơn sai nội dung, phát hành hóa đơn thay thế"}, fixture.userID, "Scoped User")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,8 +366,9 @@ func TestBatch7AccountingActionsRequireApprovalBeforeSettlement(t *testing.T) {
 	payableID := newID()
 	receivableID := newID()
 	paymentID := newID()
+	receiptID := newID()
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM payments WHERE id=$1`, paymentID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM payments WHERE id IN ($1,$2)`, paymentID, receiptID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM receivables WHERE id=$1`, receivableID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM payables WHERE id=$1`, payableID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
@@ -397,13 +398,8 @@ func TestBatch7AccountingActionsRequireApprovalBeforeSettlement(t *testing.T) {
 	if payable["status"] != "approved" {
 		t.Fatalf("payable status = %v, want approved", payable["status"])
 	}
-	payable, err = repo.PayableAction(ctx, payableID, "pay", ActionRequest{Comment: "Tất toán"}, actorID, "Batch7 Actor")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if payable["status"] != "paid" || number(payable["remaining_amount"]) != 0 || number(payable["paid_amount"]) != 100 {
-		t.Fatalf("payable settlement = status %v paid %v remaining %v, want paid/100/0", payable["status"], payable["paid_amount"], payable["remaining_amount"])
-	}
+	_, err = repo.PayableAction(ctx, payableID, "pay", ActionRequest{Comment: "Tất toán trực tiếp"}, actorID, "Batch7 Actor")
+	assertValidationError(t, err)
 
 	_, err = repo.ReceivableAction(ctx, receivableID, "receive", ActionRequest{}, actorID, "Batch7 Actor")
 	assertValidationError(t, err)
@@ -414,13 +410,13 @@ func TestBatch7AccountingActionsRequireApprovalBeforeSettlement(t *testing.T) {
 	if receivable["status"] != "approved" {
 		t.Fatalf("receivable status = %v, want approved", receivable["status"])
 	}
-	receivable, err = repo.ReceivableAction(ctx, receivableID, "receive", ActionRequest{Comment: "Đã thu"}, actorID, "Batch7 Actor")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if receivable["status"] != "received" || number(receivable["remaining_amount"]) != 0 || number(receivable["received_amount"]) != 120 {
-		t.Fatalf("receivable settlement = status %v received %v remaining %v, want received/120/0", receivable["status"], receivable["received_amount"], receivable["remaining_amount"])
-	}
+	_, err = repo.ReceivableAction(ctx, receivableID, "receive", ActionRequest{Comment: "Thu trực tiếp"}, actorID, "Batch7 Actor")
+	assertValidationError(t, err)
+
+	mustExec(t, db, `
+		INSERT INTO payment_allocations (project_id,payment_id,payable_id,allocation_type,amount,created_by)
+		VALUES ($1,$2,$3,'payable_payment',100,$4)
+	`, projectID, paymentID, payableID, actorID)
 
 	payment, err := repo.PaymentAction(ctx, paymentID, "approve", ActionRequest{Comment: "Duyệt phiếu chi"}, actorID, "Batch7 Actor")
 	if err != nil {
@@ -429,7 +425,33 @@ func TestBatch7AccountingActionsRequireApprovalBeforeSettlement(t *testing.T) {
 	if payment["status"] != "approved" || cleanID(payment["approved_by"]) != actorID || payment["paid_at"] == nil {
 		t.Fatalf("payment = status %v approved_by %v paid_at %v, want approved actor paid_at", payment["status"], payment["approved_by"], payment["paid_at"])
 	}
-	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('payable_approved','payable_paid','receivable_approved','receivable_received','payment_approved')`, 5, projectID)
+	payable, err = repo.GetPayableDetail(ctx, payableID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payable["status"] != "paid" || number(payable["remaining_amount"]) != 0 || number(payable["paid_amount"]) != 100 {
+		t.Fatalf("payable after allocated voucher = status %v paid %v remaining %v, want paid/100/0", payable["status"], payable["paid_amount"], payable["remaining_amount"])
+	}
+
+	mustExec(t, db, `
+		INSERT INTO payments (id,project_id,payment_code,payment_type,target_type,target_id,amount,payment_method,status,created_by)
+		VALUES ($1,$2,$3,'client_receipt','receivable',$4,120,'bank_transfer','draft',$5)
+	`, receiptID, projectID, "B7RCV-"+receiptID[:8], receivableID, actorID)
+	mustExec(t, db, `
+		INSERT INTO receipt_allocations (project_id,payment_id,receivable_id,allocation_type,amount,created_by)
+		VALUES ($1,$2,$3,'receivable_receipt',120,$4)
+	`, projectID, receiptID, receivableID, actorID)
+	if _, err := repo.PaymentAction(ctx, receiptID, "approve", ActionRequest{Comment: "Duyệt phiếu thu"}, actorID, "Batch7 Actor"); err != nil {
+		t.Fatal(err)
+	}
+	receivable, err = repo.GetReceivableDetail(ctx, receivableID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receivable["status"] != "received" || number(receivable["remaining_amount"]) != 0 || number(receivable["received_amount"]) != 120 {
+		t.Fatalf("receivable after allocated voucher = status %v received %v remaining %v, want received/120/0", receivable["status"], receivable["received_amount"], receivable["remaining_amount"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('payable_approved','receivable_approved','payment_approved')`, 4, projectID)
 }
 
 func TestFinancialCreationIgnoresClientDerivedStateAndAuditsActor(t *testing.T) {
@@ -463,7 +485,7 @@ func TestFinancialCreationIgnoresClientDerivedStateAndAuditsActor(t *testing.T) 
 	}
 
 	payment, err := service.CreatePayment(ctx, PaymentCreateRequest{
-		ProjectID: fixture.projectID, PaymentCode: "PMT-HARD-" + suffix, PaymentType: "other",
+		ProjectID: fixture.projectID, PaymentCode: "PMT-HARD-" + suffix, PaymentType: "inbound",
 		Amount: 200, PaymentMethod: "bank_transfer",
 	}, fixture.userID, "Scoped User")
 	if err != nil {

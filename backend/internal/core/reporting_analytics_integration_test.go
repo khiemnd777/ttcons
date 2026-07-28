@@ -114,12 +114,12 @@ func TestCashflowReportSummarizesScopedPayments(t *testing.T) {
 	mustExec(t, db, `
 		INSERT INTO payments (id, project_id, payment_code, payment_type, target_type, target_id, amount, payment_method, status, paid_at, created_by)
 		VALUES
-			($1,$2,'PMT-CF-OPEN','client_receipt','receivable',NULL,20,'bank_transfer','approved','2026-05-20T10:00:00Z',$3),
-			($4,$2,'PMT-CF-IN','client_receipt','receivable',NULL,100,'bank_transfer','approved','2026-06-03T10:00:00Z',$3),
-			($5,$2,'PMT-CF-OUT','supplier_payment','payable',NULL,40,'bank_transfer','approved','2026-06-03T11:00:00Z',$3),
-			($6,$2,'PMT-CF-OTHER','other','',NULL,10,'cash','approved','2026-06-04T09:00:00Z',$3),
-			($7,$2,'PMT-CF-PENDING','client_receipt','receivable',NULL,30,'bank_transfer','pending','2026-06-05T09:00:00Z',$3),
-			($8,$9,'PMT-CF-OTHER-PROJECT','client_receipt','receivable',NULL,999,'bank_transfer','approved','2026-06-03T10:00:00Z',$3)
+			($1,$2,'PMT-CF-OPEN','client_receipt',NULL,NULL,20,'bank_transfer','approved','2026-05-20T10:00:00Z',$3),
+			($4,$2,'PMT-CF-IN','client_receipt',NULL,NULL,100,'bank_transfer','approved','2026-06-03T10:00:00Z',$3),
+			($5,$2,'PMT-CF-OUT','supplier_payment',NULL,NULL,40,'bank_transfer','approved','2026-06-03T11:00:00Z',$3),
+			($6,$2,'PMT-CF-OTHER','other',NULL,NULL,10,'cash','approved','2026-06-04T09:00:00Z',$3),
+			($7,$2,'PMT-CF-PENDING','client_receipt',NULL,NULL,30,'bank_transfer','pending','2026-06-05T09:00:00Z',$3),
+			($8,$9,'PMT-CF-OTHER-PROJECT','client_receipt',NULL,NULL,999,'bank_transfer','approved','2026-06-03T10:00:00Z',$3)
 	`, newID(), fixture.projectID, fixture.userID, newID(), newID(), newID(), newID(), newID(), fixture.otherProjectID)
 
 	report, err := service.CashflowReport(ctx, CashflowReportRequest{
@@ -165,13 +165,16 @@ func TestCashflowReportSummarizesScopedPayments(t *testing.T) {
 func TestTaxReportSummarizesScopedInvoices(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
-	service := NewService(NewRepository(db), "test-secret")
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
 	fixture := setupProjectScopeFixture(t, db, []string{"report.finance.view", "accounting.view"})
 	payableID := newID()
 	draftPayableID := newID()
 	otherPayableID := newID()
 	receivableID := newID()
 	otherReceivableID := newID()
+	inputInvoiceID := newID()
+	outputInvoiceID := newID()
 	mustExec(t, db, `
 		INSERT INTO payables (id, project_id, payable_code, vendor_type, vendor_name, source_type, gross_amount, remaining_amount, status, created_by)
 		VALUES
@@ -182,7 +185,7 @@ func TestTaxReportSummarizesScopedInvoices(t *testing.T) {
 	mustExec(t, db, `
 		INSERT INTO receivables (id, project_id, receivable_code, client_name, source_type, gross_amount, received_amount, remaining_amount, status, created_by)
 		VALUES
-			($1,$2,$3,'Tax Client','manual',2210,0,2210,'approved',$4),
+			($1,$2,$3,'Tax Client','manual',2200,0,2200,'approved',$4),
 			($5,$6,$7,'Other Client','manual',999,0,999,'approved',$4)
 	`, receivableID, fixture.projectID, "REC-TAX-"+receivableID[:8], fixture.userID, otherReceivableID, fixture.otherProjectID, "REC-TAX-"+otherReceivableID[:8])
 	mustExec(t, db, `
@@ -194,9 +197,9 @@ func TestTaxReportSummarizesScopedInvoices(t *testing.T) {
 		)
 		VALUES
 			($1,$2,$3,'IN-TAX-001','2026-06-03','Tax Vendor','0101111111',
-				1000,100,1100,'verified',
+				1000,100,1100,'draft',
 				'local','input-invoices/tax-1.pdf','application/pdf','tax-1.pdf',128,$4,
-				$5,$5,now()),
+				$5,NULL,NULL),
 			($6,$2,$7,'IN-TAX-DRAFT','2026-06-05','Draft Vendor','0102222222',
 				500,50,550,'draft',
 				'local','input-invoices/tax-draft.pdf','application/pdf','tax-draft.pdf',128,$4,
@@ -205,7 +208,7 @@ func TestTaxReportSummarizesScopedInvoices(t *testing.T) {
 				900,90,990,'verified',
 				'local','input-invoices/tax-other.pdf','application/pdf','tax-other.pdf',128,$4,
 				$5,$5,now())
-	`, newID(), fixture.projectID, payableID, strings.Repeat("c", 64), fixture.userID, newID(), draftPayableID, newID(), fixture.otherProjectID, otherPayableID)
+	`, inputInvoiceID, fixture.projectID, payableID, strings.Repeat("c", 64), fixture.userID, newID(), draftPayableID, newID(), fixture.otherProjectID, otherPayableID)
 	mustExec(t, db, `
 		INSERT INTO output_invoices (
 			id, project_id, receivable_id, invoice_number, invoice_date, client_name, client_tax_code,
@@ -215,14 +218,20 @@ func TestTaxReportSummarizesScopedInvoices(t *testing.T) {
 		)
 		VALUES
 			($1,$2,$3,'OUT-TAX-001','2026-06-04','Tax Client','',
-				2000,200,2210,'issued',
+				2000,200,2200,'draft',
 				'local','output-invoices/tax-1.pdf','application/pdf','tax-1.pdf',128,$4,
-				$5,$5,now()),
+				$5,NULL,NULL),
 			($6,$7,$8,'OUT-TAX-OTHER','2026-06-04','Other Client','0319999999',
 				900,90,990,'issued',
 				'local','output-invoices/tax-other.pdf','application/pdf','tax-other.pdf',128,$4,
 				$5,$5,now())
-	`, newID(), fixture.projectID, receivableID, strings.Repeat("d", 64), fixture.userID, newID(), fixture.otherProjectID, otherReceivableID)
+	`, outputInvoiceID, fixture.projectID, receivableID, strings.Repeat("d", 64), fixture.userID, newID(), fixture.otherProjectID, otherReceivableID)
+	if _, err := repo.InputInvoiceAction(ctx, inputInvoiceID, "verify", ActionRequest{}, fixture.userID, "Kế toán báo cáo"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.OutputInvoiceAction(ctx, outputInvoiceID, "issue", ActionRequest{}, fixture.userID, "Kế toán báo cáo"); err != nil {
+		t.Fatal(err)
+	}
 
 	report, err := service.TaxReport(ctx, TaxReportRequest{
 		ProjectID: fixture.projectID,
@@ -252,11 +261,11 @@ func TestTaxReportSummarizesScopedInvoices(t *testing.T) {
 	if number(summary["excluded_unposted_count"]) != 1 {
 		t.Fatalf("excluded_unposted_count = %v, want 1", summary["excluded_unposted_count"])
 	}
-	if number(summary["missing_tax_code_count"]) != 1 || number(summary["vat_math_mismatch_count"]) != 1 {
-		t.Fatalf("warning counts = missing %v mismatch %v, want 1/1", summary["missing_tax_code_count"], summary["vat_math_mismatch_count"])
+	if number(summary["missing_tax_code_count"]) != 1 || number(summary["vat_math_mismatch_count"]) != 0 {
+		t.Fatalf("warning counts = missing %v mismatch %v, want 1/0", summary["missing_tax_code_count"], summary["vat_math_mismatch_count"])
 	}
-	if len(warnings) != 3 || number(summary["warning_count"]) != 3 {
-		t.Fatalf("warnings = %d summary=%v, want 3", len(warnings), summary["warning_count"])
+	if len(warnings) != 2 || number(summary["warning_count"]) != 2 {
+		t.Fatalf("warnings = %d summary=%v, want 2", len(warnings), summary["warning_count"])
 	}
 	if len(periods) != 1 || number(periods[0]["net_vat_amount"]) != 100 {
 		t.Fatalf("periods = %#v, want one net 100 row", periods)
@@ -400,6 +409,8 @@ func TestOperationalReportsAggregateWithoutJoinMultiplicationAndRespectScope(t *
 	suffix := newID()
 	materialID := newID()
 	warehouseID := newID()
+	budgetOneID := newID()
+	budgetTwoID := newID()
 	outsideStaffID := newID()
 	outsideUserID := newID()
 
@@ -442,7 +453,13 @@ func TestOperationalReportsAggregateWithoutJoinMultiplicationAndRespectScope(t *
 	mustExec(t, db, `
 		INSERT INTO accounting_budgets (id, project_id, budget_code, name, used_amount, status)
 		VALUES ($1,$2,$3,'Budget one',25,'approved'),($4,$2,$5,'Budget two',25,'approved')
-	`, newID(), fixture.projectID, "BUD-RPT-1-"+suffix[:8], newID(), "BUD-RPT-2-"+suffix[:8])
+	`, budgetOneID, fixture.projectID, "BUD-RPT-1-"+suffix[:8], budgetTwoID, "BUD-RPT-2-"+suffix[:8])
+	mustExec(t, db, `
+		INSERT INTO budget_movements (budget_id,project_id,movement_type,actual_delta,source_type,source_id,source_event,description,created_by)
+		VALUES
+			($1,$3,'actual',25,'test',$1,'report_actual','Chi phí thực tế kiểm thử báo cáo',$4),
+			($2,$3,'actual',25,'test',$2,'report_actual','Chi phí thực tế kiểm thử báo cáo',$4)
+	`, budgetOneID, budgetTwoID, fixture.projectID, fixture.userID)
 
 	accountingRows, err := service.Report(ctx, "accounting", OperationalReportRequest{ProjectID: fixture.projectID}, fixture.userID)
 	if err != nil {

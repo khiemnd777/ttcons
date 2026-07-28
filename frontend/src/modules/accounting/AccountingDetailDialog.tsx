@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Check, ExternalLink } from 'lucide-react';
+import { Check, ExternalLink, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CurrencyText } from '../../components/CurrencyText';
 import { Dialog } from '../../components/Dialog';
@@ -9,7 +9,7 @@ import { dateText } from '../../lib/utils/format';
 
 export type AccountingDetail = { type: 'budget' | 'payment'; record: Record<string, any> };
 
-export function AccountingDetailDialog({ detail, canApprove, approving, onClose, onApprove }: { detail: AccountingDetail | null; canApprove: boolean; approving: boolean; onClose: () => void; onApprove: () => void }) {
+export function AccountingDetailDialog({ detail, canApprove, canReverse = false, approving, onClose, onApprove, onReverse }: { detail: AccountingDetail | null; canApprove: boolean; canReverse?: boolean; approving: boolean; onClose: () => void; onApprove: () => void; onReverse?: () => void }) {
   if (!detail) return null;
   const budget = detail.type === 'budget';
   const record = detail.record;
@@ -23,7 +23,7 @@ export function AccountingDetailDialog({ detail, canApprove, approving, onClose,
           <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-semibold text-ink">{budget ? record.name : paymentTypeLabel(record.payment_type)}</h3><StatusBadge status={record.status} /></div>
           <p className="mt-1 text-sm text-slate-600">{record.project_name || 'Công trình hiện tại'}</p>
         </div>
-        {canAct ? <button type="button" disabled={approving} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={onApprove}><Check className="h-4 w-4" />{approving ? 'Đang duyệt...' : budget ? 'Duyệt ngân sách' : 'Duyệt phiếu'}</button> : null}
+		<div className="flex flex-wrap gap-2">{!budget && canReverse && record.status === 'approved' ? <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50" onClick={onReverse}><RotateCcw className="h-4 w-4" />Lập chứng từ đảo</button> : null}{canAct ? <button type="button" disabled={approving} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={onApprove}><Check className="h-4 w-4" />{approving ? 'Đang duyệt...' : budget ? 'Duyệt ngân sách' : 'Duyệt phiếu'}</button> : null}</div>
       </div>
     </div>
     <div className="pt-5">{budget ? <BudgetDetail record={record} /> : <PaymentDetail record={record} />}</div>
@@ -33,20 +33,24 @@ export function AccountingDetailDialog({ detail, canApprove, approving, onClose,
 function BudgetDetail({ record }: { record: Record<string, any> }) {
   const planned = Number(record.planned_amount ?? 0);
   const approved = Number(record.approved_amount ?? 0);
-  const used = Number(record.used_amount ?? 0);
+	const used = Number(record.actual_amount ?? record.used_amount ?? 0);
+	const committed = Number(record.committed_amount ?? 0);
+	const paid = Number(record.paid_amount ?? 0);
   const denominator = approved > 0 ? approved : planned;
   const usedPercent = denominator > 0 ? Math.min((used / denominator) * 100, 100) : 0;
   return <div className="space-y-5">
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Metric label="Kế hoạch" value={<CurrencyText value={planned} />} />
-      <Metric label="Đã duyệt" value={<CurrencyText value={approved} />} />
-      <Metric label="Đã dùng" value={<CurrencyText value={used} />} />
-      <Metric label="Còn lại" value={<CurrencyText value={record.remaining_amount ?? 0} />} tone={Number(record.remaining_amount ?? 0) > 0 ? 'green' : 'slate'} />
-    </div>
+	<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+	  <Metric label="Kế hoạch" value={<CurrencyText value={planned} />} />
+	  <Metric label="Đã duyệt" value={<CurrencyText value={approved} />} />
+	  <Metric label="Đã cam kết" value={<CurrencyText value={committed} />} />
+	  <Metric label="Thực chi ghi nhận" value={<CurrencyText value={used} />} />
+	  <Metric label="Đã thanh toán" value={<CurrencyText value={paid} />} />
+	</div>
     <section className="rounded-lg border border-line p-4">
-      <div className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold text-ink">Mức sử dụng ngân sách</span><span className="text-slate-600">{Math.round(usedPercent)}%</span></div>
+	  <div className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold text-ink">Tỷ lệ thực chi trên ngân sách duyệt</span><span className="text-slate-600">{Math.round(usedPercent)}%</span></div>
       <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${usedPercent}%` }} /></div>
-      <p className="mt-2 text-xs text-slate-500">{approved > 0 ? 'Tỷ lệ tính trên ngân sách đã duyệt.' : 'Ngân sách chưa duyệt; số còn lại tiếp tục do hệ thống quản lý.'}</p>
+	  <div className="mt-3 flex items-center justify-between text-sm"><span className="text-slate-600">Ngân sách khả dụng sau cam kết và thực chi</span><span className={`font-semibold ${Number(record.available_amount ?? record.remaining_amount ?? 0) < 0 ? 'text-rose-700' : 'text-ink'}`}><CurrencyText value={record.available_amount ?? record.remaining_amount ?? 0} /></span></div>
+	  <p className="mt-2 text-xs text-slate-500">{approved > 0 ? 'Thực chi lấy từ chứng từ đã ghi sổ; cam kết chi chưa phát sinh hóa đơn được theo dõi riêng.' : 'Ngân sách chưa duyệt nên chưa được phép ghi nhận cam kết chi.'}</p>
     </section>
     <RecordMeta record={record} />
   </div>;
@@ -95,5 +99,5 @@ function MetaRow({ label, value }: { label: string; value: string }) {
 }
 
 function paymentTypeLabel(value: unknown) {
-  return ({ outbound: 'Chi khác', inbound: 'Thu khác', other: 'Điều chỉnh khác', supplier_payment: 'Thanh toán nhà cung cấp', subcontractor_payment: 'Thanh toán thầu phụ', client_receipt: 'Thu từ khách hàng' } as Record<string, string>)[String(value)] ?? String(value ?? '-');
+  return ({ outbound: 'Phiếu chi khác', inbound: 'Phiếu thu khác', other: 'Dữ liệu cũ cần đối chiếu', supplier_payment: 'Thanh toán nhà cung cấp', subcontractor_payment: 'Thanh toán thầu phụ', client_receipt: 'Thu từ khách hàng' } as Record<string, string>)[String(value)] ?? String(value ?? '-');
 }

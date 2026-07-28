@@ -110,6 +110,9 @@ Tất cả dùng mật khẩu `123456`.
 - construction@consflow.local
 - subcontractor@consflow.local
 - client@consflow.local
+- design@consflow.local
+- sales@consflow.local
+- legal@consflow.local
 
 ## Module chính
 

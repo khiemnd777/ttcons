@@ -3894,6 +3894,9 @@ func (h *Handler) CreatePayment(c *fiber.Ctx) error {
 func (h *Handler) ApprovePayment(c *fiber.Ctx) error {
 	return h.paymentAction(c, "approve")
 }
+func (h *Handler) ReversePayment(c *fiber.Ctx) error {
+	return h.paymentAction(c, "reverse")
+}
 
 func (h *Handler) payableAction(c *fiber.Ctx, action string) error {
 	permissions := []string{"accounting.payable_approve"}
@@ -3934,7 +3937,11 @@ func (h *Handler) receivableAction(c *fiber.Ctx, action string) error {
 }
 
 func (h *Handler) paymentAction(c *fiber.Ctx, action string) error {
-	if err := h.requireRecordProjectPermission(c, "payments", c.Params("id"), []string{"accounting.payment_approve"}); err != nil {
+	permissions := []string{"accounting.payment_approve"}
+	if action == "reverse" {
+		permissions = []string{"accounting.journal_reverse"}
+	}
+	if err := h.requireRecordProjectPermission(c, "payments", c.Params("id"), permissions); err != nil {
 		return err
 	}
 	req, err := actionRequest(c)

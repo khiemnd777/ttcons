@@ -14627,7 +14627,7 @@ func (r *Repository) GetHandoverDetail(ctx context.Context, id string) (Record, 
 func (r *Repository) ListProjectBudget(ctx context.Context, projectID string) ([]Record, error) {
 	return r.Query(ctx, `
 		SELECT *
-		FROM accounting_budgets
+		FROM accounting_budget_balances
 		WHERE project_id=$1 AND status <> 'cancelled'
 		ORDER BY created_at DESC
 	`, projectID)
@@ -15149,26 +15149,7 @@ func (r *Repository) PayableAction(ctx context.Context, id, action string, req A
 			RETURNING *
 		`, id, actorID, fromStatus)
 	case "pay":
-		if !statusIn(fromStatus, "approved", "partially_paid", "overdue") {
-			return nil, validationError("Phải trả cần được duyệt trước khi tất toán", Record{"status": fromStatus})
-		}
-		remaining := number(current["remaining_amount"])
-		if remaining <= 0 {
-			return nil, validationError("Phải trả không còn số tiền cần tất toán")
-		}
-		toStatus = "paid"
-		event = "payable_paid"
-		metadata["amount"] = remaining
-		updated, err = queryTx(ctx, tx, `
-			UPDATE payables
-			SET status='paid',
-				paid_amount=paid_amount + $2,
-				remaining_amount=0,
-				approved_by=COALESCE(approved_by,NULLIF($3,'')::uuid),
-				updated_at=now()
-			WHERE id=$1 AND status=$4
-			RETURNING *
-		`, id, remaining, actorID, fromStatus)
+		return nil, validationError("Không được tất toán trực tiếp khoản phải trả; hãy lập và duyệt Phiếu chi để bảo toàn phân bổ công nợ, dòng tiền và bút toán")
 	default:
 		return nil, validationError("Hành động phải trả không hợp lệ", Record{"action": action})
 	}
@@ -15177,6 +15158,11 @@ func (r *Repository) PayableAction(ctx context.Context, id, action string, req A
 	}
 	if len(updated) == 0 {
 		return nil, validationError("Trạng thái phải trả đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
+	}
+	if action == "approve" {
+		if err := r.recordPayableCommitmentTx(ctx, tx, updated[0], actorID); err != nil {
+			return nil, err
+		}
 	}
 	comment := actionComment(req)
 	metadata["to_status"] = toStatus
@@ -16027,11 +16013,16 @@ func (r *Repository) CreatePayablePayment(ctx context.Context, payable Record, b
 	rows, err := queryTx(ctx, tx, `
 		INSERT INTO payments (
 			id, project_id, payment_code, payment_type, target_type, target_id,
-			amount, payment_method, status, paid_at, created_by
+			amount, payment_method, status, paid_at, created_by,
+			accounting_book_id, budget_id, cash_account_id
 		)
-		VALUES ($1,$2,$3,$4,'payable',$5,$6,$7,'draft',NULLIF($8,'')::timestamptz,NULLIF($9,'')::uuid)
+		VALUES (
+			$1,$2,$3,$4,'payable',$5,$6,$7,'draft',NULLIF($8,'')::timestamptz,NULLIF($9,'')::uuid,
+			NULLIF($10,'')::uuid,NULLIF($11,'')::uuid,NULLIF($12,'')::uuid
+		)
 		RETURNING *
-	`, paymentID, projectID, body["payment_code"], body["payment_type"], payableID, amount, body["payment_method"], fmt.Sprint(body["paid_at"]), actorID)
+	`, paymentID, projectID, body["payment_code"], body["payment_type"], payableID, amount, body["payment_method"], fmt.Sprint(body["paid_at"]), actorID,
+		body["accounting_book_id"], body["budget_id"], body["cash_account_id"])
 	if err != nil {
 		return nil, err
 	}
@@ -16189,14 +16180,14 @@ func (r *Repository) CreateInputInvoice(ctx context.Context, payable Record, bod
 			invoice_number, invoice_symbol, invoice_date, vendor_partner_id, vendor_name, vendor_tax_code,
 			amount_before_vat, vat_amount, total_amount, currency, status, notes,
 			storage_provider, storage_key, mime_type, file_name, file_size, checksum_sha256,
-			uploaded_by
+			uploaded_by, accounting_book_id, tax_code_id, expense_account_id
 		)
 		VALUES (
 			$1, $2, $3, NULLIF($4,'')::uuid, NULLIF($5,'')::uuid,
 			$6, $7, $8::date, NULLIF($9,'')::uuid, $10, $11,
 			$12, $13, $14, 'VND', 'draft', $15,
 			$16, $17, $18, $19, $20, $21,
-			NULLIF($22,'')::uuid
+			NULLIF($22,'')::uuid,$23::uuid,$24::uuid,$25::uuid
 		)
 		RETURNING *
 	`,
@@ -16222,12 +16213,18 @@ func (r *Repository) CreateInputInvoice(ctx context.Context, payable Record, bod
 		file.FileSize,
 		file.ChecksumSHA256,
 		actorID,
+		body["accounting_book_id"],
+		body["tax_code_id"],
+		body["expense_account_id"],
 	)
 	if err != nil {
 		return nil, err
 	}
 	if len(rows) == 0 {
 		return nil, sql.ErrNoRows
+	}
+	if err := insertInputInvoiceTaxLineTx(ctx, tx, rows[0], actorID); err != nil {
+		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE payables SET updated_at=now() WHERE id=$1`, payableID); err != nil {
 		return nil, err
@@ -16262,13 +16259,16 @@ func (r *Repository) InputInvoiceAction(ctx context.Context, invoiceID, action s
 		return nil, sql.ErrNoRows
 	}
 	current := rows[0]
+	if err := ensureVATSourcePeriodMutableTx(ctx, tx, cleanID(current["accounting_book_id"]), current["invoice_date"]); err != nil {
+		return nil, err
+	}
 	fromStatus := fmt.Sprint(current["status"])
 	toStatus := ""
 	event := ""
 	var updated []Record
 	switch action {
 	case "verify":
-		if !statusIn(fromStatus, "draft", "rejected") {
+		if fromStatus != "draft" {
 			return nil, validationError("Trạng thái hoá đơn không cho phép xác thực", Record{"status": fromStatus})
 		}
 		toStatus = "verified"
@@ -16288,6 +16288,9 @@ func (r *Repository) InputInvoiceAction(ctx context.Context, invoiceID, action s
 		if !statusIn(fromStatus, "draft", "verified") {
 			return nil, validationError("Trạng thái hoá đơn không cho phép từ chối", Record{"status": fromStatus})
 		}
+		if fromStatus == "verified" && actionComment(req) == "" {
+			return nil, validationError("Lý do điều chỉnh hóa đơn đã ghi sổ là bắt buộc")
+		}
 		toStatus = "rejected"
 		event = "input_invoice_rejected"
 		updated, err = queryTx(ctx, tx, `
@@ -16295,8 +16298,8 @@ func (r *Repository) InputInvoiceAction(ctx context.Context, invoiceID, action s
 			SET status='rejected',
 				rejected_by=NULLIF($2,'')::uuid,
 				rejected_at=now(),
-				verified_by=NULL,
-				verified_at=NULL,
+				verified_by=CASE WHEN $3='verified' THEN verified_by ELSE NULL END,
+				verified_at=CASE WHEN $3='verified' THEN verified_at ELSE NULL END,
 				updated_at=now()
 			WHERE id=$1 AND status=$3
 			RETURNING *
@@ -16310,10 +16313,30 @@ func (r *Repository) InputInvoiceAction(ctx context.Context, invoiceID, action s
 	if len(updated) == 0 {
 		return nil, validationError("Trạng thái hoá đơn đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
 	}
+	var journalEntry Record
+	if action == "verify" {
+		journalEntry, err = r.postInputInvoiceTx(ctx, tx, updated[0], actorID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if action == "reject" && fromStatus == "verified" {
+		journalEntry, err = r.reverseSourceJournalTx(
+			ctx, tx, cleanID(current["project_id"]), "input_invoice", invoiceID,
+			"input_invoice_verified", "input_invoice_rejected", actionComment(req), actorID,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
 	comment := actionComment(req)
 	metadata := Record{"action": action, "from_status": fromStatus, "to_status": toStatus, "payable_id": current["payable_id"]}
 	if comment != "" {
 		metadata["comment"] = comment
+	}
+	if journalEntry != nil {
+		metadata["journal_entry_id"] = journalEntry["id"]
+		metadata["journal_entry_no"] = journalEntry["entry_no"]
 	}
 	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, event, "input_invoice", invoiceID, fmt.Sprintf("Cập nhật hoá đơn đầu vào từ %s sang %s", fromStatus, toStatus), metadata); err != nil {
 		return nil, err
@@ -16816,11 +16839,16 @@ func (r *Repository) CreateReceivablePayment(ctx context.Context, receivable Rec
 	rows, err := queryTx(ctx, tx, `
 		INSERT INTO payments (
 			id, project_id, payment_code, payment_type, target_type, target_id,
-			amount, payment_method, status, paid_at, created_by
+			amount, payment_method, status, paid_at, created_by,
+			accounting_book_id, cash_account_id
 		)
-		VALUES ($1,$2,$3,$4,'receivable',$5,$6,$7,'draft',NULLIF($8,'')::timestamptz,NULLIF($9,'')::uuid)
+		VALUES (
+			$1,$2,$3,$4,'receivable',$5,$6,$7,'draft',NULLIF($8,'')::timestamptz,NULLIF($9,'')::uuid,
+			NULLIF($10,'')::uuid,NULLIF($11,'')::uuid
+		)
 		RETURNING *
-	`, paymentID, projectID, body["payment_code"], body["payment_type"], receivableID, amount, body["payment_method"], fmt.Sprint(body["paid_at"]), actorID)
+	`, paymentID, projectID, body["payment_code"], body["payment_type"], receivableID, amount, body["payment_method"], fmt.Sprint(body["paid_at"]), actorID,
+		body["accounting_book_id"], body["cash_account_id"])
 	if err != nil {
 		return nil, err
 	}
@@ -17320,14 +17348,14 @@ func (r *Repository) CreateOutputInvoice(ctx context.Context, receivable Record,
 			invoice_number, invoice_symbol, invoice_date, client_partner_id, client_name, client_tax_code,
 			amount_before_vat, vat_amount, total_amount, currency, status, notes,
 			storage_provider, storage_key, mime_type, file_name, file_size, checksum_sha256,
-			uploaded_by
+			uploaded_by, accounting_book_id, tax_code_id, revenue_account_id
 		)
 		VALUES (
 			$1, $2, $3, NULLIF($4,'')::uuid, NULLIF($5,'')::uuid,
 			$6, $7, $8::date, NULLIF($9,'')::uuid, $10, $11,
 			$12, $13, $14, 'VND', 'draft', $15,
 			$16, $17, $18, $19, $20, $21,
-			NULLIF($22,'')::uuid
+			NULLIF($22,'')::uuid,$23::uuid,$24::uuid,$25::uuid
 		)
 		RETURNING *
 	`,
@@ -17353,12 +17381,18 @@ func (r *Repository) CreateOutputInvoice(ctx context.Context, receivable Record,
 		file.FileSize,
 		file.ChecksumSHA256,
 		actorID,
+		body["accounting_book_id"],
+		body["tax_code_id"],
+		body["revenue_account_id"],
 	)
 	if err != nil {
 		return nil, err
 	}
 	if len(rows) == 0 {
 		return nil, sql.ErrNoRows
+	}
+	if err := insertOutputInvoiceTaxLineTx(ctx, tx, rows[0], actorID); err != nil {
+		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE receivables SET updated_at=now() WHERE id=$1`, receivableID); err != nil {
 		return nil, err
@@ -17393,6 +17427,9 @@ func (r *Repository) OutputInvoiceAction(ctx context.Context, invoiceID, action 
 		return nil, sql.ErrNoRows
 	}
 	current := rows[0]
+	if err := ensureVATSourcePeriodMutableTx(ctx, tx, cleanID(current["accounting_book_id"]), current["invoice_date"]); err != nil {
+		return nil, err
+	}
 	fromStatus := fmt.Sprint(current["status"])
 	toStatus := ""
 	event := ""
@@ -17419,6 +17456,9 @@ func (r *Repository) OutputInvoiceAction(ctx context.Context, invoiceID, action 
 		if !statusIn(fromStatus, "draft", "issued") {
 			return nil, validationError("Trạng thái hoá đơn không cho phép huỷ", Record{"status": fromStatus})
 		}
+		if fromStatus == "issued" && actionComment(req) == "" {
+			return nil, validationError("Lý do hủy hóa đơn đã ghi sổ là bắt buộc")
+		}
 		toStatus = "voided"
 		event = "output_invoice_voided"
 		updated, err = queryTx(ctx, tx, `
@@ -17439,10 +17479,30 @@ func (r *Repository) OutputInvoiceAction(ctx context.Context, invoiceID, action 
 	if len(updated) == 0 {
 		return nil, validationError("Trạng thái hoá đơn đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
 	}
+	var journalEntry Record
+	if action == "issue" {
+		journalEntry, err = r.postOutputInvoiceTx(ctx, tx, updated[0], actorID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if action == "void" && fromStatus == "issued" {
+		journalEntry, err = r.reverseSourceJournalTx(
+			ctx, tx, cleanID(current["project_id"]), "output_invoice", invoiceID,
+			"output_invoice_issued", "output_invoice_voided", actionComment(req), actorID,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
 	comment := actionComment(req)
 	metadata := Record{"action": action, "from_status": fromStatus, "to_status": toStatus, "receivable_id": current["receivable_id"]}
 	if comment != "" {
 		metadata["comment"] = comment
+	}
+	if journalEntry != nil {
+		metadata["journal_entry_id"] = journalEntry["id"]
+		metadata["journal_entry_no"] = journalEntry["entry_no"]
 	}
 	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, event, "output_invoice", invoiceID, fmt.Sprintf("Cập nhật hoá đơn đầu ra từ %s sang %s", fromStatus, toStatus), metadata); err != nil {
 		return nil, err
@@ -17487,26 +17547,7 @@ func (r *Repository) ReceivableAction(ctx context.Context, id, action string, re
 			RETURNING *
 		`, id, actorID, fromStatus)
 	case "receive":
-		if !statusIn(fromStatus, "approved", "partially_received", "overdue") {
-			return nil, validationError("Phải thu cần được duyệt trước khi ghi nhận thu", Record{"status": fromStatus})
-		}
-		remaining := number(current["remaining_amount"])
-		if remaining <= 0 {
-			return nil, validationError("Phải thu không còn số tiền cần ghi nhận")
-		}
-		toStatus = "received"
-		event = "receivable_received"
-		metadata["amount"] = remaining
-		updated, err = queryTx(ctx, tx, `
-			UPDATE receivables
-			SET status='received',
-				received_amount=received_amount + $2,
-				remaining_amount=0,
-				approved_by=COALESCE(approved_by,NULLIF($3,'')::uuid),
-				updated_at=now()
-			WHERE id=$1 AND status=$4
-			RETURNING *
-		`, id, remaining, actorID, fromStatus)
+		return nil, validationError("Không được tất toán trực tiếp khoản phải thu; hãy lập và duyệt Phiếu thu để bảo toàn phân bổ công nợ, dòng tiền và bút toán")
 	default:
 		return nil, validationError("Hành động phải thu không hợp lệ", Record{"action": action})
 	}
@@ -17531,6 +17572,9 @@ func (r *Repository) ReceivableAction(ctx context.Context, id, action string, re
 }
 
 func (r *Repository) PaymentAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
+	if action == "reverse" {
+		return r.ReverseApprovedPayment(ctx, id, req, actorID, actorName)
+	}
 	if action != "approve" {
 		return nil, validationError("Hành động phiếu thanh toán không hợp lệ", Record{"action": action})
 	}
@@ -17549,7 +17593,7 @@ func (r *Repository) PaymentAction(ctx context.Context, id, action string, req A
 	}
 	current := rows[0]
 	fromStatus := fmt.Sprint(current["status"])
-	if !statusIn(fromStatus, "draft", "submitted", "pending") {
+	if !statusIn(fromStatus, "draft", "submitted", "pending", "waiting_approval") {
 		return nil, validationError("Trạng thái phiếu thanh toán không cho phép duyệt", Record{"status": fromStatus})
 	}
 	updated, err := queryTx(ctx, tx, `
@@ -17573,10 +17617,18 @@ func (r *Repository) PaymentAction(ctx context.Context, id, action string, req A
 	if err := r.applyReceiptAllocationsTx(ctx, tx, updated[0], actorID, actorName); err != nil {
 		return nil, err
 	}
+	journalEntry, err := r.postPaymentTx(ctx, tx, updated[0], actorID)
+	if err != nil {
+		return nil, err
+	}
 	comment := actionComment(req)
 	metadata := Record{"action": action, "from_status": fromStatus, "to_status": "approved"}
 	if comment != "" {
 		metadata["comment"] = comment
+	}
+	if journalEntry != nil {
+		metadata["journal_entry_id"] = journalEntry["id"]
+		metadata["journal_entry_no"] = journalEntry["entry_no"]
 	}
 	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, "payment_approved", "payment", id, "Duyệt phiếu thanh toán", metadata); err != nil {
 		return nil, err

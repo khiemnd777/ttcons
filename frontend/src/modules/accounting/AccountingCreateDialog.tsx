@@ -9,12 +9,15 @@ import { SimpleForm, type FieldDef, type FormValues } from '../_shared/SimpleFor
 export type AccountingCreateMode = 'budget' | 'payment';
 
 type ProjectOption = { id: string; name: string };
+type AccountingOption = Record<string, any>;
 
 export function AccountingCreateDialog({
   open,
   initialMode,
   projectId,
   projects,
+	budgets,
+	accounts,
   canCreateBudget,
   canCreatePayment,
   onClose,
@@ -25,6 +28,8 @@ export function AccountingCreateDialog({
   initialMode: AccountingCreateMode;
   projectId: string;
   projects: ProjectOption[];
+	budgets: AccountingOption[];
+	accounts: AccountingOption[];
   canCreateBudget: boolean;
   canCreatePayment: boolean;
   onClose: () => void;
@@ -44,19 +49,21 @@ export function AccountingCreateDialog({
   ], []);
 
   const paymentFields = useMemo<FieldDef[]>(() => [
-    { name: 'project_id', label: 'Công trình (đã khóa)', type: 'select', defaultValue: projectId, required: true, options: projects.map((project) => ({ label: project.name, value: project.id })), disabledWhen: () => true },
-    { name: 'payment_code', label: 'Mã phiếu', defaultValue: `PMT-${Date.now().toString().slice(-5)}`, required: true },
-    { name: 'payment_type', label: 'Loại phiếu', type: 'select', defaultValue: 'outbound', required: true, options: enumOptions('payment_type', ['outbound', 'inbound', 'other']) },
-    { name: 'amount', label: 'Số tiền', type: 'number', defaultValue: 10000000, required: true, min: 1 },
-    { name: 'payment_method', label: 'Phương thức', type: 'select', defaultValue: 'bank_transfer', required: true, options: enumOptions('payment_method', ['bank_transfer', 'cash']) },
-  ], [projectId, projects]);
+	{ name: 'project_id', label: 'Công trình', type: 'select', defaultValue: projectId, required: true, options: projects.map((project) => ({ label: project.name, value: project.id })), disabledWhen: () => true },
+	{ name: 'payment_code', label: 'Số phiếu', defaultValue: `PC-${Date.now().toString().slice(-5)}`, required: true },
+	{ name: 'payment_type', label: 'Loại chứng từ', type: 'select', defaultValue: 'outbound', required: true, options: enumOptions('payment_type', ['outbound', 'inbound']) },
+	{ name: 'amount', label: 'Số tiền', type: 'number', defaultValue: 10000000, required: true, min: 1 },
+	{ name: 'payment_method', label: 'Phương thức thanh toán', type: 'select', defaultValue: 'bank_transfer', required: true, options: enumOptions('payment_method', ['bank_transfer', 'cash']) },
+	{ name: 'budget_id', label: 'Khoản mục ngân sách', type: 'select', defaultValue: budgets.find((budget) => budget.status === 'approved')?.id ?? '', required: true, hiddenWhen: (values) => values.payment_type !== 'outbound', options: budgets.filter((budget) => budget.status === 'approved').map((budget) => ({ label: `${budget.budget_code} · ${budget.name}`, value: budget.id })) },
+	{ name: 'cash_account_id', label: 'Tài khoản tiền', type: 'select', defaultValue: accounts.find((account) => account.account_code === '1121')?.id ?? accounts[0]?.id ?? '', required: true, options: accounts.filter((account) => ['1111', '1121'].includes(account.account_code ?? '')).map((account) => ({ label: `${account.account_code} · ${account.name}`, value: account.id })) },
+	], [accounts, budgets, projectId, projects]);
 
   const selectedProject = projects.find((project) => project.id === projectId)?.name ?? 'Chưa chọn công trình';
 
-  return <Dialog open={open} title="Tạo mới kế toán" description="Chọn đúng loại bản ghi; phiếu gắn công nợ phải trả hoặc phải thu phải được tạo từ Công nợ để giữ phân bổ." onClose={onClose} size="xl">
+	return <Dialog open={open} title="Lập chứng từ kế toán" description="Lập ngân sách hoặc Phiếu thu/Phiếu chi khác. Chứng từ công nợ được lập tại sổ chi tiết phải trả/phải thu." onClose={onClose} size="xl">
     <div className="mb-5 flex w-fit rounded-lg border border-line bg-slate-50 p-1">
       {canCreateBudget ? <ModeButton active={mode === 'budget'} label="Ngân sách" onClick={() => setMode('budget')} /> : null}
-      {canCreatePayment ? <ModeButton active={mode === 'payment'} label="Phiếu thu/chi khác" onClick={() => setMode('payment')} /> : null}
+	{canCreatePayment ? <ModeButton active={mode === 'payment'} label="Phiếu thu/Phiếu chi khác" onClick={() => setMode('payment')} /> : null}
     </div>
     {mode === 'budget' ? <SimpleForm
       key="budget-create"
@@ -76,15 +83,16 @@ export function AccountingCreateDialog({
       fields={paymentFields}
       layout="two-column"
       sections={[
-        { title: 'Thông tin phiếu', description: 'Phiếu này chỉ dành cho thu, chi hoặc điều chỉnh không gắn công nợ phải trả/phải thu.', fields: ['project_id', 'payment_code', 'payment_type'] },
-        { title: 'Giá trị và phương thức', fields: ['amount', 'payment_method'] },
+		{ title: 'Thông tin chứng từ', description: 'Phiếu này dành cho khoản thu/chi không qua công nợ. Số phiếu và loại chứng từ là căn cứ truy vết trên Sổ Nhật ký chung.', fields: ['project_id', 'payment_code', 'payment_type'] },
+		{ title: 'Giá trị và định khoản', fields: ['amount', 'payment_method', 'budget_id', 'cash_account_id'] },
       ]}
       renderAside={(values) => <AccountingSummary title="Tóm tắt phiếu" projectName={selectedProject} rows={[
         ['Loại phiếu', paymentTypeLabel(values.payment_type)],
         ['Số tiền', currency(values.amount)],
-        ['Phương thức', values.payment_method === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'],
-      ]} note={<span>Thanh toán nhà cung cấp hoặc thu khách hàng phải tạo tại <Link className="inline-flex items-center gap-1 font-semibold underline" to={`/projects/${projectId}/debt`}>Công nợ<ArrowRight className="h-3 w-3" /></Link>.</span>} />}
-      submitLabel="Tạo phiếu nháp"
+		['Phương thức', values.payment_method === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'],
+		['Định khoản dự kiến', estimatedPosting(values, accounts)],
+	  ]} note={<span>Chi trả nhà cung cấp hoặc thu tiền khách hàng phải lập tại <Link className="inline-flex items-center gap-1 font-semibold underline" to={`/projects/${projectId}/debt`}>Công nợ phải trả/phải thu<ArrowRight className="h-3 w-3" /></Link> để bảo toàn phân bổ.</span>} />}
+	  submitLabel="Lập chứng từ nháp"
       onCancel={onClose}
       onSubmit={onCreatePayment}
     />}
@@ -106,5 +114,10 @@ function AccountingSummary({ title, projectName, rows, note }: { title: string; 
 }
 
 function paymentTypeLabel(value: unknown) {
-  return ({ outbound: 'Chi khác', inbound: 'Thu khác', other: 'Điều chỉnh khác' } as Record<string, string>)[String(value)] ?? 'Chưa chọn';
+	return ({ outbound: 'Phiếu chi khác', inbound: 'Phiếu thu khác' } as Record<string, string>)[String(value)] ?? 'Chưa chọn';
+}
+
+function estimatedPosting(values: FormValues, accounts: AccountingOption[]) {
+	const cash = accounts.find((account) => account.id === values.cash_account_id)?.account_code ?? (values.payment_method === 'cash' ? '1111' : '1121');
+	return values.payment_type === 'inbound' ? `Nợ ${cash} / Có 711` : `Nợ 642 / Có ${cash}`;
 }

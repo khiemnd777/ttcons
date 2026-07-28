@@ -57,6 +57,11 @@ export function ProjectWorkspaceLayout() {
   const project = operations.data?.project_summary ?? operations.data?.project;
   const visibleGroups = visibleProjectWorkspaceGroups(hasAnyPermission);
   const activeWorkItemId = showWorkflowSidebar ? activeWorkItemIdFromPath(location.pathname) : '';
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-surface">
@@ -102,8 +107,9 @@ export function ProjectWorkspaceLayout() {
         </div>
       </header>
 
+      <div className="border-b border-line bg-white px-4 py-2 lg:hidden"><button type="button" aria-expanded={mobileSidebarOpen} className="inline-flex w-full items-center justify-between rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-ink" onClick={() => setMobileSidebarOpen((current) => !current)}><span className="inline-flex items-center gap-2"><PanelLeftClose className="h-4 w-4 text-blue-700" />{showWorkflowSidebar ? 'Mở cây quy trình' : 'Mở cây nghiệp vụ'}</span>{mobileSidebarOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button></div>
       <div className="grid min-h-[calc(100vh-73px)] lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="border-b border-line bg-white lg:sticky lg:top-[73px] lg:h-[calc(100vh-73px)] lg:overflow-auto lg:border-b-0 lg:border-r">
+        <aside className={`${mobileSidebarOpen ? 'block' : 'hidden'} border-b border-line bg-white lg:sticky lg:top-[73px] lg:block lg:h-[calc(100vh-73px)] lg:overflow-auto lg:border-b-0 lg:border-r`}>
           {showWorkflowSidebar ? (
             <WorkflowSidebar
               projectId={id}

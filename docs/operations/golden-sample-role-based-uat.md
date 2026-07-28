@@ -90,7 +90,7 @@ Không reset để “xóa” lỗi trước khi đã lưu request/response, act
 | J8 | AP/AR, lịch, tạm ứng, hóa đơn, phân bổ và đối soát | ledger IDs/amounts/status, requester separation, không tạo fake invoice/payment/stock movement |
 | J9 | Vật tư dư, checklist bàn giao, readiness, đóng tài chính và audit | blocker trước/sau, tám checklist, handover/audit IDs, AP/AR/pending payment về điều kiện đóng |
 
-## Ma trận 12 vai trò
+## Ma trận 15 vai trò
 
 Ký hiệu: `P` hành động positive-path; `D` quyết định/duyệt bằng actor khác requester; `R` chỉ đọc/đối chiếu; `N` negative write phải bị từ chối; `-` không áp dụng. Đây là trách nhiệm tối thiểu, không cho phép dùng Admin thay cho kiểm tra role-specific.
 
@@ -108,8 +108,13 @@ Ký hiệu: `P` hành động positive-path; `D` quyết định/duyệt bằng 
 | Đội thi công `construction@consflow.local` | P/N | P | N | N | R | N | P | P | N | P/R |
 | Thầu phụ `subcontractor@consflow.local` | P/N | N | N | N | R | P/R | P | P | N | R |
 | Chủ đầu tư `client@consflow.local` | P/N | P/D | D | D | N | D | R | D | R | D |
+| Thiết kế `design@consflow.local` | P/N | P | P | R | N | N | P | R | N | R |
+| Sale `sales@consflow.local` | P/N | P | P/R | P | R | P/R | R | R | R | R |
+| Pháp lý `legal@consflow.local` | P/N | N | N | R | N | P/D | N | N | R | R |
 
-Official template còn tham chiếu các vai trò `Thiết kế`, `Sale`, `Pháp lý`, nhưng Golden Live hiện chỉ có 12 demo account/project member ở bảng trên. Nếu một step bắt buộc đúng một trong ba vai trò này và không có actor được gán, ghi `BLOCKED-COVERAGE`; không dùng Admin để biến coverage thiếu thành `PASS`. Việc tạo/gán thêm account là một setup riêng cần được duyệt.
+Golden Live có actor/project member chuyên biệt cho `Thiết kế`, `Sale` và `Pháp lý`. Các step yêu cầu một trong ba vai trò này phải dùng đúng actor tương ứng; nếu account hoặc membership bị thiếu, ghi `BLOCKED-COVERAGE` và không dùng Admin để biến coverage thiếu thành `PASS`.
+
+Chuyển role tuần tự và tôn trọng `Retry-After` khi login/auth trả `429`. Một response rate-limit làm case bị nhiễu và phải chạy lại; không được tính là negative RBAC `PASS`.
 
 ## Evidence package
 
@@ -135,7 +140,7 @@ uat-evidence/<run-id>/
 - Một journey là `PASS` khi tất cả cell áp dụng pass, blocker dự kiến xuất hiện đúng lúc, requester separation/audit được giữ và không có side effect cấm.
 - Suite chỉ `PASS` khi C1 và C2 cùng pass, validator pass trước/sau, hai completed fixture không đổi, nhánh đối nghịch được skip, mutation có actor/timestamp/ID truy vết và mọi balance/approval/history invariant còn đúng.
 - Suite là `FAIL` ngay khi có cross-project/cross-role write, mutation completed fixture, bypass gate, approval sai actor, mất lịch sử, trùng side effect, fake invoice/payment/stock movement, reset nhầm target hoặc evidence không đủ để tái hiện.
-- Defect chưa xử lý hoặc thiếu actor `Thiết kế`/`Sale`/`Pháp lý` phải ghi `BLOCKED` kèm owner và điều kiện unblock; không hạ chuẩn bằng Admin hoặc SQL trực tiếp.
+- Defect chưa xử lý hoặc actor chuyên biệt bị thiếu/sai membership phải ghi `BLOCKED` kèm owner và điều kiện unblock; không hạ chuẩn bằng Admin hoặc SQL trực tiếp.
 
 ## Cổng ủy quyền trình duyệt
 

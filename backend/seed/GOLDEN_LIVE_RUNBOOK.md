@@ -25,8 +25,13 @@ Golden Live bắt đầu ở node `Khảo sát`, tiến độ 0%. Không có for
 | Đội thi công | `construction@consflow.local` |
 | Thầu phụ | `subcontractor@consflow.local` |
 | Chủ đầu tư | `client@consflow.local` |
+| Thiết kế | `design@consflow.local` |
+| Sale | `sales@consflow.local` |
+| Pháp lý | `legal@consflow.local` |
 
-Admin có thể thao tác hầu hết nghiệp vụ. Khi requester separation được bật, dùng PM gửi yêu cầu và Giám đốc hoặc vai trò phù hợp để duyệt.
+Admin có thể thao tác hầu hết nghiệp vụ nhưng không được dùng thay actor chuyên biệt khi kiểm chứng coverage. Khi requester separation được bật, dùng PM gửi yêu cầu và Giám đốc hoặc vai trò phù hợp để duyệt.
+
+Khi chuyển liên tiếp nhiều tài khoản trong UAT, chạy tuần tự và tôn trọng `Retry-After` nếu API trả `429`; không tính một response rate-limit là bằng chứng negative RBAC.
 
 ## Kịch bản công trình
 

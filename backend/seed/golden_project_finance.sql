@@ -116,11 +116,11 @@ INSERT INTO payments (
   status,paid_at,created_by,approved_by
 )
 SELECT gen_random_uuid(),project_id,'PMT-'||payable_code,'supplier_payment','payable',id,gross_amount,
-       'bank_transfer','paid','2026-06-25 10:00+07'::timestamptz,created_by,approved_by
+       'bank_transfer','approved','2026-06-25 10:00+07'::timestamptz,created_by,approved_by
 FROM payables WHERE project_id='30000000-0000-0000-0000-000000000020'
 UNION ALL
 SELECT gen_random_uuid(),project_id,'RCV-'||receivable_code,'client_receipt','receivable',id,gross_amount,
-       'bank_transfer','received','2026-06-25 10:30+07'::timestamptz,created_by,approved_by
+       'bank_transfer','approved','2026-06-25 10:30+07'::timestamptz,created_by,approved_by
 FROM receivables WHERE project_id='30000000-0000-0000-0000-000000000020';
 
 INSERT INTO advance_requests (

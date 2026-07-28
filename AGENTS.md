@@ -48,6 +48,21 @@
 - Use options only for future implementation choices. Label them as "proposal", not as current behavior.
 - If correcting a previous answer, state the exact wrong phrase, the corrected statement, and the file evidence.
 
+## Verified-Only Completion Reporting Protocol
+
+- Treat `TARGET`, `IMPLEMENTED`, `TECHNICALLY VERIFIED`, `UX ACCEPTED`, and `BLOCKED` as distinct statuses. Report the status that the evidence proves; do not collapse them into `complete`.
+- A plan, estimate, intended rating, or implementation target is not an achieved result. Before verification, label it explicitly as a target or proposal.
+- Do not use claims such as `achieved`, `complete`, `ready`, `passed`, or an equivalent quality statement unless the required verification has actually run and its evidence supports the claim.
+- Every completion or quality report must identify the tested source revision or working-tree state, build timing, environment, database and migration state when applicable, commands or scenarios run, observed results, known failures, and checks that were skipped.
+- A build result is valid only for the source state that was built. If relevant source files changed after the build, report the build as stale and run it again before claiming the current version builds.
+- Verification on an isolated, substitute, mocked, or otherwise different environment must be labelled with that exact scope. It does not prove acceptance on the main, production-like, or user-target environment.
+- If browser or UAT verification has not run, report UI and UX as `NOT UX ACCEPTED`. A successful frontend build, unit test, API test, or code review does not prove usability.
+- UX ratings before the agreed evaluation runs are targets only. Report an achieved UX rating only after executing the stated rubric against the current build, and identify whether the result is a heuristic review or user-based usability test.
+- Use fail-closed completion semantics: any unresolved blocker, failed required check, environment mismatch, or missing acceptance criterion keeps the affected scope incomplete. Passing checks in other layers do not override the blocker.
+- Lead completion reports with failed criteria, blockers, skipped checks, and scope limitations before listing successful checks.
+- If a previous report overstated or fabricated a result, retract the exact incorrect claim, replace it with the evidence-supported statement, and cite the evidence. Do not preserve a misleading conclusion for narrative consistency.
+- Never guarantee a future score, defect-free outcome, or acceptance result that has not yet been verified. State uncertainty and remaining verification work plainly.
+
 ## Human Review Gates
 
 Agents must stop before implementation when the request would change code, feature behavior, bugfix behavior, or UI.

@@ -44,6 +44,8 @@ type PipelineTemplateEdgeLayoutRequest struct {
 
 type PayableCreateRequest struct {
 	ProjectID       string  `json:"project_id"`
+	BudgetID        string  `json:"budget_id"`
+	CostAccountID   string  `json:"cost_account_id"`
 	PayableCode     string  `json:"payable_code"`
 	VendorType      string  `json:"vendor_type"`
 	VendorPartnerID string  `json:"vendor_partner_id"`
@@ -56,14 +58,15 @@ type PayableCreateRequest struct {
 }
 
 type ReceivableCreateRequest struct {
-	ProjectID       string  `json:"project_id"`
-	ReceivableCode  string  `json:"receivable_code"`
-	ClientPartnerID string  `json:"client_partner_id"`
-	ClientName      string  `json:"client_name"`
-	ContractAmount  float64 `json:"contract_amount"`
-	MilestoneName   string  `json:"milestone_name"`
-	GrossAmount     float64 `json:"gross_amount"`
-	DueDate         string  `json:"due_date"`
+	ProjectID        string  `json:"project_id"`
+	RevenueAccountID string  `json:"revenue_account_id"`
+	ReceivableCode   string  `json:"receivable_code"`
+	ClientPartnerID  string  `json:"client_partner_id"`
+	ClientName       string  `json:"client_name"`
+	ContractAmount   float64 `json:"contract_amount"`
+	MilestoneName    string  `json:"milestone_name"`
+	GrossAmount      float64 `json:"gross_amount"`
+	DueDate          string  `json:"due_date"`
 }
 
 type HandoverCreateRequest struct {
@@ -97,6 +100,8 @@ type ProjectMemberMutationRequest struct {
 }
 
 type InputInvoiceRequest struct {
+	TaxCodeID            string  `json:"tax_code_id"`
+	ExpenseAccountID     string  `json:"expense_account_id"`
 	InvoiceNumber        string  `json:"invoice_number"`
 	InvoiceSymbol        string  `json:"invoice_symbol"`
 	InvoiceDate          string  `json:"invoice_date"`
@@ -112,18 +117,20 @@ type InputInvoiceRequest struct {
 }
 
 type OutputInvoiceRequest struct {
-	InvoiceNumber   string  `json:"invoice_number"`
-	InvoiceSymbol   string  `json:"invoice_symbol"`
-	InvoiceDate     string  `json:"invoice_date"`
-	ClientPartnerID string  `json:"client_partner_id"`
-	ClientName      string  `json:"client_name"`
-	ClientTaxCode   string  `json:"client_tax_code"`
-	AmountBeforeVAT float64 `json:"amount_before_vat"`
-	VATAmount       float64 `json:"vat_amount"`
-	TotalAmount     float64 `json:"total_amount"`
-	PaymentID       string  `json:"payment_id"`
-	DocumentID      string  `json:"document_id"`
-	Notes           string  `json:"notes"`
+	TaxCodeID        string  `json:"tax_code_id"`
+	RevenueAccountID string  `json:"revenue_account_id"`
+	InvoiceNumber    string  `json:"invoice_number"`
+	InvoiceSymbol    string  `json:"invoice_symbol"`
+	InvoiceDate      string  `json:"invoice_date"`
+	ClientPartnerID  string  `json:"client_partner_id"`
+	ClientName       string  `json:"client_name"`
+	ClientTaxCode    string  `json:"client_tax_code"`
+	AmountBeforeVAT  float64 `json:"amount_before_vat"`
+	VATAmount        float64 `json:"vat_amount"`
+	TotalAmount      float64 `json:"total_amount"`
+	PaymentID        string  `json:"payment_id"`
+	DocumentID       string  `json:"document_id"`
+	Notes            string  `json:"notes"`
 }
 
 type BudgetCreateRequest struct {
@@ -134,6 +141,8 @@ type BudgetCreateRequest struct {
 
 type PaymentCreateRequest struct {
 	ProjectID     string  `json:"project_id"`
+	BudgetID      string  `json:"budget_id"`
+	CashAccountID string  `json:"cash_account_id"`
 	PaymentCode   string  `json:"payment_code"`
 	PaymentType   string  `json:"payment_type"`
 	TargetType    string  `json:"target_type"`
@@ -160,6 +169,7 @@ type AdvanceRequestCreateRequest struct {
 }
 
 type PayablePaymentCreateRequest struct {
+	CashAccountID    string  `json:"cash_account_id"`
 	PaymentCode      string  `json:"payment_code"`
 	PaymentType      string  `json:"payment_type"`
 	PaymentMethod    string  `json:"payment_method"`
@@ -187,6 +197,7 @@ type ReceivableAdvanceReceiptCreateRequest struct {
 }
 
 type ReceivableReceiptCreateRequest struct {
+	CashAccountID    string  `json:"cash_account_id"`
 	PaymentCode      string  `json:"payment_code"`
 	PaymentType      string  `json:"payment_type"`
 	PaymentMethod    string  `json:"payment_method"`

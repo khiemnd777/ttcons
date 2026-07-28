@@ -36,6 +36,14 @@ func forbiddenError(message string, details ...any) StatusError {
 	return err
 }
 
+func conflictError(message string, details ...any) StatusError {
+	err := StatusError{Status: fiber.StatusConflict, Code: "CONFLICT", Message: message}
+	if len(details) > 0 {
+		err.Details = details[0]
+	}
+	return err
+}
+
 func ErrorHandler(c *fiber.Ctx, err error) error {
 	if err == nil {
 		return nil

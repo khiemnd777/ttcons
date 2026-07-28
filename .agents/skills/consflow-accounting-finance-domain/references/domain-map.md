@@ -2,16 +2,18 @@
 
 ## Owners
 
-- Frontend modules: `frontend/src/modules/accounting` (`AccountingPage.tsx`, `AccountingCreateDialog.tsx`, `AccountingDetailDialog.tsx`), `frontend/src/modules/debt` (`DebtPage.tsx`, `DebtCreateDialog.tsx`, `DebtDetailDialog.tsx`), `frontend/src/modules/contracts`, `frontend/src/modules/reports`
+- Frontend modules: `frontend/src/modules/accounting` (`AccountingPage.tsx`, `AccountingBooksPanel.tsx`, `ManualJournalDialog.tsx`, `TaxWorkspace.tsx`, `AccountingCreateDialog.tsx`, `AccountingDetailDialog.tsx`, `CashflowPanel.tsx`), `frontend/src/modules/debt`, `frontend/src/modules/contracts`, `frontend/src/modules/reports`
 - Debt panels: `InputInvoicePanel.tsx`, `OutputInvoicePanel.tsx`, `InputPaymentPlanPanel.tsx`, `OutputBillingPlanPanel.tsx`, `PayableReconciliationPanel.tsx`, `ReceivableReconciliationPanel.tsx`
 - Report panels: `CashflowPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`
+- Backend logic: source finance methods in `handlers.go`, `service.go`, `repository_domain.go`, `types.go`; ledger owners `handlers_accounting.go`, `types_accounting.go`, `accounting_core.go`, `accounting_dimensions.go`, `accounting_posting.go`, `accounting_payment_reversal.go`, `accounting_tax.go`, `accounting_reports.go`
 - Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
 
 ## Routes
 
-- Budgets/payments: `/projects/:id/budget`, `/budgets/:id/approve`, `/payments`, `/payments/:id/approve`
+- Budgets/payments: `/projects/:id/budget`, `/budgets/:id/approve`, `/payments`, `/payments/:id/approve|reverse`
+- Ledger: `/accounting/accounts`, `/accounting/periods`, `/accounting/journal-entries`, `/projects/:id/accounting/journal-entries`, `/accounting/journal-entries/:id/reverse`
+- Ledger reports/tax/reconciliation: `/accounting/reports/trial-balance|general-ledger|profit-loss|vat`, `/accounting/tax-codes`, `/accounting/tax-periods`, `/accounting/tax-periods/:id`, `/accounting/tax-periods/:id/export|prepare|file|lock|start-amendment|adjustments|payments`, `/accounting/tax-adjustments/:id/reverse`, `/accounting/reconciliation-issues`, `/accounting/reconciliation-issues/:id/resolve`
 - Payables: `/payables`, `/payables/:id/approve|pay`, `/payables/:id/payment-schedules`, `/payment-schedules/:id/approve`, `/payables/:id/advance-requests`, `/advance-requests/:id/approve|settle`, `/payables/:id/payments`, `/payables/:id/input-invoices/upload`, `/payables/:id/reconciliation`
 - Receivables: `/receivables`, `/receivables/:id/approve|receive`, `/receivables/:id/payment-schedules`, `/receivable-payment-schedules/:id/approve`, `/receivables/:id/advance-receipts`, `/client-advance-receipts/:id/approve|settle`, `/receivables/:id/payments`, `/receivables/:id/output-invoices/upload`, `/receivables/:id/reconciliation`
 - Invoice files/actions: `/projects/:id/input-invoices`, `/input-invoices/:id/file|verify|reject`, `/projects/:id/output-invoices`, `/output-invoices/:id/file|issue|void`
@@ -21,20 +23,39 @@
 
 ## Tables And Migrations
 
-- `accounting_budgets`, `payables`, `receivables`, `payments`, `advance_requests`, `payment_allocations`
+- `accounting_budgets`, `payables`, `receivables`, `payments`, `advance_requests`, `payment_allocations`, `receipt_allocations`
+- `accounting_books`, `accounting_accounts`, `accounting_periods`, `journal_entries`, `journal_entry_lines`, `accounting_posting_rules`
+- `budget_movements`, `payment_reversals`, `accounting_backfill_issues`
+- `tax_codes`, `tax_periods`, `invoice_tax_lines`, `tax_adjustments`, `vat_return_snapshots`, `tax_period_events`
 - `input_invoices`, `output_invoices`
 - `payable_payment_schedules`, `receivable_payment_schedules`, `client_advance_receipts`
 - `contracts`, `contract_versions`, `contract_milestones`, `contract_variations`, `contract_retentions`, `contract_retention_releases`
 - Related documents: `documents`, `evidence_records`, `partners`
-- Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`, `V70`, `V71`
+- Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`, `V70`, `V71`, `V73`-`V82`
 
 ## Invariants
 
 - AP/AR records reconcile to invoices, payments/receipts, advances, settlements, and source documents.
+- Every posted journal has at least two lines and equal debit/credit totals. The deferred balance trigger and open-period trigger enforce this at transaction commit; posted headers/lines are immutable and are corrected only through a linked reversal journal.
+- A manual CTGS persists its optional `source_document_no` on the immutable journal header; journal detail presents source kinds as Vietnamese accounting document labels instead of leaking internal source codes.
+- Long migration/backfill CTGS numbers remain immutable accounting identifiers. Journal, General Ledger and VAT list surfaces may compact only their visual presentation; compacted values expose the full number through an application-rendered portal tooltip on mouse hover, keyboard focus and touch/pen tap, while assistive labels, detail, search and export flows retain the same full value.
+- Copying a CTGS is presentation-only: click, Enter or Space copies the full immutable accounting identifier, never the compact display string; explicit success/failure feedback must not mutate the posted journal.
+- Source transitions and their journals are one atomic transaction. Payable approval records budget commitment; input-invoice verification records cost/VAT/AP and actual budget; output-invoice issue records AR/revenue/VAT; payment approval records cash plus AP/AR allocation or an explicit generic income/expense account.
+- Direct `pay` on payable and direct `receive` on receivable are blocked. Settlement must pass through a Thu/Chi voucher with allocations so the cash journal, source balance, schedule/advance and budget movement cannot drift.
+- Budget balances are derived from append-only movements: `committed` is an open obligation, `actual` is recognized cost, `paid` is cash paid, and `available = approved - committed - actual`. Negative available balance is visible; approval/posting must not hide overspend with a floor at zero.
+- Payment reversal is atomic and immutable: it requires a reason, reverses allocations/source balances, records offsetting budget movements, posts a reversal journal and cancels the original voucher without deleting history.
+- Accounting periods gate all posting/reversal by entry date. Close/reopen requires a reason and permission and writes audit. No API may mutate a closed period's journal directly.
+- VAT lines are generated from input/output invoices and feed the VAT ledger. Tax code, input/output account, taxable amount, VAT amount and deductible amount remain source-backed dimensions, not frontend calculations.
+- A VAT return can be prepared only when every in-range invoice is posted with a canonical tax line and posted TK 1331/3331 turnover reconciles to the tax dimensions. Prepare creates an immutable snapshot; file records the authority reference; lock closes the declaration; later correction opens the next amendment number and creates another snapshot without rewriting history.
+- An open or amended VAT period exposes a provisional payable/credit calculation including prior-period carried credit; prepared, filed and locked screens present the immutable latest snapshot, so the UI must not mix a live preview with a filed amount.
+- VAT adjustments are append-only, require a reason and balanced linked CTGS, and are corrected only by an explicit adjustment plus journal reversal. A VAT payment belongs to one filed/locked tax period, posts Nợ TK 3331/Có TK tiền on approval, appears in cashflow, and must not create budget commitment, actual cost or paid-budget movement.
+- Once a VAT return snapshot exists, input/output invoice status changes in that source period are blocked until the controlled supplemental-declaration workflow is used. V81 covers VAT only; TNDN and TNCN are not implemented by this lifecycle.
+- V77 normalizes legacy voucher terminal statuses `paid|received` to canonical `approved` while preserving `paid_at`, and clears a legacy `target_type` only when its `target_id` never existed. Complete finance constraints are validated only after these deterministic repairs; unknown partial references must still fail migration rather than inventing a source.
+- `backfill_accounting_ledger()` is idempotent. It posts only deterministic historical sources and writes ambiguous sources to `accounting_backfill_issues`; an open issue can become `resolved` only with a same-project posted CTGS, or `accepted` only with an explanatory note and no journal link.
 - API creation of manual AP/AR is server-owned: new records start `draft`, paid/received amounts start at zero, remaining balance is computed from normalized obligation fields, and the actor/audit trail is recorded in the same fail-closed transaction. Client-supplied status or derived balances are ignored by typed contracts.
 - Generic payment/receipt creation always starts `draft` and is atomic with its audit event; approval is the only path that sets approval actor/time. AP/AR-linked payments should use the dedicated allocation endpoints so reconciliation stays correct.
 - Budget creation is typed and server-owned: clients provide only code/name/planned amount; draft approved/used/remaining amounts start at zero, and approval derives approved amount from planned amount plus remaining from approved minus used. Both creation and approval write audit in the same transaction and roll back on audit failure.
-- Generic `/payments` creation is reserved for non-AP/AR `outbound`, `inbound`, and `other` records. Supplier/subcontractor/client/advance payment types must be created from the dedicated payable/receivable endpoints with allocation context.
+- Generic `/payments` creation is reserved for non-AP/AR `outbound` and `inbound` records. Legacy `other` rows remain readable and enter reconciliation when they lack a deterministic posting direction; new supplier/subcontractor/client/advance payments must use dedicated payable/receivable endpoints with allocation context.
 - Payable and receivable list handlers both combine actor project visibility with a validated explicit `project_id` filter; project-scoped UI must not rely on client filtering.
 - The Debt UI owns AP/AR work queues, complete aging (`not_due`, `1_30`, `31_60`, `61_90`, `90_plus`, `settled`) and invoice/schedule/advance/payment/reconciliation detail. User-facing text spells these out as `công nợ phải trả` and `công nợ phải thu`; AP/AR remains technical shorthand in code/contracts/maps. Accounting owns budget, generic phiếu approval/list and cashflow presentation.
 - The project Debt page accepts presentation-only `?kind=payables|receivables&queue=...` source-navigation queries. It applies only a kind the user may view and never turns query parameters into an API mutation, allocation, approval or reconciliation action; Handover uses this to disclose the current module behind stored readiness counts.

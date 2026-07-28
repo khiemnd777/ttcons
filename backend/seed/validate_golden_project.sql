@@ -150,7 +150,7 @@ BEGIN
   IF amount <> 0 THEN RAISE EXCEPTION 'AP remaining must be zero, got %',amount; END IF;
   SELECT COALESCE(sum(remaining_amount),0) INTO amount FROM receivables WHERE project_id='30000000-0000-0000-0000-000000000020' AND status <> 'deleted';
   IF amount <> 0 THEN RAISE EXCEPTION 'AR remaining must be zero, got %',amount; END IF;
-  SELECT count(*) INTO actual FROM payments WHERE project_id='30000000-0000-0000-0000-000000000020' AND status NOT IN ('paid','received');
+  SELECT count(*) INTO actual FROM payments WHERE project_id='30000000-0000-0000-0000-000000000020' AND status <> 'approved';
   IF actual <> 0 THEN RAISE EXCEPTION 'Non-terminal Golden payments: %',actual; END IF;
   SELECT count(*) INTO actual FROM input_invoices WHERE project_id='30000000-0000-0000-0000-000000000020' AND status='verified';
   IF actual <> 1 THEN RAISE EXCEPTION 'Verified input invoice missing'; END IF;
@@ -205,6 +205,13 @@ BEGIN
   WHERE p.key='project.member.manage' AND r.name IN ('admin','director','pm');
   IF actual <> 3 THEN RAISE EXCEPTION 'Project member management role grants: expected 3, got %',actual; END IF;
 
+  SELECT count(*) INTO actual
+  FROM role_permissions rp
+  JOIN roles r ON r.id=rp.role_id
+  JOIN permissions p ON p.id=rp.permission_id
+  WHERE r.name='pm' AND p.key IN ('planning.view','planning.edit');
+  IF actual <> 2 THEN RAISE EXCEPTION 'PM official planning permissions: expected 2, got %',actual; END IF;
+
   SELECT
     (SELECT count(*) FROM pipeline_template_steps WHERE name LIKE 'Trảo đổi%') +
     (SELECT count(*) FROM pipeline_run_steps WHERE name LIKE 'Trảo đổi%') +
@@ -251,9 +258,12 @@ BEGIN
     ('qaqc@consflow.local','qa_qc'),
     ('construction@consflow.local','construction_team'),
     ('subcontractor@consflow.local','subcontractor'),
-    ('client@consflow.local','client')
+    ('client@consflow.local','client'),
+    ('design@consflow.local','design'),
+    ('sales@consflow.local','sales'),
+    ('legal@consflow.local','legal')
   ) AND u.status='active';
-  IF actual <> 5 THEN RAISE EXCEPTION 'Golden Live role accounts: expected 5, got %',actual; END IF;
+  IF actual <> 8 THEN RAISE EXCEPTION 'Golden Live dedicated role accounts: expected 8, got %',actual; END IF;
 
   SELECT count(*) INTO actual
   FROM projects p
@@ -269,7 +279,7 @@ BEGIN
 
   SELECT count(*) INTO actual FROM project_members
   WHERE project_id='30000000-0000-0000-0000-000000000022' AND active;
-  IF actual <> 12 THEN RAISE EXCEPTION 'Golden Live project members: expected 12, got %',actual; END IF;
+  IF actual <> 15 THEN RAISE EXCEPTION 'Golden Live project members: expected 15, got %',actual; END IF;
 
   SELECT count(*) INTO actual FROM pipeline_run_nodes
   WHERE project_id='30000000-0000-0000-0000-000000000022';

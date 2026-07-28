@@ -1494,8 +1494,17 @@ func (s *Service) CreatePayable(ctx context.Context, req PayableCreateRequest, a
 	if !statusIn(vendorType, vendorPartnerTypes()...) {
 		return nil, validationError("Loại vendor không hợp lệ", Record{"vendor_type": vendorType})
 	}
+	accountingBookID, costAccountID, err := s.resolveAccountingAccount(ctx, projectID, req.CostAccountID, "154")
+	if err != nil {
+		return nil, err
+	}
+	budgetID, err := s.validateAccountingBudget(ctx, projectID, req.BudgetID)
+	if err != nil {
+		return nil, err
+	}
 	body := Record{
-		"project_id": projectID, "payable_code": code, "vendor_type": vendorType,
+		"project_id": projectID, "accounting_book_id": accountingBookID, "budget_id": budgetID, "cost_account_id": costAccountID,
+		"payable_code": code, "vendor_type": vendorType,
 		"vendor_partner_id": cleanID(req.VendorPartnerID), "vendor_name": strings.TrimSpace(req.VendorName),
 		"source_type": "manual", "gross_amount": req.GrossAmount, "advance_amount": req.AdvanceAmount,
 		"retention_amount": req.RetentionAmount, "deduction_amount": req.DeductionAmount,
@@ -1528,8 +1537,12 @@ func (s *Service) CreateReceivable(ctx context.Context, req ReceivableCreateRequ
 	if err != nil {
 		return nil, err
 	}
+	accountingBookID, revenueAccountID, err := s.resolveAccountingAccount(ctx, projectID, req.RevenueAccountID, "5111")
+	if err != nil {
+		return nil, err
+	}
 	body := Record{
-		"project_id": projectID, "receivable_code": code,
+		"project_id": projectID, "accounting_book_id": accountingBookID, "revenue_account_id": revenueAccountID, "receivable_code": code,
 		"client_partner_id": cleanID(req.ClientPartnerID), "client_name": strings.TrimSpace(req.ClientName),
 		"source_type": "manual", "contract_amount": req.ContractAmount,
 		"milestone_name": strings.TrimSpace(req.MilestoneName), "gross_amount": req.GrossAmount,
@@ -9221,6 +9234,14 @@ func (s *Service) normalizePayablePaymentRequest(ctx context.Context, payable Re
 	if !statusIn(paymentMethod, "bank_transfer", "cash") {
 		return nil, validationError("Phương thức thanh toán không hợp lệ", Record{"payment_method": paymentMethod})
 	}
+	defaultCashAccount := "1121"
+	if paymentMethod == "cash" {
+		defaultCashAccount = "1111"
+	}
+	accountingBookID, cashAccountID, err := s.resolveAccountingAccount(ctx, cleanID(payable["project_id"]), req.CashAccountID, defaultCashAccount)
+	if err != nil {
+		return nil, err
+	}
 	advanceID := cleanID(req.AdvanceRequestID)
 	scheduleID := cleanID(req.ScheduleID)
 	if advanceID != "" && scheduleID != "" {
@@ -9300,6 +9321,9 @@ func (s *Service) normalizePayablePaymentRequest(ctx context.Context, payable Re
 	}
 	return Record{
 		"project_id":          cleanID(payable["project_id"]),
+		"accounting_book_id":  accountingBookID,
+		"budget_id":           cleanID(payable["budget_id"]),
+		"cash_account_id":     cashAccountID,
 		"payable_id":          cleanID(payable["id"]),
 		"payment_code":        paymentCode,
 		"payment_type":        paymentType,
@@ -9573,6 +9597,14 @@ func (s *Service) normalizeReceivablePaymentRequest(ctx context.Context, receiva
 	if !statusIn(paymentMethod, "bank_transfer", "cash") {
 		return nil, validationError("Phương thức thu không hợp lệ", Record{"payment_method": paymentMethod})
 	}
+	defaultCashAccount := "1121"
+	if paymentMethod == "cash" {
+		defaultCashAccount = "1111"
+	}
+	accountingBookID, cashAccountID, err := s.resolveAccountingAccount(ctx, cleanID(receivable["project_id"]), req.CashAccountID, defaultCashAccount)
+	if err != nil {
+		return nil, err
+	}
 	advanceID := cleanID(req.AdvanceReceiptID)
 	scheduleID := cleanID(req.ScheduleID)
 	if advanceID != "" && scheduleID != "" {
@@ -9646,6 +9678,8 @@ func (s *Service) normalizeReceivablePaymentRequest(ctx context.Context, receiva
 	}
 	return Record{
 		"project_id":         cleanID(receivable["project_id"]),
+		"accounting_book_id": accountingBookID,
+		"cash_account_id":    cashAccountID,
 		"receivable_id":      cleanID(receivable["id"]),
 		"payment_code":       paymentCode,
 		"payment_type":       paymentType,
@@ -9793,6 +9827,14 @@ func (s *Service) normalizeInputInvoiceRequest(ctx context.Context, payable Reco
 	if totalAmount <= 0 {
 		return nil, validationError("Tổng tiền hoá đơn phải lớn hơn 0")
 	}
+	accountingBookID, expenseAccountID, err := s.resolveAccountingAccount(ctx, projectID, firstNonEmpty(req.ExpenseAccountID, cleanID(payable["cost_account_id"])), "154")
+	if err != nil {
+		return nil, err
+	}
+	taxCodeID, err := s.resolveInvoiceTaxCode(ctx, projectID, req.TaxCodeID, "input", req.AmountBeforeVAT, req.VATAmount)
+	if err != nil {
+		return nil, err
+	}
 	if req.AmountBeforeVAT+req.VATAmount > 0 && totalAmount+1 < req.AmountBeforeVAT+req.VATAmount {
 		return nil, validationError("Tổng tiền hoá đơn nhỏ hơn trước VAT cộng VAT", Record{
 			"amount_before_vat": req.AmountBeforeVAT,
@@ -9832,6 +9874,9 @@ func (s *Service) normalizeInputInvoiceRequest(ctx context.Context, payable Reco
 	}
 	return Record{
 		"project_id":             projectID,
+		"accounting_book_id":     accountingBookID,
+		"tax_code_id":            taxCodeID,
+		"expense_account_id":     expenseAccountID,
 		"payable_id":             cleanID(payable["id"]),
 		"procurement_request_id": procurementRequestID,
 		"document_id":            documentID,
@@ -10012,6 +10057,14 @@ func (s *Service) normalizeOutputInvoiceRequest(ctx context.Context, receivable 
 	if totalAmount <= 0 {
 		return nil, validationError("Tổng tiền hoá đơn phải lớn hơn 0")
 	}
+	accountingBookID, revenueAccountID, err := s.resolveAccountingAccount(ctx, projectID, firstNonEmpty(req.RevenueAccountID, cleanID(receivable["revenue_account_id"])), "5111")
+	if err != nil {
+		return nil, err
+	}
+	taxCodeID, err := s.resolveInvoiceTaxCode(ctx, projectID, req.TaxCodeID, "output", req.AmountBeforeVAT, req.VATAmount)
+	if err != nil {
+		return nil, err
+	}
 	if req.AmountBeforeVAT+req.VATAmount > 0 && totalAmount+1 < req.AmountBeforeVAT+req.VATAmount {
 		return nil, validationError("Tổng tiền hoá đơn nhỏ hơn trước VAT cộng VAT", Record{
 			"amount_before_vat": req.AmountBeforeVAT,
@@ -10050,20 +10103,23 @@ func (s *Service) normalizeOutputInvoiceRequest(ctx context.Context, receivable 
 		return nil, validationError("Ghi chú hoá đơn không được vượt quá 2000 ký tự")
 	}
 	return Record{
-		"project_id":        projectID,
-		"receivable_id":     cleanID(receivable["id"]),
-		"payment_id":        paymentID,
-		"document_id":       documentID,
-		"invoice_number":    invoiceNumber,
-		"invoice_symbol":    invoiceSymbol,
-		"invoice_date":      invoiceDate,
-		"client_partner_id": clientPartnerID,
-		"client_name":       clientName,
-		"client_tax_code":   clientTaxCode,
-		"amount_before_vat": req.AmountBeforeVAT,
-		"vat_amount":        req.VATAmount,
-		"total_amount":      totalAmount,
-		"notes":             notes,
+		"project_id":         projectID,
+		"accounting_book_id": accountingBookID,
+		"tax_code_id":        taxCodeID,
+		"revenue_account_id": revenueAccountID,
+		"receivable_id":      cleanID(receivable["id"]),
+		"payment_id":         paymentID,
+		"document_id":        documentID,
+		"invoice_number":     invoiceNumber,
+		"invoice_symbol":     invoiceSymbol,
+		"invoice_date":       invoiceDate,
+		"client_partner_id":  clientPartnerID,
+		"client_name":        clientName,
+		"client_tax_code":    clientTaxCode,
+		"amount_before_vat":  req.AmountBeforeVAT,
+		"vat_amount":         req.VATAmount,
+		"total_amount":       totalAmount,
+		"notes":              notes,
 	}, nil
 }
 
@@ -10084,8 +10140,8 @@ func (s *Service) CreatePayment(ctx context.Context, req PaymentCreateRequest, a
 	if !validActivityUUID(projectID) || paymentCode == "" || amount <= 0 {
 		return nil, validationError("Phiếu thu/chi cần công trình, mã và số tiền lớn hơn 0", Record{"project_id": projectID, "payment_code": paymentCode, "amount": amount})
 	}
-	if !statusIn(paymentType, "outbound", "inbound", "other") {
-		return nil, validationError("Phiếu gắn công nợ phải được tạo tại Phải trả/Phải thu để giữ đúng phân bổ", Record{"payment_type": paymentType, "allowed_types": []string{"outbound", "inbound", "other"}})
+	if !statusIn(paymentType, "outbound", "inbound") {
+		return nil, validationError("Chỉ được lập Phiếu chi khác hoặc Phiếu thu khác tại đây; chứng từ gắn công nợ phải lập tại Phải trả/Phải thu", Record{"payment_type": paymentType, "allowed_types": []string{"outbound", "inbound"}})
 	}
 	if paymentMethod == "" {
 		paymentMethod = "bank_transfer"
@@ -10093,13 +10149,29 @@ func (s *Service) CreatePayment(ctx context.Context, req PaymentCreateRequest, a
 	if !statusIn(paymentMethod, "bank_transfer", "cash") {
 		return nil, validationError("Phương thức thanh toán không hợp lệ", Record{"payment_method": paymentMethod})
 	}
+	defaultCashAccount := "1121"
+	if paymentMethod == "cash" {
+		defaultCashAccount = "1111"
+	}
+	accountingBookID, cashAccountID, err := s.resolveAccountingAccount(ctx, projectID, req.CashAccountID, defaultCashAccount)
+	if err != nil {
+		return nil, err
+	}
+	budgetID, err := s.validateAccountingBudget(ctx, projectID, req.BudgetID)
+	if err != nil {
+		return nil, err
+	}
+	if paymentType == "outbound" && budgetID == "" {
+		return nil, validationError("Phiếu chi cần chọn ngân sách để ghi nhận thực chi")
+	}
 	targetType := strings.TrimSpace(req.TargetType)
 	targetID := cleanID(req.TargetID)
 	if (targetType == "") != (targetID == "") || (targetID != "" && !validActivityUUID(targetID)) {
 		return nil, validationError("Nguồn liên kết phiếu thu/chi không hợp lệ", Record{"target_type": targetType, "target_id": targetID})
 	}
 	normalized := Record{
-		"project_id": projectID, "payment_code": paymentCode, "payment_type": paymentType,
+		"project_id": projectID, "accounting_book_id": accountingBookID, "budget_id": budgetID, "cash_account_id": cashAccountID,
+		"payment_code": paymentCode, "payment_type": paymentType,
 		"target_type": targetType, "target_id": targetID,
 		"amount": amount, "payment_method": paymentMethod, "status": "draft", "created_by": actorID,
 	}
