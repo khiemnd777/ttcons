@@ -268,8 +268,8 @@ function configuredPrimarySurface(item: WorkItem): WorkItemPrimarySurfaceDefinit
     },
     finance: {
       kind: 'finance',
-      title: 'Hóa đơn, công nợ và thu/chi',
-      description: 'Xử lý công nợ phải trả và phải thu, hóa đơn PDF, kỳ thanh toán, ứng trước, phân bổ thu/chi và đối soát trong sổ tài chính công trình.',
+      title: 'Tài chính công trình',
+      description: 'Ghi nhận chi phí mua vật tư, lập và theo dõi hồ sơ đề nghị thu/chi nội bộ trước khi bàn giao Kế toán xử lý trên hệ thống chuyên môn.',
     },
     handover: {
       kind: 'handover',
@@ -354,8 +354,8 @@ function QualityPrimaryPanel({ item }: { item: WorkItem }) {
 function FinancePrimaryPanel({ item }: { item: WorkItem }) {
   return <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <div><h3 className="text-sm font-semibold text-ink">Sổ công nợ và chứng từ công trình</h3><p className="mt-1 text-sm leading-6 text-slate-700">Tạo/duyệt công nợ phải trả và phải thu, tải và xác minh hóa đơn PDF, lập kỳ, ứng trước, thu/chi và kiểm tra đối soát. Biểu mẫu/PDF của bước vẫn nằm ở tab hỗ trợ.</p></div>
-      <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800" to={`/projects/${item.project_id}/debt`}><FileText className="h-4 w-4" /> Mở công nợ</Link>
+      <div><h3 className="text-sm font-semibold text-ink">Hồ sơ tài chính quản trị công trình</h3><p className="mt-1 text-sm leading-6 text-slate-700">Ghi nhận chi phí mua vật tư và theo dõi đề nghị thu/chi đến khi bàn giao Kế toán. Không ghi sổ, kê khai thuế hoặc thay thế MISA.</p></div>
+      <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800" to={`/projects/${item.project_id}/accounting?tab=tasks`}><FileText className="h-4 w-4" /> Mở tài chính công trình</Link>
     </div>
   </section>;
 }
@@ -363,7 +363,7 @@ function FinancePrimaryPanel({ item }: { item: WorkItem }) {
 function HandoverPrimaryPanel({ item }: { item: WorkItem }) {
   return <section className="rounded-md border border-teal-200 bg-teal-50 p-4">
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <div><h3 className="text-sm font-semibold text-ink">Hồ sơ đóng tài chính và bàn giao</h3><p className="mt-1 text-sm leading-6 text-slate-700">Khóa nghiệm thu cuối, xác minh checklist/minh chứng, kiểm tra chất lượng, kho, công nợ phải trả/phải thu và thu chi trước khi hoàn tất bàn giao có lưu dấu vết.</p></div>
+      <div><h3 className="text-sm font-semibold text-ink">Hồ sơ đóng công trình và bàn giao</h3><p className="mt-1 text-sm leading-6 text-slate-700">Khóa nghiệm thu cuối, xác minh checklist/minh chứng, kiểm tra chất lượng, kho, chi phí vật tư và đề nghị thu/chi nội bộ trước khi hoàn tất bàn giao.</p></div>
       <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800" to={`/projects/${item.project_id}/handover`}><PackageCheck className="h-4 w-4" /> Mở bàn giao</Link>
     </div>
   </section>;

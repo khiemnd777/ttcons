@@ -28,7 +28,7 @@ const OperationsPage = lazy(() => import('../modules/operations/OperationsPage')
 const AcceptancePage = lazy(() => import('../modules/acceptance/AcceptancePage').then(({ AcceptancePage }) => ({ default: AcceptancePage })));
 const ReworkPage = lazy(() => import('../modules/rework/ReworkPage').then(({ ReworkPage }) => ({ default: ReworkPage })));
 const HandoverPage = lazy(() => import('../modules/handover/HandoverPage').then(({ HandoverPage }) => ({ default: HandoverPage })));
-const AccountingPage = lazy(() => import('../modules/accounting/AccountingPage').then(({ AccountingPage }) => ({ default: AccountingPage })));
+const ProjectFinancePage = lazy(() => import('../modules/project-finance/ProjectFinancePage').then(({ ProjectFinancePage }) => ({ default: ProjectFinancePage })));
 const DebtPage = lazy(() => import('../modules/debt/DebtPage').then(({ DebtPage }) => ({ default: DebtPage })));
 const CoreDataPage = lazy(() => import('../modules/core-data/CoreDataPage').then(({ CoreDataPage }) => ({ default: CoreDataPage })));
 const StaffPage = lazy(() => import('../modules/staff/StaffPage').then(({ StaffPage }) => ({ default: StaffPage })));
@@ -92,8 +92,7 @@ export const router = createBrowserRouter([
           { path: 'acceptance', element: guarded(<AcceptancePage />, ['acceptance.view']) },
           { path: 'rework', element: guarded(<Navigate to="../operations?tab=actions" replace />, ['rework.view']) },
           { path: 'handover', element: guarded(<HandoverPage />, ['handover.view']) },
-          { path: 'accounting', element: guarded(<AccountingPage />, ['accounting.view']) },
-          { path: 'debt', element: guarded(<DebtPage kind="both" />, ['accounting.payable_view', 'accounting.receivable_view']) },
+          { path: 'accounting', element: guarded(<ProjectFinancePage />, ['project_finance.view']) },
           { path: 'audit', element: guarded(<AuditPage scoped />, ['audit.view']) },
         ],
       },
@@ -109,7 +108,7 @@ export const router = createBrowserRouter([
       { path: '/acceptance', element: guarded(<AcceptancePage global />, ['acceptance.view']) },
       { path: '/rework', element: guarded(<ReworkPage />, ['rework.view']) },
       { path: '/handover', element: guarded(<HandoverPage />, ['handover.view']) },
-      { path: '/accounting', element: guarded(<AccountingPage global />, ['accounting.view']) },
+      { path: '/accounting', element: guarded(<ProjectFinancePage global />, ['project_finance.view']) },
       { path: '/debt/payables', element: guarded(<DebtPage kind="payables" />, ['accounting.payable_view']) },
       { path: '/debt/receivables', element: guarded(<DebtPage kind="receivables" />, ['accounting.receivable_view']) },
       { path: '/core-data', element: guarded(<CoreDataPage />, ['catalog.view']) },
@@ -117,8 +116,8 @@ export const router = createBrowserRouter([
       { path: '/roles', element: guarded(<RolesPage />, ['role.view']) },
       { path: '/permissions', element: guarded(<PermissionsPage />, ['permission.view']) },
       { path: '/audit', element: guarded(<AuditPage />, ['audit.view']) },
-      { path: '/reports', element: guarded(<ReportsPage />, ['report.view', 'report.finance.view', 'accounting.view']) },
-      { path: '/reports/:reportKey', element: guarded(<ReportsPage />, ['report.view', 'report.finance.view', 'accounting.view']) },
+      { path: '/reports', element: guarded(<ReportsPage />, ['report.view']) },
+      { path: '/reports/:reportKey', element: guarded(<ReportsPage />, ['report.view']) },
       { path: '/settings', element: guarded(<SettingsPage />, ['settings.view']) },
     ],
   },

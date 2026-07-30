@@ -1,5 +1,6 @@
 TRUNCATE TABLE
   audit_logs,
+  project_cash_requests, project_material_costs,
   activity_mentions, activity_read_states,
   receipt_allocations, client_advance_receipts, receivable_payment_schedules,
   payment_allocations, payable_payment_schedules,
@@ -50,7 +51,7 @@ INSERT INTO roles (id, name, display_name, description, system_role) VALUES
 ('20000000-0000-0000-0000-000000000002','director','Giám đốc','Duyệt ngân sách và quyết định vượt hạn mức',true),
 ('20000000-0000-0000-0000-000000000003','pm','PM','Quản lý công trình và pipeline',true),
 ('20000000-0000-0000-0000-000000000004','qs','QS','Bóc tách khối lượng, BOQ và kiểm soát chi phí',true),
-('20000000-0000-0000-0000-000000000005','accounting','Kế toán','Kiểm soát ngân sách, công nợ và thanh toán',true),
+('20000000-0000-0000-0000-000000000005','accounting','Kế toán','Ghi nhận chi phí vật tư và theo dõi hồ sơ thu/chi công trình',true),
 ('20000000-0000-0000-0000-000000000006','procurement','Mua hàng','Phụ trách yêu cầu mua và nhà cung cấp',true),
 ('20000000-0000-0000-0000-000000000007','warehouse','Thủ kho','Nhập xuất tồn và vật tư dư',true),
 ('20000000-0000-0000-0000-000000000008','supervisor','Giám sát','Báo cáo thi công và hiện trường',true),
@@ -78,6 +79,7 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('handover.view','Xem bàn giao','handover'),('handover.create','Tạo bàn giao','handover'),('handover.approve','Duyệt bàn giao','handover'),
 ('accounting.view','Xem kế toán','accounting'),('accounting.budget_view','Xem ngân sách','accounting'),('accounting.budget_approve','Duyệt ngân sách','accounting'),('accounting.payable_view','Xem phải trả','accounting'),('accounting.payable_approve','Duyệt phải trả','accounting'),('accounting.receivable_view','Xem phải thu','accounting'),('accounting.receivable_approve','Duyệt phải thu','accounting'),('accounting.payment_create','Tạo thanh toán','accounting'),('accounting.payment_approve','Duyệt thanh toán','accounting'),
 ('accounting.journal_view','Xem sổ kế toán','accounting'),('accounting.journal_post','Ghi sổ chứng từ kế toán','accounting'),('accounting.journal_reverse','Lập bút toán đảo','accounting'),('accounting.period_close','Khóa kỳ kế toán','accounting'),('accounting.period_reopen','Mở lại kỳ kế toán','accounting'),('accounting.tax_view','Xem sổ thuế','accounting'),('accounting.tax_manage','Quản lý thuế','accounting'),
+('project_finance.view','Xem tài chính công trình','project_finance'),('project_finance.cost_create','Ghi nhận chi phí vật tư','project_finance'),('project_finance.cost_review','Xác nhận chi phí vật tư','project_finance'),('project_finance.request_create','Lập đề nghị thu/chi','project_finance'),('project_finance.request_approve','Duyệt đề nghị thu/chi','project_finance'),('project_finance.process','Xác nhận bàn giao kế toán','project_finance'),('project_finance.report_view','Xem báo cáo quản trị công trình','project_finance'),
 ('contract.view','Xem hợp đồng','contract'),('contract.review','Review hợp đồng','contract'),
 ('catalog.view','Xem dữ liệu lõi','catalog'),('catalog.manage','Quản lý dữ liệu lõi','catalog'),
 ('staff.view','Xem nhân sự','staff'),('staff.create','Tạo nhân sự','staff'),('staff.update','Sửa nhân sự','staff'),('role.view','Xem role','rbac'),('role.create','Tạo role','rbac'),('role.update','Sửa role','rbac'),('permission.view','Xem permission','rbac'),('permission.assign','Gán quyền','rbac'),
@@ -86,6 +88,34 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name = 'admin'
+ON CONFLICT DO NOTHING;
+
+DELETE FROM role_permissions role_permission
+USING roles role,permissions permission
+WHERE role_permission.role_id=role.id
+  AND role_permission.permission_id=permission.id
+  AND role.name <> 'admin'
+  AND (permission.key LIKE 'accounting.%' OR permission.key IN ('accounting.view','report.finance.view'));
+
+INSERT INTO role_permissions (role_id,permission_id)
+SELECT role.id,permission.id
+FROM roles role
+JOIN permissions permission ON
+  (role.name='admin' AND permission.key LIKE 'project_finance.%') OR
+  (role.name='accounting' AND permission.key IN (
+    'project_finance.view','project_finance.cost_create','project_finance.cost_review',
+    'project_finance.request_create','project_finance.process','project_finance.report_view'
+  )) OR
+  (role.name='director' AND permission.key IN (
+    'project_finance.view','project_finance.request_approve','project_finance.report_view'
+  )) OR
+  (role.name='pm' AND permission.key IN (
+    'project_finance.view','project_finance.cost_create','project_finance.request_create','project_finance.report_view'
+  )) OR
+  (role.name='procurement' AND permission.key IN (
+    'project_finance.view','project_finance.cost_create','project_finance.request_create'
+  )) OR
+  (role.name='qs' AND permission.key IN ('project_finance.view','project_finance.report_view'))
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
@@ -187,6 +217,14 @@ JOIN permissions p ON (
 )
 ON CONFLICT DO NOTHING;
 
+-- Professional accounting remains available only to administrators for historical support.
+DELETE FROM role_permissions role_permission
+USING roles role,permissions permission
+WHERE role_permission.role_id=role.id
+  AND role_permission.permission_id=permission.id
+  AND role.name <> 'admin'
+  AND (permission.key LIKE 'accounting.%' OR permission.key IN ('accounting.view','report.finance.view'));
+
 INSERT INTO staff (id, user_id, full_name, email, phone, department, position, status) VALUES
 ('21000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Admin hệ thống','admin@consflow.local','0900000001','Công nghệ','Admin','active'),
 ('21000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002','Nguyễn Minh PM','pm@consflow.local','0900000002','Dự án','Project Manager','active'),
@@ -226,19 +264,19 @@ INSERT INTO pipeline_templates (
   id, name, description, project_type, version, status, created_by,
   template_family_id, revision_no, engine_version, definition_hash, published_at, published_by
 ) VALUES
-('40000000-0000-0000-0000-000000000001','Template hoàn thiện nội thất tiêu chuẩn','Khảo sát → Thiết kế → BOQ → Mua sắm → Kho → Thi công → Nghiệm thu → Bàn giao → Financial Closure','Hoàn thiện nội thất',1,'published','10000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001',1,1,repeat('1',64),now(),'10000000-0000-0000-0000-000000000001');
+('40000000-0000-0000-0000-000000000001','Template hoàn thiện nội thất tiêu chuẩn','Khảo sát → Thiết kế → BOQ → Mua sắm → Kho → Thi công → Nghiệm thu → Bàn giao → Tài chính công trình','Hoàn thiện nội thất',1,'published','10000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001',1,1,repeat('1',64),now(),'10000000-0000-0000-0000-000000000001');
 
 INSERT INTO pipeline_template_nodes (id, template_id, name, description, type, order_index, position_x, position_y, responsible_role_ids, required_permission, exit_conditions, approval_rule, rework_enabled, replanning_enabled, fail_path) VALUES
 ('41000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001','Khảo sát','Ghi nhận hiện trạng, kích thước và rủi ro ban đầu.','survey',1,80,120,'["Giám sát"]','planning.edit','{"text":"Có biên bản khảo sát và ảnh hiện trạng"}','PM duyệt',false,true,'previous'),
 ('41000000-0000-0000-0000-000000000002','40000000-0000-0000-0000-000000000001','Thiết kế','Chuẩn bị bản vẽ, phương án thiết kế và xác nhận với khách hàng.','design',2,320,120,'["PM"]','planning.edit','{"text":"Bản vẽ được khách hàng xác nhận"}','Chủ đầu tư xác nhận',false,true,'replanning'),
-('41000000-0000-0000-0000-000000000003','40000000-0000-0000-0000-000000000001','BOQ / Dự toán','QS bóc tách khối lượng và kiểm tra ngân sách.','boq',3,560,120,'["QS"]','boq.update','{"text":"BOQ đã duyệt và ngân sách đã kiểm tra"}','PM + QS + Kế toán duyệt',false,true,'replanning'),
-('41000000-0000-0000-0000-000000000004','40000000-0000-0000-0000-000000000001','Duyệt ngân sách','Kế toán kiểm tra ngân sách, giám đốc duyệt khi vượt hạn mức.','budget_approval',4,800,120,'["Kế toán","Giám đốc"]','accounting.budget_approve','{"text":"Ngân sách được phê duyệt"}','PM + Kế toán + Giám đốc duyệt',false,true,'replanning'),
-('41000000-0000-0000-0000-000000000005','40000000-0000-0000-0000-000000000001','Mua vật tư','Tạo yêu cầu mua, duyệt mua và đặt hàng.','procurement',5,1040,120,'["Mua hàng","Kế toán"]','procurement.approve','{"text":"Vật tư cần mua đã được duyệt"}','PM + Kế toán duyệt',false,false,'previous'),
+('41000000-0000-0000-0000-000000000003','40000000-0000-0000-0000-000000000001','BOQ / Dự toán','QS bóc tách khối lượng và lập dự toán công trình.','boq',3,560,120,'["QS"]','boq.update','{"text":"BOQ và dự toán đã được duyệt"}','PM + QS duyệt',false,true,'replanning'),
+('41000000-0000-0000-0000-000000000004','40000000-0000-0000-0000-000000000001','Duyệt kế hoạch mua vật tư','PM và Giám đốc kiểm tra giá trị mua vật tư dự kiến trước khi đặt hàng.','budget_approval',4,800,120,'["PM","Giám đốc"]','procurement.approve','{"text":"Kế hoạch mua vật tư được phê duyệt"}','PM + Giám đốc duyệt',false,true,'replanning'),
+('41000000-0000-0000-0000-000000000005','40000000-0000-0000-0000-000000000001','Mua vật tư','Tạo yêu cầu mua, duyệt mua và đặt hàng.','procurement',5,1040,120,'["Mua hàng","PM"]','procurement.approve','{"text":"Vật tư cần mua đã được duyệt"}','PM duyệt',false,false,'previous'),
 ('41000000-0000-0000-0000-000000000006','40000000-0000-0000-0000-000000000001','Xuất kho','Kiểm tra tồn kho, xuất vật tư ra công trình.','warehouse_issue',6,1280,120,'["Thủ kho"]','warehouse.issue','{"text":"Vật tư required đã xuất đủ"}','Thủ kho xác nhận',false,false,'previous'),
 ('41000000-0000-0000-0000-000000000007','40000000-0000-0000-0000-000000000001','Thi công','Daily report, issue, vật tư sử dụng và tiến độ.','construction',7,1520,120,'["Giám sát","Đội thi công"]','operation.report','{"client_payment_min_percent":30,"materials_required":true}','PM duyệt',true,true,'rework'),
 ('41000000-0000-0000-0000-000000000008','40000000-0000-0000-0000-000000000001','Nghiệm thu','Checklist nghiệm thu, pass/fail, punch list.','acceptance',8,1760,120,'["QA/QC","Chủ đầu tư"]','acceptance.approve','{"text":"Nghiệm thu đạt và punch list đã đóng"}','QA/QC + Chủ đầu tư xác nhận',true,true,'rework'),
-('41000000-0000-0000-0000-000000000009','40000000-0000-0000-0000-000000000001','Bàn giao','Closure checker, biên bản bàn giao, chứng từ.','handover',9,2000,120,'["PM","Chủ đầu tư"]','handover.approve','{"text":"Nghiệm thu cuối pass, kho và công nợ đã closure"}','PM + Chủ đầu tư xác nhận',false,false,'previous'),
-('41000000-0000-0000-0000-000000000010','40000000-0000-0000-0000-000000000001','Financial Closure','Đóng công nợ, thanh toán và báo cáo lãi/lỗ.','financial_closure',10,2240,120,'["Kế toán","Giám đốc"]','accounting.payment_approve','{"text":"Payables/Receivables đã resolve hoặc duyệt pending"}','Kế toán + Giám đốc duyệt',false,false,'none');
+('41000000-0000-0000-0000-000000000009','40000000-0000-0000-0000-000000000001','Bàn giao','Kiểm tra nghiệm thu cuối, vật tư dư và hồ sơ bàn giao.','handover',9,2000,120,'["PM","Chủ đầu tư"]','handover.approve','{"text":"Nghiệm thu cuối, kho và hồ sơ quản trị đã hoàn tất"}','PM + Chủ đầu tư xác nhận',false,false,'previous'),
+('41000000-0000-0000-0000-000000000010','40000000-0000-0000-0000-000000000001','Tài chính công trình','Xác nhận chi phí vật tư và đề nghị thu/chi nội bộ đã được xử lý.','financial_closure',10,2240,120,'["Kế toán","Giám đốc"]','project_finance.view','{"text":"Chi phí vật tư và đề nghị thu/chi đã hoàn tất"}','Kế toán + Giám đốc xác nhận',false,false,'none');
 
 INSERT INTO pipeline_template_edges (template_id, from_node_id, to_node_id, condition_type, label)
 SELECT '40000000-0000-0000-0000-000000000001', a.id, b.id, 'always', 'Hoàn tất'
@@ -251,14 +289,14 @@ SELECT id, step_name, 'Checklist mẫu của node ' || n.name, step_type, idx FR
 JOIN (VALUES
 ('Khảo sát',1,'Upload ảnh hiện trạng','photo_upload'),('Khảo sát',2,'Ghi nhận kích thước chính','checklist'),('Khảo sát',3,'Xác định rủi ro mặt bằng','checklist'),
 ('Thiết kế',1,'Upload bản vẽ','document_upload'),('Thiết kế',2,'Review phương án thiết kế','task'),('Thiết kế',3,'Khách hàng xác nhận','approval'),
-('BOQ / Dự toán',1,'Bóc tách khối lượng','task'),('BOQ / Dự toán',2,'Nhập đơn giá dự kiến','task'),('BOQ / Dự toán',3,'Kiểm tra ngân sách','budget_check'),
-('Duyệt ngân sách',1,'Tổng hợp ngân sách','budget_check'),('Duyệt ngân sách',2,'Kế toán review','approval'),('Duyệt ngân sách',3,'Giám đốc duyệt nếu vượt hạn mức','approval'),
+('BOQ / Dự toán',1,'Bóc tách khối lượng','task'),('BOQ / Dự toán',2,'Nhập đơn giá dự kiến','task'),('BOQ / Dự toán',3,'Kiểm tra dự toán','budget_check'),
+('Duyệt kế hoạch mua vật tư',1,'Tổng hợp kế hoạch mua vật tư','budget_check'),('Duyệt kế hoạch mua vật tư',2,'PM kiểm tra giá trị dự kiến','approval'),('Duyệt kế hoạch mua vật tư',3,'Giám đốc duyệt nếu vượt hạn mức','approval'),
 ('Mua vật tư',1,'Sinh nhu cầu vật tư từ BOQ','material_check'),('Mua vật tư',2,'PM duyệt nhu cầu','approval'),('Mua vật tư',3,'Đặt hàng nhà cung cấp','task'),
 ('Xuất kho',1,'Kiểm tra tồn kho','material_check'),('Xuất kho',2,'Xuất vật tư ra công trình','task'),('Xuất kho',3,'Cập nhật tồn tại site','task'),
 ('Thi công',1,'Daily report','task'),('Thi công',2,'Ghi nhận vật tư sử dụng','material_check'),('Thi công',3,'Kiểm tra chất lượng trước nghiệm thu','acceptance_check'),
 ('Nghiệm thu',1,'Tạo checklist nghiệm thu','acceptance_check'),('Nghiệm thu',2,'Upload ảnh minh chứng','photo_upload'),('Nghiệm thu',3,'Pass/Fail nghiệm thu','approval'),
 ('Bàn giao',1,'Kiểm tra punch list đã đóng','checklist'),('Bàn giao',2,'Chuẩn bị biên bản bàn giao','document_upload'),('Bàn giao',3,'Khách hàng xác nhận','approval'),
-('Financial Closure',1,'Ghi nhận phải trả/phải thu','accounting_check'),('Financial Closure',2,'Đối chiếu thanh toán','accounting_check'),('Financial Closure',3,'Đóng tài chính công trình','approval')
+('Tài chính công trình',1,'Xác nhận chi phí mua vật tư','accounting_check'),('Tài chính công trình',2,'Kiểm tra đề nghị thu/chi đã xử lý','accounting_check'),('Tài chính công trình',3,'Đóng hồ sơ tài chính quản trị','approval')
 ) s(node_name, idx, step_name, step_type) ON s.node_name = n.name
 WHERE n.template_id = '40000000-0000-0000-0000-000000000001';
 
@@ -343,7 +381,7 @@ INSERT INTO pipeline_templates (
 VALUES (
   '40000000-0000-0000-0000-000000000020',
   '[Client] Workflow hoàn thiện công trình chính thức',
-  'Workflow chính thức từ vận hành thực tế của client: khảo sát, nhánh thiết kế/không thiết kế, BOQ, đầu vào bắt buộc, thi công, nghiệm thu, bàn giao và đóng tài chính.',
+  'Workflow chính thức từ vận hành thực tế của client: khảo sát, nhánh thiết kế/không thiết kế, BOQ, đầu vào bắt buộc, thi công, nghiệm thu, bàn giao và tài chính công trình.',
   'Hoàn thiện công trình',
   1,
   'published',
@@ -380,9 +418,9 @@ WITH node_seed(id, name, description, type, order_index, position_x, position_y,
     ('41400000-0000-0000-0000-000000000007'::uuid, 'Đàm phán giá', 'Đàm phán giá cùng với chủ đầu tư và các bộ phận liên quan.', 'budget_approval', 7, 1480, 260, '["PM","QS","Giám đốc","Kế toán"]'::jsonb, 'boq.approve', '["boq.view","boq.approve","accounting.budget_view"]'::jsonb, '{"text":"Đơn giá và định mức đã chốt"}'::jsonb, 'GĐ chốt báo cáo đơn giá', false, false, 'previous'),
     ('41400000-0000-0000-0000-000000000008'::uuid, 'Chốt Hợp đồng với chủ đầu tư', 'Lên báo giá, hợp đồng, pháp lý, ký duyệt và gửi bản cứng cho chủ đầu tư.', 'contract', 8, 1760, 260, '["PM","QS","Kế toán","Giám đốc","Chủ đầu tư"]'::jsonb, 'project.update', '["project.update","accounting.view"]'::jsonb, '{"text":"Hợp đồng và hồ sơ tạm ứng với chủ đầu tư đã ký/gửi"}'::jsonb, 'PM/GĐ ký duyệt hợp đồng', false, false, 'previous'),
     ('41400000-0000-0000-0000-000000000009'::uuid, 'QA & QC / Thi công', 'Họp phân công, chốt biên bản, đảm bảo chất lượng, kế hoạch thi công và báo cáo liên tục.', 'construction', 9, 2040, 260, '["PM","QS","Giám sát","QA/QC"]'::jsonb, 'operation.report', '["operation.view","operation.report","operation.issue_create"]'::jsonb, '{"text":"QA/QC và báo cáo thi công đã hoàn tất"}'::jsonb, 'PM/QA review thi công', true, true, 'rework'),
-    ('41400000-0000-0000-0000-000000000010'::uuid, 'Nghiệm thu Đầu Vào', 'Nghiệm thu thầu phụ/tổ đội/vật tư, kiểm tra khối lượng, hồ sơ thanh toán và thanh toán thầu phụ.', 'incoming_acceptance', 10, 2320, 260, '["QA/QC","QS","Kế toán","Giám đốc"]'::jsonb, 'acceptance.approve', '["acceptance.view","acceptance.create","acceptance.approve","accounting.payable_view"]'::jsonb, '{"text":"Nghiệm thu đầu vào và thanh toán thầu phụ đã kiểm tra"}'::jsonb, 'GĐ ký nghiệm thu hồ sơ thanh toán', true, true, 'rework'),
-    ('41400000-0000-0000-0000-000000000011'::uuid, 'Nghiệm thu Đầu Ra', 'Nghiệm thu công trình, hồ sơ nghiệm thu, quyết toán, hóa đơn và thanh toán với chủ đầu tư.', 'acceptance', 11, 2600, 260, '["QA/QC","QS","PM","Giám đốc","Kế toán"]'::jsonb, 'acceptance.approve', '["acceptance.view","acceptance.create","acceptance.approve","accounting.receivable_view"]'::jsonb, '{"text":"Nghiệm thu đầu ra, quyết toán và thanh toán chủ đầu tư đã ghi nhận"}'::jsonb, 'QA/QS/PM/GĐ ký nghiệm thu đầu ra', true, true, 'rework'),
-    ('41400000-0000-0000-0000-000000000012'::uuid, 'Kết thúc: Bàn giao + Đóng tài chính', 'Bàn giao, xuất hóa đơn đầu vào/đầu ra và đóng tài chính đầy đủ.', 'financial_closure', 12, 2880, 260, '["Kế toán","PM","Giám đốc"]'::jsonb, 'accounting.payment_approve', '["handover.view","handover.approve","accounting.view","accounting.payment_approve"]'::jsonb, '{"handover_included":true,"financial_closure_included":true,"text":"Bàn giao và đóng tài chính đã hoàn tất"}'::jsonb, 'Kế toán/GĐ xác nhận đóng tài chính', false, false, 'none')
+    ('41400000-0000-0000-0000-000000000010'::uuid, 'Nghiệm thu Đầu Vào', 'Nghiệm thu thầu phụ, tổ đội và vật tư; tập hợp hồ sơ nguồn cho đề nghị chi và ghi nhận chi phí mua vật tư.', 'incoming_acceptance', 10, 2320, 260, '["QA/QC","QS","Kế toán","Giám đốc"]'::jsonb, 'acceptance.approve', '["acceptance.view","acceptance.create","acceptance.approve","project_finance.view","project_finance.cost_create","project_finance.request_create"]'::jsonb, '{"text":"Nghiệm thu đầu vào và hồ sơ nguồn tài chính công trình đã hoàn tất"}'::jsonb, 'GĐ ký nghiệm thu hồ sơ nguồn', true, true, 'rework'),
+    ('41400000-0000-0000-0000-000000000011'::uuid, 'Nghiệm thu Đầu Ra', 'Nghiệm thu công trình, tập hợp hồ sơ quyết toán và lập đề nghị thu nội bộ theo mốc hợp đồng.', 'acceptance', 11, 2600, 260, '["QA/QC","QS","PM","Giám đốc","Kế toán"]'::jsonb, 'acceptance.approve', '["acceptance.view","acceptance.create","acceptance.approve","project_finance.view","project_finance.request_create"]'::jsonb, '{"text":"Nghiệm thu đầu ra và hồ sơ đề nghị thu đã hoàn tất"}'::jsonb, 'QA/QS/PM/GĐ ký nghiệm thu đầu ra', true, true, 'rework'),
+    ('41400000-0000-0000-0000-000000000012'::uuid, 'Kết thúc: Bàn giao + Tài chính công trình', 'Bàn giao công trình và xác nhận hồ sơ tài chính quản trị đã hoàn tất; nghiệp vụ kế toán chuyên môn thực hiện ngoài Consflow.', 'financial_closure', 12, 2880, 260, '["Kế toán","PM","Giám đốc"]'::jsonb, 'project_finance.view', '["handover.view","handover.approve","project_finance.view","project_finance.report_view"]'::jsonb, '{"handover_included":true,"financial_closure_included":true,"text":"Bàn giao và hồ sơ tài chính công trình đã hoàn tất"}'::jsonb, 'Kế toán và Giám đốc xác nhận hồ sơ quản trị', false, false, 'none')
 )
 INSERT INTO pipeline_template_nodes (
   id, template_id, name, description, type, order_index, position_x, position_y,
@@ -457,17 +495,17 @@ step_seed(id, node_id, order_index, name, description, step_type, roles, permiss
     ('41500000-0000-0000-0000-000000000039'::uuid,'41400000-0000-0000-0000-000000000010'::uuid,2,'Nghiệm thu vật tư đầu vào và đầu ra','Nghiệm thu vật tư đầu vào, đầu ra và đưa số liệu cho QS kiểm tra.','acceptance_check','["QA/QC","QS"]'::jsonb,'acceptance.create',true,false,false,'builtin_generic_submission',true),
     ('41500000-0000-0000-0000-000000000040'::uuid,'41400000-0000-0000-0000-000000000010'::uuid,3,'Lập hồ sơ kiểm tra khối lượng thầu phụ','Lập hồ sơ kiểm tra khối lượng thầu phụ và áp giá.','document_upload','["QS"]'::jsonb,'boq.update',true,true,false,'builtin_generic_submission',true),
     ('41500000-0000-0000-0000-000000000041'::uuid,'41400000-0000-0000-0000-000000000010'::uuid,4,'Rà soát và kiểm tra hồ sơ khối lượng thầu phụ','Giám đốc rà soát, kiểm tra hồ sơ khối lượng thầu phụ.','approval','["Giám đốc"]'::jsonb,'boq.approve',true,false,false,'builtin_generic_submission',true),
-    ('41500000-0000-0000-0000-000000000042'::uuid,'41400000-0000-0000-0000-000000000010'::uuid,5,'Lập hồ sơ thanh toán cho thầu phụ','Lập hồ sơ thanh toán cho thầu phụ.','document_upload','["QS","Kế toán"]'::jsonb,'accounting.payable_view',true,true,false,'builtin_generic_submission',true),
-    ('41500000-0000-0000-0000-000000000043'::uuid,'41400000-0000-0000-0000-000000000010'::uuid,6,'Ký nghiệm thu hồ sơ thanh toán','Giám đốc ký nghiệm thu hồ sơ thanh toán.','approval','["Giám đốc"]'::jsonb,'accounting.payable_approve',true,false,false,'builtin_generic_submission',true),
-    ('41500000-0000-0000-0000-000000000044'::uuid,'41400000-0000-0000-0000-000000000010'::uuid,7,'Kiểm tra hồ sơ thanh toán','Kế toán kiểm tra hồ sơ thanh toán.','accounting_check','["Kế toán"]'::jsonb,'accounting.payable_view',true,false,false,'builtin_generic_submission',true),
-    ('41500000-0000-0000-0000-000000000045'::uuid,'41400000-0000-0000-0000-000000000010'::uuid,8,'Thanh toán cho thầu phụ theo đợt','Thanh toán cho thầu phụ theo đợt.','accounting_check','["Kế toán"]'::jsonb,'accounting.payment_create',true,false,false,'builtin_generic_submission',true),
+    ('41500000-0000-0000-0000-000000000042'::uuid,'41400000-0000-0000-0000-000000000010'::uuid,5,'Lập hồ sơ đề nghị chi thầu phụ','Tập hợp hồ sơ nguồn và lập đề nghị chi nội bộ để cấp có thẩm quyền duyệt.','document_upload','["QS","Kế toán"]'::jsonb,'project_finance.request_create',true,true,false,'builtin_generic_submission',true),
+    ('41500000-0000-0000-0000-000000000043'::uuid,'41400000-0000-0000-0000-000000000010'::uuid,6,'Duyệt đề nghị chi','Giám đốc kiểm tra hồ sơ nguồn và duyệt đề nghị chi nội bộ.','approval','["Giám đốc"]'::jsonb,'project_finance.request_approve',true,false,false,'builtin_generic_submission',true),
+    ('41500000-0000-0000-0000-000000000044'::uuid,'41400000-0000-0000-0000-000000000010'::uuid,7,'Kiểm tra hồ sơ đề nghị chi','Kiểm tra đủ hợp đồng, nghiệm thu, giá trị đề nghị và chứng từ nguồn trước khi bàn giao Kế toán.','accounting_check','["Kế toán"]'::jsonb,'project_finance.view',true,false,false,'builtin_generic_submission',true),
+    ('41500000-0000-0000-0000-000000000045'::uuid,'41400000-0000-0000-0000-000000000010'::uuid,8,'Bàn giao hồ sơ chi cho Kế toán','Bàn giao hồ sơ đã duyệt để Kế toán xử lý trên hệ thống chuyên môn; Consflow chỉ theo dõi trạng thái hồ sơ.','accounting_check','["Kế toán"]'::jsonb,'project_finance.process',true,false,false,'builtin_generic_submission',true),
     ('41500000-0000-0000-0000-000000000046'::uuid,'41400000-0000-0000-0000-000000000011'::uuid,1,'Nghiệm thu và ký duyệt công trình','Nghiệm thu và ký duyệt công trình.','acceptance_check','["QA/QC","QS","PM","Giám đốc"]'::jsonb,'acceptance.approve',true,false,false,'builtin_generic_submission',true),
     ('41500000-0000-0000-0000-000000000047'::uuid,'41400000-0000-0000-0000-000000000011'::uuid,2,'Ký duyệt hồ sơ nghiệm thu','Giám đốc ký duyệt hồ sơ nghiệm thu.','approval','["Giám đốc"]'::jsonb,'acceptance.approve',true,false,false,'builtin_generic_submission',true),
-    ('41500000-0000-0000-0000-000000000048'::uuid,'41400000-0000-0000-0000-000000000011'::uuid,3,'Lập hồ sơ thanh toán, quyết toán và ký duyệt','Lập hồ sơ thanh toán, quyết toán và ký duyệt giữa các bên.','document_upload','["Kế toán","QS","PM","Giám đốc"]'::jsonb,'accounting.receivable_view',true,true,false,'builtin_generic_submission',true),
-    ('41500000-0000-0000-0000-000000000049'::uuid,'41400000-0000-0000-0000-000000000011'::uuid,4,'Xuất hóa đơn cho chủ đầu tư','Xuất hóa đơn cho chủ đầu tư.','accounting_check','["Kế toán"]'::jsonb,'accounting.receivable_approve',true,false,false,'builtin_generic_submission',true),
-    ('41500000-0000-0000-0000-000000000050'::uuid,'41400000-0000-0000-0000-000000000011'::uuid,5,'Ghi nhận thanh toán từ chủ đầu tư theo từng kỳ','Ghi nhận thanh toán từ chủ đầu tư theo từng kỳ.','accounting_check','["Kế toán"]'::jsonb,'accounting.payment_create',true,false,false,'builtin_generic_submission',true),
-    ('41500000-0000-0000-0000-000000000051'::uuid,'41400000-0000-0000-0000-000000000012'::uuid,1,'Ghi nhận hóa đơn thầu phụ xuất về công ty','Ghi nhận hóa đơn thầu phụ xuất về công ty.','accounting_check','["Kế toán"]'::jsonb,'accounting.payable_view',true,false,false,'builtin_generic_submission',true),
-    ('41500000-0000-0000-0000-000000000052'::uuid,'41400000-0000-0000-0000-000000000012'::uuid,2,'Ghi nhận hóa đơn xuất cho chủ đầu tư và đóng tài chính','Ghi nhận hóa đơn xuất cho chủ đầu tư và đóng tài chính.','accounting_check','["Kế toán","Giám đốc"]'::jsonb,'accounting.payment_approve',true,false,false,'builtin_generic_submission',true)
+    ('41500000-0000-0000-0000-000000000048'::uuid,'41400000-0000-0000-0000-000000000011'::uuid,3,'Lập hồ sơ đề nghị thu từ chủ đầu tư','Tập hợp nghiệm thu, mốc hợp đồng và lập hồ sơ đề nghị thu nội bộ.','document_upload','["Kế toán","QS","PM","Giám đốc"]'::jsonb,'project_finance.request_create',true,true,false,'builtin_generic_submission',true),
+    ('41500000-0000-0000-0000-000000000049'::uuid,'41400000-0000-0000-0000-000000000011'::uuid,4,'Bàn giao hồ sơ phát hành hóa đơn đầu ra','Bàn giao hồ sơ đủ điều kiện cho Kế toán phát hành hóa đơn trên hệ thống chuyên môn.','accounting_check','["Kế toán"]'::jsonb,'project_finance.process',true,false,false,'builtin_generic_submission',true),
+    ('41500000-0000-0000-0000-000000000050'::uuid,'41400000-0000-0000-0000-000000000011'::uuid,5,'Theo dõi hồ sơ thu theo kỳ','Theo dõi tình trạng bàn giao và xử lý hồ sơ thu theo từng mốc của hợp đồng.','accounting_check','["Kế toán"]'::jsonb,'project_finance.view',true,false,false,'builtin_generic_submission',true),
+    ('41500000-0000-0000-0000-000000000051'::uuid,'41400000-0000-0000-0000-000000000012'::uuid,1,'Ghi nhận chi phí mua vật tư công trình','Nhập giá trị mua vật tư theo hồ sơ nguồn; chỉ chi phí đã xác nhận mới lên báo cáo quản trị.','accounting_check','["Kế toán"]'::jsonb,'project_finance.cost_create',true,false,false,'builtin_generic_submission',true),
+    ('41500000-0000-0000-0000-000000000052'::uuid,'41400000-0000-0000-0000-000000000012'::uuid,2,'Xác nhận hoàn tất hồ sơ tài chính quản trị','Kiểm tra đề nghị thu/chi và chi phí vật tư đã được xử lý trước khi đánh giá đủ điều kiện đóng công trình.','accounting_check','["Kế toán","Giám đốc"]'::jsonb,'project_finance.report_view',true,false,false,'builtin_generic_submission',true)
 )
 INSERT INTO pipeline_template_steps (
   id, node_id, name, description, step_type, required_role_ids, required_permission,
@@ -668,10 +706,10 @@ INSERT INTO pipeline_templates (
 INSERT INTO pipeline_template_nodes (id, template_id, name, description, type, order_index, position_x, position_y, responsible_role_ids, required_permission, exit_conditions, approval_rule, rework_enabled, replanning_enabled, fail_path, permissions) VALUES
 ('41100000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000010','Khảo sát & Planning','Thu thập hiện trạng, checklist, daily report planning và biên bản họp.','survey',1,80,120,'["Giám sát","PM"]','planning.edit','{"text":"Có ảnh, checklist, daily report và biên bản họp"}','PM duyệt planning',false,true,'previous','["planning.edit"]'),
 ('41100000-0000-0000-0000-000000000002','40000000-0000-0000-0000-000000000010','Thiết kế & Xác nhận','Upload bản vẽ, review thiết kế và lấy xác nhận khách hàng.','design',2,360,120,'["PM","Chủ đầu tư"]','planning.edit','{"text":"Bản vẽ và xác nhận khách hàng đã đủ"}','Chủ đầu tư xác nhận',false,true,'replanning','["planning.edit"]'),
-('41100000-0000-0000-0000-000000000003','40000000-0000-0000-0000-000000000010','BOQ · Mua sắm · Kho','Kiểm tra ngân sách, vật tư và nghiệm thu đầu vào.','procurement',3,640,120,'["QS","Mua hàng","Thủ kho"]','procurement.approve','{"text":"Ngân sách và vật tư đầu vào đã kiểm tra"}','PM + Kế toán duyệt',false,false,'previous','["boq.update","procurement.approve","warehouse.receive"]'),
+('41100000-0000-0000-0000-000000000003','40000000-0000-0000-0000-000000000010','BOQ · Mua sắm · Kho','Kiểm tra kế hoạch mua vật tư và nghiệm thu đầu vào.','procurement',3,640,120,'["QS","Mua hàng","Thủ kho"]','procurement.approve','{"text":"Kế hoạch mua và vật tư đầu vào đã kiểm tra"}','PM + Giám đốc duyệt',false,false,'previous','["boq.update","procurement.approve","warehouse.receive"]'),
 ('41100000-0000-0000-0000-000000000004','40000000-0000-0000-0000-000000000010','Thi công','Thi công, nhật ký, vật tư trước/sau và đối chiếu thầu phụ.','construction',4,920,120,'["Giám sát","Đội thi công","Thầu phụ"]','operation.report','{"text":"Nhật ký, vật tư và đối chiếu thầu phụ đã ghi nhận"}','PM review',true,true,'rework','["operation.report"]'),
 ('41100000-0000-0000-0000-000000000005','40000000-0000-0000-0000-000000000010','Nghiệm thu & Bàn giao','Nghiệm thu đầu ra, evidence nghiệm thu, vật tư dư, rework và bàn giao.','handover',5,1200,120,'["QA/QC","PM","Chủ đầu tư"]','handover.approve','{"text":"Nghiệm thu và bàn giao đủ hồ sơ"}','Chủ đầu tư xác nhận',true,true,'rework','["acceptance.approve","handover.approve"]'),
-('41100000-0000-0000-0000-000000000006','40000000-0000-0000-0000-000000000010','Tài chính & Công nợ','Kiểm tra kế toán, hóa đơn, lịch thanh toán và phê duyệt đóng tài chính.','financial_closure',6,1480,120,'["Kế toán","Giám đốc"]','accounting.payment_approve','{"text":"Payable/receivable đã đối soát"}','Giám đốc duyệt',false,false,'none','["accounting.payment_approve"]');
+('41100000-0000-0000-0000-000000000006','40000000-0000-0000-0000-000000000010','Tài chính công trình','Kiểm tra chi phí vật tư, đề nghị thu/chi và số liệu quản trị trước khi đóng công trình.','financial_closure',6,1480,120,'["Kế toán","Giám đốc"]','project_finance.view','{"text":"Hồ sơ tài chính công trình đã hoàn tất"}','Kế toán + Giám đốc xác nhận',false,false,'none','["project_finance.view","project_finance.report_view"]');
 
 WITH step_seed(id, node_name, order_index, name, step_type, roles, permission_key, checklist_required, document_required, photo_required, form_code, form_version_no, form_required, description) AS (
   VALUES
@@ -685,7 +723,7 @@ WITH step_seed(id, node_name, order_index, name, step_type, roles, permission_ke
     ('41200000-0000-0000-0000-000000000008','Thiết kế & Xác nhận',1,'Upload bản vẽ thiết kế','document_upload','["PM"]'::jsonb,'planning.edit',false,true,false,NULL::text,NULL::integer,false,'Upload PDF/bản vẽ thiết kế.'),
     ('41200000-0000-0000-0000-000000000009','Thiết kế & Xác nhận',2,'Review phương án thiết kế','design_review','["PM"]'::jsonb,'planning.edit',true,false,false,'builtin_generic_submission',1,true,'Review phương án bằng generic submission.'),
     ('41200000-0000-0000-0000-000000000010','Thiết kế & Xác nhận',3,'Khách hàng xác nhận thiết kế','approval','["Chủ đầu tư","PM"]'::jsonb,'handover.approve',true,false,false,'builtin_owner_client_checklist',1,true,'Xác nhận bên ngoài bởi chủ đầu tư/khách hàng.'),
-    ('41200000-0000-0000-0000-000000000011','BOQ · Mua sắm · Kho',1,'Kiểm tra ngân sách','budget_check','["QS","Kế toán"]'::jsonb,'accounting.budget_approve',true,false,false,'builtin_generic_submission',1,true,'Budget check.'),
+    ('41200000-0000-0000-0000-000000000011','BOQ · Mua sắm · Kho',1,'Duyệt kế hoạch mua vật tư','budget_check','["QS","PM","Giám đốc"]'::jsonb,'procurement.approve',true,false,false,'builtin_generic_submission',1,true,'Kiểm tra giá trị mua vật tư dự kiến trước khi đặt hàng.'),
     ('41200000-0000-0000-0000-000000000012','BOQ · Mua sắm · Kho',2,'Kiểm tra nhu cầu vật tư','material_check','["Mua hàng","Thủ kho"]'::jsonb,'warehouse.view',false,false,false,NULL::text,NULL::integer,false,'Material check.'),
     ('41200000-0000-0000-0000-000000000013','BOQ · Mua sắm · Kho',3,'Nghiệm thu đầu vào vật tư','material_check','["Thủ kho","QA/QC"]'::jsonb,'warehouse.receive',false,false,false,NULL::text,NULL::integer,false,'Incoming acceptance panel.'),
     ('41200000-0000-0000-0000-000000000014','Thi công',1,'Nhật ký thi công','daily_report','["Giám sát"]'::jsonb,'operation.report',true,false,false,'builtin_construction_daily_report',1,true,'Construction daily report.'),
@@ -696,9 +734,9 @@ WITH step_seed(id, node_name, order_index, name, step_type, roles, permission_ke
     ('41200000-0000-0000-0000-000000000019','Nghiệm thu & Bàn giao',3,'Xử lý vật tư dư','material_check','["Thủ kho"]'::jsonb,'warehouse.surplus_handle',false,false,false,NULL::text,NULL::integer,false,'Surplus handling.'),
     ('41200000-0000-0000-0000-000000000020','Nghiệm thu & Bàn giao',4,'Đối chiếu chủ đầu tư / Bàn giao','handover_check','["PM","Chủ đầu tư"]'::jsonb,'handover.approve',true,false,false,'builtin_owner_client_checklist',1,true,'Owner/client reconciliation, signature, PDF.'),
     ('41200000-0000-0000-0000-000000000021','Nghiệm thu & Bàn giao',5,'Rework sau nghiệm thu','rework_task','["Đội thi công"]'::jsonb,'rework.create',false,false,false,NULL::text,NULL::integer,false,'Rework task.'),
-    ('41200000-0000-0000-0000-000000000022','Tài chính & Công nợ',1,'Kiểm tra kế toán','accounting_check','["Kế toán"]'::jsonb,'accounting.view',true,false,false,'builtin_generic_submission',1,true,'Accounting check.'),
-    ('41200000-0000-0000-0000-000000000023','Tài chính & Công nợ',2,'Giám đốc duyệt đóng tài chính','approval','["Giám đốc"]'::jsonb,'accounting.payment_approve',true,false,false,'builtin_generic_submission',1,true,'Internal approval.'),
-    ('41200000-0000-0000-0000-000000000024','Tài chính & Công nợ',3,'Cập nhật tổng hợp project','task','["PM"]'::jsonb,'project.update',true,false,false,'builtin_generic_submission',1,true,'Task/generic submission.')
+    ('41200000-0000-0000-0000-000000000022','Tài chính công trình',1,'Kiểm tra hồ sơ tài chính công trình','accounting_check','["Kế toán"]'::jsonb,'project_finance.cost_review',true,false,false,'builtin_generic_submission',1,true,'Kiểm tra chi phí vật tư và trạng thái đề nghị thu/chi đã bàn giao.'),
+    ('41200000-0000-0000-0000-000000000023','Tài chính công trình',2,'Giám đốc duyệt đóng hồ sơ tài chính công trình','approval','["Giám đốc"]'::jsonb,'project_finance.request_approve',true,false,false,'builtin_generic_submission',1,true,'Giám đốc xác nhận hồ sơ quản trị đủ điều kiện đóng công trình.'),
+    ('41200000-0000-0000-0000-000000000024','Tài chính công trình',3,'Cập nhật tổng hợp công trình','task','["PM"]'::jsonb,'project.update',true,false,false,'builtin_generic_submission',1,true,'Cập nhật báo cáo quản trị công trình.')
 ),
 form_versions AS (
   SELECT t.code, v.version_no, v.id AS version_id
@@ -1176,5 +1214,20 @@ VALUES
 
 INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_type, target_id, description, metadata_json) VALUES
 ('30000000-0000-0000-0000-000000000010','10000000-0000-0000-0000-000000000001','Admin hệ thống','seed_full_workflow_demo','project','30000000-0000-0000-0000-000000000010','Seed demo project covering all current work item types and forms','{"template_id":"40000000-0000-0000-0000-000000000010","work_items":24,"workflow_form_instances":16}'::jsonb);
+
+INSERT INTO project_material_costs (
+  id,project_id,procurement_request_id,document_id,vendor_partner_id,vendor_name,invoice_number,invoice_date,
+  description,amount_before_vat,vat_amount,total_amount,recognized_cost_amount,notes,status,created_by,
+  submitted_by,submitted_at,reviewed_by,reviewed_at
+) VALUES
+('86000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','60000000-0000-0000-0000-000000000010','46000000-0000-0000-0000-000000000003','90000000-0000-0000-0000-000000000101','Cadivi','CPVT-FULL-001','2026-06-28','Mua dây điện cho khu A',100000000,10000000,110000000,110000000,'Chi phí vật tư quản trị đã xác nhận.','confirmed','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000004',now()-INTERVAL '2 day','10000000-0000-0000-0000-000000000004',now()-INTERVAL '1 day'),
+('86000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000010','60000000-0000-0000-0000-000000000010',NULL,'90000000-0000-0000-0000-000000000101','Cadivi','CPVT-FULL-002',CURRENT_DATE,'Mua bổ sung thiết bị điện',40000000,4000000,44000000,0,'Chờ xác nhận hồ sơ nguồn.','submitted','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000004',now(),NULL,NULL);
+
+INSERT INTO project_cash_requests (
+  id,project_id,request_code,direction,title,counterparty_name,amount,due_date,source_type,source_id,notes,status,created_by,
+  submitted_by,submitted_at,approved_by,approved_at,handed_to_accounting_by,handed_to_accounting_at
+) VALUES
+('86100000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000010','DNC-FULL-001','outbound','Đề nghị chi tiền mua dây điện','Cadivi',110000000,CURRENT_DATE+INTERVAL '2 day','procurement_request','60000000-0000-0000-0000-000000000010','Đã bàn giao Kế toán xử lý trên MISA.','handed_to_accounting','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000004',now()-INTERVAL '2 day','10000000-0000-0000-0000-000000000007',now()-INTERVAL '1 day','10000000-0000-0000-0000-000000000004',now()),
+('86100000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000010','DNT-FULL-001','inbound','Đề nghị thu theo nghiệm thu khu A','Công ty An Phát',420000000,CURRENT_DATE+INTERVAL '7 day','acceptance','71000000-0000-0000-0000-000000000010','Chờ Giám đốc duyệt trước khi bàn giao.','submitted','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000004',now(),NULL,NULL,NULL,NULL);
 
 SELECT backfill_accounting_ledger();

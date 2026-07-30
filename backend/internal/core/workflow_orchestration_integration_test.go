@@ -785,9 +785,29 @@ func TestOfficialWorkflowRevisionTwoWordingAndRoles(t *testing.T) {
 		{"42500000-0000-0000-0000-000000000038", "Nghiệm thu thầu phụ và tổ đội"},
 		{"42500000-0000-0000-0000-000000000039", "Nghiệm thu vật tư đầu vào và đầu ra"},
 		{"42500000-0000-0000-0000-000000000040", "Lập hồ sơ kiểm tra khối lượng thầu phụ"},
-		{"42500000-0000-0000-0000-000000000042", "Lập hồ sơ thanh toán cho thầu phụ"},
-		{"42500000-0000-0000-0000-000000000045", "Thanh toán cho thầu phụ theo đợt"},
-		{"42500000-0000-0000-0000-000000000051", "Ghi nhận hóa đơn thầu phụ xuất về công ty"},
+		{"42500000-0000-0000-0000-000000000042", "Lập hồ sơ đề nghị chi thầu phụ"},
+		{"42500000-0000-0000-0000-000000000045", "Bàn giao hồ sơ chi cho Kế toán"},
+		{"42500000-0000-0000-0000-000000000051", "Ghi nhận chi phí mua vật tư công trình"},
+	}
+	projectFinanceSteps := []struct {
+		stepID     string
+		name       string
+		permission string
+	}{
+		{"42500000-0000-0000-0000-000000000043", "Duyệt đề nghị chi", "project_finance.request_approve"},
+		{"42500000-0000-0000-0000-000000000044", "Kiểm tra hồ sơ đề nghị chi", "project_finance.view"},
+		{"42500000-0000-0000-0000-000000000048", "Lập hồ sơ đề nghị thu từ chủ đầu tư", "project_finance.request_create"},
+		{"42500000-0000-0000-0000-000000000049", "Bàn giao hồ sơ phát hành hóa đơn đầu ra", "project_finance.process"},
+		{"42500000-0000-0000-0000-000000000050", "Theo dõi hồ sơ thu theo kỳ", "project_finance.view"},
+		{"42500000-0000-0000-0000-000000000052", "Xác nhận hoàn tất hồ sơ tài chính quản trị", "project_finance.report_view"},
+	}
+	for _, tc := range projectFinanceSteps {
+		assertCount(t, db, `
+			SELECT COUNT(*)
+			FROM pipeline_template_steps step
+			JOIN pipeline_template_nodes node ON node.id=step.node_id
+			WHERE node.template_id=$1 AND step.id=$2 AND step.name=$3 AND step.required_permission=$4
+		`, 1, templateID, tc.stepID, tc.name, tc.permission)
 	}
 	for _, tc := range explicitEntityCases {
 		assertCount(t, db, `

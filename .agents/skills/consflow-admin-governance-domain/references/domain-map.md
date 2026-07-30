@@ -23,7 +23,7 @@
 - `auth_sessions`
 - `partners`
 - `system_settings`, `audit_logs`
-- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, accounting RBAC additions in `V73`
+- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, and project-finance boundary/RBAC in `V83`
 
 ## Invariants
 
@@ -34,14 +34,14 @@
 - Activity reply/reaction/edit/withdraw endpoints remain protected and reuse `ActivityVisibleToUser`; edit/withdraw additionally require exact author ownership, activity type `comment`, an unwithdrawn row and the 15-minute server window. UI capability flags never replace backend enforcement, managers receive no override, and no new global permission is introduced.
 - Frontend navigation and row actions mirror permissions but do not replace backend enforcement.
 - My Work list/detail capabilities and `available_actions` are actor-specific presentation hints only. `pending_approval` must retain requester separation, required decision roles and project scope; department includes role scope; the authenticated SSE exposes invalidation-only `work_queue_changed` rather than unverified work-item metadata. No new global permission or manager override is introduced.
-- Reports navigation is visible for any of `report.view`, `report.finance.view`, or `accounting.view`, but its catalog filters each report independently. Finance-only actors do not trigger operational report APIs, operational-only actors do not trigger finance APIs, and backend handlers remain authoritative.
+- Ordinary Reports navigation requires `report.view` and exposes only operational catalog entries. `Tài chính công trình` is separately gated by `project_finance.view`; its management totals/export require `project_finance.report_view`. Legacy `report.finance.view`/`accounting.*` are removed from every non-admin role by V83 and seed parity.
 - Staff report is a project-allocation view: only active staff memberships in accessible non-cancelled projects are returned and distinct accessible projects are counted. Full-company staff is available only through the `staff.view` Staff module.
 - `project.member.manage` is granted to Admin/Director/PM and always combined with project scope. Project member responses expose server capabilities; mutation synchronizes only project-scoped `user_roles`, never removes global roles, never exposes Admin/Director as assignable project roles, and writes project audit.
 - Partner catalog updates preserve downstream snapshots for historical documents.
 - Session refresh/revoke lifecycle remains DB-backed and revocable.
 - `AuthSessionActive` is never cached: immediate session revoke remains authoritative even when Redis supplies distributed rate limiting and SSE Pub/Sub.
 - V68 adds the system roles `Thiết kế`, `Sale`, `Pháp lý` with the minimum permission sets needed by their official-workflow steps and grants existing `Đội thi công` pipeline/planning access. The migration does not auto-assign users or project memberships and does not broaden existing runtime role snapshots.
-- Accounting ledger permissions are independent capability gates: `accounting.journal_view`, `accounting.journal_post`, `accounting.journal_reverse`, `accounting.period_close`, `accounting.period_reopen`, `accounting.tax_view`, and `accounting.tax_manage`. Seed parity grants the accountant all seven; Director receives read/reversal/period/tax visibility but not manual posting or tax master-data management. Every record action still combines the permission with project scope.
+- Project-finance permissions are independent capability gates: view, material-cost create/review, cash-request create/approve/process, and management report view. Accounting owns capture/review/handoff processing, Director owns cash-request approval/reporting, and all actions still combine permission with project scope. Legacy ledger/tax permissions remain admin-only historical support.
 - Manual posting, source posting, reversal, period close/reopen and migration-reconciliation resolution write actor/time/reason audit in the same transaction. Reconciliation resolution is one-way: a second resolution returns conflict and cannot overwrite the original conclusion.
 
 ## Cross-Domain Checks

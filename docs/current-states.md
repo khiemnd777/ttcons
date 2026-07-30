@@ -1,5 +1,24 @@
 # Current States
 
+## [Active] Project Finance Management Refactor
+
+### Will be done
+
+- No mandatory implementation or verification work remains. Keep this completed plan in active memory until the user explicitly asks to close it.
+
+### Done
+
+- Confirmed the business boundary: MISA remains the professional accounting/tax/double-entry system; Consflow does not integrate with MISA and does not duplicate professional books, VAT declarations, accounting periods, or journal correction workflows.
+- Completed the required local mapping bootstrap, cross-domain impact review, evidence review, API/UI architecture, Mockup as Text, and received explicit approval of implementation points 1–7.
+- Selected separate `project_material_costs` and `project_cash_requests` management sources so legacy payments, invoices, journals, ledgers, and accounting-period data remain historical and isolated from the new management report.
+- Implemented V83 schema constraints, project-finance RBAC, future-template wording and non-destructive legacy permission isolation; active/historical pipeline runs are not rewritten.
+- Implemented source-validated/audit-atomic material-cost and internal cash-request lifecycles, permission-redacted management summary, same-source CSV export, and handover readiness based on confirmed costs plus processed requests.
+- Replaced ordinary global/project Accounting routes and navigation with the five-tab `Tài chính công trình` workspace; removed professional finance panels from the normal Reports catalog and rerouted finance work items/handover blockers.
+- Added responsive create/detail/confirmation UI, mandatory reasons for `Yêu cầu bổ sung`, explicit external-system handoff wording, demo data, shared types/statuses and regression coverage.
+- Browser UAT exposed and closed two in-scope usability defects: the action-heavy header compressed its purpose text at 1280px and global project context was lost on reload. The finance header now stays stacked until `2xl`, the shared selector has an accessible label, and `/accounting` persists its selected project in the `project` query parameter.
+- Latest-source verification passed: frontend tests 31/31, production build, bundle budget (entry 120.1 KiB gzip; project-finance chunk 7.6 KiB gzip), full backend suite on an isolated PostgreSQL database, custom migration/complete Golden seed validation, Docker rebuild/restart and `/api/health`.
+- Browser UAT on the rebuilt source completed the real Golden Project flow across `Ngân Kế Toán` and `Hoàng Long`: create/submit/confirm material cost, report/provisional-profit update, create/submit/approve/handoff/process cash request, required correction reason, role-separated actions, CSV success feedback and a clean task queue. Desktop 1280px and mobile 390×844 had no document-level horizontal overflow; mobile tabs use contained horizontal scrolling, dialogs fit the viewport, selected project survives reload, and console warnings/errors were zero. Scenario-based heuristic UX rating: 8.8/10; this is not a human usability study.
+
 ## [Active] Reliable CTGS Tooltip Regression Fix
 
 ### Will be done

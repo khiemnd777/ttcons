@@ -370,6 +370,13 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg c
 	protected.Post("/accounting/reconciliation-issues/:id/resolve", h.ResolveAccountingBackfillIssue)
 	protected.Post("/projects/:id/accounting/journal-entries", h.CreateAccountingJournal)
 	protected.Post("/accounting/journal-entries/:id/reverse", h.ReverseAccountingJournal)
+	protected.Get("/projects/:id/project-finance", h.ProjectFinanceWorkspace)
+	protected.Get("/projects/:id/project-finance/options", h.ProjectFinanceOptions)
+	protected.Get("/projects/:id/project-finance/export", h.ProjectFinanceCSV)
+	protected.Post("/projects/:id/project-finance/material-costs", h.CreateProjectMaterialCost)
+	protected.Post("/projects/:id/project-finance/cash-requests", h.CreateProjectCashRequest)
+	protected.Post("/project-finance/material-costs/:id/:action", h.ProjectMaterialCostAction)
+	protected.Post("/project-finance/cash-requests/:id/:action", h.ProjectCashRequestAction)
 
 	protected.Get("/staff", h.ListStaff)
 	protected.Post("/staff", h.CreateStaff)

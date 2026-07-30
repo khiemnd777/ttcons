@@ -14,10 +14,7 @@ test('report catalog only exposes operational reports to report viewers', () => 
   );
 });
 
-test('report catalog exposes finance reports to finance or accounting viewers', () => {
-  assert.deepEqual(
-    visibleReportDefinitions(permissionCheck(['report.finance.view'])).map((report) => report.key),
-    ['profit', 'cashflow', 'tax', 'accounting'],
-  );
-  assert.equal(reportPath('profit'), '/reports/profit');
+test('professional accounting reports are not exposed in the ordinary report catalog', () => {
+  assert.deepEqual(visibleReportDefinitions(permissionCheck(['report.finance.view'])), []);
+  assert.equal(reportPath('projects'), '/reports/projects');
 });

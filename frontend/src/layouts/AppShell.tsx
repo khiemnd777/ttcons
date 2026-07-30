@@ -35,8 +35,8 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { to: '/progress', label: 'Tiến trình', icon: Kanban, permissions: ['project.view'] },
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
       { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
-      { to: '/reports', label: 'Báo cáo', icon: BarChart3, permissions: ['report.view', 'report.finance.view', 'accounting.view'] },
-      { to: '/accounting', label: 'Kế toán', icon: Calculator, permissions: ['accounting.view'] },
+      { to: '/reports', label: 'Báo cáo', icon: BarChart3, permissions: ['report.view'] },
+      { to: '/accounting', label: 'Tài chính công trình', icon: Calculator, permissions: ['project_finance.view'] },
     ],
   },
   {

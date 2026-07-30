@@ -2,6 +2,7 @@
 
 ## Owners
 
+- Ordinary project-finance report: `frontend/src/modules/project-finance/ProjectFinancePage.tsx`; backend `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`.
 - Frontend modules: `frontend/src/modules/dashboard`, `frontend/src/modules/reports`, `frontend/src/modules/accounting/AccountingBooksPanel.tsx`, `frontend/src/modules/accounting/CashflowPanel.tsx`
 - Report workspace/panels: `ReportsPage.tsx`, `reportRegistry.ts`, `ReportFilters.tsx`, `OperationalReportPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`, `CashflowPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
@@ -10,6 +11,7 @@
 
 ## Routes
 
+- Project-management finance: `/projects/:id/project-finance` and `/projects/:id/project-finance/export`.
 - Dashboard: `/reports/dashboard`
 - Report options: `/reports/options` returns only non-cancelled projects inside actor scope.
 - Operational reports: `/reports/projects`, `/reports/warehouse`, `/reports/procurement`, `/reports/accounting`, `/reports/staff`; each accepts optional `project_id` and has a matching `/export` route.
@@ -27,6 +29,9 @@
 
 ## Invariants
 
+- Ordinary `/reports` catalog exposes project, procurement, warehouse and staff reports only. Legacy accounting/cashflow/tax/profit APIs stay available for admin/history support but their panels are not registered for normal users.
+- Project-management finance reporting lives under `Tài chính công trình`: eligible main-client milestone revenue, confirmed material-purchase cost and provisional profit. The UI/API must carry the incomplete-cost-scope warning and redact management monetary totals without `project_finance.report_view`.
+- Project-finance CSV serializes the same material-cost rows returned by the workspace; it must not query legacy AP/AR/payment/invoice/ledger tables as a substitute.
 - Report APIs enforce project/user visibility.
 - Frontend routes `/reports` and `/reports/:reportKey` expose only catalog entries allowed by `report.view`, `report.finance.view`, or `accounting.view`; the base/invalid/unavailable key redirects to the first visible report. Exactly one report panel is lazy-loaded and mounted, so hidden reports do not issue API reads.
 - `/reports/options`, list results and CSV exports use the same actor project scope. A selected `project_id` is UUID-validated at the handler boundary; the service performs the single authoritative project-permission check before repository filtering, avoiding a duplicate DB permission waterfall without weakening RBAC.

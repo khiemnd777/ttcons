@@ -7,7 +7,7 @@
 - Frontend routes: `frontend/src/app/router.tsx`
 - Frontend modules: `frontend/src/modules/pipeline-builder`, `frontend/src/modules/planning`, `frontend/src/modules/workflow-forms`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
 - Shared frontend contracts: `frontend/src/lib/api/client.ts`, `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
-- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`, `V70`, `V71`
+- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`, `V70`, `V71`, `V83`
 
 ## Routes
 
@@ -46,7 +46,7 @@
 - Engine v2 steps snapshot `surface_kind` and `domain_action_key`; work-item UI must route by this contract before any legacy text heuristic.
 - Official contract steps 24 and 29-31/33 use `surface_kind='contract'`; step 32 remains the approval surface. Pending runtime steps receive the new surface/permission snapshot, while completed historical steps are not rewritten.
 - Official quality steps 36-37 use `surface_kind='quality'` with `quality.create` and `quality.recurring_manage`; only pending runtime steps receive the new surface/permission snapshot.
-- Official finance steps 42, 44-45, 48-51 use `surface_kind='finance'`; closing step 52 uses `surface_kind='handover'`. Only pending runtime steps are remapped and their configured business form/PDF remains a supporting tab.
+- Official finance-management steps 42-45 and 48-52 use `project_finance.*` permissions and user-facing wording for internal cash-request handoff, material-cost capture and management closure. V83 updates future reusable template definitions only; it does not rewrite active/historical `pipeline_run_steps`, work items, answers, approvals, audit records or PDF artifacts. The finance primary surface routes future work to Tài chính công trình while any configured form/PDF remains supporting evidence.
 - Submitting `builtin_construction_daily_report` invokes an idempotent operations-ledger bridge in the same transaction before workflow completion payload is persisted.
 - The operations timeline consumes that bridge's structured daily-report answers without changing workflow completion semantics. Direct manual reports use their own typed create/update and report-evidence-upload contract, but still do not create work items, workflow form instances, approvals or completion events; new files remain normal work-item evidence. Any report with `workflow_form_instance_id` is read-only in Operations and rejects direct update/upload, preserving the source form as authoritative. Legacy summary rows remain readable. Outgoing work-item acceptance and the project acceptance workspace share `AcceptanceEditor.tsx`, while form/signature/PDF gates and work-item action permissions remain authoritative.
 - Engine v2 hard `domain_action_key` automation runs before work-item completion. Blocked/failed outcomes are recorded idempotently and leave the work item incomplete; display-name dispatch remains legacy-only.

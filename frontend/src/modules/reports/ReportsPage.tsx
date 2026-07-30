@@ -18,9 +18,6 @@ import {
   visibleReportDefinitions,
 } from './reportRegistry';
 
-const ProfitReportPanel = lazy(() => import('./ProfitReportPanel').then((module) => ({ default: module.ProfitReportPanel })));
-const TaxReportPanel = lazy(() => import('./TaxReportPanel').then((module) => ({ default: module.TaxReportPanel })));
-const CashflowPanel = lazy(() => import('../accounting/CashflowPanel').then((module) => ({ default: module.CashflowPanel })));
 const OperationalReportPanel = lazy(() => import('./OperationalReportPanel').then((module) => ({ default: module.OperationalReportPanel })));
 
 export function ReportsPage() {
@@ -78,7 +75,7 @@ export function ReportsPage() {
         <aside className="hidden lg:block">
           <div className="sticky top-20 rounded-lg border border-line bg-white p-3 shadow-panel">
             <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Danh mục báo cáo</p>
-            {(['finance', 'operations', 'resources'] as ReportGroup[]).map((group) => {
+            {(['operations', 'resources'] as ReportGroup[]).map((group) => {
               const reports = visibleReports.filter((report) => report.group === group);
               if (!reports.length) return null;
               return (
@@ -126,15 +123,9 @@ export function ReportsPage() {
 }
 
 function ActiveReport({ reportKey, projectOptions }: { reportKey: ReportKey; projectOptions: ReportOptions['projects'] }) {
-  let panel;
-  if (reportKey === 'profit') panel = <ProfitReportPanel projectOptions={projectOptions} />;
-  else if (reportKey === 'cashflow') panel = <CashflowPanel reportMode projectOptions={projectOptions} />;
-  else if (reportKey === 'tax') panel = <TaxReportPanel projectOptions={projectOptions} />;
-  else panel = <OperationalReportPanel kind={reportKey as OperationalReportKind} projectOptions={projectOptions} />;
-
   return (
     <Suspense fallback={<div className="rounded-lg border border-line bg-white p-8"><LoadingSpinner /></div>}>
-      {panel}
+      <OperationalReportPanel kind={reportKey as OperationalReportKind} projectOptions={projectOptions} />
     </Suspense>
   );
 }

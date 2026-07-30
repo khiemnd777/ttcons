@@ -41,6 +41,7 @@
 
 - Pair with procurement when receive/order flows create stock movements or material obligations.
 - Procurement `receive` now reconciles submitted incoming-acceptance quantities into `partially_received`/`received`; it does not create `stock_movements`. Warehouse receipt remains an explicit stock action with its own balance ledger and audit.
+- Submitted incoming acceptance and posted stock documents can be selected as same-project source evidence for `project_material_costs`. This reference is read-only: material-cost creation/confirmation never posts, reverses or changes warehouse movements/balances.
 - Pair with construction operations when site usage, before/after snapshots, or surplus handling changes work item state.
 - Pair with quality/acceptance/handover when incoming acceptance, outgoing acceptance, or handover blockers depend on material state.
 

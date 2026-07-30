@@ -263,7 +263,7 @@ func TestBatch7FailedAcceptanceCreatesSingleOpenRework(t *testing.T) {
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('acceptance_failed','rework_requested')`, 3, projectID)
 }
 
-func TestBatch7HandoverBlockedAuditIncludesAccountingBlockers(t *testing.T) {
+func TestBatch7HandoverBlockedAuditIncludesProjectFinanceBlockers(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
 	repo := NewRepository(db)
@@ -272,9 +272,11 @@ func TestBatch7HandoverBlockedAuditIncludesAccountingBlockers(t *testing.T) {
 	projectID := newID()
 	acceptanceID := newID()
 	handoverID := newID()
-	payableID := newID()
+	materialCostID := newID()
+	cashRequestID := newID()
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM payables WHERE id=$1`, payableID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM project_cash_requests WHERE id=$1`, cashRequestID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM project_material_costs WHERE id=$1`, materialCostID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM handover_records WHERE id=$1`, handoverID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM acceptance_records WHERE id=$1`, acceptanceID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
@@ -292,9 +294,13 @@ func TestBatch7HandoverBlockedAuditIncludesAccountingBlockers(t *testing.T) {
 		VALUES ($1,$2,$3,'submitted',$4,true,true,true,true,$5)
 	`, handoverID, projectID, "HO-B7-"+handoverID[:8], acceptanceID, actorID)
 	mustExec(t, db, `
-		INSERT INTO payables (id, project_id, payable_code, vendor_type, vendor_name, source_type, gross_amount, paid_amount, remaining_amount, status, created_by)
-		VALUES ($1,$2,$3,'supplier','Batch7 Supplier','manual',100,0,100,'approved',$4)
-	`, payableID, projectID, "B7P-"+payableID[:8], actorID)
+		INSERT INTO project_material_costs (id,project_id,vendor_name,description,amount_before_vat,vat_amount,total_amount,status,created_by)
+		VALUES ($1,$2,'Batch7 Supplier','Vật tư chưa xác nhận',100,10,110,'submitted',$3)
+	`, materialCostID, projectID, actorID)
+	mustExec(t, db, `
+		INSERT INTO project_cash_requests (id,project_id,request_code,direction,title,counterparty_name,amount,status,created_by)
+		VALUES ($1,$2,$3,'outbound','Đề nghị chi chưa xử lý','Batch7 Supplier',110,'submitted',$4)
+	`, cashRequestID, projectID, "B7R-"+cashRequestID[:8], actorID)
 
 	blocked, err := repo.CompleteHandover(ctx, handoverID, ActionRequest{Reason: "Kiểm tra bàn giao"}, actorID, "Batch7 Actor")
 	if err != nil {
@@ -304,8 +310,8 @@ func TestBatch7HandoverBlockedAuditIncludesAccountingBlockers(t *testing.T) {
 		t.Fatalf("handover = status %v ready %v, want blocked/false", blocked["status"], blocked["ready"])
 	}
 	blockers, _ := blocked["blockers"].([]string)
-	if !containsString(blockers, "Còn công nợ phải trả chưa tất toán") {
-		t.Fatalf("blockers = %#v, want payable blocker", blockers)
+	if !containsString(blockers, "Còn chi phí vật tư chưa được xác nhận") || !containsString(blockers, "Còn đề nghị thu/chi nội bộ chưa được xử lý") {
+		t.Fatalf("blockers = %#v, want project-finance blockers", blockers)
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='handover_blocked'`, 1, projectID)
 }

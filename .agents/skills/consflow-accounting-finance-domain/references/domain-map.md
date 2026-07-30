@@ -2,6 +2,8 @@
 
 ## Owners
 
+- Ordinary project-finance UI: `frontend/src/modules/project-finance/ProjectFinancePage.tsx`, routed at `/accounting` and `/projects/:id/accounting`
+- Ordinary project-finance backend: `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, `types_project_finance.go`
 - Frontend modules: `frontend/src/modules/accounting` (`AccountingPage.tsx`, `AccountingBooksPanel.tsx`, `ManualJournalDialog.tsx`, `TaxWorkspace.tsx`, `AccountingCreateDialog.tsx`, `AccountingDetailDialog.tsx`, `CashflowPanel.tsx`), `frontend/src/modules/debt`, `frontend/src/modules/contracts`, `frontend/src/modules/reports`
 - Debt panels: `InputInvoicePanel.tsx`, `OutputInvoicePanel.tsx`, `InputPaymentPlanPanel.tsx`, `OutputBillingPlanPanel.tsx`, `PayableReconciliationPanel.tsx`, `ReceivableReconciliationPanel.tsx`
 - Report panels: `CashflowPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`
@@ -11,6 +13,8 @@
 
 ## Routes
 
+- Ordinary project finance: `/projects/:id/project-finance`, `/projects/:id/project-finance/options`, `/projects/:id/project-finance/export`, create material-cost/cash-request routes and record action routes.
+- The routes below are legacy professional-accounting support. They remain backend-compatible but are not ordinary Accounting/Reports navigation for non-admin roles.
 - Budgets/payments: `/projects/:id/budget`, `/budgets/:id/approve`, `/payments`, `/payments/:id/approve|reverse`
 - Ledger: `/accounting/accounts`, `/accounting/periods`, `/accounting/journal-entries`, `/projects/:id/accounting/journal-entries`, `/accounting/journal-entries/:id/reverse`
 - Ledger reports/tax/reconciliation: `/accounting/reports/trial-balance|general-ledger|profit-loss|vat`, `/accounting/tax-codes`, `/accounting/tax-periods`, `/accounting/tax-periods/:id`, `/accounting/tax-periods/:id/export|prepare|file|lock|start-amendment|adjustments|payments`, `/accounting/tax-adjustments/:id/reverse`, `/accounting/reconciliation-issues`, `/accounting/reconciliation-issues/:id/resolve`
@@ -23,6 +27,7 @@
 
 ## Tables And Migrations
 
+- Ordinary management records: `project_material_costs`, `project_cash_requests`; migration `V83`.
 - `accounting_budgets`, `payables`, `receivables`, `payments`, `advance_requests`, `payment_allocations`, `receipt_allocations`
 - `accounting_books`, `accounting_accounts`, `accounting_periods`, `journal_entries`, `journal_entry_lines`, `accounting_posting_rules`
 - `budget_movements`, `payment_reversals`, `accounting_backfill_issues`
@@ -31,10 +36,17 @@
 - `payable_payment_schedules`, `receivable_payment_schedules`, `client_advance_receipts`
 - `contracts`, `contract_versions`, `contract_milestones`, `contract_variations`, `contract_retentions`, `contract_retention_releases`
 - Related documents: `documents`, `evidence_records`, `partners`
-- Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`, `V70`, `V71`, `V73`-`V82`
+- Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`, `V70`, `V71`, `V73`-`V83`
 
 ## Invariants
 
+- Product boundary: Consflow ordinary users manage workflow and project-management finance only. MISA owns professional bookkeeping/tax outside Consflow; there is no MISA integration or synchronization.
+- Only `project_material_costs.status='confirmed'` contributes to management cost. Draft/submitted/needs-changes records remain visible blockers but do not alter provisional profit.
+- Provisional management profit is eligible main-client milestone revenue minus confirmed material-purchase cost. It must always disclose that labor, subcontractor, equipment, overhead, management cost and tax are excluded.
+- A project material cost must link at least one same-project procurement, incoming-acceptance, stock-document or document source. Cash-request generic source IDs are type-whitelisted and same-project validated.
+- `project_cash_requests` is an internal request/handoff workflow. `processed` means Accounting handled the dossier in the external professional system; it is not proof of cash movement, double-entry posting, invoice issuance or tax filing in Consflow.
+- Management report totals and CSV require `project_finance.report_view`; workspace responses redact management monetary totals without it. Operational transitions are actor-audited atomically and `needs_changes` requires a reason.
+- Legacy accounting, Debt and finance-report backends remain immutable/history-compatible and admin-only by ordinary RBAC. Do not derive new management material cost or cash-request completion from legacy AP/AR/payment/invoice/ledger tables.
 - AP/AR records reconcile to invoices, payments/receipts, advances, settlements, and source documents.
 - Every posted journal has at least two lines and equal debit/credit totals. The deferred balance trigger and open-period trigger enforce this at transaction commit; posted headers/lines are immutable and are corrected only through a linked reversal journal.
 - A manual CTGS persists its optional `source_document_no` on the immutable journal header; journal detail presents source kinds as Vietnamese accounting document labels instead of leaking internal source codes.
@@ -69,7 +81,7 @@
 - A milestone can open AP/AR only after the contract is active and the milestone is eligible; acceptance-required milestones must reference an approved pass/conditional-pass acceptance.
 - Retention held at milestone obligation time is reconciled through append-only release rows; each release creates a traceable AP/AR source record and cannot exceed outstanding retention.
 - The contract workspace presents milestone obligations as Vietnamese payable/receivable labels without exposing raw obligation identifiers; eligibility, obligation creation and retention release still use the existing permission and server transition gates.
-- Handover readiness reads AP/AR remaining balances and pending payment status; it snapshots those facts but never force-closes financial records.
+- Handover readiness requires zero unconfirmed project material costs and zero cash requests outside `processed|cancelled`. Older `ap_reconciliation` and `ar_reconciliation` checklist codes are compatibility aliases for these new facts and never force-close legacy financial records.
 
 ## Cross-Domain Checks
 

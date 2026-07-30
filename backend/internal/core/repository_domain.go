@@ -9341,8 +9341,8 @@ func (r *Repository) ensureHandoverScaffoldTx(ctx context.Context, tx *sql.Tx, c
 	items := []Record{
 		{"item_code": "final_acceptance", "category": "quality", "title": "Biên bản nghiệm thu cuối đạt", "source_type": "acceptance", "source_id": finalAcceptanceID},
 		{"item_code": "warehouse_closure", "category": "operation", "title": "Kho công trình và vật tư dư đã đóng", "source_type": "system_check", "source_id": handoverID},
-		{"item_code": "ap_reconciliation", "category": "finance", "title": "Công nợ phải trả đã đối soát/tất toán", "source_type": "system_check", "source_id": handoverID},
-		{"item_code": "ar_reconciliation", "category": "finance", "title": "Công nợ phải thu đã đối soát/tất toán", "source_type": "system_check", "source_id": handoverID},
+		{"item_code": "project_material_costs", "category": "finance", "title": "Chi phí vật tư công trình đã được xác nhận", "source_type": "system_check", "source_id": handoverID},
+		{"item_code": "project_cash_requests", "category": "finance", "title": "Đề nghị thu/chi nội bộ đã được xử lý", "source_type": "system_check", "source_id": handoverID},
 		{"item_code": "as_built_documents", "category": "as_built", "title": "Bản vẽ và hồ sơ hoàn công"},
 		{"item_code": "operation_manuals", "category": "operation", "title": "Hướng dẫn vận hành/bảo trì"},
 		{"item_code": "warranty_documents", "category": "warranty", "title": "Cam kết và hồ sơ bảo hành"},
@@ -14545,8 +14545,8 @@ func (r *Repository) CreateHandoverPackage(ctx context.Context, body Record, act
 	items := []Record{
 		{"item_code": "final_acceptance", "category": "quality", "title": "Biên bản nghiệm thu cuối đạt", "source_type": "acceptance", "source_id": cleanID(body["final_acceptance_id"])},
 		{"item_code": "warehouse_closure", "category": "operation", "title": "Kho công trình và vật tư dư đã đóng", "source_type": "system_check", "source_id": handover["id"]},
-		{"item_code": "ap_reconciliation", "category": "finance", "title": "Công nợ phải trả đã đối soát/tất toán", "source_type": "system_check", "source_id": handover["id"]},
-		{"item_code": "ar_reconciliation", "category": "finance", "title": "Công nợ phải thu đã đối soát/tất toán", "source_type": "system_check", "source_id": handover["id"]},
+		{"item_code": "project_material_costs", "category": "finance", "title": "Chi phí vật tư công trình đã được xác nhận", "source_type": "system_check", "source_id": handover["id"]},
+		{"item_code": "project_cash_requests", "category": "finance", "title": "Đề nghị thu/chi nội bộ đã được xử lý", "source_type": "system_check", "source_id": handover["id"]},
 		{"item_code": "as_built_documents", "category": "as_built", "title": "Bản vẽ và hồ sơ hoàn công"},
 		{"item_code": "operation_manuals", "category": "operation", "title": "Hướng dẫn vận hành/bảo trì"},
 		{"item_code": "warranty_documents", "category": "warranty", "title": "Cam kết và hồ sơ bảo hành"},
@@ -14972,21 +14972,23 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 	if err := checkCount("pending_surplus", `SELECT COUNT(*) AS total FROM site_material_balances WHERE project_id=$1 AND surplus_quantity > 0 AND surplus_status <> 'handled'`, projectID); err != nil {
 		return nil, err
 	}
-	if err := checkCount("open_payables", `SELECT COUNT(*) AS total,COALESCE(SUM(remaining_amount),0) AS amount FROM payables WHERE project_id=$1 AND status <> 'cancelled' AND remaining_amount > 0`, projectID); err != nil {
+	if err := checkCount("unconfirmed_material_costs", `SELECT COUNT(*) AS total,COALESCE(SUM(total_amount),0) AS amount FROM project_material_costs WHERE project_id=$1 AND status IN ('draft','submitted','needs_changes')`, projectID); err != nil {
 		return nil, err
 	}
-	if err := checkCount("open_receivables", `SELECT COUNT(*) AS total,COALESCE(SUM(remaining_amount),0) AS amount FROM receivables WHERE project_id=$1 AND status <> 'cancelled' AND remaining_amount > 0`, projectID); err != nil {
-		return nil, err
-	}
-	if err := checkCount("pending_payments", `SELECT COUNT(*) AS total FROM payments WHERE project_id=$1 AND status NOT IN ('approved','paid','received','cancelled')`, projectID); err != nil {
+	if err := checkCount("pending_cash_requests", `SELECT COUNT(*) AS total,COALESCE(SUM(amount),0) AS amount FROM project_cash_requests WHERE project_id=$1 AND status NOT IN ('processed','cancelled')`, projectID); err != nil {
 		return nil, err
 	}
 
+	costsReady := number(counts["unconfirmed_material_costs"]) == 0
+	cashRequestsReady := number(counts["pending_cash_requests"]) == 0
 	systemStatuses := map[string]bool{
-		"final_acceptance":  number(counts["final_acceptance"]) > 0,
-		"warehouse_closure": number(counts["pending_surplus"]) == 0,
-		"ap_reconciliation": number(counts["open_payables"]) == 0,
-		"ar_reconciliation": number(counts["open_receivables"]) == 0,
+		"final_acceptance":       number(counts["final_acceptance"]) > 0,
+		"warehouse_closure":      number(counts["pending_surplus"]) == 0,
+		"project_material_costs": costsReady,
+		"project_cash_requests":  cashRequestsReady,
+		// Compatibility for handover packages created before the project-finance boundary changed.
+		"ap_reconciliation": costsReady,
+		"ar_reconciliation": cashRequestsReady,
 	}
 	for itemCode, passed := range systemStatuses {
 		status := "pending"
@@ -15021,14 +15023,11 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 	if number(counts["pending_surplus"]) > 0 {
 		blockers = append(blockers, "Còn vật tư dư chưa xử lý")
 	}
-	if number(counts["open_payables"]) > 0 {
-		blockers = append(blockers, "Còn công nợ phải trả chưa tất toán")
+	if !costsReady {
+		blockers = append(blockers, "Còn chi phí vật tư chưa được xác nhận")
 	}
-	if number(counts["open_receivables"]) > 0 {
-		blockers = append(blockers, "Còn công nợ phải thu chưa tất toán")
-	}
-	if number(counts["pending_payments"]) > 0 {
-		blockers = append(blockers, "Còn phiếu chi/thu chưa duyệt")
+	if !cashRequestsReady {
+		blockers = append(blockers, "Còn đề nghị thu/chi nội bộ chưa được xử lý")
 	}
 	pendingItems, err := queryTx(ctx, tx, `SELECT item_code,title FROM handover_checklist_items WHERE handover_id=$1 AND required AND status <> 'verified' ORDER BY created_at`, id)
 	if err != nil {
@@ -15048,7 +15047,7 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 		UPDATE handover_records SET status=$2,documents_ready=$3,warehouse_closed=$4,payables_recorded=$5,receivables_recorded=$6,
 			readiness_snapshot_json=$7::jsonb,checked_by=NULLIF($8,'')::uuid,checked_at=now(),updated_at=now()
 		WHERE id=$1 RETURNING *
-	`, id, nextStatus, len(pendingItems) == 0, systemStatuses["warehouse_closure"], systemStatuses["ap_reconciliation"], systemStatuses["ar_reconciliation"], string(rawSnapshot), actorID)
+	`, id, nextStatus, len(pendingItems) == 0, systemStatuses["warehouse_closure"], costsReady, cashRequestsReady, string(rawSnapshot), actorID)
 	if err != nil {
 		return nil, err
 	}
