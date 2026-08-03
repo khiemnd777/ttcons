@@ -18,6 +18,7 @@ import {
   PanelLeftClose,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { PoweredBySignature } from '../../components/PoweredBySignature';
 import { StatusBadge } from '../../components/StatusBadge';
 import { get } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -109,30 +110,40 @@ export function ProjectWorkspaceLayout() {
 
       <div className="border-b border-line bg-white px-4 py-2 lg:hidden"><button type="button" aria-expanded={mobileSidebarOpen} className="inline-flex w-full items-center justify-between rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-ink" onClick={() => setMobileSidebarOpen((current) => !current)}><span className="inline-flex items-center gap-2"><PanelLeftClose className="h-4 w-4 text-blue-700" />{showWorkflowSidebar ? 'Mở cây quy trình' : 'Mở cây nghiệp vụ'}</span>{mobileSidebarOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button></div>
       <div className="grid min-h-[calc(100vh-73px)] lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className={`${mobileSidebarOpen ? 'block' : 'hidden'} border-b border-line bg-white lg:sticky lg:top-[73px] lg:block lg:h-[calc(100vh-73px)] lg:overflow-auto lg:border-b-0 lg:border-r`}>
-          {showWorkflowSidebar ? (
-            <WorkflowSidebar
-              projectId={id}
-              projectName={project?.name ?? 'Công trình'}
-              projectCode={project?.code ?? id}
-              operations={operations.data}
-              loading={operations.isLoading}
-              error={operations.error}
-              activeWorkItemId={activeWorkItemId}
-            />
-          ) : (
-            <ProjectNavigationSidebar
-              projectId={id}
-              projectName={project?.name ?? 'Công trình'}
-              projectCode={project?.code ?? id}
-              visibleGroups={visibleGroups}
-            />
-          )}
+        <aside className={`${mobileSidebarOpen ? 'flex' : 'hidden'} flex-col border-b border-line bg-white lg:sticky lg:top-[73px] lg:flex lg:h-[calc(100vh-73px)] lg:overflow-hidden lg:border-b-0 lg:border-r`}>
+          <div className="min-h-0 flex-1 overflow-auto">
+            {showWorkflowSidebar ? (
+              <WorkflowSidebar
+                projectId={id}
+                projectName={project?.name ?? 'Công trình'}
+                projectCode={project?.code ?? id}
+                operations={operations.data}
+                loading={operations.isLoading}
+                error={operations.error}
+                activeWorkItemId={activeWorkItemId}
+              />
+            ) : (
+              <ProjectNavigationSidebar
+                projectId={id}
+                projectName={project?.name ?? 'Công trình'}
+                projectCode={project?.code ?? id}
+                visibleGroups={visibleGroups}
+              />
+            )}
+          </div>
+          <div className="hidden border-t border-line px-4 py-3 lg:block">
+            <PoweredBySignature />
+          </div>
         </aside>
 
-        <main className="min-w-0 px-4 py-5 md:px-6">
-          <Outlet />
-        </main>
+        <div className="flex min-w-0 flex-col">
+          <main className="flex-1 px-4 py-5 md:px-6">
+            <Outlet />
+          </main>
+          <footer className="border-t border-line bg-white px-4 py-3 lg:hidden">
+            <PoweredBySignature />
+          </footer>
+        </div>
       </div>
     </div>
   );

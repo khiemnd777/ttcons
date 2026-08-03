@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { BrandLogo } from '../components/BrandLogo';
+import { PoweredBySignature } from '../components/PoweredBySignature';
 import { useAuth } from '../lib/auth/AuthContext';
 
 type NavItem = {
@@ -116,10 +117,13 @@ export function AppShell() {
               </div>
             ))}
           </nav>
+          <div className="border-t border-line px-4 py-3">
+            <PoweredBySignature />
+          </div>
         </div>
       </aside>
 
-      <div className="lg:pl-72">
+      <div className="flex min-h-screen flex-col lg:pl-72">
         <header className="sticky top-0 z-20 flex h-16 items-center border-b border-line bg-white/95 px-4 backdrop-blur md:px-6">
           <div className="flex w-full items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
@@ -149,9 +153,12 @@ export function AppShell() {
             </div>
           </div>
         </header>
-        <main className="px-4 py-5 md:px-6">
+        <main className="flex-1 px-4 py-5 md:px-6">
           <Outlet />
         </main>
+        <footer className="border-t border-line bg-white px-4 py-3 lg:hidden">
+          <PoweredBySignature />
+        </footer>
       </div>
     </div>
   );

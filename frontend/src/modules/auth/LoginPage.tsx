@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LogIn } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandLogo';
+import { PoweredBySignature } from '../../components/PoweredBySignature';
 import { useAuth } from '../../lib/auth/AuthContext';
 
 const loginSchema = z.object({
@@ -85,6 +86,9 @@ export function LoginPage() {
             Đăng nhập
           </button>
         </form>
+        <div className="mt-6 border-t border-line pt-4">
+          <PoweredBySignature />
+        </div>
       </div>
     </div>
   );

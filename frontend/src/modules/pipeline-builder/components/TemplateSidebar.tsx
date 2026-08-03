@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
 import { Archive, ArrowLeft, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { PoweredBySignature } from '../../../components/PoweredBySignature';
 import { StatusBadge } from '../../../components/StatusBadge';
 import type { PipelineTemplate } from '../../../lib/types/domain';
 
@@ -104,6 +105,9 @@ export function TemplateSidebar({
         </section>
 
         {children}
+      </div>
+      <div className="border-t border-line px-4 py-3">
+        <PoweredBySignature />
       </div>
     </aside>
   );
