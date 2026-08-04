@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, Plus } from 'lucide-react';
+import { AlertTriangle, Eye, GitPullRequestArrow, Plus } from 'lucide-react';
 import { get, post, postForm, put } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { useToast } from '../../components/ToastProvider';
@@ -11,7 +11,7 @@ import { dateText } from '../../lib/utils/format';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useAuth } from '../../lib/auth/AuthContext';
-import type { ConstructionActionItem, ConstructionCheck, ConstructionWorkspace } from '../../lib/types/domain';
+import type { ConstructionActionItem, ConstructionCheck, ConstructionWorkspace, Contract } from '../../lib/types/domain';
 import { ConstructionReportDetailDialog } from './ConstructionReportDetailDialog';
 import { ConstructionReportFormDialog, type ConstructionDailyReportCreatePayload } from './ConstructionReportFormDialog';
 import { ConstructionReportEvidenceDialog } from './ConstructionReportEvidenceDialog';
@@ -46,15 +46,23 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   const canViewFieldWorkspace = hasAnyPermission(['operation.view', 'quality.view', 'rework.view']);
   const canRequestCheck = hasAnyPermission(['construction.check.request']);
   const canCreateAction = hasAnyPermission(['construction.action.create']);
+  const canViewContracts = hasAnyPermission(['contract.view']);
+  const canCreateVariation = hasAnyPermission(['contract.create']);
 
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Record<string, any>[]>('/projects') });
   useEffect(() => { if (!projectId && projects.data?.[0]) setProjectId(projects.data[0].id); }, [projects.data, projectId]);
 
   const reports = useQuery({ queryKey: ['daily-reports', projectId], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/daily-reports`), enabled: Boolean(projectId) && canViewOperations });
   const construction = useQuery({ queryKey: ['construction-workspace', projectId], queryFn: () => get<ConstructionWorkspace>(`/projects/${projectId}/construction-workspace`), enabled: Boolean(projectId) && canViewFieldWorkspace, retry: false });
+  const contracts = useQuery({ queryKey: ['contracts', projectId], queryFn: () => get<Contract[]>(`/projects/${projectId}/contracts`), enabled: Boolean(projectId) && canViewContracts });
   const timelineRows = useMemo(() => [...(reports.data ?? [])].sort((left, right) => String(right.report_date ?? '').localeCompare(String(left.report_date ?? ''))), [reports.data]);
   const pendingChecks = (construction.data?.checks ?? []).filter((row) => row.status === 'pending').length;
   const activeActions = (construction.data?.actions ?? []).filter((row) => ['open', 'waiting_confirmation'].includes(row.status)).length;
+  const activeClientContract = (contracts.data ?? []).find((contract) => contract.status === 'active' && contract.contract_type === 'main_client' && contract.direction === 'receivable');
+  const activeContractDetail = useQuery({ queryKey: ['contract-detail', activeClientContract?.id], queryFn: () => get<Contract>(`/contracts/${activeClientContract?.id}`), enabled: Boolean(activeClientContract?.id) && canViewContracts });
+  const variationRows = activeContractDetail.data?.variations ?? [];
+  const openVariations = variationRows.filter((variation) => !['rejected', 'incorporated'].includes(variation.status));
+  const sourceWorkItem = construction.data?.work_items.find((item) => !['done', 'cancelled'].includes(item.status)) ?? construction.data?.work_items[0];
   const tabs = useMemo(() => [
     canViewOperations ? { key: 'timeline' as const, label: 'Nhật ký' } : null,
     canViewFieldWorkspace ? { key: 'checks' as const, label: `Kiểm tra${pendingChecks ? ` (${pendingChecks})` : ''}` } : null,
@@ -169,6 +177,16 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
 
   return <>
     <PageHeader title="Thi công" description="Ghi nhật ký, kiểm tra chất lượng và xử lý việc phát sinh ngay tại công trường." actions={<>{!global ? <ProjectBackLink projectId={projectId} /> : null}{global ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}{canReport ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={() => setOpenReport(true)}><Plus className="h-4 w-4" /> Báo cáo hôm nay</button> : null}</>} />
+    {canViewContracts ? (
+      <ConstructionVariationBand
+        projectId={projectId}
+        activeContract={activeClientContract}
+        openCount={openVariations.length}
+        urgentCount={openVariations.filter((variation) => variation.priority === 'urgent').length}
+        sourceWorkItemId={sourceWorkItem?.id}
+        canCreate={canCreateVariation}
+      />
+    ) : null}
     <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg border border-line bg-white p-1" role="tablist" aria-label="Không gian thi công">{tabs.map((tab) => <button key={tab.key} role="tab" aria-selected={activeTab === tab.key} className={`shrink-0 rounded-md px-4 py-2 text-sm font-semibold transition ${activeTab === tab.key ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`} onClick={() => changeTab(tab.key)}>{tab.label}</button>)}</div>
     {activeTab === 'timeline' && canViewOperations ? <DailyTimeline rows={timelineRows} workspace={canViewFieldWorkspace ? construction.data : undefined} loading={reports.isLoading} error={reports.error} onRetry={() => reports.refetch()} onCreate={() => setOpenReport(true)} onView={(record) => setDialog({ type: 'report', mode: 'view', record })} /> : null}
     {activeTab === 'checks' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="checks" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} /> : null}
@@ -178,6 +196,41 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
     <ConstructionReportFormDialog open={dialog?.type === 'report' && dialog.mode === 'edit'} projectId={projectId} mode="edit" record={dialog?.record ?? null} onSubmit={(values, uploads) => dialog?.record ? updateReport.mutateAsync({ reportId: dialog.record.id, values, uploads }) : Promise.resolve()} onClose={() => setDialog(null)} />
     <ConstructionReportEvidenceDialog open={dialog?.type === 'report-evidence'} projectId={projectId} record={dialog?.record ?? null} onSubmit={(workItemId, uploads) => dialog?.record ? addReportEvidence.mutateAsync({ reportId: dialog.record.id, workItemId, uploads, record: dialog.record }) : Promise.resolve()} onClose={() => setDialog(null)} />
   </>;
+}
+
+function ConstructionVariationBand({ projectId, activeContract, openCount, urgentCount, sourceWorkItemId, canCreate }: {
+  projectId: string;
+  activeContract?: Contract;
+  openCount: number;
+  urgentCount: number;
+  sourceWorkItemId?: string;
+  canCreate: boolean;
+}) {
+  const query = new URLSearchParams({ tab: 'variations' });
+  if (canCreate && activeContract) query.set('action', 'new-variation');
+  if (sourceWorkItemId) query.set('source_work_item_id', sourceWorkItemId);
+  return (
+    <section className="mb-4 flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-amber-100 text-amber-800"><AlertTriangle className="h-5 w-5" /></span>
+        <div>
+          <h2 className="text-sm font-semibold text-amber-950">Phát sinh ngoài kế hoạch</h2>
+          <p className="mt-1 text-xs leading-5 text-amber-900">
+            {activeContract
+              ? `${openCount} phát sinh đang xử lý${urgentCount ? ` · ${urgentCount} gấp` : ''}. Luồng: Đề xuất → QS → Mua hàng → PM/Giám đốc.`
+              : 'Cần hợp đồng chủ đầu tư đang hiệu lực trước khi lập phát sinh ngoài kế hoạch.'}
+          </p>
+        </div>
+      </div>
+      <Link
+        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-amber-800 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-900"
+        to={`/projects/${projectId}/contracts?${query.toString()}`}
+      >
+        <GitPullRequestArrow className="h-4 w-4" />
+        {canCreate && activeContract ? 'Đề xuất phát sinh' : 'Xem phát sinh'}
+      </Link>
+    </section>
+  );
 }
 
 async function createReportLinkedRecord(projectId: string, reportId: string, draft: ReportLinkedDraft, reportWorkItemId: string, evidenceIDs: string[], primaryEvidenceID: string) {

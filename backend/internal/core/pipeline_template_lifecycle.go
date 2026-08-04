@@ -33,7 +33,11 @@ func (s *Service) ensureDraftTemplate(ctx context.Context, resourceType, resourc
 }
 
 func (s *Service) CreateTemplateNode(ctx context.Context, templateID string, body Record) (Record, error) {
-	if _, err := s.ensureDraftTemplate(ctx, "template", templateID); err != nil {
+	template, err := s.ensureDraftTemplate(ctx, "template", templateID)
+	if err != nil {
+		return nil, err
+	}
+	if err := prepareBusinessCode(body, int(number(template["engine_version"])) >= 3); err != nil {
 		return nil, err
 	}
 	if raw, ok := body["approval_policy_json"]; ok {
@@ -48,7 +52,11 @@ func (s *Service) CreateTemplateNode(ctx context.Context, templateID string, bod
 }
 
 func (s *Service) UpdateTemplateNode(ctx context.Context, nodeID string, body Record) (Record, error) {
-	if _, err := s.ensureDraftTemplate(ctx, "node", nodeID); err != nil {
+	template, err := s.ensureDraftTemplate(ctx, "node", nodeID)
+	if err != nil {
+		return nil, err
+	}
+	if err := prepareBusinessCode(body, int(number(template["engine_version"])) >= 3); err != nil {
 		return nil, err
 	}
 	if raw, ok := body["approval_policy_json"]; ok {
@@ -59,6 +67,54 @@ func (s *Service) UpdateTemplateNode(ctx context.Context, nodeID string, body Re
 		body["approval_policy_json"] = normalized
 	}
 	return s.repo.Update(ctx, "pipeline_template_nodes", templateNodeColumns(), nodeID, body)
+}
+
+func prepareBusinessCode(body Record, required bool) error {
+	raw, provided := body["business_code"]
+	if !provided {
+		if required {
+			return validationError("Business code là bắt buộc với workflow engine v3")
+		}
+		return nil
+	}
+	code := strings.TrimSpace(fmt.Sprint(raw))
+	if code == "<nil>" {
+		code = ""
+	}
+	if code == "" {
+		if required {
+			return validationError("Business code là bắt buộc với workflow engine v3")
+		}
+		body["business_code"] = nil
+		return nil
+	}
+	if len(code) > 120 || !validBusinessCode(code) {
+		return validationError("Business code không hợp lệ; dùng chữ thường, số và dấu chấm/gạch nối/gạch dưới", Record{"business_code": code})
+	}
+	body["business_code"] = code
+	return nil
+}
+
+func validBusinessCode(code string) bool {
+	if code == "" || code[0] < 'a' || code[0] > 'z' {
+		return false
+	}
+	separator := false
+	for _, character := range code {
+		if character >= 'a' && character <= 'z' || character >= '0' && character <= '9' {
+			separator = false
+			continue
+		}
+		if character == '.' || character == '_' || character == '-' {
+			if separator {
+				return false
+			}
+			separator = true
+			continue
+		}
+		return false
+	}
+	return !separator
 }
 
 func (s *Service) DeleteTemplateNode(ctx context.Context, nodeID string) error {
@@ -158,6 +214,26 @@ func (r *Repository) TemplatePublishIssues(ctx context.Context, templateID strin
 		return nil, err
 	}
 	issues = append(issues, surfaceIssues...)
+
+	businessCodeIssues, err := r.Query(ctx, `
+		SELECT n.id AS node_id,NULL::uuid AS step_id,'BUSINESS_CODE_REQUIRED' AS code,
+			'Node của engine v2 cần business_code ổn định trước khi phát hành' AS message
+		FROM pipeline_template_nodes n
+		JOIN pipeline_templates t ON t.id=n.template_id
+		WHERE t.id=$1 AND t.engine_version >= 3 AND NULLIF(BTRIM(n.business_code),'') IS NULL
+		UNION ALL
+		SELECT n.id,s.id,'BUSINESS_CODE_REQUIRED',
+			'Bước của engine v2 cần business_code ổn định trước khi phát hành'
+		FROM pipeline_template_steps s
+		JOIN pipeline_template_nodes n ON n.id=s.node_id
+		JOIN pipeline_templates t ON t.id=n.template_id
+		WHERE t.id=$1 AND t.engine_version >= 3 AND NULLIF(BTRIM(s.business_code),'') IS NULL
+		ORDER BY node_id,step_id NULLS FIRST
+	`, templateID)
+	if err != nil {
+		return nil, err
+	}
+	issues = append(issues, businessCodeIssues...)
 
 	detail, err := r.GetTemplateDetail(ctx, templateID)
 	if err != nil {

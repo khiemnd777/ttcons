@@ -5,7 +5,7 @@ import { Dialog } from '../../components/Dialog';
 export type SignaturePoint = { x: number; y: number };
 export type SignatureStroke = { points: SignaturePoint[] };
 
-type SignatureCapturePayload = {
+export type SignatureCapturePayload = {
   purpose: string;
   comment: string;
   signature_image_data_url: string;
@@ -17,6 +17,9 @@ type SignatureCaptureDialogProps = {
   signerName?: string;
   submitting: boolean;
   signedPurposes?: string[];
+  allowedPurposes?: string[];
+  defaultPurpose?: string;
+  purposeLocked?: boolean;
   formRevision?: number;
   onClose: () => void;
   onSubmit: (payload: SignatureCapturePayload) => void;
@@ -37,12 +40,15 @@ export function SignatureCaptureDialog({
   signerName,
   submitting,
   signedPurposes = [],
+  allowedPurposes,
+  defaultPurpose = 'internal_ack',
+  purposeLocked = false,
   formRevision,
   onClose,
   onSubmit,
 }: SignatureCaptureDialogProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [purpose, setPurpose] = useState('internal_ack');
+  const [purpose, setPurpose] = useState(defaultPurpose);
   const [comment, setComment] = useState('');
   const [strokes, setStrokes] = useState<SignatureStroke[]>([]);
   const [activeStroke, setActiveStroke] = useState<SignaturePoint[] | null>(null);
@@ -57,13 +63,24 @@ export function SignatureCaptureDialog({
 
   useEffect(() => {
     if (!open) {
-      setPurpose('internal_ack');
+      setPurpose(defaultPurpose);
       setComment('');
       setStrokes([]);
       setActiveStroke(null);
       setAcknowledgedImmutable(false);
     }
-  }, [open]);
+  }, [defaultPurpose, open]);
+
+  const availablePurposeOptions = allowedPurposes?.length
+    ? signaturePurposeOptions.filter((option) => allowedPurposes.includes(option.value))
+    : signaturePurposeOptions;
+
+  useEffect(() => {
+    if (!open) return;
+    if (!availablePurposeOptions.some((option) => option.value === purpose)) {
+      setPurpose(availablePurposeOptions[0]?.value ?? defaultPurpose);
+    }
+  }, [availablePurposeOptions, defaultPurpose, open, purpose]);
 
   function drawCanvas(savedStrokes: SignatureStroke[], currentStroke: SignaturePoint[]) {
     const canvas = canvasRef.current;
@@ -194,13 +211,13 @@ export function SignatureCaptureDialog({
             <select
               className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               value={purpose}
-              disabled={submitting}
+              disabled={submitting || purposeLocked || availablePurposeOptions.length === 1}
               onChange={(event) => {
                 setPurpose(event.target.value);
                 setAcknowledgedImmutable(false);
               }}
             >
-              {signaturePurposeOptions.map((option) => (
+              {availablePurposeOptions.map((option) => (
                 <option key={option.value} value={option.value} disabled={signedPurposeSet.has(option.value)}>
                   {option.label}
                   {signedPurposeSet.has(option.value) ? ' (đã ký)' : ''}

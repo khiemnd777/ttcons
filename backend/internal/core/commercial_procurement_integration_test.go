@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,73 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 )
+
+func seedContractExecutionReadiness(t *testing.T, db *sql.DB, projectID, contractID, versionID, actorID string) {
+	t.Helper()
+	ctx := context.Background()
+	var signatureID string
+	err := db.QueryRowContext(ctx, `
+		WITH form_ref AS (
+			SELECT version.id AS form_version_id,template.id AS form_template_id,template.form_type
+			FROM workflow_form_versions version
+			JOIN workflow_form_templates template ON template.id=version.template_id
+			WHERE version.status='published'
+			ORDER BY version.published_at NULLS LAST,version.created_at
+			LIMIT 1
+		), work_row AS (
+			INSERT INTO work_items (
+				project_id,source_type,source_id,title,work_type,status,priority,role_ids,evidence_requirement_json,created_by,updated_by
+			)
+			VALUES ($1,'workflow_form_action_item',gen_random_uuid(),'Ký hợp đồng trên App','approval','completed','normal','[]'::jsonb,'{}'::jsonb,$2,$2)
+			RETURNING id
+		), instance_row AS (
+			INSERT INTO workflow_form_instances (
+				project_id,work_item_id,form_template_id,form_version_id,form_type,title,status,current_revision,
+				answers_snapshot_json,required_role_ids,created_by,submitted_by,submitted_at
+			)
+			SELECT $1,work_row.id,form_ref.form_template_id,form_ref.form_version_id,form_ref.form_type,
+				'Ký hợp đồng trên App','submitted',1,'{}'::jsonb,'[]'::jsonb,$2,$2,now()
+			FROM form_ref,work_row
+			RETURNING id,work_item_id,form_version_id
+		)
+		INSERT INTO workflow_form_signatures (
+			project_id,work_item_id,form_instance_id,form_version_id,form_revision_no,purpose,
+			signer_user_id,signer_name,signer_roles_json,comment,payload_json,payload_hash
+		)
+		SELECT $1,instance_row.work_item_id,instance_row.id,instance_row.form_version_id,1,'approved_by',
+			$2,'Contract Actor','[]'::jsonb,'Ký trong integration test','{}'::jsonb,repeat('a',64)
+		FROM instance_row
+		RETURNING id
+	`, projectID, actorID).Scan(&signatureID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, `
+		INSERT INTO contract_version_signature_links (contract_version_id,workflow_form_signature_id,purpose,linked_by)
+		VALUES ($1,$2,'approved_by',$3)
+	`, versionID, signatureID, actorID)
+	var documentID string
+	if err := db.QueryRowContext(ctx, `
+		INSERT INTO documents (
+			project_id,target_type,target_id,name,file_url,document_type,status,uploaded_by,
+			mime_type,file_size,storage_provider
+		)
+		VALUES ($1,'contract_returned_scan',$2,'signed-contract.pdf','/test/signed-contract.pdf',
+			'returned_signed_contract_scan','active',$3,'application/pdf',0,'external')
+		RETURNING id
+	`, projectID, contractID, actorID).Scan(&documentID); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, `
+		INSERT INTO contract_dispatches (
+			contract_id,contract_version_id,dispatch_no,recipient_name,delivery_method,
+			returned_scan_document_id,status,sent_by,received_by,received_at,note
+		)
+		SELECT $1,$2,COALESCE(MAX(dispatch_no),0)+1,'Chủ đầu tư','direct',$3,'received',$4,$4,now(),
+			'Đã nhận scan giấy ký trong integration test'
+		FROM contract_dispatches WHERE contract_id=$1
+	`, contractID, versionID, documentID, actorID)
+}
 
 func TestBOQUnitPriceValidation(t *testing.T) {
 	expectedPrice, comment, err := normalizeBOQUnitPriceRequest(BOQUnitPriceRequest{UnitPrice: 0, Comment: "  draft expected  "}, false)
@@ -531,6 +599,7 @@ func TestContractLifecycleCreatesVersionedObligationsVariationAndRetention(t *te
 	if _, err = service.ContractVersionAction(ctx, versionID, "sign", "Hai bên đã ký", actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
+	seedContractExecutionReadiness(t, db, projectID, contractID, versionID, actorID)
 	contract, err = service.ActivateContract(ctx, contractID, "Kích hoạt hợp đồng", actorID, "contract@test.local")
 	if err != nil {
 		t.Fatal(err)
@@ -570,6 +639,12 @@ func TestContractLifecycleCreatesVersionedObligationsVariationAndRetention(t *te
 	if _, err = service.ContractVariationAction(ctx, variationID, "submit", "Gửi duyệt phụ lục", actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = service.ContractVariationAction(ctx, variationID, "qs-review", "QS xác nhận khối lượng", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.ContractVariationAction(ctx, variationID, "purchase", "Mua hàng đã lấy giá", actorID, "contract@test.local"); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = service.ContractVariationAction(ctx, variationID, "approve", "Duyệt giá trị và tiến độ", actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
@@ -591,10 +666,29 @@ func TestContractLifecycleCreatesVersionedObligationsVariationAndRetention(t *te
 	if _, err = service.ContractVersionAction(ctx, newVersionID, "sign", "Ký V2", actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
+	seedContractExecutionReadiness(t, db, projectID, contractID, newVersionID, actorID)
 	if _, err = service.ActivateContract(ctx, contractID, "Kích hoạt V2", actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM projects WHERE id=$1 AND contract_amount=1100000`, 1, projectID)
+
+	// Historical signatures/dispatches must not make a newer current version appear execution-ready.
+	unreadyVersionID := newID()
+	mustExec(t, db, `
+		INSERT INTO contract_versions (
+			id,contract_id,version_no,version_label,amount,scope_summary,definition_hash,status,created_by
+		) VALUES ($1,$2,3,'V3 chưa đủ hồ sơ',1100000,'Kiểm thử readiness theo version',repeat('b',64),'signed',$3)
+	`, unreadyVersionID, contractID, actorID)
+	mustExec(t, db, `UPDATE contracts SET current_version_id=$2 WHERE id=$1`, contractID, unreadyVersionID)
+	contract, err = repo.GetContractDetail(ctx, contractID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	readiness := contract["execution_readiness"].(Record)
+	if boolValue(readiness["app_signed"]) || boolValue(readiness["paper_dispatched"]) || boolValue(readiness["returned_scan_received"]) || !boolValue(readiness["contract_active"]) {
+		t.Fatalf("current-version execution readiness = %#v", readiness)
+	}
+	mustExec(t, db, `UPDATE contracts SET current_version_id=$2 WHERE id=$1`, contractID, newVersionID)
 
 	retentions := contract["retentions"].([]Record)
 	retentionID := cleanID(retentions[0]["id"])

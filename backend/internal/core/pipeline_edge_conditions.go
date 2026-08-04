@@ -30,6 +30,7 @@ var pipelineEdgeConditionCatalog = []EdgeConditionDefinition{
 	{Type: "boq_approved", Label: "BOQ đã duyệt", Description: "Chuyển khi BOQ có dữ liệu và toàn bộ item đã được duyệt.", DefaultLabel: "", Category: "commercial"},
 	{Type: "procurement_approved", Label: "Mua vật tư đã duyệt", Description: "Chuyển khi yêu cầu mua vật tư đã được duyệt hoặc đã vào các trạng thái sau duyệt.", DefaultLabel: "", Category: "material"},
 	{Type: "workflow_form_answer_equals", Label: "Câu trả lời biểu mẫu bằng giá trị", Description: "Chuyển khi biểu mẫu quy trình đã được gửi ở node nguồn và có trường khớp giá trị cấu hình.", DefaultLabel: "", Category: "workflow_form"},
+	{Type: "project_entry_mode", Label: "Điểm bắt đầu công trình", Description: "Chuyển theo lựa chọn khảo sát hoặc BOQ có sẵn đã chốt khi tạo công trình.", DefaultLabel: "", Category: "project"},
 	{Type: "handover_ready", Label: "Sẵn sàng bàn giao", Description: "Chuyển khi nghiệm thu, danh sách lỗi, kho, chứng từ và công nợ không còn điểm chặn bàn giao.", DefaultLabel: "", Category: "handover"},
 	{Type: "financial_ready", Label: "Sẵn sàng đóng tài chính", Description: "Chuyển khi công nợ phải thu/phải trả không còn khoản đang mở.", DefaultLabel: "", Category: "finance"},
 }
@@ -117,6 +118,20 @@ func prepareTemplateEdgeBody(body Record, partial bool) error {
 		}
 		if _, exists := config["value"]; !exists {
 			return errors.New("value là bắt buộc cho điều kiện câu trả lời biểu mẫu")
+		}
+	}
+
+	if strings.TrimSpace(fmt.Sprint(body["condition_type"])) == "project_entry_mode" {
+		config := Record{}
+		switch value := body["condition_config"].(type) {
+		case Record:
+			config = value
+		case map[string]any:
+			config = Record(value)
+		}
+		entryMode := strings.TrimSpace(fmt.Sprint(config["value"]))
+		if !statusIn(entryMode, "survey_required", "client_boq") {
+			return errors.New("value của điều kiện điểm bắt đầu phải là survey_required hoặc client_boq")
 		}
 	}
 

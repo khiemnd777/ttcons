@@ -320,7 +320,7 @@ func newID() string {
 }
 
 func projectColumns() []ColumnSpec {
-	return []ColumnSpec{col("name"), col("code"), col("partner_id"), col("client_name"), col("address"), col("planned_start_date"), col("planned_end_date"), col("estimated_budget"), col("contract_amount"), col("status"), col("pipeline_template_id"), col("pm_staff_id"), col("progress_percent")}
+	return []ColumnSpec{col("name"), col("code"), col("partner_id"), col("client_name"), col("address"), col("planned_start_date"), col("planned_end_date"), col("estimated_budget"), col("contract_amount"), col("status"), col("pipeline_template_id"), col("pm_staff_id"), col("progress_percent"), col("workflow_entry_mode")}
 }
 
 func partnerColumns() []ColumnSpec {
@@ -332,11 +332,11 @@ func templateColumns() []ColumnSpec {
 }
 
 func templateNodeColumns() []ColumnSpec {
-	return []ColumnSpec{col("template_id"), col("name"), col("description"), col("type"), col("position_x"), col("position_y"), col("order_index"), jsonCol("responsible_role_ids"), col("required_permission"), jsonCol("permissions"), jsonCol("entry_conditions"), jsonCol("exit_conditions"), col("approval_rule"), jsonCol("approval_policy_json"), col("rework_enabled"), col("replanning_enabled"), col("fail_path"), col("status")}
+	return []ColumnSpec{col("template_id"), col("business_code"), col("name"), col("description"), col("type"), col("position_x"), col("position_y"), col("order_index"), jsonCol("responsible_role_ids"), col("required_permission"), jsonCol("permissions"), jsonCol("entry_conditions"), jsonCol("exit_conditions"), col("approval_rule"), jsonCol("approval_policy_json"), col("rework_enabled"), col("replanning_enabled"), col("fail_path"), col("status")}
 }
 
 func templateStepColumns() []ColumnSpec {
-	return []ColumnSpec{col("node_id"), col("name"), col("description"), col("step_type"), jsonCol("required_role_ids"), col("required_permission"), col("checklist_required"), col("document_required"), col("photo_required"), col("form_version_id"), col("form_required"), col("surface_kind"), col("domain_action_key"), col("order_index")}
+	return []ColumnSpec{col("node_id"), col("business_code"), col("name"), col("description"), col("step_type"), jsonCol("required_role_ids"), col("required_permission"), col("checklist_required"), col("document_required"), col("photo_required"), col("form_version_id"), col("form_required"), col("surface_kind"), col("domain_action_key"), col("order_index")}
 }
 
 func workItemColumns() []ColumnSpec {
@@ -346,6 +346,14 @@ func workItemColumns() []ColumnSpec {
 		col("assignee_staff_id"), jsonCol("watcher_staff_ids"), col("planned_start_at"), col("due_at"), col("started_at"),
 		col("completed_at"), col("blocked_at"), col("blocked_reason"), jsonCol("completion_payload_json"),
 		jsonCol("evidence_requirement_json"), col("approval_request_id"), col("created_by"), col("updated_by"),
+	}
+}
+
+func documentColumns() []ColumnSpec {
+	return []ColumnSpec{
+		col("project_id"), col("target_type"), col("target_id"), col("name"), col("file_url"),
+		col("document_type"), col("status"), col("uploaded_by"), col("mime_type"), col("file_size"),
+		col("storage_provider"), col("storage_key"), col("checksum_sha256"),
 	}
 }
 

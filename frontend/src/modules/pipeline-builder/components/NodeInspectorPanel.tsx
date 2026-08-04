@@ -6,7 +6,7 @@ import { EnumChip } from '../../../components/EnumChip';
 import type { PipelineNode, WorkflowFormCatalogItem } from '../../../lib/types/domain';
 import { enumOptions, nodeTypeValues } from '../../../lib/utils/status';
 
-const roleOptions = ['PM', 'QS', 'Thiết kế', 'Giám sát', 'Kế toán', 'Thủ kho', 'QA/QC', 'Giám đốc', 'Chủ đầu tư', 'Mua hàng', 'Đội thi công'];
+const roleOptions = ['PM', 'QS', 'Thiết kế', 'Giám sát', 'Kế toán', 'Pháp lý', 'Bộ phận HĐ', 'Thủ kho', 'QA/QC', 'Giám đốc', 'Chủ đầu tư', 'Mua hàng', 'Đội thi công'];
 const stepTypes = ['task', 'checklist', 'approval', 'document_upload', 'photo_upload', 'budget_check', 'material_check', 'daily_report', 'meeting_minutes', 'acceptance_check', 'handover_check', 'accounting_check'];
 
 type SelectOption = string | { label: string; value: string };
@@ -14,6 +14,7 @@ type StepDialogMode = 'add' | 'edit' | 'view' | null;
 type StepDropPosition = 'before' | 'after';
 type DropdownMode = 'overlay' | 'inline';
 type StepForm = {
+  business_code: string;
   name: string;
   step_type: string;
   required_role_ids: string[];
@@ -31,6 +32,7 @@ type NodeInspectorPanelProps = {
   stepDialogMode: StepDialogMode;
   stepForm: StepForm;
   stepNameInvalid: boolean;
+  stepCodeInvalid: boolean;
   stepRolesInvalid: boolean;
   stepFormInvalid: boolean;
   savePending: boolean;
@@ -64,6 +66,7 @@ export function NodeInspectorPanel({
   stepDialogMode,
   stepForm,
   stepNameInvalid,
+  stepCodeInvalid,
   stepRolesInvalid,
   stepFormInvalid,
   savePending,
@@ -194,6 +197,7 @@ export function NodeInspectorPanel({
           </div>
         ) : null}
         <div className="space-y-3">
+          <Field label="Business code" value={nodeForm.business_code} onChange={(value) => onChangeField('business_code', value)} disabled={readOnly} />
           <Field label="Tên node" value={nodeForm.name} onChange={(value) => onChangeField('name', value)} disabled={readOnly} />
           <Field label="Mô tả" value={nodeForm.description} onChange={(value) => onChangeField('description', value)} textarea disabled={readOnly} />
           <Select label="Node type" value={nodeForm.type} options={enumOptions('node_type', nodeTypeValues)} onChange={(value) => onChangeField('type', value)} disabled={readOnly} />
@@ -329,6 +333,7 @@ export function NodeInspectorPanel({
                         <p className="text-sm font-medium text-ink">{index + 1}. {step.name}</p>
                         <div className="mt-1 flex flex-wrap gap-1">
                           <EnumChip group="step_type" value={step.step_type} />
+                          {step.business_code ? <span className="rounded-md bg-violet-50 px-2 py-0.5 font-mono text-xs font-semibold text-violet-700">{step.business_code}</span> : null}
                           <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{stepRoles || 'Chưa gán role'}</span>
                           {stepWorkflowForm ? (
                             <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
@@ -402,6 +407,7 @@ export function NodeInspectorPanel({
               Revision đã phát hành là bất biến. Nội dung bên dưới chỉ để xem.
             </div>
           ) : null}
+          <Field label="Business code" value={stepForm.business_code} onChange={(value) => onChangeStepField('business_code', value)} invalid={stepCodeInvalid} invalidText="Business code phải ổn định, dạng lowercase.segment" disabled={stepDialogReadOnly} />
           <Field label="Tên" value={stepForm.name} onChange={(value) => onChangeStepField('name', value)} invalid={stepNameInvalid} disabled={stepDialogReadOnly} />
           <Select label="Loại" value={stepForm.step_type} options={enumOptions('step_type', stepTypes)} onChange={(value) => onChangeStepField('step_type', value)} disabled={stepDialogReadOnly} />
           <MultiSelect
@@ -447,7 +453,7 @@ function isRecord(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function Field({ label, value, onChange, textarea, invalid, disabled = false }: { label: string; value?: string; onChange: (value: string) => void; textarea?: boolean; invalid?: boolean; disabled?: boolean }) {
+function Field({ label, value, onChange, textarea, invalid, invalidText, disabled = false }: { label: string; value?: string; onChange: (value: string) => void; textarea?: boolean; invalid?: boolean; invalidText?: string; disabled?: boolean }) {
   const fieldClass = `mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600 ${invalid ? 'border-rose-300 bg-rose-50' : 'border-line'}`;
   return (
     <label className="block">
@@ -457,7 +463,7 @@ function Field({ label, value, onChange, textarea, invalid, disabled = false }: 
       ) : (
         <input className={fieldClass} value={value ?? ''} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
       )}
-      {invalid ? <span className="mt-1 block text-xs font-medium text-rose-600">Tên checklist là bắt buộc</span> : null}
+      {invalid ? <span className="mt-1 block text-xs font-medium text-rose-600">{invalidText ?? 'Tên checklist là bắt buộc'}</span> : null}
     </label>
   );
 }

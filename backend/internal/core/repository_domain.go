@@ -8108,6 +8108,7 @@ func (r *Repository) CloneTemplate(ctx context.Context, id, userID string) (Reco
 		oldID := fmt.Sprint(node["id"])
 		nodeBody := Record{
 			"template_id":          cloneID,
+			"business_code":        node["business_code"],
 			"name":                 node["name"],
 			"description":          node["description"],
 			"type":                 node["type"],
@@ -8136,6 +8137,7 @@ func (r *Repository) CloneTemplate(ctx context.Context, id, userID string) (Reco
 		for _, step := range steps {
 			stepBody := Record{
 				"node_id":             newNodeID,
+				"business_code":       step["business_code"],
 				"name":                step["name"],
 				"description":         step["description"],
 				"step_type":           step["step_type"],
@@ -8187,12 +8189,26 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 	}
 	defer tx.Rollback()
 
-	projectRows, err := queryTx(ctx, tx, `SELECT id FROM projects WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, projectID)
+	projectRows, err := queryTx(ctx, tx, `SELECT id,workflow_entry_mode FROM projects WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, projectID)
 	if err != nil {
 		return nil, err
 	}
 	if len(projectRows) == 0 {
 		return nil, sql.ErrNoRows
+	}
+	if fmt.Sprint(projectRows[0]["workflow_entry_mode"]) == "client_boq" {
+		var hasClientBOQ bool
+		if err := tx.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM documents
+				WHERE project_id=$1 AND target_type='project_intake' AND document_type='client_boq' AND status='active'
+			)
+		`, projectID).Scan(&hasClientBOQ); err != nil {
+			return nil, err
+		}
+		if !hasClientBOQ {
+			return nil, validationError("Công trình chọn nhánh BOQ có sẵn nhưng chưa có hồ sơ BOQ đầu vào")
+		}
 	}
 	activeRuns, err := queryTx(ctx, tx, `
 		SELECT id
@@ -8212,7 +8228,7 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 	}
 
 	if templateID == "" {
-		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(pipeline_template_id, (SELECT id FROM pipeline_templates WHERE status='published' ORDER BY created_at LIMIT 1)) FROM projects WHERE id=$1`, projectID).Scan(&templateID); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(pipeline_template_id, (SELECT id FROM pipeline_templates WHERE status='published' ORDER BY revision_no DESC, published_at DESC NULLS LAST, created_at DESC LIMIT 1)) FROM projects WHERE id=$1`, projectID).Scan(&templateID); err != nil {
 			return nil, err
 		}
 	}
@@ -8288,9 +8304,9 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 		rawApprovalPolicy, _ := json.Marshal(node["approval_policy_json"])
 		if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
 				INSERT INTO pipeline_run_nodes
-					(id, run_id, project_id, template_node_id, name, description, type, order_index, responsible_role_ids, required_permission, permissions, exit_conditions, approval_rule, approval_policy_json, fail_path, status, started_at)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11::jsonb,$12::jsonb,$13,$14::jsonb,$15,$16,%s)
-			`, startedSQL), runNodeID, runID, projectID, node["id"], node["name"], node["description"], node["type"], node["order_index"], string(rawRoles), node["required_permission"], string(rawPermissions), string(rawExit), node["approval_rule"], string(rawApprovalPolicy), node["fail_path"], status); err != nil {
+					(id, run_id, project_id, template_node_id, business_code, name, description, type, order_index, responsible_role_ids, required_permission, permissions, exit_conditions, approval_rule, approval_policy_json, fail_path, status, started_at)
+				VALUES ($1,$2,$3,$4,NULLIF($5,''),$6,$7,$8,$9,$10::jsonb,$11,$12::jsonb,$13::jsonb,$14,$15::jsonb,$16,$17,%s)
+			`, startedSQL), runNodeID, runID, projectID, node["id"], cleanOptionalText(node["business_code"]), node["name"], node["description"], node["type"], node["order_index"], string(rawRoles), node["required_permission"], string(rawPermissions), string(rawExit), node["approval_rule"], string(rawApprovalPolicy), node["fail_path"], status); err != nil {
 			return nil, err
 		}
 		steps, err := queryTx(ctx, tx, `
@@ -8310,9 +8326,9 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 			rawStepRoles, _ := json.Marshal(step["required_role_ids"])
 			if _, err := tx.ExecContext(ctx, `
 				INSERT INTO pipeline_run_steps
-					(id, run_node_id, project_id, template_step_id, name, description, step_type, required_role_ids, required_permission, checklist_required, document_required, photo_required, form_required, form_version_id, surface_kind, domain_action_key, order_index, status)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,NULLIF($14,'')::uuid,NULLIF($15,''),NULLIF($16,''),$17,'pending')
-			`, runStepID, runNodeID, projectID, step["id"], step["name"], step["description"], step["step_type"], string(rawStepRoles), step["required_permission"], step["checklist_required"], step["document_required"], step["photo_required"], step["form_required"], cleanID(step["form_version_id"]), cleanOptionalText(step["surface_kind"]), cleanOptionalText(step["domain_action_key"]), step["order_index"]); err != nil {
+					(id, run_node_id, project_id, template_step_id, business_code, name, description, step_type, required_role_ids, required_permission, checklist_required, document_required, photo_required, form_required, form_version_id, surface_kind, domain_action_key, order_index, status)
+				VALUES ($1,$2,$3,$4,NULLIF($5,''),$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,NULLIF($15,'')::uuid,NULLIF($16,''),NULLIF($17,''),$18,'pending')
+			`, runStepID, runNodeID, projectID, step["id"], cleanOptionalText(step["business_code"]), step["name"], step["description"], step["step_type"], string(rawStepRoles), step["required_permission"], step["checklist_required"], step["document_required"], step["photo_required"], step["form_required"], cleanID(step["form_version_id"]), cleanOptionalText(step["surface_kind"]), cleanOptionalText(step["domain_action_key"]), step["order_index"]); err != nil {
 				return nil, err
 			}
 			roleLabels := step["required_role_ids"]
@@ -8681,7 +8697,7 @@ func (r *Repository) clientWorkflowAutomationContext(ctx context.Context, workIt
 func clientWorkflowAutomationAction(contextRow Record) string {
 	domainActionKey := strings.TrimSpace(fmt.Sprint(contextRow["domain_action_key"]))
 	switch domainActionKey {
-	case "procurement.generate_from_boq", "procurement.require_approved", "finance.scaffold_incoming_acceptance", "finance.scaffold_outgoing_acceptance", "handover.evaluate_readiness":
+	case "procurement.generate_from_boq", "procurement.require_approved", "contract.require_execution_ready", "finance.scaffold_incoming_acceptance", "finance.scaffold_outgoing_acceptance", "handover.evaluate_readiness":
 		return domainActionKey
 	}
 	if int(number(contextRow["engine_version"])) >= 2 {
@@ -8712,6 +8728,8 @@ func (r *Repository) executeClientWorkflowAutomation(ctx context.Context, contex
 		outcome, err = r.automateClientBOQProcurement(ctx, contextRow, actorID, actorName)
 	case "input_procurement_gate", "procurement.require_approved":
 		outcome, err = r.automateClientInputProcurementGate(ctx, contextRow)
+	case "contract.require_execution_ready":
+		outcome, err = r.automateClientContractExecutionGate(ctx, contextRow)
 	case "incoming_acceptance_finance_scaffold", "finance.scaffold_incoming_acceptance":
 		outcome, err = r.automateClientIncomingAcceptanceFinance(ctx, contextRow, actorID, actorName)
 	case "outgoing_acceptance_finance_scaffold", "finance.scaffold_outgoing_acceptance":
@@ -8725,6 +8743,56 @@ func (r *Repository) executeClientWorkflowAutomation(ctx context.Context, contex
 		outcome.ActionKey = actionKey
 	}
 	return outcome, err
+}
+
+func (r *Repository) automateClientContractExecutionGate(ctx context.Context, contextRow Record) (workflowAutomationOutcome, error) {
+	projectID := cleanID(contextRow["project_id"])
+	rows, err := r.Query(ctx, `
+		SELECT c.id AS contract_id,c.status AS contract_status,cv.id AS contract_version_id,cv.status AS version_status,
+			EXISTS (
+				SELECT 1 FROM contract_version_signature_links link
+				WHERE link.contract_version_id=cv.id
+			) AS app_signed,
+			EXISTS (
+				SELECT 1 FROM contract_dispatches dispatch
+				WHERE dispatch.contract_id=c.id
+				  AND dispatch.contract_version_id=cv.id
+				  AND dispatch.status='received'
+				  AND dispatch.returned_scan_document_id IS NOT NULL
+			) AS returned_scan_received
+		FROM contracts c
+		LEFT JOIN contract_versions cv ON cv.id=c.current_version_id
+		WHERE c.project_id=$1
+		  AND c.contract_type='main_client'
+		  AND c.direction='receivable'
+		  AND c.status <> 'terminated'
+		ORDER BY (c.status='active') DESC,c.updated_at DESC,c.id
+		LIMIT 1
+	`, projectID)
+	if err != nil {
+		return workflowAutomationOutcome{}, err
+	}
+	metadata := Record{"project_id": projectID}
+	if len(rows) == 0 {
+		return automationBlocked("contract.require_execution_ready", "Chưa có hợp đồng đầu ra với chủ đầu tư", metadata), nil
+	}
+	contract := rows[0]
+	metadata["contract_id"] = contract["contract_id"]
+	metadata["contract_status"] = contract["contract_status"]
+	metadata["contract_version_id"] = contract["contract_version_id"]
+	metadata["version_status"] = contract["version_status"]
+	metadata["app_signed"] = contract["app_signed"]
+	metadata["returned_scan_received"] = contract["returned_scan_received"]
+	if fmt.Sprint(contract["version_status"]) != "signed" || !boolValue(contract["app_signed"]) {
+		return automationBlockedWithTarget("contract.require_execution_ready", "Version hợp đồng chưa được ký trên App bằng chữ ký workflow", "contract", cleanID(contract["contract_id"]), metadata), nil
+	}
+	if !boolValue(contract["returned_scan_received"]) {
+		return automationBlockedWithTarget("contract.require_execution_ready", "Chưa nhận lại và liên kết bản scan hợp đồng giấy đã ký", "contract", cleanID(contract["contract_id"]), metadata), nil
+	}
+	if fmt.Sprint(contract["contract_status"]) != "active" {
+		return automationBlockedWithTarget("contract.require_execution_ready", "Hợp đồng chưa được kích hoạt sau khi hoàn tất ký và hồ sơ giấy", "contract", cleanID(contract["contract_id"]), metadata), nil
+	}
+	return automationSucceeded("contract.require_execution_ready", "Hợp đồng đầu ra đã đủ điều kiện mở triển khai", "contract", cleanID(contract["contract_id"]), metadata), nil
 }
 
 func (r *Repository) automateClientBOQProcurement(ctx context.Context, contextRow Record, actorID, actorName string) (workflowAutomationOutcome, error) {
@@ -9969,6 +10037,15 @@ func (r *Repository) runEdgeConditionMet(ctx context.Context, tx *sql.Tx, edge, 
 		return matched, boolReason(matched, "Yêu cầu mua/đầu vào đã được duyệt", "Thiếu yêu cầu mua/đầu vào hoặc còn yêu cầu chưa được duyệt"), nil
 	case "workflow_form_answer_equals":
 		return r.workflowFormAnswerEqualsCondition(ctx, tx, edge, projectID, nodeID)
+	case "project_entry_mode":
+		config := edgeConditionConfig(edge)
+		expected := strings.TrimSpace(fmt.Sprint(config["value"]))
+		var actual string
+		if err := tx.QueryRowContext(ctx, `SELECT workflow_entry_mode FROM projects WHERE id=$1`, projectID).Scan(&actual); err != nil {
+			return false, "", err
+		}
+		matched := actual == expected
+		return matched, boolReason(matched, fmt.Sprintf("Điểm bắt đầu công trình là %s", expected), fmt.Sprintf("Điểm bắt đầu công trình là %s, không phải %s", actual, expected)), nil
 	case "handover_ready":
 		return r.handoverReadyCondition(ctx, tx, projectID)
 	case "financial_ready":
@@ -11586,7 +11663,8 @@ func (r *Repository) ListProjectContracts(ctx context.Context, projectID string)
 			cv.version_no AS current_version_no, cv.version_label AS current_version_label, cv.status AS current_version_status,
 			COALESCE(summary.milestone_count,0) AS milestone_count,
 			COALESCE(summary.variation_count,0) AS variation_count,
-			COALESCE(summary.retention_outstanding,0) AS retention_outstanding
+			COALESCE(summary.retention_outstanding,0) AS retention_outstanding,
+			COALESCE(summary.signed_scan_received,false) AS signed_scan_received
 		FROM contracts c
 		LEFT JOIN partners p ON p.id=c.counterparty_partner_id
 		LEFT JOIN contract_versions cv ON cv.id=c.current_version_id
@@ -11594,7 +11672,15 @@ func (r *Repository) ListProjectContracts(ctx context.Context, projectID string)
 			SELECT
 				(SELECT COUNT(*) FROM contract_milestones cm WHERE cm.contract_id=c.id AND cm.status <> 'cancelled') AS milestone_count,
 				(SELECT COUNT(*) FROM contract_variations v WHERE v.contract_id=c.id AND v.status <> 'rejected') AS variation_count,
-				(SELECT COALESCE(SUM(cr.outstanding_amount),0) FROM contract_retentions cr WHERE cr.contract_id=c.id AND cr.status <> 'forfeited') AS retention_outstanding
+				(SELECT COALESCE(SUM(cr.outstanding_amount),0) FROM contract_retentions cr WHERE cr.contract_id=c.id AND cr.status <> 'forfeited') AS retention_outstanding,
+				EXISTS (
+					SELECT 1
+					FROM contract_dispatches dispatch
+					WHERE dispatch.contract_id=c.id
+					  AND dispatch.contract_version_id=c.current_version_id
+					  AND dispatch.status='received'
+					  AND dispatch.returned_scan_document_id IS NOT NULL
+				) AS signed_scan_received
 		) summary ON true
 		WHERE c.project_id=$1 AND c.status <> 'terminated'
 		ORDER BY c.created_at DESC
@@ -11617,6 +11703,61 @@ func (r *Repository) GetContractDetail(ctx context.Context, contractID string) (
 	if err != nil {
 		return nil, err
 	}
+	signatures, err := r.Query(ctx, `
+		SELECT link.id AS link_id,link.contract_version_id,link.purpose,link.linked_by,link.linked_at,
+			signature.id AS workflow_form_signature_id,signature.form_instance_id,signature.signer_user_id,
+			signature.signer_name,signature.signer_roles_json,signature.comment,signature.payload_hash,
+			signature.signed_at,signature.visual_mime_type,signature.visual_file_size,
+			wfi.title AS workflow_form_title
+		FROM contract_version_signature_links link
+		JOIN workflow_form_signatures signature ON signature.id=link.workflow_form_signature_id
+		JOIN workflow_form_instances wfi ON wfi.id=signature.form_instance_id
+		JOIN contract_versions version ON version.id=link.contract_version_id
+		WHERE version.contract_id=$1
+		ORDER BY signature.signed_at DESC,signature.id
+	`, contractID)
+	if err != nil {
+		return nil, err
+	}
+	signingForms, err := r.Query(ctx, `
+		SELECT wfi.id,wfi.title,wfi.status,wfi.current_revision,wfi.submitted_at,
+			wi.id AS work_item_id,wi.title AS work_item_title,rs.business_code AS step_business_code,
+			COALESCE((
+				SELECT jsonb_agg(jsonb_build_object(
+					'id',signature.id,
+					'purpose',signature.purpose,
+					'signer_user_id',signature.signer_user_id,
+					'signer_name',signature.signer_name,
+					'signed_at',signature.signed_at,
+					'linked_contract_version_id',link.contract_version_id
+				) ORDER BY signature.signed_at DESC)
+				FROM workflow_form_signatures signature
+				LEFT JOIN contract_version_signature_links link ON link.workflow_form_signature_id=signature.id
+				WHERE signature.form_instance_id=wfi.id
+			),'[]'::jsonb) AS signatures
+		FROM contracts contract
+		JOIN workflow_form_instances wfi ON wfi.project_id=contract.project_id AND wfi.status='submitted'
+		JOIN work_items wi ON wi.id=wfi.work_item_id
+		JOIN pipeline_run_steps rs ON rs.id=wfi.run_step_id
+		WHERE contract.id=$1 AND rs.business_code='outbound_contract.app_sign'
+		ORDER BY wfi.submitted_at DESC NULLS LAST,wfi.updated_at DESC,wfi.id
+	`, contractID)
+	if err != nil {
+		return nil, err
+	}
+	dispatches, err := r.Query(ctx, `
+		SELECT dispatch.*,
+			sent.name AS sent_document_name,sent.mime_type AS sent_document_mime_type,
+			returned.name AS returned_scan_document_name,returned.mime_type AS returned_scan_document_mime_type
+		FROM contract_dispatches dispatch
+		LEFT JOIN documents sent ON sent.id=dispatch.sent_document_id
+		LEFT JOIN documents returned ON returned.id=dispatch.returned_scan_document_id
+		WHERE dispatch.contract_id=$1
+		ORDER BY dispatch.dispatch_no DESC
+	`, contractID)
+	if err != nil {
+		return nil, err
+	}
 	milestones, err := r.Query(ctx, `
 		SELECT cm.*, ar.title AS acceptance_title, ar.status AS acceptance_status
 		FROM contract_milestones cm
@@ -11627,7 +11768,16 @@ func (r *Repository) GetContractDetail(ctx context.Context, contractID string) (
 	if err != nil {
 		return nil, err
 	}
-	variations, err := r.Query(ctx, `SELECT * FROM contract_variations WHERE contract_id=$1 ORDER BY created_at DESC`, contractID)
+	variations, err := r.Query(ctx, `
+		SELECT variation.*,
+			COALESCE((
+				SELECT jsonb_agg(to_jsonb(event) ORDER BY event.created_at,event.id)
+				FROM contract_variation_events event WHERE event.variation_id=variation.id
+			),'[]'::jsonb) AS events
+		FROM contract_variations variation
+		WHERE variation.contract_id=$1
+		ORDER BY variation.created_at DESC
+	`, contractID)
 	if err != nil {
 		return nil, err
 	}
@@ -11643,10 +11793,68 @@ func (r *Repository) GetContractDetail(ctx context.Context, contractID string) (
 		return nil, err
 	}
 	contract["versions"] = versions
+	contract["workflow_signatures"] = signatures
+	contract["signing_forms"] = signingForms
+	contract["dispatches"] = dispatches
+	currentVersionID := cleanID(contract["current_version_id"])
+	appSigned := false
+	for _, signature := range signatures {
+		if cleanID(signature["contract_version_id"]) == currentVersionID {
+			appSigned = true
+			break
+		}
+	}
+	paperDispatched := false
+	returnedScanReceived := false
+	for _, dispatch := range dispatches {
+		if cleanID(dispatch["contract_version_id"]) != currentVersionID {
+			continue
+		}
+		paperDispatched = true
+		if fmt.Sprint(dispatch["status"]) == "received" && cleanID(dispatch["returned_scan_document_id"]) != "" {
+			returnedScanReceived = true
+		}
+	}
+	contract["execution_readiness"] = Record{
+		"app_signed":             appSigned,
+		"paper_dispatched":       paperDispatched,
+		"returned_scan_received": returnedScanReceived,
+		"contract_active":        fmt.Sprint(contract["status"]) == "active",
+	}
 	contract["milestones"] = milestones
 	contract["variations"] = variations
 	contract["retentions"] = retentions
 	return contract, nil
+}
+
+func (r *Repository) CreateProjectDocument(ctx context.Context, projectID, targetType, targetID, documentType, name, originalName string, file StoredFileMetadata, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO documents (
+			project_id,target_type,target_id,name,document_type,status,uploaded_by,
+			mime_type,file_size,storage_provider,storage_key,checksum_sha256
+		)
+		VALUES ($1,$2,NULLIF($3,'')::uuid,$4,NULLIF($5,''),'active',NULLIF($6,'')::uuid,$7,$8,$9,$10,$11)
+		RETURNING *
+	`, projectID, targetType, targetID, name, documentType, actorID, file.MIMEType, file.FileSize, file.StorageProvider, file.StorageKey, file.ChecksumSHA256)
+	if err != nil {
+		return nil, err
+	}
+	documentID := cleanID(rows[0]["id"])
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "project_document_uploaded", "document", documentID, "Tải hồ sơ công trình lên kho bảo vệ", Record{
+		"target_type": targetType, "target_id": targetID, "document_type": documentType,
+		"name": name, "original_filename": originalName, "checksum_sha256": file.ChecksumSHA256,
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return rows[0], nil
 }
 
 func (r *Repository) SaveContract(ctx context.Context, contractID string, body Record, actorID, actorName string) (Record, error) {
@@ -11843,6 +12051,199 @@ func (r *Repository) ContractVersionAction(ctx context.Context, versionID, actio
 	return r.GetContractDetail(ctx, cleanID(version["contract_id"]))
 }
 
+func (r *Repository) SignContractVersionWithWorkflowSignature(ctx context.Context, versionID, signatureID, comment, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	versions, err := queryTx(ctx, tx, `
+		SELECT cv.*,c.project_id,c.status AS contract_status
+		FROM contract_versions cv
+		JOIN contracts c ON c.id=cv.contract_id
+		WHERE cv.id=$1
+		FOR UPDATE OF cv,c
+	`, versionID)
+	if err != nil {
+		return nil, err
+	}
+	if len(versions) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	version := versions[0]
+	if fmt.Sprint(version["status"]) != "approved" {
+		return nil, validationError("Chỉ version đã duyệt mới được ký trên App", Record{"status": version["status"]})
+	}
+	signatures, err := queryTx(ctx, tx, `
+		SELECT signature.*,wfi.project_id AS form_project_id,rs.business_code AS step_business_code
+		FROM workflow_form_signatures signature
+		JOIN workflow_form_instances wfi ON wfi.id=signature.form_instance_id
+		JOIN pipeline_run_steps rs ON rs.id=wfi.run_step_id
+		WHERE signature.id=$1
+		FOR SHARE OF signature,wfi,rs
+	`, signatureID)
+	if err != nil {
+		return nil, err
+	}
+	if len(signatures) == 0 {
+		return nil, validationError("Không tìm thấy chữ ký workflow đã chọn")
+	}
+	signature := signatures[0]
+	if cleanID(signature["form_project_id"]) != cleanID(version["project_id"]) {
+		return nil, validationError("Chữ ký workflow không thuộc cùng công trình với hợp đồng")
+	}
+	if fmt.Sprint(signature["purpose"]) != "approved_by" || fmt.Sprint(signature["step_business_code"]) != "outbound_contract.app_sign" {
+		return nil, validationError("Chữ ký không thuộc bước ký hợp đồng trên App", Record{"purpose": signature["purpose"], "step_business_code": signature["step_business_code"]})
+	}
+	if cleanID(signature["signer_user_id"]) != actorID {
+		return nil, forbiddenError("Chỉ người vừa ký workflow mới được xác nhận ký version hợp đồng")
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO contract_version_signature_links (contract_version_id,workflow_form_signature_id,purpose,linked_by)
+		VALUES ($1,$2,'approved_by',NULLIF($3,'')::uuid)
+	`, versionID, signatureID, actorID); err != nil {
+		return nil, validationError("Chữ ký workflow đã được liên kết hoặc version đã có chữ ký", Record{"cause": err.Error()})
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE contract_versions
+		SET status='signed',signature_comment=$2,signed_by=NULLIF($3,'')::uuid,signed_at=now(),updated_at=now()
+		WHERE id=$1
+	`, versionID, comment, actorID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE contracts
+		SET status='signed',current_version_id=$2,current_amount=$3,signed_by=NULLIF($4,'')::uuid,
+			signed_date=COALESCE(signed_date,CURRENT_DATE),updated_at=now()
+		WHERE id=$1
+	`, version["contract_id"], versionID, version["amount"], actorID); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, cleanID(version["project_id"]), actorID, actorName, "contract_version_signed_on_app", "contract_version", versionID, "Ký version hợp đồng trên App", Record{
+		"contract_id": version["contract_id"], "workflow_form_signature_id": signatureID, "signature_payload_hash": signature["payload_hash"], "comment": comment,
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetContractDetail(ctx, cleanID(version["contract_id"]))
+}
+
+func (r *Repository) CreateContractDispatch(ctx context.Context, contractID string, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	contracts, err := queryTx(ctx, tx, `
+		SELECT c.*,cv.status AS version_status,
+			EXISTS (SELECT 1 FROM contract_version_signature_links link WHERE link.contract_version_id=cv.id) AS app_signed
+		FROM contracts c
+		JOIN contract_versions cv ON cv.id=c.current_version_id
+		WHERE c.id=$1 FOR UPDATE OF c
+	`, contractID)
+	if err != nil {
+		return nil, err
+	}
+	if len(contracts) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	contract := contracts[0]
+	versionID := cleanID(body["contract_version_id"])
+	if versionID == "" {
+		versionID = cleanID(contract["current_version_id"])
+	}
+	if versionID != cleanID(contract["current_version_id"]) || fmt.Sprint(contract["version_status"]) != "signed" || !boolValue(contract["app_signed"]) {
+		return nil, validationError("Chỉ version hiện hành đã ký trên App mới được gửi hồ sơ giấy")
+	}
+	if sentDocumentID := cleanID(body["sent_document_id"]); sentDocumentID != "" {
+		if err := validateProjectDocumentTx(ctx, tx, sentDocumentID, cleanID(contract["project_id"])); err != nil {
+			return nil, err
+		}
+	}
+	var dispatchNo int
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(dispatch_no),0)+1 FROM contract_dispatches WHERE contract_id=$1`, contractID).Scan(&dispatchNo); err != nil {
+		return nil, err
+	}
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO contract_dispatches (
+			contract_id,contract_version_id,dispatch_no,recipient_name,delivery_method,
+			tracking_reference,sent_document_id,status,sent_by,note
+		)
+		VALUES ($1,$2,$3,$4,$5,NULLIF($6,''),NULLIF($7,'')::uuid,'sent',NULLIF($8,'')::uuid,NULLIF($9,''))
+		RETURNING *
+	`, contractID, versionID, dispatchNo, body["recipient_name"], body["delivery_method"], body["tracking_reference"], cleanID(body["sent_document_id"]), actorID, body["note"])
+	if err != nil {
+		return nil, err
+	}
+	dispatchID := cleanID(rows[0]["id"])
+	if err := addAuditTx(ctx, tx, cleanID(contract["project_id"]), actorID, actorName, "contract_paper_dispatched", "contract_dispatch", dispatchID, "Gửi hồ sơ hợp đồng giấy cho chủ đầu tư", Record{
+		"contract_id": contractID, "contract_version_id": versionID, "dispatch_no": dispatchNo, "recipient_name": body["recipient_name"], "tracking_reference": body["tracking_reference"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetContractDetail(ctx, contractID)
+}
+
+func validateProjectDocumentTx(ctx context.Context, tx *sql.Tx, documentID, projectID string) error {
+	var total int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM documents WHERE id=$1 AND project_id=$2 AND status='active'`, documentID, projectID).Scan(&total); err != nil {
+		return err
+	}
+	if total == 0 {
+		return validationError("Hồ sơ đính kèm không thuộc công trình hoặc không còn hiệu lực", Record{"document_id": documentID})
+	}
+	return nil
+}
+
+func (r *Repository) ReceiveContractDispatch(ctx context.Context, dispatchID, scanDocumentID, note, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	rows, err := queryTx(ctx, tx, `
+		SELECT dispatch.*,contract.project_id
+		FROM contract_dispatches dispatch
+		JOIN contracts contract ON contract.id=dispatch.contract_id
+		WHERE dispatch.id=$1 FOR UPDATE OF dispatch
+	`, dispatchID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	dispatch := rows[0]
+	if fmt.Sprint(dispatch["status"]) != "sent" {
+		return nil, validationError("Hồ sơ giấy đã được ghi nhận nhận lại", Record{"status": dispatch["status"]})
+	}
+	if err := validateProjectDocumentTx(ctx, tx, scanDocumentID, cleanID(dispatch["project_id"])); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE contract_dispatches
+		SET status='received',returned_scan_document_id=$2,received_by=NULLIF($3,'')::uuid,
+			received_at=now(),note=concat_ws(E'\n',NULLIF(note,''),NULLIF($4,'')),updated_at=now()
+		WHERE id=$1
+	`, dispatchID, scanDocumentID, actorID, note); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, cleanID(dispatch["project_id"]), actorID, actorName, "contract_signed_scan_received", "contract_dispatch", dispatchID, "Nhận lại và lưu bản scan hợp đồng giấy đã ký", Record{
+		"contract_id": dispatch["contract_id"], "contract_version_id": dispatch["contract_version_id"], "returned_scan_document_id": scanDocumentID, "note": note,
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetContractDetail(ctx, cleanID(dispatch["contract_id"]))
+}
+
 func (r *Repository) ActivateContract(ctx context.Context, contractID, comment, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -11850,7 +12251,16 @@ func (r *Repository) ActivateContract(ctx context.Context, contractID, comment, 
 	}
 	defer tx.Rollback()
 	rows, err := queryTx(ctx, tx, `
-		SELECT c.*, cv.status AS version_status, cv.amount AS version_amount
+		SELECT c.*, cv.status AS version_status, cv.amount AS version_amount,
+			EXISTS (
+				SELECT 1 FROM contract_version_signature_links link
+				WHERE link.contract_version_id=cv.id
+			) AS app_signed,
+			EXISTS (
+				SELECT 1 FROM contract_dispatches dispatch
+				WHERE dispatch.contract_id=c.id AND dispatch.contract_version_id=cv.id
+				  AND dispatch.status='received' AND dispatch.returned_scan_document_id IS NOT NULL
+			) AS returned_scan_received
 		FROM contracts c LEFT JOIN contract_versions cv ON cv.id=c.current_version_id
 		WHERE c.id=$1 FOR UPDATE OF c
 	`, contractID)
@@ -11863,6 +12273,12 @@ func (r *Repository) ActivateContract(ctx context.Context, contractID, comment, 
 	contract := rows[0]
 	if fmt.Sprint(contract["status"]) != "signed" || fmt.Sprint(contract["version_status"]) != "signed" {
 		return nil, validationError("Chỉ hợp đồng có version đã ký mới được kích hoạt")
+	}
+	if !boolValue(contract["app_signed"]) {
+		return nil, validationError("Cần chữ ký approved_by trên App trước khi kích hoạt hợp đồng")
+	}
+	if !boolValue(contract["returned_scan_received"]) {
+		return nil, validationError("Cần nhận lại và lưu bản scan hợp đồng giấy đã ký trước khi kích hoạt")
 	}
 	if cleanID(contract["counterparty_partner_id"]) == "" || dateOnly(contract["effective_date"]) == "" {
 		return nil, validationError("Kích hoạt hợp đồng cần đối tác catalog và ngày hiệu lực")
@@ -12071,10 +12487,35 @@ func (r *Repository) CreateContractVariation(ctx context.Context, contractID str
 		return nil, validationError("Chỉ hợp đồng đang hiệu lực/tạm dừng mới được lập variation")
 	}
 	contract := rows[0]
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO contract_variations (contract_id,variation_code,title,variation_type,reason,amount_delta,days_delta,scope_delta,document_id,status,created_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,'')::uuid,'draft',NULLIF($10,'')::uuid)
-	`, contractID, body["variation_code"], body["title"], body["variation_type"], body["reason"], body["amount_delta"], body["days_delta"], body["scope_delta"], cleanID(body["document_id"]), actorID); err != nil {
+	if sourceWorkItemID := cleanID(body["source_work_item_id"]); sourceWorkItemID != "" {
+		var validSource bool
+		if err := tx.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM work_items item
+				LEFT JOIN pipeline_run_steps step ON step.id=item.run_step_id
+				LEFT JOIN pipeline_run_nodes node ON node.id=item.run_node_id
+				WHERE item.id=$1 AND item.project_id=$2
+				  AND (step.business_code='construction.item_reporting' OR node.business_code='construction_execution')
+			)
+		`, sourceWorkItemID, contract["project_id"]).Scan(&validSource); err != nil {
+			return nil, err
+		}
+		if !validSource {
+			return nil, validationError("Đầu việc nguồn không thuộc bước thi công của công trình")
+		}
+	}
+	variationRows, err := queryTx(ctx, tx, `
+		INSERT INTO contract_variations (
+			contract_id,variation_code,title,variation_type,reason,amount_delta,days_delta,scope_delta,
+			document_id,status,priority,source_work_item_id,created_by
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,'')::uuid,'draft',$10,NULLIF($11,'')::uuid,NULLIF($12,'')::uuid)
+		RETURNING *
+	`, contractID, body["variation_code"], body["title"], body["variation_type"], body["reason"], body["amount_delta"], body["days_delta"], body["scope_delta"], cleanID(body["document_id"]), body["priority"], cleanID(body["source_work_item_id"]), actorID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.recordContractVariationEventTx(ctx, tx, variationRows[0], "contract_variation_created", "", "draft", body["comment"], []string{"QS"}, actorID, actorName); err != nil {
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, cleanID(contract["project_id"]), actorID, actorName, "contract_variation_created", "contract", contractID, "Tạo phụ lục/variation", Record{"variation_code": body["variation_code"], "amount_delta": body["amount_delta"], "days_delta": body["days_delta"]}); err != nil {
@@ -12112,13 +12553,25 @@ func (r *Repository) ContractVariationAction(ctx context.Context, variationID, a
 	switch action {
 	case "submit":
 		if fromStatus != "draft" {
-			return nil, validationError("Chỉ variation nháp mới được gửi review")
+			return nil, validationError("Chỉ phát sinh nháp mới được gửi QS rà soát")
 		}
-		toStatus, eventType = "review", "contract_variation_submitted"
-		_, err = tx.ExecContext(ctx, `UPDATE contract_variations SET status='review',submitted_by=NULLIF($2,'')::uuid,submitted_at=now(),updated_at=now() WHERE id=$1`, variationID, actorID)
+		toStatus, eventType = "qs_review", "contract_variation_submitted"
+		_, err = tx.ExecContext(ctx, `UPDATE contract_variations SET status='qs_review',submitted_by=NULLIF($2,'')::uuid,submitted_at=now(),updated_at=now() WHERE id=$1`, variationID, actorID)
+	case "qs-review":
+		if fromStatus != "qs_review" {
+			return nil, validationError("Phát sinh chưa ở bước QS rà soát")
+		}
+		toStatus, eventType = "purchasing_sourcing", "contract_variation_qs_reviewed"
+		_, err = tx.ExecContext(ctx, `UPDATE contract_variations SET status='purchasing_sourcing',qs_reviewed_by=NULLIF($2,'')::uuid,qs_reviewed_at=now(),qs_comment=$3,updated_at=now() WHERE id=$1`, variationID, actorID, comment)
+	case "purchase":
+		if fromStatus != "purchasing_sourcing" {
+			return nil, validationError("Phát sinh chưa ở bước Mua hàng lấy giá")
+		}
+		toStatus, eventType = "pending_approval", "contract_variation_purchasing_completed"
+		_, err = tx.ExecContext(ctx, `UPDATE contract_variations SET status='pending_approval',purchasing_reviewed_by=NULLIF($2,'')::uuid,purchasing_reviewed_at=now(),purchasing_comment=$3,updated_at=now() WHERE id=$1`, variationID, actorID, comment)
 	case "approve":
-		if fromStatus != "review" {
-			return nil, validationError("Chỉ variation đang review mới được duyệt")
+		if !statusIn(fromStatus, "pending_approval", "review") {
+			return nil, validationError("Phát sinh phải qua QS và Mua hàng trước khi duyệt")
 		}
 		if cleanID(variation["approval_request_id"]) != "" {
 			var status string
@@ -12132,13 +12585,13 @@ func (r *Repository) ContractVariationAction(ctx context.Context, variationID, a
 		toStatus, eventType = "approved", "contract_variation_approved"
 		_, err = tx.ExecContext(ctx, `UPDATE contract_variations SET status='approved',approved_by=NULLIF($2,'')::uuid,approved_at=now(),updated_at=now() WHERE id=$1`, variationID, actorID)
 	case "reject":
-		if fromStatus != "review" {
-			return nil, validationError("Chỉ variation đang review mới được từ chối")
+		if !statusIn(fromStatus, "qs_review", "purchasing_sourcing", "pending_approval", "review") {
+			return nil, validationError("Trạng thái phát sinh không cho phép từ chối")
 		}
 		toStatus, eventType = "rejected", "contract_variation_rejected"
 		_, err = tx.ExecContext(ctx, `UPDATE contract_variations SET status='rejected',rejected_by=NULLIF($2,'')::uuid,rejected_at=now(),updated_at=now() WHERE id=$1`, variationID, actorID)
 	case "incorporate":
-		if fromStatus != "approved" || cleanID(variation["current_version_id"]) == "" {
+		if !statusIn(fromStatus, "approved", "procurement_created") || cleanID(variation["current_version_id"]) == "" {
 			return nil, validationError("Chỉ variation đã duyệt của hợp đồng có version hiện hành mới được tạo revision")
 		}
 		var nextVersion int
@@ -12177,6 +12630,118 @@ func (r *Repository) ContractVariationAction(ctx context.Context, variationID, a
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, cleanID(variation["project_id"]), actorID, actorName, eventType, "contract_variation", variationID, fmt.Sprintf("Chuyển variation từ %s sang %s", fromStatus, toStatus), Record{"contract_id": variation["contract_id"], "amount_delta": variation["amount_delta"], "days_delta": variation["days_delta"], "comment": comment}); err != nil {
+		return nil, err
+	}
+	nextRoles := map[string][]string{
+		"qs_review":           {"QS"},
+		"purchasing_sourcing": {"Mua hàng"},
+		"pending_approval":    {"PM", "Giám đốc"},
+	}[toStatus]
+	variation["status"] = toStatus
+	if err := r.recordContractVariationEventTx(ctx, tx, variation, eventType, fromStatus, toStatus, comment, nextRoles, actorID, actorName); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetContractDetail(ctx, cleanID(variation["contract_id"]))
+}
+
+func (r *Repository) recordContractVariationEventTx(ctx context.Context, tx *sql.Tx, variation Record, eventType, fromStatus, toStatus string, comment any, nextRoles []string, actorID, actorName string) error {
+	projectID := cleanID(variation["project_id"])
+	if projectID == "" {
+		var err error
+		projectID, err = projectIDForContractTx(ctx, tx, cleanID(variation["contract_id"]))
+		if err != nil {
+			return err
+		}
+	}
+	metadata := Record{"contract_id": variation["contract_id"], "priority": variation["priority"], "next_roles": nextRoles}
+	rawMetadata, _ := json.Marshal(metadata)
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO contract_variation_events (
+			variation_id,project_id,event_type,from_status,to_status,actor_id,actor_name,comment,metadata_json
+		)
+		VALUES ($1,$2,$3,NULLIF($4,''),NULLIF($5,''),NULLIF($6,'')::uuid,NULLIF($7,''),NULLIF($8,''),$9::jsonb)
+	`, variation["id"], projectID, eventType, fromStatus, toStatus, actorID, actorName, strings.TrimSpace(fmt.Sprint(comment)), string(rawMetadata)); err != nil {
+		return err
+	}
+	workItemID := cleanID(variation["source_work_item_id"])
+	if workItemID == "" || len(nextRoles) == 0 {
+		return nil
+	}
+	activityRows, err := queryTx(ctx, tx, `
+		INSERT INTO work_item_activities (
+			work_item_id,project_id,scope_type,scope_id,actor_id,activity_type,comment,visibility,metadata_json
+		)
+		VALUES ($1,$2,'work_item',$1,NULLIF($3,'')::uuid,'system_event',$4,'project',$5::jsonb)
+		RETURNING *
+	`, workItemID, projectID, actorID, fmt.Sprintf("Phát sinh %s chuyển sang %s", variation["variation_code"], toStatus), string(rawMetadata))
+	if err != nil {
+		return err
+	}
+	mentions := make([]ActivityMentionRequest, 0, len(nextRoles))
+	for _, role := range nextRoles {
+		mentions = append(mentions, ActivityMentionRequest{Type: "role", ID: role, Label: role})
+	}
+	return r.insertActivityAttentionTx(ctx, tx, activityRows[0], WorkItemActivityRequest{Mentions: mentions}, actorID)
+}
+
+func projectIDForContractTx(ctx context.Context, tx *sql.Tx, contractID string) (string, error) {
+	var projectID string
+	if err := tx.QueryRowContext(ctx, `SELECT project_id FROM contracts WHERE id=$1`, contractID).Scan(&projectID); err != nil {
+		return "", err
+	}
+	return projectID, nil
+}
+
+func (r *Repository) GenerateProcurementFromContractVariation(ctx context.Context, variationID, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	rows, err := queryTx(ctx, tx, `
+		SELECT variation.*,contract.project_id
+		FROM contract_variations variation
+		JOIN contracts contract ON contract.id=variation.contract_id
+		WHERE variation.id=$1 FOR UPDATE OF variation
+	`, variationID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	variation := rows[0]
+	if cleanID(variation["procurement_request_id"]) != "" {
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		return r.GetContractDetail(ctx, cleanID(variation["contract_id"]))
+	}
+	if fmt.Sprint(variation["status"]) != "approved" {
+		return nil, validationError("Chỉ phát sinh đã duyệt mới được tạo yêu cầu mua")
+	}
+	requestCode := fmt.Sprintf("VAR-%s-%d", strings.ToUpper(strings.ReplaceAll(fmt.Sprint(variation["variation_code"]), " ", "-")), time.Now().Unix())
+	amount := math.Max(number(variation["amount_delta"]), 0)
+	procurementRows, err := queryTx(ctx, tx, `
+		INSERT INTO procurement_requests (project_id,request_code,title,requested_by,status,total_estimated_amount,budget_status)
+		VALUES ($1,$2,$3,NULLIF($4,'')::uuid,'draft',$5,'within_budget')
+		RETURNING id
+	`, variation["project_id"], requestCode, fmt.Sprintf("Mua hàng cho phát sinh %s - %s", variation["variation_code"], variation["title"]), actorID, amount)
+	if err != nil {
+		return nil, err
+	}
+	procurementID := cleanID(procurementRows[0]["id"])
+	if _, err := tx.ExecContext(ctx, `UPDATE contract_variations SET status='procurement_created',procurement_request_id=$2,updated_at=now() WHERE id=$1`, variationID, procurementID); err != nil {
+		return nil, err
+	}
+	variation["status"] = "procurement_created"
+	if err := r.recordContractVariationEventTx(ctx, tx, variation, "contract_variation_procurement_created", "approved", "procurement_created", "Tạo yêu cầu mua từ phát sinh", []string{"Mua hàng"}, actorID, actorName); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, cleanID(variation["project_id"]), actorID, actorName, "contract_variation_procurement_created", "contract_variation", variationID, "Tạo yêu cầu mua từ phát sinh đã duyệt", Record{"procurement_request_id": procurementID, "request_code": requestCode}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

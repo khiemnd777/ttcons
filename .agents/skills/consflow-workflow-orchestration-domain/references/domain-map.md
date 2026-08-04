@@ -84,3 +84,11 @@
 - `GOLDEN-LIVE-001` snapshots the same official engine-v2 contract at node `Khảo sát`: node 1 is `in_progress`, all 52 run steps are pending, six first-node work items are ready, 51 exact form instances are draft, and no completion evidence or domain ledger is pre-seeded.
 - Golden Live seeds fifteen active members, including dedicated `Thiết kế`, `Sale` and `Pháp lý` actors. PM has the `planning.view`/`planning.edit` permission required by its assigned official steps; role assignment and project scope remain authoritative before the permission gate.
 - Official seeded approval policies must use V46 keys (`roles`, `quorum`, `requester_cannot_approve`, `comment_required`, `signature_required`) and mode `any`; legacy aliases such as `required_roles` are invalid for runtime approval normalization.
+
+## Official Client Workflow Rev3
+
+- V85 publishes immutable engine-3 template `40000000-0000-0000-0000-000000000022` in the existing workflow family. It has 15 uniquely coded nodes and 51 uniquely coded steps. `business_code` is the automation/API identifier; titles and client numbering remain editable presentation only on future draft revisions.
+- The root uses `project_entry_mode`: `survey_required` follows Survey -> Review/Meeting -> optional Design; `client_boq` requires an active `client_boq` project document and enters the BOQ-without-design node directly. Both paths converge before the outbound-contract gate.
+- Outbound contract is before takeoff, price sourcing, negotiation, input contract, planning and construction. Its runtime gate requires an immutable App signature link, paper dispatch and returned signed scan. UI completion or a legacy `signed` status alone cannot satisfy it.
+- Rev3 role snapshots distinguish `Giám sát` field ownership from `QA/QC` client quality-dossier ownership. Contract steps snapshot QS, Kế toán, Pháp lý, Mua hàng, Bộ phận HĐ, PM and Giám đốc.
+- `GOLDEN-REV3-BOQ-001` (project `...023`) is the untouched client-BOQ runtime fixture: 15 nodes, 51 work items and 49 draft forms. Project 022 remains bound to its original engine-2 runtime as the preservation regression.

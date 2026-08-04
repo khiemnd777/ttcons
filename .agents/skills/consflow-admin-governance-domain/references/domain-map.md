@@ -53,6 +53,11 @@
 ## Golden Live Accounts
 
 - The canonical local/dev display identities are `Ngân Kế Toán` for `accounting@consflow.local` and `Hoàng Long` for `director@consflow.local`; `users.full_name` and the linked `staff.full_name` must remain aligned, while historical audit/activity actor-name snapshots are not rewritten by an account rename.
-- Local/dev seed includes dedicated users for procurement, QA/QC, construction team, subcontractor, client, design, sales and legal roles (`procurement@consflow.local`, `qaqc@consflow.local`, `construction@consflow.local`, `subcontractor@consflow.local`, `client@consflow.local`, `design@consflow.local`, `sales@consflow.local`, `legal@consflow.local`), all documented in `backend/seed/GOLDEN_LIVE_RUNBOOK.md`.
+- Local/dev seed includes dedicated users for procurement, QA/QC, construction team, subcontractor, client, design, sales, legal and contract-department roles (`procurement@consflow.local`, `qaqc@consflow.local`, `construction@consflow.local`, `subcontractor@consflow.local`, `client@consflow.local`, `design@consflow.local`, `sales@consflow.local`, `legal@consflow.local`, `contract@consflow.local`), all documented in `backend/seed/GOLDEN_LIVE_RUNBOOK.md`.
 - `GOLDEN-LIVE-001` has fifteen active project members, including dedicated `Thiết kế`, `Sale` and `Pháp lý` demo actors, so role-scoped work, requester/approver separation and external client/subcontractor participation can be exercised without substituting Admin.
 - V72 grants `planning.view` and `planning.edit` to PM because the official workflow assigns PM to planning-gated steps. This does not bypass project scope or work-item role assignment: `CanActOnWorkItem` remains the first mutation gate.
+
+## Rev3 Contract Governance
+
+- V84 adds system role `contract_officer` displayed as `Bộ phận HĐ`, plus narrow dispatch/scan/QS-review/Purchasing-variation permissions. Contract workflow assignments include QS, Kế toán, Pháp lý, Mua hàng, Bộ phận HĐ, PM and Giám đốc; assignment does not replace permission and project-scope enforcement.
+- Contract App signing, paper dispatch, returned-scan receive, activation and each variation stage record actor/time/comment in domain audit/event history. Frontend action visibility mirrors these gates but never authorizes them.

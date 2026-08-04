@@ -196,7 +196,7 @@ BEGIN
 
   SELECT count(*) INTO actual FROM permissions
   WHERE key LIKE 'contract.%' OR key LIKE 'quality.%' OR key LIKE 'construction.%' OR key='handover.verify';
-  IF actual <> 23 THEN RAISE EXCEPTION 'Product-grade RBAC permissions after seed: expected 23, got %',actual; END IF;
+  IF actual <> 28 THEN RAISE EXCEPTION 'Product-grade RBAC permissions after seed: expected 28, got %',actual; END IF;
 
   SELECT count(*) INTO actual
   FROM role_permissions rp
@@ -234,7 +234,7 @@ BEGIN
   JOIN roles r ON r.id=rp.role_id
   JOIN permissions p ON p.id=rp.permission_id
   WHERE r.name='qa_qc' AND p.key LIKE 'construction.%';
-  IF actual <> 8 THEN RAISE EXCEPTION 'QA/QC simplified construction permissions: expected 8, got %',actual; END IF;
+  IF actual <> 9 THEN RAISE EXCEPTION 'QA/QC simplified construction permissions: expected 9, got %',actual; END IF;
   SELECT count(*) INTO actual
   FROM role_permissions rp
   JOIN roles r ON r.id=rp.role_id
@@ -261,9 +261,10 @@ BEGIN
     ('client@consflow.local','client'),
     ('design@consflow.local','design'),
     ('sales@consflow.local','sales'),
-    ('legal@consflow.local','legal')
+    ('legal@consflow.local','legal'),
+    ('contract@consflow.local','contract_officer')
   ) AND u.status='active';
-  IF actual <> 8 THEN RAISE EXCEPTION 'Golden Live dedicated role accounts: expected 8, got %',actual; END IF;
+  IF actual <> 9 THEN RAISE EXCEPTION 'Golden Live dedicated role accounts: expected 9, got %',actual; END IF;
 
   SELECT count(*) INTO actual
   FROM projects p
@@ -310,6 +311,51 @@ BEGIN
   WHERE i.project_id='30000000-0000-0000-0000-000000000022';
   IF actual <> 0 THEN RAISE EXCEPTION 'Golden Live must not have form answers, got %',actual; END IF;
 
+  -- Rev3 uses a new runtime fixture; historical project 022 must remain on its original snapshot.
+  SELECT count(*) INTO actual
+  FROM projects p
+  JOIN pipeline_runs r ON r.id=p.current_pipeline_run_id
+  WHERE p.id='30000000-0000-0000-0000-000000000023'
+    AND p.code='GOLDEN-REV3-BOQ-001'
+    AND p.workflow_entry_mode='client_boq'
+    AND p.pipeline_template_id='40000000-0000-0000-0000-000000000022'
+    AND r.template_id='40000000-0000-0000-0000-000000000022'
+    AND r.engine_version=3 AND r.status='in_progress';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Golden Rev3 project/run contract is invalid'; END IF;
+
+  SELECT count(*) INTO actual FROM documents
+  WHERE project_id='30000000-0000-0000-0000-000000000023'
+    AND document_type='client_boq' AND status='active';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Golden Rev3 client BOQ evidence: expected 1, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM project_members
+  WHERE project_id='30000000-0000-0000-0000-000000000023' AND active;
+  IF actual <> 12 THEN RAISE EXCEPTION 'Golden Rev3 project members: expected 12, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_nodes
+  WHERE project_id='30000000-0000-0000-0000-000000000023' AND business_code IS NOT NULL;
+  IF actual <> 15 THEN RAISE EXCEPTION 'Golden Rev3 coded runtime nodes: expected 15, got %',actual; END IF;
+
+  SELECT count(DISTINCT business_code) INTO actual FROM pipeline_run_steps
+  WHERE project_id='30000000-0000-0000-0000-000000000023' AND business_code IS NOT NULL;
+  IF actual <> 51 THEN RAISE EXCEPTION 'Golden Rev3 unique coded runtime steps: expected 51, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM work_items
+  WHERE project_id='30000000-0000-0000-0000-000000000023';
+  IF actual <> 51 THEN RAISE EXCEPTION 'Golden Rev3 work items: expected 51, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM workflow_form_instances
+  WHERE project_id='30000000-0000-0000-0000-000000000023'
+    AND status='draft' AND current_revision=0;
+  IF actual <> 49 THEN RAISE EXCEPTION 'Golden Rev3 draft forms: expected 49, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM projects p JOIN pipeline_runs r ON r.id=p.current_pipeline_run_id
+  WHERE p.id='30000000-0000-0000-0000-000000000022'
+    AND p.pipeline_template_id='40000000-0000-0000-0000-000000000020'
+    AND r.template_id='40000000-0000-0000-0000-000000000020';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Golden Live 022 history was unexpectedly rebound to Rev3'; END IF;
+
   SELECT
     (SELECT count(*) FROM evidence_records WHERE project_id='30000000-0000-0000-0000-000000000022') +
     (SELECT count(*) FROM documents WHERE project_id='30000000-0000-0000-0000-000000000022') +
@@ -349,7 +395,7 @@ SELECT
   (SELECT count(*) FROM workflow_form_instances f WHERE f.project_id=p.id AND f.status='submitted') AS submitted_forms,
   (SELECT count(*) FROM evidence_records e WHERE e.project_id=p.id AND e.status='accepted') AS accepted_evidence
 FROM projects p
-WHERE p.code IN ('GOLDEN-REAL-001','GOLDEN-NO-DESIGN-001','GOLDEN-LIVE-001')
+WHERE p.code IN ('GOLDEN-REAL-001','GOLDEN-NO-DESIGN-001','GOLDEN-LIVE-001','GOLDEN-REV3-BOQ-001')
 ORDER BY p.code;
 
 SELECT 'GOLDEN_SAMPLE_VALIDATION_PASSED' AS result;

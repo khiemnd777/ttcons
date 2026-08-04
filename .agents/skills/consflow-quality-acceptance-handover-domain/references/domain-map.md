@@ -65,3 +65,8 @@
 ## Golden Sample
 
 - `GOLDEN-REAL-001` preserves technical ITP/RFI/NCR/rework history behind one optional active template, four checks, four role-based evidence associations and one resolved action; the remaining pending check has context evidence and is not a handover blocker, while open actions are. Final acceptance and the handed-over package remain complete with 8/8 verified checklist items.
+
+## Rev3 QA/QC Boundary
+
+- `QA/QC` and `Giám sát` are distinct Rev3 responsibility labels. QA/QC owns preparation/coordination of the quality dossier with the client and acceptance history; Supervisor owns field checklist/photo reporting. Neither label grants the other's backend permission or replaces work-item role/project-scope checks.
+- Paper documents sent because a client does not use the App remain contract dispatch/scan records. They do not replace QA/QC acceptance evidence, immutable workflow form history, or handover readiness sources.

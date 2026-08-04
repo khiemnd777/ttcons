@@ -62,3 +62,8 @@
 ## Golden Sample
 
 - `GOLDEN-REAL-001` contains accepted evidence for every executed runtime step, three dated construction reports, one active optional check template, pass/fail/recheck result evidence, one resolved simplified action, one pending check with current-state context evidence, subcontractor/client reconciliation, material before/after history and no open simplified action blocker.
+
+## Rev3 Field Ownership And Variations
+
+- Rev3 construction reporting remains the existing per-work-item checklist/photo/daily-report flow owned by `Giám sát`; it does not create a parallel reporting ledger. QA/QC is separately responsible for the client quality dossier in planning/acceptance surfaces.
+- The construction workspace's `Phát sinh ngoài kế hoạch` CTA is orchestration into the canonical contract-variation route and includes the source work-item ID. It does not create procurement directly, alter construction report evidence, or bypass QS/Purchasing/PM-Director gates. Urgent/normal is a scheduling signal only.

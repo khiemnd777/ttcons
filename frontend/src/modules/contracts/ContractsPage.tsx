@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import {
   ArrowLeft,
@@ -10,10 +10,13 @@ import {
   GitPullRequestArrow,
   Landmark,
   Loader2,
+  PackageCheck,
+  Paperclip,
   Plus,
   Search,
   Send,
   Stamp,
+  Upload,
 } from 'lucide-react';
 import { CurrencyText } from '../../components/CurrencyText';
 import { Dialog } from '../../components/Dialog';
@@ -22,23 +25,27 @@ import { PageHeader } from '../../components/PageHeader';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
-import { get, post } from '../../lib/api/client';
+import { get, post, postForm } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import type {
   Contract,
   ContractMilestone,
+  ContractDispatch,
+  ContractSigningForm,
   ContractRetention,
   ContractVariation,
   ContractVersion,
   Partner,
+  WorkflowFormDetail,
 } from '../../lib/types/domain';
 import { currency, dateText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { partnerOptions } from '../core-data/partnerUtils';
+import { SignatureCaptureDialog, type SignatureCapturePayload } from '../work-items/SignatureCaptureDialog';
 
 type CreateDialog = 'contract' | 'version' | 'milestone' | 'variation' | null;
-type DetailTab = 'versions' | 'milestones' | 'variations' | 'retentions';
+type DetailTab = 'execution' | 'versions' | 'milestones' | 'variations' | 'retentions';
 type DirectionFilter = 'all' | 'receivable' | 'payable';
 type ActionDialog = {
   title: string;
@@ -48,6 +55,8 @@ type ActionDialog = {
   commentRequired?: boolean;
 } | null;
 type RetentionDialog = { id: string; outstanding: number; milestone: string } | null;
+type VersionSignTarget = { version: ContractVersion; form: ContractSigningForm } | null;
+type DispatchReceiveTarget = ContractDispatch | null;
 type ContractPermissions = {
   canCreate: boolean;
   canReview: boolean;
@@ -55,22 +64,31 @@ type ContractPermissions = {
   canSign: boolean;
   canManageMilestone: boolean;
   canReleaseRetention: boolean;
+  canDispatch: boolean;
+  canScan: boolean;
+  canVariationQS: boolean;
+  canVariationPurchase: boolean;
+  canVariationProcurement: boolean;
 };
 
 export function ContractsPage() {
   const { id = '' } = useParams();
-  const { hasAnyPermission } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { hasAnyPermission, user } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState('');
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<DetailTab>('milestones');
+  const [activeTab, setActiveTab] = useState<DetailTab>('execution');
   const [query, setQuery] = useState('');
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [createDialog, setCreateDialog] = useState<CreateDialog>(null);
   const [actionDialog, setActionDialog] = useState<ActionDialog>(null);
   const [retentionDialog, setRetentionDialog] = useState<RetentionDialog>(null);
+  const [versionSignTarget, setVersionSignTarget] = useState<VersionSignTarget>(null);
+  const [dispatchDialogOpen, setDispatchDialogOpen] = useState(false);
+  const [dispatchReceiveTarget, setDispatchReceiveTarget] = useState<DispatchReceiveTarget>(null);
 
   const contracts = useQuery({
     queryKey: ['contracts', id],
@@ -100,7 +118,32 @@ export function ContractsPage() {
     canSign: hasAnyPermission(['contract.sign']),
     canManageMilestone: hasAnyPermission(['contract.milestone_manage']),
     canReleaseRetention: hasAnyPermission(['contract.retention_release']),
+    canDispatch: hasAnyPermission(['contract.dispatch']),
+    canScan: hasAnyPermission(['contract.scan_manage']),
+    canVariationQS: hasAnyPermission(['contract.variation_qs_review']),
+    canVariationPurchase: hasAnyPermission(['contract.variation_purchase']),
+    canVariationProcurement: hasAnyPermission(['procurement.create', 'contract.variation_purchase']),
   };
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab && ['execution', 'versions', 'milestones', 'variations', 'retentions'].includes(requestedTab)) {
+      setActiveTab(requestedTab as DetailTab);
+    }
+    if (!selectedId && contracts.data?.length) {
+      const preferred = contracts.data.find((contract) => contract.contract_type === 'main_client' && contract.direction === 'receivable') ?? contracts.data[0];
+      setSelectedId(preferred.id);
+      if (searchParams.get('action') === 'new-variation' && preferred.status === 'active' && permissions.canCreate) {
+        setCreateDialog('variation');
+        setMobileDetailOpen(true);
+        setSearchParams((current) => {
+          const next = new URLSearchParams(current);
+          next.delete('action');
+          return next;
+        }, { replace: true });
+      }
+    }
+  }, [contracts.data, permissions.canCreate, searchParams, selectedId, setSearchParams]);
 
   const invalidate = async (contractId?: string) => {
     await queryClient.invalidateQueries({ queryKey: ['contracts', id] });
@@ -141,6 +184,56 @@ export function ContractsPage() {
     },
     onError: (error) => toast.error('Không giải phóng được khoản giữ lại', error),
   });
+  const signVersion = useMutation({
+    mutationFn: async ({ target, payload }: { target: NonNullable<VersionSignTarget>; payload: SignatureCapturePayload }) => {
+      const signedForm = await post<WorkflowFormDetail>(`/workflow-form-instances/${target.form.id}/sign`, payload);
+      const signature = [...(signedForm.signatures ?? [])]
+        .reverse()
+        .find((row) => row.purpose === 'approved_by' && row.signer_user_id === user?.id);
+      if (!signature) throw new Error('Không tìm thấy chữ ký approved_by vừa tạo để liên kết với phiên bản hợp đồng.');
+      return post<Contract>(`/contract-versions/${target.version.id}/sign`, {
+        workflow_form_signature_id: signature.id,
+        comment: payload.comment,
+      });
+    },
+    onSuccess: async () => {
+      await invalidate();
+      setVersionSignTarget(null);
+      setActiveTab('execution');
+      toast.success('Đã ký phiên bản hợp đồng trên App');
+    },
+    onError: (error) => toast.error('Không ký được phiên bản hợp đồng', error),
+  });
+  const dispatch = useMutation({
+    mutationFn: (values: Record<string, any>) => post<Contract>(`/contracts/${selectedId}/dispatches`, values),
+    onSuccess: async () => {
+      await invalidate();
+      setDispatchDialogOpen(false);
+      setActiveTab('execution');
+      toast.success('Đã ghi nhận gửi hồ sơ giấy');
+    },
+    onError: (error) => toast.error('Không ghi nhận được việc gửi hồ sơ giấy', error),
+  });
+  const receiveDispatch = useMutation({
+    mutationFn: async ({ target, file, note }: { target: ContractDispatch; file: File; note: string }) => {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('document_type', 'returned_signed_contract_scan');
+      form.append('name', file.name);
+      const document = await postForm<Record<string, any>>(`/contract-dispatches/${target.id}/documents/upload`, form);
+      return post<Contract>(`/contract-dispatches/${target.id}/receive`, {
+        returned_scan_document_id: document.id,
+        note,
+      });
+    },
+    onSuccess: async () => {
+      await invalidate();
+      setDispatchReceiveTarget(null);
+      setActiveTab('execution');
+      toast.success('Đã lưu bản scan hợp đồng giấy có chữ ký');
+    },
+    onError: (error) => toast.error('Không nhận được bản scan hợp đồng giấy', error),
+  });
 
   const summary = useMemo(() => ({
     active: (contracts.data ?? []).filter((item) => item.status === 'active').length,
@@ -149,6 +242,20 @@ export function ContractsPage() {
       .reduce((sum, item) => sum + Number(item.current_amount ?? 0), 0),
     retention: (contracts.data ?? []).reduce((sum, item) => sum + Number(item.retention_outstanding ?? 0), 0),
   }), [contracts.data]);
+
+  const scanReminders = useMemo(() => {
+    const rows = contracts.data ?? [];
+    return [
+      {
+        label: 'hợp đồng đầu ra',
+        missing: !rows.some((item) => item.direction === 'receivable' && item.signed_scan_received),
+      },
+      {
+        label: 'hợp đồng đầu vào',
+        missing: !rows.some((item) => item.direction === 'payable' && item.signed_scan_received),
+      },
+    ].filter((item) => item.missing);
+  }, [contracts.data]);
 
   const statusOptions = useMemo(
     () => [...new Set((contracts.data ?? []).map((item) => item.status).filter(Boolean))],
@@ -172,6 +279,16 @@ export function ContractsPage() {
   function selectContract(contractId: string) {
     setSelectedId(contractId);
     setMobileDetailOpen(true);
+  }
+
+  function openVersionSignature(version: ContractVersion) {
+    const form = selected?.signing_forms?.find((candidate) => candidate.status === 'submitted');
+    if (!form) {
+      setActiveTab('execution');
+      toast.warn('Chưa có biểu mẫu đã gửi tại bước “Ký hợp đồng trên App”. Hãy hoàn tất biểu mẫu workflow trước khi ký phiên bản.');
+      return;
+    }
+    setVersionSignTarget({ version, form });
   }
 
   return (
@@ -200,6 +317,20 @@ export function ContractsPage() {
         <Metric label="Tổng giá trị hiện hành" value={<CurrencyText value={summary.value} />} />
         <Metric label="Chưa giải phóng" value={<CurrencyText value={summary.retention} />} />
       </div>
+
+      {!contracts.isLoading && scanReminders.length ? (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status">
+          <div className="flex items-start gap-3">
+            <Paperclip className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold">Hồ sơ hợp đồng của dự án chưa đủ bản scan đã ký</p>
+              <p className="mt-1 text-amber-800">
+                Còn thiếu {scanReminders.map((item) => item.label).join(' và ')}. Hãy vào hồ sơ tương ứng để gửi bản giấy và tải bản scan có chữ ký về hệ thống.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
         <section className={clsx('overflow-hidden rounded-lg border border-line bg-white shadow-panel', mobileDetailOpen && 'hidden xl:block')}>
@@ -306,10 +437,25 @@ export function ContractsPage() {
                 contract={selected}
                 permissions={permissions}
                 onAction={openAction}
+                onSign={openVersionSignature}
                 onRelease={setRetentionDialog}
               />
               <ContractTabs contract={selected} activeTab={activeTab} onChange={setActiveTab} />
               <div className="p-4">
+                {activeTab === 'execution' ? (
+                  <ContractExecutionPanel
+                    contract={selected}
+                    permissions={permissions}
+                    onDispatch={() => setDispatchDialogOpen(true)}
+                    onReceive={setDispatchReceiveTarget}
+                    onActivate={() => openAction({
+                      title: 'Kích hoạt hợp đồng',
+                      description: 'Kích hoạt sau khi đủ chữ ký App, đã gửi giấy và đã nhận bản scan giấy có chữ ký.',
+                      endpoint: `/contracts/${selected.id}/activate`,
+                      success: 'Đã kích hoạt hợp đồng',
+                    })}
+                  />
+                ) : null}
                 {activeTab === 'versions' ? (
                   <VersionTable
                     contract={selected}
@@ -317,6 +463,7 @@ export function ContractsPage() {
                     canApprove={permissions.canApprove}
                     canSign={permissions.canSign}
                     onAction={openAction}
+                    onSign={openVersionSignature}
                   />
                 ) : null}
                 {activeTab === 'milestones' ? (
@@ -332,6 +479,9 @@ export function ContractsPage() {
                     canReview={permissions.canReview}
                     canApprove={permissions.canApprove}
                     canCreate={permissions.canCreate}
+                    canQS={permissions.canVariationQS}
+                    canPurchase={permissions.canVariationPurchase}
+                    canProcurement={permissions.canVariationProcurement}
                     onAction={openAction}
                   />
                 ) : null}
@@ -370,7 +520,49 @@ export function ContractsPage() {
       <CreateVariationDialog
         open={createDialog === 'variation'}
         onClose={() => setCreateDialog(null)}
-        onSubmit={(values) => create.mutateAsync({ path: `/contracts/${selectedId}/variations`, values })}
+        onSubmit={(values) => create.mutateAsync({
+          path: `/contracts/${selectedId}/variations`,
+          values: { ...values, source_work_item_id: searchParams.get('source_work_item_id') || null },
+        })}
+      />
+      <SignatureCaptureDialog
+        open={Boolean(versionSignTarget)}
+        signerName={user?.full_name}
+        submitting={signVersion.isPending}
+        signedPurposes={(versionSignTarget?.form.signatures ?? [])
+          .filter((signature) => signature.signer_user_id === user?.id)
+          .map((signature) => signature.purpose)}
+        allowedPurposes={['approved_by']}
+        defaultPurpose="approved_by"
+        purposeLocked
+        formRevision={versionSignTarget?.form.current_revision}
+        onClose={() => setVersionSignTarget(null)}
+        onSubmit={(payload) => versionSignTarget && signVersion.mutate({ target: versionSignTarget, payload })}
+      />
+      <Dialog
+        open={dispatchDialogOpen}
+        title="Gửi hồ sơ hợp đồng giấy"
+        description="Ghi nhận lần gửi hồ sơ giấy cho chủ đầu tư sau khi phiên bản đã ký trên App."
+        onClose={() => setDispatchDialogOpen(false)}
+      >
+        <SimpleForm
+          submitLabel="Xác nhận đã gửi"
+          cancelLabel="Đóng"
+          fields={[
+            { name: 'recipient_name', label: 'Người/đơn vị nhận', defaultValue: selected?.counterparty_name ?? '', required: true },
+            { name: 'delivery_method', label: 'Hình thức gửi', type: 'select', defaultValue: 'direct', required: true, options: dispatchMethodOptions },
+            { name: 'tracking_reference', label: 'Mã vận đơn/biên nhận', defaultValue: '' },
+            { name: 'note', label: 'Ghi chú bàn giao', type: 'textarea', defaultValue: '' },
+          ]}
+          onCancel={() => setDispatchDialogOpen(false)}
+          onSubmit={(values) => dispatch.mutateAsync(values)}
+        />
+      </Dialog>
+      <ReceiveContractScanDialog
+        target={dispatchReceiveTarget}
+        submitting={receiveDispatch.isPending}
+        onClose={() => setDispatchReceiveTarget(null)}
+        onSubmit={(file, note) => dispatchReceiveTarget && receiveDispatch.mutateAsync({ target: dispatchReceiveTarget, file, note })}
       />
       <Dialog
         open={Boolean(actionDialog)}
@@ -458,7 +650,7 @@ function ContractHeader({
           {permissions.canCreate && contract.status === 'active' ? (
             <PrimaryButton label="Tạo phụ lục" icon={<GitPullRequestArrow className="h-4 w-4" />} onClick={() => onCreate('variation')} />
           ) : null}
-          {permissions.canSign && contract.status === 'signed' ? (
+          {permissions.canSign && contract.status === 'signed' && contract.execution_readiness?.returned_scan_received ? (
             <PrimaryButton
               label="Kích hoạt hợp đồng"
               onClick={() => onAction({
@@ -497,11 +689,13 @@ function NextActionBand({
   contract,
   permissions,
   onAction,
+  onSign,
   onRelease,
 }: {
   contract: Contract;
   permissions: ContractPermissions;
   onAction: (value: NonNullable<ActionDialog>) => void;
+  onSign: (version: ContractVersion) => void;
   onRelease: (value: RetentionDialog) => void;
 }) {
   const draftVersion = contract.versions?.find((row) => row.status === 'draft' && permissions.canReview);
@@ -509,8 +703,10 @@ function NextActionBand({
   const approvedVersion = contract.versions?.find((row) => row.status === 'approved' && permissions.canSign);
   const activeMilestone = contract.milestones?.find((row) => row.status === 'active' && permissions.canManageMilestone);
   const eligibleMilestone = contract.milestones?.find((row) => row.status === 'eligible' && permissions.canManageMilestone);
-  const draftVariation = contract.variations?.find((row) => row.status === 'draft' && permissions.canReview);
-  const reviewVariation = contract.variations?.find((row) => row.status === 'review' && permissions.canApprove);
+  const draftVariation = contract.variations?.find((row) => row.status === 'draft' && permissions.canCreate);
+  const qsVariation = contract.variations?.find((row) => row.status === 'qs_review' && permissions.canVariationQS);
+  const purchaseVariation = contract.variations?.find((row) => row.status === 'purchasing_sourcing' && permissions.canVariationPurchase);
+  const reviewVariation = contract.variations?.find((row) => ['pending_approval', 'review'].includes(row.status) && permissions.canApprove);
   const approvedVariation = contract.variations?.find((row) => row.status === 'approved' && permissions.canCreate);
   const outstandingRetention = contract.retentions?.find((row) => Number(row.outstanding_amount) > 0 && permissions.canReleaseRetention);
 
@@ -525,20 +721,22 @@ function NextActionBand({
     actionNode = <PrimaryButton label="Duyệt phiên bản" onClick={() => onAction(versionApproveAction(reviewVersion))} />;
   } else if (approvedVersion) {
     message = `Phiên bản ${approvedVersion.version_label} đã duyệt và đang chờ ký.`;
-    actionNode = <PrimaryButton label="Ký phiên bản" onClick={() => onAction(versionSignAction(approvedVersion))} />;
+    actionNode = <PrimaryButton label="Ký phiên bản" onClick={() => onSign(approvedVersion)} />;
   } else if (contract.status === 'signed' && permissions.canSign) {
-    message = 'Hợp đồng đã ký và đang chờ kích hoạt.';
-    actionNode = (
+    message = contract.execution_readiness?.returned_scan_received
+      ? 'Hợp đồng đã có bản scan giấy ký và đang chờ kích hoạt.'
+      : 'Hợp đồng đã ký trên App; cần gửi hồ sơ giấy và nhận lại bản scan có chữ ký.';
+    actionNode = contract.execution_readiness?.returned_scan_received ? (
       <PrimaryButton
         label="Kích hoạt hợp đồng"
         onClick={() => onAction({
           title: 'Kích hoạt hợp đồng',
-          description: 'Phiên bản đã ký sẽ trở thành nguồn giá trị hiện hành; các mốc thanh toán nháp được kích hoạt.',
+          description: 'Phiên bản đã ký và bản scan giấy sẽ trở thành căn cứ thực hiện hợp đồng.',
           endpoint: `/contracts/${contract.id}/activate`,
           success: 'Đã kích hoạt hợp đồng',
         })}
       />
-    );
+    ) : null;
   } else if (activeMilestone) {
     message = `Mốc ${activeMilestone.milestone_name} đang chờ xác nhận đủ điều kiện.`;
     actionNode = <PrimaryButton label="Xác nhận đủ điều kiện" onClick={() => onAction(milestoneEligibleAction(activeMilestone))} />;
@@ -546,11 +744,17 @@ function NextActionBand({
     message = `Mốc ${eligibleMilestone.milestone_name} đã đủ điều kiện mở công nợ.`;
     actionNode = <PrimaryButton label="Mở công nợ" onClick={() => onAction(milestoneObligationAction(eligibleMilestone))} />;
   } else if (draftVariation) {
-    message = `Phụ lục ${draftVariation.variation_code} đang chờ gửi rà soát.`;
-    actionNode = <PrimaryButton label="Gửi rà soát" onClick={() => onAction(variationSubmitAction(draftVariation))} />;
+    message = `Phát sinh ${draftVariation.variation_code} đang chờ gửi QS.`;
+    actionNode = <PrimaryButton label="Gửi QS" onClick={() => onAction(variationSubmitAction(draftVariation))} />;
+  } else if (qsVariation) {
+    message = `Phát sinh ${qsVariation.variation_code} đang chờ QS rà soát.`;
+    actionNode = <PrimaryButton label="QS xác nhận" onClick={() => onAction(variationQSAction(qsVariation))} />;
+  } else if (purchaseVariation) {
+    message = `Phát sinh ${purchaseVariation.variation_code} đang chờ Mua hàng lấy giá.`;
+    actionNode = <PrimaryButton label="Xác nhận đã lấy giá" onClick={() => onAction(variationPurchaseAction(purchaseVariation))} />;
   } else if (reviewVariation) {
-    message = `Phụ lục ${reviewVariation.variation_code} đang chờ duyệt.`;
-    actionNode = <PrimaryButton label="Duyệt phụ lục" onClick={() => onAction(variationApproveAction(reviewVariation))} />;
+    message = `Phát sinh ${reviewVariation.variation_code} đang chờ PM/Giám đốc duyệt.`;
+    actionNode = <PrimaryButton label="Duyệt phát sinh" onClick={() => onAction(variationApproveAction(reviewVariation))} />;
   } else if (approvedVariation) {
     message = `Phụ lục ${approvedVariation.variation_code} đã duyệt và đang chờ tạo phiên bản điều chỉnh.`;
     actionNode = <PrimaryButton label="Tạo phiên bản điều chỉnh" onClick={() => onAction(variationIncorporateAction(approvedVariation))} />;
@@ -583,6 +787,7 @@ function NextActionBand({
 
 function ContractTabs({ contract, activeTab, onChange }: { contract: Contract; activeTab: DetailTab; onChange: (tab: DetailTab) => void }) {
   const tabs: Array<{ id: DetailTab; label: string; count: number }> = [
+    { id: 'execution', label: 'Thực hiện HĐ', count: readinessCount(contract) },
     { id: 'versions', label: 'Phiên bản', count: contract.versions?.length ?? 0 },
     { id: 'milestones', label: 'Mốc thanh toán', count: contract.milestones?.length ?? 0 },
     { id: 'variations', label: 'Phụ lục', count: contract.variations?.length ?? 0 },
@@ -620,19 +825,20 @@ function ContractTabs({ contract, activeTab, onChange }: { contract: Contract; a
   );
 }
 
-function VersionTable({ contract, canReview, canApprove, canSign, onAction }: {
+function VersionTable({ contract, canReview, canApprove, canSign, onAction, onSign }: {
   contract: Contract;
   canReview: boolean;
   canApprove: boolean;
   canSign: boolean;
   onAction: (value: NonNullable<ActionDialog>) => void;
+  onSign: (version: ContractVersion) => void;
 }) {
   const rows = contract.versions ?? [];
   if (!rows.length) return <EmptyState title="Chưa có phiên bản hợp đồng" />;
   const rowAction = (row: ContractVersion) => {
     if (canReview && row.status === 'draft') return <SmallButton label="Gửi rà soát" icon={<Send className="h-4 w-4" />} onClick={() => onAction(versionSubmitAction(row))} />;
     if (canApprove && row.status === 'review') return <SmallButton label="Duyệt" icon={<CheckCircle2 className="h-4 w-4" />} onClick={() => onAction(versionApproveAction(row))} />;
-    if (canSign && row.status === 'approved') return <SmallButton label="Ký" icon={<Stamp className="h-4 w-4" />} onClick={() => onAction(versionSignAction(row))} />;
+    if (canSign && row.status === 'approved') return <SmallButton label="Ký trên App" icon={<Stamp className="h-4 w-4" />} onClick={() => onSign(row)} />;
     return null;
   };
   return (
@@ -654,6 +860,109 @@ function VersionTable({ contract, canReview, canApprove, canSign, onAction }: {
         </RecordCard>
       ))}
     />
+  );
+}
+
+function ContractExecutionPanel({ contract, permissions, onDispatch, onReceive, onActivate }: {
+  contract: Contract;
+  permissions: ContractPermissions;
+  onDispatch: () => void;
+  onReceive: (dispatch: ContractDispatch) => void;
+  onActivate: () => void;
+}) {
+  const readiness = contract.execution_readiness;
+  const executionReady = Boolean(
+    readiness?.contract_active
+    && readiness.app_signed
+    && readiness.paper_dispatched
+    && readiness.returned_scan_received,
+  );
+  const submittedForm = contract.signing_forms?.find((form) => form.status === 'submitted');
+  const sentDispatch = contract.dispatches?.find((dispatch) => dispatch.status === 'sent');
+  const checkpoints = [
+    { label: 'Ký trên App', done: Boolean(readiness?.app_signed), detail: readiness?.app_signed ? 'Đã liên kết chữ ký approved_by' : submittedForm ? 'Biểu mẫu đã sẵn sàng ký' : 'Chưa có biểu mẫu workflow đã gửi' },
+    { label: 'Gửi hồ sơ giấy', done: Boolean(readiness?.paper_dispatched), detail: readiness?.paper_dispatched ? 'Đã ghi nhận bàn giao cho chủ đầu tư' : 'Chưa ghi nhận lần gửi' },
+    { label: 'Scan giấy có ký', done: Boolean(readiness?.returned_scan_received), detail: readiness?.returned_scan_received ? 'Đã lưu trong kho tài liệu bảo vệ' : 'Chưa nhận lại bản scan' },
+    {
+      label: 'Hiệu lực thực hiện',
+      done: executionReady,
+      detail: executionReady
+        ? 'Được phép chuyển sang triển khai'
+        : readiness?.contract_active
+          ? 'Hợp đồng lịch sử đang hiệu lực nhưng chưa đủ hồ sơ thực thi Rev3'
+          : 'Chưa kích hoạt hợp đồng',
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="font-semibold text-ink">Điều kiện thực hiện hợp đồng</h3>
+        <p className="mt-1 text-sm text-slate-500">Các mục triển khai chỉ được mở sau khi đủ chữ ký App, hồ sơ giấy và bản scan giấy đã ký.</p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+        {checkpoints.map((checkpoint, index) => (
+          <div key={checkpoint.label} className={clsx('rounded-lg border p-3', checkpoint.done ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50')}>
+            <div className="flex items-start gap-2">
+              {checkpoint.done ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /> : <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-200 text-xs font-bold text-amber-900">{index + 1}</span>}
+              <div>
+                <p className="text-sm font-semibold text-ink">{checkpoint.label}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-600">{checkpoint.detail}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {permissions.canDispatch && readiness?.app_signed && !readiness.paper_dispatched ? (
+          <PrimaryButton label="Gửi hồ sơ giấy" icon={<Send className="h-4 w-4" />} onClick={onDispatch} />
+        ) : null}
+        {permissions.canScan && sentDispatch ? (
+          <PrimaryButton label="Nhận scan giấy đã ký" icon={<Upload className="h-4 w-4" />} onClick={() => onReceive(sentDispatch)} />
+        ) : null}
+        {permissions.canSign && contract.status === 'signed' && readiness?.returned_scan_received ? (
+          <PrimaryButton label="Kích hoạt hợp đồng" icon={<PackageCheck className="h-4 w-4" />} onClick={onActivate} />
+        ) : null}
+      </div>
+      <div className="grid gap-4 2xl:grid-cols-2">
+        <section className="rounded-lg border border-line">
+          <div className="border-b border-line bg-slate-50 px-3 py-2">
+            <h4 className="text-sm font-semibold text-ink">Chữ ký App</h4>
+          </div>
+          <div className="space-y-2 p-3">
+            {(contract.workflow_signatures ?? []).length ? (contract.workflow_signatures ?? []).map((signature) => (
+              <div key={signature.workflow_form_signature_id} className="rounded-md border border-line p-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-ink">{signature.signer_name}</span>
+                  <span className="text-xs text-slate-500">{dateText(signature.signed_at)}</span>
+                </div>
+                <p className="mt-1 font-mono text-xs text-slate-500">Hash {signature.payload_hash?.slice(0, 16)}…</p>
+              </div>
+            )) : <EmptyState title={submittedForm ? 'Biểu mẫu đã gửi, đang chờ ký trên App' : 'Chưa có biểu mẫu ký hợp đồng đã gửi'} />}
+          </div>
+        </section>
+        <section className="rounded-lg border border-line">
+          <div className="border-b border-line bg-slate-50 px-3 py-2">
+            <h4 className="text-sm font-semibold text-ink">Lịch sử hồ sơ giấy</h4>
+          </div>
+          <div className="space-y-2 p-3">
+            {(contract.dispatches ?? []).length ? (contract.dispatches ?? []).map((dispatch) => (
+              <div key={dispatch.id} className="rounded-md border border-line p-3 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-ink">Lần {dispatch.dispatch_no} · {dispatch.recipient_name}</p>
+                    <p className="mt-1 text-xs text-slate-500">{dispatchMethodLabel(dispatch.delivery_method)}{dispatch.tracking_reference ? ` · ${dispatch.tracking_reference}` : ''}</p>
+                  </div>
+                  <StatusBadge status={dispatch.status} />
+                </div>
+                {dispatch.returned_scan_document_name ? <p className="mt-2 flex items-center gap-1 text-xs text-emerald-700"><Paperclip className="h-3.5 w-3.5" /> {dispatch.returned_scan_document_name}</p> : null}
+                {permissions.canScan && dispatch.status === 'sent' ? <div className="mt-2"><SmallButton label="Tải scan giấy đã ký" icon={<Upload className="h-4 w-4" />} onClick={() => onReceive(dispatch)} /></div> : null}
+              </div>
+            )) : <EmptyState title="Chưa có lần gửi hồ sơ giấy" />}
+          </div>
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -703,25 +1012,32 @@ function MilestoneTable({ contract, canManage, onAction }: {
   );
 }
 
-function VariationTable({ contract, canReview, canApprove, canCreate, onAction }: {
+function VariationTable({ contract, canReview, canApprove, canCreate, canQS, canPurchase, canProcurement, onAction }: {
   contract: Contract;
   canReview: boolean;
   canApprove: boolean;
   canCreate: boolean;
+  canQS: boolean;
+  canPurchase: boolean;
+  canProcurement: boolean;
   onAction: (value: NonNullable<ActionDialog>) => void;
 }) {
   const rows = contract.variations ?? [];
   if (!rows.length) return <EmptyState title="Chưa có phụ lục hợp đồng" />;
   const rowAction = (row: ContractVariation) => {
-    if (canReview && row.status === 'draft') return <SmallButton label="Gửi rà soát" onClick={() => onAction(variationSubmitAction(row))} />;
-    if (canApprove && row.status === 'review') return <SmallButton label="Duyệt" onClick={() => onAction(variationApproveAction(row))} />;
-    if (canCreate && row.status === 'approved') return <SmallButton label="Tạo phiên bản điều chỉnh" onClick={() => onAction(variationIncorporateAction(row))} />;
+    if ((canCreate || canReview) && row.status === 'draft') return <SmallButton label="Gửi QS" onClick={() => onAction(variationSubmitAction(row))} />;
+    if (canQS && row.status === 'qs_review') return <SmallButton label="QS xác nhận" onClick={() => onAction(variationQSAction(row))} />;
+    if (canPurchase && row.status === 'purchasing_sourcing') return <SmallButton label="Đã lấy giá" onClick={() => onAction(variationPurchaseAction(row))} />;
+    if (canApprove && ['pending_approval', 'review'].includes(row.status)) return <SmallButton label="Duyệt" onClick={() => onAction(variationApproveAction(row))} />;
+    if (canProcurement && row.status === 'approved' && !row.procurement_request_id) return <SmallButton label="Tạo yêu cầu mua" onClick={() => onAction(variationProcurementAction(row))} />;
+    if (canCreate && ['approved', 'procurement_created'].includes(row.status)) return <SmallButton label="Tạo phiên bản HĐ" onClick={() => onAction(variationIncorporateAction(row))} />;
     return null;
   };
   return (
     <ResponsiveRecords
-      headers={['Mã', 'Nội dung', 'Thay đổi giá trị', 'Thay đổi ngày', 'Trạng thái', 'Thao tác']}
+      headers={['Mức độ', 'Mã', 'Nội dung', 'Thay đổi giá trị', 'Thay đổi ngày', 'Trạng thái', 'Thao tác']}
       rows={rows.map((row) => [
+        <PriorityBadge priority={row.priority} />,
         <span className="font-semibold">{row.variation_code}</span>,
         <div><div>{row.title}</div><div className="mt-1 text-xs text-slate-500">{row.reason}</div></div>,
         <SignedCurrency value={row.amount_delta} />,
@@ -731,10 +1047,23 @@ function VariationTable({ contract, canReview, canApprove, canCreate, onAction }
       ])}
       cards={rows.map((row) => (
         <RecordCard key={row.id} title={`${row.variation_code} · ${row.title}`} status={row.status} action={rowAction(row)}>
+          <RecordValue label="Mức độ"><PriorityBadge priority={row.priority} /></RecordValue>
           <RecordValue label="Lý do" full>{row.reason || 'Chưa có lý do'}</RecordValue>
           <RecordValue label="Thay đổi giá trị"><SignedCurrency value={row.amount_delta} /></RecordValue>
           <RecordValue label="Thay đổi thời gian">{signedDays(row.days_delta)}</RecordValue>
           {row.scope_delta ? <RecordValue label="Thay đổi phạm vi" full>{row.scope_delta}</RecordValue> : null}
+          {row.procurement_request_id ? <RecordValue label="Mua hàng" full>Đã tạo yêu cầu mua #{row.procurement_request_id.slice(0, 8)}</RecordValue> : null}
+          {row.events?.length ? (
+            <RecordValue label="Lịch sử chuyển bước" full>
+              <div className="space-y-1">
+                {row.events.slice(-4).map((event) => (
+                  <div key={event.id} className="text-xs text-slate-600">
+                    {event.actor_name || 'Hệ thống'} · {statusLabel(event.to_status || event.event_type)}{event.comment ? ` · ${event.comment}` : ''}
+                  </div>
+                ))}
+              </div>
+            </RecordValue>
+          ) : null}
         </RecordCard>
       ))}
     />
@@ -937,14 +1266,15 @@ function CreateVariationDialog({ open, onClose, onSubmit }: {
   onSubmit: (values: Record<string, any>) => Promise<any>;
 }) {
   return (
-    <Dialog open={open} title="Tạo phụ lục hợp đồng" description="Phụ lục đã duyệt chỉ tạo phiên bản nháp mới, không tự thay đổi hợp đồng đang hiệu lực." onClose={onClose} size="lg">
+    <Dialog open={open} title="Đề xuất phát sinh ngoài kế hoạch" description="Luồng bắt buộc: Đề xuất → QS → Mua hàng lấy giá → PM/Giám đốc duyệt → mua hàng/điều chỉnh hợp đồng." onClose={onClose} size="lg">
       <SimpleForm
         layout="two-column"
-        submitLabel="Tạo phụ lục"
+        submitLabel="Tạo đề xuất phát sinh"
         onCancel={onClose}
         fields={[
           { name: 'variation_code', label: 'Mã phụ lục', defaultValue: `PL-${Date.now().toString().slice(-5)}`, required: true },
           { name: 'title', label: 'Tên phụ lục', defaultValue: 'Điều chỉnh phạm vi hợp đồng', required: true },
+          { name: 'priority', label: 'Mức độ', type: 'select', defaultValue: 'normal', required: true, options: variationPriorityOptions },
           { name: 'variation_type', label: 'Loại điều chỉnh', type: 'select', defaultValue: 'mixed', required: true, options: variationTypeOptions },
           { name: 'reason', label: 'Lý do', type: 'textarea', defaultValue: '', required: true, fullWidth: true },
           { name: 'amount_delta', label: 'Thay đổi giá trị (+/-)', type: 'number', defaultValue: 0 },
@@ -953,6 +1283,67 @@ function CreateVariationDialog({ open, onClose, onSubmit }: {
         ]}
         onSubmit={onSubmit}
       />
+    </Dialog>
+  );
+}
+
+function ReceiveContractScanDialog({ target, submitting, onClose, onSubmit }: {
+  target: ContractDispatch | null;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (file: File, note: string) => Promise<any> | false | null;
+}) {
+  const toast = useToast();
+  const [file, setFile] = useState<File | null>(null);
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    if (!target) {
+      setFile(null);
+      setNote('');
+    }
+  }, [target]);
+
+  async function submit() {
+    if (!file) {
+      toast.warn('Vui lòng chọn bản scan PDF hoặc ảnh hợp đồng giấy đã ký.');
+      return;
+    }
+    await onSubmit(file, note);
+  }
+
+  return (
+    <Dialog
+      open={Boolean(target)}
+      title="Nhận bản scan hợp đồng giấy đã ký"
+      description={target ? `Lần gửi ${target.dispatch_no} · ${target.recipient_name}` : undefined}
+      onClose={onClose}
+      footer={(
+        <div className="flex justify-end gap-2">
+          <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700" onClick={onClose} disabled={submitting}>Đóng</button>
+          <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60" onClick={() => void submit()} disabled={submitting}>
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            Lưu bản scan
+          </button>
+        </div>
+      )}
+    >
+      <div className="space-y-3">
+        <label className="block rounded-md border border-dashed border-line bg-slate-50 p-4">
+          <span className="text-sm font-semibold text-ink">Tệp PDF/ảnh có chữ ký hai bên</span>
+          <input
+            className="mt-2 block w-full text-sm text-slate-600"
+            type="file"
+            accept="application/pdf,image/png,image/jpeg,image/webp"
+            disabled={submitting}
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-slate-600">Ghi chú tiếp nhận</span>
+          <textarea className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm focus-ring" rows={3} value={note} disabled={submitting} onChange={(event) => setNote(event.target.value)} />
+        </label>
+      </div>
     </Dialog>
   );
 }
@@ -1022,10 +1413,6 @@ function versionApproveAction(row: ContractVersion): NonNullable<ActionDialog> {
   return { title: 'Duyệt phiên bản hợp đồng', description: row.version_label, endpoint: `/contract-versions/${row.id}/approve`, success: 'Đã duyệt phiên bản', commentRequired: true };
 }
 
-function versionSignAction(row: ContractVersion): NonNullable<ActionDialog> {
-  return { title: 'Xác nhận ký phiên bản', description: row.version_label, endpoint: `/contract-versions/${row.id}/sign`, success: 'Đã xác nhận ký phiên bản', commentRequired: true };
-}
-
 function milestoneEligibleAction(row: ContractMilestone): NonNullable<ActionDialog> {
   return { title: 'Xác nhận mốc đủ điều kiện', description: row.milestone_name, endpoint: `/contract-milestones/${row.id}/eligible`, success: 'Đã xác nhận mốc đủ điều kiện' };
 }
@@ -1035,7 +1422,15 @@ function milestoneObligationAction(row: ContractMilestone): NonNullable<ActionDi
 }
 
 function variationSubmitAction(row: ContractVariation): NonNullable<ActionDialog> {
-  return { title: 'Gửi rà soát phụ lục', description: row.title, endpoint: `/contract-variations/${row.id}/submit`, success: 'Đã gửi rà soát phụ lục' };
+  return { title: 'Gửi QS rà soát phát sinh', description: row.title, endpoint: `/contract-variations/${row.id}/submit`, success: 'Đã gửi phát sinh cho QS' };
+}
+
+function variationQSAction(row: ContractVariation): NonNullable<ActionDialog> {
+  return { title: 'QS rà soát phát sinh', description: row.title, endpoint: `/contract-variations/${row.id}/qs-review`, success: 'QS đã xác nhận và chuyển Mua hàng', commentRequired: true };
+}
+
+function variationPurchaseAction(row: ContractVariation): NonNullable<ActionDialog> {
+  return { title: 'Mua hàng xác nhận đã lấy giá', description: row.title, endpoint: `/contract-variations/${row.id}/purchase`, success: 'Đã chuyển phát sinh sang PM/Giám đốc duyệt', commentRequired: true };
 }
 
 function variationApproveAction(row: ContractVariation): NonNullable<ActionDialog> {
@@ -1049,6 +1444,41 @@ function variationIncorporateAction(row: ContractVariation): NonNullable<ActionD
     endpoint: `/contract-variations/${row.id}/incorporate`,
     success: 'Đã tạo phiên bản điều chỉnh từ phụ lục',
   };
+}
+
+function variationProcurementAction(row: ContractVariation): NonNullable<ActionDialog> {
+  return {
+    title: 'Tạo yêu cầu mua từ phát sinh',
+    description: 'Yêu cầu mua nháp được tạo sau khi phát sinh đã qua đủ QS, Mua hàng và phê duyệt.',
+    endpoint: `/contract-variations/${row.id}/generate-procurement`,
+    success: 'Đã tạo yêu cầu mua từ phát sinh',
+  };
+}
+
+function readinessCount(contract: Contract) {
+  const readiness = contract.execution_readiness;
+  if (!readiness) return 0;
+  const executionReady = readiness.contract_active
+    && readiness.app_signed
+    && readiness.paper_dispatched
+    && readiness.returned_scan_received;
+  return [readiness.app_signed, readiness.paper_dispatched, readiness.returned_scan_received, executionReady].filter(Boolean).length;
+}
+
+function PriorityBadge({ priority }: { priority?: string }) {
+  const urgent = priority === 'urgent';
+  return (
+    <span className={clsx(
+      'inline-flex rounded-md px-2 py-1 text-xs font-semibold ring-1 ring-inset',
+      urgent ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-slate-100 text-slate-700 ring-slate-200',
+    )}>
+      {urgent ? 'Gấp' : 'Không gấp'}
+    </span>
+  );
+}
+
+function dispatchMethodLabel(method?: string) {
+  return dispatchMethodOptions.find((option) => option.value === method)?.label ?? method ?? 'Chưa xác định';
 }
 
 function acceptanceLabel(row: ContractMilestone) {
@@ -1122,4 +1552,16 @@ const variationTypeOptions = [
   { value: 'price', label: 'Giá trị' },
   { value: 'time', label: 'Tiến độ' },
   { value: 'mixed', label: 'Kết hợp' },
+];
+
+const variationPriorityOptions = [
+  { value: 'normal', label: 'Không gấp' },
+  { value: 'urgent', label: 'Gấp' },
+];
+
+const dispatchMethodOptions = [
+  { value: 'direct', label: 'Bàn giao trực tiếp' },
+  { value: 'courier', label: 'Chuyển phát' },
+  { value: 'postal', label: 'Bưu điện' },
+  { value: 'other', label: 'Khác' },
 ];

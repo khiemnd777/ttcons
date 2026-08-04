@@ -39,6 +39,7 @@ type EdgeForm = {
 };
 
 type StepForm = {
+  business_code: string;
   name: string;
   step_type: string;
   required_role_ids: string[];
@@ -78,7 +79,7 @@ export function PipelineBuilderPage() {
   const [templateNameSubmitAttempted, setTemplateNameSubmitAttempted] = useState(false);
   const [deleteTemplateDialog, setDeleteTemplateDialog] = useState<PipelineTemplate | null>(null);
   const [stepDialog, setStepDialog] = useState<{ mode: 'add' | 'edit' | 'view'; step?: Record<string, any> } | null>(null);
-  const [stepForm, setStepForm] = useState<StepForm>({ name: '', step_type: 'task', required_role_ids: ['PM'], form_required: true, form_version_id: '' });
+  const [stepForm, setStepForm] = useState<StepForm>({ business_code: '', name: '', step_type: 'task', required_role_ids: ['PM'], form_required: true, form_version_id: '' });
   const [stepSubmitAttempted, setStepSubmitAttempted] = useState(false);
   const [nodeForm, setNodeForm] = useState<Record<string, any>>({});
   const [edgeForm, setEdgeForm] = useState<EdgeForm>({ label: '', condition_type: 'always', priority: '100', condition_config: {} });
@@ -205,6 +206,7 @@ export function PipelineBuilderPage() {
     }
 
     setNodeForm({
+      business_code: detailsNode.business_code ?? '',
       name: detailsNode.name,
       description: detailsNode.description ?? '',
       type: detailsNode.type ?? 'custom',
@@ -375,6 +377,7 @@ export function PipelineBuilderPage() {
     mutationFn: () => {
       if (!detailsNodeId) throw new Error('Chưa chọn node');
       return put(`/pipeline-nodes/${detailsNodeId}`, {
+        business_code: cleanString(nodeForm.business_code) || null,
         name: nodeForm.name,
         description: nodeForm.description,
         type: nodeForm.type,
@@ -524,6 +527,7 @@ export function PipelineBuilderPage() {
       if (!detailsNodeId) throw new Error('Chưa chọn node');
       const nextOrderIndex = Math.max(0, ...(detailsNode?.steps ?? []).map((step: Record<string, any>) => Number(step.order_index ?? 0))) + 1;
       return post(`/pipeline-nodes/${detailsNodeId}/steps`, {
+        business_code: cleanString(stepForm.business_code) || null,
         name: stepForm.name.trim(),
         description: 'Checklist mẫu trong node',
         step_type: stepForm.step_type,
@@ -546,6 +550,7 @@ export function PipelineBuilderPage() {
       const stepId = stepDialog?.step?.id;
       if (!stepId) throw new Error('Chưa chọn checklist');
       return put(`/pipeline-steps/${stepId}`, {
+        business_code: cleanString(stepForm.business_code) || null,
         name: stepForm.name.trim(),
         step_type: stepForm.step_type,
         required_role_ids: normalizeRoleIds(stepForm.required_role_ids),
@@ -614,6 +619,7 @@ export function PipelineBuilderPage() {
   const openAddStepDialog = () => {
     const stepType = defaultStepTypeForNode(detailsNode?.type);
     setStepForm({
+      business_code: nextStepBusinessCode(detailsNode, detailsNode?.steps ?? []),
       name: '',
       step_type: stepType,
       required_role_ids: [defaultRoleForNode(detailsNode?.type)],
@@ -628,6 +634,7 @@ export function PipelineBuilderPage() {
     const stepType = String(step.step_type ?? 'task');
     const formRequired = boolValue(step.form_required, true);
     setStepForm({
+      business_code: cleanString(step.business_code),
       name: String(step.name ?? ''),
       step_type: stepType,
       required_role_ids: normalizeRoleIds(step.required_role_ids),
@@ -640,6 +647,7 @@ export function PipelineBuilderPage() {
 
   const openViewStepDialog = (step: Record<string, any>) => {
     setStepForm({
+      business_code: cleanString(step.business_code),
       name: String(step.name ?? ''),
       step_type: String(step.step_type ?? 'task'),
       required_role_ids: normalizeRoleIds(step.required_role_ids),
@@ -652,7 +660,7 @@ export function PipelineBuilderPage() {
 
   const closeStepDialog = () => {
     setStepDialog(null);
-    setStepForm({ name: '', step_type: 'task', required_role_ids: ['PM'], form_required: true, form_version_id: '' });
+    setStepForm({ business_code: '', name: '', step_type: 'task', required_role_ids: ['PM'], form_required: true, form_version_id: '' });
     setStepSubmitAttempted(false);
   };
 
@@ -695,6 +703,7 @@ export function PipelineBuilderPage() {
     if (stepDialog?.mode === 'view') return;
     setStepSubmitAttempted(true);
     const invalidFields: string[] = [];
+    if (Number(template.data?.engine_version ?? 1) >= 3 && !validBusinessCode(stepForm.business_code)) invalidFields.push('Business code');
     if (!stepForm.name.trim()) invalidFields.push('Tên checklist');
     if (!normalizeRoleIds(stepForm.required_role_ids).length) invalidFields.push('Role phụ trách');
     if (stepForm.form_required && !stepForm.form_version_id) invalidFields.push('Workflow form');
@@ -928,6 +937,7 @@ export function PipelineBuilderPage() {
               stepDialogMode={stepDialog?.mode ?? null}
               stepForm={stepForm}
               stepNameInvalid={stepSubmitAttempted && !stepForm.name.trim()}
+              stepCodeInvalid={stepSubmitAttempted && Number(template.data?.engine_version ?? 1) >= 3 && !validBusinessCode(stepForm.business_code)}
               stepRolesInvalid={stepSubmitAttempted && !normalizeRoleIds(stepForm.required_role_ids).length}
               stepFormInvalid={stepSubmitAttempted && stepForm.form_required && !stepForm.form_version_id}
               savePending={saveNode.isPending}
@@ -1267,6 +1277,18 @@ function normalizedSearchText(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd');
+}
+
+function validBusinessCode(value: unknown) {
+  return /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/.test(cleanString(value)) && cleanString(value).length <= 120;
+}
+
+function nextStepBusinessCode(node: PipelineNode | undefined, steps: Record<string, any>[]) {
+  const nodeCode = cleanString(node?.business_code) || 'custom_node';
+  const used = new Set(steps.map((step) => cleanString(step.business_code)).filter(Boolean));
+  let index = steps.length + 1;
+  while (used.has(`${nodeCode}.step_${index}`)) index += 1;
+  return `${nodeCode}.step_${index}`;
 }
 
 function pipelineTemplatePDFDownloadName(template: PipelineTemplate) {

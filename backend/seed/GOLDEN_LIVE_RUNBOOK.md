@@ -28,8 +28,11 @@ Golden Live bắt đầu ở node `Khảo sát`, tiến độ 0%. Không có for
 | Thiết kế | `design@consflow.local` |
 | Sale | `sales@consflow.local` |
 | Pháp lý | `legal@consflow.local` |
+| Bộ phận HĐ (Rev3 project 023) | `contract@consflow.local` |
 
 Admin có thể thao tác hầu hết nghiệp vụ nhưng không được dùng thay actor chuyên biệt khi kiểm chứng coverage. Khi requester separation được bật, dùng PM gửi yêu cầu và Giám đốc hoặc vai trò phù hợp để duyệt.
+
+Tài khoản `contract@consflow.local` là project member của fixture `GOLDEN-REV3-BOQ-001` (`30000000-0000-0000-0000-000000000023`), không được bổ sung hồi tố vào runtime lịch sử `GOLDEN-LIVE-001`.
 
 Khi chuyển liên tiếp nhiều tài khoản trong UAT, chạy tuần tự và tôn trọng `Retry-After` nếu API trả `429`; không tính một response rate-limit là bằng chứng negative RBAC.
 

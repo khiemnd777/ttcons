@@ -1779,7 +1779,18 @@ func (h *Handler) ApproveContractVersion(c *fiber.Ctx) error {
 	return h.contractVersionAction(c, "approve", []string{"contract.approve"})
 }
 func (h *Handler) SignContractVersion(c *fiber.Ctx) error {
-	return h.contractVersionAction(c, "sign", []string{"contract.sign"})
+	if err := h.requireContractChildPermission(c, "version", c.Params("id"), []string{"contract.sign"}); err != nil {
+		return err
+	}
+	var req ContractVersionSignRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu ký hợp đồng không hợp lệ")
+	}
+	row, err := h.service.SignContractVersion(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
 }
 
 func (h *Handler) contractVersionAction(c *fiber.Ctx, action string, permissions []string) error {
@@ -1806,6 +1817,101 @@ func (h *Handler) ActivateContract(c *fiber.Ctx) error {
 		return err
 	}
 	row, err := h.service.ActivateContract(c.Context(), c.Params("id"), actionComment(req), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) UploadProjectDocument(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"project.update"}); err != nil {
+		return err
+	}
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Tệp hồ sơ là bắt buộc")
+	}
+	document, err := h.service.UploadProjectDocument(c.Context(), c.Params("id"), "project_intake", c.Params("id"), c.FormValue("document_type"), c.FormValue("name"), fileHeader, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, document)
+}
+
+func (h *Handler) UploadContractDocument(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "contracts", c.Params("id"), []string{"contract.create", "contract.dispatch", "contract.scan_manage"}); err != nil {
+		return err
+	}
+	contract, err := h.service.ContractDetail(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Tệp hồ sơ hợp đồng là bắt buộc")
+	}
+	document, err := h.service.UploadProjectDocument(c.Context(), cleanID(contract["project_id"]), "contract", c.Params("id"), c.FormValue("document_type"), c.FormValue("name"), fileHeader, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, document)
+}
+
+func (h *Handler) UploadContractDispatchDocument(c *fiber.Ctx) error {
+	if err := h.requireContractChildPermission(c, "dispatch", c.Params("id"), []string{"contract.scan_manage", "contract.dispatch"}); err != nil {
+		return err
+	}
+	row, err := h.service.repo.QueryOne(c.Context(), `
+		SELECT contract.project_id
+		FROM contract_dispatches dispatch JOIN contracts contract ON contract.id=dispatch.contract_id
+		WHERE dispatch.id=$1
+	`, c.Params("id"))
+	if err != nil {
+		return err
+	}
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Bản scan hợp đồng là bắt buộc")
+	}
+	document, err := h.service.UploadProjectDocument(c.Context(), cleanID(row["project_id"]), "contract_returned_scan", c.Params("id"), "signed_contract_scan", c.FormValue("name"), fileHeader, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, document)
+}
+
+func (h *Handler) GetProjectDocumentFile(c *fiber.Ctx) error {
+	file, err := h.service.ProjectDocumentFile(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return sendProtectedFile(c, file, "ho-so")
+}
+
+func (h *Handler) CreateContractDispatch(c *fiber.Ctx) error {
+	if err := h.requireRecordProjectPermission(c, "contracts", c.Params("id"), []string{"contract.dispatch"}); err != nil {
+		return err
+	}
+	var req ContractDispatchRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu gửi hồ sơ giấy không hợp lệ")
+	}
+	row, err := h.service.CreateContractDispatch(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
+func (h *Handler) ReceiveContractDispatch(c *fiber.Ctx) error {
+	if err := h.requireContractChildPermission(c, "dispatch", c.Params("id"), []string{"contract.scan_manage"}); err != nil {
+		return err
+	}
+	var req ContractDispatchReceiveRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu nhận lại hồ sơ giấy không hợp lệ")
+	}
+	row, err := h.service.ReceiveContractDispatch(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -1868,6 +1974,12 @@ func (h *Handler) CreateContractVariation(c *fiber.Ctx) error {
 func (h *Handler) SubmitContractVariation(c *fiber.Ctx) error {
 	return h.contractVariationAction(c, "submit", []string{"contract.review"})
 }
+func (h *Handler) QSReviewContractVariation(c *fiber.Ctx) error {
+	return h.contractVariationAction(c, "qs-review", []string{"contract.variation_qs_review"})
+}
+func (h *Handler) PurchaseContractVariation(c *fiber.Ctx) error {
+	return h.contractVariationAction(c, "purchase", []string{"contract.variation_purchase"})
+}
 func (h *Handler) ApproveContractVariation(c *fiber.Ctx) error {
 	return h.contractVariationAction(c, "approve", []string{"contract.approve"})
 }
@@ -1876,6 +1988,17 @@ func (h *Handler) RejectContractVariation(c *fiber.Ctx) error {
 }
 func (h *Handler) IncorporateContractVariation(c *fiber.Ctx) error {
 	return h.contractVariationAction(c, "incorporate", []string{"contract.create"})
+}
+
+func (h *Handler) GenerateContractVariationProcurement(c *fiber.Ctx) error {
+	if err := h.requireContractChildPermission(c, "variation", c.Params("id"), []string{"procurement.create", "contract.variation_purchase"}); err != nil {
+		return err
+	}
+	row, err := h.service.GenerateProcurementFromContractVariation(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
 }
 
 func (h *Handler) contractVariationAction(c *fiber.Ctx, action string, permissions []string) error {
@@ -1914,6 +2037,7 @@ func (h *Handler) requireContractChildPermission(c *fiber.Ctx, kind, id string, 
 		"milestone": `SELECT c.project_id FROM contract_milestones child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
 		"variation": `SELECT c.project_id FROM contract_variations child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
 		"retention": `SELECT c.project_id FROM contract_retentions child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
+		"dispatch":  `SELECT c.project_id FROM contract_dispatches child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
 	}
 	query := queries[kind]
 	if query == "" {

@@ -48,6 +48,7 @@ export type Project = AnyRecord & {
   pm_name?: string;
   status: string;
   progress_percent: number;
+	workflow_entry_mode: 'survey_required' | 'client_boq';
   planned_start_date?: string | null;
   planned_end_date?: string | null;
   open_issues?: number;
@@ -493,6 +494,45 @@ export type ContractVariation = ProjectOperationsRecord & {
   scope_delta?: string;
   status: string;
   resulting_version_id?: string;
+  priority: 'normal' | 'urgent' | string;
+  source_work_item_id?: string;
+  procurement_request_id?: string;
+  qs_comment?: string;
+  purchasing_comment?: string;
+  events?: AnyRecord[];
+};
+
+export type ContractWorkflowSignature = AnyRecord & {
+  workflow_form_signature_id: string;
+  contract_version_id: string;
+  form_instance_id: string;
+  signer_name: string;
+  signed_at: string;
+  payload_hash: string;
+};
+
+export type ContractSigningForm = AnyRecord & {
+  id: string;
+  title: string;
+  status: string;
+  current_revision?: number;
+  work_item_id: string;
+  signatures?: Array<AnyRecord & { id: string; purpose: string; signer_user_id?: string; linked_contract_version_id?: string }>;
+};
+
+export type ContractDispatch = AnyRecord & {
+  id: string;
+  contract_id: string;
+  contract_version_id: string;
+  dispatch_no: number;
+  recipient_name: string;
+  delivery_method: string;
+  tracking_reference?: string;
+  status: 'sent' | 'received' | string;
+  sent_at: string;
+  received_at?: string;
+  returned_scan_document_id?: string;
+  returned_scan_document_name?: string;
 };
 
 export type ContractRetention = ProjectOperationsRecord & {
@@ -532,6 +572,16 @@ export type Contract = ProjectOperationsRecord & {
   current_version_status?: string;
   milestone_count?: number;
   variation_count?: number;
+  signed_scan_received?: boolean;
+  workflow_signatures?: ContractWorkflowSignature[];
+	signing_forms?: ContractSigningForm[];
+	dispatches?: ContractDispatch[];
+	execution_readiness?: {
+		app_signed: boolean;
+		paper_dispatched: boolean;
+		returned_scan_received: boolean;
+		contract_active: boolean;
+	};
   retention_outstanding?: number;
   versions?: ContractVersion[];
   milestones?: ContractMilestone[];

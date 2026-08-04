@@ -114,6 +114,8 @@ Ký hiệu: `P` hành động positive-path; `D` quyết định/duyệt bằng 
 
 Golden Live có actor/project member chuyên biệt cho `Thiết kế`, `Sale` và `Pháp lý`. Các step yêu cầu một trong ba vai trò này phải dùng đúng actor tương ứng; nếu account hoặc membership bị thiếu, ghi `BLOCKED-COVERAGE` và không dùng Admin để biến coverage thiếu thành `PASS`.
 
+Rev3 có fixture riêng `GOLDEN-REV3-BOQ-001` (project 023) và actor `Bộ phận HĐ` là `contract@consflow.local`. Khi kiểm thử Rev3, actor này phải nhìn thấy work item hợp đồng được giao nhưng không được dùng để thay QS/Kế toán/Pháp lý/Mua hàng/PM/Giám đốc ở các quyết định cần tách vai trò. Project 022 và ma trận lịch sử 15 vai trò phía trên không được rebound sang Rev3.
+
 Chuyển role tuần tự và tôn trọng `Retry-After` khi login/auth trả `429`. Một response rate-limit làm case bị nhiễu và phải chạy lại; không được tính là negative RBAC `PASS`.
 
 ## Evidence package

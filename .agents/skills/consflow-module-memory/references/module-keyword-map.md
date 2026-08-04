@@ -196,6 +196,8 @@ Use this table before the feature table when a prompt has business-domain words.
 ## High-Risk Domain Invariants
 
 - Pipeline templates are reusable definitions; pipeline runs are project-specific runtime copies.
+- Official client workflow Rev3 is immutable template `40000000-0000-0000-0000-000000000022` in the existing family. Its node/step `business_code` values are stable automation identifiers; project display numbering and names are not identifiers. Existing runtimes, especially projects 020/021/022, must never be rebound to Rev3.
+- Project intake mode `survey_required|client_boq` is locked once a run exists. `client_boq` requires an active project document of type `client_boq` and branches directly to BOQ; it does not weaken later commercial, contract or deployment gates.
 - Publishing and cloning templates must not mutate historical project runs.
 - Approval actions must preserve actor, status, comments, and timestamps.
 - Workflow form published versions must remain immutable; runtime instances keep stable references.
@@ -205,6 +207,8 @@ Use this table before the feature table when a prompt has business-domain words.
 - BOQ final price must trace to a selected qualified supplier quotation or an explicit manual-price waiver reason.
 - Procurement receive status must be reconciled from submitted incoming acceptance quantities; stock movement remains an explicit warehouse action. Procurement acceptance reconciliation uses its own audit event and must not masquerade as a warehouse receipt.
 - `projects.contract_amount` is a compatibility snapshot from the active signed main-client contract; `contracts.current_amount` plus signed `contract_versions` are the source of truth.
+- Contract execution readiness requires the current version's immutable workflow `approved_by` signature, a paper dispatch and a received signed scan. Contract activation and downstream Rev3 deployment must fail closed until all three are present.
+- Outside-plan construction variation priority (`urgent|normal`) affects visibility only. It never bypasses Proposal -> QS review -> Purchasing sourcing -> PM/Director approval -> procurement creation, and every stage is recorded in `contract_variation_events`.
 - Contract milestone obligations and retention releases must create exactly one traceable AP/AR source record per action and preserve audit.
 - Procurement receive, stock receive/issue/transfer/return, and site material balances must preserve material traceability.
 - Material snapshots and incoming acceptance must not create implicit warehouse movement unless the explicit local contract says so.

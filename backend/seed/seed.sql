@@ -44,6 +44,7 @@ INSERT INTO users (id, email, password_hash, full_name, status) VALUES
 ('10000000-0000-0000-0000-000000000013','design@consflow.local','demo:123456','Nguyễn Hà Thiết kế','active'),
 ('10000000-0000-0000-0000-000000000014','sales@consflow.local','demo:123456','Trần Vy Sale','active'),
 ('10000000-0000-0000-0000-000000000015','legal@consflow.local','demo:123456','Lê Quang Pháp lý','active'),
+('10000000-0000-0000-0000-000000000016','contract@consflow.local','demo:123456','Vũ An Hợp đồng','active'),
 ('79900000-0000-0000-0000-000000000001','accounting.backfill@system.local','system-disabled','Hệ thống chuyển đổi sổ kế toán','inactive');
 
 INSERT INTO roles (id, name, display_name, description, system_role) VALUES
@@ -62,7 +63,8 @@ INSERT INTO roles (id, name, display_name, description, system_role) VALUES
 ('20000000-0000-0000-0000-000000000013','viewer','Viewer','Chỉ xem dữ liệu được phân quyền',true),
 ('20000000-0000-0000-0000-000000000014','design','Thiết kế','Phụ trách phương án và hồ sơ thiết kế',true),
 ('20000000-0000-0000-0000-000000000015','sales','Sale','Phụ trách phối hợp khách hàng, BOQ và hồ sơ thương mại',true),
-('20000000-0000-0000-0000-000000000016','legal','Pháp lý','Phụ trách rà soát pháp lý hợp đồng',true);
+('20000000-0000-0000-0000-000000000016','legal','Pháp lý','Phụ trách rà soát pháp lý hợp đồng',true),
+('20000000-0000-0000-0000-000000000017','contract_officer','Bộ phận HĐ','Phụ trách lập, luân chuyển, ký và lưu hồ sơ hợp đồng',true);
 
 INSERT INTO permissions (id, key, name, module)
 SELECT gen_random_uuid(), key, name, module FROM (VALUES
@@ -80,7 +82,8 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('accounting.view','Xem kế toán','accounting'),('accounting.budget_view','Xem ngân sách','accounting'),('accounting.budget_approve','Duyệt ngân sách','accounting'),('accounting.payable_view','Xem phải trả','accounting'),('accounting.payable_approve','Duyệt phải trả','accounting'),('accounting.receivable_view','Xem phải thu','accounting'),('accounting.receivable_approve','Duyệt phải thu','accounting'),('accounting.payment_create','Tạo thanh toán','accounting'),('accounting.payment_approve','Duyệt thanh toán','accounting'),
 ('accounting.journal_view','Xem sổ kế toán','accounting'),('accounting.journal_post','Ghi sổ chứng từ kế toán','accounting'),('accounting.journal_reverse','Lập bút toán đảo','accounting'),('accounting.period_close','Khóa kỳ kế toán','accounting'),('accounting.period_reopen','Mở lại kỳ kế toán','accounting'),('accounting.tax_view','Xem sổ thuế','accounting'),('accounting.tax_manage','Quản lý thuế','accounting'),
 ('project_finance.view','Xem tài chính công trình','project_finance'),('project_finance.cost_create','Ghi nhận chi phí vật tư','project_finance'),('project_finance.cost_review','Xác nhận chi phí vật tư','project_finance'),('project_finance.request_create','Lập đề nghị thu/chi','project_finance'),('project_finance.request_approve','Duyệt đề nghị thu/chi','project_finance'),('project_finance.process','Xác nhận bàn giao kế toán','project_finance'),('project_finance.report_view','Xem báo cáo quản trị công trình','project_finance'),
-('contract.view','Xem hợp đồng','contract'),('contract.review','Review hợp đồng','contract'),
+('contract.view','Xem hợp đồng','contract'),('contract.create','Tạo và sửa hợp đồng','contract'),('contract.review','Review hợp đồng','contract'),('contract.approve','Duyệt hợp đồng','contract'),('contract.sign','Ký và kích hoạt hợp đồng','contract'),('contract.milestone_manage','Quản lý milestone hợp đồng','contract'),('contract.retention_release','Giải phóng giữ lại','contract'),
+('contract.dispatch','Gửi hồ sơ hợp đồng giấy','contract'),('contract.scan_manage','Quản lý bản scan hợp đồng','contract'),('contract.variation_qs_review','QS rà soát phát sinh','contract'),('contract.variation_purchase','Mua hàng xử lý phát sinh','contract'),
 ('catalog.view','Xem dữ liệu lõi','catalog'),('catalog.manage','Quản lý dữ liệu lõi','catalog'),
 ('staff.view','Xem nhân sự','staff'),('staff.create','Tạo nhân sự','staff'),('staff.update','Sửa nhân sự','staff'),('role.view','Xem role','rbac'),('role.create','Tạo role','rbac'),('role.update','Sửa role','rbac'),('permission.view','Xem permission','rbac'),('permission.assign','Gán quyền','rbac'),
 ('audit.view','Xem audit','audit'),('report.view','Xem báo cáo','report'),('report.finance.view','Xem báo cáo tài chính','report'),('settings.view','Xem cấu hình','settings'),('settings.update','Sửa cấu hình','settings')
@@ -212,7 +215,14 @@ JOIN permissions p ON (
   OR (r.name='legal' AND p.key IN (
     'project.view','pipeline.view','contract.view','contract.review'
   ))
-  OR (r.name IN ('director','pm','qs','accounting') AND p.key IN ('contract.view','contract.review'))
+  OR (r.name='contract_officer' AND p.key IN (
+    'project.view','pipeline.view','contract.view','contract.create','contract.review','contract.dispatch','contract.scan_manage'
+  ))
+  OR (r.name='director' AND p.key IN ('contract.view','contract.review','contract.approve','contract.sign','contract.milestone_manage','contract.retention_release'))
+  OR (r.name='pm' AND p.key IN ('contract.view','contract.create','contract.review','contract.approve','contract.milestone_manage','contract.dispatch','contract.scan_manage'))
+  OR (r.name='qs' AND p.key IN ('contract.view','contract.create','contract.review','contract.milestone_manage','contract.variation_qs_review'))
+  OR (r.name='accounting' AND p.key IN ('contract.view','contract.review','contract.milestone_manage','contract.retention_release'))
+  OR (r.name='procurement' AND p.key IN ('contract.view','contract.variation_purchase','contract.dispatch','contract.scan_manage'))
   OR (r.name='client' AND p.key='contract.view')
 )
 ON CONFLICT DO NOTHING;
@@ -240,7 +250,8 @@ INSERT INTO staff (id, user_id, full_name, email, phone, department, position, s
 ('21000000-0000-0000-0000-000000000012','10000000-0000-0000-0000-000000000012','Anh Bình Chủ đầu tư','client@consflow.local','0900000012','Chủ đầu tư','Client Representative','active'),
 ('21000000-0000-0000-0000-000000000013','10000000-0000-0000-0000-000000000013','Nguyễn Hà Thiết kế','design@consflow.local','0900000013','Thiết kế','Design Lead','active'),
 ('21000000-0000-0000-0000-000000000014','10000000-0000-0000-0000-000000000014','Trần Vy Sale','sales@consflow.local','0900000014','Kinh doanh','Sales Lead','active'),
-('21000000-0000-0000-0000-000000000015','10000000-0000-0000-0000-000000000015','Lê Quang Pháp lý','legal@consflow.local','0900000015','Pháp lý','Legal Reviewer','active');
+('21000000-0000-0000-0000-000000000015','10000000-0000-0000-0000-000000000015','Lê Quang Pháp lý','legal@consflow.local','0900000015','Pháp lý','Legal Reviewer','active'),
+('21000000-0000-0000-0000-000000000016','10000000-0000-0000-0000-000000000016','Vũ An Hợp đồng','contract@consflow.local','0900000016','Hợp đồng','Contract Officer','active');
 
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id FROM users u JOIN roles r ON
@@ -258,7 +269,8 @@ SELECT u.id, r.id FROM users u JOIN roles r ON
   (u.email='client@consflow.local' AND r.name='client') OR
   (u.email='design@consflow.local' AND r.name='design') OR
   (u.email='sales@consflow.local' AND r.name='sales') OR
-  (u.email='legal@consflow.local' AND r.name='legal');
+  (u.email='legal@consflow.local' AND r.name='legal') OR
+  (u.email='contract@consflow.local' AND r.name='contract_officer');
 
 INSERT INTO pipeline_templates (
   id, name, description, project_type, version, status, created_by,

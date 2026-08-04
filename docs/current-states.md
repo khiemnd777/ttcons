@@ -1,5 +1,29 @@
 # Current States
 
+## [Active] Client Workflow Revision 3 And Contract Execution
+
+### Will be done
+
+- No mandatory implementation or verification work remains. Keep this completed plan in active memory until the user explicitly asks to close it.
+
+### Done
+
+- Audited client notes against source, database data for projects 020/021/022 and current Browser behavior using Admin and Accounting.
+- Produced and received explicit approval for the cross-domain review package, implementation phases, acceptance decisions and Mockup as Text.
+- Confirmed the client workflow lineage: revision 1 is template `40000000-0000-0000-0000-000000000020`; published revision 2 is immutable template `40000000-0000-0000-0000-000000000021`; revision 3 must use a new template row in the same family.
+- Confirmed `SignatureCaptureDialog` and immutable `workflow_form_signatures` already provide visual signature, actor/role/time, revision, payload hash, checksum and protected file access; contract integration will reuse this infrastructure rather than duplicate it.
+- Added custom migrations V84/V85 for stable node/step business codes, project entry mode, protected project documents, immutable contract-signature links, paper dispatch/returned scan, staged outside-plan variations, contract RBAC and official engine-3 Rev3 template `40000000-0000-0000-0000-000000000022`.
+- Implemented the reviewed Rev3 topology: client-BOQ projects skip survey/meeting/design, outbound contract gates all takeoff/procurement/deployment work, Node 7 negotiation is one step, design review is merged, contract/field/QA-QC roles are separated, and existing 020/021/022 runtimes remain unchanged.
+- Reused the existing signature dialog and workflow signature persistence for App signing. Contract activation now requires the current version's App signature, paper dispatch and returned signed scan; project contract UI warns when input/output signed scans are missing.
+- Implemented outside-plan variation priority and the auditable Proposal -> QS -> Purchasing -> PM/Director -> procurement stages, including construction-work-item provenance and role-targeted activity mentions.
+- Updated Project intake, Pipeline Builder, Contracts and Operations UI plus shared types/status labels; production frontend build and the complete non-DB Go suite pass on the current source.
+- Added `contract_officer` / `Bộ phận HĐ` seed parity and untouched `GOLDEN-REV3-BOQ-001` project 023. A full destructive seed replay plus Golden validator passes on isolated database `consflow_rev3_test3`: Rev3 has 15 nodes, 51 unique coded steps/work items and 49 draft forms, while project 022 remains on engine 2.
+- Applied all 85 migrations locally, passed the full DB-backed core integration suite on a clean isolated database and passed the migration checksum/manifest check. Updated central/backend/frontend and all affected domain mapping files.
+- Recovered V85 to the exact already-applied checksum `93358db...` after Docker's fail-closed startup check exposed an accidental post-apply edit; clean database test6 then applied all 85 migrations successfully. Accounting's isolated-schema test helper now retains `public` extension functions without weakening table isolation.
+- Browser UAT on the final rebuilt Docker source passed: project 023 shows/locks `client_boq` intake and Rev3; Pipeline Builder shows 15 nodes plus immutable node/step business codes; Contracts shows missing input/output scan reminders and the four execution checkpoints; Operations opens the mandatory urgent/normal variation proposal; `Bộ phận HĐ` sees exactly five role-scoped contract work items; and the App-sign action opens the existing immutable `SignatureCaptureDialog` locked to `Người phê duyệt`.
+- Browser UAT found and closed two defects before handoff: an existing project's intake selector remained editable despite backend locking, and a legacy active contract was presented as deployment-ready without Rev3 files. The selector is now disabled after runtime creation, and readiness counts only the current contract version while labeling legacy active contracts explicitly. No browser warning/error was observed; only normal Vite development/debug messages appeared.
+- Final current-source verification passed: frontend production build, `go test ./...`, full DB-backed `go test ./internal/core/... -count=1` on fresh `consflow_rev3_test6` (23.187s), focused current-version readiness regression, 85-migration checksum check, full seed/Golden validation on isolated `consflow_rev3_test3`, Docker backend/admin rebuild, API health and `git diff --check`.
+
 ## [Active] Project Finance Management Refactor
 
 ### Will be done

@@ -472,7 +472,9 @@ func openIsolatedAccountingTestDB(t *testing.T) *sql.DB {
 		t.Fatal(err)
 	}
 	query := parsed.Query()
-	query.Set("search_path", schema)
+	// Keep the test schema first while retaining extension functions installed in public
+	// (for example pgcrypto.digest used by immutable migration definitions).
+	query.Set("search_path", schema+",public")
 	parsed.RawQuery = query.Encode()
 	database, err := sql.Open("pgx", parsed.String())
 	if err != nil {

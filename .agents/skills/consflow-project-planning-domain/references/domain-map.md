@@ -56,3 +56,9 @@
 
 - Use `GOLDEN-REAL-001` as the completed flagship project and `GOLDEN-NO-DESIGN-001` as the mutually exclusive branch companion when reviewing project-first navigation, planning runtime and form-backed planning records.
 - Use `GOLDEN-LIVE-001` to experience real planning/runtime transitions. It intentionally starts at 0% with only the Khảo sát node active; reset it with local/dev `make seed` after an operational walkthrough.
+
+## Rev3 Project Intake
+
+- `projects.workflow_entry_mode` is `survey_required` by default or `client_boq`; it can change only before a pipeline run exists. Starting `client_boq` fails closed without an active project-scoped `client_boq` document, then uses the template's explicit edge condition to skip survey/meeting/design.
+- Project creation uploads BOQ evidence through the protected project-document API before starting the runtime. The selected published template ID remains explicit; fallback selection chooses the latest published revision, never mutates an existing run.
+- Use `GOLDEN-REV3-BOQ-001` (project 023) to review the untouched Rev3 client-BOQ branch. Project 022 is the preservation control and must remain on its original runtime/template snapshot.

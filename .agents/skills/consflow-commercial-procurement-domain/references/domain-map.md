@@ -53,3 +53,10 @@
 ## Golden Sample
 
 - `GOLDEN-REAL-001` is the review fixture for six approved/final-locked BOQ lines, a three-supplier/eighteen-line quote matrix, six selections, two received procurement requests, three active signed contracts, milestone obligations, variation history and released retention.
+
+## Rev3 Contract Execution And Outside-Plan Variations
+
+- The current contract version may be marked App-signed only by linking a same-project immutable `workflow_form_signature` with purpose `approved_by`; the link stores actor/time and is unique for both signature and contract version. `SignatureCaptureDialog` remains the only visual capture implementation.
+- Execution readiness is a fail-closed sequence: App sign -> paper dispatch -> upload/receive signed scan -> activate. `contract_dispatches` preserves recipient, method, tracking, sent/received actors/times and returned document. Project contract list rows expose `signed_scan_received` only for the current version so the UI can remind missing input/output scans.
+- An outside-plan variation records `priority=urgent|normal` and optional construction `source_work_item_id`. Status transitions are `draft/submitted -> qs_review -> purchasing_sourcing -> pending_approval -> approved -> procurement_created`; urgent never skips a role gate. `contract_variation_events` is append-only stage history, and procurement generation is idempotent through `procurement_request_id`.
+- Rev3 moves input takeoff/price sourcing after outbound-contract readiness. The single negotiation node precedes the input-contract/advance node; BOQ/procurement approval invariants remain unchanged.

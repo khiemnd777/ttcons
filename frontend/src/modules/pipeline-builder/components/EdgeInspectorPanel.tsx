@@ -114,6 +114,22 @@ export function EdgeInspectorPanel({
             />
           </div>
         ) : null}
+        {edgeForm.condition_type === 'project_entry_mode' ? (
+          <div className="rounded-md border border-blue-200 bg-blue-50/50 p-3">
+            <Select
+              label="Nhánh điểm bắt đầu"
+              value={String(edgeForm.condition_config.value ?? '')}
+              options={[
+                { label: 'Khảo sát trước báo giá', value: 'survey_required' },
+                { label: 'Chủ đầu tư có BOQ · vào thẳng Báo giá', value: 'client_boq' },
+              ]}
+              invalid={!['survey_required', 'client_boq'].includes(String(edgeForm.condition_config.value ?? ''))}
+              invalidText="Chọn nhánh điểm bắt đầu"
+              disabled={readOnly}
+              onChange={(value) => onChangeConditionConfig('value', value)}
+            />
+          </div>
+        ) : null}
         <Select
           label="Điều kiện chuyển tiếp"
           value={edgeForm.condition_type}
