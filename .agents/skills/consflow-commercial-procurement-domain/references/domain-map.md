@@ -24,7 +24,7 @@
 - `subcontractor_checklist_reconciliations`, `subcontractor_checklist_reconciliation_items`
 - `owner_client_checklist_reconciliations`, `owner_client_checklist_reconciliation_items`
 - Related stock tables: `stock_documents`, `stock_document_items`, `stock_movements`
-- Relevant migrations: `V1`, `V17`, `V21`, `V22`, `V61`
+- Relevant migrations: `V1`, `V17`, `V21`, `V22`, `V61`; official workflow responsibility snapshot: `V86`
 
 ## Invariants
 
@@ -58,5 +58,7 @@
 
 - The current contract version may be marked App-signed only by linking a same-project immutable `workflow_form_signature` with purpose `approved_by`; the link stores actor/time and is unique for both signature and contract version. `SignatureCaptureDialog` remains the only visual capture implementation.
 - Execution readiness is a fail-closed sequence: App sign -> paper dispatch -> upload/receive signed scan -> activate. `contract_dispatches` preserves recipient, method, tracking, sent/received actors/times and returned document. Project contract list rows expose `signed_scan_received` only for the current version so the UI can remind missing input/output scans.
-- An outside-plan variation records `priority=urgent|normal` and optional construction `source_work_item_id`. Status transitions are `draft/submitted -> qs_review -> purchasing_sourcing -> pending_approval -> approved -> procurement_created`; urgent never skips a role gate. `contract_variation_events` is append-only stage history, and procurement generation is idempotent through `procurement_request_id`.
+- An outside-plan variation records `priority=urgent|normal`, optional construction `source_work_item_id`, and optional V88 `source_construction_action_id`. Contract authors may still create a draft, while the narrow construction proposal endpoint requires an active main-client receivable contract and eligible construction source, rejects duplicate active proposals per action, and atomically creates then submits to `qs_review`. Technical remediation is independent. Status continues `draft/submitted -> qs_review -> purchasing_sourcing -> pending_approval -> approved -> procurement_created`; urgent never skips a role gate, events are append-only, and procurement generation stays idempotent through `procurement_request_id`.
 - Rev3 moves input takeoff/price sourcing after outbound-contract readiness. The single negotiation node precedes the input-contract/advance node; BOQ/procurement approval invariants remain unchanged.
+- Rev4 `...023` keeps those gates and adds `Mua hàng` beside `QS` only on `boq_without_design.pricing`; this responsibility snapshot does not approve the BOQ, lock final prices or generate procurement by itself.
+- Rev4 Operations UAT project `...025` seeds one active main-client receivable contract solely so the construction proposal UI can enter `qs_review`. That synthetic contract is not evidence of App signature, paper dispatch, signed-scan return, upstream execution readiness, or commercial approval completion.

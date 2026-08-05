@@ -83,7 +83,7 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('accounting.journal_view','Xem sổ kế toán','accounting'),('accounting.journal_post','Ghi sổ chứng từ kế toán','accounting'),('accounting.journal_reverse','Lập bút toán đảo','accounting'),('accounting.period_close','Khóa kỳ kế toán','accounting'),('accounting.period_reopen','Mở lại kỳ kế toán','accounting'),('accounting.tax_view','Xem sổ thuế','accounting'),('accounting.tax_manage','Quản lý thuế','accounting'),
 ('project_finance.view','Xem tài chính công trình','project_finance'),('project_finance.cost_create','Ghi nhận chi phí vật tư','project_finance'),('project_finance.cost_review','Xác nhận chi phí vật tư','project_finance'),('project_finance.request_create','Lập đề nghị thu/chi','project_finance'),('project_finance.request_approve','Duyệt đề nghị thu/chi','project_finance'),('project_finance.process','Xác nhận bàn giao kế toán','project_finance'),('project_finance.report_view','Xem báo cáo quản trị công trình','project_finance'),
 ('contract.view','Xem hợp đồng','contract'),('contract.create','Tạo và sửa hợp đồng','contract'),('contract.review','Review hợp đồng','contract'),('contract.approve','Duyệt hợp đồng','contract'),('contract.sign','Ký và kích hoạt hợp đồng','contract'),('contract.milestone_manage','Quản lý milestone hợp đồng','contract'),('contract.retention_release','Giải phóng giữ lại','contract'),
-('contract.dispatch','Gửi hồ sơ hợp đồng giấy','contract'),('contract.scan_manage','Quản lý bản scan hợp đồng','contract'),('contract.variation_qs_review','QS rà soát phát sinh','contract'),('contract.variation_purchase','Mua hàng xử lý phát sinh','contract'),
+('contract.dispatch','Gửi hồ sơ hợp đồng giấy','contract'),('contract.scan_manage','Quản lý bản scan hợp đồng','contract'),('contract.variation.propose','Đề xuất phát sinh thi công','contract'),('contract.variation_qs_review','QS rà soát phát sinh','contract'),('contract.variation_purchase','Mua hàng xử lý phát sinh','contract'),
 ('catalog.view','Xem dữ liệu lõi','catalog'),('catalog.manage','Quản lý dữ liệu lõi','catalog'),
 ('staff.view','Xem nhân sự','staff'),('staff.create','Tạo nhân sự','staff'),('staff.update','Sửa nhân sự','staff'),('role.view','Xem role','rbac'),('role.create','Tạo role','rbac'),('role.update','Sửa role','rbac'),('permission.view','Xem permission','rbac'),('permission.assign','Gán quyền','rbac'),
 ('audit.view','Xem audit','audit'),('report.view','Xem báo cáo','report'),('report.finance.view','Xem báo cáo tài chính','report'),('settings.view','Xem cấu hình','settings'),('settings.update','Sửa cấu hình','settings')
@@ -219,10 +219,11 @@ JOIN permissions p ON (
     'project.view','pipeline.view','contract.view','contract.create','contract.review','contract.dispatch','contract.scan_manage'
   ))
   OR (r.name='director' AND p.key IN ('contract.view','contract.review','contract.approve','contract.sign','contract.milestone_manage','contract.retention_release'))
-  OR (r.name='pm' AND p.key IN ('contract.view','contract.create','contract.review','contract.approve','contract.milestone_manage','contract.dispatch','contract.scan_manage'))
+  OR (r.name='pm' AND p.key IN ('contract.view','contract.create','contract.review','contract.approve','contract.milestone_manage','contract.dispatch','contract.scan_manage','contract.variation.propose'))
   OR (r.name='qs' AND p.key IN ('contract.view','contract.create','contract.review','contract.milestone_manage','contract.variation_qs_review'))
   OR (r.name='accounting' AND p.key IN ('contract.view','contract.review','contract.milestone_manage','contract.retention_release'))
   OR (r.name='procurement' AND p.key IN ('contract.view','contract.variation_purchase','contract.dispatch','contract.scan_manage'))
+  OR (r.name='supervisor' AND p.key='contract.variation.propose')
   OR (r.name='client' AND p.key='contract.view')
 )
 ON CONFLICT DO NOTHING;

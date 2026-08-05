@@ -61,3 +61,4 @@
 
 - V84 adds system role `contract_officer` displayed as `Bộ phận HĐ`, plus narrow dispatch/scan/QS-review/Purchasing-variation permissions. Contract workflow assignments include QS, Kế toán, Pháp lý, Mua hàng, Bộ phận HĐ, PM and Giám đốc; assignment does not replace permission and project-scope enforcement.
 - Contract App signing, paper dispatch, returned-scan receive, activation and each variation stage record actor/time/comment in domain audit/event history. Frontend action visibility mirrors these gates but never authorizes them.
+- V88 adds `contract.variation.propose` to Admin, PM and Supervisor only. It authorizes the project-scoped construction proposal endpoint, not contract list/detail or authoring: Supervisor must remain without `contract.view` and `contract.create`. The proposal transaction writes source work-item/action provenance, two variation events and one project audit before entering `qs_review`.

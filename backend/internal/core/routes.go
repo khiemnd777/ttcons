@@ -265,6 +265,8 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg c
 	protected.Put("/daily-reports/:id", h.UpdateDailyReport)
 	protected.Post("/daily-reports/:id/evidence/upload", h.UploadDailyReportEvidence)
 	protected.Get("/projects/:id/construction-workspace", h.ProjectConstructionWorkspace)
+	protected.Get("/projects/:id/construction-variation-context", h.ProjectConstructionVariationContext)
+	protected.Post("/projects/:id/construction-variation-proposals", h.ProposeConstructionVariation)
 	protected.Get("/projects/:id/construction-handoff", h.ProjectConstructionHandoff)
 	protected.Post("/projects/:id/construction-handoff/activate", h.ActivateConstructionHandoff)
 	protected.Post("/projects/:id/construction-check-templates", h.CreateConstructionCheckTemplate)

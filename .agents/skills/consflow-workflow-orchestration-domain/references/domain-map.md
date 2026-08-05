@@ -7,7 +7,7 @@
 - Frontend routes: `frontend/src/app/router.tsx`
 - Frontend modules: `frontend/src/modules/pipeline-builder`, `frontend/src/modules/planning`, `frontend/src/modules/workflow-forms`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
 - Shared frontend contracts: `frontend/src/lib/api/client.ts`, `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
-- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`, `V70`, `V71`, `V83`
+- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`, `V70`, `V71`, `V83`-`V87`
 
 ## Routes
 
@@ -20,7 +20,7 @@
 
 ## Tables
 
-- `pipeline_templates`, `pipeline_template_nodes`, `pipeline_template_edges`, `pipeline_template_steps`
+- `pipeline_templates` including report-only `report_config_json`, `pipeline_template_nodes`, `pipeline_template_edges`, `pipeline_template_steps`
 - `pipeline_runs`, `pipeline_run_nodes`, `pipeline_run_edges`, `pipeline_run_steps`
 - `work_items`, `work_item_assignments`, `work_item_activities`, `activity_mentions`, `activity_read_states`, `activity_reactions`, `activity_message_revisions`
 - `approval_rules`, `approval_requests`, `approval_actions`
@@ -53,10 +53,10 @@
 - Engine v2 node approvals snapshot structured `approval_policy_json` into the run and request. Supported modes are `any`, `all`, `quorum`, and `ordered`; stage, actor role, requester separation, comments, actions, and audit remain traceable.
 - Workflow-form template create/update/archive, node approval request and node block/complete transitions persist their audit event in the same transaction; an audit serialization/insert failure rolls back the state transition.
 - Publish validation covers graph reachability/root/sink/cycle, required published form versions, answer-condition configuration, and permission-key existence.
-- Template layout edits do not mutate existing run copies, and node coordinates plus `condition_config.diagram` are excluded from new definition hashes while all business condition keys remain hashed.
+- Template layout/report presentation edits do not mutate existing run copies. Node coordinates, `condition_config.diagram` and template `report_config_json` are excluded from new definition hashes while all business condition keys remain hashed; cloning preserves the report configuration.
 - Pipeline node `type` remains a technical template/runtime key. Pipeline Builder node cards and Node Inspector options share the frontend `nodeTypeValues`/`enumLabel` presentation contract: known official types render Vietnamese labels, while an unknown future key remains visibly readable through the raw fallback rather than being discarded.
 - The global Progress Board is presentation only. It derives a normalized stage from each project's snapshotted current run/current node without editing templates, runtime copies, work items, approvals or branch history. `survey`, `design`, commercial node types, `construction_planning`, `construction`, acceptance/rework types, and handover/financial closure are grouped for scanning; completed runs override node grouping, no-run projects stay not-started, and unknown/custom node types remain in an explicit fallback column. Realtime events invalidate the snapshot but never carry transition commands or bypass runtime gates.
-- Pipeline-template PDF export requires `pipeline.view` and reads the exact selected draft/published revision. It emits an on-demand A4 landscape Unicode snapshot whose page 1 contains one document-first topology diagram derived from edge source/target, independent of canvas coordinates and connector sides. Every two-line card shows node name plus `Loại | N steps.`, every connector label uses at most two lines, node configuration follows as section 2 and nested checklist/steps as section 3. No-edge/cycle graphs fall back to stable node order and dangling edges are omitted with a warning. Export never changes template/runtime state, persists an artifact or writes audit.
+- Pipeline-template PDF export requires `pipeline.view` and reads the exact selected draft/published revision. It emits an on-demand A4 landscape Unicode definition snapshot whose header explicitly says `Revision định nghĩa` and `Trạng thái định nghĩa`. Page 1 topology derives from edge source/target independent of canvas positions; connector labels stay attached to their route. Section 3 labels checklist/document/photo as definition-level mandatory gates and states that the single Thi công step repeats by item/day. Optional report-only node references appear in appendix A; runtime/UAT state is never included. Export never changes template/runtime state, persists an artifact or writes audit.
 - Cosmetic official-step text corrections require an additive migration and matching seed correction across template, runtime, work-item and form-instance display snapshots; they do not change statuses, answers, approvals, audit records or PDF artifacts.
 - V68 keeps official revision-2 titles action-first and moves responsibility labels into template `required_role_ids`. It adds `Thiết kế`, `Sale`, `Pháp lý`, maps the reviewed technical-team responsibility to existing `Đội thi công`, updates existing display snapshots, and preserves runtime role/assignment snapshots so active and historical authorization does not change unexpectedly.
 - V69 uses `đầu vào` as the collective workflow term for tổ đội, thầu phụ and material suppliers in aggregate step/form/node/edge labels. Entity-specific wording remains mandatory where negotiation, acceptance, payable settlement or supplier invoices identify a concrete party/material. Existing revision-2 updates are display-only: roles, assignments, statuses, answers, approvals, audit records, PDFs and published form schemas remain unchanged.
@@ -92,3 +92,11 @@
 - Outbound contract is before takeoff, price sourcing, negotiation, input contract, planning and construction. Its runtime gate requires an immutable App signature link, paper dispatch and returned signed scan. UI completion or a legacy `signed` status alone cannot satisfy it.
 - Rev3 role snapshots distinguish `Giám sát` field ownership from `QA/QC` client quality-dossier ownership. Contract steps snapshot QS, Kế toán, Pháp lý, Mua hàng, Bộ phận HĐ, PM and Giám đốc.
 - `GOLDEN-REV3-BOQ-001` (project `...023`) is the untouched client-BOQ runtime fixture: 15 nodes, 51 work items and 49 draft forms. Project 022 remains bound to its original engine-2 runtime as the preservation regression.
+
+## Official Client Workflow Rev4
+
+- V86 publishes immutable engine-3 template `40000000-0000-0000-0000-000000000023` from Rev3 `...022`; both revisions and every existing project/run snapshot remain unchanged. Only projects that still select Rev3 and have no run may move to Rev4.
+- Rev4 keeps the same 15 unique node business codes, 16 edges and 51 unique step business codes. It adds `Mua hàng` beside QS at `boq_without_design.pricing`, makes `planning.client_quality_file` QA/QC-owned with checklist+document evidence, and makes `construction.item_reporting` Giám sát-owned with checklist+photo evidence.
+- `report_config_json` contains only the approved client-node-to-Rev4-business-code appendix definition (14 references, including the split client Node 6). It is presentation metadata, excluded from runtime/UAT reporting and from the definition hash.
+- V87 preserves Rev3 and corrects only Rev4 `planning.client_quality_file` from the misleading `daily_report` type to document-backed `document_upload`; its published checklist form, quality surface, role and evidence gates remain intact.
+- `GOLDEN-REV4-ENTRY-001` (project `...024`) is the untouched entry-state control on Rev4/engine 3. `GOLDEN-REV4-CONSTRUCTION-001` (project `...025`) is an explicit synthetic construction-stage UX fixture: all non-construction nodes remain pending and only `construction.item_reporting` is ready. Neither fixture rebinds a legacy runtime or changes the template definition.

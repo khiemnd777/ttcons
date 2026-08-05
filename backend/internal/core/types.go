@@ -605,17 +605,18 @@ type ContractMilestoneRequest struct {
 }
 
 type ContractVariationRequest struct {
-	VariationCode    string  `json:"variation_code"`
-	Title            string  `json:"title"`
-	VariationType    string  `json:"variation_type"`
-	Reason           string  `json:"reason"`
-	AmountDelta      float64 `json:"amount_delta"`
-	DaysDelta        int     `json:"days_delta"`
-	ScopeDelta       string  `json:"scope_delta"`
-	DocumentID       string  `json:"document_id"`
-	Comment          string  `json:"comment"`
-	Priority         string  `json:"priority"`
-	SourceWorkItemID string  `json:"source_work_item_id"`
+	VariationCode              string  `json:"variation_code"`
+	Title                      string  `json:"title"`
+	VariationType              string  `json:"variation_type"`
+	Reason                     string  `json:"reason"`
+	AmountDelta                float64 `json:"amount_delta"`
+	DaysDelta                  int     `json:"days_delta"`
+	ScopeDelta                 string  `json:"scope_delta"`
+	DocumentID                 string  `json:"document_id"`
+	Comment                    string  `json:"comment"`
+	Priority                   string  `json:"priority"`
+	SourceWorkItemID           string  `json:"source_work_item_id"`
+	SourceConstructionActionID string  `json:"source_construction_action_id"`
 }
 
 type ContractRetentionReleaseRequest struct {

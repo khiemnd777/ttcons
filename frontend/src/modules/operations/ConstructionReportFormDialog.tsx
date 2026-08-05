@@ -106,10 +106,14 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   });
   const workItems = useMemo(
     () => [...(operations.data?.work_items ?? [])]
-      .filter((item) => item.status !== 'cancelled')
+	      .filter((item) => item.status !== 'cancelled' && item.report_eligible === true)
       .sort((left, right) => workItemRank(left) - workItemRank(right) || left.title.localeCompare(right.title, 'vi')),
     [operations.data?.work_items],
   );
+	  useEffect(() => {
+	    if (!open || mode !== 'create' || workItemId || workItems.length !== 1) return;
+	    selectWorkItem(workItems[0].id);
+	  }, [mode, open, workItemId, workItems]);
   const evidence = useQuery({
     queryKey: ['construction-report-create-evidence', projectId, workItemId],
     queryFn: () => get<ProjectEvidencePage>(`/projects/${projectId}/evidence?work_item_id=${encodeURIComponent(workItemId)}&limit=50`),
@@ -118,6 +122,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   });
   const evidenceOptions = useMemo(() => evidence.data?.items ?? [], [evidence.data?.items]);
   const selectedEvidence = useMemo(() => evidenceOptions.filter((item) => selectedEvidenceIds.includes(item.id)), [evidenceOptions, selectedEvidenceIds]);
+	  const hasPhotoEvidence = selectedEvidence.some((item) => item.evidence_type === 'photo' && item.status !== 'rejected') || uploads.some((item) => item.evidenceType === 'photo');
 
   function selectWorkItem(value: string) {
     setWorkItemId(value);
@@ -128,6 +133,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   }
 
   function toggleEvidence(id: string) {
+	    clearError('evidence_ids');
     setSelectedEvidenceIds((current) => {
       if (current.includes(id)) {
         const next = current.filter((item) => item !== id);
@@ -161,7 +167,8 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validateReport({ reportDate, weather, progressPercent, doneItems, crewItems, materialItems });
-    if (uploads.length && !workItemId) nextErrors.work_item_id = 'Công việc liên quan (bắt buộc khi có minh chứng)';
+	    if (!workItemId) nextErrors.work_item_id = 'Hạng mục thi công đang thực hiện';
+	    if (!hasPhotoEvidence) nextErrors.evidence_ids = 'Ít nhất một ảnh hiện trường';
     const linkedErrors = mode === 'create' ? validateReportLinkedDrafts(linkedDrafts, workItemId, selectedEvidenceIds.length + uploads.length > 0) : [];
     if (linkedErrors.length) setShowLinkedErrors(true);
     if (Object.keys(nextErrors).length || linkedErrors.length) {
@@ -245,9 +252,9 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
             <Field label="Tiến độ báo cáo (%)" required error={errors.progress_percent}>
               <input type="number" min={0} max={100} className={inputClass(Boolean(errors.progress_percent))} value={progressPercent} onChange={(event) => { setProgressPercent(event.target.value); clearError('progress_percent'); }} />
             </Field>
-            <Field label="Công việc liên quan" error={errors.work_item_id} helper={!workItemId ? 'Cần chọn khi có minh chứng hoặc liên kết.' : undefined}>
+	            <Field label="Hạng mục thi công" required error={errors.work_item_id} helper="Chỉ hiển thị hạng mục thuộc Node Thi công đang hoạt động.">
               <select disabled={operations.isLoading || operations.isError} className={inputClass(Boolean(errors.work_item_id))} value={workItemId} onChange={(event) => selectWorkItem(event.target.value)}>
-                <option value="">{operations.isLoading ? 'Đang tải công việc...' : operations.isError ? 'Không tải được công việc' : 'Không chọn công việc'}</option>
+	                <option value="">{operations.isLoading ? 'Đang tải hạng mục...' : operations.isError ? 'Không tải được hạng mục' : workItems.length ? 'Chọn hạng mục' : 'Chưa có hạng mục Thi công khả dụng'}</option>
                 {workItems.map((item) => <option key={item.id} value={item.id}>{item.title} · {statusLabel(item.status)}</option>)}
               </select>
             </Field>
@@ -258,7 +265,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
         <div className={clsx('grid gap-5', mode === 'create' && (canCreateCheck || canCreateAction) && 'xl:grid-cols-[minmax(0,1fr)_22rem]')}>
           <div className="space-y-5">
             <section>
-              <SectionTitle title="Công việc trong ngày" description="Chuyển nhóm bằng tab; dữ liệu đã nhập được giữ nguyên." />
+	              <SectionTitle title="Checklist báo cáo" description="Ghi các hạng mục đã làm, đang làm và kế hoạch tiếp theo trong ngày." />
               <div className="mt-3 flex gap-1 overflow-x-auto rounded-lg border border-line bg-slate-50 p-1">
                 {([
                   ['done', 'Đã làm', doneItems],
@@ -279,9 +286,9 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
             </section>
 
             <section>
-              <SectionTitle title={`Minh chứng · ${selectedEvidenceIds.length + uploads.length}`} description="Chụp ảnh hoặc chọn tệp một lần; kiểm tra và việc xử lý sẽ dùng lại minh chứng này." />
+	              <SectionTitle title={`Minh chứng · ${selectedEvidenceIds.length + uploads.length}`} description="Bắt buộc ít nhất một ảnh hiện trường; kiểm tra và việc xử lý sẽ dùng lại minh chứng này." />
               <div className="mt-3 space-y-3">
-                {!workItemId ? <InfoState title="Chưa chọn công việc liên quan" description="Có thể chuẩn bị ảnh trước; khi lưu báo cáo có minh chứng hoặc liên kết, hệ thống sẽ yêu cầu chọn công việc." /> : null}
+	                {!workItemId ? <InfoState title="Chưa chọn hạng mục thi công" description="Chọn hạng mục đang thực hiện trước khi chụp hoặc tải ảnh hiện trường." /> : null}
                 {workItemId && evidence.isLoading ? <LoadingSpinner label="Đang tải minh chứng của công việc..." /> : null}
                 {workItemId && evidence.isError ? <InlineError message="Không tải được minh chứng của công việc." onRetry={() => evidence.refetch()} /> : null}
                 {workItemId && evidence.isSuccess && evidenceOptions.length ? <details className="rounded-lg border border-line bg-slate-50 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Chọn từ minh chứng đã có · {selectedEvidenceIds.length} đã chọn</summary><div className="mt-3 grid gap-2 sm:grid-cols-2">{evidenceOptions.map((record) => {
@@ -289,7 +296,8 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
                   const rejected = record.status === 'rejected';
                   return <article key={record.id} className={clsx('rounded-lg border p-3', selected ? 'border-blue-300 bg-blue-50' : 'border-line bg-white')}><div className="flex items-start gap-3"><input type="checkbox" className="mt-1 h-4 w-4 rounded border-line" checked={selected} disabled={rejected && !selected} onChange={() => toggleEvidence(record.id)} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{record.name || record.title || 'Minh chứng'}</p><div className="mt-1 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} /><span className="text-xs text-slate-500">{record.evidence_type === 'photo' ? 'Ảnh' : 'Tài liệu'}</span></div></div>{selected ? <label className="flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-700"><input type="radio" name="primary-evidence" checked={primaryEvidenceId === record.id} onChange={() => setPrimaryEvidenceId(record.id)} /> Chính</label> : null}</div></article>;
                 })}</div></details> : null}
-                <ConstructionEvidenceCapture drafts={uploads} onChange={setUploads} hasSource={Boolean(workItemId)} disabled={saving} />
+	                <ConstructionEvidenceCapture drafts={uploads} onChange={(next) => { setUploads(next); clearError('evidence_ids'); }} hasSource={Boolean(workItemId)} disabled={saving} hint="Ảnh được tải lên theo hạng mục trước khi lưu báo cáo; nếu lưu thất bại, ảnh vẫn được giữ trong hồ sơ hạng mục." />
+	                {errors.evidence_ids ? <p className="text-xs font-medium text-rose-700">{errors.evidence_ids}</p> : null}
               </div>
             </section>
 

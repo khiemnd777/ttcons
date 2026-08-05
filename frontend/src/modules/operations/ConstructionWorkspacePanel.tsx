@@ -16,7 +16,7 @@ export type ConstructionWorkspaceDialogRequest =
   | { mode: 'checks'; state: Exclude<CheckDialogState, null> }
   | { mode: 'actions'; state: Exclude<ActionDialogState, null> };
 
-export function ConstructionWorkspacePanel({ projectId, mode, dialogRequest, onDialogRequestHandled, onViewReport }: { projectId: string; mode: SimplifiedConstructionMode; dialogRequest?: ConstructionWorkspaceDialogRequest | null; onDialogRequestHandled?: () => void; onViewReport?: (reportId: string) => void }) {
+export function ConstructionWorkspacePanel({ projectId, mode, dialogRequest, onDialogRequestHandled, onViewReport, onProposeVariation }: { projectId: string; mode: SimplifiedConstructionMode; dialogRequest?: ConstructionWorkspaceDialogRequest | null; onDialogRequestHandled?: () => void; onViewReport?: (reportId: string) => void; onProposeVariation?: (action: ConstructionActionItem) => void }) {
   const [checkDialog, setCheckDialog] = useState<CheckDialogState>(null);
   const [actionDialog, setActionDialog] = useState<ActionDialogState>(null);
   const queryClient = useQueryClient();
@@ -32,6 +32,7 @@ export function ConstructionWorkspacePanel({ projectId, mode, dialogRequest, onD
     resolveAction: hasAnyPermission(['construction.action.resolve']),
     verifyAction: hasAnyPermission(['construction.action.verify', 'replanning.approve']),
     approveImpact: hasAnyPermission(['replanning.approve', 'construction.action.verify']),
+	    proposeVariation: hasAnyPermission(['contract.variation.propose']),
   };
   const workspace = useQuery({
     queryKey: ['construction-workspace', projectId],
@@ -90,9 +91,11 @@ export function ConstructionWorkspacePanel({ projectId, mode, dialogRequest, onD
 
   const pendingChecks = workspace.data.checks.filter((row) => row.status === 'pending').length;
   const activeActions = workspace.data.actions.filter((row) => row.status === 'open' || row.status === 'waiting_confirmation').length;
+	  const constructionActive = workspace.data.runtime.construction_active;
 
   return <>
     <section className="overflow-hidden rounded-lg border border-line bg-white">
+	      {!constructionActive ? <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 text-xs font-medium text-blue-800">Quy trình chưa tới Node Thi công. Dữ liệu cũ vẫn xem được; thao tác tạo mới đang khóa.</div> : null}
       <div className="flex flex-col gap-3 border-b border-line px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -104,15 +107,15 @@ export function ConstructionWorkspacePanel({ projectId, mode, dialogRequest, onD
         </div>
         <div className="flex flex-wrap gap-2">
           {mode === 'checks' && permissions.manageTemplates ? <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setCheckDialog({ type: 'template' })}><Settings2 className="h-4 w-4" /> Mẫu kiểm tra</button> : null}
-          {mode === 'checks' && permissions.requestCheck ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setCheckDialog({ type: 'create' })}><Plus className="h-4 w-4" /> Tạo kiểm tra</button> : null}
-          {mode === 'actions' && permissions.createAction ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setActionDialog({ type: 'create' })}><Plus className="h-4 w-4" /> Tạo việc</button> : null}
+	          {mode === 'checks' && permissions.requestCheck ? <button type="button" disabled={!constructionActive} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => constructionActive && setCheckDialog({ type: 'create' })}><Plus className="h-4 w-4" /> Tạo kiểm tra</button> : null}
+	          {mode === 'actions' && permissions.createAction ? <button type="button" disabled={!constructionActive} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => constructionActive && setActionDialog({ type: 'create' })}><Plus className="h-4 w-4" /> Tạo việc</button> : null}
         </div>
       </div>
       <div className="p-4">
-        {mode === 'checks' ? <ConstructionCheckList workspace={workspace.data} canCreate={permissions.requestCheck} canEdit={permissions.editCheck} canPerform={permissions.performCheck} onCreate={() => setCheckDialog({ type: 'create' })} onView={viewCheck} onEdit={(check) => setCheckDialog({ type: 'edit', check })} onComplete={(check) => setCheckDialog({ type: 'complete', check })} /> : <ConstructionActionList workspace={workspace.data} canCreate={permissions.createAction} canEdit={permissions.editAction} canResolve={permissions.resolveAction} canVerify={permissions.verifyAction} onCreate={() => setActionDialog({ type: 'create' })} onView={viewAction} onEdit={(action) => setActionDialog({ type: 'edit', action })} onResolve={(action) => setActionDialog({ type: 'resolve', action })} onVerify={(action) => setActionDialog({ type: 'verify', action })} />}
+	        {mode === 'checks' ? <ConstructionCheckList workspace={workspace.data} canCreate={permissions.requestCheck && constructionActive} canEdit={permissions.editCheck} canPerform={permissions.performCheck} onCreate={() => setCheckDialog({ type: 'create' })} onView={viewCheck} onEdit={(check) => setCheckDialog({ type: 'edit', check })} onComplete={(check) => setCheckDialog({ type: 'complete', check })} /> : <ConstructionActionList workspace={workspace.data} canCreate={permissions.createAction && constructionActive} canEdit={permissions.editAction} canResolve={permissions.resolveAction} canVerify={permissions.verifyAction} onCreate={() => setActionDialog({ type: 'create' })} onView={viewAction} onEdit={(action) => setActionDialog({ type: 'edit', action })} onResolve={(action) => setActionDialog({ type: 'resolve', action })} onVerify={(action) => setActionDialog({ type: 'verify', action })} />}
       </div>
     </section>
     <ConstructionCheckDialogs state={checkDialog} projectId={projectId} workspace={workspace.data} canEdit={permissions.editCheck} canPerform={permissions.performCheck} onClose={() => setCheckDialog(null)} onSaved={refresh} onEdit={(check) => setCheckDialog({ type: 'edit', check })} onComplete={(check) => setCheckDialog({ type: 'complete', check })} onViewAction={viewAction} onViewReport={onViewReport ? viewReport : undefined} />
-    <ConstructionActionDialogs state={actionDialog} projectId={projectId} workspace={workspace.data} canEdit={permissions.editAction} canResolve={permissions.resolveAction} canVerify={permissions.verifyAction} canApproveImpact={permissions.approveImpact} onClose={() => setActionDialog(null)} onSaved={refresh} onEdit={(action) => setActionDialog({ type: 'edit', action })} onResolve={(action) => setActionDialog({ type: 'resolve', action })} onVerify={(action) => setActionDialog({ type: 'verify', action })} onApproveImpact={approveImpact} onViewCheck={viewCheck} onViewReport={onViewReport ? viewReport : undefined} />
+	    <ConstructionActionDialogs state={actionDialog} projectId={projectId} workspace={workspace.data} canEdit={permissions.editAction} canResolve={permissions.resolveAction} canVerify={permissions.verifyAction} canApproveImpact={permissions.approveImpact} canProposeVariation={permissions.proposeVariation} onClose={() => setActionDialog(null)} onSaved={refresh} onEdit={(action) => setActionDialog({ type: 'edit', action })} onResolve={(action) => setActionDialog({ type: 'resolve', action })} onVerify={(action) => setActionDialog({ type: 'verify', action })} onApproveImpact={approveImpact} onProposeVariation={(action) => { setActionDialog(null); onProposeVariation?.(action); }} onViewCheck={viewCheck} onViewReport={onViewReport ? viewReport : undefined} />
   </>;
 }

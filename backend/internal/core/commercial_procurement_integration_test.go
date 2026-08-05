@@ -700,6 +700,66 @@ func TestContractLifecycleCreatesVersionedObligationsVariationAndRetention(t *te
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='contract_variation_incorporated'`, 1, projectID)
 }
 
+func TestConstructionVariationProposalStartsAtQSAndTracesAction(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	contractID := newID()
+	mustExec(t, db, `
+		INSERT INTO contracts (
+			id,project_id,contract_code,title,contract_type,direction,counterparty_name,
+			currency,original_amount,current_amount,status,created_by,activated_by,activated_at
+		) VALUES ($1,$2,'HD-THI-CONG','Hợp đồng chủ đầu tư','main_client','receivable','Chủ đầu tư','VND',1000000,1000000,'active',$3,$3,now())
+	`, contractID, fixture.projectID, fixture.workerID)
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo", Name: "Hiện trạng phát sinh", FileURL: "https://example.com/variation-source.jpg", Visibility: "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	action, err := service.CreateConstructionAction(ctx, fixture.projectID, ConstructionActionRequest{
+		WorkItemID: fixture.itemID, Title: "Thay đổi vật liệu hoàn thiện", Description: "Chủ đầu tư yêu cầu đổi chủng loại",
+		Priority: "urgent", AssignedUserID: fixture.workerID, DueAt: "2026-08-10T17:00:00+07:00",
+		ImpactScope: "budget", EvidenceID: cleanID(evidence["id"]),
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := service.ProposeConstructionVariation(ctx, fixture.projectID, ContractVariationRequest{
+		VariationCode: "PS-001", Title: "Đổi vật liệu hoàn thiện", VariationType: "mixed",
+		Reason: "Yêu cầu thay đổi tại hiện trường", AmountDelta: 250000, DaysDelta: 2,
+		ScopeDelta: "Thay chủng loại vật liệu khu A", Priority: "urgent",
+		SourceWorkItemID: fixture.itemID, SourceConstructionActionID: cleanID(action["id"]),
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(proposal["status"]) != "qs_review" || cleanID(proposal["source_construction_action_id"]) != cleanID(action["id"]) {
+		t.Fatalf("construction variation proposal = %#v, want qs_review linked to action", proposal)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM contract_variation_events WHERE variation_id=$1 AND event_type IN ('contract_variation_created','contract_variation_submitted')`, 2, proposal["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND target_id=$2 AND event_type='contract_variation_proposed'`, 1, fixture.projectID, proposal["id"])
+
+	contextRow, err := service.ProjectConstructionVariationContext(ctx, fixture.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !boolValue(contextRow["available"]) || cleanID(recordFromAny(contextRow["contract"])["id"]) != contractID {
+		t.Fatalf("construction variation context = %#v, want active client contract", contextRow)
+	}
+	variations := workflowAnswerRecordList(contextRow["variations"])
+	if len(variations) != 1 || cleanID(variations[0]["source_construction_action_id"]) != cleanID(action["id"]) {
+		t.Fatalf("construction variation context rows = %#v", variations)
+	}
+	if _, err := service.ProposeConstructionVariation(ctx, fixture.projectID, ContractVariationRequest{
+		VariationCode: "PS-002", Title: "Đề xuất trùng", VariationType: "price", Reason: "Trùng nguồn",
+		Priority: "normal", SourceWorkItemID: fixture.itemID, SourceConstructionActionID: cleanID(action["id"]),
+	}, fixture.workerID, "Worker"); err == nil || !strings.Contains(err.Error(), "đã có một đề xuất") {
+		t.Fatalf("duplicate action proposal error = %v, want duplicate validation", err)
+	}
+}
+
 func TestSubcontractorChecklistFormValidatesEvidenceAndQuantities(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

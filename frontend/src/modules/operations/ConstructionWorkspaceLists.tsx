@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
 import { RowActions } from '../../components/RowActions';
 import type { ConstructionActionItem, ConstructionCheck, ConstructionWorkspace } from '../../lib/types/domain';
-import { actionStatusLabel, checkStatusLabel, dateTimeText, impactLabel, isConstructionActionEditable, isConstructionCheckEditable, isOverdue, normalizedSearch } from './constructionWorkspaceUtils';
+import { actionStatusLabel, checkStatusLabel, constructionCheckFilterWorkItems, dateTimeText, impactLabel, isConstructionActionEditable, isConstructionCheckEditable, isOverdue, normalizedSearch } from './constructionWorkspaceUtils';
 
 type CheckQueue = 'pending' | 'pass' | 'fail' | 'all';
 type ActionQueue = 'open' | 'waiting_confirmation' | 'done' | 'all';
@@ -14,6 +14,7 @@ export function ConstructionCheckList({ workspace, canCreate, canEdit, canPerfor
   const [query, setQuery] = useState('');
   const [workItemID, setWorkItemID] = useState('');
   const [timeFilter, setTimeFilter] = useState('all');
+  const filterWorkItems = useMemo(() => constructionCheckFilterWorkItems(workspace), [workspace.checks, workspace.work_items]);
   const counts = useMemo(() => ({
     pending: workspace.checks.filter((row) => row.status === 'pending').length,
     pass: workspace.checks.filter((row) => row.result === 'pass').length,
@@ -47,7 +48,7 @@ export function ConstructionCheckList({ workspace, canCreate, canEdit, canPerfor
     ]} />
     <FilterToolbar onReset={reset} showReset={filtered}>
       <SearchInput value={query} onChange={setQuery} placeholder="Tìm nội dung, vị trí, công việc" />
-      <FilterSelect value={workItemID} onChange={setWorkItemID} ariaLabel="Lọc theo công việc"><option value="">Tất cả công việc</option>{workspace.work_items.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</FilterSelect>
+      <FilterSelect value={workItemID} onChange={setWorkItemID} ariaLabel="Lọc theo công việc"><option value="">Tất cả hạng mục kiểm tra</option>{filterWorkItems.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</FilterSelect>
       <FilterSelect value={timeFilter} onChange={setTimeFilter} ariaLabel="Lọc theo thời gian"><option value="all">Mọi thời điểm</option><option value="overdue">Đã quá lịch</option><option value="today">Hôm nay</option><option value="upcoming">Sắp tới</option><option value="unscheduled">Chưa đặt lịch</option></FilterSelect>
     </FilterToolbar>
     {rows.length ? <>

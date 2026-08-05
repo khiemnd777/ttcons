@@ -904,7 +904,9 @@ func (r *Repository) listProjectWorkItems(ctx context.Context, projectID, userID
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT wi.*, p.name AS project_name, p.code AS project_code,
 			rn.name AS run_node_name, rn.order_index AS run_node_order_index,
+			rn.type AS run_node_type, rn.business_code AS run_node_business_code,
 			rs.name AS run_step_name, rs.order_index AS run_step_order_index,
+			rs.business_code AS run_step_business_code,
 			s.full_name AS assignee_name,
 			COALESCE((SELECT COUNT(*) FROM evidence_records er WHERE er.work_item_id=wi.id AND er.status <> 'rejected'),0) AS evidence_count,
 			wfi.id AS workflow_form_instance_id,
@@ -922,7 +924,18 @@ func (r *Repository) listProjectWorkItems(ctx context.Context, projectID, userID
 			rs.form_version_id AS required_workflow_form_version_id,
 			rs.surface_kind,
 			rs.domain_action_key,
-			COALESCE(pr.engine_version, 1) AS pipeline_engine_version
+			COALESCE(pr.engine_version, 1) AS pipeline_engine_version,
+			CASE
+				WHEN wi.status IN ('completed','done') THEN false
+				WHEN wi.pipeline_run_id IS NULL OR COALESCE(pr.engine_version,1) < 2 THEN true
+				ELSE pr.current_node_id=wi.run_node_id
+					AND rn.status IN ('in_progress','waiting_approval','blocked')
+					AND (
+						rs.business_code='construction.item_reporting'
+						OR rn.business_code='construction_execution'
+						OR rn.type='construction'
+					)
+			END AS report_eligible
 		FROM work_items wi
 		JOIN projects p ON p.id=wi.project_id
 		LEFT JOIN pipeline_runs pr ON pr.id=wi.pipeline_run_id
@@ -1327,7 +1340,9 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 	item, err := r.QueryOne(ctx, `
 		SELECT wi.*, p.name AS project_name, p.code AS project_code,
 			rn.name AS run_node_name, rn.order_index AS run_node_order_index,
+			rn.type AS run_node_type, rn.business_code AS run_node_business_code,
 			rs.name AS run_step_name, rs.order_index AS run_step_order_index,
+			rs.business_code AS run_step_business_code,
 			s.full_name AS assignee_name,
 			pr.current_node_id AS pipeline_current_node_id,
 			rn.status AS run_node_status,
@@ -8102,6 +8117,7 @@ func (r *Repository) CloneTemplate(ctx context.Context, id, userID string) (Reco
 		"name":               detail["name"],
 		"description":        detail["description"],
 		"project_type":       detail["project_type"],
+		"report_config_json": detail["report_config_json"],
 		"version":            revisionNo,
 		"status":             "draft",
 		"created_by":         userID,
@@ -12539,6 +12555,149 @@ func (r *Repository) CreateContractVariation(ctx context.Context, contractID str
 	return r.GetContractDetail(ctx, contractID)
 }
 
+func (r *Repository) ProjectConstructionVariationContext(ctx context.Context, projectID string) (Record, error) {
+	contracts, err := r.Query(ctx, `
+		SELECT id,contract_code,title,contract_type,direction,counterparty_name,current_amount,status
+		FROM contracts
+		WHERE project_id=$1 AND contract_type='main_client' AND direction='receivable' AND status='active'
+		ORDER BY updated_at DESC,id DESC
+		LIMIT 1
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(contracts) == 0 {
+		return Record{"available": false, "contract": nil, "variations": []Record{}}, nil
+	}
+	contract := contracts[0]
+	variations, err := r.Query(ctx, `
+		SELECT variation.id,variation.variation_code,variation.title,variation.variation_type,
+			variation.reason,variation.amount_delta,variation.days_delta,variation.scope_delta,
+			variation.status,variation.priority,variation.source_work_item_id,
+			variation.source_construction_action_id,variation.created_at,variation.updated_at,
+			item.title AS source_work_item_title,action.title AS source_construction_action_title
+		FROM contract_variations variation
+		LEFT JOIN work_items item ON item.id=variation.source_work_item_id
+		LEFT JOIN construction_action_items action ON action.id=variation.source_construction_action_id
+		WHERE variation.contract_id=$1
+		ORDER BY variation.created_at DESC,variation.id DESC
+	`, contract["id"])
+	if err != nil {
+		return nil, err
+	}
+	return Record{"available": true, "contract": contract, "variations": variations}, nil
+}
+
+func (r *Repository) ProposeConstructionVariation(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	contracts, err := queryTx(ctx, tx, `
+		SELECT *
+		FROM contracts
+		WHERE project_id=$1 AND contract_type='main_client' AND direction='receivable' AND status='active'
+		ORDER BY updated_at DESC,id DESC
+		LIMIT 1
+		FOR UPDATE
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(contracts) == 0 {
+		return nil, validationError("Công trình chưa có hợp đồng chủ đầu tư đang hiệu lực")
+	}
+	contract := contracts[0]
+	workItemID := cleanID(body["source_work_item_id"])
+	var validWorkItem bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM work_items
+			WHERE id=$1 AND project_id=$2 AND status <> 'cancelled'
+		)
+	`, workItemID, projectID).Scan(&validWorkItem); err != nil {
+		return nil, err
+	}
+	if !validWorkItem {
+		return nil, validationError("Hạng mục thi công nguồn không thuộc công trình")
+	}
+	actionID := cleanID(body["source_construction_action_id"])
+	if actionID != "" {
+		actions, err := queryTx(ctx, tx, `
+			SELECT id,work_item_id,impact_scope
+			FROM construction_action_items
+			WHERE id=$1 AND project_id=$2 AND status <> 'cancelled'
+			FOR UPDATE
+		`, actionID, projectID)
+		if err != nil {
+			return nil, err
+		}
+		if len(actions) == 0 || cleanID(actions[0]["work_item_id"]) != workItemID {
+			return nil, validationError("Việc cần xử lý nguồn không thuộc hạng mục thi công đã chọn")
+		}
+		if fmt.Sprint(actions[0]["impact_scope"]) == "none" {
+			return nil, validationError("Chỉ việc có ảnh hưởng tiến độ, chi phí hoặc phạm vi mới cần đề xuất phát sinh")
+		}
+		var duplicate bool
+		if err := tx.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM contract_variations
+				WHERE source_construction_action_id=$1
+				  AND status NOT IN ('rejected','incorporated')
+			)
+		`, actionID).Scan(&duplicate); err != nil {
+			return nil, err
+		}
+		if duplicate {
+			return nil, validationError("Việc cần xử lý đã có một đề xuất phát sinh đang được xử lý")
+		}
+	}
+	variationRows, err := queryTx(ctx, tx, `
+		INSERT INTO contract_variations (
+			contract_id,variation_code,title,variation_type,reason,amount_delta,days_delta,scope_delta,
+			document_id,status,priority,source_work_item_id,source_construction_action_id,created_by
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,'')::uuid,'draft',$10,$11,NULLIF($12,'')::uuid,NULLIF($13,'')::uuid)
+		RETURNING *
+	`, contract["id"], body["variation_code"], body["title"], body["variation_type"], body["reason"], body["amount_delta"], body["days_delta"], body["scope_delta"], cleanID(body["document_id"]), body["priority"], workItemID, actionID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	variation := variationRows[0]
+	variation["project_id"] = projectID
+	if err := r.recordContractVariationEventTx(ctx, tx, variation, "contract_variation_created", "", "draft", body["comment"], nil, actorID, actorName); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE contract_variations
+		SET status='qs_review',submitted_by=NULLIF($2,'')::uuid,submitted_at=now(),updated_at=now()
+		WHERE id=$1
+	`, variation["id"], actorID); err != nil {
+		return nil, err
+	}
+	variation["status"] = "qs_review"
+	if err := r.recordContractVariationEventTx(ctx, tx, variation, "contract_variation_submitted", "draft", "qs_review", body["comment"], []string{"QS"}, actorID, actorName); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "contract_variation_proposed", "contract_variation", cleanID(variation["id"]), "Đề xuất phát sinh từ hiện trường và gửi QS", Record{
+		"contract_id": contract["id"], "source_work_item_id": workItemID, "source_construction_action_id": actionID,
+		"priority": body["priority"], "amount_delta": body["amount_delta"], "days_delta": body["days_delta"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.QueryOne(ctx, `
+		SELECT variation.*,item.title AS source_work_item_title,action.title AS source_construction_action_title
+		FROM contract_variations variation
+		LEFT JOIN work_items item ON item.id=variation.source_work_item_id
+		LEFT JOIN construction_action_items action ON action.id=variation.source_construction_action_id
+		WHERE variation.id=$1
+	`, variation["id"])
+}
+
 func (r *Repository) ContractVariationAction(ctx context.Context, variationID, action, comment, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -12845,6 +13004,33 @@ func (r *Repository) ReleaseContractRetention(ctx context.Context, retentionID s
 }
 
 func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID string) (Record, error) {
+	runtimeRows, err := r.Query(ctx, `
+		SELECT pr.id AS pipeline_run_id,pr.status AS pipeline_run_status,COALESCE(pr.engine_version,1) AS engine_version,
+			pr.current_node_id,rn.name AS current_node_name,rn.type AS current_node_type,
+			rn.business_code AS current_node_business_code,rn.status AS current_node_status
+		FROM pipeline_runs pr
+		LEFT JOIN pipeline_run_nodes rn ON rn.id=pr.current_node_id
+		WHERE pr.project_id=$1 AND pr.status <> 'cancelled'
+		ORDER BY pr.started_at DESC,pr.id DESC
+		LIMIT 1
+	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	runtime := Record{
+		"has_pipeline_run":    false,
+		"construction_active": true,
+	}
+	if len(runtimeRows) > 0 {
+		runtime = runtimeRows[0]
+		runtime["has_pipeline_run"] = true
+		engineVersion := int(number(runtime["engine_version"]))
+		runtime["construction_active"] = engineVersion < 2 ||
+			(fmt.Sprint(runtime["pipeline_run_status"]) == "in_progress" &&
+				statusIn(fmt.Sprint(runtime["current_node_status"]), "in_progress", "waiting_approval", "blocked") &&
+				(fmt.Sprint(runtime["current_node_business_code"]) == "construction_execution" ||
+					fmt.Sprint(runtime["current_node_type"]) == "construction"))
+	}
 	templates, err := r.Query(ctx, `
 		SELECT t.*,u.full_name AS created_by_name
 		FROM construction_check_templates t
@@ -12917,6 +13103,8 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 		SELECT a.*,w.title AS work_item_title,c.title AS source_check_title,
 			u.full_name AS assigned_user_name,b.name AS before_evidence_name,re.name AS resolution_evidence_name,
 			rp.status AS impact_status,
+			variation.id AS linked_variation_id,variation.variation_code AS linked_variation_code,
+			variation.status AS linked_variation_status,variation.priority AS linked_variation_priority,
 			COALESCE(a.source_daily_report_id,c.source_daily_report_id) AS source_daily_report_id,
 			CASE WHEN a.source_daily_report_id IS NOT NULL THEN 'direct' WHEN c.source_daily_report_id IS NOT NULL THEN 'check' ELSE NULL END AS source_report_link_kind,
 			dr.report_date AS source_report_date,dr.weather AS source_report_weather
@@ -12927,6 +13115,13 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 		LEFT JOIN evidence_records b ON b.id=a.before_evidence_id
 		LEFT JOIN evidence_records re ON re.id=a.resolution_evidence_id
 		LEFT JOIN replanning_requests rp ON rp.id=a.technical_replanning_id
+		LEFT JOIN LATERAL (
+			SELECT v.id,v.variation_code,v.status,v.priority
+			FROM contract_variations v
+			WHERE v.source_construction_action_id=a.id AND v.status <> 'rejected'
+			ORDER BY v.created_at DESC,v.id DESC
+			LIMIT 1
+		) variation ON true
 		LEFT JOIN operation_daily_reports dr ON dr.id=COALESCE(a.source_daily_report_id,c.source_daily_report_id)
 		WHERE a.project_id=$1 AND a.status <> 'cancelled'
 		ORDER BY CASE a.status WHEN 'open' THEN 0 WHEN 'waiting_confirmation' THEN 1 ELSE 2 END,
@@ -12949,10 +13144,27 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 		action["events"] = events
 	}
 	workItems, err := r.Query(ctx, `
-		SELECT id,title,status,work_type,source_type,source_id,run_node_id
-		FROM work_items
-		WHERE project_id=$1 AND status <> 'cancelled'
-		ORDER BY CASE WHEN status IN ('ready','in_progress','needs_changes','blocked') THEN 0 ELSE 1 END,updated_at DESC
+		SELECT wi.id,wi.title,wi.status,wi.work_type,wi.source_type,wi.source_id,wi.run_node_id,wi.run_step_id,
+			COALESCE(pr.engine_version,1) AS pipeline_engine_version,
+			rn.type AS run_node_type,rn.business_code AS run_node_business_code,
+			rs.business_code AS run_step_business_code,
+			CASE
+				WHEN wi.status IN ('completed','done') THEN false
+				WHEN wi.pipeline_run_id IS NULL OR COALESCE(pr.engine_version,1) < 2 THEN true
+				ELSE pr.current_node_id=wi.run_node_id
+					AND rn.status IN ('in_progress','waiting_approval','blocked')
+					AND (
+						rs.business_code='construction.item_reporting'
+						OR rn.business_code='construction_execution'
+						OR rn.type='construction'
+					)
+			END AS report_eligible
+		FROM work_items wi
+		LEFT JOIN pipeline_runs pr ON pr.id=wi.pipeline_run_id
+		LEFT JOIN pipeline_run_nodes rn ON rn.id=wi.run_node_id
+		LEFT JOIN pipeline_run_steps rs ON rs.id=wi.run_step_id
+		WHERE wi.project_id=$1 AND wi.status <> 'cancelled'
+		ORDER BY CASE WHEN wi.status IN ('ready','in_progress','needs_changes','blocked') THEN 0 ELSE 1 END,wi.updated_at DESC
 		LIMIT 300
 	`, projectID)
 	if err != nil {
@@ -12969,7 +13181,7 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 	if err != nil {
 		return nil, err
 	}
-	return Record{"templates": templates, "checks": checks, "actions": actions, "work_items": workItems, "participants": participants}, nil
+	return Record{"runtime": runtime, "templates": templates, "checks": checks, "actions": actions, "work_items": workItems, "participants": participants}, nil
 }
 
 func (r *Repository) CreateConstructionCheckTemplate(ctx context.Context, projectID, name, description string, criteria []ConstructionCheckCriterion, actorID, actorName string) (Record, error) {
@@ -14930,10 +15142,22 @@ func (r *Repository) CreateWarehouse(ctx context.Context, body Record) (Record, 
 
 func (r *Repository) ListProjectDailyReports(ctx context.Context, projectID string) ([]Record, error) {
 	return r.Query(ctx, `
-		SELECT *
-		FROM operation_daily_reports
-		WHERE project_id=$1
-		ORDER BY created_at DESC
+		SELECT report.*,
+			(
+				report.work_item_id IS NOT NULL
+				AND EXISTS (
+					SELECT 1
+					FROM jsonb_array_elements_text(report.photos) photo(evidence_id)
+					JOIN evidence_records evidence ON evidence.id::text=photo.evidence_id
+					WHERE evidence.project_id=report.project_id
+					  AND evidence.work_item_id=report.work_item_id
+					  AND evidence.evidence_type='photo'
+					  AND evidence.status <> 'rejected'
+				)
+			) AS runtime_compliant
+		FROM operation_daily_reports report
+		WHERE report.project_id=$1
+		ORDER BY report.created_at DESC
 	`, projectID)
 }
 

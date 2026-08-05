@@ -469,7 +469,7 @@ func (r *Repository) NodeCompletionIssues(ctx context.Context, node Record) ([]R
 func stripTemplateVolatileFields(value any) any {
 	volatile := map[string]bool{
 		"status": true, "definition_hash": true, "published_at": true, "published_by": true,
-		"created_at": true, "updated_at": true, "node_count": true,
+		"created_at": true, "updated_at": true, "node_count": true, "report_config_json": true,
 	}
 	switch typed := value.(type) {
 	case Record:

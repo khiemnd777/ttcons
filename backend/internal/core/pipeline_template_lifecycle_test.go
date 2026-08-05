@@ -63,6 +63,30 @@ func TestTemplateDefinitionHashIgnoresLifecycleTimestamps(t *testing.T) {
 	}
 }
 
+func TestTemplateDefinitionHashIgnoresReportPresentationConfig(t *testing.T) {
+	first := Record{
+		"id": "template-1", "name": "Workflow",
+		"report_config_json": Record{"node_reference_title": "Client -> Rev4"},
+		"nodes":              []Record{{"id": "node-1", "business_code": "survey"}},
+	}
+	second := Record{
+		"id": "template-1", "name": "Workflow",
+		"report_config_json": Record{"node_reference_title": "Đối chiếu node client"},
+		"nodes":              []Record{{"id": "node-1", "business_code": "survey"}},
+	}
+	firstHash, err := templateDefinitionHash(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondHash, err := templateDefinitionHash(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstHash != secondHash {
+		t.Fatalf("expected report-only presentation config to preserve definition hash: %s != %s", firstHash, secondHash)
+	}
+}
+
 func TestTemplateDefinitionHashIgnoresDiagramPresentationMetadata(t *testing.T) {
 	first := Record{
 		"id":    "template-1",

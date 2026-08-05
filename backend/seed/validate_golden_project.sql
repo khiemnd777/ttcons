@@ -196,7 +196,7 @@ BEGIN
 
   SELECT count(*) INTO actual FROM permissions
   WHERE key LIKE 'contract.%' OR key LIKE 'quality.%' OR key LIKE 'construction.%' OR key='handover.verify';
-  IF actual <> 28 THEN RAISE EXCEPTION 'Product-grade RBAC permissions after seed: expected 28, got %',actual; END IF;
+  IF actual <> 29 THEN RAISE EXCEPTION 'Product-grade RBAC permissions after seed: expected 29, got %',actual; END IF;
 
   SELECT count(*) INTO actual
   FROM role_permissions rp
@@ -242,6 +242,18 @@ BEGIN
   WHERE r.name IN ('admin','pm','qa_qc','supervisor','construction_team')
     AND p.key IN ('construction.check.edit','construction.action.edit');
   IF actual <> 10 THEN RAISE EXCEPTION 'Construction edit role grants: expected 10, got %',actual; END IF;
+  SELECT count(*) INTO actual
+  FROM role_permissions rp
+  JOIN roles r ON r.id=rp.role_id
+  JOIN permissions p ON p.id=rp.permission_id
+  WHERE p.key='contract.variation.propose' AND r.name IN ('admin','pm','supervisor');
+  IF actual <> 3 THEN RAISE EXCEPTION 'Construction variation proposal grants: expected 3, got %',actual; END IF;
+  SELECT count(*) INTO actual
+  FROM role_permissions rp
+  JOIN roles r ON r.id=rp.role_id
+  JOIN permissions p ON p.id=rp.permission_id
+  WHERE r.name='supervisor' AND p.key IN ('contract.view','contract.create');
+  IF actual <> 0 THEN RAISE EXCEPTION 'Supervisor must not receive broad contract view/create permissions'; END IF;
   SELECT count(*) INTO actual
   FROM role_permissions rp
   JOIN roles r ON r.id=rp.role_id
@@ -311,6 +323,69 @@ BEGIN
   WHERE i.project_id='30000000-0000-0000-0000-000000000022';
   IF actual <> 0 THEN RAISE EXCEPTION 'Golden Live must not have form answers, got %',actual; END IF;
 
+  -- Rev4 is an immutable future-run definition. Its report metadata contains only
+  -- client-to-business-code references; runtime/UAT state remains outside the template report.
+  SELECT count(*) INTO actual
+  FROM pipeline_templates t
+  WHERE t.id='40000000-0000-0000-0000-000000000023'
+    AND t.source_template_id='40000000-0000-0000-0000-000000000022'
+    AND t.revision_no=4 AND t.version=4 AND t.status='published'
+    AND jsonb_array_length(t.report_config_json->'node_references')=14
+    AND NOT EXISTS (
+      SELECT 1 FROM jsonb_object_keys(t.report_config_json) AS keys(key_name)
+      WHERE key_name NOT IN ('node_reference_title','node_references')
+    );
+  IF actual <> 1 THEN RAISE EXCEPTION 'Official Rev4 template lineage/report definition is invalid'; END IF;
+
+  SELECT count(*) INTO actual
+  FROM pipeline_template_nodes
+  WHERE template_id='40000000-0000-0000-0000-000000000023';
+  IF actual <> 15 THEN RAISE EXCEPTION 'Official Rev4 nodes: expected 15, got %',actual; END IF;
+  SELECT count(DISTINCT business_code) INTO actual
+  FROM pipeline_template_nodes
+  WHERE template_id='40000000-0000-0000-0000-000000000023' AND business_code IS NOT NULL;
+  IF actual <> 15 THEN RAISE EXCEPTION 'Official Rev4 unique node business codes: expected 15, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM pipeline_template_edges
+  WHERE template_id='40000000-0000-0000-0000-000000000023';
+  IF actual <> 16 THEN RAISE EXCEPTION 'Official Rev4 edges: expected 16, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM pipeline_template_steps s
+  JOIN pipeline_template_nodes n ON n.id=s.node_id
+  WHERE n.template_id='40000000-0000-0000-0000-000000000023';
+  IF actual <> 51 THEN RAISE EXCEPTION 'Official Rev4 steps: expected 51, got %',actual; END IF;
+  SELECT count(DISTINCT s.business_code) INTO actual
+  FROM pipeline_template_steps s
+  JOIN pipeline_template_nodes n ON n.id=s.node_id
+  WHERE n.template_id='40000000-0000-0000-0000-000000000023' AND s.business_code IS NOT NULL;
+  IF actual <> 51 THEN RAISE EXCEPTION 'Official Rev4 unique step business codes: expected 51, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM pipeline_template_steps s
+  JOIN pipeline_template_nodes n ON n.id=s.node_id
+  WHERE n.template_id='40000000-0000-0000-0000-000000000023'
+    AND (
+      (s.business_code='boq_without_design.pricing' AND s.required_role_ids='["QS","Mua hàng"]'::jsonb) OR
+      (s.business_code='planning.client_quality_file' AND s.step_type='document_upload' AND s.surface_kind='quality' AND s.form_required AND s.required_role_ids='["QA/QC"]'::jsonb AND s.checklist_required AND s.document_required AND NOT s.photo_required) OR
+      (s.business_code='construction.item_reporting' AND s.required_role_ids='["Giám sát"]'::jsonb AND s.checklist_required AND NOT s.document_required AND s.photo_required)
+    );
+  IF actual <> 3 THEN RAISE EXCEPTION 'Official Rev4 role/evidence responsibilities are invalid'; END IF;
+
+  -- Historical projects 020/021/022 and their runtime snapshots must not be rebound by Rev4.
+  SELECT count(*) INTO actual
+  FROM projects p
+  JOIN pipeline_runs r ON r.id=p.current_pipeline_run_id
+  WHERE p.id IN (
+      '30000000-0000-0000-0000-000000000020',
+      '30000000-0000-0000-0000-000000000021',
+      '30000000-0000-0000-0000-000000000022'
+    )
+    AND p.pipeline_template_id<>'40000000-0000-0000-0000-000000000023'
+    AND r.template_id='40000000-0000-0000-0000-000000000020';
+  IF actual <> 3 THEN RAISE EXCEPTION 'Historical projects 020/021/022 were unexpectedly rebound by Rev4'; END IF;
+
   -- Rev3 uses a new runtime fixture; historical project 022 must remain on its original snapshot.
   SELECT count(*) INTO actual
   FROM projects p
@@ -352,9 +427,119 @@ BEGIN
   SELECT count(*) INTO actual
   FROM projects p JOIN pipeline_runs r ON r.id=p.current_pipeline_run_id
   WHERE p.id='30000000-0000-0000-0000-000000000022'
-    AND p.pipeline_template_id='40000000-0000-0000-0000-000000000020'
+    AND p.pipeline_template_id<>'40000000-0000-0000-0000-000000000022'
     AND r.template_id='40000000-0000-0000-0000-000000000020';
   IF actual <> 1 THEN RAISE EXCEPTION 'Golden Live 022 history was unexpectedly rebound to Rev3'; END IF;
+
+  -- Rev4-only UAT fixtures: 024 is a production-shaped entry state, while 025 is
+  -- an explicitly synthetic construction-stage snapshot for Operations Browser UAT.
+  SELECT count(*) INTO actual
+  FROM projects p
+  JOIN pipeline_runs r ON r.id=p.current_pipeline_run_id
+  JOIN pipeline_templates t ON t.id=r.template_id
+  WHERE p.id IN (
+      '30000000-0000-0000-0000-000000000024',
+      '30000000-0000-0000-0000-000000000025'
+    )
+    AND p.pipeline_template_id='40000000-0000-0000-0000-000000000023'
+    AND r.template_id='40000000-0000-0000-0000-000000000023'
+    AND r.engine_version=3 AND r.status='in_progress'
+    AND r.template_definition_hash=t.definition_hash;
+  IF actual <> 2 THEN RAISE EXCEPTION 'Rev4 UAT project/run snapshot contract is invalid'; END IF;
+
+  SELECT count(*) INTO actual FROM project_members
+  WHERE project_id IN (
+      '30000000-0000-0000-0000-000000000024',
+      '30000000-0000-0000-0000-000000000025'
+    ) AND active;
+  IF actual <> 24 THEN RAISE EXCEPTION 'Rev4 UAT project members: expected 24, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_nodes
+  WHERE project_id IN (
+      '30000000-0000-0000-0000-000000000024',
+      '30000000-0000-0000-0000-000000000025'
+    );
+  IF actual <> 30 THEN RAISE EXCEPTION 'Rev4 UAT runtime nodes: expected 30, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_steps
+  WHERE project_id IN (
+      '30000000-0000-0000-0000-000000000024',
+      '30000000-0000-0000-0000-000000000025'
+    );
+  IF actual <> 102 THEN RAISE EXCEPTION 'Rev4 UAT runtime steps: expected 102, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM work_items
+  WHERE project_id IN (
+      '30000000-0000-0000-0000-000000000024',
+      '30000000-0000-0000-0000-000000000025'
+    );
+  IF actual <> 102 THEN RAISE EXCEPTION 'Rev4 UAT work items: expected 102, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM workflow_form_instances
+  WHERE project_id IN (
+      '30000000-0000-0000-0000-000000000024',
+      '30000000-0000-0000-0000-000000000025'
+    ) AND status='draft' AND current_revision=0;
+  IF actual <> 98 THEN RAISE EXCEPTION 'Rev4 UAT draft forms: expected 98, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM pipeline_runs run
+  JOIN pipeline_run_nodes node ON node.id=run.current_node_id
+  WHERE run.project_id='30000000-0000-0000-0000-000000000024'
+    AND node.business_code='project_intake' AND node.status='in_progress';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Rev4 entry fixture 024 is not at project_intake'; END IF;
+
+  SELECT count(*) INTO actual
+  FROM work_items item
+  JOIN pipeline_run_steps step ON step.id=item.run_step_id
+  JOIN pipeline_run_nodes node ON node.id=item.run_node_id
+  WHERE item.project_id='30000000-0000-0000-0000-000000000024'
+    AND item.status='ready' AND node.business_code='project_intake'
+    AND step.business_code='project_intake.confirm';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Rev4 entry fixture 024 must expose exactly one entry work item'; END IF;
+
+  SELECT count(*) INTO actual
+  FROM pipeline_runs run
+  JOIN pipeline_run_nodes node ON node.id=run.current_node_id
+  WHERE run.project_id='30000000-0000-0000-0000-000000000025'
+    AND node.business_code='construction_execution' AND node.status='in_progress';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Rev4 construction fixture 025 is not at construction_execution'; END IF;
+
+  SELECT count(*) INTO actual
+  FROM work_items item
+  JOIN pipeline_run_steps step ON step.id=item.run_step_id
+  WHERE item.project_id='30000000-0000-0000-0000-000000000025'
+    AND item.status='ready'
+    AND step.business_code='construction.item_reporting'
+    AND item.role_ids='["Giám sát"]'::jsonb
+    AND item.evidence_requirement_json->>'checklist_required'='true'
+    AND item.evidence_requirement_json->>'document_required'='false'
+    AND item.evidence_requirement_json->>'photo_required'='true';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Rev4 construction fixture 025 eligible reporting item is invalid'; END IF;
+
+  SELECT count(*) INTO actual FROM work_items
+  WHERE project_id='30000000-0000-0000-0000-000000000025' AND status='ready';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Rev4 construction fixture 025 must expose exactly one ready work item, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_nodes
+  WHERE project_id='30000000-0000-0000-0000-000000000025'
+    AND status<>'pending' AND business_code<>'construction_execution';
+  IF actual <> 0 THEN RAISE EXCEPTION 'Rev4 construction fixture 025 must not fabricate completed workflow nodes'; END IF;
+
+  SELECT count(*) INTO actual FROM contracts
+  WHERE id='47000000-0000-0000-0000-000000000025'
+    AND project_id='30000000-0000-0000-0000-000000000025'
+    AND contract_code='HD-REV4-UAT-001' AND contract_type='main_client'
+    AND direction='receivable' AND status='active';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Rev4 construction fixture 025 active client contract is invalid'; END IF;
+
+  SELECT
+    (SELECT count(*) FROM operation_daily_reports WHERE project_id='30000000-0000-0000-0000-000000000025') +
+    (SELECT count(*) FROM construction_checks WHERE project_id='30000000-0000-0000-0000-000000000025') +
+    (SELECT count(*) FROM construction_action_items WHERE project_id='30000000-0000-0000-0000-000000000025') +
+    (SELECT count(*) FROM contract_variations WHERE contract_id='47000000-0000-0000-0000-000000000025')
+  INTO actual;
+  IF actual <> 0 THEN RAISE EXCEPTION 'Rev4 construction fixture 025 must begin without UAT-generated Operations records, got %',actual; END IF;
 
   SELECT
     (SELECT count(*) FROM evidence_records WHERE project_id='30000000-0000-0000-0000-000000000022') +
@@ -395,7 +580,10 @@ SELECT
   (SELECT count(*) FROM workflow_form_instances f WHERE f.project_id=p.id AND f.status='submitted') AS submitted_forms,
   (SELECT count(*) FROM evidence_records e WHERE e.project_id=p.id AND e.status='accepted') AS accepted_evidence
 FROM projects p
-WHERE p.code IN ('GOLDEN-REAL-001','GOLDEN-NO-DESIGN-001','GOLDEN-LIVE-001','GOLDEN-REV3-BOQ-001')
+WHERE p.code IN (
+  'GOLDEN-REAL-001','GOLDEN-NO-DESIGN-001','GOLDEN-LIVE-001','GOLDEN-REV3-BOQ-001',
+  'GOLDEN-REV4-ENTRY-001','GOLDEN-REV4-CONSTRUCTION-001'
+)
 ORDER BY p.code;
 
 SELECT 'GOLDEN_SAMPLE_VALIDATION_PASSED' AS result;

@@ -496,6 +496,9 @@ export type ContractVariation = ProjectOperationsRecord & {
   resulting_version_id?: string;
   priority: 'normal' | 'urgent' | string;
   source_work_item_id?: string;
+	  source_work_item_title?: string;
+	  source_construction_action_id?: string;
+	  source_construction_action_title?: string;
   procurement_request_id?: string;
   qs_comment?: string;
   purchasing_comment?: string;
@@ -845,6 +848,10 @@ export type ConstructionActionItem = ProjectOperationsRecord & {
   technical_ncr_id?: string;
   technical_rework_id?: string;
   technical_replanning_id?: string;
+	  linked_variation_id?: string;
+	  linked_variation_code?: string;
+	  linked_variation_status?: string;
+	  linked_variation_priority?: string;
   events: ConstructionActionEvent[];
 };
 
@@ -859,11 +866,43 @@ export type ConstructionDailyReportSource = {
 };
 
 export type ConstructionWorkspace = {
+	  runtime: {
+	    has_pipeline_run: boolean;
+	    pipeline_run_id?: string;
+	    pipeline_run_status?: string;
+	    engine_version?: number;
+	    current_node_id?: string;
+	    current_node_name?: string;
+	    current_node_type?: string;
+	    current_node_business_code?: string;
+	    current_node_status?: string;
+	    construction_active: boolean;
+	  };
   templates: ConstructionCheckTemplate[];
   checks: ConstructionCheck[];
   actions: ConstructionActionItem[];
-  work_items: Array<ProjectOperationsRecord & { title: string; status: string; work_type: string }>;
+	  work_items: Array<ProjectOperationsRecord & {
+	    title: string;
+	    status: string;
+	    work_type: string;
+	    source_type?: string;
+	    source_id?: string;
+	    run_node_id?: string;
+	    run_step_id?: string;
+	    pipeline_engine_version?: number;
+	    run_node_type?: string;
+	    run_node_business_code?: string;
+	    run_step_business_code?: string;
+	    report_eligible: boolean;
+	  }>;
   participants: Array<{ id: string; full_name: string; email: string }>;
+};
+
+export type ConstructionVariationContext = {
+	  available: boolean;
+	  can_propose: boolean;
+	  contract?: Pick<Contract, 'id' | 'contract_code' | 'title' | 'contract_type' | 'direction' | 'counterparty_name' | 'current_amount' | 'status'> | null;
+	  variations: ContractVariation[];
 };
 
 export type WorkItemActivity = ProjectOperationsRecord & {
@@ -2606,9 +2645,12 @@ export type WorkItem = ProjectOperationsRecord & {
   pipeline_run_id?: string;
   run_node_id?: string;
   run_node_name?: string;
+	  run_node_type?: string;
+	  run_node_business_code?: string;
   run_node_order_index?: number;
   run_step_id?: string;
   run_step_name?: string;
+	  run_step_business_code?: string;
   run_step_order_index?: number;
   evidence_count?: number;
   workflow_form_instance_id?: string;
@@ -2627,6 +2669,7 @@ export type WorkItem = ProjectOperationsRecord & {
   pipeline_engine_version?: number;
   surface_kind?: string;
   domain_action_key?: string;
+	  report_eligible?: boolean;
   automation_events?: Array<{
     id: string;
     action_key: string;

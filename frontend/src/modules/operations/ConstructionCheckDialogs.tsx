@@ -91,6 +91,7 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
   const [uploads, setUploads] = useState<ConstructionEvidenceUploadDraft[]>([]);
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
+	  const availableWorkItems = workspace.work_items.filter((item) => item.report_eligible || item.id === check?.work_item_id || item.id === sourceReport?.work_item_id);
 
   useEffect(() => {
     setValues({
@@ -171,7 +172,7 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
     <div className="space-y-5">
       {sourceReport ? <SourceReportBanner report={sourceReport} /> : null}
       <div><SectionTitle>Thông tin kiểm tra</SectionTitle><div className="mt-3 grid gap-4 sm:grid-cols-2">
-        <FieldBlock label="Công việc liên quan" required error={errors.work_item_id} helper={sourceReport?.work_item_id ? 'Được khóa theo báo cáo nguồn.' : undefined}><select disabled={Boolean(sourceReport?.work_item_id)} className={controlClass(errors.work_item_id, Boolean(sourceReport?.work_item_id))} value={values.work_item_id} onChange={(event) => changeWorkItem(event.target.value)}><option value="">Chọn công việc</option>{workspace.work_items.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></FieldBlock>
+	        <FieldBlock label="Công việc liên quan" required error={errors.work_item_id} helper={sourceReport?.work_item_id ? 'Được khóa theo báo cáo nguồn.' : 'Chỉ hiển thị hạng mục thuộc Node Thi công đang hoạt động.'}><select disabled={Boolean(sourceReport?.work_item_id)} className={controlClass(errors.work_item_id, Boolean(sourceReport?.work_item_id))} value={values.work_item_id} onChange={(event) => changeWorkItem(event.target.value)}><option value="">Chọn công việc</option>{availableWorkItems.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></FieldBlock>
         <FieldBlock label="Nội dung kiểm tra" required error={errors.title}><input className={controlClass(errors.title)} value={values.title} onChange={(event) => change(setValues, setErrors, 'title', event.target.value)} /></FieldBlock>
         <FieldBlock label="Vị trí"><input className={controlClass()} value={values.location} onChange={(event) => change(setValues, setErrors, 'location', event.target.value)} placeholder="Ví dụ: Pantry tầng 12" /></FieldBlock>
         <FieldBlock label="Thời điểm dự kiến"><input type="datetime-local" className={controlClass()} value={values.scheduled_at} onChange={(event) => change(setValues, setErrors, 'scheduled_at', event.target.value)} /></FieldBlock>

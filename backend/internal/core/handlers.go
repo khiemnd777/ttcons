@@ -2763,6 +2763,38 @@ func (h *Handler) ProjectConstructionWorkspace(c *fiber.Ctx) error {
 	return response.OK(c, workspace)
 }
 
+func (h *Handler) ProjectConstructionVariationContext(c *fiber.Ctx) error {
+	projectID := c.Params("id")
+	if err := h.requireProjectPermission(c, projectID, []string{"operation.view", "contract.view", "contract.variation.propose"}); err != nil {
+		return err
+	}
+	context, err := h.service.ProjectConstructionVariationContext(c.Context(), projectID)
+	if err != nil {
+		return err
+	}
+	canPropose, err := h.service.repo.UserHasAnyProjectPermission(c.Context(), actorID(c), projectID, []string{"contract.variation.propose"})
+	if err != nil {
+		return err
+	}
+	context["can_propose"] = canPropose
+	return response.OK(c, context)
+}
+
+func (h *Handler) ProposeConstructionVariation(c *fiber.Ctx) error {
+	if err := h.requireProjectPermission(c, c.Params("id"), []string{"contract.variation.propose"}); err != nil {
+		return err
+	}
+	req := ContractVariationRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đề xuất phát sinh không hợp lệ")
+	}
+	row, err := h.service.ProposeConstructionVariation(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
 func (h *Handler) ProjectConstructionHandoff(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"operation.view", "planning.view", "construction.handoff.manage"}); err != nil {
 		return err

@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -16,10 +17,17 @@ func TestBuildPipelineTemplatePDFDocument(t *testing.T) {
 		"description": "Quy trình mẫu",
 		"revision_no": 2,
 		"status":      "published",
+		"report_config_json": Record{
+			"node_reference_title": "Đối chiếu đánh số client -> Rev4",
+			"node_references": []any{
+				Record{"source_ref": "Node 1", "target_business_code": "survey", "note": "Khảo sát"},
+			},
+		},
 		"nodes": []Record{
 			{
 				"id":                  "node-2",
 				"order_index":         20,
+				"business_code":       "construction_execution",
 				"name":                "Thi công",
 				"type":                "construction",
 				"position_x":          360,
@@ -30,14 +38,15 @@ func TestBuildPipelineTemplatePDFDocument(t *testing.T) {
 				},
 			},
 			{
-				"id":          "node-1",
-				"order_index": 10,
-				"name":        "Khảo sát hiện trạng",
-				"description": "Ghi nhận kích thước và rủi ro",
-				"type":        "survey",
-				"position_x":  40,
-				"position_y":  40,
-				"permissions": []any{"pipeline.view", "project.execute"},
+				"id":            "node-1",
+				"order_index":   10,
+				"business_code": "survey",
+				"name":          "Khảo sát hiện trạng",
+				"description":   "Ghi nhận kích thước và rủi ro",
+				"type":          "survey",
+				"position_x":    40,
+				"position_y":    40,
+				"permissions":   []any{"pipeline.view", "project.execute"},
 				"approval_policy_json": Record{
 					"mode": "ordered",
 					"stages": []any{
@@ -48,8 +57,8 @@ func TestBuildPipelineTemplatePDFDocument(t *testing.T) {
 					"requester_cannot_approve": true,
 				},
 				"steps": []Record{
-					{"id": "step-2", "order_index": 20, "name": "Tải ảnh hiện trạng", "step_type": "photo_upload", "required_role_ids": []any{"QS"}},
-					{"id": "step-1", "order_index": 10, "name": "Lập biên bản khảo sát", "step_type": "checklist", "required_role_ids": []any{"PM", "QA/QC"}},
+					{"id": "step-2", "order_index": 20, "business_code": "survey.site_photos", "name": "Tải ảnh hiện trạng", "step_type": "photo_upload", "required_role_ids": []any{"QS"}, "photo_required": true},
+					{"id": "step-1", "order_index": 10, "business_code": "survey.minutes", "name": "Lập biên bản khảo sát", "step_type": "checklist", "required_role_ids": []any{"PM", "QA/QC"}, "checklist_required": true, "document_required": true},
 				},
 			},
 		},
@@ -83,7 +92,7 @@ func TestBuildPipelineTemplatePDFDocument(t *testing.T) {
 		t.Fatalf("expected 2 nodes, got %d", len(document.Nodes))
 	}
 	first := document.Nodes[0]
-	if first.Name != "Khảo sát hiện trạng" || first.Order != 10 {
+	if first.Name != "Khảo sát hiện trạng" || first.Order != 10 || first.BusinessCode != "survey" {
 		t.Fatalf("nodes are not ordered by order_index: %#v", first)
 	}
 	if first.Type != "Khảo sát (survey)" {
@@ -106,6 +115,16 @@ func TestBuildPipelineTemplatePDFDocument(t *testing.T) {
 	}
 	if first.Steps[0].Type != "Checklist (checklist)" || first.Steps[0].Roles != "PM, QA/QC" {
 		t.Fatalf("unexpected first step: %#v", first.Steps[0])
+	}
+	if first.Steps[0].BusinessCode != "survey.minutes" || first.Steps[0].ChecklistRequired != "Có" || first.Steps[0].DocumentRequired != "Có" || first.Steps[0].PhotoRequired != "Không" {
+		t.Fatalf("step business code/evidence gates were not exported: %#v", first.Steps[0])
+	}
+	if document.NodeReferenceTitle != "Đối chiếu đánh số client -> Rev4" || len(document.NodeReferences) != 1 {
+		t.Fatalf("expected report-only client node reference appendix: %#v", document.NodeReferences)
+	}
+	reference := document.NodeReferences[0]
+	if reference.SourceRef != "Node 1" || reference.TargetOrder != 10 || reference.BusinessCode != "survey" || reference.TargetName != "Khảo sát hiện trạng" {
+		t.Fatalf("unexpected client node reference: %#v", reference)
 	}
 
 	second := document.Nodes[1]
@@ -303,6 +322,89 @@ func TestPipelinePDFDiagramEdgeLabelPlacementAvoidsNodeCards(t *testing.T) {
 	}
 }
 
+func TestPipelinePDFDiagramOfficialBranchLabelsStayOnOwningRoutes(t *testing.T) {
+	pdf := fpdf.New("L", "mm", "A4", "")
+	pdf.AddUTF8FontFromBytes(pipelinePDFFontFamily, "", pipelinePDFRegularFont)
+	pdf.AddUTF8FontFromBytes(pipelinePDFFontFamily, "B", pipelinePDFBoldFont)
+	pdf.AddPage()
+	document := pipelinePDFOfficialBranchTestDocument()
+	layout := buildPipelinePDFDiagramLayout(document, 277, 130)
+	used := make([]pipelinePDFDiagramLabelPlacement, 0, len(layout.Edges))
+	found := map[string]bool{}
+	for _, edge := range layout.Edges {
+		placement, ok := pipelinePDFDiagramEdgeLabelPlacement(pdf, edge.Edge.Label, edge.Route, layout.Nodes, used, 277, 130)
+		if !ok {
+			t.Fatalf("expected placement for edge %s", edge.Edge.ID)
+		}
+		used = append(used, placement)
+		if edge.Edge.Label != "Có thiết kế" && edge.Edge.Label != "Không thiết kế" {
+			continue
+		}
+		found[edge.Edge.Label] = true
+		attached := pipelinePDFDiagramLabelTouchesRoute(placement.Rect, edge.Route) ||
+			(placement.HasLeader && pipelinePDFDiagramRouteContainsPoint(edge.Route, placement.Anchor))
+		if !attached {
+			t.Fatalf("branch label %q drifted away from its connector: placement=%#v route=%#v", edge.Edge.Label, placement, edge.Route)
+		}
+	}
+	if !found["Có thiết kế"] || !found["Không thiết kế"] {
+		t.Fatalf("missing official branch labels: %#v", found)
+	}
+}
+
+func pipelinePDFDiagramLabelTouchesRoute(rect pipelinePDFDiagramRect, route []pipelinePDFDiagramPoint) bool {
+	for index := 1; index < len(route); index++ {
+		if pipelinePDFDiagramSegmentIntersectsRect(route[index-1], route[index], pipelinePDFDiagramExpandRect(rect, 0.2)) {
+			return true
+		}
+	}
+	return false
+}
+
+func pipelinePDFDiagramRouteContainsPoint(route []pipelinePDFDiagramPoint, point pipelinePDFDiagramPoint) bool {
+	for index := 1; index < len(route); index++ {
+		start, end := route[index-1], route[index]
+		if pipelinePDFDiagramClose(start.X, end.X) && pipelinePDFDiagramClose(point.X, start.X) && point.Y >= math.Min(start.Y, end.Y) && point.Y <= math.Max(start.Y, end.Y) {
+			return true
+		}
+		if pipelinePDFDiagramClose(start.Y, end.Y) && pipelinePDFDiagramClose(point.Y, start.Y) && point.X >= math.Min(start.X, end.X) && point.X <= math.Max(start.X, end.X) {
+			return true
+		}
+	}
+	return false
+}
+
+func pipelinePDFOfficialBranchTestDocument() pipelineTemplatePDFDocument {
+	nodes := make([]pipelineTemplatePDFNode, 15)
+	for index := range nodes {
+		nodes[index] = pipelineTemplatePDFNode{ID: fmt.Sprintf("node-%d", index+1), Order: index + 1, Name: fmt.Sprintf("Node %d", index+1), DiagramType: "Công việc"}
+	}
+	edge := func(id, from, to, label string, priority int) pipelineTemplatePDFEdge {
+		return pipelineTemplatePDFEdge{ID: id, FromNodeID: from, ToNodeID: to, Label: label, Priority: priority}
+	}
+	return pipelineTemplatePDFDocument{
+		Nodes: nodes,
+		Edges: []pipelineTemplatePDFEdge{
+			edge("edge-1", "node-1", "node-2", "Cần khảo sát", 10),
+			edge("edge-4", "node-3", "node-4", "Có thiết kế", 10),
+			edge("edge-2", "node-1", "node-5", "Chủ đầu tư có BOQ", 20),
+			edge("edge-5", "node-3", "node-5", "Không thiết kế", 20),
+			edge("edge-3", "node-2", "node-3", "Hoàn tất khảo sát", 100),
+			edge("edge-6", "node-4", "node-6", "Hoàn tất thiết kế", 100),
+			edge("edge-7", "node-5", "node-7", "BOQ đã gửi", 100),
+			edge("edge-8", "node-6", "node-7", "BOQ đã gửi", 100),
+			edge("edge-9", "node-7", "node-8", "Hợp đồng đầu ra đã đủ điều kiện", 100),
+			edge("edge-10", "node-8", "node-9", "Đã bóc tách và lấy giá", 100),
+			edge("edge-11", "node-9", "node-10", "Đã chốt giá", 100),
+			edge("edge-12", "node-10", "node-11", "Hồ sơ đầu vào hoàn tất", 100),
+			edge("edge-13", "node-11", "node-12", "Bàn giao thi công", 100),
+			edge("edge-14", "node-12", "node-13", "Thi công hoàn tất", 100),
+			edge("edge-15", "node-13", "node-14", "Nghiệm thu đầu vào hoàn tất", 100),
+			edge("edge-16", "node-14", "node-15", "Nghiệm thu đầu ra hoàn tất", 100),
+		},
+	}
+}
+
 func pipelinePDFDiagramLabeledEdgeCount(layout pipelinePDFDiagramLayout) int {
 	count := 0
 	for _, edge := range layout.Edges {
@@ -380,5 +482,26 @@ func TestGeneratePipelineTemplatePDFProducesUnicodePDF(t *testing.T) {
 	}
 	if !strings.HasSuffix(pipelineTemplatePDFFilename(template), "-rev-3.pdf") {
 		t.Fatalf("unexpected filename: %q", pipelineTemplatePDFFilename(template))
+	}
+}
+
+func TestPipelineTemplatePDFAwarenessLabelsDescribeDefinitionOnly(t *testing.T) {
+	document := pipelineTemplatePDFDocument{
+		Revision:    4,
+		Status:      "Đã phát hành",
+		Nodes:       []pipelineTemplatePDFNode{{}, {}},
+		GeneratedAt: time.Date(2026, time.August, 5, 14, 30, 0, 0, time.FixedZone("ICT", 7*60*60)),
+	}
+	metadata := pipelinePDFDefinitionMetadata(document)
+	if !strings.Contains(metadata, "Revision định nghĩa: 4") || !strings.Contains(metadata, "Trạng thái định nghĩa: Đã phát hành") {
+		t.Fatalf("definition metadata is ambiguous: %q", metadata)
+	}
+	if !strings.Contains(pipelinePDFStepSemanticsNote, "Step Thi công được thực hiện lặp lại") {
+		t.Fatalf("construction step semantics note is missing: %q", pipelinePDFStepSemanticsNote)
+	}
+	for _, forbidden := range []string{"UAT", "runtime", "kiểm thử trình duyệt"} {
+		if strings.Contains(metadata, forbidden) || strings.Contains(pipelinePDFStepSemanticsNote, forbidden) {
+			t.Fatalf("workflow definition report leaked excluded runtime/UAT content %q", forbidden)
+		}
 	}
 }

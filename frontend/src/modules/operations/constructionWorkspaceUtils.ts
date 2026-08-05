@@ -1,4 +1,6 @@
-import type { ConstructionActionItem, ConstructionCheck } from '../../lib/types/domain';
+import type { ConstructionActionItem, ConstructionCheck, ConstructionWorkspace } from '../../lib/types/domain';
+
+export const constructionImpactHelperText = 'Chỉ phân loại ảnh hưởng kỹ thuật. Muốn mở luồng thương mại, dùng “Đề xuất phát sinh”.';
 
 export function dateTimeText(value?: string) {
   if (!value) return 'Chưa đặt';
@@ -34,6 +36,11 @@ export function checkStatusLabel(check: ConstructionCheck) {
 
 export function actionStatusLabel(status: ConstructionActionItem['status']) {
   return ({ open: 'Cần xử lý', waiting_confirmation: 'Chờ xác nhận', done: 'Đã xong', cancelled: 'Đã hủy' } as const)[status];
+}
+
+export function constructionCheckFilterWorkItems(workspace: Pick<ConstructionWorkspace, 'checks' | 'work_items'>) {
+  const referencedWorkItemIDs = new Set(workspace.checks.map((check) => check.work_item_id).filter(Boolean));
+  return workspace.work_items.filter((item) => item.report_eligible || referencedWorkItemIDs.has(item.id));
 }
 
 export function isConstructionCheckEditable(check: ConstructionCheck) {

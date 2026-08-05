@@ -713,30 +713,24 @@ func (s *Service) normalizeConstructionDailyReport(ctx context.Context, projectI
 	}
 
 	workItemID := cleanID(req.WorkItemID)
-	if workItemID != "" {
-		if !validActivityUUID(workItemID) {
-			return nil, validationError("Công việc liên quan không hợp lệ", Record{"work_item_id": req.WorkItemID})
-		}
-		item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, validationError("Không tìm thấy công việc liên quan", Record{"work_item_id": workItemID})
-		}
-		if err != nil {
-			return nil, err
-		}
-		if cleanID(item["project_id"]) != projectID || fmt.Sprint(item["status"]) == "cancelled" {
-			return nil, validationError("Công việc liên quan không thuộc công trình hoặc đã bị hủy", Record{"work_item_id": workItemID})
-		}
-		canView, err := s.repo.CanViewWorkItem(ctx, workItemID, actorID)
-		if err != nil {
-			return nil, err
-		}
-		if !canView {
-			return nil, forbiddenError("Bạn không có quyền sử dụng công việc liên quan này")
-		}
+	if workItemID == "" {
+		return nil, validationError("Báo cáo thi công cần chọn hạng mục đang thực hiện", Record{"work_item_id": "required"})
+	}
+	if _, err := s.requireActiveConstructionWorkItem(ctx, projectID, workItemID); err != nil {
+		return nil, err
+	}
+	canView, err := s.repo.CanViewWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !canView {
+		return nil, forbiddenError("Bạn không có quyền sử dụng công việc liên quan này")
 	}
 
 	evidenceIDs := normalizeConstructionReportEvidenceIDs(req.EvidenceIDs, req.PrimaryEvidenceID)
+	if len(evidenceIDs) == 0 {
+		return nil, validationError("Báo cáo thi công cần ít nhất một ảnh hiện trường", Record{"evidence_ids": "photo_required"})
+	}
 	if len(evidenceIDs) > 50 {
 		return nil, validationError("Báo cáo chỉ được liên kết tối đa 50 minh chứng", Record{"evidence_ids": len(evidenceIDs), "max": 50})
 	}
@@ -747,6 +741,7 @@ func (s *Service) normalizeConstructionDailyReport(ctx context.Context, projectI
 	if err != nil {
 		return nil, err
 	}
+	photoCount := 0
 	for _, evidenceID := range evidenceIDs {
 		if !validActivityUUID(evidenceID) {
 			return nil, validationError("Minh chứng không hợp lệ", Record{"evidence_id": evidenceID})
@@ -767,6 +762,12 @@ func (s *Service) normalizeConstructionDailyReport(ctx context.Context, projectI
 		if profileIsClient(profile) && !profile.IsManager && fmt.Sprint(evidence["visibility"]) != "client" {
 			return nil, forbiddenError("Bạn không có quyền liên kết minh chứng này")
 		}
+		if fmt.Sprint(evidence["evidence_type"]) == "photo" && fmt.Sprint(evidence["status"]) != "rejected" {
+			photoCount++
+		}
+	}
+	if photoCount == 0 {
+		return nil, validationError("Báo cáo thi công cần ít nhất một minh chứng loại ảnh", Record{"evidence_ids": "photo_required"})
 	}
 	primaryEvidenceID := cleanID(req.PrimaryEvidenceID)
 	if primaryEvidenceID == "" && len(evidenceIDs) > 0 {
@@ -1159,6 +1160,9 @@ func (s *Service) CreateConstructionCheck(ctx context.Context, projectID string,
 	if sourceDailyReportID != "" && !validActivityUUID(sourceDailyReportID) {
 		return nil, validationError("Báo cáo nguồn không hợp lệ")
 	}
+	if _, err := s.requireActiveConstructionWorkItem(ctx, projectID, workItemID); err != nil {
+		return nil, err
+	}
 	scheduledAt, err := constructionOptionalTime(req.ScheduledAt, "Thời điểm kiểm tra")
 	if err != nil {
 		return nil, err
@@ -1250,6 +1254,9 @@ func (s *Service) CreateConstructionAction(ctx context.Context, projectID string
 	}
 	if sourceDailyReportID != "" && !validActivityUUID(sourceDailyReportID) {
 		return nil, validationError("Báo cáo nguồn không hợp lệ")
+	}
+	if _, err := s.requireActiveConstructionWorkItem(ctx, projectID, cleanID(req.WorkItemID)); err != nil {
+		return nil, err
 	}
 	dueAt, err := constructionRequiredTime(req.DueAt, "Hạn xử lý")
 	if err != nil {
@@ -5225,6 +5232,41 @@ func (s *Service) requireActivePipelineWorkItem(ctx context.Context, item Record
 	return nil
 }
 
+func (s *Service) requireActiveConstructionWorkItem(ctx context.Context, projectID, workItemID string) (Record, error) {
+	projectID = cleanID(projectID)
+	workItemID = cleanID(workItemID)
+	if !validActivityUUID(projectID) || !validActivityUUID(workItemID) {
+		return nil, validationError("Hạng mục thi công không hợp lệ", Record{"work_item_id": workItemID})
+	}
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, validationError("Không tìm thấy hạng mục thi công", Record{"work_item_id": workItemID})
+	}
+	if err != nil {
+		return nil, err
+	}
+	if cleanID(item["project_id"]) != projectID || fmt.Sprint(item["status"]) == "cancelled" {
+		return nil, validationError("Hạng mục không thuộc công trình hoặc đã bị hủy", Record{"work_item_id": workItemID})
+	}
+	if statusIn(fmt.Sprint(item["status"]), "completed", "done") {
+		return nil, validationError("Hạng mục thi công đã hoàn tất, không thể ghi nhận phát sinh mới", Record{"work_item_id": workItemID, "status": item["status"]})
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+		return nil, err
+	}
+	if int(number(item["pipeline_engine_version"])) >= 2 && cleanID(item["pipeline_run_id"]) != "" &&
+		fmt.Sprint(item["run_step_business_code"]) != "construction.item_reporting" &&
+		fmt.Sprint(item["run_node_business_code"]) != "construction_execution" &&
+		fmt.Sprint(item["run_node_type"]) != "construction" {
+		return nil, validationError("Hạng mục không thuộc bước Thi công của quy trình", Record{
+			"work_item_id":           workItemID,
+			"run_node_business_code": item["run_node_business_code"],
+			"run_step_business_code": item["run_step_business_code"],
+		})
+	}
+	return item, nil
+}
+
 type workItemTransitionPlan struct {
 	ToStatus         string
 	ActivityType     string
@@ -8333,6 +8375,43 @@ func (s *Service) ContractMilestoneAction(ctx context.Context, milestoneID, acti
 }
 
 func (s *Service) CreateContractVariation(ctx context.Context, contractID string, req ContractVariationRequest, actorID, actorName string) (Record, error) {
+	body, err := normalizeContractVariationRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.CreateContractVariation(ctx, cleanID(contractID), body, actorID, actorName)
+}
+
+func (s *Service) ProjectConstructionVariationContext(ctx context.Context, projectID string) (Record, error) {
+	projectID = cleanID(projectID)
+	if !validActivityUUID(projectID) {
+		return nil, validationError("Mã công trình không hợp lệ")
+	}
+	return s.repo.ProjectConstructionVariationContext(ctx, projectID)
+}
+
+func (s *Service) ProposeConstructionVariation(ctx context.Context, projectID string, req ContractVariationRequest, actorID, actorName string) (Record, error) {
+	projectID = cleanID(projectID)
+	body, err := normalizeContractVariationRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	workItemID := cleanID(req.SourceWorkItemID)
+	if workItemID == "" {
+		return nil, validationError("Đề xuất phát sinh cần hạng mục thi công nguồn", Record{"source_work_item_id": "required"})
+	}
+	if _, err := s.requireActiveConstructionWorkItem(ctx, projectID, workItemID); err != nil {
+		return nil, err
+	}
+	actionID := cleanID(req.SourceConstructionActionID)
+	if actionID != "" && !validActivityUUID(actionID) {
+		return nil, validationError("Việc cần xử lý nguồn không hợp lệ", Record{"source_construction_action_id": actionID})
+	}
+	body["source_construction_action_id"] = actionID
+	return s.repo.ProposeConstructionVariation(ctx, projectID, body, actorID, actorName)
+}
+
+func normalizeContractVariationRequest(req ContractVariationRequest) (Record, error) {
 	if strings.TrimSpace(req.VariationCode) == "" || strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Reason) == "" {
 		return nil, validationError("Mã, tên và lý do phụ lục/variation là bắt buộc")
 	}
@@ -8350,7 +8429,7 @@ func (s *Service) CreateContractVariation(ctx context.Context, contractID string
 		"reason": strings.TrimSpace(req.Reason), "amount_delta": req.AmountDelta, "days_delta": req.DaysDelta,
 		"scope_delta": strings.TrimSpace(req.ScopeDelta), "document_id": cleanID(req.DocumentID), "comment": strings.TrimSpace(req.Comment),
 		"priority": priority, "source_work_item_id": cleanID(req.SourceWorkItemID)}
-	return s.repo.CreateContractVariation(ctx, cleanID(contractID), body, actorID, actorName)
+	return body, nil
 }
 
 func (s *Service) ContractVariationAction(ctx context.Context, variationID, action, comment, actorID, actorName string) (Record, error) {

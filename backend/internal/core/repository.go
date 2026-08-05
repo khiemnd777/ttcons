@@ -328,7 +328,7 @@ func partnerColumns() []ColumnSpec {
 }
 
 func templateColumns() []ColumnSpec {
-	return []ColumnSpec{col("id"), col("name"), col("description"), col("project_type"), col("version"), col("status"), col("created_by"), col("template_family_id"), col("revision_no"), col("source_template_id"), col("engine_version"), col("definition_hash"), col("published_at"), col("published_by")}
+	return []ColumnSpec{col("id"), col("name"), col("description"), col("project_type"), col("version"), col("status"), col("created_by"), col("template_family_id"), col("revision_no"), col("source_template_id"), col("engine_version"), col("definition_hash"), col("published_at"), col("published_by"), jsonCol("report_config_json")}
 }
 
 func templateNodeColumns() []ColumnSpec {

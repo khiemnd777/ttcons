@@ -90,8 +90,15 @@ type pipelinePDFDiagramLayout struct {
 }
 
 type pipelinePDFDiagramLabelPlacement struct {
-	Lines []string
-	Rect  pipelinePDFDiagramRect
+	Lines     []string
+	Rect      pipelinePDFDiagramRect
+	Anchor    pipelinePDFDiagramPoint
+	HasLeader bool
+}
+
+type pipelinePDFDiagramLabelCandidate struct {
+	Center pipelinePDFDiagramPoint
+	Anchor pipelinePDFDiagramPoint
 }
 
 func drawPipelinePDFWorkflowDiagram(pdf *fpdf.Fpdf, document pipelineTemplatePDFDocument) {
@@ -581,6 +588,12 @@ func drawPipelinePDFDiagramArrow(pdf *fpdf.Fpdf, route []pipelinePDFDiagramPoint
 
 func drawPipelinePDFDiagramEdgeLabel(pdf *fpdf.Fpdf, placement pipelinePDFDiagramLabelPlacement, offsetX, offsetY float64) {
 	x, y := offsetX+placement.Rect.X, offsetY+placement.Rect.Y
+	if placement.HasLeader {
+		end := pipelinePDFDiagramClosestPointOnRect(placement.Anchor, placement.Rect)
+		pdf.SetDrawColor(148, 163, 184)
+		pdf.SetLineWidth(0.25)
+		pdf.Line(offsetX+placement.Anchor.X, offsetY+placement.Anchor.Y, offsetX+end.X, offsetY+end.Y)
+	}
 	pdf.SetFillColor(255, 255, 255)
 	pdf.SetDrawColor(226, 232, 240)
 	pdf.RoundedRect(x, y, placement.Rect.Width, placement.Rect.Height, 1, "1234", "DF")
@@ -631,15 +644,20 @@ func pipelinePDFDiagramEdgeLabelPlacement(
 			}
 			labelWidth = math.Min(widthLimit, labelWidth+3.2)
 			labelHeight := float64(len(lines))*3 + 1.6
-			for _, center := range pipelinePDFDiagramLabelCandidates(route) {
-				rect := pipelinePDFDiagramRect{X: center.X - labelWidth/2, Y: center.Y - labelHeight/2, Width: labelWidth, Height: labelHeight}
+			for _, candidate := range pipelinePDFDiagramLabelCandidates(route) {
+				rect := pipelinePDFDiagramRect{X: candidate.Center.X - labelWidth/2, Y: candidate.Center.Y - labelHeight/2, Width: labelWidth, Height: labelHeight}
 				if rect.X < 1 || rect.Y < 1 || rect.X+rect.Width > canvasWidth-1 || rect.Y+rect.Height > canvasHeight-1 {
 					continue
 				}
 				if pipelinePDFDiagramLabelOverlapsNodes(rect, nodes) || pipelinePDFDiagramLabelOverlapsLabels(rect, used) {
 					continue
 				}
-				return pipelinePDFDiagramLabelPlacement{Lines: lines, Rect: rect}, true
+				return pipelinePDFDiagramLabelPlacement{
+					Lines:     lines,
+					Rect:      rect,
+					Anchor:    candidate.Anchor,
+					HasLeader: !pipelinePDFDiagramPointInRect(candidate.Anchor, rect),
+				}, true
 			}
 		}
 	}
@@ -655,7 +673,7 @@ func pipelinePDFDiagramEdgeLabelPlacement(
 	}, true
 }
 
-func pipelinePDFDiagramLabelCandidates(route []pipelinePDFDiagramPoint) []pipelinePDFDiagramPoint {
+func pipelinePDFDiagramLabelCandidates(route []pipelinePDFDiagramPoint) []pipelinePDFDiagramLabelCandidate {
 	type segment struct {
 		Start, End pipelinePDFDiagramPoint
 		Length     float64
@@ -679,25 +697,51 @@ func pipelinePDFDiagramLabelCandidates(route []pipelinePDFDiagramPoint) []pipeli
 		}
 	}
 
-	candidates := make([]pipelinePDFDiagramPoint, 0, len(segments)*27)
+	type anchor struct {
+		Point      pipelinePDFDiagramPoint
+		Horizontal bool
+	}
+	anchors := make([]anchor, 0, len(segments)*3)
 	for _, segment := range orderedSegments {
 		for _, fraction := range []float64{0.5, 0.35, 0.65} {
 			base := pipelinePDFDiagramPoint{
 				X: segment.Start.X + (segment.End.X-segment.Start.X)*fraction,
 				Y: segment.Start.Y + (segment.End.Y-segment.Start.Y)*fraction,
 			}
-			if pipelinePDFDiagramClose(segment.Start.Y, segment.End.Y) {
-				for _, offset := range []float64{0, -5, 5, -9, 9, -13, 13, -17, 17} {
-					candidates = append(candidates, pipelinePDFDiagramPoint{X: base.X, Y: base.Y + offset})
-				}
-				continue
+			anchors = append(anchors, anchor{Point: base, Horizontal: pipelinePDFDiagramClose(segment.Start.Y, segment.End.Y)})
+		}
+	}
+
+	// Try every on-route anchor before moving any label away from its connector.
+	// This prevents a crowded first segment from pushing a sibling branch label
+	// into free space before its own target-specific segment is considered.
+	candidates := make([]pipelinePDFDiagramLabelCandidate, 0, len(anchors)*9)
+	for _, anchor := range anchors {
+		candidates = append(candidates, pipelinePDFDiagramLabelCandidate{Center: anchor.Point, Anchor: anchor.Point})
+	}
+	for _, offset := range []float64{-5, 5, -9, 9, -13, 13, -17, 17} {
+		for _, anchor := range anchors {
+			center := anchor.Point
+			if anchor.Horizontal {
+				center.Y += offset
+			} else {
+				center.X += offset
 			}
-			for _, offset := range []float64{0, -5, 5, -9, 9, -13, 13, -17, 17} {
-				candidates = append(candidates, pipelinePDFDiagramPoint{X: base.X + offset, Y: base.Y})
-			}
+			candidates = append(candidates, pipelinePDFDiagramLabelCandidate{Center: center, Anchor: anchor.Point})
 		}
 	}
 	return candidates
+}
+
+func pipelinePDFDiagramPointInRect(point pipelinePDFDiagramPoint, rect pipelinePDFDiagramRect) bool {
+	return point.X >= rect.X && point.X <= rect.X+rect.Width && point.Y >= rect.Y && point.Y <= rect.Y+rect.Height
+}
+
+func pipelinePDFDiagramClosestPointOnRect(point pipelinePDFDiagramPoint, rect pipelinePDFDiagramRect) pipelinePDFDiagramPoint {
+	return pipelinePDFDiagramPoint{
+		X: math.Max(rect.X, math.Min(rect.X+rect.Width, point.X)),
+		Y: math.Max(rect.Y, math.Min(rect.Y+rect.Height, point.Y)),
+	}
 }
 
 func pipelinePDFDiagramLabelOverlapsNodes(rect pipelinePDFDiagramRect, nodes []pipelinePDFDiagramNodeLayout) bool {

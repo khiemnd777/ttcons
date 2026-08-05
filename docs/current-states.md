@@ -1,5 +1,30 @@
 # Current States
 
+## [Active] Client Workflow Revision 4 And Definition PDF
+
+### Will be done
+
+- Publish immutable official Rev4 template `40000000-0000-0000-0000-000000000023` from Rev3 without mutating published Rev3 or existing project runtime snapshots.
+- Add Purchasing to the BOQ-without-design pricing step, separate QA/QC quality-dossier ownership from Supervisor field-report ownership, and make the approved document/photo evidence gates explicit for future Rev4 runs.
+- Keep optional client-node cross-reference data on the template definition and export it with node/step business codes plus checklist/document/photo flags; exclude runtime/UAT reminders, statuses and test results from the template PDF.
+- Fix PDF connector-label placement so branch labels stay visually attached to their own route, then add focused regression coverage and visually inspect the rendered Rev4 PDF.
+- Update destructive seed replay, Golden validation and the central/backend/workflow/commercial/construction/quality mapping files, then run focused and full backend/database verification.
+
+### Done
+
+- Audited the client notes against Rev3 PDF, source and local PostgreSQL data; confirmed Rev3 has 15 nodes, 16 connectors and 51 stable coded steps.
+- Confirmed template `...022` is published and immutable, template `...023` is unused, and projects 020/021/022 already have historical runtime snapshots that must remain unchanged.
+- Proved the BOQ/QA-QC/Supervisor role and evidence-flag gaps from V85 and the database, and proved the branch-edge data is correct while PDF label placement can drift away from the owning connector.
+- Rendered the source PDF at high resolution and retracted the earlier false clipping finding: page 6 is complete, so no pagination/clipping change is in scope.
+- Produced the cross-domain review package and approved Mockup as Text; received explicit `OK triển khai` for Rev4, report-only client mapping, runtime/UAT exclusion and the PDF label fix.
+- Added V86/V87: published immutable Rev4 `...023`, preserved Rev3 and all existing runs, added report-only client references, corrected Purchasing/QS and QA/QC/Supervisor responsibility/evidence gates, and corrected the quality dossier from `daily_report` to `document_upload`.
+- Extended template repository/clone/hash handling for report presentation metadata and extended the on-demand PDF with node/step business codes, evidence flags and Appendix A while excluding runtime/UAT content.
+- Added a failing-then-passing connector-label regression; labels now try every own-route anchor before offsetting and use a leader line back to the owning connector when collision avoidance requires it.
+- Updated Makefile replay, Golden validation and central/backend/workflow/commercial/construction/quality/root-cause maps. All 87 migrations plus destructive seed replay passed on an isolated database; the temporary database was removed.
+- Applied V86/V87 to local PostgreSQL and verified Rev4 has 15 nodes, 16 edges, 51 steps and 14 client references while projects 020/021/022 retain their existing engine-2 run snapshots.
+- Exported and visually inspected all 7 pages of `output/pdf/workflow-client-workflow-hoan-thien-cong-trinh-chinh-thuc-rev-4.pdf`; no clipping was observed, branch labels remain attached, Appendix A is complete and extracted text contains no runtime/UAT content.
+- Full `go test ./...` including PostgreSQL-backed integration coverage passed on a separate disposable database; focused PDF/hash tests, migration manifest check and Golden fixture generator check also passed. Temporary test databases were removed. Browser/UAT was not run in this implementation turn.
+
 ## [Active] Adaptive Role Workbench
 
 ### Will be done

@@ -18,6 +18,8 @@ seed:
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/seed.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < migrations/V66__planning_construction_handoff.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < migrations/V85__official_client_workflow_rev3.sql; \
+		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < migrations/V86__official_client_workflow_rev4.sql; \
+		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < migrations/V87__rev4_quality_dossier_step_type.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_project.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_project_domains.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_project_closure.sql; \
@@ -25,6 +27,7 @@ seed:
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_project_finance.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_live_project.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_client_workflow_rev3.sql; \
+		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/golden_client_workflow_rev4_uat.sql; \
 		docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U consflow -d consflow < seed/validate_golden_project.sql; \
 		if docker compose -f ../docker-compose.yml ps --status running backend >/dev/null 2>&1; then \
 			docker compose -f ../docker-compose.yml cp seed/uploads/. backend:/app/uploads/ >/dev/null; \
@@ -33,6 +36,8 @@ seed:
 		psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f seed/seed.sql \
 			-f migrations/V66__planning_construction_handoff.sql \
 			-f migrations/V85__official_client_workflow_rev3.sql \
+			-f migrations/V86__official_client_workflow_rev4.sql \
+			-f migrations/V87__rev4_quality_dossier_step_type.sql \
 			-f seed/golden_project.sql \
 			-f seed/golden_project_domains.sql \
 			-f seed/golden_project_closure.sql \
@@ -40,6 +45,7 @@ seed:
 			-f seed/golden_project_finance.sql \
 			-f seed/golden_live_project.sql \
 			-f seed/golden_client_workflow_rev3.sql \
+			-f seed/golden_client_workflow_rev4_uat.sql \
 			-f seed/validate_golden_project.sql; \
 		mkdir -p "$${UPLOAD_DIR:-uploads}"; \
 		cp -R seed/uploads/. "$${UPLOAD_DIR:-uploads}/"; \

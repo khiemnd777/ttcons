@@ -31,7 +31,7 @@
 - `rework_requests`, `replanning_requests`, `handover_records`
 - Product-grade handover package: `handover_checklist_items`, `handover_records.readiness_snapshot_json`, exact final-acceptance/form source, submit/check/complete actor timestamps
 - Related forms/artifacts: `workflow_form_instances`, `workflow_form_pdf_exports`, `workflow_form_signatures`, `evidence_records`
-- Relevant migrations: `V1`, `V25`, `V26`, `V51`, `V52`, `V54`-`V56`, `V62`-`V64`, `V67`
+- Relevant migrations: `V1`, `V25`, `V26`, `V51`, `V52`, `V54`-`V56`, `V62`-`V64`, `V67`; official Rev4 responsibility/type snapshots: `V86`, `V87`
 
 ## Invariants
 
@@ -69,4 +69,5 @@
 ## Rev3 QA/QC Boundary
 
 - `QA/QC` and `Giám sát` are distinct Rev3 responsibility labels. QA/QC owns preparation/coordination of the quality dossier with the client and acceptance history; Supervisor owns field checklist/photo reporting. Neither label grants the other's backend permission or replaces work-item role/project-scope checks.
+- Rev4 `...023` encodes the dossier side as `planning.client_quality_file`: only `QA/QC` is assigned, both checklist and document evidence are required, and V87 marks it `document_upload` rather than the misleading `daily_report`. Giám sát remains on the separate construction item-report step; Rev4 does not rewrite historical runs or acceptance evidence.
 - Paper documents sent because a client does not use the App remain contract dispatch/scan records. They do not replace QA/QC acceptance evidence, immutable workflow form history, or handover readiness sources.

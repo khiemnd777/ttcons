@@ -19,6 +19,8 @@ const (
 	pipelinePDFMimeType   = "application/pdf"
 )
 
+const pipelinePDFStepSemanticsNote = "Mỗi step biểu diễn một nghĩa vụ nghiệp vụ. Step Thi công được thực hiện lặp lại theo từng hạng mục và ngày thi công."
+
 //go:embed pdfassets/NotoSans-Regular.ttf
 var pipelinePDFRegularFont []byte
 
@@ -32,18 +34,21 @@ type PipelineTemplatePDFResult struct {
 }
 
 type pipelineTemplatePDFDocument struct {
-	Name        string
-	Description string
-	Revision    int
-	Status      string
-	GeneratedAt time.Time
-	Nodes       []pipelineTemplatePDFNode
-	Edges       []pipelineTemplatePDFEdge
+	Name               string
+	Description        string
+	Revision           int
+	Status             string
+	GeneratedAt        time.Time
+	NodeReferenceTitle string
+	NodeReferences     []pipelineTemplatePDFNodeReference
+	Nodes              []pipelineTemplatePDFNode
+	Edges              []pipelineTemplatePDFEdge
 }
 
 type pipelineTemplatePDFNode struct {
 	ID                     string
 	Order                  int
+	BusinessCode           string
 	Name                   string
 	Description            string
 	Type                   string
@@ -70,10 +75,22 @@ type pipelineTemplatePDFEdge struct {
 }
 
 type pipelineTemplatePDFStep struct {
-	Order int
-	Name  string
-	Type  string
-	Roles string
+	Order             int
+	BusinessCode      string
+	Name              string
+	Type              string
+	ChecklistRequired string
+	DocumentRequired  string
+	PhotoRequired     string
+	Roles             string
+}
+
+type pipelineTemplatePDFNodeReference struct {
+	SourceRef    string
+	TargetOrder  int
+	BusinessCode string
+	TargetName   string
+	Note         string
 }
 
 type pipelinePDFTableColumn struct {
@@ -150,18 +167,20 @@ func GeneratePipelineTemplatePDF(template Record, permissionLabels map[string]st
 	drawPipelinePDFSectionTitle(pdf, "2. DANH SÁCH NODE")
 	nodeColumns := []pipelinePDFTableColumn{
 		{Header: "STT", Width: 8, Align: "C"},
-		{Header: "Tên node", Width: 34, Align: "L"},
-		{Header: "Mô tả", Width: 62, Align: "L"},
-		{Header: "Loại", Width: 30, Align: "L"},
-		{Header: "Phân quyền", Width: 42, Align: "L"},
-		{Header: "Role được duyệt", Width: 40, Align: "L"},
-		{Header: "Bắt buộc nhập ý kiến duyệt", Width: 29, Align: "C"},
-		{Header: "Người gửi không được tự duyệt", Width: 32, Align: "C"},
+		{Header: "Business code", Width: 34, Align: "L"},
+		{Header: "Tên node", Width: 30, Align: "L"},
+		{Header: "Mô tả", Width: 50, Align: "L"},
+		{Header: "Loại", Width: 26, Align: "L"},
+		{Header: "Phân quyền", Width: 38, Align: "L"},
+		{Header: "Role được duyệt", Width: 35, Align: "L"},
+		{Header: "Bắt buộc nhập ý kiến duyệt", Width: 26, Align: "C"},
+		{Header: "Người gửi không được tự duyệt", Width: 30, Align: "C"},
 	}
 	nodeRows := make([][]string, 0, len(document.Nodes))
 	for _, node := range document.Nodes {
 		nodeRows = append(nodeRows, []string{
 			strconv.Itoa(node.Order),
+			node.BusinessCode,
 			node.Name,
 			node.Description,
 			node.Type,
@@ -174,19 +193,28 @@ func GeneratePipelineTemplatePDF(template Record, permissionLabels map[string]st
 	if len(nodeRows) == 0 {
 		drawPipelinePDFEmptyState(pdf, "Workflow chưa có node.")
 	} else {
-		drawPipelinePDFTable(pdf, nodeColumns, nodeRows, 6.8, 3.5, "2. DANH SÁCH NODE (tiếp theo)")
+		drawPipelinePDFTable(pdf, nodeColumns, nodeRows, 6.2, 3.3, "2. DANH SÁCH NODE (tiếp theo)")
 	}
 
 	ensurePipelinePDFSpace(pdf, 18)
 	drawPipelinePDFSectionTitle(pdf, "3. CHECKLIST / STEP THEO NODE")
+	pdf.SetFont(pipelinePDFFontFamily, "", 8)
+	pdf.SetTextColor(71, 85, 105)
+	pdf.MultiCell(0, 4.3, pipelinePDFStepSemanticsNote, "", "L", false)
+	pdf.SetTextColor(15, 23, 42)
+	pdf.Ln(1)
 	if len(document.Nodes) == 0 {
 		drawPipelinePDFEmptyState(pdf, "Chưa có checklist/step để hiển thị.")
 	}
 	stepColumns := []pipelinePDFTableColumn{
-		{Header: "STT", Width: 10, Align: "C"},
-		{Header: "Tên", Width: 118, Align: "L"},
-		{Header: "Loại", Width: 60, Align: "L"},
-		{Header: "Role phụ trách", Width: 89, Align: "L"},
+		{Header: "STT", Width: 8, Align: "C"},
+		{Header: "Business code", Width: 43, Align: "L"},
+		{Header: "Tên", Width: 60, Align: "L"},
+		{Header: "Loại", Width: 35, Align: "L"},
+		{Header: "Checklist bắt buộc", Width: 25, Align: "C"},
+		{Header: "Tài liệu bắt buộc", Width: 25, Align: "C"},
+		{Header: "Hình ảnh bắt buộc", Width: 25, Align: "C"},
+		{Header: "Role phụ trách", Width: 56, Align: "L"},
 	}
 	for _, node := range document.Nodes {
 		title := fmt.Sprintf("NODE %02d - %s", node.Order, node.Name)
@@ -198,10 +226,36 @@ func GeneratePipelineTemplatePDF(template Record, permissionLabels map[string]st
 		}
 		rows := make([][]string, 0, len(node.Steps))
 		for _, step := range node.Steps {
-			rows = append(rows, []string{strconv.Itoa(step.Order), step.Name, step.Type, step.Roles})
+			rows = append(rows, []string{
+				strconv.Itoa(step.Order), step.BusinessCode, step.Name, step.Type,
+				step.ChecklistRequired, step.DocumentRequired, step.PhotoRequired, step.Roles,
+			})
 		}
-		drawPipelinePDFTable(pdf, stepColumns, rows, 8, 4.1, title+" (tiếp theo)")
+		drawPipelinePDFTable(pdf, stepColumns, rows, 6.8, 3.7, title+" (tiếp theo)")
 		pdf.Ln(3)
+	}
+
+	if len(document.NodeReferences) > 0 {
+		ensurePipelinePDFSpace(pdf, 20)
+		drawPipelinePDFSectionTitle(pdf, "PHỤ LỤC A - "+strings.ToUpper(document.NodeReferenceTitle))
+		referenceColumns := []pipelinePDFTableColumn{
+			{Header: "Client", Width: 26, Align: "L"},
+			{Header: "Rev4", Width: 18, Align: "C"},
+			{Header: "Business code", Width: 58, Align: "L"},
+			{Header: "Node hiện tại", Width: 65, Align: "L"},
+			{Header: "Ghi chú", Width: 110, Align: "L"},
+		}
+		referenceRows := make([][]string, 0, len(document.NodeReferences))
+		for _, reference := range document.NodeReferences {
+			referenceRows = append(referenceRows, []string{
+				reference.SourceRef,
+				fmt.Sprintf("%02d", reference.TargetOrder),
+				reference.BusinessCode,
+				reference.TargetName,
+				reference.Note,
+			})
+		}
+		drawPipelinePDFTable(pdf, referenceColumns, referenceRows, 7, 3.8, "PHỤ LỤC A - "+strings.ToUpper(document.NodeReferenceTitle)+" (tiếp theo)")
 	}
 
 	if err := pdf.Error(); err != nil {
@@ -249,6 +303,7 @@ func buildPipelineTemplatePDFDocument(template Record, permissionLabels map[stri
 		pdfNode := pipelineTemplatePDFNode{
 			ID:                     nodeID,
 			Order:                  pipelinePDFOrder(node["order_index"], nodeIndex+1),
+			BusinessCode:           pipelinePDFText(node["business_code"], "-"),
 			Name:                   pipelinePDFText(node["name"], "Node chưa đặt tên"),
 			Description:            pipelinePDFText(node["description"], "-"),
 			Type:                   pipelinePDFTypeLabel(pipelineNodeTypeLabels, typeKey),
@@ -276,10 +331,14 @@ func buildPipelineTemplatePDFDocument(template Record, permissionLabels map[stri
 				roleText = strings.Join(roles, ", ")
 			}
 			pdfNode.Steps = append(pdfNode.Steps, pipelineTemplatePDFStep{
-				Order: pipelinePDFOrder(step["order_index"], stepIndex+1),
-				Name:  pipelinePDFText(step["name"], "Step chưa đặt tên"),
-				Type:  pipelinePDFTypeLabel(pipelineStepTypeLabels, fmt.Sprint(step["step_type"])),
-				Roles: roleText,
+				Order:             pipelinePDFOrder(step["order_index"], stepIndex+1),
+				BusinessCode:      pipelinePDFText(step["business_code"], "-"),
+				Name:              pipelinePDFText(step["name"], "Step chưa đặt tên"),
+				Type:              pipelinePDFTypeLabel(pipelineStepTypeLabels, fmt.Sprint(step["step_type"])),
+				ChecklistRequired: pipelinePDFBoolean(step["checklist_required"]),
+				DocumentRequired:  pipelinePDFBoolean(step["document_required"]),
+				PhotoRequired:     pipelinePDFBoolean(step["photo_required"]),
+				Roles:             roleText,
 			})
 		}
 		document.Nodes = append(document.Nodes, pdfNode)
@@ -309,6 +368,7 @@ func buildPipelineTemplatePDFDocument(template Record, permissionLabels map[stri
 			Priority:   int(number(edge["priority"])),
 		})
 	}
+	document.NodeReferenceTitle, document.NodeReferences = pipelinePDFNodeReferences(template["report_config_json"], document.Nodes)
 	return document
 }
 
@@ -323,9 +383,13 @@ func drawPipelinePDFDocumentHeader(pdf *fpdf.Fpdf, document pipelineTemplatePDFD
 	pdf.MultiCell(0, 5.5, document.Name, "", "L", false)
 	pdf.SetFont(pipelinePDFFontFamily, "", 8)
 	pdf.SetTextColor(71, 85, 105)
-	pdf.CellFormat(0, 5, fmt.Sprintf("Revision: %d    Trạng thái: %s    Tổng số node: %d    Xuất lúc: %s", document.Revision, document.Status, len(document.Nodes), document.GeneratedAt.Format("02/01/2006 15:04 MST")), "", 1, "L", false, 0, "")
+	pdf.CellFormat(0, 5, pipelinePDFDefinitionMetadata(document), "", 1, "L", false, 0, "")
 	pdf.MultiCell(0, 4.3, "Mô tả: "+document.Description, "", "L", false)
 	pdf.Ln(2)
+}
+
+func pipelinePDFDefinitionMetadata(document pipelineTemplatePDFDocument) string {
+	return fmt.Sprintf("Revision định nghĩa: %d    Trạng thái định nghĩa: %s    Tổng số node: %d    Xuất lúc: %s", document.Revision, document.Status, len(document.Nodes), document.GeneratedAt.Format("02/01/2006 15:04 MST"))
 }
 
 func drawPipelinePDFSectionTitle(pdf *fpdf.Fpdf, title string) {
@@ -500,6 +564,56 @@ func pipelinePDFText(value any, fallback string) string {
 		return fallback
 	}
 	return text
+}
+
+func pipelinePDFBoolean(value any) string {
+	if boolValue(value) {
+		return "Có"
+	}
+	return "Không"
+}
+
+func pipelinePDFNodeReferences(value any, nodes []pipelineTemplatePDFNode) (string, []pipelineTemplatePDFNodeReference) {
+	config, ok := pipelinePDFRecord(value)
+	if !ok {
+		return "", nil
+	}
+	title := pipelinePDFText(config["node_reference_title"], "Đối chiếu node client")
+	nodeByBusinessCode := make(map[string]pipelineTemplatePDFNode, len(nodes))
+	for _, node := range nodes {
+		code := strings.TrimSpace(node.BusinessCode)
+		if code != "" && code != "-" {
+			nodeByBusinessCode[code] = node
+		}
+	}
+	references := []pipelineTemplatePDFNodeReference{}
+	for _, item := range pipelinePDFRecords(config["node_references"]) {
+		businessCode := pipelinePDFText(item["target_business_code"], "")
+		target, exists := nodeByBusinessCode[businessCode]
+		if !exists {
+			continue
+		}
+		sourceRef := pipelinePDFText(item["source_ref"], "")
+		if sourceRef == "" {
+			continue
+		}
+		references = append(references, pipelineTemplatePDFNodeReference{
+			SourceRef: sourceRef, TargetOrder: target.Order, BusinessCode: businessCode,
+			TargetName: target.Name, Note: pipelinePDFText(item["note"], "-"),
+		})
+	}
+	return title, references
+}
+
+func pipelinePDFRecord(value any) (Record, bool) {
+	switch record := value.(type) {
+	case Record:
+		return record, true
+	case map[string]any:
+		return Record(record), true
+	default:
+		return nil, false
+	}
 }
 
 func pipelinePDFOrder(value any, fallback int) int {
