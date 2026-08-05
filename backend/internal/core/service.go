@@ -2083,9 +2083,10 @@ func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, act
 		item["capabilities"] = Record{"can_act": canAct, "can_decide": canDecide}
 		item["queue_scopes"] = myWorkItemQueueScopes(item, canDecide)
 		item["available_actions"] = myWorkItemAvailableActions(item)
+		item["readiness"] = myWorkItemReadiness(item)
 		for _, internalKey := range []string{
 			"action_scope", "decision_required_roles", "decision_requested_by",
-			"pipeline_current_node_id", "run_node_status", "is_mine", "is_department", "is_watching",
+			"pipeline_current_node_id", "run_node_status", "is_mine", "is_department", "is_watching", "is_future",
 		} {
 			delete(item, internalKey)
 		}
@@ -2536,12 +2537,17 @@ func (s *Service) WorkItemDetail(ctx context.Context, workItemID, actorID string
 			return nil, err
 		}
 	}
+	if boolValue(item["is_future"]) {
+		canDecide = false
+	}
 	item["capabilities"] = Record{"can_act": canAct, "can_decide": canDecide}
 	item["can_act"] = canAct
 	item["can_decide"] = canDecide
 	item["available_actions"] = myWorkItemAvailableActions(item)
+	item["readiness"] = myWorkItemReadiness(item)
 	delete(item, "pipeline_current_node_id")
 	delete(item, "run_node_status")
+	delete(item, "is_future")
 	return item, nil
 }
 
@@ -3507,6 +3513,9 @@ func (s *Service) saveMaterialSnapshot(ctx context.Context, workItemID string, r
 	if err != nil {
 		return nil, err
 	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+		return nil, err
+	}
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
 		return nil, err
 	}
@@ -3958,6 +3967,9 @@ func (s *Service) requireSurplusHandlingWorkItemAccess(ctx context.Context, work
 	if err != nil {
 		return nil, err
 	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+		return nil, err
+	}
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
 		return nil, err
 	}
@@ -4300,6 +4312,9 @@ func (s *Service) requireIncomingAcceptanceAccess(ctx context.Context, projectID
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
 		return nil, err
 	}
 	if cleanID(item["project_id"]) != projectID {
@@ -4918,6 +4933,9 @@ func (s *Service) SignWorkflowForm(ctx context.Context, instanceID string, req W
 	if err != nil {
 		return nil, err
 	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+		return nil, err
+	}
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
 		return nil, err
 	}
@@ -4971,6 +4989,9 @@ func (s *Service) GenerateWorkflowFormPDFExport(ctx context.Context, instanceID,
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
 		return nil, err
 	}
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
@@ -5169,6 +5190,12 @@ func (s *Service) publishWorkItemChanged(item Record, actorID string) {
 }
 
 func (s *Service) requireActivePipelineWorkItem(ctx context.Context, item Record) error {
+	if myWorkPlannedStartInFuture(item["planned_start_at"], time.Now()) {
+		return validationError("Đầu việc chưa đến thời điểm được phép bắt đầu", Record{
+			"work_item_id":     item["id"],
+			"planned_start_at": item["planned_start_at"],
+		})
+	}
 	if int(number(item["pipeline_engine_version"])) < 2 || cleanID(item["pipeline_run_id"]) == "" {
 		return nil
 	}
@@ -5276,6 +5303,9 @@ func (s *Service) AddWorkItemEvidence(ctx context.Context, workItemID string, re
 	if err != nil {
 		return nil, err
 	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+		return nil, err
+	}
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
 		return nil, err
 	}
@@ -5299,6 +5329,9 @@ func (s *Service) AddWorkItemEvidenceUpload(ctx context.Context, workItemID stri
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
 		return nil, err
 	}
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
@@ -5857,6 +5890,9 @@ func (s *Service) AddWorkItemActivity(ctx context.Context, workItemID string, re
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
 		return nil, err
 	}
 	normalized, err = s.validateActivityAttachments(ctx, cleanID(item["project_id"]), workItemID, normalized)
@@ -6622,6 +6658,9 @@ func (s *Service) EvidenceAction(ctx context.Context, evidenceID, action string,
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, fmt.Sprint(evidence["work_item_id"]))
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
 		return nil, err
 	}
 	allowed, err := s.repo.CanDecideWorkItem(ctx, item, actorID)
@@ -8633,7 +8672,14 @@ func (s *Service) AcceptanceAction(ctx context.Context, id, result string, req A
 	if err != nil {
 		return nil, err
 	}
-	if cleanID(existing["work_item_id"]) != "" {
+	if workItemID := cleanID(existing["work_item_id"]); workItemID != "" {
+		item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+			return nil, err
+		}
 		if fmt.Sprint(existing["status"]) != "submitted" {
 			return nil, validationError("Nghiệm thu đầu ra cần gửi trước khi chốt kết quả", Record{"acceptance_id": id, "status": existing["status"]})
 		}
@@ -8645,6 +8691,19 @@ func (s *Service) AcceptanceAction(ctx context.Context, id, result string, req A
 }
 
 func (s *Service) CreateReworkFromAcceptance(ctx context.Context, acceptanceID, actorID, actorName string) (Record, error) {
+	existing, err := s.repo.GetAcceptanceDetail(ctx, acceptanceID)
+	if err != nil {
+		return nil, err
+	}
+	if workItemID := cleanID(existing["work_item_id"]); workItemID != "" {
+		item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+			return nil, err
+		}
+	}
 	return s.repo.CreateReworkFromAcceptance(ctx, acceptanceID, actorID, actorName)
 }
 
@@ -8670,6 +8729,9 @@ func (s *Service) requireAcceptanceWriteAccess(ctx context.Context, projectID, w
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
 		return nil, err
 	}
 	if cleanID(item["project_id"]) != projectID {

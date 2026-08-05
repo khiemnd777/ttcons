@@ -32,10 +32,10 @@ const navGroups: { title: string; items: NavItem[] }[] = [
   {
     title: 'Công việc',
     items: [
-      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permissions: ['report.view'] },
+      { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
+      { to: '/dashboard', label: 'Điều hành', icon: LayoutDashboard, permissions: ['report.view'] },
       { to: '/progress', label: 'Tiến trình', icon: Kanban, permissions: ['project.view'] },
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
-      { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
       { to: '/reports', label: 'Báo cáo', icon: BarChart3, permissions: ['report.view'] },
       { to: '/accounting', label: 'Tài chính công trình', icon: Calculator, permissions: ['project_finance.view'] },
     ],
@@ -134,7 +134,7 @@ export function AppShell() {
               >
                 <BrandLogo size={40} />
               </Link>
-              <p className="text-sm font-medium text-ink">Bắt đầu từ công trình, xử lý nghiệp vụ theo cấu trúc rõ ràng</p>
+              <p className="text-sm font-medium text-ink">Bắt đầu từ việc ưu tiên, luôn rõ Dự án › Node › Bước</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden text-right sm:block">

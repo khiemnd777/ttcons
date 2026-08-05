@@ -22,11 +22,13 @@ export function WorkflowFormPanel({
   projectId,
   evidence,
   onChanged,
+  readOnly = false,
 }: {
   workItemId: string;
   projectId?: string;
   evidence: EvidenceRecord[];
   onChanged?: () => void;
+  readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -213,9 +215,10 @@ export function WorkflowFormPanel({
         submittedAt={instance?.submitted_at}
         saving={saveDraft.isPending}
         submitting={submitForm.isPending}
-        onSave={() => saveDraft.mutate()}
+        readOnly={readOnly}
+        onSave={() => { if (!readOnly) saveDraft.mutate(); }}
         onSubmit={() => {
-          if (validateBeforeSubmit()) submitForm.mutate();
+          if (!readOnly && validateBeforeSubmit()) submitForm.mutate();
         }}
       />
 
@@ -248,7 +251,7 @@ export function WorkflowFormPanel({
                 value={values[field.field_key]}
                 evidence={evidence}
                 error={errors[field.field_key]}
-                disabled={submitted || formActionPending}
+                disabled={readOnly || submitted || formActionPending}
                 onChange={(value) => setFieldValue(field, value)}
               />
             ))}
@@ -269,7 +272,8 @@ export function WorkflowFormPanel({
               submitted={submitted}
               signedByCurrentUser={signedByCurrentUser}
               signing={signForm.isPending}
-              onOpenSign={() => setSignatureDialogOpen(true)}
+              readOnly={readOnly}
+              onOpenSign={() => { if (!readOnly) setSignatureDialogOpen(true); }}
               onViewDetail={(signature) => setSignatureDetail(signature)}
               onOpenVisual={(signature) => void openProtectedBlob(`/workflow-form-signatures/${signature.id}/visual`, 'Không mở được chữ ký')}
             />
@@ -277,7 +281,8 @@ export function WorkflowFormPanel({
               exports={pdfExports}
               submitted={submitted}
               generating={generatePDF.isPending}
-              onGenerate={() => generatePDF.mutate()}
+              readOnly={readOnly}
+              onGenerate={() => { if (!readOnly) generatePDF.mutate(); }}
               onOpen={(record) => void openProtectedBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF hồ sơ nghiệp vụ')}
             />
           </div>
@@ -286,7 +291,7 @@ export function WorkflowFormPanel({
         {form.data.events?.length ? <WorkflowFormEventsPanel events={form.data.events} /> : null}
       </div>
       <SignatureCaptureDialog
-        open={signatureDialogOpen}
+        open={!readOnly && signatureDialogOpen}
         signerName={user?.full_name}
         submitting={signForm.isPending}
         signedPurposes={signedPurposesByCurrentUser}
@@ -371,6 +376,7 @@ function WorkflowFormActionCenter({
   submittedAt,
   saving,
   submitting,
+  readOnly,
   onSave,
   onSubmit,
 }: {
@@ -383,10 +389,11 @@ function WorkflowFormActionCenter({
   submittedAt?: string;
   saving: boolean;
   submitting: boolean;
+  readOnly: boolean;
   onSave: () => void;
   onSubmit: () => void;
 }) {
-  const blocked = !submitted && validationIssueLabels.length > 0;
+  const blocked = !readOnly && !submitted && validationIssueLabels.length > 0;
   const issuePreview = validationIssueLabels.slice(0, 4).join(', ');
   const extraIssues = validationIssueLabels.length > 4 ? ` +${validationIssueLabels.length - 4}` : '';
   return (
@@ -406,10 +413,10 @@ function WorkflowFormActionCenter({
             </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-ink">
-                {blocked ? 'Cần hoàn tất thông tin trước khi gửi' : submitted ? 'Hồ sơ đã gửi, chuyển sang tài liệu' : 'Sẵn sàng lưu nháp hoặc gửi'}
+                {readOnly ? 'Hồ sơ xem trước của bước sắp tới' : blocked ? 'Cần hoàn tất thông tin trước khi gửi' : submitted ? 'Hồ sơ đã gửi, chuyển sang tài liệu' : 'Sẵn sàng lưu nháp hoặc gửi'}
               </p>
               <p className="mt-1 text-xs leading-5 text-slate-600">
-                {blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung hồ sơ đã khóa; chữ ký và PDF dùng phiên bản đã gửi.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
+                {readOnly ? 'Chỉ có thể cập nhật khi workflow chuyển đến node này.' : blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung hồ sơ đã khóa; chữ ký và PDF dùng phiên bản đã gửi.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
               </p>
             </div>
           </div>
@@ -418,7 +425,7 @@ function WorkflowFormActionCenter({
           <button
             type="button"
             className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={submitted || saving || submitting}
+            disabled={readOnly || submitted || saving || submitting}
             onClick={onSave}
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -427,7 +434,7 @@ function WorkflowFormActionCenter({
           <button
             type="button"
             className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={submitted || saving || submitting}
+            disabled={readOnly || submitted || saving || submitting}
             onClick={onSubmit}
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -867,6 +874,7 @@ function WorkflowSignaturePanel({
   submitted,
   signedByCurrentUser,
   signing,
+  readOnly,
   onOpenSign,
   onViewDetail,
   onOpenVisual,
@@ -875,11 +883,12 @@ function WorkflowSignaturePanel({
   submitted: boolean;
   signedByCurrentUser: boolean;
   signing: boolean;
+  readOnly: boolean;
   onOpenSign: () => void;
   onViewDetail: (signature: WorkflowFormSignature) => void;
   onOpenVisual: (signature: WorkflowFormSignature) => void;
 }) {
-  const disabled = !submitted || signing;
+  const disabled = readOnly || !submitted || signing;
   return (
     <section className="rounded-md border border-line bg-slate-50 p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -1045,12 +1054,14 @@ function WorkflowPDFExportPanel({
   exports,
   submitted,
   generating,
+  readOnly,
   onGenerate,
   onOpen,
 }: {
   exports: WorkflowFormPDFExport[];
   submitted: boolean;
   generating: boolean;
+  readOnly: boolean;
   onGenerate: () => void;
   onOpen: (record: WorkflowFormPDFExport) => void;
 }) {
@@ -1061,7 +1072,7 @@ function WorkflowPDFExportPanel({
         <button
           type="button"
           className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={!submitted || generating}
+          disabled={readOnly || !submitted || generating}
           onClick={onGenerate}
         >
           {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}

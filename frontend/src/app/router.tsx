@@ -52,8 +52,7 @@ function RequirePermission({ permissions, children }: { permissions?: string[]; 
 }
 
 function HomeRedirect() {
-  const { hasAnyPermission } = useAuth();
-  return <Navigate to={hasAnyPermission(['project.view']) ? '/projects' : '/my-work'} replace />;
+  return <Navigate to="/my-work" replace />;
 }
 
 function guarded(element: ReactNode, permissions?: string[], focus = false) {

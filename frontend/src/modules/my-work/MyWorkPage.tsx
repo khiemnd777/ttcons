@@ -40,13 +40,15 @@ import {
   numberValue,
   priorityLabel,
   scopeTypeLabel,
+  workItemIsUpcoming,
+  workItemWorkflowContext,
   workTypeLabel,
 } from '../work-items/workItemPresentation';
 
 type ModeKey = 'work' | 'attention';
 type QueueKey = 'mine' | 'department' | 'pending_approval' | 'watching' | 'all';
 type AttentionQueueKey = 'all' | 'mentions' | 'questions' | 'blockers' | 'reminders' | 'unread';
-type SummaryBucket = 'need_action' | 'overdue' | 'blocked' | 'waiting_decision' | 'done_today';
+type SummaryBucket = 'all' | 'need_action' | 'in_progress' | 'overdue' | 'blocked' | 'waiting_decision' | 'upcoming' | 'done_today';
 
 type FacetOption = string | {
   id?: string;
@@ -67,10 +69,12 @@ type MyWorkFacets = {
 type MyWorkSummary = {
   total: number;
   need_action: number;
+  in_progress: number;
   overdue: number;
   blocked: number;
   waiting_decision: number;
   waiting_approval: number;
+  upcoming: number;
   done_today: number;
 };
 type MyWorkPageResponse = {
@@ -130,11 +134,12 @@ export function MyWorkPage() {
   const [dialogItem, setDialogItem] = useState<WorkItem | null>(null);
   const [searchDraft, setSearchDraft] = useState(searchParams.get('search') ?? '');
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('reconnecting');
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
 
   const mode = validValue<ModeKey>(searchParams.get('mode'), ['work', 'attention'], 'work');
-  const queue = validValue<QueueKey>(searchParams.get('queue'), ['mine', 'department', 'pending_approval', 'watching', 'all'], 'mine');
+  const queue = validValue<QueueKey>(searchParams.get('queue'), ['mine', 'department', 'pending_approval', 'watching', 'all'], 'all');
   const attentionQueue = validValue<AttentionQueueKey>(searchParams.get('attention'), ['all', 'mentions', 'questions', 'blockers', 'reminders', 'unread'], 'all');
-  const bucket = validOptionalValue<SummaryBucket>(searchParams.get('bucket'), ['need_action', 'overdue', 'blocked', 'waiting_decision', 'done_today']);
+  const bucket = validValue<SummaryBucket>(searchParams.get('bucket'), ['all', 'need_action', 'in_progress', 'overdue', 'blocked', 'waiting_decision', 'upcoming', 'done_today'], 'need_action');
   const project = searchParams.get('project') ?? '';
   const status = searchParams.get('status') ?? '';
   const deadline = searchParams.get('deadline') ?? '';
@@ -200,7 +205,7 @@ export function MyWorkPage() {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       Object.entries(changes).forEach(([key, value]) => {
-        if (!value || (key === 'mode' && value === 'work') || (key === 'queue' && value === 'mine') || (key === 'sort' && value === 'priority')) next.delete(key);
+        if (!value || (key === 'mode' && value === 'work') || (key === 'queue' && value === 'all') || (key === 'bucket' && value === 'need_action') || (key === 'sort' && value === 'priority')) next.delete(key);
         else next.set(key, value);
       });
       return next;
@@ -209,14 +214,14 @@ export function MyWorkPage() {
 
   function resetFilters() {
     setSearchDraft('');
-    updateParams({ queue: null, bucket: null, project: null, status: null, deadline: null, type: null, priority: null, search: null, sort: null });
+    updateParams({ queue: 'all', bucket: 'need_action', project: null, status: null, deadline: null, type: null, priority: null, search: null, sort: 'priority' });
   }
 
   function selectBucket(nextBucket: SummaryBucket) {
     updateParams({
       mode: 'work',
       queue: nextBucket === 'waiting_decision' ? 'pending_approval' : 'all',
-      bucket: bucket === nextBucket ? null : nextBucket,
+      bucket: bucket === nextBucket ? 'all' : nextBucket,
       status: null,
       deadline: null,
       type: null,
@@ -230,14 +235,14 @@ export function MyWorkPage() {
     void activityAttention.refetch();
   }
 
-  const hasFilters = Boolean(bucket || project || status || deadline || workType || priority || search || sort !== 'priority');
+  const hasFilters = Boolean(bucket !== 'need_action' || queue !== 'all' || project || status || deadline || workType || priority || search || sort !== 'priority');
   const total = firstPage?.total ?? summary.total ?? rows.length;
 
   return (
     <>
       <PageHeader
         title="Việc của tôi"
-        description={`${user?.full_name ?? 'Người dùng'} · Công việc cần xử lý trên các công trình được phân quyền`}
+        description={`${user?.full_name ?? 'Người dùng'}${user?.roles?.length ? ` · ${user.roles.join(', ')}` : ''} · Ưu tiên công việc có thể xử lý ngay`}
         actions={(
           <div className="flex items-center gap-2">
             <LiveStatusBadge status={streamStatus} />
@@ -260,6 +265,7 @@ export function MyWorkPage() {
         <section className="mt-4 rounded-lg border border-line bg-white p-4 shadow-panel">
           <FilterBar
             searchDraft={searchDraft}
+            queue={queue}
             project={project}
             status={status}
             deadline={deadline}
@@ -268,14 +274,15 @@ export function MyWorkPage() {
             sort={sort}
             facets={facets}
             hasFilters={hasFilters}
+            advancedOpen={advancedFiltersOpen}
             onSearchDraft={setSearchDraft}
-            onSearch={() => updateParams({ search: searchDraft.trim() || null, bucket: null })}
-            onChange={(key, value) => updateParams({ [key]: value || null, bucket: null })}
+            onSearch={() => updateParams({ search: searchDraft.trim() || null, bucket: 'all' })}
+            onChange={(key, value) => updateParams({ [key]: value || null, bucket: 'all' })}
             onReset={resetFilters}
+            onToggleAdvanced={() => setAdvancedFiltersOpen((open) => !open)}
           />
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_320px]">
-            <QueueRail selected={queue} total={total} onSelect={(value) => updateParams({ queue: value })} />
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <WorkList
               rows={rows}
               selectedId={selectedItem?.id}
@@ -284,7 +291,7 @@ export function MyWorkPage() {
               error={workItems.error}
               total={total}
               hasMore={Boolean(workItems.hasNextPage)}
-              filtered={hasFilters || queue !== 'mine'}
+              filtered={hasFilters}
               onSelect={setSelectedWorkId}
               onOpen={setDialogItem}
               onLoadMore={() => void workItems.fetchNextPage()}
@@ -323,7 +330,7 @@ export function MyWorkPage() {
 
 function buildWorkPath(filters: {
   queue: QueueKey;
-  bucket?: SummaryBucket;
+  bucket: SummaryBucket;
   project: string;
   status: string;
   deadline: string;
@@ -333,7 +340,7 @@ function buildWorkPath(filters: {
   sort: string;
 }, cursor: string) {
   const params = new URLSearchParams({ queue: filters.queue, sort: filters.sort, limit: '30' });
-  if (filters.bucket) params.set('bucket', filters.bucket);
+  params.set('bucket', filters.bucket);
   if (filters.project) params.set('project_id', filters.project);
   if (filters.status) params.set('status', filters.status);
   if (filters.deadline) params.set('deadline', filters.deadline);
@@ -352,19 +359,15 @@ function validValue<T extends string>(value: string | null, values: readonly T[]
   return value && values.includes(value as T) ? value as T : fallback;
 }
 
-function validOptionalValue<T extends string>(value: string | null, values: readonly T[]): T | undefined {
-  return value && values.includes(value as T) ? value as T : undefined;
-}
+const emptySummary: MyWorkSummary = { total: 0, need_action: 0, in_progress: 0, overdue: 0, blocked: 0, waiting_decision: 0, waiting_approval: 0, upcoming: 0, done_today: 0 };
 
-const emptySummary: MyWorkSummary = { total: 0, need_action: 0, overdue: 0, blocked: 0, waiting_decision: 0, waiting_approval: 0, done_today: 0 };
-
-function SummaryStrip({ summary, selected, onSelect }: { summary: MyWorkSummary; selected?: SummaryBucket; onSelect: (bucket: SummaryBucket) => void }) {
+function SummaryStrip({ summary, selected, onSelect }: { summary: MyWorkSummary; selected: SummaryBucket; onSelect: (bucket: SummaryBucket) => void }) {
   const cards: Array<{ bucket: SummaryBucket; label: string; value: number; icon: typeof BriefcaseBusiness; activeClass: string }> = [
-    { bucket: 'need_action', label: 'Cần tôi xử lý', value: summary.need_action, icon: BriefcaseBusiness, activeClass: 'border-blue-300 bg-blue-50 ring-blue-200' },
-    { bucket: 'overdue', label: 'Quá hạn', value: summary.overdue, icon: Clock3, activeClass: 'border-red-300 bg-red-50 ring-red-200' },
-    { bucket: 'blocked', label: 'Bị chặn', value: summary.blocked, icon: AlertCircle, activeClass: 'border-rose-300 bg-rose-50 ring-rose-200' },
+    { bucket: 'need_action', label: 'Làm ngay', value: summary.need_action, icon: BriefcaseBusiness, activeClass: 'border-blue-300 bg-blue-50 ring-blue-200' },
+    { bucket: 'in_progress', label: 'Đang làm', value: summary.in_progress, icon: Clock3, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
     { bucket: 'waiting_decision', label: 'Chờ tôi duyệt', value: summary.waiting_decision, icon: ShieldAlert, activeClass: 'border-amber-300 bg-amber-50 ring-amber-200' },
-    { bucket: 'done_today', label: 'Xong hôm nay', value: summary.done_today, icon: CheckCircle2, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
+    { bucket: 'blocked', label: 'Bị chặn', value: summary.blocked, icon: AlertCircle, activeClass: 'border-rose-300 bg-rose-50 ring-rose-200' },
+    { bucket: 'upcoming', label: 'Sắp tới · chỉ xem', value: summary.upcoming, icon: Clock3, activeClass: 'border-slate-300 bg-slate-50 ring-slate-200' },
   ];
   return (
     <section className="flex gap-2 overflow-x-auto pb-1" aria-label="Tóm tắt công việc">
@@ -397,9 +400,9 @@ function ModeTab({ active, label, count, onClick }: { active: boolean; label: st
   );
 }
 
-function FilterBar({ searchDraft, project, status, deadline, workType, priority, sort, facets, hasFilters, onSearchDraft, onSearch, onChange, onReset }: {
-  searchDraft: string; project: string; status: string; deadline: string; workType: string; priority: string; sort: string; facets: MyWorkFacets; hasFilters: boolean;
-  onSearchDraft: (value: string) => void; onSearch: () => void; onChange: (key: string, value: string) => void; onReset: () => void;
+function FilterBar({ searchDraft, queue, project, status, deadline, workType, priority, sort, facets, hasFilters, advancedOpen, onSearchDraft, onSearch, onChange, onReset, onToggleAdvanced }: {
+  searchDraft: string; queue: QueueKey; project: string; status: string; deadline: string; workType: string; priority: string; sort: string; facets: MyWorkFacets; hasFilters: boolean; advancedOpen: boolean;
+  onSearchDraft: (value: string) => void; onSearch: () => void; onChange: (key: string, value: string) => void; onReset: () => void; onToggleAdvanced: () => void;
 }) {
   const projects = normalizeFacetOptions(facets.projects, 'Công trình');
   const statuses = normalizeFacetOptions(facets.statuses, 'Trạng thái');
@@ -407,20 +410,23 @@ function FilterBar({ searchDraft, project, status, deadline, workType, priority,
   const priorities = normalizeFacetOptions(facets.priorities, 'Ưu tiên');
   return (
     <div className="space-y-3 border-b border-line pb-4">
-      <div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-blue-700" /><h2 className="text-sm font-semibold text-ink">Tìm và lọc công việc</h2></div>
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1.5fr)_repeat(6,minmax(8rem,1fr))_auto]">
+      <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-blue-700" /><h2 className="text-sm font-semibold text-ink">Tìm công việc</h2></div>{hasFilters ? <button className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-blue-700" onClick={onReset}><X className="h-3.5 w-3.5" />Về mặc định</button> : null}</div>
+      <div className="grid gap-2 md:grid-cols-[minmax(14rem,1fr)_minmax(12rem,18rem)_auto]">
         <form className="flex min-w-0" onSubmit={(event) => { event.preventDefault(); onSearch(); }}>
           <div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input className="w-full rounded-l-md border border-line py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400" value={searchDraft} onChange={(event) => onSearchDraft(event.target.value)} placeholder="Tên việc, công trình..." /></div>
           <button className="rounded-r-md border border-l-0 border-line px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50" type="submit">Tìm</button>
         </form>
         <FilterSelect value={project} label="Tất cả công trình" options={projects} onChange={(value) => onChange('project', value)} />
+        <button className={clsx('inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold', advancedOpen ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-line text-slate-700 hover:bg-slate-50')} onClick={onToggleAdvanced}><SlidersHorizontal className="h-4 w-4" />Bộ lọc thêm</button>
+      </div>
+      {advancedOpen ? <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-6">
+        <FilterSelect value={queue} label="Tất cả phạm vi" options={queues.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => onChange('queue', value)} />
         <FilterSelect value={status} label="Tất cả trạng thái" options={statuses.length ? statuses.map((item) => ({ ...item, label: statusLabel(item.value) })) : statusOptions} onChange={(value) => onChange('status', value)} />
         <FilterSelect value={deadline} label="Tất cả hạn việc" options={deadlineOptions} onChange={(value) => onChange('deadline', value)} />
         <FilterSelect value={workType} label="Tất cả loại việc" options={workTypes.map((item) => ({ ...item, label: workTypeLabel(item.value) }))} onChange={(value) => onChange('type', value)} />
         <FilterSelect value={priority} label="Tất cả ưu tiên" options={priorities.map((item) => ({ ...item, label: priorityLabel(item.value) }))} onChange={(value) => onChange('priority', value)} />
         <FilterSelect value={sort} label="Sắp xếp" options={sortOptions} onChange={(value) => onChange('sort', value)} />
-        {hasFilters ? <button className="inline-flex items-center justify-center gap-1 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50" onClick={onReset}><X className="h-4 w-4" />Xóa lọc</button> : null}
-      </div>
+      </div> : null}
     </div>
   );
 }
@@ -435,19 +441,6 @@ function normalizeFacetOptions(values: FacetOption[] | undefined, fallback: stri
 
 function FilterSelect({ value, label, options, onChange }: { value: string; label: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
   return <select className="min-w-0 rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700" value={value} onChange={(event) => onChange(event.target.value)}><option value="">{label}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
-}
-
-function QueueRail({ selected, total, onSelect }: { selected: QueueKey; total: number; onSelect: (queue: QueueKey) => void }) {
-  return (
-    <nav className="flex gap-2 overflow-x-auto xl:block xl:space-y-1 xl:overflow-visible" aria-label="Phạm vi công việc">
-      {queues.map((item) => (
-        <button key={item.key} className={clsx('min-w-44 rounded-md border px-3 py-2 text-left xl:w-full', selected === item.key ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-transparent text-slate-700 hover:bg-slate-50')} onClick={() => onSelect(item.key)}>
-          <span className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{item.label}</span>{selected === item.key ? <span className="rounded-md bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{total}</span> : null}</span>
-          <span className="mt-0.5 block text-xs text-slate-500">{item.description}</span>
-        </button>
-      ))}
-    </nav>
-  );
 }
 
 function WorkList({ rows, selectedId, loading, fetchingMore, error, total, hasMore, filtered, onSelect, onOpen, onLoadMore, onReset, onRetry }: {
@@ -473,22 +466,25 @@ function WorkList({ rows, selectedId, loading, fetchingMore, error, total, hasMo
 }
 
 function NextWorkPanel({ item, onOpen }: { item: WorkItem | null; onOpen: (item: WorkItem) => void }) {
-  if (!item) return <aside className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4"><p className="text-sm font-semibold text-ink">Việc tiếp theo</p><p className="mt-2 text-sm text-slate-600">Chọn một công việc để xem ngữ cảnh xử lý.</p></aside>;
+  if (!item) return <aside className="order-first rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 xl:order-last"><p className="text-sm font-semibold text-ink">Bắt đầu tiếp</p><p className="mt-2 text-sm text-slate-600">Chọn một công việc để xem đủ Dự án › Node › Bước.</p></aside>;
+  const context = workItemWorkflowContext(item);
+  const upcoming = workItemIsUpcoming(item);
   return (
-    <aside className="rounded-lg border border-line bg-slate-50 p-4 xl:sticky xl:top-4 xl:self-start">
-      <div className="flex flex-wrap items-center gap-2"><StatusBadge status={isWorkOverdue(item) ? 'overdue' : item.status} />{item.priority ? <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600">{priorityLabel(item.priority)}</span> : null}</div>
-      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Việc tiếp theo</p>
+    <aside className="order-first rounded-lg border border-line bg-slate-50 p-4 xl:order-last xl:sticky xl:top-4 xl:self-start">
+      <div className="flex flex-wrap items-center gap-2"><StatusBadge status={isWorkOverdue(item) ? 'overdue' : item.status} />{upcoming ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">Sắp tới · chỉ xem</span> : null}{item.priority ? <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600">{priorityLabel(item.priority)}</span> : null}</div>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Bắt đầu tiếp</p>
       <h3 className="mt-1 text-base font-semibold text-ink">{item.title}</h3>
-      <p className="mt-1 text-sm text-slate-600">{item.project_code ? `${item.project_code} · ` : ''}{item.project_name ?? 'Công trình'}</p>
-      {item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-700">{item.blocked_reason}</p> : <p className="mt-3 text-sm leading-6 text-slate-600">{nextActionCopy(item)}</p>}
-      <div className="mt-4 space-y-2 text-sm"><ContextRow label="Giai đoạn" value={item.run_node_name ?? '-'} /><ContextRow label="Bước" value={item.run_step_name ?? '-'} /><ContextRow label="Phụ trách" value={item.assignee_name ?? departmentLabel(item.department)} /><ContextRow label="Hạn" value={dateText(item.due_at)} /><ContextRow label="Minh chứng" value={numberValue(item.evidence_count)} /></div>
-      <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onOpen(item)}>Mở xử lý <ChevronRight className="h-4 w-4" /></button>
+      <p className="mt-2 text-xs font-medium leading-5 text-slate-600">{context.path}</p>
+      {upcoming ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Bước này chưa đến lượt. Anh có thể xem trước hồ sơ nhưng không thể bắt đầu hoặc cập nhật.</p> : item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-700">{item.blocked_reason}</p> : <p className="mt-3 text-sm leading-6 text-slate-600">{nextActionCopy(item)}</p>}
+      <div className="mt-4 space-y-2 text-sm"><ContextRow label="Dự án" value={context.project} /><ContextRow label="Node" value={context.node} /><ContextRow label="Bước" value={context.step} /><ContextRow label="Phụ trách" value={item.assignee_name ?? departmentLabel(item.department)} /><ContextRow label="Hạn" value={dateText(item.due_at)} /><ContextRow label="Minh chứng" value={numberValue(item.evidence_count)} /></div>
+      <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onOpen(item)}>{upcoming ? 'Xem công việc' : 'Mở xử lý'} <ChevronRight className="h-4 w-4" /></button>
       {item.project_id ? <Link className="mt-2 inline-flex w-full justify-center rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${item.project_id}`}>Mở công trình</Link> : null}
     </aside>
   );
 }
 
 function nextActionCopy(item: WorkItem) {
+  if (workItemIsUpcoming(item)) return 'Chờ quy trình chuyển đến node này.';
   if (item.status === 'waiting_approval' || item.status === 'waiting_review') return (item.capabilities?.can_decide ?? item.can_decide) ? 'Rà soát hồ sơ và đưa ra quyết định.' : 'Theo dõi phản hồi từ người có thẩm quyền.';
   if (item.status === 'waiting_evidence') return 'Bổ sung đủ minh chứng trước khi hoàn tất.';
   if (item.status === 'completed') return 'Công việc đã hoàn tất. Có thể xem lại hồ sơ và lịch sử.';

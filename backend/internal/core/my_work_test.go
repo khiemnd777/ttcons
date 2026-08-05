@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNormalizeMyWorkItemsFilterAndCursor(t *testing.T) {
@@ -28,6 +29,84 @@ func TestNormalizeMyWorkItemsFilterAndCursor(t *testing.T) {
 	}
 	if _, _, err := normalizeMyWorkItemsFilter(MyWorkItemsFilter{Limit: 101}); err == nil {
 		t.Fatal("expected invalid limit error")
+	}
+	for _, bucket := range []string{"all", "in_progress", "upcoming"} {
+		if normalized, _, err := normalizeMyWorkItemsFilter(MyWorkItemsFilter{Bucket: bucket}); err != nil || normalized.Bucket != bucket {
+			t.Fatalf("bucket %q normalized to %#v with error %v", bucket, normalized, err)
+		}
+	}
+}
+
+func TestMyWorkItemReadinessSeparatesCurrentFutureAndHistory(t *testing.T) {
+	tests := []struct {
+		name string
+		item Record
+		want string
+	}{
+		{name: "actionable", item: Record{"status": "ready", "can_act": true, "is_future": false}, want: "actionable"},
+		{name: "decision", item: Record{"status": "waiting_approval", "can_decide": true}, want: "decision"},
+		{name: "upcoming", item: Record{"status": "pending", "can_act": false, "is_future": true}, want: "upcoming"},
+		{name: "read only", item: Record{"status": "pending", "can_act": false, "is_future": false}, want: "read_only"},
+		{name: "history wins", item: Record{"status": "completed", "can_act": true, "can_decide": true}, want: "history"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := myWorkItemReadiness(test.item); got != test.want {
+				t.Fatalf("readiness = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestMyWorkFutureNodeCannotActNow(t *testing.T) {
+	service := &Service{}
+	allowed, err := service.myWorkItemCanActNow(context.Background(), Record{
+		"status":                   "pending",
+		"pipeline_engine_version":  2,
+		"pipeline_run_id":          "run-1",
+		"pipeline_current_node_id": "node-current",
+		"run_node_id":              "node-future",
+		"run_node_status":          "pending",
+	}, "actor-1", true)
+	if err != nil || allowed {
+		t.Fatalf("future node allowed = %v, error = %v", allowed, err)
+	}
+}
+
+func TestMyWorkPlannedFutureCannotActNow(t *testing.T) {
+	service := &Service{}
+	planned := time.Now().Add(time.Hour)
+	allowed, err := service.myWorkItemCanActNow(context.Background(), Record{
+		"status":           "ready",
+		"planned_start_at": planned,
+	}, "actor-1", true)
+	if err != nil || allowed {
+		t.Fatalf("future planned start allowed = %v, error = %v", allowed, err)
+	}
+	if !myWorkPlannedStartInFuture(planned.Format(time.RFC3339Nano), time.Now()) {
+		t.Fatal("RFC3339 planned start should be recognized as future")
+	}
+	if err := service.requireActivePipelineWorkItem(context.Background(), Record{
+		"id":               "work-1",
+		"planned_start_at": planned,
+	}); err == nil {
+		t.Fatal("future planned start must fail the shared mutation guard")
+	}
+}
+
+func TestMyWorkSQLExposesWorkflowContextAndFutureState(t *testing.T) {
+	query := myWorkItemsBaseSQL()
+	for _, fragment := range []string{
+		"rn.order_index AS run_node_order_index",
+		"rs.order_index AS run_step_order_index",
+		") AS is_future",
+	} {
+		if !strings.Contains(query, fragment) {
+			t.Fatalf("My Work SQL missing %q", fragment)
+		}
+	}
+	if !strings.Contains(myWorkNeedActionSQL(), "AND NOT is_future") {
+		t.Fatal("need-action bucket must exclude future work")
 	}
 }
 

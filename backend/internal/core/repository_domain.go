@@ -1325,7 +1325,9 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 
 func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, clientVisibleOnly ...bool) (Record, error) {
 	item, err := r.QueryOne(ctx, `
-		SELECT wi.*, p.name AS project_name, p.code AS project_code, rn.name AS run_node_name, rs.name AS run_step_name,
+		SELECT wi.*, p.name AS project_name, p.code AS project_code,
+			rn.name AS run_node_name, rn.order_index AS run_node_order_index,
+			rs.name AS run_step_name, rs.order_index AS run_step_order_index,
 			s.full_name AS assignee_name,
 			pr.current_node_id AS pipeline_current_node_id,
 			rn.status AS run_node_status,
@@ -1344,7 +1346,17 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 			rs.form_version_id AS required_workflow_form_version_id,
 			rs.surface_kind,
 			rs.domain_action_key,
-			COALESCE(pr.engine_version, 1) AS pipeline_engine_version
+			COALESCE(pr.engine_version, 1) AS pipeline_engine_version,
+			(
+				wi.status NOT IN ('completed','cancelled') AND (
+					COALESCE(wi.planned_start_at > now(), false)
+					OR (
+						COALESCE(pr.engine_version, 1) >= 2
+						AND wi.pipeline_run_id IS NOT NULL
+						AND pr.current_node_id IS DISTINCT FROM wi.run_node_id
+					)
+				)
+			) AS is_future
 		FROM work_items wi
 		JOIN projects p ON p.id=wi.project_id
 		LEFT JOIN pipeline_runs pr ON pr.id=wi.pipeline_run_id

@@ -1,5 +1,6 @@
 import type { WorkItem } from '../../lib/types/domain';
 import { enumLabel } from '../../lib/utils/status';
+export { workItemIsUpcoming, workItemWorkflowContext } from './workItemContext';
 
 export type WorkItemActionKey =
   | 'start'

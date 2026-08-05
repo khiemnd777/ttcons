@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var myWorkQueues = map[string]bool{
@@ -22,7 +23,8 @@ var myWorkSorts = map[string]bool{
 }
 
 var myWorkBuckets = map[string]bool{
-	"": true, "need_action": true, "overdue": true, "blocked": true, "waiting_decision": true, "done_today": true,
+	"": true, "all": true, "need_action": true, "in_progress": true, "overdue": true,
+	"blocked": true, "waiting_decision": true, "upcoming": true, "done_today": true,
 }
 
 var myWorkStatuses = map[string]bool{
@@ -165,8 +167,48 @@ func myWorkItemAvailableActions(item Record) []string {
 	return actions
 }
 
+func myWorkItemReadiness(item Record) string {
+	if statusIn(fmt.Sprint(item["status"]), "completed", "cancelled") {
+		return "history"
+	}
+	if boolValue(item["can_decide"]) {
+		return "decision"
+	}
+	if boolValue(item["can_act"]) {
+		return "actionable"
+	}
+	if boolValue(item["is_future"]) {
+		return "upcoming"
+	}
+	return "read_only"
+}
+
+func myWorkPlannedStartInFuture(value any, now time.Time) bool {
+	var planned time.Time
+	switch typed := value.(type) {
+	case time.Time:
+		planned = typed
+	case *time.Time:
+		if typed != nil {
+			planned = *typed
+		}
+	default:
+		text := strings.TrimSpace(fmt.Sprint(value))
+		for _, layout := range []string{time.RFC3339Nano, time.RFC3339, "2006-01-02 15:04:05-07"} {
+			if parsed, err := time.Parse(layout, text); err == nil {
+				planned = parsed
+				break
+			}
+		}
+	}
+	return !planned.IsZero() && planned.After(now)
+}
+
 func (s *Service) myWorkItemCanActNow(ctx context.Context, item Record, actorID string, scoped bool) (bool, error) {
 	if !scoped || statusIn(fmt.Sprint(item["status"]), "completed", "cancelled") {
+		return false, nil
+	}
+	if myWorkPlannedStartInFuture(item["planned_start_at"], time.Now()) {
 		return false, nil
 	}
 	if int(number(item["pipeline_engine_version"])) >= 2 && cleanID(item["pipeline_run_id"]) != "" {

@@ -2590,6 +2590,7 @@ export type WorkItem = ProjectOperationsRecord & {
     can_decide?: boolean;
   };
   available_actions?: string[];
+  readiness?: 'actionable' | 'decision' | 'upcoming' | 'read_only' | 'history' | string;
   priority?: string;
   department?: string;
   role_ids?: string[];

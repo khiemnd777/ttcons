@@ -1,5 +1,28 @@
 # Current States
 
+## [Active] Adaptive Role Workbench
+
+### Will be done
+
+- Make `Việc của tôi` the authenticated default landing page and retain the existing executive Dashboard under the user-facing label `Điều hành`.
+- Turn `/my-work` into one adaptive role-aware workbench instead of separate duplicated role pages, using the actor-scoped work-item queue as the only task source of truth.
+- Default to work the actor can perform now, expose explicit `Đang làm` and read-only `Sắp tới` lanes, and keep future-node work non-actionable through backend capabilities and normal `WorkItemAction` gates.
+- Show the complete `Dự án › Node › Bước` context on every work card and selected-work preview while preserving the shared work-item detail dialog and its one-primary-action hierarchy.
+- Add focused backend/frontend regression coverage, update the central/detail/domain mapping files, and run non-browser verification. Browser/UAT remains skipped unless explicitly requested in the same turn.
+
+### Done
+
+- Audited the existing Dashboard, HomeRedirect, My Work frontend, `/me/work-items` handler/service/repository contract, work-item capability logic, RBAC/project scope, shared work-item detail dialog, realtime invalidation and focused tests.
+- Produced the cross-domain impact matrix, evidence-backed review package and approved Mockup as Text.
+- Received explicit approval for one adaptive role workbench, `/my-work` as the default landing page, `Điều hành` as the existing Dashboard label, complete project/node/step context and read-only future work.
+- Made authenticated root open `/my-work`, placed `Việc của tôi` first in global work navigation and retained the unchanged report dashboard under `Điều hành`.
+- Added actor-scoped `Làm ngay`, `Đang làm`, `Chờ tôi duyệt`, `Bị chặn` and `Sắp tới · chỉ xem` buckets; default state is `all + need_action`, with secondary queue/status/deadline/type/priority/sort controls under `Bộ lọc thêm`.
+- Added server `readiness`, node/step order context and source-backed `in_progress`/`upcoming` summary counts. Planned-future and engine-v2 future-node work stays visible but is excluded from current actions/decisions.
+- Added shared complete `Dự án › Node › Bước` presentation to work cards, selected preview and detail; responsive layout puts the selected next-work panel first on narrow screens.
+- Made future detail read-only across action, activity, evidence review/upload and workflow form edit/submit/sign/PDF controls, with matching backend current-time/current-node guards on work actions and mutation services.
+- Added backend readiness/future/context tests and frontend context/default-route tests; updated central, frontend, backend, workflow, governance and reporting maps.
+- Technically verified current working tree with backend `go test ./...`, frontend `npm test`, `npm run build`, bundle-budget check and `git diff --check`. Browser/UAT was not requested and remains `NOT UX ACCEPTED`.
+
 ## [Active] Client Workflow Revision 3 And Contract Execution
 
 ### Will be done

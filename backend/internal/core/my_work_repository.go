@@ -78,14 +78,20 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 		)`, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder))
 	}
 	switch filter.Bucket {
+	case "all":
+		// Keep the complete actor-scoped queue.
 	case "need_action":
 		itemConditions = append(itemConditions, myWorkNeedActionSQL())
+	case "in_progress":
+		itemConditions = append(itemConditions, "status='in_progress'")
 	case "overdue":
 		itemConditions = append(itemConditions, "status NOT IN ('completed','cancelled') AND due_at < now()")
 	case "blocked":
 		itemConditions = append(itemConditions, "status='blocked'")
 	case "waiting_decision":
 		itemConditions = append(itemConditions, "can_decide AND status IN ('waiting_review','waiting_approval')")
+	case "upcoming":
+		itemConditions = append(itemConditions, "is_future")
 	case "done_today":
 		itemConditions = append(itemConditions, "status='completed' AND completed_at IS NOT NULL AND (completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date=(now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date")
 	}
@@ -114,10 +120,12 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 		SELECT
 			COUNT(*) AS total,
 			COUNT(*) FILTER (WHERE %s) AS need_action,
+			COUNT(*) FILTER (WHERE status='in_progress') AS in_progress,
 			COUNT(*) FILTER (WHERE status NOT IN ('completed','cancelled') AND due_at < now()) AS overdue,
 			COUNT(*) FILTER (WHERE status='blocked') AS blocked,
 			COUNT(*) FILTER (WHERE can_decide AND status IN ('waiting_review','waiting_approval')) AS waiting_decision,
 			COUNT(*) FILTER (WHERE status IN ('waiting_review','waiting_approval')) AS waiting_approval,
+			COUNT(*) FILTER (WHERE is_future) AS upcoming,
 			COUNT(*) FILTER (WHERE status='completed' AND completed_at IS NOT NULL AND (completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date=(now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date) AS done_today
 		FROM base_work
 		WHERE %s
@@ -173,12 +181,7 @@ func myWorkNeedActionSQL() string {
 		OR (
 			status NOT IN ('waiting_review','waiting_approval','completed','cancelled')
 			AND can_act
-			AND NOT (
-				status='pending' AND (
-					planned_start_at > now()
-					OR (pipeline_engine_version >= 2 AND pipeline_run_id IS NOT NULL AND pipeline_current_node_id IS DISTINCT FROM run_node_id)
-				)
-			)
+			AND NOT is_future
 		)
 	)`
 }
@@ -203,7 +206,9 @@ func myWorkItemsBaseSQL() string {
 	return fmt.Sprintf(`
 		WITH scoped_work AS (
 			SELECT wi.*, p.name AS project_name, p.code AS project_code,
-				rn.name AS run_node_name, rs.name AS run_step_name, s.full_name AS assignee_name,
+				rn.name AS run_node_name, rn.order_index AS run_node_order_index,
+				rs.name AS run_step_name, rs.order_index AS run_step_order_index,
+				s.full_name AS assignee_name,
 				pr.current_node_id AS pipeline_current_node_id, rn.status AS run_node_status,
 				COALESCE(pr.engine_version, 1) AS pipeline_engine_version,
 				COALESCE((SELECT COUNT(*) FROM evidence_records er WHERE er.work_item_id=wi.id AND er.status <> 'rejected'),0) AS evidence_count,
@@ -247,9 +252,27 @@ func myWorkItemsBaseSQL() string {
 			WHERE wi.status <> 'cancelled' AND p.status <> 'cancelled' AND (%s)
 		), base_work AS (
 			SELECT sw.*,
+				(
+					status NOT IN ('completed','cancelled') AND (
+						COALESCE(planned_start_at > now(), false)
+						OR (
+							pipeline_engine_version >= 2
+							AND pipeline_run_id IS NOT NULL
+							AND pipeline_current_node_id IS DISTINCT FROM run_node_id
+						)
+					)
+				) AS is_future,
 				(NOT is_mine AND NOT is_watching AND action_scope) AS is_department,
 				(
 					action_scope AND status NOT IN ('completed','cancelled')
+					AND NOT (
+						COALESCE(planned_start_at > now(), false)
+						OR (
+							pipeline_engine_version >= 2
+							AND pipeline_run_id IS NOT NULL
+							AND pipeline_current_node_id IS DISTINCT FROM run_node_id
+						)
+					)
 					AND (
 						pipeline_engine_version < 2 OR pipeline_run_id IS NULL
 						OR (pipeline_current_node_id=run_node_id AND run_node_status IN ('in_progress','waiting_approval','blocked'))
@@ -267,6 +290,14 @@ func myWorkItemsBaseSQL() string {
 				) AS can_act,
 				(
 					status IN ('waiting_review','waiting_approval')
+					AND NOT (
+						COALESCE(planned_start_at > now(), false)
+						OR (
+							pipeline_engine_version >= 2
+							AND pipeline_run_id IS NOT NULL
+							AND pipeline_current_node_id IS DISTINCT FROM run_node_id
+						)
+					)
 					AND (decision_requested_by IS NULL OR decision_requested_by <> NULLIF($2,'')::uuid)
 					AND (
 						$11::boolean

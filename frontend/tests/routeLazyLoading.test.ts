@@ -15,3 +15,8 @@ test('authenticated pages stay lazy and below the permission boundary', async ()
     /<RequirePermission permissions=\{permissions\}>[\s\S]*<RouteModuleBoundary focus=\{focus\}>\{element\}<\/RouteModuleBoundary>[\s\S]*<\/RequirePermission>/,
   );
 });
+
+test('authenticated root opens the adaptive My Work page', async () => {
+  const source = await readFile(new URL('../src/app/router.tsx', import.meta.url), 'utf8');
+  assert.match(source, /function HomeRedirect\(\) \{\s*return <Navigate to="\/my-work" replace \/>;\s*\}/);
+});

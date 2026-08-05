@@ -48,6 +48,8 @@ import {
   numberValue,
   priorityLabel,
   visibilityLabel,
+  workItemIsUpcoming,
+  workItemWorkflowContext,
   workTypeLabel,
   workflowFormChipText,
   workflowFormNextAction,
@@ -65,15 +67,13 @@ export function WorkItemDetailDialog({
   onClose: () => void;
   onChanged?: (item: WorkItem) => void;
 }) {
-  const workContextLabel = item?.run_node_name
-    ?? item?.run_step_name
-    ?? (item?.work_type ? workTypeLabel(item.work_type) : 'Đầu việc đang chạy');
+  const workContextLabel = item ? workItemWorkflowContext(item).path : undefined;
 
   return (
     <Dialog
       open={open}
       title={item?.title ?? 'Chi tiết đầu việc'}
-      description={item ? `${item.project_name ?? 'Công trình'} · ${departmentLabel(item.department)} · ${workContextLabel}` : undefined}
+      description={item ? `${workContextLabel} · ${departmentLabel(item.department)}` : undefined}
       onClose={onClose}
       size="workspace"
     >
@@ -154,7 +154,7 @@ export function WorkItemDetailWorkspace({
   });
 
   function runAction(action: WorkItemActionKey) {
-    if (!detailItem?.id) return;
+    if (!detailItem?.id || workItemIsUpcoming(detailItem)) return;
     const comment = actionText.trim();
     if (actionRequiresReason(action) && !comment) {
       setPendingAction(action);
@@ -174,7 +174,8 @@ export function WorkItemDetailWorkspace({
   const evidence = asArray<EvidenceRecord>(detailItem?.evidence);
   const activities = asArray<WorkItemActivity>(detailItem?.activities);
   const attachmentOptions = buildActivityAttachmentOptions(evidence);
-  const primarySurface = detailItem ? resolveWorkItemPrimarySurface(detailItem) : null;
+  const futureReadOnly = detailItem ? workItemIsUpcoming(detailItem) : false;
+  const primarySurface = detailItem && !futureReadOnly ? resolveWorkItemPrimarySurface(detailItem) : null;
   const requirementRows = detailItem ? buildRequirementRows(detailItem, evidence) : [];
   const nextAction = detailItem ? resolveNextAction(detailItem, evidence, actions, primarySurface?.kind) : '';
   const latestActivity = activities[0];
@@ -187,11 +188,18 @@ export function WorkItemDetailWorkspace({
         <div className="space-y-4">
           <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} nextAction={nextAction} />
 
+          {futureReadOnly ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-semibold">Công việc chưa đến lượt · chỉ xem</p>
+              <p className="mt-1">Có thể xem trước ngữ cảnh và hồ sơ. Các thao tác bắt đầu, cập nhật, tải minh chứng, ký và gửi hồ sơ chỉ mở khi đến thời điểm kế hoạch và workflow chuyển đến node này.</p>
+            </div>
+          ) : null}
+
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
             <main className="min-w-0 space-y-4">
               <section className="rounded-lg border border-line bg-white shadow-panel">
                 <div className="border-b border-line px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{skippedHistory ? 'Bước đã bỏ qua' : 'Bước đang xử lý'}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{skippedHistory ? 'Bước đã bỏ qua' : futureReadOnly ? 'Bước sắp tới · chỉ xem' : 'Bước đang xử lý'}</p>
                   <div className="mt-1 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <h3 className="text-base font-semibold text-ink">{detailItem.run_step_name ?? detailItem.title}</h3>
@@ -212,6 +220,12 @@ export function WorkItemDetailWorkspace({
                       <p className="font-semibold text-ink">Hồ sơ lịch sử chỉ đọc</p>
                       <p className="mt-1">Work item thuộc nhánh không được lựa chọn. Nội dung được giữ lại để truy vết và không thể thao tác nghiệp vụ.</p>
                     </div>
+                  ) : futureReadOnly ? (
+                    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                      <p className="font-semibold text-ink">Nội dung xem trước</p>
+                      <p className="mt-1">Điều kiện và hồ sơ được hiển thị để chuẩn bị; chưa cho phép ghi nhận nghiệp vụ.</p>
+                      <div className="mt-3"><WorkItemRequirementPanel rows={requirementRows} /></div>
+                    </div>
                   ) : (
                     <>
                       <WorkItemRequirementPanel rows={requirementRows} />
@@ -223,7 +237,7 @@ export function WorkItemDetailWorkspace({
 
               {skippedHistory ? (
                 <SkippedWorkItemHistory activities={activities} evidence={evidence} />
-              ) : primarySurface ? (
+              ) : primarySurface || futureReadOnly ? (
                 <WorkItemSupportingTabs
                   item={detailItem}
                   evidence={evidence}
@@ -231,7 +245,8 @@ export function WorkItemDetailWorkspace({
                   attachmentOptions={attachmentOptions}
                   mentionOptions={activityMentionOptions}
                   activitySubmitting={activityAction.isPending}
-                  primarySurfaceKind={primarySurface.kind}
+                  primarySurfaceKind={primarySurface?.kind}
+                  readOnly={futureReadOnly}
                   onSubmitActivity={(payload) => {
                     if (!detailItem.id) return Promise.resolve();
                     return activityAction.mutateAsync({ workItemId: detailItem.id, payload }).then(() => undefined);
@@ -326,9 +341,11 @@ function WorkItemWorkspaceHeader({
   nextAction: string;
 }) {
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
+  const context = workItemWorkflowContext(item);
   const contextStats = [
-    { label: 'Node', value: item.run_node_name ?? '-' },
-    { label: 'Bước', value: item.run_step_name ?? '-' },
+    { label: 'Dự án', value: context.project },
+    { label: 'Node', value: context.node },
+    { label: 'Bước', value: context.step },
     { label: 'Minh chứng', value: `${activeEvidence.length} hiệu lực / ${numberValue(item.evidence_count)} tổng` },
     { label: 'Hồ sơ', value: hasWorkflowFormSummary(item) ? `${workflowFormChipText(item)} · ${statusLabel(item.workflow_form_status ?? 'draft')}` : '-' },
   ];
@@ -347,7 +364,7 @@ function WorkItemWorkspaceHeader({
           {item.priority ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{priorityLabel(item.priority)}</span> : null}
         </div>
       </div>
-      <div className="grid gap-px bg-line sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-px bg-line sm:grid-cols-2 xl:grid-cols-5">
         {contextStats.map((stat) => (
           <div key={stat.label} className="min-w-0 bg-white px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
@@ -490,6 +507,7 @@ function WorkItemSupportingTabs({
   mentionOptions,
   activitySubmitting,
   primarySurfaceKind,
+  readOnly,
   onSubmitActivity,
 }: {
   item: WorkItem;
@@ -498,14 +516,15 @@ function WorkItemSupportingTabs({
   attachmentOptions: ActivityAttachmentOption[];
   mentionOptions: ActivityMentionOption[];
   activitySubmitting: boolean;
-  primarySurfaceKind: WorkItemPrimarySurfaceKind;
+  primarySurfaceKind?: WorkItemPrimarySurfaceKind;
+  readOnly: boolean;
   onSubmitActivity: (payload: ActivityPayload) => Promise<void>;
 }) {
   const [selectedTab, setSelectedTab] = useState<SupportTabKey>('evidence');
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
   const pendingEvidence = evidence.filter((record) => ['draft', 'submitted', 'pending'].includes(String(record.status)));
   const tabs: Array<{ id: SupportTabKey; label: string; count?: number; status?: string; description: string }> = [];
-  if (!primarySurfaceUsesEvidence(primarySurfaceKind)) {
+  if (readOnly || !primarySurfaceKind || !primarySurfaceUsesEvidence(primarySurfaceKind)) {
     tabs.push({
       id: 'evidence',
       label: 'Minh chứng',
@@ -519,7 +538,7 @@ function WorkItemSupportingTabs({
     count: activities.length,
     description: activities[0] ? `Mới nhất ${compactDateTime(activities[0].created_at)}` : 'Chưa có hoạt động',
   });
-  if (hasWorkflowFormSummary(item) && !primarySurfaceUsesWorkflowForm(primarySurfaceKind)) {
+  if (hasWorkflowFormSummary(item) && (readOnly || !primarySurfaceKind || !primarySurfaceUsesWorkflowForm(primarySurfaceKind))) {
     tabs.push({
       id: 'form',
       label: 'Hồ sơ / PDF',
@@ -528,7 +547,7 @@ function WorkItemSupportingTabs({
     });
   }
   const activeTab = tabs.some((tab) => tab.id === selectedTab) ? selectedTab : tabs[0]?.id ?? 'activity';
-  const supportAction = resolveSupportTabAction(activeTab, item, evidence, activities);
+  const supportAction = readOnly ? 'Chỉ xem hồ sơ của công việc sắp tới' : resolveSupportTabAction(activeTab, item, evidence, activities);
 
   return (
     <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
@@ -537,7 +556,7 @@ function WorkItemSupportingTabs({
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin hỗ trợ</p>
             <h3 className="mt-0.5 text-sm font-semibold text-ink">Minh chứng, trao đổi và hồ sơ của đầu việc</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Theo dõi hồ sơ, trao đổi và tài liệu phục vụ bước đang xử lý.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{readOnly ? 'Xem trước hồ sơ, trao đổi và tài liệu của bước sắp tới.' : 'Theo dõi hồ sơ, trao đổi và tài liệu phục vụ bước đang xử lý.'}</p>
           </div>
           <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs">
             <p className="font-semibold uppercase tracking-wide text-blue-700">Việc hỗ trợ tiếp theo</p>
@@ -575,17 +594,18 @@ function WorkItemSupportingTabs({
         aria-labelledby={`work-item-support-tab-${activeTab}`}
         className="bg-white p-4"
       >
-        {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} /> : null}
+        {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} /> : null}
         {activeTab === 'activity' ? (
           <WorkItemActivityPanel
             activities={activities}
             attachmentOptions={attachmentOptions}
             mentionOptions={mentionOptions}
             submitting={activitySubmitting}
+            readOnly={readOnly}
             onSubmit={onSubmitActivity}
           />
         ) : null}
-        {activeTab === 'form' ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} /> : null}
+        {activeTab === 'form' ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} /> : null}
       </div>
     </section>
   );
@@ -608,12 +628,14 @@ function WorkItemActivityPanel({
   attachmentOptions,
   mentionOptions,
   submitting,
+  readOnly,
   onSubmit,
 }: {
   activities: WorkItemActivity[];
   attachmentOptions: ActivityAttachmentOption[];
   mentionOptions: ActivityMentionOption[];
   submitting: boolean;
+  readOnly: boolean;
   onSubmit: (payload: ActivityPayload) => Promise<void>;
 }) {
   const [composerOpen, setComposerOpen] = useState(false);
@@ -628,17 +650,17 @@ function WorkItemActivityPanel({
             {latestActivity ? `${latestActivity.actor_name ?? 'Hệ thống'} · ${compactDateTime(latestActivity.created_at)}` : 'Chưa có trao đổi hoặc sự kiện cho đầu việc này.'}
           </p>
         </div>
-        <button
+        {!readOnly ? <button
           type="button"
           className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
           onClick={() => setComposerOpen((current) => !current)}
         >
           <MessageSquare className="h-4 w-4" />
           {composerOpen ? 'Ẩn ô nhập' : 'Ghi hoạt động'}
-        </button>
+        </button> : <span className="rounded-md bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">Chỉ xem</span>}
       </div>
 
-      {composerOpen ? (
+      {!readOnly && composerOpen ? (
         <ActivityComposer
           mode="work_item"
           attachmentOptions={attachmentOptions}
@@ -836,6 +858,7 @@ function resolveNextAction(
   actions: WorkItemActionKey[],
   primarySurfaceKind?: WorkItemPrimarySurfaceKind,
 ) {
+  if (workItemIsUpcoming(item)) return 'Chờ workflow chuyển đến node này';
   const requirement = item.evidence_requirement_json ?? {};
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
   const requiredEvidence = requiredEvidenceLabels(requirement);
