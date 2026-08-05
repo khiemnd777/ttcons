@@ -109,10 +109,12 @@ Tất cả dùng mật khẩu `123456`.
 - qaqc@consflow.local
 - construction@consflow.local
 - subcontractor@consflow.local
-- client@consflow.local
 - design@consflow.local
 - sales@consflow.local
 - legal@consflow.local
+- contract@consflow.local
+
+Fixture kiểm tra đăng nhập bị từ chối: `client@consflow.local`. Tài khoản này ở trạng thái `inactive`, role `client` là đối tác ngoài App và không có quyền ứng dụng.
 
 ## Module chính
 

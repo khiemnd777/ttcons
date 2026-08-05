@@ -1153,6 +1153,57 @@ func TestPublishTemplateRejectsRequiredStepWithoutPublishedForm(t *testing.T) {
 	}
 }
 
+func TestPublishTemplateRejectsExternalOnlyNodeStepAndApprovalRoles(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	actorID := newID()
+	templateID := newID()
+	nodeID := newID()
+	stepID := newID()
+	externalRoleID := newID()
+	suffix := templateID[:8]
+	externalLabel := "Đối tác ngoài App " + suffix
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM pipeline_templates WHERE id=$1`, templateID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, externalRoleID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','External Publish Actor','active')`, actorID, "external-publish-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO roles (id,name,display_name,system_role,external_only) VALUES ($1,$2,$3,true,true)`, externalRoleID, "external_publish_"+suffix, externalLabel)
+	mustExec(t, db, `INSERT INTO pipeline_templates (id,template_family_id,revision_no,name,status,created_by) VALUES ($1,$1,1,'External Role Template','draft',$2)`, templateID, actorID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_template_nodes (id,template_id,name,type,order_index,responsible_role_ids,approval_policy_json)
+		VALUES ($1,$2,'External Node','custom',1,jsonb_build_array($3::text),jsonb_build_object('mode','any','roles',jsonb_build_array($3::text),'quorum',1,'requester_cannot_approve',true,'comment_required',true,'signature_required',false))
+	`, nodeID, templateID, externalLabel)
+	mustExec(t, db, `INSERT INTO pipeline_template_steps (id,node_id,name,step_type,required_role_ids,form_required,order_index) VALUES ($1,$2,'External Step','task',jsonb_build_array($3::text),false,1)`, stepID, nodeID, externalLabel)
+
+	issues, err := repo.TemplatePublishIssues(ctx, templateID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	externalIssueCount := 0
+	for _, issue := range issues {
+		if issue["code"] == "EXTERNAL_ROLE_NOT_ASSIGNABLE" {
+			externalIssueCount++
+		}
+	}
+	if externalIssueCount != 3 {
+		t.Fatalf("external-only publish issues = %d, want node + step + approval policy; issues=%#v", externalIssueCount, issues)
+	}
+	if _, err := service.PublishTemplate(ctx, templateID, actorID, "External Publish Actor"); err == nil {
+		t.Fatal("expected template publish with external-only roles to fail")
+	}
+	template, err := repo.GetByID(ctx, "pipeline_templates", templateID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if template["status"] != "draft" {
+		t.Fatalf("template status = %v, want draft", template["status"])
+	}
+}
+
 func TestWorkItemEvidenceRequiredBeforeReviewApprovalAndCompletion(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

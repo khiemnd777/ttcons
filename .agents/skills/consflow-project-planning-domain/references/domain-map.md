@@ -24,7 +24,7 @@
 - Runtime planning: `pipeline_runs`, `pipeline_run_nodes`, `pipeline_run_steps`, `work_items`, `construction_handoffs`, `construction_handoff_items`
 - Form-backed planning: `workflow_form_instances`, `workflow_form_answers`, `workflow_form_events`
 - Activity: `work_item_activities`, `activity_mentions`, `activity_read_states`, `activity_reactions`, `activity_message_revisions`
-- Relevant migrations: `V1`, `V5`, `V6`, `V7`, `V8`, `V9`, `V10`, `V11`, `V12`, `V13`, `V58`, `V60`, `V66`
+- Relevant migrations: `V1`, `V5`, `V6`, `V7`, `V8`, `V9`, `V10`, `V11`, `V12`, `V13`, `V58`, `V60`, `V66`, `V89`
 
 ## Invariants
 
@@ -34,7 +34,7 @@
 - Planning checklist evidence/status summaries do not replace the underlying submitted form history.
 - Project detail and global workspaces must agree on statuses and available actions.
 - Global `/progress` is a standalone project-stage board, not a tab inside `/projects` or project detail. It is read-only and gated by `project.view`; cards navigate to project detail and never drag/drop or transition runtime state. The scoped snapshot excludes cancelled projects through `ProjectAccessFilter`, joins only the project's snapshotted `current_pipeline_run_id` and that run's `current_node_id`, groups technical node types into stable presentation stages, and keeps blocked/overdue/issues/pending approvals as badges. Projects without a run remain `Chưa khởi động`; completed runs remain `Hoàn tất`; unknown/custom types remain visible in `Khác`.
-- Project Thành viên uses a dedicated typed API rather than the Operations payload. Active members with `project.view` see active membership; `project.member.manage` controls inactive history and mutations. Save/reactivate/deactivate synchronizes `project_members` with project-scoped `user_roles` transactionally, keeps global roles untouched, soft-deactivates history, audits changes and protects the current PM from removal.
+- Project Thành viên uses a dedicated typed API rather than the Operations payload. Active App members with `project.view` see active membership; `project.member.manage` controls inactive history and mutations. Save/reactivate/deactivate synchronizes `project_members` with project-scoped `user_roles` transactionally, keeps global roles untouched, soft-deactivates history, audits changes and protects the current PM from removal. External-only users, role IDs and matching operational labels are excluded from options and rejected on save; V89 soft-deactivates existing linked client memberships without deleting history.
 - Project `Kế hoạch` is an action-first queue over every ordered runtime step. Its default `Cần xử lý` view is derived from work-item runtime status, `waiting_approval`/`waiting_review` stay distinct, only `pending` is future work, and terminal/skipped work remains discoverable outside the actionable queue. The one next-work CTA stays blocker -> waiting approval/review -> other open work. Workflow-form draft/submitted/required state and evidence count are supporting metadata; rows only navigate to permission-gated work-item detail, while node transition/approval/block controls remain in `Quy trình`.
 - Official workflow revision 2 separates `Kế hoạch thi công` from field `Thi công`. The dedicated `client_construction_handoff_plan` form owns the inspection-item list; Planning exposes one bulk review/activation CTA. The planning node cannot complete until a handoff snapshot is activated. Each activation preserves source form/node, actor/time, form revision, handoff revision and hash; the request carries the previewed form revision and stale-tab activation is rejected after a locked recheck. Replaying the same submitted form revision returns the existing handoff. A newer form revision may supersede only generated rows that are still unstarted and have no evidence/action; otherwise activation is rejected so field history is never overwritten. Current revision-1 construction runs may import submitted QA/assignment data without mutating their runtime history.
 - Project Tổng quan leads with one prioritized action ordered blocker -> waiting approval/review -> other open work, shows the current runtime stage beside it, keeps source-backed attention counts separate from budget/contract/schedule reference data, and uses Vietnamese system labels without translating user-entered project/work-item data.
@@ -56,6 +56,7 @@
 
 - Use `GOLDEN-REAL-001` as the completed flagship project and `GOLDEN-NO-DESIGN-001` as the mutually exclusive branch companion when reviewing project-first navigation, planning runtime and form-backed planning records.
 - Use `GOLDEN-LIVE-001` to experience real planning/runtime transitions. It intentionally starts at 0% with only the Khảo sát node active; reset it with local/dev `make seed` after an operational walkthrough.
+- Golden Live has fourteen active App members. `client@consflow.local` is inactive and not a project member; client confirmation stays in project documents, forms/evidence and business snapshots.
 
 ## Rev3 Project Intake
 

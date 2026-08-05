@@ -145,3 +145,53 @@ func TestProjectMemberLifecycleAndProjectManagerProtection(t *testing.T) {
 	}
 	assertCount(t, db, `SELECT count(*) FROM audit_logs WHERE project_id=$1 AND target_type='project_member'`, 4, projectID)
 }
+
+func TestProjectMemberOptionsAndSaveExcludeExternalOnlyRoles(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	suffix := newID()
+	userID := newID()
+	staffID := newID()
+	projectID := newID()
+	internalRoleID := newID()
+	externalRoleID := newID()
+	externalLabel := "Đối tác ngoài App " + suffix[:8]
+	projectViewPermissionID := ensurePermission(t, db, "project.view", "Xem công trình", "project")
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM project_members WHERE project_id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1`, userID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id IN ($1,$2)`, internalRoleID, externalRoleID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id IN ($1,$2)`, internalRoleID, externalRoleID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, staffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, userID)
+	})
+	mustExec(t, db, `INSERT INTO roles (id,name,display_name,system_role,external_only) VALUES ($1,$2,$3,false,false),($4,$5,$6,true,true)`, internalRoleID, "member_internal_"+suffix[:8], "Nội bộ "+suffix[:8], externalRoleID, "member_external_"+suffix[:8], externalLabel)
+	mustExec(t, db, `INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2)`, internalRoleID, projectViewPermissionID)
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Member External Guard','active')`, userID, "member-external-guard-"+suffix[:8]+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,position,status) VALUES ($1,$2,'Member External Guard',$3,'Dự án','Member','active')`, staffID, userID, "member-external-staff-"+suffix[:8]+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status) VALUES ($1,'External Member Guard',$2,'Client','planning')`, projectID, "EMG-"+suffix[:8])
+
+	options, err := repo.ProjectMemberOptions(ctx, projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, role := range options["access_roles"].([]Record) {
+		if cleanID(role["id"]) == externalRoleID {
+			t.Fatalf("external-only access role leaked into options: %#v", role)
+		}
+	}
+	for _, label := range stringSlice(options["role_labels"]) {
+		if label == externalLabel {
+			t.Fatalf("external-only operational label leaked into options: %#v", options["role_labels"])
+		}
+	}
+	if _, err := repo.SaveProjectMember(ctx, projectID, "", ProjectMemberMutationRequest{StaffID: staffID, RoleIDs: []string{"Nội bộ"}, ProjectRoleIDs: []string{externalRoleID}}, "", "Integration Test"); err == nil {
+		t.Fatal("expected external-only access role assignment to fail")
+	}
+	if _, err := repo.SaveProjectMember(ctx, projectID, "", ProjectMemberMutationRequest{StaffID: staffID, RoleIDs: []string{externalLabel}, ProjectRoleIDs: []string{internalRoleID}}, "", "Integration Test"); err == nil {
+		t.Fatal("expected external-only operational role assignment to fail")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM project_members WHERE project_id=$1`, 0, projectID)
+}

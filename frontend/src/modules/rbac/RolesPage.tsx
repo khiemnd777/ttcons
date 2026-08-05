@@ -10,6 +10,7 @@ import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
 import { Dialog } from '../../components/Dialog';
+import { appRoleScopeLabel } from '../../lib/utils/roles';
 import { SimpleForm } from '../_shared/SimpleForm';
 
 type PermissionRow = Record<string, any> & {
@@ -25,6 +26,7 @@ type RoleRow = Record<string, any> & {
   display_name: string;
   permission_ids?: string[];
   permission_count?: number;
+  external_only?: boolean;
 };
 
 export function RolesPage() {
@@ -93,15 +95,15 @@ export function RolesPage() {
         columns={[
           { key: 'display_name', header: 'Vai trò', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.display_name}</span> },
           { key: 'name', header: 'Key', sortable: true },
-          { key: 'description', header: 'Mô tả' },
+          { key: 'scope', header: 'Phạm vi', render: (row) => <span className={row.external_only ? 'rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800' : 'text-slate-600'}>{appRoleScopeLabel(row)}</span> },
           { key: 'permission_count', header: 'Quyền', align: 'right', sortable: true, sortValue: (row) => Number(row.permission_count ?? row.permission_ids?.length ?? 0), render: (row) => row.permission_count ?? row.permission_ids?.length ?? 0 },
           { key: 'system_role', header: 'System', render: (row) => row.system_role ? 'Có' : 'Không' },
           {
             key: 'actions',
             header: 'Action',
             render: (row) => (
-              <RowActions onView={() => setDialog({ mode: 'view', record: row })} onEdit={canUpdate ? () => setDialog({ mode: 'edit', record: row }) : undefined}>
-                {canAssign ? (
+              <RowActions onView={() => setDialog({ mode: 'view', record: row })} onEdit={canUpdate && !row.external_only ? () => setDialog({ mode: 'edit', record: row }) : undefined}>
+                {row.external_only ? <span className="px-1 text-xs font-semibold text-amber-700">Chỉ xem</span> : canAssign ? (
                   <button title="Gán quyền" aria-label="Gán quyền" className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100" onClick={() => setPermissionRole(row)}>
                     <ShieldCheck className="h-4 w-4" />
                   </button>
@@ -123,6 +125,7 @@ export function RolesPage() {
           { key: 'display_name', label: 'Tên hiển thị' },
           { key: 'name', label: 'Key' },
           { key: 'description', label: 'Mô tả' },
+          { key: 'scope', label: 'Phạm vi', render: (row) => appRoleScopeLabel(row) },
           { key: 'permission_count', label: 'Số quyền' },
           { key: 'system_role', label: 'System role' },
         ]}

@@ -197,6 +197,63 @@ func TestAuthSessionRefreshAndLogoutRevokesAccess(t *testing.T) {
 	assertBearerStatus(t, app, "/me", nextAccessToken, http.StatusUnauthorized)
 }
 
+func TestExternalOnlyRoleDeniesAuthenticationSessionsAndRBACAssignment(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	suffix := newID()
+	externalRoleID := newID()
+	userID := newID()
+	assignmentTargetID := newID()
+	permissionID := ensurePermission(t, db, "external.only.permission."+suffix[:8], "External only permission", "rbac")
+	email := "external-only-" + suffix[:8] + "@test.local"
+	externalDisplayName := "Đối tác ngoài App " + suffix[:8]
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM auth_sessions WHERE user_id IN ($1,$2)`, userID, assignmentTargetID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id IN ($1,$2)`, userID, assignmentTargetID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id IN ($1,$2)`, userID, assignmentTargetID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, externalRoleID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, externalRoleID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM permissions WHERE id=$1`, permissionID)
+	})
+	mustExec(t, db, `INSERT INTO roles (id,name,display_name,system_role,external_only) VALUES ($1,$2,$3,true,true)`, externalRoleID, "external_only_"+suffix[:8], externalDisplayName)
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','External Session','active'),($3,$4,'demo:pw','Assignment Target','active')`, userID, email, assignmentTargetID, "assignment-target-"+suffix[:8]+"@test.local")
+	if _, err := service.UpdateRole(ctx, externalRoleID, Record{"display_name": "Renamed external role"}); err == nil {
+		t.Fatal("expected external-only role update to be denied")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM roles WHERE id=$1 AND display_name=$2`, 1, externalRoleID, externalDisplayName)
+
+	login, err := service.Login(ctx, LoginRequest{Email: email, Password: "pw"}, "test-agent", "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	accessToken := fmt.Sprint(login["token"])
+	refreshToken := fmt.Sprint(login["refresh_token"])
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2)`, userID, externalRoleID)
+
+	if _, err := service.Login(ctx, LoginRequest{Email: email, Password: "pw"}, "test-agent", "127.0.0.1"); err == nil {
+		t.Fatal("expected external-only user login to be denied")
+	}
+	if _, err := service.RefreshSession(ctx, refreshToken, "test-agent", "127.0.0.1"); err == nil {
+		t.Fatal("expected external-only refresh session to be denied")
+	}
+	handler := NewHandler(service)
+	app := fiber.New(fiber.Config{ErrorHandler: ErrorHandler})
+	app.Use(middleware.AuthRequired("test-secret", repo))
+	app.Get("/me", handler.Me)
+	assertBearerStatus(t, app, "/me", accessToken, http.StatusUnauthorized)
+
+	if _, err := repo.ReplaceRolePermissions(ctx, externalRoleID, []string{permissionID}); err == nil {
+		t.Fatal("expected external-only role permission assignment to be denied")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM role_permissions WHERE role_id=$1`, 0, externalRoleID)
+	if _, err := repo.ReplaceUserRoles(ctx, assignmentTargetID, []string{externalRoleID}, ""); err == nil {
+		t.Fatal("expected external-only user role assignment to be denied")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM user_roles WHERE user_id=$1`, 0, assignmentTargetID)
+}
+
 func TestRBACAssignmentsReplaceSnapshots(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

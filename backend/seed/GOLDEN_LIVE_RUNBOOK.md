@@ -24,7 +24,6 @@ Golden Live bắt đầu ở node `Khảo sát`, tiến độ 0%. Không có for
 | QA/QC | `qaqc@consflow.local` |
 | Đội thi công | `construction@consflow.local` |
 | Thầu phụ | `subcontractor@consflow.local` |
-| Chủ đầu tư | `client@consflow.local` |
 | Thiết kế | `design@consflow.local` |
 | Sale | `sales@consflow.local` |
 | Pháp lý | `legal@consflow.local` |
@@ -33,6 +32,8 @@ Golden Live bắt đầu ở node `Khảo sát`, tiến độ 0%. Không có for
 Admin có thể thao tác hầu hết nghiệp vụ nhưng không được dùng thay actor chuyên biệt khi kiểm chứng coverage. Khi requester separation được bật, dùng PM gửi yêu cầu và Giám đốc hoặc vai trò phù hợp để duyệt.
 
 Tài khoản `contract@consflow.local` là project member của fixture `GOLDEN-REV3-BOQ-001` (`30000000-0000-0000-0000-000000000023`), không được bổ sung hồi tố vào runtime lịch sử `GOLDEN-LIVE-001`.
+
+`client@consflow.local` chỉ là fixture âm: tài khoản và hồ sơ nhân sự đều `inactive`, role `client` là đối tác ngoài App. Chủ đầu tư không đăng nhập hoặc trở thành project member; xác nhận của họ được lưu bằng hồ sơ, evidence, biên bản và các trường nghiệp vụ hiện có.
 
 Khi chuyển liên tiếp nhiều tài khoản trong UAT, chạy tuần tự và tôn trọng `Retry-After` nếu API trả `429`; không tính một response rate-limit là bằng chứng negative RBAC.
 
@@ -61,7 +62,7 @@ Khi chuyển liên tiếp nhiều tài khoản trong UAT, chạy tuần tự và
 
 ### 3-5. Thiết kế và BOQ
 
-- Dùng PM/Chủ đầu tư để review và xác nhận thiết kế.
+- Dùng PM/Thiết kế cho thao tác trong App; lưu xác nhận của chủ đầu tư bằng hồ sơ hoặc evidence nghiệp vụ, không dùng tài khoản Chủ đầu tư.
 - Dùng QS tạo BOQ, khóa định mức và thu thập báo giá.
 - Tạo ít nhất hai báo giá nhà cung cấp, submit/qualify, so sánh và chọn giá.
 - Chỉ generate procurement sau khi BOQ đã duyệt và final price được khóa.

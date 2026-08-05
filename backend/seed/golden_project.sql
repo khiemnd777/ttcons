@@ -160,8 +160,7 @@ WHERE
   (r.name='director' AND p.key IN ('contract.view','contract.review','contract.approve','contract.sign','contract.milestone_manage','contract.retention_release')) OR
   (r.name='pm' AND p.key IN ('contract.view','contract.create','contract.review','contract.milestone_manage')) OR
   (r.name='qs' AND p.key IN ('contract.view','contract.create','contract.review','contract.milestone_manage')) OR
-  (r.name='accounting' AND p.key IN ('contract.view','contract.review','contract.milestone_manage','contract.retention_release')) OR
-  (r.name='client' AND p.key='contract.view')
+  (r.name='accounting' AND p.key IN ('contract.view','contract.review','contract.milestone_manage','contract.retention_release'))
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id,permission_id)
@@ -171,8 +170,7 @@ WHERE
   (r.name='pm' AND p.key IN ('quality.view','quality.create','quality.review','quality.approve','quality.ncr_manage','quality.recurring_manage')) OR
   (r.name='qa_qc' AND p.key IN ('quality.view','quality.create','quality.review','quality.inspect','quality.ncr_manage','quality.recurring_manage')) OR
   (r.name='supervisor' AND p.key IN ('quality.view','quality.create','quality.recurring_manage')) OR
-  (r.name='construction_team' AND p.key='quality.view') OR
-  (r.name='client' AND p.key='quality.view')
+  (r.name='construction_team' AND p.key='quality.view')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id,permission_id)
@@ -180,6 +178,11 @@ SELECT r.id,p.id
 FROM roles r CROSS JOIN permissions p
 WHERE p.key='handover.verify' AND r.name IN ('admin','director','pm','qa_qc')
 ON CONFLICT DO NOTHING;
+
+DELETE FROM role_permissions role_permission
+USING roles role
+WHERE role_permission.role_id=role.id
+  AND role.external_only;
 
 -- Golden Sample Suite
 -- Flagship executes the real "Có thiết kế" branch to final handover.

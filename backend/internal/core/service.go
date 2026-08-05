@@ -66,6 +66,17 @@ func NewService(repo *Repository, jwtSecret string) *Service {
 	}
 }
 
+func (s *Service) UpdateRole(ctx context.Context, roleID string, body Record) (Record, error) {
+	externalOnly, err := s.repo.RoleExternalOnly(ctx, roleID)
+	if err != nil {
+		return nil, err
+	}
+	if externalOnly {
+		return nil, validationError("Vai trò đối tác ngoài App chỉ được xem và không thể chỉnh sửa", Record{"role_id": roleID})
+	}
+	return s.repo.Update(ctx, "roles", roleColumns(), roleID, body)
+}
+
 const (
 	defaultUploadDir             = "uploads"
 	defaultMaxUploadBytes        = int64(10 * 1024 * 1024)

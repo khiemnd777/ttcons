@@ -40,7 +40,7 @@ INSERT INTO users (id, email, password_hash, full_name, status) VALUES
 ('10000000-0000-0000-0000-000000000009','qaqc@consflow.local','demo:123456','Phan Huy QA/QC','active'),
 ('10000000-0000-0000-0000-000000000010','construction@consflow.local','demo:123456','Đội trưởng Nguyễn Tín','active'),
 ('10000000-0000-0000-0000-000000000011','subcontractor@consflow.local','demo:123456','Đại diện Thầu phụ An Tâm','active'),
-('10000000-0000-0000-0000-000000000012','client@consflow.local','demo:123456','Anh Bình Chủ đầu tư','active'),
+('10000000-0000-0000-0000-000000000012','client@consflow.local','demo:123456','Anh Bình Chủ đầu tư','inactive'),
 ('10000000-0000-0000-0000-000000000013','design@consflow.local','demo:123456','Nguyễn Hà Thiết kế','active'),
 ('10000000-0000-0000-0000-000000000014','sales@consflow.local','demo:123456','Trần Vy Sale','active'),
 ('10000000-0000-0000-0000-000000000015','legal@consflow.local','demo:123456','Lê Quang Pháp lý','active'),
@@ -65,6 +65,9 @@ INSERT INTO roles (id, name, display_name, description, system_role) VALUES
 ('20000000-0000-0000-0000-000000000015','sales','Sale','Phụ trách phối hợp khách hàng, BOQ và hồ sơ thương mại',true),
 ('20000000-0000-0000-0000-000000000016','legal','Pháp lý','Phụ trách rà soát pháp lý hợp đồng',true),
 ('20000000-0000-0000-0000-000000000017','contract_officer','Bộ phận HĐ','Phụ trách lập, luân chuyển, ký và lưu hồ sơ hợp đồng',true);
+
+UPDATE roles
+SET external_only=(name='client');
 
 INSERT INTO permissions (id, key, name, module)
 SELECT gen_random_uuid(), key, name, module FROM (VALUES
@@ -200,9 +203,6 @@ JOIN permissions p ON (
   OR (r.name='subcontractor' AND p.key IN (
     'project.view','operation.view','operation.report','operation.issue_create','warehouse.view'
   ))
-  OR (r.name='client' AND p.key IN (
-    'project.view','acceptance.view','handover.view'
-  ))
   OR (r.name='viewer' AND p.key IN (
     'project.view','pipeline.view','operation.view','acceptance.view','handover.view','report.view'
   ))
@@ -224,9 +224,13 @@ JOIN permissions p ON (
   OR (r.name='accounting' AND p.key IN ('contract.view','contract.review','contract.milestone_manage','contract.retention_release'))
   OR (r.name='procurement' AND p.key IN ('contract.view','contract.variation_purchase','contract.dispatch','contract.scan_manage'))
   OR (r.name='supervisor' AND p.key='contract.variation.propose')
-  OR (r.name='client' AND p.key='contract.view')
 )
 ON CONFLICT DO NOTHING;
+
+DELETE FROM role_permissions role_permission
+USING roles role
+WHERE role_permission.role_id=role.id
+  AND role.external_only;
 
 -- Professional accounting remains available only to administrators for historical support.
 DELETE FROM role_permissions role_permission
@@ -248,7 +252,7 @@ INSERT INTO staff (id, user_id, full_name, email, phone, department, position, s
 ('21000000-0000-0000-0000-000000000009','10000000-0000-0000-0000-000000000009','Phan Huy QA/QC','qaqc@consflow.local','0900000009','QA/QC','Quality Engineer','active'),
 ('21000000-0000-0000-0000-000000000010','10000000-0000-0000-0000-000000000010','Đội trưởng Nguyễn Tín','construction@consflow.local','0900000010','Thi công','Construction Team Lead','active'),
 ('21000000-0000-0000-0000-000000000011','10000000-0000-0000-0000-000000000011','Đại diện Thầu phụ An Tâm','subcontractor@consflow.local','0900000011','Thầu phụ','Subcontractor Representative','active'),
-('21000000-0000-0000-0000-000000000012','10000000-0000-0000-0000-000000000012','Anh Bình Chủ đầu tư','client@consflow.local','0900000012','Chủ đầu tư','Client Representative','active'),
+('21000000-0000-0000-0000-000000000012','10000000-0000-0000-0000-000000000012','Anh Bình Chủ đầu tư','client@consflow.local','0900000012','Chủ đầu tư','Client Representative','inactive'),
 ('21000000-0000-0000-0000-000000000013','10000000-0000-0000-0000-000000000013','Nguyễn Hà Thiết kế','design@consflow.local','0900000013','Thiết kế','Design Lead','active'),
 ('21000000-0000-0000-0000-000000000014','10000000-0000-0000-0000-000000000014','Trần Vy Sale','sales@consflow.local','0900000014','Kinh doanh','Sales Lead','active'),
 ('21000000-0000-0000-0000-000000000015','10000000-0000-0000-0000-000000000015','Lê Quang Pháp lý','legal@consflow.local','0900000015','Pháp lý','Legal Reviewer','active'),

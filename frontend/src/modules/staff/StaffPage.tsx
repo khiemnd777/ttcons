@@ -12,6 +12,7 @@ import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
 import { Dialog } from '../../components/Dialog';
 import { SimpleForm } from '../_shared/SimpleForm';
+import { isAssignableAppRole } from '../../lib/utils/roles';
 import { enumOptions } from '../../lib/utils/status';
 
 type StaffRole = {
@@ -33,6 +34,7 @@ type RoleRow = Record<string, any> & {
   id: string;
   name: string;
   display_name: string;
+  external_only?: boolean;
 };
 
 type ProjectOption = Record<string, any> & {
@@ -159,7 +161,7 @@ export function StaffPage() {
       </FormDrawer>
       <StaffRoleDialog
         staff={roleDialog}
-        roles={roles.data ?? []}
+        roles={(roles.data ?? []).filter(isAssignableAppRole)}
         projects={projects.data ?? []}
         loading={roles.isLoading || projects.isLoading}
         saving={assignRoles.isPending}
@@ -206,17 +208,18 @@ function StaffRoleDialog({
   const [scope, setScope] = useState<'global' | 'project'>('global');
   const [projectID, setProjectID] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const assignableRoleIDs = useMemo(() => new Set(roles.map((role) => role.id)), [roles]);
 
   useEffect(() => {
     setScope('global');
     setProjectID('');
-    setSelected(new Set((staff?.user_roles ?? []).filter((role) => !role.project_id).map((role) => role.id)));
-  }, [staff?.id]);
+    setSelected(new Set((staff?.user_roles ?? []).filter((role) => !role.project_id && assignableRoleIDs.has(role.id)).map((role) => role.id)));
+  }, [assignableRoleIDs, staff?.id, staff?.user_roles]);
 
   useEffect(() => {
     const targetProjectID = scope === 'project' ? projectID : '';
-    setSelected(new Set((staff?.user_roles ?? []).filter((role) => (role.project_id ?? '') === targetProjectID).map((role) => role.id)));
-  }, [projectID, scope, staff?.user_roles]);
+    setSelected(new Set((staff?.user_roles ?? []).filter((role) => (role.project_id ?? '') === targetProjectID && assignableRoleIDs.has(role.id)).map((role) => role.id)));
+  }, [assignableRoleIDs, projectID, scope, staff?.user_roles]);
 
   const projectOptions = useMemo(() => projects.map((project) => ({ value: project.id, label: `${project.code ? `${project.code} - ` : ''}${project.name}` })), [projects]);
 

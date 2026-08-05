@@ -23,7 +23,7 @@
 - `auth_sessions`
 - `partners`
 - `system_settings`, `audit_logs`
-- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, and project-finance boundary/RBAC in `V83`
+- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, and external-only client access in `V89`
 
 ## Invariants
 
@@ -40,6 +40,7 @@
 - Partner catalog updates preserve downstream snapshots for historical documents.
 - Session refresh/revoke lifecycle remains DB-backed and revocable.
 - `AuthSessionActive` is never cached: immediate session revoke remains authoritative even when Redis supplies distributed rate limiting and SSE Pub/Sub.
+- `roles.external_only` classifies business counterparts that cannot act in the App. V89 marks `client`, fails when migration would strand an external-only open work item/pending approval or a mixed-role user, removes App permissions, revokes sessions, inactivates linked users/staff/project memberships and preserves `user_roles` plus historical workflow/runtime labels. Login lookup, session creation/refresh/active checks, role edit, role-permission assignment, user-role assignment and project-member save all fail closed independently of frontend filtering.
 - V68 adds the system roles `Thiết kế`, `Sale`, `Pháp lý` with the minimum permission sets needed by their official-workflow steps and grants existing `Đội thi công` pipeline/planning access. The migration does not auto-assign users or project memberships and does not broaden existing runtime role snapshots.
 - Project-finance permissions are independent capability gates: view, material-cost create/review, cash-request create/approve/process, and management report view. Accounting owns capture/review/handoff processing, Director owns cash-request approval/reporting, and all actions still combine permission with project scope. Legacy ledger/tax permissions remain admin-only historical support.
 - Manual posting, source posting, reversal, period close/reopen and migration-reconciliation resolution write actor/time/reason audit in the same transaction. Reconciliation resolution is one-way: a second resolution returns conflict and cannot overwrite the original conclusion.
@@ -53,8 +54,8 @@
 ## Golden Live Accounts
 
 - The canonical local/dev display identities are `Ngân Kế Toán` for `accounting@consflow.local` and `Hoàng Long` for `director@consflow.local`; `users.full_name` and the linked `staff.full_name` must remain aligned, while historical audit/activity actor-name snapshots are not rewritten by an account rename.
-- Local/dev seed includes dedicated users for procurement, QA/QC, construction team, subcontractor, client, design, sales, legal and contract-department roles (`procurement@consflow.local`, `qaqc@consflow.local`, `construction@consflow.local`, `subcontractor@consflow.local`, `client@consflow.local`, `design@consflow.local`, `sales@consflow.local`, `legal@consflow.local`, `contract@consflow.local`), all documented in `backend/seed/GOLDEN_LIVE_RUNBOOK.md`.
-- `GOLDEN-LIVE-001` has fifteen active project members, including dedicated `Thiết kế`, `Sale` and `Pháp lý` demo actors, so role-scoped work, requester/approver separation and external client/subcontractor participation can be exercised without substituting Admin.
+- Local/dev seed includes active App users for procurement, QA/QC, construction team, subcontractor, design, sales, legal and contract-department roles. `client@consflow.local` is an inactive negative-login fixture linked only to the external-only, permissionless `client` role; it is never a positive UAT actor.
+- `GOLDEN-LIVE-001` has fourteen active App project members, including dedicated `Thiết kế`, `Sale` and `Pháp lý` actors. Client confirmation is evidenced through documents/forms/evidence and business fields, never by a client login or active membership.
 - V72 grants `planning.view` and `planning.edit` to PM because the official workflow assigns PM to planning-gated steps. This does not bypass project scope or work-item role assignment: `CanActOnWorkItem` remains the first mutation gate.
 
 ## Rev3 Contract Governance

@@ -4170,7 +4170,15 @@ func (h *Handler) UpdateRole(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"role.update"}); err != nil {
 		return err
 	}
-	return h.update(c, "roles", roleColumns())
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.UpdateRole(c.Context(), c.Params("id"), body)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
 }
 func (h *Handler) ListPermissions(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"permission.view"}); err != nil {

@@ -4,9 +4,9 @@ import { ChevronDown, GripVertical, Pencil, Plus, Save, Trash2, X } from 'lucide
 import { Dialog } from '../../../components/Dialog';
 import { EnumChip } from '../../../components/EnumChip';
 import type { PipelineNode, WorkflowFormCatalogItem } from '../../../lib/types/domain';
+import { pipelineActorRoleOptions } from '../../../lib/utils/roles';
 import { enumOptions, nodeTypeValues } from '../../../lib/utils/status';
 
-const roleOptions = ['PM', 'QS', 'Thiết kế', 'Giám sát', 'Kế toán', 'Pháp lý', 'Bộ phận HĐ', 'Thủ kho', 'QA/QC', 'Giám đốc', 'Chủ đầu tư', 'Mua hàng', 'Đội thi công'];
 const stepTypes = ['task', 'checklist', 'approval', 'document_upload', 'photo_upload', 'budget_check', 'material_check', 'daily_report', 'meeting_minutes', 'acceptance_check', 'handover_check', 'accounting_check'];
 
 type SelectOption = string | { label: string; value: string };
@@ -232,7 +232,7 @@ export function NodeInspectorPanel({
                   <MultiSelect
                     label={approvalMode === 'ordered' ? 'Thứ tự role duyệt' : 'Role được duyệt'}
                     value={approvalRoles}
-                    options={roleOptions}
+                    options={pipelineActorRoleOptions}
                     emptyText="Chưa chọn role phê duyệt"
                     loadingPlaceholder="Đang tải roles..."
                     searchPlaceholder="Gõ để tìm role"
@@ -413,7 +413,7 @@ export function NodeInspectorPanel({
           <MultiSelect
             label="Role phụ trách"
             value={stepForm.required_role_ids}
-            options={roleOptions}
+            options={pipelineActorRoleOptions}
             invalid={stepRolesInvalid}
             emptyText="Chưa gán role phụ trách"
             loadingPlaceholder="Đang tải roles..."

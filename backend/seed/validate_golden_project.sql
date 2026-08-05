@@ -270,13 +270,25 @@ BEGIN
     ('qaqc@consflow.local','qa_qc'),
     ('construction@consflow.local','construction_team'),
     ('subcontractor@consflow.local','subcontractor'),
-    ('client@consflow.local','client'),
     ('design@consflow.local','design'),
     ('sales@consflow.local','sales'),
     ('legal@consflow.local','legal'),
     ('contract@consflow.local','contract_officer')
   ) AND u.status='active';
-  IF actual <> 9 THEN RAISE EXCEPTION 'Golden Live dedicated role accounts: expected 9, got %',actual; END IF;
+  IF actual <> 8 THEN RAISE EXCEPTION 'Golden Live dedicated App role accounts: expected 8, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM users u
+  JOIN staff s ON s.user_id=u.id
+  JOIN user_roles ur ON ur.user_id=u.id
+  JOIN roles r ON r.id=ur.role_id
+  WHERE u.email='client@consflow.local'
+    AND u.status='inactive'
+    AND s.status='inactive'
+    AND r.name='client'
+    AND r.external_only
+    AND NOT EXISTS (SELECT 1 FROM role_permissions rp WHERE rp.role_id=r.id);
+  IF actual <> 1 THEN RAISE EXCEPTION 'Client negative-login fixture must remain inactive, external-only and permissionless'; END IF;
 
   SELECT count(*) INTO actual
   FROM projects p
@@ -292,7 +304,7 @@ BEGIN
 
   SELECT count(*) INTO actual FROM project_members
   WHERE project_id='30000000-0000-0000-0000-000000000022' AND active;
-  IF actual <> 15 THEN RAISE EXCEPTION 'Golden Live project members: expected 15, got %',actual; END IF;
+  IF actual <> 14 THEN RAISE EXCEPTION 'Golden Live App project members: expected 14, got %',actual; END IF;
 
   SELECT count(*) INTO actual FROM pipeline_run_nodes
   WHERE project_id='30000000-0000-0000-0000-000000000022';

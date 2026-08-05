@@ -90,7 +90,7 @@ Không reset để “xóa” lỗi trước khi đã lưu request/response, act
 | J8 | AP/AR, lịch, tạm ứng, hóa đơn, phân bổ và đối soát | ledger IDs/amounts/status, requester separation, không tạo fake invoice/payment/stock movement |
 | J9 | Vật tư dư, checklist bàn giao, readiness, đóng tài chính và audit | blocker trước/sau, tám checklist, handover/audit IDs, AP/AR/pending payment về điều kiện đóng |
 
-## Ma trận 15 vai trò
+## Ma trận 14 vai trò App
 
 Ký hiệu: `P` hành động positive-path; `D` quyết định/duyệt bằng actor khác requester; `R` chỉ đọc/đối chiếu; `N` negative write phải bị từ chối; `-` không áp dụng. Đây là trách nhiệm tối thiểu, không cho phép dùng Admin thay cho kiểm tra role-specific.
 
@@ -107,14 +107,13 @@ Ký hiệu: `P` hành động positive-path; `D` quyết định/duyệt bằng 
 | QA/QC `qaqc@consflow.local` | P/N | R | R | N | P | N | P | P/D | N | P/D |
 | Đội thi công `construction@consflow.local` | P/N | P | N | N | R | N | P | P | N | P/R |
 | Thầu phụ `subcontractor@consflow.local` | P/N | N | N | N | R | P/R | P | P | N | R |
-| Chủ đầu tư `client@consflow.local` | P/N | P/D | D | D | N | D | R | D | R | D |
 | Thiết kế `design@consflow.local` | P/N | P | P | R | N | N | P | R | N | R |
 | Sale `sales@consflow.local` | P/N | P | P/R | P | R | P/R | R | R | R | R |
 | Pháp lý `legal@consflow.local` | P/N | N | N | R | N | P/D | N | N | R | R |
 
-Golden Live có actor/project member chuyên biệt cho `Thiết kế`, `Sale` và `Pháp lý`. Các step yêu cầu một trong ba vai trò này phải dùng đúng actor tương ứng; nếu account hoặc membership bị thiếu, ghi `BLOCKED-COVERAGE` và không dùng Admin để biến coverage thiếu thành `PASS`.
+Golden Live có actor/project member chuyên biệt cho `Thiết kế`, `Sale` và `Pháp lý`. Các step yêu cầu một trong ba vai trò này phải dùng đúng actor tương ứng; nếu account hoặc membership bị thiếu, ghi `BLOCKED-COVERAGE` và không dùng Admin để biến coverage thiếu thành `PASS`. `client@consflow.local` không nằm trong ma trận App: đây là fixture `inactive` dùng để xác nhận đăng nhập bị từ chối; hồ sơ/evidence nghiệp vụ mới là bằng chứng xác nhận của chủ đầu tư.
 
-Rev3 có fixture riêng `GOLDEN-REV3-BOQ-001` (project 023) và actor `Bộ phận HĐ` là `contract@consflow.local`. Khi kiểm thử Rev3, actor này phải nhìn thấy work item hợp đồng được giao nhưng không được dùng để thay QS/Kế toán/Pháp lý/Mua hàng/PM/Giám đốc ở các quyết định cần tách vai trò. Project 022 và ma trận lịch sử 15 vai trò phía trên không được rebound sang Rev3.
+Rev3 có fixture riêng `GOLDEN-REV3-BOQ-001` (project 023) và actor `Bộ phận HĐ` là `contract@consflow.local`. Khi kiểm thử Rev3, actor này phải nhìn thấy work item hợp đồng được giao nhưng không được dùng để thay QS/Kế toán/Pháp lý/Mua hàng/PM/Giám đốc ở các quyết định cần tách vai trò. Project 022 và ma trận 14 vai trò App phía trên không được rebound sang Rev3.
 
 Chuyển role tuần tự và tôn trọng `Retry-After` khi login/auth trả `429`. Một response rate-limit làm case bị nhiễu và phải chạy lại; không được tính là negative RBAC `PASS`.
 

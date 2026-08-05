@@ -32,7 +32,15 @@ func (r *Repository) FindUserByEmail(ctx context.Context, email string) (Record,
 	return r.QueryOne(ctx, `
 		SELECT id, email, password_hash, full_name, status, created_at, updated_at
 		FROM users
-		WHERE email=$1 AND status='active'
+		WHERE email=$1
+		  AND status='active'
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM user_roles assignment
+			JOIN roles role ON role.id=assignment.role_id
+			WHERE assignment.user_id=users.id
+			  AND role.external_only
+		  )
 	`, email)
 }
 
@@ -76,8 +84,18 @@ func (r *Repository) UserPermissions(ctx context.Context, userID string) ([]stri
 func (r *Repository) CreateAuthSession(ctx context.Context, userID, refreshHash, accessTokenID, userAgent, ipAddress string, expiresAt time.Time) (Record, error) {
 	return r.QueryOne(ctx, `
 		INSERT INTO auth_sessions (user_id, refresh_token_hash, access_token_id, user_agent, ip_address, expires_at)
-		VALUES ($1,$2,$3,NULLIF($4,''),NULLIF($5,''),$6)
-		RETURNING id::text, user_id::text, expires_at
+		SELECT account.id,$2,$3,NULLIF($4,''),NULLIF($5,''),$6
+		FROM users account
+		WHERE account.id=$1
+		  AND account.status='active'
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM user_roles assignment
+			JOIN roles role ON role.id=assignment.role_id
+			WHERE assignment.user_id=account.id
+			  AND role.external_only
+		  )
+		RETURNING id::text,user_id::text,expires_at
 	`, userID, refreshHash, accessTokenID, strings.TrimSpace(userAgent), strings.TrimSpace(ipAddress), expiresAt)
 }
 
@@ -94,6 +112,13 @@ func (r *Repository) RotateAuthSession(ctx context.Context, currentRefreshHash, 
 		WHERE s.refresh_token_hash=$1
 		  AND s.user_id=u.id
 		  AND u.status='active'
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM user_roles assignment
+			JOIN roles role ON role.id=assignment.role_id
+			WHERE assignment.user_id=u.id
+			  AND role.external_only
+		  )
 		  AND s.revoked_at IS NULL
 		  AND s.expires_at > now()
 		RETURNING s.id::text, s.user_id::text, s.expires_at
@@ -119,11 +144,26 @@ func (r *Repository) AuthSessionActive(ctx context.Context, userID, sessionID, a
 		  AND s.revoked_at IS NULL
 		  AND s.expires_at > now()
 		  AND u.status='active'
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM user_roles assignment
+			JOIN roles role ON role.id=assignment.role_id
+			WHERE assignment.user_id=u.id
+			  AND role.external_only
+		  )
 	`, sessionID, userID, accessTokenID)
 	if err != nil {
 		return false, err
 	}
 	return len(rows) > 0 && number(rows[0]["total"]) > 0, nil
+}
+
+func (r *Repository) RoleExternalOnly(ctx context.Context, roleID string) (bool, error) {
+	var externalOnly bool
+	if err := r.db.QueryRowContext(ctx, `SELECT external_only FROM roles WHERE id=$1`, roleID).Scan(&externalOnly); err != nil {
+		return false, err
+	}
+	return externalOnly, nil
 }
 
 func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, permissionIDs []string) (Record, error) {
@@ -135,8 +175,12 @@ func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, 
 
 	var roleIDText string
 	var roleDisplayName string
-	if err := tx.QueryRowContext(ctx, `SELECT id::text, display_name FROM roles WHERE id=$1 FOR UPDATE`, roleID).Scan(&roleIDText, &roleDisplayName); err != nil {
+	var externalOnly bool
+	if err := tx.QueryRowContext(ctx, `SELECT id::text,display_name,external_only FROM roles WHERE id=$1 FOR UPDATE`, roleID).Scan(&roleIDText, &roleDisplayName, &externalOnly); err != nil {
 		return nil, err
+	}
+	if externalOnly {
+		return nil, validationError("Vai trò đối tác ngoài App không được gán quyền", Record{"role_id": roleIDText, "role": roleDisplayName})
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, roleID); err != nil {
 		return nil, err
@@ -192,12 +236,16 @@ func (r *Repository) ReplaceUserRoles(ctx context.Context, userID string, roleID
 
 	assigned := 0
 	for _, roleID := range roleIDs {
-		var exists int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM roles WHERE id=$1`, roleID).Scan(&exists); err != nil {
+		var roleDisplayName string
+		var externalOnly bool
+		if err := tx.QueryRowContext(ctx, `SELECT display_name,external_only FROM roles WHERE id=$1 FOR SHARE`, roleID).Scan(&roleDisplayName, &externalOnly); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, validationError("Vai trò không tồn tại", Record{"role_id": roleID})
+			}
 			return nil, err
 		}
-		if exists == 0 {
-			return nil, validationError("Vai trò không tồn tại", Record{"role_id": roleID})
+		if externalOnly {
+			return nil, validationError("Vai trò đối tác ngoài App không thể gán cho người dùng", Record{"role_id": roleID, "role": roleDisplayName})
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO user_roles (user_id, role_id, project_id) VALUES ($1,$2,NULLIF($3,'')::uuid) ON CONFLICT DO NOTHING`, userID, roleID, projectID); err != nil {
 			return nil, err
@@ -7626,7 +7674,9 @@ func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, i
 				) ORDER BY r.display_name)
 				FROM user_roles ur
 				JOIN roles r ON r.id=ur.role_id
-				WHERE ur.user_id=s.user_id AND ur.project_id IS NULL
+				WHERE ur.user_id=s.user_id
+				  AND ur.project_id IS NULL
+				  AND NOT r.external_only
 			), '[]'::jsonb) AS global_roles,
 			COALESCE((
 				SELECT jsonb_agg(jsonb_build_object(
@@ -7682,6 +7732,13 @@ func (r *Repository) ProjectMemberOptions(ctx context.Context, projectID string)
 			LIMIT 1
 		) latest_member ON true
 		WHERE s.status='active'
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM user_roles assignment
+			JOIN roles role ON role.id=assignment.role_id
+			WHERE assignment.user_id=s.user_id
+			  AND role.external_only
+		  )
 		ORDER BY lower(s.full_name)
 	`, projectID)
 	if err != nil {
@@ -7697,6 +7754,7 @@ func (r *Repository) ProjectMemberOptions(ctx context.Context, projectID string)
 			) AS grants_project_view
 		FROM roles r
 		WHERE r.name NOT IN ('admin','director')
+		  AND NOT r.external_only
 		ORDER BY lower(r.display_name)
 	`)
 	if err != nil {
@@ -7707,11 +7765,20 @@ func (r *Repository) ProjectMemberOptions(ctx context.Context, projectID string)
 		FROM (
 			SELECT DISTINCT label
 			FROM (
-				SELECT r.display_name AS label FROM roles r
+				SELECT r.display_name AS label
+				FROM roles r
+				WHERE NOT r.external_only
 				UNION ALL
-				SELECT jsonb_array_elements_text(COALESCE(pm.role_ids, '[]'::jsonb)) AS label
+				SELECT project_label.label
 				FROM project_members pm
+				CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(pm.role_ids, '[]'::jsonb)) project_label(label)
 				WHERE pm.project_id=$1
+				  AND NOT EXISTS (
+					SELECT 1
+					FROM roles external_role
+					WHERE external_role.external_only
+					  AND lower(btrim(external_role.display_name))=lower(btrim(project_label.label))
+				  )
 			) labels
 			WHERE NULLIF(trim(label), '') IS NOT NULL
 		) distinct_labels
@@ -7751,6 +7818,13 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 		FROM staff s
 		JOIN users u ON u.id=s.user_id AND u.status='active'
 		WHERE s.id=$1 AND s.status='active'
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM user_roles assignment
+			JOIN roles role ON role.id=assignment.role_id
+			WHERE assignment.user_id=s.user_id
+			  AND role.external_only
+		  )
 		FOR UPDATE OF s
 	`, req.StaffID)
 	if err != nil {
@@ -7761,10 +7835,26 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 	}
 	staffName := strings.TrimSpace(fmt.Sprint(staffRows[0]["full_name"]))
 	userID := cleanID(staffRows[0]["user_id"])
+	for _, roleLabel := range req.RoleIDs {
+		var externalOnly bool
+		if err := tx.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM roles
+				WHERE external_only
+				  AND lower(btrim(display_name))=lower(btrim($1))
+			)
+		`, roleLabel).Scan(&externalOnly); err != nil {
+			return nil, err
+		}
+		if externalOnly {
+			return nil, validationError("Vai trò vận hành của đối tác ngoài App không thể gán cho thành viên công trình", Record{"role": roleLabel})
+		}
+	}
 
 	for _, roleID := range req.ProjectRoleIDs {
 		var exists int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM roles WHERE id=$1 AND name NOT IN ('admin','director')`, roleID).Scan(&exists); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM roles WHERE id=$1 AND name NOT IN ('admin','director') AND NOT external_only`, roleID).Scan(&exists); err != nil {
 			return nil, err
 		}
 		if exists == 0 {

@@ -200,6 +200,12 @@ func (r *Repository) TemplatePublishIssues(ctx context.Context, templateID strin
 	}
 	issues = append(issues, permissionIssues...)
 
+	externalRoleIssues, err := r.Query(ctx, templateExternalRoleIssuesSQL(), templateID)
+	if err != nil {
+		return nil, err
+	}
+	issues = append(issues, externalRoleIssues...)
+
 	surfaceIssues, err := r.Query(ctx, `
 		SELECT n.id AS node_id, s.id AS step_id, s.name AS step_name,
 			'WORK_ITEM_SURFACE_MISSING' AS code,
@@ -253,6 +259,42 @@ func (r *Repository) TemplatePublishIssues(ctx context.Context, templateID strin
 	}
 	issues = append(issues, validateTemplateGraph(nodes, edges)...)
 	return issues, nil
+}
+
+func templateExternalRoleIssuesSQL() string {
+	return `
+		SELECT n.id AS node_id,NULL::uuid AS step_id,required.role_label,
+			'EXTERNAL_ROLE_NOT_ASSIGNABLE' AS code,
+			'Node không được yêu cầu vai trò đối tác ngoài App' AS message
+		FROM pipeline_template_nodes n
+		CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(n.responsible_role_ids,'[]'::jsonb)) required(role_label)
+		JOIN roles role
+		  ON role.external_only
+		 AND lower(btrim(role.display_name))=lower(btrim(required.role_label))
+		WHERE n.template_id=$1
+		UNION ALL
+		SELECT n.id,s.id,required.role_label,
+			'EXTERNAL_ROLE_NOT_ASSIGNABLE',
+			'Bước không được yêu cầu vai trò đối tác ngoài App'
+		FROM pipeline_template_steps s
+		JOIN pipeline_template_nodes n ON n.id=s.node_id
+		CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(s.required_role_ids,'[]'::jsonb)) required(role_label)
+		JOIN roles role
+		  ON role.external_only
+		 AND lower(btrim(role.display_name))=lower(btrim(required.role_label))
+		WHERE n.template_id=$1
+		UNION ALL
+		SELECT n.id,NULL::uuid,required.role_label,
+			'EXTERNAL_ROLE_NOT_ASSIGNABLE',
+			'Chính sách phê duyệt không được yêu cầu vai trò đối tác ngoài App'
+		FROM pipeline_template_nodes n
+		CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(n.approval_policy_json->'roles','[]'::jsonb)) required(role_label)
+		JOIN roles role
+		  ON role.external_only
+		 AND lower(btrim(role.display_name))=lower(btrim(required.role_label))
+		WHERE n.template_id=$1
+		ORDER BY node_id,step_id NULLS FIRST,role_label
+	`
 }
 
 func validateTemplateGraph(nodes, edges []Record) []Record {
