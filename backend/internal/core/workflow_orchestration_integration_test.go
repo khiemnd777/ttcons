@@ -85,6 +85,7 @@ func TestWorkflowFormValidationNormalizesAndRejectsBadInput(t *testing.T) {
 		{"field_key": "summary", "label": "Kết quả", "field_type": "textarea", "required": true, "validation_json": map[string]any{"min_length": 3}},
 		{"field_key": "confirmed", "label": "Xác nhận", "field_type": "checkbox", "required": true, "validation_json": map[string]any{}},
 		{"field_key": "quantity", "label": "Khối lượng", "field_type": "number", "required": false, "validation_json": map[string]any{"min": float64(0)}},
+		{"field_key": "budget", "label": "Ngân sách", "field_type": "currency", "required": false, "validation_json": map[string]any{"min": float64(0), "currency_code": "VND"}},
 	}
 
 	_, err := service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{"summary": "ok", "extra": "bad"}, true)
@@ -93,11 +94,11 @@ func TestWorkflowFormValidationNormalizesAndRejectsBadInput(t *testing.T) {
 	_, err = service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{"summary": "ok", "confirmed": false}, true)
 	assertValidationError(t, err)
 
-	answers, err := service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{"summary": "  đã xong  ", "confirmed": true, "quantity": "12.5"}, true)
+	answers, err := service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{"summary": "  đã xong  ", "confirmed": true, "quantity": "12.5", "budget": "3100000000.50"}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if answers["summary"] != "đã xong" || answers["confirmed"] != true || number(answers["quantity"]) != 12.5 {
+	if answers["summary"] != "đã xong" || answers["confirmed"] != true || number(answers["quantity"]) != 12.5 || number(answers["budget"]) != 3100000000.50 {
 		t.Fatalf("normalized answers = %#v", answers)
 	}
 }
@@ -115,6 +116,7 @@ func TestWorkflowFormStructuredListValidation(t *testing.T) {
 				"item_fields": []any{
 					map[string]any{"key": "title", "label": "Việc cần làm", "type": "text", "required": true, "min_length": float64(3)},
 					map[string]any{"key": "quantity", "label": "Khối lượng", "type": "number", "required": true, "min": float64(0)},
+					map[string]any{"key": "amount", "label": "Giá trị", "type": "currency", "required": false, "min": float64(0)},
 					map[string]any{"key": "due_date", "label": "Due date", "type": "date", "required": true},
 					map[string]any{"key": "priority", "label": "Priority", "type": "select", "required": true, "options": []any{map[string]any{"value": "normal"}, map[string]any{"value": "high"}}},
 				},
@@ -134,7 +136,7 @@ func TestWorkflowFormStructuredListValidation(t *testing.T) {
 	assertValidationError(t, err)
 
 	answers, err := service.validateWorkflowFormAnswers(context.Background(), Record{}, fields, Record{
-		"action_items": []any{map[string]any{"title": "  Chốt bản vẽ  ", "quantity": "2.5", "due_date": "2026-06-30", "priority": "high"}},
+		"action_items": []any{map[string]any{"title": "  Chốt bản vẽ  ", "quantity": "2.5", "amount": "1250000.25", "due_date": "2026-06-30", "priority": "high"}},
 	}, true)
 	if err != nil {
 		t.Fatal(err)
@@ -148,6 +150,9 @@ func TestWorkflowFormStructuredListValidation(t *testing.T) {
 	}
 	if number(items[0]["quantity"]) != 2.5 {
 		t.Fatalf("normalized quantity = %#v", items[0]["quantity"])
+	}
+	if number(items[0]["amount"]) != 1250000.25 {
+		t.Fatalf("normalized currency amount = %#v", items[0]["amount"])
 	}
 }
 
@@ -194,6 +199,45 @@ func TestWorkflowFormTemplateAndFieldValidation(t *testing.T) {
 	}
 	if len(fields) != 1 || fields[0]["field_key"] != "action_items" || fields[0]["field_type"] != "structured_list" {
 		t.Fatalf("unexpected normalized fields: %#v", fields)
+	}
+	if !validWorkflowFieldType("currency") {
+		t.Fatal("currency must be a supported workflow field type")
+	}
+	if !validWorkflowCurrencyCode("VND") || validWorkflowCurrencyCode("1AA") || validWorkflowCurrencyCode("VNĐ") {
+		t.Fatal("currency codes must contain exactly three uppercase ASCII letters")
+	}
+	if _, err := normalizeWorkflowFormFieldRequests([]WorkflowFormFieldRequest{{
+		FieldKey:  "amount",
+		Label:     "Amount",
+		FieldType: "currency",
+		Validation: Record{
+			"currency_code":           "vnd",
+			"maximum_fraction_digits": float64(7),
+		},
+	}}, true); err == nil {
+		t.Fatal("expected invalid currency configuration to fail")
+	}
+	if _, err := normalizeWorkflowFormFieldRequests([]WorkflowFormFieldRequest{{
+		FieldKey:  "vnd_amount",
+		Label:     "VND amount",
+		FieldType: "currency",
+		Validation: Record{
+			"currency_code":           "VND",
+			"maximum_fraction_digits": float64(2),
+		},
+	}}, true); err == nil {
+		t.Fatal("expected VND fractional configuration to fail")
+	}
+	if _, err := normalizeWorkflowFormFieldRequests([]WorkflowFormFieldRequest{{
+		FieldKey:  "usd_amount",
+		Label:     "USD amount",
+		FieldType: "currency",
+		Validation: Record{
+			"currency_code":           "USD",
+			"maximum_fraction_digits": float64(2),
+		},
+	}}, true); err != nil {
+		t.Fatalf("expected valid USD fractional configuration: %v", err)
 	}
 	if _, err := normalizeWorkflowFormFieldRequests([]WorkflowFormFieldRequest{
 		{FieldKey: "dup", Label: "Dup", FieldType: "text"},

@@ -306,7 +306,7 @@ export function OutputBillingPlanPanel({ receivable, onChanged, view = 'all' }: 
             { name: 'schedule_code', label: 'Mã kỳ', defaultValue: `SCH-${Date.now().toString().slice(-5)}`, required: true },
             { name: 'schedule_type', label: 'Loại kỳ', type: 'select', defaultValue: 'progress', required: true, options: enumOptions('payment_schedule_type', ['advance', 'progress', 'final', 'retention', 'other']) },
             { name: 'milestone_name', label: 'Tên kỳ', defaultValue: 'Kỳ thu', required: true, fullWidth: true },
-            { name: 'planned_amount', label: 'Số tiền kế hoạch', type: 'number', defaultValue: Number(receivable.remaining_amount ?? receivable.gross_amount ?? 0), required: true, min: 1 },
+            { name: 'planned_amount', label: 'Số tiền kế hoạch', type: 'currency', defaultValue: Number(receivable.remaining_amount ?? receivable.gross_amount ?? 0), required: true, min: 1 },
             { name: 'due_date', label: 'Hạn thu', type: 'date' },
             { name: 'notes', label: 'Ghi chú', type: 'textarea', fullWidth: true },
           ]}
@@ -320,7 +320,7 @@ export function OutputBillingPlanPanel({ receivable, onChanged, view = 'all' }: 
           layout="two-column"
           fields={[
             { name: 'receipt_code', label: 'Mã ứng trước', defaultValue: `ADV-${Date.now().toString().slice(-5)}`, required: true },
-            { name: 'amount', label: 'Số tiền', type: 'number', defaultValue: Number(receivable.remaining_amount ?? 0), required: true, min: 1 },
+            { name: 'amount', label: 'Số tiền', type: 'currency', defaultValue: Number(receivable.remaining_amount ?? 0), required: true, min: 1 },
             { name: 'due_date', label: 'Hạn thu', type: 'date' },
             { name: 'reason', label: 'Lý do', type: 'textarea', fullWidth: true },
             { name: 'notes', label: 'Ghi chú', type: 'textarea', fullWidth: true },
@@ -336,7 +336,7 @@ export function OutputBillingPlanPanel({ receivable, onChanged, view = 'all' }: 
           fields={[
             { name: 'payment_code', label: 'Mã phiếu', defaultValue: `RCV-${Date.now().toString().slice(-5)}`, required: true },
             { name: 'payment_type', label: 'Loại', type: 'select', defaultValue: 'client_receipt', required: true, options: enumOptions('payment_type', ['client_receipt', 'advance', 'other']) },
-            { name: 'amount', label: 'Số tiền', type: 'number', defaultValue: Number(receivable.remaining_amount ?? 0), required: true, min: 1 },
+            { name: 'amount', label: 'Số tiền', type: 'currency', defaultValue: Number(receivable.remaining_amount ?? 0), required: true, min: 1 },
             { name: 'payment_method', label: 'Phương thức', type: 'select', defaultValue: 'bank_transfer', required: true, options: enumOptions('payment_method', ['bank_transfer', 'cash']) },
             { name: 'schedule_id', label: 'Kỳ thu', type: 'select', options: activeScheduleOptions },
             {
@@ -363,7 +363,7 @@ export function OutputBillingPlanPanel({ receivable, onChanged, view = 'all' }: 
               {
                 name: 'amount',
                 label: 'Số tiền quyết toán',
-                type: 'number',
+                type: 'currency',
                 defaultValue: advanceUnsettled(openDialog.advance),
                 required: true,
                 min: 1,

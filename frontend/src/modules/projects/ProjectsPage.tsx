@@ -112,8 +112,8 @@ export function ProjectsPage() {
     },
     { name: 'planned_start_date', label: 'Ngày bắt đầu dự kiến', type: 'date' as const, defaultValue: record?.planned_start_date?.slice?.(0, 10) ?? '' },
     { name: 'planned_end_date', label: 'Ngày kết thúc dự kiến', type: 'date' as const, defaultValue: record?.planned_end_date?.slice?.(0, 10) ?? '' },
-    { name: 'estimated_budget', label: 'Ngân sách dự kiến', type: 'number' as const, defaultValue: record?.estimated_budget ?? 300000000, min: 0 },
-    { name: 'contract_amount', label: 'Giá trị hợp đồng', type: 'number' as const, defaultValue: record?.contract_amount ?? 450000000, min: 0 },
+    { name: 'estimated_budget', label: 'Ngân sách dự kiến', type: 'currency' as const, defaultValue: record?.estimated_budget ?? 300000000, min: 0 },
+    { name: 'contract_amount', label: 'Giá trị hợp đồng', type: 'currency' as const, defaultValue: record?.contract_amount ?? 450000000, min: 0 },
     {
       name: 'pipeline_template_id',
       label: 'Pipeline template',

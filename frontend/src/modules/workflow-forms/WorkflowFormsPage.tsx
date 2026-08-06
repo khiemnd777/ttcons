@@ -27,7 +27,9 @@ import { PageHeader } from '../../components/PageHeader';
 import { EmptyState } from '../../components/EmptyState';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Dialog } from '../../components/Dialog';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { useToast } from '../../components/ToastProvider';
+import { resolveCurrencyFractionDigits } from '../../lib/utils/currencyInput';
 import type {
   AnyRecord,
   WorkflowFormField,
@@ -77,6 +79,7 @@ const fieldTypeOptions = [
   ['text', 'Văn bản'],
   ['textarea', 'Văn bản dài'],
   ['number', 'Số'],
+  ['currency', 'Tiền tệ'],
   ['date', 'Ngày'],
   ['select', 'Danh sách chọn'],
   ['multi_select', 'Nhiều lựa chọn'],
@@ -744,6 +747,20 @@ function DraftFieldEditor({
   function updateField(index: number, patch: Partial<DraftField>) {
     onChange(fields.map((field, currentIndex) => (currentIndex === index ? { ...field, ...patch } : field)));
   }
+  function updateFieldType(index: number, fieldType: string) {
+    const current = fields[index];
+    const validation = parseJSONObject(current.validationText) ?? {};
+    if (fieldType === 'currency') {
+      validation.currency_code ??= 'VND';
+      validation.maximum_fraction_digits ??= resolveCurrencyFractionDigits(String(validation.currency_code));
+      validation.allow_negative ??= false;
+    } else if (current.field_type === 'currency') {
+      delete validation.currency_code;
+      delete validation.maximum_fraction_digits;
+      delete validation.allow_negative;
+    }
+    updateField(index, { field_type: fieldType, validationText: stableJSONString(validation) });
+  }
   function removeField(index: number) {
     onChange(fields.filter((_field, currentIndex) => currentIndex !== index));
     setExpandedIndex((current) => {
@@ -792,11 +809,18 @@ function DraftFieldEditor({
                     <FieldInput label="Khóa kỹ thuật *" value={field.field_key} error={errors[`${index}.field_key`]} onChange={(value) => updateField(index, { field_key: value })} />
                     <label className="block">
                       <span className="text-xs font-semibold text-slate-600">Kiểu dữ liệu *</span>
-                      <select className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm" value={field.field_type} onChange={(event) => updateField(index, { field_type: event.target.value })}>
+                      <select className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm" value={field.field_type} onChange={(event) => updateFieldType(index, event.target.value)}>
                         {fieldTypeOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                       </select>
                     </label>
                   </div>
+                  {field.field_type === 'currency' ? (
+                    <CurrencyFieldConfiguration
+                      validationText={field.validationText}
+                      error={errors[`${index}.validation_json`]}
+                      onChange={(validationText) => updateField(index, { validationText })}
+                    />
+                  ) : null}
                   <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
                     <FieldInput label="Hướng dẫn nhập liệu" value={field.help_text} onChange={(value) => updateField(index, { help_text: value })} />
                     <label className="flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 md:mt-5">
@@ -831,6 +855,55 @@ function DraftFieldEditor({
         </button>
       </div>
     </div>
+  );
+}
+
+function CurrencyFieldConfiguration({ validationText, error, onChange }: { validationText: string; error?: string; onChange: (value: string) => void }) {
+  const validation = parseJSONObject(validationText) ?? {};
+  const currencyCode = String(validation.currency_code ?? 'VND').toUpperCase();
+  const isVND = currencyCode === 'VND';
+  function update(key: string, value: unknown) {
+    const next = { ...validation };
+    if (value === undefined || value === '') delete next[key];
+    else next[key] = value;
+    onChange(stableJSONString(next));
+  }
+  function updateCurrencyCode(value: string) {
+    const code = value.toUpperCase();
+    const next: AnyRecord = { ...validation, currency_code: code };
+    if (/^[A-Z]{3}$/.test(code)) next.maximum_fraction_digits = resolveCurrencyFractionDigits(code);
+    onChange(stableJSONString(next));
+  }
+  return (
+    <section className="mt-3 rounded-md border border-blue-200 bg-blue-50/60 p-3" aria-label="Cấu hình trường tiền tệ">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <FieldInput label="Mã tiền tệ" value={currencyCode} onChange={updateCurrencyCode} />
+        <FieldInput label={isVND ? 'Số lẻ tối đa · VND = 0' : 'Số lẻ tối đa'} type="number" value={String(isVND ? 0 : validation.maximum_fraction_digits ?? resolveCurrencyFractionDigits(currencyCode))} disabled={isVND} onChange={(value) => update('maximum_fraction_digits', value === '' ? undefined : Number(value))} />
+        <CurrencyConfigurationValue label="Giá trị nhỏ nhất" value={validation.min} currencyCode={currencyCode} allowNegative={Boolean(validation.allow_negative)} onChange={(value) => update('min', value)} />
+        <CurrencyConfigurationValue label="Giá trị lớn nhất" value={validation.max} currencyCode={currencyCode} allowNegative={Boolean(validation.allow_negative)} onChange={(value) => update('max', value)} />
+        <label className="flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 xl:mt-5">
+          <input type="checkbox" className="h-4 w-4 rounded border-line" checked={Boolean(validation.allow_negative)} onChange={(event) => update('allow_negative', event.target.checked)} />
+          Cho phép số âm
+        </label>
+      </div>
+      {error ? <p className="mt-2 text-xs font-medium text-rose-700">{error}</p> : <p className="mt-2 text-xs text-slate-600">VND luôn là số nguyên; tiền tệ khác dùng số lẻ ISO mặc định. Payload gửi API vẫn là số.</p>}
+    </section>
+  );
+}
+
+function CurrencyConfigurationValue({ label, value, currencyCode, allowNegative, onChange }: { label: string; value: unknown; currencyCode: string; allowNegative: boolean; onChange: (value: number | undefined) => void }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold text-slate-600">{label}</span>
+      <CurrencyInput
+        className="mt-1"
+        inputClassName="text-sm focus:ring-blue-500"
+        value={value === undefined ? '' : String(value)}
+        currencyCode={currencyCode}
+        allowNegative={allowNegative}
+        onValueChange={({ floatValue }) => onChange(floatValue ?? undefined)}
+      />
+    </label>
   );
 }
 
@@ -1028,11 +1101,12 @@ function ErrorPanel({ title, onRetry }: { title: string; onRetry: () => void }) 
   );
 }
 
-function FieldInput({ label, value, error, disabled, onChange }: { label: string; value: string; error?: string; disabled?: boolean; onChange: (value: string) => void }) {
+function FieldInput({ label, value, type = 'text', error, disabled, onChange }: { label: string; value: string; type?: string; error?: string; disabled?: boolean; onChange: (value: string) => void }) {
   return (
     <label className="block">
       <span className="text-xs font-semibold text-slate-600">{label}</span>
       <input
+        type={type}
         className={clsx('mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100', error ? 'border-rose-300 bg-rose-50' : 'border-line bg-white')}
         value={value}
         disabled={disabled}
@@ -1127,6 +1201,15 @@ function validateDraftFields(fields: DraftField[]) {
     if (!field.label.trim()) errors[`${index}.label`] = 'Tên trường là bắt buộc';
     if (!validJSON(field.optionsText)) errors[`${index}.options_json`] = 'JSON không hợp lệ';
     if (!validJSON(field.validationText)) errors[`${index}.validation_json`] = 'JSON không hợp lệ';
+    if (field.field_type === 'currency' && validJSON(field.validationText)) {
+      const validation = parseJSONObject(field.validationText) ?? {};
+      const currencyCode = String(validation.currency_code ?? 'VND');
+      const fractionDigits = Number(validation.maximum_fraction_digits ?? resolveCurrencyFractionDigits(currencyCode));
+      if (!/^[A-Z]{3}$/.test(currencyCode)) errors[`${index}.validation_json`] = 'Mã tiền tệ phải gồm 3 chữ cái viết hoa';
+      else if (!Number.isInteger(fractionDigits) || fractionDigits < 0 || fractionDigits > 6) errors[`${index}.validation_json`] = 'Số lẻ tối đa phải từ 0 đến 6';
+      else if (currencyCode === 'VND' && fractionDigits !== 0) errors[`${index}.validation_json`] = 'VND phải dùng 0 chữ số thập phân';
+      else if (validation.min !== undefined && validation.max !== undefined && Number(validation.min) > Number(validation.max)) errors[`${index}.validation_json`] = 'Giá trị nhỏ nhất không được lớn hơn giá trị lớn nhất';
+    }
     if (!validJSON(field.visibilityText)) errors[`${index}.visibility_json`] = 'JSON không hợp lệ';
   });
   if (!fields.length) errors.form = 'Cần ít nhất một trường dữ liệu';
@@ -1146,6 +1229,15 @@ function parseJSONOrDefault(value: string, fallback: AnyRecord | unknown[]) {
     return JSON.parse(value || JSON.stringify(fallback));
   } catch {
     return fallback;
+  }
+}
+
+function parseJSONObject(value: string): AnyRecord | null {
+  try {
+    const parsed = JSON.parse(value || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
   }
 }
 

@@ -88,6 +88,7 @@
 - Pair with commercial/procurement when payables, vendor invoices, advances, payment schedules, or procurement-linked source documents change.
 - Pair with quality/acceptance/handover when receivables, output invoices, client billing, or handover readiness depends on acceptance state.
 - Pair with admin/governance when partner catalog, tax codes, permissions, or audit semantics affect financial records.
+- Every editable monetary value in accounting, project finance, AP/AR, invoices, schedules, advances, settlements, taxes and journal debit/credit uses shared `CurrencyInput` or semantic `currency`; native/generic number fields remain reserved for non-money numerics. Preserve explicit currency, negative adjustment rules, decimal precision and the existing numeric API payload.
 
 ## Golden Sample
 

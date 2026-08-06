@@ -519,6 +519,7 @@ export function ContractsPage() {
       />
       <CreateVariationDialog
         open={createDialog === 'variation'}
+        currencyCode={selected?.currency}
         onClose={() => setCreateDialog(null)}
         onSubmit={(values) => create.mutateAsync({
           path: `/contracts/${selectedId}/variations`,
@@ -594,7 +595,7 @@ export function ContractsPage() {
           submitLabel="Mở công nợ giải phóng"
           cancelLabel="Đóng"
           fields={[
-            { name: 'amount', label: 'Số tiền giải phóng', type: 'number', defaultValue: retentionDialog?.outstanding ?? 0, required: true, min: 0 },
+            { name: 'amount', label: 'Số tiền giải phóng', type: 'currency', currencyCode: selected?.currency, defaultValue: retentionDialog?.outstanding ?? 0, required: true, min: 0 },
             { name: 'due_date', label: 'Ngày đến hạn', type: 'date', defaultValue: new Date().toISOString().slice(0, 10), required: true },
             { name: 'comment', label: 'Căn cứ giải phóng', type: 'textarea', defaultValue: '', required: true },
           ]}
@@ -1179,7 +1180,7 @@ function CreateContractDialog({ open, partners, onClose, onSubmit }: {
           { name: 'direction', label: 'Chiều công nợ', type: 'select', defaultValue: 'receivable', required: true, options: directionOptions },
           { name: 'counterparty_partner_id', label: 'Đối tác', type: 'select', defaultValue: '', required: true, options: partnerOptions(partners, ['client', 'supplier', 'subcontractor', 'labor_team', 'service_provider', 'other']) },
           { name: 'currency', label: 'Đơn vị tiền tệ', defaultValue: 'VND', required: true },
-          { name: 'original_amount', label: 'Giá trị gốc', type: 'number', defaultValue: 0, required: true, min: 0 },
+          { name: 'original_amount', label: 'Giá trị gốc', type: 'currency', currencyCode: (values) => String(values.currency || 'VND'), defaultValue: 0, required: true, min: 0 },
           { name: 'advance_percent', label: 'Tỷ lệ tạm ứng (%)', type: 'number', defaultValue: 0, min: 0, max: 100 },
           { name: 'retention_percent', label: 'Tỷ lệ giữ lại (%)', type: 'number', defaultValue: 0, min: 0, max: 100 },
           { name: 'warranty_days', label: 'Thời hạn bảo hành (ngày)', type: 'number', defaultValue: 0, min: 0 },
@@ -1206,7 +1207,7 @@ function CreateVersionDialog({ open, contract, onClose, onSubmit }: {
         onCancel={onClose}
         fields={[
           { name: 'version_label', label: 'Tên phiên bản', defaultValue: `V${(contract?.versions?.length ?? 0) + 1}`, required: true },
-          { name: 'amount', label: 'Giá trị phiên bản', type: 'number', defaultValue: contract?.current_amount ?? contract?.original_amount ?? 0, required: true, min: 0 },
+          { name: 'amount', label: 'Giá trị phiên bản', type: 'currency', currencyCode: contract?.currency, defaultValue: contract?.current_amount ?? contract?.original_amount ?? 0, required: true, min: 0 },
           { name: 'scope_summary', label: 'Phạm vi công việc', type: 'textarea', defaultValue: '', required: true, fullWidth: true },
           { name: 'planned_start_date', label: 'Ngày bắt đầu dự kiến', type: 'date', defaultValue: '' },
           { name: 'planned_end_date', label: 'Ngày kết thúc dự kiến', type: 'date', defaultValue: '' },
@@ -1238,7 +1239,7 @@ function CreateMilestoneDialog({ open, contract, acceptances, onClose, onSubmit 
           { name: 'milestone_type', label: 'Loại mốc', type: 'select', defaultValue: 'progress', required: true, options: milestoneTypeOptions },
           { name: 'amount_basis', label: 'Cơ sở giá trị', type: 'select', defaultValue: 'percentage', required: true, options: amountBasisOptions },
           { name: 'percentage', label: 'Tỷ lệ (%)', type: 'number', defaultValue: 10, min: 0, max: 100 },
-          { name: 'gross_amount', label: 'Giá trị cố định', type: 'number', defaultValue: 0, min: 0 },
+          { name: 'gross_amount', label: 'Giá trị cố định', type: 'currency', currencyCode: contract?.currency, defaultValue: 0, min: 0 },
           { name: 'retention_percent', label: 'Tỷ lệ giữ lại (%)', type: 'number', defaultValue: contract?.retention_percent ?? 0, min: 0, max: 100 },
           { name: 'planned_date', label: 'Ngày kế hoạch', type: 'date', defaultValue: '' },
           { name: 'due_days', label: 'Số ngày đến hạn', type: 'number', defaultValue: 7, min: 0 },
@@ -1260,8 +1261,9 @@ function CreateMilestoneDialog({ open, contract, acceptances, onClose, onSubmit 
   );
 }
 
-function CreateVariationDialog({ open, onClose, onSubmit }: {
+function CreateVariationDialog({ open, currencyCode, onClose, onSubmit }: {
   open: boolean;
+  currencyCode?: string;
   onClose: () => void;
   onSubmit: (values: Record<string, any>) => Promise<any>;
 }) {
@@ -1277,7 +1279,7 @@ function CreateVariationDialog({ open, onClose, onSubmit }: {
           { name: 'priority', label: 'Mức độ', type: 'select', defaultValue: 'normal', required: true, options: variationPriorityOptions },
           { name: 'variation_type', label: 'Loại điều chỉnh', type: 'select', defaultValue: 'mixed', required: true, options: variationTypeOptions },
           { name: 'reason', label: 'Lý do', type: 'textarea', defaultValue: '', required: true, fullWidth: true },
-          { name: 'amount_delta', label: 'Thay đổi giá trị (+/-)', type: 'number', defaultValue: 0 },
+          { name: 'amount_delta', label: 'Thay đổi giá trị (+/-)', type: 'currency', currencyCode, defaultValue: 0, allowNegative: true },
           { name: 'days_delta', label: 'Thay đổi số ngày (+/-)', type: 'number', defaultValue: 0 },
           { name: 'scope_delta', label: 'Thay đổi phạm vi', type: 'textarea', defaultValue: '', fullWidth: true },
         ]}

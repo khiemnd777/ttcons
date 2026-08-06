@@ -160,7 +160,7 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
         fields={[
           { name: 'reason', label: 'Lý do', type: 'textarea', defaultValue: 'Issue lớn ảnh hưởng kế hoạch', required: true },
           { name: 'impact_scope', label: 'Phạm vi ảnh hưởng', type: 'select', defaultValue: 'boq', required: true, options: enumOptions('impact_scope', ['design', 'boq', 'budget', 'timeline', 'material', 'subcontractor', 'client_requirement']) },
-          { name: 'budget_impact', label: 'Ảnh hưởng ngân sách', type: 'number', defaultValue: 0 },
+          { name: 'budget_impact', label: 'Ảnh hưởng ngân sách', type: 'currency', defaultValue: 0, allowNegative: true },
           { name: 'timeline_impact', label: 'Ảnh hưởng tiến độ (ngày)', type: 'number', defaultValue: 0 },
           { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: 'draft', required: true, options: enumOptions('status', ['draft', 'submitted']) },
         ]}

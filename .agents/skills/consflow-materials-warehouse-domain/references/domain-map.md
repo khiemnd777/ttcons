@@ -44,6 +44,7 @@
 - Submitted incoming acceptance and posted stock documents can be selected as same-project source evidence for `project_material_costs`. This reference is read-only: material-cost creation/confirmation never posts, reverses or changes warehouse movements/balances.
 - Pair with construction operations when site usage, before/after snapshots, or surplus handling changes work item state.
 - Pair with quality/acceptance/handover when incoming acceptance, outgoing acceptance, or handover blockers depend on material state.
+- Material `standard_price` is a monetary input and uses semantic `currency`/shared `CurrencyInput`; stock, acceptance, snapshot and surplus quantities remain numeric quantity fields and must not be converted to currency.
 
 ## Golden Sample
 

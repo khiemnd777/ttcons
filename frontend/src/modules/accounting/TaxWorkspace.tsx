@@ -209,8 +209,8 @@ export function TaxWorkspace({ projectId, enabled, accounts }: { projectId: stri
         { name: 'direction', label: 'Nhóm sổ thuế', type: 'select', defaultValue: 'input', required: true, options: [{ value: 'input', label: 'Thuế GTGT đầu vào' }, { value: 'output', label: 'Thuế GTGT đầu ra' }] },
         { name: 'tax_code_id', label: 'Mã thuế GTGT', type: 'select', required: true, options: taxCodeOptions },
         { name: 'offset_account_id', label: 'Tài khoản đối ứng', type: 'select', required: true, options: accountOptions },
-        { name: 'taxable_delta', label: 'Điều chỉnh giá trị chưa thuế', type: 'number', defaultValue: 0 },
-        { name: 'vat_delta', label: 'Điều chỉnh tiền thuế', type: 'number', required: true, validate: (value) => Math.abs(Number(value ?? 0)) < 0.005 ? 'Tiền thuế điều chỉnh phải khác 0' : undefined },
+        { name: 'taxable_delta', label: 'Điều chỉnh giá trị chưa thuế', type: 'currency', defaultValue: 0, allowNegative: true },
+        { name: 'vat_delta', label: 'Điều chỉnh tiền thuế', type: 'currency', required: true, allowNegative: true, validate: (value) => Math.abs(Number(value ?? 0)) < 0.005 ? 'Tiền thuế điều chỉnh phải khác 0' : undefined },
         { name: 'source_document_no', label: 'Số chứng từ căn cứ', placeholder: 'Biên bản, hóa đơn điều chỉnh...' },
         { name: 'reason', label: 'Lý do điều chỉnh', type: 'textarea', required: true, fullWidth: true },
       ]} renderAside={(values) => <TaxAdjustmentPreview values={values} accounts={accounts} taxCodes={taxCodes.data ?? []} />} submitLabel={createAdjustment.isPending ? 'Đang ghi sổ...' : 'Ghi sổ điều chỉnh'} onCancel={() => setDialog(null)} onSubmit={(values) => createAdjustment.mutateAsync(values)} />
@@ -226,7 +226,7 @@ export function TaxWorkspace({ projectId, enabled, accounts }: { projectId: stri
     <Dialog open={dialog?.type === 'payment'} title="Lập Phiếu nộp thuế GTGT" description="Phiếu được lập ở trạng thái nháp. Khi duyệt, hệ thống ghi Nợ TK 3331/Có TK tiền và không ghi nhận chi phí ngân sách." onClose={() => setDialog(null)}>
       <SimpleForm key={`tax-payment-${periodId}-${outstanding}`} fields={[
         { name: 'payment_code', label: 'Số Phiếu nộp thuế', defaultValue: taxPaymentCode(period), required: true },
-        { name: 'amount', label: 'Số tiền nộp', type: 'number', defaultValue: outstanding, min: 0.01, max: outstanding, required: true },
+        { name: 'amount', label: 'Số tiền nộp', type: 'currency', defaultValue: outstanding, min: 0.01, max: outstanding, required: true },
         { name: 'payment_method', label: 'Phương thức nộp', type: 'select', defaultValue: 'bank_transfer', required: true, options: [{ value: 'bank_transfer', label: 'Chuyển khoản' }, { value: 'cash', label: 'Tiền mặt' }] },
         { name: 'cash_account_id', label: 'Tài khoản tiền', type: 'select', options: accounts.filter((account) => ['1111', '1121'].includes(String(account.account_code))).map((account) => ({ value: String(account.id), label: `${account.account_code} · ${account.name}` })), helperText: 'Để trống để hệ thống chọn TK 1121 hoặc 1111 theo phương thức nộp.' },
       ]} submitLabel={createPayment.isPending ? 'Đang lập phiếu...' : 'Lập Phiếu nộp thuế'} onCancel={() => setDialog(null)} onSubmit={(values) => createPayment.mutateAsync(values)} />

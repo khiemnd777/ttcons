@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileText, Loader2, PenLine, Plus, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog } from '../../components/Dialog';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -14,6 +15,7 @@ import { dateText, percent } from '../../lib/utils/format';
 import { enumLabel } from '../../lib/utils/status';
 import { SignatureCaptureDialog, type SignatureStroke } from './SignatureCaptureDialog';
 import { compactDateTime, isGenericWorkflowFormTemplate, workflowFormTypeLabel } from './workItemPresentation';
+import { effectiveWorkflowCurrencyFields } from './workflowCurrencyFields';
 
 type FormErrors = Record<string, string>;
 
@@ -44,7 +46,10 @@ export function WorkflowFormPanel({
     retry: false,
   });
 
-  const fields = useMemo(() => form.data?.fields ?? [], [form.data?.fields]);
+  const fields = useMemo(
+    () => effectiveWorkflowCurrencyFields(form.data?.fields ?? [], form.data?.template?.code),
+    [form.data?.fields, form.data?.template?.code],
+  );
   const instance = form.data?.instance;
   const submitted = instance?.status === 'submitted';
   const businessFormTitle = workflowFormPanelTitle(
@@ -1249,6 +1254,23 @@ function renderFieldControl(
     }
     return <StructuredListControl field={field} value={value} evidence={evidence} disabled={disabled} invalid={invalid} onChange={onChange} />;
   }
+  if (field.field_type === 'currency') {
+    return (
+      <CurrencyInput
+        className="mt-1"
+        inputClassName="text-sm"
+        value={textValue(value)}
+        currencyCode={String(field.validation_json?.currency_code ?? 'VND')}
+        allowNegative={Boolean(field.validation_json?.allow_negative)}
+        maximumFractionDigits={field.validation_json?.maximum_fraction_digits === undefined ? undefined : Number(field.validation_json.maximum_fraction_digits)}
+        min={typeof field.validation_json?.min === 'number' ? field.validation_json.min : undefined}
+        max={typeof field.validation_json?.max === 'number' ? field.validation_json.max : undefined}
+        invalid={invalid}
+        disabled={disabled}
+        onValueChange={({ numericString }) => onChange(numericString)}
+      />
+    );
+  }
   return (
     <input
       type={field.field_type === 'number' || field.field_type === 'date' ? field.field_type : 'text'}
@@ -1314,9 +1336,12 @@ function validateFieldValue(field: WorkflowFormField, value: unknown) {
 type StructuredFieldSpec = {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'evidence_reference' | string;
+  type: 'text' | 'textarea' | 'number' | 'currency' | 'date' | 'select' | 'evidence_reference' | string;
   required?: boolean;
   options?: Array<{ value: string; label?: string }>;
+  currencyCode?: string;
+  allowNegative?: boolean;
+  maximumFractionDigits?: number;
 };
 
 function StructuredListControl({
@@ -1523,7 +1548,7 @@ function StructuredCell({
   onChange: (value: string) => void;
 }) {
   const className = 'mt-1 w-full rounded-md border border-line bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100';
-  const colSpan = spec.type === 'textarea' ? 'md:col-span-5' : spec.type === 'number' ? 'md:col-span-2' : 'md:col-span-3';
+  const colSpan = spec.type === 'textarea' ? 'md:col-span-5' : spec.type === 'number' || spec.type === 'currency' ? 'md:col-span-2' : 'md:col-span-3';
   const selectableEvidence = evidence.filter((record) => record.status !== 'rejected');
   return (
     <label className={clsx('block min-w-0', colSpan)}>
@@ -1532,6 +1557,17 @@ function StructuredCell({
       </span>
       {spec.type === 'textarea' ? (
         <textarea className={className} rows={2} value={textValue(value)} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+      ) : spec.type === 'currency' ? (
+        <CurrencyInput
+          className="mt-1"
+          inputClassName="px-2 py-2 text-sm"
+          value={textValue(value)}
+          currencyCode={spec.currencyCode}
+          allowNegative={spec.allowNegative}
+          maximumFractionDigits={spec.maximumFractionDigits}
+          disabled={disabled}
+          onValueChange={({ numericString }) => onChange(numericString)}
+        />
       ) : spec.type === 'select' ? (
         <select className={className} value={textValue(value)} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
           <option value="">Chọn</option>
@@ -1573,6 +1609,9 @@ function structuredItemFields(field: WorkflowFormField): StructuredFieldSpec[] {
       label: String(spec.label ?? spec.key),
       type: String(spec.type ?? 'text'),
       required: Boolean(spec.required),
+      currencyCode: spec.currency_code ? String(spec.currency_code) : undefined,
+      allowNegative: Boolean(spec.allow_negative),
+      maximumFractionDigits: spec.maximum_fraction_digits === undefined ? undefined : Number(spec.maximum_fraction_digits),
       options: Array.isArray(spec.options)
         ? spec.options
             .filter((option): option is AnyRecord => Boolean(option) && typeof option === 'object' && !Array.isArray(option) && Boolean(option.value))

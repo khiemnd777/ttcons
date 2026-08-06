@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, Plus, WalletCards } from 'lucide-react';
 import clsx from 'clsx';
 import { CurrencyText } from '../../components/CurrencyText';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { DataTable, type Column } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
@@ -237,8 +238,8 @@ function MaterialCostDialog({ open, projectId, options, onClose, onSaved }: { op
     <Field label="Số hóa đơn"><input value={values.invoice_number} onChange={(event) => setValues({ ...values, invoice_number: event.target.value })} /></Field>
     <Field label="Ngày hóa đơn"><input type="date" value={values.invoice_date} onChange={(event) => setValues({ ...values, invoice_date: event.target.value })} /></Field>
     <Field label="Nội dung chi phí *" error={errors.description} wide><input value={values.description} onChange={(event) => setValues({ ...values, description: event.target.value })} /></Field>
-    <Field label="Tiền trước VAT *" error={errors.amount_before_vat}><input type="number" min="0" value={values.amount_before_vat} onChange={(event) => setValues({ ...values, amount_before_vat: event.target.value })} /></Field>
-    <Field label="Tiền VAT"><input type="number" min="0" value={values.vat_amount} onChange={(event) => setValues({ ...values, vat_amount: event.target.value })} /></Field>
+    <Field label="Tiền trước VAT *" error={errors.amount_before_vat}><CurrencyInput min={0} invalid={Boolean(errors.amount_before_vat)} value={values.amount_before_vat} onValueChange={({ numericString }) => setValues({ ...values, amount_before_vat: numericString })} /></Field>
+    <Field label="Tiền VAT"><CurrencyInput min={0} value={values.vat_amount} onValueChange={({ numericString }) => setValues({ ...values, vat_amount: numericString })} /></Field>
     <div className="rounded-md bg-slate-50 p-3 sm:col-span-2"><p className="text-xs font-semibold uppercase text-slate-500">Tổng thanh toán</p><p className="mt-1 text-lg font-semibold">{currency(total)}</p></div>
     <Field label="Ghi chú" wide><textarea rows={3} value={values.notes} onChange={(event) => setValues({ ...values, notes: event.target.value })} /></Field>
     <button id="material-cost-form-submit" className="hidden" type="submit">Lưu</button>
@@ -257,7 +258,7 @@ function CashRequestDialog({ open, projectId, onClose, onSaved }: { open: boolea
     <Field label="Hạn xử lý"><input type="date" value={values.due_date} onChange={(event) => setValues({ ...values, due_date: event.target.value })} /></Field>
     <Field label="Nội dung *" error={errors.title} wide><input value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} /></Field>
     <Field label="Đối tượng thu/chi *" error={errors.counterparty_name}><input value={values.counterparty_name} onChange={(event) => setValues({ ...values, counterparty_name: event.target.value })} /></Field>
-    <Field label="Số tiền *" error={errors.amount}><input type="number" min="1" value={values.amount} onChange={(event) => setValues({ ...values, amount: event.target.value })} /></Field>
+    <Field label="Số tiền *" error={errors.amount}><CurrencyInput min={1} invalid={Boolean(errors.amount)} value={values.amount} onValueChange={({ numericString }) => setValues({ ...values, amount: numericString })} /></Field>
     <Field label="Ghi chú / hồ sơ cần bàn giao" wide><textarea rows={3} value={values.notes} onChange={(event) => setValues({ ...values, notes: event.target.value })} /></Field>
     <button id="cash-request-form-submit" className="hidden" type="submit">Lưu</button>
   </form></Dialog>;

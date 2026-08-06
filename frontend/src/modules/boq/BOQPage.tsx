@@ -9,6 +9,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { CurrencyText } from '../../components/CurrencyText';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { useToast } from '../../components/ToastProvider';
 import { RowActions } from '../../components/RowActions';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
@@ -192,7 +193,7 @@ export function BOQPage() {
     {
       name: 'expected_unit_price',
       label: 'Đơn giá dự kiến',
-      type: 'number' as const,
+      type: 'currency' as const,
       defaultValue: record?.expected_unit_price ?? record?.unit_price ?? 1000000,
       required: true,
       min: 0,
@@ -651,13 +652,13 @@ function PriceStagePanel({
           {buttonLabel}
         </button>
       </div>
-      <input
-        type="number"
+      <CurrencyInput
+        className="mt-3"
+        inputClassName="text-sm"
         min={0}
-        className="mt-3 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
         value={value}
         disabled={disabled}
-        onChange={(event) => onValueChange(event.target.value)}
+        onValueChange={({ numericString }) => onValueChange(numericString)}
       />
     </div>
   );

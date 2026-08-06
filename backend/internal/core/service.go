@@ -1998,6 +1998,9 @@ func normalizeWorkflowFormFieldRequests(fields []WorkflowFormFieldRequest, requi
 		if validation == nil {
 			validation = Record{}
 		}
+		if err := validateWorkflowCurrencyDefinitions(fieldType, validation); err != nil {
+			return nil, validationError(err.Error(), Record{"field_key": fieldKey})
+		}
 		visibility := field.VisibilityCondition
 		if visibility == nil {
 			visibility = Record{}
@@ -2049,7 +2052,83 @@ func validWorkflowFormType(value string) bool {
 }
 
 func validWorkflowFieldType(value string) bool {
-	return statusIn(value, "text", "number", "date", "textarea", "select", "multi_select", "checkbox", "evidence_reference", "structured_list")
+	return statusIn(value, "text", "number", "currency", "date", "textarea", "select", "multi_select", "checkbox", "evidence_reference", "structured_list")
+}
+
+func validateWorkflowCurrencyDefinitions(fieldType string, validation Record) error {
+	if fieldType == "currency" {
+		return validateWorkflowCurrencyConfiguration(validation)
+	}
+	if fieldType != "structured_list" {
+		return nil
+	}
+	rawFields, _ := validation["item_fields"].([]any)
+	for _, rawField := range rawFields {
+		spec, ok := rawField.(map[string]any)
+		if !ok || strings.TrimSpace(fmt.Sprint(spec["type"])) != "currency" {
+			continue
+		}
+		if err := validateWorkflowCurrencyConfiguration(Record(spec)); err != nil {
+			return fmt.Errorf("Cấu hình tiền tệ của %s không hợp lệ: %w", strings.TrimSpace(fmt.Sprint(spec["key"])), err)
+		}
+	}
+	return nil
+}
+
+func validateWorkflowCurrencyConfiguration(configuration Record) error {
+	currencyCode := "VND"
+	if rawCode, exists := configuration["currency_code"]; exists {
+		currencyCode = strings.TrimSpace(fmt.Sprint(rawCode))
+		if !validWorkflowCurrencyCode(currencyCode) {
+			return errors.New("mã tiền tệ phải gồm 3 chữ cái viết hoa")
+		}
+	}
+	if rawDigits, exists := configuration["maximum_fraction_digits"]; exists {
+		digits, err := workflowNumberValue(rawDigits)
+		if err != nil || digits < 0 || digits > 6 || digits != math.Trunc(digits) {
+			return errors.New("số lẻ tối đa phải là số nguyên từ 0 đến 6")
+		}
+		if currencyCode == "VND" && digits != 0 {
+			return errors.New("VND phải dùng 0 chữ số thập phân")
+		}
+	}
+	if rawAllowNegative, exists := configuration["allow_negative"]; exists {
+		if _, ok := rawAllowNegative.(bool); !ok {
+			return errors.New("allow_negative phải là boolean")
+		}
+	}
+	var minimum, maximum float64
+	var hasMinimum, hasMaximum bool
+	if rawMinimum, exists := configuration["min"]; exists {
+		value, err := workflowNumberValue(rawMinimum)
+		if err != nil {
+			return errors.New("giá trị nhỏ nhất phải là số")
+		}
+		minimum, hasMinimum = value, true
+	}
+	if rawMaximum, exists := configuration["max"]; exists {
+		value, err := workflowNumberValue(rawMaximum)
+		if err != nil {
+			return errors.New("giá trị lớn nhất phải là số")
+		}
+		maximum, hasMaximum = value, true
+	}
+	if hasMinimum && hasMaximum && minimum > maximum {
+		return errors.New("giá trị nhỏ nhất không được lớn hơn giá trị lớn nhất")
+	}
+	return nil
+}
+
+func validWorkflowCurrencyCode(code string) bool {
+	if len(code) != 3 {
+		return false
+	}
+	for _, char := range code {
+		if char < 'A' || char > 'Z' {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Service) StartPipeline(ctx context.Context, projectID, templateID, actorID, actorName string) (Record, error) {
@@ -6899,7 +6978,7 @@ func (s *Service) normalizeWorkflowFormValue(ctx context.Context, instance Recor
 			return nil, err
 		}
 		return text, nil
-	case "number":
+	case "number", "currency":
 		numeric, err := workflowNumberValue(value)
 		if err != nil {
 			return nil, err
@@ -7115,7 +7194,7 @@ func (s *Service) normalizeStructuredFieldValue(ctx context.Context, instance Re
 			return nil, fmt.Errorf("%s không được vượt quá %d ký tự", label, max)
 		}
 		return text, nil
-	case "number":
+	case "number", "currency":
 		numeric, err := workflowNumberValue(value)
 		if err != nil {
 			return nil, fmt.Errorf("%s phải là số", label)

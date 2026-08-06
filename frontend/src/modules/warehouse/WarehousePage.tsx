@@ -128,7 +128,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
       { name: 'category', label: 'Nhóm', defaultValue: 'Phụ kiện', required: true },
       { name: 'default_supplier_partner_id', label: 'Nhà cung cấp catalog', type: 'select', options: partnerOptions(partners.data ?? [], ['supplier', 'service_provider', 'other']) },
       { name: 'default_supplier', label: 'Nhà cung cấp', hiddenWhen: (values: RecordRow) => Boolean(values.default_supplier_partner_id) },
-      { name: 'standard_price', label: 'Giá chuẩn', type: 'number', defaultValue: 0, min: 0 },
+      { name: 'standard_price', label: 'Giá chuẩn', type: 'currency', defaultValue: 0, min: 0 },
     ]} onSubmit={(values) => createMaterial.mutateAsync(values)} />
 
     <StockDocumentDialog open={openDocument} projectId={projectId} receiptId={receiptParam} materials={materials.data ?? []} warehouses={warehouses.data ?? []} receiptOptions={receiptOptions.data ?? []} hasPermission={hasPermission} pending={createDocument.isPending} onClose={() => setOpenDocument(false)} onSubmit={(values) => createDocument.mutateAsync(values)} />

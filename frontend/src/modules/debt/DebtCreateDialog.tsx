@@ -46,10 +46,10 @@ export function DebtCreateDialog({
     { name: 'vendor_partner_id', label: 'Đối tác trong danh mục', type: 'select', options: partnerOptions(partners, vendorPartnerTypes), helperText: 'Nếu chọn từ danh mục, hệ thống sẽ chụp lại tên đối tác vào công nợ.' },
     { name: 'vendor_name', label: 'Tên đối tác nhập tay', required: true, hiddenWhen: (values) => Boolean(values.vendor_partner_id) },
     { name: 'due_date', label: 'Hạn thanh toán', type: 'date' },
-    { name: 'gross_amount', label: 'Giá trị ghi nhận', type: 'number', defaultValue: 10000000, required: true, min: 1 },
-    { name: 'advance_amount', label: 'Tạm ứng đã khấu trừ', type: 'number', defaultValue: 0, min: 0 },
-    { name: 'retention_amount', label: 'Giữ lại theo dõi riêng', type: 'number', defaultValue: 0, min: 0 },
-    { name: 'deduction_amount', label: 'Khấu trừ khác', type: 'number', defaultValue: 0, min: 0, validate: (value, values) => Number(values.advance_amount ?? 0) + Number(value ?? 0) > Number(values.gross_amount ?? 0) ? 'Tạm ứng và khấu trừ không được vượt giá trị ghi nhận' : undefined },
+    { name: 'gross_amount', label: 'Giá trị ghi nhận', type: 'currency', defaultValue: 10000000, required: true, min: 1 },
+    { name: 'advance_amount', label: 'Tạm ứng đã khấu trừ', type: 'currency', defaultValue: 0, min: 0 },
+    { name: 'retention_amount', label: 'Giữ lại theo dõi riêng', type: 'currency', defaultValue: 0, min: 0 },
+    { name: 'deduction_amount', label: 'Khấu trừ khác', type: 'currency', defaultValue: 0, min: 0, validate: (value, values) => Number(values.advance_amount ?? 0) + Number(value ?? 0) > Number(values.gross_amount ?? 0) ? 'Tạm ứng và khấu trừ không được vượt giá trị ghi nhận' : undefined },
   ], [partners, projectId, projects]);
 
   const receivableFields = useMemo<FieldDef[]>(() => [
@@ -59,8 +59,8 @@ export function DebtCreateDialog({
     { name: 'client_name', label: 'Tên khách hàng nhập tay', required: true, hiddenWhen: (values) => Boolean(values.client_partner_id) },
     { name: 'milestone_name', label: 'Đợt thanh toán', required: true },
     { name: 'due_date', label: 'Hạn thu', type: 'date' },
-    { name: 'contract_amount', label: 'Giá trị hợp đồng', type: 'number', min: 0 },
-    { name: 'gross_amount', label: 'Giá trị ghi nhận', type: 'number', defaultValue: 30000000, required: true, min: 1 },
+    { name: 'contract_amount', label: 'Giá trị hợp đồng', type: 'currency', min: 0 },
+    { name: 'gross_amount', label: 'Giá trị ghi nhận', type: 'currency', defaultValue: 30000000, required: true, min: 1 },
   ], [partners, projectId, projects]);
 
   const selectedProject = (values: FormValues) => projects.find((project) => project.id === values.project_id)?.name ?? 'Chưa chọn';

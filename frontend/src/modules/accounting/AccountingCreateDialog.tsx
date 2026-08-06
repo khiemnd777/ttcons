@@ -45,14 +45,14 @@ export function AccountingCreateDialog({
   const budgetFields = useMemo<FieldDef[]>(() => [
     { name: 'budget_code', label: 'Mã ngân sách', defaultValue: `BUD-${Date.now().toString().slice(-5)}`, required: true },
     { name: 'name', label: 'Tên ngân sách', defaultValue: 'Ngân sách công trình', required: true },
-    { name: 'planned_amount', label: 'Giá trị kế hoạch', type: 'number', defaultValue: 100000000, required: true, min: 1 },
+    { name: 'planned_amount', label: 'Giá trị kế hoạch', type: 'currency', defaultValue: 100000000, required: true, min: 1 },
   ], []);
 
   const paymentFields = useMemo<FieldDef[]>(() => [
 	{ name: 'project_id', label: 'Công trình', type: 'select', defaultValue: projectId, required: true, options: projects.map((project) => ({ label: project.name, value: project.id })), disabledWhen: () => true },
 	{ name: 'payment_code', label: 'Số phiếu', defaultValue: `PC-${Date.now().toString().slice(-5)}`, required: true },
 	{ name: 'payment_type', label: 'Loại chứng từ', type: 'select', defaultValue: 'outbound', required: true, options: enumOptions('payment_type', ['outbound', 'inbound']) },
-	{ name: 'amount', label: 'Số tiền', type: 'number', defaultValue: 10000000, required: true, min: 1 },
+	{ name: 'amount', label: 'Số tiền', type: 'currency', defaultValue: 10000000, required: true, min: 1 },
 	{ name: 'payment_method', label: 'Phương thức thanh toán', type: 'select', defaultValue: 'bank_transfer', required: true, options: enumOptions('payment_method', ['bank_transfer', 'cash']) },
 	{ name: 'budget_id', label: 'Khoản mục ngân sách', type: 'select', defaultValue: budgets.find((budget) => budget.status === 'approved')?.id ?? '', required: true, hiddenWhen: (values) => values.payment_type !== 'outbound', options: budgets.filter((budget) => budget.status === 'approved').map((budget) => ({ label: `${budget.budget_code} · ${budget.name}`, value: budget.id })) },
 	{ name: 'cash_account_id', label: 'Tài khoản tiền', type: 'select', defaultValue: accounts.find((account) => account.account_code === '1121')?.id ?? accounts[0]?.id ?? '', required: true, options: accounts.filter((account) => ['1111', '1121'].includes(account.account_code ?? '')).map((account) => ({ label: `${account.account_code} · ${account.name}`, value: account.id })) },

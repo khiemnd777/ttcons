@@ -88,7 +88,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
 
   const fields = (record: ProcurementRow) => [
     { name: 'title', label: 'Tiêu đề', defaultValue: record.title ?? '', required: true },
-    { name: 'total_estimated_amount', label: 'Giá trị dự kiến', type: 'number' as const, defaultValue: record.total_estimated_amount ?? 0, min: 0 },
+    { name: 'total_estimated_amount', label: 'Giá trị dự kiến', type: 'currency' as const, defaultValue: record.total_estimated_amount ?? 0, min: 0 },
     { name: 'budget_status', label: 'Ngân sách', type: 'select' as const, defaultValue: record.budget_status ?? 'within_budget', required: true, options: enumOptions('budget_status', ['within_budget', 'budget_exceeded']) },
     { name: 'supplier_partner_id', label: 'Nhà cung cấp', type: 'select' as const, defaultValue: record.supplier_partner_id ?? '', options: supplierOptions, helperText: 'Yêu cầu sinh từ BOQ đã được tách theo nhà cung cấp được chọn.' },
     { name: 'order_reference', label: 'Số đơn đặt hàng / PO', defaultValue: record.order_reference ?? '', helperText: 'Bắt buộc trước khi ghi nhận đã đặt hàng.' },

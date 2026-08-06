@@ -1,9 +1,10 @@
 import { FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { ChevronDown, X } from 'lucide-react';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { useToast } from '../../components/ToastProvider';
 
-type FieldType = 'text' | 'number' | 'date' | 'textarea' | 'select' | 'multi-select' | 'checkbox';
+type FieldType = 'text' | 'number' | 'currency' | 'date' | 'textarea' | 'select' | 'multi-select' | 'checkbox';
 type FieldOption = { label: string; value: string };
 export type FormValues = Record<string, any>;
 
@@ -18,6 +19,9 @@ export type FieldDef = {
   required?: boolean | string;
   min?: number;
   max?: number;
+  currencyCode?: string | ((values: FormValues) => string);
+  allowNegative?: boolean;
+  maximumFractionDigits?: number;
   fullWidth?: boolean;
   hiddenWhen?: (values: FormValues) => boolean;
   disabledWhen?: (values: FormValues) => boolean;
@@ -49,7 +53,10 @@ function isFieldVisible(field: FieldDef, values: FormValues) {
 }
 
 function visibleValues(fields: FieldDef[], values: FormValues) {
-  return Object.fromEntries(fields.filter((field) => isFieldVisible(field, values)).map((field) => [field.name, values[field.name]]));
+  return Object.fromEntries(fields.filter((field) => isFieldVisible(field, values)).map((field) => {
+    const value = values[field.name];
+    return [field.name, field.type === 'currency' && !isEmptyValue(value) ? Number(value) : value];
+  }));
 }
 
 export function SimpleForm({
@@ -95,7 +102,7 @@ export function SimpleForm({
         nextErrors[field.name] = typeof field.required === 'string' ? field.required : `${field.label} là bắt buộc`;
         continue;
       }
-      if (field.type === 'number' && !isEmptyValue(value)) {
+      if ((field.type === 'number' || field.type === 'currency') && !isEmptyValue(value)) {
         const numericValue = Number(value);
         if (Number.isNaN(numericValue)) {
           nextErrors[field.name] = `${field.label} phải là số hợp lệ`;
@@ -152,6 +159,21 @@ export function SimpleForm({
                   onChange={(event) => setFieldValue(field, event.target.value)}
                   aria-invalid={Boolean(error)}
                   disabled={disabled}
+                />
+              ) : field.type === 'currency' ? (
+                <CurrencyInput
+                  className="mt-1"
+                  inputClassName="text-sm focus-ring"
+                  value={values[field.name] ?? ''}
+                  currencyCode={typeof field.currencyCode === 'function' ? field.currencyCode(values) : field.currencyCode}
+                  allowNegative={field.allowNegative}
+                  maximumFractionDigits={field.maximumFractionDigits}
+                  min={field.min}
+                  max={field.max}
+                  placeholder={field.placeholder}
+                  invalid={Boolean(error)}
+                  disabled={disabled}
+                  onValueChange={({ numericString }) => setFieldValue(field, numericString)}
                 />
               ) : field.type === 'select' ? (
                 <select

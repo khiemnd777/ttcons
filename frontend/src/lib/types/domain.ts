@@ -1961,7 +1961,7 @@ export type WorkflowFormField = ProjectOperationsRecord & {
   form_version_id: string;
   field_key: string;
   label: string;
-  field_type: 'text' | 'number' | 'date' | 'textarea' | 'select' | 'multi_select' | 'checkbox' | 'evidence_reference' | 'structured_list' | string;
+  field_type: 'text' | 'number' | 'currency' | 'date' | 'textarea' | 'select' | 'multi_select' | 'checkbox' | 'evidence_reference' | 'structured_list' | string;
   required: boolean;
   options_json?: Array<{ value: string; label?: string }> | string[];
   validation_json?: AnyRecord;

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { useToast } from '../../components/ToastProvider';
 import { post } from '../../lib/api/client';
 import type { ConstructionActionItem, ConstructionVariationContext, ConstructionWorkspace } from '../../lib/types/domain';
@@ -99,7 +100,7 @@ export function ConstructionVariationProposalDialog({ open, projectId, context, 
           <FieldBlock label="Loại ảnh hưởng" required><select className={controlClass()} value={values.variation_type} onChange={(event) => change('variation_type', event.target.value)}><option value="scope">Phạm vi</option><option value="price">Chi phí</option><option value="time">Tiến độ</option><option value="mixed">Hỗn hợp</option></select></FieldBlock>
           <FieldBlock className="sm:col-span-2" label="Lý do phát sinh" required error={errors.reason}><textarea rows={3} className={controlClass(errors.reason)} value={values.reason} onChange={(event) => change('reason', event.target.value)} /></FieldBlock>
           <FieldBlock className="sm:col-span-2" label="Thay đổi phạm vi"><textarea rows={3} className={controlClass()} value={values.scope_delta} onChange={(event) => change('scope_delta', event.target.value)} placeholder="Mô tả phần việc, vật liệu hoặc thiết kế thay đổi" /></FieldBlock>
-          <FieldBlock label="Giá trị ảnh hưởng dự kiến" error={errors.amount_delta}><input type="number" step="any" className={controlClass(errors.amount_delta)} value={values.amount_delta} onChange={(event) => change('amount_delta', event.target.value)} /></FieldBlock>
+          <FieldBlock label="Giá trị ảnh hưởng dự kiến" error={errors.amount_delta}><CurrencyInput allowNegative inputClassName={controlClass(errors.amount_delta)} invalid={Boolean(errors.amount_delta)} value={values.amount_delta} onValueChange={({ numericString }) => change('amount_delta', numericString)} /></FieldBlock>
           <FieldBlock label="Số ngày ảnh hưởng dự kiến" error={errors.days_delta}><input type="number" step="1" className={controlClass(errors.days_delta)} value={values.days_delta} onChange={(event) => change('days_delta', event.target.value)} /></FieldBlock>
           <FieldBlock className="sm:col-span-2" label="Ghi chú gửi QS"><textarea rows={2} className={controlClass()} value={values.comment} onChange={(event) => change('comment', event.target.value)} /></FieldBlock>
         </div>

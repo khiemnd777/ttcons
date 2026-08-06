@@ -64,3 +64,4 @@
 - Project creation uploads BOQ evidence through the protected project-document API before starting the runtime. The selected published template ID remains explicit; fallback selection chooses the latest published revision, never mutates an existing run.
 - Use `GOLDEN-REV3-BOQ-001` (project 023) to review the untouched Rev3 client-BOQ branch. Project 022 is the preservation control and must remain on its original runtime/template snapshot.
 - For Rev4/engine-3 UAT, project 024 is the production-shaped entry-state control at `project_intake`; project 025 is a labelled synthetic construction-stage snapshot and must not be used to infer that planning handoff or earlier node gates completed.
+- Project estimated budget and contract amount are monetary inputs and use semantic `currency`/shared `CurrencyInput`; project progress, dates and other non-money numeric planning values do not.

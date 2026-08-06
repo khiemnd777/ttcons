@@ -2,6 +2,7 @@ import { type FormEvent, type ReactNode, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ExternalLink, Loader2, Plus, RefreshCw, Upload, X } from 'lucide-react';
 import { CurrencyText } from '../../components/CurrencyText';
+import { CurrencyInput } from '../../components/CurrencyInput';
 import { DataTable } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
@@ -244,9 +245,9 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
             {!draft.vendor_partner_id ? <TextField label="Vendor" value={draft.vendor_name} onChange={(value) => updateDraft('vendor_name', value)} required /> : <ReadOnlyField label="Vendor snapshot" value={draft.vendor_name} />}
             {!draft.vendor_partner_id ? <TextField label="Mã số thuế vendor" value={draft.vendor_tax_code} onChange={(value) => updateDraft('vendor_tax_code', value)} /> : <ReadOnlyField label="MST vendor" value={draft.vendor_tax_code || '-'} />}
             <TextField label="Yêu cầu mua liên kết" value={draft.procurement_request_id} onChange={(value) => updateDraft('procurement_request_id', value)} placeholder="UUID procurement request nếu có" />
-            <TextField label="Trước VAT" type="number" value={draft.amount_before_vat} onChange={(value) => updateDraft('amount_before_vat', value)} min="0" />
-            <TextField label="VAT" type="number" value={draft.vat_amount} onChange={(value) => updateDraft('vat_amount', value)} min="0" />
-            <TextField label="Tổng tiền" type="number" value={draft.total_amount} onChange={(value) => updateDraft('total_amount', value)} min="0" required />
+            <TextField label="Trước VAT" type="currency" value={draft.amount_before_vat} onChange={(value) => updateDraft('amount_before_vat', value)} min="0" />
+            <TextField label="VAT" type="currency" value={draft.vat_amount} onChange={(value) => updateDraft('vat_amount', value)} min="0" />
+            <TextField label="Tổng tiền" type="currency" value={draft.total_amount} onChange={(value) => updateDraft('total_amount', value)} min="0" required />
           </div>
 
           <label className="block">
@@ -392,14 +393,21 @@ function TextField({
   return (
     <label className="block">
       <span className="text-xs font-semibold text-slate-600">{label}{required ? ' *' : ''}</span>
-      <input
+      {type === 'currency' ? <CurrencyInput
+        className="mt-1"
+        inputClassName="text-sm focus:ring-blue-500"
+        value={value}
+        min={min}
+        placeholder={placeholder}
+        onValueChange={({ numericString }) => onChange(numericString)}
+      /> : <input
         className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
         type={type}
         value={value}
         min={min}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-      />
+      />}
     </label>
   );
 }
