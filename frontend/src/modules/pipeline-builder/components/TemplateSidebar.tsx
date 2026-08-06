@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
 import { Archive, ArrowLeft, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { BrandHomeLink } from '../../../components/BrandLogo';
 import { PoweredBySignature } from '../../../components/PoweredBySignature';
 import { StatusBadge } from '../../../components/StatusBadge';
 import type { PipelineTemplate } from '../../../lib/types/domain';
@@ -36,6 +37,9 @@ export function TemplateSidebar({
 }: TemplateSidebarProps) {
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-line bg-white">
+      <div className="h-16 shrink-0 border-b border-line">
+        <BrandHomeLink />
+      </div>
       {showBackButton ? (
         <div className="border-b border-line px-4 py-4">
           <button

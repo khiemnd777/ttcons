@@ -224,11 +224,14 @@ export function ProjectsPage() {
         ) : null}
 
         {!projects.isLoading && !projects.error && filteredProjects.length ? (
-          <div className="divide-y divide-line">
+          <div className="space-y-3 bg-slate-50/80 p-3 lg:space-y-0 lg:bg-transparent lg:p-0 lg:divide-y lg:divide-line">
             {filteredProjects.map((project) => {
               const expanded = expandedProjectIds.has(project.id);
               return (
-                <div key={project.id}>
+                <div
+                  key={project.id}
+                  className="overflow-hidden rounded-lg border border-line bg-white shadow-sm lg:rounded-none lg:border-0 lg:shadow-none"
+                >
                   <ProjectExplorerRow
                     project={project}
                     expanded={expanded}

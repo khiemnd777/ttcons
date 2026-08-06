@@ -1,4 +1,5 @@
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -11,13 +12,15 @@ import {
   Kanban,
   LayoutDashboard,
   LogOut,
+  Menu,
   Settings,
   ShieldCheck,
   Users,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { BrandLogo } from '../components/BrandLogo';
+import { BrandHomeLink } from '../components/BrandLogo';
 import { PoweredBySignature } from '../components/PoweredBySignature';
 import { useAuth } from '../lib/auth/AuthContext';
 
@@ -28,7 +31,9 @@ type NavItem = {
   permissions?: string[];
 };
 
-const navGroups: { title: string; items: NavItem[] }[] = [
+type NavGroup = { title: string; items: NavItem[] };
+
+const navGroups: NavGroup[] = [
   {
     title: 'Công việc',
     items: [
@@ -63,12 +68,64 @@ export function AppShell() {
   const { user, logout, hasAnyPermission } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const mobileNavTriggerRef = useRef<HTMLButtonElement>(null);
+  const mobileNavCloseRef = useRef<HTMLButtonElement>(null);
+  const mobileNavPanelRef = useRef<HTMLElement>(null);
   const visibleNavGroups = navGroups
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => hasAnyPermission(item.permissions)),
     }))
     .filter((group) => group.items.length > 0);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const focusFrame = window.requestAnimationFrame(() => mobileNavCloseRef.current?.focus());
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMobileNavOpen(false);
+        window.requestAnimationFrame(() => mobileNavTriggerRef.current?.focus());
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(
+        mobileNavPanelRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [],
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileNavOpen]);
+
+  const closeMobileNavigation = (returnFocus = true) => {
+    setMobileNavOpen(false);
+    if (returnFocus) window.requestAnimationFrame(() => mobileNavTriggerRef.current?.focus());
+  };
 
   const projectFocusMode = /^\/projects\/[^/]+/.test(location.pathname);
 
@@ -85,56 +142,87 @@ export function AppShell() {
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-line bg-white lg:block">
         <div className="flex h-full flex-col">
           <div className="h-16 border-b border-line">
-            <Link
-              to="/"
-              aria-label="Về trang mặc định"
-              className="flex h-full w-full items-center px-4 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
-            >
-              <BrandLogo size={40} variant="lockup" />
-            </Link>
+            <BrandHomeLink />
           </div>
-          <nav className="flex-1 overflow-auto px-3 py-5">
-            {visibleNavGroups.map((group) => (
-              <div key={group.title} className="mb-5">
-                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">{group.title}</p>
-                <div className="space-y-1">
-                  {group.items.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      className={({ isActive }) =>
-                        clsx(
-                          'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium',
-                          isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100 hover:text-ink',
-                        )
-                      }
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {item.label}
-                    </NavLink>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </nav>
+          <AppNavigation groups={visibleNavGroups} className="flex-1 overflow-auto" />
           <div className="border-t border-line px-4 py-3">
             <PoweredBySignature />
           </div>
         </div>
       </aside>
 
+      {mobileNavOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Đóng menu chính"
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]"
+            onClick={() => closeMobileNavigation()}
+          />
+          <aside
+            ref={mobileNavPanelRef}
+            id="mobile-navigation"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu chính"
+            className="relative flex h-full w-[min(18rem,calc(100vw-3rem))] flex-col border-r border-line bg-white shadow-2xl"
+          >
+            <div className="flex h-16 shrink-0 items-stretch border-b border-line">
+              <div className="min-w-0 flex-1">
+                <BrandHomeLink onClick={() => setMobileNavOpen(false)} />
+              </div>
+              <button
+                ref={mobileNavCloseRef}
+                type="button"
+                aria-label="Đóng menu chính"
+                className="m-2 grid h-10 w-10 shrink-0 place-items-center rounded-md text-slate-600 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                onClick={() => closeMobileNavigation()}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <AppNavigation groups={visibleNavGroups} className="min-h-0 flex-1 overflow-auto" onNavigate={() => setMobileNavOpen(false)} />
+            <div className="border-t border-line px-4 py-3">
+              <p className="truncate text-sm font-semibold text-ink">{user?.full_name}</p>
+              <p className="truncate text-xs text-slate-500">{user?.roles?.join(', ')}</p>
+              <button
+                type="button"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  void logout().finally(() => navigate('/login'));
+                }}
+              >
+                <LogOut className="h-4 w-4" />
+                Đăng xuất
+              </button>
+            </div>
+            <div className="border-t border-line px-4 py-3">
+              <PoweredBySignature />
+            </div>
+          </aside>
+        </div>
+      ) : null}
+
       <div className="flex min-h-screen flex-col lg:pl-72">
         <header className="sticky top-0 z-20 flex h-16 items-center border-b border-line bg-white/95 px-4 backdrop-blur md:px-6">
           <div className="flex w-full items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
-              <Link
-                to="/"
-                aria-label="Về trang mặc định"
-                className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 lg:hidden"
+              <button
+                ref={mobileNavTriggerRef}
+                type="button"
+                aria-label="Mở menu chính"
+                aria-controls="mobile-navigation"
+                aria-expanded={mobileNavOpen}
+                title="Mở menu chính"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-line text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:hidden"
+                onClick={() => setMobileNavOpen(true)}
               >
-                <BrandLogo size={40} />
-              </Link>
-              <p className="text-sm font-medium text-ink">Bắt đầu từ việc ưu tiên, luôn rõ Dự án › Node › Bước</p>
+                <Menu className="h-5 w-5" />
+              </button>
+              <BrandHomeLink compact className="lg:hidden" />
+              <p className="hidden text-sm font-medium text-ink sm:block">Bắt đầu từ việc ưu tiên, luôn rõ Dự án › Node › Bước</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden text-right sm:block">
@@ -161,5 +249,43 @@ export function AppShell() {
         </footer>
       </div>
     </div>
+  );
+}
+
+function AppNavigation({
+  groups,
+  className,
+  onNavigate,
+}: {
+  groups: NavGroup[];
+  className?: string;
+  onNavigate?: () => void;
+}) {
+  return (
+    <nav aria-label="Điều hướng chính" className={clsx('px-3 py-5', className)}>
+      {groups.map((group) => (
+        <div key={group.title} className="mb-5 last:mb-0">
+          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">{group.title}</p>
+          <div className="space-y-1">
+            {group.items.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  clsx(
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium',
+                    isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100 hover:text-ink',
+                  )
+                }
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      ))}
+    </nav>
   );
 }

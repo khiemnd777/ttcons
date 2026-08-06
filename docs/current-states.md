@@ -1,5 +1,26 @@
 # Current States
 
+## [Active] Responsive Shell Branding And Mobile Navigation
+
+### Will be done
+
+- Reuse the approved Thủ Thiêm Workflow brand lockup at the top of the Pipeline Builder and project-workspace desktop sidebars, with the same permission-aware `/` home behavior as the standard AppShell.
+- Add an accessible mobile navigation drawer to the standard AppShell so the permission-filtered `Công việc`, `Workflow`, and `Quản trị` groups remain reachable below the desktop breakpoint.
+- Preserve the existing mobile `Mở cây nghiệp vụ` / `Mở cây quy trình` project control and keep Pipeline Builder canvas responsiveness outside this scoped change.
+- Add focused regression coverage, update central/frontend/root-cause mapping, and run non-browser frontend verification. Browser/UAT remains skipped unless explicitly requested in the same turn.
+
+### Done
+
+- Confirmed from the supplied 430×932 Edge screenshot and current source that the AppShell desktop sidebar is hidden below `lg` without any mobile menu trigger or replacement navigation.
+- Confirmed Project Workspace already exposes a mobile tree toggle, while Pipeline Builder has a fixed desktop-first template sidebar; these are separate from the AppShell navigation defect.
+- Produced the evidence-backed review package and Mockup as Text, then received explicit `OK triển khai` for the combined branding and mobile-navigation scope.
+- Added shared `BrandHomeLink` behavior and reused it for standard AppShell, Pipeline Builder and project-workspace desktop brand rows plus compact AppShell/project mobile marks.
+- Added an AppShell mobile hamburger and modal left drawer that reuses the desktop permission-filtered navigation, active-route states, user/logout context and powered-by footer; backdrop, close, Escape and navigation dismiss it, body scroll is locked and keyboard focus is contained/restored.
+- Preserved the project mobile tree control, placed its return action alongside that control and aligned the desktop 320px sidebar brand row with a 64px project header. Pipeline Builder remains desktop-first beyond the approved brand addition.
+- Added a focused failing-then-passing source-contract regression for mobile navigation and focus-sidebar branding; focused test and TypeScript no-emit check pass.
+- Updated central/frontend/root-cause mapping for the shared brand-home owner, responsive AppShell navigation contract, focus-shell brand placement and mobile-menu triage path.
+- Technically verified the current frontend source with all 42 tests, the production TypeScript/Vite build, the bundle budget (121.3 KiB gzip eager entry, 105 JavaScript chunks under the 250 KiB ceiling) and `git diff --check`. Browser/UAT was not requested and remains `NOT UX ACCEPTED`.
+
 ## [Active] Client Workflow Revision 4 And Definition PDF
 
 ### Will be done

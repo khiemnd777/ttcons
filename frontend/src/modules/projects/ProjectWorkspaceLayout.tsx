@@ -18,6 +18,7 @@ import {
   PanelLeftClose,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { BrandHomeLink } from '../../components/BrandLogo';
 import { PoweredBySignature } from '../../components/PoweredBySignature';
 import { StatusBadge } from '../../components/StatusBadge';
 import { get } from '../../lib/api/client';
@@ -66,51 +67,68 @@ export function ProjectWorkspaceLayout() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <header className="sticky top-0 z-30 border-b border-line bg-white px-4 py-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-              onClick={() => navigate('/projects')}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Công trình
-            </button>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-ink">
-                {project ? `${project.code} · ${project.name}` : operations.isLoading ? 'Đang tải công trình...' : 'Không gian công trình'}
-              </p>
-              <p className="truncate text-xs text-slate-500">
-                {[
-                  project?.client_name ? `Chủ đầu tư: ${project.client_name}` : null,
-                  project?.pm_name ? `Phụ trách: ${project.pm_name}` : null,
-                  project?.status ? `Trạng thái: ${statusLabel(project.status)}` : null,
-                ].filter(Boolean).join(' · ') || (showWorkflowSidebar ? 'Quy trình là dòng thời gian xử lý công việc' : 'Cây nghiệp vụ là menu chính trong phạm vi công trình')}
-              </p>
-            </div>
+      <header className="sticky top-0 z-30 border-b border-line bg-white">
+        <div className="lg:grid lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="hidden h-16 border-r border-line lg:block">
+            <BrandHomeLink />
           </div>
-          <div className="flex items-center justify-between gap-3 lg:justify-end">
-            <div className="min-w-0 text-left lg:text-right">
-              <p className="truncate text-sm font-semibold text-ink">{user?.full_name}</p>
-              <p className="truncate text-xs text-slate-500">{user?.roles?.join(', ')}</p>
+          <div className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 lg:py-0">
+            <div className="flex min-w-0 items-center gap-3">
+              <BrandHomeLink compact className="lg:hidden" />
+              <button
+                type="button"
+                className="hidden items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 lg:inline-flex"
+                onClick={() => navigate('/projects')}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Công trình
+              </button>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-ink">
+                  {project ? `${project.code} · ${project.name}` : operations.isLoading ? 'Đang tải công trình...' : 'Không gian công trình'}
+                </p>
+                <p className="truncate text-xs text-slate-500">
+                  {[
+                    project?.client_name ? `Chủ đầu tư: ${project.client_name}` : null,
+                    project?.pm_name ? `Phụ trách: ${project.pm_name}` : null,
+                    project?.status ? `Trạng thái: ${statusLabel(project.status)}` : null,
+                  ].filter(Boolean).join(' · ') || (showWorkflowSidebar ? 'Quy trình là dòng thời gian xử lý công việc' : 'Cây nghiệp vụ là menu chính trong phạm vi công trình')}
+                </p>
+              </div>
             </div>
-            <button
-              className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-              onClick={() => {
-                void logout().finally(() => navigate('/login'));
-              }}
-            >
-              <LogOut className="h-4 w-4" />
-              Đăng xuất
-            </button>
+            <div className="flex shrink-0 items-center gap-3">
+              <div className="hidden min-w-0 text-right sm:block">
+                <p className="truncate text-sm font-semibold text-ink">{user?.full_name}</p>
+                <p className="truncate text-xs text-slate-500">{user?.roles?.join(', ')}</p>
+              </div>
+              <button
+                aria-label="Đăng xuất"
+                className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={() => {
+                  void logout().finally(() => navigate('/login'));
+                }}
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Đăng xuất</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="border-b border-line bg-white px-4 py-2 lg:hidden"><button type="button" aria-expanded={mobileSidebarOpen} className="inline-flex w-full items-center justify-between rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-ink" onClick={() => setMobileSidebarOpen((current) => !current)}><span className="inline-flex items-center gap-2"><PanelLeftClose className="h-4 w-4 text-blue-700" />{showWorkflowSidebar ? 'Mở cây quy trình' : 'Mở cây nghiệp vụ'}</span>{mobileSidebarOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button></div>
-      <div className="grid min-h-[calc(100vh-73px)] lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className={`${mobileSidebarOpen ? 'flex' : 'hidden'} flex-col border-b border-line bg-white lg:sticky lg:top-[73px] lg:flex lg:h-[calc(100vh-73px)] lg:overflow-hidden lg:border-b-0 lg:border-r`}>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 border-b border-line bg-white px-4 py-2 lg:hidden">
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          onClick={() => navigate('/projects')}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Công trình
+        </button>
+        <button type="button" aria-expanded={mobileSidebarOpen} className="inline-flex min-w-0 items-center justify-between rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-ink" onClick={() => setMobileSidebarOpen((current) => !current)}><span className="inline-flex min-w-0 items-center gap-2"><PanelLeftClose className="h-4 w-4 shrink-0 text-blue-700" /><span className="truncate">{showWorkflowSidebar ? 'Mở cây quy trình' : 'Mở cây nghiệp vụ'}</span></span>{mobileSidebarOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}</button>
+      </div>
+      <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className={`${mobileSidebarOpen ? 'flex' : 'hidden'} flex-col border-b border-line bg-white lg:sticky lg:top-16 lg:flex lg:h-[calc(100vh-4rem)] lg:overflow-hidden lg:border-b-0 lg:border-r`}>
           <div className="min-h-0 flex-1 overflow-auto">
             {showWorkflowSidebar ? (
               <WorkflowSidebar
