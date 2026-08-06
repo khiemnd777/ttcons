@@ -89,12 +89,32 @@ func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record
 }
 
 func (r *Repository) ReportProjectOptions(ctx context.Context, userID string, req ReportOptionsRequest, cursor *reportProjectOptionsCursor) ([]Record, Record, error) {
+	return r.projectOptions(ctx, userID, req, cursor, "")
+}
+
+func (r *Repository) ProjectFinanceProjectOptions(ctx context.Context, userID string, req ReportOptionsRequest, cursor *reportProjectOptionsCursor) ([]Record, Record, error) {
+	return r.projectOptions(ctx, userID, req, cursor, "project_finance.view")
+}
+
+func (r *Repository) projectOptions(ctx context.Context, userID string, req ReportOptionsRequest, cursor *reportProjectOptionsCursor, requiredPermission string) ([]Record, Record, error) {
 	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
 	if err != nil {
 		return nil, nil, err
 	}
 	args := append([]any{}, scopeArgs...)
 	conditions := []string{"p.status <> 'cancelled'", scopeSQL}
+	if requiredPermission != "" {
+		args = append(args, userID, requiredPermission)
+		conditions = append(conditions, fmt.Sprintf(`EXISTS (
+			SELECT 1
+			FROM user_roles ur
+			JOIN role_permissions rp ON rp.role_id=ur.role_id
+			JOIN permissions permission ON permission.id=rp.permission_id
+			WHERE ur.user_id=NULLIF($%d, '')::uuid
+			  AND (ur.project_id IS NULL OR ur.project_id=p.id)
+			  AND permission.key=$%d
+		)`, len(args)-1, len(args)))
+	}
 	if req.Search != "" {
 		args = append(args, "%"+req.Search+"%")
 		conditions = append(conditions, fmt.Sprintf("lower(btrim(p.code) || ' ' || btrim(p.name)) LIKE lower($%d)", len(args)))
@@ -121,14 +141,27 @@ func (r *Repository) ReportProjectOptions(ctx context.Context, userID string, re
 	}
 	var selected Record
 	if req.SelectedID != "" {
-		selectedArgs := append(append([]any{}, scopeArgs...), req.SelectedID)
+		selectedArgs := append([]any{}, scopeArgs...)
+		selectedConditions := []string{"p.status <> 'cancelled'", scopeSQL}
+		if requiredPermission != "" {
+			selectedArgs = append(selectedArgs, userID, requiredPermission)
+			selectedConditions = append(selectedConditions, fmt.Sprintf(`EXISTS (
+				SELECT 1
+				FROM user_roles ur
+				JOIN role_permissions rp ON rp.role_id=ur.role_id
+				JOIN permissions permission ON permission.id=rp.permission_id
+				WHERE ur.user_id=NULLIF($%d, '')::uuid
+				  AND (ur.project_id IS NULL OR ur.project_id=p.id)
+				  AND permission.key=$%d
+			)`, len(selectedArgs)-1, len(selectedArgs)))
+		}
+		selectedArgs = append(selectedArgs, req.SelectedID)
 		selected, err = r.QueryOne(ctx, fmt.Sprintf(`
 			SELECT p.id, p.code, p.name
 			FROM projects p
-			WHERE p.status <> 'cancelled'
-			  AND %s
+			WHERE %s
 			  AND p.id=NULLIF($%d, '')::uuid
-		`, scopeSQL, len(selectedArgs)), selectedArgs...)
+		`, strings.Join(selectedConditions, " AND "), len(selectedArgs)), selectedArgs...)
 		if errors.Is(err, sql.ErrNoRows) {
 			selected = nil
 			err = nil

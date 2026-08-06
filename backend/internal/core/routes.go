@@ -384,6 +384,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg c
 	protected.Get("/projects/:id/project-finance", h.ProjectFinanceWorkspace)
 	protected.Get("/projects/:id/project-finance/options", h.ProjectFinanceOptions)
 	protected.Get("/projects/:id/project-finance/export", h.ProjectFinanceCSV)
+	protected.Get("/project-finance/projects", h.ProjectFinanceProjects)
 	protected.Post("/projects/:id/project-finance/material-costs", h.CreateProjectMaterialCost)
 	protected.Post("/projects/:id/project-finance/cash-requests", h.CreateProjectCashRequest)
 	protected.Post("/project-finance/material-costs/:id/:action", h.ProjectMaterialCostAction)

@@ -2,7 +2,7 @@
 
 ## Owners
 
-- Ordinary project-finance report: `frontend/src/modules/project-finance/ProjectFinancePage.tsx`; backend `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`.
+- Ordinary project-finance report: `frontend/src/modules/project-finance/ProjectFinancePage.tsx` with shared `AsyncProjectPicker.tsx`/`ProjectScopeActions.tsx`; backend `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, with project-option paging shared internally through report handler/service/repository helpers.
 - Frontend modules: `frontend/src/modules/dashboard`, `frontend/src/modules/reports`, `frontend/src/modules/accounting/AccountingBooksPanel.tsx`, `frontend/src/modules/accounting/CashflowPanel.tsx`
 - Report workspace/panels: `ReportsPage.tsx`, `reportRegistry.ts`, `ReportFilters.tsx`, `OperationalReportPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`, `CashflowPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
@@ -11,7 +11,7 @@
 
 ## Routes
 
-- Project-management finance: `/projects/:id/project-finance` and `/projects/:id/project-finance/export`.
+- Project-management finance: `/project-finance/projects?search&cursor&limit&selected_id`, `/projects/:id/project-finance` and `/projects/:id/project-finance/export`.
 - Dashboard: `/reports/dashboard`
 - Report options: `/reports/options?search&cursor&limit&selected_id` returns only non-cancelled projects inside actor scope as `{projects:{items,has_more,next_cursor,selected}}`; limit defaults to 20 and is capped at 50.
 - Operational reports: `/reports/projects`, `/reports/warehouse`, `/reports/procurement`, `/reports/accounting`, `/reports/staff`; each accepts optional `project_id` and has a matching `/export` route.
@@ -32,6 +32,8 @@
 - Ordinary `/reports` catalog exposes project, procurement, warehouse and staff reports only. Legacy accounting/cashflow/tax/profit APIs stay available for admin/history support but their panels are not registered for normal users.
 - Project-management finance reporting lives under `Tài chính công trình`: eligible main-client milestone revenue, confirmed material-purchase cost and provisional profit. The UI/API must carry the incomplete-cost-scope warning and redact management monetary totals without `project_finance.report_view`.
 - Project-finance CSV serializes the same material-cost rows returned by the workspace; it must not query legacy AP/AR/payment/invoice/ledger tables as a substitute.
+- Global Project Finance keeps draft and applied project scope separate: only the explicit Apply action writes `project`, while Reset removes it and returns to the no-project state. Workspace data, create/action context and CSV always use the applied project ID; the project-scoped route remains fixed to its route ID.
+- Reports and Finance share the asynchronous picker/page presentation and internal request/cursor mechanics, not permission routes. Reports reads `/reports/options`; Finance reads `/project-finance/projects`, which additionally filters every list and selected lookup by `project_finance.view`. Neither surface eagerly loads all projects.
 - Report APIs enforce project/user visibility.
 - Frontend routes `/reports` and `/reports/:reportKey` expose only catalog entries allowed by `report.view`, `report.finance.view`, or `accounting.view`; the base/invalid/unavailable key redirects to the first visible report. Exactly one report panel is lazy-loaded and mounted, so hidden reports do not issue API reads.
 - `/reports/options`, list results and CSV exports use the same actor project scope. Report `project_id` and option `selected_id` are UUID-validated before repository access. The options repository applies the same `ProjectAccessFilter` to code/name search, keyset pages and the selected-ID lookup; an inaccessible selection returns `selected: null` without exposing its name. Report services retain the single authoritative project-permission check before report queries, avoiding a duplicate DB permission waterfall without weakening RBAC.

@@ -12,6 +12,21 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+func (h *Handler) ProjectFinanceProjects(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"project_finance.view"}); err != nil {
+		return err
+	}
+	req, err := projectOptionsRequest(c)
+	if err != nil {
+		return err
+	}
+	data, err := h.service.ProjectFinanceProjects(c.Context(), req, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, data)
+}
+
 func (h *Handler) ProjectFinanceWorkspace(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"project_finance.view"}); err != nil {
 		return err

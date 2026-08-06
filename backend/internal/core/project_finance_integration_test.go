@@ -2,7 +2,12 @@ package core
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 func TestProjectFinanceValidationRejectsIncompleteManagementRecords(t *testing.T) {
@@ -23,6 +28,76 @@ func TestProjectFinanceValidationRejectsIncompleteManagementRecords(t *testing.T
 		Amount:           100,
 	}, newID(), "Actor")
 	assertValidationError(t, err)
+}
+
+func TestProjectFinanceProjectOptionsRespectScopePermissionAndCursor(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	fixture := setupProjectScopeFixture(t, db, []string{"project_finance.view"})
+	service := NewService(NewRepository(db), "test-secret")
+	extraProjectID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM project_members WHERE project_id=$1`, extraProjectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, extraProjectID)
+	})
+	mustExec(t, db, `UPDATE user_roles SET project_id=$1 WHERE user_id=$2 AND role_id=$3`, fixture.projectID, fixture.userID, fixture.roleID)
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status) VALUES ($1,'Batch4 Scoped Z',$2,'Client','planning')`, extraProjectID, "PFZ-"+extraProjectID[:8])
+	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,'["Member"]'::jsonb,true)`, extraProjectID, fixture.staffID)
+
+	filtered, err := service.ProjectFinanceProjects(ctx, ReportOptionsRequest{
+		Search: "batch4 scoped", SelectedID: extraProjectID,
+	}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filtered.Projects.Items) != 1 || filtered.Projects.Items[0].ID != fixture.projectID {
+		t.Fatalf("finance options permission filter = %#v", filtered.Projects.Items)
+	}
+	if filtered.Projects.Selected != nil {
+		t.Fatalf("unauthorized selected project leaked: %#v", filtered.Projects.Selected)
+	}
+
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id,project_id) VALUES ($1,$2,$3)`, fixture.userID, fixture.roleID, extraProjectID)
+	first, err := service.ProjectFinanceProjects(ctx, ReportOptionsRequest{
+		Search: "batch4 scoped", Limit: 1, SelectedID: fixture.projectID,
+	}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Projects.Items) != 1 || first.Projects.Items[0].ID != fixture.projectID || !first.Projects.HasMore || first.Projects.NextCursor == "" {
+		t.Fatalf("finance options first page = %#v", first.Projects)
+	}
+	second, err := service.ProjectFinanceProjects(ctx, ReportOptionsRequest{
+		Search: "batch4 scoped", Limit: 1, Cursor: first.Projects.NextCursor,
+	}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.Projects.Items) != 1 || second.Projects.Items[0].ID != extraProjectID || second.Projects.HasMore {
+		t.Fatalf("finance options second page = %#v", second.Projects)
+	}
+
+	handler := NewHandler(service)
+	app := batch4TestApp(fixture.userID, func(app *fiber.App, h *Handler) {
+		app.Get("/project-finance/projects", h.ProjectFinanceProjects)
+	}, handler)
+	response, err := app.Test(httptest.NewRequest(http.MethodGet, "/project-finance/projects?search=batch4+scoped&limit=1&selected_id="+fixture.projectID, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+	var body struct {
+		Success bool                  `json:"success"`
+		Data    ReportOptionsResponse `json:"data"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if !body.Success || len(body.Data.Projects.Items) != 1 || body.Data.Projects.Selected == nil {
+		t.Fatalf("finance project options response = %#v", body)
+	}
 }
 
 func TestProjectFinanceCostAndCashRequestLifecycle(t *testing.T) {

@@ -21,11 +21,19 @@ type reportProjectOptionsCursor struct {
 }
 
 func (s *Service) ReportOptions(ctx context.Context, req ReportOptionsRequest, actorID string) (ReportOptionsResponse, error) {
+	return s.projectOptions(ctx, req, actorID, "")
+}
+
+func (s *Service) ProjectFinanceProjects(ctx context.Context, req ReportOptionsRequest, actorID string) (ReportOptionsResponse, error) {
+	return s.projectOptions(ctx, req, actorID, "project_finance.view")
+}
+
+func (s *Service) projectOptions(ctx context.Context, req ReportOptionsRequest, actorID, requiredPermission string) (ReportOptionsResponse, error) {
 	normalized, cursor, err := normalizeReportOptionsRequest(req)
 	if err != nil {
 		return ReportOptionsResponse{}, err
 	}
-	rows, selectedRow, err := s.repo.ReportProjectOptions(ctx, actorID, normalized, cursor)
+	rows, selectedRow, err := s.repo.projectOptions(ctx, actorID, normalized, cursor, requiredPermission)
 	if err != nil {
 		return ReportOptionsResponse{}, err
 	}

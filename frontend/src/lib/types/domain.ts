@@ -1690,22 +1690,26 @@ export type CashflowReport = AnyRecord & {
   ledger: CashflowLedgerRow[];
 };
 
-export type ReportProjectOption = {
+export type ProjectScopeOption = {
   id: string;
   code: string;
   name: string;
 };
 
-export type ReportProjectOptionsPage = {
-  items: ReportProjectOption[];
+export type ProjectScopeOptionsPage = {
+  items: ProjectScopeOption[];
   has_more: boolean;
   next_cursor?: string;
-  selected: ReportProjectOption | null;
+  selected: ProjectScopeOption | null;
 };
 
-export type ReportOptions = {
-  projects: ReportProjectOptionsPage;
+export type ProjectScopeOptions = {
+  projects: ProjectScopeOptionsPage;
 };
+
+export type ReportProjectOption = ProjectScopeOption;
+export type ReportProjectOptionsPage = ProjectScopeOptionsPage;
+export type ReportOptions = ProjectScopeOptions;
 
 export type ProjectReportRow = AnyRecord & {
   project_id: string;

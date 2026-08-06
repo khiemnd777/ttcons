@@ -8,15 +8,15 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSection } from '../../components/ListSection';
-import { PageHeader } from '../../components/PageHeader';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, get, post } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
-import type { Project, ProjectFinanceOptions, ProjectFinanceWorkspace } from '../../lib/types/domain';
+import type { ProjectFinanceOptions, ProjectFinanceWorkspace } from '../../lib/types/domain';
 import { currency, dateText } from '../../lib/utils/format';
-import { ProjectSelector } from '../_shared/ProjectSelector';
+import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
+import { ProjectScopeActions } from '../_shared/ProjectScopeActions';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 type FinanceTab = 'overview' | 'tasks' | 'costs' | 'requests' | 'report';
@@ -36,14 +36,14 @@ export function ProjectFinancePage({ global = false }: { global?: boolean }) {
   const requestedTab = searchParams.get('tab') as FinanceTab | null;
   const requestedProjectId = searchParams.get('project') ?? '';
   const [tab, setTab] = useState<FinanceTab>(tabs.some((item) => item.value === requestedTab) ? requestedTab! : 'overview');
+  const [draftProjectId, setDraftProjectId] = useState(requestedProjectId);
   const [dialog, setDialog] = useState<'cost' | 'request' | null>(null);
   const [detail, setDetail] = useState<{ kind: 'cost' | 'request'; row: FinanceRow } | null>(null);
   const [actionPrompt, setActionPrompt] = useState<{ kind: 'cost' | 'request'; row: FinanceRow; actionName: string } | null>(null);
   const { hasAnyPermission } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Project[]>('/projects'), enabled: global && !id });
-  const projectId = id ?? (global ? requestedProjectId || projects.data?.[0]?.id || '' : '');
+  const projectId = id ?? (global ? requestedProjectId : '');
 
   const workspace = useQuery({
     queryKey: ['project-finance', projectId],
@@ -79,6 +79,10 @@ export function ProjectFinancePage({ global = false }: { global?: boolean }) {
   const visibleTabs = tabs.filter((item) => item.value !== 'report' || reportVisible);
 
   useEffect(() => {
+    if (global) setDraftProjectId(requestedProjectId);
+  }, [global, requestedProjectId]);
+
+  useEffect(() => {
     if (tab === 'report' && !reportVisible) selectTab('overview');
   // selectTab is intentionally excluded because this effect follows permission/data changes only.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,11 +95,24 @@ export function ProjectFinancePage({ global = false }: { global?: boolean }) {
     setSearchParams(params, { replace: true });
   }
 
-  function selectProject(nextProjectId: string) {
+  function applyProjectScope() {
+    if (!draftProjectId) return;
     const params = new URLSearchParams(searchParams);
-    if (nextProjectId) params.set('project', nextProjectId);
-    else params.delete('project');
+    params.set('project', draftProjectId);
     setSearchParams(params, { replace: true });
+    setDialog(null);
+    setDetail(null);
+    setActionPrompt(null);
+  }
+
+  function resetProjectScope() {
+    const params = new URLSearchParams(searchParams);
+    params.delete('project');
+    setSearchParams(params, { replace: true });
+    setDraftProjectId('');
+    setDialog(null);
+    setDetail(null);
+    setActionPrompt(null);
   }
 
   async function exportReport() {
@@ -117,21 +134,45 @@ export function ProjectFinancePage({ global = false }: { global?: boolean }) {
   return (
     <div className="space-y-5">
       {id ? <ProjectBackLink /> : null}
-      <PageHeader
-        title="Tài chính công trình"
-        description="Ghi nhận chi phí mua vật tư, theo dõi hồ sơ đề nghị thu/chi và cung cấp số liệu quản trị cho Ban giám đốc. Không thay thế MISA, sổ kế toán hoặc kê khai thuế."
-        horizontalFrom="2xl"
-        actions={<>
-          {global ? <ProjectSelector value={projectId} onChange={selectProject} /> : null}
-          {canCreateCost && projectId ? <button className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setDialog('cost')}><Plus className="h-4 w-4" /> Ghi nhận chi phí vật tư</button> : null}
-          {canCreateRequest && projectId ? <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setDialog('request')}><WalletCards className="h-4 w-4" /> Lập đề nghị thu/chi</button> : null}
-        </>}
-      />
+      <header className="border-b border-line pb-5">
+        <div className={clsx('grid gap-4', global && 'xl:grid-cols-[minmax(0,1fr)_36rem] xl:items-end xl:gap-8')}>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Tài chính công trình</h1>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Ghi nhận chi phí mua vật tư, theo dõi hồ sơ đề nghị thu/chi và cung cấp số liệu quản trị cho Ban giám đốc. Không thay thế MISA, sổ kế toán hoặc kê khai thuế.</p>
+          </div>
+
+          {global ? <section className="min-w-0 border-t border-line pt-4 xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình tài chính">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <AsyncProjectPicker
+                value={draftProjectId}
+                onChange={setDraftProjectId}
+                endpoint="/project-finance/projects"
+                queryKey="project-finance-project-options"
+                emptyLabel="Chọn công trình"
+                allowEmptySelection={false}
+              />
+              <ProjectScopeActions
+                applying={workspace.isFetching}
+                applyDisabled={!draftProjectId || draftProjectId === projectId}
+                resetDisabled={workspace.isFetching || (!draftProjectId && !projectId)}
+                onApply={applyProjectScope}
+                onReset={resetProjectScope}
+              />
+            </div>
+          </section> : null}
+        </div>
+      </header>
 
       {!projectId ? <EmptyState title="Chọn công trình để xem tài chính công trình." /> : <>
-        <nav className="flex gap-1 overflow-x-auto border-b border-line" aria-label="Nội dung tài chính công trình">
-          {visibleTabs.map((item) => <button key={item.value} className={clsx('whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-semibold', tab === item.value ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-ink')} onClick={() => selectTab(item.value)}>{item.label}{item.value === 'tasks' && data?.tasks?.length ? <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">{data.tasks.length}</span> : null}</button>)}
-        </nav>
+        <div className="flex flex-col gap-3 border-b border-line sm:flex-row sm:items-end sm:justify-between">
+          <nav className="order-2 flex min-w-0 gap-1 overflow-x-auto sm:order-1" aria-label="Nội dung tài chính công trình">
+            {visibleTabs.map((item) => <button key={item.value} className={clsx('whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-semibold', tab === item.value ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-ink')} onClick={() => selectTab(item.value)}>{item.label}{item.value === 'tasks' && data?.tasks?.length ? <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">{data.tasks.length}</span> : null}</button>)}
+          </nav>
+          {canCreateCost || canCreateRequest ? <div className="order-1 flex flex-wrap gap-2 pb-0 sm:order-2 sm:pb-2">
+            {canCreateCost ? <button className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={workspace.isFetching} onClick={() => setDialog('cost')}><Plus className="h-4 w-4" /> Ghi nhận chi phí vật tư</button> : null}
+            {canCreateRequest ? <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={workspace.isFetching} onClick={() => setDialog('request')}><WalletCards className="h-4 w-4" /> Lập đề nghị thu/chi</button> : null}
+          </div> : null}
+        </div>
 
         {workspace.isLoading ? <div className="rounded-lg border border-line bg-white p-8 text-sm text-slate-600">Đang tải số liệu tài chính công trình...</div> : null}
         {workspace.isError ? <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">Không tải được số liệu. Vui lòng kiểm tra quyền và thử lại.</div> : null}

@@ -28,24 +28,32 @@ func (h *Handler) ReportOptions(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"report.view", "report.finance.view", "accounting.view"}); err != nil {
 		return err
 	}
-	limit := 0
-	if rawLimit := strings.TrimSpace(c.Query("limit")); rawLimit != "" {
-		parsed, err := strconv.Atoi(rawLimit)
-		if err != nil {
-			return validationError("limit không hợp lệ", Record{"limit": rawLimit})
-		}
-		limit = parsed
+	req, err := projectOptionsRequest(c)
+	if err != nil {
+		return err
 	}
-	data, err := h.service.ReportOptions(c.Context(), ReportOptionsRequest{
-		Search:     c.Query("search"),
-		Cursor:     c.Query("cursor"),
-		Limit:      limit,
-		SelectedID: c.Query("selected_id"),
-	}, actorID(c))
+	data, err := h.service.ReportOptions(c.Context(), req, actorID(c))
 	if err != nil {
 		return err
 	}
 	return response.OK(c, data)
+}
+
+func projectOptionsRequest(c *fiber.Ctx) (ReportOptionsRequest, error) {
+	limit := 0
+	if rawLimit := strings.TrimSpace(c.Query("limit")); rawLimit != "" {
+		parsed, err := strconv.Atoi(rawLimit)
+		if err != nil {
+			return ReportOptionsRequest{}, validationError("limit không hợp lệ", Record{"limit": rawLimit})
+		}
+		limit = parsed
+	}
+	return ReportOptionsRequest{
+		Search:     c.Query("search"),
+		Cursor:     c.Query("cursor"),
+		Limit:      limit,
+		SelectedID: c.Query("selected_id"),
+	}, nil
 }
 
 func (h *Handler) CashflowReport(c *fiber.Ctx) error {

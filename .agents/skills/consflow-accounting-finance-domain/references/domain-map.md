@@ -2,8 +2,8 @@
 
 ## Owners
 
-- Ordinary project-finance UI: `frontend/src/modules/project-finance/ProjectFinancePage.tsx`, routed at `/accounting` and `/projects/:id/accounting`
-- Ordinary project-finance backend: `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, `types_project_finance.go`
+- Ordinary project-finance UI: `frontend/src/modules/project-finance/ProjectFinancePage.tsx`, shared `frontend/src/modules/_shared/AsyncProjectPicker.tsx` and `ProjectScopeActions.tsx`, routed at `/accounting` and `/projects/:id/accounting`
+- Ordinary project-finance backend: `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, `types_project_finance.go`; project-option parsing/paging/search helpers live in `handlers_reports.go`, `service_reports.go` and `repository_reports.go`
 - Frontend modules: `frontend/src/modules/accounting` (`AccountingPage.tsx`, `AccountingBooksPanel.tsx`, `ManualJournalDialog.tsx`, `TaxWorkspace.tsx`, `AccountingCreateDialog.tsx`, `AccountingDetailDialog.tsx`, `CashflowPanel.tsx`), `frontend/src/modules/debt`, `frontend/src/modules/contracts`, `frontend/src/modules/reports`
 - Debt panels: `InputInvoicePanel.tsx`, `OutputInvoicePanel.tsx`, `InputPaymentPlanPanel.tsx`, `OutputBillingPlanPanel.tsx`, `PayableReconciliationPanel.tsx`, `ReceivableReconciliationPanel.tsx`
 - Report panels: `CashflowPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`
@@ -13,7 +13,7 @@
 
 ## Routes
 
-- Ordinary project finance: `/projects/:id/project-finance`, `/projects/:id/project-finance/options`, `/projects/:id/project-finance/export`, create material-cost/cash-request routes and record action routes.
+- Ordinary project finance: `/project-finance/projects?search&cursor&limit&selected_id`, `/projects/:id/project-finance`, `/projects/:id/project-finance/options`, `/projects/:id/project-finance/export`, create material-cost/cash-request routes and record action routes. The global project-options route requires `project_finance.view` and applies both actor project scope and per-project permission to list/search/cursor/selected resolution.
 - The routes below are legacy professional-accounting support. They remain backend-compatible but are not ordinary Accounting/Reports navigation for non-admin roles.
 - Budgets/payments: `/projects/:id/budget`, `/budgets/:id/approve`, `/payments`, `/payments/:id/approve|reverse`
 - Ledger: `/accounting/accounts`, `/accounting/periods`, `/accounting/journal-entries`, `/projects/:id/accounting/journal-entries`, `/accounting/journal-entries/:id/reverse`
@@ -36,11 +36,13 @@
 - `payable_payment_schedules`, `receivable_payment_schedules`, `client_advance_receipts`
 - `contracts`, `contract_versions`, `contract_milestones`, `contract_variations`, `contract_retentions`, `contract_retention_releases`
 - Related documents: `documents`, `evidence_records`, `partners`
-- Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`, `V70`, `V71`, `V73`-`V83`
+- Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`, `V70`, `V71`, `V73`-`V83`; existing V90 project search/order indexes support the Finance picker without a new migration.
 
 ## Invariants
 
 - Product boundary: Consflow ordinary users manage workflow and project-management finance only. MISA owns professional bookkeeping/tax outside Consflow; there is no MISA integration or synchronization.
+- Global `/accounting` uses a draft searchable project choice and applies it only through the `project` query parameter after explicit confirmation. It must not eagerly load `/projects` or auto-select the first project; Reset removes the applied project and returns to the no-project empty state. Workspace reads, creates, actions and CSV use only the applied ID. `/projects/:id/accounting` remains fixed to the route project and never renders the global selector.
+- Finance project choices come from `/project-finance/projects`, not `/reports/options`. Search is server-side by code/name with bounded cursor pages; list rows and direct `selected_id` resolution apply identical actor-scope, non-cancelled and `project_finance.view` checks, so an unauthorized selected project returns `selected: null` without leaking its name.
 - Only `project_material_costs.status='confirmed'` contributes to management cost. Draft/submitted/needs-changes records remain visible blockers but do not alter provisional profit.
 - Provisional management profit is eligible main-client milestone revenue minus confirmed material-purchase cost. It must always disclose that labor, subcontractor, equipment, overhead, management cost and tax are excluded.
 - A project material cost must link at least one same-project procurement, incoming-acceptance, stock-document or document source. Cash-request generic source IDs are type-whitelisted and same-project validated.
