@@ -98,7 +98,7 @@ export function ProfitReportPanel({ projectOptions = [] }: { projectOptions?: Re
           <ReportDateField label="Đến ngày" value={filters.to} onChange={(to) => setFilters((current) => ({ ...current, to }))} />
           <ReportSelectField label="Kỳ" value={filters.groupBy} onChange={(groupBy) => setFilters((current) => ({ ...current, groupBy: groupBy as ProfitFilters['groupBy'] }))} options={[['month', 'Tháng'], ['quarter', 'Quý']]} />
           <ReportSelectField label="Trạng thái" value={filters.status} onChange={(status) => setFilters((current) => ({ ...current, status: status as ProfitFilters['status'] }))} options={[['posted', 'Đã ghi nhận'], ['all', 'Tất cả chưa xóa']]} />
-          <ReportFilterActions applying={report.isFetching} exporting={exporting || report.isLoading} onApply={applyFilters} onReset={resetFilters} onExport={() => void exportCSV()} />
+          <ReportFilterActions applying={report.isFetching} exporting={exporting} exportDisabled={report.isLoading} onApply={applyFilters} onReset={resetFilters} onExport={() => void exportCSV()} />
         </div>
       </div>
 

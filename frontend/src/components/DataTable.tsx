@@ -33,6 +33,7 @@ export function DataTable<T extends Record<string, any>>({
   pageSizeOptions,
   defaultSort,
   getRowKey,
+  renderMobileCard,
 }: {
   rows: T[];
   columns: Column<T>[];
@@ -48,6 +49,7 @@ export function DataTable<T extends Record<string, any>>({
   pageSizeOptions?: number[];
   defaultSort?: { key: string; direction?: SortDirection };
   getRowKey?: (row: T, index: number) => string | number;
+  renderMobileCard?: (row: T) => ReactNode;
 }) {
   const [internalQuery, setInternalQuery] = useState('');
   const query = searchQuery ?? internalQuery;
@@ -87,12 +89,21 @@ export function DataTable<T extends Record<string, any>>({
   const rangeEnd = isPaginated ? Math.min(safePage * currentPageSize, sortedRows.length) : sortedRows.length;
   const hasControls = Boolean(searchPlaceholder || isPaginated);
   const resolvedPageSizeOptions = normalizedPageSizeOptions(pageSizeOptions, currentPageSize);
+  const sortableColumns = columns.filter((column) => column.sortable || column.sortValue);
+  const mobileSortValue = sort ? `${sort.key}:${sort.direction}` : '';
 
   useEffect(() => {
     setCurrentPage(1);
   }, [query, currentPageSize, rows.length, sort?.key, sort?.direction]);
 
   if (!enhanced && !rows.length) return <EmptyState title={empty} action={emptyAction} />;
+
+  const clearSearch = () => {
+    if (onSearchQueryChange) onSearchQueryChange('');
+    else setInternalQuery('');
+  };
+
+  const rowKey = (row: T, index: number) => getRowKey?.(row, index) ?? row.id ?? index;
 
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
@@ -113,17 +124,62 @@ export function DataTable<T extends Record<string, any>>({
               />
             </label>
           ) : <span />}
-          <p className="whitespace-nowrap text-xs font-medium text-slate-500">
+          <p className={clsx('whitespace-nowrap text-xs font-medium text-slate-500', renderMobileCard && 'hidden md:block')}>
             {rangeStart}-{rangeEnd} / {sortedRows.length} dòng
           </p>
         </div>
       ) : null}
 
-      {loading ? (
-        <div className="flex items-center gap-3 px-4 py-6 text-sm text-slate-600">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-          Đang tải dữ liệu...
+      {renderMobileCard && hasControls ? (
+        <div className="flex items-center justify-between gap-3 border-b border-line bg-white px-4 pb-3 text-xs font-medium text-slate-500 md:hidden">
+          <span className="whitespace-nowrap">{sortedRows.length} kết quả</span>
+          {sortableColumns.length ? (
+            <label className="flex min-w-0 items-center gap-2">
+              <span className="sr-only">Sắp xếp báo cáo</span>
+              <select
+                className="min-w-0 max-w-52 rounded-md border border-line bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100"
+                aria-label="Sắp xếp báo cáo"
+                value={mobileSortValue}
+                onChange={(event) => setSort(sortFromSelectValue(event.target.value))}
+              >
+                {!sort ? <option value="">Thứ tự mặc định</option> : null}
+                {sortableColumns.flatMap((column) => [
+                  <option key={`${column.key}:asc`} value={`${column.key}:asc`}>{column.header}: tăng dần</option>,
+                  <option key={`${column.key}:desc`} value={`${column.key}:desc`}>{column.header}: giảm dần</option>,
+                ])}
+              </select>
+            </label>
+          ) : null}
         </div>
+      ) : null}
+
+      {loading ? (
+        renderMobileCard ? (
+          <>
+            <div className="space-y-3 bg-slate-50/70 p-3 md:hidden" role="status" aria-label="Đang tải dữ liệu">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="animate-pulse rounded-lg border border-line bg-white p-4">
+                  <div className="h-4 w-2/3 rounded bg-slate-200" />
+                  <div className="mt-3 h-5 w-1/2 rounded bg-slate-100" />
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="h-12 rounded bg-slate-100" />
+                    <div className="h-12 rounded bg-slate-100" />
+                  </div>
+                </div>
+              ))}
+              <span className="sr-only">Đang tải dữ liệu...</span>
+            </div>
+            <div className="hidden items-center gap-3 px-4 py-6 text-sm text-slate-600 md:flex">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              Đang tải dữ liệu...
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-3 px-4 py-6 text-sm text-slate-600">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            Đang tải dữ liệu...
+          </div>
+        )
       ) : error ? (
         <div className="px-4 py-6">
           <div className="flex flex-col gap-3 rounded-md border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
@@ -142,7 +198,8 @@ export function DataTable<T extends Record<string, any>>({
           </div>
         </div>
       ) : visibleRows.length ? (
-      <div className="overflow-x-auto">
+      <>
+      <div className={clsx('overflow-x-auto', renderMobileCard && 'hidden md:block')}>
         <table className="min-w-full divide-y divide-line">
           <thead className="bg-slate-50">
             <tr>
@@ -172,7 +229,7 @@ export function DataTable<T extends Record<string, any>>({
           </thead>
           <tbody className="divide-y divide-line">
             {visibleRows.map((row, index) => (
-              <tr key={getRowKey?.(row, index) ?? row.id ?? index} className="hover:bg-slate-50">
+              <tr key={rowKey(row, index)} className="hover:bg-slate-50">
                 {columns.map((column) => (
                   <td key={column.key} className={clsx('px-4 py-3 text-sm text-slate-700', alignClass(column.align), column.className)}>
                     {column.render ? column.render(row) : row[column.key] ?? '-'}
@@ -183,9 +240,22 @@ export function DataTable<T extends Record<string, any>>({
           </tbody>
         </table>
       </div>
+      {renderMobileCard ? (
+        <div className="space-y-3 bg-slate-50/70 p-3 md:hidden">
+          {visibleRows.map((row, index) => <div key={rowKey(row, index)}>{renderMobileCard(row)}</div>)}
+        </div>
+      ) : null}
+      </>
       ) : (
         <div className="p-4">
-          <EmptyState title={query.trim() ? 'Không có dòng phù hợp' : empty} action={query.trim() ? undefined : emptyAction} />
+          <EmptyState
+            title={query.trim() ? 'Không có dòng phù hợp' : empty}
+            action={query.trim() && renderMobileCard ? (
+              <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={clearSearch}>
+                Xóa nội dung tìm kiếm
+              </button>
+            ) : emptyAction}
+          />
         </div>
       )}
 
@@ -229,6 +299,14 @@ export function DataTable<T extends Record<string, any>>({
 function nextSort(key: string, current: { key: string; direction: SortDirection } | null): { key: string; direction: SortDirection } {
   if (current?.key !== key) return { key, direction: 'asc' as SortDirection };
   return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+}
+
+function sortFromSelectValue(value: string): { key: string; direction: SortDirection } | null {
+  const separatorIndex = value.lastIndexOf(':');
+  if (separatorIndex <= 0) return null;
+  const direction = value.slice(separatorIndex + 1);
+  if (direction !== 'asc' && direction !== 'desc') return null;
+  return { key: value.slice(0, separatorIndex), direction };
 }
 
 function searchValueForColumn<T extends Record<string, any>>(row: T, column: Column<T>) {

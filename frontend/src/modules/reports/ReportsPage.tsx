@@ -4,7 +4,6 @@ import { Navigate, NavLink, useLocation, useNavigate, useParams } from 'react-ro
 import clsx from 'clsx';
 import { ChevronRight, ShieldAlert } from 'lucide-react';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { PageHeader } from '../../components/PageHeader';
 import { get } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import type { ReportOptions } from '../../lib/types/domain';
@@ -53,14 +52,17 @@ export function ReportsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Báo cáo & phân tích"
-        description="Chọn một báo cáo để tập trung phân tích; số liệu và CSV luôn dùng cùng phạm vi lọc và quyền truy cập."
-      />
+      <div className="mb-4 border-b border-line pb-4 md:mb-5 md:pb-5">
+        <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Báo cáo & phân tích</h1>
+        <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+          <span className="md:hidden">Số liệu và CSV dùng cùng phạm vi lọc và quyền truy cập.</span>
+          <span className="hidden md:inline">Chọn một báo cáo để tập trung phân tích; số liệu và CSV luôn dùng cùng phạm vi lọc và quyền truy cập.</span>
+        </p>
+      </div>
 
       <div className="mb-4 lg:hidden">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Báo cáo đang xem</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Loại báo cáo</span>
           <select
             className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2.5 text-sm font-semibold text-ink outline-none focus:ring-2 focus:ring-blue-100"
             value={activeReport.key}
@@ -69,6 +71,7 @@ export function ReportsPage() {
             {visibleReports.map((report) => <option key={report.key} value={report.key}>{report.label}</option>)}
           </select>
         </label>
+        <p className="mt-2 text-sm leading-5 text-slate-600">{activeReport.description}</p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -103,7 +106,7 @@ export function ReportsPage() {
         </aside>
 
         <main className="min-w-0">
-          <div className="mb-4 rounded-lg border border-line bg-white px-4 py-3 shadow-panel">
+          <div className="mb-4 hidden rounded-lg border border-line bg-white px-4 py-3 shadow-panel lg:block">
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{reportGroupLabels[activeReport.group]}</p>
             <h1 className="mt-1 text-xl font-semibold text-ink">{activeReport.label}</h1>
             <p className="mt-1 text-sm text-slate-600">{activeReport.description}</p>

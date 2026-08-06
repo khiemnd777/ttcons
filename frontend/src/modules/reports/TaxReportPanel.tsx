@@ -100,7 +100,7 @@ export function TaxReportPanel({ projectOptions = [] }: { projectOptions?: Repor
           <ReportSelectField label="Kỳ" value={filters.groupBy} onChange={(groupBy) => setFilters((current) => ({ ...current, groupBy: groupBy as TaxFilters['groupBy'] }))} options={[['month', 'Tháng'], ['quarter', 'Quý']]} />
           <ReportSelectField label="Nguồn" value={filters.source} onChange={(source) => setFilters((current) => ({ ...current, source: source as TaxFilters['source'] }))} options={[['all', 'Tất cả'], ['input', 'Đầu vào'], ['output', 'Đầu ra']]} />
           <ReportSelectField label="Trạng thái" value={filters.status} onChange={(status) => setFilters((current) => ({ ...current, status: status as TaxFilters['status'] }))} options={[['posted', 'Đã ghi nhận'], ['all', 'Tất cả chưa xóa']]} />
-          <ReportFilterActions applying={report.isFetching} exporting={exporting || report.isLoading} onApply={applyFilters} onReset={resetFilters} onExport={() => void exportCSV()} />
+          <ReportFilterActions applying={report.isFetching} exporting={exporting} exportDisabled={report.isLoading} onApply={applyFilters} onReset={resetFilters} onExport={() => void exportCSV()} />
         </div>
       </div>
 
