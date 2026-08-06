@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"consflow/backend/internal/shared/response"
@@ -27,7 +28,20 @@ func (h *Handler) ReportOptions(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"report.view", "report.finance.view", "accounting.view"}); err != nil {
 		return err
 	}
-	data, err := h.service.ReportOptions(c.Context(), actorID(c))
+	limit := 0
+	if rawLimit := strings.TrimSpace(c.Query("limit")); rawLimit != "" {
+		parsed, err := strconv.Atoi(rawLimit)
+		if err != nil {
+			return validationError("limit không hợp lệ", Record{"limit": rawLimit})
+		}
+		limit = parsed
+	}
+	data, err := h.service.ReportOptions(c.Context(), ReportOptionsRequest{
+		Search:     c.Query("search"),
+		Cursor:     c.Query("cursor"),
+		Limit:      limit,
+		SelectedID: c.Query("selected_id"),
+	}, actorID(c))
 	if err != nil {
 		return err
 	}

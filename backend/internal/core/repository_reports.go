@@ -2,9 +2,11 @@ package core
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 )
 
 func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record, error) {
@@ -86,17 +88,56 @@ func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record
 	return data, nil
 }
 
-func (r *Repository) ReportProjectOptions(ctx context.Context, userID string) ([]Record, error) {
+func (r *Repository) ReportProjectOptions(ctx context.Context, userID string, req ReportOptionsRequest, cursor *reportProjectOptionsCursor) ([]Record, Record, error) {
 	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return r.Query(ctx, fmt.Sprintf(`
-		SELECT p.id, p.name
+	args := append([]any{}, scopeArgs...)
+	conditions := []string{"p.status <> 'cancelled'", scopeSQL}
+	if req.Search != "" {
+		args = append(args, "%"+req.Search+"%")
+		conditions = append(conditions, fmt.Sprintf("lower(btrim(p.code) || ' ' || btrim(p.name)) LIKE lower($%d)", len(args)))
+	}
+	if cursor != nil {
+		args = append(args, cursor.NameKey, cursor.CodeKey, cursor.ID)
+		conditions = append(conditions, fmt.Sprintf(`
+			(lower(btrim(p.name)), lower(btrim(p.code)), p.id) >
+			($%d, $%d, NULLIF($%d, '')::uuid)
+		`, len(args)-2, len(args)-1, len(args)))
+	}
+	args = append(args, req.Limit+1)
+	rows, err := r.Query(ctx, fmt.Sprintf(`
+		SELECT p.id, p.code, p.name,
+			lower(btrim(p.name)) AS name_key,
+			lower(btrim(p.code)) AS code_key
 		FROM projects p
-		WHERE p.status <> 'cancelled' AND %s
-		ORDER BY p.name
-	`, scopeSQL), scopeArgs...)
+		WHERE %s
+		ORDER BY lower(btrim(p.name)), lower(btrim(p.code)), p.id
+		LIMIT $%d
+	`, strings.Join(conditions, " AND "), len(args)), args...)
+	if err != nil {
+		return nil, nil, err
+	}
+	var selected Record
+	if req.SelectedID != "" {
+		selectedArgs := append(append([]any{}, scopeArgs...), req.SelectedID)
+		selected, err = r.QueryOne(ctx, fmt.Sprintf(`
+			SELECT p.id, p.code, p.name
+			FROM projects p
+			WHERE p.status <> 'cancelled'
+			  AND %s
+			  AND p.id=NULLIF($%d, '')::uuid
+		`, scopeSQL, len(selectedArgs)), selectedArgs...)
+		if errors.Is(err, sql.ErrNoRows) {
+			selected = nil
+			err = nil
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return rows, selected, nil
 }
 
 func (r *Repository) Report(ctx context.Context, kind, userID, projectID string) ([]Record, error) {

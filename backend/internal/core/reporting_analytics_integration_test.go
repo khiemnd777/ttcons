@@ -11,6 +11,46 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+func TestNormalizeReportOptionsRequest(t *testing.T) {
+	selectedID := "30000000-0000-0000-0000-000000000002"
+	normalized, cursor, err := normalizeReportOptionsRequest(ReportOptionsRequest{
+		Search:     "  Thủ Đức  ",
+		SelectedID: selectedID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if normalized.Search != "Thủ Đức" || normalized.Limit != 20 || normalized.SelectedID != selectedID || cursor != nil {
+		t.Fatalf("normalized report options = %#v cursor=%#v", normalized, cursor)
+	}
+
+	if _, _, err := normalizeReportOptionsRequest(ReportOptionsRequest{Limit: 51}); err == nil {
+		t.Fatal("expected limit validation error")
+	}
+	if _, _, err := normalizeReportOptionsRequest(ReportOptionsRequest{SelectedID: "not-a-uuid"}); err == nil {
+		t.Fatal("expected selected_id validation error")
+	}
+}
+
+func TestReportProjectOptionsCursorRoundTrip(t *testing.T) {
+	want := reportProjectOptionsCursor{
+		NameKey: "cải tạo nhà phố thủ đức",
+		CodeKey: "ct-td-001",
+		ID:      "30000000-0000-0000-0000-000000000002",
+	}
+	encoded := encodeReportProjectOptionsCursor(want)
+	got, err := parseReportProjectOptionsCursor(encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("cursor = %#v, want %#v", got, want)
+	}
+	if _, err := parseReportProjectOptionsCursor("invalid"); err == nil {
+		t.Fatal("expected invalid cursor error")
+	}
+}
+
 func TestCashflowCSVIncludesLedgerRows(t *testing.T) {
 	payload, err := cashflowCSV(Record{"ledger": []Record{{
 		"occurred_at":    "2026-06-03T10:00:00Z",
@@ -501,13 +541,47 @@ func TestOperationalReportsAggregateWithoutJoinMultiplicationAndRespectScope(t *
 		t.Fatalf("staff report leaked out-of-scope staff or omitted scoped staff: %#v", staffRows)
 	}
 
-	options, err := service.ReportOptions(ctx, fixture.userID)
+	extraScopedProjectID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM project_members WHERE project_id=$1`, extraScopedProjectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, extraScopedProjectID)
+	})
+	mustExec(t, db, `INSERT INTO projects (id, name, code, client_name, status) VALUES ($1,'Batch4 Scoped Z',$2,'Client','planning')`, extraScopedProjectID, "B4SZ-"+extraScopedProjectID[:8])
+	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["Member"]'::jsonb,true)`, extraScopedProjectID, fixture.staffID)
+
+	options, err := service.ReportOptions(ctx, ReportOptionsRequest{
+		Search:     "batch4 scoped",
+		Limit:      1,
+		SelectedID: fixture.projectID,
+	}, fixture.userID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	projects, _ := options["projects"].([]Record)
-	if recordByID(projects, "id", fixture.otherProjectID) != nil || recordByID(projects, "id", fixture.projectID) == nil {
-		t.Fatalf("report options scope = %#v", projects)
+	projects := options.Projects.Items
+	if len(projects) != 1 || projects[0].ID != fixture.projectID || projects[0].Code == "" || !options.Projects.HasMore || options.Projects.NextCursor == "" {
+		t.Fatalf("report options scope/search = %#v", projects)
+	}
+	if options.Projects.Selected == nil || options.Projects.Selected.ID != fixture.projectID {
+		t.Fatalf("report options selected = %#v", options.Projects.Selected)
+	}
+	nextOptions, err := service.ReportOptions(ctx, ReportOptionsRequest{
+		Search: "batch4 scoped",
+		Limit:  1,
+		Cursor: options.Projects.NextCursor,
+	}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nextOptions.Projects.Items) != 1 || nextOptions.Projects.Items[0].ID != extraScopedProjectID || nextOptions.Projects.HasMore {
+		t.Fatalf("report options next page = %#v", nextOptions.Projects)
+	}
+
+	outsideOptions, err := service.ReportOptions(ctx, ReportOptionsRequest{Search: "batch4 other"}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(outsideOptions.Projects.Items) != 0 {
+		t.Fatalf("report options leaked out-of-scope project: %#v", outsideOptions.Projects.Items)
 	}
 }
 

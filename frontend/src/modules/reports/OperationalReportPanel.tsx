@@ -1,79 +1,37 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowUpRight } from 'lucide-react';
 import { CurrencyText } from '../../components/CurrencyText';
 import { DataTable } from '../../components/DataTable';
 import { EnumChip } from '../../components/EnumChip';
 import { StatusBadge } from '../../components/StatusBadge';
-import { useToast } from '../../components/ToastProvider';
-import { downloadBlob, get } from '../../lib/api/client';
+import { get } from '../../lib/api/client';
 import type {
   AccountingReportRow,
   ProcurementReportRow,
   ProjectReportRow,
-  ReportProjectOption,
   StaffReportRow,
   WarehouseReportRow,
 } from '../../lib/types/domain';
 import { useAuth } from '../../lib/auth/AuthContext';
-import { ReportFilterActions, ReportProjectField } from './ReportFilters';
 
 export type OperationalReportKind = 'projects' | 'warehouse' | 'procurement' | 'accounting' | 'staff';
 
 type OperationalReportPanelProps = {
   kind: OperationalReportKind;
-  projectOptions: ReportProjectOption[];
+  projectId: string;
 };
 
-const reportCopy: Record<OperationalReportKind, { title: string; basis: string; empty: string; fileName: string }> = {
-  projects: {
-    title: 'Công trình & tiến độ',
-    basis: 'Tiến độ công trình, số vấn đề đang mở và yêu cầu đang chờ duyệt trong phạm vi được phép xem.',
-    empty: 'Chưa có công trình trong phạm vi lọc',
-    fileName: 'bao-cao-cong-trinh',
-  },
-  warehouse: {
-    title: 'Vật tư / Kho',
-    basis: 'Tồn vật tư được tổng hợp độc lập với khối lượng dư để tránh nhân chéo số liệu.',
-    empty: 'Chưa có dữ liệu vật tư trong phạm vi lọc',
-    fileName: 'bao-cao-vat-tu-kho',
-  },
-  procurement: {
-    title: 'Mua sắm',
-    basis: 'Số lượng và giá trị yêu cầu mua sắm theo trạng thái xử lý và trạng thái ngân sách.',
-    empty: 'Chưa có yêu cầu mua sắm trong phạm vi lọc',
-    fileName: 'bao-cao-mua-sam',
-  },
-  accounting: {
-    title: 'Công nợ & ngân sách',
-    basis: 'Phải trả, phải thu và ngân sách đã sử dụng được cộng theo từng công trình, không khử các khoản bằng nhau.',
-    empty: 'Chưa có dữ liệu công nợ trong phạm vi lọc',
-    fileName: 'bao-cao-cong-no-ngan-sach',
-  },
-  staff: {
-    title: 'Nhân sự theo công trình',
-    basis: 'Chỉ hiển thị nhân sự thuộc các công trình người dùng được phép xem. Danh sách toàn công ty nằm ở module Nhân sự.',
-    empty: 'Chưa có nhân sự trong các công trình thuộc phạm vi lọc',
-    fileName: 'bao-cao-nhan-su-cong-trinh',
-  },
+const reportEmptyCopy: Record<OperationalReportKind, string> = {
+  projects: 'Chưa có công trình trong phạm vi lọc',
+  warehouse: 'Chưa có dữ liệu vật tư trong phạm vi lọc',
+  procurement: 'Chưa có yêu cầu mua sắm trong phạm vi lọc',
+  accounting: 'Chưa có dữ liệu công nợ trong phạm vi lọc',
+  staff: 'Chưa có nhân sự trong các công trình thuộc phạm vi lọc',
 };
 
-export function OperationalReportPanel({ kind, projectOptions }: OperationalReportPanelProps) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialProjectId = searchParams.get('project_id') ?? '';
-  const [draftProjectId, setDraftProjectId] = useState(initialProjectId);
-  const [projectId, setProjectId] = useState(initialProjectId);
-  const [exporting, setExporting] = useState(false);
-  const toast = useToast();
-  const copy = reportCopy[kind];
-
-  useEffect(() => {
-    const nextProjectId = searchParams.get('project_id') ?? '';
-    setDraftProjectId(nextProjectId);
-    setProjectId(nextProjectId);
-  }, [searchParams]);
-
+export function OperationalReportPanel({ kind, projectId }: OperationalReportPanelProps) {
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
     if (projectId) params.set('project_id', projectId);
@@ -85,69 +43,9 @@ export function OperationalReportPanel({ kind, projectOptions }: OperationalRepo
     queryFn: () => get<Record<string, unknown>[]>(`/reports/${kind}${queryString ? `?${queryString}` : ''}`),
   });
 
-  function applyFilters() {
-    const params = new URLSearchParams(searchParams);
-    if (draftProjectId) params.set('project_id', draftProjectId);
-    else params.delete('project_id');
-    setProjectId(draftProjectId);
-    setSearchParams(params, { replace: true });
-  }
-
-  function resetFilters() {
-    const params = new URLSearchParams(searchParams);
-    params.delete('project_id');
-    setDraftProjectId('');
-    setProjectId('');
-    setSearchParams(params, { replace: true });
-  }
-
-  async function exportCSV() {
-    setExporting(true);
-    try {
-      const blob = await downloadBlob(`/reports/${kind}/export${queryString ? `?${queryString}` : ''}`);
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = objectUrl;
-      anchor.download = `${copy.fileName}.csv`;
-      anchor.click();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-      toast.success(`Đã xuất CSV ${copy.title.toLocaleLowerCase('vi-VN')}`);
-    } catch (error) {
-      toast.error(`Không xuất được CSV ${copy.title.toLocaleLowerCase('vi-VN')}`, error);
-    } finally {
-      setExporting(false);
-    }
-  }
-
   const rows = report.data ?? [];
 
-  return (
-    <section className="space-y-4">
-      <div className="rounded-lg border border-line bg-white p-4 shadow-panel">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="hidden min-w-0 md:block">
-            <h2 className="text-lg font-semibold text-ink">{copy.title}</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{copy.basis}</p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 sm:hidden">Bộ lọc</p>
-            <ReportProjectField value={draftProjectId} options={projectOptions} onChange={setDraftProjectId} />
-            <ReportFilterActions
-              applying={report.isFetching}
-              exporting={exporting}
-              exportDisabled={report.isLoading}
-              onApply={applyFilters}
-              onReset={resetFilters}
-              onExport={() => void exportCSV()}
-              mobilePrimary
-            />
-          </div>
-        </div>
-      </div>
-
-      {operationalTable(kind, rows, report.isLoading, report.error, () => void report.refetch(), copy.empty)}
-    </section>
-  );
+  return operationalTable(kind, rows, report.isLoading, report.error, () => void report.refetch(), reportEmptyCopy[kind]);
 }
 
 function operationalTable(

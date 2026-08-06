@@ -5,6 +5,8 @@ export type ReportDefinition = {
   key: ReportKey;
   label: string;
   description: string;
+  basis: string;
+  fileName: string;
   group: ReportGroup;
   permissions: string[];
 };
@@ -15,10 +17,42 @@ export const reportGroupLabels: Record<ReportGroup, string> = {
 };
 
 export const reportDefinitions: ReportDefinition[] = [
-  { key: 'projects', label: 'Công trình & tiến độ', description: 'Tiến độ, vấn đề mở và yêu cầu chờ duyệt.', group: 'operations', permissions: ['report.view'] },
-  { key: 'procurement', label: 'Mua sắm', description: 'Giá trị yêu cầu theo trạng thái và ngân sách.', group: 'operations', permissions: ['report.view'] },
-  { key: 'warehouse', label: 'Vật tư / Kho', description: 'Tồn vật tư và khối lượng dư trong phạm vi được xem.', group: 'operations', permissions: ['report.view'] },
-  { key: 'staff', label: 'Nhân sự', description: 'Phân bổ nhân sự trong các công trình được phép xem.', group: 'resources', permissions: ['report.view'] },
+  {
+    key: 'projects',
+    label: 'Công trình & tiến độ',
+    description: 'Tiến độ, vấn đề mở và yêu cầu chờ duyệt.',
+    basis: 'Tiến độ công trình, số vấn đề đang mở và yêu cầu đang chờ duyệt trong phạm vi được phép xem.',
+    fileName: 'bao-cao-cong-trinh',
+    group: 'operations',
+    permissions: ['report.view'],
+  },
+  {
+    key: 'procurement',
+    label: 'Mua sắm',
+    description: 'Giá trị yêu cầu theo trạng thái và ngân sách.',
+    basis: 'Số lượng và giá trị yêu cầu mua sắm theo trạng thái xử lý và trạng thái ngân sách.',
+    fileName: 'bao-cao-mua-sam',
+    group: 'operations',
+    permissions: ['report.view'],
+  },
+  {
+    key: 'warehouse',
+    label: 'Vật tư / Kho',
+    description: 'Tồn vật tư và khối lượng dư trong phạm vi được xem.',
+    basis: 'Tồn vật tư được tổng hợp độc lập với khối lượng dư để tránh nhân chéo số liệu.',
+    fileName: 'bao-cao-vat-tu-kho',
+    group: 'operations',
+    permissions: ['report.view'],
+  },
+  {
+    key: 'staff',
+    label: 'Nhân sự',
+    description: 'Phân bổ nhân sự trong các công trình được phép xem.',
+    basis: 'Chỉ hiển thị nhân sự thuộc các công trình người dùng được phép xem. Danh sách toàn công ty nằm ở module Nhân sự.',
+    fileName: 'bao-cao-nhan-su-cong-trinh',
+    group: 'resources',
+    permissions: ['report.view'],
+  },
 ];
 
 export function visibleReportDefinitions(hasAnyPermission: (permissions?: string[]) => boolean) {

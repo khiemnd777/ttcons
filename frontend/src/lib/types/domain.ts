@@ -1692,11 +1692,19 @@ export type CashflowReport = AnyRecord & {
 
 export type ReportProjectOption = {
   id: string;
+  code: string;
   name: string;
 };
 
+export type ReportProjectOptionsPage = {
+  items: ReportProjectOption[];
+  has_more: boolean;
+  next_cursor?: string;
+  selected: ReportProjectOption | null;
+};
+
 export type ReportOptions = {
-  projects: ReportProjectOption[];
+  projects: ReportProjectOptionsPage;
 };
 
 export type ProjectReportRow = AnyRecord & {

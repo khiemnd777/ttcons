@@ -1,13 +1,15 @@
-import { lazy, Suspense } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Navigate, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { useIsFetching } from '@tanstack/react-query';
+import { Navigate, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { ChevronRight, ShieldAlert } from 'lucide-react';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { get } from '../../lib/api/client';
+import { useToast } from '../../components/ToastProvider';
+import { downloadBlob, get } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
-import type { ReportOptions } from '../../lib/types/domain';
 import type { OperationalReportKind } from './OperationalReportPanel';
+import { ReportExportButton, ReportScopeActions } from './ReportFilters';
+import { ReportProjectPicker } from './ReportProjectPicker';
 import {
   isReportKey,
   reportGroupLabels,
@@ -23,17 +25,63 @@ export function ReportsPage() {
   const { reportKey } = useParams<{ reportKey?: string }>();
   const { hasAnyPermission } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const appliedProjectId = searchParams.get('project_id') ?? '';
+  const [draftProjectId, setDraftProjectId] = useState(appliedProjectId);
+  const [exporting, setExporting] = useState(false);
+  const toast = useToast();
   const visibleReports = visibleReportDefinitions(hasAnyPermission);
   const activeReport = isReportKey(reportKey)
     ? visibleReports.find((definition) => definition.key === reportKey)
     : undefined;
+  const searchSuffix = searchParams.size ? `?${searchParams.toString()}` : '';
 
-  const options = useQuery({
-    queryKey: ['report-options'],
-    queryFn: () => get<ReportOptions>('/reports/options'),
-    staleTime: 5 * 60 * 1000,
-  });
+  useEffect(() => {
+    setDraftProjectId(appliedProjectId);
+  }, [appliedProjectId]);
+
+  const activeReportFetching = useIsFetching({
+    queryKey: ['operational-report', activeReport?.key ?? 'unavailable', appliedProjectId || 'all'],
+  }) > 0;
+
+  const exportQueryString = useMemo(() => {
+    const params = new URLSearchParams();
+    if (appliedProjectId) params.set('project_id', appliedProjectId);
+    return params.toString();
+  }, [appliedProjectId]);
+
+  function applyProjectScope() {
+    const params = new URLSearchParams(searchParams);
+    if (draftProjectId) params.set('project_id', draftProjectId);
+    else params.delete('project_id');
+    setSearchParams(params, { replace: true });
+  }
+
+  function resetProjectScope() {
+    const params = new URLSearchParams(searchParams);
+    params.delete('project_id');
+    setDraftProjectId('');
+    setSearchParams(params, { replace: true });
+  }
+
+  async function exportCSV() {
+    if (!activeReport) return;
+    setExporting(true);
+    try {
+      const blob = await downloadBlob(`/reports/${activeReport.key}/export${exportQueryString ? `?${exportQueryString}` : ''}`);
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `${activeReport.fileName}.csv`;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      toast.success(`Đã xuất CSV ${activeReport.label.toLocaleLowerCase('vi-VN')}`);
+    } catch (error) {
+      toast.error(`Không xuất được CSV ${activeReport.label.toLocaleLowerCase('vi-VN')}`, error);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   if (!visibleReports.length) {
     return (
@@ -45,20 +93,36 @@ export function ReportsPage() {
     );
   }
 
-  if (!activeReport) return <Navigate to={reportPath(visibleReports[0].key)} replace />;
-
-  const projectOptions = options.data?.projects ?? [];
-  const searchSuffix = location.search;
+  if (!activeReport) return <Navigate to={`${reportPath(visibleReports[0].key)}${searchSuffix}`} replace />;
 
   return (
     <>
-      <div className="mb-4 border-b border-line pb-4 md:mb-5 md:pb-5">
-        <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Báo cáo & phân tích</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-          <span className="md:hidden">Số liệu và CSV dùng cùng phạm vi lọc và quyền truy cập.</span>
-          <span className="hidden md:inline">Chọn một báo cáo để tập trung phân tích; số liệu và CSV luôn dùng cùng phạm vi lọc và quyền truy cập.</span>
-        </p>
-      </div>
+      <header className="mb-4 border-b border-line pb-4 md:mb-5 md:pb-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_36rem] xl:items-end xl:gap-8">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Báo cáo & phân tích</h1>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+              <span className="md:hidden">Số liệu và CSV dùng cùng phạm vi lọc và quyền truy cập.</span>
+              <span className="hidden md:inline">Chọn một báo cáo để tập trung phân tích; số liệu và CSV luôn dùng cùng phạm vi lọc và quyền truy cập.</span>
+            </p>
+          </div>
+
+          <section className="min-w-0 border-t border-line pt-4 xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình báo cáo">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <ReportProjectPicker
+                value={draftProjectId}
+                onChange={setDraftProjectId}
+              />
+              <ReportScopeActions
+                applying={activeReportFetching}
+                resetDisabled={activeReportFetching || (!draftProjectId && !appliedProjectId)}
+                onApply={applyProjectScope}
+                onReset={resetProjectScope}
+              />
+            </div>
+          </section>
+        </div>
+      </header>
 
       <div className="mb-4 lg:hidden">
         <label className="block">
@@ -71,7 +135,6 @@ export function ReportsPage() {
             {visibleReports.map((report) => <option key={report.key} value={report.key}>{report.label}</option>)}
           </select>
         </label>
-        <p className="mt-2 text-sm leading-5 text-slate-600">{activeReport.description}</p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -106,29 +169,28 @@ export function ReportsPage() {
         </aside>
 
         <main className="min-w-0">
-          <div className="mb-4 hidden rounded-lg border border-line bg-white px-4 py-3 shadow-panel lg:block">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{reportGroupLabels[activeReport.group]}</p>
-            <h1 className="mt-1 text-xl font-semibold text-ink">{activeReport.label}</h1>
-            <p className="mt-1 text-sm text-slate-600">{activeReport.description}</p>
+          <div className="mb-4 rounded-lg border border-line bg-white px-4 py-3 shadow-panel">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{reportGroupLabels[activeReport.group]}</p>
+                <h1 className="mt-1 text-xl font-semibold text-ink">{activeReport.label}</h1>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{activeReport.basis}</p>
+              </div>
+              <ReportExportButton exporting={exporting} disabled={activeReportFetching} onExport={() => void exportCSV()} />
+            </div>
           </div>
 
-          {options.isError ? (
-            <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Không tải được danh sách công trình. Báo cáo vẫn hiển thị theo toàn bộ phạm vi được phép xem.
-            </div>
-          ) : null}
-
-          <ActiveReport reportKey={activeReport.key} projectOptions={projectOptions} />
+          <ActiveReport reportKey={activeReport.key} projectId={appliedProjectId} />
         </main>
       </div>
     </>
   );
 }
 
-function ActiveReport({ reportKey, projectOptions }: { reportKey: ReportKey; projectOptions: ReportOptions['projects'] }) {
+function ActiveReport({ reportKey, projectId }: { reportKey: ReportKey; projectId: string }) {
   return (
     <Suspense fallback={<div className="rounded-lg border border-line bg-white p-8"><LoadingSpinner /></div>}>
-      <OperationalReportPanel kind={reportKey as OperationalReportKind} projectOptions={projectOptions} />
+      <OperationalReportPanel kind={reportKey as OperationalReportKind} projectId={projectId} />
     </Suspense>
   );
 }

@@ -2,6 +2,10 @@ package core
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -10,12 +14,106 @@ func (s *Service) Dashboard(ctx context.Context, actorID string) (Record, error)
 	return s.repo.DashboardReport(ctx, actorID)
 }
 
-func (s *Service) ReportOptions(ctx context.Context, actorID string) (Record, error) {
-	projects, err := s.repo.ReportProjectOptions(ctx, actorID)
+type reportProjectOptionsCursor struct {
+	NameKey string `json:"name_key"`
+	CodeKey string `json:"code_key"`
+	ID      string `json:"id"`
+}
+
+func (s *Service) ReportOptions(ctx context.Context, req ReportOptionsRequest, actorID string) (ReportOptionsResponse, error) {
+	normalized, cursor, err := normalizeReportOptionsRequest(req)
 	if err != nil {
-		return nil, err
+		return ReportOptionsResponse{}, err
 	}
-	return Record{"projects": projects}, nil
+	rows, selectedRow, err := s.repo.ReportProjectOptions(ctx, actorID, normalized, cursor)
+	if err != nil {
+		return ReportOptionsResponse{}, err
+	}
+	hasMore := len(rows) > normalized.Limit
+	if hasMore {
+		rows = rows[:normalized.Limit]
+	}
+	items := make([]ReportProjectOption, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, reportProjectOptionFromRecord(row))
+	}
+	nextCursor := ""
+	if hasMore && len(rows) > 0 {
+		last := rows[len(rows)-1]
+		nextCursor = encodeReportProjectOptionsCursor(reportProjectOptionsCursor{
+			NameKey: strings.TrimSpace(fmt.Sprint(last["name_key"])),
+			CodeKey: strings.TrimSpace(fmt.Sprint(last["code_key"])),
+			ID:      cleanID(last["id"]),
+		})
+	}
+	var selected *ReportProjectOption
+	if selectedRow != nil {
+		option := reportProjectOptionFromRecord(selectedRow)
+		selected = &option
+	}
+	return ReportOptionsResponse{Projects: ReportProjectOptionsPage{
+		Items:      items,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+		Selected:   selected,
+	}}, nil
+}
+
+func normalizeReportOptionsRequest(req ReportOptionsRequest) (ReportOptionsRequest, *reportProjectOptionsCursor, error) {
+	req.Search = strings.TrimSpace(req.Search)
+	if len([]rune(req.Search)) > 120 {
+		return req, nil, validationError("Từ khóa tìm kiếm không được vượt quá 120 ký tự")
+	}
+	req.SelectedID = cleanID(req.SelectedID)
+	if req.SelectedID != "" && !validActivityUUID(req.SelectedID) {
+		return req, nil, validationError("selected_id không hợp lệ", Record{"selected_id": req.SelectedID})
+	}
+	if req.Limit == 0 {
+		req.Limit = 20
+	}
+	if req.Limit < 1 || req.Limit > 50 {
+		return req, nil, validationError("limit phải nằm trong khoảng 1 đến 50", Record{"limit": req.Limit})
+	}
+	req.Cursor = strings.TrimSpace(req.Cursor)
+	if req.Cursor == "" {
+		return req, nil, nil
+	}
+	cursor, err := parseReportProjectOptionsCursor(req.Cursor)
+	if err != nil {
+		return req, nil, validationError("cursor không hợp lệ", Record{"cursor": req.Cursor})
+	}
+	return req, &cursor, nil
+}
+
+func reportProjectOptionFromRecord(row Record) ReportProjectOption {
+	return ReportProjectOption{
+		ID:   cleanID(row["id"]),
+		Code: strings.TrimSpace(fmt.Sprint(row["code"])),
+		Name: strings.TrimSpace(fmt.Sprint(row["name"])),
+	}
+}
+
+func encodeReportProjectOptionsCursor(cursor reportProjectOptionsCursor) string {
+	raw, _ := json.Marshal(cursor)
+	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func parseReportProjectOptionsCursor(value string) (reportProjectOptionsCursor, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return reportProjectOptionsCursor{}, err
+	}
+	cursor := reportProjectOptionsCursor{}
+	if err := json.Unmarshal(raw, &cursor); err != nil {
+		return reportProjectOptionsCursor{}, err
+	}
+	cursor.NameKey = strings.TrimSpace(cursor.NameKey)
+	cursor.CodeKey = strings.TrimSpace(cursor.CodeKey)
+	cursor.ID = cleanID(cursor.ID)
+	if cursor.NameKey == "" || cursor.CodeKey == "" || !validActivityUUID(cursor.ID) {
+		return reportProjectOptionsCursor{}, errors.New("invalid report project options cursor")
+	}
+	return cursor, nil
 }
 
 func (s *Service) Report(ctx context.Context, kind string, req OperationalReportRequest, actorID string) ([]Record, error) {
