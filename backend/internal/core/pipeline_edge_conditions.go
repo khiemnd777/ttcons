@@ -9,11 +9,21 @@ import (
 )
 
 type EdgeConditionDefinition struct {
-	Type         string `json:"type"`
-	Label        string `json:"label"`
-	Description  string `json:"description"`
-	DefaultLabel string `json:"default_label"`
-	Category     string `json:"category"`
+	Type         string                               `json:"type"`
+	Label        string                               `json:"label"`
+	Description  string                               `json:"description"`
+	DefaultLabel string                               `json:"default_label"`
+	Category     string                               `json:"category"`
+	ConfigSchema []EdgeConditionConfigFieldDefinition `json:"config_schema,omitempty"`
+}
+
+type EdgeConditionConfigFieldDefinition struct {
+	Key       string `json:"key"`
+	Label     string `json:"label"`
+	Control   string `json:"control"`
+	Required  bool   `json:"required"`
+	DependsOn string `json:"depends_on,omitempty"`
+	HelpText  string `json:"help_text,omitempty"`
 }
 
 var pipelineEdgeConditionCatalog = []EdgeConditionDefinition{
@@ -29,8 +39,15 @@ var pipelineEdgeConditionCatalog = []EdgeConditionDefinition{
 	{Type: "materials_issued", Label: "Vật tư đã xuất đủ", Description: "Chuyển khi vật tư theo kế hoạch không còn thiếu tại công trình.", DefaultLabel: "", Category: "material"},
 	{Type: "boq_approved", Label: "BOQ đã duyệt", Description: "Chuyển khi BOQ có dữ liệu và toàn bộ item đã được duyệt.", DefaultLabel: "", Category: "commercial"},
 	{Type: "procurement_approved", Label: "Mua vật tư đã duyệt", Description: "Chuyển khi yêu cầu mua vật tư đã được duyệt hoặc đã vào các trạng thái sau duyệt.", DefaultLabel: "", Category: "material"},
-	{Type: "workflow_form_answer_equals", Label: "Câu trả lời biểu mẫu bằng giá trị", Description: "Chuyển khi biểu mẫu quy trình đã được gửi ở node nguồn và có trường khớp giá trị cấu hình.", DefaultLabel: "", Category: "workflow_form"},
-	{Type: "project_entry_mode", Label: "Điểm bắt đầu công trình", Description: "Chuyển theo lựa chọn khảo sát hoặc BOQ có sẵn đã chốt khi tạo công trình.", DefaultLabel: "", Category: "project"},
+	{
+		Type: "workflow_form_answer_equals", Label: "Câu trả lời biểu mẫu bằng giá trị",
+		Description:  "Chuyển khi biểu mẫu quy trình đã được gửi ở node nguồn và có trường khớp giá trị cấu hình.",
+		DefaultLabel: "", Category: "workflow_form",
+		ConfigSchema: []EdgeConditionConfigFieldDefinition{
+			{Key: "field_key", Label: "Trường biểu mẫu nguồn", Control: "source_form_field", Required: true, HelpText: "Chọn trường thuộc biểu mẫu đã gắn vào node nguồn."},
+			{Key: "value", Label: "Giá trị cần khớp", Control: "source_field_option", Required: true, DependsOn: "field_key", HelpText: "Chọn một giá trị được định nghĩa bởi trường nguồn."},
+		},
+	},
 	{Type: "handover_ready", Label: "Sẵn sàng bàn giao", Description: "Chuyển khi nghiệm thu, danh sách lỗi, kho, chứng từ và công nợ không còn điểm chặn bàn giao.", DefaultLabel: "", Category: "handover"},
 	{Type: "financial_ready", Label: "Sẵn sàng đóng tài chính", Description: "Chuyển khi công nợ phải thu/phải trả không còn khoản đang mở.", DefaultLabel: "", Category: "finance"},
 }
@@ -47,6 +64,22 @@ func edgeConditionDefinition(conditionType string) (EdgeConditionDefinition, boo
 		}
 	}
 	return EdgeConditionDefinition{}, false
+}
+
+type edgeConditionConfigValidator func(Record) error
+
+var edgeConditionConfigValidators = map[string]edgeConditionConfigValidator{
+	"workflow_form_answer_equals": validateWorkflowFormAnswerEqualsConfig,
+}
+
+func validateWorkflowFormAnswerEqualsConfig(config Record) error {
+	if strings.TrimSpace(fmt.Sprint(config["field_key"])) == "" || fmt.Sprint(config["field_key"]) == "<nil>" {
+		return errors.New("field_key là bắt buộc cho điều kiện câu trả lời biểu mẫu")
+	}
+	if _, exists := config["value"]; !exists {
+		return errors.New("value là bắt buộc cho điều kiện câu trả lời biểu mẫu")
+	}
+	return nil
 }
 
 func prepareTemplateEdgeBody(body Record, partial bool) error {
@@ -105,33 +138,10 @@ func prepareTemplateEdgeBody(body Record, partial bool) error {
 		}
 	}
 
-	if strings.TrimSpace(fmt.Sprint(body["condition_type"])) == "workflow_form_answer_equals" {
-		config := Record{}
-		switch value := body["condition_config"].(type) {
-		case Record:
-			config = value
-		case map[string]any:
-			config = Record(value)
-		}
-		if strings.TrimSpace(fmt.Sprint(config["field_key"])) == "" || fmt.Sprint(config["field_key"]) == "<nil>" {
-			return errors.New("field_key là bắt buộc cho điều kiện câu trả lời biểu mẫu")
-		}
-		if _, exists := config["value"]; !exists {
-			return errors.New("value là bắt buộc cho điều kiện câu trả lời biểu mẫu")
-		}
-	}
-
-	if strings.TrimSpace(fmt.Sprint(body["condition_type"])) == "project_entry_mode" {
-		config := Record{}
-		switch value := body["condition_config"].(type) {
-		case Record:
-			config = value
-		case map[string]any:
-			config = Record(value)
-		}
-		entryMode := strings.TrimSpace(fmt.Sprint(config["value"]))
-		if !statusIn(entryMode, "survey_required", "client_boq") {
-			return errors.New("value của điều kiện điểm bắt đầu phải là survey_required hoặc client_boq")
+	conditionType := strings.TrimSpace(fmt.Sprint(body["condition_type"]))
+	if validator, exists := edgeConditionConfigValidators[conditionType]; exists {
+		if err := validator(recordFromAny(body["condition_config"])); err != nil {
+			return err
 		}
 	}
 

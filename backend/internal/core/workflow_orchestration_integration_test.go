@@ -34,6 +34,162 @@ func TestWorkflowTimelineCountsSubmittedAndSkippedSteps(t *testing.T) {
 	}
 }
 
+func TestSkipUnselectedBranchesSkipsOnlyExclusiveSubgraph(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := tx.ExecContext(ctx, query, args...); execErr != nil {
+			t.Fatal(execErr)
+		}
+	}
+	count := func(query string, args ...any) int {
+		t.Helper()
+		var total int
+		if queryErr := tx.QueryRowContext(ctx, query, args...).Scan(&total); queryErr != nil {
+			t.Fatal(queryErr)
+		}
+		return total
+	}
+
+	templateID := newID()
+	projectID := newID()
+	runID := newID()
+	sourceID := newID()
+	surveyID := newID()
+	meetingID := newID()
+	designID := newID()
+	boqNoDesignID := newID()
+	boqDesignID := newID()
+	mergeID := newID()
+
+	exec(`INSERT INTO pipeline_templates (id, template_family_id, name, status) VALUES ($1,$1,'Branch test','published')`, templateID)
+	exec(`INSERT INTO projects (id, name, code, client_name, pipeline_template_id) VALUES ($1,'Branch test project',$2,'Client',$3)`, projectID, "BRANCH-"+projectID[:8], templateID)
+	exec(`INSERT INTO pipeline_runs (id, project_id, template_id, engine_version) VALUES ($1,$2,$3,4)`, runID, projectID, templateID)
+
+	nodes := []struct {
+		id     string
+		name   string
+		order  int
+		status string
+	}{
+		{sourceID, "Tiếp nhận dự án", 1, "completed"},
+		{surveyID, "Khảo sát", 2, "pending"},
+		{meetingID, "Họp báo cáo khảo sát", 3, "pending"},
+		{designID, "Thiết kế", 4, "pending"},
+		{boqNoDesignID, "BOQ (Không thiết kế)", 5, "pending"},
+		{boqDesignID, "BOQ (Có thiết kế)", 6, "pending"},
+		{mergeID, "Chốt hợp đồng", 7, "pending"},
+	}
+	for _, node := range nodes {
+		exec(`
+			INSERT INTO pipeline_run_nodes (id, run_id, project_id, name, order_index, status)
+			VALUES ($1,$2,$3,$4,$5,$6)
+		`, node.id, runID, projectID, node.name, node.order, node.status)
+	}
+	exec(`UPDATE pipeline_runs SET current_node_id=$1 WHERE id=$2`, sourceID, runID)
+	exec(`UPDATE projects SET current_pipeline_run_id=$1 WHERE id=$2`, runID, projectID)
+
+	edges := [][2]string{
+		{sourceID, surveyID},
+		{sourceID, boqNoDesignID},
+		{surveyID, meetingID},
+		{meetingID, designID},
+		{meetingID, boqNoDesignID},
+		{designID, boqDesignID},
+		{boqNoDesignID, mergeID},
+		{boqDesignID, mergeID},
+	}
+	for index, edge := range edges {
+		exec(`
+			INSERT INTO pipeline_run_edges (run_id, project_id, from_run_node_id, to_run_node_id, priority)
+			VALUES ($1,$2,$3,$4,$5)
+		`, runID, projectID, edge[0], edge[1], index+1)
+	}
+
+	var formTemplateID string
+	var formVersionID string
+	var formType string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT template.id, version.id, template.form_type
+		FROM workflow_form_templates template
+		JOIN workflow_form_versions version ON version.template_id=template.id
+		WHERE template.code='builtin_checklist' AND version.status='published'
+		ORDER BY version.version_no DESC
+		LIMIT 1
+	`).Scan(&formTemplateID, &formVersionID, &formType); err != nil {
+		t.Fatal(err)
+	}
+	for _, node := range nodes[1:] {
+		stepID := newID()
+		workItemID := newID()
+		exec(`
+			INSERT INTO pipeline_run_steps (id, run_node_id, project_id, name, order_index, status)
+			VALUES ($1,$2,$3,$4,1,'pending')
+		`, stepID, node.id, projectID, node.name+" step")
+		exec(`
+			INSERT INTO work_items (id, project_id, pipeline_run_id, run_node_id, run_step_id, source_id, title, status)
+			VALUES ($1,$2,$3,$4,$5,$5,$6,'pending')
+		`, workItemID, projectID, runID, node.id, stepID, node.name+" work")
+		exec(`
+			INSERT INTO workflow_form_instances (
+				project_id, work_item_id, pipeline_run_id, run_node_id, run_step_id,
+				form_template_id, form_version_id, form_type, title, status
+			)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft')
+		`, projectID, workItemID, runID, node.id, stepID, formTemplateID, formVersionID, formType, node.name+" form")
+	}
+
+	fromNode := Record{"id": sourceID, "run_id": runID}
+	if err := skipUnselectedBranchExclusiveNodesTx(ctx, tx, fromNode, surveyID); err != nil {
+		t.Fatal(err)
+	}
+	if got := count(`SELECT COUNT(*) FROM pipeline_run_nodes WHERE run_id=$1 AND status='skipped'`, runID); got != 0 {
+		t.Fatalf("survey route skipped nodes = %d, want 0 because BOQ remains reachable later", got)
+	}
+
+	if err := skipUnselectedBranchExclusiveNodesTx(ctx, tx, fromNode, boqNoDesignID); err != nil {
+		t.Fatal(err)
+	}
+
+	exclusiveArgs := []any{surveyID, meetingID, designID, boqDesignID}
+	if got := count(`SELECT COUNT(*) FROM pipeline_run_nodes WHERE id IN ($1,$2,$3,$4) AND status='skipped'`, exclusiveArgs...); got != 4 {
+		t.Fatalf("skipped exclusive nodes = %d, want 4", got)
+	}
+	if got := count(`SELECT COUNT(*) FROM pipeline_run_nodes WHERE id IN ($1,$2) AND status='pending'`, boqNoDesignID, mergeID); got != 2 {
+		t.Fatalf("pending selected/shared nodes = %d, want 2", got)
+	}
+	if got := count(`SELECT COUNT(*) FROM pipeline_run_steps WHERE run_node_id IN ($1,$2,$3,$4) AND status='skipped'`, exclusiveArgs...); got != 4 {
+		t.Fatalf("skipped exclusive steps = %d, want 4", got)
+	}
+	if got := count(`SELECT COUNT(*) FROM work_items WHERE run_node_id IN ($1,$2,$3,$4) AND status='cancelled'`, exclusiveArgs...); got != 4 {
+		t.Fatalf("cancelled exclusive work items = %d, want 4", got)
+	}
+	if got := count(`SELECT COUNT(*) FROM workflow_form_instances WHERE run_node_id IN ($1,$2,$3,$4) AND status='cancelled'`, exclusiveArgs...); got != 4 {
+		t.Fatalf("cancelled exclusive forms = %d, want 4", got)
+	}
+	if got := count(`
+		SELECT COUNT(*)
+		FROM pipeline_run_steps
+		WHERE run_node_id IN ($1,$2) AND status='pending'
+	`, boqNoDesignID, mergeID); got != 2 {
+		t.Fatalf("pending selected/shared steps = %d, want 2", got)
+	}
+
+	if err := skipUnselectedBranchExclusiveNodesTx(ctx, tx, fromNode, boqNoDesignID); err != nil {
+		t.Fatal(err)
+	}
+	if got := count(`SELECT COUNT(*) FROM pipeline_run_nodes WHERE id IN ($1,$2,$3,$4) AND status='skipped'`, exclusiveArgs...); got != 4 {
+		t.Fatalf("idempotent skipped nodes = %d, want 4", got)
+	}
+}
+
 func TestHasChecklistPayloadRequiresChecklistContent(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -1392,9 +1548,50 @@ func TestWorkflowFormSubmitSatisfiesChecklistGate(t *testing.T) {
 	if instance["status"] != "submitted" {
 		t.Fatalf("form status = %#v", instance["status"])
 	}
+	answers := recordFromAny(form["answers"])
+	if got, ok := answers["checked_by"].(string); !ok || got != "Worker" {
+		t.Fatalf("checked_by answer = %#v, want native string Worker", answers["checked_by"])
+	}
+	if got, ok := answers["confirmed"].(bool); !ok || !got {
+		t.Fatalf("confirmed answer = %#v, want native boolean true", answers["confirmed"])
+	}
+	if _, ok := answers["checklist_items"].([]any); !ok {
+		t.Fatalf("checklist_items answer = %#v, want native array", answers["checklist_items"])
+	}
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1`, 5, instanceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='submitted'`, 1, instanceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_type='workflow_form_instance' AND target_id=$1`, 1, instanceID)
+
+	evidenceReferenceID := newID()
+	mustExec(t, db, `
+		INSERT INTO workflow_form_answers (instance_id, field_key, field_type, value_json, revision_no, updated_by)
+		VALUES
+			($1,'scalar_number','number','12.5'::jsonb,1,$2),
+			($1,'scalar_null','text','null'::jsonb,1,$2),
+			($1,'scalar_object','text','{"key":"value"}'::jsonb,1,$2),
+			($1,'scalar_array','structured_list','["one","two"]'::jsonb,1,$2),
+			($1,'scalar_evidence','evidence_reference',to_jsonb($3::text),1,$2)
+	`, instanceID, fixture.workerID, evidenceReferenceID)
+	detail, err := repo.GetWorkflowFormInstanceDetail(ctx, instanceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	detailAnswers := recordFromAny(detail["answers"])
+	if got, ok := detailAnswers["scalar_number"].(float64); !ok || got != 12.5 {
+		t.Fatalf("scalar_number answer = %#v, want native number 12.5", detailAnswers["scalar_number"])
+	}
+	if got, exists := detailAnswers["scalar_null"]; !exists || got != nil {
+		t.Fatalf("scalar_null answer = %#v (exists=%t), want native null", got, exists)
+	}
+	if got := fmt.Sprint(recordFromAny(detailAnswers["scalar_object"])["key"]); got != "value" {
+		t.Fatalf("scalar_object answer key = %q, want value", got)
+	}
+	if got, ok := detailAnswers["scalar_array"].([]any); !ok || len(got) != 2 {
+		t.Fatalf("scalar_array answer = %#v, want native two-item array", detailAnswers["scalar_array"])
+	}
+	if got, ok := detailAnswers["scalar_evidence"].(string); !ok || got != evidenceReferenceID {
+		t.Fatalf("scalar_evidence answer = %#v, want native evidence ID %s", detailAnswers["scalar_evidence"], evidenceReferenceID)
+	}
 
 	completed, err := service.WorkItemAction(ctx, fixture.itemID, "complete", WorkItemActionRequest{Comment: "done"}, fixture.workerID, "Worker")
 	if err != nil {

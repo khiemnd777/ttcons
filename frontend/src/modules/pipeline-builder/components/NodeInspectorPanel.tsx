@@ -211,6 +211,25 @@ export function NodeInspectorPanel({
           />
 
           <section className="rounded-md border border-line bg-slate-50 p-3">
+            <label className="flex items-start gap-2 text-sm font-medium text-slate-700">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-line"
+                checked={Boolean(isRecord(nodeForm.exit_conditions) && nodeForm.exit_conditions.auto_advance_when_ready)}
+                disabled={readOnly}
+                onChange={(event) => onChangeField('exit_conditions', {
+                  ...(isRecord(nodeForm.exit_conditions) ? nodeForm.exit_conditions : {}),
+                  auto_advance_when_ready: event.target.checked,
+                })}
+              />
+              <span>
+                Tự động chuyển theo Connector khi đủ điều kiện
+                <span className="mt-1 block text-xs font-normal leading-5 text-slate-500">Sau khi gửi biểu mẫu bắt buộc, engine hoàn tất đầu việc và đánh giá connector bằng cấu hình của template.</span>
+              </span>
+            </label>
+          </section>
+
+          <section className="rounded-md border border-line bg-slate-50 p-3">
             <h3 className="text-sm font-semibold text-ink">Approval policy</h3>
             <p className="mt-1 text-xs leading-5 text-slate-500">Policy này được snapshot vào run và quyết định role, quorum, thứ tự duyệt.</p>
             <div className="mt-3 space-y-3">

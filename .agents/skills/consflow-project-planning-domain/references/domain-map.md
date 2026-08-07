@@ -58,10 +58,17 @@
 - Use `GOLDEN-LIVE-001` to experience real planning/runtime transitions. It intentionally starts at 0% with only the Khảo sát node active; reset it with local/dev `make seed` after an operational walkthrough.
 - Golden Live has fourteen active App members. `client@consflow.local` is inactive and not a project member; client confirmation stays in project documents, forms/evidence and business snapshots.
 
-## Rev3 Project Intake
+## Legacy Rev3/Rev4 Project Intake
 
 - `projects.workflow_entry_mode` is `survey_required` by default or `client_boq`; it can change only before a pipeline run exists. Starting `client_boq` fails closed without an active project-scoped `client_boq` document, then uses the template's explicit edge condition to skip survey/meeting/design.
-- Project creation uploads BOQ evidence through the protected project-document API before starting the runtime. The selected published template ID remains explicit; fallback selection chooses the latest published revision, never mutates an existing run.
+- Historical project creation uploaded BOQ evidence through the protected project-document API before starting the runtime. This remains compatibility context only; new project forms must not author `workflow_entry_mode`.
 - Use `GOLDEN-REV3-BOQ-001` (project 023) to review the untouched Rev3 client-BOQ branch. Project 022 is the preservation control and must remain on its original runtime/template snapshot.
 - For Rev4/engine-3 UAT, project 024 is the production-shaped entry-state control at `project_intake`; project 025 is a labelled synthetic construction-stage snapshot and must not be used to infer that planning handoff or earlier node gates completed.
+
+## Rev5 Project Intake
+
+- Project create/edit owns metadata and explicit published-template selection only. Backend ignores client-supplied `workflow_entry_mode`; the database column remains for immutable Rev3/Rev4 compatibility.
+- After Rev5 starts, the active `Tiếp nhận dự án` work item owns `entry_route` and conditional BOQ evidence. Submitted workflow-form answers are the only Rev5 branch source; Connector configuration chooses `Khảo sát` or `BOQ (Không thiết kế)`.
+- Selecting a Rev5 connector skips the complete branch-exclusive descendant set, not only its direct sibling. Nodes shared with or reachable from the selected path remain pending/executable; project workflow progress excludes all skipped steps and keeps their cancelled work/forms available only as read-only history.
+- Projects still selecting Rev4 and having no run are moved to Rev5 by V92. Existing project runs are never rebound or rewritten.
 - Project estimated budget and contract amount are monetary inputs and use semantic `currency`/shared `CurrencyInput`; project progress, dates and other non-money numeric planning values do not.

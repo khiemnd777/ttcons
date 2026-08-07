@@ -20,8 +20,9 @@ type EdgeInspectorPanelProps = {
   edgeForm: EdgeForm;
   conditionInvalid: boolean;
   priorityInvalid: boolean;
-  answerConfigInvalid: boolean;
+  configInvalidKeys: string[];
   answerFieldOptions: Array<{ label: string; value: string }>;
+  answerValueOptionsByFieldKey: Record<string, Array<{ label: string; value: string }>>;
   savePending: boolean;
   onChangeField: (field: 'label' | 'condition_type' | 'priority', value: string) => void;
   onChangeConditionConfig: (field: string, value: any) => void;
@@ -41,8 +42,9 @@ export function EdgeInspectorPanel({
   edgeForm,
   conditionInvalid,
   priorityInvalid,
-  answerConfigInvalid,
+  configInvalidKeys,
   answerFieldOptions,
+  answerValueOptionsByFieldKey,
   savePending,
   onChangeField,
   onChangeConditionConfig,
@@ -55,11 +57,6 @@ export function EdgeInspectorPanel({
   const conditionOptions = conditions.map((condition) => ({ label: condition.label, value: condition.type }));
   if (edgeForm.condition_type && !conditionOptions.some((option) => option.value === edgeForm.condition_type)) {
     conditionOptions.push({ label: edgeForm.condition_type, value: edgeForm.condition_type });
-  }
-  const sourceFieldKey = String(edgeForm.condition_config.field_key ?? '');
-  const sourceFieldOptions = [...answerFieldOptions];
-  if (sourceFieldKey && !sourceFieldOptions.some((option) => option.value === sourceFieldKey)) {
-    sourceFieldOptions.push({ label: sourceFieldKey, value: sourceFieldKey });
   }
 
   return (
@@ -93,43 +90,6 @@ export function EdgeInspectorPanel({
           onChange={(value) => onChangeField('label', value)}
         />
 
-        {edgeForm.condition_type === 'workflow_form_answer_equals' ? (
-          <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50/50 p-3">
-            <Select
-              label="Trường biểu mẫu nguồn"
-              value={sourceFieldKey}
-              options={sourceFieldOptions}
-              invalid={answerConfigInvalid && !edgeForm.condition_config.field_key}
-              invalidText={answerFieldOptions.length ? 'Chọn trường dùng để rẽ nhánh' : 'Node nguồn chưa có trường biểu mẫu khả dụng'}
-              disabled={readOnly}
-              onChange={(value) => onChangeConditionConfig('field_key', value)}
-            />
-            <Field
-              label="Giá trị cần khớp"
-              value={String(edgeForm.condition_config.value ?? '')}
-              invalid={answerConfigInvalid && String(edgeForm.condition_config.value ?? '').trim() === ''}
-              invalidText="Nhập giá trị dùng để rẽ nhánh"
-              disabled={readOnly}
-              onChange={(value) => onChangeConditionConfig('value', value)}
-            />
-          </div>
-        ) : null}
-        {edgeForm.condition_type === 'project_entry_mode' ? (
-          <div className="rounded-md border border-blue-200 bg-blue-50/50 p-3">
-            <Select
-              label="Nhánh điểm bắt đầu"
-              value={String(edgeForm.condition_config.value ?? '')}
-              options={[
-                { label: 'Khảo sát trước báo giá', value: 'survey_required' },
-                { label: 'Chủ đầu tư có BOQ · vào thẳng Báo giá', value: 'client_boq' },
-              ]}
-              invalid={!['survey_required', 'client_boq'].includes(String(edgeForm.condition_config.value ?? ''))}
-              invalidText="Chọn nhánh điểm bắt đầu"
-              disabled={readOnly}
-              onChange={(value) => onChangeConditionConfig('value', value)}
-            />
-          </div>
-        ) : null}
         <Select
           label="Điều kiện chuyển tiếp"
           value={edgeForm.condition_type}
@@ -139,6 +99,30 @@ export function EdgeInspectorPanel({
           invalidText={conditionLoadError ? 'Không tải được danh sách điều kiện chuyển tiếp' : 'Điều kiện chuyển tiếp không hợp lệ'}
           onChange={(value) => onChangeField('condition_type', value)}
         />
+        {selectedCondition?.config_schema?.length ? (
+          <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50/50 p-3">
+            {selectedCondition.config_schema.map((configField) => {
+              const value = String(edgeForm.condition_config[configField.key] ?? '');
+              const invalid = configInvalidKeys.includes(configField.key);
+              const options = connectorConfigOptions(configField.control, configField.depends_on, edgeForm.condition_config, answerFieldOptions, answerValueOptionsByFieldKey);
+              const common = {
+                label: configField.label,
+                value,
+                invalid,
+                invalidText: configField.help_text ?? `${configField.label} là bắt buộc`,
+                disabled: readOnly,
+                onChange: (nextValue: string) => onChangeConditionConfig(configField.key, nextValue),
+              };
+              return options ? <Select key={configField.key} {...common} options={options} /> : <Field key={configField.key} {...common} />;
+            })}
+          </div>
+        ) : null}
+        {!selectedCondition && Object.keys(edgeForm.condition_config).length ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <p className="font-semibold">Cấu hình legacy chỉ đọc</p>
+            {Object.entries(edgeForm.condition_config).map(([key, value]) => <p key={key} className="mt-1 break-all">{key}: {String(value)}</p>)}
+          </div>
+        ) : null}
         <Field
           label="Ưu tiên"
           value={edgeForm.priority}
@@ -184,6 +168,22 @@ export function EdgeInspectorPanel({
       </div>
     </aside>
   );
+}
+
+function connectorConfigOptions(
+  control: string,
+  dependsOn: string | undefined,
+  config: Record<string, any>,
+  fieldOptions: Array<{ label: string; value: string }>,
+  valueOptionsByFieldKey: Record<string, Array<{ label: string; value: string }>>,
+) {
+  if (control === 'source_form_field') return fieldOptions;
+  if (control === 'source_field_option') {
+    const sourceFieldKey = String(config[dependsOn ?? ''] ?? '');
+    const options = valueOptionsByFieldKey[sourceFieldKey] ?? [];
+    return options.length ? options : undefined;
+  }
+  return undefined;
 }
 
 function Field({

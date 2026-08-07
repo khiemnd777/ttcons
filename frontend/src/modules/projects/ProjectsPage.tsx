@@ -13,10 +13,9 @@ import {
   Pencil,
   Plus,
   Search,
-  Upload,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { get, post, postForm, put } from '../../lib/api/client';
+import { get, post, put } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FormDrawer } from '../../components/FormDrawer';
@@ -41,7 +40,6 @@ export function ProjectsPage() {
   const [dialog, setDialog] = useState<{ mode: 'view' | 'edit'; record: Project } | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [clientBoqFile, setClientBoqFile] = useState<File | null>(null);
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -50,21 +48,10 @@ export function ProjectsPage() {
   const templates = useQuery({ queryKey: ['pipeline-templates'], queryFn: () => get<Record<string, any>[]>('/pipeline-templates') });
   const partners = useQuery({ queryKey: ['partners', 'client', 'active'], queryFn: () => get<Partner[]>('/partners?status=active&type=client') });
   const createProject = useMutation({
-    mutationFn: async ({ values, boqFile }: { values: Record<string, any>; boqFile?: File | null }) => {
-      const project = await post<Project>('/projects', values);
-      if (values.workflow_entry_mode === 'client_boq' && boqFile) {
-        const form = new FormData();
-        form.append('file', boqFile);
-        form.append('document_type', 'client_boq');
-        form.append('name', boqFile.name);
-        await postForm<Record<string, any>>(`/projects/${project.id}/documents/upload`, form);
-      }
-      return project;
-    },
+    mutationFn: (values: Record<string, any>) => post<Project>('/projects', values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       setOpen(false);
-      setClientBoqFile(null);
       toast.success('Đã tạo công trình');
     },
     onError: (error) => toast.error('Không tạo được công trình', error),
@@ -98,18 +85,6 @@ export function ProjectsPage() {
       hiddenWhen: (values: Record<string, any>) => Boolean(values.partner_id),
     },
     { name: 'address', label: 'Địa chỉ', defaultValue: record?.address ?? '' },
-    {
-      name: 'workflow_entry_mode',
-      label: 'Điểm bắt đầu quy trình',
-      type: 'select' as const,
-      defaultValue: record?.workflow_entry_mode ?? 'survey_required',
-      required: true,
-      options: workflowEntryModeOptions,
-      disabledWhen: record ? () => Boolean(record.current_pipeline_run_id) : undefined,
-      helperText: record?.current_pipeline_run_id
-        ? 'Điểm bắt đầu đã khóa vì công trình đã có quy trình đang chạy.'
-        : 'Nếu chủ đầu tư đã có BOQ, công trình vào thẳng bước BOQ và không đi qua khảo sát/họp/thiết kế.',
-    },
     { name: 'planned_start_date', label: 'Ngày bắt đầu dự kiến', type: 'date' as const, defaultValue: record?.planned_start_date?.slice?.(0, 10) ?? '' },
     { name: 'planned_end_date', label: 'Ngày kết thúc dự kiến', type: 'date' as const, defaultValue: record?.planned_end_date?.slice?.(0, 10) ?? '' },
     { name: 'estimated_budget', label: 'Ngân sách dự kiến', type: 'currency' as const, defaultValue: record?.estimated_budget ?? 300000000, min: 0 },
@@ -249,24 +224,11 @@ export function ProjectsPage() {
         ) : null}
       </section>
 
-      <FormDrawer open={open} title="Tạo công trình mới" onClose={() => { setOpen(false); setClientBoqFile(null); }}>
+      <FormDrawer open={open} title="Tạo công trình mới" onClose={() => setOpen(false)}>
         <SimpleForm
           submitLabel="Tạo công trình"
           fields={projectFields()}
-          renderAside={(values) => (
-            <ProjectEntryModeAside
-              entryMode={values.workflow_entry_mode}
-              boqFile={clientBoqFile}
-              onFileChange={setClientBoqFile}
-            />
-          )}
-          onSubmit={(values) => {
-            if (values.workflow_entry_mode === 'client_boq' && !clientBoqFile) {
-              toast.warn({ title: 'Thiếu BOQ đầu vào', description: 'Chọn tệp BOQ của chủ đầu tư trước khi tạo công trình theo nhánh Báo giá.' });
-              return;
-            }
-            return createProject.mutateAsync({ values, boqFile: clientBoqFile });
-          }}
+          onSubmit={(values) => createProject.mutateAsync(values)}
         />
       </FormDrawer>
       <RecordDetailDialog
@@ -281,7 +243,6 @@ export function ProjectsPage() {
           { key: 'partner_name', label: 'Đối tác catalog' },
           { key: 'partner_tax_code', label: 'MST đối tác' },
           { key: 'address', label: 'Địa chỉ' },
-          { key: 'workflow_entry_mode', label: 'Điểm bắt đầu', render: (row) => workflowEntryModeLabel(row.workflow_entry_mode) },
           { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
           { key: 'estimated_budget', label: 'Ngân sách', render: (row) => <CurrencyText value={row.estimated_budget} /> },
           { key: 'contract_amount', label: 'Hợp đồng', render: (row) => <CurrencyText value={row.contract_amount} /> },
@@ -304,57 +265,11 @@ export function ProjectsPage() {
   );
 }
 
-function ProjectEntryModeAside({ entryMode, boqFile, onFileChange }: {
-  entryMode: string;
-  boqFile: File | null;
-  onFileChange: (file: File | null) => void;
-}) {
-  const clientBoq = entryMode === 'client_boq';
-  return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nhánh workflow</p>
-        <h3 className="mt-1 text-sm font-semibold text-ink">{clientBoq ? 'Báo giá từ BOQ có sẵn' : 'Khảo sát trước báo giá'}</h3>
-      </div>
-      <div className="space-y-2 text-xs leading-5 text-slate-600">
-        <p className={clientBoq ? 'text-slate-400 line-through' : 'font-semibold text-blue-700'}>1. Khảo sát → Họp khách hàng → Thiết kế</p>
-        <p className="font-semibold text-blue-700">2. BOQ/Báo giá</p>
-        <p>3. Hợp đồng đầu ra → bóc tách/mua hàng → triển khai</p>
-      </div>
-      {clientBoq ? (
-        <label className="block rounded-md border border-dashed border-blue-300 bg-blue-50 p-3">
-          <span className="flex items-center gap-2 text-sm font-semibold text-blue-900"><Upload className="h-4 w-4" /> BOQ của chủ đầu tư *</span>
-          <input
-            className="mt-2 block w-full text-xs text-slate-600"
-            type="file"
-            accept="application/pdf,image/png,image/jpeg,image/webp"
-            onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
-          />
-          <p className="mt-2 break-all text-xs text-blue-800">{boqFile?.name ?? 'Chưa chọn tệp'}</p>
-        </label>
-      ) : (
-        <div className="rounded-md border border-line bg-white p-3 text-xs leading-5 text-slate-600">
-          Công trình sẽ bắt đầu bằng khảo sát và chỉ vào BOQ sau khi hoàn tất nhánh đầu vào.
-        </div>
-      )}
-    </div>
-  );
-}
-
 function latestPublishedTemplateId(templates: Record<string, any>[]) {
   return [...templates]
     .filter((template) => template.status === 'published')
     .sort((left, right) => Number(right.revision_no ?? right.version ?? 0) - Number(left.revision_no ?? left.version ?? 0))[0]?.id ?? '';
 }
-
-function workflowEntryModeLabel(mode?: string) {
-  return workflowEntryModeOptions.find((option) => option.value === mode)?.label ?? mode ?? 'Chưa xác định';
-}
-
-const workflowEntryModeOptions = [
-  { value: 'survey_required', label: 'Khảo sát trước báo giá' },
-  { value: 'client_boq', label: 'Chủ đầu tư có sẵn BOQ · vào thẳng Báo giá' },
-];
 
 function ProjectExpandedWorkspace({ project, folders }: { project: Project; folders: ProjectWorkspaceGroup[] }) {
   return (

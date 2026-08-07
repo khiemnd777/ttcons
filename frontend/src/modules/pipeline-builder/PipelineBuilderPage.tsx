@@ -154,12 +154,39 @@ export function PipelineBuilderPage() {
       });
     });
   }, [nodeById, selectedConnector, workflowForms.data]);
+  const answerValueOptionsByFieldKey = useMemo(() => {
+    if (!selectedConnector) return {};
+    const sourceNode = nodeById.get(String(selectedConnector.from_node_id));
+    const versionIds = new Set((sourceNode?.steps ?? []).map((step: Record<string, any>) => String(step.form_version_id ?? '')).filter(Boolean));
+    const optionsByFieldKey: Record<string, Array<{ label: string; value: string }>> = {};
+    (workflowForms.data ?? []).forEach((form) => {
+      if (!versionIds.has(String(form.version_id))) return;
+      (form.fields ?? []).forEach((field) => {
+        const options = Array.isArray(field.options_json) ? field.options_json : [];
+        optionsByFieldKey[field.field_key] = options.map((option) => {
+          if (typeof option === 'string') return { label: option, value: option };
+          return { label: option.label ?? option.value, value: option.value };
+        }).filter((option) => option.value);
+      });
+    });
+    return optionsByFieldKey;
+  }, [nodeById, selectedConnector, workflowForms.data]);
   const selectedConnectorSource = selectedConnector ? nodeById.get(String(selectedConnector.from_node_id)) : undefined;
   const selectedConnectorTarget = selectedConnector ? nodeById.get(String(selectedConnector.to_node_id)) : undefined;
   const detailsNode = detailsNodeId ? nodeById.get(detailsNodeId) : undefined;
   const edgeConditionTypes = useMemo(
     () => new Set((edgeConditions.data ?? []).map((condition) => condition.type)),
     [edgeConditions.data],
+  );
+  const selectedEdgeCondition = useMemo(
+    () => (edgeConditions.data ?? []).find((condition) => condition.type === edgeForm.condition_type),
+    [edgeConditions.data, edgeForm.condition_type],
+  );
+  const invalidEdgeConfigKeys = useMemo(
+    () => (selectedEdgeCondition?.config_schema ?? [])
+      .filter((field) => field.required && String(edgeForm.condition_config[field.key] ?? '').trim() === '')
+      .map((field) => field.key),
+    [edgeForm.condition_config, selectedEdgeCondition?.config_schema],
   );
   const permissionOptions = useMemo(
     () => (permissions.data ?? []).map((permission) => ({
@@ -212,6 +239,7 @@ export function PipelineBuilderPage() {
       type: detailsNode.type ?? 'custom',
       permissions: normalizePermissions(detailsNode),
       approval_policy_json: isRecord(detailsNode.approval_policy_json) ? detailsNode.approval_policy_json : { mode: 'none' },
+      exit_conditions: isRecord(detailsNode.exit_conditions) ? detailsNode.exit_conditions : {},
     });
     closeStepDialog();
   }, [detailsNode?.id]);
@@ -224,7 +252,10 @@ export function PipelineBuilderPage() {
     });
   }, [detailsNode?.type, stepDialog, stepForm.form_required, stepForm.form_version_id, workflowForms.data]);
 
-  const validationIssues = useMemo(() => buildValidationIssues(nodes, rawEdges, edgeConditionTypes, workflowFormVersionIds), [nodes, rawEdges, edgeConditionTypes, workflowFormVersionIds]);
+  const validationIssues = useMemo(
+    () => buildValidationIssues(nodes, rawEdges, edgeConditions.data ?? [], workflowFormVersionIds, isPublished),
+    [nodes, rawEdges, edgeConditions.data, workflowFormVersionIds, isPublished],
+  );
 
   const invalidate = (templateId = selectedTemplateId) => {
     queryClient.invalidateQueries({ queryKey: ['pipeline-templates'] });
@@ -383,6 +414,7 @@ export function PipelineBuilderPage() {
         type: nodeForm.type,
         permissions: Array.isArray(nodeForm.permissions) ? nodeForm.permissions : [],
         approval_policy_json: isRecord(nodeForm.approval_policy_json) ? nodeForm.approval_policy_json : { mode: 'none' },
+        exit_conditions: isRecord(nodeForm.exit_conditions) ? nodeForm.exit_conditions : {},
       });
     },
     onSuccess: () => {
@@ -730,10 +762,9 @@ export function PipelineBuilderPage() {
     if (!edgeForm.condition_type || !edgeConditionTypes.has(edgeForm.condition_type)) invalidLabels.push('Điều kiện chuyển tiếp');
     if (!Number.isInteger(priority) || priority < 1 || priority > 999) invalidLabels.push('Ưu tiên');
     if (edgeConditions.isError) invalidLabels.push('Danh sách điều kiện');
-    if (edgeForm.condition_type === 'workflow_form_answer_equals') {
-      if (!String(edgeForm.condition_config.field_key ?? '').trim()) invalidLabels.push('Trường biểu mẫu nguồn');
-      if (String(edgeForm.condition_config.value ?? '').trim() === '') invalidLabels.push('Giá trị cần khớp');
-    }
+    invalidLabels.push(...(selectedEdgeCondition?.config_schema ?? [])
+      .filter((field) => invalidEdgeConfigKeys.includes(field.key))
+      .map((field) => field.label));
 
     if (invalidLabels.length) {
       toast.warn({
@@ -991,11 +1022,12 @@ export function PipelineBuilderPage() {
               edgeForm={edgeForm}
               conditionInvalid={edgeSubmitAttempted && (!edgeForm.condition_type || !edgeConditionTypes.has(edgeForm.condition_type))}
               priorityInvalid={edgeSubmitAttempted && !validEdgePriority(edgeForm.priority)}
-              answerConfigInvalid={edgeSubmitAttempted && edgeForm.condition_type === 'workflow_form_answer_equals' && (!String(edgeForm.condition_config.field_key ?? '').trim() || String(edgeForm.condition_config.value ?? '').trim() === '')}
+              configInvalidKeys={edgeSubmitAttempted ? invalidEdgeConfigKeys : []}
               answerFieldOptions={answerFieldOptions}
+              answerValueOptionsByFieldKey={answerValueOptionsByFieldKey}
               savePending={saveEdgeSettings.isPending}
               onChangeField={(field, value) => {
-                if (!isReadOnly) setEdgeForm((current) => ({ ...current, [field]: value }));
+                if (!isReadOnly) setEdgeForm((current) => field === 'condition_type' ? { ...current, condition_type: value, condition_config: {} } : { ...current, [field]: value });
               }}
               onChangeConditionConfig={(field, value) => {
                 if (!isReadOnly) setEdgeForm((current) => ({ ...current, condition_config: { ...current.condition_config, [field]: value } }));
@@ -1300,8 +1332,15 @@ function pipelineTemplatePDFDownloadName(template: PipelineTemplate) {
   return `workflow-${slug}-rev-${revision}.pdf`;
 }
 
-function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdge[], conditionTypes: Set<string>, workflowFormVersionIds: Set<string>) {
+function buildValidationIssues(
+  nodes: PipelineNode[],
+  edges: PipelineTemplateEdge[],
+  conditions: PipelineEdgeConditionDefinition[],
+  workflowFormVersionIds: Set<string>,
+  allowUnknownConditions: boolean,
+) {
   const issues: string[] = [];
+  const conditionByType = new Map(conditions.map((condition) => [condition.type, condition]));
   if (!nodes.length) issues.push('Template chưa có node');
   nodes.forEach((node) => {
     if (!node.name?.trim()) issues.push('Có node thiếu tên');
@@ -1325,7 +1364,7 @@ function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdg
     if (!nodeIds.has(String(edge.to_node_id))) issues.push('Có cạnh trỏ tới node đã xóa');
     if (String(edge.label ?? '').trim().length > 80) issues.push(`Connector ${edge.id} có nhãn quá dài`);
     if (!String(edge.condition_type ?? '').trim()) issues.push('Có connector thiếu điều kiện chuyển tiếp');
-    if (conditionTypes.size && !conditionTypes.has(String(edge.condition_type ?? ''))) issues.push(`Connector ${edge.label || edge.id} dùng điều kiện chuyển tiếp không được hỗ trợ`);
+    if (!allowUnknownConditions && conditionByType.size && !conditionByType.has(String(edge.condition_type ?? ''))) issues.push(`Connector ${edge.label || edge.id} dùng điều kiện chuyển tiếp không được hỗ trợ`);
     if (!validEdgePriority(String(edge.priority ?? 100))) issues.push(`Connector ${edge.label || edge.id} có priority không hợp lệ`);
     if (nodeIds.has(String(edge.from_node_id)) && nodeIds.has(String(edge.to_node_id))) {
       const from = String(edge.from_node_id);
@@ -1334,12 +1373,11 @@ function buildValidationIssues(nodes: PipelineNode[], edges: PipelineTemplateEdg
       indegree.set(to, (indegree.get(to) ?? 0) + 1);
       adjacency.get(from)?.push(to);
     }
-    if (edge.condition_type === 'workflow_form_answer_equals') {
-      const config = isRecord(edge.condition_config) ? edge.condition_config : {};
-      if (!cleanString(config.field_key) || !Object.prototype.hasOwnProperty.call(config, 'value') || cleanString(config.value) === '') {
-        issues.push(`Connector ${edge.label || edge.id} thiếu trường hoặc giá trị rẽ nhánh`);
-      }
-    }
+    const config = isRecord(edge.condition_config) ? edge.condition_config : {};
+    const missingConfigLabels = (conditionByType.get(String(edge.condition_type ?? ''))?.config_schema ?? [])
+      .filter((field) => field.required && cleanString(config[field.key]) === '')
+      .map((field) => field.label);
+    if (missingConfigLabels.length) issues.push(`Connector ${edge.label || edge.id} thiếu ${missingConfigLabels.join(', ')}`);
   });
   if (nodes.length) {
     const roots = nodes.filter((node) => (indegree.get(node.id) ?? 0) === 0);

@@ -16,6 +16,7 @@ import { enumLabel } from '../../lib/utils/status';
 import { SignatureCaptureDialog, type SignatureStroke } from './SignatureCaptureDialog';
 import { compactDateTime, isGenericWorkflowFormTemplate, workflowFormTypeLabel } from './workItemPresentation';
 import { effectiveWorkflowCurrencyFields } from './workflowCurrencyFields';
+import { effectiveWorkflowFormFields } from './workflowFormRules';
 
 type FormErrors = Record<string, string>;
 
@@ -65,16 +66,17 @@ export function WorkflowFormPanel({
     [signatures, user?.id],
   );
   const signedByCurrentUser = signedPurposesByCurrentUser.includes('internal_ack');
-  const validationIssues = useMemo(() => fields.map((field) => validateFieldValue(field, values[field.field_key])).filter(Boolean), [fields, values]);
-  const checklistField = fields.find((field) => field.field_type === 'structured_list' && field.field_key === 'checklist_items');
+  const activeFields = useMemo(() => effectiveWorkflowFormFields(fields, values), [fields, values]);
+  const validationIssues = useMemo(() => activeFields.map((field) => validateFieldValue(field, values[field.field_key])).filter(Boolean), [activeFields, values]);
+  const checklistField = activeFields.find((field) => field.field_type === 'structured_list' && field.field_key === 'checklist_items');
   const checklistStats = checklistField ? checklistStatsFromRows(structuredRows(values[checklistField.field_key])) : null;
   const isPlanningDailyReport = instance?.form_type === 'daily_report' && form.data?.template?.code !== 'builtin_construction_daily_report';
   const isMeetingMinutes = instance?.form_type === 'meeting_minutes';
   const isPlanningChecklist = instance?.form_type === 'checklist' && form.data?.template?.code === 'builtin_checklist';
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
   const validationIssueLabels = useMemo(
-    () => fields.filter((field) => validateFieldValue(field, values[field.field_key])).map((field) => field.label),
-    [fields, values],
+    () => activeFields.filter((field) => validateFieldValue(field, values[field.field_key])).map((field) => field.label),
+    [activeFields, values],
   );
 
   useEffect(() => {
@@ -101,9 +103,15 @@ export function WorkflowFormPanel({
 
   const submitForm = useMutation({
     mutationFn: () => post<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/submit`, { answers: values }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       invalidate();
-      toast.success('Đã gửi hồ sơ nghiệp vụ');
+      if (result.auto_transition?.status === 'advanced') {
+        toast.success('Đã xác nhận và chuyển sang bước tiếp theo');
+      } else if (result.auto_transition?.status === 'blocked') {
+        toast.warn({ title: 'Đã lưu lựa chọn nhưng chưa thể chuyển bước', description: result.auto_transition.message ?? 'Kiểm tra điều kiện connector và thử lại.' });
+      } else {
+        toast.success('Đã gửi hồ sơ nghiệp vụ');
+      }
     },
     onError: (error) => toast.error('Không gửi được hồ sơ nghiệp vụ', error),
   });
@@ -153,13 +161,13 @@ export function WorkflowFormPanel({
 
   function validateBeforeSubmit() {
     const nextErrors: FormErrors = {};
-    fields.forEach((field) => {
+    activeFields.forEach((field) => {
       const value = values[field.field_key];
       const error = validateFieldValue(field, value);
       if (error) nextErrors[field.field_key] = error;
     });
     setErrors(nextErrors);
-    const labels = fields.filter((field) => nextErrors[field.field_key]).map((field) => field.label);
+    const labels = activeFields.filter((field) => nextErrors[field.field_key]).map((field) => field.label);
     if (labels.length) {
       toast.warn({ title: 'Thiếu thông tin nghiệp vụ', description: labels.join(', ') });
       return false;
@@ -225,6 +233,7 @@ export function WorkflowFormPanel({
         onSubmit={() => {
           if (!readOnly && validateBeforeSubmit()) submitForm.mutate();
         }}
+        submitLabel={form.data.auto_advance_when_ready ? 'Xác nhận và tiếp tục' : 'Gửi hồ sơ'}
       />
 
       <div className="space-y-3">
@@ -246,10 +255,10 @@ export function WorkflowFormPanel({
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nội dung cần xử lý</p>
               <h4 className="mt-0.5 text-sm font-semibold text-ink">Thông tin nghiệp vụ</h4>
             </div>
-            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{fields.length} thông tin</span>
+            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{activeFields.length} thông tin</span>
           </div>
           <div className="grid gap-3 p-3">
-            {fields.map((field) => (
+            {activeFields.map((field) => (
               <WorkflowFieldControl
                 key={field.field_key}
                 field={field}
@@ -384,6 +393,7 @@ function WorkflowFormActionCenter({
   readOnly,
   onSave,
   onSubmit,
+  submitLabel,
 }: {
   title: string;
   versionNo: number;
@@ -397,6 +407,7 @@ function WorkflowFormActionCenter({
   readOnly: boolean;
   onSave: () => void;
   onSubmit: () => void;
+  submitLabel: string;
 }) {
   const blocked = !readOnly && !submitted && validationIssueLabels.length > 0;
   const issuePreview = validationIssueLabels.slice(0, 4).join(', ');
@@ -443,7 +454,7 @@ function WorkflowFormActionCenter({
             onClick={onSubmit}
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Gửi hồ sơ
+            {submitLabel}
           </button>
         </div>
       </div>

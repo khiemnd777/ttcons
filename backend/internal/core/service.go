@@ -450,14 +450,9 @@ func (s *Service) CreateProject(ctx context.Context, body Record) (Record, error
 	if body["status"] == nil {
 		body["status"] = "draft"
 	}
-	entryMode := strings.TrimSpace(fmt.Sprint(body["workflow_entry_mode"]))
-	if entryMode == "" || entryMode == "<nil>" {
-		entryMode = "survey_required"
-	}
-	if !statusIn(entryMode, "survey_required", "client_boq") {
-		return nil, validationError("Điểm bắt đầu quy trình không hợp lệ", Record{"workflow_entry_mode": entryMode})
-	}
-	body["workflow_entry_mode"] = entryMode
+	// The workflow form and connector configuration own runtime routing.
+	// Ignore this legacy project field for newly created projects.
+	delete(body, "workflow_entry_mode")
 	if err := s.applyPartnerSnapshot(ctx, body, "partner_id", "client_name", "", []string{"client"}); err != nil {
 		return nil, err
 	}
@@ -470,24 +465,7 @@ func (s *Service) CreateProject(ctx context.Context, body Record) (Record, error
 }
 
 func (s *Service) UpdateProject(ctx context.Context, id string, body Record) (Record, error) {
-	if raw, provided := body["workflow_entry_mode"]; provided {
-		entryMode := strings.TrimSpace(fmt.Sprint(raw))
-		if !statusIn(entryMode, "survey_required", "client_boq") {
-			return nil, validationError("Điểm bắt đầu quy trình không hợp lệ", Record{"workflow_entry_mode": entryMode})
-		}
-		current, err := s.repo.QueryOne(ctx, `
-			SELECT p.workflow_entry_mode,
-				EXISTS (SELECT 1 FROM pipeline_runs pr WHERE pr.project_id=p.id) AS pipeline_started
-			FROM projects p WHERE p.id=$1 AND p.status <> 'cancelled'
-		`, cleanID(id))
-		if err != nil {
-			return nil, err
-		}
-		if boolValue(current["pipeline_started"]) && entryMode != strings.TrimSpace(fmt.Sprint(current["workflow_entry_mode"])) {
-			return nil, validationError("Không thể đổi điểm bắt đầu sau khi công trình đã khởi chạy quy trình")
-		}
-		body["workflow_entry_mode"] = entryMode
-	}
+	delete(body, "workflow_entry_mode")
 	if err := s.applyPartnerSnapshot(ctx, body, "partner_id", "client_name", "", []string{"client"}); err != nil {
 		return nil, err
 	}
@@ -2017,6 +1995,9 @@ func normalizeWorkflowFormFieldRequests(fields []WorkflowFormFieldRequest, requi
 			"visibility_condition_json": visibility,
 		})
 	}
+	if err := validateWorkflowFormFieldRules(out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -2664,6 +2645,15 @@ func (s *Service) WorkItemForm(ctx context.Context, workItemID, actorID string) 
 		return nil, err
 	}
 	form["available"] = true
+	if instance := recordFromAny(form["instance"]); len(instance) > 0 {
+		runNodeID := cleanID(instance["run_node_id"])
+		if runNodeID != "" {
+			if node, nodeErr := s.repo.GetByID(ctx, "pipeline_run_nodes", runNodeID); nodeErr == nil {
+				exitConditions := recordFromAny(node["exit_conditions"])
+				form["auto_advance_when_ready"] = boolValue(exitConditions["auto_advance_when_ready"])
+			}
+		}
+	}
 	return form, nil
 }
 
@@ -5191,7 +5181,39 @@ func (s *Service) saveWorkflowForm(ctx context.Context, instanceID string, req W
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.SaveWorkflowForm(ctx, instanceID, normalized, strings.TrimSpace(req.Comment), submit, actorID, actorName)
+	saved, err := s.repo.SaveWorkflowForm(ctx, instanceID, normalized, strings.TrimSpace(req.Comment), submit, actorID, actorName)
+	if err != nil || !submit {
+		return saved, err
+	}
+	saved["auto_transition"] = s.autoAdvanceSubmittedWorkflowForm(ctx, instance, actorID, actorName)
+	return saved, nil
+}
+
+func (s *Service) autoAdvanceSubmittedWorkflowForm(ctx context.Context, instance Record, actorID, actorName string) Record {
+	runNodeID := cleanID(instance["run_node_id"])
+	workItemID := cleanID(instance["work_item_id"])
+	if runNodeID == "" || workItemID == "" {
+		return Record{"status": "not_configured"}
+	}
+	node, err := s.repo.GetByID(ctx, "pipeline_run_nodes", runNodeID)
+	if err != nil {
+		return Record{"status": "blocked", "message": err.Error()}
+	}
+	exitConditions := recordFromAny(node["exit_conditions"])
+	if !boolValue(exitConditions["auto_advance_when_ready"]) {
+		return Record{"status": "not_configured"}
+	}
+	if _, err := s.WorkItemAction(ctx, workItemID, "complete", WorkItemActionRequest{}, actorID, actorName); err != nil {
+		return Record{"status": "blocked", "message": err.Error()}
+	}
+	run, err := s.AdvanceRunNode(ctx, runNodeID, actorID, actorName)
+	if err != nil {
+		return Record{"status": "blocked", "message": err.Error()}
+	}
+	if fmt.Sprint(run["status"]) == "blocked" {
+		return Record{"status": "blocked", "message": run["block_reason"]}
+	}
+	return Record{"status": "advanced", "current_node_id": run["current_node_id"]}
 }
 
 func (s *Service) WorkItemAction(ctx context.Context, workItemID, action string, req WorkItemActionRequest, actorID, actorName string) (Record, error) {
@@ -6921,7 +6943,17 @@ func (s *Service) validateWorkflowFormAnswers(ctx context.Context, instance Reco
 	for _, field := range fields {
 		key := fmt.Sprint(field["field_key"])
 		value, hasValue := answers[key]
-		required := boolValue(field["required"])
+		visible, err := workflowFormFieldVisible(field, answers)
+		if err != nil {
+			return nil, validationError("Quy tắc hiển thị biểu mẫu không hợp lệ", Record{"field": key, "error": err.Error()})
+		}
+		if !visible {
+			continue
+		}
+		required, err := workflowFormFieldRequired(field, answers)
+		if err != nil {
+			return nil, validationError("Quy tắc bắt buộc biểu mẫu không hợp lệ", Record{"field": key, "error": err.Error()})
+		}
 		if submit && required && workflowFormValueEmpty(field, value) {
 			missing = append(missing, key)
 			fieldErrors[key] = fmt.Sprintf("%s là bắt buộc", field["label"])

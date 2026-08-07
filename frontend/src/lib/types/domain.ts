@@ -211,6 +211,14 @@ export type PipelineEdgeConditionDefinition = {
   description: string;
   default_label: string;
   category: string;
+  config_schema?: Array<{
+    key: string;
+    label: string;
+    control: 'source_form_field' | 'source_field_option' | 'text' | string;
+    required: boolean;
+    depends_on?: string;
+    help_text?: string;
+  }>;
 };
 
 export type PipelineTemplate = AnyRecord & {
@@ -252,6 +260,9 @@ export type WorkflowFormCatalogItem = AnyRecord & {
     label: string;
     field_type: string;
     required: boolean;
+    options_json?: Array<{ value: string; label?: string }> | string[];
+    validation_json?: AnyRecord;
+    visibility_condition_json?: AnyRecord;
     order_index?: number;
   }>;
 };
@@ -2103,6 +2114,8 @@ export type PlanningChecklistItem = AnyRecord & {
 
 export type WorkflowFormDetail = {
   available: boolean;
+  auto_advance_when_ready?: boolean;
+  auto_transition?: AnyRecord & { status?: 'advanced' | 'blocked' | 'not_configured' | string; message?: string };
   instance?: AnyRecord & {
     id: string;
     project_id: string;

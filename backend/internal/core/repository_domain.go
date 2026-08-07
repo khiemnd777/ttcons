@@ -2320,7 +2320,12 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 	}
 	answers := Record{}
 	for _, row := range answerRows {
-		answers[fmt.Sprint(row["field_key"])] = row["value_json"]
+		fieldKey := fmt.Sprint(row["field_key"])
+		value, decodeErr := decodeWorkflowFormAnswerValue(row["value_json"])
+		if decodeErr != nil {
+			return nil, fmt.Errorf("decode workflow form answer %s: %w", fieldKey, decodeErr)
+		}
+		answers[fieldKey] = value
 	}
 	events, err := queryRecords(ctx, db, `
 		SELECT wfe.*, u.full_name AS actor_name
@@ -2371,6 +2376,27 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 		"signatures":  signatures,
 		"pdf_exports": pdfExports,
 	}, nil
+}
+
+func decodeWorkflowFormAnswerValue(value any) (any, error) {
+	switch typed := value.(type) {
+	case nil:
+		return nil, nil
+	case string:
+		var decoded any
+		if err := json.Unmarshal([]byte(typed), &decoded); err != nil {
+			return nil, err
+		}
+		return decoded, nil
+	case []byte:
+		var decoded any
+		if err := json.Unmarshal(typed, &decoded); err != nil {
+			return nil, err
+		}
+		return decoded, nil
+	default:
+		return typed, nil
+	}
 }
 
 func (r *Repository) GetSubcontractorReconciliation(ctx context.Context, workItemID string) (Record, error) {
@@ -4143,6 +4169,9 @@ func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) 
 						'label', f.label,
 						'field_type', f.field_type,
 						'required', f.required,
+						'options_json', f.options_json,
+						'validation_json', f.validation_json,
+						'visibility_condition_json', f.visibility_condition_json,
 						'order_index', f.order_index
 					)
 					ORDER BY f.order_index, f.created_at, f.id
@@ -8307,26 +8336,12 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 	}
 	defer tx.Rollback()
 
-	projectRows, err := queryTx(ctx, tx, `SELECT id,workflow_entry_mode FROM projects WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, projectID)
+	projectRows, err := queryTx(ctx, tx, `SELECT id FROM projects WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, projectID)
 	if err != nil {
 		return nil, err
 	}
 	if len(projectRows) == 0 {
 		return nil, sql.ErrNoRows
-	}
-	if fmt.Sprint(projectRows[0]["workflow_entry_mode"]) == "client_boq" {
-		var hasClientBOQ bool
-		if err := tx.QueryRowContext(ctx, `
-			SELECT EXISTS (
-				SELECT 1 FROM documents
-				WHERE project_id=$1 AND target_type='project_intake' AND document_type='client_boq' AND status='active'
-			)
-		`, projectID).Scan(&hasClientBOQ); err != nil {
-			return nil, err
-		}
-		if !hasClientBOQ {
-			return nil, validationError("Công trình chọn nhánh BOQ có sẵn nhưng chưa có hồ sơ BOQ đầu vào")
-		}
 	}
 	activeRuns, err := queryTx(ctx, tx, `
 		SELECT id
@@ -8370,6 +8385,9 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 			"template_id": templateID,
 			"status":      templateRows[0]["status"],
 		})
+	}
+	if err := validateLegacyProjectEntryPrerequisites(ctx, tx, projectID, templateID); err != nil {
+		return nil, err
 	}
 
 	formIssues, err := queryTx(ctx, tx, templatePublishFormIssuesSQL(), templateID)
@@ -9890,7 +9908,7 @@ func (r *Repository) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorN
 	}
 	if nextNode != nil {
 		nextID := fmt.Sprint(nextNode["id"])
-		if err := skipUnselectedDirectBranchesTx(ctx, tx, node, nextID); err != nil {
+		if err := skipUnselectedBranchExclusiveNodesTx(ctx, tx, node, nextID); err != nil {
 			return nil, err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE pipeline_run_nodes SET status='in_progress', started_at=COALESCE(started_at, now()) WHERE id=$1`, nextID); err != nil {
@@ -9937,27 +9955,37 @@ func (r *Repository) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorN
 	return r.GetPipelineRun(ctx, fmt.Sprint(node["project_id"]))
 }
 
-func skipUnselectedDirectBranchesTx(ctx context.Context, tx *sql.Tx, fromNode Record, selectedNodeID string) error {
+func skipUnselectedBranchExclusiveNodesTx(ctx context.Context, tx *sql.Tx, fromNode Record, selectedNodeID string) error {
 	skippedRows, err := queryTx(ctx, tx, `
-		WITH RECURSIVE reachable(id) AS (
+		WITH RECURSIVE selected_reachable(id) AS (
 			SELECT $3::uuid
 			UNION
 			SELECT e.to_run_node_id
 			FROM pipeline_run_edges e
-			JOIN reachable r ON r.id=e.from_run_node_id
+			JOIN selected_reachable selected ON selected.id=e.from_run_node_id
 			WHERE e.run_id=$1
-		), alternatives AS (
+		), alternative_roots(id) AS (
 			SELECT DISTINCT e.to_run_node_id AS id
 			FROM pipeline_run_edges e
 			WHERE e.run_id=$1
 			  AND e.from_run_node_id=$2
 			  AND e.to_run_node_id <> $3
-			  AND NOT EXISTS (SELECT 1 FROM reachable r WHERE r.id=e.to_run_node_id)
+		), alternative_reachable(id) AS (
+			SELECT id FROM alternative_roots
+			UNION
+			SELECT e.to_run_node_id
+			FROM pipeline_run_edges e
+			JOIN alternative_reachable alternative ON alternative.id=e.from_run_node_id
+			WHERE e.run_id=$1
+		), branch_exclusive(id) AS (
+			SELECT id FROM alternative_reachable
+			EXCEPT
+			SELECT id FROM selected_reachable
 		)
 		UPDATE pipeline_run_nodes rn
 		SET status='skipped', block_reason='Nhánh không được chọn bởi điều kiện chuyển bước'
-		FROM alternatives a
-		WHERE rn.id=a.id AND rn.status='pending'
+		FROM branch_exclusive exclusive
+		WHERE rn.id=exclusive.id AND rn.status='pending'
 		RETURNING rn.id
 	`, fromNode["run_id"], fromNode["id"], selectedNodeID)
 	if err != nil {
@@ -10054,135 +10082,7 @@ func (r *Repository) nextRunNodeByOrder(ctx context.Context, tx *sql.Tx, node Re
 }
 
 func (r *Repository) runEdgeConditionMet(ctx context.Context, tx *sql.Tx, edge, fromNode Record) (bool, string, error) {
-	projectID := fmt.Sprint(fromNode["project_id"])
-	nodeID := fmt.Sprint(fromNode["id"])
-
-	switch edgeConditionType(edge) {
-	case "", "always":
-		return true, "Điều kiện luôn khớp", nil
-	case "order_index":
-		matched := number(edge["to_order_index"]) > number(fromNode["order_index"])
-		return matched, boolReason(matched, "Node đích đứng sau node nguồn", "Node đích không đứng sau node nguồn"), nil
-	case "approval_approved":
-		return r.edgeExists(ctx, tx, "Phê duyệt node đã được duyệt", "Phê duyệt node chưa được duyệt", `
-			SELECT COUNT(*) AS total
-			FROM approval_requests
-			WHERE project_id=$1 AND target_type='pipeline_run_node' AND target_id=$2 AND status='approved'
-		`, projectID, nodeID)
-	case "approval_rejected":
-		return r.edgeExists(ctx, tx, "Phê duyệt node đã bị từ chối", "Phê duyệt node chưa bị từ chối", `
-			SELECT COUNT(*) AS total
-			FROM approval_requests
-			WHERE project_id=$1 AND target_type='pipeline_run_node' AND target_id=$2 AND status='rejected'
-		`, projectID, nodeID)
-	case "acceptance_passed":
-		return r.edgeExists(ctx, tx, "Nghiệm thu đã đạt", "Chưa có nghiệm thu hoàn tất đạt", `
-			SELECT COUNT(*) AS total
-			FROM acceptance_records
-			WHERE project_id=$1 AND result='pass' AND status='completed'
-		`, projectID)
-	case "acceptance_failed":
-		return r.edgeExists(ctx, tx, "Nghiệm thu không đạt", "Chưa có nghiệm thu không đạt", `
-			SELECT COUNT(*) AS total
-			FROM acceptance_records
-			WHERE project_id=$1 AND result='fail'
-		`, projectID)
-	case "rework_required":
-		return r.edgeExists(ctx, tx, "Cần sửa lỗi", "Không có yêu cầu sửa lỗi đang mở", `
-			SELECT COUNT(*) AS total
-			FROM (
-				SELECT id FROM rework_requests WHERE project_id=$1 AND status IN ('draft','approved','in_progress')
-				UNION ALL
-				SELECT id FROM issues WHERE project_id=$1 AND requires_rework AND status IN ('open','in_progress')
-			) required_rework
-		`, projectID)
-	case "rework_completed":
-		total, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM rework_requests WHERE project_id=$1`, projectID)
-		if err != nil {
-			return false, "", err
-		}
-		open, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM rework_requests WHERE project_id=$1 AND status IN ('draft','approved','in_progress')`, projectID)
-		if err != nil {
-			return false, "", err
-		}
-		matched := total > 0 && open == 0
-		return matched, boolReason(matched, "Tất cả yêu cầu sửa lỗi đã hoàn tất", "Yêu cầu sửa lỗi vẫn đang mở hoặc chưa tồn tại"), nil
-	case "replanning_required":
-		return r.edgeExists(ctx, tx, "Cần lập kế hoạch lại", "Không có yêu cầu lập kế hoạch lại đang mở", `
-			SELECT COUNT(*) AS total
-			FROM (
-				SELECT id FROM replanning_requests WHERE project_id=$1 AND status IN ('draft','submitted')
-				UNION ALL
-				SELECT id FROM issues WHERE project_id=$1 AND requires_replanning AND status IN ('open','in_progress')
-			) required_replanning
-		`, projectID)
-	case "materials_issued":
-		missing, err := r.scalarNumberTx(ctx, tx, `
-			SELECT COUNT(*) AS total
-			FROM site_material_balances
-			WHERE project_id=$1 AND issued_quantity < planned_quantity
-		`, projectID)
-		if err != nil {
-			return false, "", err
-		}
-		matched := missing == 0
-		return matched, boolReason(matched, "Vật tư theo kế hoạch đã xuất đủ", "Vật tư theo kế hoạch vẫn còn thiếu"), nil
-	case "boq_approved":
-		total, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM boq_items WHERE project_id=$1 AND status <> 'deleted'`, projectID)
-		if err != nil {
-			return false, "", err
-		}
-		notApproved, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM boq_items WHERE project_id=$1 AND status <> 'deleted' AND status <> 'approved'`, projectID)
-		if err != nil {
-			return false, "", err
-		}
-		matched := total > 0 && notApproved == 0
-		return matched, boolReason(matched, "Tất cả dòng BOQ đã được duyệt", "BOQ đang thiếu dữ liệu hoặc còn dòng chưa duyệt"), nil
-	case "procurement_approved":
-		total, err := r.scalarNumberTx(ctx, tx, `SELECT COUNT(*) AS total FROM procurement_requests WHERE project_id=$1 AND status <> 'cancelled'`, projectID)
-		if err != nil {
-			return false, "", err
-		}
-		notApproved, err := r.scalarNumberTx(ctx, tx, `
-			SELECT COUNT(*) AS total
-			FROM procurement_requests
-			WHERE project_id=$1 AND status <> 'cancelled' AND status NOT IN ('approved','ordered','partially_received','received')
-		`, projectID)
-		if err != nil {
-			return false, "", err
-		}
-		matched := total > 0 && notApproved == 0
-		return matched, boolReason(matched, "Yêu cầu mua/đầu vào đã được duyệt", "Thiếu yêu cầu mua/đầu vào hoặc còn yêu cầu chưa được duyệt"), nil
-	case "workflow_form_answer_equals":
-		return r.workflowFormAnswerEqualsCondition(ctx, tx, edge, projectID, nodeID)
-	case "project_entry_mode":
-		config := edgeConditionConfig(edge)
-		expected := strings.TrimSpace(fmt.Sprint(config["value"]))
-		var actual string
-		if err := tx.QueryRowContext(ctx, `SELECT workflow_entry_mode FROM projects WHERE id=$1`, projectID).Scan(&actual); err != nil {
-			return false, "", err
-		}
-		matched := actual == expected
-		return matched, boolReason(matched, fmt.Sprintf("Điểm bắt đầu công trình là %s", expected), fmt.Sprintf("Điểm bắt đầu công trình là %s, không phải %s", actual, expected)), nil
-	case "handover_ready":
-		return r.handoverReadyCondition(ctx, tx, projectID)
-	case "financial_ready":
-		openDebt, err := r.scalarNumberTx(ctx, tx, `
-			SELECT COUNT(*) AS total
-			FROM (
-				SELECT id FROM payables WHERE project_id=$1 AND status <> 'cancelled' AND remaining_amount > 0
-				UNION ALL
-				SELECT id FROM receivables WHERE project_id=$1 AND status <> 'cancelled' AND remaining_amount > 0
-			) open_debt
-		`, projectID)
-		if err != nil {
-			return false, "", err
-		}
-		matched := openDebt == 0
-		return matched, boolReason(matched, "Không còn công nợ phải thu hoặc phải trả đang mở", "Công nợ phải thu hoặc phải trả vẫn còn mở"), nil
-	default:
-		return false, fmt.Sprintf("Loại điều kiện chuyển bước chưa được hỗ trợ: %s", edgeConditionType(edge)), nil
-	}
+	return evaluateRunEdgeCondition(r, ctx, tx, edge, fromNode)
 }
 
 func (r *Repository) workflowFormAnswerEqualsCondition(ctx context.Context, tx *sql.Tx, edge Record, projectID, runNodeID string) (bool, string, error) {
