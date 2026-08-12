@@ -486,7 +486,7 @@ function WorkflowFormOperationsSummary({
           <h4 className="mt-0.5 text-sm font-semibold text-ink">Việc tiếp theo: {nextAction}</h4>
         </div>
         <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[36rem]">
-          <WorkflowStepPill label="Checklist" value={checklistStats ? `${checklistStats.complete}/${checklistStats.total} hoàn tất` : 'Không áp dụng'} active={!submitted && Boolean(checklistStats?.needsAction)} />
+          {checklistStats ? <WorkflowStepPill label="Checklist" value={`${checklistStats.complete}/${checklistStats.total} hoàn tất`} active={!submitted && Boolean(checklistStats.needsAction)} /> : null}
           <WorkflowStepPill label="Minh chứng" value={`${evidenceCount} đang hiệu lực`} active={!submitted && evidenceCount === 0} />
           <WorkflowStepPill label="Chữ ký" value={`${signatures.length} đã ký`} active={submitted && signatures.length === 0} />
           <WorkflowStepPill label="PDF" value={`${pdfExports.length} tệp`} active={submitted && signatures.length > 0 && pdfExports.length === 0} />

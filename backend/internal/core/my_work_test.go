@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -252,6 +253,73 @@ func TestMyWorkItemsPageContractPaginationAndDecisionCapability(t *testing.T) {
 	}
 	if number(requesterPage["total"]) != 0 {
 		t.Fatalf("requester pending approval total = %v, want 0", requesterPage["total"])
+	}
+}
+
+func TestPendingApprovalsExposeActorCapabilities(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	waiting, err := service.WorkItemAction(ctx, fixture.itemID, "request-approval", WorkItemActionRequest{
+		Comment:       "PM duyệt giúp",
+		RequiredRoles: []string{"PM"},
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := cleanID(waiting["approval_request_id"])
+	if approvalID == "" {
+		t.Fatal("expected approval_request_id")
+	}
+
+	pmRows, err := service.PendingApprovals(ctx, PendingApprovalFilter{
+		ProjectID: fixture.projectID, DecidableOnly: true,
+	}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pmRows) != 1 || cleanID(pmRows[0]["id"]) != approvalID {
+		t.Fatalf("PM pending approvals = %#v", pmRows)
+	}
+	capabilities, _ := pmRows[0]["capabilities"].(Record)
+	if !boolValue(capabilities["can_decide"]) {
+		t.Fatalf("PM capabilities = %#v", pmRows[0]["capabilities"])
+	}
+	actions := stringSlice(pmRows[0]["available_actions"])
+	for _, expected := range []string{"approve", "request-change", "reject"} {
+		if !containsMyWorkString(actions, expected) {
+			t.Fatalf("PM available actions = %#v, missing %s", actions, expected)
+		}
+	}
+	decisionContext, _ := pmRows[0]["decision_context"].(Record)
+	if !stringSliceContains(stringSlice(decisionContext["required_roles"]), "PM") {
+		t.Fatalf("decision context = %#v", decisionContext)
+	}
+	if fmt.Sprint(pmRows[0]["target_name"]) != "Batch3 work item" {
+		t.Fatalf("target name = %#v", pmRows[0]["target_name"])
+	}
+
+	requesterRows, err := service.PendingApprovals(ctx, PendingApprovalFilter{
+		ProjectID: fixture.projectID, DecidableOnly: true,
+	}, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(requesterRows) != 0 {
+		t.Fatalf("requester decidable approvals = %#v, want none", requesterRows)
+	}
+	visibleRows, err := service.PendingApprovals(ctx, PendingApprovalFilter{ProjectID: fixture.projectID}, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(visibleRows) != 1 {
+		t.Fatalf("requester visible approvals = %#v", visibleRows)
+	}
+	requesterCapabilities, _ := visibleRows[0]["capabilities"].(Record)
+	if boolValue(requesterCapabilities["can_decide"]) || len(stringSlice(visibleRows[0]["available_actions"])) != 0 {
+		t.Fatalf("requester approval contract = %#v", visibleRows[0])
 	}
 }
 

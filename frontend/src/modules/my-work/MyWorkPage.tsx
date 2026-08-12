@@ -23,7 +23,8 @@ import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
-import type { ActivityAttentionItem, WorkItem } from '../../lib/types/domain';
+import type { ActivityAttentionItem, ApprovalRequest, WorkItem } from '../../lib/types/domain';
+import { ApprovalPanel } from '../../components/ApprovalPanel';
 import { dateText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import { ActivityAttachments } from '../work-items/ActivityAttachments';
@@ -158,6 +159,16 @@ export function MyWorkPage() {
     getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor : undefined,
     retry: false,
   });
+  const pendingNodeApprovals = useQuery({
+    queryKey: ['approvals', 'pending', 'decidable', project],
+    queryFn: () => {
+      const params = new URLSearchParams({ decidable_only: 'true' });
+      if (project) params.set('project_id', project);
+      return get<ApprovalRequest[]>(`/approvals/pending?${params.toString()}`);
+    },
+    enabled: mode === 'work',
+    retry: false,
+  });
 
   const attentionPath = useMemo(() => {
     const params = new URLSearchParams({ limit: '120' });
@@ -181,7 +192,13 @@ export function MyWorkPage() {
 
   const firstPage = workItems.data?.pages[0];
   const rows = useMemo(() => dedupeWorkItems(workItems.data?.pages.flatMap((page) => page.items) ?? []), [workItems.data]);
-  const summary = firstPage?.summary ?? emptySummary;
+  const baseSummary = firstPage?.summary ?? emptySummary;
+  const nodeApprovalCount = pendingNodeApprovals.data?.filter((request) => request.target_type === 'pipeline_run_node').length ?? 0;
+  const summary = useMemo(() => ({
+    ...baseSummary,
+    total: baseSummary.total + nodeApprovalCount,
+    waiting_decision: baseSummary.waiting_decision + nodeApprovalCount,
+  }), [baseSummary, nodeApprovalCount]);
   const facets = firstPage?.facets ?? {};
   const attentionRows = useMemo(() => asArray<ActivityAttentionItem>(activityAttention.data), [activityAttention.data]);
   const selectedItem = rows.find((item) => item.id === selectedWorkId) ?? rows[0] ?? null;
@@ -233,6 +250,7 @@ export function MyWorkPage() {
   function refreshAll() {
     void workItems.refetch();
     void activityAttention.refetch();
+    void pendingNodeApprovals.refetch();
   }
 
   const hasFilters = Boolean(bucket !== 'need_action' || queue !== 'all' || project || status || deadline || workType || priority || search || sort !== 'priority');
@@ -282,6 +300,15 @@ export function MyWorkPage() {
             onToggleAdvanced={() => setAdvancedFiltersOpen((open) => !open)}
           />
 
+          {(queue === 'pending_approval' || bucket === 'waiting_decision') ? (
+            <NodeApprovalLane
+              rows={(pendingNodeApprovals.data ?? []).filter((request) => request.target_type === 'pipeline_run_node')}
+              loading={pendingNodeApprovals.isLoading}
+              error={pendingNodeApprovals.error}
+              onRetry={() => void pendingNodeApprovals.refetch()}
+            />
+          ) : null}
+
           <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <WorkList
               rows={rows}
@@ -325,6 +352,21 @@ export function MyWorkPage() {
         }}
       />
     </>
+  );
+}
+
+function NodeApprovalLane({ rows, loading, error, onRetry }: { rows: ApprovalRequest[]; loading: boolean; error: unknown; onRetry: () => void }) {
+  return (
+    <section className="mt-4 rounded-md border border-amber-200 bg-amber-50/50 p-3" aria-labelledby="node-approval-lane-title">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h2 id="node-approval-lane-title" className="text-sm font-semibold text-ink">Phê duyệt giai đoạn quy trình</h2>
+          <p className="mt-1 text-xs text-slate-600">Quyết định ở cấp node; không tạo đầu việc giả trong danh sách công việc.</p>
+        </div>
+        <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-amber-800">{rows.length} yêu cầu</span>
+      </div>
+      {loading ? <LoadingSpinner /> : error ? <SourceError title="Không tải được yêu cầu phê duyệt giai đoạn" onRetry={onRetry} /> : rows.length ? <div className="space-y-2">{rows.map((request) => <ApprovalPanel key={request.id} request={request} />)}</div> : <p className="rounded-md border border-dashed border-amber-200 bg-white p-4 text-sm text-slate-600">Không có giai đoạn nào đang chờ anh phê duyệt.</p>}
+    </section>
   );
 }
 

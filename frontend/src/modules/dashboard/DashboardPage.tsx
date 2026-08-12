@@ -25,6 +25,8 @@ import { PageHeader } from '../../components/PageHeader';
 import { CurrencyText } from '../../components/CurrencyText';
 import { StatusBadge } from '../../components/StatusBadge';
 import { EnumChip } from '../../components/EnumChip';
+import { ApprovalDecisionActions } from '../../components/ApprovalPanel';
+import type { ApprovalRequest } from '../../lib/types/domain';
 
 type DashboardStatusRow = {
   status: string;
@@ -52,17 +54,6 @@ type DashboardProject = {
   progress_percent?: number | string;
   open_issues?: number | string;
   pending_approvals?: number | string;
-};
-
-type DashboardApproval = {
-  id: string;
-  project_id?: string;
-  project_name?: string;
-  target_id?: string;
-  target_type?: string;
-  reason?: string;
-  status?: string;
-  created_at?: string;
 };
 
 type AttentionTone = 'rose' | 'amber' | 'orange';
@@ -102,7 +93,7 @@ export function DashboardPage() {
   });
   const approvals = useQuery({
     queryKey: ['approvals', 'pending'],
-    queryFn: () => get<DashboardApproval[]>('/approvals/pending'),
+    queryFn: () => get<ApprovalRequest[]>('/approvals/pending'),
   });
 
   const attentionProjects = useMemo(
@@ -190,7 +181,7 @@ export function DashboardPage() {
             id="dashboard-approvals-title"
             title="Việc chờ phê duyệt"
             count={approvals.isSuccess ? pendingApprovals.length : undefined}
-            description="Mở đúng nguồn nghiệp vụ để xem và xử lý yêu cầu."
+            description="Xử lý trực tiếp khi anh có quyền; mở nguồn nghiệp vụ khi cần đối chiếu thêm."
           />
           {approvals.isLoading ? (
             <PanelLoading rows={3} />
@@ -315,7 +306,7 @@ function AttentionMetric({
   );
 }
 
-function ApprovalItem({ approval, canViewProjects }: { approval: DashboardApproval; canViewProjects: boolean }) {
+function ApprovalItem({ approval, canViewProjects }: { approval: ApprovalRequest; canViewProjects: boolean }) {
   const destination = approvalDestination(approval, canViewProjects);
 
   return (
@@ -334,16 +325,14 @@ function ApprovalItem({ approval, canViewProjects }: { approval: DashboardApprov
           <h3 className="mt-2 text-sm font-semibold leading-5 text-ink">{approval.reason || 'Yêu cầu phê duyệt'}</h3>
           <p className="mt-1 truncate text-xs text-slate-500">{approval.project_name || 'Chưa xác định công trình'}</p>
         </div>
-        {destination ? (
-          <Link
-            className="inline-flex shrink-0 items-center justify-center gap-1 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-            to={destination.to}
-          >
-            {destination.label} <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        ) : (
-          <span className="text-xs font-medium text-slate-500">Chỉ xem thông tin</span>
-        )}
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <ApprovalDecisionActions request={approval} compact />
+          {destination ? (
+            <Link className="inline-flex items-center justify-center gap-1 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100" to={destination.to}>
+              {destination.label} <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          ) : null}
+        </div>
       </div>
     </li>
   );
@@ -584,7 +573,7 @@ function FinanceRow({ label, value, icon, valueClassName = 'text-ink' }: { label
   );
 }
 
-function approvalDestination(approval: DashboardApproval, canViewProjects: boolean) {
+function approvalDestination(approval: ApprovalRequest, canViewProjects: boolean) {
   if (!canViewProjects || !approval.project_id) return null;
   if (approval.target_type === 'work_item' && approval.target_id) {
     return { to: `/projects/${approval.project_id}/work-items/${approval.target_id}`, label: 'Mở nguồn' };

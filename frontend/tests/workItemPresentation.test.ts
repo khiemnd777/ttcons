@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { WorkItem } from '../src/lib/types/domain.ts';
 import { workItemIsUpcoming, workItemWorkflowContext } from '../src/modules/work-items/workItemContext.ts';
+import { missingCompletionRequirementLabels } from '../src/modules/work-items/workItemRequirements.ts';
 
 function workItem(values: Partial<WorkItem> = {}): WorkItem {
   return {
@@ -42,4 +43,16 @@ test('keeps non-workflow items explicit instead of dropping a context level', ()
 test('uses server readiness as the future read-only source of truth', () => {
   assert.equal(workItemIsUpcoming(workItem({ readiness: 'upcoming' })), true);
   assert.equal(workItemIsUpcoming(workItem({ readiness: 'actionable' })), false);
+});
+
+test('uses backend completion requirements instead of inferring checklist evidence', () => {
+  const item = workItem({
+    completion_requirements: [
+      { key: 'workflow_form', label: 'Hồ sơ nghiệp vụ bắt buộc', required: true, status: 'satisfied' },
+      { key: 'checklist', label: 'Checklist của bước', required: true, status: 'satisfied', satisfied_by: 'workflow_form' },
+      { key: 'document', label: 'Tài liệu', required: true, status: 'missing' },
+    ],
+  });
+
+  assert.deepEqual(missingCompletionRequirementLabels(item), ['Tài liệu']);
 });

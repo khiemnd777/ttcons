@@ -24,6 +24,8 @@ import {
   workflowFormNextAction,
 } from '../work-items/workItemPresentation';
 import { ConstructionHandoffPanel } from './ConstructionHandoffPanel';
+import { ApprovalPanel } from '../../components/ApprovalPanel';
+import type { ApprovalRequest } from '../../lib/types/domain';
 
 export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipeline' }) {
   const { id = '' } = useParams();
@@ -52,11 +54,18 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
     enabled: Boolean(id) && mode === 'pipeline' && Boolean(run.data),
     retry: false,
   });
+  const approvals = useQuery({
+    queryKey: ['approvals', 'pending', id],
+    queryFn: () => get<ApprovalRequest[]>(`/approvals/pending?project_id=${encodeURIComponent(id)}`),
+    enabled: Boolean(id) && Boolean(run.data),
+    retry: false,
+  });
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['pipeline-run', id] });
     queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
     queryClient.invalidateQueries({ queryKey: ['work-item'] });
     queryClient.invalidateQueries({ queryKey: ['work-item-form'] });
+    queryClient.invalidateQueries({ queryKey: ['approvals'] });
   };
   const start = useMutation({
     mutationFn: () => post(`/projects/${id}/start-pipeline`, {}),
@@ -227,14 +236,21 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
           onOpenWork={(item) => navigate(workItemDetailPath(item.id, currentReturnTo(location), item.project_id ?? id))}
           renderStageContext={(timelineNode) => {
             const runNode = nodes.find((node: Record<string, any>) => String(node.id) === timelineNode.id);
+            const approval = approvals.data?.find((request) => request.target_type === 'pipeline_run_node' && request.target_id === timelineNode.id);
             return (
-              <PipelineStageContext
-                node={runNode ?? timelineNode}
-                actionPending={requestApproval.isPending || advance.isPending || block.isPending}
-                onRequestApproval={() => requestApproval.mutate(timelineNode.id)}
-                onAdvance={() => advance.mutate(timelineNode.id)}
-                onBlock={() => setBlockNodeId(timelineNode.id)}
-              />
+              <div className="space-y-3">
+                {approvals.isLoading && String((runNode ?? timelineNode).status) === 'waiting_approval' ? <div className="rounded-md border border-line bg-slate-50 px-3 py-3 text-sm text-slate-600">Đang tải yêu cầu phê duyệt…</div> : null}
+                {approvals.isError && String((runNode ?? timelineNode).status) === 'waiting_approval' ? <div className="flex items-center justify-between gap-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700"><span>Không tải được quyền và hành động phê duyệt.</span><button type="button" className="font-semibold" onClick={() => approvals.refetch()}>Thử lại</button></div> : null}
+                <ApprovalPanel request={approval} onChanged={invalidate} />
+                <PipelineStageContext
+                  node={runNode ?? timelineNode}
+                  approvalPending={Boolean(approval)}
+                  actionPending={requestApproval.isPending || advance.isPending || block.isPending}
+                  onRequestApproval={() => requestApproval.mutate(timelineNode.id)}
+                  onAdvance={() => advance.mutate(timelineNode.id)}
+                  onBlock={() => setBlockNodeId(timelineNode.id)}
+                />
+              </div>
             );
           }}
         />
@@ -346,12 +362,14 @@ function PipelineManagementMenu({ onRecreate }: { onRecreate: () => void }) {
 
 function PipelineStageContext({
   node,
+  approvalPending,
   actionPending,
   onRequestApproval,
   onAdvance,
   onBlock,
 }: {
   node: Record<string, any>;
+  approvalPending: boolean;
   actionPending: boolean;
   onRequestApproval: () => void;
   onAdvance: () => void;
@@ -385,11 +403,11 @@ function PipelineStageContext({
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-            disabled={actionPending}
+            disabled={actionPending || approvalPending}
             onClick={onRequestApproval}
           >
             <Send className="h-4 w-4" />
-            Yêu cầu phê duyệt
+            {approvalPending ? 'Đang chờ phê duyệt' : 'Yêu cầu phê duyệt'}
           </button>
           <button
             type="button"

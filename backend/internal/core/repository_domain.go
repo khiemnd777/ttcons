@@ -779,10 +779,36 @@ func (r *Repository) CanDecideApprovalRequest(ctx context.Context, request Recor
 		labels = append(labels, projectLabels...)
 	}
 	requiredRoles := stringSlice(request["required_roles"])
+	if policy.enabled() {
+		requiredRoles = policy.rolesForStage(int(number(request["current_stage"])))
+	}
 	if len(requiredRoles) == 0 {
 		return false, nil
 	}
 	return roleLabelsIntersect(labels, requiredRoles), nil
+}
+
+func (r *Repository) ListPendingApprovalRequests(ctx context.Context, actorID, projectID string) ([]Record, error) {
+	scopeSQL, args, err := r.ProjectAccessFilter(ctx, actorID, "p", 1)
+	if err != nil {
+		return nil, err
+	}
+	projectFilter := ""
+	if projectID != "" {
+		projectFilter = fmt.Sprintf(" AND p.id=$%d", len(args)+1)
+		args = append(args, projectID)
+	}
+	return r.Query(ctx, fmt.Sprintf(`
+		SELECT ar.*, p.name AS project_name, u.full_name AS requested_by_name,
+			COALESCE(prn.name, wi.title, ar.reason, 'Yêu cầu phê duyệt') AS target_name
+		FROM approval_requests ar
+		JOIN projects p ON p.id=ar.project_id AND p.status <> 'cancelled'
+		LEFT JOIN users u ON u.id=ar.requested_by
+		LEFT JOIN pipeline_run_nodes prn ON ar.target_type='pipeline_run_node' AND prn.id=ar.target_id
+		LEFT JOIN work_items wi ON ar.target_type='work_item' AND wi.id=ar.target_id
+		WHERE ar.status='pending' AND %s%s
+		ORDER BY ar.created_at DESC
+	`, scopeSQL, projectFilter), args...)
 }
 
 func (r *Repository) UserHasProjectScope(ctx context.Context, userID, projectID string) (bool, error) {

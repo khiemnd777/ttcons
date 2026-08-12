@@ -237,6 +237,11 @@ type MyWorkItemsFilter struct {
 	Limit     int
 }
 
+type PendingApprovalFilter struct {
+	ProjectID     string
+	DecidableOnly bool
+}
+
 type WorkItemEvidenceRequest struct {
 	EvidenceType    string `json:"evidence_type"`
 	DocumentType    string `json:"document_type"`

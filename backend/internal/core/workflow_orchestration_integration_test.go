@@ -664,6 +664,7 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
 	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
 
 	actorID := newID()
 	actorStaffID := newID()
@@ -698,9 +699,9 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 		VALUES ($1,$2,'Survey','survey',1,'["PM"]'::jsonb)
 	`, nodeID, templateID)
 	mustExec(t, db, `
-		INSERT INTO pipeline_template_steps (id, node_id, name, step_type, required_role_ids, document_required, photo_required, form_version_id, form_required, order_index)
-		VALUES ($1,$2,'Upload survey','document_upload','["PM"]'::jsonb,false,false,$4,true,1),
-		       ($3,$2,'Confirm survey','checklist','["PM"]'::jsonb,false,false,$4,true,2)
+		INSERT INTO pipeline_template_steps (id, node_id, name, step_type, required_role_ids, checklist_required, document_required, photo_required, form_version_id, form_required, order_index)
+		VALUES ($1,$2,'Upload survey','document_upload','["PM"]'::jsonb,false,false,false,$4,true,1),
+		       ($3,$2,'Confirm survey','checklist','["PM"]'::jsonb,true,false,false,$4,true,2)
 	`, stepOneID, nodeID, stepTwoID, formVersionID)
 	mustExec(t, db, `
 		INSERT INTO projects (id, name, code, client_name, status, pipeline_template_id)
@@ -750,6 +751,26 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 	}
 	if cleanID(detail["workflow_form_instance_id"]) == "" || fmt.Sprint(detail["workflow_form_template_name"]) == "" || !boolValue(detail["workflow_form_required"]) {
 		t.Fatalf("expected workflow form summary on work item detail, got %#v", detail)
+	}
+	secondWorkItemID := cleanID(steps[1]["work_item_id"])
+	beforeRequirements, err := service.WorkItemDetail(ctx, secondWorkItemID, actorID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeRows, _ := beforeRequirements["completion_requirements"].([]Record)
+	beforeChecklist := recordByID(beforeRows, "key", "checklist")
+	if beforeChecklist == nil || fmt.Sprint(beforeChecklist["status"]) != "missing" {
+		t.Fatalf("checklist before form submit = %#v", beforeRows)
+	}
+	mustExec(t, db, `UPDATE workflow_form_instances SET status='submitted',submitted_by=$2,submitted_at=now() WHERE work_item_id=$1`, secondWorkItemID, actorID)
+	afterRequirements, err := service.WorkItemDetail(ctx, secondWorkItemID, actorID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterRows, _ := afterRequirements["completion_requirements"].([]Record)
+	afterChecklist := recordByID(afterRows, "key", "checklist")
+	if afterChecklist == nil || fmt.Sprint(afterChecklist["status"]) != "satisfied" || fmt.Sprint(afterChecklist["satisfied_by"]) != "workflow_form" {
+		t.Fatalf("checklist after form submit = %#v", afterRows)
 	}
 	projectItems, err := repo.ListProjectWorkItems(ctx, projectID, actorID)
 	if err != nil {

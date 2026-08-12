@@ -1406,18 +1406,10 @@ func (h *Handler) PendingApprovals(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"project.view", "operation.view", "procurement.view", "accounting.view", "report.view"}); err != nil {
 		return err
 	}
-	scopeSQL, scopeArgs, err := h.projectAccessFilter(c, "p", 1)
-	if err != nil {
-		return err
-	}
-	rows, err := h.service.repo.Query(c.Context(), fmt.Sprintf(`
-		SELECT ar.*, p.name AS project_name
-		FROM approval_requests ar
-		LEFT JOIN projects p ON p.id=ar.project_id
-		WHERE ar.status='pending' AND (p.id IS NULL OR p.status <> 'cancelled')
-		  AND (p.id IS NOT NULL AND %s)
-		ORDER BY ar.created_at DESC
-	`, scopeSQL), scopeArgs...)
+	rows, err := h.service.PendingApprovals(c.Context(), PendingApprovalFilter{
+		ProjectID:     c.Query("project_id"),
+		DecidableOnly: c.QueryBool("decidable_only", false),
+	}, actorID(c))
 	if err != nil {
 		return err
 	}

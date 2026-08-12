@@ -2706,9 +2706,41 @@ export type WorkItem = ProjectOperationsRecord & {
     updated_at?: string;
   }>;
   approval_request_id?: string;
+	completion_requirements?: WorkItemCompletionRequirement[];
   activities?: WorkItemActivity[];
   evidence?: EvidenceRecord[];
   assignments?: ProjectOperationsRecord[];
+};
+
+export type WorkItemCompletionRequirement = {
+  key: 'workflow_form' | 'checklist' | 'document' | 'photo' | string;
+  label: string;
+  required: boolean;
+  status: 'satisfied' | 'missing' | string;
+  satisfied_by?: 'workflow_form' | 'evidence' | 'completion_payload' | string;
+};
+
+export type ApprovalDecisionContext = {
+  current_stage: number;
+  required_roles: string[];
+  quorum: number;
+  comment_required: boolean;
+  requester_cannot_approve: boolean;
+};
+
+export type ApprovalRequest = ProjectOperationsRecord & {
+  project_name?: string;
+  target_id?: string;
+  target_type?: string;
+  target_name?: string;
+  requested_by?: string;
+  requested_by_name?: string;
+  reason?: string;
+  status: string;
+  current_stage?: number;
+  capabilities?: { can_decide?: boolean };
+  available_actions?: string[];
+  decision_context?: ApprovalDecisionContext;
 };
 
 export type ProjectOperationsVisibility = AnyRecord & {

@@ -2623,6 +2623,11 @@ func (s *Service) WorkItemDetail(ctx context.Context, workItemID, actorID string
 	item["can_decide"] = canDecide
 	item["available_actions"] = myWorkItemAvailableActions(item)
 	item["readiness"] = myWorkItemReadiness(item)
+	completionRequirements, err := s.workItemCompletionRequirements(ctx, item, recordFromAny(item["completion_payload_json"]))
+	if err != nil {
+		return nil, err
+	}
+	item["completion_requirements"] = completionRequirements
 	delete(item, "pipeline_current_node_id")
 	delete(item, "run_node_status")
 	delete(item, "is_future")
@@ -7416,15 +7421,29 @@ func (s *Service) requireWorkItemPermission(ctx context.Context, item Record, ac
 }
 
 func (s *Service) missingRequiredEvidence(ctx context.Context, item Record, req WorkItemActionRequest) ([]string, error) {
+	requirements, err := s.workItemCompletionRequirements(ctx, item, req.CompletionPayload)
+	if err != nil {
+		return nil, err
+	}
+	missing := []string{}
+	for _, requirement := range requirements {
+		if boolValue(requirement["required"]) && fmt.Sprint(requirement["status"]) == "missing" {
+			missing = append(missing, fmt.Sprint(requirement["key"]))
+		}
+	}
+	return missing, nil
+}
+
+func (s *Service) workItemCompletionRequirements(ctx context.Context, item Record, completionPayload Record) ([]Record, error) {
 	requirement, _ := item["evidence_requirement_json"].(map[string]any)
 	if len(requirement) == 0 {
-		return nil, nil
+		return []Record{}, nil
 	}
 	counts, err := s.repo.WorkItemEvidenceCounts(ctx, fmt.Sprint(item["id"]))
 	if err != nil {
 		return nil, err
 	}
-	missing := []string{}
+	rows := []Record{}
 	engineVersion := int(number(item["pipeline_engine_version"]))
 	formRequired := boolValue(item["workflow_form_required"]) || boolValue(requirement["form_required"])
 	requiredFormVersionID := cleanID(item["required_workflow_form_version_id"])
@@ -7433,31 +7452,51 @@ func (s *Service) missingRequiredEvidence(ctx context.Context, item Record, req 
 	}
 	exactFormSubmitted := fmt.Sprint(item["workflow_form_status"]) == "submitted" &&
 		(requiredFormVersionID == "" || cleanID(item["workflow_form_version_id"]) == requiredFormVersionID)
-	if engineVersion >= 2 && formRequired && !exactFormSubmitted {
-		missing = append(missing, "workflow_form")
+	if engineVersion >= 2 && formRequired {
+		rows = append(rows, completionRequirement("workflow_form", "Hồ sơ nghiệp vụ bắt buộc", exactFormSubmitted, "workflow_form"))
 	}
-	if boolValue(requirement["document_required"]) && counts["document"] == 0 {
-		missing = append(missing, "document")
+	if boolValue(requirement["document_required"]) {
+		rows = append(rows, completionRequirement("document", "Tài liệu", counts["document"] > 0, "evidence"))
 	}
-	if boolValue(requirement["photo_required"]) && counts["photo"] == 0 {
-		missing = append(missing, "photo")
+	if boolValue(requirement["photo_required"]) {
+		rows = append(rows, completionRequirement("photo", "Hình ảnh", counts["photo"] > 0, "evidence"))
 	}
-	if boolValue(requirement["checklist_required"]) && counts["checklist"] == 0 && !hasChecklistPayload(req.CompletionPayload) {
-		if engineVersion >= 2 && formRequired {
-			if !exactFormSubmitted && !stringSliceContains(missing, "workflow_form") {
-				missing = append(missing, "workflow_form")
+	if boolValue(requirement["checklist_required"]) {
+		satisfied := counts["checklist"] > 0
+		satisfiedBy := "evidence"
+		if !satisfied && hasChecklistPayload(completionPayload) {
+			satisfied = true
+			satisfiedBy = "completion_payload"
+		}
+		if !satisfied && engineVersion >= 2 && formRequired && exactFormSubmitted {
+			satisfied = true
+			satisfiedBy = "workflow_form"
+		}
+		if !satisfied && engineVersion < 2 {
+			submittedForm, err := s.repo.HasSubmittedWorkflowFormForWorkItem(ctx, fmt.Sprint(item["id"]))
+			if err != nil {
+				return nil, err
 			}
-			return missing, nil
+			if submittedForm {
+				satisfied = true
+				satisfiedBy = "workflow_form"
+			}
 		}
-		submittedForm, err := s.repo.HasSubmittedWorkflowFormForWorkItem(ctx, fmt.Sprint(item["id"]))
-		if err != nil {
-			return nil, err
-		}
-		if !submittedForm {
-			missing = append(missing, "checklist")
-		}
+		rows = append(rows, completionRequirement("checklist", "Checklist của bước", satisfied, satisfiedBy))
 	}
-	return missing, nil
+	return rows, nil
+}
+
+func completionRequirement(key, label string, satisfied bool, satisfiedBy string) Record {
+	status := "missing"
+	if satisfied {
+		status = "satisfied"
+	}
+	row := Record{"key": key, "label": label, "required": true, "status": status}
+	if satisfied {
+		row["satisfied_by"] = satisfiedBy
+	}
+	return row
 }
 
 func withLegacyChecklistCompletion(item Record, req WorkItemActionRequest) WorkItemActionRequest {
@@ -7844,6 +7883,55 @@ func (s *Service) ApprovalAction(ctx context.Context, id, action, comment, actor
 	}
 	s.publishProjectProgressChanged(cleanID(updated["project_id"]))
 	return updated, nil
+}
+
+func (s *Service) PendingApprovals(ctx context.Context, filter PendingApprovalFilter, actorID string) ([]Record, error) {
+	filter.ProjectID = strings.TrimSpace(filter.ProjectID)
+	if filter.ProjectID != "" {
+		if _, err := uuid.Parse(filter.ProjectID); err != nil {
+			return nil, validationError("project_id không hợp lệ", Record{"project_id": filter.ProjectID})
+		}
+	}
+	rows, err := s.repo.ListPendingApprovalRequests(ctx, actorID, filter.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Record, 0, len(rows))
+	for _, row := range rows {
+		canDecide, err := s.repo.CanDecideApprovalRequest(ctx, row, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if filter.DecidableOnly && !canDecide {
+			continue
+		}
+		policy := approvalPolicyFromValue(row["policy_json"])
+		stage := int(number(row["current_stage"]))
+		requiredRoles := stringSlice(row["required_roles"])
+		quorum := 1
+		commentRequired := false
+		requesterCannotApprove := true
+		if policy.enabled() {
+			requiredRoles = policy.rolesForStage(stage)
+			quorum = policy.quorumForStage(stage)
+			commentRequired = policy.CommentRequired
+			requesterCannotApprove = policy.RequesterCannotApprove
+		}
+		row["capabilities"] = Record{"can_decide": canDecide}
+		row["available_actions"] = []string{}
+		if canDecide {
+			row["available_actions"] = []string{"approve", "request-change", "reject"}
+		}
+		row["decision_context"] = Record{
+			"current_stage":            stage,
+			"required_roles":           requiredRoles,
+			"quorum":                   quorum,
+			"comment_required":         commentRequired,
+			"requester_cannot_approve": requesterCannotApprove,
+		}
+		out = append(out, row)
+	}
+	return out, nil
 }
 
 func normalizeApprovalAction(action string) string {

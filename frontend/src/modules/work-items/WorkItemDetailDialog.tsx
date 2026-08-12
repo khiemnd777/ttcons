@@ -34,6 +34,7 @@ import {
   type WorkItemPrimarySurfaceKind,
 } from './WorkItemPrimarySurface';
 import { WorkflowFormPanel } from './WorkflowFormPanel';
+import { missingCompletionRequirementLabels } from './workItemRequirements';
 import {
   actionDescriptions,
   actionLabels,
@@ -177,7 +178,7 @@ export function WorkItemDetailWorkspace({
   const futureReadOnly = detailItem ? workItemIsUpcoming(detailItem) : false;
   const primarySurface = detailItem && !futureReadOnly ? resolveWorkItemPrimarySurface(detailItem) : null;
   const requirementRows = detailItem ? buildRequirementRows(detailItem, evidence) : [];
-  const nextAction = detailItem ? resolveNextAction(detailItem, evidence, actions, primarySurface?.kind) : '';
+  const nextAction = detailItem ? resolveNextAction(detailItem, actions, primarySurface?.kind) : '';
   const latestActivity = activities[0];
   const skippedHistory = detailItem?.status === 'cancelled';
   return (
@@ -768,8 +769,6 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
   const rows: RequirementRow[] = [];
   const requirement = item.evidence_requirement_json ?? {};
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
-  const acceptedEvidence = evidence.filter((record) => record.status === 'accepted');
-  const requiredEvidence = requiredEvidenceLabels(requirement);
 
   if (item.blocked_reason) {
     rows.push({
@@ -800,27 +799,15 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
     });
   }
 
-  if (hasWorkflowFormSummary(item)) {
-    const submitted = item.workflow_form_status === 'submitted';
-    const required = Boolean(item.workflow_form_required);
-    rows.push({
-      id: 'workflow-form',
-      label: required ? 'Hồ sơ nghiệp vụ bắt buộc' : 'Hồ sơ nghiệp vụ',
-      description: submitted
-        ? `${workflowFormChipText(item)} đã được gửi.`
-        : `${workflowFormChipText(item)} đang ở trạng thái ${statusLabel(item.workflow_form_status ?? 'draft')}.`,
-      state: submitted ? 'done' : required ? 'blocked' : 'warning',
-    });
-  }
-
-  if (requiredEvidence.length) {
-    rows.push({
-      id: 'evidence',
-      label: 'Minh chứng bắt buộc',
-      description: activeEvidence.length
-        ? `${activeEvidence.length} minh chứng đang hiệu lực, ${acceptedEvidence.length} đã được duyệt.`
-        : `Cần bổ sung: ${requiredEvidence.join(', ')}.`,
-      state: activeEvidence.length ? 'done' : 'blocked',
+  if (item.completion_requirements?.length) {
+    item.completion_requirements.forEach((completionRequirement) => {
+      const satisfied = completionRequirement.status === 'satisfied';
+      rows.push({
+        id: `completion-${completionRequirement.key}`,
+        label: completionRequirement.label,
+        description: completionRequirementDescription(completionRequirement.key, satisfied, completionRequirement.satisfied_by),
+        state: satisfied ? 'done' : 'blocked',
+      });
     });
   } else {
     rows.push({
@@ -854,20 +841,16 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
 
 function resolveNextAction(
   item: WorkItem,
-  evidence: EvidenceRecord[],
   actions: WorkItemActionKey[],
   primarySurfaceKind?: WorkItemPrimarySurfaceKind,
 ) {
   if (workItemIsUpcoming(item)) return 'Chờ workflow chuyển đến node này';
-  const requirement = item.evidence_requirement_json ?? {};
-  const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
-  const requiredEvidence = requiredEvidenceLabels(requirement);
-  const missingRequiredEvidence = requiredEvidence.length > 0 && activeEvidence.length === 0;
-  const missingRequiredForm = hasWorkflowFormSummary(item) && item.workflow_form_required && item.workflow_form_status !== 'submitted';
+  const missingRequirements = missingCompletionRequirementLabels(item);
+  const missingWorkflowForm = item.completion_requirements?.some((requirement) => requirement.key === 'workflow_form' && requirement.required && requirement.status === 'missing');
 
   if (item.status === 'blocked') return actionLabels['resolve-blocker'];
-  if (missingRequiredForm) return workflowFormNextAction(item);
-  if (missingRequiredEvidence) return 'Bổ sung minh chứng';
+  if (missingWorkflowForm) return workflowFormNextAction(item);
+  if (missingRequirements.length) return `Bổ sung: ${missingRequirements.join(', ')}`;
   if (primarySurfaceKind) {
     const surfaceAction = primarySurfaceNextAction(primarySurfaceKind, actions);
     if (surfaceAction) return surfaceAction;
@@ -903,12 +886,12 @@ function primarySurfaceNextAction(kind: WorkItemPrimarySurfaceKind, actions: Wor
   }
 }
 
-function requiredEvidenceLabels(requirement: Record<string, unknown>) {
-  return [
-    requirement.checklist_required ? 'Checklist' : '',
-    requirement.document_required ? 'Tài liệu' : '',
-    requirement.photo_required ? 'Ảnh' : '',
-  ].filter(Boolean);
+function completionRequirementDescription(key: string, satisfied: boolean, satisfiedBy?: string) {
+  if (!satisfied) return 'Chưa đáp ứng điều kiện hoàn tất.';
+  if (satisfiedBy === 'workflow_form') return key === 'checklist' ? 'Đã đáp ứng qua hồ sơ nghiệp vụ đã gửi.' : 'Hồ sơ nghiệp vụ đúng phiên bản đã được gửi.';
+  if (satisfiedBy === 'completion_payload') return 'Đã ghi nhận trong dữ liệu hoàn tất của đầu việc.';
+  if (satisfiedBy === 'evidence') return 'Đã có minh chứng đang hiệu lực.';
+  return 'Đã đáp ứng.';
 }
 
 function firstRoleLabel(item: WorkItem) {
