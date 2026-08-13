@@ -7,6 +7,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob } from '../../lib/api/client';
 import type { EvidenceRecord } from '../../lib/types/domain';
+import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
 import { isProtectedStorageProvider } from '../../lib/utils/protectedStorage.ts';
 import { compactDateTime, evidenceLabel, visibilityLabel } from './workItemPresentation';
 
@@ -62,15 +63,9 @@ export function EvidenceGallery({
       return;
     }
     if (isProtectedStorageProvider(record.storage_provider) && record.storage_key) {
-      const viewer = window.open('', '_blank', 'noopener,noreferrer');
       try {
-        const blob = await downloadBlob(`/evidence/${record.id}/file`);
-        const objectUrl = URL.createObjectURL(blob);
-        if (viewer) viewer.location.href = objectUrl;
-        else window.open(objectUrl, '_blank', 'noopener,noreferrer');
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+        await openProtectedBlob(() => downloadBlob(`/evidence/${record.id}/file`));
       } catch (error) {
-        viewer?.close();
         toast.error('Không mở được tệp minh chứng', error);
       }
       return;

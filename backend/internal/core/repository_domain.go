@@ -1794,6 +1794,11 @@ func (r *Repository) PlanningDailyReports(ctx context.Context, filter PlanningDa
 				SELECT COUNT(*)
 				FROM workflow_form_pdf_exports wfp
 				WHERE wfp.form_instance_id=report_rows.form_instance_uuid
+				  AND NOT EXISTS (
+					SELECT 1
+					FROM workflow_form_pdf_export_deletions deletion
+					WHERE deletion.pdf_export_id=wfp.id AND deletion.status='deleted'
+				  )
 			) AS pdf_export_count,
 			report_rows.submitted_by::text AS submitted_by,
 			report_rows.submitted_by_name,
@@ -2026,6 +2031,11 @@ func (r *Repository) PlanningMeetingMinutes(ctx context.Context, filter Planning
 				SELECT COUNT(*)
 				FROM workflow_form_pdf_exports wfp
 				WHERE wfp.form_instance_id=meeting_rows.form_instance_uuid
+				  AND NOT EXISTS (
+					SELECT 1
+					FROM workflow_form_pdf_export_deletions deletion
+					WHERE deletion.pdf_export_id=wfp.id AND deletion.status='deleted'
+				  )
 			) AS pdf_export_count,
 			meeting_rows.submitted_by::text AS submitted_by,
 			meeting_rows.submitted_by_name,
@@ -2289,6 +2299,11 @@ func (r *Repository) PlanningChecklists(ctx context.Context, filter PlanningChec
 				SELECT COUNT(*)
 				FROM workflow_form_pdf_exports wfp
 				WHERE wfp.form_instance_id=checklist_rows.form_instance_uuid
+				  AND NOT EXISTS (
+					SELECT 1
+					FROM workflow_form_pdf_export_deletions deletion
+					WHERE deletion.pdf_export_id=wfp.id AND deletion.status='deleted'
+				  )
 			) AS pdf_export_count,
 			checklist_rows.submitted_by::text AS submitted_by,
 			checklist_rows.submitted_by_name,
@@ -2374,10 +2389,24 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 		return nil, err
 	}
 	pdfExports, err := queryRecords(ctx, db, `
-		SELECT *
-		FROM workflow_form_pdf_exports
-		WHERE form_instance_id=$1
-		ORDER BY generated_at DESC, created_at DESC
+		SELECT
+			wfpe.*,
+			COALESCE(deletion.status, '') AS deletion_status,
+			(
+				SELECT COUNT(*)
+				FROM acceptance_records acceptance
+				WHERE acceptance.pdf_export_id=wfpe.id
+			) AS acceptance_reference_count,
+			NOT EXISTS (
+				SELECT 1
+				FROM acceptance_records acceptance
+				WHERE acceptance.pdf_export_id=wfpe.id
+			) AS can_delete
+		FROM workflow_form_pdf_exports wfpe
+		LEFT JOIN workflow_form_pdf_export_deletions deletion ON deletion.pdf_export_id=wfpe.id
+		WHERE wfpe.form_instance_id=$1
+		  AND COALESCE(deletion.status, '') <> 'deleted'
+		ORDER BY wfpe.generated_at DESC, wfpe.created_at DESC
 	`, instanceID)
 	if err != nil {
 		return nil, err
@@ -5429,12 +5458,210 @@ func (r *Repository) GetWorkflowFormSignatureDetail(ctx context.Context, signatu
 
 func (r *Repository) GetWorkflowFormPDFExportDetail(ctx context.Context, exportID string) (Record, error) {
 	return r.QueryOne(ctx, `
-		SELECT wfpe.*, wi.status AS work_item_status
+		SELECT
+			wfpe.*,
+			wi.status AS work_item_status,
+			COALESCE(deletion.status, '') AS deletion_status,
+			(
+				SELECT COUNT(*)
+				FROM acceptance_records acceptance
+				WHERE acceptance.pdf_export_id=wfpe.id
+			) AS acceptance_reference_count
 		FROM workflow_form_pdf_exports wfpe
 		JOIN work_items wi ON wi.id=wfpe.work_item_id AND wi.project_id=wfpe.project_id
 		JOIN projects p ON p.id=wfpe.project_id
+		LEFT JOIN workflow_form_pdf_export_deletions deletion ON deletion.pdf_export_id=wfpe.id
+		WHERE wfpe.id=$1
+		  AND wi.status <> 'cancelled'
+		  AND p.status <> 'cancelled'
+		  AND COALESCE(deletion.status, '') NOT IN ('pending', 'deleted')
+	`, exportID)
+}
+
+func (r *Repository) GetWorkflowFormPDFExportForDeletion(ctx context.Context, exportID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			wfpe.*,
+			wi.status AS work_item_status,
+			COALESCE(deletion.status, '') AS deletion_status,
+			(
+				SELECT COUNT(*)
+				FROM acceptance_records acceptance
+				WHERE acceptance.pdf_export_id=wfpe.id
+			) AS acceptance_reference_count
+		FROM workflow_form_pdf_exports wfpe
+		JOIN work_items wi ON wi.id=wfpe.work_item_id AND wi.project_id=wfpe.project_id
+		JOIN projects p ON p.id=wfpe.project_id
+		LEFT JOIN workflow_form_pdf_export_deletions deletion ON deletion.pdf_export_id=wfpe.id
 		WHERE wfpe.id=$1 AND wi.status <> 'cancelled' AND p.status <> 'cancelled'
 	`, exportID)
+}
+
+func (r *Repository) PrepareWorkflowFormPDFExportDeletion(ctx context.Context, exportID, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	exportRows, err := queryTx(ctx, tx, `
+		SELECT wfpe.*
+		FROM workflow_form_pdf_exports wfpe
+		WHERE wfpe.id=$1
+		FOR UPDATE
+	`, exportID)
+	if err != nil {
+		return nil, err
+	}
+	if len(exportRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	export := exportRows[0]
+
+	var referenceCount int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM acceptance_records
+		WHERE pdf_export_id=$1
+	`, exportID).Scan(&referenceCount); err != nil {
+		return nil, err
+	}
+	if referenceCount > 0 {
+		return nil, conflictError("Không thể xoá PDF đã được liên kết với hồ sơ nghiệm thu đầu ra", Record{
+			"pdf_export_id":              exportID,
+			"acceptance_reference_count": referenceCount,
+		})
+	}
+
+	deletionRows, err := queryTx(ctx, tx, `
+		SELECT status
+		FROM workflow_form_pdf_export_deletions
+		WHERE pdf_export_id=$1
+		FOR UPDATE
+	`, exportID)
+	if err != nil {
+		return nil, err
+	}
+	if len(deletionRows) > 0 && fmt.Sprint(deletionRows[0]["status"]) == "deleted" {
+		export["deletion_status"] = "deleted"
+		export["already_deleted"] = true
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		return export, nil
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO workflow_form_pdf_export_deletions
+			(pdf_export_id, status, requested_by, requested_by_name, requested_at, attempt_count, last_error, storage_deleted_at, completed_at, updated_at)
+		VALUES
+			($1, 'pending', NULLIF($2,'')::uuid, NULLIF($3,''), now(), 1, NULL, NULL, NULL, now())
+		ON CONFLICT (pdf_export_id) DO UPDATE
+		SET status='pending',
+			requested_by=EXCLUDED.requested_by,
+			requested_by_name=EXCLUDED.requested_by_name,
+			requested_at=now(),
+			attempt_count=workflow_form_pdf_export_deletions.attempt_count + 1,
+			last_error=NULL,
+			storage_deleted_at=NULL,
+			completed_at=NULL,
+			updated_at=now()
+	`, exportID, actorID, actorName); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	export["deletion_status"] = "pending"
+	export["acceptance_reference_count"] = referenceCount
+	return export, nil
+}
+
+func (r *Repository) MarkWorkflowFormPDFExportDeletionFailed(ctx context.Context, exportID, errorMessage string) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE workflow_form_pdf_export_deletions
+		SET status='failed', last_error=NULLIF($2,''), completed_at=NULL, updated_at=now()
+		WHERE pdf_export_id=$1 AND status <> 'deleted'
+	`, exportID, errorMessage)
+	return err
+}
+
+func (r *Repository) CompleteWorkflowFormPDFExportDeletion(ctx context.Context, exportID, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	exportRows, err := queryTx(ctx, tx, `
+		SELECT wfpe.*
+		FROM workflow_form_pdf_exports wfpe
+		WHERE wfpe.id=$1
+		FOR UPDATE
+	`, exportID)
+	if err != nil {
+		return nil, err
+	}
+	if len(exportRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	export := exportRows[0]
+
+	completion, err := tx.ExecContext(ctx, `
+		UPDATE workflow_form_pdf_export_deletions
+		SET status='deleted',
+			last_error=NULL,
+			storage_deleted_at=COALESCE(storage_deleted_at, now()),
+			completed_at=COALESCE(completed_at, now()),
+			updated_at=now()
+		WHERE pdf_export_id=$1 AND status <> 'deleted'
+	`, exportID)
+	if err != nil {
+		return nil, err
+	}
+	rowsAffected, err := completion.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+
+	instanceID := cleanID(export["form_instance_id"])
+	if rowsAffected > 0 {
+		projectID := cleanID(export["project_id"])
+		workItemID := cleanID(export["work_item_id"])
+		fileName := strings.TrimSpace(fmt.Sprint(export["file_name"]))
+		eventMetadata := Record{
+			"workflow_form_instance_id": instanceID,
+			"pdf_export_id":             exportID,
+			"file_name":                 fileName,
+			"checksum_sha256":           export["checksum_sha256"],
+			"form_revision_no":          export["form_revision_no"],
+		}
+		rawEventMetadata, _ := json.Marshal(eventMetadata)
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, from_status, to_status, comment, metadata_json)
+			VALUES ($1, $2, $3, NULLIF($4,'')::uuid, 'pdf_export_deleted', 'submitted', 'submitted', $5, $6::jsonb)
+		`, instanceID, projectID, workItemID, actorID, fmt.Sprintf("Xoá PDF biểu mẫu quy trình: %s", fileName), string(rawEventMetadata)); err != nil {
+			return nil, err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+			VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'system_event', $4, 'internal', $5::jsonb)
+		`, workItemID, projectID, actorID, fmt.Sprintf("Đã xoá PDF biểu mẫu quy trình: %s", fileName), string(rawEventMetadata)); err != nil {
+			return nil, err
+		}
+		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_pdf_export_deleted", "workflow_form_pdf_export", exportID, "Xoá PDF biểu mẫu quy trình", eventMetadata); err != nil {
+			return nil, err
+		}
+	}
+
+	detail, err := getWorkflowFormInstanceDetail(ctx, tx, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return detail, nil
 }
 
 func createMeetingMinutesActionItemsTx(ctx context.Context, tx *sql.Tx, instance Record, answers Record, actorID string) ([]string, error) {

@@ -1275,6 +1275,14 @@ func (h *Handler) GetWorkflowFormPDFExportFile(c *fiber.Ctx) error {
 	return sendProtectedFile(c, file, "workflow-form.pdf")
 }
 
+func (h *Handler) DeleteWorkflowFormPDFExport(c *fiber.Ctx) error {
+	form, err := h.service.DeleteWorkflowFormPDFExport(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, form)
+}
+
 func sendProtectedFile(c *fiber.Ctx, file EvidenceFileResult, fallbackName string) error {
 	c.Set(fiber.HeaderContentType, file.MIMEType)
 	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf("inline; filename=%q; filename*=UTF-8''%s", fallbackName, url.PathEscape(file.Filename)))

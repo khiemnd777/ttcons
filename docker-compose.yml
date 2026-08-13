@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: consflow
-      POSTGRES_USER: consflow
-      POSTGRES_PASSWORD: consflow
+      POSTGRES_DB: "${POSTGRES_DB:?POSTGRES_DB is required}"
+      POSTGRES_USER: "${POSTGRES_USER:?POSTGRES_USER is required}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
     ports:
-      - "127.0.0.1:5432:5432"
+      - "${POSTGRES_BIND_ADDRESS:?POSTGRES_BIND_ADDRESS is required}:${POSTGRES_PORT:?POSTGRES_PORT is required}:5432"
     volumes:
       - consflow_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U consflow -d consflow"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "127.0.0.1:6379:6379"
+      - "${REDIS_BIND_ADDRESS:?REDIS_BIND_ADDRESS is required}:${REDIS_PORT:?REDIS_PORT is required}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -28,20 +28,34 @@ services:
   backend:
     build:
       context: ./backend
+    user: "${LOCAL_UID:?LOCAL_UID is required}:${LOCAL_GID:?LOCAL_GID is required}"
     environment:
-      PORT: 8080
-      DATABASE_URL: postgres://consflow:consflow@postgres:5432/consflow?sslmode=disable
-      REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: consflow-local-dev-secret
-      FRONTEND_ORIGIN: http://localhost:5173
+      APP_ENV: "${APP_ENV:?APP_ENV is required}"
+      PORT: "${PORT:?PORT is required}"
+      DATABASE_URL: "${COMPOSE_DATABASE_URL:?COMPOSE_DATABASE_URL is required}"
+      REDIS_URL: "${COMPOSE_REDIS_URL:?COMPOSE_REDIS_URL is required}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
+      FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is required}"
       MIGRATIONS_DIR: /app/migrations
-      AUTO_MIGRATE: "true"
-      UPLOAD_DIR: /app/uploads
-      MAX_UPLOAD_BYTES: "10485760"
+      AUTO_MIGRATE: "${AUTO_MIGRATE:?AUTO_MIGRATE is required}"
+      STORAGE_PROVIDER: "${STORAGE_PROVIDER:?STORAGE_PROVIDER is required}"
+      STORAGE_PATH: /storage
+      STORAGE_OPERATION_TIMEOUT: "${STORAGE_OPERATION_TIMEOUT:?STORAGE_OPERATION_TIMEOUT is required}"
+      STORAGE_S3_BUCKET: "${STORAGE_S3_BUCKET:-}"
+      STORAGE_S3_REGION: "${STORAGE_S3_REGION:-}"
+      STORAGE_S3_ENDPOINT: "${STORAGE_S3_ENDPOINT:-}"
+      STORAGE_S3_USE_PATH_STYLE: "${STORAGE_S3_USE_PATH_STYLE:-false}"
+      STORAGE_S3_ALLOW_INSECURE_ENDPOINT: "${STORAGE_S3_ALLOW_INSECURE_ENDPOINT:-false}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN:-}"
+      MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:?MAX_UPLOAD_BYTES is required}"
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${BACKEND_BIND_ADDRESS:?BACKEND_BIND_ADDRESS is required}:${BACKEND_PORT:?BACKEND_PORT is required}:${PORT:?PORT is required}"
     volumes:
-      - consflow_uploads:/app/uploads
+      - type: bind
+        source: "${STORAGE_PATH:?STORAGE_PATH is required}"
+        target: /storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,9 +68,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.dev
     environment:
-      VITE_API_URL: http://localhost:8080/api
+      VITE_API_URL: "${VITE_API_URL:?VITE_API_URL is required}"
     ports:
-      - "127.0.0.1:5173:5173"
+      - "${ADMIN_BIND_ADDRESS:?ADMIN_BIND_ADDRESS is required}:${ADMIN_PORT:?ADMIN_PORT is required}:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -65,4 +79,3 @@ services:
 
 volumes:
   consflow_postgres:
-  consflow_uploads:

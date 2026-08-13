@@ -174,17 +174,17 @@ images:
 
 Schema V70 mở allowlist `s3` cho evidence, signature visual, workflow PDF và input/output invoice metadata. V71 giữ tương thích với metadata legacy nhưng chặn mọi internal key mới bị null, rỗng hoặc không canonical. Schema Job của release phải apply cả V70 và V71 trước operator migration. Binary `/app/consflow-storage-migrate` dùng dry-run mặc định, chỉ copy/update metadata khi có `--apply`, và cần `STORAGE_MIGRATION_TIMEOUT` cùng storage runtime/S3 credential contract ở trên.
 
-Kubernetes base cố ý dùng `emptyDir` tại `UPLOAD_DIR`; nó không có legacy local objects. Vì vậy trước khi scale từ Compose/single-host sang baseline hai replica:
+Kubernetes application base không mount filesystem cho object storage; backend chỉ khởi tạo S3 và không có legacy local objects. Vì vậy trước khi scale từ Compose/single-host sang baseline hai replica:
 
 1. Backup database, giữ nguyên local upload directory và snapshot inventory/checksum.
 2. Apply V70 và V71 bằng migration Job/release image tương thích.
 3. Drain/stop application writes để inventory không phát sinh record local mới.
-4. Chạy `/app/consflow-storage-migrate` không flag từ operator container/host đang mount đúng legacy `UPLOAD_DIR`; chỉ tiếp tục nếu JSON summary có `failed=0` và `source_verified=inventory`.
+4. Chạy `/app/consflow-storage-migrate` không flag từ operator container/host đang mount đúng legacy `STORAGE_PATH`; chỉ tiếp tục nếu JSON summary có `failed=0` và `source_verified=inventory`.
 5. Chạy lại với `--apply`; yêu cầu `failed=0`, `updated=inventory`, destination read/checksum verification đầy đủ.
 6. Chạy dry-run lần cuối; inventory local phải bằng 0. Giữ source objects read-only qua rollback retention window, không xóa ngay.
 7. Chỉ sau đó apply Kubernetes overlay có `STORAGE_PROVIDER=s3` và hai backend replicas, rồi kiểm thử upload ở pod A/download ở pod B cùng các protected endpoint.
 
-Phương án dùng RWX volume để dual-read local objects trong Kubernetes cần review platform riêng. Base không cung cấp PVC/RWX và không xem `emptyDir` là storage migration source.
+Phương án dùng RWX volume để dual-read local objects trong Kubernetes cần review platform riêng. Application base không cung cấp PVC/RWX hoặc `emptyDir` cho object storage; PVC chỉ xuất hiện trong operator Job mẫu như nguồn legacy read-only.
 
 Nếu platform đã copy nguyên vẹn legacy tree vào một existing read-only RWX PVC, có thể dùng `deploy/k8s/storage-migrate` làm operator Job. Tạo overlay ngoài repo thay image bằng cùng immutable backend digest, thêm run-unique `nameSuffix`, thay `STORAGE_S3_BUCKET/REGION/ENDPOINT` và thay claim `replace-with-legacy-upload-rwx-pvc`. Lượt đầu giữ nguyên không có `args` để dry-run:
 

@@ -37,7 +37,6 @@ type Service struct {
 	streamCapacity              *ActivityStreamCapacity
 	streamVisibilityTimeout     time.Duration
 	streamMaxConnectionLifetime time.Duration
-	uploadDir                   string
 	maxUploadBytes              int64
 	storageMu                   sync.Mutex
 	storageRegistry             *sharedstorage.Registry
@@ -57,9 +56,9 @@ func NewService(repo *Repository, jwtSecret string) *Service {
 		streamCapacity:              NewActivityStreamCapacity(500, 20, 2),
 		streamVisibilityTimeout:     2 * time.Second,
 		streamMaxConnectionLifetime: 5 * time.Minute,
-		uploadDir:                   defaultUploadDir,
 		maxUploadBytes:              defaultMaxUploadBytes,
 		storageWriteProvider:        sharedstorage.LocalProvider,
+		storageConfigErr:            errors.New("storage registry is not configured"),
 		accessTokenTTL:              defaultAccessTokenTTL,
 		refreshTokenTTL:             defaultRefreshTokenTTL,
 		refreshCookieSameSite:       defaultRefreshCookieSameSite,
@@ -78,7 +77,6 @@ func (s *Service) UpdateRole(ctx context.Context, roleID string, body Record) (R
 }
 
 const (
-	defaultUploadDir             = "uploads"
 	defaultMaxUploadBytes        = int64(10 * 1024 * 1024)
 	defaultAccessTokenTTL        = 15 * time.Minute
 	defaultRefreshTokenTTL       = 7 * 24 * time.Hour
@@ -101,7 +99,11 @@ var allowedEvidenceUploadMIMEs = map[string]evidenceUploadMimeSpec{
 func (s *Service) ConfigureUploads(uploadDir string, maxUploadBytes int64) {
 	uploadDir = strings.TrimSpace(uploadDir)
 	if uploadDir == "" {
-		uploadDir = defaultUploadDir
+		s.storageMu.Lock()
+		s.storageRegistry = nil
+		s.storageConfigErr = errors.New("storage path is empty")
+		s.storageMu.Unlock()
+		return
 	}
 	if maxUploadBytes <= 0 {
 		maxUploadBytes = defaultMaxUploadBytes
@@ -109,7 +111,6 @@ func (s *Service) ConfigureUploads(uploadDir string, maxUploadBytes int64) {
 	localStore, err := sharedstorage.NewLocal(uploadDir)
 	if err != nil {
 		s.storageMu.Lock()
-		s.uploadDir = uploadDir
 		s.maxUploadBytes = maxUploadBytes
 		s.storageRegistry = nil
 		s.storageConfigErr = err
@@ -121,7 +122,6 @@ func (s *Service) ConfigureUploads(uploadDir string, maxUploadBytes int64) {
 		err = s.ConfigureStorage(registry, sharedstorage.LocalProvider, maxUploadBytes)
 	}
 	s.storageMu.Lock()
-	s.uploadDir = uploadDir
 	if err != nil {
 		s.storageRegistry = nil
 	}
@@ -155,25 +155,13 @@ func (s *Service) ConfigureStorage(registry *sharedstorage.Registry, writeProvid
 func (s *Service) storageBackend() (*sharedstorage.Registry, error) {
 	s.storageMu.Lock()
 	defer s.storageMu.Unlock()
-	if s.storageConfigErr != nil {
-		return nil, s.storageConfigErr
-	}
 	if s.storageRegistry != nil {
 		return s.storageRegistry, nil
 	}
-	localStore, err := sharedstorage.NewLocal(s.uploadDir)
-	if err != nil {
-		s.storageConfigErr = err
-		return nil, err
+	if s.storageConfigErr != nil {
+		return nil, s.storageConfigErr
 	}
-	registry, err := sharedstorage.NewRegistry(localStore)
-	if err != nil {
-		s.storageConfigErr = err
-		return nil, err
-	}
-	s.storageRegistry = registry
-	s.storageWriteProvider = sharedstorage.LocalProvider
-	return registry, nil
+	return nil, errors.New("storage registry is not configured")
 }
 
 func (s *Service) storageWriter() (*sharedstorage.Registry, string, error) {
@@ -5089,7 +5077,17 @@ func (s *Service) GenerateWorkflowFormPDFExport(ctx context.Context, instanceID,
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
 		return nil, err
 	}
-	pdfBytes, payloadHash, err := GenerateWorkflowFormPDF(form)
+	pdfBytes, payloadHash, err := GenerateWorkflowFormPDFWithContext(form, WorkflowFormPDFContext{
+		GeneratedAt:   time.Now(),
+		GeneratedBy:   actorName,
+		ProjectCode:   strings.TrimSpace(fmt.Sprint(item["project_code"])),
+		ProjectName:   strings.TrimSpace(fmt.Sprint(item["project_name"])),
+		NodeName:      strings.TrimSpace(fmt.Sprint(item["run_node_name"])),
+		NodeOrder:     int(number(item["run_node_order_index"])),
+		StepName:      strings.TrimSpace(fmt.Sprint(item["run_step_name"])),
+		StepOrder:     int(number(item["run_step_order_index"])),
+		WorkItemTitle: strings.TrimSpace(fmt.Sprint(item["title"])),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -5143,6 +5141,70 @@ func (s *Service) WorkflowFormPDFExportFile(ctx context.Context, exportID, actor
 		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem PDF biểu mẫu quy trình này")
 	}
 	return s.storedFileResult(ctx, export, "storage_provider", "storage_key", "mime_type", fmt.Sprint(export["file_name"]))
+}
+
+func (s *Service) DeleteWorkflowFormPDFExport(ctx context.Context, exportID, actorID, actorName string) (Record, error) {
+	exportID = cleanID(exportID)
+	if !validActivityUUID(exportID) {
+		return nil, validationError("pdf_export_id không hợp lệ", Record{"pdf_export_id": exportID})
+	}
+	export, err := s.repo.GetWorkflowFormPDFExportForDeletion(ctx, exportID)
+	if err != nil {
+		return nil, err
+	}
+	workItemID := cleanID(export["work_item_id"])
+	allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền xoá PDF biểu mẫu quy trình này")
+	}
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+		return nil, err
+	}
+	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+		return nil, err
+	}
+
+	prepared, err := s.repo.PrepareWorkflowFormPDFExportDeletion(ctx, exportID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	instanceID := cleanID(prepared["form_instance_id"])
+	if prepared["already_deleted"] == true || fmt.Sprint(prepared["deletion_status"]) == "deleted" {
+		return s.repo.GetWorkflowFormInstanceDetail(ctx, instanceID)
+	}
+
+	provider := strings.TrimSpace(fmt.Sprint(prepared["storage_provider"]))
+	storageKey := strings.TrimSpace(fmt.Sprint(prepared["storage_key"]))
+	registry, err := s.storageBackend()
+	if err == nil {
+		err = registry.Delete(ctx, provider, storageKey)
+	}
+	if err != nil {
+		if markErr := s.repo.MarkWorkflowFormPDFExportDeletionFailed(ctx, exportID, boundedStorageError(err)); markErr != nil {
+			log.Printf("level=error component=storage operation=delete_pdf_mark_failed pdf_export_id=%q error=%q", exportID, markErr)
+		}
+		log.Printf("level=error component=storage operation=delete_workflow_form_pdf provider=%q key=%q pdf_export_id=%q error=%q", provider, storageKey, exportID, err)
+		return nil, errors.New("Không thể xoá tệp PDF khỏi kho lưu trữ")
+	}
+	return s.repo.CompleteWorkflowFormPDFExportDeletion(ctx, exportID, actorID, actorName)
+}
+
+func boundedStorageError(err error) string {
+	if err == nil {
+		return ""
+	}
+	value := []rune(err.Error())
+	if len(value) > 2000 {
+		value = value[:2000]
+	}
+	return string(value)
 }
 
 func (s *Service) saveWorkflowForm(ctx context.Context, instanceID string, req WorkflowFormSaveRequest, submit bool, actorID, actorName string) (Record, error) {
@@ -5577,13 +5639,16 @@ func (s *Service) storeProjectDocumentUpload(ctx context.Context, projectID, tar
 	if !ok {
 		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("Hồ sơ chỉ hỗ trợ PDF, PNG, JPG hoặc WebP", Record{"mime_type": detectedMIME})
 	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return StoredFileMetadata{}, storedObjectRef{}, "", fmt.Errorf("rewind project document upload: %w", err)
+	}
 	originalName := cleanUploadFilename(fileHeader.Filename)
 	storageKey := path.Join("project-documents", projectID, targetType, targetID, uuid.NewString()+spec.Extension)
 	registry, writeProvider, err := s.storageWriter()
 	if err != nil {
 		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}
-	object, err := registry.Put(ctx, writeProvider, storageKey, io.MultiReader(bytes.NewReader(header[:n]), source), sharedstorage.PutOptions{ContentType: detectedMIME, ExpectedSize: fileHeader.Size})
+	object, err := registry.Put(ctx, writeProvider, storageKey, source, sharedstorage.PutOptions{ContentType: detectedMIME, ExpectedSize: fileHeader.Size})
 	if err != nil {
 		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}
@@ -5711,6 +5776,9 @@ func (s *Service) storeEvidenceUpload(ctx context.Context, item Record, req Work
 	if !ok {
 		return storedObjectRef{}, req, validationError("Định dạng minh chứng không được hỗ trợ", Record{"mime_type": detectedMIME})
 	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return storedObjectRef{}, req, fmt.Errorf("rewind evidence upload: %w", err)
+	}
 	requestedType := strings.TrimSpace(req.EvidenceType)
 	if requestedType != "" && requestedType != spec.EvidenceType {
 		return storedObjectRef{}, req, validationError("Loại minh chứng không khớp với định dạng tệp", Record{"evidence_type": requestedType, "mime_type": detectedMIME})
@@ -5743,7 +5811,7 @@ func (s *Service) storeEvidenceUpload(ctx context.Context, item Record, req Work
 	if err != nil {
 		return storedObjectRef{}, req, err
 	}
-	object, err := registry.Put(ctx, normalized.StorageProvider, normalized.StorageKey, io.MultiReader(bytes.NewReader(header[:n]), source), sharedstorage.PutOptions{
+	object, err := registry.Put(ctx, normalized.StorageProvider, normalized.StorageKey, source, sharedstorage.PutOptions{
 		ContentType:  detectedMIME,
 		ExpectedSize: fileHeader.Size,
 	})
@@ -5780,6 +5848,9 @@ func (s *Service) storeInputInvoicePDF(ctx context.Context, projectID, payableID
 	if detectedMIME != "application/pdf" {
 		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("Hoá đơn đầu vào chỉ hỗ trợ PDF", Record{"mime_type": detectedMIME})
 	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return StoredFileMetadata{}, storedObjectRef{}, "", fmt.Errorf("rewind input invoice upload: %w", err)
+	}
 	originalName := cleanUploadFilename(fileHeader.Filename)
 	if originalName == "minh-chung" || originalName == "evidence-file" {
 		originalName = "input-invoice.pdf"
@@ -5792,7 +5863,7 @@ func (s *Service) storeInputInvoicePDF(ctx context.Context, projectID, payableID
 	if err != nil {
 		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}
-	object, err := registry.Put(ctx, writeProvider, storageKey, io.MultiReader(bytes.NewReader(header[:n]), source), sharedstorage.PutOptions{ContentType: "application/pdf", ExpectedSize: fileHeader.Size})
+	object, err := registry.Put(ctx, writeProvider, storageKey, source, sharedstorage.PutOptions{ContentType: "application/pdf", ExpectedSize: fileHeader.Size})
 	if err != nil {
 		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}
@@ -5830,6 +5901,9 @@ func (s *Service) storeOutputInvoicePDF(ctx context.Context, projectID, receivab
 	if detectedMIME != "application/pdf" {
 		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("Hoá đơn đầu ra chỉ hỗ trợ PDF", Record{"mime_type": detectedMIME})
 	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return StoredFileMetadata{}, storedObjectRef{}, "", fmt.Errorf("rewind output invoice upload: %w", err)
+	}
 	originalName := cleanUploadFilename(fileHeader.Filename)
 	if originalName == "minh-chung" || originalName == "evidence-file" {
 		originalName = "output-invoice.pdf"
@@ -5842,7 +5916,7 @@ func (s *Service) storeOutputInvoicePDF(ctx context.Context, projectID, receivab
 	if err != nil {
 		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}
-	object, err := registry.Put(ctx, writeProvider, storageKey, io.MultiReader(bytes.NewReader(header[:n]), source), sharedstorage.PutOptions{ContentType: "application/pdf", ExpectedSize: fileHeader.Size})
+	object, err := registry.Put(ctx, writeProvider, storageKey, source, sharedstorage.PutOptions{ContentType: "application/pdf", ExpectedSize: fileHeader.Size})
 	if err != nil {
 		return StoredFileMetadata{}, storedObjectRef{}, "", err
 	}

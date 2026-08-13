@@ -3,11 +3,15 @@ package core
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestWorkflowTimelineCountsSubmittedAndSkippedSteps(t *testing.T) {
@@ -417,10 +421,20 @@ func TestWorkflowFormPDFGeneratorProducesPDFWithSignatureStamp(t *testing.T) {
 		"template": Record{"name": "Biên bản họp", "form_type": "meeting_minutes"},
 		"version":  Record{"version_no": 2},
 		"fields": []Record{
-			{"field_key": "summary", "label": "Nội dung", "order_index": 1},
-			{"field_key": "confirmed", "label": "Xác nhận", "order_index": 2},
+			{"field_key": "summary", "label": "Nội dung", "field_type": "textarea", "order_index": 1},
+			{"field_key": "style", "label": "Phong cách mong muốn", "field_type": "select", "options_json": []any{map[string]any{"value": "minimal", "label": "Tối giản"}}, "order_index": 2},
+			{"field_key": "meeting_date", "label": "Ngày họp", "field_type": "date", "order_index": 3},
+			{"field_key": "budget", "label": "Ngân sách", "field_type": "currency", "validation_json": Record{"currency_code": "VND"}, "order_index": 4},
+			{"field_key": "risks", "label": "Danh sách rủi ro", "field_type": "structured_list", "validation_json": Record{"item_fields": []any{
+				map[string]any{"key": "risk", "label": "Rủi ro", "type": "textarea"},
+				map[string]any{"key": "severity", "label": "Mức độ", "type": "select", "options": []any{map[string]any{"value": "high", "label": "Cao"}}},
+			}}, "order_index": 5},
+			{"field_key": "confirmed", "label": "Xác nhận", "field_type": "checkbox", "order_index": 6},
 		},
-		"answers": Record{"summary": "Đã thống nhất kế hoạch tuần", "confirmed": true},
+		"answers": Record{
+			"summary": "Đã thống nhất kế hoạch tuần", "style": "minimal", "meeting_date": "2026-06-21", "budget": 12500000, "confirmed": true,
+			"risks": []any{map[string]any{"risk": "Chậm phê duyệt vật liệu", "severity": "high"}},
+		},
 		"signatures": []Record{{
 			"signer_name":            "Worker",
 			"purpose":                "internal_ack",
@@ -440,18 +454,51 @@ func TestWorkflowFormPDFGeneratorProducesPDFWithSignatureStamp(t *testing.T) {
 			},
 		}},
 	}
-	pdfBytes, payloadHash, err := GenerateWorkflowFormPDF(form)
+	context := WorkflowFormPDFContext{
+		GeneratedAt: time.Date(2026, 6, 21, 17, 30, 0, 0, time.FixedZone("ICT", 7*60*60)),
+		GeneratedBy: "Nguyễn Văn A", ProjectCode: "DA-001", ProjectName: "Văn phòng An Phát",
+		NodeName: "Khảo sát", NodeOrder: 2, StepName: "Nắm phong cách thiết kế", StepOrder: 3,
+	}
+	pdfBytes, payloadHash, err := GenerateWorkflowFormPDFWithContext(form, context)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-1.4")) {
+	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-")) {
 		t.Fatalf("expected PDF header, got %q", pdfBytes[:8])
+	}
+	if len(pdfBytes) < 10000 {
+		t.Fatalf("expected embedded-font PDF, got only %d bytes", len(pdfBytes))
 	}
 	if len(payloadHash) != 64 {
 		t.Fatalf("payload hash = %q, want 64 chars", payloadHash)
 	}
-	if !bytes.Contains(pdfBytes, []byte("SIGNED BY Worker")) {
-		t.Fatal("expected generated PDF to include visual signature stamp text")
+	document, err := buildWorkflowFormPDFDocument(form, context, payloadHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.Title != "Biên bản họp kế hoạch" || document.Project != "DA-001 · Văn phòng An Phát" || document.Workflow != "Node 2: Khảo sát › Bước 3: Nắm phong cách thiết kế" {
+		t.Fatalf("unexpected PDF business context: %#v", document)
+	}
+	if len(document.Fields) != 5 || document.Fields[1].Display != "Tối giản" || document.Fields[2].Display != "21/06/2026" || document.Fields[3].Display != "12.500.000 VND" || document.Fields[4].Display != "1 mục" {
+		t.Fatalf("unexpected localized PDF fields: %#v", document.Fields)
+	}
+	structuredSpecs := workflowPDFStructuredSpecs(document.Fields[4].Definition)
+	structuredRows := workflowPDFRecords(document.Fields[4].Value)
+	if len(structuredSpecs) != 2 || len(structuredRows) != 1 || workflowPDFDisplayStructuredValue(structuredSpecs[1], structuredRows[0]["severity"]) != "Cao" {
+		t.Fatalf("unexpected localized structured-list presentation: specs=%#v rows=%#v", structuredSpecs, structuredRows)
+	}
+	if len(document.Confirmations) != 1 || document.Confirmations[0].Display != "Đã xác nhận" {
+		t.Fatalf("unexpected PDF confirmations: %#v", document.Confirmations)
+	}
+	if workflowPDFPurposeLabel("internal_ack") != "Xác nhận nội bộ" || len(signatureStrokes(document.Signatures[0])) != 1 {
+		t.Fatalf("signature presentation was not preserved: %#v", document.Signatures)
+	}
+	_, secondPayloadHash, err := GenerateWorkflowFormPDFWithContext(form, WorkflowFormPDFContext{GeneratedAt: context.GeneratedAt.Add(time.Hour), GeneratedBy: "Người khác"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secondPayloadHash != payloadHash {
+		t.Fatalf("presentation metadata changed immutable payload hash: %s != %s", secondPayloadHash, payloadHash)
 	}
 }
 
@@ -1740,7 +1787,8 @@ func TestWorkflowFormSignatureRequiresSubmittedFormAndIsImmutable(t *testing.T) 
 	ctx := context.Background()
 	repo := NewRepository(db)
 	service := NewService(repo, "test-secret")
-	service.ConfigureUploads(t.TempDir(), 1024*1024)
+	storageRoot := t.TempDir()
+	service.ConfigureUploads(storageRoot, 1024*1024)
 	fixture := setupWorkItemFlowFixture(t, db, false)
 
 	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "task", false)
@@ -1844,7 +1892,7 @@ func TestWorkflowFormSignatureRequiresSubmittedFormAndIsImmutable(t *testing.T) 
 	if err := pdfFile.Reader.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-1.4")) {
+	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-")) {
 		t.Fatalf("expected PDF bytes, got %q", pdfBytes[:8])
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='pdf_exported'`, 1, instanceID)
@@ -1858,6 +1906,76 @@ func TestWorkflowFormSignatureRequiresSubmittedFormAndIsImmutable(t *testing.T) 
 	}
 	if _, err := db.ExecContext(ctx, `UPDATE workflow_form_pdf_exports SET title='mutated' WHERE id=$1`, pdfExportID); err == nil {
 		t.Fatal("expected immutable workflow form PDF export update to fail")
+	}
+	unconfiguredService := NewService(repo, "test-secret")
+	if _, err := unconfiguredService.DeleteWorkflowFormPDFExport(ctx, pdfExportID, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("expected PDF deletion with unavailable storage to fail")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_pdf_export_deletions WHERE pdf_export_id=$1 AND status='failed' AND attempt_count=1`, 1, pdfExportID)
+	failedDeletionForm, err := repo.GetWorkflowFormInstanceDetail(ctx, instanceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	failedExports, ok := failedDeletionForm["pdf_exports"].([]Record)
+	if !ok || len(failedExports) != 1 || fmt.Sprint(failedExports[0]["deletion_status"]) != "failed" {
+		t.Fatalf("failed deletion should remain retryable, got %#v", failedDeletionForm["pdf_exports"])
+	}
+
+	deletedForm, err := service.DeleteWorkflowFormPDFExport(ctx, pdfExportID, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	remainingExports, ok := deletedForm["pdf_exports"].([]Record)
+	if !ok || len(remainingExports) != 0 {
+		t.Fatalf("deleted PDF export should be hidden from the form, got %#v", deletedForm["pdf_exports"])
+	}
+	if _, err := service.WorkflowFormPDFExportFile(ctx, pdfExportID, fixture.workerID); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("deleted PDF file lookup error = %#v, want sql.ErrNoRows", err)
+	}
+	storageKey := fmt.Sprint(pdfExports[0]["storage_key"])
+	if _, err := os.Stat(filepath.Join(storageRoot, filepath.FromSlash(storageKey))); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("deleted PDF storage object stat error = %#v, want os.ErrNotExist", err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_pdf_exports WHERE id=$1`, 1, pdfExportID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_pdf_export_deletions WHERE pdf_export_id=$1 AND status='deleted'`, 1, pdfExportID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='pdf_export_deleted'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_type='workflow_form_pdf_export' AND target_id=$1 AND event_type='workflow_form_pdf_export_deleted'`, 1, pdfExportID)
+
+	if _, err := service.DeleteWorkflowFormPDFExport(ctx, pdfExportID, fixture.workerID, "Worker"); err != nil {
+		t.Fatalf("idempotent PDF deletion failed: %v", err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='pdf_export_deleted'`, 1, instanceID)
+
+	linkedForm, err := service.GenerateWorkflowFormPDFExport(ctx, instanceID, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	linkedExports, ok := linkedForm["pdf_exports"].([]Record)
+	if !ok || len(linkedExports) != 1 {
+		t.Fatalf("expected one active replacement PDF export, got %#v", linkedForm["pdf_exports"])
+	}
+	linkedExportID := cleanID(linkedExports[0]["id"])
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO acceptance_records (project_id, work_item_id, form_instance_id, pdf_export_id, title, requested_by)
+		VALUES ($1, $2, $3, $4, 'Referenced PDF acceptance', $5)
+	`, fixture.projectID, fixture.itemID, instanceID, linkedExportID, fixture.workerID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.DeleteWorkflowFormPDFExport(ctx, linkedExportID, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("expected referenced PDF deletion to fail")
+	} else {
+		var statusErr StatusError
+		if !errors.As(err, &statusErr) || statusErr.Code != "CONFLICT" {
+			t.Fatalf("referenced PDF deletion error = %#v, want CONFLICT", err)
+		}
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_pdf_export_deletions WHERE pdf_export_id=$1`, 0, linkedExportID)
+	linkedFile, err := service.WorkflowFormPDFExportFile(ctx, linkedExportID, fixture.workerID)
+	if err != nil {
+		t.Fatalf("referenced PDF should remain readable: %v", err)
+	}
+	if err := linkedFile.Reader.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 

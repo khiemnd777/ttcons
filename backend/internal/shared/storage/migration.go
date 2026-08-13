@@ -249,9 +249,12 @@ func copyObject(ctx context.Context, source, destination Store, record Migration
 	if err != nil {
 		return false, "", fmt.Errorf("open local source: %w", err)
 	}
-	hasher := sha256.New()
-	counter := &countingReader{reader: io.TeeReader(object.Reader, hasher)}
-	info, putErr := destination.Put(ctx, record.Key, counter, PutOptions{ContentType: record.ContentType, ExpectedSize: record.Size})
+	seekable, ok := object.Reader.(io.ReadSeeker)
+	if !ok {
+		_ = object.Reader.Close()
+		return false, "", errors.New("local migration source is not seekable")
+	}
+	info, putErr := destination.Put(ctx, record.Key, seekable, PutOptions{ContentType: record.ContentType, ExpectedSize: record.Size})
 	closeErr := object.Reader.Close()
 	if putErr != nil && !errors.Is(putErr, ErrObjectExists) {
 		return false, "", fmt.Errorf("copy object to S3: %w", putErr)
@@ -260,18 +263,17 @@ func copyObject(ctx context.Context, source, destination Store, record Migration
 		return false, "", fmt.Errorf("close local source: %w", closeErr)
 	}
 	if putErr == nil {
-		if counter.count != record.Size || info.Size != record.Size {
+		if info.Size != record.Size {
 			_ = destination.Delete(ctx, record.Key)
-			return false, "", fmt.Errorf("copy object to S3: size mismatch local=%d destination=%d expected=%d", counter.count, info.Size, record.Size)
+			return false, "", fmt.Errorf("copy object to S3: size mismatch destination=%d expected=%d", info.Size, record.Size)
 		}
-		sourceHash := hex.EncodeToString(hasher.Sum(nil))
+		sourceHash := info.ChecksumSHA256
+		if sourceHash == "" {
+			return false, "", errors.New("S3 put did not return a source checksum")
+		}
 		if record.ChecksumSHA256 != "" && sourceHash != record.ChecksumSHA256 {
 			_ = destination.Delete(ctx, record.Key)
 			return false, "", errors.New("local source checksum does not match database metadata")
-		}
-		if info.ChecksumSHA256 != "" && info.ChecksumSHA256 != sourceHash {
-			_ = destination.Delete(ctx, record.Key)
-			return false, "", errors.New("S3 put checksum does not match streamed local source")
 		}
 		return true, sourceHash, nil
 	}

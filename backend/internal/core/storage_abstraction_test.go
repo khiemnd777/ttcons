@@ -234,7 +234,7 @@ func TestEvidenceAuthorizationRunsBeforeStorageOpen(t *testing.T) {
 	}
 }
 
-func TestActiveS3WriterKeepsLegacyLocalObjectsReadable(t *testing.T) {
+func TestExplicitRegistryCanReadLegacyLocalObjectWhileWritingS3(t *testing.T) {
 	localReader := &closeSpyReader{Reader: bytes.NewReader([]byte("legacy"))}
 	local := &storageFakeStore{object: sharedstorage.Object{
 		Reader: localReader,

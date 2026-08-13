@@ -161,6 +161,8 @@ export function workflowFormEventLabel(value?: unknown) {
     submitted: 'Đã chốt hồ sơ',
     reopened: 'Đã mở lại hồ sơ',
     cancelled: 'Đã hủy hồ sơ',
+    pdf_exported: 'Đã tạo PDF',
+    pdf_export_deleted: 'Đã xoá PDF',
   };
   return labels[eventType] ?? enumLabel('event_type', eventType);
 }

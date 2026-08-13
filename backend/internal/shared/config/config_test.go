@@ -9,7 +9,7 @@ import (
 )
 
 func TestConfigValidateTrustedProxiesAndMode(t *testing.T) {
-	cfg := Config{AppEnv: "development", RateLimitMode: "enforce", DBMaxOpenConns: 20, DBMaxIdleConns: 10}
+	cfg := Config{AppEnv: "development", RateLimitMode: "enforce", DBMaxOpenConns: 20, DBMaxIdleConns: 10, StoragePath: t.TempDir()}
 	cfg.TrustedProxies = []string{"10.0.0.0/8", "127.0.0.1"}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("valid config rejected: %v", err)
@@ -63,6 +63,10 @@ func TestProductionConfigValidationFailsClosed(t *testing.T) {
 		RateLimitMode:           "enforce",
 		DBMaxOpenConns:          20,
 		DBMaxIdleConns:          10,
+		StorageProvider:         "s3",
+		StorageOperationTimeout: 30 * time.Second,
+		StorageS3Bucket:         "artifacts",
+		StorageS3Region:         "ap-southeast-1",
 	}
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("valid production config rejected: %v", err)
@@ -83,6 +87,12 @@ func TestProductionConfigValidationFailsClosed(t *testing.T) {
 		{"insecure refresh cookie", func(cfg *Config) { cfg.AuthRefreshCookieSecure = false }},
 		{"disabled limiter", func(cfg *Config) { cfg.RateLimitEnabled = false }},
 		{"backend auto migrate", func(cfg *Config) { cfg.AutoMigrate = true }},
+		{"non-S3 production storage", func(cfg *Config) {
+			cfg.StorageProvider = "default"
+			cfg.StoragePath = t.TempDir()
+			cfg.StorageS3Bucket = ""
+			cfg.StorageS3Region = ""
+		}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -131,12 +141,13 @@ func TestProductionLoadRejectsMalformedOrNonPositiveRuntimeEnvironment(t *testin
 }
 
 func TestStorageConfigRequiresCompleteS3Contract(t *testing.T) {
-	base := Config{AppEnv: "development", RateLimitMode: "enforce", DBMaxOpenConns: 20, DBMaxIdleConns: 10, StorageOperationTimeout: 30 * time.Second}
+	base := Config{AppEnv: "development", RateLimitMode: "enforce", DBMaxOpenConns: 20, DBMaxIdleConns: 10, StoragePath: t.TempDir(), StorageOperationTimeout: 30 * time.Second}
 	tests := []struct {
 		name   string
 		mutate func(*Config)
 	}{
 		{"unknown provider", func(cfg *Config) { cfg.StorageProvider = "filesystem" }},
+		{"legacy local provider alias", func(cfg *Config) { cfg.StorageProvider = "local" }},
 		{"missing bucket", func(cfg *Config) { cfg.StorageProvider = "s3"; cfg.StorageS3Region = "ap-southeast-1" }},
 		{"missing region", func(cfg *Config) { cfg.StorageProvider = "s3"; cfg.StorageS3Bucket = "artifacts" }},
 		{"endpoint credentials", func(cfg *Config) {
@@ -163,6 +174,28 @@ func TestStorageConfigRequiresCompleteS3Contract(t *testing.T) {
 	valid.StorageS3Endpoint = "https://storage.example.com"
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("valid S3-compatible configuration rejected: %v", err)
+	}
+}
+
+func TestDefaultStorageRequiresPathAndS3DoesNot(t *testing.T) {
+	base := Config{AppEnv: "development", RateLimitMode: "enforce", DBMaxOpenConns: 20, DBMaxIdleConns: 10, StorageOperationTimeout: 30 * time.Second}
+	for _, provider := range []string{"", "default"} {
+		cfg := base
+		cfg.StorageProvider = provider
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "STORAGE_PATH") {
+			t.Fatalf("provider=%q missing path error=%v", provider, err)
+		}
+		cfg.StoragePath = t.TempDir()
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("provider=%q with path rejected: %v", provider, err)
+		}
+	}
+	s3Config := base
+	s3Config.StorageProvider = "s3"
+	s3Config.StorageS3Bucket = "artifacts"
+	s3Config.StorageS3Region = "ap-southeast-1"
+	if err := s3Config.Validate(); err != nil {
+		t.Fatalf("S3 config incorrectly required STORAGE_PATH: %v", err)
 	}
 }
 
@@ -202,7 +235,8 @@ func TestStorageMigrationValidationRequiresOnlyDatabaseAndS3(t *testing.T) {
 	}
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("DATABASE_URL", "postgres://consflow:strong-password@postgres:5432/consflow?sslmode=disable")
-	t.Setenv("STORAGE_PROVIDER", "local")
+	t.Setenv("STORAGE_PROVIDER", "s3")
+	t.Setenv("STORAGE_PATH", "/external/legacy-storage")
 	t.Setenv("STORAGE_S3_BUCKET", "artifacts")
 	t.Setenv("STORAGE_S3_REGION", "ap-southeast-1")
 	t.Setenv("STORAGE_S3_ENDPOINT", "https://storage.example.com")
@@ -219,6 +253,7 @@ func TestStorageMigrationValidationRequiresOnlyDatabaseAndS3(t *testing.T) {
 
 func TestDevelopmentLoadFallsBackForMalformedRuntimeEnvironment(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
+	t.Setenv("STORAGE_PATH", t.TempDir())
 	t.Setenv("HTTP_READ_TIMEOUT", "not-a-duration")
 	cfg := Load()
 	if err := cfg.Validate(); err != nil {
@@ -383,6 +418,7 @@ func TestDevelopmentLoadAllowsMissingSecretSources(t *testing.T) {
 		unsetEnvironment(t, key)
 	}
 	t.Setenv("APP_ENV", "development")
+	t.Setenv("STORAGE_PATH", t.TempDir())
 
 	cfg := Load()
 	if err := cfg.Validate(); err != nil {
@@ -476,6 +512,9 @@ func setValidProductionEnvironment(t *testing.T) {
 	t.Setenv("AUTH_REFRESH_COOKIE_SECURE", "true")
 	t.Setenv("RATE_LIMIT_ENABLED", "true")
 	t.Setenv("AUTO_MIGRATE", "false")
+	t.Setenv("STORAGE_PROVIDER", "s3")
+	t.Setenv("STORAGE_S3_BUCKET", "artifacts")
+	t.Setenv("STORAGE_S3_REGION", "ap-southeast-1")
 }
 
 func clearSecretFileEnvironment(t *testing.T) {

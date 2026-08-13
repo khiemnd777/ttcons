@@ -139,8 +139,6 @@ spec:
             - name: runtime-secrets
               mountPath: /var/run/secrets/consflow
               readOnly: true
-            - name: uploads
-              mountPath: /app/uploads
             - name: tmp
               mountPath: /tmp
       volumes:
@@ -156,11 +154,6 @@ spec:
                 path: redis_url
               - key: jwt_secret
                 path: jwt_secret
-        # This is scratch space only. Multi-replica production must use the
-        # configured S3-compatible provider, never local object persistence.
-        - name: uploads
-          emptyDir:
-            sizeLimit: 1Gi
         - name: tmp
           emptyDir:
             sizeLimit: 256Mi

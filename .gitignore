@@ -10,6 +10,7 @@ frontend/dist/
 tmp/
 uploads/
 backend/uploads/
+/storage/
 !backend/seed/uploads/
 !backend/seed/uploads/**
 

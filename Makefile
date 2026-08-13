@@ -1,29 +1,39 @@
-COMPOSE ?= docker compose
+ENV_FILE ?= .env
+-include $(ENV_FILE)
+
+COMPOSE ?= docker compose --env-file $(ENV_FILE)
 SERVICE ?=
 BACKEND_GOCACHE ?= $(CURDIR)/backend/.gocache
 
-.PHONY: up down restart build run log test backend-test backend-fmt frontend-build migrate-check docker-config
+.PHONY: check-local-env up down restart build run log test backend-test backend-fmt frontend-build migrate-check docker-config
 
-up:
+check-local-env:
+	@test -f "$(ENV_FILE)" || (echo "Missing $(ENV_FILE); copy .env.example to $(ENV_FILE) and configure it."; exit 1)
+	@test -n "$(STORAGE_PATH)" || (echo "STORAGE_PATH is required in $(ENV_FILE)."; exit 1)
+	@test -n "$(LOCAL_UID)" || (echo "LOCAL_UID is required in $(ENV_FILE)."; exit 1)
+	@test -n "$(LOCAL_GID)" || (echo "LOCAL_GID is required in $(ENV_FILE)."; exit 1)
+
+up: check-local-env
 	$(MAKE) --no-print-directory down
 	$(MAKE) --no-print-directory build
 	$(MAKE) --no-print-directory run
 
-down:
+down: check-local-env
 	$(COMPOSE) down --remove-orphans
 
-restart:
+restart: check-local-env
 	$(MAKE) --no-print-directory down
 	$(MAKE) --no-print-directory build
 	$(MAKE) --no-print-directory run
 
-build:
+build: check-local-env
 	$(COMPOSE) build
 
-run:
+run: check-local-env
+	mkdir -p "$(STORAGE_PATH)"
 	$(COMPOSE) up -d
 
-log:
+log: check-local-env
 	$(COMPOSE) logs -f --tail=200 $(SERVICE)
 
 test:
@@ -42,5 +52,5 @@ frontend-build:
 migrate-check:
 	cd backend && make migrate-check
 
-docker-config:
+docker-config: check-local-env
 	$(COMPOSE) config

@@ -37,7 +37,7 @@ type Config struct {
 	AutoMigrate                    bool
 	MigrationLockTimeout           time.Duration
 	MigrationTimeout               time.Duration
-	UploadDir                      string
+	StoragePath                    string
 	StorageProvider                string
 	StorageOperationTimeout        time.Duration
 	StorageMigrationTimeout        time.Duration
@@ -102,8 +102,8 @@ func Load() Config {
 		AutoMigrate:                    getenvBoolTracked("AUTO_MIGRATE", true, validation),
 		MigrationLockTimeout:           getenvDurationTracked("MIGRATION_LOCK_TIMEOUT", 30*time.Second, false, validation),
 		MigrationTimeout:               getenvDurationTracked("MIGRATION_TIMEOUT", 5*time.Minute, false, validation),
-		UploadDir:                      getenv("UPLOAD_DIR", "uploads"),
-		StorageProvider:                strings.ToLower(strings.TrimSpace(getenv("STORAGE_PROVIDER", "local"))),
+		StoragePath:                    strings.TrimSpace(os.Getenv("STORAGE_PATH")),
+		StorageProvider:                strings.ToLower(strings.TrimSpace(os.Getenv("STORAGE_PROVIDER"))),
 		StorageOperationTimeout:        getenvDurationTracked("STORAGE_OPERATION_TIMEOUT", 30*time.Second, false, validation),
 		StorageMigrationTimeout:        getenvDurationTracked("STORAGE_MIGRATION_TIMEOUT", 2*time.Hour, false, validation),
 		StorageS3Bucket:                strings.TrimSpace(os.Getenv("STORAGE_S3_BUCKET")),
@@ -186,6 +186,9 @@ func (c Config) Validate() error {
 	if err := c.validateStorage(); err != nil {
 		return err
 	}
+	if appEnv == "production" && c.StorageWriteProvider() != "s3" {
+		return fmt.Errorf("STORAGE_PROVIDER must be s3 in production")
+	}
 	for _, proxy := range c.TrustedProxies {
 		if net.ParseIP(proxy) == nil {
 			if _, _, err := net.ParseCIDR(proxy); err != nil {
@@ -241,12 +244,13 @@ func (c Config) Validate() error {
 }
 
 func (c Config) validateStorage() error {
-	provider := strings.ToLower(strings.TrimSpace(c.StorageProvider))
-	if provider == "" {
-		provider = "local"
+	provider := c.StorageWriteProvider()
+	rawProvider := strings.ToLower(strings.TrimSpace(c.StorageProvider))
+	if rawProvider != "" && rawProvider != "default" && rawProvider != "s3" {
+		return fmt.Errorf("STORAGE_PROVIDER must be empty, default, or s3")
 	}
-	if provider != "local" && provider != "s3" {
-		return fmt.Errorf("STORAGE_PROVIDER must be local or s3")
+	if provider == "local" && strings.TrimSpace(c.StoragePath) == "" {
+		return fmt.Errorf("STORAGE_PATH must not be empty when STORAGE_PROVIDER is empty or default")
 	}
 	if c.StorageOperationTimeout < 0 {
 		return fmt.Errorf("STORAGE_OPERATION_TIMEOUT must not be negative")
@@ -278,6 +282,16 @@ func (c Config) validateStorage() error {
 	return nil
 }
 
+// StorageWriteProvider resolves the environment-facing default provider to the
+// persisted provider name used by the storage registry and database metadata.
+func (c Config) StorageWriteProvider() string {
+	provider := strings.ToLower(strings.TrimSpace(c.StorageProvider))
+	if provider == "" || provider == "default" {
+		return "local"
+	}
+	return provider
+}
+
 // ValidateStorageMigration validates the one-shot local-to-S3 operator job.
 // It intentionally requires only the database secret and S3 runtime contract;
 // Redis, JWT, frontend, and HTTP settings are irrelevant to this offline job.
@@ -307,6 +321,9 @@ func (c Config) ValidateStorageMigration() error {
 	}
 	if err := c.validateStorage(); err != nil {
 		return err
+	}
+	if strings.TrimSpace(c.StoragePath) == "" {
+		return fmt.Errorf("STORAGE_PATH is required for the external legacy storage migration source")
 	}
 	if strings.TrimSpace(c.StorageS3Bucket) == "" || strings.TrimSpace(c.StorageS3Region) == "" {
 		return fmt.Errorf("STORAGE_S3_BUCKET and STORAGE_S3_REGION are required for storage migration")

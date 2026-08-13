@@ -2185,6 +2185,9 @@ export type WorkflowFormPDFExport = ProjectOperationsRecord & {
   generated_by?: string;
   generated_by_name?: string;
   generated_at: string;
+  deletion_status?: '' | 'pending' | 'failed';
+  acceptance_reference_count?: number;
+  can_delete?: boolean;
 };
 
 export type SubcontractorReconciliationItem = ProjectOperationsRecord & {

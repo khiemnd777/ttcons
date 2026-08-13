@@ -8,9 +8,10 @@ import (
 )
 
 type RuntimeConfig struct {
-	WriteProvider string
-	LocalRoot     string
-	S3            S3Config
+	WriteProvider         string
+	LocalRoot             string
+	EnableLegacyLocalRead bool
+	S3                    S3Config
 }
 
 type Runtime struct {
@@ -21,34 +22,44 @@ type Runtime struct {
 
 func NewRuntime(ctx context.Context, cfg RuntimeConfig) (*Runtime, error) {
 	writeProvider := strings.ToLower(strings.TrimSpace(cfg.WriteProvider))
-	if writeProvider == "" {
+	if writeProvider == "" || writeProvider == "default" {
 		writeProvider = LocalProvider
 	}
 	if writeProvider != LocalProvider && writeProvider != S3Provider {
 		return nil, fmt.Errorf("unsupported storage write provider %q", writeProvider)
 	}
 
-	localStore, err := NewLocal(cfg.LocalRoot)
-	if err != nil {
-		return nil, fmt.Errorf("configure local storage: %w", err)
+	var localStore *Local
+	stores := make([]Store, 0, 2)
+	if writeProvider == LocalProvider || cfg.EnableLegacyLocalRead {
+		configuredLocal, err := NewLocal(cfg.LocalRoot)
+		if err != nil {
+			return nil, fmt.Errorf("configure local storage: %w", err)
+		}
+		localStore = configuredLocal
+		stores = append(stores, localStore)
 	}
-	stores := []Store{localStore}
-	s3Configured := strings.TrimSpace(cfg.S3.Bucket) != "" || strings.TrimSpace(cfg.S3.Region) != "" || strings.TrimSpace(cfg.S3.Endpoint) != "" || cfg.S3.UsePathStyle
-	if writeProvider == S3Provider || s3Configured {
+	if writeProvider == S3Provider {
 		s3Store, s3Err := NewS3(ctx, cfg.S3)
 		if s3Err != nil {
-			_ = localStore.Close()
+			if localStore != nil {
+				_ = localStore.Close()
+			}
 			return nil, fmt.Errorf("configure S3 storage: %w", s3Err)
 		}
 		stores = append(stores, s3Store)
 	}
 	registry, err := NewRegistry(stores...)
 	if err != nil {
-		_ = localStore.Close()
+		if localStore != nil {
+			_ = localStore.Close()
+		}
 		return nil, err
 	}
 	if _, err := registry.Store(writeProvider); err != nil {
-		_ = localStore.Close()
+		if localStore != nil {
+			_ = localStore.Close()
+		}
 		return nil, err
 	}
 	return &Runtime{Registry: registry, WriteProvider: writeProvider, local: localStore}, nil

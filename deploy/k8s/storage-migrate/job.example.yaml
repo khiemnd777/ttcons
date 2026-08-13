@@ -1,6 +1,6 @@
 # Optional pre-cutover operator Job. It is excluded from the application base
 # and deliberately cannot run until an overlay supplies an immutable image,
-# bucket/region and an existing RWX PVC containing the legacy UPLOAD_DIR tree.
+# bucket/region and an existing RWX PVC containing the legacy STORAGE_PATH tree.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -48,7 +48,7 @@ spec:
               value: production
             - name: DATABASE_URL_FILE
               value: /var/run/secrets/consflow/database_url
-            - name: UPLOAD_DIR
+            - name: STORAGE_PATH
               value: /legacy/uploads
             - name: STORAGE_PROVIDER
               value: s3

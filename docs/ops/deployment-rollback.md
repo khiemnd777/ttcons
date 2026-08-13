@@ -19,8 +19,16 @@ This document keeps the controlled Docker Compose single-host procedure below. F
 
    Confirm the remaining non-secret environment variables:
    - `FRONTEND_ORIGIN`
-   - `UPLOAD_DIR`
+   - `STORAGE_PROVIDER=s3`
+   - `STORAGE_S3_BUCKET`
+   - `STORAGE_S3_REGION`
+   - optional `STORAGE_S3_ENDPOINT` and path-style settings
    - `MAX_UPLOAD_BYTES`
+
+   Production does not mount a local object directory. Confirm the S3
+   credential chain is available and that backend startup storage preflight can
+   create, read, and delete its probe object before returning the origin to the
+   load balancer.
 2. Run local validation:
    ```bash
    make migrate-check

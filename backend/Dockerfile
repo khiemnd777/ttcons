@@ -11,9 +11,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-storage-migrate ./cmd/sto
 FROM alpine:3.20
 WORKDIR /app
 RUN addgroup -S -g 10001 appgroup \
-    && adduser -S -D -H -u 10001 -G appgroup appuser \
-    && mkdir -p /app/uploads \
-    && chown -R 10001:10001 /app/uploads
+    && adduser -S -D -H -u 10001 -G appgroup appuser
 COPY --from=build /bin/consflow /app/consflow
 COPY --from=build /bin/consflow-migrate /app/consflow-migrate
 COPY --from=build /bin/consflow-storage-migrate /app/consflow-storage-migrate

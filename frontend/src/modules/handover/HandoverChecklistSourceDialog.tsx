@@ -7,6 +7,7 @@ import { useToast } from '../../components/ToastProvider';
 import { downloadBlob } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { currency, dateText } from '../../lib/utils/format';
+import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
 import {
   automaticSourcePresentation,
   checklistItemCodeLabel,
@@ -38,16 +39,10 @@ export function HandoverChecklistSourceDialog({ open, item, detail, canEdit = fa
   const canOpenAutomaticSource = Boolean(automaticSource && hasAnyPermission(automaticSource.permissions));
 
   async function openEvidence(source: LinkedSourcePresentation) {
-    const viewer = window.open('', '_blank', 'noopener,noreferrer');
     setOpeningEvidenceID(source.id);
     try {
-      const blob = await downloadBlob(`/evidence/${source.id}/file`);
-      const objectUrl = URL.createObjectURL(blob);
-      if (viewer) viewer.location.href = objectUrl;
-      else window.open(objectUrl, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      await openProtectedBlob(() => downloadBlob(`/evidence/${source.id}/file`));
     } catch (error) {
-      viewer?.close();
       toast.error('Không mở được tệp minh chứng', error);
     } finally {
       setOpeningEvidenceID('');

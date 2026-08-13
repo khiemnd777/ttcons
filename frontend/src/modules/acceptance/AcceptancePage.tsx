@@ -7,6 +7,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
+import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
@@ -436,16 +437,10 @@ function ChecklistItemDialog({ selected, record, onClose }: { selected: Selected
       return;
     }
     if (!evidenceId) return;
-    const viewer = window.open('', '_blank', 'noopener,noreferrer');
     setOpeningEvidence(evidenceId);
     try {
-      const blob = await downloadBlob(`/evidence/${evidenceId}/file`);
-      const url = URL.createObjectURL(blob);
-      if (viewer) viewer.location.href = url;
-      else window.open(url, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      await openProtectedBlob(() => downloadBlob(`/evidence/${evidenceId}/file`));
     } catch (error) {
-      viewer?.close();
       toast.error('Không mở được minh chứng', error);
     } finally {
       setOpeningEvidence('');

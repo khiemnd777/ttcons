@@ -43,6 +43,7 @@ assert(secret_like_keys.empty?, "runtime ConfigMap contains secret-like keys: #{
 assert(config.dig("data", "AUTO_MIGRATE") == "false", "backend AUTO_MIGRATE must remain false")
 assert(config.dig("data", "RATE_LIMIT_MODE") == "enforce", "production base must enforce rate limits")
 assert(config.dig("data", "STORAGE_PROVIDER") == "s3", "multi-replica base must force the S3 provider")
+assert(!config.fetch("data", {}).key?("STORAGE_PATH"), "S3-only application base must not configure STORAGE_PATH")
 assert(config.dig("data", "STORAGE_S3_BUCKET") == "", "base S3 bucket must fail closed until overlaid")
 assert(config.dig("data", "STORAGE_S3_REGION") == "", "base S3 region must fail closed until overlaid")
 assert(config.dig("data", "TRUSTED_PROXY_CIDRS")&.start_with?("REPLACE_"),
@@ -98,6 +99,12 @@ end
 
 backend = named(rendered, "Deployment", "backend")
 backend_container = backend.dig("spec", "template", "spec", "containers").find { |item| item["name"] == "backend" }
+backend_mounts = backend_container.fetch("volumeMounts", [])
+backend_volumes = backend.dig("spec", "template", "spec").fetch("volumes", [])
+assert(backend_mounts.none? { |mount| mount["mountPath"] == "/app/uploads" || mount["mountPath"] == "/storage" },
+       "S3-only backend must not mount a local object-storage path")
+assert(backend_volumes.none? { |volume| volume["name"] == "uploads" },
+       "S3-only backend must not define an upload scratch volume")
 backend_env = backend_container.fetch("env").to_h { |item| [item["name"], item["value"]] }
 %w[DATABASE_URL_FILE REDIS_URL_FILE JWT_SECRET_FILE].each do |key|
   assert(backend_env[key]&.start_with?("/var/run/secrets/consflow/"), "backend must source #{key} from a mounted Secret")
@@ -200,6 +207,8 @@ storage_env = storage_container.fetch("env").to_h { |item| [item["name"], item["
 assert(storage_env["DATABASE_URL_FILE"] == "/var/run/secrets/consflow/database_url",
        "storage migration must use the mounted database secret")
 assert(storage_env["STORAGE_PROVIDER"] == "s3", "storage migration destination must be S3")
+assert(storage_env["STORAGE_PATH"] == "/legacy/uploads",
+       "storage migration must read the explicit external legacy STORAGE_PATH")
 assert(storage_env["STORAGE_S3_BUCKET"] == "" && storage_env["STORAGE_S3_REGION"] == "",
        "storage migration bucket/region must fail closed until overlaid")
 storage_aws_env = storage_container.fetch("env").select { |item| item["name"]&.start_with?("AWS_") }

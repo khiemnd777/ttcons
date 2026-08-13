@@ -34,8 +34,9 @@ func main() {
 	defer connection.Close()
 
 	runtime, err := sharedstorage.NewRuntime(ctx, sharedstorage.RuntimeConfig{
-		WriteProvider: sharedstorage.S3Provider,
-		LocalRoot:     cfg.UploadDir,
+		WriteProvider:         sharedstorage.S3Provider,
+		LocalRoot:             cfg.StoragePath,
+		EnableLegacyLocalRead: true,
 		S3: sharedstorage.S3Config{
 			Bucket:           cfg.StorageS3Bucket,
 			Region:           cfg.StorageS3Region,

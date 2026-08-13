@@ -34,6 +34,17 @@ AGENTS.md
 
 ## Chạy bằng Docker
 
+Tạo cấu hình local trước lần chạy đầu tiên:
+
+```bash
+cp .env.example .env
+```
+
+Cập nhật `LOCAL_UID`, `LOCAL_GID` theo `id -u` / `id -g` và đặt
+`STORAGE_PATH` thành đường dẫn tuyệt đối tới thư mục `storage/` ở root repo.
+`.env` là nguồn cấu hình local chính và đã được Git ignore; `.env.example` là
+template không chứa secret thật.
+
 ```bash
 make up
 ```
@@ -53,6 +64,14 @@ Sau khi stack chạy:
 - Admin frontend: http://localhost:5173
 - Backend API: http://localhost:8080/api
 - PostgreSQL: localhost:5432, database `consflow`, user/password `consflow`
+
+Object storage development mặc định nằm tại `STORAGE_PATH` trong `.env`, trỏ tới
+thư mục `storage/` ở root repo và được Git ignore. `make up` tạo thư mục này,
+bind-mount vào backend tại `/storage` và chạy container bằng UID/GID khai báo
+trong `.env`; object không nằm trong Docker named volume. Khi chạy backend trực
+tiếp, `backend/Makefile` nạp cùng `.env`. `STORAGE_PROVIDER=s3` sử dụng riêng S3
+và không khởi tạo local storage.
+Production Compose và Kubernetes bắt buộc S3, không mount object-storage path.
 
 Production Compose là topology single-host có kiểm soát. Baseline Kubernetes cho hai replica `admin`/`backend`, external managed PostgreSQL/Redis/S3, migration Job và các rollout gate nằm tại [`deploy/k8s/README.md`](deploy/k8s/README.md); manifests cố ý fail-closed và không tự deploy cluster.
 

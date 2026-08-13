@@ -14,7 +14,7 @@ import (
 func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg config.Config, storageRegistry *sharedstorage.Registry) (func(), error) {
 	repo := NewRepository(db)
 	service := NewService(repo, cfg.JWTSecret)
-	if err := service.ConfigureStorage(storageRegistry, cfg.StorageProvider, cfg.MaxUploadBytes); err != nil {
+	if err := service.ConfigureStorage(storageRegistry, cfg.StorageWriteProvider(), cfg.MaxUploadBytes); err != nil {
 		return nil, err
 	}
 	service.ConfigureAuth(cfg.AuthAccessTokenMinutes, cfg.AuthRefreshTokenHours, cfg.AuthRefreshCookieSecure, cfg.AuthRefreshCookieSameSite)
@@ -150,6 +150,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg c
 	protected.Get("/evidence/:id/file", h.GetEvidenceFile)
 	protected.Get("/workflow-form-signatures/:id/visual", h.GetWorkflowFormSignatureVisual)
 	protected.Get("/workflow-form-pdf-exports/:id/file", h.GetWorkflowFormPDFExportFile)
+	protected.Delete("/workflow-form-pdf-exports/:id", h.DeleteWorkflowFormPDFExport)
 	protected.Post("/evidence/:id/accept", h.AcceptEvidence)
 	protected.Post("/evidence/:id/reject", h.RejectEvidence)
 	protected.Post("/pipeline-run-nodes/:id/start", h.StartRunNode)

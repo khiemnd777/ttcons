@@ -28,8 +28,8 @@ func main() {
 		log.Fatalf("invalid configuration: %v", err)
 	}
 	storageRuntime, err := sharedstorage.NewRuntime(context.Background(), sharedstorage.RuntimeConfig{
-		WriteProvider: cfg.StorageProvider,
-		LocalRoot:     cfg.UploadDir,
+		WriteProvider: cfg.StorageWriteProvider(),
+		LocalRoot:     cfg.StoragePath,
 		S3: sharedstorage.S3Config{
 			Bucket:           cfg.StorageS3Bucket,
 			Region:           cfg.StorageS3Region,
@@ -46,18 +46,16 @@ func main() {
 			log.Printf("event=storage_close error=%v", err)
 		}
 	}()
-	if cfg.StorageProvider == sharedstorage.S3Provider {
-		preflightContext, cancelPreflight := context.WithTimeout(context.Background(), cfg.StorageOperationTimeout)
-		writeStore, storeErr := storageRuntime.Registry.Store(storageRuntime.WriteProvider)
-		if storeErr == nil {
-			storeErr = sharedstorage.VerifyWriteAccess(preflightContext, writeStore)
-		}
-		cancelPreflight()
-		if storeErr != nil {
-			log.Fatalf("verify active storage provider: %v", storeErr)
-		}
-		log.Printf("event=storage_preflight provider=s3 status=ready")
+	preflightContext, cancelPreflight := context.WithTimeout(context.Background(), cfg.StorageOperationTimeout)
+	writeStore, storeErr := storageRuntime.Registry.Store(storageRuntime.WriteProvider)
+	if storeErr == nil {
+		storeErr = sharedstorage.VerifyWriteAccess(preflightContext, writeStore)
 	}
+	cancelPreflight()
+	if storeErr != nil {
+		log.Fatalf("verify active storage provider: %v", storeErr)
+	}
+	log.Printf("event=storage_preflight provider=%s status=ready", storageRuntime.WriteProvider)
 	if cfg.AutoMigrate {
 		migrationContext, cancelMigration := context.WithTimeout(context.Background(), cfg.MigrationTimeout)
 		migrationConn, err := db.Connect(migrationContext, cfg.DatabaseURL, db.Options{
@@ -106,17 +104,7 @@ func main() {
 	defer redisClient.Close()
 
 	runtimeMetrics := observability.New(conn)
-	app := fiber.New(fiber.Config{
-		AppName:                 "consflow",
-		BodyLimit:               int(cfg.MaxUploadBytes + 1024*1024),
-		ReadTimeout:             cfg.HTTPReadTimeout,
-		WriteTimeout:            cfg.HTTPWriteTimeout,
-		IdleTimeout:             cfg.HTTPIdleTimeout,
-		ProxyHeader:             fiber.HeaderXForwardedFor,
-		EnableTrustedProxyCheck: true,
-		TrustedProxies:          cfg.TrustedProxies,
-		ErrorHandler:            observability.ErrorHandler(core.ErrorHandler),
-	})
+	app := fiber.New(serverConfig(cfg))
 	app.Use(runtimeMetrics.Middleware())
 	app.Use(recover.New())
 	app.Use(cors.New(cors.Config{
@@ -170,5 +158,20 @@ func main() {
 		}
 	case <-shutdownContext.Done():
 		log.Printf("event=backend_shutdown_deadline_exceeded")
+	}
+}
+
+func serverConfig(cfg config.Config) fiber.Config {
+	return fiber.Config{
+		AppName:                      "consflow",
+		BodyLimit:                    int(cfg.MaxUploadBytes + 1024*1024),
+		DisablePreParseMultipartForm: true,
+		ReadTimeout:                  cfg.HTTPReadTimeout,
+		WriteTimeout:                 cfg.HTTPWriteTimeout,
+		IdleTimeout:                  cfg.HTTPIdleTimeout,
+		ProxyHeader:                  fiber.HeaderXForwardedFor,
+		EnableTrustedProxyCheck:      true,
+		TrustedProxies:               cfg.TrustedProxies,
+		ErrorHandler:                 observability.ErrorHandler(core.ErrorHandler),
 	}
 }

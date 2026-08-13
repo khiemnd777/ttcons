@@ -1,5 +1,62 @@
 # Current States
 
+## [Active] Workflow Form PDF Open And Delete
+
+### Will be done
+
+- Replace the duplicated protected-blob popup flow with one shared helper that retains exactly one user-opened tab, detaches its opener, loads the authenticated blob and navigates that tab without a second popup.
+- Add an audited, retryable workflow-form PDF deletion lifecycle that preserves immutable export metadata, physically deletes the unreferenced Local/S3 object and blocks deletion while an outgoing acceptance references the export.
+- Exclude completed deletions from form detail, protected download and PDF-derived counts; expose server-backed delete readiness to the work-item UI.
+- Add the approved responsive PDF row actions and shared confirmation dialog states, focused backend/frontend regression coverage and required Consflow mapping updates.
+- Run non-browser technical verification, including current-source tests/build, migration validation, API deletion checks and visual rendering of a generated PDF. Browser/UAT remains skipped unless explicitly requested.
+
+### Done
+
+- Reproduced the blank-open defect from source and the supplied Edge state: the first `noopener` tab may return a null handle, then a second `window.open` runs after the blob await and is popup-blocked, leaving the original tab blank.
+- Verified the protected PDF endpoint independently returns HTTP 200, `application/pdf`, 1,829 bytes and `%PDF-1.4`; rendered the retrieved page and confirmed the workflow-form content is present.
+- Confirmed there is no current delete UI/API, the export row is database-immutable, and outgoing acceptance can reference `workflow_form_pdf_exports.id`.
+- Confirmed all three duplicate exports on the reported work item have the same checksum and currently have no outgoing-acceptance references.
+- Produced the impact review, safe-delete contract and Mockup as Text; received explicit `OK triển khai` approval.
+- Added V93 with a separate `workflow_form_pdf_export_deletions` lifecycle so immutable export metadata remains intact. Deferred database guards reject both deleting a referenced PDF and creating an acceptance reference to a pending/deleted PDF.
+- Added protected `DELETE /workflow-form-pdf-exports/:id` with the same work-item action/current-node/permission gates as generation. Local/S3 object deletion is retryable, storage failures remain visible as `failed`, success writes one workflow event, work-item activity and audit row, and repeat deletion is idempotent.
+- Updated active form/detail/report queries and outgoing-acceptance options: completed deletions are hidden, pending deletion cannot be downloaded/linked, failed deletion remains retryable, and the UI receives server-backed reference count/delete readiness.
+- Added `Xoá`/`Thử xoá lại`, linked-record disabled guidance and a shared confirmation dialog to the PDF rows. Read-only work keeps deletion disabled.
+- Added `openProtectedBlob.ts` and moved workflow PDF/signature plus evidence consumers to exactly one synchronous viewer; the helper explicitly reports popup blocking and never opens a second window after `await`.
+- Updated backend/frontend/root-cause/workflow/quality mappings for the route, V93 lifecycle, acceptance invariant and shared protected-viewer contract.
+- Technically verified the current source with full `go test ./...`, all 76 frontend tests, TypeScript/Vite production build, `git diff --check`, and a fresh PostgreSQL migration/integration run. The integration covers failed-storage retry, physical object deletion, retained immutable metadata/tombstone/audit, idempotent repeat deletion and acceptance-reference conflict. The temporary test databases were removed. Browser/UAT was not requested and remains `NOT UX ACCEPTED`.
+- Rebuilt the localhost Compose stack from the verified source. V93 is recorded as `workflow form pdf export deletion`; the final backend startup skipped all 93 already-applied migrations, passed `storage_preflight provider=local`, and both `/api/health` and `/api/ready` returned HTTP 200.
+
+## [Active] External Storage Boundary Redesign
+
+### Will be done
+
+- Replace the implicit container-local upload directory with an explicit storage contract: blank/default provider uses `STORAGE_PATH`, while `s3` uses only the configured S3 backend.
+- Keep the development filesystem default under the repository at `storage/`, bind it into Docker without a Docker-managed volume, and ignore it from Git.
+- Remove temporary filesystem staging from S3 writes and prevent multipart uploads from spilling into the container filesystem.
+- Make production Compose and the Kubernetes runtime S3-only, while retaining an explicit external filesystem source only for the one-time storage migration command.
+- Preserve the existing Docker volume and the 35 database references to provider `local`; do not delete or rewrite legacy data automatically.
+- Add focused backend/storage/config regression coverage, update deployment validation and Consflow mapping, then run non-browser technical verification.
+
+### Done
+
+- Confirmed the PDF failure is an API 500 caused by the backend process lacking write permission on the Docker-managed `/app/uploads` volume, not an RBAC/API permission denial.
+- Confirmed generated workflow PDFs are produced in memory before storage, so PDF generation does not require a container-local temporary file.
+- Confirmed S3 writes currently use `os.CreateTemp` and Fiber multipart parsing can spill large uploads to the process temporary directory; both paths are included in the approved redesign.
+- Confirmed the current database has 35 `local` storage references across workflow evidence/signature/PDF and invoice records; the approved cutover preserves those records and the old volume for an explicit migration instead of deleting either.
+- Produced the storage/runtime/deployment review package and received explicit `OK triển khai` approval.
+- Replaced `UPLOAD_DIR` with the fail-closed storage contract: empty/`default` resolves to persisted provider `local` and requires `STORAGE_PATH`; production requires `s3`, whose runtime does not create/register local storage.
+- Removed implicit service-local storage fallback, made startup probe every active provider, rewound seekable multipart sources after MIME detection and configured Fiber to keep bounded multipart bodies in memory instead of process temp files.
+- Removed S3 `os.CreateTemp` staging; S3 now hashes and size-checks the seekable source, rewinds it and streams it to the AWS SDK while preserving bounded retries.
+- Moved development storage to ignored repo-root `storage/`, bind-mounted it at `/storage` under the host UID/GID, removed the Docker upload named volume from runtime configuration and changed seed fixture copy to write directly on the host.
+- Made production Compose and Kubernetes application runtime S3-only with no object-storage mount; retained an explicit external read-only `STORAGE_PATH` only for the operator migration Job/binary.
+- Exported the 17 legacy volume objects into `storage/` with matching SHA-256 for all 17 files. The original `ttcons_consflow_uploads` volume remains intact with 17 files and is not mounted by the new backend.
+- Rebuilt the local stack with revision `60824c0` plus the current working tree. Backend runs as host `501:20`, mounts only the host bind at `/storage`, and logged `storage_preflight provider=local status=ready` before listening.
+- Re-ran the originally failing workflow-form PDF action through the API for instance `12a97195-ea63-456e-a38f-9941bd605a6f`; it returned HTTP 201 and created a 1,829-byte ignored host file owned by `khiemnguyen:staff` with mode `0640`. This added one legitimate PDF-export record; the 35 pre-existing local metadata references were preserved.
+- Added focused config/runtime/S3/multipart regressions and updated central/backend/root-cause/workflow mapping plus deployment/runbook documentation. Full `go test ./...`, development and production Compose config validation, Kubernetes deterministic render validation and `git diff --check` pass. Browser/UAT was not requested and remains `NOT UX ACCEPTED`.
+- Added the ignored local `.env` and repository template `.env.example`; root and backend Makefiles now load that file explicitly, local Compose consumes its service/runtime variables without hidden storage fallbacks, and production remains S3-only through `.env.prod.example`.
+- Preserved the existing Compose project name `ttcons` so local PostgreSQL continues using `ttcons_consflow_postgres`. The first restart exposed and corrected both an accidental project-name mismatch and a partially configured S3 region under the default provider; the unstarted temporary `consflow` containers/network and their unused empty PostgreSQL volume were removed without touching the `ttcons` volume.
+- Final `.env` verification passed with mode `0600`, exact key parity against `.env.example`, local/default and production/S3 Compose render checks, and a rebuilt `ttcons` stack. PostgreSQL/Redis are healthy, backend/admin are up, storage preflight reports `provider=local status=ready`, all 92 migrations are already applied, backend runs as `501:20`, and its sole object mount is the host bind `storage/ -> /storage`.
+
 ## [Active] Dashboard Approval Ownership Clarity
 
 ### Will be done

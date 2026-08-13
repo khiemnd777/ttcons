@@ -9,6 +9,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -75,6 +77,34 @@ func TestS3PutStreamsSizeContentTypeAndChecksum(t *testing.T) {
 	}
 }
 
+func TestS3PutDoesNotRequireTemporaryFilesystem(t *testing.T) {
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing-temp-directory"))
+	client := &fakeS3Client{}
+	store, err := newS3WithClient(S3Config{Bucket: "artifacts", OperationTimeout: time.Second}, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := []byte("memory-only S3 source")
+	if _, err := store.Put(context.Background(), "workflow/pdf.pdf", bytes.NewReader(payload), PutOptions{ExpectedSize: int64(len(payload))}); err != nil {
+		t.Fatalf("S3 put unexpectedly required TMPDIR: %v", err)
+	}
+}
+
+func TestS3PutRejectsNonSeekableSourceBeforeCallingClient(t *testing.T) {
+	client := &fakeS3Client{}
+	store, err := newS3WithClient(S3Config{Bucket: "artifacts", OperationTimeout: time.Second}, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.Put(context.Background(), "workflow/non-seekable.pdf", bytes.NewBufferString("content"), PutOptions{ExpectedSize: 7})
+	if err == nil || !strings.Contains(err.Error(), "seekable") {
+		t.Fatalf("non-seekable source error=%v", err)
+	}
+	if client.putInput != nil {
+		t.Fatal("non-seekable source reached S3 client")
+	}
+}
+
 func TestS3PutRejectsExistingObjectAndSizeMismatch(t *testing.T) {
 	client := &fakeS3Client{putErr: &smithy.GenericAPIError{Code: "PreconditionFailed", Message: "exists"}}
 	store, _ := newS3WithClient(S3Config{Bucket: "artifacts"}, client)
@@ -90,7 +120,7 @@ func TestS3PutRejectsExistingObjectAndSizeMismatch(t *testing.T) {
 		t.Fatalf("size mismatch error=%v", err)
 	}
 	if client.putInput != nil {
-		t.Fatal("size mismatch reached S3 before local staging validation")
+		t.Fatal("size mismatch reached S3 before source validation")
 	}
 }
 

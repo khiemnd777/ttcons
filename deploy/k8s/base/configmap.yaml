@@ -11,7 +11,6 @@ data:
   FRONTEND_ORIGIN: https://workflow.example.invalid
   MIGRATIONS_DIR: /app/migrations
   AUTO_MIGRATE: "false"
-  UPLOAD_DIR: /app/uploads
   # Multi-replica production is S3-only. Empty bucket/region make the base fail
   # validation until a reviewed environment overlay supplies real values.
   STORAGE_PROVIDER: s3

@@ -17,6 +17,12 @@ type memoryStore struct {
 	objects  map[string][]byte
 }
 
+type memoryReadSeekCloser struct {
+	*bytes.Reader
+}
+
+func (memoryReadSeekCloser) Close() error { return nil }
+
 func newMemoryStore(provider string) *memoryStore {
 	return &memoryStore{provider: provider, objects: map[string][]byte{}}
 }
@@ -48,7 +54,7 @@ func (s *memoryStore) Open(_ context.Context, key string) (Object, error) {
 	if !exists {
 		return Object{}, ErrNotFound
 	}
-	return Object{Reader: io.NopCloser(bytes.NewReader(append([]byte(nil), content...))), Info: ObjectInfo{Provider: s.provider, Key: key, Size: int64(len(content))}}, nil
+	return Object{Reader: memoryReadSeekCloser{Reader: bytes.NewReader(append([]byte(nil), content...))}, Info: ObjectInfo{Provider: s.provider, Key: key, Size: int64(len(content))}}, nil
 }
 
 func (s *memoryStore) Delete(_ context.Context, key string) error {

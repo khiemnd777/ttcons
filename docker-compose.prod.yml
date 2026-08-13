@@ -103,7 +103,16 @@ services:
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is required}"
       MIGRATIONS_DIR: /app/migrations
       AUTO_MIGRATE: "false"
-      UPLOAD_DIR: /app/uploads
+      STORAGE_PROVIDER: "s3"
+      STORAGE_OPERATION_TIMEOUT: "${STORAGE_OPERATION_TIMEOUT:-30s}"
+      STORAGE_S3_BUCKET: "${STORAGE_S3_BUCKET:?STORAGE_S3_BUCKET is required}"
+      STORAGE_S3_REGION: "${STORAGE_S3_REGION:?STORAGE_S3_REGION is required}"
+      STORAGE_S3_ENDPOINT: "${STORAGE_S3_ENDPOINT:-}"
+      STORAGE_S3_USE_PATH_STYLE: "${STORAGE_S3_USE_PATH_STYLE:-false}"
+      STORAGE_S3_ALLOW_INSECURE_ENDPOINT: "${STORAGE_S3_ALLOW_INSECURE_ENDPOINT:-false}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN:-}"
       MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:-10485760}"
       AUTH_ACCESS_TOKEN_MINUTES: "${AUTH_ACCESS_TOKEN_MINUTES:-15}"
       AUTH_REFRESH_TOKEN_HOURS: "${AUTH_REFRESH_TOKEN_HOURS:-168}"
@@ -171,8 +180,6 @@ services:
       - jwt_secret
     expose:
       - "8080"
-    volumes:
-      - consflow_uploads:/app/uploads
     networks:
       - app_internal
     depends_on:
@@ -263,4 +270,3 @@ secrets:
 volumes:
   consflow_postgres:
   consflow_redis:
-  consflow_uploads:

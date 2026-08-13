@@ -54,7 +54,8 @@ export function OutgoingAcceptancePanel({
 
   const form = acceptanceQuery.data?.form;
   const formInstance = form?.instance;
-  const pdfExports = (form?.pdf_exports ?? []) as WorkflowFormPDFExport[];
+  const pdfExports = ((form?.pdf_exports ?? []) as WorkflowFormPDFExport[])
+    .filter((record) => record.deletion_status !== 'pending');
   const signatures = form?.signatures ?? [];
   const evidenceOptions = useMemo(() => evidence.filter((item) => item.status !== 'rejected'), [evidence]);
   const submitted = records.filter((record) => record.status === 'submitted' || record.status === 'completed');

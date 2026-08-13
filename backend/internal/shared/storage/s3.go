@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -113,38 +112,37 @@ func (s *S3) Put(ctx context.Context, key string, source io.Reader, options PutO
 	if options.ExpectedSize < 0 {
 		return ObjectInfo{}, errors.New("S3 storage requires a known expected size")
 	}
+	seekable, ok := source.(io.ReadSeeker)
+	if !ok {
+		return ObjectInfo{}, errors.New("S3 storage source must be seekable")
+	}
 	operationContext, cancel := context.WithTimeout(ctx, s.operationTimeout)
 	defer cancel()
 
-	staged, err := os.CreateTemp("", "consflow-s3-put-*")
+	start, err := seekable.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return ObjectInfo{}, fmt.Errorf("create S3 upload staging file: %w", err)
+		return ObjectInfo{}, fmt.Errorf("resolve S3 upload source position: %w", err)
 	}
-	stagedName := staged.Name()
-	defer func() {
-		_ = staged.Close()
-		_ = os.Remove(stagedName)
-	}()
 	hasher := sha256.New()
-	stagingSource := io.Reader(&contextReader{ctx: operationContext, reader: source})
+	hashSource := io.Reader(&contextReader{ctx: operationContext, reader: seekable})
 	const maxInt64 = int64(^uint64(0) >> 1)
 	if options.ExpectedSize < maxInt64 {
-		stagingSource = io.LimitReader(stagingSource, options.ExpectedSize+1)
+		hashSource = io.LimitReader(hashSource, options.ExpectedSize+1)
 	}
-	written, err := io.Copy(io.MultiWriter(staged, hasher), stagingSource)
+	written, err := io.Copy(hasher, hashSource)
 	if err != nil {
-		return ObjectInfo{}, fmt.Errorf("stage S3 upload: %w", err)
+		return ObjectInfo{}, fmt.Errorf("hash S3 upload source: %w", err)
 	}
 	if written != options.ExpectedSize {
 		return ObjectInfo{}, fmt.Errorf("storage size mismatch: expected %d, read %d", options.ExpectedSize, written)
 	}
-	if _, err := staged.Seek(0, io.SeekStart); err != nil {
-		return ObjectInfo{}, fmt.Errorf("rewind S3 upload staging file: %w", err)
+	if _, err := seekable.Seek(start, io.SeekStart); err != nil {
+		return ObjectInfo{}, fmt.Errorf("rewind S3 upload source: %w", err)
 	}
 	input := &s3.PutObjectInput{
 		Bucket:        aws.String(s.bucket),
 		Key:           aws.String(key),
-		Body:          staged,
+		Body:          seekable,
 		ContentType:   aws.String(normalizedContentType(options.ContentType)),
 		IfNoneMatch:   aws.String("*"),
 		ContentLength: aws.Int64(options.ExpectedSize),

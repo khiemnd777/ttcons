@@ -2,6 +2,7 @@ import { ExternalLink, FileImage, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob } from '../../lib/api/client';
+import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
 
 export function ConstructionEvidenceButton({ evidenceId, name, label }: { evidenceId?: string; name?: string; label: string }) {
   const toast = useToast();
@@ -12,10 +13,7 @@ export function ConstructionEvidenceButton({ evidenceId, name, label }: { eviden
   async function open() {
     setOpening(true);
     try {
-      const blob = await downloadBlob(`/evidence/${evidenceId}/file`);
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      await openProtectedBlob(() => downloadBlob(`/evidence/${evidenceId}/file`));
     } catch (error) {
       toast.error('Không mở được minh chứng', error);
     } finally {
