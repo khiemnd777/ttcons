@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+async function source(path: string) {
+  return readFile(new URL(path, import.meta.url), 'utf8');
+}
+
+test('completion requirement rows expose keyboard actions and explicit instructions', async () => {
+  const detail = await source('../src/modules/work-items/WorkItemDetailDialog.tsx');
+
+  assert.match(detail, /<button[\s\S]*onClick=\{\(\) => onNavigate\(navigationTarget\)\}/);
+  assert.match(detail, /<span className="font-semibold">Cách xử lý:<\/span>/);
+  assert.match(detail, /focus-visible:ring-2/);
+  assert.match(detail, /permissionRequirementPresentation\(item\)/);
+  assert.doesNotMatch(detail, /Yêu cầu quyền: \$\{requirement\.required_permission\}/);
+});
+
+test('evidence requirement navigation opens and focuses the matching uploader', async () => {
+  const evidencePanel = await source('../src/modules/work-items/EvidencePanel.tsx');
+
+  assert.match(evidencePanel, /setEvidenceType\(navigationRequest\.target\.evidenceType \?\? 'photo'\)/);
+  assert.match(evidencePanel, /setUploadOpen\(true\)/);
+  assert.match(evidencePanel, /revealWorkItemRequirementTarget\(uploadFormRef\.current, fileInputRef\.current\)/);
+});
+
+test('workflow-form navigation targets the first issue, checklist field, or submit action', async () => {
+  const formPanel = await source('../src/modules/work-items/WorkflowFormPanel.tsx');
+
+  assert.match(formPanel, /candidate\.field_key === 'checklist_items'/);
+  assert.match(formPanel, /activeFields\.find\(\(candidate\) => validateFieldValue/);
+  assert.match(formPanel, /data-workflow-field-key=\{field\.field_key\}/);
+  assert.match(formPanel, /data-workflow-form-submit/);
+});

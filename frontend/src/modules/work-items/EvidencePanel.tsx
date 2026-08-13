@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useMemo, useRef, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock3, FileText, Image as ImageIcon, Loader2, Upload } from 'lucide-react';
 import clsx from 'clsx';
@@ -6,6 +6,8 @@ import { useToast } from '../../components/ToastProvider';
 import { post, postForm } from '../../lib/api/client';
 import type { EvidenceRecord } from '../../lib/types/domain';
 import { EvidenceGallery, formatEvidenceFileSize, isImageEvidence, type EvidenceReviewAction } from './EvidenceGallery';
+import type { WorkItemRequirementNavigationRequest } from './workItemRequirements';
+import { revealWorkItemRequirementTarget } from './workItemRequirementNavigation';
 
 const maxEvidenceUploadBytes = 10 * 1024 * 1024;
 
@@ -14,22 +16,53 @@ type EvidencePanelProps = {
   projectId?: string;
   evidence: EvidenceRecord[];
   readOnly?: boolean;
+  navigationRequest?: WorkItemRequirementNavigationRequest | null;
 };
 
 type EvidenceUploadType = 'photo' | 'document';
 type EvidenceVisibility = 'internal' | 'project' | 'client';
 
-export function EvidencePanel({ workItemId, projectId, evidence, readOnly = false }: EvidencePanelProps) {
+export function EvidencePanel({
+  workItemId,
+  projectId,
+  evidence,
+  readOnly = false,
+  navigationRequest,
+}: EvidencePanelProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [evidenceType, setEvidenceType] = useState<EvidenceUploadType>('photo');
   const [visibility, setVisibility] = useState<EvidenceVisibility>('project');
   const [name, setName] = useState('');
   const [caption, setCaption] = useState('');
+  const panelRef = useRef<HTMLElement | null>(null);
+  const uploadFormRef = useRef<HTMLFormElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const lastHandledNavigationRef = useRef<number | null>(null);
   const stats = useMemo(() => evidenceStats(evidence), [evidence]);
   const queryClient = useQueryClient();
   const toast = useToast();
+
+  useEffect(() => {
+    if (navigationRequest?.target.kind !== 'evidence') return undefined;
+    if (lastHandledNavigationRef.current === navigationRequest.requestId) return undefined;
+    lastHandledNavigationRef.current = navigationRequest.requestId;
+
+    if (navigationRequest.target.openUpload && !readOnly) {
+      setEvidenceType(navigationRequest.target.evidenceType ?? 'photo');
+      setUploadOpen(true);
+      let removeHighlight: (() => void) | undefined;
+      const timer = window.setTimeout(() => {
+        removeHighlight = revealWorkItemRequirementTarget(uploadFormRef.current, fileInputRef.current);
+      }, 0);
+      return () => {
+        window.clearTimeout(timer);
+        removeHighlight?.();
+      };
+    }
+
+    return revealWorkItemRequirementTarget(panelRef.current, panelRef.current);
+  }, [navigationRequest?.requestId, navigationRequest?.target.kind, readOnly]);
 
   const uploadEvidence = useMutation({
     mutationFn: (formData: FormData) => postForm<EvidenceRecord>(`/work-items/${workItemId}/evidence/upload`, formData),
@@ -100,7 +133,7 @@ export function EvidencePanel({ workItemId, projectId, evidence, readOnly = fals
   }
 
   return (
-    <section className="space-y-3">
+    <section ref={panelRef} tabIndex={-1} className="scroll-mt-24 space-y-3 rounded-md outline-none">
       <div className="flex flex-col gap-3 rounded-md border border-line bg-slate-50 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sổ minh chứng</p>
@@ -128,7 +161,7 @@ export function EvidencePanel({ workItemId, projectId, evidence, readOnly = fals
       </div>
 
       {!readOnly && uploadOpen ? (
-        <form className="rounded-md border border-blue-100 bg-blue-50/40 p-3" onSubmit={submitUpload}>
+        <form ref={uploadFormRef} tabIndex={-1} className="scroll-mt-24 rounded-md border border-blue-100 bg-blue-50/40 p-3 outline-none" onSubmit={submitUpload}>
           <div className="grid gap-2 lg:grid-cols-[minmax(0,1.4fr)_9rem_9rem_minmax(0,1fr)_minmax(0,1fr)]">
             <label className="min-w-0">
               <span className="text-xs font-semibold text-slate-600">Tệp</span>

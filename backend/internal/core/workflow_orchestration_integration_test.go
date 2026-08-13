@@ -916,12 +916,25 @@ func TestStartPipelineGeneratesWorkItemsAndIsIdempotent(t *testing.T) {
 	}
 	firstStep := steps[0]
 	workItemID := cleanID(firstStep["work_item_id"])
+	mustExec(t, db, `
+		UPDATE work_items
+		SET evidence_requirement_json=jsonb_set(
+			COALESCE(evidence_requirement_json, '{}'::jsonb),
+			'{required_permission}',
+			to_jsonb('planning.edit'::text),
+			true
+		)
+		WHERE id=$1
+	`, workItemID)
 	detail, err := repo.GetWorkItemDetail(ctx, workItemID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cleanID(detail["workflow_form_instance_id"]) == "" || fmt.Sprint(detail["workflow_form_template_name"]) == "" || !boolValue(detail["workflow_form_required"]) {
 		t.Fatalf("expected workflow form summary on work item detail, got %#v", detail)
+	}
+	if fmt.Sprint(detail["required_permission_name"]) != "Cập nhật kế hoạch" || fmt.Sprint(detail["required_permission_description"]) != "Cập nhật nội dung kế hoạch được phân công" {
+		t.Fatalf("expected source-backed permission metadata on work item detail, got name=%v description=%v", detail["required_permission_name"], detail["required_permission_description"])
 	}
 	secondWorkItemID := cleanID(steps[1]["work_item_id"])
 	beforeRequirements, err := service.WorkItemDetail(ctx, secondWorkItemID, actorID)

@@ -74,7 +74,7 @@ INSERT INTO permissions (id, key, name, module)
 SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('project.view','Xem công trình','project'),('project.create','Tạo công trình','project'),('project.update','Cập nhật công trình','project'),('project.delete','Xóa công trình','project'),('project.member.manage','Quản lý thành viên công trình','project'),
 ('pipeline.view','Xem pipeline','pipeline'),('pipeline.create','Tạo pipeline','pipeline'),('pipeline.edit','Sửa pipeline','pipeline'),('pipeline.publish','Publish pipeline','pipeline'),('pipeline.run','Chạy pipeline','pipeline'),('pipeline.advance_node','Chuyển node','pipeline'),
-('planning.view','Xem planning','planning'),('planning.edit','Sửa planning','planning'),
+('planning.view','Xem planning','planning'),('planning.edit','Cập nhật kế hoạch','planning'),
 ('boq.view','Xem BOQ','boq'),('boq.create','Tạo BOQ','boq'),('boq.update','Sửa BOQ','boq'),('boq.approve','Duyệt BOQ','boq'),
 ('procurement.view','Xem mua sắm','procurement'),('procurement.create','Tạo yêu cầu mua','procurement'),('procurement.approve','Duyệt mua','procurement'),('procurement.order','Đặt hàng','procurement'),('procurement.receive','Nhận hàng','procurement'),
 ('warehouse.view','Xem kho','warehouse'),('warehouse.receive','Nhập kho','warehouse'),('warehouse.issue','Xuất kho','warehouse'),('warehouse.transfer','Điều chuyển','warehouse'),('warehouse.adjust','Điều chỉnh kho','warehouse'),('warehouse.surplus_handle','Xử lý vật tư dư','warehouse'),
@@ -93,6 +93,10 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('audit.view','Xem audit','audit'),('report.view','Xem báo cáo','report'),('report.finance.view','Xem báo cáo tài chính','report'),('settings.view','Xem cấu hình','settings'),('settings.update','Sửa cấu hình','settings'),
 ('seal.use','Sử dụng con dấu','settings'),('seal.manage','Quản lý con dấu','settings')
 ) AS p(key, name, module);
+
+UPDATE permissions
+SET description='Cập nhật nội dung kế hoạch được phân công'
+WHERE key='planning.edit';
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name = 'admin'

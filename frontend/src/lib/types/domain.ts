@@ -2762,6 +2762,8 @@ export type WorkItem = ProjectOperationsRecord & {
   pipeline_engine_version?: number;
   surface_kind?: string;
   domain_action_key?: string;
+  required_permission_name?: string;
+  required_permission_description?: string;
 	  report_eligible?: boolean;
   automation_events?: Array<{
     id: string;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileText, Loader2, PenLine, Plus, Stamp, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
@@ -15,6 +15,8 @@ import { dateText, percent } from '../../lib/utils/format';
 import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
 import { enumLabel } from '../../lib/utils/status';
 import { SignatureCaptureDialog, type SignatureStroke, type WorkflowSealApplicationPayload } from './SignatureCaptureDialog';
+import type { WorkItemRequirementNavigationRequest } from './workItemRequirements';
+import { firstFocusableRequirementControl, revealWorkItemRequirementTarget } from './workItemRequirementNavigation';
 import { compactDateTime, isGenericWorkflowFormTemplate, workflowFormEventLabel, workflowFormStatusLabel, workflowFormTypeLabel } from './workItemPresentation';
 import { effectiveWorkflowCurrencyFields } from './workflowCurrencyFields';
 import { effectiveWorkflowFormFields } from './workflowFormRules';
@@ -44,12 +46,14 @@ export function WorkflowFormPanel({
   evidence,
   onChanged,
   readOnly = false,
+  navigationRequest,
 }: {
   workItemId: string;
   projectId?: string;
   evidence: EvidenceRecord[];
   onChanged?: () => void;
   readOnly?: boolean;
+  navigationRequest?: WorkItemRequirementNavigationRequest | null;
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -60,6 +64,10 @@ export function WorkflowFormPanel({
   const [signatureDetail, setSignatureDetail] = useState<WorkflowFormSignature | null>(null);
   const [sealApplicationDetail, setSealApplicationDetail] = useState<WorkflowFormSealApplication | null>(null);
   const [pdfDeleteCandidate, setPDFDeleteCandidate] = useState<WorkflowFormPDFExport | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const actionCenterRef = useRef<HTMLDivElement | null>(null);
+  const fieldsSectionRef = useRef<HTMLElement | null>(null);
+  const lastHandledNavigationRef = useRef<number | null>(null);
   const form = useQuery({
     queryKey: ['work-item-form', workItemId],
     queryFn: () => get<WorkflowFormDetail>(`/work-items/${workItemId}/form`),
@@ -121,6 +129,57 @@ export function WorkflowFormPanel({
     setValues(form.data?.answers ?? {});
     setErrors({});
   }, [form.data?.answers, instance?.id]);
+
+  useEffect(() => {
+    if (navigationRequest?.target.kind !== 'workflow_form') return undefined;
+    if (lastHandledNavigationRef.current === navigationRequest.requestId) return undefined;
+    if (form.isLoading) return undefined;
+    const navigationTarget = navigationRequest.target;
+
+    let removeHighlight: (() => void) | undefined;
+    const timer = window.setTimeout(() => {
+      lastHandledNavigationRef.current = navigationRequest.requestId;
+
+      if (!form.data?.available || form.isError) {
+        removeHighlight = revealWorkItemRequirementTarget(panelRef.current, panelRef.current);
+        return;
+      }
+
+      const focusMode = navigationTarget.focus;
+      const field = focusMode === 'checklist'
+        ? activeFields.find((candidate) => candidate.field_key === 'checklist_items')
+        : focusMode === 'first_issue'
+          ? activeFields.find((candidate) => validateFieldValue(candidate, values[candidate.field_key]))
+          : undefined;
+
+      if (field) {
+        const error = validateFieldValue(field, values[field.field_key]);
+        if (error) setErrors((current) => ({ ...current, [field.field_key]: error }));
+        const fieldContainer = Array.from(
+          panelRef.current?.querySelectorAll<HTMLElement>('[data-workflow-field-key]') ?? [],
+        ).find((element) => element.dataset.workflowFieldKey === field.field_key) ?? null;
+        removeHighlight = revealWorkItemRequirementTarget(
+          fieldContainer,
+          firstFocusableRequirementControl(fieldContainer),
+        );
+        return;
+      }
+
+      if (focusMode !== 'source' && !submitted && !readOnly) {
+        const submitButton = actionCenterRef.current?.querySelector<HTMLElement>('[data-workflow-form-submit]') ?? null;
+        removeHighlight = revealWorkItemRequirementTarget(actionCenterRef.current, submitButton);
+        return;
+      }
+
+      const sourceContainer = actionCenterRef.current ?? fieldsSectionRef.current ?? panelRef.current;
+      removeHighlight = revealWorkItemRequirementTarget(sourceContainer, sourceContainer);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      removeHighlight?.();
+    };
+  }, [activeFields, form.data?.available, form.isError, form.isLoading, navigationRequest?.requestId, navigationRequest?.target.kind, readOnly, submitted, values]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['work-item-form', workItemId] });
@@ -262,7 +321,7 @@ export function WorkflowFormPanel({
 
   if (form.isLoading) {
     return (
-      <section>
+      <section ref={panelRef} tabIndex={-1} className="scroll-mt-24 rounded-md outline-none">
         <h3 className="mb-2 text-sm font-semibold text-ink">Hồ sơ nghiệp vụ</h3>
         <div className="rounded-md border border-line bg-white p-4">
           <LoadingSpinner />
@@ -273,7 +332,7 @@ export function WorkflowFormPanel({
 
   if (form.isError) {
     return (
-      <section>
+      <section ref={panelRef} tabIndex={-1} className="scroll-mt-24 rounded-md outline-none">
         <h3 className="mb-2 text-sm font-semibold text-ink">Hồ sơ nghiệp vụ</h3>
         <div className="rounded-md border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">
           <p className="font-semibold">Không tải được hồ sơ nghiệp vụ</p>
@@ -292,7 +351,7 @@ export function WorkflowFormPanel({
 
   if (!form.data?.available) {
     return (
-      <section>
+      <section ref={panelRef} tabIndex={-1} className="scroll-mt-24 rounded-md outline-none">
         <h3 className="mb-2 text-sm font-semibold text-ink">Hồ sơ nghiệp vụ</h3>
         <EmptyState title="Bước này chưa có hồ sơ nghiệp vụ." />
       </section>
@@ -302,24 +361,26 @@ export function WorkflowFormPanel({
   const formActionPending = saveDraft.isPending || submitForm.isPending;
 
   return (
-    <section className="space-y-3">
-      <WorkflowFormActionCenter
-        title={businessFormTitle}
-        versionNo={Number(form.data.version?.version_no ?? 1)}
-        status={instance?.status ?? 'draft'}
-        submitted={submitted}
-        validationIssueLabels={validationIssueLabels}
-        updatedAt={instance?.updated_at}
-        submittedAt={instance?.submitted_at}
-        saving={saveDraft.isPending}
-        submitting={submitForm.isPending}
-        readOnly={readOnly}
-        onSave={() => { if (!readOnly) saveDraft.mutate(); }}
-        onSubmit={() => {
-          if (!readOnly && validateBeforeSubmit()) submitForm.mutate();
-        }}
-        submitLabel={form.data.auto_advance_when_ready ? 'Xác nhận và tiếp tục' : 'Chốt hồ sơ'}
-      />
+    <section ref={panelRef} tabIndex={-1} className="scroll-mt-24 space-y-3 rounded-md outline-none">
+      <div ref={actionCenterRef} tabIndex={-1} className="scroll-mt-24 rounded-md outline-none">
+        <WorkflowFormActionCenter
+          title={businessFormTitle}
+          versionNo={Number(form.data.version?.version_no ?? 1)}
+          status={instance?.status ?? 'draft'}
+          submitted={submitted}
+          validationIssueLabels={validationIssueLabels}
+          updatedAt={instance?.updated_at}
+          submittedAt={instance?.submitted_at}
+          saving={saveDraft.isPending}
+          submitting={submitForm.isPending}
+          readOnly={readOnly}
+          onSave={() => { if (!readOnly) saveDraft.mutate(); }}
+          onSubmit={() => {
+            if (!readOnly && validateBeforeSubmit()) submitForm.mutate();
+          }}
+          submitLabel={form.data.auto_advance_when_ready ? 'Xác nhận và tiếp tục' : 'Chốt hồ sơ'}
+        />
+      </div>
 
       <div className="space-y-3">
         <WorkflowFormOperationsSummary
@@ -335,7 +396,7 @@ export function WorkflowFormPanel({
         {isMeetingMinutes ? <MeetingMinutesSummary values={values} submitted={submitted} /> : null}
         {isPlanningChecklist ? <PlanningChecklistSummary values={values} submitted={submitted} /> : null}
 
-        <section className="rounded-md border border-line bg-white">
+        <section ref={fieldsSectionRef} tabIndex={-1} className="scroll-mt-24 rounded-md border border-line bg-white outline-none">
           <div className="flex flex-col gap-2 border-b border-line bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nội dung cần xử lý</p>
@@ -600,6 +661,7 @@ function WorkflowFormActionCenter({
           </button>
           <button
             type="button"
+            data-workflow-form-submit
             className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={readOnly || submitted || saving || submitting}
             onClick={onSubmit}
@@ -1643,7 +1705,11 @@ function WorkflowFieldControl({
   );
   const fieldContent = renderFieldControl(field, value, evidence, disabled, Boolean(error), controlClassName, onChange);
   return (
-    <div className={clsx('block', (field.field_type === 'textarea' || field.field_type === 'structured_list') && 'md:col-span-2')}>
+    <div
+      data-workflow-field-key={field.field_key}
+      tabIndex={-1}
+      className={clsx('scroll-mt-24 rounded-md outline-none', (field.field_type === 'textarea' || field.field_type === 'structured_list') && 'md:col-span-2')}
+    >
       <span className="text-sm font-semibold text-slate-700">{field.label}</span>
       {field.required ? <span className="ml-1 text-rose-600">*</span> : null}
       {fieldContent}

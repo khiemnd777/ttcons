@@ -13,6 +13,7 @@ import { OutgoingAcceptancePanel } from './OutgoingAcceptancePanel';
 import { SubcontractorReconciliationPanel } from './SubcontractorReconciliationPanel';
 import { SurplusHandlingPanel } from './SurplusHandlingPanel';
 import { WorkflowFormPanel } from './WorkflowFormPanel';
+import type { WorkItemRequirementNavigationRequest } from './workItemRequirements';
 import { departmentLabel, hasWorkflowFormSummary, workTypeLabel, workflowFormChipText } from './workItemPresentation';
 
 export type WorkItemPrimarySurfaceKind =
@@ -41,15 +42,17 @@ export function WorkItemPrimarySurface({
   item,
   evidence,
   surface = resolveWorkItemPrimarySurface(item),
+  navigationRequest,
 }: {
   item: WorkItem;
   evidence: EvidenceRecord[];
   surface?: WorkItemPrimarySurfaceDefinition;
+  navigationRequest?: WorkItemRequirementNavigationRequest | null;
 }) {
   return (
     <section className="space-y-3">
       <PrimarySurfaceHeader surface={surface} item={item} />
-      {renderPrimaryPanel(surface.kind, item, evidence)}
+      {renderPrimaryPanel(surface.kind, item, evidence, navigationRequest)}
     </section>
   );
 }
@@ -294,14 +297,19 @@ export function primarySurfaceUsesEvidence(kind: WorkItemPrimarySurfaceKind) {
   return kind === 'evidence';
 }
 
-function renderPrimaryPanel(kind: WorkItemPrimarySurfaceKind, item: WorkItem, evidence: EvidenceRecord[]) {
+function renderPrimaryPanel(
+  kind: WorkItemPrimarySurfaceKind,
+  item: WorkItem,
+  evidence: EvidenceRecord[],
+  navigationRequest?: WorkItemRequirementNavigationRequest | null,
+) {
   switch (kind) {
     case 'workflow_form':
-      return <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} />;
+      return <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} navigationRequest={navigationRequest} />;
     case 'evidence':
-      return <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} />;
+      return <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} navigationRequest={navigationRequest} />;
     case 'approval':
-      return <ApprovalPrimaryPanel item={item} evidence={evidence} />;
+      return <ApprovalPrimaryPanel item={item} evidence={evidence} navigationRequest={navigationRequest} />;
     case 'incoming_acceptance':
       return <IncomingAcceptancePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} />;
     case 'material_snapshot':
@@ -387,7 +395,15 @@ function PrimarySurfaceHeader({ surface, item }: { surface: WorkItemPrimarySurfa
   );
 }
 
-function ApprovalPrimaryPanel({ item, evidence }: { item: WorkItem; evidence: EvidenceRecord[] }) {
+function ApprovalPrimaryPanel({
+  item,
+  evidence,
+  navigationRequest,
+}: {
+  item: WorkItem;
+  evidence: EvidenceRecord[];
+  navigationRequest?: WorkItemRequirementNavigationRequest | null;
+}) {
   return (
     <section className="space-y-3">
       <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
@@ -409,7 +425,7 @@ function ApprovalPrimaryPanel({ item, evidence }: { item: WorkItem; evidence: Ev
         </div>
       </div>
       {hasWorkflowFormSummary(item) ? (
-        <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} />
+        <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} navigationRequest={navigationRequest} />
       ) : (
         <EmptyState title="Không có hồ sơ nghiệp vụ gắn với phê duyệt này." />
       )}

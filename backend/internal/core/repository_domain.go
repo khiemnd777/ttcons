@@ -1435,6 +1435,8 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 			rs.form_version_id AS required_workflow_form_version_id,
 			rs.surface_kind,
 			rs.domain_action_key,
+			required_permission.name AS required_permission_name,
+			required_permission.description AS required_permission_description,
 			COALESCE(pr.engine_version, 1) AS pipeline_engine_version,
 			(
 				wi.status NOT IN ('completed','cancelled') AND (
@@ -1455,6 +1457,8 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 		LEFT JOIN workflow_form_instances wfi ON wfi.work_item_id=wi.id AND wfi.status <> 'cancelled'
 		LEFT JOIN workflow_form_versions wfv ON wfv.id=wfi.form_version_id
 		LEFT JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
+		LEFT JOIN permissions required_permission
+			ON required_permission.key=NULLIF(wi.evidence_requirement_json->>'required_permission','')
 		WHERE wi.id=$1 AND p.status <> 'cancelled'
 	`, workItemID)
 	if err != nil {

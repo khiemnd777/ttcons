@@ -1,8 +1,9 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   Circle,
   Clock3,
@@ -34,7 +35,14 @@ import {
   type WorkItemPrimarySurfaceKind,
 } from './WorkItemPrimarySurface';
 import { WorkflowFormPanel } from './WorkflowFormPanel';
-import { missingCompletionRequirementLabels } from './workItemRequirements';
+import {
+  completionRequirementPresentation,
+  missingCompletionRequirementLabels,
+  permissionRequirementPresentation,
+  type WorkItemRequirementNavigationRequest,
+  type WorkItemRequirementNavigationTarget,
+} from './workItemRequirements';
+import { firstFocusableRequirementControl, revealWorkItemRequirementTarget } from './workItemRequirementNavigation';
 import {
   actionDescriptions,
   actionLabels,
@@ -101,6 +109,8 @@ export function WorkItemDetailWorkspace({
   const queryClient = useQueryClient();
   const toast = useToast();
   const selectedWorkId = workItemId ?? item?.id ?? '';
+  const navigationSequence = useRef(0);
+  const [navigationRequest, setNavigationRequest] = useState<WorkItemRequirementNavigationRequest | null>(null);
   const workDetail = useQuery({
     queryKey: ['work-item', selectedWorkId],
     queryFn: () => get<WorkItem>(`/work-items/${selectedWorkId}`),
@@ -173,13 +183,22 @@ export function WorkItemDetailWorkspace({
     onClose?.();
   }
 
+  function navigateToRequirement(target: WorkItemRequirementNavigationTarget) {
+    navigationSequence.current += 1;
+    setNavigationRequest({ requestId: navigationSequence.current, target });
+  }
+
+  useEffect(() => {
+    setNavigationRequest(null);
+  }, [selectedWorkId]);
+
   const actions = permittedActions(detailItem);
   const evidence = asArray<EvidenceRecord>(detailItem?.evidence);
   const activities = asArray<WorkItemActivity>(detailItem?.activities);
   const attachmentOptions = buildActivityAttachmentOptions(evidence);
   const futureReadOnly = detailItem ? workItemIsUpcoming(detailItem) : false;
   const primarySurface = detailItem && !futureReadOnly ? resolveWorkItemPrimarySurface(detailItem) : null;
-  const requirementRows = detailItem ? buildRequirementRows(detailItem, evidence) : [];
+  const requirementRows = detailItem ? buildRequirementRows(detailItem, evidence, actions, futureReadOnly) : [];
   const nextAction = detailItem ? resolveNextAction(detailItem, actions, primarySurface?.kind) : '';
   const latestActivity = activities[0];
   const skippedHistory = detailItem?.status === 'cancelled';
@@ -227,12 +246,12 @@ export function WorkItemDetailWorkspace({
                     <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
                       <p className="font-semibold text-ink">Nội dung xem trước</p>
                       <p className="mt-1">Điều kiện và hồ sơ được hiển thị để chuẩn bị; chưa cho phép ghi nhận nghiệp vụ.</p>
-                      <div className="mt-3"><WorkItemRequirementPanel rows={requirementRows} /></div>
+                      <div className="mt-3"><WorkItemRequirementPanel rows={requirementRows} onNavigate={navigateToRequirement} /></div>
                     </div>
                   ) : (
                     <>
-                      <WorkItemRequirementPanel rows={requirementRows} />
-                      {primarySurface ? <WorkItemPrimarySurface item={detailItem} evidence={evidence} surface={primarySurface} /> : null}
+                      <WorkItemRequirementPanel rows={requirementRows} onNavigate={navigateToRequirement} />
+                      {primarySurface ? <WorkItemPrimarySurface item={detailItem} evidence={evidence} surface={primarySurface} navigationRequest={navigationRequest} /> : null}
                     </>
                   )}
                 </div>
@@ -249,6 +268,7 @@ export function WorkItemDetailWorkspace({
                   mentionOptions={activityMentionOptions}
                   activitySubmitting={activityAction.isPending}
                   primarySurfaceKind={primarySurface?.kind}
+                  navigationRequest={navigationRequest}
                   readOnly={futureReadOnly}
                   onSubmitActivity={(payload) => {
                     if (!detailItem.id) return Promise.resolve();
@@ -269,6 +289,7 @@ export function WorkItemDetailWorkspace({
               onActionTextChange={setActionText}
               onRunAction={runAction}
               onClose={closeDialog}
+              navigationRequest={navigationRequest}
             />
           </div>
         </div>
@@ -331,6 +352,9 @@ type RequirementRow = {
   id: string;
   label: string;
   description: string;
+  guidance: string;
+  actionLabel?: string;
+  target?: WorkItemRequirementNavigationTarget;
   state: RequirementState;
 };
 
@@ -386,7 +410,13 @@ function WorkItemWorkspaceHeader({
   );
 }
 
-function WorkItemRequirementPanel({ rows }: { rows: RequirementRow[] }) {
+function WorkItemRequirementPanel({
+  rows,
+  onNavigate,
+}: {
+  rows: RequirementRow[];
+  onNavigate: (target: WorkItemRequirementNavigationTarget) => void;
+}) {
   return (
     <section className="rounded-md border border-line bg-slate-50 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -397,15 +427,43 @@ function WorkItemRequirementPanel({ rows }: { rows: RequirementRow[] }) {
         <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{rows.length} mục</span>
       </div>
       <div className="mt-3 divide-y divide-line rounded-md border border-line bg-white">
-        {rows.map((row) => (
-          <div key={row.id} className="flex items-start gap-3 px-3 py-2.5">
-            <RequirementIcon state={row.state} />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink">{row.label}</p>
-              <p className="mt-0.5 text-xs leading-5 text-slate-600">{row.description}</p>
+        {rows.map((row) => {
+          const navigationTarget = row.target;
+          const content = (
+            <>
+              <RequirementIcon state={row.state} />
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-sm font-semibold text-ink">{row.label}</p>
+                <p className="mt-0.5 text-xs leading-5 text-slate-600">{row.description}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-700">
+                  <span className="font-semibold">Cách xử lý:</span> {row.guidance}
+                </p>
+              </div>
+              {navigationTarget && row.actionLabel ? (
+                <span className="inline-flex shrink-0 items-center gap-1 self-center text-xs font-semibold text-blue-700">
+                  {row.actionLabel}
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </span>
+              ) : null}
+            </>
+          );
+
+          return navigationTarget ? (
+            <button
+              key={row.id}
+              type="button"
+              className="flex w-full items-start gap-3 px-3 py-2.5 transition hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+              onClick={() => onNavigate(navigationTarget)}
+              aria-label={`${row.label}: ${row.actionLabel ?? 'Mở nội dung liên quan'}`}
+            >
+              {content}
+            </button>
+          ) : (
+            <div key={row.id} className="flex items-start gap-3 px-3 py-2.5">
+              {content}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -422,6 +480,7 @@ function WorkItemActionPanel({
   onActionTextChange,
   onRunAction,
   onClose,
+  navigationRequest,
 }: {
   item: WorkItem;
   actions: WorkItemActionKey[];
@@ -433,12 +492,19 @@ function WorkItemActionPanel({
   onActionTextChange: (value: string) => void;
   onRunAction: (action: WorkItemActionKey) => void;
   onClose: () => void;
+  navigationRequest: WorkItemRequirementNavigationRequest | null;
 }) {
   const primaryAction = actions[0];
   const secondaryActions = actions.slice(1);
+  const panelRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (navigationRequest?.target.kind !== 'action_panel') return undefined;
+    return revealWorkItemRequirementTarget(panelRef.current, firstFocusableRequirementControl(panelRef.current));
+  }, [navigationRequest?.requestId, navigationRequest?.target.kind]);
 
   return (
-    <aside className="rounded-lg border border-line bg-white p-3 shadow-panel xl:sticky xl:top-[5.5rem] xl:self-start">
+    <aside ref={panelRef} tabIndex={-1} className="scroll-mt-24 rounded-lg border border-line bg-white p-3 shadow-panel outline-none xl:sticky xl:top-[5.5rem] xl:self-start">
       <div className="border-b border-line pb-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Việc cần làm</p>
         <h3 className="mt-1 text-sm font-semibold text-ink">{nextAction}</h3>
@@ -510,6 +576,7 @@ function WorkItemSupportingTabs({
   mentionOptions,
   activitySubmitting,
   primarySurfaceKind,
+  navigationRequest,
   readOnly,
   onSubmitActivity,
 }: {
@@ -520,6 +587,7 @@ function WorkItemSupportingTabs({
   mentionOptions: ActivityMentionOption[];
   activitySubmitting: boolean;
   primarySurfaceKind?: WorkItemPrimarySurfaceKind;
+  navigationRequest: WorkItemRequirementNavigationRequest | null;
   readOnly: boolean;
   onSubmitActivity: (payload: ActivityPayload) => Promise<void>;
 }) {
@@ -551,6 +619,16 @@ function WorkItemSupportingTabs({
   }
   const activeTab = tabs.some((tab) => tab.id === selectedTab) ? selectedTab : tabs[0]?.id ?? 'activity';
   const supportAction = readOnly ? 'Chỉ xem hồ sơ của công việc sắp tới' : resolveSupportTabAction(activeTab, item, evidence, activities);
+
+  useEffect(() => {
+    if (!navigationRequest) return;
+    const requestedTab = navigationRequest.target.kind === 'evidence'
+      ? 'evidence'
+      : navigationRequest.target.kind === 'workflow_form'
+        ? 'form'
+        : null;
+    if (requestedTab && tabs.some((tab) => tab.id === requestedTab)) setSelectedTab(requestedTab);
+  }, [navigationRequest?.requestId]);
 
   return (
     <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
@@ -597,7 +675,7 @@ function WorkItemSupportingTabs({
         aria-labelledby={`work-item-support-tab-${activeTab}`}
         className="bg-white p-4"
       >
-        {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} /> : null}
+        {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} /> : null}
         {activeTab === 'activity' ? (
           <WorkItemActivityPanel
             activities={activities}
@@ -608,7 +686,7 @@ function WorkItemSupportingTabs({
             onSubmit={onSubmitActivity}
           />
         ) : null}
-        {activeTab === 'form' ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} /> : null}
+        {activeTab === 'form' ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} /> : null}
       </div>
     </section>
   );
@@ -768,7 +846,12 @@ function RequirementIcon({ state }: { state: RequirementState }) {
   return <Circle className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />;
 }
 
-function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): RequirementRow[] {
+function buildRequirementRows(
+  item: WorkItem,
+  evidence: EvidenceRecord[],
+  actions: WorkItemActionKey[],
+  readOnly: boolean,
+): RequirementRow[] {
   const rows: RequirementRow[] = [];
   const requirement = item.evidence_requirement_json ?? {};
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
@@ -778,6 +861,11 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
       id: 'blocker',
       label: 'Điểm chặn đang mở',
       description: item.blocked_reason,
+      guidance: actions.includes('resolve-blocker')
+        ? 'Ghi rõ cách đã xử lý, sau đó chọn Gỡ điểm chặn.'
+        : 'Liên hệ người đang phụ trách hoặc người quản lý workflow để xử lý nguyên nhân chặn.',
+      actionLabel: actions.includes('resolve-blocker') ? 'Đến thao tác gỡ chặn' : undefined,
+      target: actions.includes('resolve-blocker') ? { kind: 'action_panel' } : undefined,
       state: 'blocked',
     });
   }
@@ -794,6 +882,17 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
         : automationStatus === 'blocked' || automationStatus === 'failed'
           ? `${item.domain_action_key}: ${reason || 'Đang bị chặn; dùng lại thao tác hoàn tất sau khi khắc phục.'}`
           : `${item.domain_action_key} sẽ được kiểm tra trước khi đầu việc hoàn tất.`,
+      guidance: automationStatus === 'succeeded' || automationStatus === 'skipped'
+        ? 'Không còn thao tác bổ sung cho điều kiện này.'
+        : actions.includes('complete')
+          ? 'Khắc phục lý do chặn nếu có, sau đó chọn Hoàn tất để hệ thống chạy lại kiểm tra.'
+          : 'Tự động hóa sẽ được hệ thống kiểm tra khi đầu việc có thể Hoàn tất; liên hệ người quản lý workflow nếu trạng thái không thay đổi.',
+      actionLabel: actions.includes('complete') && automationStatus !== 'succeeded' && automationStatus !== 'skipped'
+        ? 'Đến thao tác Hoàn tất'
+        : undefined,
+      target: actions.includes('complete') && automationStatus !== 'succeeded' && automationStatus !== 'skipped'
+        ? { kind: 'action_panel' }
+        : undefined,
       state: automationStatus === 'succeeded' || automationStatus === 'skipped'
         ? 'done'
         : automationStatus === 'blocked' || automationStatus === 'failed'
@@ -805,10 +904,14 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
   if (item.completion_requirements?.length) {
     item.completion_requirements.forEach((completionRequirement) => {
       const satisfied = completionRequirement.status === 'satisfied';
+      const presentation = completionRequirementPresentation(item, completionRequirement, readOnly);
       rows.push({
         id: `completion-${completionRequirement.key}`,
         label: completionRequirement.label,
-        description: completionRequirementDescription(completionRequirement.key, satisfied, completionRequirement.satisfied_by),
+        description: presentation.description,
+        guidance: presentation.guidance,
+        actionLabel: presentation.actionLabel,
+        target: presentation.target,
         state: satisfied ? 'done' : 'blocked',
       });
     });
@@ -817,24 +920,39 @@ function buildRequirementRows(item: WorkItem, evidence: EvidenceRecord[]): Requi
       id: 'evidence-optional',
       label: 'Minh chứng',
       description: activeEvidence.length ? `${activeEvidence.length} minh chứng đang hiệu lực.` : 'Không có yêu cầu minh chứng đặc biệt.',
+      guidance: activeEvidence.length
+        ? 'Mở Sổ minh chứng để xem các tệp đang hiệu lực.'
+        : readOnly
+          ? 'Có thể xem trước Sổ minh chứng; không bắt buộc tải tệp cho điều kiện hoàn tất.'
+          : 'Có thể tải ảnh hoặc tài liệu nếu cần bổ sung bối cảnh cho đầu việc.',
+      actionLabel: activeEvidence.length || readOnly ? 'Xem minh chứng' : 'Mở Sổ minh chứng',
+      target: { kind: 'evidence', openUpload: false },
       state: activeEvidence.length ? 'done' : 'neutral',
     });
   }
 
   if (item.status === 'waiting_approval' || item.status === 'waiting_review' || item.approval_request_id) {
+    const hasDecisionAction = actions.some((action) => decisionActions.has(action));
     rows.push({
       id: 'approval',
       label: item.status === 'waiting_review' ? 'Đang chờ rà soát' : 'Phê duyệt',
       description: item.approval_request_id ? 'Yêu cầu phê duyệt đã được liên kết với đầu việc.' : 'Đầu việc đang ở hàng chờ xử lý.',
+      guidance: hasDecisionAction
+        ? 'Kiểm tra hồ sơ liên quan, ghi chú nếu cần rồi chọn quyết định phù hợp tại Việc cần làm.'
+        : 'Chờ người có quyền rà soát/phê duyệt xử lý; theo dõi diễn biến trong tab Hoạt động.',
+      actionLabel: hasDecisionAction ? 'Đến điểm quyết định' : undefined,
+      target: hasDecisionAction ? { kind: 'action_panel' } : undefined,
       state: item.status === 'waiting_approval' || item.status === 'waiting_review' ? 'warning' : 'done',
     });
   }
 
   if (requirement.required_permission) {
+    const permissionPresentation = permissionRequirementPresentation(item);
     rows.push({
       id: 'permission',
       label: 'Quyền xử lý',
-      description: `Yêu cầu quyền: ${requirement.required_permission}.`,
+      description: permissionPresentation.description,
+      guidance: permissionPresentation.guidance,
       state: 'neutral',
     });
   }
@@ -887,14 +1005,6 @@ function primarySurfaceNextAction(kind: WorkItemPrimarySurfaceKind, actions: Wor
     default:
       return null;
   }
-}
-
-function completionRequirementDescription(key: string, satisfied: boolean, satisfiedBy?: string) {
-  if (!satisfied) return 'Chưa đáp ứng điều kiện hoàn tất.';
-  if (satisfiedBy === 'workflow_form') return key === 'checklist' ? 'Đã đáp ứng qua hồ sơ nghiệp vụ đã chốt.' : 'Hồ sơ nghiệp vụ đúng phiên bản đã được chốt.';
-  if (satisfiedBy === 'completion_payload') return 'Đã ghi nhận trong dữ liệu hoàn tất của đầu việc.';
-  if (satisfiedBy === 'evidence') return 'Đã có minh chứng đang hiệu lực.';
-  return 'Đã đáp ứng.';
 }
 
 function firstRoleLabel(item: WorkItem) {

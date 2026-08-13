@@ -1,5 +1,24 @@
 # Current States
 
+## [Active] Actionable Work Item Completion Requirements
+
+### Will be done
+
+- Turn work-item completion requirements into keyboard-accessible actions that navigate to the exact workflow-form, evidence, or action surface when an on-screen target exists.
+- For photo/document requirements, open the existing evidence uploader with the required type selected and focus the file input; for workflow forms/checklists, focus the first incomplete field or the form submit action.
+- Show explicit resolution guidance instead of a fake action when a requirement has no direct field or section, including permission, automation, approval, and unknown future requirement states.
+- Preserve backend `completion_requirements` as the only completion-gate contract; add focused frontend coverage, update Consflow mapping, and run non-browser frontend tests/build.
+
+### Done
+
+- Confirmed from the supplied Edge screenshots and current source that requirement rows are static `div` elements with generic descriptions and no navigation/focus target.
+- Confirmed the backend already returns canonical `workflow_form`, `checklist`, `document`, and `photo` keys; no API, schema, migration, or backend completion-gate change is required.
+- Produced the review package and Mockup as Text, then received explicit `OK triển khai` approval.
+- Added a typed page-local navigation request and keyboard-accessible full-row actions. Form/checklist requirements focus and temporarily highlight the exact checklist/first-invalid field or the form submit/source fallback; photo/document requirements open or view the evidence surface with the required upload type selected; blocker/automation/approval gates focus `Việc cần làm` only when the actor has a matching action.
+- Added explicit `Cách xử lý` guidance to every row. Permission-only, completion-payload-only, unknown, and unavailable-form requirements remain non-clickable instead of advertising a target that does not exist.
+- Added focused presentation/wiring regressions and updated the central, frontend, and workflow-orchestration maps. Backend/API/database behavior remains unchanged.
+- Frontend verification on the current working tree: `npm test` and `npm run build` pass; browser/UAT verification was not run under the repository rule, so the UI remains `NOT UX ACCEPTED` until a separate browser acceptance pass.
+
 ## [Active] Workflow Form PDF Open And Delete
 
 ### Will be done

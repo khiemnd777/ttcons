@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { WorkItem } from '../src/lib/types/domain.ts';
 import { workItemIsUpcoming, workItemWorkflowContext } from '../src/modules/work-items/workItemContext.ts';
-import { missingCompletionRequirementLabels } from '../src/modules/work-items/workItemRequirements.ts';
+import {
+  completionRequirementPresentation,
+  missingCompletionRequirementLabels,
+  permissionRequirementPresentation,
+} from '../src/modules/work-items/workItemRequirements.ts';
 
 function workItem(values: Partial<WorkItem> = {}): WorkItem {
   return {
@@ -55,4 +59,113 @@ test('uses backend completion requirements instead of inferring checklist eviden
   });
 
   assert.deepEqual(missingCompletionRequirementLabels(item), ['Tài liệu']);
+});
+
+test('maps a missing workflow form requirement to the first incomplete form control', () => {
+  const item = workItem({
+    workflow_form_instance_id: 'form-1',
+    completion_requirements: [
+      { key: 'workflow_form', label: 'Hồ sơ nghiệp vụ bắt buộc', required: true, status: 'missing' },
+    ],
+  });
+
+  const presentation = completionRequirementPresentation(item, item.completion_requirements![0]);
+
+  assert.equal(presentation.actionLabel, 'Hoàn tất hồ sơ');
+  assert.deepEqual(presentation.target, { kind: 'workflow_form', focus: 'first_issue' });
+  assert.match(presentation.guidance, /Chốt hồ sơ/);
+});
+
+test('does not expose a workflow-form action when detail has no rendered form surface', () => {
+  const item = workItem({
+    workflow_form_required: true,
+    completion_requirements: [
+      { key: 'workflow_form', label: 'Hồ sơ nghiệp vụ bắt buộc', required: true, status: 'missing' },
+    ],
+  });
+
+  const presentation = completionRequirementPresentation(item, item.completion_requirements![0]);
+
+  assert.equal(presentation.target, undefined);
+  assert.match(presentation.guidance, /kiểm tra form\/version/);
+});
+
+test('opens the evidence uploader with the backend-required evidence type', () => {
+  const item = workItem({
+    completion_requirements: [
+      { key: 'document', label: 'Tài liệu', required: true, status: 'missing' },
+    ],
+  });
+
+  const presentation = completionRequirementPresentation(item, item.completion_requirements![0]);
+
+  assert.equal(presentation.actionLabel, 'Tải tài liệu');
+  assert.deepEqual(presentation.target, { kind: 'evidence', evidenceType: 'document', openUpload: true });
+});
+
+test('keeps read-only evidence navigation view-only', () => {
+  const item = workItem({
+    completion_requirements: [
+      { key: 'photo', label: 'Hình ảnh', required: true, status: 'missing' },
+    ],
+  });
+
+  const presentation = completionRequirementPresentation(item, item.completion_requirements![0], true);
+
+  assert.equal(presentation.actionLabel, 'Xem minh chứng');
+  assert.deepEqual(presentation.target, { kind: 'evidence', evidenceType: 'photo', openUpload: false });
+});
+
+test('shows instructions without a fake target when no screen control owns the requirement', () => {
+  const item = workItem({
+    completion_requirements: [
+      { key: 'future_gate', label: 'Điều kiện mở rộng', required: true, status: 'missing' },
+    ],
+  });
+
+  const presentation = completionRequirementPresentation(item, item.completion_requirements![0]);
+
+  assert.equal(presentation.target, undefined);
+  assert.equal(presentation.actionLabel, undefined);
+  assert.match(presentation.guidance, /Chưa có đích thao tác/);
+});
+
+test('explains a checklist satisfied by completion payload without inventing a form field', () => {
+  const item = workItem({
+    completion_requirements: [
+      { key: 'checklist', label: 'Checklist', required: true, status: 'satisfied', satisfied_by: 'completion_payload' },
+    ],
+  });
+
+  const presentation = completionRequirementPresentation(item, item.completion_requirements![0]);
+
+  assert.equal(presentation.target, undefined);
+  assert.match(presentation.guidance, /Không có field riêng/);
+});
+
+test('presents a work-item permission with source-backed Vietnamese metadata', () => {
+  const presentation = permissionRequirementPresentation(workItem({
+    evidence_requirement_json: { required_permission: 'planning.edit' },
+    required_permission_name: 'Cập nhật kế hoạch',
+    required_permission_description: 'Cập nhật nội dung kế hoạch được phân công',
+  }));
+
+  assert.equal(presentation.description, 'Yêu cầu: Cập nhật kế hoạch.');
+  assert.equal(
+    presentation.guidance,
+    'Quyền này cho phép cập nhật nội dung kế hoạch được phân công. Nếu chưa được cấp, liên hệ Quản lý dự án hoặc Admin.',
+  );
+  assert.doesNotMatch(`${presentation.description} ${presentation.guidance}`, /planning\.edit/);
+});
+
+test('hides an unknown permission key behind actionable generic guidance', () => {
+  const presentation = permissionRequirementPresentation(workItem({
+    evidence_requirement_json: { required_permission: 'future.unknown' },
+  }));
+
+  assert.deepEqual(presentation, {
+    description: 'Yêu cầu: Quyền thao tác đầu việc.',
+    guidance: 'Liên hệ Quản lý dự án hoặc Admin để kiểm tra quyền cần cấp.',
+  });
+  assert.doesNotMatch(`${presentation.description} ${presentation.guidance}`, /future\.unknown/);
 });
