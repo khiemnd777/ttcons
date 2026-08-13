@@ -26,6 +26,11 @@ import { CurrencyText } from '../../components/CurrencyText';
 import { StatusBadge } from '../../components/StatusBadge';
 import { EnumChip } from '../../components/EnumChip';
 import { ApprovalDecisionActions } from '../../components/ApprovalPanel';
+import {
+  approvalCanDecide,
+  approvalRequesterLabel,
+  approvalRequiredRolesLabel,
+} from '../../components/approvalPresentation';
 import type { ApprovalRequest } from '../../lib/types/domain';
 
 type DashboardStatusRow = {
@@ -179,16 +184,16 @@ export function DashboardPage() {
         <section id="dashboard-approvals" className="scroll-mt-20 overflow-hidden rounded-lg border border-line bg-white shadow-panel" aria-labelledby="dashboard-approvals-title">
           <PanelHeader
             id="dashboard-approvals-title"
-            title="Việc chờ phê duyệt"
+            title="Yêu cầu đang chờ phê duyệt"
             count={approvals.isSuccess ? pendingApprovals.length : undefined}
-            description="Xử lý trực tiếp khi anh có quyền; mở nguồn nghiệp vụ khi cần đối chiếu thêm."
+            description="Trong phạm vi quản lý; mỗi dòng cho biết người gửi và vai trò đang chờ duyệt."
           />
           {approvals.isLoading ? (
             <PanelLoading rows={3} />
           ) : approvals.isError ? (
             <PanelState
               kind="error"
-              title="Không tải được danh sách chờ phê duyệt"
+              title="Không tải được các yêu cầu đang chờ phê duyệt"
               action={<RetryButton onClick={() => void approvals.refetch()} />}
             />
           ) : displayedApprovals.length ? (
@@ -211,7 +216,7 @@ export function DashboardPage() {
               ) : null}
             </>
           ) : (
-            <PanelState kind="success" title="Không có việc chờ phê duyệt" />
+            <PanelState kind="success" title="Không có yêu cầu đang chờ phê duyệt" />
           )}
         </section>
 
@@ -308,6 +313,7 @@ function AttentionMetric({
 
 function ApprovalItem({ approval, canViewProjects }: { approval: ApprovalRequest; canViewProjects: boolean }) {
   const destination = approvalDestination(approval, canViewProjects);
+  const canDecide = approvalCanDecide(approval);
 
   return (
     <li className="px-4 py-4">
@@ -324,9 +330,25 @@ function ApprovalItem({ approval, canViewProjects }: { approval: ApprovalRequest
           </div>
           <h3 className="mt-2 text-sm font-semibold leading-5 text-ink">{approval.reason || 'Yêu cầu phê duyệt'}</h3>
           <p className="mt-1 truncate text-xs text-slate-500">{approval.project_name || 'Chưa xác định công trình'}</p>
+          <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-5">
+            <div className="flex min-w-0 gap-1">
+              <dt className="shrink-0 text-slate-500">Người gửi:</dt>
+              <dd className="break-words font-semibold text-slate-700">{approvalRequesterLabel(approval)}</dd>
+            </div>
+            <div className="flex min-w-0 gap-1">
+              <dt className="shrink-0 text-slate-500">Chờ duyệt:</dt>
+              <dd className="break-words font-semibold text-slate-700">{approvalRequiredRolesLabel(approval)}</dd>
+            </div>
+          </dl>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
-          <ApprovalDecisionActions request={approval} compact />
+        <div className="flex shrink-0 flex-wrap justify-start gap-2 sm:justify-end">
+          {canDecide ? (
+            <ApprovalDecisionActions request={approval} compact />
+          ) : (
+            <span className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-500">
+              Chỉ theo dõi
+            </span>
+          )}
           {destination ? (
             <Link className="inline-flex items-center justify-center gap-1 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100" to={destination.to}>
               {destination.label} <ArrowRight className="h-3.5 w-3.5" />

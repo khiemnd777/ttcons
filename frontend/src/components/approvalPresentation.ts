@@ -10,6 +10,17 @@ export function approvalRequiresComment(request: ApprovalRequest) {
   return Boolean(request.decision_context?.comment_required);
 }
 
+export function approvalRequesterLabel(request: ApprovalRequest) {
+  return request.requested_by_name?.trim() || 'Chưa xác định người gửi';
+}
+
+export function approvalRequiredRolesLabel(request: ApprovalRequest) {
+  const roles = request.decision_context?.required_roles
+    ?.map((role) => role.trim())
+    .filter(Boolean);
+  return roles?.length ? roles.join(', ') : 'Chưa xác định vai trò duyệt';
+}
+
 export function approvalDecisionLabel(request: ApprovalRequest) {
   const context = request.decision_context;
   if (!context) return 'Chờ phê duyệt';

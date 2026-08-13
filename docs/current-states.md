@@ -1,5 +1,43 @@
 # Current States
 
+## [Active] Project Explorer Column Sorting
+
+### Will be done
+
+- Add local sorting for `Cây công trình`, `Trạng thái`, and `Phụ trách` on `/projects` without changing the API, project visibility, or workflow state.
+- Preserve API order until the user chooses a sort; apply search/status filtering before sorting and keep expanded projects attached to their IDs.
+- Provide accessible clickable desktop headers and a compact mobile sort selector with equivalent ascending/descending choices.
+- Add focused regression coverage, update central/frontend/project-planning mapping, and run non-browser frontend verification.
+
+### Done
+
+- Confirmed from the supplied Edge screenshot and current source that all three desktop headers are static and the filtered list preserves API order.
+- Produced the approved review package and Mockup as Text; received explicit `OK triển khai` for frontend-only sorting, Vietnamese display-value semantics, missing PM values last, and responsive controls.
+- Added a non-mutating project-explorer sort helper with natural Vietnamese code/name comparison, display-label status comparison, stable project tie-breaking and unassigned-PM-last behavior in both directions.
+- Added accessible desktop header controls and a narrow-screen sort selector backed by the same local state; search/status filtering still runs first and expanded project IDs remain unchanged.
+- Added focused sort and responsive regression coverage, and updated central/frontend/project-planning mapping for the new `/projects` presentation contract.
+- Technically verified the current frontend source with all 70 tests, the TypeScript/Vite production build, the bundle budget (121.5 KiB gzip eager entry, 110 JavaScript chunks under the 250 KiB ceiling) and `git diff --check`. Browser/UAT was not requested and remains `NOT UX ACCEPTED`.
+
+## [Active] Dashboard Approval Ownership Clarity
+
+### Will be done
+
+- Rename the Dashboard pending-approval panel so it reads as a scoped management queue rather than personal work.
+- Show the requester's name and the current required approval roles on every row, with truthful fallbacks for incomplete legacy/test records.
+- Keep server `capabilities` and `available_actions` authoritative; show an explicit read-only state when the actor cannot decide.
+- Add focused frontend regression coverage, update central/frontend/workflow/reporting mapping, and run non-browser frontend verification.
+
+### Done
+
+- Confirmed from the supplied Edge screenshot and current source that Dashboard loads actor-scoped `/approvals/pending` but omits the existing `requested_by_name` and `decision_context.required_roles` fields.
+- Confirmed the backend API, approval policy, requester separation, project scope and decision authorization do not need to change.
+- Built the repeatable source-level signal `CURRENT_BUG_REPRODUCED` and confirmed the existing approval presentation tests pass before implementation.
+- Produced the review package and Mockup as Text, then received explicit `Duyệt làm đi` approval for the scoped UI fix, fallback wording, unchanged RBAC and unchanged fixture data.
+- Renamed the Dashboard panel to `Yêu cầu đang chờ phê duyệt`, clarified its management scope, and added requester/current-role context with explicit missing-metadata fallbacks on every row.
+- Kept `/approvals/pending`, server `capabilities` and `available_actions` unchanged; rows without decision capability now show `Chỉ theo dõi` while source navigation remains available.
+- Added shared requester/role presentation helpers, focused helper/source-contract regression coverage, and updated central/frontend/workflow/reporting mapping for the clarified Dashboard contract.
+- Technically verified the current frontend source with all 64 tests, TypeScript/Vite production build, bundle budget (121.5 KiB gzip eager entry, 109 JavaScript chunks under the 250 KiB ceiling) and `git diff --check`. Browser/UAT was not requested and remains `NOT UX ACCEPTED`.
+
 ## [Active] Responsive Shell Branding And Mobile Navigation
 
 ### Will be done

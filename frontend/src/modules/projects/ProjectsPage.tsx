@@ -6,6 +6,8 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
+  ChevronsUpDown,
   CircleDot,
   Eye,
   Folder,
@@ -28,18 +30,29 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { SimpleForm } from '../_shared/SimpleForm';
 import type { Partner, Project } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
+import { statusLabel } from '../../lib/utils/status';
 import { partnerOptions } from '../core-data/partnerUtils';
 import {
   projectWorkspaceGroupPath,
   visibleProjectWorkspaceGroups,
   type ProjectWorkspaceGroup,
 } from './projectWorkspaceNavigation';
+import {
+  nextProjectExplorerSort,
+  projectExplorerSortFromValue,
+  projectExplorerSortOptions,
+  projectExplorerSortValue,
+  sortProjectExplorerRows,
+  type ProjectExplorerSort,
+  type ProjectExplorerSortKey,
+} from './projectExplorerSort';
 
 export function ProjectsPage() {
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<{ mode: 'view' | 'edit'; record: Project } | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [projectSort, setProjectSort] = useState<ProjectExplorerSort | null>(null);
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -110,12 +123,13 @@ export function ProjectsPage() {
   }, [projects.data]);
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return (projects.data ?? []).filter((project) => {
+    const filtered = (projects.data ?? []).filter((project) => {
       const matchesStatus = statusFilter ? project.status === statusFilter : true;
       const haystack = [project.name, project.code, project.client_name, project.pm_name].filter(Boolean).join(' ').toLowerCase();
       return matchesStatus && (!query || haystack.includes(query));
     });
-  }, [projects.data, search, statusFilter]);
+    return sortProjectExplorerRows(filtered, projectSort, statusLabel);
+  }, [projectSort, projects.data, search, statusFilter]);
 
   useEffect(() => {
     if (!projects.data?.length) return;
@@ -169,10 +183,24 @@ export function ProjectsPage() {
                 <option key={status} value={status}>{status}</option>
               ))}
             </select>
+            <select
+              aria-label="Sắp xếp công trình"
+              className="rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring lg:hidden"
+              value={projectExplorerSortValue(projectSort)}
+              onChange={(event) => setProjectSort(projectExplorerSortFromValue(event.target.value))}
+            >
+              <option value="">Thứ tự mặc định</option>
+              {projectExplorerSortOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        <ProjectExplorerHeader />
+        <ProjectExplorerHeader
+          sort={projectSort}
+          onSort={(key) => setProjectSort((current) => nextProjectExplorerSort(key, current))}
+        />
 
         {projects.isLoading ? (
           <div className="p-8">
@@ -388,15 +416,54 @@ function nonNegativeCount(value: unknown) {
   return Math.max(0, Math.round(parsed));
 }
 
-function ProjectExplorerHeader() {
+function ProjectExplorerHeader({
+  sort,
+  onSort,
+}: {
+  sort: ProjectExplorerSort | null;
+  onSort: (key: ProjectExplorerSortKey) => void;
+}) {
   return (
     <div className="hidden grid-cols-[minmax(0,1.6fr)_160px_150px_120px_140px] gap-4 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-      <span>Cây công trình</span>
-      <span>Trạng thái</span>
-      <span>Phụ trách</span>
+      <ProjectExplorerSortHeader label="Cây công trình" sortKey="project" sort={sort} onSort={onSort} />
+      <ProjectExplorerSortHeader label="Trạng thái" sortKey="status" sort={sort} onSort={onSort} />
+      <ProjectExplorerSortHeader label="Phụ trách" sortKey="owner" sort={sort} onSort={onSort} />
       <span>Tiến độ</span>
       <span className="text-right">Mở</span>
     </div>
+  );
+}
+
+function ProjectExplorerSortHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+}: {
+  label: string;
+  sortKey: ProjectExplorerSortKey;
+  sort: ProjectExplorerSort | null;
+  onSort: (key: ProjectExplorerSortKey) => void;
+}) {
+  const activeDirection = sort?.key === sortKey ? sort.direction : null;
+  const nextDirection = activeDirection === 'asc' ? 'giảm dần' : 'tăng dần';
+
+  return (
+    <button
+      type="button"
+      className={`inline-flex w-fit items-center gap-1 rounded-sm text-left hover:text-ink focus-ring ${activeDirection ? 'text-blue-700' : ''}`}
+      aria-label={`Sắp xếp ${label} ${nextDirection}`}
+      onClick={() => onSort(sortKey)}
+    >
+      <span>{label}</span>
+      {activeDirection === 'asc' ? (
+        <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+      ) : activeDirection === 'desc' ? (
+        <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+      ) : (
+        <ChevronsUpDown className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+      )}
+    </button>
   );
 }
 
