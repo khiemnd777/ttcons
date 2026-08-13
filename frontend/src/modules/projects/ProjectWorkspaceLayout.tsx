@@ -31,6 +31,7 @@ import type {
 } from '../../lib/types/domain';
 import { statusLabel } from '../../lib/utils/status';
 import { workItemDetailPath } from '../work-items/workItemNavigation';
+import { workflowFormStatusLabel } from '../work-items/workItemPresentation';
 import {
   projectWorkspaceGroupPath,
   projectWorkspacePath,
@@ -462,7 +463,7 @@ function WorkflowStepItem({
           <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-slate-600">{statusLabel(status)}</span>
           {step.workflow_form_instance_id ? (
             <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
-              Hồ sơ {statusLabel(cleanText(step.workflow_form_status) || 'draft')}
+              Hồ sơ {workflowFormStatusLabel(step.workflow_form_status)}
             </span>
           ) : null}
           {Number(step.evidence_count ?? 0) > 0 ? (

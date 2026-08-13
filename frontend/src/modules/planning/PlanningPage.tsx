@@ -616,7 +616,7 @@ function PlanningActionWorkspace({
           <PlanningMetric label="Cần xử lý" value={metrics.actionable} tone="text-blue-700" />
           <PlanningMetric label="Chờ duyệt" value={metrics.waiting} tone="text-amber-700" />
           <PlanningMetric label="Bị chặn" value={metrics.blocked} tone="text-rose-700" />
-          <PlanningMetric label="Hồ sơ đã gửi" value={`${metrics.submittedForms}/${metrics.formsTotal}`} tone="text-emerald-700" />
+          <PlanningMetric label="Hồ sơ đã chốt" value={`${metrics.submittedForms}/${metrics.formsTotal}`} tone="text-emerald-700" />
         </div>
       </section>
 

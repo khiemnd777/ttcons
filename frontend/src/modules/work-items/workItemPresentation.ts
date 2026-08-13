@@ -1,5 +1,5 @@
 import type { WorkItem } from '../../lib/types/domain';
-import { enumLabel } from '../../lib/utils/status';
+import { enumLabel, statusLabel } from '../../lib/utils/status';
 export { workItemIsUpcoming, workItemWorkflowContext } from './workItemContext';
 
 export type WorkItemActionKey =
@@ -147,9 +147,36 @@ export function workflowFormChipText(value?: Record<string, unknown> | null) {
   return version > 0 ? `${label} v${version}` : label;
 }
 
+export function workflowFormStatusLabel(value?: unknown) {
+  const status = String(value ?? '').trim();
+  if (status === 'submitted') return 'Đã chốt';
+  return statusLabel(status || 'draft');
+}
+
+export function workflowFormEventLabel(value?: unknown) {
+  const eventType = String(value ?? '').trim();
+  const labels: Record<string, string> = {
+    created: 'Đã tạo hồ sơ',
+    draft_saved: 'Đã lưu nháp hồ sơ',
+    submitted: 'Đã chốt hồ sơ',
+    reopened: 'Đã mở lại hồ sơ',
+    cancelled: 'Đã hủy hồ sơ',
+  };
+  return labels[eventType] ?? enumLabel('event_type', eventType);
+}
+
+export function workflowFormActivityComment(value?: { metadata_json?: Record<string, unknown>; activity_type?: string; comment?: string }) {
+  const comment = String(value?.comment ?? '');
+  const workflowFormVersionID = String(value?.metadata_json?.form_version_id ?? '').trim();
+  if (value?.activity_type === 'system_event' && workflowFormVersionID && comment === 'Đã gửi biểu mẫu quy trình') {
+    return 'Đã chốt hồ sơ nghiệp vụ';
+  }
+  return comment;
+}
+
 export function workflowFormNextAction(value?: Record<string, unknown> | null) {
   if (!hasWorkflowFormSummary(value)) return 'Theo dõi hoạt động';
-  if (value?.workflow_form_status !== 'submitted') return 'Gửi hồ sơ nghiệp vụ';
+  if (value?.workflow_form_status !== 'submitted') return 'Chốt hồ sơ nghiệp vụ';
   return 'Ký / PDF / hoàn tất bước';
 }
 

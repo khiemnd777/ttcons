@@ -51,6 +51,7 @@ export type Project = AnyRecord & {
 	workflow_entry_mode: 'survey_required' | 'client_boq';
   planned_start_date?: string | null;
   planned_end_date?: string | null;
+  created_at?: string;
   open_issues?: number;
   pending_approvals?: number;
 };

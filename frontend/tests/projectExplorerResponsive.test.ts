@@ -27,4 +27,16 @@ test('project explorer exposes equivalent desktop and mobile sort controls', asy
   assert.match(projectsPage, /ProjectExplorerSortHeader label="Cây công trình" sortKey="project"/);
   assert.match(projectsPage, /ProjectExplorerSortHeader label="Trạng thái" sortKey="status"/);
   assert.match(projectsPage, /ProjectExplorerSortHeader label="Phụ trách" sortKey="owner"/);
+  assert.match(projectsPage, /ProjectExplorerSortHeader label="Ngày tạo" sortKey="created_at"/);
+  assert.match(projectsPage, /rounded-sm text-left uppercase hover:text-ink focus-ring/);
+});
+
+test('project explorer shows the creation date after progress on desktop and labels it on mobile', async () => {
+  const projectsPage = await source('../src/modules/projects/ProjectsPage.tsx');
+  const domainTypes = await source('../src/lib/types/domain.ts');
+
+  assert.match(projectsPage, /<span>Tiến độ<\/span>\s*<ProjectExplorerSortHeader label="Ngày tạo" sortKey="created_at"[^/]+\/>\s*<span className="text-right">Mở<\/span>/);
+  assert.match(projectsPage, /<span className="font-medium text-slate-500 lg:hidden">Ngày tạo: <\/span>\s*\{dateText\(project\.created_at\)\}/);
+  assert.match(projectsPage, /grid-cols-\[minmax\(0,1\.6fr\)_135px_100px_90px_90px_112px\]/);
+  assert.match(domainTypes, /export type Project =[^}]+created_at\?: string;/s);
 });

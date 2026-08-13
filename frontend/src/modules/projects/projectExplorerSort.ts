@@ -1,6 +1,6 @@
 import type { Project } from '../../lib/types/domain';
 
-export type ProjectExplorerSortKey = 'project' | 'status' | 'owner';
+export type ProjectExplorerSortKey = 'project' | 'status' | 'owner' | 'created_at';
 export type ProjectExplorerSortDirection = 'asc' | 'desc';
 export type ProjectExplorerSort = {
   key: ProjectExplorerSortKey;
@@ -14,6 +14,8 @@ export const projectExplorerSortOptions: Array<{ value: string; label: string }>
   { value: 'status:desc', label: 'Trạng thái: giảm dần' },
   { value: 'owner:asc', label: 'Phụ trách: tăng dần' },
   { value: 'owner:desc', label: 'Phụ trách: giảm dần' },
+  { value: 'created_at:asc', label: 'Ngày tạo: cũ nhất trước' },
+  { value: 'created_at:desc', label: 'Ngày tạo: mới nhất trước' },
 ];
 
 const vietnameseCollator = new Intl.Collator('vi', {
@@ -74,7 +76,30 @@ function compareProjectField(
     const rightStatus = right.status ? statusDisplayLabel(right.status) : '';
     return compareLocalizedText(leftStatus, rightStatus, sort.direction);
   }
-  return compareLocalizedText(left.pm_name, right.pm_name, sort.direction);
+  if (sort.key === 'owner') {
+    return compareLocalizedText(left.pm_name, right.pm_name, sort.direction);
+  }
+  return compareCreationDates(left.created_at, right.created_at, sort.direction);
+}
+
+function compareCreationDates(
+  left: unknown,
+  right: unknown,
+  direction: ProjectExplorerSortDirection,
+) {
+  const leftTimestamp = creationTimestamp(left);
+  const rightTimestamp = creationTimestamp(right);
+  if (leftTimestamp === null && rightTimestamp === null) return 0;
+  if (leftTimestamp === null) return 1;
+  if (rightTimestamp === null) return -1;
+  const result = leftTimestamp - rightTimestamp;
+  return direction === 'asc' ? result : -result;
+}
+
+function creationTimestamp(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
 function compareLocalizedText(
@@ -92,5 +117,5 @@ function compareLocalizedText(
 }
 
 function isProjectExplorerSortKey(value: string): value is ProjectExplorerSortKey {
-  return value === 'project' || value === 'status' || value === 'owner';
+  return value === 'project' || value === 'status' || value === 'owner' || value === 'created_at';
 }

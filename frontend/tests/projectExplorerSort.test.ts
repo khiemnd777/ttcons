@@ -5,6 +5,7 @@ import { statusLabel } from '../src/lib/utils/status.ts';
 import {
   nextProjectExplorerSort,
   projectExplorerSortFromValue,
+  projectExplorerSortOptions,
   sortProjectExplorerRows,
 } from '../src/modules/projects/projectExplorerSort.ts';
 
@@ -75,11 +76,33 @@ test('project explorer keeps unassigned projects last in either owner direction'
   );
 });
 
+test('project explorer sorts creation timestamps chronologically and keeps unusable dates last', () => {
+  const rows = [
+    project('missing', { created_at: undefined }),
+    project('newer', { created_at: '2026-08-10T09:30:00Z' }),
+    project('invalid', { created_at: 'not-a-date' }),
+    project('older', { created_at: '2026-08-08T14:00:00Z' }),
+  ];
+
+  const ascending = sortProjectExplorerRows(rows, { key: 'created_at', direction: 'asc' }).map((row) => row.id);
+  const descending = sortProjectExplorerRows(rows, { key: 'created_at', direction: 'desc' }).map((row) => row.id);
+
+  assert.deepEqual(ascending.slice(0, 2), ['older', 'newer']);
+  assert.deepEqual(descending.slice(0, 2), ['newer', 'older']);
+  assert.deepEqual(new Set(ascending.slice(2)), new Set(['invalid', 'missing']));
+  assert.deepEqual(new Set(descending.slice(2)), new Set(['invalid', 'missing']));
+});
+
 test('project explorer sort controls start ascending, toggle direction, and reject invalid values', () => {
   const ascending = nextProjectExplorerSort('status', null);
   assert.deepEqual(ascending, { key: 'status', direction: 'asc' });
   assert.deepEqual(nextProjectExplorerSort('status', ascending), { key: 'status', direction: 'desc' });
   assert.deepEqual(projectExplorerSortFromValue('owner:desc'), { key: 'owner', direction: 'desc' });
+  assert.deepEqual(projectExplorerSortFromValue('created_at:desc'), { key: 'created_at', direction: 'desc' });
+  assert.deepEqual(projectExplorerSortOptions.slice(-2), [
+    { value: 'created_at:asc', label: 'Ngày tạo: cũ nhất trước' },
+    { value: 'created_at:desc', label: 'Ngày tạo: mới nhất trước' },
+  ]);
   assert.equal(projectExplorerSortFromValue('progress:asc'), null);
   assert.equal(projectExplorerSortFromValue('owner:sideways'), null);
 });

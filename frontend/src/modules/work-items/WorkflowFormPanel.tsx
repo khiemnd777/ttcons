@@ -14,7 +14,7 @@ import type { AnyRecord, EvidenceRecord, WorkflowFormDetail, WorkflowFormField, 
 import { dateText, percent } from '../../lib/utils/format';
 import { enumLabel } from '../../lib/utils/status';
 import { SignatureCaptureDialog, type SignatureStroke } from './SignatureCaptureDialog';
-import { compactDateTime, isGenericWorkflowFormTemplate, workflowFormTypeLabel } from './workItemPresentation';
+import { compactDateTime, isGenericWorkflowFormTemplate, workflowFormEventLabel, workflowFormStatusLabel, workflowFormTypeLabel } from './workItemPresentation';
 import { effectiveWorkflowCurrencyFields } from './workflowCurrencyFields';
 import { effectiveWorkflowFormFields } from './workflowFormRules';
 
@@ -110,10 +110,10 @@ export function WorkflowFormPanel({
       } else if (result.auto_transition?.status === 'blocked') {
         toast.warn({ title: 'Đã lưu lựa chọn nhưng chưa thể chuyển bước', description: result.auto_transition.message ?? 'Kiểm tra điều kiện connector và thử lại.' });
       } else {
-        toast.success('Đã gửi hồ sơ nghiệp vụ');
+        toast.success('Đã chốt hồ sơ nghiệp vụ');
       }
     },
-    onError: (error) => toast.error('Không gửi được hồ sơ nghiệp vụ', error),
+    onError: (error) => toast.error('Không chốt được hồ sơ nghiệp vụ', error),
   });
 
   const signForm = useMutation({
@@ -233,7 +233,7 @@ export function WorkflowFormPanel({
         onSubmit={() => {
           if (!readOnly && validateBeforeSubmit()) submitForm.mutate();
         }}
-        submitLabel={form.data.auto_advance_when_ready ? 'Xác nhận và tiếp tục' : 'Gửi hồ sơ'}
+        submitLabel={form.data.auto_advance_when_ready ? 'Xác nhận và tiếp tục' : 'Chốt hồ sơ'}
       />
 
       <div className="space-y-3">
@@ -271,7 +271,7 @@ export function WorkflowFormPanel({
             ))}
           </div>
           <div className="border-t border-line bg-slate-50 px-3 py-2 text-xs text-slate-500">
-            {instance?.submitted_at ? `Đã gửi ${compactDateTime(instance.submitted_at)}` : `Cập nhật ${compactDateTime(instance?.updated_at)}`}
+            {instance?.submitted_at ? `Chốt lúc ${compactDateTime(instance.submitted_at)}` : `Cập nhật ${compactDateTime(instance?.updated_at)}`}
           </div>
         </section>
 
@@ -418,10 +418,10 @@ function WorkflowFormActionCenter({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-ink">{title}</h3>
-            <StatusBadge status={status} />
+            <StatusBadge status={status} label={workflowFormStatusLabel(status)} />
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Hồ sơ nghiệp vụ v{versionNo} · {submittedAt ? `Đã gửi ${compactDateTime(submittedAt)}` : `Cập nhật ${compactDateTime(updatedAt)}`}
+            Hồ sơ nghiệp vụ v{versionNo} · {submittedAt ? `Chốt lúc ${compactDateTime(submittedAt)}` : `Cập nhật ${compactDateTime(updatedAt)}`}
           </p>
           <div className="mt-3 flex items-start gap-2">
             <span className={clsx('mt-0.5 rounded-md p-1.5', blocked ? 'bg-white text-amber-700' : 'bg-blue-50 text-blue-700')}>
@@ -429,10 +429,10 @@ function WorkflowFormActionCenter({
             </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-ink">
-                {readOnly ? 'Hồ sơ xem trước của bước sắp tới' : blocked ? 'Cần hoàn tất thông tin trước khi gửi' : submitted ? 'Hồ sơ đã gửi, chuyển sang tài liệu' : 'Sẵn sàng lưu nháp hoặc gửi'}
+                {readOnly ? 'Hồ sơ xem trước của bước sắp tới' : blocked ? 'Cần hoàn tất thông tin trước khi chốt' : submitted ? 'Hồ sơ đã được chốt' : 'Sẵn sàng lưu nháp hoặc chốt hồ sơ'}
               </p>
               <p className="mt-1 text-xs leading-5 text-slate-600">
-                {readOnly ? 'Chỉ có thể cập nhật khi workflow chuyển đến node này.' : blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung hồ sơ đã khóa; chữ ký và PDF dùng phiên bản đã gửi.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
+                {readOnly ? 'Chỉ có thể cập nhật khi workflow chuyển đến node này.' : blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung đã khóa và được lưu vào đầu việc; chưa gửi cho người duyệt. Chữ ký và PDF dùng phiên bản đã chốt.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
               </p>
             </div>
           </div>
@@ -506,7 +506,7 @@ function WorkflowFormEventsPanel({ events }: { events: AnyRecord[] }) {
       <div className="divide-y divide-line">
         {events.slice(0, 5).map((event) => (
           <div key={String(event.id)} className="px-3 py-2">
-            <p className="text-xs font-semibold text-ink">{enumLabel('event_type', String(event.event_type))}</p>
+            <p className="text-xs font-semibold text-ink">{workflowFormEventLabel(event.event_type)}</p>
             <p className="mt-1 text-xs text-slate-500">{event.actor_name ?? 'Hệ thống'} · {compactDateTime(event.created_at)}</p>
           </div>
         ))}
@@ -525,7 +525,7 @@ function PlanningDailyReportSummary({ values, submitted }: { values: AnyRecord; 
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">Nhật ký kế hoạch</p>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            {submitted ? 'Nhật ký đã gửi; các hạng mục sẽ làm đã được dùng để sinh đầu việc kế hoạch tiếp theo.' : 'Hoàn tất phần Đã làm và Sẽ làm trước khi gửi nhật ký.'}
+            {submitted ? 'Nhật ký đã chốt; các hạng mục sẽ làm đã được dùng để sinh đầu việc kế hoạch tiếp theo.' : 'Hoàn tất phần Đã làm và Sẽ làm trước khi chốt nhật ký.'}
           </p>
         </div>
         <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[40rem]">
@@ -562,7 +562,7 @@ function MeetingMinutesSummary({ values, submitted }: { values: AnyRecord; submi
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">{textOrDash(values.meeting_title) === '-' ? 'Biên bản họp' : textOrDash(values.meeting_title)}</p>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            {submitted ? 'Biên bản đã gửi; đầu việc được dùng để sinh đầu việc theo hồ sơ nghiệp vụ.' : 'Hoàn tất người tham dự, quyết định và đầu việc trước khi gửi biên bản.'}
+            {submitted ? 'Biên bản đã chốt; đầu việc được dùng để sinh đầu việc theo hồ sơ nghiệp vụ.' : 'Hoàn tất người tham dự, quyết định và đầu việc trước khi chốt biên bản.'}
           </p>
         </div>
         <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[40rem]">
@@ -625,7 +625,7 @@ function PlanningChecklistSummary({ values, submitted }: { values: AnyRecord; su
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">Checklist kế hoạch</p>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            {submitted ? 'Checklist đã gửi; dữ liệu hoàn tất được lưu lại để kiểm tra bước.' : 'Chỉ được gửi khi mọi dòng ở trạng thái Hoàn tất hoặc Không áp dụng.'}
+            {submitted ? 'Checklist đã chốt; dữ liệu hoàn tất được lưu lại để kiểm tra bước.' : 'Chỉ được chốt khi mọi dòng ở trạng thái Hoàn tất hoặc Không áp dụng.'}
           </p>
         </div>
         <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[40rem]">
@@ -789,7 +789,7 @@ function WorkflowStepPill({ label, value, active }: { label: string; value: stri
 
 function workflowNextAction(submitted: boolean, validationIssueCount: number, signatureCount: number, pdfCount: number) {
   if (!submitted && validationIssueCount > 0) return 'Hoàn tất checklist/hồ sơ';
-  if (!submitted) return 'Gửi hồ sơ nghiệp vụ';
+  if (!submitted) return 'Chốt hồ sơ nghiệp vụ';
   if (signatureCount === 0) return 'Ký / đóng dấu PDF';
   if (pdfCount === 0) return 'Tạo PDF';
   return 'Mở tài liệu hoặc hoàn tất đầu việc';
@@ -959,12 +959,12 @@ function WorkflowSignaturePanel({
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-line px-3 py-4 text-sm font-medium text-slate-500">
-          {submitted ? 'Chưa có chữ ký nội bộ.' : 'Gửi hồ sơ trước khi ký nội bộ.'}
+          {submitted ? 'Chưa có chữ ký nội bộ.' : 'Chốt hồ sơ trước khi ký nội bộ.'}
         </div>
       )}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs text-slate-500">
-          {!submitted ? 'Gửi hồ sơ trước khi ký.' : signedByCurrentUser ? 'Bạn đã ký xác nhận nội bộ; vẫn có thể ký mục đích khác nếu cần.' : 'Chữ ký canvas sẽ được lưu như tệp được bảo vệ.'}
+          {!submitted ? 'Chốt hồ sơ trước khi ký.' : signedByCurrentUser ? 'Bạn đã ký xác nhận nội bộ; vẫn có thể ký mục đích khác nếu cần.' : 'Chữ ký canvas sẽ được lưu như tệp được bảo vệ.'}
         </div>
         <button
           type="button"
@@ -1120,7 +1120,7 @@ function WorkflowPDFExportPanel({
         </div>
       ) : (
         <div className="rounded-md border border-dashed border-line px-3 py-4 text-sm font-medium text-slate-500">
-          {submitted ? 'Chưa tạo PDF cho hồ sơ này.' : 'Gửi hồ sơ trước khi tạo PDF.'}
+          {submitted ? 'Chưa tạo PDF cho hồ sơ này.' : 'Chốt hồ sơ trước khi tạo PDF.'}
         </div>
       )}
     </section>
@@ -1338,7 +1338,7 @@ function validateFieldValue(field: WorkflowFormField, value: unknown) {
       }
     }
     if (field.field_key === 'checklist_items' && !['done', 'not_applicable'].includes(String(row.status ?? ''))) {
-      return `${field.label} dòng ${rowIndex + 1}: trạng thái phải là Hoàn tất hoặc Không áp dụng trước khi gửi`;
+      return `${field.label} dòng ${rowIndex + 1}: trạng thái phải là Hoàn tất hoặc Không áp dụng trước khi chốt`;
     }
   }
   return '';

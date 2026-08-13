@@ -62,7 +62,7 @@ const toneByStatus: Record<string, string> = {
   deleted: 'bg-slate-100 text-slate-500 ring-slate-200',
 };
 
-export function StatusBadge({ status, className }: { status?: string; className?: string }) {
+export function StatusBadge({ status, label, className }: { status?: string; label?: string; className?: string }) {
   return (
     <span
       className={clsx(
@@ -71,7 +71,7 @@ export function StatusBadge({ status, className }: { status?: string; className?
         className,
       )}
     >
-      {statusLabel(status)}
+      {label ?? statusLabel(status)}
     </span>
   );
 }

@@ -36,7 +36,7 @@ import type {
   ProjectActivitySummary,
   WorkItemActivity,
 } from '../../lib/types/domain';
-import { activityLabel, compactDateTime, scopeTypeLabel } from './workItemPresentation';
+import { activityLabel, compactDateTime, scopeTypeLabel, workflowFormActivityComment } from './workItemPresentation';
 import { ActivityAttachments } from './ActivityAttachments';
 import { ActivityReactionBar, ActivityReplyQuote } from './ActivityConversationMeta';
 import {
@@ -838,11 +838,12 @@ function ChatMessage({
   }, [menuOpen]);
 
   const system = !['comment', 'status', 'blocker', 'question', 'decision', 'reminder', 'file_note'].includes(item.activity_type);
+  const comment = workflowFormActivityComment(item);
   if (system) {
     return (
       <div className="flex justify-center py-1">
         <span className="max-w-[90%] rounded-full bg-slate-200/80 px-3 py-1 text-center text-[11px] text-slate-500">
-          {item.actor_name ?? 'Hệ thống'} · {activityLabel(item.activity_type)}{item.comment ? ` · ${item.comment}` : ''} · {compactDateTime(item.created_at)}
+          {item.actor_name ?? 'Hệ thống'} · {activityLabel(item.activity_type)}{comment ? ` · ${comment}` : ''} · {compactDateTime(item.created_at)}
         </span>
       </div>
     );
@@ -891,7 +892,7 @@ function ChatMessage({
               </div>
             ) : null}
           </div>
-          {withdrawn ? <p className="text-sm italic leading-6">Tin nhắn đã được thu hồi</p> : item.comment ? <p className={clsx('whitespace-pre-wrap break-words text-sm leading-6', item.activity_type === 'comment' ? '' : 'mt-1.5')}>{item.comment}</p> : null}
+          {withdrawn ? <p className="text-sm italic leading-6">Tin nhắn đã được thu hồi</p> : comment ? <p className={clsx('whitespace-pre-wrap break-words text-sm leading-6', item.activity_type === 'comment' ? '' : 'mt-1.5')}>{comment}</p> : null}
           {!withdrawn && mentions.length ? (
             <div className="mt-2 flex flex-wrap gap-1">
               {mentions.map((mention, index) => <span key={`${mention.id ?? mention.label}:${index}`} className="rounded bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold text-blue-700">@{mention.label || mention.id}</span>)}
@@ -999,6 +1000,7 @@ function ActivityCard({
   const resolveLabel = activityResolveLabel(item);
   const resolved = activityResolved(item);
   const withdrawn = Boolean(item.withdrawn_at);
+  const comment = workflowFormActivityComment(item);
   return (
     <article className={clsx(
       'rounded-md border px-3 py-3',
@@ -1029,7 +1031,7 @@ function ActivityCard({
         </div>
       </div>
       {!withdrawn ? <ActivityReplyQuote replyTo={item.reply_to} /> : null}
-      {withdrawn ? <p className="mt-2 text-sm italic text-slate-500">Tin nhắn đã được thu hồi</p> : item.comment ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{item.comment}</p> : null}
+      {withdrawn ? <p className="mt-2 text-sm italic text-slate-500">Tin nhắn đã được thu hồi</p> : comment ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{comment}</p> : null}
       {!withdrawn ? <ActivityAttachments attachments={item.attachments} /> : null}
       {!withdrawn && item.reactions?.length ? <div className="mt-2"><ActivityReactionBar reactions={item.reactions} /></div> : null}
       <div className="mt-2 flex flex-wrap items-center gap-2">

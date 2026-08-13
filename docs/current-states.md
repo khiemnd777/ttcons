@@ -1,23 +1,5 @@
 # Current States
 
-## [Active] Project Explorer Column Sorting
-
-### Will be done
-
-- Add local sorting for `Cây công trình`, `Trạng thái`, and `Phụ trách` on `/projects` without changing the API, project visibility, or workflow state.
-- Preserve API order until the user chooses a sort; apply search/status filtering before sorting and keep expanded projects attached to their IDs.
-- Provide accessible clickable desktop headers and a compact mobile sort selector with equivalent ascending/descending choices.
-- Add focused regression coverage, update central/frontend/project-planning mapping, and run non-browser frontend verification.
-
-### Done
-
-- Confirmed from the supplied Edge screenshot and current source that all three desktop headers are static and the filtered list preserves API order.
-- Produced the approved review package and Mockup as Text; received explicit `OK triển khai` for frontend-only sorting, Vietnamese display-value semantics, missing PM values last, and responsive controls.
-- Added a non-mutating project-explorer sort helper with natural Vietnamese code/name comparison, display-label status comparison, stable project tie-breaking and unassigned-PM-last behavior in both directions.
-- Added accessible desktop header controls and a narrow-screen sort selector backed by the same local state; search/status filtering still runs first and expanded project IDs remain unchanged.
-- Added focused sort and responsive regression coverage, and updated central/frontend/project-planning mapping for the new `/projects` presentation contract.
-- Technically verified the current frontend source with all 70 tests, the TypeScript/Vite production build, the bundle budget (121.5 KiB gzip eager entry, 110 JavaScript chunks under the 250 KiB ceiling) and `git diff --check`. Browser/UAT was not requested and remains `NOT UX ACCEPTED`.
-
 ## [Active] Dashboard Approval Ownership Clarity
 
 ### Will be done

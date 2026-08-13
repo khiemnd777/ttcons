@@ -1,9 +1,8 @@
 import clsx from 'clsx';
 import { StatusBadge } from '../../components/StatusBadge';
 import { dateText } from '../../lib/utils/format';
-import { statusLabel } from '../../lib/utils/status';
 import type { WorkItem } from '../../lib/types/domain';
-import { asArray, departmentLabel, hasWorkflowFormSummary, isWorkOverdue, numberValue, workItemIsUpcoming, workItemWorkflowContext, workTypeLabel, workflowFormChipText } from './workItemPresentation';
+import { asArray, departmentLabel, hasWorkflowFormSummary, isWorkOverdue, numberValue, workItemIsUpcoming, workItemWorkflowContext, workTypeLabel, workflowFormChipText, workflowFormStatusLabel } from './workItemPresentation';
 
 export function WorkItemCard({
   item,
@@ -33,7 +32,7 @@ export function WorkItemCard({
             {item.department ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{departmentLabel(item.department)}</span> : null}
             {hasWorkflowFormSummary(item) ? (
               <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-                {workflowFormChipText(item)} · {statusLabel(item.workflow_form_status ?? 'draft')}
+                {workflowFormChipText(item)} · {workflowFormStatusLabel(item.workflow_form_status)}
               </span>
             ) : null}
           </div>

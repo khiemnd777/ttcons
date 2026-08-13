@@ -455,7 +455,7 @@ export const enumLabels: Record<EnumLabelGroup, LabelMap> = {
     work_item_evidence_added: 'Đã thêm minh chứng',
     work_item_evidence_accepted: 'Đã chấp nhận minh chứng',
     workflow_form_draft_saved: 'Đã lưu nháp hồ sơ nghiệp vụ',
-    workflow_form_submitted: 'Đã gửi hồ sơ nghiệp vụ',
+    workflow_form_submitted: 'Đã chốt hồ sơ nghiệp vụ',
     workflow_form_signed: 'Đã ký hồ sơ nghiệp vụ',
     signed: 'Đã ký',
     work_item_evidence_rejected: 'Từ chối minh chứng',

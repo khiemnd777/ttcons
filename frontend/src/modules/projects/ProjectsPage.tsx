@@ -424,11 +424,12 @@ function ProjectExplorerHeader({
   onSort: (key: ProjectExplorerSortKey) => void;
 }) {
   return (
-    <div className="hidden grid-cols-[minmax(0,1.6fr)_160px_150px_120px_140px] gap-4 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+    <div className="hidden grid-cols-[minmax(0,1.6fr)_135px_100px_90px_90px_112px] gap-3 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
       <ProjectExplorerSortHeader label="Cây công trình" sortKey="project" sort={sort} onSort={onSort} />
       <ProjectExplorerSortHeader label="Trạng thái" sortKey="status" sort={sort} onSort={onSort} />
       <ProjectExplorerSortHeader label="Phụ trách" sortKey="owner" sort={sort} onSort={onSort} />
       <span>Tiến độ</span>
+      <ProjectExplorerSortHeader label="Ngày tạo" sortKey="created_at" sort={sort} onSort={onSort} />
       <span className="text-right">Mở</span>
     </div>
   );
@@ -446,12 +447,14 @@ function ProjectExplorerSortHeader({
   onSort: (key: ProjectExplorerSortKey) => void;
 }) {
   const activeDirection = sort?.key === sortKey ? sort.direction : null;
-  const nextDirection = activeDirection === 'asc' ? 'giảm dần' : 'tăng dần';
+  const nextDirection = sortKey === 'created_at'
+    ? activeDirection === 'asc' ? 'mới nhất trước' : 'cũ nhất trước'
+    : activeDirection === 'asc' ? 'giảm dần' : 'tăng dần';
 
   return (
     <button
       type="button"
-      className={`inline-flex w-fit items-center gap-1 rounded-sm text-left hover:text-ink focus-ring ${activeDirection ? 'text-blue-700' : ''}`}
+      className={`inline-flex w-fit items-center gap-1 rounded-sm text-left uppercase hover:text-ink focus-ring ${activeDirection ? 'text-blue-700' : ''}`}
       aria-label={`Sắp xếp ${label} ${nextDirection}`}
       onClick={() => onSort(sortKey)}
     >
@@ -481,7 +484,7 @@ function ProjectExplorerRow({
   onEdit: () => void;
 }) {
   return (
-    <div className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1.6fr)_160px_150px_120px_140px] lg:items-center">
+    <div className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1.6fr)_135px_100px_90px_90px_112px] lg:items-center">
       <div className="flex min-w-0 items-start gap-3">
         <button
           type="button"
@@ -511,6 +514,10 @@ function ProjectExplorerRow({
           </div>
           <span className="text-xs font-semibold text-slate-600">{project.progress_percent ?? 0}%</span>
         </div>
+      </div>
+      <div className="text-sm text-slate-600">
+        <span className="font-medium text-slate-500 lg:hidden">Ngày tạo: </span>
+        {dateText(project.created_at)}
       </div>
       <div className="flex items-center justify-start gap-2 lg:justify-end">
         <button

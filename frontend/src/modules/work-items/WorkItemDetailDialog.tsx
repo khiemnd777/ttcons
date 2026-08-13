@@ -53,7 +53,9 @@ import {
   workItemWorkflowContext,
   workTypeLabel,
   workflowFormChipText,
+  workflowFormActivityComment,
   workflowFormNextAction,
+  workflowFormStatusLabel,
   type WorkItemActionKey,
 } from './workItemPresentation';
 
@@ -311,7 +313,7 @@ function SkippedWorkItemHistory({ activities, evidence }: { activities: WorkItem
                 <span className="font-semibold text-slate-700">{activity.actor_name ?? 'Hệ thống'}</span>
                 <span>{compactDateTime(activity.created_at)}</span>
               </div>
-              <p className="mt-1 text-sm text-slate-700">{activity.comment || statusLabel(activity.to_status ?? activity.activity_type ?? 'cancelled')}</p>
+              <p className="mt-1 text-sm text-slate-700">{workflowFormActivityComment(activity) || statusLabel(activity.to_status ?? activity.activity_type ?? 'cancelled')}</p>
             </div>
           ))}
         </div>
@@ -348,7 +350,7 @@ function WorkItemWorkspaceHeader({
     { label: 'Node', value: context.node },
     { label: 'Bước', value: context.step },
     { label: 'Minh chứng', value: `${activeEvidence.length} hiệu lực / ${numberValue(item.evidence_count)} tổng` },
-    { label: 'Hồ sơ', value: hasWorkflowFormSummary(item) ? `${workflowFormChipText(item)} · ${statusLabel(item.workflow_form_status ?? 'draft')}` : '-' },
+    { label: 'Hồ sơ', value: hasWorkflowFormSummary(item) ? `${workflowFormChipText(item)} · ${workflowFormStatusLabel(item.workflow_form_status)}` : '-' },
   ];
 
   return (
@@ -582,7 +584,7 @@ function WorkItemSupportingTabs({
             >
               <span>{tab.label}</span>
               {typeof tab.count === 'number' ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-inset ring-line">{tab.count}</span> : null}
-              {tab.status ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-100">{statusLabel(tab.status)}</span> : null}
+              {tab.status ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-100">{tab.id === 'form' ? workflowFormStatusLabel(tab.status) : statusLabel(tab.status)}</span> : null}
               <span className="sr-only">{tab.description}</span>
             </button>
           ))}
@@ -686,6 +688,7 @@ function WorkItemActivityPanel({
 }
 
 function ActivityTimelineItem({ activity }: { activity: WorkItemActivity }) {
+  const comment = workflowFormActivityComment(activity);
   return (
     <article className="rounded-md border border-line bg-white px-3 py-2.5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -698,7 +701,7 @@ function ActivityTimelineItem({ activity }: { activity: WorkItemActivity }) {
         {activity.visibility ? <span className="w-fit rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{visibilityLabel(activity.visibility)}</span> : null}
       </div>
       <ActivityReplyQuote replyTo={activity.reply_to} />
-      {activity.withdrawn_at ? <p className="mt-2 text-sm italic text-slate-500">Tin nhắn đã được thu hồi</p> : activity.comment ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-5 text-slate-700">{activity.comment}</p> : null}
+      {activity.withdrawn_at ? <p className="mt-2 text-sm italic text-slate-500">Tin nhắn đã được thu hồi</p> : comment ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-5 text-slate-700">{comment}</p> : null}
       <ActivityAttachments attachments={activity.attachments} />
       {!activity.withdrawn_at && activity.reactions?.length ? <div className="mt-2"><ActivityReactionBar reactions={activity.reactions} /></div> : null}
     </article>
@@ -888,7 +891,7 @@ function primarySurfaceNextAction(kind: WorkItemPrimarySurfaceKind, actions: Wor
 
 function completionRequirementDescription(key: string, satisfied: boolean, satisfiedBy?: string) {
   if (!satisfied) return 'Chưa đáp ứng điều kiện hoàn tất.';
-  if (satisfiedBy === 'workflow_form') return key === 'checklist' ? 'Đã đáp ứng qua hồ sơ nghiệp vụ đã gửi.' : 'Hồ sơ nghiệp vụ đúng phiên bản đã được gửi.';
+  if (satisfiedBy === 'workflow_form') return key === 'checklist' ? 'Đã đáp ứng qua hồ sơ nghiệp vụ đã chốt.' : 'Hồ sơ nghiệp vụ đúng phiên bản đã được chốt.';
   if (satisfiedBy === 'completion_payload') return 'Đã ghi nhận trong dữ liệu hoàn tất của đầu việc.';
   if (satisfiedBy === 'evidence') return 'Đã có minh chứng đang hiệu lực.';
   return 'Đã đáp ứng.';
