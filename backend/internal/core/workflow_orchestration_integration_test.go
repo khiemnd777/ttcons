@@ -4,8 +4,13 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -407,7 +412,76 @@ func TestWorkflowFormTemplateAndFieldValidation(t *testing.T) {
 	}
 }
 
+func TestStoreSealAssetUploadNormalizesSupportedImagesAndRejectsSVG(t *testing.T) {
+	service := NewService(nil, "test-secret")
+	storageRoot := t.TempDir()
+	service.ConfigureUploads(storageRoot, 10*1024*1024)
+
+	imageData := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	imageData.Set(0, 0, color.RGBA{R: 180, G: 20, B: 20, A: 255})
+	var pngBuffer bytes.Buffer
+	if err := png.Encode(&pngBuffer, imageData); err != nil {
+		t.Fatal(err)
+	}
+	var jpegBuffer bytes.Buffer
+	if err := jpeg.Encode(&jpegBuffer, imageData, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatal(err)
+	}
+	webpBytes, err := base64.StdEncoding.DecodeString("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, testCase := range []struct {
+		name     string
+		filename string
+		content  []byte
+		mimeType string
+	}{
+		{name: "png", filename: "seal.png", content: pngBuffer.Bytes(), mimeType: "image/png"},
+		{name: "jpeg", filename: "seal.jpg", content: jpegBuffer.Bytes(), mimeType: "image/jpeg"},
+		{name: "webp", filename: "seal.webp", content: webpBytes, mimeType: "image/webp"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			stored, _, originalName, sourceMIME, width, height, storeErr := service.storeSealAssetUpload(
+				context.Background(),
+				testMultipartFileHeader(t, "file", testCase.filename, testCase.content),
+			)
+			if storeErr != nil {
+				t.Fatal(storeErr)
+			}
+			if originalName != testCase.filename || sourceMIME != testCase.mimeType {
+				t.Fatalf("upload metadata original=%q mime=%q, want %q %q", originalName, sourceMIME, testCase.filename, testCase.mimeType)
+			}
+			if stored.MIMEType != "image/png" || stored.StorageProvider != "local" || stored.StorageKey == "" || stored.FileSize <= 0 || len(stored.ChecksumSHA256) != 64 {
+				t.Fatalf("normalized seal metadata = %#v", stored)
+			}
+			if width <= 0 || height <= 0 {
+				t.Fatalf("normalized dimensions = %dx%d", width, height)
+			}
+			normalized, readErr := os.ReadFile(filepath.Join(storageRoot, filepath.FromSlash(stored.StorageKey)))
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if !bytes.HasPrefix(normalized, []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}) {
+				t.Fatalf("normalized content is not PNG: %v", normalized[:min(8, len(normalized))])
+			}
+		})
+	}
+
+	_, _, _, _, _, _, err = service.storeSealAssetUpload(
+		context.Background(),
+		testMultipartFileHeader(t, "file", "seal.svg", []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`)),
+	)
+	assertValidationError(t, err)
+}
+
 func TestWorkflowFormPDFGeneratorProducesPDFWithSignatureStamp(t *testing.T) {
+	sealApplicationID := newID()
+	sealImage, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=")
+	if err != nil {
+		t.Fatal(err)
+	}
 	form := Record{
 		"instance": Record{
 			"id":               newID(),
@@ -436,6 +510,7 @@ func TestWorkflowFormPDFGeneratorProducesPDFWithSignatureStamp(t *testing.T) {
 			"risks": []any{map[string]any{"risk": "Chậm phê duyệt vật liệu", "severity": "high"}},
 		},
 		"signatures": []Record{{
+			"id":                     newID(),
 			"signer_name":            "Worker",
 			"purpose":                "internal_ack",
 			"signed_at":              "2026-06-21T10:00:00Z",
@@ -453,11 +528,29 @@ func TestWorkflowFormPDFGeneratorProducesPDFWithSignatureStamp(t *testing.T) {
 				},
 			},
 		}},
+		"seal_applications": []Record{{
+			"id":                sealApplicationID,
+			"seal_asset_name":   "Dấu tròn TTCons",
+			"purpose":           "internal_ack",
+			"applied_by_name":   "Giám đốc",
+			"applied_at":        "2026-06-21T10:05:00Z",
+			"payload_hash":      strings.Repeat("c", 64),
+			"checksum_sha256":   strings.Repeat("d", 64),
+			"width_px":          1,
+			"height_px":         1,
+			"form_revision_no":  2,
+			"seal_asset_status": "active",
+			"storage_provider":  "local",
+			"storage_key":       "seal-assets/test.png",
+			"mime_type":         "image/png",
+			"file_size":         len(sealImage),
+		}},
 	}
 	context := WorkflowFormPDFContext{
 		GeneratedAt: time.Date(2026, 6, 21, 17, 30, 0, 0, time.FixedZone("ICT", 7*60*60)),
 		GeneratedBy: "Nguyễn Văn A", ProjectCode: "DA-001", ProjectName: "Văn phòng An Phát",
 		NodeName: "Khảo sát", NodeOrder: 2, StepName: "Nắm phong cách thiết kế", StepOrder: 3,
+		SealImages: map[string][]byte{sealApplicationID: sealImage},
 	}
 	pdfBytes, payloadHash, err := GenerateWorkflowFormPDFWithContext(form, context)
 	if err != nil {
@@ -493,12 +586,43 @@ func TestWorkflowFormPDFGeneratorProducesPDFWithSignatureStamp(t *testing.T) {
 	if workflowPDFPurposeLabel("internal_ack") != "Xác nhận nội bộ" || len(signatureStrokes(document.Signatures[0])) != 1 {
 		t.Fatalf("signature presentation was not preserved: %#v", document.Signatures)
 	}
+	if len(document.SealApplications) != 1 || cleanID(document.SealApplications[0]["id"]) != sealApplicationID || len(document.SealImages[sealApplicationID]) == 0 {
+		t.Fatalf("seal presentation was not preserved: applications=%#v images=%d", document.SealApplications, len(document.SealImages[sealApplicationID]))
+	}
 	_, secondPayloadHash, err := GenerateWorkflowFormPDFWithContext(form, WorkflowFormPDFContext{GeneratedAt: context.GeneratedAt.Add(time.Hour), GeneratedBy: "Người khác"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if secondPayloadHash != payloadHash {
 		t.Fatalf("presentation metadata changed immutable payload hash: %s != %s", secondPayloadHash, payloadHash)
+	}
+	form["seal_applications"].([]Record)[0]["seal_asset_status"] = "archived"
+	form["seal_applications"].([]Record)[0]["storage_provider"] = "s3"
+	_, archivedPayloadHash, err := GenerateWorkflowFormPDFWithContext(form, context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if archivedPayloadHash != payloadHash {
+		t.Fatalf("mutable seal catalog/storage presentation changed immutable payload hash: %s != %s", archivedPayloadHash, payloadHash)
+	}
+	form["pdf_confirmation_preferences"] = []Record{{
+		"purpose":            "internal_ack",
+		"include_signatures": false,
+		"include_seals":      true,
+	}}
+	selectedForm, confirmationSelection := selectWorkflowFormPDFConfirmations(form)
+	if len(workflowPDFRecords(selectedForm["signatures"])) != 0 || len(workflowPDFRecords(selectedForm["seal_applications"])) != 1 {
+		t.Fatalf("selected PDF confirmations = signatures %#v seals %#v", selectedForm["signatures"], selectedForm["seal_applications"])
+	}
+	if number(confirmationSelection["signature_count"]) != 0 || number(confirmationSelection["seal_application_count"]) != 1 {
+		t.Fatalf("confirmation selection metadata = %#v", confirmationSelection)
+	}
+	_, selectedPayloadHash, err := GenerateWorkflowFormPDFWithContext(selectedForm, context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selectedPayloadHash == payloadHash {
+		t.Fatal("excluding a signature must change the rendered confirmation snapshot hash")
 	}
 }
 
@@ -1780,6 +1904,216 @@ func TestPlanningChecklistSubmitRequiresClearItemsAndValidEvidence(t *testing.T)
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='checklist_items'`, 1, instanceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='submitted'`, 1, instanceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND completion_payload_json ? 'checklist_items'`, 1, fixture.itemID)
+}
+
+func TestWorkflowFormSealAssetsAreReusableArchivedAndSeparateFromSignatures(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	service.ConfigureUploads(t.TempDir(), 10*1024*1024)
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "task", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1, $2, v.template_id, v.id, t.form_type, 'Seal confirmation form', $3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := cleanID(instanceRows[0]["id"])
+	sealImage := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	sealImage.Set(0, 0, color.RGBA{R: 180, G: 20, B: 20, A: 255})
+	var sealBuffer bytes.Buffer
+	if err := png.Encode(&sealBuffer, sealImage); err != nil {
+		t.Fatal(err)
+	}
+	pngBytes := sealBuffer.Bytes()
+
+	if _, err := service.SealAssets(ctx, false, fixture.workerID); err == nil {
+		t.Fatal("expected seal catalog permission to be required")
+	} else {
+		var statusErr StatusError
+		if !errors.As(err, &statusErr) || statusErr.Code != "FORBIDDEN" {
+			t.Fatalf("seal catalog permission error = %#v", err)
+		}
+	}
+	if _, err := service.CreateSealAsset(ctx, "Dấu chưa cấp quyền", testMultipartFileHeader(t, "file", "seal.png", pngBytes), fixture.workerID, "Worker"); err == nil {
+		t.Fatal("expected seal.manage permission to be required")
+	}
+
+	mustExec(t, db, `
+		INSERT INTO role_permissions (role_id, permission_id)
+		SELECT assignment.role_id, permission.id
+		FROM user_roles assignment
+		JOIN permissions permission ON permission.key IN ('seal.use','seal.manage')
+		WHERE assignment.user_id=$1
+		ON CONFLICT DO NOTHING
+	`, fixture.workerID)
+	asset, err := service.CreateSealAsset(ctx, "Dấu tròn TTCons", testMultipartFileHeader(t, "file", "ttcons-seal.png", pngBytes), fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assetID := cleanID(asset["id"])
+	if assetID == "" || fmt.Sprint(asset["status"]) != "active" || fmt.Sprint(asset["mime_type"]) != "image/png" || fmt.Sprint(asset["source_mime_type"]) != "image/png" {
+		t.Fatalf("created seal asset = %#v", asset)
+	}
+	if hash := fmt.Sprint(asset["checksum_sha256"]); len(hash) != 64 {
+		t.Fatalf("seal checksum = %q, want 64 hex chars", hash)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_type='seal_asset' AND target_id=$1 AND event_type='seal_asset_uploaded'`, 1, assetID)
+
+	_, err = service.ApplyWorkflowFormSeal(ctx, instanceID, WorkflowFormSealApplyRequest{SealAssetID: assetID, Purpose: "internal_ack"}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
+	if _, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{
+		Answers: Record{"summary": "Đã hoàn tất nội dung để xác nhận bằng con dấu"},
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+
+	form, err := service.ApplyWorkflowFormSeal(ctx, instanceID, WorkflowFormSealApplyRequest{
+		SealAssetID: assetID,
+		Purpose:     "internal_ack",
+		Comment:     "Đóng dấu xác nhận nội bộ",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	form, err = service.ApplyWorkflowFormSeal(ctx, instanceID, WorkflowFormSealApplyRequest{
+		SealAssetID: assetID,
+		Purpose:     "reviewed_by",
+		Comment:     "Tái sử dụng cùng tài nguyên cho mục đích rà soát",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	applications, ok := form["seal_applications"].([]Record)
+	if !ok || len(applications) != 2 {
+		t.Fatalf("expected two reusable seal applications, got %#v", form["seal_applications"])
+	}
+	if signatures, ok := form["signatures"].([]Record); !ok || len(signatures) != 0 {
+		t.Fatalf("seal applications must remain separate from human signatures, got %#v", form["signatures"])
+	}
+	applicationID := cleanID(applications[0]["id"])
+	if applicationID == "" || cleanID(applications[0]["seal_asset_id"]) != assetID {
+		t.Fatalf("seal application missing immutable links: %#v", applications[0])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='seal_applied'`, 2, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_type='workflow_form_seal_application' AND event_type='workflow_form_seal_applied' AND metadata_json->>'seal_asset_id'=$1`, 2, assetID)
+
+	archived, err := service.ArchiveSealAsset(ctx, assetID, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(archived["status"]) != "archived" {
+		t.Fatalf("archived seal status = %#v", archived["status"])
+	}
+	activeAssets, err := service.SealAssets(ctx, false, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recordByID(activeAssets, "id", assetID) != nil {
+		t.Fatalf("archived seal remained in active catalog: %#v", activeAssets)
+	}
+	allAssets, err := service.SealAssets(ctx, true, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if archivedAsset := recordByID(allAssets, "id", assetID); archivedAsset == nil || fmt.Sprint(archivedAsset["status"]) != "archived" {
+		t.Fatalf("archived seal missing from management catalog: %#v", allAssets)
+	}
+	if _, err := service.ApplyWorkflowFormSeal(ctx, instanceID, WorkflowFormSealApplyRequest{SealAssetID: assetID, Purpose: "approved_by"}, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("expected archived seal to be unavailable for new applications")
+	} else {
+		assertValidationError(t, err)
+	}
+
+	visualFile, err := service.WorkflowFormSealApplicationVisual(ctx, applicationID, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	visualBytes, err := io.ReadAll(visualFile.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := visualFile.Reader.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if visualFile.MIMEType != "image/png" || !bytes.HasPrefix(visualBytes, []byte{0x89, 'P', 'N', 'G'}) {
+		t.Fatalf("historical seal visual = mime %q bytes %v", visualFile.MIMEType, visualBytes[:min(8, len(visualBytes))])
+	}
+
+	form, err = service.SignWorkflowForm(ctx, instanceID, testSignatureRequest("Ký cùng mục đích để chọn thành phần PDF"), fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	form, err = service.SaveWorkflowFormPDFConfirmationPreference(ctx, instanceID, WorkflowFormPDFConfirmationPreferenceRequest{
+		Purpose:           "internal_ack",
+		IncludeSignatures: false,
+		IncludeSeals:      true,
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	preferences, ok := form["pdf_confirmation_preferences"].([]Record)
+	if !ok || len(preferences) != 1 || boolValue(preferences[0]["include_signatures"]) || !boolValue(preferences[0]["include_seals"]) {
+		t.Fatalf("unexpected PDF confirmation preference: %#v", form["pdf_confirmation_preferences"])
+	}
+	if _, err := service.SaveWorkflowFormPDFConfirmationPreference(ctx, instanceID, WorkflowFormPDFConfirmationPreferenceRequest{
+		Purpose:           "internal_ack",
+		IncludeSignatures: false,
+		IncludeSeals:      false,
+	}, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("expected at least one PDF confirmation kind to remain selected")
+	} else {
+		assertValidationError(t, err)
+	}
+
+	pdfForm, err := service.GenerateWorkflowFormPDFExport(ctx, instanceID, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pdfExports, ok := pdfForm["pdf_exports"].([]Record)
+	if !ok || len(pdfExports) != 1 {
+		t.Fatalf("expected PDF with seal confirmations, got %#v", pdfForm["pdf_exports"])
+	}
+	exportMetadata := recordFromAny(pdfExports[0]["metadata_json"])
+	confirmationSelection := recordFromAny(exportMetadata["confirmation_selection"])
+	if number(confirmationSelection["signature_count"]) != 0 || number(confirmationSelection["seal_application_count"]) != 2 {
+		t.Fatalf("PDF confirmation selection = %#v, want 0 signatures and 2 seals", confirmationSelection)
+	}
+	if ids, ok := confirmationSelection["signature_ids"].([]any); !ok || len(ids) != 0 {
+		t.Fatalf("selected signature ids = %#v, want empty", confirmationSelection["signature_ids"])
+	}
+	pdfFile, err := service.WorkflowFormPDFExportFile(ctx, cleanID(pdfExports[0]["id"]), fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pdfBytes, err := io.ReadAll(pdfFile.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pdfFile.Reader.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-")) {
+		t.Fatalf("expected PDF bytes, got %q", pdfBytes[:min(8, len(pdfBytes))])
+	}
+
+	if _, err := db.ExecContext(ctx, `UPDATE workflow_form_seal_applications SET comment='mutated' WHERE id=$1`, applicationID); err == nil {
+		t.Fatal("expected immutable seal application update to fail")
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE seal_assets SET name='mutated' WHERE id=$1`, assetID); err == nil {
+		t.Fatal("expected immutable seal asset content update to fail")
+	}
 }
 
 func TestWorkflowFormSignatureRequiresSubmittedFormAndIsImmutable(t *testing.T) {

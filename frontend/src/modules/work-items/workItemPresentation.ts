@@ -161,6 +161,8 @@ export function workflowFormEventLabel(value?: unknown) {
     submitted: 'Đã chốt hồ sơ',
     reopened: 'Đã mở lại hồ sơ',
     cancelled: 'Đã hủy hồ sơ',
+    signed: 'Đã ký hồ sơ',
+    seal_applied: 'Đã đóng dấu hồ sơ',
     pdf_exported: 'Đã tạo PDF',
     pdf_export_deleted: 'Đã xoá PDF',
   };
@@ -179,7 +181,7 @@ export function workflowFormActivityComment(value?: { metadata_json?: Record<str
 export function workflowFormNextAction(value?: Record<string, unknown> | null) {
   if (!hasWorkflowFormSummary(value)) return 'Theo dõi hoạt động';
   if (value?.workflow_form_status !== 'submitted') return 'Chốt hồ sơ nghiệp vụ';
-  return 'Ký / PDF / hoàn tất bước';
+  return 'Xác nhận / PDF / hoàn tất bước';
 }
 
 function firstNonEmpty(...values: unknown[]) {

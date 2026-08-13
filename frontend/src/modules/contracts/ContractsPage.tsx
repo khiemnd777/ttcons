@@ -530,6 +530,7 @@ export function ContractsPage() {
         open={Boolean(versionSignTarget)}
         signerName={user?.full_name}
         submitting={signVersion.isPending}
+        allowedKinds={['signature']}
         signedPurposes={(versionSignTarget?.form.signatures ?? [])
           .filter((signature) => signature.signer_user_id === user?.id)
           .map((signature) => signature.purpose)}

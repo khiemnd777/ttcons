@@ -35,26 +35,29 @@ type WorkflowFormPDFContext struct {
 	StepName      string
 	StepOrder     int
 	WorkItemTitle string
+	SealImages    map[string][]byte
 }
 
 type workflowFormPDFDocument struct {
-	Title           string
-	TemplateName    string
-	TemplateVersion int
-	FormType        string
-	Status          string
-	Revision        int
-	ProjectID       string
-	WorkItemID      string
-	Project         string
-	Workflow        string
-	SubmittedAt     string
-	GeneratedAt     string
-	GeneratedBy     string
-	PayloadHash     string
-	Fields          []workflowFormPDFField
-	Confirmations   []workflowFormPDFField
-	Signatures      []Record
+	Title            string
+	TemplateName     string
+	TemplateVersion  int
+	FormType         string
+	Status           string
+	Revision         int
+	ProjectID        string
+	WorkItemID       string
+	Project          string
+	Workflow         string
+	SubmittedAt      string
+	GeneratedAt      string
+	GeneratedBy      string
+	PayloadHash      string
+	Fields           []workflowFormPDFField
+	Confirmations    []workflowFormPDFField
+	Signatures       []Record
+	SealApplications []Record
+	SealImages       map[string][]byte
 }
 
 type workflowFormPDFField struct {
@@ -126,13 +129,105 @@ func GenerateWorkflowFormPDFWithContext(form Record, context WorkflowFormPDFCont
 
 func workflowFormPDFSnapshot(form Record) Record {
 	return Record{
-		"instance":   form["instance"],
-		"template":   form["template"],
-		"version":    form["version"],
-		"fields":     form["fields"],
-		"answers":    form["answers"],
-		"signatures": form["signatures"],
+		"instance":          form["instance"],
+		"template":          form["template"],
+		"version":           form["version"],
+		"fields":            form["fields"],
+		"answers":           form["answers"],
+		"signatures":        form["signatures"],
+		"seal_applications": workflowFormPDFSealApplicationSnapshots(form["seal_applications"]),
 	}
+}
+
+func selectWorkflowFormPDFConfirmations(form Record) (Record, Record) {
+	signatures := workflowPDFRecords(form["signatures"])
+	sealApplications := workflowPDFRecords(form["seal_applications"])
+	preferences := workflowPDFRecords(form["pdf_confirmation_preferences"])
+
+	hasSignatures := map[string]bool{}
+	hasSeals := map[string]bool{}
+	preferenceByPurpose := map[string]Record{}
+	for _, signature := range signatures {
+		hasSignatures[strings.TrimSpace(fmt.Sprint(signature["purpose"]))] = true
+	}
+	for _, application := range sealApplications {
+		hasSeals[strings.TrimSpace(fmt.Sprint(application["purpose"]))] = true
+	}
+	for _, preference := range preferences {
+		purpose := strings.TrimSpace(fmt.Sprint(preference["purpose"]))
+		if purpose != "" {
+			preferenceByPurpose[purpose] = preference
+		}
+	}
+
+	selectedSignatures := make([]Record, 0, len(signatures))
+	selectedSignatureIDs := make([]string, 0, len(signatures))
+	for _, signature := range signatures {
+		purpose := strings.TrimSpace(fmt.Sprint(signature["purpose"]))
+		preference, hasPreference := preferenceByPurpose[purpose]
+		if hasSignatures[purpose] && hasSeals[purpose] && hasPreference && !boolValue(preference["include_signatures"]) {
+			continue
+		}
+		selectedSignatures = append(selectedSignatures, signature)
+		if id := cleanID(signature["id"]); id != "" {
+			selectedSignatureIDs = append(selectedSignatureIDs, id)
+		}
+	}
+
+	selectedSealApplications := make([]Record, 0, len(sealApplications))
+	selectedSealApplicationIDs := make([]string, 0, len(sealApplications))
+	for _, application := range sealApplications {
+		purpose := strings.TrimSpace(fmt.Sprint(application["purpose"]))
+		preference, hasPreference := preferenceByPurpose[purpose]
+		if hasSignatures[purpose] && hasSeals[purpose] && hasPreference && !boolValue(preference["include_seals"]) {
+			continue
+		}
+		selectedSealApplications = append(selectedSealApplications, application)
+		if id := cleanID(application["id"]); id != "" {
+			selectedSealApplicationIDs = append(selectedSealApplicationIDs, id)
+		}
+	}
+
+	selectedForm := make(Record, len(form))
+	for key, value := range form {
+		selectedForm[key] = value
+	}
+	selectedForm["signatures"] = selectedSignatures
+	selectedForm["seal_applications"] = selectedSealApplications
+
+	selection := Record{
+		"signature_ids":          selectedSignatureIDs,
+		"seal_application_ids":   selectedSealApplicationIDs,
+		"signature_count":        len(selectedSignatures),
+		"seal_application_count": len(selectedSealApplications),
+	}
+	return selectedForm, selection
+}
+
+func workflowFormPDFSealApplicationSnapshots(value any) []Record {
+	applications := workflowPDFRecords(value)
+	snapshots := make([]Record, 0, len(applications))
+	for _, application := range applications {
+		snapshots = append(snapshots, Record{
+			"id":                    application["id"],
+			"project_id":            application["project_id"],
+			"work_item_id":          application["work_item_id"],
+			"form_instance_id":      application["form_instance_id"],
+			"form_version_id":       application["form_version_id"],
+			"form_revision_no":      application["form_revision_no"],
+			"seal_asset_id":         application["seal_asset_id"],
+			"purpose":               application["purpose"],
+			"applied_by":            application["applied_by"],
+			"applied_by_name":       application["applied_by_name"],
+			"applied_by_roles_json": application["applied_by_roles_json"],
+			"comment":               application["comment"],
+			"payload_json":          application["payload_json"],
+			"payload_hash":          application["payload_hash"],
+			"applied_at":            application["applied_at"],
+			"created_at":            application["created_at"],
+		})
+	}
+	return snapshots
 }
 
 func buildWorkflowFormPDFDocument(form Record, context WorkflowFormPDFContext, payloadHash string) (workflowFormPDFDocument, error) {
@@ -147,21 +242,23 @@ func buildWorkflowFormPDFDocument(form Record, context WorkflowFormPDFContext, p
 		generatedAt = time.Now()
 	}
 	document := workflowFormPDFDocument{
-		Title:           workflowPDFText(instance["title"], "Hồ sơ nghiệp vụ"),
-		TemplateName:    workflowPDFText(template["name"], "Biểu mẫu quy trình"),
-		TemplateVersion: int(number(version["version_no"])),
-		FormType:        workflowPDFFormTypeLabel(fmt.Sprint(instance["form_type"])),
-		Status:          workflowPDFStatusLabel(fmt.Sprint(instance["status"])),
-		Revision:        int(number(instance["current_revision"])),
-		ProjectID:       workflowPDFText(instance["project_id"], ""),
-		WorkItemID:      workflowPDFText(instance["work_item_id"], ""),
-		Project:         workflowPDFProjectLabel(context, instance),
-		Workflow:        workflowPDFWorkflowLabel(context, instance),
-		SubmittedAt:     workflowPDFDateTime(instance["submitted_at"]),
-		GeneratedAt:     workflowPDFDateTime(generatedAt),
-		GeneratedBy:     workflowPDFText(context.GeneratedBy, "Không xác định"),
-		PayloadHash:     payloadHash,
-		Signatures:      workflowPDFRecords(form["signatures"]),
+		Title:            workflowPDFText(instance["title"], "Hồ sơ nghiệp vụ"),
+		TemplateName:     workflowPDFText(template["name"], "Biểu mẫu quy trình"),
+		TemplateVersion:  int(number(version["version_no"])),
+		FormType:         workflowPDFFormTypeLabel(fmt.Sprint(instance["form_type"])),
+		Status:           workflowPDFStatusLabel(fmt.Sprint(instance["status"])),
+		Revision:         int(number(instance["current_revision"])),
+		ProjectID:        workflowPDFText(instance["project_id"], ""),
+		WorkItemID:       workflowPDFText(instance["work_item_id"], ""),
+		Project:          workflowPDFProjectLabel(context, instance),
+		Workflow:         workflowPDFWorkflowLabel(context, instance),
+		SubmittedAt:      workflowPDFDateTime(instance["submitted_at"]),
+		GeneratedAt:      workflowPDFDateTime(generatedAt),
+		GeneratedBy:      workflowPDFText(context.GeneratedBy, "Không xác định"),
+		PayloadHash:      payloadHash,
+		Signatures:       workflowPDFRecords(form["signatures"]),
+		SealApplications: workflowPDFRecords(form["seal_applications"]),
+		SealImages:       context.SealImages,
 	}
 
 	for _, field := range fields {
@@ -520,17 +617,20 @@ func (r *workflowFormPDFRenderer) drawConfirmations() {
 
 func (r *workflowFormPDFRenderer) drawSignatures() {
 	minimumHeight := 32.0
-	if len(r.document.Signatures) > 0 {
+	if len(r.document.Signatures) > 0 || len(r.document.SealApplications) > 0 {
 		minimumHeight = 69
 	}
 	r.ensureSpace(minimumHeight)
-	r.drawSectionTitle("03", "CHỮ KÝ NỘI BỘ", "Dấu vết xác nhận gắn với đúng nội dung và phiên bản hồ sơ")
-	if len(r.document.Signatures) == 0 {
-		r.drawEmptyState("Chưa có chữ ký nội bộ.")
+	r.drawSectionTitle("03", "XÁC NHẬN VÀ CON DẤU", "Dấu vết xác nhận gắn với đúng nội dung và phiên bản hồ sơ")
+	if len(r.document.Signatures) == 0 && len(r.document.SealApplications) == 0 {
+		r.drawEmptyState("Chưa có chữ ký cá nhân hoặc con dấu công ty.")
 		return
 	}
 	for _, signature := range r.document.Signatures {
 		r.drawSignature(signature)
+	}
+	for _, application := range r.document.SealApplications {
+		r.drawSealApplication(application)
 	}
 }
 
@@ -585,6 +685,73 @@ func (r *workflowFormPDFRenderer) drawSignature(signature Record) {
 	pdf.CellFormat(metaW, 4, "Hash nội dung: "+workflowPDFShortHash(fmt.Sprint(signature["payload_hash"])), "", 1, "L", false, 0, "")
 	pdf.SetX(metaX)
 	pdf.CellFormat(metaW, 4, "Checksum chữ ký: "+workflowPDFShortHash(fmt.Sprint(signature["visual_checksum_sha256"])), "", 0, "L", false, 0, "")
+	pdf.SetY(y + height + 3)
+}
+
+func (r *workflowFormPDFRenderer) drawSealApplication(application Record) {
+	r.ensureSpace(51)
+	pdf := r.pdf
+	x := workflowPDFMargin
+	y := pdf.GetY()
+	height := 47.0
+	pdf.SetFillColor(255, 255, 255)
+	pdf.SetDrawColor(203, 213, 225)
+	pdf.RoundedRect(x, y, workflowPDFContentWidth, height, 2, "1234", "FD")
+
+	canvasX, canvasY, canvasW, canvasH := x+4, y+8, 64.0, 31.0
+	pdf.SetFillColor(248, 250, 252)
+	pdf.SetDrawColor(226, 232, 240)
+	pdf.RoundedRect(canvasX, canvasY, canvasW, canvasH, 1.5, "1234", "FD")
+	applicationID := cleanID(application["id"])
+	imageBytes := r.document.SealImages[applicationID]
+	if len(imageBytes) == 0 {
+		pdf.SetXY(canvasX+3, canvasY+12)
+		pdf.SetTextColor(148, 163, 184)
+		pdf.SetFont(workflowPDFFontFamily, "", 7)
+		pdf.CellFormat(canvasW-6, 5, "Không tải được ảnh con dấu", "", 0, "C", false, 0, "")
+	} else {
+		imageName := "seal-" + applicationID
+		info := pdf.RegisterImageOptionsReader(imageName, fpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}, bytes.NewReader(imageBytes))
+		if info != nil {
+			maxW, maxH := canvasW-8, canvasH-4
+			imageW, imageH := maxW, maxH
+			if width := number(application["width_px"]); width > 0 {
+				if heightPx := number(application["height_px"]); heightPx > 0 {
+					ratio := width / heightPx
+					imageH = imageW / ratio
+					if imageH > maxH {
+						imageH = maxH
+						imageW = imageH * ratio
+					}
+				}
+			}
+			imageX := canvasX + (canvasW-imageW)/2
+			imageY := canvasY + (canvasH-imageH)/2
+			pdf.ImageOptions(imageName, imageX, imageY, imageW, imageH, false, fpdf.ImageOptions{ImageType: "PNG"}, 0, "")
+		}
+	}
+
+	metaX := canvasX + canvasW + 6
+	metaW := workflowPDFContentWidth - canvasW - 14
+	pdf.SetXY(metaX, y+5)
+	pdf.SetTextColor(30, 64, 175)
+	pdf.SetFont(workflowPDFFontFamily, "B", 7)
+	pdf.CellFormat(metaW, 4, "CON DẤU CÔNG TY · "+strings.ToUpper(workflowPDFPurposeLabel(fmt.Sprint(application["purpose"]))), "", 1, "L", false, 0, "")
+	pdf.SetX(metaX)
+	pdf.SetTextColor(15, 23, 42)
+	pdf.SetFont(workflowPDFFontFamily, "B", 10)
+	pdf.CellFormat(metaW, 5.5, workflowPDFText(application["seal_asset_name"], "Con dấu công ty"), "", 1, "L", false, 0, "")
+	pdf.SetX(metaX)
+	pdf.SetTextColor(71, 85, 105)
+	pdf.SetFont(workflowPDFFontFamily, "", 7.3)
+	pdf.CellFormat(metaW, 4.5, "Áp dụng bởi: "+workflowPDFText(application["applied_by_name"], "Không xác định"), "", 1, "L", false, 0, "")
+	pdf.SetX(metaX)
+	pdf.SetFont(workflowPDFFontFamily, "", 6.3)
+	pdf.CellFormat(metaW, 4, "Đóng dấu lúc: "+workflowPDFText(workflowPDFDateTime(application["applied_at"]), "Chưa ghi nhận"), "", 1, "L", false, 0, "")
+	pdf.SetX(metaX)
+	pdf.CellFormat(metaW, 4, "Hash nội dung: "+workflowPDFShortHash(fmt.Sprint(application["payload_hash"])), "", 1, "L", false, 0, "")
+	pdf.SetX(metaX)
+	pdf.CellFormat(metaW, 4, "Checksum con dấu: "+workflowPDFShortHash(fmt.Sprint(application["checksum_sha256"])), "", 0, "L", false, 0, "")
 	pdf.SetY(y + height + 3)
 }
 

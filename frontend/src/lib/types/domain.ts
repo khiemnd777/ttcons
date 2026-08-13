@@ -2144,7 +2144,54 @@ export type WorkflowFormDetail = {
   answers?: AnyRecord;
   events?: AnyRecord[];
   signatures?: WorkflowFormSignature[];
+  seal_applications?: WorkflowFormSealApplication[];
+  pdf_confirmation_preferences?: WorkflowFormPDFConfirmationPreference[];
   pdf_exports?: WorkflowFormPDFExport[];
+};
+
+export type SealAsset = ProjectOperationsRecord & {
+  name: string;
+  status: 'active' | 'archived' | string;
+  original_name: string;
+  source_mime_type: 'image/png' | 'image/jpeg' | 'image/webp' | string;
+  storage_provider: 'local' | 's3' | string;
+  storage_key: string;
+  mime_type: 'image/png' | string;
+  file_size: number;
+  width_px: number;
+  height_px: number;
+  checksum_sha256: string;
+  uploaded_by: string;
+  uploaded_by_name: string;
+  archived_by?: string;
+  archived_by_name?: string;
+  archived_at?: string;
+};
+
+export type WorkflowFormSealApplication = ProjectOperationsRecord & {
+  project_id: string;
+  work_item_id: string;
+  form_instance_id: string;
+  form_version_id: string;
+  form_revision_no: number;
+  seal_asset_id: string;
+  seal_asset_name: string;
+  seal_asset_status: 'active' | 'archived' | string;
+  purpose: 'internal_ack' | 'prepared_by' | 'reviewed_by' | 'approved_by' | 'received_by' | string;
+  applied_by: string;
+  applied_by_name: string;
+  applied_by_roles_json?: string[] | AnyRecord[];
+  comment?: string;
+  payload_json?: AnyRecord;
+  payload_hash: string;
+  storage_provider: 'local' | 's3' | string;
+  storage_key: string;
+  mime_type: 'image/png' | string;
+  file_size: number;
+  width_px: number;
+  height_px: number;
+  checksum_sha256: string;
+  applied_at: string;
 };
 
 export type WorkflowFormSignature = ProjectOperationsRecord & {
@@ -2168,6 +2215,23 @@ export type WorkflowFormSignature = ProjectOperationsRecord & {
   signed_at: string;
 };
 
+export type WorkflowFormPDFConfirmationPreference = ProjectOperationsRecord & {
+  form_instance_id: string;
+  purpose: 'internal_ack' | 'prepared_by' | 'reviewed_by' | 'approved_by' | 'received_by' | string;
+  include_signatures: boolean;
+  include_seals: boolean;
+  updated_by?: string;
+  updated_by_name?: string;
+  updated_at: string;
+};
+
+export type WorkflowFormPDFConfirmationSelection = {
+  signature_ids?: string[];
+  seal_application_ids?: string[];
+  signature_count?: number;
+  seal_application_count?: number;
+};
+
 export type WorkflowFormPDFExport = ProjectOperationsRecord & {
   work_item_id: string;
   form_instance_id: string;
@@ -2181,7 +2245,7 @@ export type WorkflowFormPDFExport = ProjectOperationsRecord & {
   file_size: number;
   checksum_sha256: string;
   payload_hash: string;
-  metadata_json?: AnyRecord;
+  metadata_json?: AnyRecord & { confirmation_selection?: WorkflowFormPDFConfirmationSelection };
   generated_by?: string;
   generated_by_name?: string;
   generated_at: string;

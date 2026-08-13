@@ -55,6 +55,11 @@ func (r *SQLMigrationRepository) InventoryLocal(ctx context.Context) ([]Migratio
 			FROM workflow_form_signatures
 			WHERE visual_storage_provider = 'local'
 			UNION ALL
+			SELECT 'seal_assets', id::text, storage_provider,
+				storage_key, file_size::bigint, COALESCE(mime_type, 'image/png'), checksum_sha256
+			FROM seal_assets
+			WHERE storage_provider = 'local'
+			UNION ALL
 			SELECT 'workflow_form_pdf_exports', id::text, storage_provider,
 				storage_key, file_size::bigint, COALESCE(mime_type, 'application/pdf'), checksum_sha256
 			FROM workflow_form_pdf_exports
@@ -101,6 +106,8 @@ func (r *SQLMigrationRepository) MoveToS3(ctx context.Context, record MigrationR
 		query = `UPDATE evidence_records SET storage_provider='s3', storage_key=$1 WHERE id=$2::uuid AND storage_provider='local' AND storage_key=$3`
 	case "workflow_form_signatures":
 		query = `UPDATE workflow_form_signatures SET visual_storage_provider='s3', visual_storage_key=$1 WHERE id=$2::uuid AND visual_storage_provider='local' AND visual_storage_key=$3`
+	case "seal_assets":
+		query = `UPDATE seal_assets SET storage_provider='s3', storage_key=$1 WHERE id=$2::uuid AND storage_provider='local' AND storage_key=$3`
 	case "workflow_form_pdf_exports":
 		query = `UPDATE workflow_form_pdf_exports SET storage_provider='s3', storage_key=$1 WHERE id=$2::uuid AND storage_provider='local' AND storage_key=$3`
 	case "input_invoices":

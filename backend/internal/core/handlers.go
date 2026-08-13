@@ -1189,6 +1189,93 @@ func (h *Handler) SignWorkflowForm(c *fiber.Ctx) error {
 	return response.Created(c, form)
 }
 
+func (h *Handler) SealAssets(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"seal.use", "seal.manage"}); err != nil {
+		return err
+	}
+	assets, err := h.service.SealAssets(c.Context(), c.QueryBool("include_archived", false), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, assets)
+}
+
+func (h *Handler) UploadSealAsset(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"seal.manage"}); err != nil {
+		return err
+	}
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Tệp ảnh con dấu là bắt buộc")
+	}
+	asset, err := h.service.CreateSealAsset(c.Context(), c.FormValue("name"), fileHeader, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, asset)
+}
+
+func (h *Handler) ArchiveSealAsset(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"seal.manage"}); err != nil {
+		return err
+	}
+	asset, err := h.service.ArchiveSealAsset(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, asset)
+}
+
+func (h *Handler) GetSealAssetFile(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"seal.use", "seal.manage"}); err != nil {
+		return err
+	}
+	file, err := h.service.SealAssetFile(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return sendProtectedFile(c, file, "con-dau.png")
+}
+
+func (h *Handler) ApplyWorkflowFormSeal(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"seal.use"}); err != nil {
+		return err
+	}
+	req := WorkflowFormSealApplyRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu con dấu workflow form không hợp lệ")
+		}
+	}
+	form, err := h.service.ApplyWorkflowFormSeal(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, form)
+}
+
+func (h *Handler) GetWorkflowFormSealApplicationVisual(c *fiber.Ctx) error {
+	file, err := h.service.WorkflowFormSealApplicationVisual(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return sendProtectedFile(c, file, "con-dau-ho-so.png")
+}
+
+func (h *Handler) SaveWorkflowFormPDFConfirmationPreference(c *fiber.Ctx) error {
+	req := WorkflowFormPDFConfirmationPreferenceRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Lựa chọn xác nhận hiển thị trong PDF không hợp lệ")
+		}
+	}
+	form, err := h.service.SaveWorkflowFormPDFConfirmationPreference(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, form)
+}
+
 func (h *Handler) GenerateWorkflowFormPDFExport(c *fiber.Ctx) error {
 	form, err := h.service.GenerateWorkflowFormPDFExport(c.Context(), c.Params("id"), actorID(c), actorName(c))
 	if err != nil {

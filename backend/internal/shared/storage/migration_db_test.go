@@ -15,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
-func TestSQLMigrationRepositoryInventoriesEveryLocalRowAcrossFiveFamilies(t *testing.T) {
+func TestSQLMigrationRepositoryInventoriesEveryLocalRowAcrossSixFamilies(t *testing.T) {
 	dsn := os.Getenv("CONSFLOW_TEST_DATABASE_URL")
 	if strings.TrimSpace(dsn) == "" {
 		if os.Getenv("CI") != "" {
@@ -60,6 +60,10 @@ func TestSQLMigrationRepositoryInventoriesEveryLocalRowAcrossFiveFamilies(t *tes
 			id uuid PRIMARY KEY, visual_storage_provider text NOT NULL, visual_storage_key text,
 			visual_file_size bigint, visual_mime_type text, visual_checksum_sha256 text
 		);
+		CREATE TABLE seal_assets (
+			id uuid PRIMARY KEY, storage_provider text NOT NULL, storage_key text NOT NULL,
+			file_size bigint NOT NULL, mime_type text, checksum_sha256 text NOT NULL
+		);
 		CREATE TABLE workflow_form_pdf_exports (
 			id uuid PRIMARY KEY, storage_provider text NOT NULL, storage_key text NOT NULL,
 			file_size bigint NOT NULL, mime_type text, checksum_sha256 text NOT NULL
@@ -85,6 +89,7 @@ func TestSQLMigrationRepositoryInventoriesEveryLocalRowAcrossFiveFamilies(t *tes
 	fixtures := []fixture{
 		{family: "evidence_records", id: uuid.NewString(), key: "evidence/valid.pdf", content: []byte("evidence")},
 		{family: "workflow_form_signatures", id: uuid.NewString(), key: "workflow-signatures/valid.svg", content: []byte("signature")},
+		{family: "seal_assets", id: uuid.NewString(), key: "seal-assets/valid.png", content: []byte("seal")},
 		{family: "workflow_form_pdf_exports", id: uuid.NewString(), key: "workflow-form-pdfs/valid.pdf", content: []byte("workflow-pdf")},
 		{family: "input_invoices", id: uuid.NewString(), key: "input-invoices/valid.pdf", content: []byte("input-invoice")},
 		{family: "output_invoices", id: uuid.NewString(), key: "output-invoices/valid.pdf", content: []byte("output-invoice")},
@@ -98,6 +103,8 @@ func TestSQLMigrationRepositoryInventoriesEveryLocalRowAcrossFiveFamilies(t *tes
 			statement = `INSERT INTO evidence_records VALUES ($1,'local',$2,$3,'application/pdf',$4)`
 		case "workflow_form_signatures":
 			statement = `INSERT INTO workflow_form_signatures VALUES ($1,'local',$2,$3,'image/svg+xml',$4)`
+		case "seal_assets":
+			statement = `INSERT INTO seal_assets VALUES ($1,'local',$2,$3,'image/png',$4)`
 		case "workflow_form_pdf_exports":
 			statement = `INSERT INTO workflow_form_pdf_exports VALUES ($1,'local',$2,$3,'application/pdf',$4)`
 		case "input_invoices":
@@ -134,8 +141,8 @@ func TestSQLMigrationRepositoryInventoriesEveryLocalRowAcrossFiveFamilies(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != 8 {
-		t.Fatalf("inventory size=%d, want five valid plus three invalid local rows", len(records))
+	if len(records) != 9 {
+		t.Fatalf("inventory size=%d, want six valid plus three invalid local rows", len(records))
 	}
 	familyCounts := map[string]int{}
 	invalidVisible := false
@@ -166,7 +173,7 @@ func TestSQLMigrationRepositoryInventoriesEveryLocalRowAcrossFiveFamilies(t *tes
 	}
 	destination := newMemoryStore(S3Provider)
 	summary, migrationErr := MigrateLocalToS3(ctx, repository, local, destination, MigrationOptions{})
-	if migrationErr == nil || summary.Inventory != 8 || summary.SourceVerified != 5 || summary.Failed != 3 {
+	if migrationErr == nil || summary.Inventory != 9 || summary.SourceVerified != 6 || summary.Failed != 3 {
 		t.Fatalf("dry-run error=%v summary=%#v", migrationErr, summary)
 	}
 
@@ -188,7 +195,7 @@ func TestSQLMigrationRepositoryInventoriesEveryLocalRowAcrossFiveFamilies(t *tes
 		}
 	}
 	var moved int
-	for _, table := range []string{"evidence_records", "workflow_form_signatures", "workflow_form_pdf_exports", "input_invoices", "output_invoices"} {
+	for _, table := range []string{"evidence_records", "workflow_form_signatures", "seal_assets", "workflow_form_pdf_exports", "input_invoices", "output_invoices"} {
 		providerColumn := "storage_provider"
 		if table == "workflow_form_signatures" {
 			providerColumn = "visual_storage_provider"

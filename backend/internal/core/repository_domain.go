@@ -2383,7 +2383,36 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 		SELECT *
 		FROM workflow_form_signatures
 		WHERE form_instance_id=$1
-		ORDER BY signed_at DESC, created_at DESC
+		ORDER BY signed_at DESC, created_at DESC, id
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	sealApplications, err := queryRecords(ctx, db, `
+		SELECT
+			application.*,
+			asset.name AS seal_asset_name,
+			asset.status AS seal_asset_status,
+			asset.storage_provider,
+			asset.storage_key,
+			asset.mime_type,
+			asset.file_size,
+			asset.width_px,
+			asset.height_px,
+			asset.checksum_sha256
+		FROM workflow_form_seal_applications application
+		JOIN seal_assets asset ON asset.id=application.seal_asset_id
+		WHERE application.form_instance_id=$1
+		ORDER BY application.applied_at DESC, application.created_at DESC, application.id
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	pdfConfirmationPreferences, err := queryRecords(ctx, db, `
+		SELECT *
+		FROM workflow_form_pdf_confirmation_preferences
+		WHERE form_instance_id=$1
+		ORDER BY purpose, created_at, id
 	`, instanceID)
 	if err != nil {
 		return nil, err
@@ -2425,11 +2454,13 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 			"version_no": instance["form_version_no"],
 			"status":     instance["form_version_status"],
 		},
-		"fields":      fields,
-		"answers":     answers,
-		"events":      events,
-		"signatures":  signatures,
-		"pdf_exports": pdfExports,
+		"fields":                       fields,
+		"answers":                      answers,
+		"events":                       events,
+		"signatures":                   signatures,
+		"seal_applications":            sealApplications,
+		"pdf_confirmation_preferences": pdfConfirmationPreferences,
+		"pdf_exports":                  pdfExports,
 	}, nil
 }
 
@@ -5194,6 +5225,296 @@ func workflowAnswerRecordList(value any) []Record {
 	}
 }
 
+func (r *Repository) ListSealAssets(ctx context.Context, includeArchived bool) ([]Record, error) {
+	statusFilter := "WHERE status='active'"
+	if includeArchived {
+		statusFilter = ""
+	}
+	return r.Query(ctx, `
+		SELECT *
+		FROM seal_assets
+		`+statusFilter+`
+		ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, created_at DESC, id
+	`)
+}
+
+func (r *Repository) GetSealAsset(ctx context.Context, sealAssetID string) (Record, error) {
+	return r.QueryOne(ctx, `SELECT * FROM seal_assets WHERE id=$1`, sealAssetID)
+}
+
+func (r *Repository) CreateSealAsset(
+	ctx context.Context,
+	name, originalName, sourceMIME string,
+	file StoredFileMetadata,
+	width, height int,
+	actorID, actorName string,
+) (result Record, err error) {
+	tracker := storedMutationTracker{}
+	defer tracker.wrap(&err)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO seal_assets (
+			name, original_name, source_mime_type,
+			storage_provider, storage_key, mime_type, file_size,
+			width_px, height_px, checksum_sha256, uploaded_by, uploaded_by_name
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULLIF($11,'')::uuid,$12)
+		RETURNING *
+	`, name, originalName, sourceMIME, file.StorageProvider, file.StorageKey, file.MIMEType, file.FileSize, width, height, file.ChecksumSHA256, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	asset := rows[0]
+	assetID := cleanID(asset["id"])
+	if err := addAuditTx(ctx, tx, "", actorID, actorName, "seal_asset_uploaded", "seal_asset", assetID, "Tải tài nguyên con dấu công ty", Record{
+		"name":             name,
+		"source_mime_type": sourceMIME,
+		"mime_type":        file.MIMEType,
+		"file_size":        file.FileSize,
+		"width_px":         width,
+		"height_px":        height,
+		"checksum_sha256":  file.ChecksumSHA256,
+	}); err != nil {
+		return nil, err
+	}
+	return finalizeStoredMutation(&tracker, func() (Record, error) { return asset, nil }, tx.Commit)
+}
+
+func (r *Repository) ArchiveSealAsset(ctx context.Context, sealAssetID, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `SELECT * FROM seal_assets WHERE id=$1 FOR UPDATE`, sealAssetID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	if fmt.Sprint(rows[0]["status"]) == "archived" {
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		return rows[0], nil
+	}
+	updatedRows, err := queryTx(ctx, tx, `
+		UPDATE seal_assets
+		SET status='archived', archived_by=NULLIF($2,'')::uuid, archived_by_name=$3, archived_at=now(), updated_at=now()
+		WHERE id=$1 AND status='active'
+		RETURNING *
+	`, sealAssetID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	if len(updatedRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	asset := updatedRows[0]
+	if err := addAuditTx(ctx, tx, "", actorID, actorName, "seal_asset_archived", "seal_asset", sealAssetID, "Lưu trữ tài nguyên con dấu công ty", Record{
+		"name":            asset["name"],
+		"checksum_sha256": asset["checksum_sha256"],
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return asset, nil
+}
+
+func (r *Repository) ApplyWorkflowFormSeal(ctx context.Context, instanceID, sealAssetID, purpose, comment, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `
+		SELECT
+			wfi.*,
+			wft.code AS form_code,
+			wft.name AS form_name,
+			wfv.version_no AS form_version_no
+		FROM workflow_form_instances wfi
+		JOIN workflow_form_versions wfv ON wfv.id=wfi.form_version_id
+		JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
+		WHERE wfi.id=$1
+		FOR UPDATE
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	instance := rows[0]
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return nil, validationError("Biểu mẫu quy trình phải được chốt trước khi đóng dấu", Record{"status": instance["status"]})
+	}
+	projectID := cleanID(instance["project_id"])
+	workItemID := cleanID(instance["work_item_id"])
+	formVersionID := cleanID(instance["form_version_id"])
+	formRevisionNo := int(number(instance["current_revision"]))
+	if projectID == "" || workItemID == "" || formVersionID == "" {
+		return nil, validationError("Biểu mẫu quy trình thiếu liên kết để đóng dấu", Record{"workflow_form_instance_id": instanceID})
+	}
+
+	assetRows, err := queryTx(ctx, tx, `SELECT * FROM seal_assets WHERE id=$1 AND status='active' FOR SHARE`, sealAssetID)
+	if err != nil {
+		return nil, err
+	}
+	if len(assetRows) == 0 {
+		return nil, validationError("Con dấu không tồn tại hoặc đã được lưu trữ", Record{"seal_asset_id": sealAssetID})
+	}
+	asset := assetRows[0]
+
+	duplicateRows, err := queryTx(ctx, tx, `
+		SELECT COUNT(*) AS total
+		FROM workflow_form_seal_applications
+		WHERE form_instance_id=$1 AND purpose=$2 AND seal_asset_id=$3
+	`, instanceID, purpose, sealAssetID)
+	if err != nil {
+		return nil, err
+	}
+	if len(duplicateRows) > 0 && number(duplicateRows[0]["total"]) > 0 {
+		return nil, validationError("Con dấu này đã được áp dụng cho cùng mục đích trên hồ sơ", Record{"purpose": purpose, "seal_asset_id": sealAssetID})
+	}
+
+	roleRows, err := queryTx(ctx, tx, `
+		SELECT COALESCE(jsonb_agg(role_name ORDER BY role_name), '[]'::jsonb) AS roles
+		FROM (
+			SELECT DISTINCT role.display_name AS role_name
+			FROM user_roles assignment
+			JOIN roles role ON role.id=assignment.role_id
+			WHERE assignment.user_id=$1
+		) actor_roles
+	`, actorID)
+	if err != nil {
+		return nil, err
+	}
+	actorRoles := any([]any{})
+	if len(roleRows) > 0 && roleRows[0]["roles"] != nil {
+		actorRoles = roleRows[0]["roles"]
+	}
+	appliedByName := strings.TrimSpace(actorName)
+	if appliedByName == "" {
+		appliedByName = actorID
+	}
+	payload := Record{
+		"source":                    "workflow_form_seal_application",
+		"workflow_form_instance_id": instanceID,
+		"workflow_form_version_id":  formVersionID,
+		"workflow_form_revision_no": formRevisionNo,
+		"workflow_form_type":        instance["form_type"],
+		"workflow_form_code":        instance["form_code"],
+		"workflow_form_title":       instance["title"],
+		"answers_snapshot":          instance["answers_snapshot_json"],
+		"project_id":                projectID,
+		"work_item_id":              workItemID,
+		"purpose":                   purpose,
+		"comment":                   comment,
+		"applied_by":                actorID,
+		"applied_by_name":           appliedByName,
+		"applied_by_roles":          actorRoles,
+		"seal_asset": Record{
+			"id":              sealAssetID,
+			"name":            asset["name"],
+			"mime_type":       asset["mime_type"],
+			"file_size":       asset["file_size"],
+			"width_px":        asset["width_px"],
+			"height_px":       asset["height_px"],
+			"checksum_sha256": asset["checksum_sha256"],
+		},
+	}
+	rawPayload, _ := json.Marshal(payload)
+	hashBytes := sha256.Sum256(rawPayload)
+	payloadHash := hex.EncodeToString(hashBytes[:])
+	rawRoles, _ := json.Marshal(actorRoles)
+
+	applicationRows, err := queryTx(ctx, tx, `
+		INSERT INTO workflow_form_seal_applications (
+			project_id, work_item_id, form_instance_id, form_version_id, form_revision_no,
+			seal_asset_id, purpose, applied_by, applied_by_name, applied_by_roles_json,
+			comment, payload_json, payload_hash
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,'')::uuid,$9,$10::jsonb,NULLIF($11,''),$12::jsonb,$13)
+		RETURNING *
+	`, projectID, workItemID, instanceID, formVersionID, formRevisionNo, sealAssetID, purpose, actorID, appliedByName, string(rawRoles), comment, string(rawPayload), payloadHash)
+	if err != nil {
+		return nil, err
+	}
+	if len(applicationRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	applicationID := cleanID(applicationRows[0]["id"])
+	metadata := Record{
+		"workflow_form_instance_id": instanceID,
+		"seal_application_id":       applicationID,
+		"seal_asset_id":             sealAssetID,
+		"seal_asset_name":           asset["name"],
+		"purpose":                   purpose,
+		"payload_hash":              payloadHash,
+		"form_revision_no":          formRevisionNo,
+		"checksum_sha256":           asset["checksum_sha256"],
+	}
+	rawMetadata, _ := json.Marshal(metadata)
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, from_status, to_status, comment, metadata_json)
+		VALUES ($1,$2,$3,NULLIF($4,'')::uuid,'seal_applied','submitted','submitted',$5,$6::jsonb)
+	`, instanceID, projectID, workItemID, actorID, fmt.Sprintf("Đã áp dụng con dấu: %s", asset["name"]), string(rawMetadata)); err != nil {
+		return nil, err
+	}
+	activityComment := fmt.Sprintf("Đã áp dụng con dấu công ty: %s", asset["name"])
+	if comment != "" {
+		activityComment = comment
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+		VALUES ($1,$2,'work_item',$1,NULLIF($3,'')::uuid,'system_event',$4,'internal',$5::jsonb)
+	`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_seal_applied", "workflow_form_seal_application", applicationID, "Áp dụng con dấu công ty vào biểu mẫu quy trình", metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetWorkflowFormInstanceDetail(ctx, instanceID)
+}
+
+func (r *Repository) GetWorkflowFormSealApplicationDetail(ctx context.Context, applicationID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT
+			application.*,
+			asset.name AS seal_asset_name,
+			asset.status AS seal_asset_status,
+			asset.storage_provider,
+			asset.storage_key,
+			asset.mime_type,
+			asset.file_size,
+			asset.width_px,
+			asset.height_px,
+			asset.checksum_sha256
+		FROM workflow_form_seal_applications application
+		JOIN seal_assets asset ON asset.id=application.seal_asset_id
+		JOIN work_items item ON item.id=application.work_item_id AND item.project_id=application.project_id
+		JOIN projects project ON project.id=application.project_id
+		WHERE application.id=$1 AND item.status <> 'cancelled' AND project.status <> 'cancelled'
+	`, applicationID)
+}
+
 func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, comment string, visualFile StoredFileMetadata, strokes []WorkflowFormSignatureStroke, actorID, actorName string) (result Record, err error) {
 	tracker := storedMutationTracker{}
 	defer tracker.wrap(&err)
@@ -5351,7 +5672,73 @@ func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, 
 	}, tx.Commit)
 }
 
-func (r *Repository) CreateWorkflowFormPDFExport(ctx context.Context, instanceID, fileName, title string, pdfFile StoredFileMetadata, payloadHash, actorID, actorName string) (result Record, err error) {
+func (r *Repository) SaveWorkflowFormPDFConfirmationPreference(ctx context.Context, instanceID, purpose string, includeSignatures, includeSeals bool, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	instance, err := queryOneRecord(ctx, tx, `
+		SELECT id, status
+		FROM workflow_form_instances
+		WHERE id=$1
+		FOR UPDATE
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return nil, validationError("Biểu mẫu quy trình phải được chốt trước khi chọn xác nhận hiển thị trong PDF", Record{"status": instance["status"]})
+	}
+	availableKinds, err := queryOneRecord(ctx, tx, `
+		SELECT
+			EXISTS (
+				SELECT 1
+				FROM workflow_form_signatures
+				WHERE form_instance_id=$1 AND purpose=$2
+			) AS has_signatures,
+			EXISTS (
+				SELECT 1
+				FROM workflow_form_seal_applications
+				WHERE form_instance_id=$1 AND purpose=$2
+			) AS has_seals
+	`, instanceID, purpose)
+	if err != nil {
+		return nil, err
+	}
+	if !boolValue(availableKinds["has_signatures"]) || !boolValue(availableKinds["has_seals"]) {
+		return nil, validationError("Chỉ chọn thành phần PDF khi cùng mục đích đã có cả chữ ký cá nhân và con dấu công ty", Record{
+			"purpose":        purpose,
+			"has_signatures": availableKinds["has_signatures"],
+			"has_seals":      availableKinds["has_seals"],
+		})
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO workflow_form_pdf_confirmation_preferences
+			(form_instance_id, purpose, include_signatures, include_seals, updated_by, updated_by_name)
+		VALUES
+			($1, $2, $3, $4, NULLIF($5, '')::uuid, NULLIF($6, ''))
+		ON CONFLICT (form_instance_id, purpose) DO UPDATE
+		SET include_signatures=EXCLUDED.include_signatures,
+			include_seals=EXCLUDED.include_seals,
+			updated_by=EXCLUDED.updated_by,
+			updated_by_name=EXCLUDED.updated_by_name,
+			updated_at=now()
+	`, instanceID, purpose, includeSignatures, includeSeals, actorID, actorName); err != nil {
+		return nil, err
+	}
+	result, err := getWorkflowFormInstanceDetail(ctx, tx, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (r *Repository) CreateWorkflowFormPDFExport(ctx context.Context, instanceID, fileName, title string, pdfFile StoredFileMetadata, payloadHash string, confirmationSelection Record, actorID, actorName string) (result Record, err error) {
 	tracker := storedMutationTracker{}
 	defer tracker.wrap(&err)
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -5401,6 +5788,7 @@ func (r *Repository) CreateWorkflowFormPDFExport(ctx context.Context, instanceID
 		"workflow_form_title":      instance["title"],
 		"workflow_form_version_no": instance["form_version_no"],
 		"form_revision_no":         revisionNo,
+		"confirmation_selection":   confirmationSelection,
 	}
 	rawMetadata, _ := json.Marshal(metadata)
 
@@ -5424,6 +5812,7 @@ func (r *Repository) CreateWorkflowFormPDFExport(ctx context.Context, instanceID
 		"payload_hash":              payloadHash,
 		"checksum_sha256":           pdfFile.ChecksumSHA256,
 		"form_revision_no":          revisionNo,
+		"confirmation_selection":    confirmationSelection,
 	}
 	rawEventMetadata, _ := json.Marshal(eventMetadata)
 	if _, err := tx.ExecContext(ctx, `

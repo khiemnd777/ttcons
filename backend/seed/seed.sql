@@ -10,8 +10,9 @@ TRUNCATE TABLE
   material_before_after_snapshot_items, material_before_after_snapshots,
   owner_client_checklist_reconciliation_items, owner_client_checklist_reconciliations,
   subcontractor_checklist_reconciliation_items, subcontractor_checklist_reconciliations,
-  workflow_form_pdf_exports, workflow_form_signatures, workflow_form_events,
+  workflow_form_pdf_exports, workflow_form_seal_applications, workflow_form_signatures, workflow_form_events,
   workflow_form_answers, workflow_form_instances,
+  seal_assets,
   evidence_records, work_item_activities, work_item_assignments, work_items,
   documents, advance_requests, payments, receivables, payables, accounting_budgets,
   handover_records, replanning_requests, rework_requests, acceptance_checklist_items,
@@ -89,7 +90,8 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('contract.dispatch','Gửi hồ sơ hợp đồng giấy','contract'),('contract.scan_manage','Quản lý bản scan hợp đồng','contract'),('contract.variation.propose','Đề xuất phát sinh thi công','contract'),('contract.variation_qs_review','QS rà soát phát sinh','contract'),('contract.variation_purchase','Mua hàng xử lý phát sinh','contract'),
 ('catalog.view','Xem dữ liệu lõi','catalog'),('catalog.manage','Quản lý dữ liệu lõi','catalog'),
 ('staff.view','Xem nhân sự','staff'),('staff.create','Tạo nhân sự','staff'),('staff.update','Sửa nhân sự','staff'),('role.view','Xem role','rbac'),('role.create','Tạo role','rbac'),('role.update','Sửa role','rbac'),('permission.view','Xem permission','rbac'),('permission.assign','Gán quyền','rbac'),
-('audit.view','Xem audit','audit'),('report.view','Xem báo cáo','report'),('report.finance.view','Xem báo cáo tài chính','report'),('settings.view','Xem cấu hình','settings'),('settings.update','Sửa cấu hình','settings')
+('audit.view','Xem audit','audit'),('report.view','Xem báo cáo','report'),('report.finance.view','Xem báo cáo tài chính','report'),('settings.view','Xem cấu hình','settings'),('settings.update','Sửa cấu hình','settings'),
+('seal.use','Sử dụng con dấu','settings'),('seal.manage','Quản lý con dấu','settings')
 ) AS p(key, name, module);
 
 INSERT INTO role_permissions (role_id, permission_id)
@@ -216,9 +218,9 @@ JOIN permissions p ON (
     'project.view','pipeline.view','contract.view','contract.review'
   ))
   OR (r.name='contract_officer' AND p.key IN (
-    'project.view','pipeline.view','contract.view','contract.create','contract.review','contract.dispatch','contract.scan_manage'
+    'project.view','pipeline.view','contract.view','contract.create','contract.review','contract.dispatch','contract.scan_manage','seal.use'
   ))
-  OR (r.name='director' AND p.key IN ('contract.view','contract.review','contract.approve','contract.sign','contract.milestone_manage','contract.retention_release'))
+  OR (r.name='director' AND p.key IN ('contract.view','contract.review','contract.approve','contract.sign','contract.milestone_manage','contract.retention_release','seal.use'))
   OR (r.name='pm' AND p.key IN ('contract.view','contract.create','contract.review','contract.approve','contract.milestone_manage','contract.dispatch','contract.scan_manage','contract.variation.propose'))
   OR (r.name='qs' AND p.key IN ('contract.view','contract.create','contract.review','contract.milestone_manage','contract.variation_qs_review'))
   OR (r.name='accounting' AND p.key IN ('contract.view','contract.review','contract.milestone_manage','contract.retention_release'))

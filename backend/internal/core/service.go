@@ -11,6 +11,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	"image/png"
 	"io"
 	"log"
 	"math"
@@ -28,6 +31,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	_ "golang.org/x/image/webp"
 )
 
 type Service struct {
@@ -82,6 +86,9 @@ const (
 	defaultRefreshTokenTTL       = 7 * 24 * time.Hour
 	defaultRefreshCookieSameSite = "Lax"
 	activityMessageEditWindow    = 15 * time.Minute
+	maxSealUploadBytes           = int64(10 * 1024 * 1024)
+	maxSealImageDimension        = 4096
+	maxSealImagePixels           = 16 * 1024 * 1024
 )
 
 type evidenceUploadMimeSpec struct {
@@ -4975,6 +4982,280 @@ func dateOnly(value any) string {
 	return text
 }
 
+func (s *Service) SealAssets(ctx context.Context, includeArchived bool, actorID string) ([]Record, error) {
+	allowed, err := s.repo.CanUsePermission(ctx, actorID, []string{"seal.use", "seal.manage"})
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền xem tài nguyên con dấu")
+	}
+	if includeArchived {
+		canManage, err := s.repo.CanUsePermission(ctx, actorID, []string{"seal.manage"})
+		if err != nil {
+			return nil, err
+		}
+		if !canManage {
+			return nil, forbiddenError("Bạn không có quyền xem con dấu đã lưu trữ")
+		}
+	}
+	return s.repo.ListSealAssets(ctx, includeArchived)
+}
+
+func (s *Service) CreateSealAsset(ctx context.Context, name string, fileHeader *multipart.FileHeader, actorID, actorName string) (Record, error) {
+	allowed, err := s.repo.CanUsePermission(ctx, actorID, []string{"seal.manage"})
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền tải tài nguyên con dấu")
+	}
+	name = strings.TrimSpace(name)
+	if name == "" && fileHeader != nil {
+		originalName := cleanUploadFilename(fileHeader.Filename)
+		name = strings.TrimSpace(strings.TrimSuffix(originalName, filepath.Ext(originalName)))
+	}
+	if name == "" {
+		return nil, validationError("Tên con dấu là bắt buộc")
+	}
+	if len([]rune(name)) > 120 {
+		return nil, validationError("Tên con dấu không được vượt quá 120 ký tự")
+	}
+	file, storedObject, originalName, sourceMIME, width, height, err := s.storeSealAssetUpload(ctx, fileHeader)
+	if err != nil {
+		return nil, err
+	}
+	asset, err := s.repo.CreateSealAsset(ctx, name, originalName, sourceMIME, file, width, height, actorID, actorName)
+	if err != nil {
+		return nil, s.cleanupStoredObjectAfterError(storedObject, err)
+	}
+	return asset, nil
+}
+
+func (s *Service) storeSealAssetUpload(ctx context.Context, fileHeader *multipart.FileHeader) (StoredFileMetadata, storedObjectRef, string, string, int, int, error) {
+	uploadLimit := min(s.maxUploadBytes, maxSealUploadBytes)
+	if fileHeader == nil {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, validationError("Tệp ảnh con dấu là bắt buộc")
+	}
+	if fileHeader.Size <= 0 {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, validationError("Tệp ảnh con dấu không được rỗng")
+	}
+	if fileHeader.Size > uploadLimit {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, validationError("Tệp ảnh con dấu vượt quá dung lượng cho phép", Record{"max_bytes": uploadLimit})
+	}
+	source, err := fileHeader.Open()
+	if err != nil {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, err
+	}
+	defer source.Close()
+	raw, err := io.ReadAll(io.LimitReader(source, uploadLimit+1))
+	if err != nil {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, err
+	}
+	if int64(len(raw)) > uploadLimit {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, validationError("Tệp ảnh con dấu vượt quá dung lượng cho phép", Record{"max_bytes": uploadLimit})
+	}
+	headerLength := min(len(raw), 512)
+	sourceMIME := http.DetectContentType(raw[:headerLength])
+	if !statusIn(sourceMIME, "image/png", "image/jpeg", "image/webp") {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, validationError("Con dấu chỉ hỗ trợ PNG, JPG hoặc WebP", Record{"mime_type": sourceMIME})
+	}
+	config, _, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, validationError("Không đọc được kích thước ảnh con dấu")
+	}
+	if config.Width <= 0 || config.Height <= 0 || config.Width > maxSealImageDimension || config.Height > maxSealImageDimension || int64(config.Width)*int64(config.Height) > maxSealImagePixels {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, validationError("Kích thước ảnh con dấu vượt quá giới hạn 4096 x 4096 px", Record{"width_px": config.Width, "height_px": config.Height})
+	}
+	decoded, _, err := image.Decode(bytes.NewReader(raw))
+	if err != nil {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, validationError("Ảnh con dấu không hợp lệ")
+	}
+	var normalized bytes.Buffer
+	if err := png.Encode(&normalized, decoded); err != nil {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, fmt.Errorf("normalize seal image: %w", err)
+	}
+	if int64(normalized.Len()) > uploadLimit {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, validationError("Ảnh con dấu sau chuẩn hóa vượt quá dung lượng cho phép", Record{"max_bytes": uploadLimit})
+	}
+	storageKey := path.Join("seal-assets", uuid.NewString()+".png")
+	file, storedObject, err := s.storeGeneratedFile(ctx, storageKey, normalized.Bytes(), "image/png")
+	if err != nil {
+		return StoredFileMetadata{}, storedObjectRef{}, "", "", 0, 0, err
+	}
+	return file, storedObject, cleanUploadFilename(fileHeader.Filename), sourceMIME, config.Width, config.Height, nil
+}
+
+func (s *Service) ArchiveSealAsset(ctx context.Context, sealAssetID, actorID, actorName string) (Record, error) {
+	sealAssetID = cleanID(sealAssetID)
+	if !validActivityUUID(sealAssetID) {
+		return nil, validationError("seal_asset_id không hợp lệ", Record{"seal_asset_id": sealAssetID})
+	}
+	allowed, err := s.repo.CanUsePermission(ctx, actorID, []string{"seal.manage"})
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền lưu trữ tài nguyên con dấu")
+	}
+	return s.repo.ArchiveSealAsset(ctx, sealAssetID, actorID, actorName)
+}
+
+func (s *Service) SealAssetFile(ctx context.Context, sealAssetID, actorID string) (EvidenceFileResult, error) {
+	sealAssetID = cleanID(sealAssetID)
+	if !validActivityUUID(sealAssetID) {
+		return EvidenceFileResult{}, validationError("seal_asset_id không hợp lệ", Record{"seal_asset_id": sealAssetID})
+	}
+	asset, err := s.repo.GetSealAsset(ctx, sealAssetID)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	allowed, err := s.repo.CanUsePermission(ctx, actorID, []string{"seal.use", "seal.manage"})
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	if !allowed {
+		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem tài nguyên con dấu")
+	}
+	if fmt.Sprint(asset["status"]) == "archived" {
+		canManage, err := s.repo.CanUsePermission(ctx, actorID, []string{"seal.manage"})
+		if err != nil {
+			return EvidenceFileResult{}, err
+		}
+		if !canManage {
+			return EvidenceFileResult{}, forbiddenError("Con dấu này đã được lưu trữ")
+		}
+	}
+	return s.storedFileResult(ctx, asset, "storage_provider", "storage_key", "mime_type", sealAssetFilename(asset))
+}
+
+func sealAssetFilename(asset Record) string {
+	name := strings.TrimSpace(fmt.Sprint(asset["name"]))
+	if name == "" || name == "<nil>" {
+		name = "con-dau"
+	}
+	return cleanUploadFilename(name + ".png")
+}
+
+func (s *Service) ApplyWorkflowFormSeal(ctx context.Context, instanceID string, req WorkflowFormSealApplyRequest, actorID, actorName string) (Record, error) {
+	instanceID = cleanID(instanceID)
+	if !validActivityUUID(instanceID) {
+		return nil, validationError("workflow_form_instance_id không hợp lệ", Record{"workflow_form_instance_id": instanceID})
+	}
+	sealAssetID := cleanID(req.SealAssetID)
+	if !validActivityUUID(sealAssetID) {
+		return nil, validationError("seal_asset_id không hợp lệ", Record{"seal_asset_id": req.SealAssetID})
+	}
+	purpose := strings.TrimSpace(req.Purpose)
+	if purpose == "" {
+		purpose = "internal_ack"
+	}
+	if !validWorkflowSignaturePurpose(purpose) {
+		return nil, validationError("Mục đích xác nhận bằng con dấu không hợp lệ", Record{"purpose": purpose})
+	}
+	comment := strings.TrimSpace(req.Comment)
+	if len([]rune(comment)) > 1000 {
+		return nil, validationError("Ghi chú con dấu không được vượt quá 1000 ký tự")
+	}
+	allowed, err := s.repo.CanUsePermission(ctx, actorID, []string{"seal.use"})
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền sử dụng con dấu công ty")
+	}
+	form, err := s.repo.GetWorkflowFormInstanceDetail(ctx, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	instance, _ := form["instance"].(Record)
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return nil, validationError("Biểu mẫu quy trình phải được chốt trước khi đóng dấu", Record{"status": instance["status"]})
+	}
+	workItemID := cleanID(instance["work_item_id"])
+	if workItemID == "" {
+		return nil, validationError("Biểu mẫu quy trình chưa liên kết đầu việc", Record{"workflow_form_instance_id": instanceID})
+	}
+	canAct, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !canAct {
+		return nil, forbiddenError("Bạn không có quyền đóng dấu hồ sơ quy trình này")
+	}
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+		return nil, err
+	}
+	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+		return nil, err
+	}
+	return s.repo.ApplyWorkflowFormSeal(ctx, instanceID, sealAssetID, purpose, comment, actorID, actorName)
+}
+
+func (s *Service) WorkflowFormSealApplicationVisual(ctx context.Context, applicationID, actorID string) (EvidenceFileResult, error) {
+	applicationID = cleanID(applicationID)
+	if !validActivityUUID(applicationID) {
+		return EvidenceFileResult{}, validationError("seal_application_id không hợp lệ", Record{"seal_application_id": applicationID})
+	}
+	application, err := s.repo.GetWorkflowFormSealApplicationDetail(ctx, applicationID)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	allowed, err := s.repo.CanViewWorkItem(ctx, cleanID(application["work_item_id"]), actorID)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	if !allowed {
+		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem con dấu trên hồ sơ này")
+	}
+	return s.storedFileResult(ctx, application, "storage_provider", "storage_key", "mime_type", sealAssetFilename(application))
+}
+
+func (s *Service) workflowFormSealImages(ctx context.Context, form Record) (map[string][]byte, error) {
+	applications := workflowAnswerRecordList(form["seal_applications"])
+	images := make(map[string][]byte, len(applications))
+	if len(applications) == 0 {
+		return images, nil
+	}
+	registry, err := s.storageBackend()
+	if err != nil {
+		return nil, err
+	}
+	for _, application := range applications {
+		applicationID := cleanID(application["id"])
+		provider := strings.TrimSpace(fmt.Sprint(application["storage_provider"]))
+		storageKey := strings.TrimSpace(fmt.Sprint(application["storage_key"]))
+		if applicationID == "" || provider == "" || storageKey == "" {
+			return nil, validationError("Bản ghi con dấu thiếu thông tin tệp bảo vệ", Record{"seal_application_id": applicationID})
+		}
+		object, err := registry.Open(ctx, provider, storageKey)
+		if err != nil {
+			return nil, err
+		}
+		content, readErr := io.ReadAll(io.LimitReader(object.Reader, s.maxUploadBytes+1))
+		closeErr := object.Reader.Close()
+		if readErr != nil {
+			return nil, readErr
+		}
+		if closeErr != nil {
+			return nil, closeErr
+		}
+		if int64(len(content)) > s.maxUploadBytes {
+			return nil, validationError("Ảnh con dấu vượt quá dung lượng tạo PDF", Record{"seal_application_id": applicationID})
+		}
+		checksum := sha256.Sum256(content)
+		if expected := strings.TrimSpace(fmt.Sprint(application["checksum_sha256"])); expected != "" && expected != "<nil>" && hex.EncodeToString(checksum[:]) != expected {
+			return nil, validationError("Checksum ảnh con dấu không khớp", Record{"seal_application_id": applicationID})
+		}
+		images[applicationID] = content
+	}
+	return images, nil
+}
+
 func (s *Service) SignWorkflowForm(ctx context.Context, instanceID string, req WorkflowFormSignRequest, actorID, actorName string) (Record, error) {
 	if !validActivityUUID(instanceID) {
 		return nil, validationError("workflow_form_instance_id không hợp lệ", Record{"workflow_form_instance_id": instanceID})
@@ -5043,6 +5324,71 @@ func validWorkflowSignaturePurpose(purpose string) bool {
 	return statusIn(purpose, "internal_ack", "prepared_by", "reviewed_by", "approved_by", "received_by")
 }
 
+func (s *Service) SaveWorkflowFormPDFConfirmationPreference(ctx context.Context, instanceID string, req WorkflowFormPDFConfirmationPreferenceRequest, actorID, actorName string) (Record, error) {
+	instanceID = cleanID(instanceID)
+	if !validActivityUUID(instanceID) {
+		return nil, validationError("workflow_form_instance_id không hợp lệ", Record{"workflow_form_instance_id": instanceID})
+	}
+	purpose := strings.TrimSpace(req.Purpose)
+	if !validWorkflowSignaturePurpose(purpose) {
+		return nil, validationError("Mục đích xác nhận hiển thị trong PDF không hợp lệ", Record{"purpose": purpose})
+	}
+	if !req.IncludeSignatures && !req.IncludeSeals {
+		return nil, validationError("Mỗi mục đích phải hiển thị ít nhất chữ ký cá nhân hoặc con dấu công ty trong PDF", Record{"purpose": purpose})
+	}
+	form, err := s.repo.GetWorkflowFormInstanceDetail(ctx, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	instance, _ := form["instance"].(Record)
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return nil, validationError("Biểu mẫu quy trình phải được chốt trước khi chọn xác nhận hiển thị trong PDF", Record{"status": instance["status"]})
+	}
+	hasSignature := false
+	for _, signature := range workflowAnswerRecordList(form["signatures"]) {
+		if strings.TrimSpace(fmt.Sprint(signature["purpose"])) == purpose {
+			hasSignature = true
+			break
+		}
+	}
+	hasSeal := false
+	for _, application := range workflowAnswerRecordList(form["seal_applications"]) {
+		if strings.TrimSpace(fmt.Sprint(application["purpose"])) == purpose {
+			hasSeal = true
+			break
+		}
+	}
+	if !hasSignature || !hasSeal {
+		return nil, validationError("Chỉ chọn thành phần PDF khi cùng mục đích đã có cả chữ ký cá nhân và con dấu công ty", Record{
+			"purpose":        purpose,
+			"has_signatures": hasSignature,
+			"has_seals":      hasSeal,
+		})
+	}
+	workItemID := cleanID(instance["work_item_id"])
+	if workItemID == "" {
+		return nil, validationError("Biểu mẫu quy trình chưa liên kết đầu việc", Record{"workflow_form_instance_id": instanceID})
+	}
+	allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền chọn xác nhận hiển thị trong PDF của hồ sơ này")
+	}
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+		return nil, err
+	}
+	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+		return nil, err
+	}
+	return s.repo.SaveWorkflowFormPDFConfirmationPreference(ctx, instanceID, purpose, req.IncludeSignatures, req.IncludeSeals, actorID, actorName)
+}
+
 func (s *Service) GenerateWorkflowFormPDFExport(ctx context.Context, instanceID, actorID, actorName string) (Record, error) {
 	if !validActivityUUID(instanceID) {
 		return nil, validationError("workflow_form_instance_id không hợp lệ", Record{"workflow_form_instance_id": instanceID})
@@ -5077,7 +5423,12 @@ func (s *Service) GenerateWorkflowFormPDFExport(ctx context.Context, instanceID,
 	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
 		return nil, err
 	}
-	pdfBytes, payloadHash, err := GenerateWorkflowFormPDFWithContext(form, WorkflowFormPDFContext{
+	pdfForm, confirmationSelection := selectWorkflowFormPDFConfirmations(form)
+	sealImages, err := s.workflowFormSealImages(ctx, pdfForm)
+	if err != nil {
+		return nil, err
+	}
+	pdfBytes, payloadHash, err := GenerateWorkflowFormPDFWithContext(pdfForm, WorkflowFormPDFContext{
 		GeneratedAt:   time.Now(),
 		GeneratedBy:   actorName,
 		ProjectCode:   strings.TrimSpace(fmt.Sprint(item["project_code"])),
@@ -5087,18 +5438,19 @@ func (s *Service) GenerateWorkflowFormPDFExport(ctx context.Context, instanceID,
 		StepName:      strings.TrimSpace(fmt.Sprint(item["run_step_name"])),
 		StepOrder:     int(number(item["run_step_order_index"])),
 		WorkItemTitle: strings.TrimSpace(fmt.Sprint(item["title"])),
+		SealImages:    sealImages,
 	})
 	if err != nil {
 		return nil, err
 	}
 	revisionNo := int(number(instance["current_revision"]))
-	fileName := workflowFormPDFFileName(form, revisionNo)
+	fileName := workflowFormPDFFileName(pdfForm, revisionNo)
 	storageKey := path.Join("workflow-form-pdfs", projectID, instanceID, uuid.NewString()+".pdf")
 	pdfFile, storedObject, err := s.storeGeneratedFile(ctx, storageKey, pdfBytes, "application/pdf")
 	if err != nil {
 		return nil, err
 	}
-	exportedForm, err := s.repo.CreateWorkflowFormPDFExport(ctx, instanceID, fileName, fmt.Sprint(instance["title"]), pdfFile, payloadHash, actorID, actorName)
+	exportedForm, err := s.repo.CreateWorkflowFormPDFExport(ctx, instanceID, fileName, fmt.Sprint(instance["title"]), pdfFile, payloadHash, confirmationSelection, actorID, actorName)
 	if err != nil {
 		return nil, s.cleanupStoredObjectAfterError(storedObject, err)
 	}

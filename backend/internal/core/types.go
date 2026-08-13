@@ -500,6 +500,18 @@ type WorkflowFormSignRequest struct {
 	SignatureStrokes      []WorkflowFormSignatureStroke `json:"signature_strokes"`
 }
 
+type WorkflowFormSealApplyRequest struct {
+	SealAssetID string `json:"seal_asset_id"`
+	Purpose     string `json:"purpose"`
+	Comment     string `json:"comment"`
+}
+
+type WorkflowFormPDFConfirmationPreferenceRequest struct {
+	Purpose           string `json:"purpose"`
+	IncludeSignatures bool   `json:"include_signatures"`
+	IncludeSeals      bool   `json:"include_seals"`
+}
+
 type BOQUnitPriceRequest struct {
 	UnitPrice float64 `json:"unit_price"`
 	Comment   string  `json:"comment"`
