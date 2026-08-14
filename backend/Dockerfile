@@ -1,12 +1,21 @@
+# syntax=docker/dockerfile:1.7
+
 FROM golang:1.23-alpine AS build
 WORKDIR /src
 RUN apk add --no-cache git
 COPY go.mod go.sum* ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow ./cmd/server
-RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-migrate ./cmd/migrate
-RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-storage-migrate ./cmd/storage-migrate
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow ./cmd/server
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-migrate ./cmd/migrate
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-storage-migrate ./cmd/storage-migrate
 
 FROM alpine:3.20
 WORKDIR /app

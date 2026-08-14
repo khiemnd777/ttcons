@@ -56,6 +56,17 @@ export type Project = AnyRecord & {
   pending_approvals?: number;
 };
 
+export type ProjectExplorerPage = {
+  items: Project[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  options: {
+    statuses: string[];
+  };
+};
+
 export type ProjectProgressStageKey =
   | 'not_started'
   | 'survey'

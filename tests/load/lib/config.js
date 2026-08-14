@@ -1,5 +1,5 @@
 const PROFILE_NAMES = ['baseline', 'step', 'spike', 'soak'];
-const HTTP_WORKLOADS = ['health', 'general', 'dashboard', 'report', 'upload'];
+const HTTP_WORKLOADS = ['health', 'general', 'dashboard', 'report', 'project_explorer', 'upload'];
 
 const rawTarget = requiredEnv('TARGET_BASE_URL');
 export const target = validateTarget(rawTarget);
@@ -293,6 +293,7 @@ function thresholdDefaults(selectedProfile, selectedWorkload) {
     general: 750,
     dashboard: 1500,
     report: 1800,
+    project_explorer: 750,
     upload: 2500,
   };
   const profileMultiplier = { baseline: 1, step: 1.5, spike: 2.5, soak: 1.5 };

@@ -20,6 +20,7 @@ import (
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -102,6 +103,14 @@ func main() {
 		log.Fatalf("connect redis: %v", err)
 	}
 	defer redisClient.Close()
+	var redisCacheClient *redis.Client
+	if cfg.ProjectExplorerCacheMode != "off" {
+		redisCacheClient, err = cache.Connect(context.Background(), cfg.RedisCacheURL, cfg.ProjectExplorerCacheTimeout)
+		if err != nil {
+			log.Fatalf("connect project explorer cache redis: %v", err)
+		}
+		defer redisCacheClient.Close()
+	}
 
 	runtimeMetrics := observability.New(conn)
 	app := fiber.New(serverConfig(cfg))
@@ -120,7 +129,7 @@ func main() {
 	}))
 	app.Get("/metrics", runtimeMetrics.Handler())
 
-	closeRoutes, err := core.RegisterRoutes(app, conn, redisClient, cfg, storageRuntime.Registry)
+	closeRoutes, err := core.RegisterRoutes(app, conn, redisClient, redisCacheClient, cfg, storageRuntime.Registry, runtimeMetrics)
 	if err != nil {
 		log.Fatalf("register routes: %v", err)
 	}

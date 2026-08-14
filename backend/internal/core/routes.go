@@ -1,7 +1,9 @@
 package core
 
 import (
+	"context"
 	"database/sql"
+	"sync"
 
 	"consflow/backend/internal/shared/config"
 	"consflow/backend/internal/shared/middleware"
@@ -11,7 +13,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg config.Config, storageRegistry *sharedstorage.Registry) (func(), error) {
+func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *redis.Client, cfg config.Config, storageRegistry *sharedstorage.Registry, cacheObserver ProjectExplorerCacheObserver) (func(), error) {
 	repo := NewRepository(db)
 	service := NewService(repo, cfg.JWTSecret)
 	if err := service.ConfigureStorage(storageRegistry, cfg.StorageWriteProvider(), cfg.MaxUploadBytes); err != nil {
@@ -19,6 +21,15 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg c
 	}
 	service.ConfigureAuth(cfg.AuthAccessTokenMinutes, cfg.AuthRefreshTokenHours, cfg.AuthRefreshCookieSecure, cfg.AuthRefreshCookieSameSite)
 	service.ConfigureActivityStreaming(redisClient, cfg.SSEBrokerChannel, cfg.RedisOperationTimeout, cfg.SSEMaxConnections, cfg.SSEMaxConnectionsPerIP, cfg.SSEMaxConnectionsPerActor, cfg.SSEVisibilityTimeout, cfg.SSEMaxConnectionLifetime)
+	service.ConfigureProjectExplorerCache(redisCacheClient, ProjectExplorerCacheConfig{
+		Mode:             cfg.ProjectExplorerCacheMode,
+		OperationTimeout: cfg.ProjectExplorerCacheTimeout,
+		IndexTTL:         cfg.ProjectExplorerCacheIndexTTL,
+		RowTTL:           cfg.ProjectExplorerCacheRowTTL,
+		LockTTL:          cfg.ProjectExplorerCacheLockTTL,
+		MaxValueBytes:    cfg.ProjectExplorerCacheMaxBytes,
+	}, cacheObserver)
+	stopProjectExplorerDispatcher := service.StartProjectExplorerInvalidationDispatcher(context.Background())
 	h := NewHandler(service)
 	h.ConfigureReadiness(cfg.ReadinessTimeout, db.PingContext)
 
@@ -47,6 +58,8 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg c
 	protected.Get("/auth/me", h.Me)
 
 	protected.Get("/projects", h.ListProjects)
+	protected.Get("/projects/explorer", h.ProjectExplorer)
+	protected.Get("/projects/explorer/stream", h.ProjectExplorerStream)
 	protected.Post("/projects", h.CreateProject)
 	protected.Get("/projects/progress-board", h.ProjectProgressBoard)
 	protected.Get("/projects/progress-board/stream", h.ProjectProgressBoardStream)
@@ -430,7 +443,13 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient *redis.Client, cfg c
 	protected.Get("/reports/staff/export", h.StaffReportCSV)
 	protected.Get("/settings", h.Settings)
 
-	return service.CloseActivityStreaming, nil
+	var closeOnce sync.Once
+	return func() {
+		closeOnce.Do(func() {
+			stopProjectExplorerDispatcher()
+			service.CloseActivityStreaming()
+		})
+	}, nil
 }
 
 func rateLimitPolicies(values config.RateLimitPolicies) middleware.RateLimitPolicies {

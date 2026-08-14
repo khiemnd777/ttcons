@@ -20,10 +20,14 @@ import (
 const unmatchedRoute = "__unmatched__"
 
 type Metrics struct {
-	registry         *prometheus.Registry
-	requestsTotal    *prometheus.CounterVec
-	requestDuration  *prometheus.HistogramVec
-	requestsInFlight *prometheus.GaugeVec
+	registry                     *prometheus.Registry
+	requestsTotal                *prometheus.CounterVec
+	requestDuration              *prometheus.HistogramVec
+	requestsInFlight             *prometheus.GaugeVec
+	projectExplorerCacheRequests *prometheus.CounterVec
+	projectExplorerCacheDuration *prometheus.HistogramVec
+	projectExplorerCacheFallback *prometheus.CounterVec
+	projectExplorerCacheMismatch prometheus.Counter
 }
 
 func New(database *sql.DB) *Metrics {
@@ -49,6 +53,31 @@ func New(database *sql.DB) *Metrics {
 			Name:      "requests_in_flight",
 			Help:      "HTTP requests currently being handled.",
 		}, []string{"method", "class"}),
+		projectExplorerCacheRequests: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "consflow",
+			Subsystem: "project_explorer_cache",
+			Name:      "requests_total",
+			Help:      "Project explorer cache item outcomes by bounded layer and outcome.",
+		}, []string{"layer", "outcome"}),
+		projectExplorerCacheDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: "consflow",
+			Subsystem: "project_explorer_cache",
+			Name:      "operation_duration_seconds",
+			Help:      "Project explorer cache operation duration.",
+			Buckets:   []float64{0.001, 0.003, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5},
+		}, []string{"operation"}),
+		projectExplorerCacheFallback: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "consflow",
+			Subsystem: "project_explorer_cache",
+			Name:      "fallback_total",
+			Help:      "Project explorer database fallbacks by bounded reason.",
+		}, []string{"reason"}),
+		projectExplorerCacheMismatch: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: "consflow",
+			Subsystem: "project_explorer_cache",
+			Name:      "shadow_mismatch_total",
+			Help:      "Stable-revision semantic mismatches observed in shadow mode.",
+		}),
 	}
 
 	registry.MustRegister(
@@ -57,11 +86,43 @@ func New(database *sql.DB) *Metrics {
 		metrics.requestsTotal,
 		metrics.requestDuration,
 		metrics.requestsInFlight,
+		metrics.projectExplorerCacheRequests,
+		metrics.projectExplorerCacheDuration,
+		metrics.projectExplorerCacheFallback,
+		metrics.projectExplorerCacheMismatch,
 	)
 	if database != nil {
 		registry.MustRegister(collectors.NewDBStatsCollector(database, "primary"))
 	}
 	return metrics
+}
+
+func (m *Metrics) ObserveProjectExplorerCache(layer, outcome string, count int) {
+	if m == nil || count <= 0 {
+		return
+	}
+	m.projectExplorerCacheRequests.WithLabelValues(layer, outcome).Add(float64(count))
+}
+
+func (m *Metrics) ObserveProjectExplorerCacheOperation(operation string, elapsed time.Duration) {
+	if m == nil {
+		return
+	}
+	m.projectExplorerCacheDuration.WithLabelValues(operation).Observe(elapsed.Seconds())
+}
+
+func (m *Metrics) ObserveProjectExplorerCacheFallback(reason string) {
+	if m == nil {
+		return
+	}
+	m.projectExplorerCacheFallback.WithLabelValues(reason).Inc()
+}
+
+func (m *Metrics) ObserveProjectExplorerCacheMismatch() {
+	if m == nil {
+		return
+	}
+	m.projectExplorerCacheMismatch.Inc()
 }
 
 func (m *Metrics) Middleware() fiber.Handler {

@@ -75,6 +75,8 @@ spec:
               value: /var/run/secrets/consflow/database_url
             - name: REDIS_URL_FILE
               value: /var/run/secrets/consflow/redis_url
+            - name: REDIS_CACHE_URL_FILE
+              value: /var/run/secrets/consflow/redis_cache_url
             - name: JWT_SECRET_FILE
               value: /var/run/secrets/consflow/jwt_secret
             # The AWS SDK v2 default credential chain also supports a reviewed
@@ -152,6 +154,8 @@ spec:
                 path: database_url
               - key: redis_url
                 path: redis_url
+              - key: redis_cache_url
+                path: redis_cache_url
               - key: jwt_secret
                 path: jwt_secret
         - name: tmp

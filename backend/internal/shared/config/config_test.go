@@ -39,6 +39,43 @@ func TestLoadDefaultsToDevelopment(t *testing.T) {
 	}
 }
 
+func TestProjectExplorerCacheRequiresDedicatedRedisWhenEnabled(t *testing.T) {
+	base := Config{
+		AppEnv:                   "development",
+		RateLimitMode:            "enforce",
+		DBMaxOpenConns:           20,
+		DBMaxIdleConns:           10,
+		StoragePath:              t.TempDir(),
+		ProjectExplorerCacheMode: "serve",
+	}
+	if err := base.Validate(); err == nil || !strings.Contains(err.Error(), "REDIS_CACHE_URL") {
+		t.Fatalf("enabled cache without dedicated URL error=%v", err)
+	}
+	base.RedisCacheURL = "redis://cache:6379/0"
+	if err := base.Validate(); err != nil {
+		t.Fatalf("valid dedicated cache rejected: %v", err)
+	}
+	base.RedisCacheURL = "redis://:CHANGE_ME@cache:6379/0"
+	if err := base.Validate(); err == nil {
+		t.Fatal("cache placeholder URL was accepted")
+	}
+}
+
+func TestLoadOptionalRedisCacheURLFromFile(t *testing.T) {
+	clearSecretFileEnvironment(t)
+	unsetEnvironment(t, "REDIS_CACHE_URL")
+	path := filepath.Join(t.TempDir(), "redis-cache-url")
+	if err := os.WriteFile(path, []byte("redis://cache:6379/0\n"), 0o600); err != nil {
+		t.Fatalf("write cache URL: %v", err)
+	}
+	t.Setenv("REDIS_CACHE_URL_FILE", path)
+	t.Setenv("PROJECT_EXPLORER_CACHE_MODE", "shadow")
+	cfg := Load()
+	if cfg.RedisCacheURL != "redis://cache:6379/0" || cfg.ProjectExplorerCacheMode != "shadow" {
+		t.Fatalf("cache config=(%q,%q)", cfg.RedisCacheURL, cfg.ProjectExplorerCacheMode)
+	}
+}
+
 func TestLoadNormalizesAndValidateRejectsUnknownAppEnv(t *testing.T) {
 	t.Setenv("APP_ENV", "  PRODUCTION  ")
 	if cfg := Load(); cfg.AppEnv != "production" {
@@ -519,7 +556,7 @@ func setValidProductionEnvironment(t *testing.T) {
 
 func clearSecretFileEnvironment(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"DATABASE_URL_FILE", "REDIS_URL_FILE", "JWT_SECRET_FILE"} {
+	for _, key := range []string{"DATABASE_URL_FILE", "REDIS_URL_FILE", "REDIS_CACHE_URL_FILE", "JWT_SECRET_FILE"} {
 		unsetEnvironment(t, key)
 	}
 }

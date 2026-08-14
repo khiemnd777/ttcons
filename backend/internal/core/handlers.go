@@ -133,6 +133,24 @@ func (h *Handler) ListProjects(c *fiber.Ctx) error {
 	return response.OK(c, rows)
 }
 
+func (h *Handler) ProjectExplorer(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"project.view"}); err != nil {
+		return err
+	}
+	page, err := h.service.ProjectExplorer(c.Context(), actorID(c), ProjectExplorerRequest{
+		Search:    c.Query("search"),
+		Status:    c.Query("status"),
+		Sort:      c.Query("sort"),
+		Direction: c.Query("direction"),
+		Page:      c.QueryInt("page", 1),
+		PageSize:  c.QueryInt("page_size", projectExplorerDefaultPageSize),
+	})
+	if err != nil {
+		return err
+	}
+	return response.OK(c, page)
+}
+
 func (h *Handler) ProjectProgressBoard(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"project.view"}); err != nil {
 		return err

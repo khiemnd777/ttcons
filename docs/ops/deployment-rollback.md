@@ -74,7 +74,7 @@ For an in-place single-host production deploy, use this explicit sequence. A pla
 2. Build the new release while the old containers still serve drained traffic:
    ```bash
    docker compose --env-file .env.prod -f docker-compose.prod.yml build
-   docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm --no-deps --entrypoint /bin/sh backend -ec 'test -r /run/secrets/database_url && test -r /run/secrets/redis_url && test -r /run/secrets/jwt_secret'
+   docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm --no-deps --entrypoint /bin/sh backend -ec 'test -r /run/secrets/database_url && test -r /run/secrets/redis_url && test -r /run/secrets/redis_cache_url && test -r /run/secrets/jwt_secret'
    docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T --user postgres postgres test -r /run/secrets/postgres_password
    docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T --user redis redis test -r /run/secrets/redis_password
    ```

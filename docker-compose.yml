@@ -25,6 +25,17 @@ services:
       timeout: 5s
       retries: 12
 
+  redis-cache:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "192mb", "--maxmemory-policy", "volatile-lfu"]
+    ports:
+      - "${REDIS_CACHE_BIND_ADDRESS:?REDIS_CACHE_BIND_ADDRESS is required}:${REDIS_CACHE_PORT:?REDIS_CACHE_PORT is required}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
   backend:
     build:
       context: ./backend
@@ -34,6 +45,13 @@ services:
       PORT: "${PORT:?PORT is required}"
       DATABASE_URL: "${COMPOSE_DATABASE_URL:?COMPOSE_DATABASE_URL is required}"
       REDIS_URL: "${COMPOSE_REDIS_URL:?COMPOSE_REDIS_URL is required}"
+      REDIS_CACHE_URL: "${COMPOSE_REDIS_CACHE_URL:?COMPOSE_REDIS_CACHE_URL is required}"
+      PROJECT_EXPLORER_CACHE_MODE: "${PROJECT_EXPLORER_CACHE_MODE:?PROJECT_EXPLORER_CACHE_MODE is required}"
+      PROJECT_EXPLORER_CACHE_TIMEOUT: "${PROJECT_EXPLORER_CACHE_TIMEOUT:-200ms}"
+      PROJECT_EXPLORER_CACHE_INDEX_TTL: "${PROJECT_EXPLORER_CACHE_INDEX_TTL:-5m}"
+      PROJECT_EXPLORER_CACHE_ROW_TTL: "${PROJECT_EXPLORER_CACHE_ROW_TTL:-10m}"
+      PROJECT_EXPLORER_CACHE_LOCK_TTL: "${PROJECT_EXPLORER_CACHE_LOCK_TTL:-2s}"
+      PROJECT_EXPLORER_CACHE_MAX_VALUE_BYTES: "${PROJECT_EXPLORER_CACHE_MAX_VALUE_BYTES:-262144}"
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is required}"
       MIGRATIONS_DIR: /app/migrations
@@ -60,6 +78,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-cache:
         condition: service_healthy
 
   admin:

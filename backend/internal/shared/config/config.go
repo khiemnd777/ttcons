@@ -31,6 +31,7 @@ type Config struct {
 	Port                           string
 	DatabaseURL                    string
 	RedisURL                       string
+	RedisCacheURL                  string
 	JWTSecret                      string
 	FrontendOrigin                 string
 	MigrationsDir                  string
@@ -64,6 +65,12 @@ type Config struct {
 	DBConnMaxLifetime              time.Duration
 	DBConnMaxIdleTime              time.Duration
 	RedisOperationTimeout          time.Duration
+	ProjectExplorerCacheMode       string
+	ProjectExplorerCacheTimeout    time.Duration
+	ProjectExplorerCacheIndexTTL   time.Duration
+	ProjectExplorerCacheRowTTL     time.Duration
+	ProjectExplorerCacheLockTTL    time.Duration
+	ProjectExplorerCacheMaxBytes   int
 	RateLimitRedisMaxInFlight      int
 	RateLimitEnabled               bool
 	RateLimitMode                  string
@@ -90,12 +97,14 @@ func Load() Config {
 	validation := &envValidation{}
 	databaseURL := getenvSecretTracked("DATABASE_URL", "postgres://consflow:consflow@127.0.0.1:5432/consflow?sslmode=disable", validation)
 	redisURL := getenvSecretTracked("REDIS_URL", "redis://localhost:6379/0", validation)
+	redisCacheURL := getenvOptionalSecretTracked("REDIS_CACHE_URL", validation)
 	jwtSecret := getenvSecretTracked("JWT_SECRET", "consflow-local-dev-secret", validation)
 	cfg := Config{
 		AppEnv:                         strings.ToLower(strings.TrimSpace(getenv("APP_ENV", "development"))),
 		Port:                           getenv("PORT", "8080"),
 		DatabaseURL:                    databaseURL,
 		RedisURL:                       redisURL,
+		RedisCacheURL:                  redisCacheURL,
 		JWTSecret:                      jwtSecret,
 		FrontendOrigin:                 getenv("FRONTEND_ORIGIN", "http://localhost:5173"),
 		MigrationsDir:                  getenv("MIGRATIONS_DIR", "migrations"),
@@ -119,21 +128,27 @@ func Load() Config {
 		TrustedProxies:                 getenvCSV("TRUSTED_PROXY_CIDRS"),
 		HTTPReadTimeout:                getenvDurationTracked("HTTP_READ_TIMEOUT", 15*time.Second, false, validation),
 		// SSE responses are intentionally long-lived, so the global write deadline is disabled by default.
-		HTTPWriteTimeout:          getenvDurationTracked("HTTP_WRITE_TIMEOUT", 0, true, validation),
-		HTTPIdleTimeout:           getenvDurationTracked("HTTP_IDLE_TIMEOUT", 60*time.Second, false, validation),
-		ShutdownTimeout:           getenvDurationTracked("SHUTDOWN_TIMEOUT", 15*time.Second, false, validation),
-		ReadinessTimeout:          getenvDurationTracked("READINESS_TIMEOUT", 2*time.Second, false, validation),
-		DBStatementTimeout:        getenvDurationTracked("DB_STATEMENT_TIMEOUT", 15*time.Second, false, validation),
-		DBLockTimeout:             getenvDurationTracked("DB_LOCK_TIMEOUT", 5*time.Second, false, validation),
-		DBMaxOpenConns:            getenvIntTracked("DB_MAX_OPEN_CONNS", 20, validation),
-		DBMaxIdleConns:            getenvIntTracked("DB_MAX_IDLE_CONNS", 10, validation),
-		DBConnMaxLifetime:         getenvDurationTracked("DB_CONN_MAX_LIFETIME", 30*time.Minute, false, validation),
-		DBConnMaxIdleTime:         getenvDurationTracked("DB_CONN_MAX_IDLE_TIME", 5*time.Minute, false, validation),
-		RedisOperationTimeout:     getenvDurationTracked("REDIS_OPERATION_TIMEOUT", 250*time.Millisecond, false, validation),
-		RateLimitRedisMaxInFlight: getenvIntTracked("RATE_LIMIT_REDIS_MAX_IN_FLIGHT", 32, validation),
-		RateLimitEnabled:          getenvBoolTracked("RATE_LIMIT_ENABLED", true, validation),
-		RateLimitMode:             strings.ToLower(strings.TrimSpace(getenv("RATE_LIMIT_MODE", "enforce"))),
-		RateLimitLocalMaxKeys:     getenvIntTracked("RATE_LIMIT_LOCAL_MAX_KEYS", 10000, validation),
+		HTTPWriteTimeout:             getenvDurationTracked("HTTP_WRITE_TIMEOUT", 0, true, validation),
+		HTTPIdleTimeout:              getenvDurationTracked("HTTP_IDLE_TIMEOUT", 60*time.Second, false, validation),
+		ShutdownTimeout:              getenvDurationTracked("SHUTDOWN_TIMEOUT", 15*time.Second, false, validation),
+		ReadinessTimeout:             getenvDurationTracked("READINESS_TIMEOUT", 2*time.Second, false, validation),
+		DBStatementTimeout:           getenvDurationTracked("DB_STATEMENT_TIMEOUT", 15*time.Second, false, validation),
+		DBLockTimeout:                getenvDurationTracked("DB_LOCK_TIMEOUT", 5*time.Second, false, validation),
+		DBMaxOpenConns:               getenvIntTracked("DB_MAX_OPEN_CONNS", 20, validation),
+		DBMaxIdleConns:               getenvIntTracked("DB_MAX_IDLE_CONNS", 10, validation),
+		DBConnMaxLifetime:            getenvDurationTracked("DB_CONN_MAX_LIFETIME", 30*time.Minute, false, validation),
+		DBConnMaxIdleTime:            getenvDurationTracked("DB_CONN_MAX_IDLE_TIME", 5*time.Minute, false, validation),
+		RedisOperationTimeout:        getenvDurationTracked("REDIS_OPERATION_TIMEOUT", 250*time.Millisecond, false, validation),
+		ProjectExplorerCacheMode:     strings.ToLower(strings.TrimSpace(getenv("PROJECT_EXPLORER_CACHE_MODE", "off"))),
+		ProjectExplorerCacheTimeout:  getenvDurationTracked("PROJECT_EXPLORER_CACHE_TIMEOUT", 200*time.Millisecond, false, validation),
+		ProjectExplorerCacheIndexTTL: getenvDurationTracked("PROJECT_EXPLORER_CACHE_INDEX_TTL", 5*time.Minute, false, validation),
+		ProjectExplorerCacheRowTTL:   getenvDurationTracked("PROJECT_EXPLORER_CACHE_ROW_TTL", 10*time.Minute, false, validation),
+		ProjectExplorerCacheLockTTL:  getenvDurationTracked("PROJECT_EXPLORER_CACHE_LOCK_TTL", 2*time.Second, false, validation),
+		ProjectExplorerCacheMaxBytes: getenvIntTracked("PROJECT_EXPLORER_CACHE_MAX_VALUE_BYTES", 256*1024, validation),
+		RateLimitRedisMaxInFlight:    getenvIntTracked("RATE_LIMIT_REDIS_MAX_IN_FLIGHT", 32, validation),
+		RateLimitEnabled:             getenvBoolTracked("RATE_LIMIT_ENABLED", true, validation),
+		RateLimitMode:                strings.ToLower(strings.TrimSpace(getenv("RATE_LIMIT_MODE", "enforce"))),
+		RateLimitLocalMaxKeys:        getenvIntTracked("RATE_LIMIT_LOCAL_MAX_KEYS", 10000, validation),
 		RateLimitIP: RateLimitPolicies{
 			Auth:    rateLimitPolicy("RATE_LIMIT_IP_AUTH", 10, 10, validation),
 			General: rateLimitPolicy("RATE_LIMIT_IP_GENERAL", 300, 60, validation),
@@ -176,6 +191,22 @@ func (c Config) Validate() error {
 	}
 	if c.RateLimitMode != "observe" && c.RateLimitMode != "enforce" {
 		return fmt.Errorf("RATE_LIMIT_MODE must be observe or enforce")
+	}
+	projectExplorerCacheMode := strings.ToLower(strings.TrimSpace(c.ProjectExplorerCacheMode))
+	if projectExplorerCacheMode == "" {
+		projectExplorerCacheMode = "off"
+	}
+	if projectExplorerCacheMode != "off" && projectExplorerCacheMode != "shadow" && projectExplorerCacheMode != "serve" {
+		return fmt.Errorf("PROJECT_EXPLORER_CACHE_MODE must be off, shadow, or serve")
+	}
+	if projectExplorerCacheMode != "off" {
+		if strings.TrimSpace(c.RedisCacheURL) == "" || containsPlaceholder(c.RedisCacheURL) {
+			return fmt.Errorf("REDIS_CACHE_URL must be configured without CHANGE_ME when PROJECT_EXPLORER_CACHE_MODE is enabled")
+		}
+		redisCacheURL, err := url.Parse(c.RedisCacheURL)
+		if err != nil || (redisCacheURL.Scheme != "redis" && redisCacheURL.Scheme != "rediss") || redisCacheURL.Host == "" {
+			return fmt.Errorf("REDIS_CACHE_URL must be an absolute redis:// or rediss:// URL when PROJECT_EXPLORER_CACHE_MODE is enabled")
+		}
 	}
 	if c.DBMaxIdleConns > c.DBMaxOpenConns {
 		return fmt.Errorf("DB_MAX_IDLE_CONNS must not exceed DB_MAX_OPEN_CONNS")
@@ -439,6 +470,36 @@ func getenvSecretTracked(key, fallback string, validation *envValidation) string
 	if !fileSet {
 		validation.markSecretDefault(fmt.Sprintf("%s or %s", key, fileKey))
 		return fallback
+	}
+	if strings.TrimSpace(filePath) == "" {
+		validation.markSecretError(fmt.Sprintf("%s must name a readable secret file", fileKey))
+		return ""
+	}
+	value, err := readSecretFile(filePath)
+	if err != nil {
+		validation.markSecretError(fmt.Sprintf("%s: %v", fileKey, err))
+		return ""
+	}
+	return value
+}
+
+func getenvOptionalSecretTracked(key string, validation *envValidation) string {
+	directValue, directSet := os.LookupEnv(key)
+	fileKey := key + "_FILE"
+	filePath, fileSet := os.LookupEnv(fileKey)
+	if directSet && fileSet {
+		validation.markSecretError(fmt.Sprintf("%s and %s must not both be set", key, fileKey))
+		return ""
+	}
+	if directSet {
+		if strings.TrimSpace(directValue) == "" {
+			validation.markSecretError(fmt.Sprintf("%s must not be empty", key))
+			return ""
+		}
+		return directValue
+	}
+	if !fileSet {
+		return ""
 	}
 	if strings.TrimSpace(filePath) == "" {
 		validation.markSecretError(fmt.Sprintf("%s must name a readable secret file", fileKey))

@@ -9,7 +9,6 @@ import {
   ChevronUp,
   ChevronsUpDown,
   CircleDot,
-  Eye,
   Folder,
   FolderOpen,
   Pencil,
@@ -17,20 +16,17 @@ import {
   Search,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { get, post, put } from '../../lib/api/client';
+import { get, post, put, streamSSE, type StreamStatus } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FormDrawer } from '../../components/FormDrawer';
-import { CurrencyText } from '../../components/CurrencyText';
 import { useToast } from '../../components/ToastProvider';
-import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { SimpleForm } from '../_shared/SimpleForm';
-import type { Partner, Project } from '../../lib/types/domain';
+import type { Partner, Project, ProjectExplorerPage } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
-import { statusLabel } from '../../lib/utils/status';
 import { partnerOptions } from '../core-data/partnerUtils';
 import {
   projectWorkspaceGroupPath,
@@ -42,28 +38,48 @@ import {
   projectExplorerSortFromValue,
   projectExplorerSortOptions,
   projectExplorerSortValue,
-  sortProjectExplorerRows,
   type ProjectExplorerSort,
   type ProjectExplorerSortKey,
 } from './projectExplorerSort';
 
 export function ProjectsPage() {
   const [open, setOpen] = useState(false);
-  const [dialog, setDialog] = useState<{ mode: 'view' | 'edit'; record: Project } | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [search, setSearch] = useState('');
+	const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [projectSort, setProjectSort] = useState<ProjectExplorerSort | null>(null);
+	const [page, setPage] = useState(1);
+	const [pageSize, setPageSize] = useState(25);
+	const [streamStatus, setStreamStatus] = useState<StreamStatus>('reconnecting');
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { hasAnyPermission } = useAuth();
-  const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Project[]>('/projects') });
+  const { hasAnyPermission, user } = useAuth();
+	const explorerParams = useMemo(() => {
+		const params = new URLSearchParams({
+			page: String(page),
+			page_size: String(pageSize),
+			search: debouncedSearch,
+			status: statusFilter,
+			sort: projectSort?.key ?? 'created_at',
+			direction: projectSort?.direction ?? 'desc',
+		});
+		return params.toString();
+	}, [debouncedSearch, page, pageSize, projectSort, statusFilter]);
+	const projects = useQuery({
+		queryKey: ['project-explorer', user?.id, explorerParams],
+		queryFn: () => get<ProjectExplorerPage>(`/projects/explorer?${explorerParams}`),
+		staleTime: 0,
+		refetchInterval: streamStatus === 'connected' ? false : 60_000,
+	});
   const templates = useQuery({ queryKey: ['pipeline-templates'], queryFn: () => get<Record<string, any>[]>('/pipeline-templates') });
   const partners = useQuery({ queryKey: ['partners', 'client', 'active'], queryFn: () => get<Partner[]>('/partners?status=active&type=client') });
   const createProject = useMutation({
     mutationFn: (values: Record<string, any>) => post<Project>('/projects', values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+		queryClient.invalidateQueries({ queryKey: ['project-explorer'] });
       setOpen(false);
       toast.success('Đã tạo công trình');
     },
@@ -73,7 +89,8 @@ export function ProjectsPage() {
     mutationFn: ({ projectId, values }: { projectId: string; values: Record<string, any> }) => put<Project>(`/projects/${projectId}`, values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      setDialog(null);
+		queryClient.invalidateQueries({ queryKey: ['project-explorer'] });
+      setEditingProject(null);
       toast.success('Đã cập nhật công trình');
     },
     onError: (error) => toast.error('Không cập nhật được công trình', error),
@@ -84,11 +101,12 @@ export function ProjectsPage() {
     { name: 'code', label: 'Mã công trình', defaultValue: record?.code ?? `PRJ-${Date.now().toString().slice(-5)}`, required: true },
     {
       name: 'partner_id',
-      label: 'Chủ đầu tư catalog',
+      label: 'Chọn chủ đầu tư có sẵn',
       type: 'select' as const,
       defaultValue: record?.partner_id ?? '',
       options: partnerOptions(partners.data ?? [], ['client']),
-      helperText: 'Khi chọn catalog, backend tự snapshot tên chủ đầu tư vào công trình.',
+      helperText: 'Khi chọn, hệ thống lưu tên chủ đầu tư hiện tại vào công trình.',
+      fullWidth: true,
     },
     {
       name: 'client_name',
@@ -96,8 +114,9 @@ export function ProjectsPage() {
       defaultValue: record?.client_name ?? 'Khách hàng mới',
       required: true,
       hiddenWhen: (values: Record<string, any>) => Boolean(values.partner_id),
+      fullWidth: true,
     },
-    { name: 'address', label: 'Địa chỉ', defaultValue: record?.address ?? '' },
+    { name: 'address', label: 'Địa chỉ', defaultValue: record?.address ?? '', fullWidth: true },
     { name: 'planned_start_date', label: 'Ngày bắt đầu dự kiến', type: 'date' as const, defaultValue: record?.planned_start_date?.slice?.(0, 10) ?? '' },
     { name: 'planned_end_date', label: 'Ngày kết thúc dự kiến', type: 'date' as const, defaultValue: record?.planned_end_date?.slice?.(0, 10) ?? '' },
     { name: 'estimated_budget', label: 'Ngân sách dự kiến', type: 'currency' as const, defaultValue: record?.estimated_budget ?? 300000000, min: 0 },
@@ -110,6 +129,7 @@ export function ProjectsPage() {
       options: (templates.data ?? [])
         .filter((template) => template.status === 'published')
         .map((template) => ({ label: `${template.name} · revision ${template.revision_no ?? template.version}`, value: template.id })),
+      fullWidth: true,
     },
   ];
 
@@ -117,25 +137,52 @@ export function ProjectsPage() {
     () => visibleProjectWorkspaceGroups(hasAnyPermission),
     [hasAnyPermission],
   );
-  const statusOptions = useMemo(() => {
-    const values = new Set((projects.data ?? []).map((project) => project.status).filter(Boolean));
-    return Array.from(values).sort();
-  }, [projects.data]);
-  const filteredProjects = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const filtered = (projects.data ?? []).filter((project) => {
-      const matchesStatus = statusFilter ? project.status === statusFilter : true;
-      const haystack = [project.name, project.code, project.client_name, project.pm_name].filter(Boolean).join(' ').toLowerCase();
-      return matchesStatus && (!query || haystack.includes(query));
-    });
-    return sortProjectExplorerRows(filtered, projectSort, statusLabel);
-  }, [projectSort, projects.data, search, statusFilter]);
+  const statusOptions = projects.data?.options.statuses ?? [];
+	const filteredProjects = projects.data?.items ?? [];
+
+	useEffect(() => {
+		const timer = window.setTimeout(() => {
+			setDebouncedSearch(search.trim());
+			setPage(1);
+		}, 300);
+		return () => window.clearTimeout(timer);
+	}, [search]);
+
+	useEffect(() => {
+		let invalidateTimer: number | undefined;
+		const stop = streamSSE('/projects/explorer/stream', {
+			onStatus: setStreamStatus,
+			onEvent: (message) => {
+				if (message.event !== 'project_explorer_changed') return;
+				if (invalidateTimer !== undefined) window.clearTimeout(invalidateTimer);
+				invalidateTimer = window.setTimeout(() => {
+					void queryClient.invalidateQueries({ queryKey: ['project-explorer'] });
+				}, 300);
+			},
+		});
+		return () => {
+			stop();
+			if (invalidateTimer !== undefined) window.clearTimeout(invalidateTimer);
+		};
+	}, [queryClient]);
+
+	useEffect(() => {
+		if (projects.data && projects.data.total_pages > 0 && page > projects.data.total_pages) {
+			setPage(projects.data.total_pages);
+		}
+	}, [page, projects.data]);
 
   useEffect(() => {
-    if (!projects.data?.length) return;
+		const rows = projects.data?.items ?? [];
+		if (!rows.length) {
+			setExpandedProjectIds(new Set());
+			return;
+		}
     setExpandedProjectIds((current) => {
-      if (current.size) return current;
-      return new Set([projects.data[0].id]);
+			const visible = new Set(rows.map((project) => project.id));
+			const retained = new Set(Array.from(current).filter((projectID) => visible.has(projectID)));
+			if (retained.size) return retained;
+			return new Set([rows[0].id]);
     });
   }, [projects.data]);
 
@@ -170,13 +217,16 @@ export function ProjectsPage() {
                 className="w-full rounded-md border border-line bg-white py-2 pl-9 pr-3 text-sm focus-ring"
                 value={search}
                 placeholder="Tìm công trình, mã, chủ đầu tư"
-                onChange={(event) => setSearch(event.target.value)}
+				onChange={(event) => setSearch(event.target.value)}
               />
             </label>
             <select
               className="rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring"
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+				onChange={(event) => {
+					setStatusFilter(event.target.value);
+					setPage(1);
+				}}
             >
               <option value="">Tất cả trạng thái</option>
               {statusOptions.map((status) => (
@@ -187,7 +237,10 @@ export function ProjectsPage() {
               aria-label="Sắp xếp công trình"
               className="rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring lg:hidden"
               value={projectExplorerSortValue(projectSort)}
-              onChange={(event) => setProjectSort(projectExplorerSortFromValue(event.target.value))}
+				onChange={(event) => {
+					setProjectSort(projectExplorerSortFromValue(event.target.value));
+					setPage(1);
+				}}
             >
               <option value="">Thứ tự mặc định</option>
               {projectExplorerSortOptions.map((option) => (
@@ -199,7 +252,10 @@ export function ProjectsPage() {
 
         <ProjectExplorerHeader
           sort={projectSort}
-          onSort={(key) => setProjectSort((current) => nextProjectExplorerSort(key, current))}
+			onSort={(key) => {
+				setProjectSort((current) => nextProjectExplorerSort(key, current));
+				setPage(1);
+			}}
         />
 
         {projects.isLoading ? (
@@ -222,7 +278,7 @@ export function ProjectsPage() {
 
         {!projects.isLoading && !projects.error && !filteredProjects.length ? (
           <div className="p-6">
-            <EmptyState title={projects.data?.length ? 'Không tìm thấy công trình phù hợp' : 'Chưa có công trình'} />
+			<EmptyState title={debouncedSearch || statusFilter ? 'Không tìm thấy công trình phù hợp' : 'Chưa có công trình'} />
           </div>
         ) : null}
 
@@ -239,8 +295,7 @@ export function ProjectsPage() {
                     project={project}
                     expanded={expanded}
                     onToggle={() => toggleProject(project.id)}
-                    onView={() => setDialog({ mode: 'view', record: project })}
-                    onEdit={() => setDialog({ mode: 'edit', record: project })}
+                    onEdit={() => setEditingProject(project)}
                   />
                   {expanded ? (
                     <ProjectExpandedWorkspace project={project} folders={visibleFolders} />
@@ -250,6 +305,20 @@ export function ProjectsPage() {
             })}
           </div>
         ) : null}
+
+		{!projects.isLoading && !projects.error && projects.data ? (
+			<ProjectExplorerPagination
+				page={page}
+				pageSize={pageSize}
+				total={projects.data.total}
+				totalPages={projects.data.total_pages}
+				onPageChange={setPage}
+				onPageSizeChange={(nextPageSize) => {
+					setPageSize(nextPageSize);
+					setPage(1);
+				}}
+			/>
+		) : null}
       </section>
 
       <FormDrawer open={open} title="Tạo công trình mới" onClose={() => setOpen(false)}>
@@ -259,44 +328,133 @@ export function ProjectsPage() {
           onSubmit={(values) => createProject.mutateAsync(values)}
         />
       </FormDrawer>
-      <RecordDetailDialog
-        open={dialog?.mode === 'view'}
-        title="Chi tiết công trình"
-        record={dialog?.record ?? null}
-        onClose={() => setDialog(null)}
-        fields={[
-          { key: 'name', label: 'Tên công trình' },
-          { key: 'code', label: 'Mã' },
-          { key: 'client_name', label: 'Chủ đầu tư' },
-          { key: 'partner_name', label: 'Đối tác catalog' },
-          { key: 'partner_tax_code', label: 'MST đối tác' },
-          { key: 'address', label: 'Địa chỉ' },
-          { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-          { key: 'estimated_budget', label: 'Ngân sách', render: (row) => <CurrencyText value={row.estimated_budget} /> },
-          { key: 'contract_amount', label: 'Hợp đồng', render: (row) => <CurrencyText value={row.contract_amount} /> },
-          { key: 'progress_percent', label: 'Tiến độ', render: (row) => `${row.progress_percent ?? 0}%` },
-        ]}
-      />
-      <FormDrawer open={dialog?.mode === 'edit'} title="Chỉnh sửa công trình" onClose={() => setDialog(null)}>
-        {dialog?.record ? (
-          <SimpleForm
-            submitLabel="Lưu thay đổi"
-            fields={projectFields(dialog.record)}
-            onSubmit={(values) => updateProject.mutateAsync({
-              projectId: dialog.record.id,
-              values: { ...values, partner_id: values.partner_id || null, pipeline_template_id: values.pipeline_template_id || null },
-            })}
-          />
+      <FormDrawer open={Boolean(editingProject)} title="Chỉnh sửa công trình" onClose={() => setEditingProject(null)}>
+        {editingProject ? (
+          <div className="space-y-5">
+            <ProjectEditSummary project={editingProject} />
+            <SimpleForm
+              submitLabel="Lưu thay đổi"
+              fields={projectFields(editingProject)}
+              layout="two-column"
+              sections={[
+                {
+                  title: 'Thông tin công trình',
+                  fields: ['name', 'code', 'partner_id', 'client_name', 'address'],
+                },
+                {
+                  title: 'Kế hoạch & giá trị',
+                  fields: ['planned_start_date', 'planned_end_date', 'estimated_budget', 'contract_amount'],
+                },
+                {
+                  title: 'Quy trình',
+                  fields: ['pipeline_template_id'],
+                },
+              ]}
+              onCancel={() => setEditingProject(null)}
+              onSubmit={(values) => updateProject.mutateAsync({
+                projectId: editingProject.id,
+                values: { ...values, partner_id: values.partner_id || null, pipeline_template_id: values.pipeline_template_id || null },
+              })}
+            />
+          </div>
         ) : null}
       </FormDrawer>
     </>
   );
 }
 
+function ProjectExplorerPagination({
+	page,
+	pageSize,
+	total,
+	totalPages,
+	onPageChange,
+	onPageSizeChange,
+}: {
+	page: number;
+	pageSize: number;
+	total: number;
+	totalPages: number;
+	onPageChange: (page: number) => void;
+	onPageSizeChange: (pageSize: number) => void;
+}) {
+	const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
+	const last = Math.min(total, page * pageSize);
+	return (
+		<div className="flex flex-col gap-3 border-t border-line px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+			<p>Hiển thị <span className="font-semibold text-ink">{first}–{last}</span> trong <span className="font-semibold text-ink">{total}</span> công trình</p>
+			<div className="flex flex-wrap items-center gap-2">
+				<label className="flex items-center gap-2">
+					<span>Số dòng</span>
+					<select
+						aria-label="Số công trình mỗi trang"
+						className="rounded-md border border-line bg-white px-2 py-1.5 focus-ring"
+						value={pageSize}
+						onChange={(event) => onPageSizeChange(Number(event.target.value))}
+					>
+						{[25, 50, 100].map((value) => <option key={value} value={value}>{value}</option>)}
+					</select>
+				</label>
+				<button
+					type="button"
+					className="rounded-md border border-line bg-white px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+					disabled={page <= 1}
+					onClick={() => onPageChange(page - 1)}
+				>Trước</button>
+				<span className="min-w-20 text-center font-medium">Trang {totalPages === 0 ? 0 : page}/{totalPages}</span>
+				<button
+					type="button"
+					className="rounded-md border border-line bg-white px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+					disabled={totalPages === 0 || page >= totalPages}
+					onClick={() => onPageChange(page + 1)}
+				>Sau</button>
+			</div>
+		</div>
+	);
+}
+
 function latestPublishedTemplateId(templates: Record<string, any>[]) {
   return [...templates]
     .filter((template) => template.status === 'published')
     .sort((left, right) => Number(right.revision_no ?? right.version ?? 0) - Number(left.revision_no ?? left.version ?? 0))[0]?.id ?? '';
+}
+
+function ProjectEditSummary({ project }: { project: Project }) {
+  const progress = boundedPercent(project.progress_percent ?? 0);
+
+  return (
+    <section className="rounded-lg border border-line bg-slate-50 p-4" aria-label="Tổng quan công trình">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-ink">Tổng quan</h3>
+          <p className="mt-1 truncate text-xs text-slate-500">{project.code} · {project.name}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trạng thái</span>
+          <StatusBadge status={project.status} />
+        </div>
+      </div>
+      <dl className="mt-4 grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tiến độ</dt>
+          <dd className="mt-1 flex items-center gap-2 text-sm font-semibold text-ink">
+            <span>{progress}%</span>
+            <span className="h-1.5 min-w-20 flex-1 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+              <span className="block h-full rounded-full bg-blue-600" style={{ width: `${progress}%` }} />
+            </span>
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Chủ đầu tư đã chọn</dt>
+          <dd className="mt-1 break-words text-sm text-ink">{project.partner_name || '-'}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">MST đối tác</dt>
+          <dd className="mt-1 break-words text-sm text-ink">{project.partner_tax_code || '-'}</dd>
+        </div>
+      </dl>
+    </section>
+  );
 }
 
 function ProjectExpandedWorkspace({ project, folders }: { project: Project; folders: ProjectWorkspaceGroup[] }) {
@@ -474,13 +632,11 @@ function ProjectExplorerRow({
   project,
   expanded,
   onToggle,
-  onView,
   onEdit,
 }: {
   project: Project;
   expanded: boolean;
   onToggle: () => void;
-  onView: () => void;
   onEdit: () => void;
 }) {
   return (
@@ -520,15 +676,6 @@ function ProjectExplorerRow({
         {dateText(project.created_at)}
       </div>
       <div className="flex items-center justify-start gap-2 lg:justify-end">
-        <button
-          type="button"
-          className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100"
-          title="Xem nhanh"
-          aria-label="Xem nhanh công trình"
-          onClick={onView}
-        >
-          <Eye className="h-4 w-4" />
-        </button>
         <button
           type="button"
           className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100"

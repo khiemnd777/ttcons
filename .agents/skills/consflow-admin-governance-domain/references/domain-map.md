@@ -23,7 +23,7 @@
 - `auth_sessions`
 - `partners`
 - `system_settings`, `audit_logs`
-- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, and external-only client access in `V89`
+- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, external-only client access in `V89`, and actor/project explorer cache revisions/outbox retention in `V97`-`V100`
 
 ## Invariants
 
@@ -39,8 +39,10 @@
 - Staff report is a project-allocation view: only active staff memberships in accessible non-cancelled projects are returned and distinct accessible projects are counted. Full-company staff is available only through the `staff.view` Staff module.
 - `project.member.manage` is granted to Admin/Director/PM and always combined with project scope. Project member responses expose server capabilities; mutation synchronizes only project-scoped `user_roles`, never removes global roles, never exposes Admin/Director as assignable project roles, and writes project audit.
 - Partner catalog updates preserve downstream snapshots for historical documents.
+- Project setup presents the active `client` partner selector as `Chọn chủ đầu tư có sẵn` and its selected summary as `Chủ đầu tư đã chọn`; these user-facing labels do not change active/type filtering, `partner_id`, name snapshot behavior or catalog governance.
 - Session refresh/revoke lifecycle remains DB-backed and revocable.
 - `AuthSessionActive` is never cached: immediate session revoke remains authoritative even when Redis supplies distributed rate limiting and SSE Pub/Sub.
+- The project explorer index cache is actor-scoped, not role-name scoped. Membership, staff-user linkage, user-role and role-permission mutations bump the affected actor revision in the same database transaction. Redis index IDs are still rechecked with current `ProjectAccessFilter` before any cached row is returned; cache keys or frontend visibility never authorize access.
 - `roles.external_only` classifies business counterparts that cannot act in the App. V89 marks `client`, fails when migration would strand an external-only open work item/pending approval or a mixed-role user, removes App permissions, revokes sessions, inactivates linked users/staff/project memberships and preserves `user_roles` plus historical workflow/runtime labels. Login lookup, session creation/refresh/active checks, role edit, role-permission assignment, user-role assignment and project-member save all fail closed independently of frontend filtering.
 - V68 adds the system roles `Thiết kế`, `Sale`, `Pháp lý` with the minimum permission sets needed by their official-workflow steps and grants existing `Đội thi công` pipeline/planning access. The migration does not auto-assign users or project memberships and does not broaden existing runtime role snapshots.
 - Project-finance permissions are independent capability gates: view, material-cost create/review, cash-request create/approve/process, and management report view. Accounting owns capture/review/handoff processing, Director owns cash-request approval/reporting, and all actions still combine permission with project scope. Legacy ledger/tax permissions remain admin-only historical support.

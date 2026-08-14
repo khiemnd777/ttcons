@@ -63,6 +63,33 @@ services:
     cpus: "${REDIS_CPU_LIMIT:-0.5}"
     pids_limit: 128
 
+  redis-cache:
+    <<: *common-runtime
+    image: redis:7-alpine
+    secrets:
+      - redis_cache_password
+    command:
+      - /bin/sh
+      - -ec
+      - exec redis-server --save "" --appendonly no --maxmemory "$${REDIS_CACHE_MAXMEMORY:-192mb}" --maxmemory-policy volatile-lfu --requirepass "$$(cat /run/secrets/redis_cache_password)"
+    environment:
+      REDIS_CACHE_MAXMEMORY: "${REDIS_CACHE_MAXMEMORY:-192mb}"
+    networks:
+      - app_internal
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(cat /run/secrets/redis_cache_password)\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    stop_grace_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    mem_limit: "${REDIS_CACHE_MEMORY_LIMIT:-256m}"
+    cpus: "${REDIS_CACHE_CPU_LIMIT:-0.5}"
+    pids_limit: 128
+
   migrate:
     <<: *common-runtime
     restart: "no"
@@ -99,6 +126,7 @@ services:
       PORT: "8080"
       DATABASE_URL_FILE: /run/secrets/database_url
       REDIS_URL_FILE: /run/secrets/redis_url
+      REDIS_CACHE_URL_FILE: /run/secrets/redis_cache_url
       JWT_SECRET_FILE: /run/secrets/jwt_secret
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is required}"
       MIGRATIONS_DIR: /app/migrations
@@ -131,6 +159,12 @@ services:
       DB_CONN_MAX_LIFETIME: "${DB_CONN_MAX_LIFETIME:-30m}"
       DB_CONN_MAX_IDLE_TIME: "${DB_CONN_MAX_IDLE_TIME:-5m}"
       REDIS_OPERATION_TIMEOUT: "${REDIS_OPERATION_TIMEOUT:-250ms}"
+      PROJECT_EXPLORER_CACHE_MODE: "${PROJECT_EXPLORER_CACHE_MODE:-off}"
+      PROJECT_EXPLORER_CACHE_TIMEOUT: "${PROJECT_EXPLORER_CACHE_TIMEOUT:-200ms}"
+      PROJECT_EXPLORER_CACHE_INDEX_TTL: "${PROJECT_EXPLORER_CACHE_INDEX_TTL:-5m}"
+      PROJECT_EXPLORER_CACHE_ROW_TTL: "${PROJECT_EXPLORER_CACHE_ROW_TTL:-10m}"
+      PROJECT_EXPLORER_CACHE_LOCK_TTL: "${PROJECT_EXPLORER_CACHE_LOCK_TTL:-2s}"
+      PROJECT_EXPLORER_CACHE_MAX_VALUE_BYTES: "${PROJECT_EXPLORER_CACHE_MAX_VALUE_BYTES:-262144}"
       RATE_LIMIT_REDIS_MAX_IN_FLIGHT: "${RATE_LIMIT_REDIS_MAX_IN_FLIGHT:-32}"
       RATE_LIMIT_ENABLED: "${RATE_LIMIT_ENABLED:-true}"
       RATE_LIMIT_MODE: "${RATE_LIMIT_MODE:-observe}"
@@ -177,6 +211,7 @@ services:
     secrets:
       - database_url
       - redis_url
+      - redis_cache_url
       - jwt_secret
     expose:
       - "8080"
@@ -188,6 +223,8 @@ services:
       migrate:
         condition: service_completed_successfully
       redis:
+        condition: service_started
+      redis-cache:
         condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/ready"]
@@ -264,6 +301,10 @@ secrets:
     file: "${REDIS_PASSWORD_FILE:?REDIS_PASSWORD_FILE is required}"
   redis_url:
     file: "${REDIS_URL_FILE:?REDIS_URL_FILE is required}"
+  redis_cache_password:
+    file: "${REDIS_CACHE_PASSWORD_FILE:?REDIS_CACHE_PASSWORD_FILE is required}"
+  redis_cache_url:
+    file: "${REDIS_CACHE_URL_FILE:?REDIS_CACHE_URL_FILE is required}"
   jwt_secret:
     file: "${JWT_SECRET_FILE:?JWT_SECRET_FILE is required}"
 

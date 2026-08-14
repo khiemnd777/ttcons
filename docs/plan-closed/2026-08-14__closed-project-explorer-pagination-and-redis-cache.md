@@ -1,0 +1,26 @@
+# [Closed] Project Explorer Pagination And Redis Cache
+
+## Will be done
+
+- Add a dedicated actor-scoped `GET /projects/explorer` contract with server pagination, normalized search/status/sort inputs and explicit response metadata while preserving legacy `GET /projects` consumers.
+- Make PostgreSQL transactionally authoritative for cache invalidation through catalog, actor-access and per-project row revisions; cover project membership, role scope and every joined/derived row dependency used by the explorer.
+- Add a dedicated Redis cache runtime with `off`, `shadow` and `serve` modes, versioned index/row keys, bounded TTL and payload sizes, local request coalescing, safe distributed index-fill locking and database fallback on every cache failure.
+- Move only `ProjectsPage` to the paginated explorer contract, preserve the approved unified project edit dialog, add exact local React Query invalidation and a reconnect-safe project-explorer invalidation stream.
+- Add low-cardinality cache observability, dedicated development/production/Kubernetes configuration, CI/integration/load coverage and the required central/backend/frontend/project-planning/admin/runtime mapping updates.
+
+## Done
+
+- Audited the current list, access filter, joined issue/approval counters, React Query cache, Redis runtime, Compose/Kubernetes configuration and custom migration runner.
+- Confirmed that `GET /projects` is an unpaginated actor-scoped PostgreSQL query, the browser has a 30-second in-memory query cache, and Redis currently has no project-list application cache.
+- Produced the approved review package covering transactional versioned invalidation, dedicated Redis isolation, two-tier cache keys, multi-replica stampede control, fallback behavior, client-cache invalidation, rollout and validation; received explicit `OK triển khai` approval.
+- Confirmed pre-existing uncommitted project-dialog, test, current-state and mapping edits and will preserve them while implementing this plan.
+- Added protected `GET /projects/explorer` and `GET /projects/explorer/stream` while retaining legacy `GET /projects`. The typed contract validates page sizes 25/50/100, debounced search, status, global sort/direction, returns total/pages/status options and reuses `ProjectAccessFilter`.
+- Added V97-V100 for catalog/actor/project revisions, transactional invalidation outbox, actor-bootstrap correction, explorer query indexes and indexed seven-day published-outbox retention. Project rows, issue/approval counters, membership/access, staff owner, partner and template display changes bump the narrowest safe revision in the source transaction.
+- Added a dedicated disposable Redis cache with `off|shadow|serve`, catalog+actor-versioned index keys, project-versioned rows, payload/TTL limits, jitter, local singleflight, token-safe distributed locks, circuit breaker and DB fallback. Cached IDs are re-authorized in PostgreSQL and both actor/catalog plus project revisions are rechecked at the end of the cache read before response return.
+- Added durable after-commit SSE dispatch with retry/backoff and seven-day published-outbox retention. The frontend invalidates actor-scoped explorer queries from SSE and polls every 60 seconds when disconnected; create/update also invalidate legacy and explorer query families.
+- Moved only `ProjectsPage` to the paginated contract, retained the approved unified edit dialog and responsive explorer, added 25/50/100 page controls and server sort/filter semantics, and removed previous-page placeholder data so page metadata never labels stale rows as the new page.
+- Added low-cardinality Prometheus cache metrics, dedicated development/production/Kubernetes/CI cache configuration, a non-production k6 workload and rollout/rollback runbook. Runtime Redis remains separate from non-persistent bounded-memory `redis-cache`; backend Docker builds now use BuildKit module/build cache mounts after transient Go-proxy EOF failures.
+- Updated central backend/frontend/root-cause, project-planning and admin-governance maps for the new ownership, authorization, invalidation and runtime contracts.
+- Technical verification on the current working tree: all 100 migrations pass checksum validation; V100 is applied to local PostgreSQL; full `go test ./...` passes; PostgreSQL+Redis integration proves search, row-derived invalidation, actor access invalidation and closed-Redis fallback; migration integration proves revision/outbox triggers; frontend `npm test` passes 101/101 and `npm run build` passes; development/production Compose render and Kubernetes deterministic validation pass.
+- Rebuilt and restarted localhost using `down -> build -> run`. PostgreSQL, runtime Redis and dedicated Redis cache are healthy; backend/admin are up; health/readiness return 200; final startup reports all 100 migrations applied/skipped correctly. Live API checks returned 58 projects over 3 pages at 25 rows, search returned 16 rows, and a final `serve`-mode cold/hot pair recorded one index miss then one index hit plus 25 row misses/hits. This smoke run does not substitute for a staged `shadow` acceptance window.
+- Browser/UAT remains `NOT UX ACCEPTED` because browser verification was not requested. The k6 workload was added but not executed because k6 is unavailable locally, so no achieved p95/load target is claimed.

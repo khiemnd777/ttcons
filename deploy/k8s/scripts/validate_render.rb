@@ -106,7 +106,7 @@ assert(backend_mounts.none? { |mount| mount["mountPath"] == "/app/uploads" || mo
 assert(backend_volumes.none? { |volume| volume["name"] == "uploads" },
        "S3-only backend must not define an upload scratch volume")
 backend_env = backend_container.fetch("env").to_h { |item| [item["name"], item["value"]] }
-%w[DATABASE_URL_FILE REDIS_URL_FILE JWT_SECRET_FILE].each do |key|
+%w[DATABASE_URL_FILE REDIS_URL_FILE REDIS_CACHE_URL_FILE JWT_SECRET_FILE].each do |key|
   assert(backend_env[key]&.start_with?("/var/run/secrets/consflow/"), "backend must source #{key} from a mounted Secret")
 end
 aws_env = backend_container.fetch("env").select { |item| item["name"]&.start_with?("AWS_") }
@@ -125,6 +125,8 @@ backend_secret = backend.dig("spec", "template", "spec", "volumes").find { |volu
 backend_secret_items = backend_secret&.dig("secret", "items") || []
 assert(backend_secret_items.any? { |item| item["key"] == "database_url" && item["path"] == "database_url" },
        "backend must mount only the runtime database credential at database_url")
+assert(backend_secret_items.any? { |item| item["key"] == "redis_cache_url" && item["path"] == "redis_cache_url" },
+       "backend must mount the dedicated project explorer cache credential at redis_cache_url")
 assert(backend_secret_items.none? { |item| item["key"] == "migration_database_url" },
        "backend must not mount the migration-owner database credential")
 

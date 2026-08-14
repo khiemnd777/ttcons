@@ -57,9 +57,10 @@ Bốn key ứng dụng tối thiểu hiện tại:
 - `database_url`: absolute `postgres://`/`postgresql://` URL của runtime role ít quyền, chỉ có DML/quyền cần thiết cho API và không có quyền DDL/schema owner;
 - `migration_database_url`: URL của role migration có quyền DDL/owner cần cho custom migration runner; key này chỉ được mount vào schema Job;
 - `redis_url`: absolute `redis://`/`rediss://` URL tới managed Redis;
+- `redis_cache_url`: absolute `redis://`/`rediss://` URL tới managed Redis riêng cho cache dữ liệu có thể tái tạo; không dùng chung rate limiting/SSE;
 - `jwt_secret`: ít nhất 32 byte ngẫu nhiên.
 
-Secret được mount read-only mode `0440` qua supplemental group. Backend chỉ đọc `database_url`, `redis_url`, `jwt_secret`; schema Job chỉ đọc `migration_database_url`. Storage migration Job dùng runtime `database_url` vì chỉ đọc/update metadata, không cần DDL. Cách này giữ kiểm tra bounded/non-empty/NUL/trailing-newline hiện có, giảm blast radius và không đặt secret trực tiếp trong ConfigMap hay Pod spec.
+Secret được mount read-only mode `0440` qua supplemental group. Backend chỉ đọc `database_url`, `redis_url`, `redis_cache_url`, `jwt_secret`; schema Job chỉ đọc `migration_database_url`. Storage migration Job dùng runtime `database_url` vì chỉ đọc/update metadata, không cần DDL. Cách này giữ kiểm tra bounded/non-empty/NUL/trailing-newline hiện có, giảm blast radius và không đặt secret trực tiếp trong ConfigMap hay Pod spec.
 
 Storage runtime dùng contract đã xác nhận:
 
@@ -76,6 +77,7 @@ kubectl -n consflow create secret generic consflow-runtime-secrets \
   --from-file=database_url=/secure/runtime/database_url \
   --from-file=migration_database_url=/secure/migration/database_url \
   --from-file=redis_url=/secure/runtime/redis_url \
+  --from-file=redis_cache_url=/secure/runtime/redis_cache_url \
   --from-file=jwt_secret=/secure/runtime/jwt_secret \
   --dry-run=client -o yaml | kubectl apply -f -
 ```

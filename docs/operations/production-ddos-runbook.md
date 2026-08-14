@@ -22,8 +22,8 @@ Repo cũng có baseline application multi-node tại [`deploy/k8s`](../../deploy
 ## Chuẩn bị cấu hình
 
 1. Sao chép `.env.prod.example` thành `.env.prod` ngoài source control. File này chỉ chứa đường dẫn tới secret, không chứa giá trị secret.
-2. Tạo thư mục `.env.prod.secrets` chỉ owner truy cập và tạo đủ năm file được `.env.prod` tham chiếu: `postgres_password`, `database_url`, `redis_password`, `redis_url`, `jwt_secret`. Tên thư mục theo mẫu `.env.*` nên đã được `.gitignore` loại trừ.
-3. Tạo mật khẩu/JWT bằng nguồn ngẫu nhiên bảo mật; JWT secret tối thiểu 32 byte. File `database_url` chứa toàn bộ PostgreSQL URL, file `redis_url` chứa toàn bộ Redis URL. URL-encode mật khẩu trong hai URL; password trong URL phải tương ứng với file password của service.
+2. Tạo thư mục `.env.prod.secrets` chỉ owner truy cập và tạo đủ bảy file được `.env.prod` tham chiếu: `postgres_password`, `database_url`, `redis_password`, `redis_url`, `redis_cache_password`, `redis_cache_url`, `jwt_secret`. Tên thư mục theo mẫu `.env.*` nên đã được `.gitignore` loại trừ.
+3. Tạo mật khẩu/JWT bằng nguồn ngẫu nhiên bảo mật; JWT secret tối thiểu 32 byte. `redis_url` dành riêng cho rate limiting/SSE, còn `redis_cache_url` trỏ tới Redis cache có thể tái tạo và không được dùng chung. URL-encode mật khẩu trong các URL; password trong URL phải tương ứng với file password của service.
 4. Đặt `FRONTEND_ORIGIN` thành HTTPS origin người dùng thật.
 5. Đặt `TRUSTED_PROXY_CIDR` đúng subnet của proxy/load balancer kết nối trực tiếp tới Nginx và `REAL_IP_HEADER` đúng header do proxy đó ghi đè. Không tin header client khi origin còn nhận kết nối trực tiếp.
 6. Giữ `ADMIN_BIND_ADDRESS=127.0.0.1` nếu proxy chạy cùng host. Chỉ dùng private interface hoặc `0.0.0.0` sau khi firewall đã allowlist proxy CIDR và từ chối mọi nguồn khác.
@@ -35,8 +35,8 @@ File mẫu không chứa production secret. Tạo file môi trường, thư mụ
 cp .env.prod.example .env.prod
 chmod 600 .env.prod
 install -d -m 700 .env.prod.secrets
-touch .env.prod.secrets/postgres_password .env.prod.secrets/database_url .env.prod.secrets/redis_password .env.prod.secrets/redis_url .env.prod.secrets/jwt_secret
-chmod 644 .env.prod.secrets/postgres_password .env.prod.secrets/database_url .env.prod.secrets/redis_password .env.prod.secrets/redis_url .env.prod.secrets/jwt_secret
+touch .env.prod.secrets/postgres_password .env.prod.secrets/database_url .env.prod.secrets/redis_password .env.prod.secrets/redis_url .env.prod.secrets/redis_cache_password .env.prod.secrets/redis_cache_url .env.prod.secrets/jwt_secret
+chmod 644 .env.prod.secrets/postgres_password .env.prod.secrets/database_url .env.prod.secrets/redis_password .env.prod.secrets/redis_url .env.prod.secrets/redis_cache_password .env.prod.secrets/redis_cache_url .env.prod.secrets/jwt_secret
 ```
 
 Điền secret bằng secret manager hoặc kênh nhập không ghi lại plaintext vào shell history. Backend chấp nhận file tối đa 64 KiB, từ chối file thiếu/không đọc được/rỗng/chứa NUL và chỉ bỏ đúng một line ending `LF` hoặc `CRLF` ở cuối. Production bắt buộc có direct hoặc `_FILE` source cho từng secret; direct value rỗng, source bị thiếu và khai báo đồng thời direct với `_FILE` đều fail-closed.
@@ -50,7 +50,7 @@ Không commit `.env.prod` hoặc thư mục `.env.prod.secrets`, không đưa n�
 ```bash
 docker compose --env-file .env.prod -f docker-compose.prod.yml config --quiet
 docker compose --env-file .env.prod -f docker-compose.prod.yml build
-docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm --no-deps --entrypoint /bin/sh backend -ec 'test -r /run/secrets/database_url && test -r /run/secrets/redis_url && test -r /run/secrets/jwt_secret'
+docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm --no-deps --entrypoint /bin/sh backend -ec 'test -r /run/secrets/database_url && test -r /run/secrets/redis_url && test -r /run/secrets/redis_cache_url && test -r /run/secrets/jwt_secret'
 docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T --user postgres postgres test -r /run/secrets/postgres_password
 docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T --user redis redis test -r /run/secrets/redis_password
 docker compose --env-file .env.prod -f docker-compose.prod.yml stop -t 30 admin backend

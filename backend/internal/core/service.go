@@ -37,6 +37,7 @@ import (
 type Service struct {
 	repo                        *Repository
 	jwtSecret                   string
+	projectExplorer             *projectExplorerRuntime
 	streamHub                   *ActivityStreamHub
 	streamCapacity              *ActivityStreamCapacity
 	streamVisibilityTimeout     time.Duration

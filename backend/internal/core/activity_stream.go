@@ -5,6 +5,7 @@ import (
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -116,6 +117,40 @@ func (h *ActivityStreamHub) Publish(event ActivityStreamEvent) {
 		return
 	}
 	h.redisUnavailableUntil.Store(0)
+}
+
+func (h *ActivityStreamHub) PublishDurable(ctx context.Context, event ActivityStreamEvent) error {
+	if h == nil {
+		return errors.New("activity stream hub is unavailable")
+	}
+	if event.Type == "" {
+		event.Type = "activity_changed"
+	}
+	if event.At == "" {
+		event.At = time.Now().UTC().Format(time.RFC3339)
+	}
+	h.broadcast(event)
+
+	h.mu.RLock()
+	client := h.redisClient
+	channel := h.brokerChannel
+	instanceID := h.instanceID
+	timeout := h.redisTimeout
+	closed := h.closed
+	h.mu.RUnlock()
+	if closed || client == nil || channel == "" {
+		return errors.New("activity stream redis broker is unavailable")
+	}
+	payload, err := json.Marshal(activityBrokerMessage{Source: instanceID, Event: event})
+	if err != nil {
+		return err
+	}
+	publishCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	if err := client.Publish(publishCtx, channel, payload).Err(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (h *ActivityStreamHub) broadcast(event ActivityStreamEvent) {
@@ -410,6 +445,52 @@ func (h *Handler) ProjectProgressBoardStream(c *fiber.Ctx) error {
 		return projectProgressBoardStreamEvent(event, visibleProjects)
 	})
 	return nil
+}
+
+func (h *Handler) ProjectExplorerStream(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"project.view"}); err != nil {
+		return err
+	}
+	release, ok := h.acquireActivityStream(c)
+	if !ok {
+		return activityStreamCapacityExceeded(c)
+	}
+	userID := actorID(c)
+	ctx, cancel := context.WithTimeout(context.Background(), h.service.streamVisibilityTimeout)
+	visibleProjects, err := h.service.repo.ProjectVisibleProjectIDs(ctx, userID)
+	cancel()
+	if err != nil {
+		release()
+		return err
+	}
+	h.writeActivityStream(c, release, func(event ActivityStreamEvent) (string, ActivityStreamEvent, bool) {
+		return projectExplorerStreamEvent(event, userID, visibleProjects)
+	})
+	return nil
+}
+
+func projectExplorerStreamEvent(event ActivityStreamEvent, actorID string, visibleProjects map[string]struct{}) (string, ActivityStreamEvent, bool) {
+	if event.Type != "project_explorer_changed" {
+		return "", ActivityStreamEvent{}, false
+	}
+	switch event.ScopeType {
+	case "actor":
+		if event.ActorID != actorID {
+			return "", ActivityStreamEvent{}, false
+		}
+	case "project":
+		if _, visible := visibleProjects[event.ProjectID]; !visible {
+			return "", ActivityStreamEvent{}, false
+		}
+	case "catalog":
+	default:
+		return "", ActivityStreamEvent{}, false
+	}
+	return "project_explorer_changed", ActivityStreamEvent{
+		Type:      "project_explorer_changed",
+		ProjectID: event.ProjectID,
+		At:        event.At,
+	}, true
 }
 
 func projectProgressBoardStreamEvent(event ActivityStreamEvent, visibleProjects map[string]struct{}) (string, ActivityStreamEvent, bool) {

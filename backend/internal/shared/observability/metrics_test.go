@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -119,6 +120,24 @@ func TestMetricsEndpointIsNotRecorded(t *testing.T) {
 	if strings.Contains(first, `route="/metrics"`) || strings.Contains(second, `route="/metrics"`) {
 		t.Fatal("metrics endpoint must not record itself")
 	}
+}
+
+func TestProjectExplorerCacheMetricsUseBoundedLabels(t *testing.T) {
+	metrics := New(nil)
+	metrics.ObserveProjectExplorerCache("index", "hit", 2)
+	metrics.ObserveProjectExplorerCache("row", "miss", 3)
+	metrics.ObserveProjectExplorerCacheOperation("mget", 5*time.Millisecond)
+	metrics.ObserveProjectExplorerCacheFallback("scope_mismatch")
+	metrics.ObserveProjectExplorerCacheMismatch()
+
+	app := fiber.New()
+	app.Get("/metrics", metrics.Handler())
+	body := scrapeMetrics(t, app)
+	assertContains(t, body, `consflow_project_explorer_cache_requests_total{layer="index",outcome="hit"} 2`)
+	assertContains(t, body, `consflow_project_explorer_cache_requests_total{layer="row",outcome="miss"} 3`)
+	assertContains(t, body, `consflow_project_explorer_cache_operation_duration_seconds_count{operation="mget"} 1`)
+	assertContains(t, body, `consflow_project_explorer_cache_fallback_total{reason="scope_mismatch"} 1`)
+	assertContains(t, body, `consflow_project_explorer_cache_shadow_mismatch_total 1`)
 }
 
 func TestProductionNginxExplicitlyDeniesMetricsProxy(t *testing.T) {
