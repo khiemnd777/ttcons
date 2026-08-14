@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, type Ref } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, ClipboardCheck, FileCheck2, FileText, PackageCheck, ScrollText, ShieldCheck, Upload } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
@@ -12,7 +12,11 @@ import { OwnerClientReconciliationPanel } from './OwnerClientReconciliationPanel
 import { OutgoingAcceptancePanel } from './OutgoingAcceptancePanel';
 import { SubcontractorReconciliationPanel } from './SubcontractorReconciliationPanel';
 import { SurplusHandlingPanel } from './SurplusHandlingPanel';
-import { WorkflowFormPanel } from './WorkflowFormPanel';
+import {
+  WorkflowFormPanel,
+  type WorkflowFormActionHandle,
+  type WorkflowFormActionState,
+} from './WorkflowFormPanel';
 import type { WorkItemRequirementNavigationRequest } from './workItemRequirements';
 import { departmentLabel, hasWorkflowFormSummary, workTypeLabel, workflowFormChipText } from './workItemPresentation';
 
@@ -42,27 +46,49 @@ export function WorkItemPrimarySurface({
   item,
   evidence,
   surface = resolveWorkItemPrimarySurface(item),
+  readOnly = false,
   navigationRequest,
+  workflowFormActionRef,
+  onWorkflowFormActionStateChange,
 }: {
   item: WorkItem;
   evidence: EvidenceRecord[];
   surface?: WorkItemPrimarySurfaceDefinition;
+  readOnly?: boolean;
   navigationRequest?: WorkItemRequirementNavigationRequest | null;
+  workflowFormActionRef?: Ref<WorkflowFormActionHandle>;
+  onWorkflowFormActionStateChange?: (state: WorkflowFormActionState | null) => void;
 }) {
   return (
     <section className="space-y-3">
-      <PrimarySurfaceHeader surface={surface} item={item} />
-      {renderPrimaryPanel(surface.kind, item, evidence, navigationRequest)}
+      {surface.kind !== 'workflow_form' ? <PrimarySurfaceHeader surface={surface} item={item} /> : null}
+      {renderPrimaryPanel(
+        surface.kind,
+        item,
+        evidence,
+        readOnly,
+        navigationRequest,
+        workflowFormActionRef,
+        onWorkflowFormActionStateChange,
+      )}
     </section>
   );
 }
 
 export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySurfaceDefinition {
+  const hasWorkflowForm = hasWorkflowFormSummary(item);
+  if (hasWorkflowForm) {
+    return {
+      kind: 'workflow_form',
+      title: workflowFormChipText(item),
+      description: 'Việc chính là hoàn tất hồ sơ nghiệp vụ của bước trước khi gửi rà soát/duyệt.',
+    };
+  }
+
   const configuredSurface = configuredPrimarySurface(item);
   if (configuredSurface) return configuredSurface;
 
   const workType = normalizeSearch(item.work_type);
-  const hasWorkflowForm = hasWorkflowFormSummary(item);
   const searchText = normalizeSearch([
     item.work_type,
     item.title,
@@ -88,18 +114,6 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
     'outgoing acceptance',
     'nghiệm thu & ký duyệt công trình',
     'nghiem thu & ky duyet cong trinh',
-  ]);
-  const isProcurementMaterialWorkflow = workType === 'material_check' && hasWorkflowForm && includesAny(searchText, [
-    'mua hàng',
-    'mua hang',
-    'tổ đội',
-    'to doi',
-    'thầu phụ',
-    'thau phu',
-    'nhà cung cấp',
-    'nha cung cap',
-    'cung cấp vật tư',
-    'cung cap vat tu',
   ]);
   const isSubcontractorQuantityDossier = includesAny(searchText, [
     'hồ sơ kiểm tra khối lượng thầu phụ',
@@ -151,14 +165,6 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
     };
   }
 
-  if (isProcurementMaterialWorkflow) {
-    return {
-      kind: 'workflow_form',
-      title: workflowFormChipText(item),
-      description: 'Việc chính là hoàn tất hồ sơ mua hàng/đầu vào của bước trước khi gửi rà soát/duyệt.',
-    };
-  }
-
   if (workType === 'material_check') {
     if (includesAny(searchText, ['nghiệm thu đầu vào', 'nghiem thu dau vao', 'incoming acceptance', 'nhận vật tư', 'nhan vat tu'])) {
       return {
@@ -189,19 +195,11 @@ export function resolveWorkItemPrimarySurface(item: WorkItem): WorkItemPrimarySu
     };
   }
 
-  if (workType === 'document_upload' && !hasWorkflowForm) {
+  if (workType === 'document_upload') {
     return {
       kind: 'evidence',
       title: 'Nộp tài liệu',
       description: 'Việc chính là tải đúng tài liệu và kiểm tra trạng thái minh chứng.',
-    };
-  }
-
-  if (hasWorkflowForm) {
-    return {
-      kind: 'workflow_form',
-      title: workflowFormChipText(item),
-      description: 'Việc chính là hoàn tất hồ sơ nghiệp vụ của bước trước khi gửi rà soát/duyệt.',
     };
   }
 
@@ -301,11 +299,25 @@ function renderPrimaryPanel(
   kind: WorkItemPrimarySurfaceKind,
   item: WorkItem,
   evidence: EvidenceRecord[],
+  readOnly: boolean,
   navigationRequest?: WorkItemRequirementNavigationRequest | null,
+  workflowFormActionRef?: Ref<WorkflowFormActionHandle>,
+  onWorkflowFormActionStateChange?: (state: WorkflowFormActionState | null) => void,
 ) {
   switch (kind) {
     case 'workflow_form':
-      return <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} navigationRequest={navigationRequest} />;
+      return (
+        <WorkflowFormPanel
+          workItemId={item.id}
+          projectId={item.project_id}
+          evidence={evidence}
+          readOnly={readOnly}
+          navigationRequest={navigationRequest}
+          externalActions
+          actionRef={workflowFormActionRef}
+          onActionStateChange={onWorkflowFormActionStateChange}
+        />
+      );
     case 'evidence':
       return <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} navigationRequest={navigationRequest} />;
     case 'approval':

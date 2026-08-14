@@ -1,15 +1,17 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  ChevronDown,
   Circle,
   Clock3,
+  FileCheck2,
   Loader2,
   MessageSquare,
-  PlayCircle,
+  Save,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -34,7 +36,11 @@ import {
   resolveWorkItemPrimarySurface,
   type WorkItemPrimarySurfaceKind,
 } from './WorkItemPrimarySurface';
-import { WorkflowFormPanel } from './WorkflowFormPanel';
+import {
+  WorkflowFormPanel,
+  type WorkflowFormActionHandle,
+  type WorkflowFormActionState,
+} from './WorkflowFormPanel';
 import {
   completionRequirementPresentation,
   missingCompletionRequirementLabels,
@@ -110,7 +116,9 @@ export function WorkItemDetailWorkspace({
   const toast = useToast();
   const selectedWorkId = workItemId ?? item?.id ?? '';
   const navigationSequence = useRef(0);
+  const workflowFormActionRef = useRef<WorkflowFormActionHandle | null>(null);
   const [navigationRequest, setNavigationRequest] = useState<WorkItemRequirementNavigationRequest | null>(null);
+  const [workflowFormActionState, setWorkflowFormActionState] = useState<WorkflowFormActionState | null>(null);
   const workDetail = useQuery({
     queryKey: ['work-item', selectedWorkId],
     queryFn: () => get<WorkItem>(`/work-items/${selectedWorkId}`),
@@ -188,8 +196,13 @@ export function WorkItemDetailWorkspace({
     setNavigationRequest({ requestId: navigationSequence.current, target });
   }
 
+  const handleWorkflowFormActionStateChange = useCallback((state: WorkflowFormActionState | null) => {
+    setWorkflowFormActionState(state);
+  }, []);
+
   useEffect(() => {
     setNavigationRequest(null);
+    setWorkflowFormActionState(null);
   }, [selectedWorkId]);
 
   const actions = permittedActions(detailItem);
@@ -197,8 +210,12 @@ export function WorkItemDetailWorkspace({
   const activities = asArray<WorkItemActivity>(detailItem?.activities);
   const attachmentOptions = buildActivityAttachmentOptions(evidence);
   const futureReadOnly = detailItem ? workItemIsUpcoming(detailItem) : false;
-  const primarySurface = detailItem && !futureReadOnly ? resolveWorkItemPrimarySurface(detailItem) : null;
+  const resolvedPrimarySurface = detailItem ? resolveWorkItemPrimarySurface(detailItem) : null;
+  const primarySurface = futureReadOnly && resolvedPrimarySurface?.kind !== 'workflow_form'
+    ? null
+    : resolvedPrimarySurface;
   const requirementRows = detailItem ? buildRequirementRows(detailItem, evidence, actions, futureReadOnly) : [];
+  const incompleteRequirementCount = requirementRows.filter((row) => row.state === 'blocked' || row.state === 'warning').length;
   const nextAction = detailItem ? resolveNextAction(detailItem, actions, primarySurface?.kind) : '';
   const latestActivity = activities[0];
   const skippedHistory = detailItem?.status === 'cancelled';
@@ -208,7 +225,7 @@ export function WorkItemDetailWorkspace({
       {workDetail.error && !detailItem ? <EmptyState title="Không tải được chi tiết đầu việc" /> : null}
       {detailItem ? (
         <div className="space-y-4">
-          <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} nextAction={nextAction} />
+          <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} />
 
           {futureReadOnly ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -219,43 +236,33 @@ export function WorkItemDetailWorkspace({
 
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
             <main className="min-w-0 space-y-4">
-              <section className="rounded-lg border border-line bg-white shadow-panel">
-                <div className="border-b border-line px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{skippedHistory ? 'Bước đã bỏ qua' : futureReadOnly ? 'Bước sắp tới · chỉ xem' : 'Bước đang xử lý'}</p>
-                  <div className="mt-1 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
-                      <h3 className="text-base font-semibold text-ink">{detailItem.run_step_name ?? detailItem.title}</h3>
-                      <p className="mt-1 text-sm leading-5 text-slate-600">
-                        {detailItem.description || 'Chưa có mô tả chi tiết cho bước này.'}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap gap-2 text-xs font-semibold text-slate-600">
-                      <MetaPill icon={<Users className="h-3.5 w-3.5" />} label={detailItem.assignee_name ?? firstRoleLabel(detailItem) ?? departmentLabel(detailItem.department)} />
-                      <MetaPill icon={<Clock3 className="h-3.5 w-3.5" />} label={dateText(detailItem.due_at)} />
-                    </div>
-                  </div>
+              {skippedHistory ? (
+                <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-panel">
+                  <p className="font-semibold text-ink">Hồ sơ lịch sử chỉ đọc</p>
+                  <p className="mt-1">Work item thuộc nhánh không được lựa chọn. Nội dung được giữ lại để truy vết và không thể thao tác nghiệp vụ.</p>
                 </div>
-
-                <div className="space-y-4 p-4">
-                  {skippedHistory ? (
-                    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
-                      <p className="font-semibold text-ink">Hồ sơ lịch sử chỉ đọc</p>
-                      <p className="mt-1">Work item thuộc nhánh không được lựa chọn. Nội dung được giữ lại để truy vết và không thể thao tác nghiệp vụ.</p>
-                    </div>
-                  ) : futureReadOnly ? (
-                    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
-                      <p className="font-semibold text-ink">Nội dung xem trước</p>
-                      <p className="mt-1">Điều kiện và hồ sơ được hiển thị để chuẩn bị; chưa cho phép ghi nhận nghiệp vụ.</p>
-                      <div className="mt-3"><WorkItemRequirementPanel rows={requirementRows} onNavigate={navigateToRequirement} /></div>
-                    </div>
-                  ) : (
-                    <>
-                      <WorkItemRequirementPanel rows={requirementRows} onNavigate={navigateToRequirement} />
-                      {primarySurface ? <WorkItemPrimarySurface item={detailItem} evidence={evidence} surface={primarySurface} navigationRequest={navigationRequest} /> : null}
-                    </>
-                  )}
+              ) : futureReadOnly && !primarySurface ? (
+                <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-panel">
+                  <p className="font-semibold text-ink">Nội dung xem trước</p>
+                  <p className="mt-1">Điều kiện và hồ sơ được hiển thị để chuẩn bị; chưa cho phép ghi nhận nghiệp vụ.</p>
+                  <div className="mt-3"><WorkItemRequirementPanel rows={requirementRows} onNavigate={navigateToRequirement} /></div>
                 </div>
-              </section>
+              ) : (
+                <>
+                  <WorkItemRequirementPanel rows={requirementRows} onNavigate={navigateToRequirement} />
+                  {primarySurface ? (
+                    <WorkItemPrimarySurface
+                      item={detailItem}
+                      evidence={evidence}
+                      surface={primarySurface}
+                      readOnly={futureReadOnly}
+                      navigationRequest={navigationRequest}
+                      workflowFormActionRef={workflowFormActionRef}
+                      onWorkflowFormActionStateChange={handleWorkflowFormActionStateChange}
+                    />
+                  ) : null}
+                </>
+              )}
 
               {skippedHistory ? (
                 <SkippedWorkItemHistory activities={activities} evidence={evidence} />
@@ -285,9 +292,14 @@ export function WorkItemDetailWorkspace({
               pendingAction={pendingAction}
               submitting={workAction.isPending}
               nextAction={nextAction}
+              workflowFormActionState={workflowFormActionState}
+              incompleteRequirementCount={incompleteRequirementCount}
               latestActivity={latestActivity}
               onActionTextChange={setActionText}
               onRunAction={runAction}
+              onSaveWorkflowForm={() => workflowFormActionRef.current?.save()}
+              onSubmitWorkflowForm={() => workflowFormActionRef.current?.submit()}
+              onNavigateRequirement={navigateToRequirement}
               onClose={closeDialog}
               navigationRequest={navigationRequest}
             />
@@ -361,29 +373,20 @@ type RequirementRow = {
 function WorkItemWorkspaceHeader({
   item,
   evidence,
-  nextAction,
 }: {
   item: WorkItem;
   evidence: EvidenceRecord[];
-  nextAction: string;
 }) {
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
   const context = workItemWorkflowContext(item);
-  const contextStats = [
-    { label: 'Dự án', value: context.project },
-    { label: 'Node', value: context.node },
-    { label: 'Bước', value: context.step },
-    { label: 'Minh chứng', value: `${activeEvidence.length} hiệu lực / ${numberValue(item.evidence_count)} tổng` },
-    { label: 'Hồ sơ', value: hasWorkflowFormSummary(item) ? `${workflowFormChipText(item)} · ${workflowFormStatusLabel(item.workflow_form_status)}` : '-' },
-  ];
 
   return (
-    <section className="rounded-lg border border-line bg-white shadow-panel">
-      <div className="flex flex-col gap-3 border-b border-line px-4 py-3 lg:flex-row lg:items-start lg:justify-between">
+    <section className="rounded-lg border border-line bg-white px-4 py-3 shadow-panel">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quy trình đang chạy</p>
+          <p className="truncate text-xs font-semibold text-blue-700">{context.node} · {context.step}</p>
           <h3 className="mt-1 text-base font-semibold text-ink">{item.title}</h3>
-          <p className="mt-1 text-sm text-slate-600">Trạng thái, điều kiện hoàn thành và hành động tiếp theo.</p>
+          {item.description ? <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{item.description}</p> : null}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <StatusBadge status={isWorkOverdue(item) ? 'overdue' : item.status} />
@@ -391,20 +394,15 @@ function WorkItemWorkspaceHeader({
           {item.priority ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{priorityLabel(item.priority)}</span> : null}
         </div>
       </div>
-      <div className="grid gap-px bg-line sm:grid-cols-2 xl:grid-cols-5">
-        {contextStats.map((stat) => (
-          <div key={stat.label} className="min-w-0 bg-white px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
-            <p className="mt-1 truncate text-sm font-semibold text-ink">{stat.value}</p>
-          </div>
-        ))}
-      </div>
-      <div className="flex items-start gap-2 border-t border-line bg-blue-50 px-4 py-3 text-sm">
-        <PlayCircle className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
-        <div className="min-w-0">
-          <span className="font-semibold text-blue-900">Việc tiếp theo: </span>
-          <span className="text-blue-800">{nextAction}</span>
-        </div>
+      <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3 text-xs font-semibold text-slate-600">
+        <MetaPill icon={<Users className="h-3.5 w-3.5" />} label={item.assignee_name ?? firstRoleLabel(item) ?? departmentLabel(item.department)} />
+        <MetaPill icon={<Clock3 className="h-3.5 w-3.5" />} label={dateText(item.due_at)} />
+        <span className="rounded-md bg-slate-100 px-2 py-1">{activeEvidence.length}/{numberValue(item.evidence_count)} minh chứng</span>
+        {hasWorkflowFormSummary(item) ? (
+          <span className="max-w-full truncate rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">
+            {workflowFormChipText(item)} · {workflowFormStatusLabel(item.workflow_form_status)}
+          </span>
+        ) : null}
       </div>
     </section>
   );
@@ -417,16 +415,26 @@ function WorkItemRequirementPanel({
   rows: RequirementRow[];
   onNavigate: (target: WorkItemRequirementNavigationTarget) => void;
 }) {
+  if (!rows.length) return null;
+  const incompleteCount = rows.filter((row) => row.state === 'blocked' || row.state === 'warning').length;
   return (
-    <section className="rounded-md border border-line bg-slate-50 p-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Điều kiện bắt buộc</p>
-          <h3 className="mt-0.5 text-sm font-semibold text-ink">Điều kiện trước khi hoàn thành</h3>
+    <details className={clsx('group rounded-md border bg-white shadow-panel', incompleteCount ? 'border-amber-200' : 'border-line')}>
+      <summary className={clsx('flex cursor-pointer list-none items-center justify-between gap-3 rounded-md px-3 py-3', incompleteCount ? 'bg-amber-50 hover:bg-amber-100' : 'bg-slate-50 hover:bg-slate-100')}>
+        <div className="flex min-w-0 items-center gap-2">
+          {incompleteCount ? <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" /> : <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />}
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Điều kiện bắt buộc</p>
+            <h3 className="mt-0.5 text-sm font-semibold text-ink">
+              {incompleteCount ? `Còn ${incompleteCount} điều kiện cần xử lý` : 'Không có điều kiện đang chặn'}
+            </h3>
+          </div>
         </div>
-        <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{rows.length} mục</span>
-      </div>
-      <div className="mt-3 divide-y divide-line rounded-md border border-line bg-white">
+        <span className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-600">
+          Xem chi tiết
+          <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+        </span>
+      </summary>
+      <div className="divide-y divide-line border-t border-line bg-white">
         {rows.map((row) => {
           const navigationTarget = row.target;
           const content = (
@@ -465,7 +473,7 @@ function WorkItemRequirementPanel({
           );
         })}
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -476,9 +484,14 @@ function WorkItemActionPanel({
   pendingAction,
   submitting,
   nextAction,
+  workflowFormActionState,
+  incompleteRequirementCount,
   latestActivity,
   onActionTextChange,
   onRunAction,
+  onSaveWorkflowForm,
+  onSubmitWorkflowForm,
+  onNavigateRequirement,
   onClose,
   navigationRequest,
 }: {
@@ -488,57 +501,142 @@ function WorkItemActionPanel({
   pendingAction: WorkItemActionKey | null;
   submitting: boolean;
   nextAction: string;
+  workflowFormActionState: WorkflowFormActionState | null;
+  incompleteRequirementCount: number;
   latestActivity?: WorkItemActivity;
   onActionTextChange: (value: string) => void;
   onRunAction: (action: WorkItemActionKey) => void;
+  onSaveWorkflowForm: () => void;
+  onSubmitWorkflowForm: () => void;
+  onNavigateRequirement: (target: WorkItemRequirementNavigationTarget) => void;
   onClose: () => void;
   navigationRequest: WorkItemRequirementNavigationRequest | null;
 }) {
-  const primaryAction = actions[0];
-  const secondaryActions = actions.slice(1);
+  const workflowFormIsPrimary = Boolean(
+    workflowFormActionState?.available
+    && !workflowFormActionState.submitted
+    && !workflowFormActionState.readOnly,
+  );
+  const formIssueCount = workflowFormActionState?.validationIssueLabels.length ?? 0;
+  const primaryAction = workflowFormIsPrimary ? undefined : actions[0];
+  const secondaryActions = workflowFormIsPrimary ? actions : actions.slice(1);
+  const panelNextAction = workflowFormIsPrimary
+    ? formIssueCount
+      ? `Hoàn tất ${formIssueCount} thông tin bắt buộc`
+      : 'Chốt hồ sơ nghiệp vụ'
+    : nextAction;
   const panelRef = useRef<HTMLElement | null>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
 
   useEffect(() => {
-    if (navigationRequest?.target.kind !== 'action_panel') return undefined;
-    return revealWorkItemRequirementTarget(panelRef.current, firstFocusableRequirementControl(panelRef.current));
-  }, [navigationRequest?.requestId, navigationRequest?.target.kind]);
+    if (pendingAction && actionRequiresReason(pendingAction)) setNoteOpen(true);
+  }, [pendingAction]);
+
+  useEffect(() => {
+    const shouldRevealActionPanel = navigationRequest?.target.kind === 'action_panel'
+      || (
+        navigationRequest?.target.kind === 'workflow_form'
+        && workflowFormIsPrimary
+        && formIssueCount === 0
+      );
+    if (!shouldRevealActionPanel) return undefined;
+    const submitButton = panelRef.current?.querySelector<HTMLElement>('[data-workflow-form-submit]') ?? null;
+    return revealWorkItemRequirementTarget(panelRef.current, submitButton ?? firstFocusableRequirementControl(panelRef.current));
+  }, [formIssueCount, navigationRequest?.requestId, navigationRequest?.target.kind, workflowFormIsPrimary]);
 
   return (
-    <aside ref={panelRef} tabIndex={-1} className="scroll-mt-24 rounded-lg border border-line bg-white p-3 shadow-panel outline-none xl:sticky xl:top-[5.5rem] xl:self-start">
+    <aside ref={panelRef} tabIndex={-1} className="order-first scroll-mt-24 rounded-lg border border-line bg-white p-3 shadow-panel outline-none xl:order-none xl:sticky xl:top-[5.5rem] xl:self-start">
       <div className="border-b border-line pb-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Việc cần làm</p>
-        <h3 className="mt-1 text-sm font-semibold text-ink">{nextAction}</h3>
+        <h3 className="mt-1 text-sm font-semibold leading-5 text-ink">{panelNextAction}</h3>
+        {workflowFormIsPrimary && formIssueCount ? (
+          <p className="mt-1 text-xs leading-5 text-amber-700">
+            Thiếu: {workflowFormActionState?.validationIssueLabels.slice(0, 3).join(', ')}
+            {formIssueCount > 3 ? ` +${formIssueCount - 3}` : ''}
+          </p>
+        ) : incompleteRequirementCount ? (
+          <p className="mt-1 text-xs text-slate-500">{incompleteRequirementCount} điều kiện chưa hoàn tất</p>
+        ) : null}
       </div>
 
-      {actions.length ? (
-        <div className="mt-3 space-y-3">
+      {workflowFormIsPrimary || actions.length ? (
+        <div className="mt-3 space-y-2">
+          {workflowFormIsPrimary && formIssueCount ? (
+            <button
+              type="button"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+              onClick={() => onNavigateRequirement({ kind: 'workflow_form', focus: 'first_issue' })}
+            >
+              <ArrowRight className="h-4 w-4" />
+              Đến thông tin còn thiếu
+            </button>
+          ) : null}
+
+          {workflowFormIsPrimary ? (
+            <>
+              <button
+                type="button"
+                data-workflow-form-submit
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={workflowFormActionState?.saving || workflowFormActionState?.submitting}
+                onClick={onSubmitWorkflowForm}
+              >
+                {workflowFormActionState?.submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />}
+                {workflowFormActionState?.submitLabel ?? 'Chốt hồ sơ'}
+              </button>
+              <button
+                type="button"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={workflowFormActionState?.saving || workflowFormActionState?.submitting}
+                onClick={onSaveWorkflowForm}
+              >
+                {workflowFormActionState?.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Lưu nháp
+              </button>
+            </>
+          ) : primaryAction ? (
+            <ActionButton action={primaryAction} primary submitting={submitting} onRunAction={onRunAction} />
+          ) : null}
+
+          <button
+            type="button"
+            className="w-full px-2 py-1 text-xs font-semibold text-slate-500 hover:text-blue-700"
+            aria-expanded={noteOpen}
+            onClick={() => setNoteOpen((current) => !current)}
+          >
+            {noteOpen ? 'Ẩn ghi chú' : actionText.trim() ? 'Sửa ghi chú' : 'Thêm ghi chú / lý do'}
+          </button>
+          {noteOpen ? (
           <textarea
             className={clsx(
-              'min-h-24 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500',
+              'min-h-20 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500',
               pendingAction && actionRequiresReason(pendingAction) && !actionText.trim() ? 'border-amber-300 bg-amber-50' : 'border-line bg-white',
             )}
             value={actionText}
             onChange={(event) => onActionTextChange(event.target.value)}
             placeholder="Ghi chú / lý do cho thao tác"
           />
-
-          {primaryAction ? (
-            <ActionButton action={primaryAction} primary submitting={submitting} onRunAction={onRunAction} />
           ) : null}
 
           {secondaryActions.length ? (
-            <div className="space-y-2">
-              {secondaryActions.map((action) => (
-                <ActionButton key={action} action={action} submitting={submitting} onRunAction={onRunAction} />
-              ))}
-            </div>
+            <details className="group rounded-md border border-line bg-slate-50">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                <span>Thao tác khác</span>
+                <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+              </summary>
+              <div className="space-y-2 border-t border-line bg-white p-2">
+                {secondaryActions.map((action) => (
+                  <ActionButton key={action} action={action} submitting={submitting} onRunAction={onRunAction} />
+                ))}
+              </div>
+            </details>
           ) : null}
         </div>
       ) : (
         <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-600">Không có thao tác trực tiếp cho trạng thái hiện tại.</p>
       )}
 
-      <div className="mt-4 space-y-3 border-t border-line pt-3">
+      <div className="mt-4 hidden space-y-3 border-t border-line pt-3 xl:block">
         <ActionFact icon={<ShieldCheck className="h-4 w-4" />} label="Trạng thái" value={<StatusBadge status={isWorkOverdue(item) ? 'overdue' : item.status} />} />
         <ActionFact icon={<Users className="h-4 w-4" />} label="Phụ trách" value={item.assignee_name ?? firstRoleLabel(item) ?? departmentLabel(item.department)} />
         <ActionFact icon={<Clock3 className="h-4 w-4" />} label="Hạn xử lý" value={dateText(item.due_at)} />
@@ -560,7 +658,7 @@ function WorkItemActionPanel({
             Mở công trình
           </Link>
         ) : null}
-        <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>
+        <button type="button" className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>
           Đóng
         </button>
       </div>
@@ -605,11 +703,11 @@ function WorkItemSupportingTabs({
   }
   tabs.push({
     id: 'activity',
-    label: 'Hoạt động',
+    label: 'Trao đổi & lịch sử',
     count: activities.length,
     description: activities[0] ? `Mới nhất ${compactDateTime(activities[0].created_at)}` : 'Chưa có hoạt động',
   });
-  if (hasWorkflowFormSummary(item) && (readOnly || !primarySurfaceKind || !primarySurfaceUsesWorkflowForm(primarySurfaceKind))) {
+  if (hasWorkflowFormSummary(item) && (!primarySurfaceKind || !primarySurfaceUsesWorkflowForm(primarySurfaceKind))) {
     tabs.push({
       id: 'form',
       label: 'Hồ sơ / PDF',
@@ -618,7 +716,6 @@ function WorkItemSupportingTabs({
     });
   }
   const activeTab = tabs.some((tab) => tab.id === selectedTab) ? selectedTab : tabs[0]?.id ?? 'activity';
-  const supportAction = readOnly ? 'Chỉ xem hồ sơ của công việc sắp tới' : resolveSupportTabAction(activeTab, item, evidence, activities);
 
   useEffect(() => {
     if (!navigationRequest) return;
@@ -632,20 +729,8 @@ function WorkItemSupportingTabs({
 
   return (
     <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
-      <div className="border-b border-line bg-white px-4 pt-3">
-        <div className="space-y-3">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin hỗ trợ</p>
-            <h3 className="mt-0.5 text-sm font-semibold text-ink">Minh chứng, trao đổi và hồ sơ của đầu việc</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-500">{readOnly ? 'Xem trước hồ sơ, trao đổi và tài liệu của bước sắp tới.' : 'Theo dõi hồ sơ, trao đổi và tài liệu phục vụ bước đang xử lý.'}</p>
-          </div>
-          <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs">
-            <p className="font-semibold uppercase tracking-wide text-blue-700">Việc hỗ trợ tiếp theo</p>
-            <p className="mt-1 font-semibold text-blue-950">{supportAction}</p>
-          </div>
-        </div>
-
-        <div className="mt-3 flex overflow-x-auto" role="tablist" aria-label="Thông tin hỗ trợ">
+      <div className="border-b border-line bg-white px-3 pt-1">
+        <div className="flex overflow-x-auto" role="tablist" aria-label="Thông tin hỗ trợ">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -690,18 +775,6 @@ function WorkItemSupportingTabs({
       </div>
     </section>
   );
-}
-
-function resolveSupportTabAction(activeTab: SupportTabKey, item: WorkItem, evidence: EvidenceRecord[], activities: WorkItemActivity[]) {
-  if (activeTab === 'evidence') {
-    const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
-    const pending = evidence.filter((record) => ['draft', 'submitted', 'pending'].includes(String(record.status))).length;
-    if (!activeEvidence.length) return 'Bổ sung minh chứng cho đầu việc';
-    if (pending) return `Rà soát ${pending} minh chứng đang chờ`;
-    return 'Minh chứng đã sẵn sàng';
-  }
-  if (activeTab === 'form') return workflowFormNextAction(item);
-  return activities.length ? `Theo dõi ${activities.length} hoạt động gần nhất` : 'Ghi hoạt động đầu tiên';
 }
 
 function WorkItemActivityPanel({

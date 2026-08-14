@@ -9,7 +9,7 @@ async function source(path: string) {
 test('workflow form panel describes submit as locking an internal version', async () => {
   const panel = await source('../src/modules/work-items/WorkflowFormPanel.tsx');
 
-  assert.match(panel, /form\.data\.auto_advance_when_ready \? 'Xác nhận và tiếp tục' : 'Chốt hồ sơ'/);
+  assert.match(panel, /form\.data\?\.auto_advance_when_ready \? 'Xác nhận và tiếp tục' : 'Chốt hồ sơ'/);
   assert.match(panel, /toast\.success\('Đã chốt hồ sơ nghiệp vụ'\)/);
   assert.match(panel, /Nội dung đã khóa và được lưu vào đầu việc; chưa gửi cho người duyệt\./);
   assert.doesNotMatch(panel, /'Gửi hồ sơ'/);

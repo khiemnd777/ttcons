@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileText, Loader2, PenLine, Plus, Stamp, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Download, ExternalLink, FileText, Loader2, PenLine, Plus, Stamp, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog } from '../../components/Dialog';
 import { CurrencyInput } from '../../components/CurrencyInput';
@@ -40,6 +40,26 @@ type ConfirmationPurposeGroup = {
   includeSeals: boolean;
 };
 
+export type WorkflowFormActionState = {
+  available: boolean;
+  submitted: boolean;
+  readOnly: boolean;
+  saving: boolean;
+  submitting: boolean;
+  submitLabel: string;
+  validationIssueLabels: string[];
+  title: string;
+  status: string;
+  versionNo: number;
+  updatedAt?: string;
+  submittedAt?: string;
+};
+
+export type WorkflowFormActionHandle = {
+  save: () => void;
+  submit: () => void;
+};
+
 export function WorkflowFormPanel({
   workItemId,
   projectId,
@@ -47,6 +67,9 @@ export function WorkflowFormPanel({
   onChanged,
   readOnly = false,
   navigationRequest,
+  externalActions = false,
+  actionRef,
+  onActionStateChange,
 }: {
   workItemId: string;
   projectId?: string;
@@ -54,6 +77,9 @@ export function WorkflowFormPanel({
   onChanged?: () => void;
   readOnly?: boolean;
   navigationRequest?: WorkItemRequirementNavigationRequest | null;
+  externalActions?: boolean;
+  actionRef?: Ref<WorkflowFormActionHandle>;
+  onActionStateChange?: (state: WorkflowFormActionState | null) => void;
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -64,6 +90,8 @@ export function WorkflowFormPanel({
   const [signatureDetail, setSignatureDetail] = useState<WorkflowFormSignature | null>(null);
   const [sealApplicationDetail, setSealApplicationDetail] = useState<WorkflowFormSealApplication | null>(null);
   const [pdfDeleteCandidate, setPDFDeleteCandidate] = useState<WorkflowFormPDFExport | null>(null);
+  const [fieldsOpen, setFieldsOpen] = useState(true);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
   const panelRef = useRef<HTMLElement | null>(null);
   const actionCenterRef = useRef<HTMLDivElement | null>(null);
   const fieldsSectionRef = useRef<HTMLElement | null>(null);
@@ -131,6 +159,11 @@ export function WorkflowFormPanel({
   }, [form.data?.answers, instance?.id]);
 
   useEffect(() => {
+    setFieldsOpen(!submitted);
+    setDocumentsOpen(submitted);
+  }, [instance?.id, submitted]);
+
+  useEffect(() => {
     if (navigationRequest?.target.kind !== 'workflow_form') return undefined;
     if (lastHandledNavigationRef.current === navigationRequest.requestId) return undefined;
     if (form.isLoading) return undefined;
@@ -138,9 +171,8 @@ export function WorkflowFormPanel({
 
     let removeHighlight: (() => void) | undefined;
     const timer = window.setTimeout(() => {
-      lastHandledNavigationRef.current = navigationRequest.requestId;
-
       if (!form.data?.available || form.isError) {
+        lastHandledNavigationRef.current = navigationRequest.requestId;
         removeHighlight = revealWorkItemRequirementTarget(panelRef.current, panelRef.current);
         return;
       }
@@ -153,6 +185,11 @@ export function WorkflowFormPanel({
           : undefined;
 
       if (field) {
+        if (!fieldsOpen) {
+          setFieldsOpen(true);
+          return;
+        }
+        lastHandledNavigationRef.current = navigationRequest.requestId;
         const error = validateFieldValue(field, values[field.field_key]);
         if (error) setErrors((current) => ({ ...current, [field.field_key]: error }));
         const fieldContainer = Array.from(
@@ -166,11 +203,17 @@ export function WorkflowFormPanel({
       }
 
       if (focusMode !== 'source' && !submitted && !readOnly) {
+        if (externalActions) {
+          lastHandledNavigationRef.current = navigationRequest.requestId;
+          return;
+        }
+        lastHandledNavigationRef.current = navigationRequest.requestId;
         const submitButton = actionCenterRef.current?.querySelector<HTMLElement>('[data-workflow-form-submit]') ?? null;
         removeHighlight = revealWorkItemRequirementTarget(actionCenterRef.current, submitButton);
         return;
       }
 
+      lastHandledNavigationRef.current = navigationRequest.requestId;
       const sourceContainer = actionCenterRef.current ?? fieldsSectionRef.current ?? panelRef.current;
       removeHighlight = revealWorkItemRequirementTarget(sourceContainer, sourceContainer);
     }, 0);
@@ -179,7 +222,7 @@ export function WorkflowFormPanel({
       window.clearTimeout(timer);
       removeHighlight?.();
     };
-  }, [activeFields, form.data?.available, form.isError, form.isLoading, navigationRequest?.requestId, navigationRequest?.target.kind, readOnly, submitted, values]);
+  }, [activeFields, externalActions, fieldsOpen, form.data?.available, form.isError, form.isLoading, navigationRequest?.requestId, navigationRequest?.target.kind, readOnly, submitted, values]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['work-item-form', workItemId] });
@@ -319,6 +362,39 @@ export function WorkflowFormPanel({
     return true;
   }
 
+  const submitLabel = form.data?.auto_advance_when_ready ? 'Xác nhận và tiếp tục' : 'Chốt hồ sơ';
+  const actionState = useMemo<WorkflowFormActionState>(() => ({
+    available: Boolean(form.data?.available) && !form.isLoading && !form.isError,
+    submitted,
+    readOnly,
+    saving: saveDraft.isPending,
+    submitting: submitForm.isPending,
+    submitLabel,
+    validationIssueLabels,
+    title: businessFormTitle,
+    status: instance?.status ?? 'draft',
+    versionNo: Number(form.data?.version?.version_no ?? 1),
+    updatedAt: instance?.updated_at,
+    submittedAt: instance?.submitted_at,
+  }), [businessFormTitle, form.data?.available, form.data?.version?.version_no, form.isError, form.isLoading, instance?.status, instance?.submitted_at, instance?.updated_at, readOnly, saveDraft.isPending, submitForm.isPending, submitLabel, submitted, validationIssueLabels]);
+
+  useImperativeHandle(actionRef, () => ({
+    save: () => {
+      if (!readOnly && !submitted && form.data?.available) saveDraft.mutate();
+    },
+    submit: () => {
+      if (!readOnly && !submitted && form.data?.available && validateBeforeSubmit()) submitForm.mutate();
+    },
+  }), [activeFields, form.data?.available, readOnly, submitted, values]);
+
+  useEffect(() => {
+    if (externalActions) onActionStateChange?.(actionState);
+  }, [actionState, externalActions, onActionStateChange]);
+
+  useEffect(() => () => {
+    if (externalActions) onActionStateChange?.(null);
+  }, [externalActions, onActionStateChange, workItemId]);
+
   if (form.isLoading) {
     return (
       <section ref={panelRef} tabIndex={-1} className="scroll-mt-24 rounded-md outline-none">
@@ -374,16 +450,17 @@ export function WorkflowFormPanel({
           saving={saveDraft.isPending}
           submitting={submitForm.isPending}
           readOnly={readOnly}
+          showActions={!externalActions}
           onSave={() => { if (!readOnly) saveDraft.mutate(); }}
           onSubmit={() => {
             if (!readOnly && validateBeforeSubmit()) submitForm.mutate();
           }}
-          submitLabel={form.data.auto_advance_when_ready ? 'Xác nhận và tiếp tục' : 'Chốt hồ sơ'}
+          submitLabel={submitLabel}
         />
       </div>
 
       <div className="space-y-3">
-        <WorkflowFormOperationsSummary
+        {!externalActions ? <WorkflowFormOperationsSummary
           submitted={submitted}
           validationIssueCount={validationIssues.length}
           evidenceCount={activeEvidence.length}
@@ -391,20 +468,28 @@ export function WorkflowFormPanel({
           signatures={signatures}
           sealApplications={sealApplications}
           pdfExports={pdfExports}
-        />
+        /> : null}
         {isPlanningDailyReport ? <PlanningDailyReportSummary values={values} submitted={submitted} /> : null}
         {isMeetingMinutes ? <MeetingMinutesSummary values={values} submitted={submitted} /> : null}
         {isPlanningChecklist ? <PlanningChecklistSummary values={values} submitted={submitted} /> : null}
 
         <section ref={fieldsSectionRef} tabIndex={-1} className="scroll-mt-24 rounded-md border border-line bg-white outline-none">
-          <div className="flex flex-col gap-2 border-b border-line bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-3 border-b border-line bg-slate-50 px-3 py-3 text-left hover:bg-slate-100"
+            aria-expanded={fieldsOpen}
+            onClick={() => setFieldsOpen((current) => !current)}
+          >
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nội dung cần xử lý</p>
               <h4 className="mt-0.5 text-sm font-semibold text-ink">Thông tin nghiệp vụ</h4>
             </div>
-            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{activeFields.length} thông tin</span>
-          </div>
-          <div className="grid gap-3 p-3">
+            <span className="inline-flex items-center gap-2">
+              <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{activeFields.length} thông tin</span>
+              {fieldsOpen ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronRight className="h-4 w-4 text-slate-500" />}
+            </span>
+          </button>
+          {fieldsOpen ? <div className="grid gap-3 p-3">
             {activeFields.map((field) => (
               <WorkflowFieldControl
                 key={field.field_key}
@@ -416,18 +501,27 @@ export function WorkflowFormPanel({
                 onChange={(value) => setFieldValue(field, value)}
               />
             ))}
-          </div>
-          <div className="border-t border-line bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          </div> : null}
+          {fieldsOpen ? <div className="border-t border-line bg-slate-50 px-3 py-2 text-xs text-slate-500">
             {instance?.submitted_at ? `Chốt lúc ${compactDateTime(instance.submitted_at)}` : `Cập nhật ${compactDateTime(instance?.updated_at)}`}
-          </div>
+          </div> : null}
         </section>
 
         <section className="rounded-md border border-line bg-white">
-          <div className="border-b border-line bg-slate-50 px-3 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tài liệu nghiệp vụ</p>
-            <h4 className="mt-0.5 text-sm font-semibold text-ink">Xác nhận hồ sơ và PDF</h4>
-          </div>
-          <div className="space-y-3 p-3">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-3 border-b border-line bg-slate-50 px-3 py-3 text-left hover:bg-slate-100"
+            aria-expanded={documentsOpen}
+            onClick={() => setDocumentsOpen((current) => !current)}
+          >
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tài liệu nghiệp vụ</p>
+              <h4 className="mt-0.5 text-sm font-semibold text-ink">Xác nhận hồ sơ và PDF</h4>
+              {!submitted ? <p className="mt-1 text-xs text-slate-500">Mở sau khi chốt hồ sơ để ký, đóng dấu hoặc tạo PDF.</p> : null}
+            </div>
+            {documentsOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" /> : <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />}
+          </button>
+          {documentsOpen ? <div className="space-y-3 p-3">
             <WorkflowConfirmationPanel
               groups={confirmationGroups}
               signatureCount={signatures.length}
@@ -464,7 +558,7 @@ export function WorkflowFormPanel({
               onOpen={(record) => void openWorkflowBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF hồ sơ nghiệp vụ')}
               onRequestDelete={(record) => { if (!readOnly && record.can_delete) setPDFDeleteCandidate(record); }}
             />
-          </div>
+          </div> : null}
         </section>
 
         {form.data.events?.length ? <WorkflowFormEventsPanel events={form.data.events} /> : null}
@@ -603,6 +697,7 @@ function WorkflowFormActionCenter({
   saving,
   submitting,
   readOnly,
+  showActions,
   onSave,
   onSubmit,
   submitLabel,
@@ -617,6 +712,7 @@ function WorkflowFormActionCenter({
   saving: boolean;
   submitting: boolean;
   readOnly: boolean;
+  showActions: boolean;
   onSave: () => void;
   onSubmit: () => void;
   submitLabel: string;
@@ -625,7 +721,7 @@ function WorkflowFormActionCenter({
   const issuePreview = validationIssueLabels.slice(0, 4).join(', ');
   const extraIssues = validationIssueLabels.length > 4 ? ` +${validationIssueLabels.length - 4}` : '';
   return (
-    <section className={clsx('rounded-md border p-3', blocked ? 'border-amber-200 bg-amber-50' : 'border-line bg-white')}>
+    <section className={clsx('rounded-md border p-3', showActions && blocked ? 'border-amber-200 bg-amber-50' : 'border-line bg-white')}>
       <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -635,7 +731,7 @@ function WorkflowFormActionCenter({
           <p className="mt-1 text-xs text-slate-500">
             Hồ sơ nghiệp vụ v{versionNo} · {submittedAt ? `Chốt lúc ${compactDateTime(submittedAt)}` : `Cập nhật ${compactDateTime(updatedAt)}`}
           </p>
-          <div className="mt-3 flex items-start gap-2">
+          {showActions ? <div className="mt-3 flex items-start gap-2">
             <span className={clsx('mt-0.5 rounded-md p-1.5', blocked ? 'bg-white text-amber-700' : 'bg-blue-50 text-blue-700')}>
               {blocked ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
             </span>
@@ -647,9 +743,9 @@ function WorkflowFormActionCenter({
                 {readOnly ? 'Chỉ có thể cập nhật khi workflow chuyển đến node này.' : blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung đã khóa và được lưu vào đầu việc; chưa gửi cho người duyệt. Xác nhận và PDF dùng phiên bản đã chốt.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
               </p>
             </div>
-          </div>
+          </div> : null}
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2 xl:justify-end">
+        {showActions ? <div className="flex shrink-0 flex-wrap gap-2 xl:justify-end">
           <button
             type="button"
             className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -669,7 +765,7 @@ function WorkflowFormActionCenter({
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {submitLabel}
           </button>
-        </div>
+        </div> : null}
       </div>
     </section>
   );
@@ -714,12 +810,15 @@ function WorkflowFormOperationsSummary({
 
 function WorkflowFormEventsPanel({ events }: { events: AnyRecord[] }) {
   return (
-    <section className="rounded-md border border-line bg-white">
-      <div className="border-b border-line bg-slate-50 px-3 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lịch sử hồ sơ</p>
-        <h4 className="mt-0.5 text-sm font-semibold text-ink">Sự kiện gần nhất</h4>
-      </div>
-      <div className="divide-y divide-line">
+    <details className="group rounded-md border border-line bg-white">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-slate-50 px-3 py-3 hover:bg-slate-100">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lịch sử hồ sơ</p>
+          <h4 className="mt-0.5 text-sm font-semibold text-ink">{events.length} sự kiện · Mở khi cần tra cứu</h4>
+        </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-slate-500 transition group-open:rotate-90" />
+      </summary>
+      <div className="divide-y divide-line border-t border-line">
         {events.slice(0, 5).map((event) => (
           <div key={String(event.id)} className="px-3 py-2">
             <p className="text-xs font-semibold text-ink">{workflowFormEventLabel(event.event_type)}</p>
@@ -727,7 +826,7 @@ function WorkflowFormEventsPanel({ events }: { events: AnyRecord[] }) {
           </div>
         ))}
       </div>
-    </section>
+    </details>
   );
 }
 
