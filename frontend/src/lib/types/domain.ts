@@ -109,6 +109,27 @@ export type ProjectProgressBoardResponse = {
   generated_at: string;
 };
 
+export type ProjectProgressPMOption = {
+  id: string;
+  name: string;
+};
+
+export type ProjectProgressSummaryResponse = {
+  filtered_total: number;
+  stage_counts: Record<ProjectProgressStageKey, number>;
+  pm_options: ProjectProgressPMOption[];
+  status_options: string[];
+  generated_at: string;
+};
+
+export type ProjectProgressStagePage = {
+  items: ProjectProgressItem[];
+  total: number;
+  has_more: boolean;
+  next_cursor?: string;
+  generated_at: string;
+};
+
 export type ProjectMemberAccessRole = {
   id: string;
   name: string;

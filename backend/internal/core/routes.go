@@ -62,6 +62,8 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Get("/projects/explorer/stream", h.ProjectExplorerStream)
 	protected.Post("/projects", h.CreateProject)
 	protected.Get("/projects/progress-board", h.ProjectProgressBoard)
+	protected.Get("/projects/progress-board/summary", h.ProjectProgressBoardSummary)
+	protected.Get("/projects/progress-board/stages/:stageKey", h.ProjectProgressBoardStage)
 	protected.Get("/projects/progress-board/stream", h.ProjectProgressBoardStream)
 	protected.Get("/projects/:id", h.GetProject)
 	protected.Put("/projects/:id", h.UpdateProject)

@@ -1,11 +1,19 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import {
+  useInfiniteQuery,
+  useIsFetching,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
 import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
   Clock3,
+  Loader2,
   RefreshCw,
   Search,
   UserRound,
@@ -15,13 +23,20 @@ import { EmptyState } from '../../components/EmptyState';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { get, streamSSE, type StreamStatus } from '../../lib/api/client';
+import { useAuth } from '../../lib/auth/AuthContext';
 import type {
-  ProjectProgressBoardResponse,
   ProjectProgressItem,
   ProjectProgressStageKey,
+  ProjectProgressStagePage,
+  ProjectProgressSummaryResponse,
 } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
+import {
+  mergeProjectProgressPages,
+  projectProgressFilterQuery,
+  projectProgressStageQuery,
+} from './projectProgressBoard';
 
 type ProgressStage = {
   key: ProjectProgressStageKey;
@@ -44,19 +59,55 @@ const progressStages: ProgressStage[] = [
 
 export function ProjectProgressPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('reconnecting');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pmFilter, setPMFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [mobileStage, setMobileStage] = useState<ProjectProgressStageKey>('not_started');
-
-  const progressQuery = useQuery({
-    queryKey: ['project-progress-board'],
-    queryFn: () => get<ProjectProgressBoardResponse>('/projects/progress-board'),
-    refetchInterval: streamStatus === 'connected' ? false : 60_000,
-  });
+  const [hasPendingUpdates, setHasPendingUpdates] = useState(false);
+  const desktopBoardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const timeoutID = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timeoutID);
+  }, [search]);
+
+  const filterQuery = useMemo(() => projectProgressFilterQuery({
+    search: debouncedSearch,
+    pmStaffId: pmFilter,
+    status: statusFilter,
+  }), [debouncedSearch, pmFilter, statusFilter]);
+  const actorQueryKey = user?.id ?? 'anonymous';
+  const summaryQueryKey = useMemo(
+    () => ['project-progress-board-summary', actorQueryKey, filterQuery] as const,
+    [actorQueryKey, filterQuery],
+  );
+  const stageQueryRoot = useMemo(
+    () => ['project-progress-board-stage', actorQueryKey, filterQuery] as const,
+    [actorQueryKey, filterQuery],
+  );
+  const activeQueryContext = useRef<{ summaryKey: readonly unknown[]; stageRoot: readonly unknown[] }>({
+    summaryKey: summaryQueryKey,
+    stageRoot: stageQueryRoot,
+  });
+  activeQueryContext.current = { summaryKey: summaryQueryKey, stageRoot: stageQueryRoot };
+
+  const summaryQuery = useQuery({
+    queryKey: summaryQueryKey,
+    queryFn: () => get<ProjectProgressSummaryResponse>(withQuery('/projects/progress-board/summary', filterQuery)),
+    enabled: Boolean(user?.id),
+    refetchInterval: streamStatus === 'connected' ? false : 60_000,
+  });
+  const stageFetchCount = useIsFetching({ queryKey: stageQueryRoot });
+
+  useEffect(() => {
+    setHasPendingUpdates(false);
+  }, [actorQueryKey, filterQuery]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
     let invalidateTimer: number | undefined;
     const stop = streamSSE('/projects/progress-board/stream', {
       onStatus: setStreamStatus,
@@ -64,7 +115,16 @@ export function ProjectProgressPage() {
         if (message.event !== 'project_progress_changed') return;
         if (invalidateTimer !== undefined) window.clearTimeout(invalidateTimer);
         invalidateTimer = window.setTimeout(() => {
-          void queryClient.invalidateQueries({ queryKey: ['project-progress-board'] });
+          const context = activeQueryContext.current;
+          const hasDeepPages = queryClient
+            .getQueriesData<InfiniteData<ProjectProgressStagePage>>({ queryKey: context.stageRoot })
+            .some(([, data]) => (data?.pages.length ?? 0) > 1);
+          if (hasDeepPages) {
+            setHasPendingUpdates(true);
+            return;
+          }
+          void queryClient.invalidateQueries({ queryKey: context.summaryKey, exact: true });
+          void queryClient.invalidateQueries({ queryKey: context.stageRoot, refetchType: 'active' });
         }, 500);
       },
     });
@@ -72,42 +132,21 @@ export function ProjectProgressPage() {
       stop();
       if (invalidateTimer !== undefined) window.clearTimeout(invalidateTimer);
     };
-  }, [queryClient]);
+  }, [queryClient, user?.id]);
 
-  const items = progressQuery.data?.items ?? [];
-  const pmOptions = useMemo(
-    () => Array.from(new Set(items.map((item) => item.pm_name).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'vi')),
-    [items],
-  );
-  const statusOptions = useMemo(
-    () => Array.from(new Set(items.map((item) => item.project_status).filter(Boolean))).sort(),
-    [items],
-  );
-  const filteredItems = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase('vi');
-    return items.filter((item) => {
-      if (pmFilter && item.pm_name !== pmFilter) return false;
-      if (statusFilter && item.project_status !== statusFilter) return false;
-      if (!query) return true;
-      return [item.code, item.name, item.client_name, item.pm_name, item.current_node_name]
-        .filter(Boolean)
-        .join(' ')
-        .toLocaleLowerCase('vi')
-        .includes(query);
-    });
-  }, [items, pmFilter, search, statusFilter]);
-  const groupedItems = useMemo(() => {
-    const groups = {} as Record<ProjectProgressStageKey, ProjectProgressItem[]>;
-    progressStages.forEach((stage) => {
-      groups[stage.key] = [];
-    });
-    filteredItems.forEach((item) => {
-      const stageKey = progressStages.some((stage) => stage.key === item.stage_key) ? item.stage_key : 'other';
-      groups[stageKey].push(item);
-    });
-    return groups;
-  }, [filteredItems]);
+  async function refreshBoard() {
+    setHasPendingUpdates(false);
+    await Promise.all([
+      queryClient.resetQueries({ queryKey: stageQueryRoot }),
+      queryClient.invalidateQueries({ queryKey: summaryQueryKey, exact: true }),
+    ]);
+  }
+
+  const stageCounts = summaryQuery.data?.stage_counts;
+  const filteredTotal = Math.max(0, Number(summaryQuery.data?.filtered_total ?? 0));
   const selectedMobileStage = progressStages.find((stage) => stage.key === mobileStage) ?? progressStages[0];
+  const hasFilters = Boolean(debouncedSearch || pmFilter || statusFilter);
+  const isRefreshing = summaryQuery.isFetching || stageFetchCount > 0;
 
   return (
     <>
@@ -116,15 +155,15 @@ export function ProjectProgressPage() {
         description="Theo dõi giai đoạn hiện tại và điểm cần xử lý của tất cả công trình."
         actions={(
           <div className="flex items-center gap-2">
-            <LiveStatus status={streamStatus} generatedAt={progressQuery.data?.generated_at} />
+            <LiveStatus status={streamStatus} generatedAt={summaryQuery.data?.generated_at} />
             <button
               type="button"
               aria-label="Làm mới tiến trình"
               className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={progressQuery.isFetching}
-              onClick={() => void progressQuery.refetch()}
+              disabled={isRefreshing}
+              onClick={() => void refreshBoard()}
             >
-              <RefreshCw className={clsx('h-4 w-4', progressQuery.isFetching && 'animate-spin')} />
+              <RefreshCw className={clsx('h-4 w-4', isRefreshing && 'animate-spin')} />
             </button>
           </div>
         )}
@@ -133,54 +172,75 @@ export function ProjectProgressPage() {
       <section className="mb-4 rounded-lg border border-line bg-white p-3 shadow-panel">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(320px,1fr)_220px_220px]">
           <label className="relative block">
+            <span className="sr-only">Tìm công trình</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
+              maxLength={120}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Tìm công trình, mã, chủ đầu tư"
               className="w-full rounded-md border border-line bg-white py-2 pl-9 pr-3 text-sm focus-ring"
             />
           </label>
-          <select
-            value={pmFilter}
-            onChange={(event) => setPMFilter(event.target.value)}
-            className="rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring"
-          >
-            <option value="">Tất cả phụ trách</option>
-            {pmOptions.map((pmName) => <option key={pmName} value={pmName}>{pmName}</option>)}
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring"
-          >
-            <option value="">Tất cả tình trạng</option>
-            {statusOptions.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
-          </select>
+          <label className="block">
+            <span className="sr-only">Lọc theo phụ trách</span>
+            <select
+              value={pmFilter}
+              onChange={(event) => setPMFilter(event.target.value)}
+              className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring"
+            >
+              <option value="">Tất cả phụ trách</option>
+              {(summaryQuery.data?.pm_options ?? []).map((option) => (
+                <option key={option.id} value={option.id}>{option.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="sr-only">Lọc theo tình trạng công trình</span>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring"
+            >
+              <option value="">Tất cả tình trạng</option>
+              {(summaryQuery.data?.status_options ?? []).map((status) => (
+                <option key={status} value={status}>{statusLabel(status)}</option>
+              ))}
+            </select>
+          </label>
         </div>
       </section>
 
-      {progressQuery.isError && progressQuery.data ? (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          <span>Chưa lấy được bản cập nhật mới nhất. Board đang hiển thị dữ liệu gần nhất.</span>
-          <button type="button" className="font-semibold underline" onClick={() => void progressQuery.refetch()}>Thử lại</button>
+      {hasPendingUpdates ? (
+        <div className="mb-4 flex flex-col items-start justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 sm:flex-row sm:items-center">
+          <span>Có dữ liệu mới. Cập nhật board để giữ đúng thứ tự và vị trí phân trang.</span>
+          <button type="button" className="shrink-0 font-semibold underline" onClick={() => void refreshBoard()}>
+            Cập nhật
+          </button>
         </div>
       ) : null}
 
-      {progressQuery.isLoading ? <ProgressBoardSkeleton /> : null}
+      {summaryQuery.isError && summaryQuery.data ? (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <span>Chưa lấy được tổng hợp mới nhất. Board đang hiển thị dữ liệu gần nhất.</span>
+          <button type="button" className="font-semibold underline" onClick={() => void summaryQuery.refetch()}>Thử lại</button>
+        </div>
+      ) : null}
 
-      {progressQuery.isError && !progressQuery.data ? (
+      {summaryQuery.isPending ? <ProgressBoardSkeleton /> : null}
+
+      {summaryQuery.isError && !summaryQuery.data ? (
         <EmptyState
-          title="Không tải được tiến trình công trình"
-          action={<button type="button" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => void progressQuery.refetch()}>Thử lại</button>}
+          title="Không tải được tổng hợp tiến trình công trình"
+          action={<button type="button" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => void summaryQuery.refetch()}>Thử lại</button>}
         />
       ) : null}
 
-      {progressQuery.data && filteredItems.length === 0 ? (
-        <EmptyState title={items.length === 0 ? 'Chưa có công trình để theo dõi' : 'Không có công trình phù hợp bộ lọc'} />
+      {summaryQuery.data && filteredTotal === 0 ? (
+        <EmptyState title={hasFilters ? 'Không có công trình phù hợp bộ lọc' : 'Chưa có công trình để theo dõi'} />
       ) : null}
 
-      {progressQuery.data && filteredItems.length > 0 ? (
+      {summaryQuery.data && filteredTotal > 0 ? (
         <>
           <div className="mb-3 lg:hidden">
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Giai đoạn</label>
@@ -190,23 +250,225 @@ export function ProjectProgressPage() {
               className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring"
             >
               {progressStages.map((stage) => (
-                <option key={stage.key} value={stage.key}>{stage.label} · {groupedItems[stage.key].length}</option>
+                <option key={stage.key} value={stage.key}>{stage.label} · {stageCounts?.[stage.key] ?? 0}</option>
               ))}
             </select>
           </div>
           <div className="lg:hidden">
-            <ProgressColumn stage={selectedMobileStage} items={groupedItems[selectedMobileStage.key]} />
+            <ProgressColumn
+              key={selectedMobileStage.key}
+              stage={selectedMobileStage}
+              total={stageCounts?.[selectedMobileStage.key] ?? 0}
+              actorID={actorQueryKey}
+              filterQuery={filterQuery}
+              queryKeyRoot={stageQueryRoot}
+              streamStatus={streamStatus}
+              forceActive
+            />
           </div>
-          <div className="hidden overflow-x-auto pb-3 lg:block">
+          <div ref={desktopBoardRef} className="hidden overflow-x-auto pb-3 lg:block">
             <div className="grid auto-cols-[286px] grid-flow-col items-start gap-3">
               {progressStages.map((stage) => (
-                <ProgressColumn key={stage.key} stage={stage} items={groupedItems[stage.key]} scrollable />
+                <ProgressColumn
+                  key={stage.key}
+                  stage={stage}
+                  total={stageCounts?.[stage.key] ?? 0}
+                  actorID={actorQueryKey}
+                  filterQuery={filterQuery}
+                  queryKeyRoot={stageQueryRoot}
+                  streamStatus={streamStatus}
+                  horizontalRootRef={desktopBoardRef}
+                />
               ))}
             </div>
           </div>
         </>
       ) : null}
     </>
+  );
+}
+
+function ProgressColumn({
+  stage,
+  total,
+  actorID,
+  filterQuery,
+  queryKeyRoot,
+  streamStatus,
+  horizontalRootRef,
+  forceActive = false,
+}: {
+  stage: ProgressStage;
+  total: number;
+  actorID: string;
+  filterQuery: string;
+  queryKeyRoot: readonly unknown[];
+  streamStatus: StreamStatus;
+  horizontalRootRef?: RefObject<HTMLDivElement>;
+  forceActive?: boolean;
+}) {
+  const columnRef = useRef<HTMLElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const active = useNearHorizontalViewport(columnRef, horizontalRootRef, forceActive);
+  const query = useInfiniteQuery({
+    queryKey: [...queryKeyRoot, stage.key],
+    initialPageParam: '',
+    queryFn: ({ pageParam }) => get<ProjectProgressStagePage>(
+      `/projects/progress-board/stages/${stage.key}?${projectProgressStageQuery(filterQuery, String(pageParam ?? ''))}`,
+    ),
+    getNextPageParam: (page) => page.has_more && page.next_cursor ? page.next_cursor : undefined,
+    enabled: active && total > 0 && actorID !== 'anonymous',
+    refetchInterval: (state) => {
+      if (streamStatus === 'connected') return false;
+      const data = state.state.data as InfiniteData<ProjectProgressStagePage> | undefined;
+      return (data?.pages.length ?? 0) <= 1 ? 60_000 : false;
+    },
+  });
+  const items = useMemo(() => mergeProjectProgressPages(query.data?.pages), [query.data?.pages]);
+  const authoritativeTotal = Math.max(0, Number(query.data?.pages[0]?.total ?? total));
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => 238,
+    getItemKey: (index) => items[index]?.id ?? index,
+    overscan: 3,
+  });
+
+  return (
+    <section ref={columnRef} className="overflow-hidden rounded-lg border border-line bg-slate-50/70">
+      <header className={clsx('flex items-center justify-between gap-2 border-b border-line px-3 py-3', stage.headerClassName)}>
+        <h2 className="min-w-0 text-sm font-semibold">{stage.label}</h2>
+        <span className="inline-flex items-center gap-1.5">
+          {query.isFetching && !query.isFetchingNextPage ? <RefreshCw className="h-3 w-3 animate-spin" aria-label="Đang cập nhật" /> : null}
+          <span className="inline-flex min-w-6 items-center justify-center rounded-md bg-white/90 px-1.5 py-0.5 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200">
+            {authoritativeTotal}
+          </span>
+        </span>
+      </header>
+
+      {total === 0 ? <ProgressColumnEmpty /> : null}
+      {total > 0 && !active ? <ProgressColumnDeferred /> : null}
+      {total > 0 && active && query.isPending ? <ProgressColumnSkeleton /> : null}
+      {total > 0 && active && query.isError && !query.data ? (
+        <div className="p-3 text-center text-xs text-rose-700">
+          <p>Không tải được cột này.</p>
+          <button type="button" className="mt-2 font-semibold underline" onClick={() => void query.refetch()}>Thử lại</button>
+        </div>
+      ) : null}
+
+      {query.data ? (
+        <>
+          {query.isError ? (
+            <div className="mx-2 mt-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-xs text-rose-700">
+              Dữ liệu cũ đang được giữ lại. <button type="button" className="font-semibold underline" onClick={() => void query.refetch()}>Thử lại</button>
+            </div>
+          ) : null}
+          {items.length > 0 ? (
+            <div
+              ref={listRef}
+              aria-busy={query.isFetching}
+              className="max-h-[calc(100vh-350px)] min-h-[160px] overflow-y-auto p-2"
+            >
+              <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+                {virtualizer.getVirtualItems().map((virtualItem) => {
+                  const item = items[virtualItem.index];
+                  return (
+                    <div
+                      key={item.id}
+                      ref={virtualizer.measureElement}
+                      data-index={virtualItem.index}
+                      className="absolute left-0 top-0 w-full pb-2"
+                      style={{ transform: `translateY(${virtualItem.start}px)` }}
+                    >
+                      <ProgressCard item={item} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : <ProgressColumnEmpty />}
+
+          <div className="border-t border-line bg-white/70 p-2 text-center">
+            {query.hasNextPage ? (
+              <button
+                type="button"
+                disabled={query.isFetchingNextPage}
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => void query.fetchNextPage()}
+              >
+                {query.isFetchingNextPage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Tải thêm 25
+              </button>
+            ) : (
+              <span className="text-[11px] text-slate-500">Đã tải toàn bộ {authoritativeTotal} công trình</span>
+            )}
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function useNearHorizontalViewport(
+  columnRef: RefObject<HTMLElement>,
+  rootRef: RefObject<HTMLDivElement> | undefined,
+  forceActive: boolean,
+) {
+  const [active, setActive] = useState(forceActive);
+  useEffect(() => {
+    if (forceActive) {
+      setActive(true);
+      return undefined;
+    }
+    const column = columnRef.current;
+    const root = rootRef?.current;
+    if (!column || !root || typeof IntersectionObserver === 'undefined') {
+      setActive(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setActive(true);
+        observer.disconnect();
+      }
+    }, {
+      root,
+      rootMargin: '0px 600px 0px 600px',
+      threshold: 0.01,
+    });
+    observer.observe(column);
+    return () => observer.disconnect();
+  }, [columnRef, forceActive, rootRef]);
+  return active;
+}
+
+function ProgressColumnDeferred() {
+  return (
+    <div className="m-2 flex min-h-40 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white/70 px-3 text-center text-xs text-slate-500">
+      Dữ liệu sẽ tải khi cột xuất hiện gần vùng xem.
+    </div>
+  );
+}
+
+function ProgressColumnEmpty() {
+  return (
+    <div className="m-2 rounded-md border border-dashed border-slate-300 bg-white/70 px-3 py-6 text-center text-xs text-slate-500">
+      Không có công trình
+    </div>
+  );
+}
+
+function ProgressColumnSkeleton() {
+  return (
+    <div className="space-y-2 p-2">
+      {Array.from({ length: 3 }, (_, index) => (
+        <div key={index} className="animate-pulse rounded-md border border-line bg-white p-3">
+          <div className="h-3 w-20 rounded bg-slate-200" />
+          <div className="mt-2 h-4 w-4/5 rounded bg-slate-200" />
+          <div className="mt-4 h-2 rounded bg-slate-100" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -229,26 +491,6 @@ function LiveStatus({ status, generatedAt }: { status: StreamStatus; generatedAt
       <span className={clsx('h-2 w-2 rounded-full', status === 'connected' ? 'bg-emerald-500' : status === 'reconnecting' ? 'bg-amber-500' : 'bg-slate-400')} />
       <span className="hidden sm:inline">{label}</span>
     </span>
-  );
-}
-
-function ProgressColumn({ stage, items, scrollable = false }: { stage: ProgressStage; items: ProjectProgressItem[]; scrollable?: boolean }) {
-  return (
-    <section className="overflow-hidden rounded-lg border border-line bg-slate-50/70">
-      <header className={clsx('flex items-center justify-between gap-2 border-b border-line px-3 py-3', stage.headerClassName)}>
-        <h2 className="min-w-0 text-sm font-semibold">{stage.label}</h2>
-        <span className="inline-flex min-w-6 items-center justify-center rounded-md bg-white/90 px-1.5 py-0.5 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200">
-          {items.length}
-        </span>
-      </header>
-      <div className={clsx('space-y-2 p-2', scrollable && 'max-h-[calc(100vh-330px)] overflow-y-auto')}>
-        {items.length ? items.map((item) => <ProgressCard key={item.id} item={item} />) : (
-          <div className="rounded-md border border-dashed border-slate-300 bg-white/70 px-3 py-6 text-center text-xs text-slate-500">
-            Không có công trình
-          </div>
-        )}
-      </div>
-    </section>
   );
 }
 
@@ -340,6 +582,10 @@ function ProgressBoardSkeleton() {
       ))}
     </div>
   );
+}
+
+function withQuery(path: string, query: string) {
+  return query ? `${path}?${query}` : path;
 }
 
 function nonNegativeNumber(value: unknown) {
