@@ -20,6 +20,31 @@ button, input, select, textarea {
   @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
 }
 
+.structured-list-scroll {
+  overscroll-behavior-x: contain;
+  scrollbar-color: #94a3b8 #e2e8f0;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.structured-list-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.structured-list-scroll::-webkit-scrollbar-track {
+  background: #e2e8f0;
+}
+
+.structured-list-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border: 2px solid #e2e8f0;
+  border-radius: 9999px;
+}
+
+.structured-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
 .pipeline-details-panel {
   animation: pipeline-details-slide-in 180ms ease-out;
 }
