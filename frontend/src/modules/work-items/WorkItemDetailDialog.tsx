@@ -24,7 +24,7 @@ import { get, post } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import { useToast } from '../../components/ToastProvider';
-import type { ActivityPayload, EvidenceRecord, ProjectActivityOptions, WorkItem, WorkItemActivity } from '../../lib/types/domain';
+import type { ActivityPayload, EvidenceRecord, ProjectActivityOptions, WorkItem, WorkItemActivity, WorkItemStartRequirement } from '../../lib/types/domain';
 import { ActivityAttachments } from './ActivityAttachments';
 import { ActivityReactionBar, ActivityReplyQuote } from './ActivityConversationMeta';
 import { ActivityComposer, type ActivityAttachmentOption, type ActivityMentionOption } from './ActivityComposer';
@@ -112,6 +112,9 @@ export function WorkItemDetailWorkspace({
 }) {
   const [actionText, setActionText] = useState('');
   const [pendingAction, setPendingAction] = useState<WorkItemActionKey | null>(null);
+  const [startConfirmationOpen, setStartConfirmationOpen] = useState(false);
+  const [startReason, setStartReason] = useState('');
+  const [startReasonAttempted, setStartReasonAttempted] = useState(false);
   const queryClient = useQueryClient();
   const toast = useToast();
   const selectedWorkId = workItemId ?? item?.id ?? '';
@@ -143,11 +146,24 @@ export function WorkItemDetailWorkspace({
   ];
 
   const workAction = useMutation({
-    mutationFn: ({ workItemId, action, comment }: { workItemId: string; action: WorkItemActionKey; comment: string }) =>
-      post<WorkItem>(`/work-items/${workItemId}/${action}`, { comment, reason: comment }),
+    mutationFn: ({ workItemId, action, comment, bypassStartRequirements, startRequirementsToken }: {
+      workItemId: string;
+      action: WorkItemActionKey;
+      comment: string;
+      bypassStartRequirements?: boolean;
+      startRequirementsToken?: string;
+    }) => post<WorkItem>(`/work-items/${workItemId}/${action}`, {
+      comment,
+      reason: comment,
+      bypass_start_requirements: bypassStartRequirements,
+      start_requirements_token: startRequirementsToken,
+    }),
     onSuccess: (updated, variables) => {
       setActionText('');
       setPendingAction(null);
+      setStartConfirmationOpen(false);
+      setStartReason('');
+      setStartReasonAttempted(false);
       queryClient.invalidateQueries({ queryKey: ['work-item', variables.workItemId] });
       queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
       queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
@@ -157,7 +173,12 @@ export function WorkItemDetailWorkspace({
       onChanged?.(updated);
       toast.success(`Đã ${actionLabels[variables.action].toLowerCase()}`);
     },
-    onError: (error) => toast.error('Không thao tác được đầu việc', error),
+    onError: (error, variables) => {
+      if (variables.bypassStartRequirements) {
+        queryClient.invalidateQueries({ queryKey: ['work-item', variables.workItemId] });
+      }
+      toast.error('Không thao tác được đầu việc', error);
+    },
   });
   const activityAction = useMutation({
     mutationFn: ({ workItemId, payload }: { workItemId: string; payload: ActivityPayload }) =>
@@ -175,7 +196,14 @@ export function WorkItemDetailWorkspace({
   });
 
   function runAction(action: WorkItemActionKey) {
-    if (!detailItem?.id || workItemIsUpcoming(detailItem)) return;
+    if (!detailItem?.id) return;
+    if (workItemIsUpcoming(detailItem)) {
+      if (action !== 'start' || !detailItem.start_readiness?.can_bypass) return;
+      setStartReason('');
+      setStartReasonAttempted(false);
+      setStartConfirmationOpen(true);
+      return;
+    }
     const comment = actionText.trim();
     if (actionRequiresReason(action) && !comment) {
       setPendingAction(action);
@@ -185,9 +213,29 @@ export function WorkItemDetailWorkspace({
     workAction.mutate({ workItemId: detailItem.id, action, comment });
   }
 
+  function confirmEarlyStart() {
+    if (!detailItem?.id || !detailItem.start_readiness?.can_bypass) return;
+    const reason = startReason.trim();
+    if (!reason) {
+      setStartReasonAttempted(true);
+      toast.warn({ title: 'Cần nhập lý do bắt đầu sớm', description: 'Lý do được lưu cùng lịch sử và audit của đầu việc.' });
+      return;
+    }
+    workAction.mutate({
+      workItemId: detailItem.id,
+      action: 'start',
+      comment: reason,
+      bypassStartRequirements: true,
+      startRequirementsToken: detailItem.start_readiness.snapshot_token,
+    });
+  }
+
   function closeDialog() {
     setActionText('');
     setPendingAction(null);
+    setStartConfirmationOpen(false);
+    setStartReason('');
+    setStartReasonAttempted(false);
     onClose?.();
   }
 
@@ -203,6 +251,9 @@ export function WorkItemDetailWorkspace({
   useEffect(() => {
     setNavigationRequest(null);
     setWorkflowFormActionState(null);
+    setStartConfirmationOpen(false);
+    setStartReason('');
+    setStartReasonAttempted(false);
   }, [selectedWorkId]);
 
   const actions = permittedActions(detailItem);
@@ -215,7 +266,9 @@ export function WorkItemDetailWorkspace({
     ? null
     : resolvedPrimarySurface;
   const requirementRows = detailItem ? buildRequirementRows(detailItem, evidence, actions, futureReadOnly) : [];
-  const incompleteRequirementCount = requirementRows.filter((row) => row.state === 'blocked' || row.state === 'warning').length;
+  const incompleteRequirementCount = futureReadOnly
+    ? numberValue(detailItem?.start_readiness?.unmet_count)
+    : requirementRows.filter((row) => row.state === 'blocked' || row.state === 'warning').length;
   const nextAction = detailItem ? resolveNextAction(detailItem, actions, primarySurface?.kind) : '';
   const latestActivity = activities[0];
   const skippedHistory = detailItem?.status === 'cancelled';
@@ -229,13 +282,25 @@ export function WorkItemDetailWorkspace({
 
           {futureReadOnly ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <p className="font-semibold">Công việc chưa đến lượt · chỉ xem</p>
-              <p className="mt-1">Có thể xem trước ngữ cảnh và hồ sơ. Các thao tác bắt đầu, cập nhật, tải minh chứng, ký và gửi hồ sơ chỉ mở khi đến thời điểm kế hoạch và workflow chuyển đến node này.</p>
+              <p className="font-semibold">Công việc chưa đến lượt · Chỉ xem</p>
+              <p className="mt-1">
+                {detailItem.start_readiness?.can_bypass
+                  ? 'Có thể xem trước ngữ cảnh và hồ sơ. Chọn Bắt đầu để xác nhận các điều kiện còn thiếu và thực hiện công việc này sớm.'
+                  : 'Có thể xem trước ngữ cảnh và hồ sơ. Cần chốt nhánh workflow hoặc xử lý điều kiện chặn trước khi bắt đầu công việc này sớm.'}
+              </p>
+            </div>
+          ) : null}
+
+          {detailItem.is_early_execution ? (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              <p className="font-semibold">Đang thực hiện sớm · Workflow chưa chuyển đến node này</p>
+              <p className="mt-1">Các điều kiện hoàn tất và quyền nghiệp vụ vẫn được áp dụng bình thường. Tiến độ workflow chính không bị dịch chuyển.</p>
             </div>
           ) : null}
 
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
             <main className="min-w-0 space-y-4">
+              <WorkItemStartRequirementPanel item={detailItem} />
               {skippedHistory ? (
                 <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-panel">
                   <p className="font-semibold text-ink">Hồ sơ lịch sử chỉ đọc</p>
@@ -306,6 +371,48 @@ export function WorkItemDetailWorkspace({
           </div>
         </div>
       ) : null}
+      <Dialog
+        open={startConfirmationOpen}
+        title="Bắt đầu công việc trước lượt?"
+        description="Workflow chính vẫn giữ nguyên node hiện tại. Thao tác này và lý do sẽ được lưu trong lịch sử audit."
+        onClose={() => {
+          if (workAction.isPending) return;
+          setStartConfirmationOpen(false);
+          setStartReasonAttempted(false);
+        }}
+        size="md"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+              disabled={workAction.isPending}
+              onClick={() => setStartConfirmationOpen(false)}
+            >
+              Quay lại
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={workAction.isPending || !detailItem?.start_readiness?.can_bypass}
+              onClick={confirmEarlyStart}
+            >
+              {workAction.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Bắt đầu ngay
+            </button>
+          </div>
+        )}
+      >
+        <EarlyStartConfirmationContent
+          requirements={detailItem?.start_readiness?.requirements ?? []}
+          reason={startReason}
+          reasonInvalid={startReasonAttempted && !startReason.trim()}
+          onReasonChange={(value) => {
+            setStartReason(value);
+            if (value.trim()) setStartReasonAttempted(false);
+          }}
+        />
+      </Dialog>
     </>
   );
 }
@@ -326,6 +433,138 @@ function permittedActions(item?: WorkItem | null): WorkItemActionKey[] {
     if (decisionActions.has(action)) return (item.capabilities?.can_decide ?? item.can_decide) === true;
     return (item.capabilities?.can_act ?? item.can_act) === true;
   });
+}
+
+function WorkItemStartRequirementPanel({ item }: { item: WorkItem }) {
+  const readiness = item.start_readiness;
+  const requirements = readiness?.requirements ?? [];
+  if (!requirements.length) return null;
+
+  const unmetCount = numberValue(readiness?.unmet_count);
+  return (
+    <details
+      className={clsx('group rounded-md border bg-white shadow-panel', unmetCount ? 'border-amber-200' : 'border-line')}
+      open={unmetCount > 0}
+    >
+      <summary className={clsx('flex cursor-pointer list-none items-center justify-between gap-3 rounded-md px-3 py-3', unmetCount ? 'bg-amber-50 hover:bg-amber-100' : 'bg-slate-50 hover:bg-slate-100')}>
+        <div className="flex min-w-0 items-center gap-2">
+          {unmetCount ? <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" /> : <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />}
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Điều kiện để bắt đầu</p>
+            <h3 className="mt-0.5 text-sm font-semibold text-ink">
+              {unmetCount ? `Còn ${unmetCount} điều kiện chưa hoàn tất` : 'Đã đủ điều kiện bắt đầu theo quy trình'}
+            </h3>
+          </div>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-600">
+          {requirements.length} mục
+          <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+        </span>
+      </summary>
+      <div className="divide-y divide-line border-t border-line bg-white">
+        {requirements.map((requirement) => (
+          <StartRequirementRow key={requirement.id} item={item} requirement={requirement} />
+        ))}
+      </div>
+      {readiness?.state === 'route_unresolved' ? (
+        <p className="border-t border-rose-100 bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-700">
+          Phải chốt nhánh workflow trước khi có thể bắt đầu công việc này sớm.
+        </p>
+      ) : readiness?.can_bypass ? (
+        <p className="border-t border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+          Có thể chọn <span className="font-semibold">Bắt đầu</span> để xác nhận và thực hiện sớm. Các điều kiện hoàn tất của chính công việc vẫn giữ nguyên.
+        </p>
+      ) : null}
+    </details>
+  );
+}
+
+function StartRequirementRow({
+  item,
+  requirement,
+  compact = false,
+}: {
+  item?: WorkItem;
+  requirement: WorkItemStartRequirement;
+  compact?: boolean;
+}) {
+  const content = (
+    <>
+      {requirement.satisfied
+        ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+        : <Circle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-ink">{requirement.label}</p>
+        <p className="mt-0.5 text-xs leading-5 text-slate-600">
+          {[requirement.node_label, requirement.step_label, statusLabel(requirement.status)].filter(Boolean).join(' · ')}
+        </p>
+        {requirement.description ? <p className="mt-0.5 text-xs leading-5 text-slate-600">{requirement.description}</p> : null}
+      </div>
+      {requirement.can_open && requirement.work_item_id && !compact ? (
+        <span className="inline-flex shrink-0 items-center gap-1 self-center text-xs font-semibold text-blue-700">
+          Mở công việc
+          <ArrowRight className="h-3.5 w-3.5" />
+        </span>
+      ) : null}
+    </>
+  );
+
+  if (item && requirement.can_open && requirement.work_item_id && !compact) {
+    const returnTo = item.project_id ? `/projects/${item.project_id}` : '/my-work';
+    return (
+      <Link
+        className="flex items-start gap-3 px-3 py-2.5 transition hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+        to={`/projects/${item.project_id}/work-items/${requirement.work_item_id}?returnTo=${encodeURIComponent(returnTo)}`}
+      >
+        {content}
+      </Link>
+    );
+  }
+  return <div className={clsx('flex items-start gap-3', compact ? 'py-2' : 'px-3 py-2.5')}>{content}</div>;
+}
+
+function EarlyStartConfirmationContent({
+  requirements,
+  reason,
+  reasonInvalid,
+  onReasonChange,
+}: {
+  requirements: WorkItemStartRequirement[];
+  reason: string;
+  reasonInvalid: boolean;
+  onReasonChange: (value: string) => void;
+}) {
+  const unmetRequirements = requirements.filter((requirement) => !requirement.satisfied);
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
+        <p className="text-sm font-semibold text-amber-900">Cần hoàn thành các điều kiện sau theo workflow:</p>
+        <div className="mt-2 divide-y divide-amber-100">
+          {unmetRequirements.map((requirement) => (
+            <StartRequirementRow key={requirement.id} requirement={requirement} compact />
+          ))}
+        </div>
+      </div>
+      <p className="text-sm leading-6 text-slate-700">
+        Anh có thể tiếp tục và bắt đầu công việc ngay mà không đi qua lần lượt các bước trên. Việc này không bỏ qua quyền thao tác, điểm chặn nghiệp vụ hoặc điều kiện hoàn tất của công việc đang mở.
+      </p>
+      <label className="block text-sm font-semibold text-ink" htmlFor="early-start-reason">
+        Lý do bắt đầu sớm <span className="text-rose-600">*</span>
+      </label>
+      <textarea
+        id="early-start-reason"
+        className={clsx(
+          'min-h-24 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500',
+          reasonInvalid ? 'border-rose-300 bg-rose-50' : 'border-line bg-white',
+        )}
+        value={reason}
+        onChange={(event) => onReasonChange(event.target.value)}
+        placeholder="Ví dụ: cần triển khai song song để kịp tiến độ công trình"
+        aria-invalid={reasonInvalid}
+      />
+      {reasonInvalid ? <p className="text-xs font-medium text-rose-700">Vui lòng nhập lý do để lưu cùng lịch sử audit.</p> : null}
+    </div>
+  );
 }
 
 function SkippedWorkItemHistory({ activities, evidence }: { activities: WorkItemActivity[]; evidence: EvidenceRecord[] }) {
@@ -1038,7 +1277,7 @@ function resolveNextAction(
   actions: WorkItemActionKey[],
   primarySurfaceKind?: WorkItemPrimarySurfaceKind,
 ) {
-  if (workItemIsUpcoming(item)) return 'Chờ workflow chuyển đến node này';
+  if (workItemIsUpcoming(item)) return actions.includes('start') ? actionLabels.start : 'Chờ workflow chuyển đến node này';
   const missingRequirements = missingCompletionRequirementLabels(item);
   const missingWorkflowForm = item.completion_requirements?.some((requirement) => requirement.key === 'workflow_form' && requirement.required && requirement.status === 'missing');
 

@@ -43,6 +43,139 @@ func TestWorkflowTimelineCountsSubmittedAndSkippedSteps(t *testing.T) {
 	}
 }
 
+func TestWorkItemCanStartOutOfSequenceWithoutMovingRunPointer(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	templateID := newID()
+	runID := newID()
+	currentNodeID := newID()
+	futureNodeID := newID()
+	currentStepID := newID()
+	futureStepID := newID()
+	futureWorkItemID := newID()
+	defer func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM pipeline_templates WHERE id=$1`, templateID)
+	}()
+
+	var workerStaffID string
+	if err := db.QueryRowContext(ctx, `SELECT id::text FROM staff WHERE user_id=$1`, fixture.workerID).Scan(&workerStaffID); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, `INSERT INTO pipeline_templates (id,template_family_id,name,status) VALUES ($1,$1,'Early start test','published')`, templateID)
+	mustExec(t, db, `UPDATE projects SET pipeline_template_id=$2 WHERE id=$1`, fixture.projectID, templateID)
+	mustExec(t, db, `INSERT INTO pipeline_runs (id,project_id,template_id,engine_version,status) VALUES ($1,$2,$3,4,'active')`, runID, fixture.projectID, templateID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (id,run_id,project_id,name,type,order_index,status)
+		VALUES ($1,$3,$4,'Node hiện tại','task',1,'in_progress'),($2,$3,$4,'Node tương lai','task',2,'pending')
+	`, currentNodeID, futureNodeID, runID, fixture.projectID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$1 WHERE id=$2`, currentNodeID, runID)
+	mustExec(t, db, `UPDATE projects SET current_pipeline_run_id=$1 WHERE id=$2`, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_steps (id,run_node_id,project_id,name,order_index,status)
+		VALUES ($1,$3,$4,'Bước hiện tại',1,'in_progress'),($2,$5,$4,'Bước tương lai',1,'pending')
+	`, currentStepID, futureStepID, currentNodeID, fixture.projectID, futureNodeID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_edges (run_id,project_id,from_run_node_id,to_run_node_id,condition_type,priority)
+		VALUES ($1,$2,$3,$4,'always',1)
+	`, runID, fixture.projectID, currentNodeID, futureNodeID)
+	mustExec(t, db, `
+		UPDATE work_items
+		SET pipeline_run_id=$2,run_node_id=$3,run_step_id=$4,status='ready'
+		WHERE id=$1
+	`, fixture.itemID, runID, currentNodeID, currentStepID)
+	mustExec(t, db, `
+		INSERT INTO work_items (
+			id,project_id,pipeline_run_id,run_node_id,run_step_id,source_type,source_id,title,work_type,status,
+			role_ids,assignee_staff_id,evidence_requirement_json,created_by,updated_by
+		)
+		VALUES ($1,$2,$3,$4,$5,'pipeline_run_step',$5,'Công việc tương lai','task','pending',
+			'["Đội thi công"]'::jsonb,$6,'{"required_permission":"operation.report"}'::jsonb,$7,$7)
+	`, futureWorkItemID, fixture.projectID, runID, futureNodeID, futureStepID, workerStaffID, fixture.workerID)
+
+	detail, err := service.WorkItemDetail(ctx, futureWorkItemID, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	startReadiness := recordFromAny(detail["start_readiness"])
+	if fmt.Sprint(startReadiness["state"]) != workItemStartRequirementsUnmet || !boolValue(startReadiness["can_bypass"]) {
+		t.Fatalf("start readiness = %#v", startReadiness)
+	}
+	requirements, ok := startReadiness["requirements"].([]Record)
+	if !ok || len(requirements) != 2 {
+		t.Fatalf("requirements = %#v, want transition plus current work item", startReadiness["requirements"])
+	}
+	if !containsMyWorkString(stringSlice(detail["available_actions"]), "start") {
+		t.Fatalf("available actions = %#v, want start", detail["available_actions"])
+	}
+
+	if _, err := service.WorkItemAction(ctx, futureWorkItemID, "start", WorkItemActionRequest{}, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("future start without explicit bypass confirmation must fail")
+	}
+	if _, err := service.WorkItemAction(ctx, futureWorkItemID, "start", WorkItemActionRequest{
+		BypassStartRequirements: true,
+		StartRequirementsToken:  "stale-token",
+		Reason:                  "Triển khai song song",
+	}, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("future start with stale snapshot must fail")
+	}
+
+	updated, err := service.WorkItemAction(ctx, futureWorkItemID, "start", WorkItemActionRequest{
+		BypassStartRequirements: true,
+		StartRequirementsToken:  fmt.Sprint(startReadiness["snapshot_token"]),
+		Reason:                  "Triển khai song song để kịp tiến độ",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(updated["status"]) != "in_progress" {
+		t.Fatalf("updated status = %v", updated["status"])
+	}
+	var currentNodeAfter string
+	if err := db.QueryRowContext(ctx, `SELECT current_node_id::text FROM pipeline_runs WHERE id=$1`, runID).Scan(&currentNodeAfter); err != nil {
+		t.Fatal(err)
+	}
+	if currentNodeAfter != currentNodeID {
+		t.Fatalf("run pointer moved to %s, want %s", currentNodeAfter, currentNodeID)
+	}
+
+	after, err := service.WorkItemDetail(ctx, futureWorkItemID, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !boolValue(after["is_early_execution"]) || fmt.Sprint(after["readiness"]) != "actionable" {
+		t.Fatalf("early execution detail = %#v", after)
+	}
+	var activityOverrideMode, activityReason string
+	if err := db.QueryRowContext(ctx, `
+		SELECT metadata_json->'start_override'->>'mode', metadata_json->'start_override'->>'reason'
+		FROM work_item_activities
+		WHERE work_item_id=$1 AND activity_type='started'
+		ORDER BY created_at DESC LIMIT 1
+	`, futureWorkItemID).Scan(&activityOverrideMode, &activityReason); err != nil {
+		t.Fatal(err)
+	}
+	if activityOverrideMode != "out_of_sequence" || activityReason != "Triển khai song song để kịp tiến độ" {
+		t.Fatalf("activity override = %q/%q", activityOverrideMode, activityReason)
+	}
+	var auditActorID, auditOverrideMode, auditReason, auditDescription string
+	if err := db.QueryRowContext(ctx, `
+		SELECT actor_id::text, metadata_json->'start_override'->>'mode',
+			metadata_json->'start_override'->>'reason', description
+		FROM audit_logs
+		WHERE target_type='work_item' AND target_id=$1 AND event_type='work_item_started'
+		ORDER BY created_at DESC LIMIT 1
+	`, futureWorkItemID).Scan(&auditActorID, &auditOverrideMode, &auditReason, &auditDescription); err != nil {
+		t.Fatal(err)
+	}
+	if auditActorID != fixture.workerID || auditOverrideMode != "out_of_sequence" || auditReason != activityReason || !strings.Contains(auditDescription, "Bắt đầu sớm") {
+		t.Fatalf("audit = actor %q, mode %q, reason %q, description %q", auditActorID, auditOverrideMode, auditReason, auditDescription)
+	}
+}
+
 func TestSkipUnselectedBranchesSkipsOnlyExclusiveSubgraph(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

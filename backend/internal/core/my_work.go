@@ -153,11 +153,16 @@ func myWorkItemQueueScopes(item Record, canDecide bool) []string {
 func myWorkItemAvailableActions(item Record) []string {
 	canAct := boolValue(item["can_act"])
 	canDecide := boolValue(item["can_decide"])
+	startReadiness := recordFromAny(item["start_readiness"])
 	status := fmt.Sprint(item["status"])
 	actions := make([]string, 0, 6)
 	for _, action := range []string{"start", "complete", "block", "resolve-blocker", "request-review", "request-approval"} {
 		plan, err := workItemTransitionForAction(action, item)
-		if err == nil && !plan.Decision && canAct {
+		canRun := canAct
+		if action == "start" && len(startReadiness) > 0 {
+			canRun = boolValue(startReadiness["can_start"])
+		}
+		if err == nil && !plan.Decision && canRun {
 			actions = append(actions, action)
 		}
 	}
@@ -208,10 +213,11 @@ func (s *Service) myWorkItemCanActNow(ctx context.Context, item Record, actorID 
 	if !scoped || statusIn(fmt.Sprint(item["status"]), "completed", "cancelled") {
 		return false, nil
 	}
-	if myWorkPlannedStartInFuture(item["planned_start_at"], time.Now()) {
+	started := workItemHasStarted(item)
+	if !started && myWorkPlannedStartInFuture(item["planned_start_at"], time.Now()) {
 		return false, nil
 	}
-	if int(number(item["pipeline_engine_version"])) >= 2 && cleanID(item["pipeline_run_id"]) != "" {
+	if !started && int(number(item["pipeline_engine_version"])) >= 2 && cleanID(item["pipeline_run_id"]) != "" {
 		if cleanID(item["pipeline_current_node_id"]) != cleanID(item["run_node_id"]) ||
 			!statusIn(fmt.Sprint(item["run_node_status"]), "in_progress", "waiting_approval", "blocked") {
 			return false, nil

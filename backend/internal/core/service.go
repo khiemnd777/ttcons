@@ -2596,11 +2596,15 @@ func (s *Service) WorkItemDetail(ctx context.Context, workItemID, actorID string
 	if err != nil {
 		return nil, err
 	}
-	canAct, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	canActInScope, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
 	if err != nil {
 		return nil, err
 	}
-	canAct, err = s.myWorkItemCanActNow(ctx, item, actorID, canAct)
+	canAct, err := s.myWorkItemCanActNow(ctx, item, actorID, canActInScope)
+	if err != nil {
+		return nil, err
+	}
+	startReadiness, err := s.workItemStartReadiness(ctx, item, actorID, profile, canActInScope)
 	if err != nil {
 		return nil, err
 	}
@@ -2617,6 +2621,7 @@ func (s *Service) WorkItemDetail(ctx context.Context, workItemID, actorID string
 	item["capabilities"] = Record{"can_act": canAct, "can_decide": canDecide}
 	item["can_act"] = canAct
 	item["can_decide"] = canDecide
+	item["start_readiness"] = startReadiness
 	item["available_actions"] = myWorkItemAvailableActions(item)
 	item["readiness"] = myWorkItemReadiness(item)
 	completionRequirements, err := s.workItemCompletionRequirements(ctx, item, recordFromAny(item["completion_payload_json"]))
@@ -5648,12 +5653,71 @@ func (s *Service) WorkItemAction(ctx context.Context, workItemID, action string,
 	if err != nil {
 		return nil, err
 	}
-	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
-		return nil, err
-	}
 	plan, err := workItemTransitionForAction(action, item)
 	if err != nil {
 		return nil, err
+	}
+	actionScopeChecked := false
+	if activeErr := s.requireActivePipelineWorkItem(ctx, item); activeErr != nil {
+		if action != "start" {
+			return nil, activeErr
+		}
+		allowed, scopeErr := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+		if scopeErr != nil {
+			return nil, scopeErr
+		}
+		if !allowed {
+			return nil, forbiddenError("Bạn không có quyền thao tác đầu việc này")
+		}
+		if permissionErr := s.requireWorkItemPermission(ctx, item, actorID); permissionErr != nil {
+			return nil, permissionErr
+		}
+		profile, profileErr := s.repo.WorkItemAccessProfile(ctx, actorID)
+		if profileErr != nil {
+			return nil, profileErr
+		}
+		startReadiness, readinessErr := s.workItemStartReadiness(ctx, item, actorID, profile, allowed)
+		if readinessErr != nil {
+			return nil, readinessErr
+		}
+		if !req.BypassStartRequirements {
+			return nil, validationError("Cần xác nhận các điều kiện bắt đầu trước khi thực hiện công việc sớm", Record{
+				"start_readiness": startReadiness,
+			})
+		}
+		if !boolValue(startReadiness["can_bypass"]) {
+			return nil, validationError("Công việc chưa thể bắt đầu sớm do nhánh workflow hoặc điều kiện chặn chưa được giải quyết", Record{
+				"start_readiness": startReadiness,
+			})
+		}
+		reason := workItemActionComment(req)
+		if reason == "" {
+			return nil, validationError("Lý do bắt đầu sớm là bắt buộc", Record{"action": action})
+		}
+		expectedToken := strings.TrimSpace(fmt.Sprint(startReadiness["snapshot_token"]))
+		if strings.TrimSpace(req.StartRequirementsToken) == "" || req.StartRequirementsToken != expectedToken {
+			return nil, conflictError("Điều kiện bắt đầu đã thay đổi, vui lòng tải lại và xác nhận lại", Record{
+				"start_readiness": startReadiness,
+			})
+		}
+		overrideMode := "out_of_sequence"
+		if cleanID(startReadiness["current_node_id"]) == cleanID(startReadiness["target_node_id"]) {
+			overrideMode = "schedule_override"
+		}
+		req.StartOverrideMetadata = Record{
+			"mode":                     overrideMode,
+			"actor_id":                 actorID,
+			"actor_name":               actorName,
+			"started_at":               time.Now().UTC().Format(time.RFC3339Nano),
+			"reason":                   reason,
+			"current_node_id":          startReadiness["current_node_id"],
+			"current_node_name":        startReadiness["current_node_name"],
+			"target_node_id":           startReadiness["target_node_id"],
+			"target_node_name":         startReadiness["target_node_name"],
+			"start_requirements_token": expectedToken,
+			"unmet_requirements":       startReadiness["requirements"],
+		}
+		actionScopeChecked = true
 	}
 	if plan.RequiresReason && workItemActionComment(req) == "" {
 		return nil, validationError("Lý do thao tác là bắt buộc", Record{"action": action})
@@ -5667,12 +5731,14 @@ func (s *Service) WorkItemAction(ctx context.Context, workItemID, action string,
 			return nil, forbiddenError("Bạn không có quyền duyệt đầu việc này")
 		}
 	} else {
-		allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
-		if err != nil {
-			return nil, err
-		}
-		if !allowed {
-			return nil, forbiddenError("Bạn không có quyền thao tác đầu việc này")
+		if !actionScopeChecked {
+			allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+			if err != nil {
+				return nil, err
+			}
+			if !allowed {
+				return nil, forbiddenError("Bạn không có quyền thao tác đầu việc này")
+			}
 		}
 		if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
 			return nil, err
@@ -5729,7 +5795,8 @@ func (s *Service) publishWorkItemChanged(item Record, actorID string) {
 }
 
 func (s *Service) requireActivePipelineWorkItem(ctx context.Context, item Record) error {
-	if myWorkPlannedStartInFuture(item["planned_start_at"], time.Now()) {
+	started := workItemHasStarted(item)
+	if !started && myWorkPlannedStartInFuture(item["planned_start_at"], time.Now()) {
 		return validationError("Đầu việc chưa đến thời điểm được phép bắt đầu", Record{
 			"work_item_id":     item["id"],
 			"planned_start_at": item["planned_start_at"],
@@ -5739,7 +5806,7 @@ func (s *Service) requireActivePipelineWorkItem(ctx context.Context, item Record
 		return nil
 	}
 	rows, err := s.repo.Query(ctx, `
-		SELECT pr.current_node_id, rn.status AS node_status
+		SELECT pr.current_node_id, pr.status AS run_status, rn.status AS node_status
 		FROM pipeline_runs pr
 		LEFT JOIN pipeline_run_nodes rn ON rn.id=pr.current_node_id
 		WHERE pr.id=$1
@@ -5750,6 +5817,22 @@ func (s *Service) requireActivePipelineWorkItem(ctx context.Context, item Record
 	currentNodeID := ""
 	if len(rows) > 0 {
 		currentNodeID = cleanID(rows[0]["current_node_id"])
+	}
+	if len(rows) == 0 {
+		return validationError("Không tìm thấy pipeline run của đầu việc")
+	}
+	if statusIn(fmt.Sprint(rows[0]["run_status"]), "completed", "cancelled") {
+		return validationError("Pipeline run không còn cho phép thao tác đầu việc", Record{"run_status": rows[0]["run_status"]})
+	}
+	if started && currentNodeID != "" && currentNodeID != cleanID(item["run_node_id"]) {
+		if !statusIn(fmt.Sprint(rows[0]["node_status"]), "in_progress", "waiting_approval", "blocked") ||
+			!statusIn(fmt.Sprint(item["run_node_status"]), "pending", "in_progress", "waiting_approval", "blocked") {
+			return validationError("Pipeline run hoặc node bắt đầu sớm không còn cho phép thao tác", Record{
+				"current_node_status": rows[0]["node_status"],
+				"target_node_status":  item["run_node_status"],
+			})
+		}
+		return nil
 	}
 	if currentNodeID == "" || currentNodeID != cleanID(item["run_node_id"]) {
 		return validationError("Đầu việc chưa thuộc node đang thực hiện của quy trình", Record{

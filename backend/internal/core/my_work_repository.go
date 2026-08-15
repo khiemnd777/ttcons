@@ -253,7 +253,7 @@ func myWorkItemsBaseSQL() string {
 		), base_work AS (
 			SELECT sw.*,
 				(
-					status NOT IN ('completed','cancelled') AND (
+					status NOT IN ('completed','cancelled') AND started_at IS NULL AND (
 						COALESCE(planned_start_at > now(), false)
 						OR (
 							pipeline_engine_version >= 2
@@ -262,20 +262,32 @@ func myWorkItemsBaseSQL() string {
 						)
 					)
 				) AS is_future,
+				(
+					status NOT IN ('completed','cancelled')
+					AND started_at IS NOT NULL
+					AND pipeline_engine_version >= 2
+					AND pipeline_run_id IS NOT NULL
+					AND pipeline_current_node_id IS DISTINCT FROM run_node_id
+				) AS is_early_execution,
 				(NOT is_mine AND NOT is_watching AND action_scope) AS is_department,
 				(
 					action_scope AND status NOT IN ('completed','cancelled')
-					AND NOT (
-						COALESCE(planned_start_at > now(), false)
-						OR (
-							pipeline_engine_version >= 2
-							AND pipeline_run_id IS NOT NULL
-							AND pipeline_current_node_id IS DISTINCT FROM run_node_id
-						)
-					)
 					AND (
-						pipeline_engine_version < 2 OR pipeline_run_id IS NULL
-						OR (pipeline_current_node_id=run_node_id AND run_node_status IN ('in_progress','waiting_approval','blocked'))
+						started_at IS NOT NULL
+						OR (
+							NOT (
+								COALESCE(planned_start_at > now(), false)
+								OR (
+									pipeline_engine_version >= 2
+									AND pipeline_run_id IS NOT NULL
+									AND pipeline_current_node_id IS DISTINCT FROM run_node_id
+								)
+							)
+							AND (
+								pipeline_engine_version < 2 OR pipeline_run_id IS NULL
+								OR (pipeline_current_node_id=run_node_id AND run_node_status IN ('in_progress','waiting_approval','blocked'))
+							)
+						)
 					)
 					AND (
 						NULLIF(evidence_requirement_json->>'required_permission','') IS NULL
@@ -290,12 +302,15 @@ func myWorkItemsBaseSQL() string {
 				) AS can_act,
 				(
 					status IN ('waiting_review','waiting_approval')
-					AND NOT (
-						COALESCE(planned_start_at > now(), false)
-						OR (
-							pipeline_engine_version >= 2
-							AND pipeline_run_id IS NOT NULL
-							AND pipeline_current_node_id IS DISTINCT FROM run_node_id
+					AND (
+						started_at IS NOT NULL
+						OR NOT (
+							COALESCE(planned_start_at > now(), false)
+							OR (
+								pipeline_engine_version >= 2
+								AND pipeline_run_id IS NOT NULL
+								AND pipeline_current_node_id IS DISTINCT FROM run_node_id
+							)
 						)
 					)
 					AND (decision_requested_by IS NULL OR decision_requested_by <> NULLIF($2,'')::uuid)

@@ -74,6 +74,23 @@ func TestMyWorkFutureNodeCannotActNow(t *testing.T) {
 	}
 }
 
+func TestMyWorkEarlyStartedFutureNodeCanActNow(t *testing.T) {
+	service := &Service{}
+	allowed, err := service.myWorkItemCanActNow(context.Background(), Record{
+		"status":                   "in_progress",
+		"started_at":               time.Now().Add(-time.Minute),
+		"planned_start_at":         time.Now().Add(time.Hour),
+		"pipeline_engine_version":  2,
+		"pipeline_run_id":          "run-1",
+		"pipeline_current_node_id": "node-current",
+		"run_node_id":              "node-future",
+		"run_node_status":          "pending",
+	}, "actor-1", true)
+	if err != nil || !allowed {
+		t.Fatalf("early-started future node allowed = %v, error = %v", allowed, err)
+	}
+}
+
 func TestMyWorkPlannedFutureCannotActNow(t *testing.T) {
 	service := &Service{}
 	planned := time.Now().Add(time.Hour)

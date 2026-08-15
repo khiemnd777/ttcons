@@ -2753,6 +2753,8 @@ export type WorkItem = ProjectOperationsRecord & {
     can_act?: boolean;
     can_decide?: boolean;
   };
+	is_early_execution?: boolean;
+	start_readiness?: WorkItemStartReadiness;
   available_actions?: string[];
   readiness?: 'actionable' | 'decision' | 'upcoming' | 'read_only' | 'history' | string;
   priority?: string;
@@ -2820,6 +2822,36 @@ export type WorkItemCompletionRequirement = {
   required: boolean;
   status: 'satisfied' | 'missing' | string;
   satisfied_by?: 'workflow_form' | 'evidence' | 'completion_payload' | string;
+};
+
+export type WorkItemStartRequirement = {
+	id: string;
+	type: 'work_item' | 'transition' | 'planned_start' | 'node_approval' | 'automation' | 'blocker' | 'route' | string;
+	node_id?: string;
+	node_label?: string;
+	step_id?: string;
+	step_label?: string;
+	work_item_id?: string;
+	label: string;
+	status: string;
+	satisfied: boolean;
+	can_open: boolean;
+	description?: string;
+	workflow_form_status?: string;
+	planned_start_at?: string;
+};
+
+export type WorkItemStartReadiness = {
+	state: 'ready' | 'requirements_unmet' | 'route_unresolved' | 'not_allowed' | string;
+	can_start: boolean;
+	can_bypass: boolean;
+	unmet_count: number;
+	requirements: WorkItemStartRequirement[];
+	snapshot_token?: string;
+	current_node_id?: string;
+	current_node_name?: string;
+	target_node_id?: string;
+	target_node_name?: string;
 };
 
 export type ApprovalDecisionContext = {

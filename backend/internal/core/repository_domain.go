@@ -1439,7 +1439,7 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 			required_permission.description AS required_permission_description,
 			COALESCE(pr.engine_version, 1) AS pipeline_engine_version,
 			(
-				wi.status NOT IN ('completed','cancelled') AND (
+				wi.status NOT IN ('completed','cancelled') AND wi.started_at IS NULL AND (
 					COALESCE(wi.planned_start_at > now(), false)
 					OR (
 						COALESCE(pr.engine_version, 1) >= 2
@@ -1447,7 +1447,14 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 						AND pr.current_node_id IS DISTINCT FROM wi.run_node_id
 					)
 				)
-			) AS is_future
+			) AS is_future,
+			(
+				wi.status NOT IN ('completed','cancelled')
+				AND wi.started_at IS NOT NULL
+				AND COALESCE(pr.engine_version, 1) >= 2
+				AND wi.pipeline_run_id IS NOT NULL
+				AND pr.current_node_id IS DISTINCT FROM wi.run_node_id
+			) AS is_early_execution
 		FROM work_items wi
 		JOIN projects p ON p.id=wi.project_id
 		LEFT JOIN pipeline_runs pr ON pr.id=wi.pipeline_run_id
@@ -6375,7 +6382,13 @@ func (r *Repository) ApplyWorkItemTransition(ctx context.Context, item Record, t
 		payload = Record{}
 	}
 	rawPayload, _ := json.Marshal(payload)
-	rawMetadata, _ := json.Marshal(Record{"action": activityType})
+	metadata := Record{"action": activityType}
+	expectedCurrentNodeID := ""
+	if len(req.StartOverrideMetadata) > 0 {
+		metadata["start_override"] = req.StartOverrideMetadata
+		expectedCurrentNodeID = cleanID(req.StartOverrideMetadata["current_node_id"])
+	}
+	rawMetadata, _ := json.Marshal(metadata)
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -6394,12 +6407,27 @@ func (r *Repository) ApplyWorkItemTransition(ctx context.Context, item Record, t
 				updated_by=NULLIF($9,'')::uuid,
 				updated_at=now()
 			WHERE id=$1 AND status=$10
+			  AND (
+				$11=''
+				OR EXISTS (
+					SELECT 1 FROM pipeline_runs pr
+					WHERE pr.id=work_items.pipeline_run_id
+					  AND COALESCE(pr.current_node_id::text, '')=$11
+					  AND pr.status NOT IN ('completed','cancelled')
+				)
+			  )
 			RETURNING id
-		`, workItemID, toStatus, activityType == "started", activityType == "completed", activityType == "blocked", activityType == "blocker_resolved", strings.TrimSpace(req.Reason), string(rawPayload), actorID, fromStatus)
+		`, workItemID, toStatus, activityType == "started", activityType == "completed", activityType == "blocked", activityType == "blocker_resolved", strings.TrimSpace(req.Reason), string(rawPayload), actorID, fromStatus, expectedCurrentNodeID)
 	if err != nil {
 		return nil, err
 	}
 	if len(updated) == 0 {
+		if expectedCurrentNodeID != "" {
+			return nil, conflictError("Điều kiện bắt đầu đã thay đổi, vui lòng tải lại và xác nhận lại", Record{
+				"expected_status":          fromStatus,
+				"expected_current_node_id": expectedCurrentNodeID,
+			})
+		}
 		return nil, validationError("Trạng thái đầu việc đã thay đổi, vui lòng tải lại trước khi thao tác", Record{"expected_status": fromStatus})
 	}
 
@@ -6413,7 +6441,11 @@ func (r *Repository) ApplyWorkItemTransition(ctx context.Context, item Record, t
 	`, workItemID, projectID, actorID, activityType, comment, fromStatus, toStatus, string(rawMetadata)); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "work_item_"+activityType, "work_item", workItemID, workItemAuditDescription(activityType, item, comment), json.RawMessage(rawMetadata)); err != nil {
+	auditDescription := workItemAuditDescription(activityType, item, comment)
+	if len(req.StartOverrideMetadata) > 0 {
+		auditDescription = fmt.Sprintf("Bắt đầu sớm đầu việc %s: %s", item["title"], comment)
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "work_item_"+activityType, "work_item", workItemID, auditDescription, json.RawMessage(rawMetadata)); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

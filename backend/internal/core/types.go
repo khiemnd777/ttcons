@@ -217,10 +217,13 @@ type ReceivableAdvanceSettlementRequest struct {
 }
 
 type WorkItemActionRequest struct {
-	Comment           string   `json:"comment"`
-	Reason            string   `json:"reason"`
-	CompletionPayload Record   `json:"completion_payload"`
-	RequiredRoles     []string `json:"required_roles"`
+	Comment                 string   `json:"comment"`
+	Reason                  string   `json:"reason"`
+	CompletionPayload       Record   `json:"completion_payload"`
+	RequiredRoles           []string `json:"required_roles"`
+	BypassStartRequirements bool     `json:"bypass_start_requirements"`
+	StartRequirementsToken  string   `json:"start_requirements_token"`
+	StartOverrideMetadata   Record   `json:"-"`
 }
 
 type MyWorkItemsFilter struct {
