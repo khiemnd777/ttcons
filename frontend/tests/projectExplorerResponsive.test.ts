@@ -37,6 +37,11 @@ test('project explorer shows the creation date after progress on desktop and lab
 
   assert.match(projectsPage, /<span>Tiến độ<\/span>\s*<ProjectExplorerSortHeader label="Ngày tạo" sortKey="created_at"[^/]+\/>\s*<span className="text-right">Mở<\/span>/);
   assert.match(projectsPage, /<span className="font-medium text-slate-500 lg:hidden">Ngày tạo: <\/span>\s*\{dateText\(project\.created_at\)\}/);
-  assert.match(projectsPage, /grid-cols-\[minmax\(0,1\.6fr\)_135px_100px_90px_90px_112px\]/);
+  assert.match(projectsPage, /const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-\[minmax\(0,1\.6fr\)_135px_100px_112px_100px_112px\]';/);
+  assert.equal((projectsPage.match(/\$\{PROJECT_EXPLORER_DESKTOP_GRID_CLASS\}/g) ?? []).length, 2);
+  assert.match(projectsPage, /className="flex min-w-0 items-center gap-2"/);
+  assert.match(projectsPage, /className="h-1\.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100"/);
+  assert.match(projectsPage, /className="shrink-0 text-xs font-semibold tabular-nums text-slate-600"/);
+  assert.match(projectsPage, /className="whitespace-nowrap text-sm tabular-nums text-slate-600"/);
   assert.match(domainTypes, /export type Project =[^}]+created_at\?: string;/s);
 });

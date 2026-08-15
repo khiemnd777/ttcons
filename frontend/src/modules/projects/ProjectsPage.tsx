@@ -42,6 +42,8 @@ import {
   type ProjectExplorerSortKey,
 } from './projectExplorerSort';
 
+const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-[minmax(0,1.6fr)_135px_100px_112px_100px_112px]';
+
 export function ProjectsPage() {
   const [open, setOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -181,8 +183,7 @@ export function ProjectsPage() {
     setExpandedProjectIds((current) => {
 			const visible = new Set(rows.map((project) => project.id));
 			const retained = new Set(Array.from(current).filter((projectID) => visible.has(projectID)));
-			if (retained.size) return retained;
-			return new Set([rows[0].id]);
+			return retained;
     });
   }, [projects.data]);
 
@@ -582,7 +583,7 @@ function ProjectExplorerHeader({
   onSort: (key: ProjectExplorerSortKey) => void;
 }) {
   return (
-    <div className="hidden grid-cols-[minmax(0,1.6fr)_135px_100px_90px_90px_112px] gap-3 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+    <div className={`hidden ${PROJECT_EXPLORER_DESKTOP_GRID_CLASS} gap-3 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid`}>
       <ProjectExplorerSortHeader label="Cây công trình" sortKey="project" sort={sort} onSort={onSort} />
       <ProjectExplorerSortHeader label="Trạng thái" sortKey="status" sort={sort} onSort={onSort} />
       <ProjectExplorerSortHeader label="Phụ trách" sortKey="owner" sort={sort} onSort={onSort} />
@@ -640,7 +641,7 @@ function ProjectExplorerRow({
   onEdit: () => void;
 }) {
   return (
-    <div className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1.6fr)_135px_100px_90px_90px_112px] lg:items-center">
+    <div className={`grid gap-3 px-4 py-3 ${PROJECT_EXPLORER_DESKTOP_GRID_CLASS} lg:items-center`}>
       <div className="flex min-w-0 items-start gap-3">
         <button
           type="button"
@@ -664,14 +665,14 @@ function ProjectExplorerRow({
       <div><StatusBadge status={project.status} /></div>
       <div className="text-sm text-slate-700">{project.pm_name ?? '-'}</div>
       <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-slate-100">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
             <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, Math.max(0, Number(project.progress_percent ?? 0)))}%` }} />
           </div>
-          <span className="text-xs font-semibold text-slate-600">{project.progress_percent ?? 0}%</span>
+          <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-600">{project.progress_percent ?? 0}%</span>
         </div>
       </div>
-      <div className="text-sm text-slate-600">
+      <div className="whitespace-nowrap text-sm tabular-nums text-slate-600">
         <span className="font-medium text-slate-500 lg:hidden">Ngày tạo: </span>
         {dateText(project.created_at)}
       </div>

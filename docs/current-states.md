@@ -1,5 +1,21 @@
 # Current States
 
+## [Active] Project Explorer Default Collapsed
+
+### Will be done
+
+- Keep every `/projects` explorer row collapsed on initial load and whenever a new loaded page has no still-visible manually expanded project.
+- Preserve the existing manual multi-row expand/collapse interaction and retain manually expanded project IDs across authoritative refetches while those IDs remain visible.
+- Add focused frontend regression coverage, update the frontend/project-planning maps, and run non-browser frontend tests/build.
+
+### Done
+
+- Confirmed from the supplied Edge screenshot and current source that the explorer effect automatically expands `rows[0].id` whenever no expanded project remains visible.
+- Produced the review package and Mockup as Text, then received explicit `OK triển khai` approval for the default-collapsed behavior across initial load, search, filter and pagination changes.
+- Removed the first-row fallback while preserving project-ID-based manual multi-row expansion and pruning only IDs that disappear from the authoritative loaded page.
+- Added focused source-contract regression coverage and updated the frontend/project-planning maps for the new user-controlled default-collapsed contract. Backend/API/database behavior remains unchanged.
+- Technically verified the current frontend source with the focused explorer test (3/3), the complete frontend suite (105/105), the TypeScript/Vite production build and `git diff --check`. Browser/UAT was not requested and remains `NOT UX ACCEPTED`.
+
 ## [Active] Actionable Work Item Completion Requirements
 
 ### Will be done

@@ -20,3 +20,10 @@ test('project explorer invalidates browser cache locally and across the authenti
   assert.match(source, /staleTime: 0/);
   assert.match(source, /refetchInterval: streamStatus === 'connected' \? false : 60_000/);
 });
+
+test('project explorer stays collapsed until the user explicitly expands a visible project', () => {
+  assert.match(source, /const \[expandedProjectIds, setExpandedProjectIds\] = useState<Set<string>>\(new Set\(\)\)/);
+  assert.match(source, /const retained = new Set\(Array\.from\(current\)\.filter\(\(projectID\) => visible\.has\(projectID\)\)\)/);
+  assert.match(source, /return retained;/);
+  assert.doesNotMatch(source, /new Set\(\[rows\[0\]\.id\]\)/);
+});
