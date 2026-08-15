@@ -38,7 +38,7 @@ test('work-item secondary content uses progressive disclosure', async () => {
 
   assert.match(formPanel, /setFieldsOpen\(!submitted\)/);
   assert.match(formPanel, /setDocumentsOpen\(submitted\)/);
-  assert.match(formPanel, /Mở sau khi chốt hồ sơ để ký, đóng dấu hoặc tạo PDF/);
+  assert.match(formPanel, /Hoàn tất bước 1 để ký, đóng dấu hoặc tạo PDF/);
   assert.match(formPanel, /<details className="group rounded-md border border-line bg-white">/);
 
   assert.match(projectWorkspace, /\{nodes\.map\(\(node, index\) => \(/);
@@ -46,6 +46,31 @@ test('work-item secondary content uses progressive disclosure', async () => {
   assert.doesNotMatch(projectWorkspace, /showAllNodes/);
   assert.doesNotMatch(projectWorkspace, /Xem toàn bộ quy trình/);
   assert.doesNotMatch(projectWorkspace, /Thu gọn về giai đoạn hiện tại/);
+});
+
+test('workflow form uses one integrated vertical process card for its real sections', async () => {
+  const formPanel = await source('../src/modules/work-items/WorkflowFormPanel.tsx');
+
+  assert.match(formPanel, /<ol[\s\S]*data-workflow-process="two-step"[\s\S]*overflow-hidden rounded-lg border/);
+  assert.match(formPanel, /<li[\s\S]*data-workflow-step="content"[\s\S]*aria-current=\{!submitted \? 'step' : undefined\}/);
+  assert.match(formPanel, /<li[\s\S]*data-workflow-step="documents"[\s\S]*aria-current=\{submitted \? 'step' : undefined\}/);
+  assert.match(formPanel, /data-workflow-step-rail/);
+  assert.match(formPanel, /data-workflow-process-line="content-to-documents"/);
+  assert.doesNotMatch(formPanel, /ArrowDown/);
+  assert.match(formPanel, /grid-cols-\[2\.25rem_minmax\(0,1fr\)\][\s\S]*sm:grid-cols-\[2\.75rem_minmax\(0,1fr\)\]/);
+  assert.doesNotMatch(formPanel, /className="flex h-8 items-center pl-\[1\.125rem\]"/);
+  assert.doesNotMatch(formPanel, /WorkflowFormSequence/);
+  assert.doesNotMatch(formPanel, /ArrowRight/);
+  assert.match(formPanel, /disabled=\{!submitted\}/);
+  assert.match(formPanel, /Hoàn tất bước 1 để ký, đóng dấu hoặc tạo PDF\./);
+  assert.match(formPanel, /Đã chốt/);
+  assert.match(formPanel, /validationIssues\.length[\s\S]*cần xử lý/);
+
+  const step1Index = formPanel.indexOf('aria-hidden="true">1</span>');
+  const processLineIndex = formPanel.indexOf('data-workflow-process-line="content-to-documents"');
+  const step2Index = formPanel.indexOf('aria-hidden="true">2</span>');
+  assert.ok(step1Index !== -1 && processLineIndex !== -1 && step2Index !== -1);
+  assert.ok(step1Index < processLineIndex && processLineIndex < step2Index);
 });
 
 test('upcoming workflow forms keep the primary layout while remaining read-only', async () => {
