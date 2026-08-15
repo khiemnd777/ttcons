@@ -10,9 +10,13 @@ test('completion requirement rows expose keyboard actions and explicit instructi
   const detail = await source('../src/modules/work-items/WorkItemDetailDialog.tsx');
 
   assert.match(detail, /<button[\s\S]*onClick=\{\(\) => onNavigate\(navigationTarget\)\}/);
-  assert.match(detail, /<span className="font-semibold">Cách xử lý:<\/span>/);
+  assert.match(detail, /row\.kind === 'permission' \? 'Khi không thể thao tác:' : 'Cách xử lý:'/);
   assert.match(detail, /focus-visible:ring-2/);
   assert.match(detail, /permissionRequirementPresentation\(item\)/);
+  assert.match(detail, /if \(kind === 'permission'\) return <Shield className="[^"]*text-blue-600"/);
+  assert.match(detail, /label: 'Quyền thao tác'/);
+  assert.match(detail, /kind: 'permission'/);
+  assert.match(detail, /Thông tin truy cập/);
   assert.doesNotMatch(detail, /Yêu cầu quyền: \$\{requirement\.required_permission\}/);
 });
 

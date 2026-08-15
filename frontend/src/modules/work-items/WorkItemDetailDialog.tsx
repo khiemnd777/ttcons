@@ -12,6 +12,7 @@ import {
   Loader2,
   MessageSquare,
   Save,
+  Shield,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -606,6 +607,7 @@ type RequirementRow = {
   guidance: string;
   actionLabel?: string;
   target?: WorkItemRequirementNavigationTarget;
+  kind?: 'permission';
   state: RequirementState;
 };
 
@@ -678,12 +680,19 @@ function WorkItemRequirementPanel({
           const navigationTarget = row.target;
           const content = (
             <>
-              <RequirementIcon state={row.state} />
+              <RequirementIcon state={row.state} kind={row.kind} />
               <div className="min-w-0 flex-1 text-left">
-                <p className="text-sm font-semibold text-ink">{row.label}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-ink">{row.label}</p>
+                  {row.kind === 'permission' ? (
+                    <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+                      Thông tin truy cập
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-0.5 text-xs leading-5 text-slate-600">{row.description}</p>
                 <p className="mt-1 text-xs leading-5 text-slate-700">
-                  <span className="font-semibold">Cách xử lý:</span> {row.guidance}
+                  <span className="font-semibold">{row.kind === 'permission' ? 'Khi không thể thao tác:' : 'Cách xử lý:'}</span> {row.guidance}
                 </p>
               </div>
               {navigationTarget && row.actionLabel ? (
@@ -1151,7 +1160,8 @@ function MetaPill({ icon, label }: { icon: ReactNode; label: string }) {
   );
 }
 
-function RequirementIcon({ state }: { state: RequirementState }) {
+function RequirementIcon({ state, kind }: { state: RequirementState; kind?: RequirementRow['kind'] }) {
+  if (kind === 'permission') return <Shield className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />;
   if (state === 'done') return <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />;
   if (state === 'blocked') return <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />;
   if (state === 'warning') return <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />;
@@ -1262,9 +1272,10 @@ function buildRequirementRows(
     const permissionPresentation = permissionRequirementPresentation(item);
     rows.push({
       id: 'permission',
-      label: 'Quyền xử lý',
+      label: 'Quyền thao tác',
       description: permissionPresentation.description,
       guidance: permissionPresentation.guidance,
+      kind: 'permission',
       state: 'neutral',
     });
   }

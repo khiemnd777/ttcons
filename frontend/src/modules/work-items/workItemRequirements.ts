@@ -26,26 +26,22 @@ function cleanPresentationText(value: unknown) {
   return typeof value === 'string' ? value.trim().replace(/[.!?]+$/u, '') : '';
 }
 
-function lowerFirst(value: string) {
-  return value ? `${value.charAt(0).toLocaleLowerCase('vi-VN')}${value.slice(1)}` : value;
-}
-
 export function permissionRequirementPresentation(item: WorkItem): PermissionRequirementPresentation {
   const permissionName = cleanPresentationText(item.required_permission_name);
   const permissionDescription = cleanPresentationText(item.required_permission_description);
 
   if (!permissionName) {
     return {
-      description: 'Yêu cầu: Quyền thao tác đầu việc.',
+      description: 'Cần quyền thao tác đầu việc.',
       guidance: 'Liên hệ Quản lý dự án hoặc Admin để kiểm tra quyền cần cấp.',
     };
   }
 
   return {
-    description: `Yêu cầu: ${permissionName}.`,
+    description: `Cần quyền: ${permissionName}.`,
     guidance: permissionDescription
-      ? `Quyền này cho phép ${lowerFirst(permissionDescription)}. Nếu chưa được cấp, liên hệ Quản lý dự án hoặc Admin.`
-      : 'Nếu chưa được cấp, liên hệ Quản lý dự án hoặc Admin.',
+      ? `Liên hệ Quản lý dự án hoặc Admin để kiểm tra quyền. Phạm vi quyền: ${permissionDescription}.`
+      : 'Liên hệ Quản lý dự án hoặc Admin để kiểm tra quyền.',
   };
 }
 

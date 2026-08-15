@@ -150,10 +150,10 @@ test('presents a work-item permission with source-backed Vietnamese metadata', (
     required_permission_description: 'Cập nhật nội dung kế hoạch được phân công',
   }));
 
-  assert.equal(presentation.description, 'Yêu cầu: Cập nhật kế hoạch.');
+  assert.equal(presentation.description, 'Cần quyền: Cập nhật kế hoạch.');
   assert.equal(
     presentation.guidance,
-    'Quyền này cho phép cập nhật nội dung kế hoạch được phân công. Nếu chưa được cấp, liên hệ Quản lý dự án hoặc Admin.',
+    'Liên hệ Quản lý dự án hoặc Admin để kiểm tra quyền. Phạm vi quyền: Cập nhật nội dung kế hoạch được phân công.',
   );
   assert.doesNotMatch(`${presentation.description} ${presentation.guidance}`, /planning\.edit/);
 });
@@ -164,7 +164,7 @@ test('hides an unknown permission key behind actionable generic guidance', () =>
   }));
 
   assert.deepEqual(presentation, {
-    description: 'Yêu cầu: Quyền thao tác đầu việc.',
+    description: 'Cần quyền thao tác đầu việc.',
     guidance: 'Liên hệ Quản lý dự án hoặc Admin để kiểm tra quyền cần cấp.',
   });
   assert.doesNotMatch(`${presentation.description} ${presentation.guidance}`, /future\.unknown/);
