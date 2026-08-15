@@ -25,7 +25,7 @@ import { get, post } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import { useToast } from '../../components/ToastProvider';
-import type { ActivityPayload, EvidenceRecord, ProjectActivityOptions, WorkItem, WorkItemActivity, WorkItemStartRequirement } from '../../lib/types/domain';
+import type { ActivityPayload, EvidenceRecord, ProjectActivityOptions, WorkflowFormDetail, WorkItem, WorkItemActivity, WorkItemStartRequirement } from '../../lib/types/domain';
 import { ActivityAttachments } from './ActivityAttachments';
 import { ActivityReactionBar, ActivityReplyQuote } from './ActivityConversationMeta';
 import { ActivityComposer, type ActivityAttachmentOption, type ActivityMentionOption } from './ActivityComposer';
@@ -39,6 +39,7 @@ import {
 } from './WorkItemPrimarySurface';
 import {
   WorkflowFormPanel,
+  WorkflowFormEventsPanel,
   type WorkflowFormActionHandle,
   type WorkflowFormActionState,
 } from './WorkflowFormPanel';
@@ -598,6 +599,7 @@ function SkippedWorkItemHistory({ activities, evidence }: { activities: WorkItem
 }
 
 type SupportTabKey = 'evidence' | 'activity' | 'form';
+type ActivityHistoryFilter = 'all' | 'discussion' | 'form';
 type RequirementState = 'done' | 'warning' | 'blocked' | 'neutral';
 
 type RequirementRow = {
@@ -937,10 +939,24 @@ function WorkItemSupportingTabs({
   readOnly: boolean;
   onSubmitActivity: (payload: ActivityPayload) => Promise<void>;
 }) {
-  const [selectedTab, setSelectedTab] = useState<SupportTabKey>('evidence');
+  const [selectedTab, setSelectedTab] = useState<SupportTabKey>('activity');
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
   const pendingEvidence = evidence.filter((record) => ['draft', 'submitted', 'pending'].includes(String(record.status)));
+  const hasWorkflowForm = hasWorkflowFormSummary(item);
+  const workflowFormHistory = useQuery({
+    queryKey: ['work-item-form', item.id],
+    queryFn: () => get<WorkflowFormDetail>(`/work-items/${item.id}/form`),
+    enabled: hasWorkflowForm,
+    retry: false,
+  });
+  const workflowFormEvents = workflowFormHistory.data?.events ?? [];
   const tabs: Array<{ id: SupportTabKey; label: string; count?: number; status?: string; description: string }> = [];
+  tabs.push({
+    id: 'activity',
+    label: 'Trao đổi & lịch sử',
+    count: activities.length,
+    description: activities[0] ? `Mới nhất ${compactDateTime(activities[0].created_at)}` : 'Chưa có hoạt động',
+  });
   if (readOnly || !primarySurfaceKind || !primarySurfaceUsesEvidence(primarySurfaceKind)) {
     tabs.push({
       id: 'evidence',
@@ -949,13 +965,7 @@ function WorkItemSupportingTabs({
       description: pendingEvidence.length ? `${pendingEvidence.length} đang chờ` : 'Sẵn sàng',
     });
   }
-  tabs.push({
-    id: 'activity',
-    label: 'Trao đổi & lịch sử',
-    count: activities.length,
-    description: activities[0] ? `Mới nhất ${compactDateTime(activities[0].created_at)}` : 'Chưa có hoạt động',
-  });
-  if (hasWorkflowFormSummary(item) && (!primarySurfaceKind || !primarySurfaceUsesWorkflowForm(primarySurfaceKind))) {
+  if (hasWorkflowForm && (!primarySurfaceKind || !primarySurfaceUsesWorkflowForm(primarySurfaceKind))) {
     tabs.push({
       id: 'form',
       label: 'Hồ sơ / PDF',
@@ -964,6 +974,10 @@ function WorkItemSupportingTabs({
     });
   }
   const activeTab = tabs.some((tab) => tab.id === selectedTab) ? selectedTab : tabs[0]?.id ?? 'activity';
+
+  useEffect(() => {
+    setSelectedTab('activity');
+  }, [item.id]);
 
   useEffect(() => {
     if (!navigationRequest) return;
@@ -1011,11 +1025,17 @@ function WorkItemSupportingTabs({
         {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} /> : null}
         {activeTab === 'activity' ? (
           <WorkItemActivityPanel
+            key={item.id}
             activities={activities}
             attachmentOptions={attachmentOptions}
             mentionOptions={mentionOptions}
             submitting={activitySubmitting}
             readOnly={readOnly}
+            workflowFormHistoryAvailable={hasWorkflowForm}
+            workflowFormEvents={workflowFormEvents}
+            workflowFormHistoryLoading={workflowFormHistory.isLoading}
+            workflowFormHistoryError={workflowFormHistory.isError}
+            onRetryWorkflowFormHistory={() => void workflowFormHistory.refetch()}
             onSubmit={onSubmitActivity}
           />
         ) : null}
@@ -1031,6 +1051,11 @@ function WorkItemActivityPanel({
   mentionOptions,
   submitting,
   readOnly,
+  workflowFormHistoryAvailable,
+  workflowFormEvents,
+  workflowFormHistoryLoading,
+  workflowFormHistoryError,
+  onRetryWorkflowFormHistory,
   onSubmit,
 }: {
   activities: WorkItemActivity[];
@@ -1038,10 +1063,23 @@ function WorkItemActivityPanel({
   mentionOptions: ActivityMentionOption[];
   submitting: boolean;
   readOnly: boolean;
+  workflowFormHistoryAvailable: boolean;
+  workflowFormEvents: Record<string, unknown>[];
+  workflowFormHistoryLoading: boolean;
+  workflowFormHistoryError: boolean;
+  onRetryWorkflowFormHistory: () => void;
   onSubmit: (payload: ActivityPayload) => Promise<void>;
 }) {
   const [composerOpen, setComposerOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<ActivityHistoryFilter>('all');
   const latestActivity = activities[0];
+  const discussionActivities = activities.filter((activity) => ['comment', 'blocker', 'question', 'decision', 'reminder', 'file_note'].includes(activity.activity_type));
+  const visibleActivities = historyFilter === 'discussion' ? discussionActivities : activities;
+  const filters: Array<{ id: ActivityHistoryFilter; label: string; count: number }> = [
+    { id: 'all', label: 'Tất cả', count: activities.length },
+    { id: 'discussion', label: 'Trao đổi', count: discussionActivities.length },
+  ];
+  if (workflowFormHistoryAvailable) filters.push({ id: 'form', label: 'Hồ sơ', count: workflowFormEvents.length });
   return (
     <section className="space-y-3">
       <div className="flex flex-col gap-3 rounded-md border border-line bg-slate-50 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1055,7 +1093,10 @@ function WorkItemActivityPanel({
         {!readOnly ? <button
           type="button"
           className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-          onClick={() => setComposerOpen((current) => !current)}
+          onClick={() => {
+            if (!composerOpen) setHistoryFilter('discussion');
+            setComposerOpen((current) => !current);
+          }}
         >
           <MessageSquare className="h-4 w-4" />
           {composerOpen ? 'Ẩn ô nhập' : 'Ghi hoạt động'}
@@ -1073,14 +1114,48 @@ function WorkItemActivityPanel({
         />
       ) : null}
 
-      {activities.length ? (
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Lọc trao đổi và lịch sử">
+        {filters.map((filter) => (
+          <button
+            key={filter.id}
+            type="button"
+            aria-pressed={historyFilter === filter.id}
+            className={clsx(
+              'inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-semibold transition',
+              historyFilter === filter.id
+                ? 'border-blue-200 bg-blue-50 text-blue-700'
+                : 'border-line bg-white text-slate-600 hover:bg-slate-50 hover:text-ink',
+            )}
+            onClick={() => {
+              setHistoryFilter(filter.id);
+              if (filter.id === 'form') setComposerOpen(false);
+            }}
+          >
+            {filter.label}
+            <span className="rounded-full bg-white px-1.5 py-0.5 text-[11px] text-slate-600 ring-1 ring-inset ring-line">{filter.count}</span>
+          </button>
+        ))}
+      </div>
+
+      {historyFilter === 'form' ? (
+        workflowFormHistoryLoading ? <LoadingSpinner />
+          : workflowFormHistoryError ? (
+            <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-800">
+              <p className="font-semibold">Không tải được lịch sử hồ sơ</p>
+              <button type="button" className="mt-2 rounded-md border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100" onClick={onRetryWorkflowFormHistory}>
+                Thử lại
+              </button>
+            </div>
+          ) : workflowFormEvents.length ? <WorkflowFormEventsPanel events={workflowFormEvents} />
+            : <EmptyState title="Chưa có sự kiện hồ sơ" />
+      ) : visibleActivities.length ? (
         <div className="space-y-2">
-          {activities.map((activity) => (
+          {visibleActivities.map((activity) => (
             <ActivityTimelineItem key={activity.id} activity={activity} />
           ))}
         </div>
       ) : (
-        <EmptyState title="Chưa có hoạt động cho đầu việc này" />
+        <EmptyState title={historyFilter === 'discussion' ? 'Chưa có trao đổi cho đầu việc này' : 'Chưa có hoạt động cho đầu việc này'} />
       )}
     </section>
   );

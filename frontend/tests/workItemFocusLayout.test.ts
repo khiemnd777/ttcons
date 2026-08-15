@@ -39,13 +39,37 @@ test('work-item secondary content uses progressive disclosure', async () => {
   assert.match(formPanel, /setFieldsOpen\(!submitted\)/);
   assert.match(formPanel, /setDocumentsOpen\(submitted\)/);
   assert.match(formPanel, /Hoàn tất bước 1 để ký, đóng dấu hoặc tạo PDF/);
-  assert.match(formPanel, /<details className="group rounded-md border border-line bg-white">/);
+  assert.doesNotMatch(formPanel, /form\.data\.events\?\.length \? <WorkflowFormEventsPanel/);
 
   assert.match(projectWorkspace, /\{nodes\.map\(\(node, index\) => \(/);
   assert.doesNotMatch(projectWorkspace, /visibleNodeEntries/);
   assert.doesNotMatch(projectWorkspace, /showAllNodes/);
   assert.doesNotMatch(projectWorkspace, /Xem toàn bộ quy trình/);
   assert.doesNotMatch(projectWorkspace, /Thu gọn về giai đoạn hiện tại/);
+});
+
+test('activity and form history lead the supporting tabs without interrupting the form process', async () => {
+  const detail = await source('../src/modules/work-items/WorkItemDetailDialog.tsx');
+  const formPanel = await source('../src/modules/work-items/WorkflowFormPanel.tsx');
+
+  assert.match(detail, /useState<SupportTabKey>\('activity'\)/);
+  assert.match(detail, /setSelectedTab\('activity'\);[\s\S]*\[item\.id\]/);
+  assert.match(detail, /type ActivityHistoryFilter = 'all' \| 'discussion' \| 'form'/);
+  assert.match(detail, /\{ id: 'all', label: 'Tất cả'/);
+  assert.match(detail, /\{ id: 'discussion', label: 'Trao đổi'/);
+  assert.match(detail, /filters\.push\(\{ id: 'form', label: 'Hồ sơ'/);
+  assert.match(detail, /<WorkflowFormEventsPanel events=\{workflowFormEvents\}/);
+
+  const activityTabIndex = detail.indexOf("id: 'activity'");
+  const evidenceTabIndex = detail.indexOf("id: 'evidence'", activityTabIndex);
+  assert.ok(activityTabIndex !== -1 && evidenceTabIndex !== -1);
+  assert.ok(activityTabIndex < evidenceTabIndex);
+
+  const processIndex = formPanel.indexOf('data-workflow-process="two-step"');
+  const eventPanelIndex = formPanel.indexOf('export function WorkflowFormEventsPanel');
+  assert.ok(processIndex !== -1 && eventPanelIndex !== -1);
+  assert.ok(processIndex < eventPanelIndex);
+  assert.doesNotMatch(formPanel.slice(processIndex, eventPanelIndex), /WorkflowFormEventsPanel/);
 });
 
 test('workflow form uses one integrated vertical process card for its real sections', async () => {
@@ -82,7 +106,7 @@ test('upcoming workflow forms keep the primary layout while remaining read-only'
   assert.match(detail, /futureReadOnly && !primarySurface/);
   assert.match(detail, /readOnly=\{futureReadOnly\}/);
   assert.doesNotMatch(detail, /hasWorkflowFormSummary\(item\) && \(readOnly \|\| !primarySurfaceKind/);
-  assert.match(detail, /hasWorkflowFormSummary\(item\) && \(!primarySurfaceKind \|\| !primarySurfaceUsesWorkflowForm\(primarySurfaceKind\)\)/);
+  assert.match(detail, /hasWorkflowForm && \(!primarySurfaceKind \|\| !primarySurfaceUsesWorkflowForm\(primarySurfaceKind\)\)/);
 
   assert.match(primarySurface, /readOnly = false/);
   assert.match(primarySurface, /readOnly=\{readOnly\}/);
