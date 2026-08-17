@@ -1195,7 +1195,7 @@ function WorkItemSupportingTabs({
         aria-labelledby={`work-item-support-tab-${activeTab}`}
         className="bg-white p-4"
       >
-        {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} /> : null}
+        {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} variant="embedded" /> : null}
         {activeTab === 'activity' ? (
           <WorkItemActivityPanel
             key={item.id}

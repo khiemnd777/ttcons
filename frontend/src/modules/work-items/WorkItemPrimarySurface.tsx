@@ -319,7 +319,7 @@ function renderPrimaryPanel(
         />
       );
     case 'evidence':
-      return <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} navigationRequest={navigationRequest} />;
+      return <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} navigationRequest={navigationRequest} variant="primary" />;
     case 'approval':
       return <ApprovalPrimaryPanel item={item} evidence={evidence} navigationRequest={navigationRequest} />;
     case 'incoming_acceptance':

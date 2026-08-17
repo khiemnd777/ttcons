@@ -17,6 +17,7 @@ type EvidencePanelProps = {
   evidence: EvidenceRecord[];
   readOnly?: boolean;
   navigationRequest?: WorkItemRequirementNavigationRequest | null;
+  variant?: 'primary' | 'embedded';
 };
 
 type EvidenceUploadType = 'photo' | 'document';
@@ -28,6 +29,7 @@ export function EvidencePanel({
   evidence,
   readOnly = false,
   navigationRequest,
+  variant = 'embedded',
 }: EvidencePanelProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -133,7 +135,16 @@ export function EvidencePanel({
   }
 
   return (
-    <section ref={panelRef} tabIndex={-1} className="scroll-mt-24 space-y-3 rounded-md outline-none">
+    <section
+      ref={panelRef}
+      tabIndex={-1}
+      className={clsx(
+        'scroll-mt-24 space-y-3 outline-none',
+        variant === 'primary'
+          ? 'rounded-lg border border-line bg-white p-4 shadow-panel'
+          : 'rounded-md',
+      )}
+    >
       <div className="flex flex-col gap-3 rounded-md border border-line bg-slate-50 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sổ minh chứng</p>

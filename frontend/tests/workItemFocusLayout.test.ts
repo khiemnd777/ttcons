@@ -48,6 +48,20 @@ test('work-item secondary content uses progressive disclosure', async () => {
   assert.doesNotMatch(projectWorkspace, /Thu gọn về giai đoạn hiện tại/);
 });
 
+test('primary evidence has one visual section while the supporting tab stays embedded', async () => {
+  const detail = await source('../src/modules/work-items/WorkItemDetailDialog.tsx');
+  const primarySurface = await source('../src/modules/work-items/WorkItemPrimarySurface.tsx');
+  const evidencePanel = await source('../src/modules/work-items/EvidencePanel.tsx');
+
+  assert.match(primarySurface, /case 'evidence':[\s\S]*?<EvidencePanel[^>]*variant="primary"/);
+  assert.match(detail, /activeTab === 'evidence' \? <EvidencePanel[^>]*variant="embedded"/);
+  assert.match(evidencePanel, /variant = 'embedded'/);
+  assert.match(
+    evidencePanel,
+    /variant === 'primary'[\s\S]*?'rounded-lg border border-line bg-white p-4 shadow-panel'[\s\S]*?: 'rounded-md'/,
+  );
+});
+
 test('activity and form history lead the supporting tabs without interrupting the form process', async () => {
   const detail = await source('../src/modules/work-items/WorkItemDetailDialog.tsx');
   const formPanel = await source('../src/modules/work-items/WorkflowFormPanel.tsx');
