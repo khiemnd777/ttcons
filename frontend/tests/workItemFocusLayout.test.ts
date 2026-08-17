@@ -76,8 +76,8 @@ test('workflow form uses one integrated vertical process card for its real secti
   const formPanel = await source('../src/modules/work-items/WorkflowFormPanel.tsx');
 
   assert.match(formPanel, /<ol[\s\S]*data-workflow-process="two-step"[\s\S]*overflow-hidden rounded-lg border/);
-  assert.match(formPanel, /<li[\s\S]*data-workflow-step="content"[\s\S]*aria-current=\{!submitted \? 'step' : undefined\}/);
-  assert.match(formPanel, /<li[\s\S]*data-workflow-step="documents"[\s\S]*aria-current=\{submitted \? 'step' : undefined\}/);
+  assert.match(formPanel, /<li[\s\S]*data-workflow-step="content"[\s\S]*aria-current=\{!submitted \|\| amending \? 'step' : undefined\}/);
+  assert.match(formPanel, /<li[\s\S]*data-workflow-step="documents"[\s\S]*aria-current=\{submitted && !amending \? 'step' : undefined\}/);
   assert.match(formPanel, /data-workflow-step-rail/);
   assert.match(formPanel, /data-workflow-process-line="content-to-documents"/);
   assert.doesNotMatch(formPanel, /ArrowDown/);
@@ -85,7 +85,7 @@ test('workflow form uses one integrated vertical process card for its real secti
   assert.doesNotMatch(formPanel, /className="flex h-8 items-center pl-\[1\.125rem\]"/);
   assert.doesNotMatch(formPanel, /WorkflowFormSequence/);
   assert.doesNotMatch(formPanel, /ArrowRight/);
-  assert.match(formPanel, /disabled=\{!submitted\}/);
+  assert.match(formPanel, /disabled=\{!submitted \|\| amending\}/);
   assert.match(formPanel, /Hoàn tất bước 1 để ký, đóng dấu hoặc tạo PDF\./);
   assert.match(formPanel, /Đã chốt/);
   assert.match(formPanel, /validationIssues\.length[\s\S]*cần xử lý/);

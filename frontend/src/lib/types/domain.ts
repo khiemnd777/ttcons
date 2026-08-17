@@ -2147,6 +2147,9 @@ export type PlanningChecklistItem = AnyRecord & {
 
 export type WorkflowFormDetail = {
   available: boolean;
+  capabilities?: {
+    can_amend?: boolean;
+  };
   auto_advance_when_ready?: boolean;
   auto_transition?: AnyRecord & { status?: 'advanced' | 'blocked' | 'not_configured' | string; message?: string };
   instance?: AnyRecord & {
@@ -2224,6 +2227,7 @@ export type WorkflowFormSealApplication = ProjectOperationsRecord & {
   height_px: number;
   checksum_sha256: string;
   applied_at: string;
+  is_current_revision?: boolean;
 };
 
 export type WorkflowFormSignature = ProjectOperationsRecord & {
@@ -2245,6 +2249,7 @@ export type WorkflowFormSignature = ProjectOperationsRecord & {
   visual_file_size?: number;
   visual_checksum_sha256?: string;
   signed_at: string;
+  is_current_revision?: boolean;
 };
 
 export type WorkflowFormPDFConfirmationPreference = ProjectOperationsRecord & {
@@ -2284,6 +2289,7 @@ export type WorkflowFormPDFExport = ProjectOperationsRecord & {
   deletion_status?: '' | 'pending' | 'failed';
   acceptance_reference_count?: number;
   can_delete?: boolean;
+  is_current_revision?: boolean;
 };
 
 export type SubcontractorReconciliationItem = ProjectOperationsRecord & {

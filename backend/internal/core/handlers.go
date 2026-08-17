@@ -1193,6 +1193,20 @@ func (h *Handler) SubmitWorkflowForm(c *fiber.Ctx) error {
 	return response.OK(c, form)
 }
 
+func (h *Handler) AmendWorkflowForm(c *fiber.Ctx) error {
+	req := WorkflowFormAmendRequest{}
+	if len(c.Body()) > 0 {
+		if err := json.Unmarshal(c.Body(), &req); err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu chỉnh sửa hồ sơ nghiệp vụ không hợp lệ")
+		}
+	}
+	form, err := h.service.AmendWorkflowForm(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, form)
+}
+
 func (h *Handler) SignWorkflowForm(c *fiber.Ctx) error {
 	req := WorkflowFormSignRequest{}
 	if len(c.Body()) > 0 {

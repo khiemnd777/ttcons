@@ -553,6 +553,134 @@ BEGIN
   INTO actual;
   IF actual <> 0 THEN RAISE EXCEPTION 'Rev4 construction fixture 025 must begin without UAT-generated Operations records, got %',actual; END IF;
 
+  -- Rev6 lean-form runtime fixture: the intake decision is truthfully completed,
+  -- survey is current, and all later runtime work remains untouched.
+  SELECT count(*) INTO actual
+  FROM projects project
+  JOIN pipeline_runs run ON run.id=project.current_pipeline_run_id
+  JOIN pipeline_templates template ON template.id=run.template_id
+  JOIN pipeline_run_nodes current_node ON current_node.id=run.current_node_id
+  WHERE project.id='30000000-0000-0000-0000-000000000026'
+    AND project.code='GOLDEN-REV6-LEAN-001'
+    AND project.pipeline_template_id='40000000-0000-0000-0000-000000000025'
+    AND project.workflow_entry_mode='survey_required'
+    AND project.status='planning' AND project.progress_percent=2
+    AND run.id='42000000-0000-0000-0000-000000000026'
+    AND run.template_id='40000000-0000-0000-0000-000000000025'
+    AND run.engine_version=4 AND run.status='in_progress'
+    AND run.template_definition_hash=template.definition_hash
+    AND current_node.business_code='survey' AND current_node.status='in_progress';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Golden Rev6 lean project/run snapshot contract is invalid'; END IF;
+
+  SELECT count(*) INTO actual FROM project_members
+  WHERE project_id='30000000-0000-0000-0000-000000000026' AND active;
+  SELECT count(*) INTO expected
+  FROM staff
+  JOIN users actor ON actor.id=staff.user_id
+  JOIN user_roles actor_role ON actor_role.user_id=actor.id
+  JOIN roles role ON role.id=actor_role.role_id
+  WHERE actor.email IN (
+    'admin@consflow.local','pm@consflow.local','qs@consflow.local',
+    'accounting@consflow.local','supervisor@consflow.local','director@consflow.local',
+    'procurement@consflow.local','qaqc@consflow.local','design@consflow.local',
+    'sales@consflow.local','legal@consflow.local','contract@consflow.local'
+  );
+  IF actual <> expected THEN RAISE EXCEPTION 'Golden Rev6 project members: expected %, got %',expected,actual; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_nodes
+  WHERE project_id='30000000-0000-0000-0000-000000000026';
+  IF actual <> 15 THEN RAISE EXCEPTION 'Golden Rev6 runtime nodes: expected 15, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_nodes
+  WHERE project_id='30000000-0000-0000-0000-000000000026'
+    AND status='completed' AND business_code='project_intake';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Golden Rev6 intake node must be completed'; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_nodes
+  WHERE project_id='30000000-0000-0000-0000-000000000026'
+    AND status='pending' AND business_code NOT IN ('project_intake','survey');
+  IF actual <> 13 THEN RAISE EXCEPTION 'Golden Rev6 later pending nodes: expected 13, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_steps
+  WHERE project_id='30000000-0000-0000-0000-000000000026';
+  IF actual <> 51 THEN RAISE EXCEPTION 'Golden Rev6 runtime steps: expected 51, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM pipeline_run_steps run_step
+  JOIN pipeline_template_steps template_step ON template_step.id=run_step.template_step_id
+  WHERE run_step.project_id='30000000-0000-0000-0000-000000000026'
+    AND (
+      run_step.form_required<>template_step.form_required
+      OR run_step.form_version_id IS DISTINCT FROM template_step.form_version_id
+    );
+  IF actual <> 0 THEN RAISE EXCEPTION 'Golden Rev6 runtime form snapshots drift from Rev6 template: %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM work_items
+  WHERE project_id='30000000-0000-0000-0000-000000000026';
+  IF actual <> 51 THEN RAISE EXCEPTION 'Golden Rev6 work items: expected 51, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM work_items item
+  JOIN pipeline_run_steps step ON step.id=item.run_step_id
+  WHERE item.project_id='30000000-0000-0000-0000-000000000026'
+    AND item.status='completed' AND step.business_code='project_intake.confirm';
+  IF actual <> 1 THEN RAISE EXCEPTION 'Golden Rev6 intake work item must be completed'; END IF;
+
+  SELECT count(*) INTO actual
+  FROM work_items item
+  JOIN pipeline_run_nodes node ON node.id=item.run_node_id
+  WHERE item.project_id='30000000-0000-0000-0000-000000000026'
+    AND item.status='ready' AND node.business_code='survey';
+  IF actual <> 6 THEN RAISE EXCEPTION 'Golden Rev6 ready survey work items: expected 6, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM work_items
+  WHERE project_id='30000000-0000-0000-0000-000000000026' AND status='pending';
+  IF actual <> 44 THEN RAISE EXCEPTION 'Golden Rev6 pending work items: expected 44, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM workflow_form_instances
+  WHERE project_id='30000000-0000-0000-0000-000000000026';
+  IF actual <> 50 THEN RAISE EXCEPTION 'Golden Rev6 form instances: expected 50, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM workflow_form_instances instance
+  JOIN pipeline_run_steps step ON step.id=instance.run_step_id
+  WHERE instance.project_id='30000000-0000-0000-0000-000000000026'
+    AND step.business_code='project_intake.confirm'
+    AND instance.status='submitted' AND instance.current_revision=1
+    AND instance.answers_snapshot_json='{"entry_route":"survey_required"}'::jsonb
+    AND EXISTS (
+      SELECT 1
+      FROM workflow_form_answers answer
+      WHERE answer.instance_id=instance.id
+        AND answer.field_key='entry_route'
+        AND answer.value_json='"survey_required"'::jsonb
+        AND answer.revision_no=1
+    );
+  IF actual <> 1 THEN RAISE EXCEPTION 'Golden Rev6 submitted intake routing answer is invalid'; END IF;
+
+  SELECT count(*) INTO actual FROM workflow_form_instances
+  WHERE project_id='30000000-0000-0000-0000-000000000026'
+    AND status='draft' AND current_revision=0 AND answers_snapshot_json='{}'::jsonb;
+  IF actual <> 49 THEN RAISE EXCEPTION 'Golden Rev6 draft forms: expected 49, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM workflow_form_instances instance
+  JOIN workflow_form_versions version ON version.id=instance.form_version_id
+  WHERE instance.project_id='30000000-0000-0000-0000-000000000026'
+    AND version.schema_json->>'variant'='lean_capture_v2';
+  IF actual <> 43 THEN RAISE EXCEPTION 'Golden Rev6 lean form instances: expected 43, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM workflow_form_instances instance
+  JOIN workflow_form_versions version ON version.id=instance.form_version_id
+  JOIN workflow_form_fields field ON field.form_version_id=version.id
+  WHERE instance.project_id='30000000-0000-0000-0000-000000000026'
+    AND version.schema_json->>'variant'='lean_capture_v2'
+    AND field.field_key IN (
+      'scope_summary','work_result','linked_evidence_id','next_action','confirmed'
+    );
+  IF actual <> 0 THEN RAISE EXCEPTION 'Golden Rev6 lean runtime still exposes % universal fields',actual; END IF;
+
   SELECT
     (SELECT count(*) FROM evidence_records WHERE project_id='30000000-0000-0000-0000-000000000022') +
     (SELECT count(*) FROM documents WHERE project_id='30000000-0000-0000-0000-000000000022') +
@@ -594,7 +722,7 @@ SELECT
 FROM projects p
 WHERE p.code IN (
   'GOLDEN-REAL-001','GOLDEN-NO-DESIGN-001','GOLDEN-LIVE-001','GOLDEN-REV3-BOQ-001',
-  'GOLDEN-REV4-ENTRY-001','GOLDEN-REV4-CONSTRUCTION-001'
+  'GOLDEN-REV4-ENTRY-001','GOLDEN-REV4-CONSTRUCTION-001','GOLDEN-REV6-LEAN-001'
 )
 ORDER BY p.code;
 

@@ -140,8 +140,10 @@ func workflowFormPDFSnapshot(form Record) Record {
 }
 
 func selectWorkflowFormPDFConfirmations(form Record) (Record, Record) {
-	signatures := workflowPDFRecords(form["signatures"])
-	sealApplications := workflowPDFRecords(form["seal_applications"])
+	instance := workflowPDFRecord(form["instance"])
+	currentRevision := int(number(instance["current_revision"]))
+	signatures := workflowPDFRecordsForRevision(form["signatures"], currentRevision)
+	sealApplications := workflowPDFRecordsForRevision(form["seal_applications"], currentRevision)
 	preferences := workflowPDFRecords(form["pdf_confirmation_preferences"])
 
 	hasSignatures := map[string]bool{}
@@ -202,6 +204,20 @@ func selectWorkflowFormPDFConfirmations(form Record) (Record, Record) {
 		"seal_application_count": len(selectedSealApplications),
 	}
 	return selectedForm, selection
+}
+
+func workflowPDFRecordsForRevision(value any, revisionNo int) []Record {
+	records := workflowPDFRecords(value)
+	if revisionNo <= 0 {
+		return records
+	}
+	filtered := make([]Record, 0, len(records))
+	for _, record := range records {
+		if int(number(record["form_revision_no"])) == revisionNo {
+			filtered = append(filtered, record)
+		}
+	}
+	return filtered
 }
 
 func workflowFormPDFSealApplicationSnapshots(value any) []Record {
@@ -270,8 +286,9 @@ func buildWorkflowFormPDFDocument(form Record, context WorkflowFormPDFContext, p
 			continue
 		}
 		key := strings.TrimSpace(fmt.Sprint(field["field_key"]))
+		presentationField := workflowPDFPresentationField(strings.TrimSpace(fmt.Sprint(template["code"])), field)
 		entry := workflowFormPDFField{
-			Definition: field,
+			Definition: presentationField,
 			Label:      workflowPDFText(field["label"], key),
 			FieldType:  strings.TrimSpace(fmt.Sprint(field["field_type"])),
 			Value:      answers[key],
@@ -284,6 +301,29 @@ func buildWorkflowFormPDFDocument(form Record, context WorkflowFormPDFContext, p
 		}
 	}
 	return document, nil
+}
+
+func workflowPDFPresentationField(templateCode string, field Record) Record {
+	if templateCode != clientSiteRiskAssessmentFormCode || strings.TrimSpace(fmt.Sprint(field["field_key"])) != clientSiteRiskItemsFieldKey || strings.TrimSpace(fmt.Sprint(field["field_type"])) != "structured_list" {
+		return field
+	}
+	validation := workflowPDFRecord(field["validation_json"])
+	specs := workflowPDFRecords(validation["item_fields"])
+	filteredSpecs := make([]Record, 0, len(specs))
+	for _, spec := range specs {
+		if strings.TrimSpace(fmt.Sprint(spec["key"])) == clientSiteRiskCategoryFieldKey {
+			continue
+		}
+		filteredSpecs = append(filteredSpecs, spec)
+	}
+	if len(filteredSpecs) == len(specs) {
+		return field
+	}
+	presentationField := cloneWorkflowFormRecord(field)
+	presentationValidation := cloneWorkflowFormRecord(validation)
+	presentationValidation["item_fields"] = filteredSpecs
+	presentationField["validation_json"] = presentationValidation
+	return presentationField
 }
 
 func (r *workflowFormPDFRenderer) addPage(first bool) {

@@ -8,7 +8,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
-import { del, downloadBlob, get, post, postForm, put } from '../../lib/api/client';
+import { ApiError, del, downloadBlob, get, post, postForm, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import type { AnyRecord, EvidenceRecord, SealAsset, WorkflowFormDetail, WorkflowFormField, WorkflowFormPDFConfirmationPreference, WorkflowFormPDFExport, WorkflowFormSealApplication, WorkflowFormSignature } from '../../lib/types/domain';
 import { dateText, percent } from '../../lib/utils/format';
@@ -20,6 +20,7 @@ import { firstFocusableRequirementControl, revealWorkItemRequirementTarget } fro
 import { compactDateTime, isGenericWorkflowFormTemplate, workflowFormEventLabel, workflowFormStatusLabel, workflowFormTypeLabel } from './workItemPresentation';
 import { effectiveWorkflowCurrencyFields } from './workflowCurrencyFields';
 import { effectiveWorkflowFormFields } from './workflowFormRules';
+import { effectiveWorkflowStructuredListFields } from './workflowStructuredListFields';
 
 type FormErrors = Record<string, string>;
 
@@ -42,6 +43,9 @@ type ConfirmationPurposeGroup = {
 
 export type WorkflowFormActionState = {
   available: boolean;
+  canAmend: boolean;
+  amending: boolean;
+  amendmentSaving: boolean;
   submitted: boolean;
   readOnly: boolean;
   saving: boolean;
@@ -51,6 +55,7 @@ export type WorkflowFormActionState = {
   title: string;
   status: string;
   versionNo: number;
+  currentRevision: number;
   updatedAt?: string;
   submittedAt?: string;
 };
@@ -58,6 +63,9 @@ export type WorkflowFormActionState = {
 export type WorkflowFormActionHandle = {
   save: () => void;
   submit: () => void;
+  beginAmendment: (reason: string) => void;
+  saveAmendment: () => void;
+  cancelAmendment: () => void;
 };
 
 export function WorkflowFormPanel({
@@ -90,6 +98,8 @@ export function WorkflowFormPanel({
   const [signatureDetail, setSignatureDetail] = useState<WorkflowFormSignature | null>(null);
   const [sealApplicationDetail, setSealApplicationDetail] = useState<WorkflowFormSealApplication | null>(null);
   const [pdfDeleteCandidate, setPDFDeleteCandidate] = useState<WorkflowFormPDFExport | null>(null);
+  const [amending, setAmending] = useState(false);
+  const [amendmentReason, setAmendmentReason] = useState('');
   const [fieldsOpen, setFieldsOpen] = useState(true);
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const panelRef = useRef<HTMLElement | null>(null);
@@ -112,19 +122,28 @@ export function WorkflowFormPanel({
   });
 
   const fields = useMemo(
-    () => effectiveWorkflowCurrencyFields(form.data?.fields ?? [], form.data?.template?.code),
+    () => effectiveWorkflowStructuredListFields(
+      effectiveWorkflowCurrencyFields(form.data?.fields ?? [], form.data?.template?.code),
+      form.data?.template?.code,
+    ),
     [form.data?.fields, form.data?.template?.code],
   );
   const instance = form.data?.instance;
   const submitted = instance?.status === 'submitted';
+  const currentRevision = Number(instance?.current_revision ?? 0);
+  const canAmend = Boolean(form.data?.capabilities?.can_amend) && submitted && !readOnly;
   const businessFormTitle = workflowFormPanelTitle(
     instance?.title,
     form.data?.template?.code,
     form.data?.template?.name,
     instance?.form_type,
   );
-  const signatures = form.data?.signatures ?? [];
-  const sealApplications = form.data?.seal_applications ?? [];
+  const allSignatures = form.data?.signatures ?? [];
+  const allSealApplications = form.data?.seal_applications ?? [];
+  const signatures = allSignatures.filter((signature) => signature.is_current_revision ?? signature.form_revision_no === currentRevision);
+  const sealApplications = allSealApplications.filter((application) => application.is_current_revision ?? application.form_revision_no === currentRevision);
+  const historicalSignatures = allSignatures.filter((signature) => !(signature.is_current_revision ?? signature.form_revision_no === currentRevision));
+  const historicalSealApplications = allSealApplications.filter((application) => !(application.is_current_revision ?? application.form_revision_no === currentRevision));
   const pdfConfirmationPreferences = form.data?.pdf_confirmation_preferences ?? [];
   const pdfExports = form.data?.pdf_exports ?? [];
   const confirmationGroups = useMemo(
@@ -152,11 +171,21 @@ export function WorkflowFormPanel({
     () => activeFields.filter((field) => validateFieldValue(field, values[field.field_key])).map((field) => field.label),
     [activeFields, values],
   );
+  const amendmentHasChanges = useMemo(
+    () => !workflowFormAnswersEqual(values, form.data?.answers ?? {}),
+    [form.data?.answers, values],
+  );
 
   useEffect(() => {
+    if (amending) return;
     setValues(form.data?.answers ?? {});
     setErrors({});
-  }, [form.data?.answers, instance?.id]);
+  }, [amending, form.data?.answers, instance?.id]);
+
+  useEffect(() => {
+    setAmending(false);
+    setAmendmentReason('');
+  }, [instance?.id]);
 
   useEffect(() => {
     setFieldsOpen(!submitted);
@@ -255,6 +284,32 @@ export function WorkflowFormPanel({
       }
     },
     onError: (error) => toast.error('Không chốt được hồ sơ nghiệp vụ', error),
+  });
+
+  const amendForm = useMutation({
+    mutationFn: () => post<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/amend`, {
+      answers: values,
+      reason: amendmentReason,
+      expected_revision: currentRevision,
+    }),
+    onSuccess: (result) => {
+      queryClient.setQueryData<WorkflowFormDetail>(['work-item-form', workItemId], (current) => ({
+        ...result,
+        available: true,
+        capabilities: current?.capabilities,
+      }));
+      setAmending(false);
+      setAmendmentReason('');
+      invalidate();
+      toast.success('Đã lưu phiên bản chỉnh sửa và ghi lịch sử thay đổi');
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 409) {
+        toast.warn({ title: 'Hồ sơ đã có phiên bản mới', description: 'Nội dung đang nhập vẫn được giữ. Hãy sao chép phần cần thiết, huỷ chỉnh sửa rồi mở lại phiên bản mới nhất.' });
+        return;
+      }
+      toast.error('Không lưu được nội dung chỉnh sửa', error);
+    },
   });
 
   const signForm = useMutation({
@@ -362,9 +417,42 @@ export function WorkflowFormPanel({
     return true;
   }
 
+  function beginAmendment(reason: string) {
+    const normalizedReason = reason.trim();
+    if (!canAmend || !normalizedReason) return;
+    setValues(form.data?.answers ?? {});
+    setErrors({});
+    setAmendmentReason(normalizedReason);
+    setAmending(true);
+    setFieldsOpen(true);
+    setDocumentsOpen(false);
+  }
+
+  function cancelAmendment() {
+    if (amendForm.isPending) return;
+    setValues(form.data?.answers ?? {});
+    setErrors({});
+    setAmending(false);
+    setAmendmentReason('');
+    setFieldsOpen(false);
+    setDocumentsOpen(true);
+  }
+
+  function saveAmendment() {
+    if (!canAmend || !amending || amendForm.isPending) return;
+    if (!amendmentHasChanges) {
+      toast.warn({ title: 'Chưa có nội dung thay đổi', description: 'Hãy cập nhật ít nhất một thông tin trước khi lưu phiên bản mới.' });
+      return;
+    }
+    if (validateBeforeSubmit()) amendForm.mutate();
+  }
+
   const submitLabel = form.data?.auto_advance_when_ready ? 'Xác nhận và tiếp tục' : 'Chốt hồ sơ';
   const actionState = useMemo<WorkflowFormActionState>(() => ({
     available: Boolean(form.data?.available) && !form.isLoading && !form.isError,
+    canAmend,
+    amending,
+    amendmentSaving: amendForm.isPending,
     submitted,
     readOnly,
     saving: saveDraft.isPending,
@@ -374,9 +462,10 @@ export function WorkflowFormPanel({
     title: businessFormTitle,
     status: instance?.status ?? 'draft',
     versionNo: Number(form.data?.version?.version_no ?? 1),
+    currentRevision,
     updatedAt: instance?.updated_at,
     submittedAt: instance?.submitted_at,
-  }), [businessFormTitle, form.data?.available, form.data?.version?.version_no, form.isError, form.isLoading, instance?.status, instance?.submitted_at, instance?.updated_at, readOnly, saveDraft.isPending, submitForm.isPending, submitLabel, submitted, validationIssueLabels]);
+  }), [amendForm.isPending, amending, businessFormTitle, canAmend, currentRevision, form.data?.available, form.data?.version?.version_no, form.isError, form.isLoading, instance?.status, instance?.submitted_at, instance?.updated_at, readOnly, saveDraft.isPending, submitForm.isPending, submitLabel, submitted, validationIssueLabels]);
 
   useImperativeHandle(actionRef, () => ({
     save: () => {
@@ -385,7 +474,10 @@ export function WorkflowFormPanel({
     submit: () => {
       if (!readOnly && !submitted && form.data?.available && validateBeforeSubmit()) submitForm.mutate();
     },
-  }), [activeFields, form.data?.available, readOnly, submitted, values]);
+    beginAmendment,
+    saveAmendment,
+    cancelAmendment,
+  }), [activeFields, amendForm.isPending, amendmentHasChanges, amendmentReason, amending, canAmend, currentRevision, form.data?.answers, form.data?.available, readOnly, submitted, values]);
 
   useEffect(() => {
     if (externalActions) onActionStateChange?.(actionState);
@@ -434,7 +526,7 @@ export function WorkflowFormPanel({
     );
   }
 
-  const formActionPending = saveDraft.isPending || submitForm.isPending;
+  const formActionPending = saveDraft.isPending || submitForm.isPending || amendForm.isPending;
 
   return (
     <section ref={panelRef} tabIndex={-1} className="scroll-mt-24 space-y-3 rounded-md outline-none">
@@ -459,6 +551,13 @@ export function WorkflowFormPanel({
         />
       </div>
 
+      {amending ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="font-semibold">Đang chỉnh sửa · dự kiến phiên bản {currentRevision + 1}</p>
+          <p className="mt-1 text-xs leading-5">Lý do: {amendmentReason}. Chữ ký, con dấu và PDF tạm khóa cho đến khi lưu hoặc huỷ chỉnh sửa.</p>
+        </div>
+      ) : null}
+
       <div className="space-y-3">
         {!externalActions ? <WorkflowFormOperationsSummary
           submitted={submitted}
@@ -480,14 +579,16 @@ export function WorkflowFormPanel({
         >
           <li
             data-workflow-step="content"
-            aria-current={!submitted ? 'step' : undefined}
+            aria-current={!submitted || amending ? 'step' : undefined}
             className="grid grid-cols-[2.25rem_minmax(0,1fr)] sm:grid-cols-[2.75rem_minmax(0,1fr)]"
           >
             <div data-workflow-step-rail aria-hidden="true" className="relative flex justify-center bg-slate-50/80 pt-3">
               <span className={clsx(
                 'relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold sm:h-7 sm:w-7',
-                submitted
+                submitted && !amending
                   ? 'bg-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-200'
+                  : amending
+                    ? 'bg-amber-500 text-white shadow-sm'
                   : 'bg-blue-600 text-white shadow-sm',
               )} aria-hidden="true">1</span>
               <span
@@ -500,7 +601,9 @@ export function WorkflowFormPanel({
                 type="button"
                 className={clsx(
                   'flex w-full flex-col gap-2 px-3 py-3 text-left transition-colors sm:flex-row sm:items-center sm:justify-between',
-                  submitted
+                  amending
+                    ? 'bg-amber-50/60 hover:bg-amber-50'
+                    : submitted
                     ? 'bg-emerald-50/40 hover:bg-emerald-50/70'
                     : 'bg-blue-50/60 hover:bg-blue-50',
                 )}
@@ -512,7 +615,8 @@ export function WorkflowFormPanel({
                   <h4 className="mt-0.5 text-sm font-semibold text-ink">Thông tin nghiệp vụ</h4>
                 </div>
                 <span className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap sm:justify-end">
-                  {submitted ? <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">Đã chốt</span> : null}
+                  {amending ? <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">Đang chỉnh sửa · v{currentRevision + 1}</span> : null}
+                  {submitted && !amending ? <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">Đã chốt</span> : null}
                   {!submitted && validationIssues.length ? <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">{validationIssues.length} cần xử lý</span> : null}
                   {!submitted && !validationIssues.length ? <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">Sẵn sàng chốt</span> : null}
                   <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{activeFields.length} thông tin</span>
@@ -527,28 +631,28 @@ export function WorkflowFormPanel({
                     value={values[field.field_key]}
                     evidence={evidence}
                     error={errors[field.field_key]}
-                    disabled={readOnly || submitted || formActionPending}
-                    displayOnly={readOnly || submitted}
+                    disabled={readOnly || (submitted && !amending) || formActionPending}
+                    displayOnly={readOnly || (submitted && !amending)}
                     onChange={(value) => setFieldValue(field, value)}
                   />
                 ))}
               </div> : null}
               {fieldsOpen ? <div className="border-t border-line bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                {instance?.submitted_at ? `Chốt lúc ${compactDateTime(instance.submitted_at)}` : `Cập nhật ${compactDateTime(instance?.updated_at)}`}
+                {amending ? `Lý do chỉnh sửa: ${amendmentReason}` : instance?.submitted_at ? `Chốt lúc ${compactDateTime(instance.submitted_at)}` : `Cập nhật ${compactDateTime(instance?.updated_at)}`}
               </div> : null}
             </section>
           </li>
 
           <li
             data-workflow-step="documents"
-            aria-current={submitted ? 'step' : undefined}
+            aria-current={submitted && !amending ? 'step' : undefined}
             className="grid grid-cols-[2.25rem_minmax(0,1fr)] sm:grid-cols-[2.75rem_minmax(0,1fr)]"
           >
             <div data-workflow-step-rail aria-hidden="true" className="relative flex justify-center bg-slate-50/80 pt-3">
               <span className="absolute left-1/2 top-0 h-3 w-px -translate-x-1/2 bg-slate-300" />
               <span className={clsx(
                 'relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold sm:h-7 sm:w-7',
-                submitted
+                submitted && !amending
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'bg-slate-200 text-slate-500 ring-1 ring-inset ring-slate-300',
               )} aria-hidden="true">2</span>
@@ -558,21 +662,22 @@ export function WorkflowFormPanel({
                 type="button"
                 className={clsx(
                   'flex w-full flex-col gap-2 px-3 py-3 text-left transition-colors sm:flex-row sm:items-center sm:justify-between',
-                  submitted ? 'bg-blue-50/60 hover:bg-blue-50' : 'bg-slate-50 text-slate-500',
+                  submitted && !amending ? 'bg-blue-50/60 hover:bg-blue-50' : 'bg-slate-50 text-slate-500',
                   'disabled:cursor-not-allowed',
                 )}
-                aria-expanded={submitted && documentsOpen}
-                disabled={!submitted}
-                onClick={() => { if (submitted) setDocumentsOpen((current) => !current); }}
+                aria-expanded={submitted && !amending && documentsOpen}
+                disabled={!submitted || amending}
+                onClick={() => { if (submitted && !amending) setDocumentsOpen((current) => !current); }}
               >
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tài liệu nghiệp vụ</p>
                   <h4 className="mt-0.5 text-sm font-semibold text-ink">Xác nhận hồ sơ và PDF</h4>
                   {!submitted ? <p className="mt-1 text-xs text-slate-500">Hoàn tất bước 1 để ký, đóng dấu hoặc tạo PDF.</p> : null}
+                  {amending ? <p className="mt-1 text-xs text-amber-700">Tạm khóa khi đang chỉnh sửa nội dung hồ sơ.</p> : null}
                 </div>
                 <span className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
-                  {!submitted ? <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-600"><LockKeyhole className="h-3.5 w-3.5" /> Chưa mở</span> : null}
-                  {submitted ? documentsOpen ? <ChevronDown className="ml-auto h-4 w-4 text-slate-500 sm:ml-0" /> : <ChevronRight className="ml-auto h-4 w-4 text-slate-500 sm:ml-0" /> : null}
+                  {!submitted || amending ? <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-600"><LockKeyhole className="h-3.5 w-3.5" /> {amending ? 'Tạm khóa' : 'Chưa mở'}</span> : null}
+                  {submitted && !amending ? documentsOpen ? <ChevronDown className="ml-auto h-4 w-4 text-slate-500 sm:ml-0" /> : <ChevronRight className="ml-auto h-4 w-4 text-slate-500 sm:ml-0" /> : null}
                 </span>
               </button>
               {documentsOpen ? <div className="space-y-3 border-t border-line p-3">
@@ -611,6 +716,14 @@ export function WorkflowFormPanel({
                   onGenerate={() => { if (!readOnly) generatePDF.mutate(); }}
                   onOpen={(record) => void openWorkflowBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF hồ sơ nghiệp vụ')}
                   onRequestDelete={(record) => { if (!readOnly && record.can_delete) setPDFDeleteCandidate(record); }}
+                />
+                <WorkflowHistoricalConfirmations
+                  signatures={historicalSignatures}
+                  sealApplications={historicalSealApplications}
+                  onViewSignatureDetail={(signature) => setSignatureDetail(signature)}
+                  onOpenSignatureVisual={(signature) => void openWorkflowBlob(`/workflow-form-signatures/${signature.id}/visual`, 'Không mở được chữ ký')}
+                  onViewSealDetail={(application) => setSealApplicationDetail(application)}
+                  onOpenSealVisual={(application) => void openWorkflowBlob(`/workflow-form-seal-applications/${application.id}/visual`, 'Không mở được ảnh con dấu')}
                 />
               </div> : null}
             </section>
@@ -872,16 +985,49 @@ export function WorkflowFormEventsPanel({ events }: { events: AnyRecord[] }) {
         <p className="mt-1 text-xs text-slate-500">Các lần tạo, lưu, chốt, xác nhận và xuất PDF của hồ sơ nghiệp vụ.</p>
       </div>
       <div className="divide-y divide-line overflow-hidden rounded-md border border-line bg-white">
-        {events.slice(0, 5).map((event) => (
-          <article key={String(event.id)} className="px-3 py-2.5">
-            <p className="text-xs font-semibold text-ink">{workflowFormEventLabel(event.event_type)}</p>
-            <p className="mt-1 text-xs text-slate-500">{event.actor_name ?? 'Hệ thống'} · {compactDateTime(event.created_at)}</p>
-          </article>
-        ))}
+        {events.slice(0, 5).map((event) => {
+          const changes = workflowFormAmendmentChanges(event);
+          return (
+            <article key={String(event.id)} className="px-3 py-2.5">
+              <p className="text-xs font-semibold text-ink">{workflowFormEventLabel(event.event_type)}</p>
+              <p className="mt-1 text-xs text-slate-500">{event.actor_name ?? 'Hệ thống'} · {compactDateTime(event.created_at)}</p>
+              {event.event_type === 'amended' ? (
+                <div className="mt-2 rounded-md border border-amber-100 bg-amber-50 p-2 text-xs text-slate-700">
+                  <p className="font-semibold text-amber-900">Phiên bản {String(event.metadata_json?.from_revision ?? '?')} → {String(event.metadata_json?.to_revision ?? '?')}</p>
+                  <p className="mt-1"><span className="font-semibold">Lý do:</span> {String(event.metadata_json?.reason ?? event.comment ?? '-')}</p>
+                  {changes.length ? (
+                    <div className="mt-2 space-y-2">
+                      {changes.map((change) => (
+                        <div key={String(change.field_key)} className="rounded border border-amber-100 bg-white p-2">
+                          <p className="font-semibold text-ink">{String(change.field_label || change.field_key)}</p>
+                          <p className="mt-1 whitespace-pre-wrap break-words"><span className="font-semibold text-slate-500">Trước:</span> {workflowFormHistoryValue(change.before, change.before_present)}</p>
+                          <p className="mt-1 whitespace-pre-wrap break-words"><span className="font-semibold text-slate-500">Sau:</span> {workflowFormHistoryValue(change.after, change.after_present)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
       </div>
       {events.length > 5 ? <p className="text-xs text-slate-500">Đang hiển thị 5 sự kiện gần nhất.</p> : null}
     </section>
   );
+}
+
+function workflowFormAmendmentChanges(event: AnyRecord) {
+  const changes = event.metadata_json?.changed_fields;
+  return Array.isArray(changes) ? changes.filter((change): change is AnyRecord => Boolean(change && typeof change === 'object')) : [];
+}
+
+function workflowFormHistoryValue(value: unknown, present: unknown) {
+  if (present === false || value === undefined || value === null || value === '') return '—';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'boolean') return value ? 'Có' : 'Không';
+  if (typeof value === 'number') return String(value);
+  return JSON.stringify(value, null, 2);
 }
 
 function PlanningDailyReportSummary({ values, submitted }: { values: AnyRecord; submitted: boolean }) {
@@ -1254,6 +1400,10 @@ function textOrDash(value: unknown) {
   return text || '-';
 }
 
+function workflowFormAnswersEqual(left: AnyRecord, right: AnyRecord) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 const confirmationPurposeOrder = ['prepared_by', 'reviewed_by', 'approved_by', 'received_by', 'internal_ack'];
 
 function buildConfirmationPurposeGroups(
@@ -1541,6 +1691,58 @@ function ConfirmationEmpty({ text }: { text: string }) {
   return <div className="rounded-md border border-dashed border-line bg-white px-3 py-4 text-sm font-medium text-slate-500">{text}</div>;
 }
 
+function WorkflowHistoricalConfirmations({
+  signatures,
+  sealApplications,
+  onViewSignatureDetail,
+  onOpenSignatureVisual,
+  onViewSealDetail,
+  onOpenSealVisual,
+}: {
+  signatures: WorkflowFormSignature[];
+  sealApplications: WorkflowFormSealApplication[];
+  onViewSignatureDetail: (signature: WorkflowFormSignature) => void;
+  onOpenSignatureVisual: (signature: WorkflowFormSignature) => void;
+  onViewSealDetail: (application: WorkflowFormSealApplication) => void;
+  onOpenSealVisual: (application: WorkflowFormSealApplication) => void;
+}) {
+  if (!signatures.length && !sealApplications.length) return null;
+  return (
+    <details className="group rounded-md border border-line bg-slate-50">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold text-slate-700">
+        <span>Xác nhận phiên bản trước · {signatures.length} chữ ký · {sealApplications.length} con dấu</span>
+        <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+      </summary>
+      <div className="space-y-2 border-t border-line bg-white p-3">
+        {signatures.map((signature) => (
+          <div key={signature.id} className="flex flex-col gap-2 rounded-md border border-line bg-slate-50 p-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 text-xs text-slate-600">
+              <p className="font-semibold text-ink">Chữ ký · {signaturePurposeLabel(signature.purpose)}</p>
+              <p className="mt-1">Phiên bản {signature.form_revision_no} · {signature.signer_name} · {compactDateTime(signature.signed_at)}</p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <button type="button" className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100" onClick={() => onViewSignatureDetail(signature)}>Chi tiết</button>
+              {signature.visual_storage_key ? <button type="button" className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50" onClick={() => onOpenSignatureVisual(signature)}>Mở chữ ký</button> : null}
+            </div>
+          </div>
+        ))}
+        {sealApplications.map((application) => (
+          <div key={application.id} className="flex flex-col gap-2 rounded-md border border-line bg-slate-50 p-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 text-xs text-slate-600">
+              <p className="font-semibold text-ink">Con dấu · {signaturePurposeLabel(application.purpose)}</p>
+              <p className="mt-1">Phiên bản {application.form_revision_no} · {application.seal_asset_name} · {compactDateTime(application.applied_at)}</p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <button type="button" className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100" onClick={() => onViewSealDetail(application)}>Chi tiết</button>
+              <button type="button" className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50" onClick={() => onOpenSealVisual(application)}>Mở con dấu</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function SignatureDetailDialog({
   signature,
   onClose,
@@ -1734,7 +1936,10 @@ function WorkflowPDFExportPanel({
             <div key={record.id} className="rounded-md border border-line bg-slate-50 px-3 py-2">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">{record.file_name}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-ink">{record.file_name}</p>
+                    {record.is_current_revision === false ? <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">Phiên bản trước</span> : null}
+                  </div>
                   <p className="mt-1 text-xs text-slate-500">
                     Phiên bản {record.form_revision_no} · {compactDateTime(record.generated_at)} · sha256:{record.checksum_sha256.slice(0, 12)}
                   </p>

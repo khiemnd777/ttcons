@@ -33,10 +33,13 @@ migrate-check:
 seed: check-local-env
 	@if $(BACKEND_COMPOSE) ps --status running postgres >/dev/null 2>&1; then \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/seed.sql; \
+		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < migrations/V41__official_workflow_business_forms.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < migrations/V66__planning_construction_handoff.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < migrations/V85__official_client_workflow_rev3.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < migrations/V86__official_client_workflow_rev4.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < migrations/V87__rev4_quality_dossier_step_type.sql; \
+		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < migrations/V92__official_client_workflow_rev5_dynamic_intake.sql; \
+		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < migrations/V102__lean_official_workflow_forms.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/golden_project.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/golden_project_domains.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/golden_project_closure.sql; \
@@ -45,13 +48,17 @@ seed: check-local-env
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/golden_live_project.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/golden_client_workflow_rev3.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/golden_client_workflow_rev4_uat.sql; \
+		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/golden_client_workflow_rev6_lean.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/validate_golden_project.sql; \
 	else \
 		psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f seed/seed.sql \
+			-f migrations/V41__official_workflow_business_forms.sql \
 			-f migrations/V66__planning_construction_handoff.sql \
 			-f migrations/V85__official_client_workflow_rev3.sql \
 			-f migrations/V86__official_client_workflow_rev4.sql \
 			-f migrations/V87__rev4_quality_dossier_step_type.sql \
+			-f migrations/V92__official_client_workflow_rev5_dynamic_intake.sql \
+			-f migrations/V102__lean_official_workflow_forms.sql \
 			-f seed/golden_project.sql \
 			-f seed/golden_project_domains.sql \
 			-f seed/golden_project_closure.sql \
@@ -60,6 +67,7 @@ seed: check-local-env
 			-f seed/golden_live_project.sql \
 			-f seed/golden_client_workflow_rev3.sql \
 			-f seed/golden_client_workflow_rev4_uat.sql \
+			-f seed/golden_client_workflow_rev6_lean.sql \
 			-f seed/validate_golden_project.sql; \
 	fi; \
 	mkdir -p "$(STORAGE_PATH)"; \

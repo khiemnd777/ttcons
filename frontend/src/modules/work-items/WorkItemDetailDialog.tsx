@@ -11,6 +11,7 @@ import {
   FileCheck2,
   Loader2,
   MessageSquare,
+  PencilLine,
   Save,
   Shield,
   ShieldCheck,
@@ -124,6 +125,9 @@ export function WorkItemDetailWorkspace({
   const workflowFormActionRef = useRef<WorkflowFormActionHandle | null>(null);
   const [navigationRequest, setNavigationRequest] = useState<WorkItemRequirementNavigationRequest | null>(null);
   const [workflowFormActionState, setWorkflowFormActionState] = useState<WorkflowFormActionState | null>(null);
+  const [amendmentDialogOpen, setAmendmentDialogOpen] = useState(false);
+  const [amendmentReason, setAmendmentReason] = useState('');
+  const [amendmentReasonAttempted, setAmendmentReasonAttempted] = useState(false);
   const workDetail = useQuery({
     queryKey: ['work-item', selectedWorkId],
     queryFn: () => get<WorkItem>(`/work-items/${selectedWorkId}`),
@@ -256,6 +260,9 @@ export function WorkItemDetailWorkspace({
     setStartConfirmationOpen(false);
     setStartReason('');
     setStartReasonAttempted(false);
+    setAmendmentDialogOpen(false);
+    setAmendmentReason('');
+    setAmendmentReasonAttempted(false);
   }, [selectedWorkId]);
 
   const actions = permittedActions(detailItem);
@@ -274,12 +281,17 @@ export function WorkItemDetailWorkspace({
   const nextAction = detailItem ? resolveNextAction(detailItem, actions, primarySurface?.kind) : '';
   const latestActivity = activities[0];
   const skippedHistory = detailItem?.status === 'cancelled';
+  const showMobileWorkflowFormActions = Boolean(
+    workflowFormActionState?.available
+    && !workflowFormActionState.submitted
+    && !workflowFormActionState.readOnly,
+  );
   return (
     <>
       {workDetail.isLoading && !detailItem ? <LoadingSpinner /> : null}
       {workDetail.error && !detailItem ? <EmptyState title="Không tải được chi tiết đầu việc" /> : null}
       {detailItem ? (
-        <div className="space-y-4">
+        <div className={clsx('space-y-4', showMobileWorkflowFormActions && 'pb-20 xl:pb-0')}>
           <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} />
 
           {futureReadOnly ? (
@@ -366,6 +378,13 @@ export function WorkItemDetailWorkspace({
               onRunAction={runAction}
               onSaveWorkflowForm={() => workflowFormActionRef.current?.save()}
               onSubmitWorkflowForm={() => workflowFormActionRef.current?.submit()}
+              onRequestWorkflowFormAmendment={() => {
+                setAmendmentReason('');
+                setAmendmentReasonAttempted(false);
+                setAmendmentDialogOpen(true);
+              }}
+              onSaveWorkflowFormAmendment={() => workflowFormActionRef.current?.saveAmendment()}
+              onCancelWorkflowFormAmendment={() => workflowFormActionRef.current?.cancelAmendment()}
               onNavigateRequirement={navigateToRequirement}
               onClose={closeDialog}
               navigationRequest={navigationRequest}
@@ -373,6 +392,59 @@ export function WorkItemDetailWorkspace({
           </div>
         </div>
       ) : null}
+      <Dialog
+        open={amendmentDialogOpen}
+        title="Chỉnh sửa hồ sơ đã chốt?"
+        description={`Thao tác này sẽ tạo phiên bản ${Number(workflowFormActionState?.currentRevision ?? 0) + 1}. Trạng thái đầu việc và quy trình được giữ nguyên.`}
+        onClose={() => {
+          setAmendmentDialogOpen(false);
+          setAmendmentReasonAttempted(false);
+        }}
+        size="md"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => setAmendmentDialogOpen(false)}>
+              Huỷ
+            </button>
+            <button
+              type="button"
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              onClick={() => {
+                const reason = amendmentReason.trim();
+                if (!reason) {
+                  setAmendmentReasonAttempted(true);
+                  toast.warn({ title: 'Thiếu lý do chỉnh sửa', description: 'Nhập lý do để lịch sử thay đổi có đủ bối cảnh.' });
+                  return;
+                }
+                workflowFormActionRef.current?.beginAmendment(reason);
+                setAmendmentDialogOpen(false);
+                setAmendmentReason('');
+                setAmendmentReasonAttempted(false);
+              }}
+            >
+              Bắt đầu chỉnh sửa
+            </button>
+          </div>
+        )}
+      >
+        <label className="block text-sm font-semibold text-slate-700">
+          Lý do chỉnh sửa <span className="text-rose-600">*</span>
+          <textarea
+            className={clsx(
+              'mt-2 min-h-28 w-full rounded-md border bg-white px-3 py-2 text-sm font-normal outline-none focus:ring-2 focus:ring-blue-500',
+              amendmentReasonAttempted && !amendmentReason.trim() ? 'border-rose-400' : 'border-line',
+            )}
+            value={amendmentReason}
+            maxLength={1000}
+            onChange={(event) => {
+              setAmendmentReason(event.target.value);
+              if (event.target.value.trim()) setAmendmentReasonAttempted(false);
+            }}
+            placeholder="Ví dụ: Bổ sung phạm vi theo biên bản khảo sát ngày 17-08"
+          />
+        </label>
+        {amendmentReasonAttempted && !amendmentReason.trim() ? <p className="mt-1 text-xs font-medium text-rose-600">Lý do chỉnh sửa là bắt buộc.</p> : null}
+      </Dialog>
       <Dialog
         open={startConfirmationOpen}
         title="Bắt đầu công việc trước lượt?"
@@ -741,6 +813,9 @@ function WorkItemActionPanel({
   onRunAction,
   onSaveWorkflowForm,
   onSubmitWorkflowForm,
+  onRequestWorkflowFormAmendment,
+  onSaveWorkflowFormAmendment,
+  onCancelWorkflowFormAmendment,
   onNavigateRequirement,
   onClose,
   navigationRequest,
@@ -758,6 +833,9 @@ function WorkItemActionPanel({
   onRunAction: (action: WorkItemActionKey) => void;
   onSaveWorkflowForm: () => void;
   onSubmitWorkflowForm: () => void;
+  onRequestWorkflowFormAmendment: () => void;
+  onSaveWorkflowFormAmendment: () => void;
+  onCancelWorkflowFormAmendment: () => void;
   onNavigateRequirement: (target: WorkItemRequirementNavigationTarget) => void;
   onClose: () => void;
   navigationRequest: WorkItemRequirementNavigationRequest | null;
@@ -767,10 +845,16 @@ function WorkItemActionPanel({
     && !workflowFormActionState.submitted
     && !workflowFormActionState.readOnly,
   );
+  const workflowFormCanAmend = Boolean(workflowFormActionState?.available && workflowFormActionState.canAmend && !workflowFormActionState.amending);
+  const workflowFormIsAmending = Boolean(workflowFormActionState?.available && workflowFormActionState.amending);
   const formIssueCount = workflowFormActionState?.validationIssueLabels.length ?? 0;
   const primaryAction = workflowFormIsPrimary ? undefined : actions[0];
   const secondaryActions = workflowFormIsPrimary ? actions : actions.slice(1);
-  const panelNextAction = workflowFormIsPrimary
+  const panelNextAction = workflowFormIsAmending
+    ? `Lưu phiên bản chỉnh sửa ${workflowFormActionState?.currentRevision ? workflowFormActionState.currentRevision + 1 : ''}`.trim()
+    : workflowFormCanAmend
+      ? 'Hồ sơ đã chốt · Có thể chỉnh sửa'
+      : workflowFormIsPrimary
     ? formIssueCount
       ? `Hoàn tất ${formIssueCount} thông tin bắt buộc`
       : 'Chốt hồ sơ nghiệp vụ'
@@ -788,10 +872,14 @@ function WorkItemActionPanel({
         navigationRequest?.target.kind === 'workflow_form'
         && workflowFormIsPrimary
         && formIssueCount === 0
-      );
+    );
     if (!shouldRevealActionPanel) return undefined;
-    const submitButton = panelRef.current?.querySelector<HTMLElement>('[data-workflow-form-submit]') ?? null;
-    return revealWorkItemRequirementTarget(panelRef.current, submitButton ?? firstFocusableRequirementControl(panelRef.current));
+    const submitVariant = typeof window !== 'undefined' && window.matchMedia('(max-width: 1279px)').matches
+      ? 'mobile'
+      : 'desktop';
+    const submitButton = panelRef.current?.querySelector<HTMLElement>(`[data-workflow-form-submit="${submitVariant}"]`) ?? null;
+    const revealContainer = submitVariant === 'mobile' && submitButton ? submitButton : panelRef.current;
+    return revealWorkItemRequirementTarget(revealContainer, submitButton ?? firstFocusableRequirementControl(panelRef.current));
   }, [formIssueCount, navigationRequest?.requestId, navigationRequest?.target.kind, workflowFormIsPrimary]);
 
   return (
@@ -823,27 +911,14 @@ function WorkItemActionPanel({
           ) : null}
 
           {workflowFormIsPrimary ? (
-            <>
-              <button
-                type="button"
-                data-workflow-form-submit
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={workflowFormActionState?.saving || workflowFormActionState?.submitting}
-                onClick={onSubmitWorkflowForm}
-              >
-                {workflowFormActionState?.submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />}
-                {workflowFormActionState?.submitLabel ?? 'Chốt hồ sơ'}
-              </button>
-              <button
-                type="button"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={workflowFormActionState?.saving || workflowFormActionState?.submitting}
-                onClick={onSaveWorkflowForm}
-              >
-                {workflowFormActionState?.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Lưu nháp
-              </button>
-            </>
+            <div className="hidden xl:block">
+              <WorkflowFormPrimaryActions
+                state={workflowFormActionState}
+                variant="desktop"
+                onSave={onSaveWorkflowForm}
+                onSubmit={onSubmitWorkflowForm}
+              />
+            </div>
           ) : primaryAction ? (
             <ActionButton action={primaryAction} primary submitting={submitting} onRunAction={onRunAction} />
           ) : null}
@@ -882,6 +957,10 @@ function WorkItemActionPanel({
             </details>
           ) : null}
         </div>
+      ) : workflowFormCanAmend || workflowFormIsAmending ? (
+        <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-600">
+          {workflowFormIsAmending ? 'Kiểm tra nội dung rồi lưu phiên bản mới hoặc huỷ để giữ nguyên hồ sơ.' : 'Có thể tạo phiên bản mới mà không mở lại tiến độ quy trình.'}
+        </p>
       ) : (
         <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-600">Không có thao tác trực tiếp cho trạng thái hiện tại.</p>
       )}
@@ -900,6 +979,36 @@ function WorkItemActionPanel({
       </div>
 
       <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3">
+        {workflowFormIsAmending ? (
+          <>
+            <button
+              type="button"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={workflowFormActionState?.amendmentSaving}
+              onClick={onSaveWorkflowFormAmendment}
+            >
+              {workflowFormActionState?.amendmentSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Lưu chỉnh sửa
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={workflowFormActionState?.amendmentSaving}
+              onClick={onCancelWorkflowFormAmendment}
+            >
+              Huỷ chỉnh sửa
+            </button>
+          </>
+        ) : workflowFormCanAmend ? (
+          <button
+            type="button"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+            onClick={onRequestWorkflowFormAmendment}
+          >
+            <PencilLine className="h-4 w-4" />
+            Chỉnh sửa
+          </button>
+        ) : null}
         {item.project_id ? (
           <Link
             className="inline-flex items-center justify-center rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
@@ -912,7 +1021,71 @@ function WorkItemActionPanel({
           Đóng
         </button>
       </div>
+
+      {workflowFormIsPrimary ? (
+        <div
+          data-workflow-form-mobile-actions
+          className="fixed inset-x-3 bottom-3 z-50 rounded-lg border border-line bg-white/95 p-2 shadow-2xl backdrop-blur xl:hidden"
+          style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+        >
+          <WorkflowFormPrimaryActions
+            state={workflowFormActionState}
+            variant="mobile"
+            onSave={onSaveWorkflowForm}
+            onSubmit={onSubmitWorkflowForm}
+          />
+        </div>
+      ) : null}
     </aside>
+  );
+}
+
+function WorkflowFormPrimaryActions({
+  state,
+  variant,
+  onSave,
+  onSubmit,
+}: {
+  state: WorkflowFormActionState | null;
+  variant: 'desktop' | 'mobile';
+  onSave: () => void;
+  onSubmit: () => void;
+}) {
+  const disabled = Boolean(state?.saving || state?.submitting);
+  const saveButton = (
+    <button
+      type="button"
+      className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+      disabled={disabled}
+      onClick={onSave}
+    >
+      {state?.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+      Lưu nháp
+    </button>
+  );
+  const submitButton = (
+    <button
+      type="button"
+      data-workflow-form-submit={variant}
+      className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+      disabled={disabled}
+      onClick={onSubmit}
+    >
+      {state?.submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />}
+      {state?.submitLabel ?? 'Chốt hồ sơ'}
+    </button>
+  );
+
+  return variant === 'mobile' ? (
+    <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-2">
+      {saveButton}
+      {submitButton}
+    </div>
+  ) : (
+    <div className="space-y-2">
+      {submitButton}
+      {saveButton}
+    </div>
   );
 }
 

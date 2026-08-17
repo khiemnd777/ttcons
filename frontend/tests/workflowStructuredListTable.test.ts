@@ -117,7 +117,7 @@ test('structured list table keeps required-cell feedback and read-only presentat
   const table = functionSlice(panel, 'function StructuredListTable(', 'function StructuredDeleteButton(');
   const cell = functionSlice(panel, 'function StructuredCell(', 'function structuredCellDisplayValue(');
 
-  assert.match(panel, /displayOnly=\{readOnly \|\| submitted\}/);
+  assert.match(panel, /displayOnly=\{readOnly \|\| \(submitted && !amending\)\}/);
   assert.match(table, /structuredCellInvalid\(spec, row\[spec\.key\], invalid, checklist\)/);
   assert.match(table, /!displayOnly \? <StructuredDeleteButton/);
   assert.match(table, /!displayOnly \? \(/);

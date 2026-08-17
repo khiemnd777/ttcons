@@ -160,6 +160,7 @@ export function workflowFormEventLabel(value?: unknown) {
     draft_saved: 'Đã lưu nháp hồ sơ',
     submitted: 'Đã chốt hồ sơ',
     reopened: 'Đã mở lại hồ sơ',
+    amended: 'Đã chỉnh sửa hồ sơ',
     cancelled: 'Đã hủy hồ sơ',
     signed: 'Đã ký hồ sơ',
     seal_applied: 'Đã đóng dấu hồ sơ',

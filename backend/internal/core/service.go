@@ -2651,6 +2651,11 @@ func (s *Service) WorkItemForm(ctx context.Context, workItemID, actorID string) 
 		return nil, err
 	}
 	form["available"] = true
+	canAmend, err := s.canAmendWorkflowForm(ctx, form, actorID)
+	if err != nil {
+		return nil, err
+	}
+	form["capabilities"] = Record{"can_amend": canAmend}
 	if instance := recordFromAny(form["instance"]); len(instance) > 0 {
 		runNodeID := cleanID(instance["run_node_id"])
 		if runNodeID != "" {
@@ -2669,6 +2674,74 @@ func (s *Service) SaveWorkflowFormDraft(ctx context.Context, instanceID string, 
 
 func (s *Service) SubmitWorkflowForm(ctx context.Context, instanceID string, req WorkflowFormSaveRequest, actorID, actorName string) (Record, error) {
 	return s.saveWorkflowForm(ctx, instanceID, req, true, actorID, actorName)
+}
+
+func (s *Service) AmendWorkflowForm(ctx context.Context, instanceID string, req WorkflowFormAmendRequest, actorID, actorName string) (Record, error) {
+	instanceID = cleanID(instanceID)
+	if !validActivityUUID(instanceID) {
+		return nil, validationError("workflow_form_instance_id không hợp lệ", Record{"workflow_form_instance_id": instanceID})
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, validationError("Lý do chỉnh sửa hồ sơ nghiệp vụ là bắt buộc", Record{"field": "reason"})
+	}
+	if len([]rune(reason)) > 1000 {
+		return nil, validationError("Lý do chỉnh sửa không được vượt quá 1000 ký tự", Record{"field": "reason", "max_length": 1000})
+	}
+	if req.ExpectedRevision <= 0 {
+		return nil, validationError("Phiên bản hồ sơ cần chỉnh sửa không hợp lệ", Record{"expected_revision": req.ExpectedRevision})
+	}
+	form, err := s.repo.GetWorkflowFormInstanceDetail(ctx, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	instance := recordFromAny(form["instance"])
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return nil, validationError("Chỉ hồ sơ nghiệp vụ đã chốt mới được chỉnh sửa", Record{"status": instance["status"]})
+	}
+	canAmend, err := s.canAmendWorkflowForm(ctx, form, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !canAmend {
+		return nil, forbiddenError("Bạn không có quyền chỉnh sửa hồ sơ nghiệp vụ này")
+	}
+	fields := workflowAnswerRecordList(form["fields"])
+	normalized, err := s.validateWorkflowFormAnswers(ctx, instance, fields, req.Answers, true)
+	if err != nil {
+		return nil, err
+	}
+	updated, err := s.repo.AmendWorkflowForm(ctx, instanceID, normalized, reason, req.ExpectedRevision, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishWorkItemChanged(Record{"id": instance["work_item_id"], "project_id": instance["project_id"]}, actorID)
+	return updated, nil
+}
+
+func (s *Service) canAmendWorkflowForm(ctx context.Context, form Record, actorID string) (bool, error) {
+	instance := recordFromAny(form["instance"])
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return false, nil
+	}
+	workItemID := cleanID(instance["work_item_id"])
+	if workItemID == "" {
+		return false, nil
+	}
+	allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil || !allowed {
+		return false, err
+	}
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+	if err != nil {
+		return false, err
+	}
+	requirement := recordFromAny(item["evidence_requirement_json"])
+	requiredPermission := strings.TrimSpace(fmt.Sprint(requirement["required_permission"]))
+	if requiredPermission == "" || requiredPermission == "<nil>" {
+		return true, nil
+	}
+	return s.repo.UserHasAnyProjectPermission(ctx, actorID, cleanID(item["project_id"]), []string{requiredPermission})
 }
 
 func (s *Service) SubcontractorReconciliation(ctx context.Context, workItemID, actorID string) (Record, error) {
@@ -5193,10 +5266,7 @@ func (s *Service) ApplyWorkflowFormSeal(ctx context.Context, instanceID string, 
 	if err != nil {
 		return nil, err
 	}
-	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
-		return nil, err
-	}
-	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+	if err := s.requireWorkflowFormArtifactScope(ctx, item, instance, actorID); err != nil {
 		return nil, err
 	}
 	return s.repo.ApplyWorkflowFormSeal(ctx, instanceID, sealAssetID, purpose, comment, actorID, actorName)
@@ -5300,10 +5370,7 @@ func (s *Service) SignWorkflowForm(ctx context.Context, instanceID string, req W
 	if err != nil {
 		return nil, err
 	}
-	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
-		return nil, err
-	}
-	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+	if err := s.requireWorkflowFormArtifactScope(ctx, item, instance, actorID); err != nil {
 		return nil, err
 	}
 	imageBytes, imageMIME, err := parseSignatureImageDataURL(req.SignatureImageDataURL)
@@ -5350,16 +5417,17 @@ func (s *Service) SaveWorkflowFormPDFConfirmationPreference(ctx context.Context,
 	if fmt.Sprint(instance["status"]) != "submitted" {
 		return nil, validationError("Biểu mẫu quy trình phải được chốt trước khi chọn xác nhận hiển thị trong PDF", Record{"status": instance["status"]})
 	}
+	currentRevision := int(number(instance["current_revision"]))
 	hasSignature := false
 	for _, signature := range workflowAnswerRecordList(form["signatures"]) {
-		if strings.TrimSpace(fmt.Sprint(signature["purpose"])) == purpose {
+		if int(number(signature["form_revision_no"])) == currentRevision && strings.TrimSpace(fmt.Sprint(signature["purpose"])) == purpose {
 			hasSignature = true
 			break
 		}
 	}
 	hasSeal := false
 	for _, application := range workflowAnswerRecordList(form["seal_applications"]) {
-		if strings.TrimSpace(fmt.Sprint(application["purpose"])) == purpose {
+		if int(number(application["form_revision_no"])) == currentRevision && strings.TrimSpace(fmt.Sprint(application["purpose"])) == purpose {
 			hasSeal = true
 			break
 		}
@@ -5386,10 +5454,7 @@ func (s *Service) SaveWorkflowFormPDFConfirmationPreference(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
-		return nil, err
-	}
-	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+	if err := s.requireWorkflowFormArtifactScope(ctx, item, instance, actorID); err != nil {
 		return nil, err
 	}
 	return s.repo.SaveWorkflowFormPDFConfirmationPreference(ctx, instanceID, purpose, req.IncludeSignatures, req.IncludeSeals, actorID, actorName)
@@ -5423,10 +5488,7 @@ func (s *Service) GenerateWorkflowFormPDFExport(ctx context.Context, instanceID,
 	if err != nil {
 		return nil, err
 	}
-	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
-		return nil, err
-	}
-	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+	if err := s.requireWorkflowFormArtifactScope(ctx, item, instance, actorID); err != nil {
 		return nil, err
 	}
 	pdfForm, confirmationSelection := selectWorkflowFormPDFConfirmations(form)
@@ -7443,6 +7505,7 @@ func (s *Service) validateWorkflowFormAnswers(ctx context.Context, instance Reco
 	if answers == nil {
 		answers = Record{}
 	}
+	answers = applyWorkflowFormAnswerDefaults(instance, answers)
 	fieldByKey := map[string]Record{}
 	for _, field := range fields {
 		fieldByKey[fmt.Sprint(field["field_key"])] = field
@@ -7928,6 +7991,19 @@ func (s *Service) requireWorkItemPermission(ctx context.Context, item Record, ac
 		return forbiddenError("Bạn không có quyền bắt buộc để thao tác đầu việc này", Record{"permission": requiredPermission})
 	}
 	return nil
+}
+
+func (s *Service) requireWorkflowFormArtifactScope(ctx context.Context, item, instance Record, actorID string) error {
+	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+		return err
+	}
+	// The first submitted revision keeps the original current-node gate. A later
+	// revision can only exist through an audited amendment, so its confirmations
+	// and PDF may be completed without reopening or rewinding the pipeline.
+	if int(number(instance["current_revision"])) > 1 {
+		return nil
+	}
+	return s.requireActivePipelineWorkItem(ctx, item)
 }
 
 func (s *Service) missingRequiredEvidence(ctx context.Context, item Record, req WorkItemActionRequest) ([]string, error) {

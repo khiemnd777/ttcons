@@ -23,7 +23,7 @@
 - `auth_sessions`
 - `partners`
 - `system_settings`, `audit_logs`
-- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, external-only client access in `V89`, and actor/project explorer cache revisions/outbox retention in `V97`-`V100`
+- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, external-only client access in `V89`, actor/project explorer cache revisions/outbox retention in `V97`-`V100`, and revision-scoped workflow-form confirmations in `V101`
 
 ## Invariants
 
@@ -34,6 +34,7 @@
 - Activity reply/reaction/edit/withdraw endpoints remain protected and reuse `ActivityVisibleToUser`; edit/withdraw additionally require exact author ownership, activity type `comment`, an unwithdrawn row and the 15-minute server window. UI capability flags never replace backend enforcement, managers receive no override, and no new global permission is introduced.
 - Frontend navigation and row actions mirror permissions but do not replace backend enforcement.
 - Work-item detail may expose the permission catalog name/description as presentation metadata, but authorization continues to use the raw snapshotted key through backend permission helpers. User-facing requirement text must not reveal raw keys; missing catalog metadata falls back to generic administrator guidance. V96 standardizes `planning.edit` as `Cập nhật kế hoạch` / `Cập nhật nội dung kế hoạch được phân công` without adding or removing any role grant.
+- Submitted workflow-form amendment capability is server-owned and combines `CanActOnWorkItem` with the work item's snapshotted required permission; the UI `can_amend` flag only controls presentation. Amendment does not grant managers/directors a new override and does not require the historical work item to remain the current pipeline node. The atomic `workflow_form_amended` audit stores actor, mandatory reason, from/to revision and exact field-label-aware before/after changes; audit failure rolls back the content revision. Later signatures, seals and PDFs remain separately attributable to their form revision.
 - My Work is one adaptive actor-scoped role workbench, not one page per role. List/detail `readiness`, capabilities and `available_actions` are actor-specific presentation hints only. `pending_approval` retains requester separation, required decision roles and project scope; `upcoming` work remains visible but current-time/current-node backend gates deny every mutation path. The authenticated SSE still exposes invalidation-only `work_queue_changed`. No new global permission, role filter, manager override, table or migration is introduced.
 - Ordinary Reports navigation requires `report.view` and exposes only operational catalog entries. `Tài chính công trình` is separately gated by `project_finance.view`; its management totals/export require `project_finance.report_view`. Legacy `report.finance.view`/`accounting.*` are removed from every non-admin role by V83 and seed parity.
 - Staff report is a project-allocation view: only active staff memberships in accessible non-cancelled projects are returned and distinct accessible projects are counted. Full-company staff is available only through the `staff.view` Staff module.

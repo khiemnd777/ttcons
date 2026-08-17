@@ -2391,11 +2391,11 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 		return nil, err
 	}
 	signatures, err := queryRecords(ctx, db, `
-		SELECT *
-		FROM workflow_form_signatures
-		WHERE form_instance_id=$1
-		ORDER BY signed_at DESC, created_at DESC, id
-	`, instanceID)
+		SELECT signature.*, signature.form_revision_no=$2 AS is_current_revision
+		FROM workflow_form_signatures signature
+		WHERE signature.form_instance_id=$1
+		ORDER BY signature.form_revision_no DESC, signature.signed_at DESC, signature.created_at DESC, signature.id
+	`, instanceID, instance["current_revision"])
 	if err != nil {
 		return nil, err
 	}
@@ -2410,12 +2410,13 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 			asset.file_size,
 			asset.width_px,
 			asset.height_px,
-			asset.checksum_sha256
+			asset.checksum_sha256,
+			application.form_revision_no=$2 AS is_current_revision
 		FROM workflow_form_seal_applications application
 		JOIN seal_assets asset ON asset.id=application.seal_asset_id
 		WHERE application.form_instance_id=$1
 		ORDER BY application.applied_at DESC, application.created_at DESC, application.id
-	`, instanceID)
+	`, instanceID, instance["current_revision"])
 	if err != nil {
 		return nil, err
 	}
@@ -2431,13 +2432,14 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 	pdfExports, err := queryRecords(ctx, db, `
 		SELECT
 			wfpe.*,
+			wfpe.form_revision_no=$2 AS is_current_revision,
 			COALESCE(deletion.status, '') AS deletion_status,
 			(
 				SELECT COUNT(*)
 				FROM acceptance_records acceptance
 				WHERE acceptance.pdf_export_id=wfpe.id
 			) AS acceptance_reference_count,
-			NOT EXISTS (
+			wfpe.form_revision_no=$2 AND NOT EXISTS (
 				SELECT 1
 				FROM acceptance_records acceptance
 				WHERE acceptance.pdf_export_id=wfpe.id
@@ -2447,7 +2449,7 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 		WHERE wfpe.form_instance_id=$1
 		  AND COALESCE(deletion.status, '') <> 'deleted'
 		ORDER BY wfpe.generated_at DESC, wfpe.created_at DESC
-	`, instanceID)
+	`, instanceID, instance["current_revision"])
 	if err != nil {
 		return nil, err
 	}
@@ -5160,6 +5162,202 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 	return r.GetWorkflowFormInstanceDetail(ctx, instanceID)
 }
 
+func (r *Repository) AmendWorkflowForm(ctx context.Context, instanceID string, answers Record, reason string, expectedRevision int, actorID, actorName string) (Record, error) {
+	if answers == nil {
+		answers = Record{}
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := queryTx(ctx, tx, `
+		SELECT wfi.*, wft.code AS form_code
+		FROM workflow_form_instances wfi
+		JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
+		WHERE wfi.id=$1
+		FOR UPDATE OF wfi
+	`, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	instance := rows[0]
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return nil, conflictError("Trạng thái hồ sơ đã thay đổi, vui lòng tải lại", Record{"status": instance["status"]})
+	}
+	currentRevision := int(number(instance["current_revision"]))
+	if currentRevision != expectedRevision {
+		return nil, conflictError("Phiên bản hồ sơ đã thay đổi, vui lòng tải lại trước khi lưu", Record{
+			"expected_revision": expectedRevision,
+			"current_revision":  currentRevision,
+		})
+	}
+	fields, err := workflowFormFieldRowsTx(ctx, tx, cleanID(instance["form_version_id"]))
+	if err != nil {
+		return nil, err
+	}
+	previousAnswers := recordFromAny(instance["answers_snapshot_json"])
+	changes := workflowFormAnswerChanges(previousAnswers, answers, fields)
+	if len(changes) == 0 {
+		return nil, validationError("Hồ sơ chưa có nội dung thay đổi", Record{"reason": "no_changes"})
+	}
+	nextRevision := currentRevision + 1
+	rawSnapshot, _ := json.Marshal(answers)
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM workflow_form_answers wfa
+		WHERE wfa.instance_id=$1
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM jsonb_object_keys($2::jsonb) AS amended(field_key)
+			WHERE amended.field_key=wfa.field_key
+		  )
+	`, instanceID, string(rawSnapshot)); err != nil {
+		return nil, err
+	}
+	for key, value := range answers {
+		rawValue, _ := json.Marshal(value)
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO workflow_form_answers (instance_id, field_key, field_type, value_json, revision_no, updated_by)
+			SELECT $1, wff.field_key, wff.field_type, $3::jsonb, $4, NULLIF($5,'')::uuid
+			FROM workflow_form_fields wff
+			WHERE wff.form_version_id=$2 AND wff.field_key=$6
+			ON CONFLICT (instance_id, field_key)
+			DO UPDATE SET value_json=EXCLUDED.value_json, field_type=EXCLUDED.field_type, revision_no=EXCLUDED.revision_no, updated_by=EXCLUDED.updated_by, updated_at=now()
+		`, instanceID, instance["form_version_id"], string(rawValue), nextRevision, actorID, key); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE workflow_form_instances
+		SET current_revision=$2,
+			answers_snapshot_json=$3::jsonb,
+			updated_at=now()
+		WHERE id=$1
+	`, instanceID, nextRevision, string(rawSnapshot)); err != nil {
+		return nil, err
+	}
+
+	workItemID := cleanID(instance["work_item_id"])
+	projectID := cleanID(instance["project_id"])
+	completionPatch := Record{
+		"workflow_form_instance_id": instanceID,
+		"workflow_form_version_id":  instance["form_version_id"],
+		"workflow_form_type":        instance["form_type"],
+		"workflow_form_answers":     answers,
+		"workflow_form_revision":    nextRevision,
+	}
+	if fmt.Sprint(instance["form_type"]) == "checklist" {
+		if checklistItems, ok := answers["checklist_items"]; ok {
+			completionPatch["checklist_items"] = checklistItems
+			completionPatch["checklist"] = checklistItems
+		}
+	}
+	rawCompletionPatch, _ := json.Marshal(completionPatch)
+	if workItemID != "" {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE work_items
+			SET completion_payload_json=COALESCE(completion_payload_json, '{}'::jsonb) || $2::jsonb,
+				updated_by=NULLIF($3,'')::uuid,
+				updated_at=now()
+			WHERE id=$1
+		`, workItemID, string(rawCompletionPatch), actorID); err != nil {
+			return nil, err
+		}
+	}
+
+	metadata := Record{
+		"workflow_form_instance_id": instanceID,
+		"form_type":                 instance["form_type"],
+		"form_version_id":           instance["form_version_id"],
+		"from_revision":             currentRevision,
+		"to_revision":               nextRevision,
+		"reason":                    reason,
+		"changed_fields":            changes,
+		"downstream_reprocessed":    false,
+	}
+	rawMetadata, _ := json.Marshal(metadata)
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, from_status, to_status, comment, metadata_json)
+		VALUES ($1,$2,NULLIF($3,'')::uuid,NULLIF($4,'')::uuid,'amended','submitted','submitted',$5,$6::jsonb)
+	`, instanceID, projectID, workItemID, actorID, reason, string(rawMetadata)); err != nil {
+		return nil, err
+	}
+	if workItemID != "" {
+		activityComment := fmt.Sprintf(
+			"Đã chỉnh sửa hồ sơ nghiệp vụ v%d → v%d: %s. Lý do: %s",
+			currentRevision,
+			nextRevision,
+			workflowFormChangedFieldLabels(changes),
+			reason,
+		)
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, visibility, metadata_json)
+			VALUES ($1,$2,'work_item',$1,NULLIF($3,'')::uuid,'system_event',$4,'internal',$5::jsonb)
+		`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
+			return nil, err
+		}
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_amended", "workflow_form_instance", instanceID, "Chỉnh sửa hồ sơ nghiệp vụ đã chốt", metadata); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetWorkflowFormInstanceDetail(ctx, instanceID)
+}
+
+func workflowFormAnswerChanges(before, after Record, fields []Record) []Record {
+	changes := make([]Record, 0)
+	for _, field := range fields {
+		key := strings.TrimSpace(fmt.Sprint(field["field_key"]))
+		if key == "" {
+			continue
+		}
+		beforeValue, beforePresent := before[key]
+		afterValue, afterPresent := after[key]
+		if beforePresent == afterPresent && workflowFormJSONValuesEqual(beforeValue, afterValue) {
+			continue
+		}
+		changes = append(changes, Record{
+			"field_key":      key,
+			"field_label":    strings.TrimSpace(fmt.Sprint(field["label"])),
+			"field_type":     field["field_type"],
+			"before":         beforeValue,
+			"after":          afterValue,
+			"before_present": beforePresent,
+			"after_present":  afterPresent,
+		})
+	}
+	return changes
+}
+
+func workflowFormJSONValuesEqual(left, right any) bool {
+	leftJSON, leftErr := json.Marshal(left)
+	rightJSON, rightErr := json.Marshal(right)
+	return leftErr == nil && rightErr == nil && string(leftJSON) == string(rightJSON)
+}
+
+func workflowFormChangedFieldLabels(changes []Record) string {
+	labels := make([]string, 0, len(changes))
+	for _, change := range changes {
+		label := strings.TrimSpace(fmt.Sprint(change["field_label"]))
+		if label == "" {
+			label = strings.TrimSpace(fmt.Sprint(change["field_key"]))
+		}
+		if label != "" {
+			labels = append(labels, label)
+		}
+	}
+	if len(labels) == 0 {
+		return "nội dung hồ sơ"
+	}
+	return strings.Join(labels, ", ")
+}
+
 func syncConstructionDailyReportTx(ctx context.Context, tx *sql.Tx, instance Record, answers Record, actorID string) error {
 	completedItems := workflowAnswerRecordList(answers["completed_items"])
 	crewItems := workflowAnswerRecordList(answers["crew_items"])
@@ -5393,8 +5591,8 @@ func (r *Repository) ApplyWorkflowFormSeal(ctx context.Context, instanceID, seal
 	duplicateRows, err := queryTx(ctx, tx, `
 		SELECT COUNT(*) AS total
 		FROM workflow_form_seal_applications
-		WHERE form_instance_id=$1 AND purpose=$2 AND seal_asset_id=$3
-	`, instanceID, purpose, sealAssetID)
+		WHERE form_instance_id=$1 AND form_revision_no=$2 AND purpose=$3 AND seal_asset_id=$4
+	`, instanceID, formRevisionNo, purpose, sealAssetID)
 	if err != nil {
 		return nil, err
 	}
@@ -5568,8 +5766,8 @@ func (r *Repository) SignWorkflowForm(ctx context.Context, instanceID, purpose, 
 	duplicateRows, err := queryTx(ctx, tx, `
 		SELECT COUNT(*) AS total
 		FROM workflow_form_signatures
-		WHERE form_instance_id=$1 AND signer_user_id=$2 AND purpose=$3
-	`, instanceID, actorID, purpose)
+		WHERE form_instance_id=$1 AND form_revision_no=$2 AND signer_user_id=$3 AND purpose=$4
+	`, instanceID, revisionNo, actorID, purpose)
 	if err != nil {
 		return nil, err
 	}
@@ -5691,7 +5889,7 @@ func (r *Repository) SaveWorkflowFormPDFConfirmationPreference(ctx context.Conte
 	defer tx.Rollback()
 
 	instance, err := queryOneRecord(ctx, tx, `
-		SELECT id, status
+		SELECT id, status, current_revision
 		FROM workflow_form_instances
 		WHERE id=$1
 		FOR UPDATE
@@ -5707,14 +5905,14 @@ func (r *Repository) SaveWorkflowFormPDFConfirmationPreference(ctx context.Conte
 			EXISTS (
 				SELECT 1
 				FROM workflow_form_signatures
-				WHERE form_instance_id=$1 AND purpose=$2
+				WHERE form_instance_id=$1 AND form_revision_no=$3 AND purpose=$2
 			) AS has_signatures,
 			EXISTS (
 				SELECT 1
 				FROM workflow_form_seal_applications
-				WHERE form_instance_id=$1 AND purpose=$2
+				WHERE form_instance_id=$1 AND form_revision_no=$3 AND purpose=$2
 			) AS has_seals
-	`, instanceID, purpose)
+	`, instanceID, purpose, instance["current_revision"])
 	if err != nil {
 		return nil, err
 	}
@@ -5905,10 +6103,11 @@ func (r *Repository) PrepareWorkflowFormPDFExportDeletion(ctx context.Context, e
 	defer tx.Rollback()
 
 	exportRows, err := queryTx(ctx, tx, `
-		SELECT wfpe.*
+		SELECT wfpe.*, wfi.current_revision
 		FROM workflow_form_pdf_exports wfpe
+		JOIN workflow_form_instances wfi ON wfi.id=wfpe.form_instance_id
 		WHERE wfpe.id=$1
-		FOR UPDATE
+		FOR UPDATE OF wfpe, wfi
 	`, exportID)
 	if err != nil {
 		return nil, err
@@ -5917,6 +6116,13 @@ func (r *Repository) PrepareWorkflowFormPDFExportDeletion(ctx context.Context, e
 		return nil, sql.ErrNoRows
 	}
 	export := exportRows[0]
+	if int(number(export["form_revision_no"])) != int(number(export["current_revision"])) {
+		return nil, conflictError("PDF của phiên bản trước được giữ bất biến trong lịch sử hồ sơ", Record{
+			"pdf_export_id":       exportID,
+			"form_revision_no":    export["form_revision_no"],
+			"current_revision_no": export["current_revision"],
+		})
+	}
 
 	var referenceCount int
 	if err := tx.QueryRowContext(ctx, `

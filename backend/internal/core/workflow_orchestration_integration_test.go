@@ -454,6 +454,109 @@ func TestWorkflowFormStructuredListValidation(t *testing.T) {
 	}
 }
 
+func TestSiteRiskAssessmentDefaultsMissingCategoryAndPreservesExistingValue(t *testing.T) {
+	service := NewService(&Repository{}, "test-secret")
+	fields := []Record{{
+		"field_key":  clientSiteRiskItemsFieldKey,
+		"label":      "Danh sách rủi ro",
+		"field_type": "structured_list",
+		"required":   true,
+		"validation_json": map[string]any{
+			"min_items": float64(1),
+			"item_fields": []any{
+				map[string]any{"key": "risk", "label": "Rủi ro", "type": "textarea", "required": true},
+				map[string]any{"key": clientSiteRiskCategoryFieldKey, "label": "Nhóm", "type": "select", "required": true, "options": []any{
+					map[string]any{"value": "mep"},
+					map[string]any{"value": clientSiteRiskDefaultCategory},
+				}},
+				map[string]any{"key": "severity", "label": "Mức độ", "type": "select", "required": true, "options": []any{map[string]any{"value": "high"}}},
+			},
+		},
+	}}
+	instance := Record{"form_code": clientSiteRiskAssessmentFormCode}
+
+	answers, err := service.validateWorkflowFormAnswers(context.Background(), instance, fields, Record{
+		clientSiteRiskItemsFieldKey: []any{map[string]any{"risk": "Thiếu tải điện", "severity": "high"}},
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, ok := answers[clientSiteRiskItemsFieldKey].([]Record)
+	if !ok || len(items) != 1 || items[0][clientSiteRiskCategoryFieldKey] != clientSiteRiskDefaultCategory {
+		t.Fatalf("defaulted site risks = %#v, want category other", answers[clientSiteRiskItemsFieldKey])
+	}
+
+	answers, err = service.validateWorkflowFormAnswers(context.Background(), instance, fields, Record{
+		clientSiteRiskItemsFieldKey: []any{map[string]any{"risk": "Xung đột đường ống", clientSiteRiskCategoryFieldKey: "mep", "severity": "high"}},
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items = answers[clientSiteRiskItemsFieldKey].([]Record)
+	if items[0][clientSiteRiskCategoryFieldKey] != "mep" {
+		t.Fatalf("existing category = %#v, want mep", items[0][clientSiteRiskCategoryFieldKey])
+	}
+
+	_, err = service.validateWorkflowFormAnswers(context.Background(), Record{"form_code": "another_form"}, fields, Record{
+		clientSiteRiskItemsFieldKey: []any{map[string]any{"risk": "Thiếu tải điện", "severity": "high"}},
+	}, true)
+	assertValidationError(t, err)
+}
+
+func TestSiteRiskAssessmentPersistsDefaultCategory(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	var formVersionID string
+	var formTemplateID string
+	var formType string
+	if err := db.QueryRowContext(ctx, `
+		SELECT v.id::text,t.id::text,t.form_type
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE t.code=$1 AND v.status='published'
+		ORDER BY v.version_no DESC
+		LIMIT 1
+	`, clientSiteRiskAssessmentFormCode).Scan(&formVersionID, &formTemplateID, &formType); err != nil {
+		t.Fatal(err)
+	}
+	instanceID := newID()
+	mustExec(t, db, `
+		INSERT INTO workflow_form_instances (
+			id,project_id,work_item_id,form_template_id,form_version_id,form_type,title,created_by
+		) VALUES ($1,$2,$3,$4,$5,$6,'Đánh giá rủi ro mặt bằng',$7)
+	`, instanceID, fixture.projectID, fixture.itemID, formTemplateID, formVersionID, formType, fixture.workerID)
+
+	if _, err := service.SaveWorkflowFormDraft(ctx, instanceID, WorkflowFormSaveRequest{Answers: Record{
+		clientSiteRiskItemsFieldKey: []any{map[string]any{"risk": "Thiếu tải điện", "severity": "high", "mitigation": "Kiểm tra lại công suất"}},
+	}}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM workflow_form_answers
+		WHERE instance_id=$1
+		  AND field_key=$2
+		  AND value_json->0->>$3=$4
+	`, 1, instanceID, clientSiteRiskItemsFieldKey, clientSiteRiskCategoryFieldKey, clientSiteRiskDefaultCategory)
+
+	if _, err := service.SaveWorkflowFormDraft(ctx, instanceID, WorkflowFormSaveRequest{Answers: Record{
+		clientSiteRiskItemsFieldKey: []any{map[string]any{"risk": "Xung đột đường ống", clientSiteRiskCategoryFieldKey: "mep", "severity": "high"}},
+	}}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM workflow_form_answers
+		WHERE instance_id=$1
+		  AND field_key=$2
+		  AND value_json->0->>$3='mep'
+	`, 1, instanceID, clientSiteRiskItemsFieldKey, clientSiteRiskCategoryFieldKey)
+}
+
 func TestDefaultWorkflowFormCodePrefersSpecificStepTypes(t *testing.T) {
 	if got := defaultWorkflowFormCode("daily_report", true, "Checklist thầu phụ"); got != "builtin_daily_report" {
 		t.Fatalf("daily report default form = %s", got)
@@ -756,6 +859,93 @@ func TestWorkflowFormPDFGeneratorProducesPDFWithSignatureStamp(t *testing.T) {
 	}
 	if selectedPayloadHash == payloadHash {
 		t.Fatal("excluding a signature must change the rendered confirmation snapshot hash")
+	}
+}
+
+func TestWorkflowFormPDFSelectsConfirmationsFromCurrentRevisionOnly(t *testing.T) {
+	form := Record{
+		"instance": Record{"current_revision": 2},
+		"signatures": []Record{
+			{"id": "signature-v1", "purpose": "internal_ack", "form_revision_no": 1},
+			{"id": "signature-v2", "purpose": "internal_ack", "form_revision_no": 2},
+		},
+		"seal_applications": []Record{
+			{"id": "seal-v1", "purpose": "internal_ack", "form_revision_no": 1},
+			{"id": "seal-v2", "purpose": "internal_ack", "form_revision_no": 2},
+		},
+		"pdf_confirmation_preferences": []Record{{
+			"purpose":            "internal_ack",
+			"include_signatures": true,
+			"include_seals":      true,
+		}},
+	}
+	selected, selection := selectWorkflowFormPDFConfirmations(form)
+	signatures := workflowPDFRecords(selected["signatures"])
+	seals := workflowPDFRecords(selected["seal_applications"])
+	if len(signatures) != 1 || cleanID(signatures[0]["id"]) != "signature-v2" {
+		t.Fatalf("selected signatures = %#v, want current revision only", signatures)
+	}
+	if len(seals) != 1 || cleanID(seals[0]["id"]) != "seal-v2" {
+		t.Fatalf("selected seals = %#v, want current revision only", seals)
+	}
+	if number(selection["signature_count"]) != 1 || number(selection["seal_application_count"]) != 1 {
+		t.Fatalf("selection counts = %#v", selection)
+	}
+}
+
+func TestWorkflowFormPDFOmitsSiteRiskCategoryFromNewPresentation(t *testing.T) {
+	field := Record{
+		"field_key": clientSiteRiskItemsFieldKey, "label": "Danh sách rủi ro", "field_type": "structured_list",
+		"validation_json": Record{"item_fields": []any{
+			map[string]any{"key": "risk", "label": "Rủi ro", "type": "textarea"},
+			map[string]any{"key": clientSiteRiskCategoryFieldKey, "label": "Nhóm", "type": "select", "options": []any{map[string]any{"value": clientSiteRiskDefaultCategory, "label": "Khác"}}},
+			map[string]any{"key": "severity", "label": "Mức độ", "type": "select"},
+			map[string]any{"key": "mitigation", "label": "Hướng xử lý", "type": "textarea"},
+		}},
+	}
+	form := Record{
+		"instance": Record{"title": "Đánh giá rủi ro mặt bằng", "form_type": "checklist", "status": "submitted"},
+		"template": Record{"code": clientSiteRiskAssessmentFormCode, "name": "Đánh giá rủi ro mặt bằng"},
+		"version":  Record{"version_no": 1},
+		"fields":   []Record{field},
+		"answers": Record{clientSiteRiskItemsFieldKey: []any{map[string]any{
+			"risk": "Thiếu tải điện", clientSiteRiskCategoryFieldKey: clientSiteRiskDefaultCategory, "severity": "high", "mitigation": "Kiểm tra lại công suất",
+		}}},
+	}
+	pdfBytes, payloadHash, err := GenerateWorkflowFormPDFWithContext(form, WorkflowFormPDFContext{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-")) {
+		t.Fatalf("expected site-risk PDF header, got %q", pdfBytes[:min(8, len(pdfBytes))])
+	}
+	document, err := buildWorkflowFormPDFDocument(form, WorkflowFormPDFContext{}, payloadHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(document.Fields) != 1 {
+		t.Fatalf("PDF fields = %#v, want one risk list", document.Fields)
+	}
+	specs := workflowPDFStructuredSpecs(document.Fields[0].Definition)
+	keys := make([]string, 0, len(specs))
+	for _, spec := range specs {
+		keys = append(keys, fmt.Sprint(spec["key"]))
+	}
+	if strings.Join(keys, ",") != "risk,severity,mitigation" {
+		t.Fatalf("site-risk PDF specs = %v, want category omitted", keys)
+	}
+	storedSpecs := workflowPDFStructuredSpecs(field)
+	if len(storedSpecs) != 4 {
+		t.Fatalf("published field definition was mutated: %#v", storedSpecs)
+	}
+
+	form["template"] = Record{"code": "another_form", "name": "Biểu mẫu khác"}
+	otherDocument, err := buildWorkflowFormPDFDocument(form, WorkflowFormPDFContext{}, strings.Repeat("b", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(workflowPDFStructuredSpecs(otherDocument.Fields[0].Definition)) != 4 {
+		t.Fatalf("unrelated PDF field was changed: %#v", otherDocument.Fields[0].Definition)
 	}
 }
 
@@ -2260,6 +2450,133 @@ func TestWorkflowFormSealAssetsAreReusableArchivedAndSeparateFromSignatures(t *t
 	if _, err := db.ExecContext(ctx, `UPDATE seal_assets SET name='mutated' WHERE id=$1`, assetID); err == nil {
 		t.Fatal("expected immutable seal asset content update to fail")
 	}
+}
+
+func TestWorkflowFormAmendmentCreatesAuditedRevisionWithoutChangingWorkItemState(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	service.ConfigureUploads(t.TempDir(), 1024*1024)
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "task", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1,$2,v.template_id,v.id,t.form_type,'Amendment form',$3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := cleanID(instanceRows[0]["id"])
+	if _, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{
+		Answers: Record{"summary": "Nội dung ban đầu"},
+		Comment: "Chốt lần đầu",
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SignWorkflowForm(ctx, instanceID, testSignatureRequest("Ký phiên bản 1"), fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	versionOnePDF, err := service.GenerateWorkflowFormPDFExport(ctx, instanceID, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	versionOneExports := workflowAnswerRecordList(versionOnePDF["pdf_exports"])
+	if len(versionOneExports) != 1 {
+		t.Fatalf("version-one PDF exports = %#v", versionOnePDF["pdf_exports"])
+	}
+	versionOnePDFID := cleanID(versionOneExports[0]["id"])
+	mustExec(t, db, `UPDATE work_items SET status='completed',completed_at=now() WHERE id=$1`, fixture.itemID)
+
+	workItemForm, err := service.WorkItemForm(ctx, fixture.itemID, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !boolValue(recordFromAny(workItemForm["capabilities"])["can_amend"]) {
+		t.Fatalf("expected server amendment capability, got %#v", workItemForm["capabilities"])
+	}
+
+	amended, err := service.AmendWorkflowForm(ctx, instanceID, WorkflowFormAmendRequest{
+		Answers:          Record{"summary": "Nội dung đã chỉnh sửa"},
+		Reason:           "Bổ sung theo biên bản khảo sát",
+		ExpectedRevision: 1,
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance := recordFromAny(amended["instance"])
+	if fmt.Sprint(instance["status"]) != "submitted" || int(number(instance["current_revision"])) != 2 {
+		t.Fatalf("amended instance = %#v, want submitted revision 2", instance)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='completed'`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='summary' AND value_json='"Nội dung đã chỉnh sửa"'::jsonb AND revision_no=2`, 1, instanceID)
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM workflow_form_events
+		WHERE instance_id=$1
+		  AND event_type='amended'
+		  AND metadata_json->>'from_revision'='1'
+		  AND metadata_json->>'to_revision'='2'
+		  AND metadata_json->'changed_fields'->0->>'field_key'='summary'
+		  AND metadata_json->'changed_fields'->0->>'before'='Nội dung ban đầu'
+		  AND metadata_json->'changed_fields'->0->>'after'='Nội dung đã chỉnh sửa'
+	`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='system_event' AND comment LIKE 'Đã chỉnh sửa hồ sơ nghiệp vụ v1 → v2:%'`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_type='workflow_form_instance' AND target_id=$1 AND event_type='workflow_form_amended'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='workflow_form_action_item'`, 0, fixture.projectID)
+
+	if _, err := service.SignWorkflowForm(ctx, instanceID, testSignatureRequest("Ký phiên bản 2"), fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_signatures WHERE form_instance_id=$1 AND signer_user_id=$2 AND purpose='internal_ack'`, 2, instanceID, fixture.workerID)
+	if _, err := service.DeleteWorkflowFormPDFExport(ctx, versionOnePDFID, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("expected prior-revision PDF deletion to be rejected")
+	}
+	versionTwoPDF, err := service.GenerateWorkflowFormPDFExport(ctx, instanceID, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	versionTwoExports := workflowAnswerRecordList(versionTwoPDF["pdf_exports"])
+	currentExports := 0
+	for _, export := range versionTwoExports {
+		if int(number(export["form_revision_no"])) != 2 {
+			continue
+		}
+		currentExports++
+		selection := recordFromAny(recordFromAny(export["metadata_json"])["confirmation_selection"])
+		if int(number(selection["signature_count"])) != 1 {
+			t.Fatalf("revision-two PDF confirmation selection = %#v, want one current signature", selection)
+		}
+	}
+	if currentExports != 1 {
+		t.Fatalf("current PDF exports = %d, want 1; all=%#v", currentExports, versionTwoExports)
+	}
+
+	_, err = service.AmendWorkflowForm(ctx, instanceID, WorkflowFormAmendRequest{
+		Answers:          Record{"summary": "Nội dung stale"},
+		Reason:           "Ghi đè phiên cũ",
+		ExpectedRevision: 1,
+	}, fixture.workerID, "Worker")
+	var statusErr StatusError
+	if !errors.As(err, &statusErr) || statusErr.Code != "CONFLICT" {
+		t.Fatalf("stale amendment error = %#v, want conflict", err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_instances WHERE id=$1 AND current_revision=2`, 1, instanceID)
+
+	_, err = service.AmendWorkflowForm(ctx, instanceID, WorkflowFormAmendRequest{
+		Answers:          Record{"summary": "Nội dung đã chỉnh sửa"},
+		Reason:           "Không có thay đổi",
+		ExpectedRevision: 2,
+	}, fixture.workerID, "Worker")
+	assertValidationError(t, err)
 }
 
 func TestWorkflowFormSignatureRequiresSubmittedFormAndIsImmutable(t *testing.T) {

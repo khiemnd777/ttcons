@@ -309,6 +309,12 @@ type WorkflowFormSaveRequest struct {
 	Comment string `json:"comment"`
 }
 
+type WorkflowFormAmendRequest struct {
+	Answers          Record `json:"answers"`
+	Reason           string `json:"reason"`
+	ExpectedRevision int    `json:"expected_revision"`
+}
+
 type PlanningDailyReportFilter struct {
 	ProjectID  string
 	DateFrom   string

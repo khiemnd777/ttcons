@@ -153,6 +153,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Get("/work-items/:id/outgoing-acceptance", h.WorkItemOutgoingAcceptance)
 	protected.Put("/workflow-form-instances/:id/draft", h.SaveWorkflowFormDraft)
 	protected.Post("/workflow-form-instances/:id/submit", h.SubmitWorkflowForm)
+	protected.Post("/workflow-form-instances/:id/amend", h.AmendWorkflowForm)
 	protected.Post("/workflow-form-instances/:id/sign", h.SignWorkflowForm)
 	protected.Post("/workflow-form-instances/:id/seal-applications", h.ApplyWorkflowFormSeal)
 	protected.Put("/workflow-form-instances/:id/pdf-confirmation-preference", h.SaveWorkflowFormPDFConfirmationPreference)
