@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -30,8 +30,8 @@ import { statusLabel } from '../../lib/utils/status';
 import { ActivityAttachments } from '../work-items/ActivityAttachments';
 import { ActivityReactionBar, ActivityReplyQuote } from '../work-items/ActivityConversationMeta';
 import { WorkItemCard } from '../work-items/WorkItemCard';
-import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
+import { executionTargetActionLabel, executionTargetPath, executionTargetWorkspaceLabel } from '../work-items/workItemExecutionTarget';
 import {
   asArray,
   activityLabel,
@@ -130,9 +130,9 @@ export function MyWorkPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null);
-  const [dialogItem, setDialogItem] = useState<WorkItem | null>(null);
   const [searchDraft, setSearchDraft] = useState(searchParams.get('search') ?? '');
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('reconnecting');
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
@@ -253,14 +253,18 @@ export function MyWorkPage() {
     void pendingNodeApprovals.refetch();
   }
 
+  function openWorkItem(item: WorkItem) {
+    navigate(executionTargetPath(item, currentReturnTo(location)));
+  }
+
   const hasFilters = Boolean(bucket !== 'need_action' || queue !== 'all' || project || status || deadline || workType || priority || search || sort !== 'priority');
   const total = firstPage?.total ?? summary.total ?? rows.length;
 
   return (
     <>
       <PageHeader
-        title="Việc của tôi"
-        description={`${user?.full_name ?? 'Người dùng'}${user?.roles?.length ? ` · ${user.roles.join(', ')}` : ''} · Ưu tiên công việc có thể xử lý ngay`}
+        title="Bàn làm việc"
+        description={`${user?.full_name ?? 'Người dùng'}${user?.roles?.length ? ` · ${user.roles.join(', ')}` : ''} · Mở thẳng đúng sổ nghiệp vụ cần xử lý`}
         actions={(
           <div className="flex items-center gap-2">
             <LiveStatusBadge status={streamStatus} />
@@ -320,12 +324,12 @@ export function MyWorkPage() {
               hasMore={Boolean(workItems.hasNextPage)}
               filtered={hasFilters}
               onSelect={setSelectedWorkId}
-              onOpen={setDialogItem}
+              onOpen={openWorkItem}
               onLoadMore={() => void workItems.fetchNextPage()}
               onReset={resetFilters}
               onRetry={() => void workItems.refetch()}
             />
-            <NextWorkPanel item={selectedItem} onOpen={setDialogItem} />
+            <NextWorkPanel item={selectedItem} onOpen={openWorkItem} />
           </div>
         </section>
       ) : (
@@ -342,15 +346,6 @@ export function MyWorkPage() {
         />
       )}
 
-      <WorkItemDetailDialog
-        open={Boolean(dialogItem)}
-        item={dialogItem}
-        onClose={() => setDialogItem(null)}
-        onChanged={(updated) => {
-          setDialogItem(updated);
-          void queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
-        }}
-      />
     </>
   );
 }
@@ -508,18 +503,19 @@ function WorkList({ rows, selectedId, loading, fetchingMore, error, total, hasMo
 }
 
 function NextWorkPanel({ item, onOpen }: { item: WorkItem | null; onOpen: (item: WorkItem) => void }) {
-  if (!item) return <aside className="order-first rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 xl:order-last"><p className="text-sm font-semibold text-ink">Bắt đầu tiếp</p><p className="mt-2 text-sm text-slate-600">Chọn một công việc để xem đủ Dự án › Node › Bước.</p></aside>;
+  if (!item) return <aside className="order-first rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 xl:order-last"><p className="text-sm font-semibold text-ink">Nơi làm việc</p><p className="mt-2 text-sm text-slate-600">Chọn một công việc để mở đúng sổ nghiệp vụ.</p></aside>;
   const context = workItemWorkflowContext(item);
   const upcoming = workItemIsUpcoming(item);
   return (
     <aside className="order-first rounded-lg border border-line bg-slate-50 p-4 xl:order-last xl:sticky xl:top-4 xl:self-start">
       <div className="flex flex-wrap items-center gap-2"><StatusBadge status={isWorkOverdue(item) ? 'overdue' : item.status} />{upcoming ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">Sắp tới · chỉ xem</span> : null}{item.priority ? <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600">{priorityLabel(item.priority)}</span> : null}</div>
-      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Bắt đầu tiếp</p>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Nơi làm việc</p>
       <h3 className="mt-1 text-base font-semibold text-ink">{item.title}</h3>
       <p className="mt-2 text-xs font-medium leading-5 text-slate-600">{context.path}</p>
-      {upcoming ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Bước này chưa đến lượt. Anh có thể xem trước hồ sơ nhưng không thể bắt đầu hoặc cập nhật.</p> : item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-700">{item.blocked_reason}</p> : <p className="mt-3 text-sm leading-6 text-slate-600">{nextActionCopy(item)}</p>}
+      <p className="mt-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">Thực hiện tại: {executionTargetWorkspaceLabel(item)}</p>
+      {upcoming ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Bước này chưa đến lượt. Có thể xem trước hồ sơ nhưng chưa thể bắt đầu hoặc cập nhật.</p> : item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-700">{item.blocked_reason}</p> : <p className="mt-3 text-sm leading-6 text-slate-600">{nextActionCopy(item)}</p>}
       <div className="mt-4 space-y-2 text-sm"><ContextRow label="Dự án" value={context.project} /><ContextRow label="Node" value={context.node} /><ContextRow label="Bước" value={context.step} /><ContextRow label="Phụ trách" value={item.assignee_name ?? departmentLabel(item.department)} /><ContextRow label="Hạn" value={dateText(item.due_at)} /><ContextRow label="Minh chứng" value={numberValue(item.evidence_count)} /></div>
-      <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onOpen(item)}>{upcoming ? 'Xem công việc' : 'Mở xử lý'} <ChevronRight className="h-4 w-4" /></button>
+      <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onOpen(item)}>{upcoming ? 'Xem trước công việc' : executionTargetActionLabel(item)} <ChevronRight className="h-4 w-4" /></button>
       {item.project_id ? <Link className="mt-2 inline-flex w-full justify-center rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${item.project_id}`}>Mở công trình</Link> : null}
     </aside>
   );

@@ -35,6 +35,7 @@
 
 ## Invariants
 
+- Acceptance and handover pages remain the canonical quality/handover ledgers. A work-item `execution_target` may open either workspace with presentation-only `?task=` context; the shared task banner/dialog supplies workflow gates without cloning acceptance criteria, evidence, result, rework or handover records and without weakening their source-domain transitions.
 - ITP revisions preserve `definition_hash`; only one active revision exists per project/family and approved/active/superseded revisions are immutable.
 - RFI inspection requires project-owned evidence. A rejected RFI creates a linked NCR and draft rework record atomically instead of losing the failed inspection history.
 - NCR follows `open -> root_cause -> corrective_action -> reinspection -> closed`; closure requires an accepted/conditional reinspection RFI and completed linked rework.

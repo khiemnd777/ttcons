@@ -27,6 +27,7 @@
 
 ## Invariants
 
+- Warehouse remains the canonical stock ledger. Presentation-only `?task=` context may link a workflow item into the warehouse workspace, but it never creates or posts stock, bypasses incoming acceptance or changes balance/movement traceability; all stock mutations remain source-domain actions.
 - Every stock operation keeps source, target, actor, quantity, material, and project traceability.
 - Posted stock documents are multi-line and atomic. Transfer documents require distinct active source/target warehouses, lock both balances in stable order and count the same quantity out of the source and into the target.
 - Submitted incoming acceptance is only a selectable receipt source. A linked receipt cannot exceed `accepted_quantity - previously linked receive movements`; acceptance never posts stock by itself.

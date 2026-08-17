@@ -37,7 +37,7 @@ const navGroups: NavGroup[] = [
   {
     title: 'Công việc',
     items: [
-      { to: '/my-work', label: 'Việc của tôi', icon: BriefcaseBusiness },
+      { to: '/my-work', label: 'Bàn làm việc', icon: BriefcaseBusiness },
       { to: '/dashboard', label: 'Điều hành', icon: LayoutDashboard, permissions: ['report.view'] },
       { to: '/progress', label: 'Tiến trình', icon: Kanban, permissions: ['project.view'] },
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },

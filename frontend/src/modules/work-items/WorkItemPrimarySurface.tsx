@@ -95,9 +95,9 @@ function BusinessSourceCard({ item }: { item: WorkItem }) {
             <p className="mt-1 text-xs leading-5 text-slate-600">{source.message || (ready ? 'Nguồn nghiệp vụ đã sẵn sàng.' : 'Hoàn tất dữ liệu tại module nguồn trước khi chốt bước.')}</p>
           </div>
         </div>
-        {source.route ? (
-          <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-current bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" to={source.route}>
-            Mở nguồn <ExternalLink className="h-4 w-4" />
+        {(item.execution_target?.route || source.route) ? (
+          <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-current bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" to={item.execution_target?.route || source.route || '#'}>
+            {item.execution_target?.action_label || 'Mở sổ nghiệp vụ'} <ExternalLink className="h-4 w-4" />
           </Link>
         ) : null}
       </div>

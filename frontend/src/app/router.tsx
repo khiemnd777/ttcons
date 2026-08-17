@@ -20,6 +20,7 @@ const PlanningDailyReportsPage = lazy(() => import('../modules/planning-daily-re
 const MeetingMinutesPage = lazy(() => import('../modules/meeting-minutes/MeetingMinutesPage').then(({ MeetingMinutesPage }) => ({ default: MeetingMinutesPage })));
 const PlanningChecklistsPage = lazy(() => import('../modules/planning-checklists/PlanningChecklistsPage').then(({ PlanningChecklistsPage }) => ({ default: PlanningChecklistsPage })));
 const PlanningPage = lazy(() => import('../modules/planning/PlanningPage').then(({ PlanningPage }) => ({ default: PlanningPage })));
+const PreparationPage = lazy(() => import('../modules/planning/PreparationPage').then(({ PreparationPage }) => ({ default: PreparationPage })));
 const BOQPage = lazy(() => import('../modules/boq/BOQPage').then(({ BOQPage }) => ({ default: BOQPage })));
 const ProcurementPage = lazy(() => import('../modules/procurement/ProcurementPage').then(({ ProcurementPage }) => ({ default: ProcurementPage })));
 const ContractsPage = lazy(() => import('../modules/contracts/ContractsPage').then(({ ContractsPage }) => ({ default: ContractsPage })));
@@ -81,6 +82,7 @@ export const router = createBrowserRouter([
           { index: true, element: guarded(<ProjectDetailPage />) },
           { path: 'work-items/:workItemId', element: guarded(<WorkItemDetailPage />) },
           { path: 'pipeline', element: guarded(<PlanningPage mode="pipeline" />, ['pipeline.view']) },
+          { path: 'preparation', element: guarded(<PreparationPage />, ['project.view']) },
           { path: 'planning', element: guarded(<PlanningPage />, ['planning.view', 'pipeline.view']) },
           { path: 'boq', element: guarded(<BOQPage />, ['boq.view']) },
           { path: 'procurement', element: guarded(<ProcurementPage scoped />, ['procurement.view']) },

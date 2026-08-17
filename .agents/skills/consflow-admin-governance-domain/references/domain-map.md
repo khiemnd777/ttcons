@@ -27,6 +27,7 @@
 
 ## Invariants
 
+- `Bàn làm việc` remains actor-scoped. Backend `execution_target` is a navigation hint produced only after ordinary list/detail scope; frontend accepts internal routes only. The hint never replaces project visibility, work-item action scope, source-module RBAC or mutation-time authorization, and unsafe/missing targets fail closed to guarded work-item detail.
 - Protected endpoints stay under auth middleware.
 - The shared IP rate limiter runs before JWT/session work. `AuthClaimsRequired` must stop on missing/invalid JWT; only verified claims supply the actor key, so actor rate limiting runs before authoritative `AuthSessionRequired`/`AuthSessionActive` DB validation. Heavy-route concurrency runs after the session gate. Rejected `401`/`429`/`503` requests never reach business/audit handlers; backpressure responses use the shared envelope with `Retry-After`. Trusted proxy CIDRs must identify only the immediate Nginx/internal proxy network.
 - Backend permission helpers are the source of truth for authorization.

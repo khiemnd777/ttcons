@@ -28,6 +28,7 @@
 
 ## Invariants
 
+- BOQ, contracts and procurement remain the sole business ledgers for their records. A work-item `execution_target` may open these pages with presentation-only `?task=` context; `ProjectTaskContext` does not duplicate a commercial form, grant permission or perform a transition. Source-domain status/actions and workflow completion gates remain independently authoritative.
 - Approved and final-locked BOQ prices drive procurement values; final price traces to a selected qualified quote or an explicit manual waiver reason.
 - BOQ lifecycle fields are server-owned: create always starts at draft; content and expected price change only in draft/revised; norm lock requires submitted; approval requires every submitted line norm-locked; final lock requires approved. A revise request needs an audit reason, clears the approver, and is blocked after final lock or while any non-cancelled procurement request is linked. A norm-locked revised line keeps its commercial fields immutable and permits descriptive metadata only.
 - V103 adds immutable project-level `boq_releases`. Each successful serialized project BOQ approval supersedes the prior current release and snapshots all approved rows, item count, total amount, actor/time and SHA-256 definition hash with a monotonic release number. Rev7 source gates read that release instead of asking users to retype BOQ/version/price data in workflow forms.

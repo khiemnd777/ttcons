@@ -6,9 +6,12 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   Clock3,
   FileCheck2,
+  GitBranch,
   Loader2,
   MessageSquare,
   PencilLine,
@@ -52,6 +55,8 @@ import {
   type WorkItemRequirementNavigationTarget,
 } from './workItemRequirements';
 import { firstFocusableRequirementControl, revealWorkItemRequirementTarget } from './workItemRequirementNavigation';
+import { executionTargetPath } from './workItemExecutionTarget';
+import type { WorkItemWorkflowNavigation } from './workItemWorkflowNavigation';
 import {
   actionDescriptions,
   actionLabels,
@@ -105,11 +110,13 @@ export function WorkItemDetailDialog({
 export function WorkItemDetailWorkspace({
   item,
   workItemId,
+  workflowNavigation,
   onClose,
   onChanged,
 }: {
   item?: WorkItem | null;
   workItemId?: string;
+  workflowNavigation?: WorkItemWorkflowNavigation;
   onClose?: () => void;
   onChanged?: (item: WorkItem) => void;
 }) {
@@ -292,7 +299,7 @@ export function WorkItemDetailWorkspace({
       {workDetail.error && !detailItem ? <EmptyState title="Không tải được chi tiết đầu việc" /> : null}
       {detailItem ? (
         <div className={clsx('space-y-4', showMobileWorkflowFormActions && 'pb-20 xl:pb-0')}>
-          <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} />
+          <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} workflowNavigation={workflowNavigation} />
 
           {futureReadOnly ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -688,19 +695,22 @@ type RequirementRow = {
 function WorkItemWorkspaceHeader({
   item,
   evidence,
+  workflowNavigation,
 }: {
   item: WorkItem;
   evidence: EvidenceRecord[];
+  workflowNavigation?: WorkItemWorkflowNavigation;
 }) {
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
   const context = workItemWorkflowContext(item);
 
   return (
     <section className="rounded-lg border border-line bg-white px-4 py-3 shadow-panel">
+      {workflowNavigation ? <WorkItemWorkflowToolbar navigation={workflowNavigation} /> : null}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="truncate text-xs font-semibold text-blue-700">{context.node} · {context.step}</p>
-          <h3 className="mt-1 text-base font-semibold text-ink">{item.title}</h3>
+          {!workflowNavigation ? <p className="truncate text-xs font-semibold text-blue-700">{context.node} · {context.step}</p> : null}
+          <h3 className={clsx('text-base font-semibold text-ink', !workflowNavigation && 'mt-1')}>{item.title}</h3>
           {item.description ? <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{item.description}</p> : null}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -721,6 +731,71 @@ function WorkItemWorkspaceHeader({
       </div>
     </section>
   );
+}
+
+function WorkItemWorkflowToolbar({ navigation }: { navigation: WorkItemWorkflowNavigation }) {
+  const previousPath = navigation.previous ? executionTargetPath(navigation.previous, navigation.returnTo) : '';
+  const nextPath = navigation.next ? executionTargetPath(navigation.next, navigation.returnTo) : '';
+
+  return (
+    <nav
+      className="-mx-4 -mt-3 mb-3 flex min-h-11 flex-col justify-center gap-2 border-b border-line px-4 py-2 text-xs font-semibold sm:flex-row sm:items-center sm:gap-3 sm:py-0"
+      aria-label="Vị trí trong giai đoạn"
+      data-work-item-workflow-context
+    >
+      <div className="flex min-w-0 shrink-0 items-center gap-2 whitespace-nowrap">
+        <span className="inline-flex min-w-0 items-center gap-1 text-blue-700">
+          <span className="uppercase tracking-wide text-slate-500">Giai đoạn</span>
+          <span className="max-w-44 truncate text-sm">{navigation.stageName}</span>
+        </span>
+        <span className="h-4 w-px bg-line" aria-hidden="true" />
+        <span className="text-sm tabular-nums text-ink">Bước {navigation.position}/{navigation.total}</span>
+      </div>
+
+      <div className="flex min-w-0 items-center gap-1 overflow-hidden sm:ml-auto">
+        {navigation.previous ? (
+          <Link
+            className="inline-flex min-w-0 items-center gap-1 rounded-md px-2 py-1.5 text-blue-700 hover:bg-blue-50"
+            to={previousPath}
+            aria-label={`Mở bước trước: ${workflowNeighborTitle(navigation.previous)}`}
+          >
+            <ChevronLeft className="h-4 w-4 shrink-0" />
+            <span className="shrink-0">Bước {workflowNeighborNumber(navigation.previous)}</span>
+            <span className="hidden max-w-40 truncate lg:inline">· {workflowNeighborTitle(navigation.previous)}</span>
+          </Link>
+        ) : null}
+        {navigation.next ? (
+          <Link
+            className="inline-flex min-w-0 items-center gap-1 rounded-md px-2 py-1.5 text-blue-700 hover:bg-blue-50"
+            to={nextPath}
+            aria-label={`Mở bước sau: ${workflowNeighborTitle(navigation.next)}`}
+          >
+            <span className="shrink-0">Bước {workflowNeighborNumber(navigation.next)}</span>
+            <span className="hidden max-w-40 truncate lg:inline">· {workflowNeighborTitle(navigation.next)}</span>
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          </Link>
+        ) : null}
+        {navigation.progressPath ? (
+          <Link
+            className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md border border-line bg-white px-2 py-1.5 text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 sm:ml-1"
+            to={navigation.progressPath}
+          >
+            <GitBranch className="h-3.5 w-3.5" />
+            Tiến độ
+          </Link>
+        ) : null}
+      </div>
+    </nav>
+  );
+}
+
+function workflowNeighborNumber(item: WorkItem) {
+  const value = Number(item.run_step_order_index);
+  return Number.isFinite(value) && value > 0 ? value : '-';
+}
+
+function workflowNeighborTitle(item: WorkItem) {
+  return item.run_step_name?.trim() || item.title;
 }
 
 function WorkItemRequirementPanel({

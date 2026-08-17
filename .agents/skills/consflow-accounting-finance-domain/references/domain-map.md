@@ -40,6 +40,7 @@
 
 ## Invariants
 
+- Tài chính công trình remains the canonical management-finance workspace. Work-item `execution_target` links may preserve existing source tabs and add presentation-only `?task=` context; they do not create a parallel payable/receivable/cash ledger, grant financial permission, post a journal or mark an external payment processed.
 - Product boundary: Consflow ordinary users manage workflow and project-management finance only. MISA owns professional bookkeeping/tax outside Consflow; there is no MISA integration or synchronization.
 - Global `/accounting` uses a draft searchable project choice and applies it only through the `project` query parameter after explicit confirmation. It must not eagerly load `/projects` or auto-select the first project; Reset removes the applied project and returns to the no-project empty state. Workspace reads, creates, actions and CSV use only the applied ID. `/projects/:id/accounting` remains fixed to the route project and never renders the global selector.
 - Finance project choices come from `/project-finance/projects`, not `/reports/options`. Search is server-side by code/name with bounded cursor pages; list rows and direct `selected_id` resolution apply identical actor-scope, non-cancelled and `project_finance.view` checks, so an unauthorized selected project returns `selected: null` without leaking its name.

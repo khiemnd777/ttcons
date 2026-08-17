@@ -2814,6 +2814,7 @@ export type WorkItem = ProjectOperationsRecord & {
     target_id?: string;
     facts?: AnyRecord;
   };
+  execution_target?: WorkItemExecutionTarget;
   required_permission_name?: string;
   required_permission_description?: string;
 	  report_eligible?: boolean;
@@ -2832,6 +2833,21 @@ export type WorkItem = ProjectOperationsRecord & {
   activities?: WorkItemActivity[];
   evidence?: EvidenceRecord[];
   assignments?: ProjectOperationsRecord[];
+};
+
+export type WorkItemExecutionTarget = {
+  kind: 'domain' | 'capture' | 'evidence' | 'approval' | 'mixed' | 'work_item' | string;
+  workspace: 'preparation' | 'planning' | 'boq' | 'contracts' | 'procurement' | 'warehouse' | 'operations' | 'acceptance' | 'handover' | 'project_finance' | 'work_item' | string;
+  route: string;
+  fallback_route?: string;
+  action_label: string;
+  completion_mode: 'domain_gate' | 'workflow_form' | 'evidence' | 'approval' | 'domain_then_form' | 'work_item' | string;
+  source_status?: string;
+  source_ready?: boolean;
+  source_message?: string;
+  action_key?: string;
+  target_type?: string;
+  target_id?: string;
 };
 
 export type WorkItemCompletionRequirement = {

@@ -3,6 +3,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { dateText } from '../../lib/utils/format';
 import type { WorkItem } from '../../lib/types/domain';
 import { asArray, departmentLabel, hasWorkflowFormSummary, isWorkOverdue, numberValue, workItemIsUpcoming, workItemWorkflowContext, workTypeLabel, workflowFormChipText, workflowFormStatusLabel } from './workItemPresentation';
+import { executionTargetActionLabel } from './workItemExecutionTarget';
 
 export function WorkItemCard({
   item,
@@ -50,7 +51,7 @@ export function WorkItemCard({
           className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
           onClick={onOpen}
         >
-          {upcoming ? 'Xem' : 'Mở xử lý'}
+          {upcoming ? 'Xem trước' : executionTargetActionLabel(item)}
         </button>
       </div>
       {item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{item.blocked_reason}</p> : null}

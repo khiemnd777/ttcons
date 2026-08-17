@@ -28,8 +28,8 @@ test('project explorer groups open their canonical first workspace for an admin'
 
   assert.deepEqual(routeMap(allPermissions), {
     overview: '/projects/project-1',
-    planning: '/projects/project-1/pipeline',
-    materials: '/projects/project-1/contracts',
+    planning: '/projects/project-1/preparation',
+    materials: '/projects/project-1/boq',
     quality: '/projects/project-1/operations',
     finance: '/projects/project-1/handover',
     governance: '/projects/project-1?tab=members',
@@ -42,8 +42,8 @@ test('project explorer groups fall back to the first child the user may view', (
     'project_finance.view', 'audit.view',
   ]), {
     overview: '/projects/project-1',
-    planning: '/projects/project-1/boq',
-    materials: '/projects/project-1/warehouse',
+    planning: '/projects/project-1/preparation',
+    materials: '/projects/project-1/boq',
     quality: '/projects/project-1/acceptance',
     finance: '/projects/project-1/accounting',
     governance: '/projects/project-1?tab=members',

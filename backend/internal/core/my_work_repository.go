@@ -207,7 +207,9 @@ func myWorkItemsBaseSQL() string {
 		WITH scoped_work AS (
 			SELECT wi.*, p.name AS project_name, p.code AS project_code,
 				rn.name AS run_node_name, rn.order_index AS run_node_order_index,
+				rn.type AS run_node_type, rn.business_code AS run_node_business_code,
 				rs.name AS run_step_name, rs.order_index AS run_step_order_index,
+				rs.business_code AS run_step_business_code,
 				s.full_name AS assignee_name,
 				pr.current_node_id AS pipeline_current_node_id, rn.status AS run_node_status,
 				COALESCE(pr.engine_version, 1) AS pipeline_engine_version,

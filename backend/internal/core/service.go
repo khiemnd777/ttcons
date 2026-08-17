@@ -2139,7 +2139,12 @@ func (s *Service) ProjectWorkItems(ctx context.Context, projectID, actorID strin
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền xem công việc của công trình này")
 	}
-	return s.repo.ListProjectWorkItems(ctx, projectID, actorID)
+	items, err := s.repo.ListProjectWorkItems(ctx, projectID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	attachExecutionTargets(items)
+	return items, nil
 }
 
 func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, actorID string) (Record, error) {
@@ -2158,6 +2163,7 @@ func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, act
 		item["queue_scopes"] = myWorkItemQueueScopes(item, canDecide)
 		item["available_actions"] = myWorkItemAvailableActions(item)
 		item["readiness"] = myWorkItemReadiness(item)
+		item["execution_target"] = workItemExecutionTarget(item, nil)
 		for _, internalKey := range []string{
 			"action_scope", "decision_required_roles", "decision_requested_by",
 			"pipeline_current_node_id", "run_node_status", "is_mine", "is_department", "is_watching", "is_future",
@@ -2226,7 +2232,14 @@ func (s *Service) ProjectOperations(ctx context.Context, projectID, actorID stri
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền xem điều hành công trình này")
 	}
-	return s.repo.ProjectOperations(ctx, projectID, actorID, filter)
+	operations, err := s.repo.ProjectOperations(ctx, projectID, actorID, filter)
+	if err != nil {
+		return nil, err
+	}
+	if items, ok := operations["work_items"].([]Record); ok {
+		attachExecutionTargets(items)
+	}
+	return operations, nil
 }
 
 func (s *Service) ProjectEvidencePage(ctx context.Context, projectID string, filter ProjectEvidenceFilter, actorID string) (Record, error) {
@@ -2631,6 +2644,7 @@ func (s *Service) WorkItemDetail(ctx context.Context, workItemID, actorID string
 	if len(businessSource) > 0 {
 		item["business_source"] = businessSource
 	}
+	item["execution_target"] = workItemExecutionTarget(item, businessSource)
 	completionRequirements, err := s.workItemCompletionRequirements(ctx, item, recordFromAny(item["completion_payload_json"]))
 	if err != nil {
 		return nil, err

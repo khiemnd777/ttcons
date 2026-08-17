@@ -14,7 +14,8 @@ import { ProjectBackLink } from '../../components/ProjectBackLink';
 import type { ProjectOperationsResponse, ProjectOperationsTimelineNode, WorkItem } from '../../lib/types/domain';
 import { enumLabel, statusLabel } from '../../lib/utils/status';
 import { ProjectWorkflowWorkspace } from '../projects/ProjectDetailPage';
-import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
+import { currentReturnTo } from '../work-items/workItemNavigation';
+import { executionTargetPath } from '../work-items/workItemExecutionTarget';
 import {
   asArray,
   hasWorkflowFormSummary,
@@ -49,9 +50,9 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
     retry: false,
   });
   const operations = useQuery({
-    queryKey: ['project-operations', id],
+    queryKey: ['project-operations', id, 'full'],
     queryFn: () => get<ProjectOperationsResponse>(`/projects/${id}/operations`),
-    enabled: Boolean(id) && mode === 'pipeline' && Boolean(run.data),
+    enabled: Boolean(id) && Boolean(run.data),
     retry: false,
   });
   const approvals = useQuery({
@@ -125,7 +126,8 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
       toast.warn({ title: 'Bước chưa có đầu việc', description: 'Quy trình đang chạy chưa tạo đầu việc cho bước này.' });
       return;
     }
-    navigate(workItemDetailPath(workItem.id, currentReturnTo(location), workItem.project_id ?? id));
+    const enriched = operations.data?.work_items?.find((item) => item.id === workItem.id) ?? workItem;
+    navigate(executionTargetPath(enriched, currentReturnTo(location)));
   }
 
   if (run.isLoading) return mode === 'planning' ? <PlanningWorkspaceLoading /> : <LoadingSpinner />;
@@ -136,7 +138,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
   return (
     <>
       <PageHeader
-        title={mode === 'pipeline' ? 'Quy trình công trình' : 'Kế hoạch'}
+        title={mode === 'pipeline' ? 'Tiến độ & Phụ thuộc' : 'Kế hoạch công việc'}
         description={run.data ? `${run.data.project_name} · Mẫu: ${run.data.template_name}` : 'Chưa có quy trình đang chạy cho công trình này.'}
         actions={
           mode === 'pipeline' ? (
@@ -152,7 +154,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
                   onClick={() => navigate(`/projects/${id}/pipeline`)}
                 >
                   <GitBranch className="h-4 w-4" />
-                  Mở quy trình
+                  Xem tiến độ & phụ thuộc
                 </button>
               ) : null}
               {terminalRun ? (
@@ -233,7 +235,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
           startPending={start.isPending}
           onSelectNode={setSelectedNodeId}
           onStartPipeline={() => start.mutate()}
-          onOpenWork={(item) => navigate(workItemDetailPath(item.id, currentReturnTo(location), item.project_id ?? id))}
+          onOpenWork={(item) => navigate(executionTargetPath(item, currentReturnTo(location)))}
           renderStageContext={(timelineNode) => {
             const runNode = nodes.find((node: Record<string, any>) => String(node.id) === timelineNode.id);
             const approval = approvals.data?.find((request) => request.target_type === 'pipeline_run_node' && request.target_id === timelineNode.id);
@@ -596,7 +598,7 @@ function PlanningActionWorkspace({
               <StatusBadge status={currentNode?.status ?? 'pending'} />
             </div>
             <h2 className="mt-2 text-lg font-bold text-ink">{currentNode?.name ?? 'Chưa có giai đoạn đang chạy'}</h2>
-            <p className="mt-1 line-clamp-2 text-sm text-slate-600">{currentNode?.description ?? 'Mở quy trình để kiểm tra trạng thái vận hành.'}</p>
+            <p className="mt-1 line-clamp-2 text-sm text-slate-600">{currentNode?.description ?? 'Mở tiến độ để kiểm tra trạng thái vận hành và phụ thuộc.'}</p>
           </div>
           <div className="w-full shrink-0 lg:w-80">
             <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold">
@@ -711,7 +713,7 @@ function PlanningActionWorkspace({
           </div>
 
           {!rows.length ? (
-            <EmptyState title="Quy trình này chưa có đầu việc." />
+            <EmptyState title="Kế hoạch tiến độ này chưa có đầu việc." />
           ) : filteredRows.length ? (
             <PlanningWorkList rows={filteredRows} onOpen={onOpenRow} />
           ) : (

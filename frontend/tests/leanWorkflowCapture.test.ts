@@ -51,12 +51,12 @@ test('Rev7 drafts preserve persisted answers over server suggestions and collaps
   assert.doesNotMatch(panel, /md:col-span-2/);
 });
 
-test('Rev7 work item surface renders canonical source readiness and direct source navigation', async () => {
+test('Rev7 work item surface renders canonical source readiness and backend-owned execution navigation', async () => {
   const surface = await source('../src/modules/work-items/WorkItemPrimarySurface.tsx');
 
   assert.match(surface, /item\.business_source \? <BusinessSourceCard/);
   assert.match(surface, /Dữ liệu từ module nguồn/);
   assert.match(surface, /source\.ready/);
-  assert.match(surface, /to=\{source\.route\}/);
-  assert.match(surface, /Mở nguồn/);
+  assert.match(surface, /item\.execution_target\?\.route \|\| source\.route/);
+  assert.match(surface, /item\.execution_target\?\.action_label \|\| 'Mở sổ nghiệp vụ'/);
 });

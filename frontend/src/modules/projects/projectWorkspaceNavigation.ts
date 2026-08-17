@@ -25,15 +25,15 @@ export const PROJECT_WORKSPACE_GROUPS: ProjectWorkspaceGroup[] = [
   },
   {
     key: 'planning',
-    label: 'Kế hoạch & Quy trình',
-    explorerLabel: 'Kế hoạch & Workflow',
-    description: 'Pipeline, planning, BOQ / dự toán',
+    label: 'Kế hoạch',
+    explorerLabel: 'Kế hoạch',
+    description: 'Hồ sơ chuẩn bị, kế hoạch công việc và tiến độ phụ thuộc',
     to: 'planning',
-    permissions: ['planning.view', 'pipeline.view', 'boq.view'],
+    permissions: ['project.view', 'planning.view', 'pipeline.view'],
     children: [
-      { label: 'Quy trình', to: 'pipeline', permissions: ['pipeline.view'] },
-      { label: 'Kế hoạch', to: 'planning', permissions: ['planning.view', 'pipeline.view'] },
-      { label: 'Dự toán khối lượng', to: 'boq', permissions: ['boq.view'] },
+      { label: 'Hồ sơ chuẩn bị', to: 'preparation', permissions: ['project.view'] },
+      { label: 'Kế hoạch công việc', to: 'planning', permissions: ['planning.view', 'pipeline.view'] },
+      { label: 'Tiến độ & Phụ thuộc', to: 'pipeline', permissions: ['pipeline.view'] },
     ],
   },
   {
@@ -43,6 +43,7 @@ export const PROJECT_WORKSPACE_GROUPS: ProjectWorkspaceGroup[] = [
     to: 'procurement',
     permissions: ['procurement.view', 'warehouse.view', 'contract.view'],
     children: [
+      { label: 'BOQ', to: 'boq', permissions: ['boq.view'] },
       { label: 'Hợp đồng', to: 'contracts', permissions: ['contract.view'] },
       { label: 'Mua sắm', to: 'procurement', permissions: ['procurement.view'] },
       { label: 'Kho vật tư', to: 'warehouse', permissions: ['warehouse.view'] },

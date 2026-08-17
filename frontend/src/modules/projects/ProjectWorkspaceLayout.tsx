@@ -38,6 +38,7 @@ import {
   visibleProjectWorkspaceGroups,
   type ProjectWorkspaceGroup,
 } from './projectWorkspaceNavigation';
+import { ProjectTaskContext } from './ProjectTaskContext';
 
 type ProjectWorkspaceOperations = ProjectOperationsResponse | ProjectOperationsSidebarResponse;
 
@@ -46,12 +47,13 @@ export function ProjectWorkspaceLayout() {
   const { user, logout, hasAnyPermission } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const showWorkflowSidebar = isProjectWorkItemDetailPath(location.pathname);
-  const operationsView = showWorkflowSidebar ? 'workflow-sidebar' : 'full';
+  const workItemDetail = isProjectWorkItemDetailPath(location.pathname);
+  const showWorkflowSidebar = false;
+  const operationsView = 'full';
   const operations = useQuery({
     queryKey: ['project-operations', id, operationsView],
     queryFn: () => get<ProjectOperationsResponse | ProjectOperationsSidebarResponse>(
-      `/projects/${id}/operations${showWorkflowSidebar ? '?view=workflow-sidebar' : ''}`,
+      `/projects/${id}/operations`,
     ),
     enabled: Boolean(id),
     retry: false,
@@ -93,7 +95,7 @@ export function ProjectWorkspaceLayout() {
                     project?.client_name ? `Chủ đầu tư: ${project.client_name}` : null,
                     project?.pm_name ? `Phụ trách: ${project.pm_name}` : null,
                     project?.status ? `Trạng thái: ${statusLabel(project.status)}` : null,
-                  ].filter(Boolean).join(' · ') || (showWorkflowSidebar ? 'Quy trình là dòng thời gian xử lý công việc' : 'Cây nghiệp vụ là menu chính trong phạm vi công trình')}
+                  ].filter(Boolean).join(' · ') || (workItemDetail ? 'Hồ sơ công việc và điều kiện điều phối' : 'Cây nghiệp vụ là menu chính trong phạm vi công trình')}
                 </p>
               </div>
             </div>
@@ -126,7 +128,7 @@ export function ProjectWorkspaceLayout() {
           <ArrowLeft className="h-4 w-4" />
           Công trình
         </button>
-        <button type="button" aria-expanded={mobileSidebarOpen} className="inline-flex min-w-0 items-center justify-between rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-ink" onClick={() => setMobileSidebarOpen((current) => !current)}><span className="inline-flex min-w-0 items-center gap-2"><PanelLeftClose className="h-4 w-4 shrink-0 text-blue-700" /><span className="truncate">{showWorkflowSidebar ? 'Mở cây quy trình' : 'Mở cây nghiệp vụ'}</span></span>{mobileSidebarOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}</button>
+        <button type="button" aria-expanded={mobileSidebarOpen} className="inline-flex min-w-0 items-center justify-between rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-ink" onClick={() => setMobileSidebarOpen((current) => !current)}><span className="inline-flex min-w-0 items-center gap-2"><PanelLeftClose className="h-4 w-4 shrink-0 text-blue-700" /><span className="truncate">Mở cây nghiệp vụ</span></span>{mobileSidebarOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}</button>
       </div>
       <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className={`${mobileSidebarOpen ? 'flex' : 'hidden'} flex-col border-b border-line bg-white lg:sticky lg:top-16 lg:flex lg:h-[calc(100vh-4rem)] lg:overflow-hidden lg:border-b-0 lg:border-r`}>
@@ -157,6 +159,7 @@ export function ProjectWorkspaceLayout() {
 
         <div className="flex min-w-0 flex-col">
           <main className="flex-1 px-4 py-5 md:px-6">
+            <ProjectTaskContext projectId={id} />
             <Outlet />
           </main>
           <footer className="border-t border-line bg-white px-4 py-3 lg:hidden">
@@ -633,9 +636,14 @@ function WorkspaceGroupNode({ group, projectId }: { group: ProjectWorkspaceGroup
     <div>
       <Link
         to={groupTarget}
+        aria-current={!group.children.length && groupActive ? 'page' : undefined}
         className={clsx(
           'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold focus-ring',
-          groupActive ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50 hover:text-ink',
+          group.children.length
+            ? 'text-slate-700 hover:bg-slate-50 hover:text-ink'
+            : groupActive
+              ? 'bg-blue-50 text-blue-700'
+              : 'text-slate-700 hover:bg-slate-50 hover:text-ink',
         )}
       >
         <ChevronDown className="h-4 w-4 shrink-0" />
@@ -651,6 +659,7 @@ function WorkspaceGroupNode({ group, projectId }: { group: ProjectWorkspaceGroup
               <Link
                 key={`${group.key}-${child.label}`}
                 to={childTarget}
+                aria-current={active ? 'page' : undefined}
                 className={clsx(
                   'ml-8 flex w-[calc(100%-2rem)] items-center gap-2 border-l border-slate-200 px-4 py-1.5 text-sm focus-ring',
                   active ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700',

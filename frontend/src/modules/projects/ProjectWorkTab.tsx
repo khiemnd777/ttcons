@@ -15,6 +15,7 @@ import {
   orderWorkItemsByWorkflow,
   workflowFormChipText,
 } from '../work-items/workItemPresentation';
+import { executionTargetActionLabel } from '../work-items/workItemExecutionTarget';
 
 type WorkQueueFilter = 'actionable' | 'waiting' | 'blocked' | 'future' | 'completed' | 'skipped' | 'all';
 type WorkSort = 'priority' | 'workflow' | 'due';
@@ -346,7 +347,7 @@ function OpenWorkButton({ item, onOpen }: { item: WorkItem; onOpen: () => void }
       onClick={onOpen}
       aria-label={`Mở ${item.title}`}
     >
-      Mở
+      {executionTargetActionLabel(item)}
       <ArrowUpRight className="h-3.5 w-3.5" />
     </button>
   );
