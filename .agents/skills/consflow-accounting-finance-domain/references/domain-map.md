@@ -92,6 +92,7 @@
 - Pair with admin/governance when partner catalog, tax codes, permissions, or audit semantics affect financial records.
 - Every editable monetary value in accounting, project finance, AP/AR, invoices, schedules, advances, settlements, taxes and journal debit/credit uses shared `CurrencyInput` or semantic `currency`; native/generic number fields remain reserved for non-money numerics. Preserve explicit currency, negative adjustment rules, decimal precision and the existing numeric API payload.
 - V102's lean workflow forms do not post or reconcile invoices. `client_output_invoice_issue` and `client_input_invoice_closure` V2 require only an operational invoice status by default; number and semantic VND currency amount become visible and required only for `issued` or `received`. Canonical invoice/AR/AP routes, files, transitions, journals, tax and reconciliation remain separate and authoritative.
+- Rev7 removes duplicated invoice number/amount/status, payment period/amount, received/paid amount and closure-check capture from workflow forms. `source.*`, `receivable.issue_invoice`, `payable.verify_input_invoice`, finance scaffold and handover gates read canonical AP/AR, verified/issued invoice, allocation and readiness records and fail closed before work-item completion; they never post accounting entries from form answers.
 
 ## Golden Sample
 

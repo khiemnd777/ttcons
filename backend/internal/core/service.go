@@ -2624,6 +2624,13 @@ func (s *Service) WorkItemDetail(ctx context.Context, workItemID, actorID string
 	item["start_readiness"] = startReadiness
 	item["available_actions"] = myWorkItemAvailableActions(item)
 	item["readiness"] = myWorkItemReadiness(item)
+	businessSource, err := s.repo.WorkflowBusinessSourceForWorkItem(ctx, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	if len(businessSource) > 0 {
+		item["business_source"] = businessSource
+	}
 	completionRequirements, err := s.workItemCompletionRequirements(ctx, item, recordFromAny(item["completion_payload_json"]))
 	if err != nil {
 		return nil, err
@@ -2651,12 +2658,23 @@ func (s *Service) WorkItemForm(ctx context.Context, workItemID, actorID string) 
 		return nil, err
 	}
 	form["available"] = true
+	actorName := ""
+	if actorID != "" {
+		if actor, actorErr := s.repo.GetByID(ctx, "users", actorID); actorErr == nil {
+			actorName = strings.TrimSpace(fmt.Sprint(actor["full_name"]))
+		}
+	}
+	instance := recordFromAny(form["instance"])
+	fields := workflowAnswerRecordList(form["fields"])
+	if !statusIn(fmt.Sprint(instance["status"]), "submitted", "cancelled") {
+		form["suggested_answers"] = workflowFormSuggestedAnswers(instance, fields, actorName, time.Now())
+	}
 	canAmend, err := s.canAmendWorkflowForm(ctx, form, actorID)
 	if err != nil {
 		return nil, err
 	}
 	form["capabilities"] = Record{"can_amend": canAmend}
-	if instance := recordFromAny(form["instance"]); len(instance) > 0 {
+	if len(instance) > 0 {
 		runNodeID := cleanID(instance["run_node_id"])
 		if runNodeID != "" {
 			if node, nodeErr := s.repo.GetByID(ctx, "pipeline_run_nodes", runNodeID); nodeErr == nil {
@@ -2707,7 +2725,8 @@ func (s *Service) AmendWorkflowForm(ctx context.Context, instanceID string, req 
 		return nil, forbiddenError("Bạn không có quyền chỉnh sửa hồ sơ nghiệp vụ này")
 	}
 	fields := workflowAnswerRecordList(form["fields"])
-	normalized, err := s.validateWorkflowFormAnswers(ctx, instance, fields, req.Answers, true)
+	answers := applyWorkflowFormSuggestedAnswers(instance, fields, req.Answers, actorName, time.Now())
+	normalized, err := s.validateWorkflowFormAnswers(ctx, instance, fields, answers, true)
 	if err != nil {
 		return nil, err
 	}
@@ -5664,7 +5683,8 @@ func (s *Service) saveWorkflowForm(ctx context.Context, instanceID string, req W
 		return nil, validationError("Trạng thái biểu mẫu quy trình không cho phép lưu nháp", Record{"status": instance["status"]})
 	}
 	fields, _ := form["fields"].([]Record)
-	normalized, err := s.validateWorkflowFormAnswers(ctx, instance, fields, req.Answers, submit)
+	answers := applyWorkflowFormSuggestedAnswers(instance, fields, req.Answers, actorName, time.Now())
+	normalized, err := s.validateWorkflowFormAnswers(ctx, instance, fields, answers, submit)
 	if err != nil {
 		return nil, err
 	}

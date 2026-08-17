@@ -294,6 +294,7 @@ func TestBOQLifecycleHardeningAndProcurementLink(t *testing.T) {
 	if number(approved["item_count"]) != 2 {
 		t.Fatalf("approve result = %#v, want two norm-locked submitted rows", approved)
 	}
+	assertCount(t, db, `SELECT COUNT(*) FROM boq_releases WHERE project_id=$1 AND status='released' AND release_no=1 AND item_count=2`, 1, projectID)
 	_, err = service.ReviseBOQ(ctx, draftID, BOQReviseRequest{}, actorID, "boq@test.local")
 	assertValidationError(t, err)
 	revised, err := service.ReviseBOQ(ctx, draftID, BOQReviseRequest{Reason: "  Bổ sung diễn giải theo hiện trường  "}, actorID, "boq@test.local")
@@ -795,6 +796,7 @@ func TestSubcontractorChecklistFormValidatesEvidenceAndQuantities(t *testing.T) 
 		WHERE t.code='builtin_subcontractor_checklist'
 		  AND t.status='active'
 		  AND v.status='published'
+		  AND COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
 		ORDER BY v.version_no DESC
 		LIMIT 1
 	`).Scan(&formVersionID); err != nil {
@@ -959,6 +961,7 @@ func TestSubcontractorChecklistReconciliationPersistsAuditAndValidatesReferences
 		WHERE t.code='builtin_subcontractor_checklist'
 		  AND t.status='active'
 		  AND v.status='published'
+		  AND COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
 		ORDER BY v.version_no DESC
 		LIMIT 1
 	`).Scan(&formVersionID); err != nil {
@@ -1108,6 +1111,7 @@ func TestOwnerClientChecklistFormValidatesEvidenceAndSubmitGate(t *testing.T) {
 		WHERE t.code='builtin_owner_client_checklist'
 		  AND t.status='active'
 		  AND v.status='published'
+		  AND COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
 		ORDER BY v.version_no DESC
 		LIMIT 1
 	`).Scan(&formVersionID); err != nil {
@@ -1246,6 +1250,7 @@ func TestOwnerClientChecklistReconciliationPersistsAuditAndValidatesAcceptance(t
 		WHERE t.code='builtin_owner_client_checklist'
 		  AND t.status='active'
 		  AND v.status='published'
+		  AND COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
 		ORDER BY v.version_no DESC
 		LIMIT 1
 	`).Scan(&formVersionID); err != nil {

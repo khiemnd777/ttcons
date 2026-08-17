@@ -2177,6 +2177,7 @@ export type WorkflowFormDetail = {
   };
   fields?: WorkflowFormField[];
   answers?: AnyRecord;
+  suggested_answers?: AnyRecord;
   events?: AnyRecord[];
   signatures?: WorkflowFormSignature[];
   seal_applications?: WorkflowFormSealApplication[];
@@ -2802,6 +2803,17 @@ export type WorkItem = ProjectOperationsRecord & {
   pipeline_engine_version?: number;
   surface_kind?: string;
   domain_action_key?: string;
+  business_source?: {
+    action_key?: string;
+    label?: string;
+    ready?: boolean;
+    status?: string;
+    message?: string;
+    route?: string;
+    target_type?: string;
+    target_id?: string;
+    facts?: AnyRecord;
+  };
   required_permission_name?: string;
   required_permission_description?: string;
 	  report_eligible?: boolean;

@@ -34,3 +34,29 @@ test('mobile and desktop workflow actions share the same save and submit callbac
   assert.match(detail, /onSaveWorkflowForm=\{\(\) => workflowFormActionRef\.current\?\.save\(\)\}/);
   assert.match(detail, /onSubmitWorkflowForm=\{\(\) => workflowFormActionRef\.current\?\.submit\(\)\}/);
 });
+
+test('Rev7 drafts preserve persisted answers over server suggestions and collapse optional capture', async () => {
+  const panel = await source('../src/modules/work-items/WorkflowFormPanel.tsx');
+
+  assert.match(panel, /form\.data\?\.suggested_answers/);
+  assert.match(panel, /\{ \.\.\.\(form\.data\?\.suggested_answers \?\? \{\}\), \.\.\.\(form\.data\?\.answers \?\? \{\}\) \}/);
+  assert.match(panel, /workflowFormFieldIsOptional/);
+  assert.match(panel, /validation_json\?\.capture_mode === 'optional'/);
+  assert.match(panel, /Thông tin bổ sung/);
+  assert.match(panel, /Không bắt buộc/);
+  assert.match(panel, /aria-expanded=\{optionalFieldsOpen\}/);
+  assert.match(panel, /className="grid grid-cols-1 gap-3 border-t border-line p-3"/);
+  assert.match(panel, /className="grid grid-cols-1 gap-3 border-t border-slate-200 bg-white p-3"/);
+  assert.match(panel, /className="min-w-0 scroll-mt-24 rounded-md outline-none"/);
+  assert.doesNotMatch(panel, /md:col-span-2/);
+});
+
+test('Rev7 work item surface renders canonical source readiness and direct source navigation', async () => {
+  const surface = await source('../src/modules/work-items/WorkItemPrimarySurface.tsx');
+
+  assert.match(surface, /item\.business_source \? <BusinessSourceCard/);
+  assert.match(surface, /Dữ liệu từ module nguồn/);
+  assert.match(surface, /source\.ready/);
+  assert.match(surface, /to=\{source\.route\}/);
+  assert.match(surface, /Mở nguồn/);
+});

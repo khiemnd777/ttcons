@@ -2341,6 +2341,7 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 			wft.description AS form_description,
 			wfv.version_no AS form_version_no,
 			wfv.status AS form_version_status,
+			COALESCE(wfv.schema_json->>'variant','') AS form_version_variant,
 			wi.title AS work_item_title,
 			wi.status AS work_item_status
 		FROM workflow_form_instances wfi
@@ -2361,6 +2362,12 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 	if err != nil {
 		return nil, err
 	}
+	fields = applyOperationalWorkflowFormFieldPresentation(
+		fmt.Sprint(instance["form_version_variant"]),
+		fmt.Sprint(instance["form_code"]),
+		fields,
+	)
+	delete(instance, "form_version_variant")
 	answerRows, err := queryRecords(ctx, db, `
 		SELECT field_key, value_json, revision_no, updated_by, updated_at
 		FROM workflow_form_answers
@@ -4235,6 +4242,7 @@ func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) 
 				template_id
 			FROM workflow_form_versions
 			WHERE status='published'
+			  AND COALESCE(schema_json->>'variant','')<>'operational_capture_v3'
 			ORDER BY template_id, version_no DESC, published_at DESC NULLS LAST, created_at DESC
 		),
 		step_usage AS (
@@ -4279,6 +4287,7 @@ func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) 
 			) AS fields
 		FROM workflow_form_templates t
 		JOIN workflow_form_versions v ON v.template_id=t.id AND v.status='published'
+		  AND COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
 		JOIN latest_published lp ON lp.template_id=t.id
 		LEFT JOIN workflow_form_fields f ON f.form_version_id=v.id
 		LEFT JOIN step_usage su ON su.form_version_id=v.id
@@ -4899,6 +4908,7 @@ func (r *Repository) DefaultWorkflowFormVersionID(ctx context.Context, stepType 
 		FROM workflow_form_templates t
 		JOIN workflow_form_versions v ON v.template_id=t.id
 		WHERE t.code=$1 AND t.status='active' AND v.status='published'
+		  AND COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
 		ORDER BY v.version_no DESC
 		LIMIT 1
 	`, code)
@@ -9608,7 +9618,7 @@ func (r *Repository) RunClientWorkflowAutomationForWorkItem(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	if cleanID(contextRow["template_id"]) != clientOfficialWorkflowTemplateID {
+	if !isClientOfficialWorkflowContext(contextRow) {
 		return nil
 	}
 	if int(number(contextRow["engine_version"])) >= 2 {
@@ -9643,7 +9653,7 @@ func (r *Repository) RunRequiredWorkflowAutomationForWorkItem(ctx context.Contex
 	if err != nil {
 		return err
 	}
-	if int(number(contextRow["engine_version"])) < 2 || cleanID(contextRow["template_id"]) != clientOfficialWorkflowTemplateID {
+	if int(number(contextRow["engine_version"])) < 2 || !isClientOfficialWorkflowContext(contextRow) {
 		return nil
 	}
 	actionKey := clientWorkflowAutomationAction(contextRow)
@@ -9697,6 +9707,8 @@ func (r *Repository) clientWorkflowAutomationContext(ctx context.Context, workIt
 			pr.template_id,
 			COALESCE(pr.engine_version, 1) AS engine_version,
 			pt.name AS template_name,
+			pt.template_family_id,
+			pt.revision_no AS template_revision_no,
 			rn.id AS context_run_node_id,
 			rn.name AS run_node_name,
 			rn.type AS run_node_type,
@@ -9717,7 +9729,11 @@ func (r *Repository) clientWorkflowAutomationContext(ctx context.Context, workIt
 func clientWorkflowAutomationAction(contextRow Record) string {
 	domainActionKey := strings.TrimSpace(fmt.Sprint(contextRow["domain_action_key"]))
 	switch domainActionKey {
-	case "procurement.generate_from_boq", "procurement.require_approved", "contract.require_execution_ready", "finance.scaffold_incoming_acceptance", "finance.scaffold_outgoing_acceptance", "handover.evaluate_readiness":
+	case "procurement.generate_from_boq", "procurement.require_approved", "contract.require_execution_ready", "finance.scaffold_incoming_acceptance", "finance.scaffold_outgoing_acceptance", "handover.evaluate_readiness",
+		"construction.activate_handoff", "subcontractor.reconcile_checklist", "acceptance.incoming_material", "subcontractor.prepare_quantity_dossier", "owner.reconcile_acceptance", "receivable.issue_invoice", "payable.verify_input_invoice":
+		return domainActionKey
+	}
+	if strings.HasPrefix(domainActionKey, "source.") {
 		return domainActionKey
 	}
 	if int(number(contextRow["engine_version"])) >= 2 {
@@ -9756,13 +9772,268 @@ func (r *Repository) executeClientWorkflowAutomation(ctx context.Context, contex
 		outcome, err = r.automateClientOutgoingAcceptanceFinance(ctx, contextRow, actorID, actorName)
 	case "handover_financial_closure_check", "handover.evaluate_readiness":
 		outcome, err = r.automateClientHandoverClosure(ctx, contextRow, actorID, actorName)
+	case "construction.activate_handoff", "subcontractor.reconcile_checklist", "acceptance.incoming_material", "subcontractor.prepare_quantity_dossier", "owner.reconcile_acceptance", "receivable.issue_invoice", "payable.verify_input_invoice":
+		outcome, err = r.automateClientOperationalSourceGate(ctx, contextRow, actionKey)
 	default:
-		return workflowAutomationOutcome{}, nil
+		if strings.HasPrefix(actionKey, "source.") {
+			outcome, err = r.automateClientOperationalSourceGate(ctx, contextRow, actionKey)
+		} else {
+			return workflowAutomationOutcome{}, nil
+		}
 	}
 	if outcome.ActionKey != "" {
 		outcome.ActionKey = actionKey
 	}
 	return outcome, err
+}
+
+func isClientOfficialWorkflowContext(contextRow Record) bool {
+	return cleanID(contextRow["template_id"]) == clientOfficialWorkflowTemplateID ||
+		cleanID(contextRow["template_family_id"]) == clientOfficialWorkflowTemplateID
+}
+
+func (r *Repository) WorkflowBusinessSourceForWorkItem(ctx context.Context, workItemID string) (Record, error) {
+	contextRow, err := r.clientWorkflowAutomationContext(ctx, cleanID(workItemID))
+	if err != nil {
+		return nil, err
+	}
+	if !isClientOfficialWorkflowContext(contextRow) || int(number(contextRow["template_revision_no"])) < 7 {
+		return nil, nil
+	}
+	actionKey := clientWorkflowAutomationAction(contextRow)
+	if actionKey == "" {
+		return nil, nil
+	}
+	inspectionKey := actionKey
+	switch actionKey {
+	case "procurement.generate_from_boq":
+		inspectionKey = "source.boq_release_ready"
+	case "procurement.require_approved":
+		outcome, inspectErr := r.automateClientInputProcurementGate(ctx, contextRow)
+		return workflowBusinessSourceRecord(actionKey, outcome), inspectErr
+	case "contract.require_execution_ready":
+		outcome, inspectErr := r.automateClientContractExecutionGate(ctx, contextRow)
+		return workflowBusinessSourceRecord(actionKey, outcome), inspectErr
+	case "finance.scaffold_incoming_acceptance":
+		inspectionKey = "source.input_invoice_verified"
+	case "finance.scaffold_outgoing_acceptance":
+		inspectionKey = "receivable.issue_invoice"
+	case "handover.evaluate_readiness":
+		return Record{
+			"action_key": actionKey,
+			"label":      "Hồ sơ bàn giao và đóng tài chính",
+			"ready":      false,
+			"status":     "pending_check",
+			"message":    "Readiness được kiểm tra fail-closed khi hoàn tất bước.",
+			"route":      fmt.Sprintf("/projects/%s/handover", cleanID(contextRow["project_id"])),
+		}, nil
+	}
+	outcome, err := r.automateClientOperationalSourceGate(ctx, contextRow, inspectionKey)
+	return workflowBusinessSourceRecord(actionKey, outcome), err
+}
+
+func workflowBusinessSourceRecord(actionKey string, outcome workflowAutomationOutcome) Record {
+	if outcome.ActionKey == "" && outcome.Status == "" {
+		return nil
+	}
+	metadata := outcome.Metadata
+	if metadata == nil {
+		metadata = Record{}
+	}
+	message := outcome.Message
+	if outcome.BlockerReason != "" {
+		message = outcome.BlockerReason
+	}
+	return Record{
+		"action_key":  actionKey,
+		"label":       metadata["label"],
+		"ready":       outcome.Status == "succeeded" || outcome.Status == "skipped",
+		"status":      outcome.Status,
+		"message":     message,
+		"route":       metadata["route"],
+		"target_type": outcome.TargetType,
+		"target_id":   outcome.TargetID,
+		"facts":       metadata,
+	}
+}
+
+func (r *Repository) automateClientOperationalSourceGate(ctx context.Context, contextRow Record, actionKey string) (workflowAutomationOutcome, error) {
+	projectID := cleanID(contextRow["project_id"])
+	workItemID := cleanID(contextRow["id"])
+	metadata := Record{"project_id": projectID}
+	var row Record
+	var err error
+	ready := false
+	reason := "Nguồn nghiệp vụ chưa sẵn sàng"
+	targetType := "project"
+	targetID := projectID
+
+	switch actionKey {
+	case "source.design_documents_ready":
+		metadata["label"] = "Hồ sơ thiết kế phát hành"
+		metadata["route"] = fmt.Sprintf("/projects/%s", projectID)
+		row, err = r.QueryOne(ctx, `
+			SELECT COUNT(*) AS total,MAX(er.id::text) AS target_id
+			FROM evidence_records er
+			JOIN work_items wi ON wi.id=er.work_item_id
+			LEFT JOIN pipeline_run_nodes node ON node.id=wi.run_node_id
+			WHERE er.project_id=$1 AND er.status IN ('submitted','accepted')
+			  AND (wi.id=$2 OR node.business_code='design')
+		`, projectID, workItemID)
+		ready = number(row["total"]) > 0
+		reason = "Chưa có hồ sơ/minh chứng thiết kế đã nộp"
+		targetType, targetID = "evidence", cleanID(row["target_id"])
+	case "source.boq_items_ready":
+		metadata["label"] = "BOQ công trình"
+		metadata["route"] = fmt.Sprintf("/projects/%s/boq", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM boq_items WHERE project_id=$1 AND status<>'deleted'`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Chưa có dòng BOQ trong module BOQ"
+		targetType, targetID = "boq_item", cleanID(row["target_id"])
+	case "source.boq_approved", "source.boq_release_ready":
+		metadata["label"] = "Bản phát hành BOQ"
+		metadata["route"] = fmt.Sprintf("/projects/%s/boq", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id,MAX(release_no) AS release_no FROM boq_releases WHERE project_id=$1 AND status='released'`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "BOQ chưa được duyệt để tạo bản phát hành"
+		targetType, targetID = "boq_release", cleanID(row["target_id"])
+	case "source.contract_version_ready", "source.contract_review_ready", "source.contract_app_signed":
+		metadata["label"] = "Hợp đồng chủ đầu tư"
+		metadata["route"] = fmt.Sprintf("/projects/%s/contracts", projectID)
+		row, err = r.QueryOne(ctx, `
+			SELECT c.id::text AS target_id,c.status,cv.status AS version_status,cv.version_no,
+			  EXISTS (SELECT 1 FROM contract_version_signature_links link WHERE link.contract_version_id=cv.id) AS app_signed
+			FROM contracts c
+			LEFT JOIN contract_versions cv ON cv.id=c.current_version_id
+			WHERE c.project_id=$1 AND c.contract_type='main_client' AND c.direction='receivable' AND c.status<>'terminated'
+			ORDER BY c.updated_at DESC LIMIT 1
+		`, projectID)
+		targetType, targetID = "contract", cleanID(row["target_id"])
+		switch actionKey {
+		case "source.contract_version_ready":
+			ready = targetID != "" && cleanID(row["version_no"]) != ""
+			reason = "Chưa có version hợp đồng chủ đầu tư"
+		case "source.contract_review_ready":
+			ready = statusIn(fmt.Sprint(row["version_status"]), "approved", "signed")
+			reason = "Version hợp đồng chưa được duyệt"
+		case "source.contract_app_signed":
+			ready = fmt.Sprint(row["version_status"]) == "signed" && boolValue(row["app_signed"])
+			reason = "Version hợp đồng chưa được ký trên App"
+		}
+	case "source.supplier_quotation_ready":
+		metadata["label"] = "Báo giá nhà cung cấp"
+		metadata["route"] = fmt.Sprintf("/projects/%s/procurement", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM supplier_quotations WHERE project_id=$1 AND status IN ('qualified','selected')`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Chưa có báo giá nhà cung cấp đạt điều kiện"
+		targetType, targetID = "supplier_quotation", cleanID(row["target_id"])
+	case "source.supplier_selection_ready":
+		metadata["label"] = "Lựa chọn báo giá"
+		metadata["route"] = fmt.Sprintf("/projects/%s/procurement", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM supplier_quote_selections WHERE project_id=$1 AND status='active'`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Chưa chốt lựa chọn báo giá đầu vào"
+		targetType, targetID = "supplier_quote_selection", cleanID(row["target_id"])
+	case "source.procurement_contract_ready":
+		metadata["label"] = "Hợp đồng đầu vào"
+		metadata["route"] = fmt.Sprintf("/projects/%s/contracts", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM contracts WHERE project_id=$1 AND direction='payable' AND contract_type IN ('supplier','subcontractor','service') AND status IN ('approved','signed','active')`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Chưa có hợp đồng đầu vào đã duyệt"
+		targetType, targetID = "contract", cleanID(row["target_id"])
+	case "subcontractor.reconcile_checklist", "subcontractor.prepare_quantity_dossier", "source.subcontractor_reconciliation_ready":
+		metadata["label"] = "Đối chiếu thầu phụ"
+		metadata["route"] = fmt.Sprintf("/projects/%s/acceptance", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM subcontractor_checklist_reconciliations WHERE project_id=$1 AND status='submitted'`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Đối chiếu checklist/khối lượng thầu phụ chưa được chốt"
+		targetType, targetID = "subcontractor_reconciliation", cleanID(row["target_id"])
+	case "acceptance.incoming_material":
+		metadata["label"] = "Nghiệm thu vật tư đầu vào"
+		metadata["route"] = fmt.Sprintf("/projects/%s/acceptance", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM incoming_acceptance_records WHERE project_id=$1 AND status='submitted'`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Hồ sơ nghiệm thu vật tư đầu vào chưa được chốt"
+		targetType, targetID = "incoming_acceptance", cleanID(row["target_id"])
+	case "construction.activate_handoff":
+		metadata["label"] = "Bàn giao kế hoạch thi công"
+		metadata["route"] = fmt.Sprintf("/projects/%s/planning", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id,MAX(revision_no) AS revision_no FROM construction_handoffs WHERE project_id=$1 AND status='activated'`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Kế hoạch thi công chưa được kích hoạt bàn giao"
+		targetType, targetID = "construction_handoff", cleanID(row["target_id"])
+	case "source.payable_ready", "source.payable_approved":
+		metadata["label"] = "Công nợ phải trả"
+		metadata["route"] = fmt.Sprintf("/projects/%s/accounting?tab=tasks", projectID)
+		if actionKey == "source.payable_approved" {
+			row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM payables WHERE project_id=$1 AND status IN ('approved','partially_paid','paid')`, projectID)
+		} else {
+			row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM payables WHERE project_id=$1 AND status IN ('submitted','approved','partially_paid','paid')`, projectID)
+		}
+		ready = number(row["total"]) > 0
+		reason = "Chưa có công nợ phải trả ở trạng thái phù hợp"
+		targetType, targetID = "payable", cleanID(row["target_id"])
+	case "source.input_invoice_verified", "payable.verify_input_invoice":
+		metadata["label"] = "Hóa đơn đầu vào"
+		metadata["route"] = fmt.Sprintf("/projects/%s/accounting?tab=tasks", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM input_invoices WHERE project_id=$1 AND status='verified'`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Chưa có hóa đơn đầu vào đã xác minh"
+		targetType, targetID = "input_invoice", cleanID(row["target_id"])
+	case "source.final_acceptance_ready":
+		metadata["label"] = "Nghiệm thu đầu ra"
+		metadata["route"] = fmt.Sprintf("/projects/%s/acceptance", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM acceptance_records WHERE project_id=$1 AND type='final' AND status='completed' AND result IN ('pass','conditional_pass')`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Nghiệm thu đầu ra chưa hoàn tất đạt"
+		targetType, targetID = "acceptance", cleanID(row["target_id"])
+	case "owner.reconcile_acceptance":
+		metadata["label"] = "Đối chiếu chủ đầu tư"
+		metadata["route"] = fmt.Sprintf("/projects/%s/acceptance", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM owner_client_checklist_reconciliations WHERE project_id=$1 AND status='submitted'`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Đối chiếu chủ đầu tư chưa được chốt"
+		targetType, targetID = "owner_client_reconciliation", cleanID(row["target_id"])
+	case "source.receivable_ready":
+		metadata["label"] = "Công nợ phải thu"
+		metadata["route"] = fmt.Sprintf("/projects/%s/accounting?tab=tasks", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM receivables WHERE project_id=$1 AND status IN ('submitted','approved','partially_received','received')`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Chưa có công nợ phải thu ở trạng thái phù hợp"
+		targetType, targetID = "receivable", cleanID(row["target_id"])
+	case "receivable.issue_invoice":
+		metadata["label"] = "Hóa đơn đầu ra"
+		metadata["route"] = fmt.Sprintf("/projects/%s/accounting?tab=tasks", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM output_invoices WHERE project_id=$1 AND status='issued'`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Chưa có hóa đơn đầu ra đã phát hành"
+		targetType, targetID = "output_invoice", cleanID(row["target_id"])
+	case "source.receivable_collected":
+		metadata["label"] = "Thu tiền công trình"
+		metadata["route"] = fmt.Sprintf("/projects/%s/accounting?tab=tasks", projectID)
+		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM receivables WHERE project_id=$1 AND status='received' AND gross_amount>0 AND remaining_amount<=0`, projectID)
+		ready = number(row["total"]) > 0
+		reason = "Công nợ phải thu chưa được thu đủ"
+		targetType, targetID = "receivable", cleanID(row["target_id"])
+	default:
+		return workflowAutomationOutcome{}, nil
+	}
+	if err != nil {
+		if err == sql.ErrNoRows {
+			row = Record{}
+		} else {
+			return workflowAutomationOutcome{}, err
+		}
+	}
+	for key, value := range row {
+		if key != "target_id" {
+			metadata[key] = value
+		}
+	}
+	if !ready {
+		return automationBlockedWithTarget(actionKey, reason, targetType, targetID, metadata), nil
+	}
+	return automationSucceeded(actionKey, "Nguồn nghiệp vụ đã sẵn sàng", targetType, targetID, metadata), nil
 }
 
 func (r *Repository) automateClientContractExecutionGate(ctx context.Context, contextRow Record) (workflowAutomationOutcome, error) {
@@ -11509,6 +11780,29 @@ func (r *Repository) BOQProjectAction(ctx context.Context, projectID, action, ac
 	if count == 0 {
 		return nil, validationError("Không có dòng BOQ ở trạng thái phù hợp để thực hiện", Record{"action": action, "expected_statuses": fromStatuses})
 	}
+	if action == "approve" {
+		if _, err := tx.ExecContext(ctx, `UPDATE boq_releases SET status='superseded' WHERE project_id=$1 AND status='released'`, projectID); err != nil {
+			return nil, err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO boq_releases (
+				project_id,release_no,status,item_count,total_amount,definition_hash,
+				items_snapshot_json,released_by,released_at
+			)
+			SELECT
+				$1,
+				COALESCE((SELECT MAX(release_no)+1 FROM boq_releases WHERE project_id=$1),1),
+				'released',COUNT(*),
+				COALESCE(SUM(quantity*COALESCE(final_unit_price,norm_unit_price,expected_unit_price,unit_price,0)),0),
+				encode(digest(COALESCE(jsonb_agg(to_jsonb(item) ORDER BY item.category,item.created_at,item.id)::text,'[]'),'sha256'),'hex'),
+				COALESCE(jsonb_agg(to_jsonb(item) ORDER BY item.category,item.created_at,item.id),'[]'),
+				NULLIF($2,'')::uuid,now()
+			FROM boq_items item
+			WHERE item.project_id=$1 AND item.status='approved'
+		`, projectID, actorID); err != nil {
+			return nil, err
+		}
+	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "project_boq", projectID, fmt.Sprintf("Chuyển %d dòng BOQ sang %s", count, toStatus), Record{"action": action, "from_statuses": fromStatuses, "to_status": toStatus, "item_count": count}); err != nil {
 		return nil, err
 	}
@@ -12735,14 +13029,39 @@ func (r *Repository) CreateProjectDocument(ctx context.Context, projectID, targe
 		return nil, err
 	}
 	defer tx.Rollback()
+	seriesLock := strings.Join([]string{"document_release", projectID, targetType, targetID, documentType}, ":")
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, seriesLock); err != nil {
+		return nil, err
+	}
+	var revisionNo int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(MAX(revision_no),0)+1
+		FROM documents
+		WHERE project_id=$1 AND target_type=$2
+		  AND target_id IS NOT DISTINCT FROM NULLIF($3,'')::uuid
+		  AND document_type IS NOT DISTINCT FROM NULLIF($4,'')
+	`, projectID, targetType, targetID, documentType).Scan(&revisionNo); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE documents
+		SET release_status='superseded'
+		WHERE project_id=$1 AND target_type=$2
+		  AND target_id IS NOT DISTINCT FROM NULLIF($3,'')::uuid
+		  AND document_type IS NOT DISTINCT FROM NULLIF($4,'')
+		  AND release_status='released'
+	`, projectID, targetType, targetID, documentType); err != nil {
+		return nil, err
+	}
 	rows, err := queryTx(ctx, tx, `
 		INSERT INTO documents (
 			project_id,target_type,target_id,name,document_type,status,uploaded_by,
-			mime_type,file_size,storage_provider,storage_key,checksum_sha256
+			mime_type,file_size,storage_provider,storage_key,checksum_sha256,
+			revision_no,release_status,released_at,released_by
 		)
-		VALUES ($1,$2,NULLIF($3,'')::uuid,$4,NULLIF($5,''),'active',NULLIF($6,'')::uuid,$7,$8,$9,$10,$11)
+		VALUES ($1,$2,NULLIF($3,'')::uuid,$4,NULLIF($5,''),'active',NULLIF($6,'')::uuid,$7,$8,$9,$10,$11,$12,'released',now(),NULLIF($6,'')::uuid)
 		RETURNING *
-	`, projectID, targetType, targetID, name, documentType, actorID, file.MIMEType, file.FileSize, file.StorageProvider, file.StorageKey, file.ChecksumSHA256)
+	`, projectID, targetType, targetID, name, documentType, actorID, file.MIMEType, file.FileSize, file.StorageProvider, file.StorageKey, file.ChecksumSHA256, revisionNo)
 	if err != nil {
 		return nil, err
 	}
@@ -12750,6 +13069,7 @@ func (r *Repository) CreateProjectDocument(ctx context.Context, projectID, targe
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "project_document_uploaded", "document", documentID, "Tải hồ sơ công trình lên kho bảo vệ", Record{
 		"target_type": targetType, "target_id": targetID, "document_type": documentType,
 		"name": name, "original_filename": originalName, "checksum_sha256": file.ChecksumSHA256,
+		"revision_no": revisionNo, "release_status": "released",
 	}); err != nil {
 		return nil, err
 	}

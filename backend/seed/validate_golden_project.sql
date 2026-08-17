@@ -10,10 +10,11 @@ BEGIN
   IF actual <> 2 THEN RAISE EXCEPTION 'Golden projects: expected 2, got %',actual; END IF;
 
   SELECT count(*) INTO actual
-  FROM projects
-  WHERE code IN ('GOLDEN-REAL-001','GOLDEN-NO-DESIGN-001')
-    AND pipeline_template_id='40000000-0000-0000-0000-000000000020'
-    AND status='completed' AND progress_percent=100;
+  FROM projects project
+  JOIN pipeline_templates template ON template.id=project.pipeline_template_id
+  WHERE project.code IN ('GOLDEN-REAL-001','GOLDEN-NO-DESIGN-001')
+    AND template.template_family_id='40000000-0000-0000-0000-000000000020'
+    AND project.status='completed' AND project.progress_percent=100;
   IF actual <> 2 THEN RAISE EXCEPTION 'Golden projects are not completed on official template: %',actual; END IF;
 
   SELECT count(*) INTO actual
@@ -680,6 +681,51 @@ BEGIN
       'scope_summary','work_result','linked_evidence_id','next_action','confirmed'
     );
   IF actual <> 0 THEN RAISE EXCEPTION 'Golden Rev6 lean runtime still exposes % universal fields',actual; END IF;
+
+  -- Rev7 operational fixture: duplicate capture is removed while source-only
+  -- steps keep explicit action keys and no empty workflow forms.
+  SELECT count(*) INTO actual
+  FROM projects project
+  JOIN pipeline_runs run ON run.id=project.current_pipeline_run_id
+  JOIN pipeline_templates template ON template.id=run.template_id
+  JOIN pipeline_run_nodes current_node ON current_node.id=run.current_node_id
+  WHERE project.id='30000000-0000-0000-0000-000000000027'
+    AND project.code='GOLDEN-REV7-OPS-001'
+    AND project.pipeline_template_id='40000000-0000-0000-0000-000000000026'
+    AND run.id='42000000-0000-0000-0000-000000000027'
+    AND run.template_id='40000000-0000-0000-0000-000000000026'
+    AND run.engine_version=4 AND run.template_definition_hash=template.definition_hash
+    AND current_node.business_code='survey' AND current_node.status='in_progress';
+  IF actual<>1 THEN RAISE EXCEPTION 'Golden Rev7 operational project/run snapshot contract is invalid'; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_nodes
+  WHERE project_id='30000000-0000-0000-0000-000000000027';
+  IF actual<>15 THEN RAISE EXCEPTION 'Golden Rev7 runtime nodes: expected 15, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_steps
+  WHERE project_id='30000000-0000-0000-0000-000000000027';
+  IF actual<>50 THEN RAISE EXCEPTION 'Golden Rev7 runtime steps: expected 50, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM workflow_form_instances
+  WHERE project_id='30000000-0000-0000-0000-000000000027';
+  IF actual<>27 THEN RAISE EXCEPTION 'Golden Rev7 form instances: expected 27, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM pipeline_run_steps
+  WHERE project_id='30000000-0000-0000-0000-000000000027'
+    AND form_version_id IS NULL AND domain_action_key IS NOT NULL;
+  IF actual<>22 THEN RAISE EXCEPTION 'Golden Rev7 source/action-only steps: expected 22, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM workflow_form_instances instance
+  JOIN workflow_form_versions version ON version.id=instance.form_version_id
+  JOIN workflow_form_fields field ON field.form_version_id=version.id
+  WHERE instance.project_id='30000000-0000-0000-0000-000000000027'
+    AND field.field_key IN (
+      'confirmed','progress_percent','site_photo_evidence_id','output_invoice_no',
+      'boq_version','quote_version','invoice_status'
+    );
+  IF actual<>0 THEN RAISE EXCEPTION 'Golden Rev7 still exposes % removed administrative fields',actual; END IF;
 
   SELECT
     (SELECT count(*) FROM evidence_records WHERE project_id='30000000-0000-0000-0000-000000000022') +

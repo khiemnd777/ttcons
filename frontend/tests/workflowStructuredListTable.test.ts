@@ -42,7 +42,8 @@ test('structured list table handles compact, wide and narrow-screen schemas', as
   const field = functionSlice(panel, 'function WorkflowFieldControl(', 'function renderFieldControl(');
   const table = functionSlice(panel, 'function StructuredListTable(', 'function StructuredDeleteButton(');
 
-  assert.match(field, /className=\{clsx\('min-w-0 scroll-mt-24/);
+  assert.match(field, /className="min-w-0 scroll-mt-24 rounded-md outline-none"/);
+  assert.doesNotMatch(field, /md:col-span-2/);
   assert.match(table, /mt-1 min-w-0 w-full max-w-full rounded-md border p-2/);
   assert.match(table, /structured-list-scroll hidden min-w-0 w-full max-w-full overflow-x-auto rounded-md border border-line md:block/);
   assert.match(table, /className="space-y-2 md:hidden"/);

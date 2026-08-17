@@ -101,6 +101,7 @@ export function WorkflowFormPanel({
   const [amending, setAmending] = useState(false);
   const [amendmentReason, setAmendmentReason] = useState('');
   const [fieldsOpen, setFieldsOpen] = useState(true);
+  const [optionalFieldsOpen, setOptionalFieldsOpen] = useState(false);
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const panelRef = useRef<HTMLElement | null>(null);
   const actionCenterRef = useRef<HTMLDivElement | null>(null);
@@ -160,6 +161,8 @@ export function WorkflowFormPanel({
   );
   const signedByCurrentUser = signedPurposesByCurrentUser.includes('internal_ack');
   const activeFields = useMemo(() => effectiveWorkflowFormFields(fields, values), [fields, values]);
+  const coreFields = useMemo(() => activeFields.filter((field) => !workflowFormFieldIsOptional(field)), [activeFields]);
+  const optionalFields = useMemo(() => activeFields.filter(workflowFormFieldIsOptional), [activeFields]);
   const validationIssues = useMemo(() => activeFields.map((field) => validateFieldValue(field, values[field.field_key])).filter(Boolean), [activeFields, values]);
   const checklistField = activeFields.find((field) => field.field_type === 'structured_list' && field.field_key === 'checklist_items');
   const checklistStats = checklistField ? checklistStatsFromRows(structuredRows(values[checklistField.field_key])) : null;
@@ -178,9 +181,11 @@ export function WorkflowFormPanel({
 
   useEffect(() => {
     if (amending) return;
-    setValues(form.data?.answers ?? {});
+    setValues(submitted
+      ? (form.data?.answers ?? {})
+      : { ...(form.data?.suggested_answers ?? {}), ...(form.data?.answers ?? {}) });
     setErrors({});
-  }, [amending, form.data?.answers, instance?.id]);
+  }, [amending, form.data?.answers, form.data?.suggested_answers, instance?.id, submitted]);
 
   useEffect(() => {
     setAmending(false);
@@ -190,6 +195,7 @@ export function WorkflowFormPanel({
   useEffect(() => {
     setFieldsOpen(!submitted);
     setDocumentsOpen(submitted);
+    setOptionalFieldsOpen(false);
   }, [instance?.id, submitted]);
 
   useEffect(() => {
@@ -619,12 +625,12 @@ export function WorkflowFormPanel({
                   {submitted && !amending ? <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">Đã chốt</span> : null}
                   {!submitted && validationIssues.length ? <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">{validationIssues.length} cần xử lý</span> : null}
                   {!submitted && !validationIssues.length ? <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">Sẵn sàng chốt</span> : null}
-                  <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{activeFields.length} thông tin</span>
+                  <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{coreFields.length} chính{optionalFields.length ? ` · ${optionalFields.length} bổ sung` : ''}</span>
                   {fieldsOpen ? <ChevronDown className="ml-auto h-4 w-4 text-slate-500 sm:ml-0" /> : <ChevronRight className="ml-auto h-4 w-4 text-slate-500 sm:ml-0" />}
                 </span>
               </button>
-              {fieldsOpen ? <div className="grid gap-3 border-t border-line p-3">
-                {activeFields.map((field) => (
+              {fieldsOpen ? <div className="grid grid-cols-1 gap-3 border-t border-line p-3">
+                {coreFields.map((field) => (
                   <WorkflowFieldControl
                     key={field.field_key}
                     field={field}
@@ -636,6 +642,36 @@ export function WorkflowFormPanel({
                     onChange={(value) => setFieldValue(field, value)}
                   />
                 ))}
+                {optionalFields.length ? (
+                  <section className="min-w-0 overflow-hidden rounded-md border border-dashed border-slate-300 bg-slate-50/70">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                      aria-expanded={optionalFieldsOpen}
+                      onClick={() => setOptionalFieldsOpen((current) => !current)}
+                    >
+                      <span>
+                        Thông tin bổ sung
+                        <span className="ml-2 text-xs font-normal text-slate-500">Không bắt buộc · {optionalFields.length} mục</span>
+                      </span>
+                      {optionalFieldsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                    {optionalFieldsOpen ? <div className="grid grid-cols-1 gap-3 border-t border-slate-200 bg-white p-3">
+                      {optionalFields.map((field) => (
+                        <WorkflowFieldControl
+                          key={field.field_key}
+                          field={field}
+                          value={values[field.field_key]}
+                          evidence={evidence}
+                          error={errors[field.field_key]}
+                          disabled={readOnly || (submitted && !amending) || formActionPending}
+                          displayOnly={readOnly || (submitted && !amending)}
+                          onChange={(value) => setFieldValue(field, value)}
+                        />
+                      ))}
+                    </div> : null}
+                  </section>
+                ) : null}
               </div> : null}
               {fieldsOpen ? <div className="border-t border-line bg-slate-50 px-3 py-2 text-xs text-slate-500">
                 {amending ? `Lý do chỉnh sửa: ${amendmentReason}` : instance?.submitted_at ? `Chốt lúc ${compactDateTime(instance.submitted_at)}` : `Cập nhật ${compactDateTime(instance?.updated_at)}`}
@@ -2068,7 +2104,7 @@ function WorkflowFieldControl({
     <div
       data-workflow-field-key={field.field_key}
       tabIndex={-1}
-      className={clsx('min-w-0 scroll-mt-24 rounded-md outline-none', (field.field_type === 'textarea' || field.field_type === 'structured_list') && 'md:col-span-2')}
+      className="min-w-0 scroll-mt-24 rounded-md outline-none"
     >
       <span className="text-sm font-semibold text-slate-700">{field.label}</span>
       {field.required ? <span className="ml-1 text-rose-600">*</span> : null}
@@ -2188,6 +2224,10 @@ function textValue(value: unknown) {
 function arrayValue(value: unknown) {
   if (Array.isArray(value)) return value.map((item) => String(item));
   return [];
+}
+
+export function workflowFormFieldIsOptional(field: WorkflowFormField) {
+  return field.validation_json?.capture_mode === 'optional';
 }
 
 function valueEmpty(field: WorkflowFormField, value: unknown) {

@@ -131,3 +131,11 @@
 - Only projects still selecting Rev5 with no `pipeline_runs` move to Rev6. The local/dev seed sequence reapplies V92 and V102 after reset so Rev6 remains available without rebinding Golden Rev4 runtime fixtures.
 - Seed parity must reapply V41 before V66 so the later immutable revisions clone the official business-form mappings rather than the seed file's legacy generic-form references; V92 and V102 then restore the latest published routing/form revision.
 - `backend/seed/golden_client_workflow_rev6_lean.sql` creates the idempotent `GOLDEN-REV6-LEAN-001` Survey-state runtime after V102; `backend/seed/validate_golden_project.sql` asserts its 15 nodes, 51 steps/work items, exact form versions, 50 instances, 43 lean references and absence of the five removed universal fields.
+
+## Official Client Workflow Rev7
+
+- V103/V104 publish immutable engine-4 template `40000000-0000-0000-0000-000000000026` from Rev6. Rev7 preserves 15 nodes and Connector routing, removes duplicate step `planning.assignment_meeting`, and leaves 50 steps, 27 form-backed steps, 22 source/action-only steps plus the photo-evidence step, and 87 field occurrences. Rev6 and historical runs/forms remain unchanged.
+- `validation_json.default_source` drives server `suggested_answers` for current date, actor name and step title without overwriting persisted answers. `capture_mode=optional` is presentation metadata only; required/conditional validation remains server-authoritative.
+- Rev7 runtime presentation may alias the labels/help text of exact `operational_capture_v3` form-code/field-key pairs, but must not mutate published form versions, field keys, stored answers or historical runtimes. The shared workflow-form renderer keeps primary and `Thông tin bổ sung` fields in one explicit column at every breakpoint.
+- Hard automation membership follows the official `template_family_id=...020`, not only the original template ID. Rev7 `source.*` and existing domain actions run fail-closed before completion; work-item detail exposes the same read-only source status through `business_source`.
+- `GOLDEN-REV7-OPS-001` (project/run `...027`) is the additive Survey-state Rev7 fixture. It contains 15 nodes, 50 work items/steps, 27 exact form instances and 22 explicit source/action-only steps.

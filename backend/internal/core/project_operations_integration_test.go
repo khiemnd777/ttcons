@@ -296,6 +296,7 @@ func TestCreateDailyReportPersistsStructuredEvidenceAndRejectsMismatchedEvidence
 		FROM workflow_form_versions v
 		JOIN workflow_form_templates t ON t.id=v.template_id
 		WHERE t.code='builtin_construction_daily_report' AND v.status='published'
+		  AND COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
 		ORDER BY v.version_no DESC
 		LIMIT 1
 		RETURNING id
@@ -888,6 +889,7 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 		WHERE t.code='builtin_construction_daily_report'
 		  AND t.status='active'
 		  AND v.status='published'
+		  AND COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
 		ORDER BY v.version_no DESC
 		LIMIT 1
 	`).Scan(&formVersionID); err != nil {

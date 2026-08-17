@@ -218,6 +218,25 @@ func TestEngineV2AutomationUsesStableDomainActionKey(t *testing.T) {
 	}
 }
 
+func TestOfficialWorkflowAutomationRecognizesRevisionFamily(t *testing.T) {
+	if !isClientOfficialWorkflowContext(Record{
+		"template_id":        "40000000-0000-0000-0000-000000000026",
+		"template_family_id": clientOfficialWorkflowTemplateID,
+	}) {
+		t.Fatal("published revision in the official family must keep hard automation gates")
+	}
+	if isClientOfficialWorkflowContext(Record{
+		"template_id":        "40000000-0000-0000-0000-000000000026",
+		"template_family_id": "40000000-0000-0000-0000-000000000099",
+	}) {
+		t.Fatal("unrelated template family must not run official workflow automation")
+	}
+	contextRow := Record{"engine_version": 4, "domain_action_key": "source.boq_release_ready"}
+	if action := clientWorkflowAutomationAction(contextRow); action != "source.boq_release_ready" {
+		t.Fatalf("expected Rev7 source gate, got %q", action)
+	}
+}
+
 func TestNormalizeOrderedApprovalPolicyBuildsRoleStages(t *testing.T) {
 	normalized, err := normalizeApprovalPolicyValue(Record{
 		"mode":                     "ordered",

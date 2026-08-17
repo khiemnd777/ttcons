@@ -1,6 +1,6 @@
 import { ReactNode, type Ref } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, FileCheck2, FileText, PackageCheck, ScrollText, ShieldCheck, Upload } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, ExternalLink, FileCheck2, FileText, PackageCheck, ScrollText, ShieldCheck, Upload } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
 import { StatusBadge } from '../../components/StatusBadge';
 import type { EvidenceRecord, WorkItem } from '../../lib/types/domain';
@@ -62,6 +62,7 @@ export function WorkItemPrimarySurface({
   return (
     <section className="space-y-3">
       {surface.kind !== 'workflow_form' ? <PrimarySurfaceHeader surface={surface} item={item} /> : null}
+      {item.business_source ? <BusinessSourceCard item={item} /> : null}
       {renderPrimaryPanel(
         surface.kind,
         item,
@@ -71,6 +72,35 @@ export function WorkItemPrimarySurface({
         workflowFormActionRef,
         onWorkflowFormActionStateChange,
       )}
+    </section>
+  );
+}
+
+function BusinessSourceCard({ item }: { item: WorkItem }) {
+  const source = item.business_source;
+  if (!source) return null;
+  const ready = Boolean(source.ready);
+  return (
+    <section className={ready
+      ? 'rounded-md border border-emerald-200 bg-emerald-50 p-3'
+      : 'rounded-md border border-amber-200 bg-amber-50 p-3'}>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span className={ready ? 'mt-0.5 rounded-md bg-white p-1.5 text-emerald-700' : 'mt-0.5 rounded-md bg-white p-1.5 text-amber-700'}>
+            {ready ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dữ liệu từ module nguồn</p>
+            <h3 className="mt-0.5 text-sm font-semibold text-ink">{source.label || 'Nguồn nghiệp vụ của bước'}</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-600">{source.message || (ready ? 'Nguồn nghiệp vụ đã sẵn sàng.' : 'Hoàn tất dữ liệu tại module nguồn trước khi chốt bước.')}</p>
+          </div>
+        </div>
+        {source.route ? (
+          <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-current bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" to={source.route}>
+            Mở nguồn <ExternalLink className="h-4 w-4" />
+          </Link>
+        ) : null}
+      </div>
     </section>
   );
 }
