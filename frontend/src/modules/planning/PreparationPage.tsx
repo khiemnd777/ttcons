@@ -105,7 +105,7 @@ export function PreparationPage() {
             {returnTo ? 'Quay lại' : 'Danh sách hồ sơ'}
           </button>
           <Link className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50" to={`/projects/${id}/pipeline`}>
-            Tiến độ & Phụ thuộc
+            Quy trình
           </Link>
         </div>
 
@@ -115,7 +115,7 @@ export function PreparationPage() {
         ) : invalidTask ? (
           <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
             <p className="font-semibold">Công việc này không thuộc Hồ sơ chuẩn bị.</p>
-            <p className="mt-1">Mở công việc từ Bàn làm việc hoặc Tiến độ để App đưa đến đúng sổ nghiệp vụ.</p>
+            <p className="mt-1">Mở công việc từ Bàn làm việc hoặc Quy trình để App đưa đến đúng sổ nghiệp vụ.</p>
             <button className="mt-3 rounded-md border border-rose-200 bg-white px-3 py-2 font-semibold" onClick={closeTask}>Đóng ngữ cảnh sai</button>
           </div>
         ) : selectedItem ? (
@@ -138,7 +138,7 @@ export function PreparationPage() {
       <PageHeader
         title="Hồ sơ chuẩn bị"
         description="Hồ sơ tiếp nhận, khảo sát và thiết kế cần chuẩn bị."
-        actions={<Link className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50" to={`/projects/${id}/pipeline`}>Tiến độ & Phụ thuộc</Link>}
+        actions={<Link className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50" to={`/projects/${id}/pipeline`}>Quy trình</Link>}
       />
 
       <section className="mt-4 overflow-hidden rounded-lg border border-line bg-white shadow-panel" aria-label="Danh sách hồ sơ chuẩn bị">

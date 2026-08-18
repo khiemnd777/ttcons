@@ -138,7 +138,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
   return (
     <>
       <PageHeader
-        title={mode === 'pipeline' ? 'Tiến độ & Phụ thuộc' : 'Kế hoạch công việc'}
+        title={mode === 'pipeline' ? 'Quy trình' : 'Kế hoạch công việc'}
         description={run.data ? `${run.data.project_name} · Mẫu: ${run.data.template_name}` : 'Chưa có quy trình đang chạy cho công trình này.'}
         actions={
           mode === 'pipeline' ? (
@@ -154,7 +154,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
                   onClick={() => navigate(`/projects/${id}/pipeline`)}
                 >
                   <GitBranch className="h-4 w-4" />
-                  Xem tiến độ & phụ thuộc
+                  Xem quy trình
                 </button>
               ) : null}
               {terminalRun ? (

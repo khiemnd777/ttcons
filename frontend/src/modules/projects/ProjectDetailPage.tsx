@@ -176,7 +176,7 @@ export function ProjectDetailPage() {
   const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
   const tabs: Array<{ id: ProjectDetailTab; label: string; count?: number }> = [
     { id: 'overview', label: 'Tổng quan' },
-    { id: 'workflow', label: 'Tiến độ & Phụ thuộc', count: timeline.length },
+    { id: 'workflow', label: 'Quy trình', count: timeline.length },
     { id: 'work', label: 'Danh sách công việc', count: allWorkItems.length },
     { id: 'activity', label: 'Trao đổi', count: activityTotalCount },
     { id: 'files', label: 'Hồ sơ', count: numberValue(data.evidence_summary?.total ?? latestEvidence.length) },
@@ -806,7 +806,7 @@ function WorkflowExecutionSummary({
     <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
       <div className="flex items-center gap-2 border-b border-line px-4 py-3">
         <GitBranch className="h-5 w-5 text-blue-700" />
-        <h2 className="font-semibold text-ink">Tiến độ & Phụ thuộc</h2>
+        <h2 className="font-semibold text-ink">Quy trình</h2>
       </div>
       <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-[minmax(180px,1.15fr)_minmax(210px,1.25fr)_110px_110px_110px_minmax(250px,1.3fr)] xl:items-center xl:gap-0 xl:p-0">
         <div className="min-w-0 xl:border-r xl:border-line xl:px-5 xl:py-4">

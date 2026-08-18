@@ -27,13 +27,13 @@ export const PROJECT_WORKSPACE_GROUPS: ProjectWorkspaceGroup[] = [
     key: 'planning',
     label: 'Kế hoạch',
     explorerLabel: 'Kế hoạch',
-    description: 'Hồ sơ chuẩn bị, kế hoạch công việc và tiến độ phụ thuộc',
+    description: 'Hồ sơ chuẩn bị, kế hoạch công việc và quy trình',
     to: 'planning',
     permissions: ['project.view', 'planning.view', 'pipeline.view'],
     children: [
       { label: 'Hồ sơ chuẩn bị', to: 'preparation', permissions: ['project.view'] },
       { label: 'Kế hoạch công việc', to: 'planning', permissions: ['planning.view', 'pipeline.view'] },
-      { label: 'Tiến độ & Phụ thuộc', to: 'pipeline', permissions: ['pipeline.view'] },
+      { label: 'Quy trình', to: 'pipeline', permissions: ['pipeline.view'] },
     ],
   },
   {
