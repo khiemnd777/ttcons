@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Camera, ClipboardCheck, Loader2, Package, Plus, RefreshCw, Trash2, Users, Wrench } from 'lucide-react';
+import { AlertTriangle, Camera, ClipboardCheck, Eye, FileText, Image as ImageIcon, Loader2, Package, Plus, RefreshCw, Trash2, Users, Wrench } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog } from '../../components/Dialog';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
-import { get } from '../../lib/api/client';
-import type { ConstructionWorkspace, ProjectEvidencePage, ProjectOperationsResponse, WorkItem } from '../../lib/types/domain';
+import { downloadBlob, get } from '../../lib/api/client';
+import type { ConstructionWorkspace, EvidenceRecord, ProjectEvidencePage, ProjectOperationsResponse, WorkItem } from '../../lib/types/domain';
+import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
+import { isProtectedStorageProvider } from '../../lib/utils/protectedStorage';
 import { statusLabel } from '../../lib/utils/status';
+import { EvidenceDraftViewerDialog, EvidenceRecordViewerDialog, isImageEvidence } from '../_shared/EvidenceRecordViewerDialog';
+import { useEvidencePreviewUrls } from '../work-items/EvidenceGallery';
 import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
 import { ConstructionReportLinkedComposer, createReportLinkedDraft, reportLinkedSubmitLabel, validateReportLinkedDrafts, type ReportLinkedDraft } from './ConstructionReportLinkedComposer';
 import { constructionReportEditModel } from './constructionReportViewModel';
@@ -16,6 +20,9 @@ import { constructionReportEditModel } from './constructionReportViewModel';
 type CrewDraft = { crew_name: string; worker_count: string; work_hours: string; note: string };
 type MaterialDraft = { material_name: string; quantity: string; unit: string; note: string };
 type BlockerDraft = { id: string; content: string };
+type ReportEvidenceViewer =
+  | { source: 'stored'; record: EvidenceRecord }
+  | { source: 'draft'; draft: ConstructionEvidenceUploadDraft; previewURL: string };
 export type ConstructionDailyReportCreatePayload = {
   report_date: string;
   weather: string;
@@ -70,6 +77,8 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   const [workGroup, setWorkGroup] = useState<'done' | 'current' | 'next'>('done');
   const [linkedDrafts, setLinkedDrafts] = useState<ReportLinkedDraft[]>([]);
   const [showLinkedErrors, setShowLinkedErrors] = useState(false);
+  const [evidencePreviewRetryKey, setEvidencePreviewRetryKey] = useState(0);
+  const [evidenceViewer, setEvidenceViewer] = useState<ReportEvidenceViewer | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -96,6 +105,8 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
     setWorkGroup('done');
     setLinkedDrafts([]);
     setShowLinkedErrors(false);
+    setEvidencePreviewRetryKey(0);
+    setEvidenceViewer(null);
   }, [mode, open, record, suggestion]);
 
   const operations = useQuery({
@@ -122,7 +133,12 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   });
   const evidenceOptions = useMemo(() => evidence.data?.items ?? [], [evidence.data?.items]);
   const selectedEvidence = useMemo(() => evidenceOptions.filter((item) => selectedEvidenceIds.includes(item.id)), [evidenceOptions, selectedEvidenceIds]);
-	  const hasPhotoEvidence = selectedEvidence.some((item) => item.evidence_type === 'photo' && item.status !== 'rejected') || uploads.some((item) => item.evidenceType === 'photo');
+  const previewEvidence = useMemo(() => {
+    if (evidenceViewer?.source !== 'stored' || selectedEvidence.some((item) => item.id === evidenceViewer.record.id)) return selectedEvidence;
+    return [...selectedEvidence, evidenceViewer.record];
+  }, [evidenceViewer, selectedEvidence]);
+  const selectedEvidencePreviews = useEvidencePreviewUrls(previewEvidence, evidencePreviewRetryKey);
+  const hasPhotoEvidence = selectedEvidence.some((item) => item.evidence_type === 'photo' && item.status !== 'rejected') || uploads.some((item) => item.evidenceType === 'photo');
 
   function selectWorkItem(value: string) {
     setWorkItemId(value);
@@ -162,6 +178,22 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   function removeBlocker(id: string) {
     setBlockers((current) => current.length === 1 ? [emptyBlocker()] : current.filter((item) => item.id !== id));
     setLinkedDrafts((current) => current.filter((draft) => draft.source_blocker_key !== id));
+  }
+
+  async function openEvidenceFile(record: EvidenceRecord) {
+    try {
+      if (isProtectedStorageProvider(record.storage_provider) && record.storage_key) {
+        await openProtectedBlob(() => downloadBlob(`/evidence/${record.id}/file`));
+        return;
+      }
+      if (record.file_url) {
+        window.open(record.file_url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      toast.warn({ title: 'Minh chứng chưa có tệp', description: 'Bản ghi này không có tệp có thể mở.' });
+    } catch (error) {
+      toast.error('Không mở được minh chứng', error);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -222,22 +254,41 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
     });
   }
 
+  function closeReportDialog() {
+    if (evidenceViewer) {
+      setEvidenceViewer(null);
+      return;
+    }
+    onClose();
+  }
+
+  const viewerRecord = evidenceViewer?.source === 'stored' ? evidenceViewer.record : null;
+  const viewerDraft = evidenceViewer?.source === 'draft' ? evidenceViewer.draft : null;
+  const viewerPreviewURL = evidenceViewer?.source === 'draft'
+    ? evidenceViewer.previewURL
+    : viewerRecord
+      ? selectedEvidencePreviews.urls[viewerRecord.id] || (!viewerRecord.storage_key ? viewerRecord.file_url : undefined)
+      : undefined;
+  const viewerLoading = Boolean(viewerRecord && selectedEvidencePreviews.loadingIds.has(viewerRecord.id));
+  const viewerError = viewerRecord && selectedEvidencePreviews.errorIds.has(viewerRecord.id) ? 'Không tải được ảnh minh chứng.' : undefined;
+
   return (
-    <Dialog
-      open={open}
-      title={mode === 'edit' ? 'Chỉnh sửa báo cáo thi công' : 'Báo cáo thi công hôm nay'}
-      description={mode === 'edit' ? 'Cập nhật nội dung báo cáo; các liên kết đã tạo vẫn giữ nguyên lịch sử.' : 'Ghi hiện trường và tạo ngay kiểm tra hoặc việc xử lý trong một lần lưu.'}
-      size="report"
-      onClose={onClose}
-      footer={(
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" disabled={saving} className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60" onClick={onClose}>Hủy</button>
-          <button type="submit" form="construction-report-form" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{saving ? 'Đang lưu...' : mode === 'edit' ? 'Lưu thay đổi' : reportLinkedSubmitLabel(linkedDrafts)}
-          </button>
-        </div>
-      )}
-    >
+    <>
+      <Dialog
+        open={open}
+        title={mode === 'edit' ? 'Chỉnh sửa báo cáo thi công' : 'Báo cáo thi công hôm nay'}
+        description={mode === 'edit' ? 'Cập nhật nội dung báo cáo; các liên kết đã tạo vẫn giữ nguyên lịch sử.' : 'Ghi hiện trường và tạo ngay kiểm tra hoặc việc xử lý trong một lần lưu.'}
+        size="report"
+        onClose={closeReportDialog}
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" disabled={saving} className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60" onClick={closeReportDialog}>Hủy</button>
+            <button type="submit" form="construction-report-form" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{saving ? 'Đang lưu...' : mode === 'edit' ? 'Lưu thay đổi' : reportLinkedSubmitLabel(linkedDrafts)}
+            </button>
+          </div>
+        )}
+      >
       <form id="construction-report-form" className="space-y-5" onSubmit={handleSubmit}>
         <section className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -265,7 +316,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
         <div className={clsx('grid gap-5', mode === 'create' && (canCreateCheck || canCreateAction) && 'xl:grid-cols-[minmax(0,1fr)_22rem]')}>
           <div className="space-y-5">
             <section>
-	              <SectionTitle title="Checklist báo cáo" description="Ghi các hạng mục đã làm, đang làm và kế hoạch tiếp theo trong ngày." />
+	              <SectionTitle title="Công việc trong ngày" description="Ghi các hạng mục đã làm, đang làm và kế hoạch tiếp theo trong ngày." />
               <div className="mt-3 flex gap-1 overflow-x-auto rounded-lg border border-line bg-slate-50 p-1">
                 {([
                   ['done', 'Đã làm', doneItems],
@@ -291,12 +342,8 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
 	                {!workItemId ? <InfoState title="Chưa chọn hạng mục thi công" description="Chọn hạng mục đang thực hiện trước khi chụp hoặc tải ảnh hiện trường." /> : null}
                 {workItemId && evidence.isLoading ? <LoadingSpinner label="Đang tải minh chứng của công việc..." /> : null}
                 {workItemId && evidence.isError ? <InlineError message="Không tải được minh chứng của công việc." onRetry={() => evidence.refetch()} /> : null}
-                {workItemId && evidence.isSuccess && evidenceOptions.length ? <details className="rounded-lg border border-line bg-slate-50 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Chọn từ minh chứng đã có · {selectedEvidenceIds.length} đã chọn</summary><div className="mt-3 grid gap-2 sm:grid-cols-2">{evidenceOptions.map((record) => {
-                  const selected = selectedEvidenceIds.includes(record.id);
-                  const rejected = record.status === 'rejected';
-                  return <article key={record.id} className={clsx('rounded-lg border p-3', selected ? 'border-blue-300 bg-blue-50' : 'border-line bg-white')}><div className="flex items-start gap-3"><input type="checkbox" className="mt-1 h-4 w-4 rounded border-line" checked={selected} disabled={rejected && !selected} onChange={() => toggleEvidence(record.id)} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{record.name || record.title || 'Minh chứng'}</p><div className="mt-1 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} /><span className="text-xs text-slate-500">{record.evidence_type === 'photo' ? 'Ảnh' : 'Tài liệu'}</span></div></div>{selected ? <label className="flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-700"><input type="radio" name="primary-evidence" checked={primaryEvidenceId === record.id} onChange={() => setPrimaryEvidenceId(record.id)} /> Chính</label> : null}</div></article>;
-                })}</div></details> : null}
-	                <ConstructionEvidenceCapture drafts={uploads} onChange={(next) => { setUploads(next); clearError('evidence_ids'); }} hasSource={Boolean(workItemId)} disabled={saving} hint="Ảnh được tải lên theo hạng mục trước khi lưu báo cáo; nếu lưu thất bại, ảnh vẫn được giữ trong hồ sơ hạng mục." />
+	                {workItemId && evidence.isSuccess && evidenceOptions.length ? <details className="rounded-lg border border-line bg-slate-50 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Chọn từ minh chứng đã có · {selectedEvidenceIds.length} đã chọn</summary><div className="mt-3 grid gap-2 sm:grid-cols-2">{evidenceOptions.map((record) => <ExistingEvidenceOption key={record.id} record={record} selected={selectedEvidenceIds.includes(record.id)} primary={primaryEvidenceId === record.id} previewURL={selectedEvidencePreviews.urls[record.id]} previewPending={selectedEvidencePreviews.loadingIds.has(record.id)} previewFailed={selectedEvidencePreviews.errorIds.has(record.id)} onToggle={() => toggleEvidence(record.id)} onPrimary={() => setPrimaryEvidenceId(record.id)} onOpen={() => isImageEvidence(record) ? setEvidenceViewer({ source: 'stored', record }) : void openEvidenceFile(record)} onRetry={() => setEvidencePreviewRetryKey((current) => current + 1)} />)}</div></details> : null}
+	                <ConstructionEvidenceCapture drafts={uploads} onChange={(next) => { setUploads(next); clearError('evidence_ids'); }} hasSource={Boolean(workItemId)} disabled={saving} hint="Ảnh được tải lên theo hạng mục trước khi lưu báo cáo; nếu lưu thất bại, ảnh vẫn được giữ trong hồ sơ hạng mục." onPreviewPhoto={(draft, previewURL) => setEvidenceViewer({ source: 'draft', draft, previewURL })} />
 	                {errors.evidence_ids ? <p className="text-xs font-medium text-rose-700">{errors.evidence_ids}</p> : null}
               </div>
             </section>
@@ -304,7 +351,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
             <details className="rounded-lg border border-line bg-white p-4" open={mode === 'edit' || Boolean(errors.crew_items || errors.material_items)}>
               <summary className="cursor-pointer font-semibold text-ink">Thông tin bổ sung <span className="ml-2 text-xs font-normal text-slate-500">Nhân công, vật tư và ghi chú</span></summary>
               <div className="mt-4 space-y-5">
-                <section><SectionTitle title="Nguồn lực sử dụng" description="Nhân công và vật tư được lưu thành danh sách có cấu trúc." /><div className="mt-3 grid gap-3 lg:grid-cols-2"><CrewEditor rows={crewItems} onChange={(rows) => { setCrewItems(rows); clearError('crew_items'); }} error={errors.crew_items} /><MaterialEditor rows={materialItems} onChange={(rows) => { setMaterialItems(rows); clearError('material_items'); }} error={errors.material_items} /></div>{manpowerSummary || materialSummary ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800"><strong>Dữ liệu tóm tắt cũ được giữ nguyên:</strong>{manpowerSummary ? ` Nhân công: ${manpowerSummary}.` : ''}{materialSummary ? ` Vật tư: ${materialSummary}.` : ''}</div> : null}</section>
+	                <section><SectionTitle title="Nguồn lực sử dụng" description="Nhân công và vật tư được lưu thành danh sách có cấu trúc." /><div className="mt-3 space-y-4"><CrewEditor rows={crewItems} onChange={(rows) => { setCrewItems(rows); clearError('crew_items'); }} error={errors.crew_items} /><MaterialEditor rows={materialItems} onChange={(rows) => { setMaterialItems(rows); clearError('material_items'); }} error={errors.material_items} /></div>{manpowerSummary || materialSummary ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800"><strong>Dữ liệu tóm tắt cũ được giữ nguyên:</strong>{manpowerSummary ? ` Nhân công: ${manpowerSummary}.` : ''}{materialSummary ? ` Vật tư: ${materialSummary}.` : ''}</div> : null}</section>
                 <section><SectionTitle title="Ghi chú hiện trường" description="Thông tin bổ sung, không tự động tính là blocker." /><textarea className={clsx(inputClass(false), 'mt-3 min-h-24')} value={fieldNotes} onChange={(event) => setFieldNotes(event.target.value)} placeholder="Ví dụ: Không có sự cố an toàn; khu vực đã được vệ sinh cuối ca." /></section>
               </div>
             </details>
@@ -312,8 +359,64 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
 
           {mode === 'create' && (canCreateCheck || canCreateAction) ? <ConstructionReportLinkedComposer mode="batch" drafts={linkedDrafts} onChange={setLinkedDrafts} workspace={workspace} sourceWorkItemId={workItemId} reportEvidence={selectedEvidence} reportEvidencePending={uploads.length > 0} primaryEvidenceId={primaryEvidenceId} canCreateCheck={canCreateCheck} canCreateAction={canCreateAction} showValidation={showLinkedErrors} /> : null}
         </div>
-      </form>
-    </Dialog>
+        </form>
+      </Dialog>
+      <EvidenceRecordViewerDialog
+        record={viewerRecord}
+        previewUrl={viewerPreviewURL}
+        previewLoading={viewerLoading}
+        previewError={viewerError}
+        showWorkItem
+        onRetry={viewerRecord ? () => setEvidencePreviewRetryKey((current) => current + 1) : undefined}
+        onClose={() => setEvidenceViewer(null)}
+      />
+      <EvidenceDraftViewerDialog
+        open={Boolean(viewerDraft)}
+        name={viewerDraft?.name ?? 'Minh chứng'}
+        originalName={viewerDraft?.file.name ?? ''}
+        previewUrl={viewerDraft ? viewerPreviewURL : undefined}
+        mimeType={viewerDraft?.file.type}
+        fileSize={viewerDraft?.file.size ?? 0}
+        caption={viewerDraft?.caption}
+        onClose={() => setEvidenceViewer(null)}
+      />
+    </>
+  );
+}
+
+function ExistingEvidenceOption({ record, selected, primary, previewURL, previewPending, previewFailed, onToggle, onPrimary, onOpen, onRetry }: {
+  record: EvidenceRecord;
+  selected: boolean;
+  primary: boolean;
+  previewURL?: string;
+  previewPending: boolean;
+  previewFailed: boolean;
+  onToggle: () => void;
+  onPrimary: () => void;
+  onOpen: () => void;
+  onRetry: () => void;
+}) {
+  const rejected = record.status === 'rejected';
+  const image = isImageEvidence(record);
+  const title = record.name || record.title || 'Minh chứng';
+  return (
+    <article className={clsx('min-w-0 rounded-lg border p-3', selected ? 'border-blue-300 bg-blue-50' : 'border-line bg-white')}>
+      <div className="flex min-w-0 items-start gap-3">
+        <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 rounded border-line" checked={selected} disabled={rejected && !selected} onChange={onToggle} aria-label={`Chọn ${title}`} />
+        <button type="button" className="grid h-14 w-16 shrink-0 place-items-center overflow-hidden rounded-md border border-line bg-slate-100 text-slate-400" onClick={onOpen} aria-label={`${image ? 'Xem ảnh' : 'Mở tệp'} ${title}`}>
+          {previewURL ? <img src={previewURL} alt={title} className="h-full w-full object-cover" /> : previewPending ? <Loader2 className="h-5 w-5 animate-spin text-blue-600" /> : image ? <ImageIcon className={clsx('h-5 w-5', previewFailed && 'text-rose-500')} /> : <FileText className="h-5 w-5" />}
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-ink">{title}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} /><span className="text-xs text-slate-500">{image ? 'Ảnh' : 'Tài liệu'}</span></div>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button type="button" className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline" onClick={onOpen}><Eye className="h-3.5 w-3.5" /> {image ? 'Xem ảnh' : 'Mở tệp'}</button>
+            {previewFailed ? <button type="button" className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 hover:underline" onClick={onRetry}><RefreshCw className="h-3.5 w-3.5" /> Thử lại thumbnail</button> : null}
+          </div>
+        </div>
+        {selected ? <label className="flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-700"><input type="radio" name="primary-evidence" checked={primary} onChange={onPrimary} /> Chính</label> : null}
+      </div>
+    </article>
   );
 }
 
@@ -330,11 +433,71 @@ function TextListEditor({ title, required = false, values, onChange, tone, error
 }
 
 function CrewEditor({ rows, onChange, error }: { rows: CrewDraft[]; onChange: (rows: CrewDraft[]) => void; error?: string }) {
-  return <ResourceEditorFrame icon={<Users className="h-4 w-4" />} title="Nhân công / tổ đội" count={rows.filter(hasCrewValue).length} error={error} onAdd={() => onChange([...rows, emptyCrew()])}><div className="space-y-3">{rows.map((row, index) => <div key={index} className="rounded-md border border-line bg-slate-50 p-3"><div className="grid gap-2 sm:grid-cols-2"><input className={inputClass(Boolean(error))} value={row.crew_name} placeholder="Tên tổ / đội" onChange={(event) => onChange(updateRow(rows, index, { crew_name: event.target.value }))} /><input type="number" min={1} className={inputClass(Boolean(error))} value={row.worker_count} placeholder="Số người" onChange={(event) => onChange(updateRow(rows, index, { worker_count: event.target.value }))} /><input type="number" min={0} step="0.5" className={inputClass(Boolean(error))} value={row.work_hours} placeholder="Giờ công" onChange={(event) => onChange(updateRow(rows, index, { work_hours: event.target.value }))} /><div className="flex gap-2"><input className={inputClass(Boolean(error))} value={row.note} placeholder="Ghi chú" onChange={(event) => onChange(updateRow(rows, index, { note: event.target.value }))} /><button type="button" disabled={rows.length === 1} className="rounded-md p-2 text-slate-400 hover:bg-white hover:text-rose-600 disabled:opacity-30" onClick={() => onChange(rows.filter((_item, itemIndex) => itemIndex !== index))}><Trash2 className="h-4 w-4" /></button></div></div></div>)}</div></ResourceEditorFrame>;
+  return (
+    <ResourceEditorFrame icon={<Users className="h-4 w-4" />} title="Nhân công / tổ đội" count={rows.filter(hasCrewValue).length} error={error} onAdd={() => onChange([...rows, emptyCrew()])}>
+      <div className="w-full overflow-x-auto rounded-md border border-line">
+        <table className="w-full min-w-[760px] border-collapse text-sm">
+          <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
+            <tr>
+              <th className="w-12 border-b border-line px-2 py-2"><span className="sr-only">Thao tác</span></th>
+              <th className="w-12 border-b border-line px-2 py-2">#</th>
+              <th className="min-w-52 border-b border-line px-2 py-2">Tên tổ / đội <span className="text-rose-600">*</span></th>
+              <th className="w-32 border-b border-line px-2 py-2">Số người <span className="text-rose-600">*</span></th>
+              <th className="w-32 border-b border-line px-2 py-2">Giờ công</th>
+              <th className="min-w-60 border-b border-line px-2 py-2">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line bg-white">
+            {rows.map((row, index) => (
+              <tr key={index}>
+                <td className="px-2 py-2 align-top"><button type="button" disabled={rows.length === 1} className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30" onClick={() => onChange(rows.filter((_item, itemIndex) => itemIndex !== index))} aria-label={`Xóa dòng nhân công ${index + 1}`}><Trash2 className="h-4 w-4" /></button></td>
+                <td className="px-2 py-3 align-top text-xs font-semibold text-slate-500">{index + 1}</td>
+                <td className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.crew_name} placeholder="Tên tổ / đội" onChange={(event) => onChange(updateRow(rows, index, { crew_name: event.target.value }))} aria-label={`Tên tổ đội dòng ${index + 1}`} /></td>
+                <td className="px-2 py-2 align-top"><input type="number" min={1} className={tableInputClass(Boolean(error))} value={row.worker_count} placeholder="Số người" onChange={(event) => onChange(updateRow(rows, index, { worker_count: event.target.value }))} aria-label={`Số người dòng ${index + 1}`} /></td>
+                <td className="px-2 py-2 align-top"><input type="number" min={0} step="0.5" className={tableInputClass(Boolean(error))} value={row.work_hours} placeholder="Giờ công" onChange={(event) => onChange(updateRow(rows, index, { work_hours: event.target.value }))} aria-label={`Giờ công dòng ${index + 1}`} /></td>
+                <td className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.note} placeholder="Ghi chú" onChange={(event) => onChange(updateRow(rows, index, { note: event.target.value }))} aria-label={`Ghi chú nhân công dòng ${index + 1}`} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[11px] text-slate-500 md:hidden">Kéo ngang trong bảng để xem và chỉnh sửa đủ các cột.</p>
+    </ResourceEditorFrame>
+  );
 }
 
 function MaterialEditor({ rows, onChange, error }: { rows: MaterialDraft[]; onChange: (rows: MaterialDraft[]) => void; error?: string }) {
-  return <ResourceEditorFrame icon={<Package className="h-4 w-4" />} title="Vật tư sử dụng" count={rows.filter(hasMaterialValue).length} error={error} onAdd={() => onChange([...rows, emptyMaterial()])}><div className="space-y-3">{rows.map((row, index) => <div key={index} className="rounded-md border border-line bg-slate-50 p-3"><div className="grid gap-2 sm:grid-cols-2"><input className={inputClass(Boolean(error))} value={row.material_name} placeholder="Tên vật tư" onChange={(event) => onChange(updateRow(rows, index, { material_name: event.target.value }))} /><div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2"><input type="number" min={0} step="any" className={inputClass(Boolean(error))} value={row.quantity} placeholder="Số lượng" onChange={(event) => onChange(updateRow(rows, index, { quantity: event.target.value }))} /><input className={inputClass(Boolean(error))} value={row.unit} placeholder="ĐVT" onChange={(event) => onChange(updateRow(rows, index, { unit: event.target.value }))} /></div><div className="flex gap-2 sm:col-span-2"><input className={inputClass(Boolean(error))} value={row.note} placeholder="Ghi chú vật tư" onChange={(event) => onChange(updateRow(rows, index, { note: event.target.value }))} /><button type="button" disabled={rows.length === 1} className="rounded-md p-2 text-slate-400 hover:bg-white hover:text-rose-600 disabled:opacity-30" onClick={() => onChange(rows.filter((_item, itemIndex) => itemIndex !== index))}><Trash2 className="h-4 w-4" /></button></div></div></div>)}</div></ResourceEditorFrame>;
+  return (
+    <ResourceEditorFrame icon={<Package className="h-4 w-4" />} title="Vật tư sử dụng" count={rows.filter(hasMaterialValue).length} error={error} onAdd={() => onChange([...rows, emptyMaterial()])}>
+      <div className="w-full overflow-x-auto rounded-md border border-line">
+        <table className="w-full min-w-[760px] border-collapse text-sm">
+          <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
+            <tr>
+              <th className="w-12 border-b border-line px-2 py-2"><span className="sr-only">Thao tác</span></th>
+              <th className="w-12 border-b border-line px-2 py-2">#</th>
+              <th className="min-w-56 border-b border-line px-2 py-2">Tên vật tư <span className="text-rose-600">*</span></th>
+              <th className="w-36 border-b border-line px-2 py-2">Số lượng <span className="text-rose-600">*</span></th>
+              <th className="w-28 border-b border-line px-2 py-2">ĐVT <span className="text-rose-600">*</span></th>
+              <th className="min-w-60 border-b border-line px-2 py-2">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line bg-white">
+            {rows.map((row, index) => (
+              <tr key={index}>
+                <td className="px-2 py-2 align-top"><button type="button" disabled={rows.length === 1} className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30" onClick={() => onChange(rows.filter((_item, itemIndex) => itemIndex !== index))} aria-label={`Xóa dòng vật tư ${index + 1}`}><Trash2 className="h-4 w-4" /></button></td>
+                <td className="px-2 py-3 align-top text-xs font-semibold text-slate-500">{index + 1}</td>
+                <td className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.material_name} placeholder="Tên vật tư" onChange={(event) => onChange(updateRow(rows, index, { material_name: event.target.value }))} aria-label={`Tên vật tư dòng ${index + 1}`} /></td>
+                <td className="px-2 py-2 align-top"><input type="number" min={0} step="any" className={tableInputClass(Boolean(error))} value={row.quantity} placeholder="Số lượng" onChange={(event) => onChange(updateRow(rows, index, { quantity: event.target.value }))} aria-label={`Số lượng vật tư dòng ${index + 1}`} /></td>
+                <td className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.unit} placeholder="ĐVT" onChange={(event) => onChange(updateRow(rows, index, { unit: event.target.value }))} aria-label={`Đơn vị tính dòng ${index + 1}`} /></td>
+                <td className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.note} placeholder="Ghi chú vật tư" onChange={(event) => onChange(updateRow(rows, index, { note: event.target.value }))} aria-label={`Ghi chú vật tư dòng ${index + 1}`} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[11px] text-slate-500 md:hidden">Kéo ngang trong bảng để xem và chỉnh sửa đủ các cột.</p>
+    </ResourceEditorFrame>
+  );
 }
 
 function ResourceEditorFrame({ icon, title, count, error, onAdd, children }: { icon: ReactNode; title: string; count: number; error?: string; onAdd: () => void; children: ReactNode }) {
@@ -385,3 +548,4 @@ function hasMaterialValue(item: MaterialDraft) { return Boolean(item.material_na
 function todayText() { return new Date().toISOString().slice(0, 10); }
 function workItemRank(item: WorkItem) { return ['ready', 'in_progress', 'needs_changes', 'blocked'].includes(item.status) ? 0 : ['waiting_review', 'waiting_approval'].includes(item.status) ? 1 : 2; }
 function inputClass(error: boolean) { return clsx('mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100', error ? 'border-rose-300 bg-rose-50' : 'border-line'); }
+function tableInputClass(error: boolean) { return clsx('w-full rounded-md border bg-white px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100', error ? 'border-rose-300 bg-rose-50' : 'border-line'); }

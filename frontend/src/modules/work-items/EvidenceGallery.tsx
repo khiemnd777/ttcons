@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, ExternalLink, FileText, Image as ImageIcon, Loader2, Search, XCircle } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Eye, FileText, Image as ImageIcon, Search } from 'lucide-react';
 import clsx from 'clsx';
-import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
@@ -9,9 +8,18 @@ import { downloadBlob } from '../../lib/api/client';
 import type { EvidenceRecord } from '../../lib/types/domain';
 import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
 import { isProtectedStorageProvider } from '../../lib/utils/protectedStorage.ts';
+import {
+  EvidenceRecordViewerDialog,
+  evidenceRecordTitle as evidenceTitle,
+  formatEvidenceFileSize,
+  isImageEvidence,
+  originalFilename,
+  type EvidenceReviewAction,
+} from '../_shared/EvidenceRecordViewerDialog';
 import { compactDateTime, evidenceLabel, visibilityLabel } from './workItemPresentation';
 
-export type EvidenceReviewAction = 'accept' | 'reject';
+export { formatEvidenceFileSize, isImageEvidence };
+export type { EvidenceReviewAction };
 
 type EvidenceFilter = 'all' | 'photo' | 'document' | 'submitted' | 'accepted' | 'rejected';
 
@@ -49,7 +57,9 @@ export function EvidenceGallery({
   const [selected, setSelected] = useState<EvidenceRecord | null>(null);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewingAction, setReviewingAction] = useState<EvidenceReviewAction | null>(null);
-  const previewUrls = useEvidencePreviewUrls(evidence);
+  const [previewRetryKey, setPreviewRetryKey] = useState(0);
+  const previews = useEvidencePreviewUrls(evidence, previewRetryKey);
+  const previewUrls = previews.urls;
   const filterCounts = useMemo(() => evidenceFilterCounts(evidence), [evidence]);
   const rows = useMemo(
     () => showControls ? filterEvidence(evidence, activeFilter, query) : evidence,
@@ -174,7 +184,7 @@ export function EvidenceGallery({
                 previewUrl={previewUrls[record.id]}
                 showWorkItem={showWorkItem}
                 listContext={listContext}
-                onOpen={() => void openEvidence(record)}
+                onOpen={() => isImageEvidence(record) ? setSelected(record) : void openEvidence(record)}
                 onSelect={() => {
                   setSelected(record);
                   setReviewComment('');
@@ -191,7 +201,7 @@ export function EvidenceGallery({
               record={record}
               previewUrl={previewUrls[record.id]}
               showWorkItem={showWorkItem}
-              onOpen={() => void openEvidence(record)}
+              onOpen={() => isImageEvidence(record) ? setSelected(record) : void openEvidence(record)}
               onSelect={() => {
                 setSelected(record);
                 setReviewComment('');
@@ -203,15 +213,18 @@ export function EvidenceGallery({
         <EmptyState title={evidence.length ? 'Không có minh chứng phù hợp bộ lọc' : emptyTitle} />
       )}
 
-      <EvidenceDetailDialog
+      <EvidenceRecordViewerDialog
         record={selected}
-        previewUrl={selected ? previewUrls[selected.id] : undefined}
+        previewUrl={selected ? previewUrls[selected.id] || (!selected.storage_key ? selected.file_url : undefined) : undefined}
+        previewLoading={selected ? previews.loadingIds.has(selected.id) : false}
+        previewError={selected && previews.errorIds.has(selected.id) ? 'Không tải được ảnh minh chứng.' : undefined}
         showWorkItem={showWorkItem}
         canReview={Boolean(onReview) && (selected?.can_review ?? true)}
         reviewingAction={reviewingAction}
         reviewComment={reviewComment}
         onReviewCommentChange={setReviewComment}
-        onOpen={() => selected && void openEvidence(selected)}
+        onOpenFile={() => selected && void openEvidence(selected)}
+        onRetry={() => setPreviewRetryKey((current) => current + 1)}
         onClose={() => {
           setSelected(null);
           setReviewComment('');
@@ -279,8 +292,8 @@ function EvidenceListRow({
           className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
           onClick={onOpen}
         >
-          <ExternalLink className="h-3.5 w-3.5" />
-          Mở
+          {isImageEvidence(record) ? <Eye className="h-3.5 w-3.5" /> : <ExternalLink className="h-3.5 w-3.5" />}
+          {isImageEvidence(record) ? 'Xem ảnh' : 'Mở tệp'}
         </button>
       </div>
       {fileCell}
@@ -369,152 +382,13 @@ function EvidenceCard({
             className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
             onClick={onOpen}
           >
-            <ExternalLink className="h-3.5 w-3.5" />
-            Mở
+            {isImageEvidence(record) ? <Eye className="h-3.5 w-3.5" /> : <ExternalLink className="h-3.5 w-3.5" />}
+            {isImageEvidence(record) ? 'Xem ảnh' : 'Mở tệp'}
           </button>
         </div>
       </div>
       {record.caption ? <p className="mt-2 line-clamp-2 text-sm leading-5 text-slate-600">{record.caption}</p> : null}
     </article>
-  );
-}
-
-function EvidenceDetailDialog({
-  record,
-  previewUrl,
-  showWorkItem,
-  canReview,
-  reviewingAction,
-  reviewComment,
-  onReviewCommentChange,
-  onOpen,
-  onClose,
-  onReview,
-}: {
-  record: EvidenceRecord | null;
-  previewUrl?: string;
-  showWorkItem: boolean;
-  canReview: boolean;
-  reviewingAction: EvidenceReviewAction | null;
-  reviewComment: string;
-  onReviewCommentChange: (value: string) => void;
-  onOpen: () => void;
-  onClose: () => void;
-  onReview: (action: EvidenceReviewAction) => void;
-}) {
-  if (!record) return null;
-  const reviewable = canReview && ['draft', 'submitted', 'pending'].includes(String(record.status));
-  return (
-    <Dialog
-      open={Boolean(record)}
-      title="Chi tiết minh chứng"
-      description="Thông tin tệp, nơi lưu trữ và trạng thái rà soát của minh chứng."
-      size="xl"
-      onClose={onClose}
-      footer={
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-slate-500">Tệp được bảo vệ được mở qua API có kiểm tra quyền đầu việc.</p>
-          <div className="flex flex-wrap justify-end gap-2">
-            {reviewable ? (
-              <>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={Boolean(reviewingAction)}
-                  onClick={() => onReview('reject')}
-                >
-                  {reviewingAction === 'reject' ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
-                  Từ chối
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={Boolean(reviewingAction)}
-                  onClick={() => onReview('accept')}
-                >
-                  {reviewingAction === 'accept' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  Duyệt
-                </button>
-              </>
-            ) : null}
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
-              onClick={onOpen}
-            >
-              <ExternalLink className="h-4 w-4" />
-              Mở tệp
-            </button>
-            <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>
-              Đóng
-            </button>
-          </div>
-        </div>
-      }
-    >
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0">
-          <div className="overflow-hidden rounded-md border border-line bg-slate-100">
-            {previewUrl ? (
-              <img className="max-h-[520px] w-full object-contain" src={previewUrl} alt={evidenceTitle(record)} />
-            ) : (
-              <div className="flex min-h-72 items-center justify-center text-slate-400">
-                {isImageEvidence(record) ? <ImageIcon className="h-12 w-12" /> : <FileText className="h-12 w-12" />}
-              </div>
-            )}
-          </div>
-          {record.caption ? <p className="mt-3 whitespace-pre-wrap break-words rounded-md border border-line bg-slate-50 p-3 text-sm leading-6 text-slate-700">{record.caption}</p> : null}
-        </div>
-        <div className="min-w-0 space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="break-words text-sm font-semibold text-ink">{evidenceTitle(record)}</p>
-              <p className="mt-1 text-xs text-slate-500">{record.document_name ?? originalFilename(record) ?? record.id}</p>
-            </div>
-            <StatusBadge status={record.status} />
-          </div>
-          <div className="grid gap-2">
-            <EvidenceMeta label="Loại" value={evidenceLabel(record.evidence_type)} />
-            <EvidenceMeta label="Phạm vi hiển thị" value={visibilityLabel(record.visibility ?? 'project')} />
-            {showWorkItem ? <EvidenceMeta label="Đầu việc" value={record.work_item_title ?? '-'} /> : null}
-            {showWorkItem && record.run_node_name ? <EvidenceMeta label="Giai đoạn" value={record.run_node_name} /> : null}
-            <EvidenceMeta label="Người gửi" value={record.submitted_by_name ?? record.uploaded_by ?? '-'} />
-            <EvidenceMeta label="Thời điểm gửi" value={compactDateTime(record.created_at)} />
-            <EvidenceMeta label="Người rà soát" value={record.reviewed_by_name ?? record.reviewed_by ?? '-'} />
-            <EvidenceMeta label="Thời điểm rà soát" value={compactDateTime(record.reviewed_at)} />
-            <EvidenceMeta label="Nơi lưu trữ" value={isProtectedStorageProvider(record.storage_provider) ? 'Tệp nội bộ được bảo vệ' : (record.file_url ? 'Liên kết ngoài' : '-')} />
-            <EvidenceMeta label="MIME / Dung lượng" value={[record.mime_type, record.file_size ? formatEvidenceFileSize(record.file_size) : undefined].filter(Boolean).join(' · ') || '-'} />
-            <EvidenceMeta label="Tên tệp gốc" value={originalFilename(record) ?? '-'} />
-          </div>
-          <div className="rounded-md border border-line bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mã kiểm tra SHA-256</p>
-            <p className="mt-1 break-all font-mono text-xs leading-5 text-slate-700">{record.checksum_sha256 || '-'}</p>
-          </div>
-          {reviewable ? (
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-600">Ghi chú rà soát</span>
-              <textarea
-                className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-                rows={3}
-                value={reviewComment}
-                onChange={(event) => onReviewCommentChange(event.target.value)}
-                placeholder="Lý do duyệt/từ chối"
-                disabled={Boolean(reviewingAction)}
-              />
-            </label>
-          ) : null}
-        </div>
-      </div>
-    </Dialog>
-  );
-}
-
-function EvidenceMeta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-line bg-white px-3 py-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 break-words text-sm text-ink">{value}</p>
-    </div>
   );
 }
 
@@ -554,8 +428,12 @@ function filterEvidence(evidence: EvidenceRecord[], filter: EvidenceFilter, quer
   });
 }
 
-function useEvidencePreviewUrls(evidence: EvidenceRecord[]) {
-  const [urls, setUrls] = useState<Record<string, string>>({});
+export function useEvidencePreviewUrls(evidence: EvidenceRecord[], retryKey = 0) {
+  const [state, setState] = useState<{
+    urls: Record<string, string>;
+    loadingIds: Set<string>;
+    errorIds: Set<string>;
+  }>({ urls: {}, loadingIds: new Set(), errorIds: new Set() });
   const signature = useMemo(
     () => evidence.map((record) => `${record.id}:${record.storage_key ?? ''}:${record.updated_at ?? ''}:${record.mime_type ?? ''}`).join('|'),
     [evidence],
@@ -564,22 +442,26 @@ function useEvidencePreviewUrls(evidence: EvidenceRecord[]) {
   useEffect(() => {
     let cancelled = false;
     const objectUrls: string[] = [];
-    setUrls({});
+    const imageRecords = evidence.filter((record) => isProtectedStorageProvider(record.storage_provider) && record.storage_key && isImageEvidence(record));
+    setState({ urls: {}, loadingIds: new Set(imageRecords.map((record) => record.id)), errorIds: new Set() });
 
     async function loadPreviews() {
-      const imageRecords = evidence.filter((record) => isProtectedStorageProvider(record.storage_provider) && record.storage_key && isImageEvidence(record));
       const entries = await Promise.all(imageRecords.map(async (record) => {
         try {
           const blob = await downloadBlob(`/evidence/${record.id}/file`);
           const objectUrl = URL.createObjectURL(blob);
           objectUrls.push(objectUrl);
-          return [record.id, objectUrl] as const;
+          return { id: record.id, objectUrl };
         } catch {
-          return null;
+          return { id: record.id, objectUrl: '' };
         }
       }));
       if (!cancelled) {
-        setUrls(Object.fromEntries(entries.filter(Boolean) as Array<readonly [string, string]>));
+        setState({
+          urls: Object.fromEntries(entries.filter((entry) => entry.objectUrl).map((entry) => [entry.id, entry.objectUrl])),
+          loadingIds: new Set(),
+          errorIds: new Set(entries.filter((entry) => !entry.objectUrl).map((entry) => entry.id)),
+        });
       } else {
         objectUrls.forEach((url) => URL.revokeObjectURL(url));
       }
@@ -590,32 +472,11 @@ function useEvidencePreviewUrls(evidence: EvidenceRecord[]) {
       cancelled = true;
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [signature]);
+  }, [retryKey, signature]);
 
-  return urls;
-}
-
-export function isImageEvidence(record: EvidenceRecord) {
-  return record.evidence_type === 'photo' || String(record.mime_type ?? '').startsWith('image/');
+  return state;
 }
 
 function isDocumentEvidence(record: EvidenceRecord) {
   return record.evidence_type === 'document' || String(record.mime_type ?? '').includes('pdf');
-}
-
-function evidenceTitle(record: EvidenceRecord) {
-  return record.name ?? record.title ?? record.document_name ?? record.id;
-}
-
-function originalFilename(record: EvidenceRecord) {
-  const payload = record.payload_json;
-  if (!payload || typeof payload !== 'object') return '';
-  return String(payload.original_filename ?? '').trim();
-}
-
-export function formatEvidenceFileSize(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return '-';
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
