@@ -38,6 +38,7 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const requestedRecordId = searchParams.get('record')?.trim() ?? '';
+  const requestedTaskId = searchParams.get('task')?.trim() ?? '';
   const appliedRecordId = useRef('');
   const [projectId, setProjectId] = useState(id ?? '');
   const [selectedId, setSelectedId] = useState('');
@@ -70,6 +71,10 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
     enabled: Boolean(projectId) && canCreate,
     retry: false,
   });
+  const taskWorkItem = useMemo(
+    () => requestedTaskId ? operations.data?.work_items?.find((item) => item.id === requestedTaskId && item.execution_target?.workspace === 'acceptance') : undefined,
+    [operations.data?.work_items, requestedTaskId],
+  );
   const rows = acceptances.data ?? [];
   useEffect(() => {
     if (!rows.length) {
@@ -168,7 +173,7 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
   });
 
   function openNewEditor() {
-    setDraft(createAcceptanceDraft());
+    setDraft(createAcceptanceDraft({ workItemId: taskWorkItem?.id }));
     setEditorOpen(true);
   }
 
@@ -194,7 +199,7 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
           actions={<>
             {!global ? <ProjectBackLink projectId={projectId} /> : null}
             {global ? <ProjectSelector value={projectId} onChange={(value) => { setProjectId(value); setSelectedId(''); }} /> : null}
-            {canCreate ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={openNewEditor}><Plus className="h-4 w-4" /> Tạo biên bản</button> : null}
+            {canCreate ? <button disabled={!projectId || Boolean(requestedTaskId && operations.isLoading)} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={openNewEditor}><Plus className="h-4 w-4" /> Tạo biên bản</button> : null}
           </>}
         />
 
@@ -265,8 +270,19 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
           <button disabled={save.isPending} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={() => save.mutate({ submit: true })}>{save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Gửi nghiệm thu</button>
         </div>}
       >
-        <AcceptanceEditor draft={draft} projectId={projectId} evidence={operations.data?.latest_evidence ?? []} workItems={operations.data?.work_items ?? []} disabled={save.isPending} onChange={setDraft} />
-        {operations.error ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Không tải được danh sách công việc và minh chứng; anh vẫn có thể lưu biên bản chưa chọn Công việc liên quan.</p> : null}
+        <AcceptanceEditor
+          draft={draft}
+          projectId={projectId}
+          evidence={operations.data?.latest_evidence ?? []}
+          workItems={operations.data?.work_items ?? []}
+          fixedWorkItem={Boolean(taskWorkItem && draft.work_item_id === taskWorkItem.id)}
+          workItemsLoading={operations.isLoading}
+          workItemsError={Boolean(operations.error)}
+          disabled={save.isPending}
+          onReloadWorkItems={() => { void operations.refetch(); }}
+          onChange={setDraft}
+        />
+        {operations.error ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Không tải được danh sách nguồn công việc và minh chứng; anh vẫn có thể lưu biên bản khi chưa cần tải ảnh/tệp mới.</p> : null}
       </Dialog>
 
       <Dialog
@@ -333,7 +349,7 @@ function AcceptanceDetail({ record, canCreate, canConclude, canCreateRework, bus
         <div className="mt-4 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
           <Info label="Đại diện chủ đầu tư" value={record.client_representative} />
           <Info label="Đại diện nhà thầu" value={record.contractor_representative} />
-          <Info label="Công việc liên quan" value={record.work_item_title} />
+          <Info label="Nguồn công việc" value={record.work_item_title} />
           <Info label="Hồ sơ / PDF" value={record.pdf_file_name || record.workflow_form_title || record.document_status} />
         </div>
         {record.scope_summary ? <div className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700"><span className="font-semibold">Phạm vi: </span>{record.scope_summary}</div> : null}
@@ -344,7 +360,7 @@ function AcceptanceDetail({ record, canCreate, canConclude, canCreateRework, bus
           <div>
             <h3 className="flex items-center gap-2 font-semibold text-ink"><ClipboardCheck className="h-4 w-4 text-blue-600" /> Checklist nghiệm thu</h3>
             <p className="mt-1 text-xs text-slate-500">{checklist.length} tiêu chí · Đạt {passed} · Có điều kiện {conditional} · Không đạt {failed} · Chờ {pending}</p>
-            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">Nguồn checklist: các tiêu chí được lập trực tiếp trong biên bản này; công việc liên quan, hồ sơ và PDF chỉ là liên kết tham chiếu.</p>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">Nguồn checklist: các tiêu chí được lập trực tiếp trong biên bản này; nguồn công việc, hồ sơ và PDF chỉ là liên kết tham chiếu.</p>
           </div>
           <div className="flex flex-wrap gap-2"><SummaryChip label="Đạt" value={passed} tone="green" /><SummaryChip label="Có điều kiện" value={conditional} tone="amber" /><SummaryChip label="Không đạt" value={failed} tone="red" /></div>
         </div>
@@ -481,7 +497,7 @@ function ChecklistItemDialog({ selected, record, onClose }: { selected: Selected
             <section className="rounded-md border border-line p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin bổ sung</p><dl className="mt-3 grid gap-3 sm:grid-cols-2">{supplemental.map(([key, value]) => <div key={key}><dt className="text-xs font-semibold text-slate-500">{supplementalLabel(key)}</dt><dd className="mt-1 break-words text-sm text-ink">{supplementalValue(value)}</dd></div>)}</dl></section>
           ) : null}
 
-          <p className="text-xs leading-5 text-slate-500">Nguồn: tiêu chí được lập và lưu trong biên bản {record?.acceptance_code ?? record?.id ?? ''}; Công việc liên quan, hồ sơ và PDF chỉ là liên kết tham chiếu.</p>
+          <p className="text-xs leading-5 text-slate-500">Nguồn: tiêu chí được lập và lưu trong biên bản {record?.acceptance_code ?? record?.id ?? ''}; nguồn công việc, hồ sơ và PDF chỉ là liên kết tham chiếu.</p>
         </div>
       ) : null}
     </Dialog>

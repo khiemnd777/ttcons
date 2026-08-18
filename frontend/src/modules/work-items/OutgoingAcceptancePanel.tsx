@@ -12,6 +12,7 @@ import type {
   EvidenceRecord,
   OutgoingAcceptanceResponse,
   WorkflowFormPDFExport,
+  WorkItem,
 } from '../../lib/types/domain';
 import {
   AcceptanceEditor,
@@ -27,10 +28,12 @@ export function OutgoingAcceptancePanel({
   workItemId,
   projectId,
   evidence,
+  workItem,
 }: {
   workItemId: string;
   projectId?: string;
   evidence: EvidenceRecord[];
+  workItem?: WorkItem;
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -193,6 +196,7 @@ export function OutgoingAcceptancePanel({
           draft={draft}
           projectId={projectId}
           evidence={evidenceOptions}
+          workItems={workItem ? [workItem] : []}
           formInstance={formInstance?.id ? { id: formInstance.id, title: formInstance.title } : undefined}
           pdfExports={pdfExports}
           fixedWorkItem

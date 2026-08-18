@@ -378,7 +378,7 @@ function renderPrimaryPanel(
     case 'surplus_handling':
       return <SurplusHandlingPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} />;
     case 'outgoing_acceptance':
-      return <OutgoingAcceptancePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} />;
+      return <OutgoingAcceptancePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItem={item} />;
     case 'owner_client_reconciliation':
       return <OwnerClientReconciliationPanel workItemId={item.id} projectId={item.project_id} />;
     case 'subcontractor_reconciliation':

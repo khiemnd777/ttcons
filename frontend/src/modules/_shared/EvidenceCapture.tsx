@@ -13,6 +13,8 @@ export type ConstructionEvidenceUploadDraft = {
   caption: string;
 };
 
+export type EvidenceCaptureIntent = 'file' | 'camera';
+
 type ConstructionEvidenceCaptureProps = {
   drafts: ConstructionEvidenceUploadDraft[];
   onChange: (drafts: ConstructionEvidenceUploadDraft[]) => void;
@@ -21,10 +23,11 @@ type ConstructionEvidenceCaptureProps = {
   compact?: boolean;
   hint?: string;
   maxFiles?: number;
+  onSourceRequired?: (intent: EvidenceCaptureIntent, resume: () => void) => void;
   onPreviewPhoto?: (draft: ConstructionEvidenceUploadDraft, previewURL: string) => void;
 };
 
-export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disabled = false, compact = false, hint, maxFiles, onPreviewPhoto }: ConstructionEvidenceCaptureProps) {
+export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disabled = false, compact = false, hint, maxFiles, onSourceRequired, onPreviewPhoto }: ConstructionEvidenceCaptureProps) {
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fallbackCameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -56,6 +59,14 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
     onChange(drafts.map((draft) => draft.id === id ? { ...draft, ...patch } : draft));
   }
 
+  function requestCapture(intent: EvidenceCaptureIntent, resume: () => void) {
+    if (!hasSource && onSourceRequired) {
+      onSourceRequired(intent, resume);
+      return;
+    }
+    resume();
+  }
+
   return (
     <div className="rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4">
       <input ref={fileInputRef} type="file" multiple accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
@@ -66,8 +77,8 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
           <p className="mt-1 text-xs leading-5 text-slate-500">{hint ?? 'Tệp chỉ được tải lên sau khi lưu báo cáo và được lưu theo công việc liên quan đã chọn.'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={disabled} className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" onClick={() => fileInputRef.current?.click()}><Upload className="h-4 w-4" /> Chọn tệp</button>
-          <button type="button" disabled={disabled} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" onClick={() => setCameraOpen(true)}><Camera className="h-4 w-4" /> Mở camera</button>
+          <button type="button" disabled={disabled} className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" onClick={() => requestCapture('file', () => fileInputRef.current?.click())}><Upload className="h-4 w-4" /> Chọn tệp</button>
+          <button type="button" disabled={disabled} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" onClick={() => requestCapture('camera', () => setCameraOpen(true))}><Camera className="h-4 w-4" /> Mở camera</button>
         </div>
       </div>
 

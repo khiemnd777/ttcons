@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Circle, ClipboardCheck, FileText, Image as ImageIcon, Plus, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AlertTriangle, CheckCircle2, Circle, ClipboardCheck, FileText, Image as ImageIcon, Link2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
 import { StatusBadge } from '../../components/StatusBadge';
+import { useToast } from '../../components/ToastProvider';
 import { postForm } from '../../lib/api/client';
 import type { AcceptanceChecklistItem, AcceptanceRecord, EvidenceRecord, WorkflowFormPDFExport, WorkItem } from '../../lib/types/domain';
 import {
   EvidenceCapture,
   evidenceUploadFormData,
+  type EvidenceCaptureIntent,
   type EvidenceUploadDraft,
 } from '../_shared/EvidenceCapture';
 import { AcceptanceEvidencePicker } from './AcceptanceEvidencePicker';
+import { AcceptanceWorkItemPickerDialog } from './AcceptanceWorkItemPickerDialog';
 
 export type AcceptanceLineDraft = {
   key: string;
@@ -91,7 +94,10 @@ export function AcceptanceEditor({
   formInstance,
   pdfExports = [],
   fixedWorkItem = false,
+  workItemsLoading = false,
+  workItemsError = false,
   disabled = false,
+  onReloadWorkItems,
   onChange,
 }: {
   draft: AcceptanceDraft;
@@ -101,12 +107,26 @@ export function AcceptanceEditor({
   formInstance?: { id: string; title?: string };
   pdfExports?: WorkflowFormPDFExport[];
   fixedWorkItem?: boolean;
+  workItemsLoading?: boolean;
+  workItemsError?: boolean;
   disabled?: boolean;
+  onReloadWorkItems?: () => void;
   onChange: (draft: AcceptanceDraft) => void;
 }) {
+  const toast = useToast();
   const [selectedKey, setSelectedKey] = useState(draft.checklist[0]?.key ?? '');
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [evidencePickerOpen, setEvidencePickerOpen] = useState(false);
+  const [workItemPickerOpen, setWorkItemPickerOpen] = useState(false);
+  const [workItemPickerMode, setWorkItemPickerMode] = useState<'capture' | 'change'>('change');
+  const pendingCaptureResume = useRef<(() => void) | null>(null);
   const evidenceCatalog = useMemo(() => new Map(evidence.map((record) => [String(record.id), record])), [evidence]);
+  const selectedWorkItem = useMemo(() => workItems.find((item) => item.id === draft.work_item_id), [draft.work_item_id, workItems]);
+  const evidenceWorkItemIDs = useMemo(() => new Set(
+    draft.checklist.flatMap((line) => line.evidence_records.map((record) => String(record.work_item_id ?? '').trim()).filter(Boolean)),
+  ), [draft.checklist]);
+  const evidenceSourceWorkItemId = evidenceWorkItemIDs.size === 1 ? Array.from(evidenceWorkItemIDs)[0] : '';
+  const hasMixedEvidenceSources = evidenceWorkItemIDs.size > 1;
+  const hasQueuedUploads = draft.checklist.some((line) => line.uploads.length > 0);
 
   useEffect(() => {
     if (draft.checklist.some((line) => line.key === selectedKey)) return;
@@ -132,6 +152,35 @@ export function AcceptanceEditor({
   const selectedEvidence = selectedLine ? mergeEvidenceRecords(selectedLine, evidenceCatalog) : [];
   const selectedEvidenceCount = selectedLine ? selectedLine.evidence_ids.length + selectedLine.uploads.length : 0;
 
+  function openWorkItemPicker(mode: 'capture' | 'change', resume?: () => void) {
+    if (hasMixedEvidenceSources) {
+      toast.warn({ title: 'Minh chứng thuộc nhiều công việc', description: 'Bỏ các minh chứng khác nguồn trước khi gắn công việc hoặc tải ảnh/tệp mới.' });
+      return;
+    }
+    pendingCaptureResume.current = resume ?? null;
+    setWorkItemPickerMode(mode);
+    setWorkItemPickerOpen(true);
+  }
+
+  function closeWorkItemPicker() {
+    pendingCaptureResume.current = null;
+    setWorkItemPickerOpen(false);
+  }
+
+  function selectWorkItem(workItemId: string) {
+    const resume = pendingCaptureResume.current;
+    pendingCaptureResume.current = null;
+    updateDraft({ work_item_id: workItemId });
+    setWorkItemPickerOpen(false);
+    resume?.();
+  }
+
+  function clearWorkItem() {
+    pendingCaptureResume.current = null;
+    updateDraft({ work_item_id: '' });
+    setWorkItemPickerOpen(false);
+  }
+
   return (
     <div className="space-y-4">
       <section className="rounded-lg border border-line bg-white p-4">
@@ -140,14 +189,16 @@ export function AcceptanceEditor({
           <div><h3 className="text-sm font-semibold text-ink">Thông tin biên bản</h3><p className="mt-1 text-xs leading-5 text-slate-500">Xác định phạm vi nghiệm thu trước khi lập các tiêu chí kiểm tra.</p></div>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {!fixedWorkItem ? (
-            <EditorField label="Công việc liên quan" className="xl:col-span-2">
-              <select className={controlClassName} value={draft.work_item_id} onChange={(event) => updateDraft({ work_item_id: event.target.value })} disabled={disabled}>
-                <option value="">Không chọn công việc</option>
-                {workItems.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.status}</option>)}
-              </select>
-              <span className="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-500">Bắt buộc khi có ảnh hoặc tệp mới chờ tải lên.</span>
-            </EditorField>
+          {draft.work_item_id ? (
+            <div className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50/60 p-3 md:col-span-2 md:flex-row md:items-center md:justify-between xl:col-span-4" aria-label="Nguồn công việc">
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-blue-700"><Link2 className="h-3.5 w-3.5" /> Nguồn công việc</p>
+                <p className="mt-1 truncate text-sm font-semibold text-ink">{selectedWorkItem?.title || selectedWorkItem?.name || 'Công việc đã liên kết'}</p>
+                {selectedWorkItem ? <div className="mt-1 flex flex-wrap items-center gap-2"><StatusBadge status={selectedWorkItem.status} />{selectedWorkItem.run_node_name ? <span className="text-xs text-slate-600">Giai đoạn: {selectedWorkItem.run_node_name}</span> : null}{selectedWorkItem.assignee_name ? <span className="text-xs text-slate-600">Phụ trách: {selectedWorkItem.assignee_name}</span> : null}</div> : null}
+              </div>
+              {!fixedWorkItem && !evidenceSourceWorkItemId ? <button type="button" disabled={disabled} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50" onClick={() => openWorkItemPicker('change')}><Pencil className="h-4 w-4" /> Thay đổi</button> : null}
+              {!fixedWorkItem && evidenceSourceWorkItemId ? <span className="shrink-0 text-xs font-semibold text-slate-500">Đã khóa theo minh chứng</span> : null}
+            </div>
           ) : null}
           <EditorField label="Loại biên bản">
             <select className={controlClassName} value={draft.type} onChange={(event) => updateDraft({ type: event.target.value })} disabled={disabled}>
@@ -245,13 +296,14 @@ export function AcceptanceEditor({
                   {selectedLine.photo_url ? <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">Tiêu chí này còn một liên kết ảnh từ dữ liệu cũ. Liên kết sẽ tiếp tục được giữ khi lưu.</div> : null}
 
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" disabled={disabled || !projectId || selectedLine.evidence_ids.length + selectedLine.uploads.length >= 10} className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50" onClick={() => setPickerOpen(true)}><FileText className="h-4 w-4" /> Chọn từ hồ sơ công trình</button>
+                    <button type="button" disabled={disabled || !projectId || selectedLine.evidence_ids.length + selectedLine.uploads.length >= 10} className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50" onClick={() => setEvidencePickerOpen(true)}><FileText className="h-4 w-4" /> Chọn từ hồ sơ công trình</button>
                   </div>
 
                   <EvidenceCapture
                     drafts={selectedLine.uploads}
                     onChange={(uploads) => updateLine(selectedLine.key, { uploads })}
                     hasSource={Boolean(draft.work_item_id)}
+                    onSourceRequired={(_intent: EvidenceCaptureIntent, resume) => openWorkItemPicker('capture', resume)}
                     disabled={disabled || selectedLine.evidence_ids.length >= 10}
                     compact
                     maxFiles={Math.max(0, 10 - selectedLine.evidence_ids.length)}
@@ -295,19 +347,34 @@ export function AcceptanceEditor({
 
       {selectedLine ? (
         <AcceptanceEvidencePicker
-          open={pickerOpen}
+          open={evidencePickerOpen}
           projectId={projectId}
           workItemId={draft.work_item_id || undefined}
           selected={selectedEvidence}
           maxSelected={Math.max(0, 10 - selectedLine.uploads.length)}
-          onClose={() => setPickerOpen(false)}
+          onClose={() => setEvidencePickerOpen(false)}
           onConfirm={(records) => {
             const normalized = uniqueEvidenceRecords(records);
             updateLine(selectedLine.key, { evidence_records: normalized, evidence_ids: normalized.map((record) => String(record.id)), evidence_id: String(normalized[0]?.id ?? '') });
-            setPickerOpen(false);
+            setEvidencePickerOpen(false);
           }}
         />
       ) : null}
+
+      <AcceptanceWorkItemPickerDialog
+        open={workItemPickerOpen}
+        items={workItems}
+        selectedId={draft.work_item_id}
+        requiredWorkItemId={evidenceSourceWorkItemId}
+        loading={workItemsLoading}
+        error={workItemsError}
+        confirmLabel={workItemPickerMode === 'capture' ? 'Chọn và tiếp tục' : 'Dùng công việc này'}
+        canClear={workItemPickerMode === 'change' && Boolean(draft.work_item_id) && !hasQueuedUploads && !evidenceSourceWorkItemId}
+        onClose={closeWorkItemPicker}
+        onRetry={onReloadWorkItems}
+        onClear={clearWorkItem}
+        onConfirm={selectWorkItem}
+      />
     </div>
   );
 }
@@ -319,7 +386,7 @@ function CriterionListItem({ line, index, active, onClick }: { line: AcceptanceL
 
 function SelectedEvidenceCard({ record, mismatch, disabled, onRemove }: { record: EvidenceRecord; mismatch: boolean; disabled: boolean; onRemove: () => void }) {
   const Icon = record.evidence_type === 'photo' ? ImageIcon : FileText;
-  return <article className={clsx('flex min-w-0 items-start gap-3 rounded-md border p-3', mismatch ? 'border-amber-300 bg-amber-50' : 'border-line bg-white')}><span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-500"><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{record.name || record.title || String(record.id)}</p><p className="mt-1 truncate text-xs text-slate-500">{record.work_item_title || 'Hồ sơ công trình'}</p><div className="mt-2 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} />{mismatch ? <span className="text-xs font-semibold text-amber-800">Khác Công việc liên quan</span> : null}</div></div><button type="button" disabled={disabled} className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50" onClick={onRemove} aria-label="Bỏ minh chứng"><X className="h-4 w-4" /></button></article>;
+  return <article className={clsx('flex min-w-0 items-start gap-3 rounded-md border p-3', mismatch ? 'border-amber-300 bg-amber-50' : 'border-line bg-white')}><span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-500"><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{record.name || record.title || String(record.id)}</p><p className="mt-1 truncate text-xs text-slate-500">{record.work_item_title || 'Hồ sơ công trình'}</p><div className="mt-2 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} />{mismatch ? <span className="text-xs font-semibold text-amber-800">Khác nguồn công việc</span> : null}</div></div><button type="button" disabled={disabled} className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50" onClick={onRemove} aria-label="Bỏ minh chứng"><X className="h-4 w-4" /></button></article>;
 }
 
 function EditorField({ label, className = '', children }: { label: string; className?: string; children: ReactNode }) {
@@ -354,7 +421,7 @@ export function acceptanceDraftPayload(draft: AcceptanceDraft, requireComplete: 
   if (requireComplete && !draft.acceptance_date) invalid.push('Ngày nghiệm thu');
   if (requireComplete && draft.signature_status === 'pending') invalid.push('Chữ ký');
   if (requireComplete && draft.document_status === 'pending') invalid.push('Tài liệu/PDF');
-  if (!draft.work_item_id && draft.checklist.some((line) => line.uploads.length > 0)) invalid.push('Công việc liên quan cho tệp chờ tải');
+  if (!draft.work_item_id && draft.checklist.some((line) => line.uploads.length > 0)) invalid.push('Nguồn công việc cho tệp chờ tải');
   const lines = draft.checklist.filter(hasLineInput);
   if (requireComplete && lines.length === 0) invalid.push('Tiêu chí nghiệm thu');
   const checklist = lines.map((line, index) => {
@@ -363,7 +430,7 @@ export function acceptanceDraftPayload(draft: AcceptanceDraft, requireComplete: 
     if (!line.title.trim()) invalid.push(`Hạng mục tiêu chí ${index + 1}`);
     if (requireComplete && line.decision === 'pending') invalid.push(`Kết quả tiêu chí ${index + 1}`);
     if (evidenceCount > 10) invalid.push(`Tối đa 10 minh chứng ở tiêu chí ${index + 1}`);
-    if (draft.work_item_id && line.evidence_records.some((record) => record.work_item_id && record.work_item_id !== draft.work_item_id)) invalid.push(`Minh chứng khác Công việc liên quan ở tiêu chí ${index + 1}`);
+    if (draft.work_item_id && line.evidence_records.some((record) => record.work_item_id && record.work_item_id !== draft.work_item_id)) invalid.push(`Minh chứng khác nguồn công việc ở tiêu chí ${index + 1}`);
     const evidenceRequired = line.photo_required || line.decision === 'conditional_pass' || line.decision === 'fail';
     if (requireComplete && evidenceRequired && evidenceCount === 0 && !line.photo_url.trim()) invalid.push(`Minh chứng tiêu chí ${index + 1}`);
     if (requireComplete && (line.decision === 'conditional_pass' || line.decision === 'fail') && !line.required_action.trim()) invalid.push(`Yêu cầu xử lý tiêu chí ${index + 1}`);
@@ -393,7 +460,7 @@ export function acceptanceDraftPayload(draft: AcceptanceDraft, requireComplete: 
 
 export async function uploadAcceptanceDraftEvidence(draft: AcceptanceDraft, onProgress?: (next: AcceptanceDraft) => void): Promise<AcceptanceDraft> {
   if (!draft.checklist.some((line) => line.uploads.length)) return draft;
-  if (!draft.work_item_id) throw new Error('Chọn Công việc liên quan trước khi tải ảnh hoặc tệp minh chứng.');
+  if (!draft.work_item_id) throw new Error('Chọn nguồn công việc trước khi tải ảnh hoặc tệp minh chứng.');
   let next = draft;
   for (const sourceLine of draft.checklist) {
     for (const upload of sourceLine.uploads) {
