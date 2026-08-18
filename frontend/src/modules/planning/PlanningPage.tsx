@@ -789,17 +789,18 @@ function PlanningWorkList({ rows, onOpen }: { rows: PlanningWorkRow[]; onOpen: (
         <table className="w-full min-w-[840px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-3 py-2"><span className="sr-only">Thao tác</span></th>
               <th className="px-3 py-2">Công việc</th>
               <th className="px-3 py-2">Giai đoạn</th>
               <th className="px-3 py-2">Loại</th>
               <th className="px-3 py-2">Trạng thái</th>
               <th className="px-3 py-2">Yêu cầu</th>
-              <th className="px-3 py-2 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.id} className="border-b border-line last:border-0 hover:bg-slate-50/70">
+                <td className="px-3 py-3 align-top"><PlanningWorkButton row={row} onOpen={() => onOpen(row)} /></td>
                 <td className="max-w-sm px-3 py-3 align-top">
                   <p className="font-semibold text-ink">{row.title}</p>
                   <p className="mt-1 line-clamp-1 text-xs text-slate-500">{row.formTitle ? `Hồ sơ: ${row.formTitle}` : row.nextAction}</p>
@@ -814,7 +815,6 @@ function PlanningWorkList({ rows, onOpen }: { rows: PlanningWorkRow[]; onOpen: (
                   <p className="text-xs font-semibold text-slate-700">{planningWorkRequirementLabel(row)}</p>
                   <p className="mt-1 text-xs text-slate-500">{row.evidenceCount} minh chứng</p>
                 </td>
-                <td className="px-3 py-3 text-right align-top"><PlanningWorkButton row={row} onOpen={() => onOpen(row)} /></td>
               </tr>
             ))}
           </tbody>

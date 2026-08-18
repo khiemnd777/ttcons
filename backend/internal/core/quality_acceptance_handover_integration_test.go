@@ -316,6 +316,73 @@ func TestBatch7HandoverBlockedAuditIncludesProjectFinanceBlockers(t *testing.T) 
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='handover_blocked'`, 1, projectID)
 }
 
+func TestRev8PhysicalHandoverCompletesBeforeProjectFinanceClose(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+
+	actorID := newID()
+	staffID := newID()
+	projectID := newID()
+	acceptanceID := newID()
+	handoverID := newID()
+	materialCostID := newID()
+	cashRequestID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, staffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Rev8 Handover Actor','active')`, actorID, "rev8-handover-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,status) VALUES ($1,$2,'Rev8 Handover Actor',$3,'operations','active')`, staffID, actorID, "rev8-handover-staff-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status,pipeline_template_id) VALUES ($1,'Rev8 Handover',$2,'Client','handover','40000000-0000-0000-0000-000000000027')`, projectID, "R8H-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,'["PM"]'::jsonb,true)`, projectID, staffID)
+	if _, err := repo.StartPipeline(ctx, projectID, "40000000-0000-0000-0000-000000000027", actorID, "Rev8 Handover Actor"); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, `
+		INSERT INTO acceptance_records (id,project_id,type,title,requested_by,approved_by,status,result)
+		VALUES ($1,$2,'final','Rev8 final acceptance',$3,$3,'completed','pass')
+	`, acceptanceID, projectID, actorID)
+	mustExec(t, db, `
+		INSERT INTO handover_records
+			(id,project_id,handover_code,status,final_acceptance_id,documents_ready,warehouse_closed,payables_recorded,receivables_recorded,created_by)
+		VALUES ($1,$2,$3,'submitted',$4,true,true,false,false,$5)
+	`, handoverID, projectID, "HO-R8-"+handoverID[:8], acceptanceID, actorID)
+	mustExec(t, db, `
+		INSERT INTO project_material_costs (id,project_id,vendor_name,description,amount_before_vat,vat_amount,total_amount,status,created_by)
+		VALUES ($1,$2,'Rev8 Supplier','Chi phí chờ xác nhận',100,10,110,'submitted',$3)
+	`, materialCostID, projectID, actorID)
+	mustExec(t, db, `
+		INSERT INTO project_cash_requests (id,project_id,request_code,direction,title,counterparty_name,amount,status,created_by)
+		VALUES ($1,$2,$3,'outbound','Đề nghị chi chờ xử lý','Rev8 Supplier',110,'submitted',$4)
+	`, cashRequestID, projectID, "R8R-"+cashRequestID[:8], actorID)
+
+	completed, err := repo.CompleteHandover(ctx, handoverID, ActionRequest{Comment: "Bàn giao vật lý"}, actorID, "Rev8 Handover Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed["status"] != "handed_over" {
+		t.Fatalf("Rev8 handover status=%v, want handed_over despite pending finance", completed["status"])
+	}
+
+	financeWorkItemID := clientOfficialWorkItemIDByAction(t, db, projectID, "source.project_finance_close_ready")
+	source, err := repo.WorkflowBusinessSourceForWorkItem(ctx, financeWorkItemID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if boolValue(source["ready"]) || source["status"] != "blocked" {
+		t.Fatalf("Rev8 finance source=%#v, want blocked after physical handover", source)
+	}
+	checks, ok := source["checks"].([]Record)
+	if !ok || len(checks) != 3 {
+		t.Fatalf("Rev8 finance checks=%#v, want 3 composite checks", source["checks"])
+	}
+	if !boolValue(checks[0]["ready"]) || boolValue(checks[1]["ready"]) || boolValue(checks[2]["ready"]) {
+		t.Fatalf("Rev8 finance check states=%#v, want handover ready and finance pending", checks)
+	}
+}
+
 func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

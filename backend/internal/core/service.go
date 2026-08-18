@@ -19,6 +19,7 @@ import (
 	"math"
 	"mime/multipart"
 	"net/http"
+	"net/mail"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -213,13 +214,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, userAgent string,
 		return nil, err
 	}
 	hash := fmt.Sprint(user["password_hash"])
-	ok := false
-	if strings.HasPrefix(hash, "demo:") {
-		ok = strings.TrimPrefix(hash, "demo:") == req.Password
-	} else {
-		ok = bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)) == nil
-	}
-	if !ok {
+	if !passwordMatches(hash, req.Password) {
 		return nil, sql.ErrNoRows
 	}
 	roles, err := s.repo.UserRoles(ctx, fmt.Sprint(user["id"]))
@@ -227,6 +222,10 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, userAgent string,
 		return nil, err
 	}
 	permissions, err := s.repo.UserPermissions(ctx, fmt.Sprint(user["id"]))
+	if err != nil {
+		return nil, err
+	}
+	profile, err := s.repo.GetOwnProfile(ctx, fmt.Sprint(user["id"]))
 	if err != nil {
 		return nil, err
 	}
@@ -244,29 +243,132 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, userAgent string,
 	if err != nil {
 		return nil, err
 	}
-	delete(user, "password_hash")
-	user["roles"] = roles
-	user["permissions"] = permissions
+	profile["roles"] = roles
+	profile["permissions"] = permissions
 	return Record{
 		"token":              token,
 		"access_expires_at":  accessExpiresAt.Format(time.RFC3339),
 		"refresh_token":      refreshToken,
 		"refresh_expires_at": refreshExpiresAt.Format(time.RFC3339),
-		"user":               user,
+		"user":               profile,
 	}, nil
 }
 
 func (s *Service) Me(ctx context.Context, userID string) (Record, error) {
-	user, err := s.repo.GetByID(ctx, "users", userID)
+	user, err := s.repo.GetOwnProfile(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 	roles, _ := s.repo.UserRoles(ctx, userID)
 	permissions, _ := s.repo.UserPermissions(ctx, userID)
-	delete(user, "password_hash")
 	user["roles"] = roles
 	user["permissions"] = permissions
 	return user, nil
+}
+
+func (s *Service) UpdateOwnProfile(ctx context.Context, userID, actorName string, req UpdateOwnProfileRequest) (Record, error) {
+	fullName := strings.Join(strings.Fields(req.FullName), " ")
+	if count := len([]rune(fullName)); count < 2 || count > 120 {
+		return nil, validationError("Họ tên phải có từ 2 đến 120 ký tự", Record{"field": "full_name"})
+	}
+	email, err := normalizeProfileEmail(req.Email)
+	if err != nil {
+		return nil, err
+	}
+	phone, err := normalizeProfilePhone(req.Phone)
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := s.repo.GetByID(ctx, "users", userID)
+	if err != nil {
+		return nil, err
+	}
+	emailChanged := fmt.Sprint(account["email"]) != email
+	if emailChanged && !passwordMatches(fmt.Sprint(account["password_hash"]), req.CurrentPassword) {
+		return nil, validationError("Mật khẩu hiện tại không đúng", Record{"field": "current_password"})
+	}
+
+	reauthRequired, err := s.repo.UpdateOwnProfile(ctx, userID, actorName, fullName, email, phone)
+	if err != nil {
+		return nil, err
+	}
+	profile, err := s.Me(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return Record{"user": profile, "reauth_required": reauthRequired}, nil
+}
+
+func (s *Service) ChangeOwnPassword(ctx context.Context, userID, actorName string, req ChangeOwnPasswordRequest) (Record, error) {
+	account, err := s.repo.GetByID(ctx, "users", userID)
+	if err != nil {
+		return nil, err
+	}
+	currentHash := fmt.Sprint(account["password_hash"])
+	if !passwordMatches(currentHash, req.CurrentPassword) {
+		return nil, validationError("Mật khẩu hiện tại không đúng", Record{"field": "current_password"})
+	}
+	if req.NewPassword != req.NewPasswordConfirmation {
+		return nil, validationError("Mật khẩu xác nhận không khớp", Record{"field": "new_password_confirmation"})
+	}
+	if count := len([]rune(req.NewPassword)); count < 8 || len([]byte(req.NewPassword)) > 72 {
+		return nil, validationError("Mật khẩu mới phải có ít nhất 8 ký tự và không vượt quá 72 byte", Record{"field": "new_password"})
+	}
+	if passwordMatches(currentHash, req.NewPassword) {
+		return nil, validationError("Mật khẩu mới phải khác mật khẩu hiện tại", Record{"field": "new_password"})
+	}
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.ChangeOwnPassword(ctx, userID, actorName, string(passwordHash)); err != nil {
+		return nil, err
+	}
+	return Record{"password_changed": true, "reauth_required": true}, nil
+}
+
+func passwordMatches(hash, password string) bool {
+	if password == "" {
+		return false
+	}
+	if strings.HasPrefix(hash, "demo:") {
+		return strings.TrimPrefix(hash, "demo:") == password
+	}
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+}
+
+func normalizeProfileEmail(raw string) (string, error) {
+	email := strings.ToLower(strings.TrimSpace(raw))
+	if email == "" || len(email) > 254 || strings.ContainsAny(email, " \t\r\n") {
+		return "", validationError("Email đăng nhập không hợp lệ", Record{"field": "email"})
+	}
+	parsed, err := mail.ParseAddress(email)
+	if err != nil || parsed.Address != email {
+		return "", validationError("Email đăng nhập không hợp lệ", Record{"field": "email"})
+	}
+	return email, nil
+}
+
+func normalizeProfilePhone(raw string) (string, error) {
+	phone := strings.TrimSpace(raw)
+	if phone == "" {
+		return "", nil
+	}
+	phone = strings.NewReplacer(" ", "", "-", "", ".", "", "(", "", ")", "").Replace(phone)
+	digits := phone
+	if strings.HasPrefix(digits, "+") {
+		digits = strings.TrimPrefix(digits, "+")
+	}
+	if len(digits) < 8 || len(digits) > 15 {
+		return "", validationError("Số điện thoại phải có từ 8 đến 15 chữ số", Record{"field": "phone"})
+	}
+	for _, digit := range digits {
+		if digit < '0' || digit > '9' {
+			return "", validationError("Số điện thoại chỉ được gồm chữ số và dấu + ở đầu", Record{"field": "phone"})
+		}
+	}
+	return phone, nil
 }
 
 func (s *Service) RefreshSession(ctx context.Context, refreshToken string, userAgent string, ipAddress string) (Record, error) {
@@ -803,6 +905,16 @@ func (s *Service) UpdateDailyReport(ctx context.Context, reportID string, req Co
 	if cleanID(current["workflow_form_instance_id"]) != "" {
 		return nil, validationError("Báo cáo từ quy trình phải được cập nhật tại công việc liên quan", Record{"workflow_form_instance_id": current["workflow_form_instance_id"]})
 	}
+	if !boolValue(current["report_delivery_eligible"]) {
+		return nil, validationError("Nhật ký lịch sử này chỉ dùng để tra cứu và không thể chỉnh sửa", Record{"report_id": reportID})
+	}
+	workReportStatus, err := s.repo.WorkReportStatusForSource(ctx, reportID)
+	if err != nil {
+		return nil, err
+	}
+	if workReportStatus != "" && workReportStatus != "needs_changes" {
+		return nil, validationError("Báo cáo chỉ được chỉnh sửa khi chưa gửi hoặc đang được yêu cầu bổ sung", Record{"report_id": reportID, "status": workReportStatus})
+	}
 	existingEvidenceIDs := map[string]bool{}
 	for _, evidenceID := range constructionReportStringList(current["photos"]) {
 		existingEvidenceIDs[evidenceID] = true
@@ -839,6 +951,16 @@ func (s *Service) AddDailyReportEvidenceUpload(ctx context.Context, reportID, re
 	}
 	if cleanID(report["workflow_form_instance_id"]) != "" {
 		return nil, validationError("Báo cáo từ quy trình phải bổ sung minh chứng tại công việc liên quan", Record{"workflow_form_instance_id": report["workflow_form_instance_id"]})
+	}
+	if !boolValue(report["report_delivery_eligible"]) {
+		return nil, validationError("Nhật ký lịch sử này chỉ dùng để tra cứu và không thể bổ sung minh chứng", Record{"report_id": reportID})
+	}
+	workReportStatus, err := s.repo.WorkReportStatusForSource(ctx, reportID)
+	if err != nil {
+		return nil, err
+	}
+	if workReportStatus != "" && workReportStatus != "needs_changes" {
+		return nil, validationError("Báo cáo chỉ được bổ sung minh chứng khi chưa gửi hoặc đang được yêu cầu bổ sung", Record{"report_id": reportID, "status": workReportStatus})
 	}
 
 	workItemID := cleanID(report["work_item_id"])

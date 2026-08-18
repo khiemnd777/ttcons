@@ -727,6 +727,52 @@ BEGIN
     );
   IF actual<>0 THEN RAISE EXCEPTION 'Golden Rev7 still exposes % removed administrative fields',actual; END IF;
 
+  -- Rev8 lean fixture: the same 15-node lifecycle is expressed as 21
+  -- accountable work packages with exactly one primary role per step.
+  SELECT count(*) INTO actual
+  FROM projects project
+  JOIN pipeline_runs run ON run.id=project.current_pipeline_run_id
+  JOIN pipeline_templates template ON template.id=run.template_id
+  JOIN pipeline_run_nodes current_node ON current_node.id=run.current_node_id
+  WHERE project.id='30000000-0000-0000-0000-000000000028'
+    AND project.code='GOLDEN-REV8-LEAN-001'
+    AND project.pipeline_template_id='40000000-0000-0000-0000-000000000027'
+    AND run.id='42000000-0000-0000-0000-000000000028'
+    AND run.template_id='40000000-0000-0000-0000-000000000027'
+    AND run.engine_version=4 AND run.template_definition_hash=template.definition_hash
+    AND current_node.business_code='survey' AND current_node.status='in_progress';
+  IF actual<>1 THEN RAISE EXCEPTION 'Golden Rev8 lean project/run snapshot contract is invalid'; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_nodes
+  WHERE project_id='30000000-0000-0000-0000-000000000028';
+  IF actual<>15 THEN RAISE EXCEPTION 'Golden Rev8 runtime nodes: expected 15, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM pipeline_run_steps
+  WHERE project_id='30000000-0000-0000-0000-000000000028';
+  IF actual<>21 THEN RAISE EXCEPTION 'Golden Rev8 runtime steps: expected 21, got %',actual; END IF;
+
+  SELECT count(*) INTO actual FROM workflow_form_instances
+  WHERE project_id='30000000-0000-0000-0000-000000000028';
+  IF actual<>15 THEN RAISE EXCEPTION 'Golden Rev8 form instances: expected 15, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM pipeline_run_steps
+  WHERE project_id='30000000-0000-0000-0000-000000000028'
+    AND form_version_id IS NULL AND domain_action_key IS NOT NULL;
+  IF actual<>6 THEN RAISE EXCEPTION 'Golden Rev8 source/action-only steps: expected 6, got %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM pipeline_run_steps
+  WHERE project_id='30000000-0000-0000-0000-000000000028'
+    AND jsonb_array_length(required_role_ids)<>1;
+  IF actual<>0 THEN RAISE EXCEPTION 'Golden Rev8 steps without one primary role: %',actual; END IF;
+
+  SELECT count(*) INTO actual
+  FROM pipeline_run_nodes
+  WHERE project_id='30000000-0000-0000-0000-000000000028'
+    AND approval_policy_json<>'{}'::jsonb;
+  IF actual<>2 THEN RAISE EXCEPTION 'Golden Rev8 approval nodes: expected 2, got %',actual; END IF;
+
   SELECT
     (SELECT count(*) FROM evidence_records WHERE project_id='30000000-0000-0000-0000-000000000022') +
     (SELECT count(*) FROM documents WHERE project_id='30000000-0000-0000-0000-000000000022') +

@@ -629,24 +629,17 @@ function WorkspaceWorkTable({ rows, onOpenWork }: { rows: WorkItem[]; onOpenWork
         <table className="min-w-full divide-y divide-line text-sm">
           <thead className="bg-white">
             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-0 py-3 pr-3"><span className="sr-only">Thao tác</span></th>
               <th className="px-0 py-3 pr-4">Việc</th>
               <th className="px-3 py-3">Trạng thái</th>
               <th className="px-3 py-3">Phụ trách</th>
               <th className="px-3 py-3">Hạn</th>
-              <th className="px-0 py-3 pl-3 text-right">Mở</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {rows.map((item) => (
               <tr key={item.id} className="hover:bg-slate-50">
-                <td className="max-w-md px-0 py-3 pr-4">
-                  <p className="truncate font-semibold text-ink">{item.title}</p>
-                  <p className="mt-1 truncate text-xs text-slate-500">{item.workflow_name ?? item.node_name ?? departmentLabel(item.department)}</p>
-                </td>
-                <td className="px-3 py-3"><StatusBadge status={item.status} /></td>
-                <td className="px-3 py-3 text-slate-700">{workOwner(item)}</td>
-                <td className="px-3 py-3 text-slate-600">{dateText(workDueDate(item))}</td>
-                <td className="px-0 py-3 pl-3 text-right">
+                <td className="px-0 py-3 pr-3">
                   <button
                     type="button"
                     className="inline-flex items-center justify-center rounded-md border border-line p-1.5 text-blue-700 hover:bg-blue-50"
@@ -657,6 +650,13 @@ function WorkspaceWorkTable({ rows, onOpenWork }: { rows: WorkItem[]; onOpenWork
                     <ArrowUpRight className="h-4 w-4" />
                   </button>
                 </td>
+                <td className="max-w-md px-0 py-3 pr-4">
+                  <p className="truncate font-semibold text-ink">{item.title}</p>
+                  <p className="mt-1 truncate text-xs text-slate-500">{item.workflow_name ?? item.node_name ?? departmentLabel(item.department)}</p>
+                </td>
+                <td className="px-3 py-3"><StatusBadge status={item.status} /></td>
+                <td className="px-3 py-3 text-slate-700">{workOwner(item)}</td>
+                <td className="px-3 py-3 text-slate-600">{dateText(workDueDate(item))}</td>
               </tr>
             ))}
           </tbody>
@@ -1035,13 +1035,13 @@ function WorkflowWorkPanel({
             <>
               <div className="hidden overflow-x-auto rounded-md border border-line md:block">
                 <div className="min-w-[920px]">
-                  <div className="grid grid-cols-[minmax(260px,1.6fr)_120px_minmax(140px,0.8fr)_110px_minmax(170px,1fr)_72px] gap-3 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  <div className="grid grid-cols-[72px_minmax(260px,1.6fr)_120px_minmax(140px,0.8fr)_110px_minmax(170px,1fr)] gap-3 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <span><span className="sr-only">Thao tác</span></span>
                     <span>Công việc</span>
                     <span>Trạng thái</span>
                     <span>Phụ trách</span>
                     <span>Hạn</span>
                     <span>Hồ sơ / Minh chứng</span>
-                    <span className="text-right">Thao tác</span>
                   </div>
                   <div className="divide-y divide-line">
                     {visibleRows.map((item, index) => (
@@ -1092,7 +1092,16 @@ function WorkflowWorkTableRow({
 }) {
   const displayStatus = item.status === 'cancelled' ? 'skipped' : item.status;
   return (
-    <div className="grid grid-cols-[minmax(260px,1.6fr)_120px_minmax(140px,0.8fr)_110px_minmax(170px,1fr)_72px] items-start gap-3 px-3 py-3 text-sm hover:bg-slate-50/80">
+    <div className="grid grid-cols-[72px_minmax(260px,1.6fr)_120px_minmax(140px,0.8fr)_110px_minmax(170px,1fr)] items-start gap-3 px-3 py-3 text-sm hover:bg-slate-50/80">
+      <button
+        type="button"
+        className="inline-flex items-center justify-center gap-1 rounded-md border border-line px-2 py-1.5 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+        onClick={onOpen}
+        aria-label={`Mở ${item.title}`}
+      >
+        Mở
+        <ArrowUpRight className="h-3.5 w-3.5" />
+      </button>
       <div className="flex min-w-0 items-start gap-3">
         <span className="w-6 shrink-0 pt-0.5 text-xs font-semibold tabular-nums text-slate-500">
           {String(item.run_step_order_index ?? fallbackIndex + 1).padStart(2, '0')}
@@ -1110,15 +1119,6 @@ function WorkflowWorkTableRow({
         <p className="font-medium text-slate-700">{workflowFormRequirementLabel(item)}</p>
         <p className="mt-1">{numberValue(item.evidence_count)} minh chứng</p>
       </div>
-      <button
-        type="button"
-        className="inline-flex items-center justify-end gap-1 rounded-md border border-line px-2 py-1.5 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
-        onClick={onOpen}
-        aria-label={`Mở ${item.title}`}
-      >
-        Mở
-        <ArrowUpRight className="h-3.5 w-3.5" />
-      </button>
     </div>
   );
 }
@@ -1309,17 +1309,17 @@ function ProjectAuditPanel({ projectId, initialRows }: { projectId: string; init
       {!logs.isLoading && !rows.length ? <EmptyState title="Chưa có sự kiện hệ thống" /> : null}
       {rows.length ? (
         <div className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
-          <div className="hidden grid-cols-[120px_180px_minmax(140px,1fr)_150px_32px] gap-3 border-b border-line bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
-            <span>Thời gian</span><span>Sự kiện</span><span>Người thực hiện</span><span>Đối tượng</span><span />
+          <div className="hidden grid-cols-[32px_120px_180px_minmax(140px,1fr)_150px] gap-3 border-b border-line bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
+            <span><span className="sr-only">Thao tác</span></span><span>Thời gian</span><span>Sự kiện</span><span>Người thực hiện</span><span>Đối tượng</span>
           </div>
           <div className="divide-y divide-line">
             {rows.map((row) => (
-              <Link key={row.id} to={`/projects/${projectId}/audit`} className="grid gap-2 px-4 py-3 hover:bg-slate-50 md:grid-cols-[120px_180px_minmax(140px,1fr)_150px_32px] md:items-center md:gap-3">
+              <Link key={row.id} to={`/projects/${projectId}/audit`} className="grid gap-2 px-4 py-3 hover:bg-slate-50 md:grid-cols-[32px_120px_180px_minmax(140px,1fr)_150px] md:items-center md:gap-3">
+                <ChevronRight className="hidden h-4 w-4 text-blue-700 md:block" />
                 <span className="text-xs text-slate-500">{compactDateTime(row.created_at)}</span>
                 <span><EnumChip group="event_type" value={row.event_type} /></span>
                 <span className="text-sm text-slate-700">{row.actor_name ?? '-'}</span>
                 <span><EnumChip group="target_type" value={row.target_type} /></span>
-                <ChevronRight className="hidden h-4 w-4 text-blue-700 md:block" />
                 <p className="text-sm leading-5 text-slate-600 md:col-span-5">{row.description ?? '-'}</p>
               </Link>
             ))}

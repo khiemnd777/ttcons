@@ -2,13 +2,18 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Search } from 'lucide-react';
 import { EmptyState } from './EmptyState';
+import { actionColumnsFirst, isActionColumn } from './tableActionColumns';
 
-type SortDirection = 'asc' | 'desc';
+export { actionColumnsFirst, isActionColumn } from './tableActionColumns';
+
+export type SortDirection = 'asc' | 'desc';
+export type DataTableSort = { key: string; direction: SortDirection };
 type SortValue = string | number | boolean | Date | null | undefined;
 
 export type Column<T> = {
   key: string;
   header: string;
+  action?: boolean;
   render?: (row: T) => ReactNode;
   sortable?: boolean;
   sortValue?: (row: T) => SortValue;
@@ -32,6 +37,8 @@ export function DataTable<T extends Record<string, any>>({
   pageSize,
   pageSizeOptions,
   defaultSort,
+  sortState,
+  onSortStateChange,
   getRowKey,
   renderMobileCard,
 }: {
@@ -48,14 +55,21 @@ export function DataTable<T extends Record<string, any>>({
   pageSize?: number;
   pageSizeOptions?: number[];
   defaultSort?: { key: string; direction?: SortDirection };
+  sortState?: DataTableSort | null;
+  onSortStateChange?: (sort: DataTableSort | null) => void;
   getRowKey?: (row: T, index: number) => string | number;
   renderMobileCard?: (row: T) => ReactNode;
 }) {
   const [internalQuery, setInternalQuery] = useState('');
   const query = searchQuery ?? internalQuery;
-  const [sort, setSort] = useState<{ key: string; direction: SortDirection } | null>(
+  const [internalSort, setInternalSort] = useState<DataTableSort | null>(
     defaultSort ? { key: defaultSort.key, direction: defaultSort.direction ?? 'asc' } : null,
   );
+  const sort = sortState === undefined ? internalSort : sortState;
+  const updateSort = (next: DataTableSort | null) => {
+    if (onSortStateChange) onSortStateChange(next);
+    else setInternalSort(next);
+  };
   const [currentPage, setCurrentPage] = useState(1);
   const [currentPageSize, setCurrentPageSize] = useState(pageSize ?? 0);
   const enhanced = Boolean(searchPlaceholder || loading || error || onRetry || pageSize || defaultSort || emptyAction);
@@ -65,8 +79,8 @@ export function DataTable<T extends Record<string, any>>({
   }, [pageSize]);
 
   useEffect(() => {
-    setSort(defaultSort ? { key: defaultSort.key, direction: defaultSort.direction ?? 'asc' } : null);
-  }, [defaultSort?.key, defaultSort?.direction]);
+    if (sortState === undefined) setInternalSort(defaultSort ? { key: defaultSort.key, direction: defaultSort.direction ?? 'asc' } : null);
+  }, [defaultSort?.key, defaultSort?.direction, sortState]);
 
   const filteredRows = useMemo(() => {
     const normalizedQuery = normalizeSearchText(query);
@@ -91,6 +105,7 @@ export function DataTable<T extends Record<string, any>>({
   const resolvedPageSizeOptions = normalizedPageSizeOptions(pageSizeOptions, currentPageSize);
   const sortableColumns = columns.filter((column) => column.sortable || column.sortValue);
   const mobileSortValue = sort ? `${sort.key}:${sort.direction}` : '';
+  const orderedColumns = useMemo(() => actionColumnsFirst(columns), [columns]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -140,7 +155,7 @@ export function DataTable<T extends Record<string, any>>({
                 className="min-w-0 max-w-52 rounded-md border border-line bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-100"
                 aria-label="Sắp xếp báo cáo"
                 value={mobileSortValue}
-                onChange={(event) => setSort(sortFromSelectValue(event.target.value))}
+                onChange={(event) => updateSort(sortFromSelectValue(event.target.value))}
               >
                 {!sort ? <option value="">Thứ tự mặc định</option> : null}
                 {sortableColumns.flatMap((column) => [
@@ -203,8 +218,9 @@ export function DataTable<T extends Record<string, any>>({
         <table className="min-w-full divide-y divide-line">
           <thead className="bg-slate-50">
             <tr>
-              {columns.map((column) => {
-                const canSort = Boolean(column.sortable || column.sortValue);
+              {orderedColumns.map((column) => {
+                const actionColumn = isActionColumn(column);
+                const canSort = !actionColumn && Boolean(column.sortable || column.sortValue);
                 const activeSort = sort?.key === column.key ? sort.direction : null;
                 return (
                 <th
@@ -212,10 +228,12 @@ export function DataTable<T extends Record<string, any>>({
                   aria-sort={activeSort === 'asc' ? 'ascending' : activeSort === 'desc' ? 'descending' : undefined}
                   className={clsx('px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500', alignClass(column.align), column.headerClassName)}
                 >
-                  {canSort ? (
+                  {actionColumn ? (
+                    <span className="sr-only">Thao tác</span>
+                  ) : canSort ? (
                     <button
                       className={clsx('inline-flex items-center gap-1 rounded-sm hover:text-ink focus:outline-none focus:ring-2 focus:ring-blue-100', justifyClass(column.align))}
-                      onClick={() => setSort(nextSort(column.key, sort))}
+                      onClick={() => updateSort(nextSort(column.key, sort))}
                       type="button"
                     >
                       <span>{column.header}</span>
@@ -230,7 +248,7 @@ export function DataTable<T extends Record<string, any>>({
           <tbody className="divide-y divide-line">
             {visibleRows.map((row, index) => (
               <tr key={rowKey(row, index)} className="hover:bg-slate-50">
-                {columns.map((column) => (
+                {orderedColumns.map((column) => (
                   <td key={column.key} className={clsx('px-4 py-3 text-sm text-slate-700', alignClass(column.align), column.className)}>
                     {column.render ? column.render(row) : row[column.key] ?? '-'}
                   </td>

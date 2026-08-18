@@ -191,13 +191,13 @@ export function ProjectWorkTab({ rows, onOpenWork }: { rows: WorkItem[]; onOpenW
               <table className="min-w-full divide-y divide-line">
                 <thead className="bg-slate-50">
                   <tr>
+                    <WorkTableHeader label="" />
                     <WorkTableHeader label="Trạng thái" />
                     <WorkTableHeader label="Công việc" />
                     <WorkTableHeader label="Giai đoạn" />
                     <WorkTableHeader label="Phụ trách" />
                     <WorkTableHeader label="Hạn" />
                     <WorkTableHeader label="Yêu cầu" />
-                    <WorkTableHeader label="" align="right" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
@@ -274,7 +274,7 @@ function WorkFilterSelect({
 }
 
 function WorkTableHeader({ label, align = 'left' }: { label: string; align?: 'left' | 'right' }) {
-  return <th className={clsx('px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500', align === 'right' && 'text-right')}>{label}</th>;
+  return <th className={clsx('px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500', align === 'right' && 'text-right')}>{label || <span className="sr-only">Thao tác</span>}</th>;
 }
 
 function ProjectWorkRow({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
@@ -283,6 +283,9 @@ function ProjectWorkRow({ item, onOpen }: { item: WorkItem; onOpen: () => void }
   const step = item.run_step_name && item.run_step_name !== item.title ? item.run_step_name : undefined;
   return (
     <tr className={clsx('hover:bg-slate-50', item.status === 'cancelled' && 'bg-slate-50/70')}>
+      <td className="px-4 py-3 align-top">
+        <OpenWorkButton item={item} onOpen={onOpen} />
+      </td>
       <td className="whitespace-nowrap px-4 py-3 align-top"><WorkStatus item={item} /></td>
       <td className="min-w-[300px] px-4 py-3 align-top">
         <p className="font-semibold text-ink">{item.title}</p>
@@ -303,9 +306,6 @@ function ProjectWorkRow({ item, onOpen }: { item: WorkItem; onOpen: () => void }
           {workFormRequirement(item)}
         </p>
         <p className="mt-1 text-xs text-slate-500">{numberValue(item.evidence_count)} minh chứng</p>
-      </td>
-      <td className="px-4 py-3 text-right align-top">
-        <OpenWorkButton item={item} onOpen={onOpen} />
       </td>
     </tr>
   );

@@ -25,7 +25,7 @@ import {
 
 type PreparationFilter = 'need_action' | 'upcoming' | 'done' | 'all';
 
-const PREPARATION_TABLE_GRID = 'grid-cols-[7.5rem_minmax(18rem,1.8fr)_minmax(10rem,1fr)_5.5rem_8rem]';
+const PREPARATION_TABLE_GRID = 'grid-cols-[8rem_7.5rem_minmax(18rem,1.8fr)_minmax(10rem,1fr)_5.5rem]';
 
 export function PreparationPage() {
   const { id = '' } = useParams();
@@ -245,11 +245,11 @@ function PreparationQueue({ items, onOpen }: { items: WorkItem[]; onOpen: (item:
       </div>
       <div className="hidden xl:block" data-preparation-desktop-table>
         <div className={clsx('grid items-center gap-3 border-b border-line bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-500', PREPARATION_TABLE_GRID)}>
+          <span><span className="sr-only">Thao tác</span></span>
           <span>Trạng thái</span>
           <span>Hồ sơ / Công việc</span>
           <span>Phụ trách</span>
           <span>Hạn</span>
-          <span className="text-right">Thao tác</span>
         </div>
         {groups.map((group, index) => {
           const collapsed = collapsedGroups.has(group.key);
@@ -310,11 +310,11 @@ function PreparationStageHeader({
 function PreparationDesktopRow({ item, onOpen }: { item: WorkItem; onOpen: () => void }) {
   return (
     <div className={clsx('grid items-center gap-3 px-4 py-3 hover:bg-slate-50', PREPARATION_TABLE_GRID)}>
+      <div><PreparationOpenButton item={item} onOpen={onOpen} /></div>
       <div><StatusBadge status={item.status} /></div>
       <PreparationDocumentSummary item={item} />
       <p className="min-w-0 text-sm text-slate-600">{workItemOwner(item)}</p>
       <p className="whitespace-nowrap text-sm text-slate-500">{dateText(item.due_at)}</p>
-      <div className="text-right"><PreparationOpenButton item={item} onOpen={onOpen} /></div>
     </div>
   );
 }

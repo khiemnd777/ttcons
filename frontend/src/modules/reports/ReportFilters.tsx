@@ -56,22 +56,40 @@ export function ReportScopeActions({
 export function ReportExportButton({
   exporting,
   disabled = false,
+  format,
+  onFormatChange,
   onExport,
 }: {
   exporting: boolean;
   disabled?: boolean;
+  format: 'pdf' | 'xlsx' | 'csv';
+  onFormatChange: (format: 'pdf' | 'xlsx' | 'csv') => void;
   onExport: () => void;
 }) {
   return (
-    <button
-      type="button"
-      className="inline-flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-      onClick={onExport}
-      disabled={exporting || disabled}
-    >
-      {exporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-      <span>{exporting ? 'Đang xuất…' : 'CSV'}</span>
-    </button>
+    <div className="inline-flex overflow-hidden rounded-md border border-blue-200 bg-white">
+      <label className="sr-only" htmlFor="statistics-export-format">Định dạng xuất dữ liệu</label>
+      <select
+        id="statistics-export-format"
+        className="border-0 border-r border-blue-100 bg-white px-2.5 py-2 text-sm font-semibold text-blue-700 outline-none focus:ring-2 focus:ring-inset focus:ring-blue-100 disabled:opacity-60"
+        value={format}
+        onChange={(event) => onFormatChange(event.target.value as 'pdf' | 'xlsx' | 'csv')}
+        disabled={exporting || disabled}
+      >
+        <option value="pdf">PDF</option>
+        <option value="xlsx">Excel</option>
+        <option value="csv">CSV</option>
+      </select>
+      <button
+        type="button"
+        className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+        onClick={onExport}
+        disabled={exporting || disabled}
+      >
+        {exporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        <span>{exporting ? 'Đang xuất…' : 'Xuất dữ liệu'}</span>
+      </button>
+    </div>
   );
 }
 

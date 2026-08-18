@@ -150,20 +150,20 @@ export function EvidenceGallery({
       {rows.length && variant === 'list' ? (
         <div className="overflow-hidden rounded-md border border-line bg-white">
           {listContext === 'project' ? (
-            <div className="hidden grid-cols-[minmax(0,1.7fr)_10rem_8.5rem_7rem_8rem] gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+            <div className="hidden grid-cols-[8rem_minmax(0,1.7fr)_10rem_8.5rem_7rem] gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+              <span><span className="sr-only">Thao tác</span></span>
               <span>Hồ sơ / nguồn</span>
               <span>Người gửi</span>
               <span>Thời gian</span>
               <span>Trạng thái</span>
-              <span className="text-right">Thao tác</span>
             </div>
           ) : (
-            <div className="hidden grid-cols-[minmax(0,1.6fr)_8rem_8rem_7rem_8rem] gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+            <div className="hidden grid-cols-[8rem_minmax(0,1.6fr)_8rem_8rem_7rem] gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+              <span><span className="sr-only">Thao tác</span></span>
               <span>Minh chứng</span>
               <span>Loại</span>
               <span>Phạm vi hiển thị</span>
               <span>Trạng thái</span>
-              <span className="text-right">Thao tác</span>
             </div>
           )}
           <div className="divide-y divide-line">
@@ -267,9 +267,22 @@ function EvidenceListRow({
     <article className={clsx(
       'grid gap-3 px-3 py-3 lg:items-center',
       listContext === 'project'
-        ? 'lg:grid-cols-[minmax(0,1.7fr)_10rem_8.5rem_7rem_8rem]'
-        : 'lg:grid-cols-[minmax(0,1.6fr)_8rem_8rem_7rem_8rem]',
+        ? 'lg:grid-cols-[8rem_minmax(0,1.7fr)_10rem_8.5rem_7rem]'
+        : 'lg:grid-cols-[8rem_minmax(0,1.6fr)_8rem_8rem_7rem]',
     )}>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100" onClick={onSelect}>
+          Chi tiết
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+          onClick={onOpen}
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Mở
+        </button>
+      </div>
       {fileCell}
       {listContext === 'project' ? (
         <>
@@ -296,19 +309,6 @@ function EvidenceListRow({
       )}
       <div>
         <StatusBadge status={record.status} />
-      </div>
-      <div className="flex flex-wrap gap-2 lg:justify-end">
-        <button type="button" className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100" onClick={onSelect}>
-          Chi tiết
-        </button>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
-          onClick={onOpen}
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          Mở
-        </button>
       </div>
     </article>
   );

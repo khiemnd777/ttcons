@@ -42,7 +42,7 @@ import {
   type ProjectExplorerSortKey,
 } from './projectExplorerSort';
 
-const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-[minmax(0,1.6fr)_135px_100px_112px_100px_112px]';
+const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-[112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
 
 export function ProjectsPage() {
   const [open, setOpen] = useState(false);
@@ -584,12 +584,12 @@ function ProjectExplorerHeader({
 }) {
   return (
     <div className={`hidden ${PROJECT_EXPLORER_DESKTOP_GRID_CLASS} gap-3 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid`}>
+      <span><span className="sr-only">Thao tác</span></span>
       <ProjectExplorerSortHeader label="Cây công trình" sortKey="project" sort={sort} onSort={onSort} />
       <ProjectExplorerSortHeader label="Trạng thái" sortKey="status" sort={sort} onSort={onSort} />
       <ProjectExplorerSortHeader label="Phụ trách" sortKey="owner" sort={sort} onSort={onSort} />
       <span>Tiến độ</span>
       <ProjectExplorerSortHeader label="Ngày tạo" sortKey="created_at" sort={sort} onSort={onSort} />
-      <span className="text-right">Mở</span>
     </div>
   );
 }
@@ -642,6 +642,25 @@ function ProjectExplorerRow({
 }) {
   return (
     <div className={`grid gap-3 px-4 py-3 ${PROJECT_EXPLORER_DESKTOP_GRID_CLASS} lg:items-center`}>
+      <div className="flex items-center justify-start gap-2">
+        <button
+          type="button"
+          className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100"
+          title="Chỉnh sửa"
+          aria-label="Chỉnh sửa công trình"
+          onClick={onEdit}
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <Link
+          title="Mở cây nghiệp vụ"
+          aria-label="Mở cây nghiệp vụ công trình"
+          className="rounded-md border border-line p-1.5 text-blue-700 hover:bg-blue-50"
+          to={`/projects/${project.id}`}
+        >
+          <FolderOpen className="h-4 w-4" />
+        </Link>
+      </div>
       <div className="flex min-w-0 items-start gap-3">
         <button
           type="button"
@@ -675,25 +694,6 @@ function ProjectExplorerRow({
       <div className="whitespace-nowrap text-sm tabular-nums text-slate-600">
         <span className="font-medium text-slate-500 lg:hidden">Ngày tạo: </span>
         {dateText(project.created_at)}
-      </div>
-      <div className="flex items-center justify-start gap-2 lg:justify-end">
-        <button
-          type="button"
-          className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100"
-          title="Chỉnh sửa"
-          aria-label="Chỉnh sửa công trình"
-          onClick={onEdit}
-        >
-          <Pencil className="h-4 w-4" />
-        </button>
-        <Link
-          title="Mở cây nghiệp vụ"
-          aria-label="Mở cây nghiệp vụ công trình"
-          className="rounded-md border border-line p-1.5 text-blue-700 hover:bg-blue-50"
-          to={`/projects/${project.id}`}
-        >
-          <FolderOpen className="h-4 w-4" />
-        </Link>
       </div>
     </div>
   );

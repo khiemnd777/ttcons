@@ -2,7 +2,7 @@
 
 ## Owners
 
-- Frontend modules: `frontend/src/modules/auth`, `frontend/src/modules/staff`, `frontend/src/modules/rbac`, `frontend/src/modules/core-data`, `frontend/src/modules/audit`, `frontend/src/modules/settings`
+- Frontend modules: `frontend/src/modules/auth`, `frontend/src/modules/profile`, `frontend/src/modules/staff`, `frontend/src/modules/rbac`, `frontend/src/modules/core-data`, `frontend/src/modules/audit`, `frontend/src/modules/settings`
 - Frontend auth/navigation: `frontend/src/lib/auth/AuthContext.tsx`, `frontend/src/app/router.tsx`, `frontend/src/layouts/AppShell.tsx`
 - Backend routes: `backend/internal/core/routes.go`
 - Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `repository.go`, `types.go`
@@ -10,12 +10,12 @@
 
 ## Routes
 
-- Auth: `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me`
+- Auth and personal profile: `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me`, `PUT /auth/profile`, `PUT /auth/password`; product page `/profile`
 - Core data: `/partners`
 - Staff/RBAC: `/staff`, `/roles`, `/permissions`, `/roles/:id/permissions`, `/users/:id/roles`
 - Project membership governance: `/projects/:id/members`, `/projects/:id/members/:memberId`
 - Audit/settings: `/audit-logs`, `/projects/:id/audit-logs`, `/settings`
-- Reports governance: `/reports/options`, `/reports/staff` and `/reports/staff/export`
+- Statistics governance: `/statistics/options`, `/statistics/staff` and `/statistics/staff/export`; authored-report governance: `/work-reports/*`; legacy Dashboard/professional-report routes remain `/reports/*`
 
 ## Tables And Migrations
 
@@ -23,7 +23,7 @@
 - `auth_sessions`
 - `partners`
 - `system_settings`, `audit_logs`
-- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, external-only client access in `V89`, actor/project explorer cache revisions/outbox retention in `V97`-`V100`, and revision-scoped workflow-form confirmations in `V101`
+- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, external-only client access in `V89`, actor/project explorer cache revisions/outbox retention in `V97`-`V100`, revision-scoped workflow-form confirmations in `V101`, and `statistics.*`/`work_report.*` separation plus authored-report history in `V106`
 
 ## Invariants
 
@@ -37,12 +37,15 @@
 - Work-item detail may expose the permission catalog name/description as presentation metadata, but authorization continues to use the raw snapshotted key through backend permission helpers. User-facing requirement text must not reveal raw keys; missing catalog metadata falls back to generic administrator guidance. V96 standardizes `planning.edit` as `Cập nhật kế hoạch` / `Cập nhật nội dung kế hoạch được phân công` without adding or removing any role grant.
 - Submitted workflow-form amendment capability is server-owned and combines `CanActOnWorkItem` with the work item's snapshotted required permission; the UI `can_amend` flag only controls presentation. Amendment does not grant managers/directors a new override and does not require the historical work item to remain the current pipeline node. The atomic `workflow_form_amended` audit stores actor, mandatory reason, from/to revision and exact field-label-aware before/after changes; audit failure rolls back the content revision. Later signatures, seals and PDFs remain separately attributable to their form revision.
 - My Work is one adaptive actor-scoped role workbench, not one page per role. List/detail `readiness`, capabilities and `available_actions` are actor-specific presentation hints only. `pending_approval` retains requester separation, required decision roles and project scope; `upcoming` work remains visible but current-time/current-node backend gates deny every mutation path. The authenticated SSE still exposes invalidation-only `work_queue_changed`. No new global permission, role filter, manager override, table or migration is introduced.
-- Ordinary Reports navigation requires `report.view` and exposes only operational catalog entries. `Tài chính công trình` is separately gated by `project_finance.view`; its management totals/export require `project_finance.report_view`. Legacy `report.finance.view`/`accounting.*` are removed from every non-admin role by V83 and seed parity.
+- Aggregate navigation is labelled `Thống kê`, requires `statistics.view`, and uses `statistics.export` for PDF/Excel/CSV. V106 copies existing `report.view` role grants to both statistics permissions so the former aggregate audience keeps access; `report.view` remains the Dashboard/legacy compatibility gate and does not authorize authored employee reports.
+- Authored `Báo cáo` navigation requires `work_report.view`. Field roles carrying `operation.report` receive view/create/submit/export; Admin/Director/PM receive their explicit review/manage subset from V106. Backend checks do not rely on those role names: list scopes require the corresponding permission, every project filter/detail/export combines project permission with `ProjectAccessFilter`/`CanAccessProjectPermission`, and direct report detail/PDF additionally requires author, recipient or project-scoped `work_report.manage`. Review requires recipient identity unless the actor has project-scoped manage.
+- `Tài chính công trình` remains separately gated by `project_finance.view`; its management totals/export require `project_finance.report_view`. Legacy `report.finance.view`/`accounting.*` are removed from every non-admin role by V83 and seed parity.
 - Staff report is a project-allocation view: only active staff memberships in accessible non-cancelled projects are returned and distinct accessible projects are counted. Full-company staff is available only through the `staff.view` Staff module.
 - `project.member.manage` is granted to Admin/Director/PM and always combined with project scope. Project member responses expose server capabilities; mutation synchronizes only project-scoped `user_roles`, never removes global roles, never exposes Admin/Director as assignable project roles, and writes project audit.
 - Partner catalog updates preserve downstream snapshots for historical documents.
 - Project setup presents the active `client` partner selector as `Chọn chủ đầu tư có sẵn` and its selected summary as `Chủ đầu tư đã chọn`; these user-facing labels do not change active/type filtering, `partner_id`, name snapshot behavior or catalog governance.
 - Session refresh/revoke lifecycle remains DB-backed and revocable.
+- Personal Profile is actor-owned and permission-free after authentication: neither self-service mutation accepts a target user ID. `/auth/me` uses `users` for login identity and a preferred non-deleted linked `staff` row for phone/department/position. Profile writes mirror full name/email/phone to every linked non-deleted staff row in one audit-atomic transaction, never create governance staff implicitly, and leave department/position/roles read-only. Email change requires the current password; password change requires current/matching confirmation and persists bcrypt only. Either sensitive change revokes every session and clears the refresh cookie so the JWT email used by later audit cannot remain stale. Audit records changed field names/session outcome only and never password material; historical audit/activity actor snapshots are not rewritten.
 - `AuthSessionActive` is never cached: immediate session revoke remains authoritative even when Redis supplies distributed rate limiting and SSE Pub/Sub.
 - The project explorer index cache is actor-scoped, not role-name scoped. Membership, staff-user linkage, user-role and role-permission mutations bump the affected actor revision in the same database transaction. Redis index IDs are still rechecked with current `ProjectAccessFilter` before any cached row is returned; cache keys or frontend visibility never authorize access.
 - `roles.external_only` classifies business counterparts that cannot act in the App. V89 marks `client`, fails when migration would strand an external-only open work item/pending approval or a mixed-role user, removes App permissions, revokes sessions, inactivates linked users/staff/project memberships and preserves `user_roles` plus historical workflow/runtime labels. Login lookup, session creation/refresh/active checks, role edit, role-permission assignment, user-role assignment and project-member save all fail closed independently of frontend filtering.

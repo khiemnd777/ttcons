@@ -22,36 +22,36 @@ export const reportDefinitions: ReportDefinition[] = [
     label: 'Công trình & tiến độ',
     description: 'Tiến độ, vấn đề mở và yêu cầu chờ duyệt.',
     basis: 'Tiến độ công trình, số vấn đề đang mở và yêu cầu đang chờ duyệt trong phạm vi được phép xem.',
-    fileName: 'bao-cao-cong-trinh',
+    fileName: 'thong-ke-cong-trinh',
     group: 'operations',
-    permissions: ['report.view'],
+    permissions: ['statistics.view'],
   },
   {
     key: 'procurement',
     label: 'Mua sắm',
     description: 'Giá trị yêu cầu theo trạng thái và ngân sách.',
     basis: 'Số lượng và giá trị yêu cầu mua sắm theo trạng thái xử lý và trạng thái ngân sách.',
-    fileName: 'bao-cao-mua-sam',
+    fileName: 'thong-ke-mua-sam',
     group: 'operations',
-    permissions: ['report.view'],
+    permissions: ['statistics.view'],
   },
   {
     key: 'warehouse',
     label: 'Vật tư / Kho',
     description: 'Tồn vật tư và khối lượng dư trong phạm vi được xem.',
     basis: 'Tồn vật tư được tổng hợp độc lập với khối lượng dư để tránh nhân chéo số liệu.',
-    fileName: 'bao-cao-vat-tu-kho',
+    fileName: 'thong-ke-vat-tu-kho',
     group: 'operations',
-    permissions: ['report.view'],
+    permissions: ['statistics.view'],
   },
   {
     key: 'staff',
     label: 'Nhân sự',
     description: 'Phân bổ nhân sự trong các công trình được phép xem.',
     basis: 'Chỉ hiển thị nhân sự thuộc các công trình người dùng được phép xem. Danh sách toàn công ty nằm ở module Nhân sự.',
-    fileName: 'bao-cao-nhan-su-cong-trinh',
+    fileName: 'thong-ke-nhan-su-cong-trinh',
     group: 'resources',
-    permissions: ['report.view'],
+    permissions: ['statistics.view'],
   },
 ];
 
@@ -64,5 +64,5 @@ export function isReportKey(value?: string): value is ReportKey {
 }
 
 export function reportPath(key: ReportKey) {
-  return `/reports/${key}`;
+  return `/statistics/${key}`;
 }

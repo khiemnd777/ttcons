@@ -845,14 +845,14 @@ function VersionTable({ contract, canReview, canApprove, canSign, onAction, onSi
   };
   return (
     <ResponsiveRecords
-      headers={['Phiên bản', 'Giá trị', 'Phạm vi', 'Mã kiểm chứng', 'Trạng thái', 'Thao tác']}
+      headers={['', 'Phiên bản', 'Giá trị', 'Phạm vi', 'Mã kiểm chứng', 'Trạng thái']}
       rows={rows.map((row) => [
+        rowAction(row),
         <span className="font-semibold">V{row.version_no} · {row.version_label}</span>,
         <CurrencyText value={row.amount} />,
         row.scope_summary,
         <span className="font-mono text-xs">{row.definition_hash?.slice(0, 12)}…</span>,
         <StatusBadge status={row.status} />,
-        rowAction(row),
       ])}
       cards={rows.map((row) => (
         <RecordCard key={row.id} title={`V${row.version_no} · ${row.version_label}`} status={row.status} action={rowAction(row)}>
@@ -1037,15 +1037,15 @@ function VariationTable({ contract, canReview, canApprove, canCreate, canQS, can
   };
   return (
     <ResponsiveRecords
-      headers={['Mức độ', 'Mã', 'Nội dung', 'Thay đổi giá trị', 'Thay đổi ngày', 'Trạng thái', 'Thao tác']}
+      headers={['', 'Mức độ', 'Mã', 'Nội dung', 'Thay đổi giá trị', 'Thay đổi ngày', 'Trạng thái']}
       rows={rows.map((row) => [
+        rowAction(row),
         <PriorityBadge priority={row.priority} />,
         <span className="font-semibold">{row.variation_code}</span>,
         <div><div>{row.title}</div><div className="mt-1 text-xs text-slate-500">{row.reason}</div></div>,
         <SignedCurrency value={row.amount_delta} />,
         signedDays(row.days_delta),
         <StatusBadge status={row.status} />,
-        rowAction(row),
       ])}
       cards={rows.map((row) => (
         <RecordCard key={row.id} title={`${row.variation_code} · ${row.title}`} status={row.status} action={rowAction(row)}>
@@ -1087,15 +1087,15 @@ function RetentionTable({ contract, canRelease, onRelease }: {
   ) : null;
   return (
     <ResponsiveRecords
-      headers={['Nguồn', 'Đã giữ', 'Đã giải phóng', 'Còn lại', 'Hết bảo hành', 'Trạng thái', 'Thao tác']}
+      headers={['', 'Nguồn', 'Đã giữ', 'Đã giải phóng', 'Còn lại', 'Hết bảo hành', 'Trạng thái']}
       rows={rows.map((row) => [
+        rowAction(row),
         <span className="font-semibold">{row.milestone_code} · {row.milestone_name}</span>,
         <CurrencyText value={row.held_amount} />,
         <CurrencyText value={row.released_amount} />,
         <CurrencyText value={row.outstanding_amount} />,
         row.warranty_end_date ? dateText(row.warranty_end_date) : 'Theo xác nhận',
         <StatusBadge status={row.status} />,
-        rowAction(row),
       ])}
       cards={rows.map((row) => (
         <RecordCard key={row.id} title={`${row.milestone_code} · ${row.milestone_name}`} status={row.status} action={rowAction(row)}>
@@ -1115,7 +1115,7 @@ function ResponsiveRecords({ headers, rows, cards }: { headers: string[]; rows: 
       <div className="hidden overflow-x-auto rounded-md border border-line 2xl:block">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-            <tr>{headers.map((header) => <th key={header} className="px-3 py-2">{header}</th>)}</tr>
+            <tr>{headers.map((header, index) => <th key={index} className="px-3 py-2">{header || <span className="sr-only">Thao tác</span>}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-line">
             {rows.map((cells, rowIndex) => (

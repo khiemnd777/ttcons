@@ -7,21 +7,22 @@ function permissionCheck(granted: string[]) {
   return (required?: string[]) => !required?.length || required.some((permission) => permissions.has(permission));
 }
 
-test('report catalog only exposes operational reports to report viewers', () => {
+test('statistics catalog only exposes aggregates to statistics viewers', () => {
   assert.deepEqual(
-    visibleReportDefinitions(permissionCheck(['report.view'])).map((report) => report.key),
+    visibleReportDefinitions(permissionCheck(['statistics.view'])).map((report) => report.key),
     ['projects', 'procurement', 'warehouse', 'staff'],
   );
+  assert.deepEqual(visibleReportDefinitions(permissionCheck(['report.view'])), []);
 });
 
-test('professional accounting reports are not exposed in the ordinary report catalog', () => {
+test('professional accounting reports are not exposed in the statistics catalog', () => {
   assert.deepEqual(visibleReportDefinitions(permissionCheck(['report.finance.view'])), []);
-  assert.equal(reportPath('projects'), '/reports/projects');
+  assert.equal(reportPath('projects'), '/statistics/projects');
 });
 
-test('every catalog report defines one active-report basis and CSV file name', () => {
+test('every statistics definition has a basis and neutral export file name', () => {
   for (const report of reportDefinitions) {
     assert.ok(report.basis.length > report.description.length);
-    assert.match(report.fileName, /^bao-cao-/);
+    assert.match(report.fileName, /^thong-ke-/);
   }
 });

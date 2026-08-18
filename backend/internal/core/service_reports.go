@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -10,8 +11,280 @@ import (
 	"time"
 )
 
-func (s *Service) Dashboard(ctx context.Context, actorID string) (Record, error) {
-	return s.repo.DashboardReport(ctx, actorID)
+func (s *Service) Dashboard(ctx context.Context, req DashboardPeriodRequest, actorID string) (DashboardReportResponse, error) {
+	_, meta, err := normalizeDashboardPeriodRequest(req)
+	if err != nil {
+		return DashboardReportResponse{}, err
+	}
+	financeVisible, err := s.repo.UserHasAnyPermission(ctx, actorID, []string{"report.finance.view", "accounting.view"})
+	if err != nil {
+		return DashboardReportResponse{}, err
+	}
+	snapshot, err := s.repo.DashboardReport(ctx, actorID)
+	if err != nil {
+		return DashboardReportResponse{}, err
+	}
+	result := DashboardReportResponse{
+		Meta:            meta,
+		Capabilities:    DashboardCapabilities{FinanceVisible: financeVisible},
+		ProjectSnapshot: snapshot,
+	}
+	if !financeVisible {
+		return result, nil
+	}
+	cashflow, err := s.repo.CashflowReport(ctx, CashflowReportRequest{
+		FromDate: meta.FromDate,
+		ToDate:   meta.ToDate,
+		GroupBy:  meta.GroupBy,
+		Status:   "approved",
+	}, actorID)
+	if err != nil {
+		return DashboardReportResponse{}, err
+	}
+	result.Cashflow = dashboardCashflowFromRecord(cashflow)
+	return result, nil
+}
+
+func (s *Service) DashboardProjects(ctx context.Context, req DashboardProjectsRequest, actorID string) (DashboardProjectsPage, error) {
+	period, meta, err := normalizeDashboardPeriodRequest(req.DashboardPeriodRequest)
+	if err != nil {
+		return DashboardProjectsPage{}, err
+	}
+	req.DashboardPeriodRequest = period
+	financeVisible, err := s.repo.UserHasAnyPermission(ctx, actorID, []string{"report.finance.view", "accounting.view"})
+	if err != nil {
+		return DashboardProjectsPage{}, err
+	}
+	normalized, offset, filterHash, err := normalizeDashboardProjectsRequest(req, meta, financeVisible)
+	if err != nil {
+		return DashboardProjectsPage{}, err
+	}
+	page, err := s.repo.DashboardProjects(ctx, actorID, normalized, meta, financeVisible, offset)
+	if err != nil {
+		return DashboardProjectsPage{}, err
+	}
+	if page.HasMore {
+		page.NextCursor = encodeDashboardProjectsCursor(dashboardProjectsCursor{
+			Version:    1,
+			Offset:     offset + normalized.Limit,
+			FilterHash: filterHash,
+		})
+	}
+	return page, nil
+}
+
+var dashboardLocation = time.FixedZone("Asia/Ho_Chi_Minh", 7*60*60)
+
+func normalizeDashboardPeriodRequest(req DashboardPeriodRequest) (DashboardPeriodRequest, DashboardPeriodMeta, error) {
+	return normalizeDashboardPeriodRequestAt(req, time.Now())
+}
+
+func normalizeDashboardPeriodRequestAt(req DashboardPeriodRequest, now time.Time) (DashboardPeriodRequest, DashboardPeriodMeta, error) {
+	today := now.In(dashboardLocation)
+	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, dashboardLocation)
+	req.PeriodType = strings.TrimSpace(req.PeriodType)
+	if req.PeriodType == "" {
+		req.PeriodType = "month"
+	}
+	if !statusIn(req.PeriodType, "month", "quarter", "year") {
+		return DashboardPeriodRequest{}, DashboardPeriodMeta{}, validationError("Loại kỳ Dashboard không hợp lệ", Record{"period_type": req.PeriodType})
+	}
+	if req.Year == 0 {
+		req.Year = today.Year()
+	}
+	if req.Year < 1900 || req.Year > today.Year() {
+		return DashboardPeriodRequest{}, DashboardPeriodMeta{}, validationError("Năm Dashboard không hợp lệ", Record{"year": req.Year})
+	}
+
+	var start, end time.Time
+	switch req.PeriodType {
+	case "month":
+		if req.PeriodNo == 0 {
+			req.PeriodNo = int(today.Month())
+		}
+		if req.PeriodNo < 1 || req.PeriodNo > 12 {
+			return DashboardPeriodRequest{}, DashboardPeriodMeta{}, validationError("Tháng Dashboard không hợp lệ", Record{"period_no": req.PeriodNo})
+		}
+		start = time.Date(req.Year, time.Month(req.PeriodNo), 1, 0, 0, 0, 0, dashboardLocation)
+		end = start.AddDate(0, 1, -1)
+	case "quarter":
+		if req.PeriodNo == 0 {
+			req.PeriodNo = (int(today.Month())-1)/3 + 1
+		}
+		if req.PeriodNo < 1 || req.PeriodNo > 4 {
+			return DashboardPeriodRequest{}, DashboardPeriodMeta{}, validationError("Quý Dashboard không hợp lệ", Record{"period_no": req.PeriodNo})
+		}
+		startMonth := time.Month((req.PeriodNo-1)*3 + 1)
+		start = time.Date(req.Year, startMonth, 1, 0, 0, 0, 0, dashboardLocation)
+		end = start.AddDate(0, 3, -1)
+	case "year":
+		req.PeriodNo = 0
+		start = time.Date(req.Year, time.January, 1, 0, 0, 0, 0, dashboardLocation)
+		end = time.Date(req.Year, time.December, 31, 0, 0, 0, 0, dashboardLocation)
+	}
+	if start.After(today) {
+		return DashboardPeriodRequest{}, DashboardPeriodMeta{}, validationError("Không thể xem kỳ Dashboard trong tương lai", Record{"period_type": req.PeriodType, "year": req.Year, "period_no": req.PeriodNo})
+	}
+	isCurrent := !today.Before(start) && !today.After(end)
+	to := end
+	if isCurrent {
+		to = today
+	}
+	groupBy := "month"
+	if req.PeriodType == "month" {
+		groupBy = "day"
+	}
+	return req, DashboardPeriodMeta{
+		PeriodType:     req.PeriodType,
+		Year:           req.Year,
+		PeriodNo:       req.PeriodNo,
+		FromDate:       start.Format("2006-01-02"),
+		ToDate:         to.Format("2006-01-02"),
+		AsOfDate:       today.Format("2006-01-02"),
+		GroupBy:        groupBy,
+		IsCurrent:      isCurrent,
+		CanMoveForward: end.Before(today),
+	}, nil
+}
+
+type dashboardProjectsCursor struct {
+	Version    int    `json:"version"`
+	Offset     int    `json:"offset"`
+	FilterHash string `json:"filter_hash"`
+}
+
+func normalizeDashboardProjectsRequest(req DashboardProjectsRequest, meta DashboardPeriodMeta, financeVisible bool) (DashboardProjectsRequest, int, string, error) {
+	req.Search = strings.TrimSpace(req.Search)
+	if len([]rune(req.Search)) > 120 {
+		return req, 0, "", validationError("Từ khóa tìm kiếm không được vượt quá 120 ký tự")
+	}
+	req.Status = strings.TrimSpace(req.Status)
+	if len([]rune(req.Status)) > 60 {
+		return req, 0, "", validationError("Trạng thái công trình không hợp lệ", Record{"status": req.Status})
+	}
+	req.Sort = strings.TrimSpace(req.Sort)
+	if req.Sort == "" {
+		req.Sort = "name"
+	}
+	if !statusIn(req.Sort, "name", "status", "progress", "net") {
+		return req, 0, "", validationError("Sắp xếp Dashboard không hợp lệ", Record{"sort": req.Sort})
+	}
+	if req.Sort == "net" && !financeVisible {
+		req.Sort = "name"
+	}
+	req.Direction = strings.ToLower(strings.TrimSpace(req.Direction))
+	if req.Direction == "" {
+		req.Direction = "asc"
+	}
+	if !statusIn(req.Direction, "asc", "desc") {
+		return req, 0, "", validationError("Chiều sắp xếp Dashboard không hợp lệ", Record{"direction": req.Direction})
+	}
+	if req.Limit == 0 {
+		req.Limit = 25
+	}
+	if req.Limit < 1 || req.Limit > 50 {
+		return req, 0, "", validationError("limit phải nằm trong khoảng 1 đến 50", Record{"limit": req.Limit})
+	}
+	filterHash := dashboardProjectsFilterHash(req, meta, financeVisible)
+	req.Cursor = strings.TrimSpace(req.Cursor)
+	if req.Cursor == "" {
+		return req, 0, filterHash, nil
+	}
+	cursor, err := parseDashboardProjectsCursor(req.Cursor)
+	if err != nil || cursor.Version != 1 || cursor.Offset < 0 || cursor.FilterHash != filterHash {
+		return req, 0, "", validationError("cursor không hợp lệ hoặc không còn khớp bộ lọc", Record{"cursor": req.Cursor})
+	}
+	return req, cursor.Offset, filterHash, nil
+}
+
+func dashboardProjectsFilterHash(req DashboardProjectsRequest, meta DashboardPeriodMeta, financeVisible bool) string {
+	raw := strings.Join([]string{
+		meta.PeriodType,
+		fmt.Sprint(meta.Year),
+		fmt.Sprint(meta.PeriodNo),
+		meta.FromDate,
+		meta.ToDate,
+		strings.ToLower(req.Search),
+		req.Status,
+		req.Sort,
+		req.Direction,
+		fmt.Sprint(financeVisible),
+		fmt.Sprint(req.Limit),
+	}, "\x1f")
+	sum := sha256.Sum256([]byte(raw))
+	return fmt.Sprintf("%x", sum[:])
+}
+
+func encodeDashboardProjectsCursor(cursor dashboardProjectsCursor) string {
+	raw, _ := json.Marshal(cursor)
+	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func parseDashboardProjectsCursor(value string) (dashboardProjectsCursor, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return dashboardProjectsCursor{}, err
+	}
+	cursor := dashboardProjectsCursor{}
+	if err := json.Unmarshal(raw, &cursor); err != nil {
+		return dashboardProjectsCursor{}, err
+	}
+	if len(cursor.FilterHash) != sha256.Size*2 {
+		return dashboardProjectsCursor{}, errors.New("invalid dashboard cursor")
+	}
+	return cursor, nil
+}
+
+func dashboardCashflowFromRecord(report Record) *DashboardCashflow {
+	summary := recordFromAny(report["summary"])
+	result := &DashboardCashflow{
+		Summary: DashboardCashflowSummary{
+			OpeningBalance:      number(summary["opening_balance"]),
+			TotalInflow:         number(summary["total_inflow"]),
+			TotalOutflow:        number(summary["total_outflow"]),
+			NetFlow:             number(summary["net_flow"]),
+			ClosingBalance:      number(summary["closing_balance"]),
+			PaymentCount:        int(number(summary["payment_count"])),
+			PendingPaymentCount: int(number(summary["pending_payment_count"])),
+			PendingPaymentTotal: number(summary["pending_payment_total"]),
+			UnclassifiedCount:   int(number(summary["unclassified_count"])),
+			NonCashCount:        int(number(summary["non_cash_count"])),
+		},
+		Series:   []DashboardCashflowSeries{},
+		Projects: []DashboardCashflowProject{},
+	}
+	for _, row := range workflowAnswerRecordList(report["series"]) {
+		result.Series = append(result.Series, DashboardCashflowSeries{
+			PeriodStart:    dashboardDateString(row["period_start"]),
+			InflowAmount:   number(row["inflow_amount"]),
+			OutflowAmount:  number(row["outflow_amount"]),
+			NetAmount:      number(row["net_amount"]),
+			RunningBalance: number(row["running_balance"]),
+			PaymentCount:   int(number(row["payment_count"])),
+		})
+	}
+	for _, row := range workflowAnswerRecordList(report["projects"]) {
+		result.Projects = append(result.Projects, DashboardCashflowProject{
+			ProjectID:     cleanID(row["project_id"]),
+			ProjectName:   strings.TrimSpace(fmt.Sprint(row["project_name"])),
+			InflowAmount:  number(row["inflow_amount"]),
+			OutflowAmount: number(row["outflow_amount"]),
+			NetAmount:     number(row["net_amount"]),
+			PaymentCount:  int(number(row["payment_count"])),
+		})
+	}
+	return result
+}
+
+func dashboardDateString(value any) string {
+	if parsed, ok := value.(time.Time); ok {
+		return parsed.In(dashboardLocation).Format("2006-01-02")
+	}
+	text := strings.TrimSpace(fmt.Sprint(value))
+	if len(text) >= 10 {
+		return text[:10]
+	}
+	return text
 }
 
 type reportProjectOptionsCursor struct {

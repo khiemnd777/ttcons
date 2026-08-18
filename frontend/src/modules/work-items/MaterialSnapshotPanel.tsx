@@ -418,7 +418,18 @@ function MaterialSnapshotRow({
   const material = materialById.get(row.material_id);
 
   return (
-    <div className="grid gap-3 py-3 xl:grid-cols-[1.2fr_1fr_1.2fr_44px]">
+    <div className="grid gap-3 py-3 xl:grid-cols-[44px_1.2fr_1fr_1.2fr]">
+      <div className="flex items-start">
+        <button
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line text-slate-500 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={disabled}
+          onClick={onRemove}
+          title="Xóa dòng"
+          aria-label="Xóa dòng vật tư"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
       <div className="min-w-0">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-semibold text-ink">Dòng {index + 1}</p>
@@ -579,17 +590,6 @@ function MaterialSnapshotRow({
         </div>
       </div>
 
-      <div className="flex items-start justify-end">
-        <button
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line text-slate-500 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={disabled}
-          onClick={onRemove}
-          title="Xóa dòng"
-          aria-label="Xóa dòng vật tư"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
     </div>
   );
 }

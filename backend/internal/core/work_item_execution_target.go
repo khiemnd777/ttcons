@@ -46,6 +46,7 @@ var executionWorkspaceByActionPrefix = []struct {
 	{Prefix: "source.boq", Workspace: executionWorkspaceBOQ},
 	{Prefix: "boq.", Workspace: executionWorkspaceBOQ},
 	{Prefix: "source.contract", Workspace: executionWorkspaceContracts},
+	{Prefix: "source.input_contract", Workspace: executionWorkspaceContracts},
 	{Prefix: "contract.", Workspace: executionWorkspaceContracts},
 	{Prefix: "source.supplier", Workspace: executionWorkspaceProcurement},
 	{Prefix: "source.procurement", Workspace: executionWorkspaceContracts},
@@ -55,6 +56,7 @@ var executionWorkspaceByActionPrefix = []struct {
 	{Prefix: "planning.", Workspace: executionWorkspacePlanning},
 	{Prefix: "construction.", Workspace: executionWorkspacePlanning},
 	{Prefix: "subcontractor.", Workspace: executionWorkspaceAcceptance},
+	{Prefix: "source.subcontractor", Workspace: executionWorkspaceAcceptance},
 	{Prefix: "owner.", Workspace: executionWorkspaceAcceptance},
 	{Prefix: "acceptance.", Workspace: executionWorkspaceAcceptance},
 	{Prefix: "source.final_acceptance", Workspace: executionWorkspaceAcceptance},
@@ -64,6 +66,8 @@ var executionWorkspaceByActionPrefix = []struct {
 	{Prefix: "source.receivable", Workspace: executionWorkspaceProjectFinance},
 	{Prefix: "receivable.", Workspace: executionWorkspaceProjectFinance},
 	{Prefix: "finance.", Workspace: executionWorkspaceProjectFinance},
+	{Prefix: "source.project_finance", Workspace: executionWorkspaceProjectFinance},
+	{Prefix: "source.handover", Workspace: executionWorkspaceHandover},
 	{Prefix: "handover.", Workspace: executionWorkspaceHandover},
 }
 

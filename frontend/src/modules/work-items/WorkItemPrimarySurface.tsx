@@ -80,6 +80,8 @@ function BusinessSourceCard({ item }: { item: WorkItem }) {
   const source = item.business_source;
   if (!source) return null;
   const ready = Boolean(source.ready);
+  const checks = source.checks ?? [];
+  const readyCheckCount = checks.filter((check) => check.ready).length;
   return (
     <section className={ready
       ? 'rounded-md border border-emerald-200 bg-emerald-50 p-3'
@@ -90,7 +92,9 @@ function BusinessSourceCard({ item }: { item: WorkItem }) {
             {ready ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
           </span>
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dữ liệu từ module nguồn</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {checks.length > 0 ? `Điều kiện nguồn · ${readyCheckCount}/${checks.length}` : 'Dữ liệu từ module nguồn'}
+            </p>
             <h3 className="mt-0.5 text-sm font-semibold text-ink">{source.label || 'Nguồn nghiệp vụ của bước'}</h3>
             <p className="mt-1 text-xs leading-5 text-slate-600">{source.message || (ready ? 'Nguồn nghiệp vụ đã sẵn sàng.' : 'Hoàn tất dữ liệu tại module nguồn trước khi chốt bước.')}</p>
           </div>
@@ -101,6 +105,21 @@ function BusinessSourceCard({ item }: { item: WorkItem }) {
           </Link>
         ) : null}
       </div>
+      {checks.length > 0 ? (
+        <ul className="mt-3 grid gap-2 border-t border-current/10 pt-3 md:grid-cols-2">
+          {checks.map((check) => (
+            <li className="flex min-w-0 items-start gap-2 rounded-md bg-white/80 px-2.5 py-2" key={check.key}>
+              {check.ready
+                ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />}
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-800">{check.label}</p>
+                {!check.ready && check.message ? <p className="mt-0.5 text-xs leading-4 text-slate-500">{check.message}</p> : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }

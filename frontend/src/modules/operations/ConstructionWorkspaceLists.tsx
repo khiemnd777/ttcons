@@ -54,13 +54,13 @@ export function ConstructionCheckList({ workspace, canCreate, canEdit, canPerfor
     {rows.length ? <>
       <div className="hidden overflow-x-auto rounded-lg border border-line bg-white lg:block">
         <table className="min-w-full divide-y divide-line">
-          <thead className="bg-slate-50"><tr><Th>Nội dung / vị trí</Th><Th>Công việc</Th><Th>Lịch kiểm tra</Th><Th>Kết quả</Th><Th className="text-right">Thao tác</Th></tr></thead>
+          <thead className="bg-slate-50"><tr><Th><span className="sr-only">Thao tác</span></Th><Th>Nội dung / vị trí</Th><Th>Công việc</Th><Th>Lịch kiểm tra</Th><Th>Kết quả</Th></tr></thead>
           <tbody className="divide-y divide-line">{rows.map((row) => <tr key={row.id} className="hover:bg-slate-50">
+            <Td><div className="flex gap-2"><RowActions onView={() => onView(row)} onEdit={canEdit && isConstructionCheckEditable(row) ? () => onEdit(row) : undefined} />{row.status === 'pending' && canPerform ? <PrimaryButton onClick={() => onComplete(row)} icon={<CheckCircle2 className="h-4 w-4" />}>Ghi kết quả</PrimaryButton> : null}</div></Td>
             <Td><button className="max-w-[24rem] text-left" onClick={() => onView(row)}><span className="block font-semibold text-ink">{row.title}</span><span className="mt-1 block text-xs text-slate-500">{row.location || 'Chưa ghi vị trí'} · {row.criteria_jsonb?.length ?? 0} tiêu chí · {row.context_evidence?.length ?? 0} ảnh hiện trạng</span>{row.source_handoff_item_id ? <PlanningSourceBadge revision={row.handoff_revision_no} /> : row.technical_rfi_id ? <SourceBadge /> : null}</button></Td>
             <Td><span className="line-clamp-2 max-w-[17rem]">{row.work_item_title || 'Công việc liên quan'}</span><span className="mt-1 block text-xs text-slate-500">{row.template_name || 'Không dùng mẫu'}</span></Td>
             <Td><span className={clsx('inline-flex items-center gap-1.5', isOverdue(row.scheduled_at, row.status) && 'font-semibold text-rose-700')}><Clock3 className="h-3.5 w-3.5" />{dateTimeText(row.scheduled_at || row.checked_at || row.created_at)}</span><span className="mt-1 block text-xs text-slate-500">{row.checked_by_name || row.requested_by_name || 'Chưa xác định người thực hiện'}</span></Td>
             <Td><CheckStatusPill row={row} /></Td>
-            <Td className="text-right"><div className="flex justify-end gap-2"><RowActions onView={() => onView(row)} onEdit={canEdit && isConstructionCheckEditable(row) ? () => onEdit(row) : undefined} />{row.status === 'pending' && canPerform ? <PrimaryButton onClick={() => onComplete(row)} icon={<CheckCircle2 className="h-4 w-4" />}>Ghi kết quả</PrimaryButton> : null}</div></Td>
           </tr>)}</tbody>
         </table>
       </div>
@@ -103,13 +103,13 @@ export function ConstructionActionList({ workspace, canCreate, canEdit, canResol
     </FilterToolbar>
     {rows.length ? <>
       <div className="hidden overflow-x-auto rounded-lg border border-line bg-white lg:block"><table className="min-w-full divide-y divide-line">
-        <thead className="bg-slate-50"><tr><Th>Việc / nguồn</Th><Th>Người xử lý</Th><Th>Hạn xử lý</Th><Th>Ảnh hưởng</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th></tr></thead>
+        <thead className="bg-slate-50"><tr><Th><span className="sr-only">Thao tác</span></Th><Th>Việc / nguồn</Th><Th>Người xử lý</Th><Th>Hạn xử lý</Th><Th>Ảnh hưởng</Th><Th>Trạng thái</Th></tr></thead>
         <tbody className="divide-y divide-line">{rows.map((row) => <tr key={row.id} className={clsx('hover:bg-slate-50', row.priority === 'urgent' && row.status !== 'done' && 'bg-rose-50/30')}>
+          <Td><div className="flex gap-2"><RowActions onView={() => onView(row)} onEdit={canEdit && isConstructionActionEditable(row) ? () => onEdit(row) : undefined} />{row.status === 'open' && canResolve ? <PrimaryButton onClick={() => onResolve(row)} icon={<Wrench className="h-4 w-4" />}>Gửi khắc phục</PrimaryButton> : row.status === 'waiting_confirmation' && canVerify ? <PrimaryButton tone="green" onClick={() => onVerify(row)} icon={<ShieldCheck className="h-4 w-4" />}>Xác nhận</PrimaryButton> : null}</div></Td>
           <Td><button className="max-w-[24rem] text-left" onClick={() => onView(row)}><span className="flex items-center gap-2 font-semibold text-ink">{row.priority === 'urgent' ? <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" /> : null}{row.title}</span><span className="mt-1 block line-clamp-2 text-xs text-slate-500">{row.source_check_title ? `Từ kiểm tra: ${row.source_check_title}` : row.work_item_title || 'Công việc liên quan'}</span>{!isConstructionActionEditable(row) && row.status === 'open' ? <SourceBadge /> : null}</button></Td>
           <Td><span className="inline-flex items-center gap-1.5"><UserRound className="h-3.5 w-3.5 text-slate-400" />{row.assigned_user_name || 'Chưa xác định'}</span></Td>
           <Td><span className={clsx(isOverdue(row.due_at, row.status) && 'font-semibold text-rose-700')}>{isOverdue(row.due_at, row.status) ? 'Quá hạn · ' : ''}{dateTimeText(row.due_at)}</span></Td>
           <Td>{impactLabel(row.impact_scope)}</Td><Td><ActionStatusPill status={row.status} /></Td>
-          <Td className="text-right"><div className="flex justify-end gap-2"><RowActions onView={() => onView(row)} onEdit={canEdit && isConstructionActionEditable(row) ? () => onEdit(row) : undefined} />{row.status === 'open' && canResolve ? <PrimaryButton onClick={() => onResolve(row)} icon={<Wrench className="h-4 w-4" />}>Gửi khắc phục</PrimaryButton> : row.status === 'waiting_confirmation' && canVerify ? <PrimaryButton tone="green" onClick={() => onVerify(row)} icon={<ShieldCheck className="h-4 w-4" />}>Xác nhận</PrimaryButton> : null}</div></Td>
         </tr>)}</tbody>
       </table></div>
       <div className="space-y-3 lg:hidden">{rows.map((row) => <article key={row.id} className={clsx('rounded-lg border bg-white p-4 shadow-sm', row.priority === 'urgent' && row.status !== 'done' ? 'border-rose-200' : 'border-line')}>

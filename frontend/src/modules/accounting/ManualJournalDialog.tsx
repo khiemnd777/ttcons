@@ -116,18 +116,18 @@ export function ManualJournalDialog({
 
       <div className="hidden overflow-x-auto rounded-lg border border-line md:block">
         <table className="min-w-[920px] w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Tài khoản *</th><th className="px-3 py-2">Diễn giải dòng</th><th className="px-3 py-2 text-right">Phát sinh Nợ</th><th className="px-3 py-2 text-right">Phát sinh Có</th><th className="w-12 px-2 py-2" /></tr></thead>
+          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="w-12 px-2 py-2"><span className="sr-only">Thao tác</span></th><th className="px-3 py-2">Tài khoản *</th><th className="px-3 py-2">Diễn giải dòng</th><th className="px-3 py-2 text-right">Phát sinh Nợ</th><th className="px-3 py-2 text-right">Phát sinh Có</th></tr></thead>
           <tbody>
             {lines.map((line, index) => {
               const debit = amount(line.debit_amount);
               const credit = amount(line.credit_amount);
               const amountInvalid = (debit <= 0 && credit <= 0) || (debit > 0 && credit > 0);
               return <tr key={line.key} className="border-t border-line align-top">
+                <td className="px-2 py-3"><button type="button" disabled={lines.length <= 2} className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30" aria-label={`Xóa dòng ${index + 1}`} onClick={() => { setLines((current) => current.filter((item) => item.key !== line.key)); clearInvalid(); }}><Trash2 className="h-4 w-4" /></button></td>
                 <td className="px-3 py-2"><select value={line.account_id} onChange={(event) => updateLine(line.key, 'account_id', event.target.value)} className={fieldClass(!line.account_id)}><option value="">Chọn tài khoản</option>{accounts.filter((account) => account.is_postable !== false).map((account) => <option key={account.id} value={account.id}>{account.account_code} · {account.name}</option>)}</select></td>
                 <td className="px-3 py-2"><input value={line.description} onChange={(event) => updateLine(line.key, 'description', event.target.value)} placeholder={`Diễn giải dòng ${index + 1}`} className={fieldClass()} /></td>
                 <td className="px-3 py-2"><CurrencyInput min={0} value={line.debit_amount} invalid={amountInvalid} onValueChange={({ numericString }) => updateLine(line.key, 'debit_amount', numericString)} /></td>
                 <td className="px-3 py-2"><CurrencyInput min={0} value={line.credit_amount} invalid={amountInvalid} onValueChange={({ numericString }) => updateLine(line.key, 'credit_amount', numericString)} /></td>
-                <td className="px-2 py-3"><button type="button" disabled={lines.length <= 2} className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30" aria-label={`Xóa dòng ${index + 1}`} onClick={() => { setLines((current) => current.filter((item) => item.key !== line.key)); clearInvalid(); }}><Trash2 className="h-4 w-4" /></button></td>
               </tr>;
             })}
           </tbody>

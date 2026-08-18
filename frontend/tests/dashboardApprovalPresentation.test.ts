@@ -7,14 +7,24 @@ const dashboardSource = readFileSync(
   'utf8',
 );
 
-test('keeps Dashboard approvals as a scoped management queue with explicit ownership context', () => {
-  assert.match(dashboardSource, /get<ApprovalRequest\[\]>\('\/approvals\/pending'\)/);
-  assert.doesNotMatch(dashboardSource, /\/approvals\/pending\?decidable_only=true/);
-  assert.match(dashboardSource, /title="Yêu cầu đang chờ phê duyệt"/);
-  assert.match(dashboardSource, />Người gửi:<\/dt>/);
-  assert.match(dashboardSource, /approvalRequesterLabel\(approval\)/);
-  assert.match(dashboardSource, />Chờ duyệt:<\/dt>/);
-  assert.match(dashboardSource, /approvalRequiredRolesLabel\(approval\)/);
-  assert.match(dashboardSource, /canDecide \? \(/);
-  assert.match(dashboardSource, /Chỉ theo dõi/);
+test('keeps Dashboard as a management summary instead of a personal action queue', () => {
+  assert.match(dashboardSource, /title="Dashboard tổng hợp"/);
+  assert.match(dashboardSource, /\/reports\/dashboard\?/);
+  assert.match(dashboardSource, /\/reports\/dashboard\/projects\?/);
+  assert.doesNotMatch(dashboardSource, /\/approvals\/pending/);
+  assert.doesNotMatch(dashboardSource, /ApprovalDecisionActions|ApprovalPanel|approvalCanDecide/);
+  assert.doesNotMatch(dashboardSource, /title="Yêu cầu đang chờ phê duyệt"/);
+});
+
+test('uses the shared action-first table convention for the project portfolio', () => {
+  assert.match(dashboardSource, /<DataTable/);
+  assert.match(dashboardSource, /key: 'action'/);
+  assert.match(dashboardSource, /action: true/);
+  assert.match(dashboardSource, /renderMobileCard=/);
+});
+
+test('keeps financial rows permission-sensitive', () => {
+  assert.match(dashboardSource, /capabilities\.finance_visible/);
+  assert.match(dashboardSource, /project\.finance_visible/);
+  assert.match(dashboardSource, /Không có quyền xem tài chính công trình này/);
 });

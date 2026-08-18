@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const clientOfficialWorkflowTemplateID = "40000000-0000-0000-0000-000000000020"
@@ -42,6 +44,170 @@ func (r *Repository) FindUserByEmail(ctx context.Context, email string) (Record,
 			  AND role.external_only
 		  )
 	`, email)
+}
+
+func (r *Repository) GetOwnProfile(ctx context.Context, userID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT account.id::text,account.email,account.full_name,account.status,
+			account.created_at,account.updated_at,
+			COALESCE(profile.phone,'') AS phone,
+			COALESCE(profile.department,'') AS department,
+			COALESCE(profile.position,'') AS position
+		FROM users account
+		LEFT JOIN LATERAL (
+			SELECT staff.phone,staff.department,staff.position
+			FROM staff
+			WHERE staff.user_id=account.id
+			  AND staff.status <> 'deleted'
+			ORDER BY CASE WHEN staff.status='active' THEN 0 ELSE 1 END,staff.updated_at DESC,staff.id
+			LIMIT 1
+		) profile ON true
+		WHERE account.id=$1
+		  AND account.status='active'
+	`, userID)
+}
+
+func (r *Repository) UpdateOwnProfile(ctx context.Context, userID, actorName, fullName, email, phone string) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	var currentFullName string
+	var currentEmail string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT full_name,email
+		FROM users
+		WHERE id=$1 AND status='active'
+		FOR UPDATE
+	`, userID).Scan(&currentFullName, &currentEmail); err != nil {
+		return false, err
+	}
+
+	var staffCount int
+	var currentPhone string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*),COALESCE((
+			SELECT linked.phone
+			FROM staff linked
+			WHERE linked.user_id=$1 AND linked.status <> 'deleted'
+			ORDER BY CASE WHEN linked.status='active' THEN 0 ELSE 1 END,linked.updated_at DESC,linked.id
+			LIMIT 1
+		),'')
+		FROM staff
+		WHERE user_id=$1 AND status <> 'deleted'
+	`, userID).Scan(&staffCount, &currentPhone); err != nil {
+		return false, err
+	}
+	if staffCount == 0 && phone != "" {
+		return false, validationError("Tài khoản chưa được liên kết hồ sơ nhân sự nên chưa thể lưu số điện thoại", Record{"field": "phone"})
+	}
+
+	emailChanged := currentEmail != email
+	changedFields := make([]string, 0, 3)
+	if currentFullName != fullName {
+		changedFields = append(changedFields, "full_name")
+	}
+	if emailChanged {
+		changedFields = append(changedFields, "email")
+	}
+	if currentPhone != phone {
+		changedFields = append(changedFields, "phone")
+	}
+	if len(changedFields) == 0 {
+		return false, nil
+	}
+
+	var emailInUse bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM users
+			WHERE id <> $1 AND lower(email)=lower($2)
+		)
+	`, userID, email).Scan(&emailInUse); err != nil {
+		return false, err
+	}
+	if emailInUse {
+		return false, conflictError("Email đăng nhập đã được sử dụng", Record{"field": "email"})
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE users
+		SET full_name=$2,email=$3,updated_at=now()
+		WHERE id=$1 AND status='active'
+	`, userID, fullName, email); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return false, conflictError("Email đăng nhập đã được sử dụng", Record{"field": "email"})
+		}
+		return false, err
+	}
+	if staffCount > 0 {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE staff
+			SET full_name=$2,email=$3,phone=NULLIF($4,''),updated_at=now()
+			WHERE user_id=$1 AND status <> 'deleted'
+		`, userID, fullName, email, phone); err != nil {
+			return false, err
+		}
+	}
+	if emailChanged {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE auth_sessions
+			SET revoked_at=COALESCE(revoked_at,now())
+			WHERE user_id=$1 AND revoked_at IS NULL
+		`, userID); err != nil {
+			return false, err
+		}
+	}
+	if err := addAuditTx(ctx, tx, "", userID, actorName, "user_profile_updated", "user_account", userID, "Người dùng cập nhật hồ sơ cá nhân", Record{
+		"changed_fields":  changedFields,
+		"session_revoked": emailChanged,
+	}); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return emailChanged, nil
+}
+
+func (r *Repository) ChangeOwnPassword(ctx context.Context, userID, actorName, passwordHash string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.ExecContext(ctx, `
+		UPDATE users
+		SET password_hash=$2,updated_at=now()
+		WHERE id=$1 AND status='active'
+	`, userID, passwordHash)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE auth_sessions
+		SET revoked_at=COALESCE(revoked_at,now())
+		WHERE user_id=$1 AND revoked_at IS NULL
+	`, userID); err != nil {
+		return err
+	}
+	if err := addAuditTx(ctx, tx, "", userID, actorName, "user_password_changed", "user_account", userID, "Người dùng đổi mật khẩu", Record{
+		"session_revoked": true,
+	}); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *Repository) UserRoles(ctx context.Context, userID string) ([]string, error) {
@@ -5199,6 +5365,12 @@ func (r *Repository) AmendWorkflowForm(ctx context.Context, instanceID string, a
 	if fmt.Sprint(instance["status"]) != "submitted" {
 		return nil, conflictError("Trạng thái hồ sơ đã thay đổi, vui lòng tải lại", Record{"status": instance["status"]})
 	}
+	constructionDailyReport := fmt.Sprint(instance["form_type"]) == "daily_report" && strings.TrimSpace(fmt.Sprint(instance["form_code"])) == "builtin_construction_daily_report"
+	if constructionDailyReport {
+		if err := ensureConstructionDailyReportAmendableTx(ctx, tx, instanceID); err != nil {
+			return nil, err
+		}
+	}
 	currentRevision := int(number(instance["current_revision"]))
 	if currentRevision != expectedRevision {
 		return nil, conflictError("Phiên bản hồ sơ đã thay đổi, vui lòng tải lại trước khi lưu", Record{
@@ -5275,6 +5447,11 @@ func (r *Repository) AmendWorkflowForm(ctx context.Context, instanceID string, a
 				updated_at=now()
 			WHERE id=$1
 		`, workItemID, string(rawCompletionPatch), actorID); err != nil {
+			return nil, err
+		}
+	}
+	if constructionDailyReport {
+		if err := syncConstructionDailyReportTx(ctx, tx, instance, answers, actorID); err != nil {
 			return nil, err
 		}
 	}
@@ -5425,6 +5602,43 @@ func syncConstructionDailyReportTx(ctx context.Context, tx *sql.Tx, instance Rec
 		fmt.Sprintf("%.0f nhân sự / %d đội", manpower, len(crewItems)), strings.Join(materialNames, "; "),
 		strings.Join(blockerTitles, "; "), int(number(answers["progress_percent"])), string(photosRaw), instance["id"], cleanID(instance["work_item_id"]), string(structuredRaw), primaryEvidenceID)
 	return err
+}
+
+func ensureConstructionDailyReportAmendableTx(ctx context.Context, tx *sql.Tx, workflowFormInstanceID string) error {
+	var sourceID string
+	var deliveryEligible bool
+	err := tx.QueryRowContext(ctx, `
+		SELECT id::text,report_delivery_eligible
+		FROM operation_daily_reports
+		WHERE workflow_form_instance_id=$1
+		FOR UPDATE
+	`, workflowFormInstanceID).Scan(&sourceID, &deliveryEligible)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !deliveryEligible {
+		return validationError("Nhật ký lịch sử này chỉ dùng để tra cứu và không thể chỉnh sửa", Record{"workflow_form_instance_id": workflowFormInstanceID})
+	}
+	var status string
+	err = tx.QueryRowContext(ctx, `
+		SELECT status
+		FROM work_reports
+		WHERE source_kind='operation_daily_report' AND source_id=$1
+		FOR UPDATE
+	`, sourceID).Scan(&status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if status != "needs_changes" {
+		return validationError("Báo cáo chỉ được chỉnh sửa sau khi người nhận yêu cầu bổ sung", Record{"workflow_form_instance_id": workflowFormInstanceID, "status": status})
+	}
+	return nil
 }
 
 func workflowAnswerRecordList(value any) []Record {
@@ -9853,7 +10067,19 @@ func workflowBusinessSourceRecord(actionKey string, outcome workflowAutomationOu
 		"route":       metadata["route"],
 		"target_type": outcome.TargetType,
 		"target_id":   outcome.TargetID,
+		"checks":      metadata["checks"],
 		"facts":       metadata,
+	}
+}
+
+func workflowSourceReadinessCheck(key, label string, ready bool, message, route string) Record {
+	return Record{
+		"key":     key,
+		"label":   label,
+		"ready":   ready,
+		"status":  map[bool]string{true: "ready", false: "blocked"}[ready],
+		"message": message,
+		"route":   route,
 	}
 }
 
@@ -9941,12 +10167,52 @@ func (r *Repository) automateClientOperationalSourceGate(ctx context.Context, co
 		ready = number(row["total"]) > 0
 		reason = "Chưa có hợp đồng đầu vào đã duyệt"
 		targetType, targetID = "contract", cleanID(row["target_id"])
+	case "source.input_contract_package_ready":
+		metadata["label"] = "Gói hợp đồng đầu vào"
+		metadata["route"] = fmt.Sprintf("/projects/%s/contracts", projectID)
+		row, err = r.QueryOne(ctx, `
+			SELECT
+			  (SELECT COUNT(*) FROM procurement_requests
+			   WHERE project_id=$1 AND status IN ('approved','ordered','partially_received','received')) AS approved_procurements,
+			  (SELECT COUNT(*) FROM contracts
+			   WHERE project_id=$1 AND direction='payable'
+			     AND contract_type IN ('supplier','subcontractor','service')
+			     AND status IN ('approved','signed','active')) AS ready_contracts,
+			  (SELECT MAX(id::text) FROM contracts
+			   WHERE project_id=$1 AND direction='payable'
+			     AND contract_type IN ('supplier','subcontractor','service')
+			     AND status IN ('approved','signed','active')) AS target_id
+		`, projectID)
+		procurementReady := number(row["approved_procurements"]) > 0
+		contractReady := number(row["ready_contracts"]) > 0
+		ready = procurementReady && contractReady
+		reason = "Procurement hoặc hợp đồng đầu vào chưa đủ điều kiện"
+		metadata["checks"] = []Record{
+			workflowSourceReadinessCheck("approved_procurement", "Procurement đã duyệt", procurementReady, "Cần ít nhất một yêu cầu mua đã duyệt.", fmt.Sprintf("/projects/%s/procurement", projectID)),
+			workflowSourceReadinessCheck("ready_input_contract", "Hợp đồng đầu vào đủ điều kiện", contractReady, "Hợp đồng nhà cung cấp/thầu phụ cần ở trạng thái đã duyệt, đã ký hoặc đang hiệu lực.", fmt.Sprintf("/projects/%s/contracts", projectID)),
+		}
+		targetType, targetID = "contract", cleanID(row["target_id"])
 	case "subcontractor.reconcile_checklist", "subcontractor.prepare_quantity_dossier", "source.subcontractor_reconciliation_ready":
 		metadata["label"] = "Đối chiếu thầu phụ"
 		metadata["route"] = fmt.Sprintf("/projects/%s/acceptance", projectID)
 		row, err = r.QueryOne(ctx, `SELECT COUNT(*) AS total,MAX(id::text) AS target_id FROM subcontractor_checklist_reconciliations WHERE project_id=$1 AND status='submitted'`, projectID)
 		ready = number(row["total"]) > 0
 		reason = "Đối chiếu checklist/khối lượng thầu phụ chưa được chốt"
+		targetType, targetID = "subcontractor_reconciliation", cleanID(row["target_id"])
+	case "source.subcontractor_acceptance_package_ready":
+		metadata["label"] = "Gói nghiệm thu thầu phụ"
+		metadata["route"] = fmt.Sprintf("/projects/%s/acceptance", projectID)
+		row, err = r.QueryOne(ctx, `
+			SELECT COUNT(*) AS submitted_reconciliations,MAX(id::text) AS target_id
+			FROM subcontractor_checklist_reconciliations
+			WHERE project_id=$1 AND status='submitted'
+		`, projectID)
+		reconciliationReady := number(row["submitted_reconciliations"]) > 0
+		ready = reconciliationReady
+		reason = "Đối chiếu checklist/khối lượng thầu phụ chưa được chốt"
+		metadata["checks"] = []Record{
+			workflowSourceReadinessCheck("subcontractor_reconciliation", "Đối chiếu thầu phụ đã chốt", reconciliationReady, "Chốt checklist và khối lượng tại workspace Nghiệm thu.", fmt.Sprintf("/projects/%s/acceptance", projectID)),
+		}
 		targetType, targetID = "subcontractor_reconciliation", cleanID(row["target_id"])
 	case "acceptance.incoming_material":
 		metadata["label"] = "Nghiệm thu vật tư đầu vào"
@@ -9987,6 +10253,29 @@ func (r *Repository) automateClientOperationalSourceGate(ctx context.Context, co
 		ready = number(row["total"]) > 0
 		reason = "Nghiệm thu đầu ra chưa hoàn tất đạt"
 		targetType, targetID = "acceptance", cleanID(row["target_id"])
+	case "source.final_acceptance_package_ready":
+		metadata["label"] = "Gói nghiệm thu cuối"
+		metadata["route"] = fmt.Sprintf("/projects/%s/acceptance", projectID)
+		row, err = r.QueryOne(ctx, `
+			SELECT
+			  (SELECT COUNT(*) FROM owner_client_checklist_reconciliations
+			   WHERE project_id=$1 AND status='submitted') AS owner_reconciliations,
+			  (SELECT COUNT(*) FROM acceptance_records
+			   WHERE project_id=$1 AND type='final' AND status='completed'
+			     AND result IN ('pass','conditional_pass')) AS final_acceptances,
+			  (SELECT MAX(id::text) FROM acceptance_records
+			   WHERE project_id=$1 AND type='final' AND status='completed'
+			     AND result IN ('pass','conditional_pass')) AS target_id
+		`, projectID)
+		ownerReady := number(row["owner_reconciliations"]) > 0
+		acceptanceReady := number(row["final_acceptances"]) > 0
+		ready = ownerReady && acceptanceReady
+		reason = "Đối chiếu chủ đầu tư hoặc nghiệm thu cuối chưa hoàn tất đạt"
+		metadata["checks"] = []Record{
+			workflowSourceReadinessCheck("owner_reconciliation", "Đối chiếu chủ đầu tư đã chốt", ownerReady, "Gửi bản đối chiếu checklist/khối lượng với chủ đầu tư.", fmt.Sprintf("/projects/%s/acceptance", projectID)),
+			workflowSourceReadinessCheck("final_acceptance", "Nghiệm thu cuối đạt", acceptanceReady, "Nghiệm thu cuối phải hoàn tất với kết quả đạt hoặc đạt có điều kiện.", fmt.Sprintf("/projects/%s/acceptance", projectID)),
+		}
+		targetType, targetID = "acceptance", cleanID(row["target_id"])
 	case "owner.reconcile_acceptance":
 		metadata["label"] = "Đối chiếu chủ đầu tư"
 		metadata["route"] = fmt.Sprintf("/projects/%s/acceptance", projectID)
@@ -10015,6 +10304,45 @@ func (r *Repository) automateClientOperationalSourceGate(ctx context.Context, co
 		ready = number(row["total"]) > 0
 		reason = "Công nợ phải thu chưa được thu đủ"
 		targetType, targetID = "receivable", cleanID(row["target_id"])
+	case "source.handover_completed":
+		metadata["label"] = "Bàn giao vật lý công trình"
+		metadata["route"] = fmt.Sprintf("/projects/%s/handover", projectID)
+		row, err = r.QueryOne(ctx, `
+			SELECT COUNT(*) AS handed_over,MAX(id::text) AS target_id
+			FROM handover_records
+			WHERE project_id=$1 AND status='handed_over' AND completed_at IS NOT NULL
+		`, projectID)
+		ready = number(row["handed_over"]) > 0
+		reason = "Bàn giao vật lý công trình chưa hoàn tất"
+		metadata["checks"] = []Record{
+			workflowSourceReadinessCheck("physical_handover", "Hồ sơ bàn giao đã hoàn tất", ready, "Hoàn tất kiểm tra readiness và bàn giao trong workspace Bàn giao.", fmt.Sprintf("/projects/%s/handover", projectID)),
+		}
+		targetType, targetID = "handover", cleanID(row["target_id"])
+	case "source.project_finance_close_ready":
+		metadata["label"] = "Khóa tài chính công trình"
+		metadata["route"] = fmt.Sprintf("/projects/%s/accounting?tab=tasks", projectID)
+		row, err = r.QueryOne(ctx, `
+			SELECT
+			  (SELECT COUNT(*) FROM handover_records
+			   WHERE project_id=$1 AND status='handed_over' AND completed_at IS NOT NULL) AS handed_over,
+			  (SELECT COUNT(*) FROM project_material_costs
+			   WHERE project_id=$1 AND status NOT IN ('confirmed','cancelled')) AS pending_costs,
+			  (SELECT COUNT(*) FROM project_cash_requests
+			   WHERE project_id=$1 AND status NOT IN ('processed','cancelled')) AS pending_cash_requests,
+			  (SELECT MAX(id::text) FROM handover_records
+			   WHERE project_id=$1 AND status='handed_over') AS target_id
+		`, projectID)
+		handoverReady := number(row["handed_over"]) > 0
+		costsReady := number(row["pending_costs"]) == 0
+		cashReady := number(row["pending_cash_requests"]) == 0
+		ready = handoverReady && costsReady && cashReady
+		reason = "Bàn giao hoặc hồ sơ tài chính công trình còn điều kiện chưa kết thúc"
+		metadata["checks"] = []Record{
+			workflowSourceReadinessCheck("physical_handover", "Bàn giao vật lý đã hoàn tất", handoverReady, "Hoàn tất bàn giao trước khi khóa tài chính.", fmt.Sprintf("/projects/%s/handover", projectID)),
+			workflowSourceReadinessCheck("material_costs", "Chi phí vật tư đã xác nhận", costsReady, "Mọi chi phí vật tư phải được xác nhận hoặc hủy.", fmt.Sprintf("/projects/%s/accounting?tab=costs", projectID)),
+			workflowSourceReadinessCheck("cash_requests", "Đề nghị thu/chi đã xử lý", cashReady, "Mọi đề nghị thu/chi phải được xử lý hoặc hủy.", fmt.Sprintf("/projects/%s/accounting?tab=tasks", projectID)),
+		}
+		targetType, targetID = "handover", cleanID(row["target_id"])
 	default:
 		return workflowAutomationOutcome{}, nil
 	}
@@ -10063,8 +10391,18 @@ func (r *Repository) automateClientContractExecutionGate(ctx context.Context, co
 	if err != nil {
 		return workflowAutomationOutcome{}, err
 	}
-	metadata := Record{"project_id": projectID}
+	metadata := Record{
+		"project_id": projectID,
+		"label":      "Gói hợp đồng chủ đầu tư",
+		"route":      fmt.Sprintf("/projects/%s/contracts", projectID),
+	}
 	if len(rows) == 0 {
+		metadata["checks"] = []Record{
+			workflowSourceReadinessCheck("current_version", "Version hợp đồng hiện hành", false, "Chưa có hợp đồng đầu ra với chủ đầu tư.", fmt.Sprintf("/projects/%s/contracts", projectID)),
+			workflowSourceReadinessCheck("app_signature", "Ký workflow trên App", false, "Cần ký version hợp đồng trên App.", fmt.Sprintf("/projects/%s/contracts", projectID)),
+			workflowSourceReadinessCheck("returned_scan", "Bản scan giấy đã nhận", false, "Cần liên kết bản scan giấy đã ký.", fmt.Sprintf("/projects/%s/contracts", projectID)),
+			workflowSourceReadinessCheck("active_contract", "Hợp đồng đã kích hoạt", false, "Kích hoạt hợp đồng sau khi đủ chữ ký và hồ sơ giấy.", fmt.Sprintf("/projects/%s/contracts", projectID)),
+		}
 		return automationBlocked("contract.require_execution_ready", "Chưa có hợp đồng đầu ra với chủ đầu tư", metadata), nil
 	}
 	contract := rows[0]
@@ -10074,13 +10412,23 @@ func (r *Repository) automateClientContractExecutionGate(ctx context.Context, co
 	metadata["version_status"] = contract["version_status"]
 	metadata["app_signed"] = contract["app_signed"]
 	metadata["returned_scan_received"] = contract["returned_scan_received"]
-	if fmt.Sprint(contract["version_status"]) != "signed" || !boolValue(contract["app_signed"]) {
+	versionReady := cleanID(contract["contract_version_id"]) != "" && statusIn(fmt.Sprint(contract["version_status"]), "approved", "signed")
+	appSigned := fmt.Sprint(contract["version_status"]) == "signed" && boolValue(contract["app_signed"])
+	returnedScanReady := boolValue(contract["returned_scan_received"])
+	contractActive := fmt.Sprint(contract["contract_status"]) == "active"
+	metadata["checks"] = []Record{
+		workflowSourceReadinessCheck("current_version", "Version hợp đồng hiện hành", versionReady, "Version hợp đồng cần được duyệt hoặc ký.", fmt.Sprintf("/projects/%s/contracts", projectID)),
+		workflowSourceReadinessCheck("app_signature", "Ký workflow trên App", appSigned, "Version hiện hành cần được ký trên App.", fmt.Sprintf("/projects/%s/contracts", projectID)),
+		workflowSourceReadinessCheck("returned_scan", "Bản scan giấy đã nhận", returnedScanReady, "Liên kết bản scan hợp đồng giấy đã ký tại lần gửi hợp đồng.", fmt.Sprintf("/projects/%s/contracts", projectID)),
+		workflowSourceReadinessCheck("active_contract", "Hợp đồng đã kích hoạt", contractActive, "Kích hoạt hợp đồng sau khi đủ hồ sơ ký.", fmt.Sprintf("/projects/%s/contracts", projectID)),
+	}
+	if !appSigned {
 		return automationBlockedWithTarget("contract.require_execution_ready", "Version hợp đồng chưa được ký trên App bằng chữ ký workflow", "contract", cleanID(contract["contract_id"]), metadata), nil
 	}
-	if !boolValue(contract["returned_scan_received"]) {
+	if !returnedScanReady {
 		return automationBlockedWithTarget("contract.require_execution_ready", "Chưa nhận lại và liên kết bản scan hợp đồng giấy đã ký", "contract", cleanID(contract["contract_id"]), metadata), nil
 	}
-	if fmt.Sprint(contract["contract_status"]) != "active" {
+	if !contractActive {
 		return automationBlockedWithTarget("contract.require_execution_ready", "Hợp đồng chưa được kích hoạt sau khi hoàn tất ký và hồ sơ giấy", "contract", cleanID(contract["contract_id"]), metadata), nil
 	}
 	return automationSucceeded("contract.require_execution_ready", "Hợp đồng đầu ra đã đủ điều kiện mở triển khai", "contract", cleanID(contract["contract_id"]), metadata), nil
@@ -10707,11 +11055,16 @@ func (r *Repository) ensureHandoverScaffoldTx(ctx context.Context, tx *sql.Tx, c
 		{"item_code": "warranty_documents", "category": "warranty", "title": "Cam kết và hồ sơ bảo hành"},
 		{"item_code": "signed_handover_minutes", "category": "legal", "title": "Biên bản bàn giao có xác nhận hai bên"},
 	}
+	splitFinance := int(number(contextRow["template_revision_no"])) >= 8 && isClientOfficialWorkflowContext(contextRow)
 	for _, item := range items {
+		required := true
+		if splitFinance && statusIn(fmt.Sprint(item["item_code"]), "project_material_costs", "project_cash_requests") {
+			required = false
+		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO handover_checklist_items (handover_id,project_id,item_code,category,title,required,status,source_type,source_id)
-			VALUES ($1,$2,$3,$4,$5,true,'pending',NULLIF($6,''),NULLIF($7,'')::uuid)
-		`, handoverID, projectID, item["item_code"], item["category"], item["title"], item["source_type"], cleanID(item["source_id"])); err != nil {
+			VALUES ($1,$2,$3,$4,$5,$6,'pending',NULLIF($7,''),NULLIF($8,'')::uuid)
+		`, handoverID, projectID, item["item_code"], item["category"], item["title"], required, item["source_type"], cleanID(item["source_id"])); err != nil {
 			return "", nil, err
 		}
 	}
@@ -16547,11 +16900,19 @@ func (r *Repository) CreateHandoverPackage(ctx context.Context, body Record, act
 		{"item_code": "warranty_documents", "category": "warranty", "title": "Cam kết và hồ sơ bảo hành"},
 		{"item_code": "signed_handover_minutes", "category": "legal", "title": "Biên bản bàn giao có xác nhận hai bên"},
 	}
+	splitFinance, err := r.projectUsesSplitHandoverFinanceTx(ctx, tx, cleanID(handover["project_id"]))
+	if err != nil {
+		return nil, err
+	}
 	for _, item := range items {
+		required := true
+		if splitFinance && statusIn(fmt.Sprint(item["item_code"]), "project_material_costs", "project_cash_requests") {
+			required = false
+		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO handover_checklist_items (handover_id,project_id,item_code,category,title,required,status,source_type,source_id)
-			VALUES ($1,$2,$3,$4,$5,true,'pending',NULLIF($6,''),NULLIF($7,'')::uuid)
-		`, handover["id"], handover["project_id"], item["item_code"], item["category"], item["title"], item["source_type"], cleanID(item["source_id"])); err != nil {
+			VALUES ($1,$2,$3,$4,$5,$6,'pending',NULLIF($7,''),NULLIF($8,'')::uuid)
+		`, handover["id"], handover["project_id"], item["item_code"], item["category"], item["title"], required, item["source_type"], cleanID(item["source_id"])); err != nil {
 			return nil, err
 		}
 	}
@@ -16917,6 +17278,24 @@ func (r *Repository) UpdateHandoverChecklistItem(ctx context.Context, id string,
 	return updated[0], nil
 }
 
+func (r *Repository) projectUsesSplitHandoverFinanceTx(ctx context.Context, tx *sql.Tx, projectID string) (bool, error) {
+	rows, err := queryTx(ctx, tx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM projects project
+			JOIN pipeline_runs run ON run.id=project.current_pipeline_run_id
+			JOIN pipeline_templates template ON template.id=run.template_id
+			WHERE project.id=$1
+			  AND (template.id=$2 OR template.template_family_id=$2)
+			  AND template.revision_no>=8
+		) AS enabled
+	`, projectID, clientOfficialWorkflowTemplateID)
+	if err != nil {
+		return false, err
+	}
+	return len(rows) > 0 && boolValue(rows[0]["enabled"]), nil
+}
+
 func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -16935,6 +17314,10 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 		return nil, validationError("Cần gửi hồ sơ bàn giao trước khi kiểm tra readiness", Record{"status": handover["status"]})
 	}
 	projectID := cleanID(handover["project_id"])
+	splitFinance, err := r.projectUsesSplitHandoverFinanceTx(ctx, tx, projectID)
+	if err != nil {
+		return nil, err
+	}
 	counts := Record{}
 	checkCount := func(key, query string, args ...any) error {
 		result, err := queryTx(ctx, tx, query, args...)
@@ -17018,13 +17401,21 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 	if number(counts["pending_surplus"]) > 0 {
 		blockers = append(blockers, "Còn vật tư dư chưa xử lý")
 	}
-	if !costsReady {
+	if !splitFinance && !costsReady {
 		blockers = append(blockers, "Còn chi phí vật tư chưa được xác nhận")
 	}
-	if !cashRequestsReady {
+	if !splitFinance && !cashRequestsReady {
 		blockers = append(blockers, "Còn đề nghị thu/chi nội bộ chưa được xử lý")
 	}
-	pendingItems, err := queryTx(ctx, tx, `SELECT item_code,title FROM handover_checklist_items WHERE handover_id=$1 AND required AND status <> 'verified' ORDER BY created_at`, id)
+	pendingItems, err := queryTx(ctx, tx, `
+		SELECT item_code,title
+		FROM handover_checklist_items
+		WHERE handover_id=$1
+		  AND required
+		  AND status <> 'verified'
+		  AND (NOT $2 OR item_code NOT IN ('project_material_costs','project_cash_requests','ap_reconciliation','ar_reconciliation'))
+		ORDER BY created_at
+	`, id, splitFinance)
 	if err != nil {
 		return nil, err
 	}
@@ -17036,7 +17427,11 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 	if ready {
 		nextStatus = "ready"
 	}
-	snapshot := Record{"ready": ready, "blockers": blockers, "counts": counts, "checked_at": time.Now().UTC().Format(time.RFC3339)}
+	snapshot := Record{
+		"ready": ready, "blockers": blockers, "counts": counts,
+		"finance_separated": splitFinance,
+		"checked_at":        time.Now().UTC().Format(time.RFC3339),
+	}
 	rawSnapshot, _ := json.Marshal(snapshot)
 	updated, err := queryTx(ctx, tx, `
 		UPDATE handover_records SET status=$2,documents_ready=$3,warehouse_closed=$4,payables_recorded=$5,receivables_recorded=$6,

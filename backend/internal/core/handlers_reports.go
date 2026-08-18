@@ -17,11 +17,78 @@ func (h *Handler) Dashboard(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"report.view"}); err != nil {
 		return err
 	}
-	data, err := h.service.Dashboard(c.Context(), actorID(c))
+	req, err := dashboardPeriodRequest(c)
+	if err != nil {
+		return err
+	}
+	data, err := h.service.Dashboard(c.Context(), req, actorID(c))
 	if err != nil {
 		return err
 	}
 	return response.OK(c, data)
+}
+
+func (h *Handler) DashboardProjects(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"report.view"}); err != nil {
+		return err
+	}
+	req, err := dashboardProjectsRequest(c)
+	if err != nil {
+		return err
+	}
+	data, err := h.service.DashboardProjects(c.Context(), req, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, data)
+}
+
+func dashboardPeriodRequest(c *fiber.Ctx) (DashboardPeriodRequest, error) {
+	year, err := optionalQueryInt(c, "year")
+	if err != nil {
+		return DashboardPeriodRequest{}, err
+	}
+	periodNo, err := optionalQueryInt(c, "period_no")
+	if err != nil {
+		return DashboardPeriodRequest{}, err
+	}
+	return DashboardPeriodRequest{
+		PeriodType: c.Query("period_type"),
+		Year:       year,
+		PeriodNo:   periodNo,
+	}, nil
+}
+
+func dashboardProjectsRequest(c *fiber.Ctx) (DashboardProjectsRequest, error) {
+	period, err := dashboardPeriodRequest(c)
+	if err != nil {
+		return DashboardProjectsRequest{}, err
+	}
+	limit, err := optionalQueryInt(c, "limit")
+	if err != nil {
+		return DashboardProjectsRequest{}, err
+	}
+	return DashboardProjectsRequest{
+		DashboardPeriodRequest: period,
+		Search:                 c.Query("search"),
+		Status:                 c.Query("status"),
+		Sort:                   c.Query("sort"),
+		Direction:              c.Query("direction"),
+		Cursor:                 c.Query("cursor"),
+		Limit:                  limit,
+	}, nil
+}
+
+func optionalQueryInt(c *fiber.Ctx, key string) (int, error) {
+	raw := strings.TrimSpace(c.Query(key))
+	if raw == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, validationError(fmt.Sprintf("%s không hợp lệ", key), Record{key: raw})
+	}
+	return parsed, nil
 }
 
 func (h *Handler) ReportOptions(c *fiber.Ctx) error {
@@ -236,7 +303,12 @@ func operationalReportRequest(c *fiber.Ctx) (OperationalReportRequest, error) {
 	if projectID != "" && !validActivityUUID(projectID) {
 		return OperationalReportRequest{}, validationError("project_id không hợp lệ", Record{"project_id": projectID})
 	}
-	return OperationalReportRequest{ProjectID: projectID}, nil
+	return OperationalReportRequest{
+		ProjectID: projectID,
+		Search:    c.Query("search"),
+		Sort:      c.Query("sort"),
+		Direction: c.Query("direction"),
+	}, nil
 }
 
 func cashflowReportRequest(c *fiber.Ctx) CashflowReportRequest {

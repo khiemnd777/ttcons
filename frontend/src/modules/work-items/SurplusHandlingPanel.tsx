@@ -305,7 +305,25 @@ function SurplusRow({
   const over = quantity > surplus + 0.000001;
 
   return (
-    <div className="grid gap-3 py-3 xl:grid-cols-[1fr_1fr_1.2fr_auto]">
+    <div className="grid gap-3 py-3 xl:grid-cols-[auto_1fr_1fr_1.2fr]">
+      <div className="flex flex-wrap items-start gap-2">
+        <button
+          className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={disabled}
+          onClick={onSave}
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Lưu nháp
+        </button>
+        <button
+          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={disabled}
+          onClick={onSubmit}
+        >
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Gửi
+        </button>
+      </div>
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-ink">{balance.material_name ?? balance.material_id}</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -412,24 +430,6 @@ function SurplusRow({
         />
       </div>
 
-      <div className="flex flex-wrap items-start justify-end gap-2">
-        <button
-          className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={disabled}
-          onClick={onSave}
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Lưu nháp
-        </button>
-        <button
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={disabled}
-          onClick={onSubmit}
-        >
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Gửi
-        </button>
-      </div>
     </div>
   );
 }

@@ -9,83 +9,185 @@ import (
 	"strings"
 )
 
-func (r *Repository) DashboardReport(ctx context.Context, userID string) (Record, error) {
+func (r *Repository) DashboardReport(ctx context.Context, userID string) (DashboardProjectSnapshot, error) {
 	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
 	if err != nil {
-		return nil, err
+		return DashboardProjectSnapshot{}, err
 	}
 	data, err := r.QueryOne(ctx, fmt.Sprintf(`
 		WITH scoped_projects AS MATERIALIZED (
-			SELECT p.id, p.status
+			SELECT p.id, p.status, COALESCE(p.progress_percent, 0) AS progress_percent
 			FROM projects p
 			WHERE p.status <> 'cancelled' AND %s
 		)
 		SELECT
 			(SELECT COUNT(*) FROM scoped_projects) AS total_projects,
 			(SELECT COUNT(*) FROM scoped_projects WHERE status IN ('planning','in_progress','acceptance','handover')) AS active_projects,
+			(SELECT COUNT(*) FROM scoped_projects WHERE status='completed') AS completed_projects,
 			(SELECT COUNT(*) FROM scoped_projects WHERE status='blocked') AS blocked_projects,
+			(SELECT COALESCE(AVG(progress_percent), 0) FROM scoped_projects) AS average_progress,
+			(SELECT COUNT(*) FROM issues issue JOIN scoped_projects sp ON sp.id=issue.project_id WHERE issue.status IN ('open','in_progress')) AS open_issues,
 			(SELECT COUNT(*) FROM approval_requests ar JOIN scoped_projects sp ON sp.id=ar.project_id WHERE ar.status='pending') AS pending_approvals,
-			(SELECT COALESCE(SUM(rec.remaining_amount),0) FROM receivables rec JOIN scoped_projects sp ON sp.id=rec.project_id WHERE rec.status <> 'cancelled') AS receivable_remaining,
-			(SELECT COALESCE(SUM(pay.remaining_amount),0) FROM payables pay JOIN scoped_projects sp ON sp.id=pay.project_id WHERE pay.status <> 'cancelled') AS payable_remaining,
-			(SELECT COUNT(*) FROM site_material_balances smb JOIN materials m ON m.id=smb.material_id JOIN scoped_projects sp ON sp.id=smb.project_id WHERE smb.issued_quantity < smb.planned_quantity AND m.active) AS missing_materials,
-			(SELECT COUNT(*) FROM acceptance_records ar JOIN scoped_projects sp ON sp.id=ar.project_id WHERE ar.result='fail') AS failed_acceptances,
-			(SELECT COUNT(*) FROM rework_requests rw JOIN scoped_projects sp ON sp.id=rw.project_id WHERE rw.status IN ('draft','approved','in_progress')) AS pending_reworks,
-			(SELECT COALESCE(SUM(CASE WHEN pay.payment_type='client_receipt' THEN pay.amount ELSE -pay.amount END),0)
-			 FROM payments pay
-			 JOIN scoped_projects sp ON sp.id=pay.project_id
-			 WHERE pay.status <> 'cancelled'
-			   AND date_trunc('month', pay.created_at)=date_trunc('month', now())) AS cashflow_month
+			(SELECT COUNT(*) FROM scoped_projects WHERE status='planning') AS planning_projects,
+			(SELECT COUNT(*) FROM scoped_projects WHERE status='in_progress') AS in_progress_projects,
+			(SELECT COUNT(*) FROM scoped_projects WHERE status='acceptance') AS acceptance_projects,
+			(SELECT COUNT(*) FROM scoped_projects WHERE status='handover') AS handover_projects
 	`, scopeSQL), scopeArgs...)
 	if err != nil {
-		return nil, err
+		return DashboardProjectSnapshot{}, err
 	}
-	charts := Record{}
-	statusRows, err := r.Query(ctx, fmt.Sprintf(`SELECT p.status, COUNT(*) AS total FROM projects p WHERE p.status <> 'cancelled' AND %s GROUP BY p.status ORDER BY p.status`, scopeSQL), scopeArgs...)
-	if err != nil {
-		return nil, err
-	}
-	debtRows, err := r.Query(ctx, fmt.Sprintf(`
-		SELECT 'Phải thu' AS type, COALESCE(SUM(rec.remaining_amount),0) AS amount
-		FROM receivables rec
-		JOIN projects p ON p.id=rec.project_id
-		WHERE rec.status <> 'cancelled' AND p.status <> 'cancelled' AND %s
-		UNION ALL
-		SELECT 'Phải trả' AS type, COALESCE(SUM(pay.remaining_amount),0) AS amount
-		FROM payables pay
-		JOIN projects p ON p.id=pay.project_id
-		WHERE pay.status <> 'cancelled' AND p.status <> 'cancelled' AND %s
-	`, scopeSQL, scopeSQL), scopeArgs...)
-	if err != nil {
-		return nil, err
-	}
-	costRows, err := r.Query(ctx, fmt.Sprintf(`
-		SELECT p.name, COALESCE(SUM(b.actual_amount),0) AS used_amount, COALESCE(SUM(b.remaining_amount),0) AS remaining_amount
+	statusRows, err := r.Query(ctx, fmt.Sprintf(`
+		SELECT p.status, COUNT(*) AS total
 		FROM projects p
-		LEFT JOIN accounting_budget_balances b ON b.project_id=p.id AND b.status <> 'cancelled'
 		WHERE p.status <> 'cancelled' AND %s
-		GROUP BY p.id
-		ORDER BY p.created_at
+		GROUP BY p.status
+		ORDER BY p.status
 	`, scopeSQL), scopeArgs...)
 	if err != nil {
-		return nil, err
+		return DashboardProjectSnapshot{}, err
 	}
-	approvalRows, err := r.Query(ctx, fmt.Sprintf(`
-		SELECT ar.target_type, COUNT(*) AS total
-		FROM approval_requests ar
-		JOIN projects p ON p.id=ar.project_id
-		WHERE p.status <> 'cancelled' AND %s
-		GROUP BY ar.target_type
-		ORDER BY ar.target_type
-	`, scopeSQL), scopeArgs...)
+	statusCounts := make([]DashboardStatusMetric, 0, len(statusRows))
+	for _, row := range statusRows {
+		statusCounts = append(statusCounts, DashboardStatusMetric{
+			Status: strings.TrimSpace(fmt.Sprint(row["status"])),
+			Total:  int(number(row["total"])),
+		})
+	}
+	return DashboardProjectSnapshot{
+		TotalProjects:     int(number(data["total_projects"])),
+		ActiveProjects:    int(number(data["active_projects"])),
+		CompletedProjects: int(number(data["completed_projects"])),
+		BlockedProjects:   int(number(data["blocked_projects"])),
+		OpenIssues:        int(number(data["open_issues"])),
+		PendingApprovals:  int(number(data["pending_approvals"])),
+		AverageProgress:   number(data["average_progress"]),
+		StatusCounts:      statusCounts,
+	}, nil
+}
+
+func (r *Repository) DashboardProjects(ctx context.Context, userID string, req DashboardProjectsRequest, meta DashboardPeriodMeta, financeVisible bool, offset int) (DashboardProjectsPage, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
 	if err != nil {
-		return nil, err
+		return DashboardProjectsPage{}, err
 	}
-	charts["project_status"] = statusRows
-	charts["debt"] = debtRows
-	charts["cost_by_project"] = costRows
-	charts["approvals_by_type"] = approvalRows
-	data["charts"] = charts
-	return data, nil
+	args := append([]any{}, scopeArgs...)
+	conditions := []string{"p.status <> 'cancelled'", scopeSQL}
+	if req.Search != "" {
+		args = append(args, "%"+req.Search+"%")
+		conditions = append(conditions, fmt.Sprintf("lower(btrim(p.code) || ' ' || btrim(p.name)) LIKE lower($%d)", len(args)))
+	}
+	if req.Status != "" {
+		args = append(args, req.Status)
+		conditions = append(conditions, fmt.Sprintf("p.status=$%d", len(args)))
+	}
+
+	financeSelect := `FALSE AS finance_visible,
+		NULL::numeric AS inflow_amount,
+		NULL::numeric AS outflow_amount,
+		NULL::numeric AS net_amount`
+	financeJoin := ""
+	if financeVisible {
+		args = append(args, userID, meta.FromDate, meta.ToDate)
+		permissionIdx := len(args) - 2
+		fromIdx := len(args) - 1
+		toIdx := len(args)
+		financeJoin = fmt.Sprintf(`
+			LEFT JOIN LATERAL (
+				SELECT
+					TRUE AS finance_visible,
+					COALESCE(SUM(CASE WHEN classified.direction='inflow' THEN classified.amount ELSE 0 END), 0) AS inflow_amount,
+					COALESCE(SUM(CASE WHEN classified.direction='outflow' THEN classified.amount ELSE 0 END), 0) AS outflow_amount,
+					COALESCE(SUM(CASE
+						WHEN classified.direction='inflow' THEN classified.amount
+						WHEN classified.direction='outflow' THEN -classified.amount
+						ELSE 0
+					END), 0) AS net_amount
+				FROM (
+					SELECT COALESCE(pay.amount, 0) AS amount, %s AS direction
+					FROM payments pay
+					WHERE pay.project_id=p.id
+					  AND pay.status='approved'
+					  AND %s >= $%d::date
+					  AND %s < ($%d::date + INTERVAL '1 day')
+				) classified
+			) finance ON %s
+		`, cashflowDirectionSQL("pay"), cashflowOccurredAtSQL(), fromIdx, cashflowOccurredAtSQL(), toIdx, reportFinancePermissionSQL("p", permissionIdx))
+		financeSelect = `COALESCE(finance.finance_visible, FALSE) AS finance_visible,
+		finance.inflow_amount,
+		finance.outflow_amount,
+		finance.net_amount`
+	}
+
+	orderColumn := "lower(project_page.name)"
+	switch req.Sort {
+	case "status":
+		orderColumn = "project_page.status"
+	case "progress":
+		orderColumn = "project_page.progress_percent"
+	case "net":
+		orderColumn = "COALESCE(project_page.net_amount, 0)"
+	}
+	direction := "ASC"
+	if req.Direction == "desc" {
+		direction = "DESC"
+	}
+	args = append(args, req.Limit+1, offset)
+	limitIdx := len(args) - 1
+	offsetIdx := len(args)
+	rows, err := r.Query(ctx, fmt.Sprintf(`
+		WITH project_page AS MATERIALIZED (
+			SELECT
+				p.id,
+				p.code,
+				p.name,
+				p.status,
+				COALESCE(p.progress_percent, 0) AS progress_percent,
+				(SELECT COUNT(*) FROM issues issue WHERE issue.project_id=p.id AND issue.status IN ('open','in_progress')) AS open_issues,
+				(SELECT COUNT(*) FROM approval_requests approval WHERE approval.project_id=p.id AND approval.status='pending') AS pending_approvals,
+				%s
+			FROM projects p
+			%s
+			WHERE %s
+		)
+		SELECT project_page.*, COUNT(*) OVER() AS total_count
+		FROM project_page
+		ORDER BY %s %s, lower(project_page.name), project_page.id
+		LIMIT $%d OFFSET $%d
+	`, financeSelect, financeJoin, strings.Join(conditions, " AND "), orderColumn, direction, limitIdx, offsetIdx), args...)
+	if err != nil {
+		return DashboardProjectsPage{}, err
+	}
+	total := 0
+	if len(rows) > 0 {
+		total = int(number(rows[0]["total_count"]))
+	}
+	hasMore := len(rows) > req.Limit
+	if hasMore {
+		rows = rows[:req.Limit]
+	}
+	items := make([]DashboardProjectItem, 0, len(rows))
+	for _, row := range rows {
+		item := DashboardProjectItem{
+			ID:               cleanID(row["id"]),
+			Code:             strings.TrimSpace(fmt.Sprint(row["code"])),
+			Name:             strings.TrimSpace(fmt.Sprint(row["name"])),
+			Status:           strings.TrimSpace(fmt.Sprint(row["status"])),
+			ProgressPercent:  number(row["progress_percent"]),
+			OpenIssues:       int(number(row["open_issues"])),
+			PendingApprovals: int(number(row["pending_approvals"])),
+			FinanceVisible:   boolValue(row["finance_visible"]),
+		}
+		if item.FinanceVisible {
+			inflow := number(row["inflow_amount"])
+			outflow := number(row["outflow_amount"])
+			net := number(row["net_amount"])
+			item.InflowAmount = &inflow
+			item.OutflowAmount = &outflow
+			item.NetAmount = &net
+		}
+		items = append(items, item)
+	}
+	return DashboardProjectsPage{Items: items, Total: total, HasMore: hasMore}, nil
 }
 
 func (r *Repository) ReportProjectOptions(ctx context.Context, userID string, req ReportOptionsRequest, cursor *reportProjectOptionsCursor) ([]Record, Record, error) {
@@ -174,11 +276,43 @@ func (r *Repository) projectOptions(ctx context.Context, userID string, req Repo
 }
 
 func (r *Repository) Report(ctx context.Context, kind, userID, projectID string) ([]Record, error) {
+	return r.report(ctx, kind, userID, projectID, "")
+}
+
+func (r *Repository) StatisticsReport(ctx context.Context, kind, userID, projectID string) ([]Record, error) {
+	return r.report(ctx, kind, userID, projectID, "statistics.view")
+}
+
+func (r *Repository) report(ctx context.Context, kind, userID, projectID, requiredPermission string) ([]Record, error) {
 	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
 	if err != nil {
 		return nil, err
 	}
 	args := append([]any{}, scopeArgs...)
+	globalPermissionSQL := "TRUE"
+	if requiredPermission != "" {
+		args = append(args, userID, requiredPermission)
+		userIndex := len(args) - 1
+		permissionIndex := len(args)
+		globalPermissionSQL = fmt.Sprintf(`EXISTS (
+			SELECT 1
+			FROM user_roles ur
+			JOIN role_permissions rp ON rp.role_id=ur.role_id
+			JOIN permissions permission ON permission.id=rp.permission_id
+			WHERE ur.user_id=NULLIF($%d,'')::uuid
+			  AND ur.project_id IS NULL
+			  AND permission.key=$%d
+		)`, userIndex, permissionIndex)
+		scopeSQL = fmt.Sprintf(`(%s AND EXISTS (
+			SELECT 1
+			FROM user_roles ur
+			JOIN role_permissions rp ON rp.role_id=ur.role_id
+			JOIN permissions permission ON permission.id=rp.permission_id
+			WHERE ur.user_id=NULLIF($%d,'')::uuid
+			  AND (ur.project_id IS NULL OR ur.project_id=p.id)
+			  AND permission.key=$%d
+		))`, scopeSQL, userIndex, permissionIndex)
+	}
 	projectFilter := ""
 	if projectID != "" {
 		args = append(args, projectID)
@@ -196,12 +330,12 @@ func (r *Repository) Report(ctx context.Context, kind, userID, projectID string)
 		`, scopeSQL, projectFilter), args...)
 	case "warehouse":
 		movementScope := fmt.Sprintf(`(
-			sm.project_id IS NULL
+			(sm.project_id IS NULL AND %s)
 			OR EXISTS (
 				SELECT 1 FROM projects p
 				WHERE p.id=sm.project_id AND p.status <> 'cancelled' AND %s
 			)
-		)`, scopeSQL)
+		)`, globalPermissionSQL, scopeSQL)
 		balanceProjectFilter := ""
 		if projectID != "" {
 			projectPlaceholder := fmt.Sprintf("$%d", len(args))
@@ -210,6 +344,10 @@ func (r *Repository) Report(ctx context.Context, kind, userID, projectID string)
 				WHERE p.id=sm.project_id AND p.id=%s AND p.status <> 'cancelled' AND %s
 			)`, projectPlaceholder, scopeSQL)
 			balanceProjectFilter = fmt.Sprintf(" AND p.id=%s", projectPlaceholder)
+		}
+		materialVisibility := "TRUE"
+		if requiredPermission != "" {
+			materialVisibility = fmt.Sprintf("(%s OR st.material_id IS NOT NULL OR site.material_id IS NOT NULL)", globalPermissionSQL)
 		}
 		return r.Query(ctx, fmt.Sprintf(`
 			WITH stock_totals AS (
@@ -235,9 +373,9 @@ func (r *Repository) Report(ctx context.Context, kind, userID, projectID string)
 			FROM materials m
 			LEFT JOIN stock_totals st ON st.material_id=m.id
 			LEFT JOIN site_totals site ON site.material_id=m.id
-			WHERE m.active
+			WHERE m.active AND %s
 			ORDER BY m.category, m.name
-		`, movementScope, scopeSQL, balanceProjectFilter), args...)
+		`, movementScope, scopeSQL, balanceProjectFilter, materialVisibility), args...)
 	case "procurement":
 		return r.Query(ctx, fmt.Sprintf(`
 			SELECT pr.status, pr.budget_status, COUNT(*) AS total, COALESCE(SUM(pr.total_estimated_amount),0) AS amount
@@ -293,7 +431,7 @@ func (r *Repository) Report(ctx context.Context, kind, userID, projectID string)
 }
 
 func (r *Repository) CashflowReport(ctx context.Context, req CashflowReportRequest, userID string) (Record, error) {
-	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
+	scopeSQL, scopeArgs, err := r.reportFinanceAccessFilter(ctx, userID, "p", 1)
 	if err != nil {
 		return nil, err
 	}
@@ -427,6 +565,22 @@ func (r *Repository) CashflowReport(ctx context.Context, req CashflowReportReque
 		return nil, err
 	}
 
+	projectRows, err := r.Query(ctx, rangeCTE+`
+		SELECT
+			project_id,
+			project_name,
+			COUNT(*) AS payment_count,
+			COALESCE(SUM(inflow_amount), 0) AS inflow_amount,
+			COALESCE(SUM(outflow_amount), 0) AS outflow_amount,
+			COALESCE(SUM(net_amount), 0) AS net_amount
+		FROM cashflow_rows
+		GROUP BY project_id, project_name
+		ORDER BY GREATEST(COALESCE(SUM(inflow_amount), 0), COALESCE(SUM(outflow_amount), 0)) DESC, project_name
+	`, rangeArgs...)
+	if err != nil {
+		return nil, err
+	}
+
 	ledgerRows, err := r.Query(ctx, rangeCTE+`
 		SELECT
 			occurred_at,
@@ -458,6 +612,7 @@ func (r *Repository) CashflowReport(ctx context.Context, req CashflowReportReque
 		"summary":    summary,
 		"series":     seriesRows,
 		"categories": categoryRows,
+		"projects":   projectRows,
 		"ledger":     ledgerRows,
 	}, nil
 }
@@ -1275,6 +1430,36 @@ func profitPeriodExpr(groupBy string) string {
 	return "date_trunc('month', invoice_date)::date"
 }
 
+func (r *Repository) reportFinanceAccessFilter(ctx context.Context, userID, projectAlias string, start int) (string, []any, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, projectAlias, start)
+	if err != nil {
+		return "", nil, err
+	}
+	scopeArgs = append(scopeArgs, userID)
+	return fmt.Sprintf("(%s AND %s)", scopeSQL, reportFinancePermissionSQL(projectAlias, start+len(scopeArgs)-1)), scopeArgs, nil
+}
+
+func reportFinancePermissionSQL(projectAlias string, userIDPlaceholder int) string {
+	return fmt.Sprintf(`EXISTS (
+		SELECT 1
+		FROM user_roles finance_role
+		JOIN role_permissions finance_role_permission ON finance_role_permission.role_id=finance_role.role_id
+		JOIN permissions finance_permission ON finance_permission.id=finance_role_permission.permission_id
+		WHERE finance_role.user_id=NULLIF($%d, '')::uuid
+		  AND (finance_role.project_id IS NULL OR finance_role.project_id=%s.id)
+		  AND finance_permission.key IN ('report.finance.view','accounting.view')
+	)`, userIDPlaceholder, projectAlias)
+}
+
+func cashflowDirectionSQL(alias string) string {
+	return fmt.Sprintf(`CASE
+		WHEN %[1]s.payment_type IN ('client_receipt','inbound') OR (%[1]s.payment_type='advance' AND %[1]s.target_type='receivable') THEN 'inflow'
+		WHEN %[1]s.payment_type IN ('supplier_payment','subcontractor_payment','outbound','tax_payment') OR (%[1]s.payment_type='advance' AND %[1]s.target_type='payable') THEN 'outflow'
+		WHEN %[1]s.payment_type='advance_settlement' THEN 'non_cash'
+		ELSE 'unclassified'
+	END`, alias)
+}
+
 func cashflowRowsCTE(scopeSQL, projectFilter, dateFilter, statusFilter string) string {
 	return fmt.Sprintf(`
 		WITH classified AS (
@@ -1284,12 +1469,7 @@ func cashflowRowsCTE(scopeSQL, projectFilter, dateFilter, statusFilter string) s
 				COALESCE(created.full_name, '') AS created_by_name,
 				COALESCE(approved.full_name, '') AS approved_by_name,
 				%s AS occurred_at,
-				CASE
-					WHEN pay.payment_type IN ('client_receipt','inbound') OR (pay.payment_type='advance' AND pay.target_type='receivable') THEN 'inflow'
-					WHEN pay.payment_type IN ('supplier_payment','subcontractor_payment','outbound','tax_payment') OR (pay.payment_type='advance' AND pay.target_type='payable') THEN 'outflow'
-					WHEN pay.payment_type='advance_settlement' THEN 'non_cash'
-					ELSE 'unclassified'
-				END AS direction,
+				%s AS direction,
 				CASE
 					WHEN pay.payment_type='client_receipt' THEN 'Thu khách hàng'
 					WHEN pay.payment_type='inbound' THEN 'Thu khác'
@@ -1325,7 +1505,7 @@ func cashflowRowsCTE(scopeSQL, projectFilter, dateFilter, statusFilter string) s
 				END AS net_amount
 			FROM classified
 		)
-	`, cashflowOccurredAtSQL(), scopeSQL, projectFilter, dateFilter, statusFilter)
+	`, cashflowOccurredAtSQL(), cashflowDirectionSQL("pay"), scopeSQL, projectFilter, dateFilter, statusFilter)
 }
 
 func cashflowOccurredAtSQL() string {

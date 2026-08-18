@@ -1,0 +1,19 @@
+package core
+
+type WorkReportFilter struct {
+	Scope     string
+	ProjectID string
+	Status    string
+	DateFrom  string
+	DateTo    string
+	Search    string
+}
+
+type WorkReportSubmitRequest struct {
+	RecipientID string `json:"recipient_id"`
+	Comment     string `json:"comment"`
+}
+
+type WorkReportReviewRequest struct {
+	Comment string `json:"comment"`
+}

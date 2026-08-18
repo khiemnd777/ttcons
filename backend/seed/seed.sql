@@ -90,7 +90,10 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('contract.dispatch','Gửi hồ sơ hợp đồng giấy','contract'),('contract.scan_manage','Quản lý bản scan hợp đồng','contract'),('contract.variation.propose','Đề xuất phát sinh thi công','contract'),('contract.variation_qs_review','QS rà soát phát sinh','contract'),('contract.variation_purchase','Mua hàng xử lý phát sinh','contract'),
 ('catalog.view','Xem dữ liệu lõi','catalog'),('catalog.manage','Quản lý dữ liệu lõi','catalog'),
 ('staff.view','Xem nhân sự','staff'),('staff.create','Tạo nhân sự','staff'),('staff.update','Sửa nhân sự','staff'),('role.view','Xem role','rbac'),('role.create','Tạo role','rbac'),('role.update','Sửa role','rbac'),('permission.view','Xem permission','rbac'),('permission.assign','Gán quyền','rbac'),
-('audit.view','Xem audit','audit'),('report.view','Xem báo cáo','report'),('report.finance.view','Xem báo cáo tài chính','report'),('settings.view','Xem cấu hình','settings'),('settings.update','Sửa cấu hình','settings'),
+('audit.view','Xem audit','audit'),('report.view','Xem báo cáo','report'),('report.finance.view','Xem báo cáo tài chính','report'),
+('statistics.view','Xem thống kê','statistics'),('statistics.export','Xuất dữ liệu thống kê','statistics'),
+('work_report.view','Xem báo cáo công việc','work_report'),('work_report.create','Lập báo cáo công việc','work_report'),('work_report.submit','Gửi báo cáo công việc','work_report'),('work_report.review','Xem xét báo cáo công việc','work_report'),('work_report.export','Xuất báo cáo công việc','work_report'),('work_report.manage','Quản lý báo cáo công việc','work_report'),
+('settings.view','Xem cấu hình','settings'),('settings.update','Sửa cấu hình','settings'),
 ('seal.use','Sử dụng con dấu','settings'),('seal.manage','Quản lý con dấu','settings')
 ) AS p(key, name, module);
 
@@ -100,6 +103,23 @@ WHERE key='planning.edit';
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name = 'admin'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id,permission_id)
+SELECT role.id,permission.id
+FROM roles role
+JOIN permissions permission ON
+  (role.name='admin' AND permission.key IN (
+    'statistics.view','statistics.export','work_report.view','work_report.create',
+    'work_report.submit','work_report.review','work_report.export','work_report.manage'
+  )) OR
+  (role.name='director' AND permission.key IN (
+    'work_report.view','work_report.review','work_report.export','work_report.manage'
+  )) OR
+  (role.name='pm' AND permission.key IN (
+    'work_report.view','work_report.create','work_report.submit','work_report.review',
+    'work_report.export','work_report.manage'
+  ))
 ON CONFLICT DO NOTHING;
 
 DELETE FROM role_permissions role_permission
@@ -231,6 +251,20 @@ JOIN permissions p ON (
   OR (r.name='procurement' AND p.key IN ('contract.view','contract.variation_purchase','contract.dispatch','contract.scan_manage'))
   OR (r.name='supervisor' AND p.key='contract.variation.propose')
 )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id,permission_id)
+SELECT DISTINCT existing.role_id,target.id
+FROM role_permissions existing
+JOIN permissions legacy ON legacy.id=existing.permission_id AND legacy.key='report.view'
+JOIN permissions target ON target.key IN ('statistics.view','statistics.export')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id,permission_id)
+SELECT DISTINCT existing.role_id,target.id
+FROM role_permissions existing
+JOIN permissions source_permission ON source_permission.id=existing.permission_id AND source_permission.key='operation.report'
+JOIN permissions target ON target.key IN ('work_report.view','work_report.create','work_report.submit','work_report.export')
 ON CONFLICT DO NOTHING;
 
 DELETE FROM role_permissions role_permission

@@ -131,7 +131,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
         { key: 'progress', header: 'Tiến trình', render: (row) => <ProcurementProgress row={row} /> },
         { key: 'total_estimated_amount', header: 'Giá trị', align: 'right', sortable: true, sortValue: (row) => numeric(row.total_estimated_amount), render: (row) => <div><CurrencyText value={row.total_estimated_amount} /><div className="mt-1"><EnumChip group="budget_status" value={row.budget_status} /></div></div> },
         { key: 'delivery', header: 'Giao dự kiến', sortable: true, sortValue: (row) => row.expected_delivery_date, render: (row) => <div className={isOverdue(row) ? 'font-semibold text-rose-700' : ''}>{formatDate(row.expected_delivery_date)}{isOverdue(row) ? <div className="mt-1 flex items-center gap-1 text-xs"><AlertTriangle className="h-3.5 w-3.5" />Trễ giao</div> : null}</div> },
-        { key: 'next', header: 'Việc tiếp theo', align: 'right', render: (row) => <NextAction row={row} projectId={row.project_id ?? projectId} locationPath={`${location.pathname}${location.search}`} hasPermission={hasPermission} onView={() => setViewId(row.id)} onEdit={() => setEditRecord(row)} onAction={(name) => action.mutate({ requestId: row.id, name })} /> },
+        { key: 'next', header: 'Việc tiếp theo', action: true, align: 'right', render: (row) => <NextAction row={row} projectId={row.project_id ?? projectId} locationPath={`${location.pathname}${location.search}`} hasPermission={hasPermission} onView={() => setViewId(row.id)} onEdit={() => setEditRecord(row)} onAction={(name) => action.mutate({ requestId: row.id, name })} /> },
       ]} empty="Không có yêu cầu trong hàng đợi này" />
     </div>
     <div className="space-y-3 lg:hidden">

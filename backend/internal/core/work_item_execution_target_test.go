@@ -119,6 +119,43 @@ func TestWorkItemExecutionTargetUsesCanonicalBusinessWorkspace(t *testing.T) {
 			completion: "evidence",
 			action:     "Nộp minh chứng",
 		},
+		{
+			name: "Rev8 input contract package opens contracts",
+			item: Record{
+				"id": "work-10", "project_id": "project-1", "domain_action_key": "source.input_contract_package_ready",
+			},
+			source:     Record{"route": "/projects/project-1/contracts", "ready": false, "status": "blocked"},
+			kind:       "domain",
+			workspace:  executionWorkspaceContracts,
+			route:      "/projects/project-1/contracts?task=work-10",
+			completion: "domain_gate",
+			action:     "Mở hợp đồng",
+		},
+		{
+			name: "Rev8 subcontractor package opens acceptance",
+			item: Record{
+				"id": "work-11", "project_id": "project-1", "domain_action_key": "source.subcontractor_acceptance_package_ready",
+				"workflow_form_instance_id": "form-11",
+			},
+			source:     Record{"route": "/projects/project-1/acceptance", "ready": false, "status": "blocked"},
+			kind:       "mixed",
+			workspace:  executionWorkspaceAcceptance,
+			route:      "/projects/project-1/acceptance?task=work-11",
+			completion: "domain_then_form",
+			action:     "Mở nghiệm thu",
+		},
+		{
+			name: "Rev8 finance close opens project finance",
+			item: Record{
+				"id": "work-12", "project_id": "project-1", "domain_action_key": "source.project_finance_close_ready",
+			},
+			source:     Record{"route": "/projects/project-1/accounting?tab=tasks", "ready": false, "status": "blocked"},
+			kind:       "domain",
+			workspace:  executionWorkspaceProjectFinance,
+			route:      "/projects/project-1/accounting?tab=tasks&task=work-12",
+			completion: "domain_gate",
+			action:     "Mở tài chính công trình",
+		},
 	}
 
 	for _, tt := range tests {
@@ -140,6 +177,66 @@ func TestWorkItemExecutionTargetUsesCanonicalBusinessWorkspace(t *testing.T) {
 				t.Fatalf("action_label=%q want %q", got, tt.action)
 			}
 		})
+	}
+}
+
+func TestRev8EveryWorkItemHasOneExecutionTarget(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	actorID := newID()
+	staffID := newID()
+	projectID := newID()
+	adminRoleID := ensureRole(t, db, "admin", "Admin")
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1`, actorID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, staffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Rev8 Target Admin','active')`, actorID, "rev8-target-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,status) VALUES ($1,$2,'Rev8 Target Admin',$3,'management','active')`, staffID, actorID, "rev8-target-staff-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, actorID, adminRoleID)
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status,pipeline_template_id) VALUES ($1,'Rev8 Execution Target',$2,'Client','planning','40000000-0000-0000-0000-000000000027')`, projectID, "R8T-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,'["PM"]'::jsonb,true)`, projectID, staffID)
+	if _, err := repo.StartPipeline(ctx, projectID, "40000000-0000-0000-0000-000000000027", actorID, "Rev8 Target Admin"); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := repo.ListProjectOperationsWorkItems(ctx, projectID, actorID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 21 {
+		t.Fatalf("Rev8 work item count=%d want 21", len(items))
+	}
+	attachExecutionTargets(items)
+	workspaceCounts := map[string]int{}
+	for _, item := range items {
+		target := recordFromAny(item["execution_target"])
+		if cleanID(target["kind"]) == "" || cleanID(target["workspace"]) == "" || cleanID(target["route"]) == "" || cleanID(target["action_label"]) == "" {
+			t.Fatalf("work item %s has incomplete execution target: %#v", cleanID(item["id"]), target)
+		}
+		if cleanID(target["workspace"]) == executionWorkspaceWorkItem {
+			t.Fatalf("official Rev8 work item %s fell back to generic detail: %#v", cleanID(item["id"]), target)
+		}
+		workspaceCounts[cleanID(target["workspace"])]++
+	}
+	wantWorkspaceCounts := map[string]int{
+		executionWorkspacePreparation:    6,
+		executionWorkspacePlanning:       2,
+		executionWorkspaceBOQ:            3,
+		executionWorkspaceContracts:      2,
+		executionWorkspaceProcurement:    2,
+		executionWorkspaceOperations:     1,
+		executionWorkspaceAcceptance:     3,
+		executionWorkspaceHandover:       1,
+		executionWorkspaceProjectFinance: 1,
+	}
+	for workspace, want := range wantWorkspaceCounts {
+		if got := workspaceCounts[workspace]; got != want {
+			t.Fatalf("Rev8 workspace %s count=%d want %d; all=%#v", workspace, got, want, workspaceCounts)
+		}
 	}
 }
 

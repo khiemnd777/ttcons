@@ -2,11 +2,13 @@ package core
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -48,6 +50,65 @@ func TestReportProjectOptionsCursorRoundTrip(t *testing.T) {
 	}
 	if _, err := parseReportProjectOptionsCursor("invalid"); err == nil {
 		t.Fatal("expected invalid cursor error")
+	}
+}
+
+func TestNormalizeDashboardPeriodRequest(t *testing.T) {
+	now := time.Date(2026, time.August, 18, 9, 30, 0, 0, time.FixedZone("ICT", 7*60*60))
+
+	month, monthMeta, err := normalizeDashboardPeriodRequestAt(DashboardPeriodRequest{}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if month.PeriodType != "month" || month.Year != 2026 || month.PeriodNo != 8 || monthMeta.FromDate != "2026-08-01" || monthMeta.ToDate != "2026-08-18" || monthMeta.GroupBy != "day" || !monthMeta.IsCurrent || monthMeta.CanMoveForward {
+		t.Fatalf("current month normalization = request %#v meta %#v", month, monthMeta)
+	}
+
+	quarter, quarterMeta, err := normalizeDashboardPeriodRequestAt(DashboardPeriodRequest{PeriodType: "quarter", Year: 2026, PeriodNo: 2}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if quarter.PeriodNo != 2 || quarterMeta.FromDate != "2026-04-01" || quarterMeta.ToDate != "2026-06-30" || quarterMeta.GroupBy != "month" || quarterMeta.IsCurrent || !quarterMeta.CanMoveForward {
+		t.Fatalf("quarter normalization = request %#v meta %#v", quarter, quarterMeta)
+	}
+
+	_, leapMeta, err := normalizeDashboardPeriodRequestAt(DashboardPeriodRequest{PeriodType: "month", Year: 2024, PeriodNo: 2}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if leapMeta.ToDate != "2024-02-29" {
+		t.Fatalf("leap month to = %s, want 2024-02-29", leapMeta.ToDate)
+	}
+
+	if _, _, err := normalizeDashboardPeriodRequestAt(DashboardPeriodRequest{PeriodType: "month", Year: 2026, PeriodNo: 9}, now); err == nil {
+		t.Fatal("expected future dashboard period validation error")
+	}
+}
+
+func TestDashboardProjectsCursorBindsFilters(t *testing.T) {
+	request := DashboardProjectsRequest{
+		DashboardPeriodRequest: DashboardPeriodRequest{PeriodType: "month", Year: 2026, PeriodNo: 8},
+		Search:                 "  Nhà phố  ",
+		Sort:                   "progress",
+		Direction:              "desc",
+		Limit:                  25,
+	}
+	meta := DashboardPeriodMeta{PeriodType: "month", Year: 2026, PeriodNo: 8, FromDate: "2026-08-01", ToDate: "2026-08-18"}
+	normalized, offset, filterHash, err := normalizeDashboardProjectsRequest(request, meta, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if normalized.Search != "Nhà phố" || offset != 0 || len(filterHash) != sha256.Size*2 {
+		t.Fatalf("normalized dashboard projects = %#v offset=%d hash=%q", normalized, offset, filterHash)
+	}
+	normalized.Cursor = encodeDashboardProjectsCursor(dashboardProjectsCursor{Version: 1, Offset: 25, FilterHash: filterHash})
+	_, offset, _, err = normalizeDashboardProjectsRequest(normalized, meta, true)
+	if err != nil || offset != 25 {
+		t.Fatalf("dashboard cursor offset=%d err=%v", offset, err)
+	}
+	normalized.Search = "Khác"
+	if _, _, _, err := normalizeDashboardProjectsRequest(normalized, meta, true); err == nil {
+		t.Fatal("expected dashboard cursor to fail after filters change")
 	}
 }
 
@@ -175,6 +236,7 @@ func TestCashflowReportSummarizesScopedPayments(t *testing.T) {
 	summary, _ := report["summary"].(Record)
 	series, _ := report["series"].([]Record)
 	categories, _ := report["categories"].([]Record)
+	projects, _ := report["projects"].([]Record)
 	ledger, _ := report["ledger"].([]Record)
 	if number(summary["opening_balance"]) != 20 {
 		t.Fatalf("opening_balance = %v, want 20", summary["opening_balance"])
@@ -197,8 +259,83 @@ func TestCashflowReportSummarizesScopedPayments(t *testing.T) {
 	if len(categories) < 3 {
 		t.Fatalf("categories = %#v, want at least inflow/outflow/unclassified", categories)
 	}
+	if len(projects) != 1 || cleanID(projects[0]["project_id"]) != fixture.projectID || number(projects[0]["net_amount"]) != 60 {
+		t.Fatalf("cashflow project breakdown = %#v, want scoped project net 60", projects)
+	}
 	if len(ledger) != 3 {
 		t.Fatalf("ledger rows = %d, want 3 approved scoped rows", len(ledger))
+	}
+}
+
+func TestDashboardRedactsFinanceWithoutFinancePermission(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupProjectScopeFixture(t, db, []string{"report.view"})
+
+	dashboard, err := service.Dashboard(ctx, DashboardPeriodRequest{PeriodType: "month", Year: 2026, PeriodNo: 6}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dashboard.Capabilities.FinanceVisible || dashboard.Cashflow != nil {
+		t.Fatalf("dashboard leaked finance capability/data: %#v", dashboard)
+	}
+	if dashboard.ProjectSnapshot.TotalProjects != 1 || dashboard.Meta.FromDate != "2026-06-01" || dashboard.Meta.ToDate != "2026-06-30" {
+		t.Fatalf("dashboard snapshot/meta = %#v", dashboard)
+	}
+
+	page, err := service.DashboardProjects(ctx, DashboardProjectsRequest{
+		DashboardPeriodRequest: DashboardPeriodRequest{PeriodType: "month", Year: 2026, PeriodNo: 6},
+	}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || page.Items[0].FinanceVisible || page.Items[0].InflowAmount != nil || page.Items[0].OutflowAmount != nil || page.Items[0].NetAmount != nil {
+		t.Fatalf("dashboard project row leaked finance data: %#v", page.Items)
+	}
+}
+
+func TestDashboardProjectsUsesScopedPaymentLedgerAndCursor(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupProjectScopeFixture(t, db, []string{"report.view", "report.finance.view"})
+	extraProjectID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM project_members WHERE project_id=$1`, extraProjectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, extraProjectID)
+	})
+	mustExec(t, db, `UPDATE projects SET name='Dashboard Alpha', progress_percent=42 WHERE id=$1`, fixture.projectID)
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status,progress_percent) VALUES ($1,'Dashboard Beta',$2,'Client','in_progress',75)`, extraProjectID, "DBB-"+extraProjectID[:8])
+	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,'["Member"]'::jsonb,true)`, extraProjectID, fixture.staffID)
+	mustExec(t, db, `
+		INSERT INTO payments (id,project_id,payment_code,payment_type,amount,payment_method,status,paid_at,created_by)
+		VALUES ($1,$2,'PMT-DASH-IN','client_receipt',120,'bank_transfer','approved','2026-06-03T10:00:00Z',$3),
+		       ($4,$2,'PMT-DASH-OUT','outbound',35,'bank_transfer','approved','2026-06-04T10:00:00Z',$3),
+		       ($5,$6,'PMT-DASH-OTHER','client_receipt',999,'bank_transfer','approved','2026-06-03T10:00:00Z',$3)
+	`, newID(), fixture.projectID, fixture.userID, newID(), newID(), fixture.otherProjectID)
+
+	request := DashboardProjectsRequest{
+		DashboardPeriodRequest: DashboardPeriodRequest{PeriodType: "month", Year: 2026, PeriodNo: 6},
+		Search:                 "Dashboard",
+		Sort:                   "name",
+		Direction:              "asc",
+		Limit:                  1,
+	}
+	first, err := service.DashboardProjects(ctx, request, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Items) != 1 || first.Items[0].ID != fixture.projectID || !first.Items[0].FinanceVisible || first.Items[0].NetAmount == nil || *first.Items[0].NetAmount != 85 || !first.HasMore || first.NextCursor == "" || first.Total != 2 {
+		t.Fatalf("dashboard projects first page = %#v", first)
+	}
+	request.Cursor = first.NextCursor
+	second, err := service.DashboardProjects(ctx, request, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.Items) != 1 || second.Items[0].ID != extraProjectID || second.HasMore || second.Total != 2 {
+		t.Fatalf("dashboard projects second page = %#v", second)
 	}
 }
 

@@ -20,6 +20,19 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+type UpdateOwnProfileRequest struct {
+	FullName        string `json:"full_name"`
+	Email           string `json:"email"`
+	Phone           string `json:"phone"`
+	CurrentPassword string `json:"current_password"`
+}
+
+type ChangeOwnPasswordRequest struct {
+	CurrentPassword         string `json:"current_password"`
+	NewPassword             string `json:"new_password"`
+	NewPasswordConfirmation string `json:"new_password_confirmation"`
+}
+
 type ActionRequest struct {
 	Comment string `json:"comment"`
 	Reason  string `json:"reason"`

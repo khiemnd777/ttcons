@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight } from 'lucide-react';
 import { CurrencyText } from '../../components/CurrencyText';
-import { DataTable } from '../../components/DataTable';
+import { DataTable, type DataTableSort } from '../../components/DataTable';
 import { EnumChip } from '../../components/EnumChip';
 import { StatusBadge } from '../../components/StatusBadge';
 import { get } from '../../lib/api/client';
@@ -21,6 +21,10 @@ export type OperationalReportKind = 'projects' | 'warehouse' | 'procurement' | '
 type OperationalReportPanelProps = {
   kind: OperationalReportKind;
   projectId: string;
+  searchQuery: string;
+  sortState: DataTableSort;
+  onSearchQueryChange: (value: string) => void;
+  onSortStateChange: (sort: DataTableSort | null) => void;
 };
 
 const reportEmptyCopy: Record<OperationalReportKind, string> = {
@@ -31,7 +35,7 @@ const reportEmptyCopy: Record<OperationalReportKind, string> = {
   staff: 'Chưa có nhân sự trong các công trình thuộc phạm vi lọc',
 };
 
-export function OperationalReportPanel({ kind, projectId }: OperationalReportPanelProps) {
+export function OperationalReportPanel({ kind, projectId, searchQuery, sortState, onSearchQueryChange, onSortStateChange }: OperationalReportPanelProps) {
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
     if (projectId) params.set('project_id', projectId);
@@ -40,12 +44,12 @@ export function OperationalReportPanel({ kind, projectId }: OperationalReportPan
 
   const report = useQuery({
     queryKey: ['operational-report', kind, projectId || 'all'],
-    queryFn: () => get<Record<string, unknown>[]>(`/reports/${kind}${queryString ? `?${queryString}` : ''}`),
+    queryFn: () => get<Record<string, unknown>[]>(`/statistics/${kind}${queryString ? `?${queryString}` : ''}`),
   });
 
   const rows = report.data ?? [];
 
-  return operationalTable(kind, rows, report.isLoading, report.error, () => void report.refetch(), reportEmptyCopy[kind]);
+  return operationalTable(kind, rows, report.isLoading, report.error, () => void report.refetch(), reportEmptyCopy[kind], searchQuery, sortState, onSearchQueryChange, onSortStateChange);
 }
 
 function operationalTable(
@@ -55,8 +59,12 @@ function operationalTable(
   error: unknown,
   onRetry: () => void,
   empty: string,
+  searchQuery: string,
+  sortState: DataTableSort,
+  onSearchQueryChange: (value: string) => void,
+  onSortStateChange: (sort: DataTableSort | null) => void,
 ) {
-  const common = { loading, error, onRetry, empty, pageSize: 10 };
+  const common = { loading, error, onRetry, empty, pageSize: 10, searchQuery, sortState, onSearchQueryChange, onSortStateChange };
 
   if (kind === 'projects') {
     return (

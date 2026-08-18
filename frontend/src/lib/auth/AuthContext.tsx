@@ -7,6 +7,7 @@ type AuthContextValue = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<User>;
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (permissions?: string[]) => boolean;
 };
@@ -46,6 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async logout() {
         await logoutRequest();
         setUser(null);
+      },
+      async refreshUser() {
+        const nextUser = await api<User>('/auth/me');
+        setUser(nextUser);
+        return nextUser;
       },
       hasPermission(permission: string) {
         return Boolean(user?.permissions?.includes(permission));

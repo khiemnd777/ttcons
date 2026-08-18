@@ -4,6 +4,7 @@ import { Navigate, NavLink, useNavigate, useParams, useSearchParams } from 'reac
 import clsx from 'clsx';
 import { ChevronRight, ShieldAlert } from 'lucide-react';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import type { DataTableSort } from '../../components/DataTable';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, get } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -21,7 +22,14 @@ import {
 
 const OperationalReportPanel = lazy(() => import('./OperationalReportPanel').then((module) => ({ default: module.OperationalReportPanel })));
 
-export function ReportsPage() {
+const defaultStatisticsSort: Record<ReportKey, DataTableSort> = {
+  projects: { key: 'name', direction: 'asc' },
+  procurement: { key: 'amount', direction: 'desc' },
+  warehouse: { key: 'name', direction: 'asc' },
+  staff: { key: 'full_name', direction: 'asc' },
+};
+
+export function StatisticsPage() {
   const { reportKey } = useParams<{ reportKey?: string }>();
   const { hasAnyPermission } = useAuth();
   const navigate = useNavigate();
@@ -29,8 +37,12 @@ export function ReportsPage() {
   const appliedProjectId = searchParams.get('project_id') ?? '';
   const [draftProjectId, setDraftProjectId] = useState(appliedProjectId);
   const [exporting, setExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'xlsx' | 'csv'>('xlsx');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortState, setSortState] = useState<DataTableSort>(defaultStatisticsSort.projects);
   const toast = useToast();
   const visibleReports = visibleReportDefinitions(hasAnyPermission);
+  const canExport = hasAnyPermission(['statistics.export']);
   const activeReport = isReportKey(reportKey)
     ? visibleReports.find((definition) => definition.key === reportKey)
     : undefined;
@@ -40,6 +52,12 @@ export function ReportsPage() {
     setDraftProjectId(appliedProjectId);
   }, [appliedProjectId]);
 
+  useEffect(() => {
+    if (!activeReport) return;
+    setSearchQuery('');
+    setSortState(defaultStatisticsSort[activeReport.key]);
+  }, [activeReport?.key]);
+
   const activeReportFetching = useIsFetching({
     queryKey: ['operational-report', activeReport?.key ?? 'unavailable', appliedProjectId || 'all'],
   }) > 0;
@@ -47,8 +65,11 @@ export function ReportsPage() {
   const exportQueryString = useMemo(() => {
     const params = new URLSearchParams();
     if (appliedProjectId) params.set('project_id', appliedProjectId);
+    if (searchQuery.trim()) params.set('search', searchQuery.trim());
+    params.set('sort', sortState.key);
+    params.set('direction', sortState.direction);
     return params.toString();
-  }, [appliedProjectId]);
+  }, [appliedProjectId, searchQuery, sortState.direction, sortState.key]);
 
   function applyProjectScope() {
     const params = new URLSearchParams(searchParams);
@@ -64,20 +85,22 @@ export function ReportsPage() {
     setSearchParams(params, { replace: true });
   }
 
-  async function exportCSV() {
+  async function exportData() {
     if (!activeReport) return;
     setExporting(true);
     try {
-      const blob = await downloadBlob(`/reports/${activeReport.key}/export${exportQueryString ? `?${exportQueryString}` : ''}`);
+      const params = new URLSearchParams(exportQueryString);
+      params.set('format', exportFormat);
+      const blob = await downloadBlob(`/statistics/${activeReport.key}/export?${params.toString()}`);
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = objectUrl;
-      anchor.download = `${activeReport.fileName}.csv`;
+      anchor.download = `${activeReport.fileName}.${exportFormat}`;
       anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-      toast.success(`Đã xuất CSV ${activeReport.label.toLocaleLowerCase('vi-VN')}`);
+      toast.success(`Đã xuất ${exportFormat === 'xlsx' ? 'Excel' : exportFormat.toUpperCase()} ${activeReport.label.toLocaleLowerCase('vi-VN')}`);
     } catch (error) {
-      toast.error(`Không xuất được CSV ${activeReport.label.toLocaleLowerCase('vi-VN')}`, error);
+      toast.error(`Không xuất được dữ liệu ${activeReport.label.toLocaleLowerCase('vi-VN')}`, error);
     } finally {
       setExporting(false);
     }
@@ -87,8 +110,8 @@ export function ReportsPage() {
     return (
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-800">
         <ShieldAlert className="h-6 w-6" />
-        <h1 className="mt-3 text-lg font-semibold">Chưa có quyền xem báo cáo</h1>
-        <p className="mt-1 text-sm">Liên hệ quản trị viên để được cấp quyền báo cáo phù hợp.</p>
+        <h1 className="mt-3 text-lg font-semibold">Chưa có quyền xem thống kê</h1>
+        <p className="mt-1 text-sm">Liên hệ quản trị viên để được cấp quyền thống kê phù hợp.</p>
       </div>
     );
   }
@@ -100,14 +123,14 @@ export function ReportsPage() {
       <header className="mb-4 border-b border-line pb-4 md:mb-5 md:pb-5">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_36rem] xl:items-end xl:gap-8">
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Báo cáo & phân tích</h1>
+            <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Thống kê</h1>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-              <span className="md:hidden">Số liệu và CSV dùng cùng phạm vi lọc và quyền truy cập.</span>
-              <span className="hidden md:inline">Chọn một báo cáo để tập trung phân tích; số liệu và CSV luôn dùng cùng phạm vi lọc và quyền truy cập.</span>
+              <span className="md:hidden">Xem số liệu tổng hợp và xuất dữ liệu theo cùng phạm vi quyền.</span>
+              <span className="hidden md:inline">Theo dõi số liệu tổng hợp từ dữ liệu vận hành; PDF, Excel và CSV dùng cùng phạm vi lọc và quyền truy cập.</span>
             </p>
           </div>
 
-          <section className="min-w-0 border-t border-line pt-4 xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình báo cáo">
+          <section className="min-w-0 border-t border-line pt-4 xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình thống kê">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <ReportProjectPicker
                 value={draftProjectId}
@@ -126,7 +149,7 @@ export function ReportsPage() {
 
       <div className="mb-4 lg:hidden">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Loại báo cáo</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Loại thống kê</span>
           <select
             className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2.5 text-sm font-semibold text-ink outline-none focus:ring-2 focus:ring-blue-100"
             value={activeReport.key}
@@ -140,7 +163,7 @@ export function ReportsPage() {
       <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
           <div className="sticky top-20 rounded-lg border border-line bg-white p-3 shadow-panel">
-            <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Danh mục báo cáo</p>
+            <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Danh mục thống kê</p>
             {(['operations', 'resources'] as ReportGroup[]).map((group) => {
               const reports = visibleReports.filter((report) => report.group === group);
               if (!reports.length) return null;
@@ -176,21 +199,53 @@ export function ReportsPage() {
                 <h1 className="mt-1 text-xl font-semibold text-ink">{activeReport.label}</h1>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{activeReport.basis}</p>
               </div>
-              <ReportExportButton exporting={exporting} disabled={activeReportFetching} onExport={() => void exportCSV()} />
+              {canExport ? (
+                <ReportExportButton
+                  exporting={exporting}
+                  disabled={activeReportFetching}
+                  format={exportFormat}
+                  onFormatChange={setExportFormat}
+                  onExport={() => void exportData()}
+                />
+              ) : <span className="text-xs font-semibold text-slate-500">Chỉ xem</span>}
             </div>
           </div>
 
-          <ActiveReport reportKey={activeReport.key} projectId={appliedProjectId} />
+          <ActiveReport
+            reportKey={activeReport.key}
+            projectId={appliedProjectId}
+            searchQuery={searchQuery}
+            sortState={sortState}
+            onSearchQueryChange={setSearchQuery}
+            onSortStateChange={(next) => setSortState(next ?? defaultStatisticsSort[activeReport.key])}
+          />
         </main>
       </div>
     </>
   );
 }
 
-function ActiveReport({ reportKey, projectId }: { reportKey: ReportKey; projectId: string }) {
+// Alias giữ tương thích tạm thời cho các import nội bộ cũ trong lúc URL sản phẩm đã chuyển sang /statistics.
+export const ReportsPage = StatisticsPage;
+
+function ActiveReport({ reportKey, projectId, searchQuery, sortState, onSearchQueryChange, onSortStateChange }: {
+  reportKey: ReportKey;
+  projectId: string;
+  searchQuery: string;
+  sortState: DataTableSort;
+  onSearchQueryChange: (value: string) => void;
+  onSortStateChange: (sort: DataTableSort | null) => void;
+}) {
   return (
     <Suspense fallback={<div className="rounded-lg border border-line bg-white p-8"><LoadingSpinner /></div>}>
-      <OperationalReportPanel kind={reportKey as OperationalReportKind} projectId={projectId} />
+      <OperationalReportPanel
+        kind={reportKey as OperationalReportKind}
+        projectId={projectId}
+        searchQuery={searchQuery}
+        sortState={sortState}
+        onSearchQueryChange={onSearchQueryChange}
+        onSortStateChange={onSortStateChange}
+      />
     </Suspense>
   );
 }

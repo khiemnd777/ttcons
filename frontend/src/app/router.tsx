@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useLocation, useParams } from 'react-router-dom';
 import { lazy, type ReactNode } from 'react';
 import { AppShell } from '../layouts/AppShell';
 import { useAuth } from '../lib/auth/AuthContext';
@@ -13,6 +13,7 @@ const ProjectProgressPage = lazy(() => import('../modules/projects/ProjectProgre
 const ProjectDetailPage = lazy(() => import('../modules/projects/ProjectDetailPage').then(({ ProjectDetailPage }) => ({ default: ProjectDetailPage })));
 const ProjectWorkspaceLayout = lazy(() => import('../modules/projects/ProjectWorkspaceLayout').then(({ ProjectWorkspaceLayout }) => ({ default: ProjectWorkspaceLayout })));
 const MyWorkPage = lazy(() => import('../modules/my-work/MyWorkPage').then(({ MyWorkPage }) => ({ default: MyWorkPage })));
+const ProfilePage = lazy(() => import('../modules/profile/ProfilePage').then(({ ProfilePage }) => ({ default: ProfilePage })));
 const WorkItemDetailPage = lazy(() => import('../modules/work-items/WorkItemDetailPage').then(({ WorkItemDetailPage }) => ({ default: WorkItemDetailPage })));
 const PipelineBuilderPage = lazy(() => import('../modules/pipeline-builder/PipelineBuilderPage').then(({ PipelineBuilderPage }) => ({ default: PipelineBuilderPage })));
 const WorkflowFormsPage = lazy(() => import('../modules/workflow-forms/WorkflowFormsPage').then(({ WorkflowFormsPage }) => ({ default: WorkflowFormsPage })));
@@ -37,6 +38,7 @@ const RolesPage = lazy(() => import('../modules/rbac/RolesPage').then(({ RolesPa
 const PermissionsPage = lazy(() => import('../modules/rbac/PermissionsPage').then(({ PermissionsPage }) => ({ default: PermissionsPage })));
 const AuditPage = lazy(() => import('../modules/audit/AuditPage').then(({ AuditPage }) => ({ default: AuditPage })));
 const ReportsPage = lazy(() => import('../modules/reports/ReportsPage').then(({ ReportsPage }) => ({ default: ReportsPage })));
+const WorkReportsPage = lazy(() => import('../modules/work-reports/WorkReportsPage').then(({ WorkReportsPage }) => ({ default: WorkReportsPage })));
 const SettingsPage = lazy(() => import('../modules/settings/SettingsPage').then(({ SettingsPage }) => ({ default: SettingsPage })));
 
 function RequireAuth() {
@@ -56,6 +58,13 @@ function HomeRedirect() {
   return <Navigate to="/my-work" replace />;
 }
 
+function LegacyStatisticsRedirect() {
+  const { reportKey } = useParams<{ reportKey?: string }>();
+  const location = useLocation();
+  const target = reportKey ? `/statistics/${reportKey}` : '/statistics';
+  return <Navigate to={`${target}${location.search}`} replace />;
+}
+
 function guarded(element: ReactNode, permissions?: string[], focus = false) {
   return (
     <RequirePermission permissions={permissions}>
@@ -73,6 +82,7 @@ export const router = createBrowserRouter([
       { path: '/dashboard', element: guarded(<DashboardPage />, ['report.view']) },
       { path: '/progress', element: guarded(<ProjectProgressPage />, ['project.view']) },
       { path: '/my-work', element: guarded(<MyWorkPage />) },
+      { path: '/profile', element: guarded(<ProfilePage />) },
       { path: '/work-items/:id', element: guarded(<WorkItemDetailPage />) },
       { path: '/projects', element: guarded(<ProjectsPage />, ['project.view']) },
       {
@@ -117,8 +127,10 @@ export const router = createBrowserRouter([
       { path: '/roles', element: guarded(<RolesPage />, ['role.view']) },
       { path: '/permissions', element: guarded(<PermissionsPage />, ['permission.view']) },
       { path: '/audit', element: guarded(<AuditPage />, ['audit.view']) },
-      { path: '/reports', element: guarded(<ReportsPage />, ['report.view']) },
-      { path: '/reports/:reportKey', element: guarded(<ReportsPage />, ['report.view']) },
+      { path: '/reports', element: guarded(<WorkReportsPage />, ['work_report.view']) },
+      { path: '/reports/:reportKey', element: guarded(<LegacyStatisticsRedirect />, ['statistics.view']) },
+      { path: '/statistics', element: guarded(<ReportsPage />, ['statistics.view']) },
+      { path: '/statistics/:reportKey', element: guarded(<ReportsPage />, ['statistics.view']) },
       { path: '/settings', element: guarded(<SettingsPage />, ['settings.view']) },
     ],
   },

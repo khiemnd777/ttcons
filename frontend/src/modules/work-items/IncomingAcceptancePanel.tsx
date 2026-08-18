@@ -552,7 +552,15 @@ function IncomingLine({
   }
 
   return (
-    <div className="grid grid-cols-[32px_1.5fr_1.3fr_90px_90px_90px_80px_118px_120px_1.2fr_44px] gap-2 py-3 text-sm">
+    <div className="grid grid-cols-[44px_32px_1.5fr_1.3fr_90px_90px_90px_80px_118px_120px_1.2fr] gap-2 py-3 text-sm">
+      <button
+        className="inline-flex h-9 items-center justify-center rounded-md border border-line text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={disabled}
+        onClick={onRemove}
+        aria-label="Xóa dòng nghiệm thu"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
       <div className="pt-2 text-xs font-semibold text-slate-500">{index + 1}</div>
       <select className={controlClassName} value={line.material_id} onChange={(event) => selectMaterial(event.target.value)} disabled={disabled}>
         <option value="">Chọn vật tư</option>
@@ -616,14 +624,6 @@ function IncomingLine({
         </select>
         <input className={controlClassName} value={line.defect_note} onChange={(event) => onChange({ defect_note: event.target.value })} disabled={disabled} placeholder="Mô tả lỗi" />
       </div>
-      <button
-        className="inline-flex h-9 items-center justify-center rounded-md border border-line text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={disabled}
-        onClick={onRemove}
-        aria-label="Xóa dòng nghiệm thu"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
     </div>
   );
 }

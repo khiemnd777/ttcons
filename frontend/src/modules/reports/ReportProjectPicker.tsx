@@ -13,8 +13,8 @@ export function ReportProjectPicker({
     <AsyncProjectPicker
       value={value}
       onChange={onChange}
-      endpoint="/reports/options"
-      queryKey="report-project-options"
+      endpoint="/statistics/options"
+      queryKey="statistics-project-options"
       emptyLabel="Tất cả công trình được phép xem"
       disabled={disabled}
     />

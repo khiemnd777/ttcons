@@ -35,6 +35,10 @@ export type User = {
   full_name: string;
   roles: string[];
   permissions?: string[];
+  phone?: string;
+  department?: string;
+  position?: string;
+  status?: string;
 };
 
 export type Project = AnyRecord & {
@@ -2812,6 +2816,14 @@ export type WorkItem = ProjectOperationsRecord & {
     route?: string;
     target_type?: string;
     target_id?: string;
+    checks?: Array<{
+      key: string;
+      label: string;
+      ready: boolean;
+      status?: string;
+      message?: string;
+      route?: string;
+    }>;
     facts?: AnyRecord;
   };
   execution_target?: WorkItemExecutionTarget;

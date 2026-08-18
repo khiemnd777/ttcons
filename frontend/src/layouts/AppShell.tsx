@@ -8,6 +8,7 @@ import {
   Calculator,
   Database,
   FileClock,
+  FileText,
   GitBranch,
   Kanban,
   LayoutDashboard,
@@ -15,6 +16,7 @@ import {
   Menu,
   Settings,
   ShieldCheck,
+  UserRound,
   Users,
   X,
   type LucideIcon,
@@ -38,10 +40,11 @@ const navGroups: NavGroup[] = [
     title: 'Công việc',
     items: [
       { to: '/my-work', label: 'Bàn làm việc', icon: BriefcaseBusiness },
-      { to: '/dashboard', label: 'Điều hành', icon: LayoutDashboard, permissions: ['report.view'] },
+      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permissions: ['report.view'] },
       { to: '/progress', label: 'Tiến trình', icon: Kanban, permissions: ['project.view'] },
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
-      { to: '/reports', label: 'Báo cáo', icon: BarChart3, permissions: ['report.view'] },
+      { to: '/reports', label: 'Báo cáo', icon: FileText, permissions: ['work_report.view'] },
+      { to: '/statistics', label: 'Thống kê', icon: BarChart3, permissions: ['statistics.view'] },
       { to: '/accounting', label: 'Tài chính công trình', icon: Calculator, permissions: ['project_finance.view'] },
     ],
   },
@@ -191,6 +194,17 @@ export function AppShell() {
                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
                 onClick={() => {
                   setMobileNavOpen(false);
+                  navigate('/profile');
+                }}
+              >
+                <UserRound className="h-4 w-4" />
+                Hồ sơ cá nhân
+              </button>
+              <button
+                type="button"
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={() => {
+                  setMobileNavOpen(false);
                   void logout().finally(() => navigate('/login'));
                 }}
               >
@@ -225,10 +239,15 @@ export function AppShell() {
               <p className="hidden text-sm font-medium text-ink sm:block">Bắt đầu từ việc ưu tiên, luôn rõ Dự án › Node › Bước</p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="hidden text-right sm:block">
+              <button
+                type="button"
+                className="hidden rounded-md px-2 py-1 text-right hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:block"
+                onClick={() => navigate('/profile')}
+                aria-label="Mở hồ sơ cá nhân"
+              >
                 <p className="text-sm font-semibold text-ink">{user?.full_name}</p>
                 <p className="text-xs text-slate-500">{user?.roles?.join(', ')}</p>
-              </div>
+              </button>
               <button
                 className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
                 onClick={() => {

@@ -93,6 +93,34 @@ func (h *Handler) Me(c *fiber.Ctx) error {
 	return response.OK(c, user)
 }
 
+func (h *Handler) UpdateOwnProfile(c *fiber.Ctx) error {
+	var req UpdateOwnProfileRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu hồ sơ cá nhân không hợp lệ")
+	}
+	result, err := h.service.UpdateOwnProfile(c.Context(), actorID(c), actorName(c), req)
+	if err != nil {
+		return err
+	}
+	if boolValue(result["reauth_required"]) {
+		h.clearRefreshCookie(c)
+	}
+	return response.OK(c, result, "Đã cập nhật hồ sơ cá nhân")
+}
+
+func (h *Handler) ChangeOwnPassword(c *fiber.Ctx) error {
+	var req ChangeOwnPasswordRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đổi mật khẩu không hợp lệ")
+	}
+	result, err := h.service.ChangeOwnPassword(c.Context(), actorID(c), actorName(c), req)
+	if err != nil {
+		return err
+	}
+	h.clearRefreshCookie(c)
+	return response.OK(c, result, "Đã đổi mật khẩu")
+}
+
 func (h *Handler) setRefreshCookie(c *fiber.Ctx, token string, expiresAtText string) {
 	expiresAt, err := time.Parse(time.RFC3339, expiresAtText)
 	if err != nil {

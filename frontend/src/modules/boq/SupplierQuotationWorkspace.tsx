@@ -201,23 +201,23 @@ export function SupplierQuotationWorkspace({ projectId, boqItems, mode }: { proj
           <div className="overflow-x-auto rounded-md border border-line">
             <table className="min-w-[900px] w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                <tr><th className="px-3 py-2">Mã</th><th className="px-3 py-2">Nhà cung cấp</th><th className="px-3 py-2">Hiệu lực</th><th className="px-3 py-2 text-right">Giá trị</th><th className="px-3 py-2">Đánh giá</th><th className="px-3 py-2">Trạng thái</th><th className="px-3 py-2 text-right">Thao tác</th></tr>
+                <tr><th className="px-3 py-2"><span className="sr-only">Thao tác</span></th><th className="px-3 py-2">Mã</th><th className="px-3 py-2">Nhà cung cấp</th><th className="px-3 py-2">Hiệu lực</th><th className="px-3 py-2 text-right">Giá trị</th><th className="px-3 py-2">Đánh giá</th><th className="px-3 py-2">Trạng thái</th></tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {quotations.data.map((quotation) => (
                   <tr key={quotation.id}>
+                    <td className="px-3 py-2"><div className="flex gap-2">
+                      <button className="rounded-md border border-line p-2 hover:bg-slate-100" title="Xem báo giá" onClick={() => void openView(quotation.id)}><Eye className="h-4 w-4" /></button>
+                      {quotation.status === 'draft' && hasPermission('procurement.create') && hasPermission('catalog.view') ? <button className="rounded-md border border-line p-2 hover:bg-slate-100" title="Sửa báo giá" onClick={() => void openEdit(quotation.id)}><Pencil className="h-4 w-4" /></button> : null}
+                      {quotation.status === 'draft' && hasPermission('procurement.create') ? <button className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-2 py-1.5 font-semibold text-blue-700 hover:bg-blue-50" disabled={submit.isPending} onClick={() => submit.mutate(quotation.id)}><Send className="h-4 w-4" /> Gửi duyệt</button> : null}
+                      {quotation.status === 'submitted' && canQualify ? <button className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1.5 font-semibold text-emerald-700 hover:bg-emerald-50" onClick={() => setQualification({ quotation, technical_status: 'compliant', commercial_status: 'compliant', comment: '' })}><ClipboardCheck className="h-4 w-4" /> Đánh giá</button> : null}
+                    </div></td>
                     <td className="px-3 py-2 font-semibold text-ink">{quotation.quotation_code}</td>
                     <td className="px-3 py-2">{quotation.supplier_name}<div className="text-xs text-slate-500">{quotation.item_count ?? 0} dòng</div></td>
                     <td className="px-3 py-2">{dateText(quotation.quotation_date)}<div className="text-xs text-slate-500">đến {quotation.valid_until ? dateText(quotation.valid_until) : 'không giới hạn'}</div></td>
                     <td className="px-3 py-2 text-right"><CurrencyText value={quotation.total_amount ?? 0} /></td>
                     <td className="px-3 py-2 text-xs">Kỹ thuật: {qualificationLabel(quotation.technical_status)}<br />Thương mại: {qualificationLabel(quotation.commercial_status)}</td>
                     <td className="px-3 py-2"><QuotationStatus status={quotation.status} /></td>
-                    <td className="px-3 py-2"><div className="flex justify-end gap-2">
-                      <button className="rounded-md border border-line p-2 hover:bg-slate-100" title="Xem báo giá" onClick={() => void openView(quotation.id)}><Eye className="h-4 w-4" /></button>
-                      {quotation.status === 'draft' && hasPermission('procurement.create') && hasPermission('catalog.view') ? <button className="rounded-md border border-line p-2 hover:bg-slate-100" title="Sửa báo giá" onClick={() => void openEdit(quotation.id)}><Pencil className="h-4 w-4" /></button> : null}
-                      {quotation.status === 'draft' && hasPermission('procurement.create') ? <button className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-2 py-1.5 font-semibold text-blue-700 hover:bg-blue-50" disabled={submit.isPending} onClick={() => submit.mutate(quotation.id)}><Send className="h-4 w-4" /> Gửi duyệt</button> : null}
-                      {quotation.status === 'submitted' && canQualify ? <button className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1.5 font-semibold text-emerald-700 hover:bg-emerald-50" onClick={() => setQualification({ quotation, technical_status: 'compliant', commercial_status: 'compliant', comment: '' })}><ClipboardCheck className="h-4 w-4" /> Đánh giá</button> : null}
-                    </div></td>
                   </tr>
                 ))}
               </tbody>
