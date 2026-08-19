@@ -46,7 +46,8 @@ test('manual responsive grids keep their action track first', async () => {
   assert.match(projectWork, /<tr>\s*<WorkTableHeader label="" \/>\s*<WorkTableHeader label="Trạng thái"/);
   assert.match(projectWork, /<tr[^>]*>\s*<td[^>]*>\s*<OpenWorkButton/);
   assert.match(projects, /PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-\[112px_/);
-  assert.match(evidence, /grid-cols-\[8rem_minmax\(0,1\.7fr\)/);
+  assert.match(evidence, /const PROJECT_EVIDENCE_LIST_GRID_CLASS = 'xl:grid-cols-\[8rem_/);
+  assert.match(evidence, /PROJECT_EVIDENCE_LIST_GRID_CLASS\)\}>\s*<span><span className="sr-only">Thao tác<\/span><\/span>/);
   assert.match(evidence, /\)\}>\s*<div className="flex flex-wrap gap-2">/);
   assert.match(incoming, /grid-cols-\[44px_32px_1\.5fr_/);
   assert.match(materials, /xl:grid-cols-\[44px_1\.2fr_1fr_1\.2fr\]/);

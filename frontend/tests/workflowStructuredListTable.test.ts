@@ -10,6 +10,10 @@ async function globalStylesSource() {
   return readFile(new URL('../src/index.css', import.meta.url), 'utf8');
 }
 
+async function apiClientSource() {
+  return readFile(new URL('../src/lib/api/client.ts', import.meta.url), 'utf8');
+}
+
 function functionSlice(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
   const endIndex = source.indexOf(end, startIndex + start.length);
@@ -119,11 +123,40 @@ test('structured list table keeps required-cell feedback and read-only presentat
   const cell = functionSlice(panel, 'function StructuredCell(', 'function structuredCellDisplayValue(');
 
   assert.match(panel, /displayOnly=\{readOnly \|\| \(submitted && !amending\)\}/);
-  assert.match(table, /structuredCellInvalid\(spec, row\[spec\.key\], invalid, checklist\)/);
+  assert.match(table, /structuredCellInvalid\(templateCode, fieldKey, spec, row, invalid, checklist\)/);
+  assert.match(table, /workflowStructuredOtherDetailRequired\(templateCode, fieldKey, row, spec\.key\)/);
+  assert.match(table, /required=\{spec\.required \|\| workflowStructuredOtherDetailRequired/);
   assert.match(table, /!displayOnly \? <StructuredDeleteButton/);
   assert.match(table, /!displayOnly \? \(/);
   assert.match(cell, /if \(displayOnly\)/);
   assert.match(cell, /structuredCellDisplayValue\(spec, value, evidence\)/);
   assert.match(cell, /aria-invalid=\{invalid \|\| undefined\}/);
   assert.match(panel, /checklist && spec\.key === 'status'/);
+});
+
+test('submit validation reports structured text length issues on the exact cell', async () => {
+  const panel = await workflowFormPanelSource();
+  const validation = functionSlice(panel, 'function structuredCellIssue(', 'function structuredSpecRequired(');
+  const schema = panel.slice(panel.indexOf('function structuredItemFields('));
+  const cell = functionSlice(panel, 'function StructuredCell(', 'function structuredCellDisplayValue(');
+
+  assert.match(schema, /minLength: optionalFiniteNumber\(spec\.min_length\)/);
+  assert.match(schema, /maxLength: optionalFiniteNumber\(spec\.max_length\)/);
+  assert.match(validation, /phải có ít nhất \$\{spec\.minLength\} ký tự/);
+  assert.match(validation, /không được vượt quá \$\{spec\.maxLength\} ký tự/);
+  assert.match(panel, /return `\$\{field\.label\} dòng \$\{rowIndex \+ 1\}: \$\{issue\}`/);
+  assert.match(cell, /issue \? <p className="mt-1 text-xs font-medium text-rose-700">\{issue\}<\/p> : null/);
+});
+
+test('API validation details are preserved and mapped back to workflow fields', async () => {
+  const panel = await workflowFormPanelSource();
+  const client = await apiClientSource();
+
+  assert.match(client, /details\?: unknown/);
+  assert.match(client, /this\.details = details/);
+  assert.match(client, /json\?\.error\?\.details/);
+  assert.match(panel, /function workflowFormApiFieldErrors\(/);
+  assert.match(panel, /error instanceof ApiError/);
+  assert.match(panel, /setErrors\(fieldErrors\)/);
+  assert.match(panel, /toast\.warn\(\{ title: 'Dữ liệu hồ sơ chưa hợp lệ'/);
 });

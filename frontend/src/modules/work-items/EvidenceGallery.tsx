@@ -13,6 +13,8 @@ import {
   evidenceRecordTitle as evidenceTitle,
   formatEvidenceFileSize,
   isImageEvidence,
+  isInlinePdfEvidence,
+  isPdfEvidence,
   originalFilename,
   type EvidenceReviewAction,
 } from '../_shared/EvidenceRecordViewerDialog';
@@ -22,6 +24,9 @@ export { formatEvidenceFileSize, isImageEvidence };
 export type { EvidenceReviewAction };
 
 type EvidenceFilter = 'all' | 'photo' | 'document' | 'submitted' | 'accepted' | 'rejected';
+
+const PROJECT_EVIDENCE_LIST_GRID_CLASS = 'xl:grid-cols-[8rem_minmax(0,1.4fr)_minmax(0,0.75fr)_minmax(0,1fr)_9rem_8rem_7rem]';
+const DEFAULT_EVIDENCE_LIST_GRID_CLASS = 'lg:grid-cols-[8rem_minmax(0,1.6fr)_8rem_8rem_7rem]';
 
 type EvidenceGalleryProps = {
   evidence: EvidenceRecord[];
@@ -160,15 +165,17 @@ export function EvidenceGallery({
       {rows.length && variant === 'list' ? (
         <div className="overflow-hidden rounded-md border border-line bg-white">
           {listContext === 'project' ? (
-            <div className="hidden grid-cols-[8rem_minmax(0,1.7fr)_10rem_8.5rem_7rem] gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+            <div className={clsx('hidden gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:grid', PROJECT_EVIDENCE_LIST_GRID_CLASS)}>
               <span><span className="sr-only">Thao tác</span></span>
-              <span>Hồ sơ / nguồn</span>
+              <span>Hồ sơ</span>
+              <span>Giai đoạn</span>
+              <span>Đầu việc</span>
               <span>Người gửi</span>
               <span>Thời gian</span>
               <span>Trạng thái</span>
             </div>
           ) : (
-            <div className="hidden grid-cols-[8rem_minmax(0,1.6fr)_8rem_8rem_7rem] gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+            <div className={clsx('hidden gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid', DEFAULT_EVIDENCE_LIST_GRID_CLASS)}>
               <span><span className="sr-only">Thao tác</span></span>
               <span>Minh chứng</span>
               <span>Loại</span>
@@ -184,7 +191,7 @@ export function EvidenceGallery({
                 previewUrl={previewUrls[record.id]}
                 showWorkItem={showWorkItem}
                 listContext={listContext}
-                onOpen={() => isImageEvidence(record) ? setSelected(record) : void openEvidence(record)}
+                onOpen={() => canPreviewEvidenceInApp(record) ? setSelected(record) : void openEvidence(record)}
                 onSelect={() => {
                   setSelected(record);
                   setReviewComment('');
@@ -201,7 +208,7 @@ export function EvidenceGallery({
               record={record}
               previewUrl={previewUrls[record.id]}
               showWorkItem={showWorkItem}
-              onOpen={() => isImageEvidence(record) ? setSelected(record) : void openEvidence(record)}
+              onOpen={() => canPreviewEvidenceInApp(record) ? setSelected(record) : void openEvidence(record)}
               onSelect={() => {
                 setSelected(record);
                 setReviewComment('');
@@ -251,8 +258,19 @@ function EvidenceListRow({
   onSelect: () => void;
 }) {
   const title = evidenceTitle(record);
+  const fileMeta = [
+    evidenceLabel(record.evidence_type),
+    visibilityLabel(record.visibility ?? 'project'),
+    record.mime_type,
+    record.file_size ? formatEvidenceFileSize(record.file_size) : undefined,
+  ].filter(Boolean).join(' · ') || compactDateTime(record.created_at);
   const fileCell = (
-    <button type="button" className="flex min-w-0 items-start gap-3 text-left" onClick={onSelect}>
+    <button
+      type="button"
+      className="flex min-w-0 items-start gap-3 text-left"
+      aria-label={`Xem chi tiết hồ sơ ${title}`}
+      onClick={onSelect}
+    >
       <span className="grid h-12 w-14 shrink-0 place-items-center overflow-hidden rounded-md border border-line bg-slate-100 text-slate-400">
         {previewUrl ? (
           <img className="h-full w-full object-cover" src={previewUrl} alt={title} />
@@ -263,16 +281,19 @@ function EvidenceListRow({
         )}
       </span>
       <span className="min-w-0">
-        <span className="block line-clamp-2 text-sm font-semibold leading-5 text-ink">{title}</span>
-        <span className="mt-1 block truncate text-xs text-slate-500">
-          {[
-            evidenceLabel(record.evidence_type),
-            visibilityLabel(record.visibility ?? 'project'),
-            record.mime_type,
-            record.file_size ? formatEvidenceFileSize(record.file_size) : undefined,
-          ].filter(Boolean).join(' · ') || compactDateTime(record.created_at)}
+        <span
+          className={clsx('block text-sm font-semibold leading-5 text-ink', listContext === 'project' ? 'truncate' : 'line-clamp-2')}
+          title={listContext === 'project' ? title : undefined}
+        >
+          {title}
         </span>
-        {showWorkItem ? <span className="mt-1 block line-clamp-1 text-xs text-slate-500">{record.run_node_name ? `${record.run_node_name} · ` : ''}{record.work_item_title ?? 'Đầu việc'}</span> : null}
+        <span
+          className="mt-1 block truncate text-xs text-slate-500"
+          title={listContext === 'project' ? fileMeta : undefined}
+        >
+          {fileMeta}
+        </span>
+        {showWorkItem && listContext !== 'project' ? <span className="mt-1 block line-clamp-1 text-xs text-slate-500">{record.run_node_name ? `${record.run_node_name} · ` : ''}{record.work_item_title ?? 'Đầu việc'}</span> : null}
       </span>
     </button>
   );
@@ -280,8 +301,8 @@ function EvidenceListRow({
     <article className={clsx(
       'grid gap-3 px-3 py-3 lg:items-center',
       listContext === 'project'
-        ? 'lg:grid-cols-[8rem_minmax(0,1.7fr)_10rem_8.5rem_7rem]'
-        : 'lg:grid-cols-[8rem_minmax(0,1.6fr)_8rem_8rem_7rem]',
+        ? PROJECT_EVIDENCE_LIST_GRID_CLASS
+        : DEFAULT_EVIDENCE_LIST_GRID_CLASS,
     )}>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100" onClick={onSelect}>
@@ -292,20 +313,19 @@ function EvidenceListRow({
           className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
           onClick={onOpen}
         >
-          {isImageEvidence(record) ? <Eye className="h-3.5 w-3.5" /> : <ExternalLink className="h-3.5 w-3.5" />}
-          {isImageEvidence(record) ? 'Xem ảnh' : 'Mở tệp'}
+          {canPreviewEvidenceInApp(record) ? <Eye className="h-3.5 w-3.5" /> : <ExternalLink className="h-3.5 w-3.5" />}
+          {evidenceOpenLabel(record)}
         </button>
       </div>
       {fileCell}
       {listContext === 'project' ? (
         <>
-          <div className="min-w-0 text-xs text-slate-600 lg:text-sm">
-            <span className="mr-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 lg:hidden">Người gửi</span>
-            <span className="line-clamp-2">{record.submitted_by_name ?? record.uploaded_by ?? '-'}</span>
-          </div>
-          <div className="text-xs text-slate-600 lg:text-sm">
-            <span className="mr-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 lg:hidden">Thời gian</span>
-            {compactDateTime(record.created_at)}
+          <ProjectEvidenceTextCell label="Giai đoạn" value={record.run_node_name} />
+          <ProjectEvidenceTextCell label="Đầu việc" value={record.work_item_title} />
+          <ProjectEvidenceTextCell label="Người gửi" value={record.submitted_by_name ?? record.uploaded_by} />
+          <div className="grid min-w-0 grid-cols-[6rem_minmax(0,1fr)] items-start gap-2 text-xs text-slate-600 xl:block xl:text-sm">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 xl:hidden">Thời gian</span>
+            <span>{compactDateTime(record.created_at)}</span>
           </div>
         </>
       ) : (
@@ -324,6 +344,23 @@ function EvidenceListRow({
         <StatusBadge status={record.status} />
       </div>
     </article>
+  );
+}
+
+function ProjectEvidenceTextCell({ label, value }: { label: string; value?: string }) {
+  const displayValue = String(value ?? '').trim() || '—';
+  return (
+    <div className="grid min-w-0 grid-cols-[6rem_minmax(0,1fr)] items-start gap-2 text-xs text-slate-600 xl:block xl:text-sm">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 xl:hidden">{label}</span>
+      <span
+        className="block min-w-0 truncate rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+        title={displayValue}
+        aria-label={`${label}: ${displayValue}`}
+        tabIndex={0}
+      >
+        {displayValue}
+      </span>
+    </div>
   );
 }
 
@@ -382,8 +419,8 @@ function EvidenceCard({
             className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
             onClick={onOpen}
           >
-            {isImageEvidence(record) ? <Eye className="h-3.5 w-3.5" /> : <ExternalLink className="h-3.5 w-3.5" />}
-            {isImageEvidence(record) ? 'Xem ảnh' : 'Mở tệp'}
+            {canPreviewEvidenceInApp(record) ? <Eye className="h-3.5 w-3.5" /> : <ExternalLink className="h-3.5 w-3.5" />}
+            {evidenceOpenLabel(record)}
           </button>
         </div>
       </div>
@@ -478,5 +515,15 @@ export function useEvidencePreviewUrls(evidence: EvidenceRecord[], retryKey = 0)
 }
 
 function isDocumentEvidence(record: EvidenceRecord) {
-  return record.evidence_type === 'document' || String(record.mime_type ?? '').includes('pdf');
+  return record.evidence_type === 'document' || isPdfEvidence(record);
+}
+
+function canPreviewEvidenceInApp(record: EvidenceRecord) {
+  return isImageEvidence(record) || isInlinePdfEvidence(record);
+}
+
+function evidenceOpenLabel(record: EvidenceRecord) {
+  if (isImageEvidence(record)) return 'Xem ảnh';
+  if (isInlinePdfEvidence(record)) return 'Xem PDF';
+  return 'Mở tệp';
 }

@@ -21,6 +21,24 @@ function riskItemsField(): WorkflowFormField {
   };
 }
 
+function dimensionItemsField(): WorkflowFormField {
+  return {
+    form_version_id: 'version',
+    field_key: 'dimension_items',
+    label: 'Kích thước chính',
+    field_type: 'structured_list',
+    required: true,
+    validation_json: {
+      min_items: 1,
+      item_fields: [
+        { key: 'area', label: 'Khu vực', type: 'text', required: true, min_length: 2, max_length: 160 },
+        { key: 'dimension', label: 'Kích thước', type: 'text', required: true },
+        { key: 'unit', label: 'ĐVT', type: 'text', required: true },
+      ],
+    },
+  };
+}
+
 test('hides the site-risk category without mutating the published field definition', () => {
   const stored = riskItemsField();
   const [effective] = effectiveWorkflowStructuredListFields([stored], 'client_site_risk_assessment');
@@ -33,6 +51,31 @@ test('hides the site-risk category without mutating the published field definiti
 
 test('keeps structured-list fields unchanged outside the approved site-risk form', () => {
   const stored = riskItemsField();
+  const [effective] = effectiveWorkflowStructuredListFields([stored], 'another_form');
+  assert.strictEqual(effective, stored);
+});
+
+test('makes only survey work-package area optional without mutating the published schema', () => {
+  const stored = dimensionItemsField();
+  const [effective] = effectiveWorkflowStructuredListFields([stored], 'client_survey_work_package');
+  const effectiveSpecs = effective.validation_json?.item_fields as Array<Record<string, unknown>>;
+  const storedSpecs = stored.validation_json?.item_fields as Array<Record<string, unknown>>;
+
+  assert.deepEqual(effectiveSpecs[0], {
+    key: 'area',
+    label: 'Khu vực',
+    type: 'text',
+    required: false,
+    max_length: 160,
+  });
+  assert.equal(effectiveSpecs[1].required, true);
+  assert.equal(effectiveSpecs[2].required, true);
+  assert.equal(storedSpecs[0].required, true);
+  assert.equal(storedSpecs[0].min_length, 2);
+});
+
+test('keeps survey dimension area required for unrelated forms', () => {
+  const stored = dimensionItemsField();
   const [effective] = effectiveWorkflowStructuredListFields([stored], 'another_form');
   assert.strictEqual(effective, stored);
 });

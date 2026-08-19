@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Camera, CameraIcon, ExternalLink, Eye, FileText, Image, Loader2, RefreshCw, SwitchCamera, Trash2, Upload, X } from 'lucide-react';
 import { useToast } from '../../components/ToastProvider';
 import { EvidenceDraftViewerDialog, formatEvidenceFileSize } from './EvidenceRecordViewerDialog';
+import {
+  classifyEvidenceFile,
+  evidenceFileAccept,
+  evidenceFileKindLabel,
+  evidenceSupportedFileHint,
+  type EvidenceFileKind,
+} from './evidenceFileTypes';
 
 export const constructionEvidenceMaxBytes = 10 * 1024 * 1024;
 
@@ -9,6 +16,7 @@ export type ConstructionEvidenceUploadDraft = {
   id: string;
   file: File;
   evidenceType: 'photo' | 'document';
+  fileKind: EvidenceFileKind;
   name: string;
   caption: string;
 };
@@ -37,16 +45,16 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
   function addFiles(files: File[]) {
     const valid: ConstructionEvidenceUploadDraft[] = [];
     files.forEach((file) => {
-      const evidenceType = evidenceTypeForFile(file);
-      if (!evidenceType) {
-        toast.warn({ title: 'Tệp không được hỗ trợ', description: `${file.name}: chỉ nhận PNG, JPG, WebP hoặc PDF.` });
+      const classification = classifyEvidenceFile(file);
+      if (!classification) {
+        toast.warn({ title: 'Tệp không được hỗ trợ', description: `${file.name}: chỉ nhận ${evidenceSupportedFileHint}.` });
         return;
       }
       if (file.size <= 0 || file.size > constructionEvidenceMaxBytes) {
         toast.warn({ title: 'Dung lượng tệp không hợp lệ', description: `${file.name}: tối đa ${formatEvidenceFileSize(constructionEvidenceMaxBytes)}.` });
         return;
       }
-      valid.push({ id: newDraftID(), file, evidenceType, name: file.name, caption: '' });
+      valid.push({ id: newDraftID(), file, evidenceType: classification.evidenceType, fileKind: classification.kind, name: file.name, caption: '' });
     });
     const available = maxFiles === undefined ? valid.length : Math.max(0, maxFiles - drafts.length);
     if (valid.length > available) {
@@ -69,7 +77,7 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
 
   return (
     <div className="rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4">
-      <input ref={fileInputRef} type="file" multiple accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
+      <input ref={fileInputRef} type="file" multiple accept={evidenceFileAccept} className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
       <input ref={fallbackCameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -83,7 +91,7 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
       </div>
 
       {!hasSource && drafts.length ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Đã giữ {drafts.length} tệp trong hàng đợi. Chọn công việc liên quan trước khi lưu để tải minh chứng.</p> : null}
-      {!drafts.length ? <div className="mt-3 rounded-md border border-line bg-white px-3 py-4 text-center text-xs text-slate-500">Chưa chọn tệp. PNG/JPG/WebP/PDF, tối đa 10 MB mỗi tệp.</div> : null}
+      {!drafts.length ? <div className="mt-3 rounded-md border border-line bg-white px-3 py-4 text-center text-xs text-slate-500">Chưa chọn tệp. {evidenceSupportedFileHint}, tối đa 10 MB mỗi tệp.</div> : null}
       {drafts.length ? <div className={`mt-3 grid gap-3 ${compact ? 'sm:grid-cols-2' : 'md:grid-cols-2'}`}>{drafts.map((draft) => <EvidenceDraftCard key={draft.id} draft={draft} onChange={(patch) => updateDraft(draft.id, patch)} onRemove={() => onChange(drafts.filter((item) => item.id !== draft.id))} onPreview={(previewURL) => onPreviewPhoto ? onPreviewPhoto(draft, previewURL) : setLocalPreview({ draft, previewURL })} />)}</div> : null}
 
       <CameraCaptureModal
@@ -108,11 +116,12 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
 }
 
 export function constructionEvidenceFormData(draft: ConstructionEvidenceUploadDraft, workItemId: string) {
+  const classification = classifyEvidenceFile(draft.file);
   const formData = new FormData();
   formData.append('file', draft.file);
   formData.append('work_item_id', workItemId);
-  formData.append('evidence_type', draft.evidenceType);
-  formData.append('visibility', 'project');
+  formData.append('evidence_type', classification?.evidenceType ?? draft.evidenceType);
+  formData.append('visibility', 'internal');
   formData.append('name', draft.name.trim() || draft.file.name);
   if (draft.caption.trim()) formData.append('caption', draft.caption.trim());
   return formData;
@@ -134,7 +143,7 @@ function EvidenceDraftCard({ draft, onChange, onRemove, onPreview }: { draft: Co
       {draft.evidenceType === 'photo' && previewURL && !previewFailed ? <button type="button" className="group relative block h-32 w-full" aria-label={`Xem ảnh ${draft.name}`} onClick={() => onPreview(previewURL)}><img src={previewURL} alt={draft.name} className="h-full w-full object-cover" onError={() => setPreviewFailed(true)} /><span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-ink/65 px-2 py-1.5 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"><Eye className="h-3.5 w-3.5" /> Xem ảnh</span></button> : draft.evidenceType === 'photo' && previewFailed ? <div className="px-4 py-5 text-center"><Image className="mx-auto h-9 w-9 text-rose-400" /><p className="mt-2 text-xs font-semibold text-rose-700">Không đọc được ảnh xem trước</p></div> : <FileText className="h-9 w-9 text-slate-400" />}
     </div>
     <div className="space-y-2 p-3">
-      <div className="flex items-start gap-2"><span className="mt-2 text-blue-600">{draft.evidenceType === 'photo' ? <Image className="h-4 w-4" /> : <FileText className="h-4 w-4" />}</span><div className="min-w-0 flex-1"><input className="w-full rounded-md border border-line px-2.5 py-1.5 text-sm font-semibold text-ink outline-none focus:border-blue-300" value={draft.name} onChange={(event) => onChange({ name: event.target.value })} aria-label="Tên minh chứng" /><p className="mt-1 text-xs text-slate-500">{formatEvidenceFileSize(draft.file.size)}</p></div><button type="button" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={onRemove} aria-label={`Xóa ${draft.name}`}><Trash2 className="h-4 w-4" /></button></div>
+      <div className="flex items-start gap-2"><span className="mt-2 text-blue-600">{draft.evidenceType === 'photo' ? <Image className="h-4 w-4" /> : <FileText className="h-4 w-4" />}</span><div className="min-w-0 flex-1"><input className="w-full rounded-md border border-line px-2.5 py-1.5 text-sm font-semibold text-ink outline-none focus:border-blue-300" value={draft.name} onChange={(event) => onChange({ name: event.target.value })} aria-label="Tên minh chứng" /><p className="mt-1 text-xs text-slate-500">{evidenceFileKindLabel(draft.fileKind)} · {formatEvidenceFileSize(draft.file.size)}</p></div><button type="button" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={onRemove} aria-label={`Xóa ${draft.name}`}><Trash2 className="h-4 w-4" /></button></div>
       <input className="w-full rounded-md border border-line px-2.5 py-1.5 text-sm outline-none focus:border-blue-300" value={draft.caption} onChange={(event) => onChange({ caption: event.target.value })} placeholder="Ghi chú vị trí / hạng mục" />
       {previewURL && draft.evidenceType === 'photo' ? <button type="button" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline" onClick={() => onPreview(previewURL)}><Eye className="h-3.5 w-3.5" /> Xem ảnh</button> : null}
       {previewURL && draft.evidenceType === 'document' ? <a href={previewURL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Mở tệp</a> : null}
@@ -233,12 +242,6 @@ function CameraCaptureModal({ open, onClose, onUse, onFallback }: { open: boolea
       </div>
     </section>
   </div>;
-}
-
-function evidenceTypeForFile(file: File): ConstructionEvidenceUploadDraft['evidenceType'] | null {
-  if (file.type === 'application/pdf' || file.name.toLocaleLowerCase().endsWith('.pdf')) return 'document';
-  if (['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return 'photo';
-  return null;
 }
 
 function stopCamera(ref: React.MutableRefObject<MediaStream | null>) {

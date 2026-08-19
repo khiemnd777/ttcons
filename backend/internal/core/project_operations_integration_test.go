@@ -956,8 +956,8 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 	readyAnswers := Record{
 		"report_date":            "2026-07-12",
 		"reported_by":            "Supervisor",
-		"construction_scope":     "civil",
-		"weather":                "normal",
+		"construction_scope":     "Cảnh quan ngoài nhà",
+		"weather":                "Hạn chế tiếng ồn theo khung giờ",
 		"progress_percent":       42,
 		"site_photo_evidence_id": evidenceID,
 		"completed_items": []any{
@@ -977,7 +977,7 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 			map[string]any{"crew_name": "Tổ nề A", "trade": "Masonry", "worker_count": "8", "work_hours": "8", "note": "Đủ quân số"},
 		},
 		"material_usage_items": []any{
-			map[string]any{"material_name": "Xi măng", "material_code": "XM-01", "quantity": "12", "unit": "bao", "source": "site_balance", "note": "Ghi nhận report, không trừ kho"},
+			map[string]any{"material_name": "Xi măng", "material_code": "XM-01", "quantity": "12", "unit": "bao", "source": "other", "note": "Nhà cung cấp giao trực tiếp, không trừ kho"},
 		},
 		"next_plan_items": []any{
 			map[string]any{"title": "Tô tường khu B", "owner_role": "Giám sát", "owner_name": "Supervisor", "due_date": "2026-07-13", "priority": "high", "description": "Bám theo tiến độ tuần"},
@@ -996,7 +996,7 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 		t.Fatalf("form status = %#v, want submitted", instance["status"])
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='completed_items' AND value_json->0->>'actual_quantity'='24.5'`, 1, instanceID)
-	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='material_usage_items' AND value_json->0->>'source'='site_balance'`, 1, instanceID)
+	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_answers WHERE instance_id=$1 AND field_key='material_usage_items' AND value_json->0->>'source'='other' AND value_json->0->>'note'='Nhà cung cấp giao trực tiếp, không trừ kho'`, 1, instanceID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM operation_daily_reports
@@ -1011,7 +1011,9 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 		  AND manpower_summary='8 nhân sự / 1 đội'
 		  AND material_usage_summary='Xi măng'
 		  AND issues_summary='Cần bổ sung xi măng trước ca chiều'
+		  AND weather='Hạn chế tiếng ồn theo khung giờ'
 		  AND structured_json->'completed_items'->0->>'actual_quantity'='24.5'
+		  AND structured_json->'material_usage_items'->0->>'source'='other'
 	`, 1, fixture.projectID, instanceID, fixture.itemID, fixture.workerID, evidenceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='workflow_form_action_item' AND source_id=$2`, 1, fixture.projectID, instanceID)
 	assertCount(t, db, `
@@ -1023,7 +1025,7 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 		  AND wia.activity_type='created'
 		  AND wia.comment='Đầu việc kế hoạch tiếp theo được sinh từ nhật ký thi công'
 		  AND wia.metadata_json->>'source'='construction_daily_report'
-		  AND wia.metadata_json->>'construction_scope'='civil'
+		  AND wia.metadata_json->>'construction_scope'='Cảnh quan ngoài nhà'
 	`, 1, instanceID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
@@ -1033,5 +1035,5 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 		  AND comment='Nhật ký thi công đã sinh 1 đầu việc kế hoạch tiếp theo'
 		  AND metadata_json->>'source'='construction_daily_report'
 	`, 1, fixture.itemID)
-	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND completion_payload_json->'workflow_form_answers'->'material_usage_items'->0->>'source'='site_balance'`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND completion_payload_json->'workflow_form_answers'->>'construction_scope'='Cảnh quan ngoài nhà' AND completion_payload_json->'workflow_form_answers'->'material_usage_items'->0->>'source'='other'`, 1, fixture.itemID)
 }

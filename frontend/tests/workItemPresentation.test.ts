@@ -3,6 +3,7 @@ import test from 'node:test';
 import type { WorkItem } from '../src/lib/types/domain.ts';
 import { workItemIsUpcoming, workItemWorkflowContext } from '../src/modules/work-items/workItemContext.ts';
 import {
+  completionRequirementNavigationFromError,
   completionRequirementPresentation,
   missingCompletionRequirementLabels,
   permissionRequirementPresentation,
@@ -101,6 +102,28 @@ test('opens the evidence uploader with the backend-required evidence type', () =
 
   assert.equal(presentation.actionLabel, 'Tải tài liệu');
   assert.deepEqual(presentation.target, { kind: 'evidence', evidenceType: 'document', openUpload: true });
+});
+
+test('routes a completion error to the backend-required evidence uploader', () => {
+  const item = workItem({
+    completion_requirements: [
+      { key: 'photo', label: 'Hình ảnh', required: true, status: 'satisfied' },
+    ],
+  });
+
+  const target = completionRequirementNavigationFromError(item, {
+    details: { missing_evidence: ['photo'] },
+  });
+
+  assert.deepEqual(target, { kind: 'evidence', evidenceType: 'photo', openUpload: true });
+});
+
+test('keeps unrelated work-item errors on the ordinary toast path', () => {
+  const target = completionRequirementNavigationFromError(workItem(), {
+    details: { permission: 'planning.edit' },
+  });
+
+  assert.equal(target, undefined);
 });
 
 test('keeps read-only evidence navigation view-only', () => {

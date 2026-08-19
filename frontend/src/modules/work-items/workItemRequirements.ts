@@ -51,6 +51,45 @@ export function missingCompletionRequirementLabels(item: WorkItem) {
     .map((requirement) => requirement.label);
 }
 
+export function completionRequirementNavigationFromError(
+  item: WorkItem,
+  error: unknown,
+): WorkItemRequirementNavigationTarget | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const details = (error as { details?: unknown }).details;
+  if (!details || typeof details !== 'object' || Array.isArray(details)) return undefined;
+  const rawMissing = (details as Record<string, unknown>).missing_evidence;
+  if (!Array.isArray(rawMissing)) return undefined;
+
+  const missingKeys = rawMissing
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  for (const key of missingKeys) {
+    const current = item.completion_requirements?.find((requirement) => requirement.key === key);
+    const requirement: WorkItemCompletionRequirement = {
+      key,
+      label: current?.label ?? completionRequirementFallbackLabel(key),
+      required: true,
+      status: 'missing',
+      satisfied_by: current?.satisfied_by,
+    };
+    const target = completionRequirementPresentation(item, requirement).target;
+    if (target) return target;
+  }
+
+  return undefined;
+}
+
+function completionRequirementFallbackLabel(key: string) {
+  if (key === 'workflow_form') return 'Hồ sơ nghiệp vụ bắt buộc';
+  if (key === 'checklist') return 'Checklist của bước';
+  if (key === 'document') return 'Tài liệu';
+  if (key === 'photo') return 'Hình ảnh';
+  return key;
+}
+
 export function completionRequirementPresentation(
   item: WorkItem,
   requirement: WorkItemCompletionRequirement,

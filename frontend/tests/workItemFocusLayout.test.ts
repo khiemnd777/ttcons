@@ -62,22 +62,22 @@ test('primary evidence has one visual section while the supporting tab stays emb
   );
 });
 
-test('activity and form history lead the supporting tabs without interrupting the form process', async () => {
+test('evidence leads the supporting tabs without interrupting activity or form history', async () => {
   const detail = await source('../src/modules/work-items/WorkItemDetailDialog.tsx');
   const formPanel = await source('../src/modules/work-items/WorkflowFormPanel.tsx');
 
-  assert.match(detail, /useState<SupportTabKey>\('activity'\)/);
-  assert.match(detail, /setSelectedTab\('activity'\);[\s\S]*\[item\.id\]/);
+  assert.match(detail, /useState<SupportTabKey>\('evidence'\)/);
+  assert.match(detail, /setSelectedTab\('evidence'\);[\s\S]*\[item\.id\]/);
   assert.match(detail, /type ActivityHistoryFilter = 'all' \| 'discussion' \| 'form'/);
   assert.match(detail, /\{ id: 'all', label: 'Tất cả'/);
   assert.match(detail, /\{ id: 'discussion', label: 'Trao đổi'/);
   assert.match(detail, /filters\.push\(\{ id: 'form', label: 'Hồ sơ'/);
   assert.match(detail, /<WorkflowFormEventsPanel events=\{workflowFormEvents\}/);
 
-  const activityTabIndex = detail.indexOf("id: 'activity'");
-  const evidenceTabIndex = detail.indexOf("id: 'evidence'", activityTabIndex);
+  const evidenceTabIndex = detail.indexOf("id: 'evidence'");
+  const activityTabIndex = detail.indexOf("id: 'activity'", evidenceTabIndex);
   assert.ok(activityTabIndex !== -1 && evidenceTabIndex !== -1);
-  assert.ok(activityTabIndex < evidenceTabIndex);
+  assert.ok(evidenceTabIndex < activityTabIndex);
 
   const processIndex = formPanel.indexOf('data-workflow-process="two-step"');
   const eventPanelIndex = formPanel.indexOf('export function WorkflowFormEventsPanel');

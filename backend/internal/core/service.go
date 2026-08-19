@@ -6443,19 +6443,14 @@ func (s *Service) storeEvidenceUpload(ctx context.Context, item Record, req Work
 	}
 	defer source.Close()
 
-	header := make([]byte, 512)
-	n, readErr := io.ReadFull(source, header)
-	if readErr != nil && !errors.Is(readErr, io.ErrUnexpectedEOF) && !errors.Is(readErr, io.EOF) {
-		return storedObjectRef{}, req, readErr
-	}
-	detectedMIME := http.DetectContentType(header[:n])
-	spec, ok := allowedEvidenceUploadMIMEs[detectedMIME]
-	if !ok {
-		return storedObjectRef{}, req, validationError("Định dạng minh chứng không được hỗ trợ", Record{"mime_type": detectedMIME})
+	spec, err := detectEvidenceUploadFile(source, fileHeader.Size, fileHeader.Filename)
+	if err != nil {
+		return storedObjectRef{}, req, err
 	}
 	if _, err := source.Seek(0, io.SeekStart); err != nil {
 		return storedObjectRef{}, req, fmt.Errorf("rewind evidence upload: %w", err)
 	}
+	detectedMIME := spec.MIMEType
 	requestedType := strings.TrimSpace(req.EvidenceType)
 	if requestedType != "" && requestedType != spec.EvidenceType {
 		return storedObjectRef{}, req, validationError("Loại minh chứng không khớp với định dạng tệp", Record{"evidence_type": requestedType, "mime_type": detectedMIME})
@@ -7601,10 +7596,9 @@ func validateWorkItemEvidenceRequestForStorage(req WorkItemEvidenceRequest, allo
 	req.ChecksumSHA256 = strings.ToLower(strings.TrimSpace(req.ChecksumSHA256))
 	req.Caption = strings.TrimSpace(req.Caption)
 	req.RevisionNo = strings.TrimSpace(req.RevisionNo)
-	req.Visibility = strings.TrimSpace(req.Visibility)
-	if req.Visibility == "" {
-		req.Visibility = "internal"
-	}
+	// Evidence is an internal operational record. Keep the column for historical
+	// compatibility, but do not allow new writes to select a broader audience.
+	req.Visibility = "internal"
 	if req.StorageProvider == "" {
 		req.StorageProvider = "external"
 	}
@@ -7614,10 +7608,6 @@ func validateWorkItemEvidenceRequestForStorage(req WorkItemEvidenceRequest, allo
 	validType := map[string]bool{"document": true, "photo": true, "checklist": true, "link": true, "note": true, "other": true}
 	if !validType[req.EvidenceType] {
 		return req, validationError("Loại minh chứng không hợp lệ", Record{"evidence_type": req.EvidenceType})
-	}
-	validVisibility := map[string]bool{"internal": true, "project": true, "client": true}
-	if !validVisibility[req.Visibility] {
-		return req, validationError("Phạm vi hiển thị minh chứng không hợp lệ", Record{"visibility": req.Visibility})
 	}
 	validStorageProvider := map[string]bool{"external": true, sharedstorage.LocalProvider: true}
 	if allowS3 {
@@ -7716,10 +7706,20 @@ func (s *Service) validateWorkflowFormAnswers(ctx context.Context, instance Reco
 			fieldErrors[key] = fmt.Sprintf("%s là bắt buộc", field["label"])
 			continue
 		}
+		if submit {
+			if issue := workflowSelectOtherTextSubmitIssue(instance, field, value); issue != "" {
+				fieldErrors[key] = issue
+				continue
+			}
+			if issue := workflowFormOtherDetailSubmitIssue(instance, field, value, answers); issue != "" {
+				fieldErrors[key] = issue
+				continue
+			}
+		}
 		if !hasValue || workflowFormValueEmpty(field, value) {
 			continue
 		}
-		normalizedValue, err := s.normalizeWorkflowFormValue(ctx, instance, field, value)
+		normalizedValue, err := s.normalizeWorkflowFormValue(ctx, instance, field, value, submit)
 		if err != nil {
 			fieldErrors[key] = err.Error()
 			continue
@@ -7758,12 +7758,12 @@ func workflowFormValueEmpty(field Record, value any) bool {
 	}
 }
 
-func (s *Service) normalizeWorkflowFormValue(ctx context.Context, instance Record, field Record, value any) (any, error) {
+func (s *Service) normalizeWorkflowFormValue(ctx context.Context, instance Record, field Record, value any, submit bool) (any, error) {
 	fieldType := fmt.Sprint(field["field_type"])
 	switch fieldType {
 	case "text", "textarea":
 		text := strings.TrimSpace(fmt.Sprint(value))
-		if err := validateWorkflowTextLength(field, text); err != nil {
+		if err := validateWorkflowTextLength(field, text, submit); err != nil {
 			return nil, err
 		}
 		return text, nil
@@ -7784,10 +7784,7 @@ func (s *Service) normalizeWorkflowFormValue(ctx context.Context, instance Recor
 		if text == "" {
 			return nil, errors.New("Lựa chọn không hợp lệ")
 		}
-		if !workflowOptionAllowed(field, text) {
-			return nil, errors.New("Lựa chọn không nằm trong schema")
-		}
-		return text, nil
+		return normalizeWorkflowSelectAnswer(instance, field, text)
 	case "multi_select":
 		values, err := workflowStringList(value)
 		if err != nil {
@@ -7828,7 +7825,7 @@ func (s *Service) normalizeWorkflowFormValue(ctx context.Context, instance Recor
 		}
 		return evidenceID, nil
 	case "structured_list":
-		return s.normalizeWorkflowStructuredList(ctx, instance, field, value)
+		return s.normalizeWorkflowStructuredList(ctx, instance, field, value, submit)
 	default:
 		return nil, errors.New("Loại trường không được hỗ trợ")
 	}
@@ -7863,7 +7860,7 @@ func validateChecklistSubmitReady(answers Record) error {
 	})
 }
 
-func (s *Service) normalizeWorkflowStructuredList(ctx context.Context, instance Record, field Record, value any) ([]Record, error) {
+func (s *Service) normalizeWorkflowStructuredList(ctx context.Context, instance Record, field Record, value any, submit bool) ([]Record, error) {
 	items, err := workflowRecordList(value)
 	if err != nil {
 		return nil, err
@@ -7892,7 +7889,7 @@ func (s *Service) normalizeWorkflowStructuredList(ctx context.Context, instance 
 		if key == "" || key == "<nil>" {
 			continue
 		}
-		record := Record(spec)
+		record := effectiveWorkflowStructuredItemField(instance, field, Record(spec))
 		itemFields = append(itemFields, record)
 		fieldByKey[key] = record
 	}
@@ -7918,7 +7915,7 @@ func (s *Service) normalizeWorkflowStructuredList(ctx context.Context, instance 
 			if !hasValue || structuredValueEmpty(spec, value) {
 				continue
 			}
-			normalizedValue, err := s.normalizeStructuredFieldValue(ctx, instance, spec, value)
+			normalizedValue, err := s.normalizeStructuredFieldValue(ctx, instance, spec, value, submit)
 			if err != nil {
 				return nil, fmt.Errorf("%s dòng %d: %s", field["label"], index+1, err.Error())
 			}
@@ -7967,7 +7964,7 @@ func structuredValueEmpty(field Record, value any) bool {
 	return strings.TrimSpace(fmt.Sprint(value)) == "" || strings.TrimSpace(fmt.Sprint(value)) == "<nil>"
 }
 
-func (s *Service) normalizeStructuredFieldValue(ctx context.Context, instance Record, field Record, value any) (any, error) {
+func (s *Service) normalizeStructuredFieldValue(ctx context.Context, instance Record, field Record, value any, submit bool) (any, error) {
 	fieldType := fmt.Sprint(field["type"])
 	label := fmt.Sprint(field["label"])
 	if label == "" || label == "<nil>" {
@@ -7976,7 +7973,7 @@ func (s *Service) normalizeStructuredFieldValue(ctx context.Context, instance Re
 	switch fieldType {
 	case "text", "textarea":
 		text := strings.TrimSpace(fmt.Sprint(value))
-		if min := int(number(field["min_length"])); min > 0 && len([]rune(text)) < min {
+		if min := int(number(field["min_length"])); submit && min > 0 && len([]rune(text)) < min {
 			return nil, fmt.Errorf("%s phải có ít nhất %d ký tự", label, min)
 		}
 		if max := int(number(field["max_length"])); max > 0 && len([]rune(text)) > max {
@@ -8057,9 +8054,9 @@ func structuredOptionAllowed(field Record, selected string) bool {
 	return false
 }
 
-func validateWorkflowTextLength(field Record, text string) error {
+func validateWorkflowTextLength(field Record, text string, enforceMin bool) error {
 	validation, _ := field["validation_json"].(map[string]any)
-	if min := int(number(validation["min_length"])); min > 0 && len([]rune(text)) < min {
+	if min := int(number(validation["min_length"])); enforceMin && min > 0 && len([]rune(text)) < min {
 		return fmt.Errorf("%s phải có ít nhất %d ký tự", field["label"], min)
 	}
 	if max := int(number(validation["max_length"])); max > 0 && len([]rune(text)) > max {

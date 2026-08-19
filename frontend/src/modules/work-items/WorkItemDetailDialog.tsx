@@ -48,6 +48,7 @@ import {
   type WorkflowFormActionState,
 } from './WorkflowFormPanel';
 import {
+  completionRequirementNavigationFromError,
   completionRequirementPresentation,
   missingCompletionRequirementLabels,
   permissionRequirementPresentation,
@@ -191,6 +192,10 @@ export function WorkItemDetailWorkspace({
         queryClient.invalidateQueries({ queryKey: ['work-item', variables.workItemId] });
       }
       toast.error('Không thao tác được đầu việc', error);
+      if (variables.action === 'complete' && detailItem) {
+        const target = completionRequirementNavigationFromError(detailItem, error);
+        if (target) navigateToRequirement(target);
+      }
     },
   });
   const activityAction = useMutation({
@@ -1187,7 +1192,7 @@ function WorkItemSupportingTabs({
   readOnly: boolean;
   onSubmitActivity: (payload: ActivityPayload) => Promise<void>;
 }) {
-  const [selectedTab, setSelectedTab] = useState<SupportTabKey>('activity');
+  const [selectedTab, setSelectedTab] = useState<SupportTabKey>('evidence');
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
   const pendingEvidence = evidence.filter((record) => ['draft', 'submitted', 'pending'].includes(String(record.status)));
   const hasWorkflowForm = hasWorkflowFormSummary(item);
@@ -1199,12 +1204,6 @@ function WorkItemSupportingTabs({
   });
   const workflowFormEvents = workflowFormHistory.data?.events ?? [];
   const tabs: Array<{ id: SupportTabKey; label: string; count?: number; status?: string; description: string }> = [];
-  tabs.push({
-    id: 'activity',
-    label: 'Trao đổi & lịch sử',
-    count: activities.length,
-    description: activities[0] ? `Mới nhất ${compactDateTime(activities[0].created_at)}` : 'Chưa có hoạt động',
-  });
   if (readOnly || !primarySurfaceKind || !primarySurfaceUsesEvidence(primarySurfaceKind)) {
     tabs.push({
       id: 'evidence',
@@ -1213,6 +1212,12 @@ function WorkItemSupportingTabs({
       description: pendingEvidence.length ? `${pendingEvidence.length} đang chờ` : 'Sẵn sàng',
     });
   }
+  tabs.push({
+    id: 'activity',
+    label: 'Trao đổi & lịch sử',
+    count: activities.length,
+    description: activities[0] ? `Mới nhất ${compactDateTime(activities[0].created_at)}` : 'Chưa có hoạt động',
+  });
   if (hasWorkflowForm && (!primarySurfaceKind || !primarySurfaceUsesWorkflowForm(primarySurfaceKind))) {
     tabs.push({
       id: 'form',
@@ -1224,7 +1229,7 @@ function WorkItemSupportingTabs({
   const activeTab = tabs.some((tab) => tab.id === selectedTab) ? selectedTab : tabs[0]?.id ?? 'activity';
 
   useEffect(() => {
-    setSelectedTab('activity');
+    setSelectedTab('evidence');
   }, [item.id]);
 
   useEffect(() => {

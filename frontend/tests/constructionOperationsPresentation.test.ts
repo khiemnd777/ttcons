@@ -58,6 +58,8 @@ test('construction report exposes protected saved evidence preview and the appro
   assert.match(source, /<ExistingEvidenceOption/);
   assert.match(source, /Thử lại thumbnail/);
   assert.match(source, /<EvidenceRecordViewerDialog/);
+  assert.match(source, /isImageEvidence\(record\) \|\| isInlinePdfEvidence\(record\)/);
+  assert.match(source, /pdf \? 'Xem PDF'/);
   assert.match(source, /<EvidenceDraftViewerDialog/);
   assert.match(source, /showWorkItem/);
   assert.match(source, /onPreviewPhoto=\{\(draft, previewURL\) => setEvidenceViewer/);
@@ -73,13 +75,27 @@ test('shared evidence viewer keeps images in-app with loading, retry, decode fai
 
   assert.match(viewer, /role="dialog"/);
   assert.match(viewer, /z-\[80\]/);
+  assert.match(viewer, /max-w-\[min\(1180px,calc\(100vw-2rem\)\)\]/);
   assert.match(viewer, /object-contain/);
   assert.match(viewer, /Đang tải ảnh minh chứng/);
   assert.match(viewer, /Không thể hiển thị định dạng ảnh này/);
   assert.match(viewer, /Thử lại/);
+  assert.match(viewer, /mediaType === 'photo'/);
+  assert.match(viewer, /mediaType === 'pdf'/);
+  assert.match(viewer, /<EvidencePdfViewer/);
+  assert.match(viewer, /mediaAction \?/);
+  assert.match(viewer, /documentUnavailableText/);
+  assert.doesNotMatch(viewer, /Tài liệu được mở bằng hành động Mở tệp/);
   assert.match(viewer, /event\.stopImmediatePropagation\(\)/);
   assert.match(viewer, /addEventListener\('keydown', onKeyDown, true\)/);
   assert.match(recordViewer, /<EvidenceViewerDialog/);
+  assert.match(recordViewer, /headerStatus=\{<StatusBadge status=\{record\.status\} \/>\}/);
+  assert.match(recordViewer, /mediaAction=\{mediaAction\}/);
+  assert.match(recordViewer, /Nguồn hồ sơ/);
+  assert.match(recordViewer, /Gửi và rà soát/);
+  assert.match(recordViewer, /<details className=/);
+  assert.match(recordViewer, /Chi tiết kỹ thuật/);
+  assert.match(recordViewer, /Chấp nhận/);
   assert.match(recordViewer, /Phạm vi hiển thị/);
   assert.match(recordViewer, /Người gửi/);
   assert.match(recordViewer, /Nơi lưu trữ/);
@@ -93,7 +109,10 @@ test('shared evidence viewer keeps images in-app with loading, retry, decode fai
   assert.match(gallery, /import \{[\s\S]*EvidenceRecordViewerDialog[\s\S]*\} from '\.\.\/_shared\/EvidenceRecordViewerDialog'/);
   assert.match(gallery, /<EvidenceRecordViewerDialog/);
   assert.doesNotMatch(gallery, /function EvidenceDetailDialog/);
-  assert.match(gallery, /isImageEvidence\(record\) \? setSelected\(record\) : void openEvidence\(record\)/);
+  assert.match(gallery, /canPreviewEvidenceInApp\(record\) \? setSelected\(record\) : void openEvidence\(record\)/);
+  assert.match(gallery, /Xem PDF/);
+  const persistedFooter = recordViewer.slice(recordViewer.indexOf('footer={('), recordViewer.indexOf('details={('));
+  assert.doesNotMatch(persistedFooter, /Mở tệp/);
 });
 
 test('construction report resources stay in one column and edit through inline tables', async () => {

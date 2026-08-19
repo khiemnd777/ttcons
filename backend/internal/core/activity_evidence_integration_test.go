@@ -510,6 +510,40 @@ func TestWorkItemEvidenceUploadStoresProtectedFile(t *testing.T) {
 		t.Fatalf("filename = %q, want .png suffix", file.Filename)
 	}
 
+	for _, officeUpload := range []struct {
+		filename string
+		content  []byte
+		mimeType string
+	}{
+		{filename: "survey.docx", content: openXMLTestFile(t, "word/document.xml", false), mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+		{filename: "measurements.xlsx", content: openXMLTestFile(t, "xl/workbook.xml", false), mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+	} {
+		officeEvidence, uploadErr := service.AddWorkItemEvidenceUpload(ctx, fixture.itemID, WorkItemEvidenceRequest{
+			EvidenceType: "document",
+			Name:         officeUpload.filename,
+			Visibility:   "project",
+		}, testMultipartFileHeader(t, "file", officeUpload.filename, officeUpload.content), fixture.workerID, "Worker")
+		if uploadErr != nil {
+			t.Fatalf("upload %s: %v", officeUpload.filename, uploadErr)
+		}
+		if got := fmt.Sprint(officeEvidence["mime_type"]); got != officeUpload.mimeType {
+			t.Fatalf("%s MIME = %q, want %q", officeUpload.filename, got, officeUpload.mimeType)
+		}
+		officeSum := sha256.Sum256(officeUpload.content)
+		if got := fmt.Sprint(officeEvidence["checksum_sha256"]); got != hex.EncodeToString(officeSum[:]) {
+			t.Fatalf("%s checksum = %s, want %s", officeUpload.filename, got, hex.EncodeToString(officeSum[:]))
+		}
+		officeFile, fileErr := service.EvidenceFile(ctx, fmt.Sprint(officeEvidence["id"]), fixture.workerID)
+		if fileErr != nil {
+			t.Fatalf("open %s: %v", officeUpload.filename, fileErr)
+		}
+		officeBytes, readErr := io.ReadAll(officeFile.Reader)
+		_ = officeFile.Reader.Close()
+		if readErr != nil || officeFile.MIMEType != officeUpload.mimeType || !bytes.Equal(officeBytes, officeUpload.content) {
+			t.Fatalf("download %s mismatch: mime=%q read_error=%v", officeUpload.filename, officeFile.MIMEType, readErr)
+		}
+	}
+
 	invalidHeader := testMultipartFileHeader(t, "file", "notes.txt", []byte("not an allowed evidence file"))
 	_, err = service.AddWorkItemEvidenceUpload(ctx, fixture.itemID, WorkItemEvidenceRequest{EvidenceType: "photo", Name: "Bad file"}, invalidHeader, fixture.workerID, "Worker")
 	assertValidationError(t, err)

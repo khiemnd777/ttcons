@@ -20,6 +20,20 @@ import { firstFocusableRequirementControl, revealWorkItemRequirementTarget } fro
 import { compactDateTime, isGenericWorkflowFormTemplate, workflowFormEventLabel, workflowFormStatusLabel, workflowFormTypeLabel } from './workItemPresentation';
 import { effectiveWorkflowCurrencyFields } from './workflowCurrencyFields';
 import { effectiveWorkflowFormFields } from './workflowFormRules';
+import {
+  workflowStructuredOtherDetailRequired,
+  workflowTopLevelOtherDetailDependentKeys,
+  workflowTopLevelOtherDetailRequired,
+} from './workflowOtherDetailRules';
+import {
+  workflowSelectOptionChangeValue,
+  workflowSelectOptionValue,
+  workflowSelectOtherTextChangeValue,
+  workflowSelectOtherTextConfig,
+  workflowSelectOtherTextIssue,
+  workflowSelectOtherTextValue,
+  workflowSelectSupportsOtherText,
+} from './workflowSelectOtherText';
 import { effectiveWorkflowStructuredListFields } from './workflowStructuredListFields';
 
 type FormErrors = Record<string, string>;
@@ -122,12 +136,13 @@ export function WorkflowFormPanel({
     retry: false,
   });
 
+  const templateCode = form.data?.template?.code;
   const fields = useMemo(
     () => effectiveWorkflowStructuredListFields(
-      effectiveWorkflowCurrencyFields(form.data?.fields ?? [], form.data?.template?.code),
-      form.data?.template?.code,
+      effectiveWorkflowCurrencyFields(form.data?.fields ?? [], templateCode),
+      templateCode,
     ),
-    [form.data?.fields, form.data?.template?.code],
+    [form.data?.fields, templateCode],
   );
   const instance = form.data?.instance;
   const submitted = instance?.status === 'submitted';
@@ -163,7 +178,10 @@ export function WorkflowFormPanel({
   const activeFields = useMemo(() => effectiveWorkflowFormFields(fields, values), [fields, values]);
   const coreFields = useMemo(() => activeFields.filter((field) => !workflowFormFieldIsOptional(field)), [activeFields]);
   const optionalFields = useMemo(() => activeFields.filter(workflowFormFieldIsOptional), [activeFields]);
-  const validationIssues = useMemo(() => activeFields.map((field) => validateFieldValue(field, values[field.field_key])).filter(Boolean), [activeFields, values]);
+  const validationIssues = useMemo(
+    () => activeFields.map((field) => validateFieldValue(templateCode, field, values[field.field_key], values)).filter(Boolean),
+    [activeFields, templateCode, values],
+  );
   const checklistField = activeFields.find((field) => field.field_type === 'structured_list' && field.field_key === 'checklist_items');
   const checklistStats = checklistField ? checklistStatsFromRows(structuredRows(values[checklistField.field_key])) : null;
   const isPlanningDailyReport = instance?.form_type === 'daily_report' && form.data?.template?.code !== 'builtin_construction_daily_report';
@@ -171,8 +189,8 @@ export function WorkflowFormPanel({
   const isPlanningChecklist = instance?.form_type === 'checklist' && form.data?.template?.code === 'builtin_checklist';
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
   const validationIssueLabels = useMemo(
-    () => activeFields.filter((field) => validateFieldValue(field, values[field.field_key])).map((field) => field.label),
-    [activeFields, values],
+    () => activeFields.filter((field) => validateFieldValue(templateCode, field, values[field.field_key], values)).map((field) => field.label),
+    [activeFields, templateCode, values],
   );
   const amendmentHasChanges = useMemo(
     () => !workflowFormAnswersEqual(values, form.data?.answers ?? {}),
@@ -216,7 +234,7 @@ export function WorkflowFormPanel({
       const field = focusMode === 'checklist'
         ? activeFields.find((candidate) => candidate.field_key === 'checklist_items')
         : focusMode === 'first_issue'
-          ? activeFields.find((candidate) => validateFieldValue(candidate, values[candidate.field_key]))
+          ? activeFields.find((candidate) => validateFieldValue(templateCode, candidate, values[candidate.field_key], values))
           : undefined;
 
       if (field) {
@@ -225,7 +243,7 @@ export function WorkflowFormPanel({
           return;
         }
         lastHandledNavigationRef.current = navigationRequest.requestId;
-        const error = validateFieldValue(field, values[field.field_key]);
+        const error = validateFieldValue(templateCode, field, values[field.field_key], values);
         if (error) setErrors((current) => ({ ...current, [field.field_key]: error }));
         const fieldContainer = Array.from(
           panelRef.current?.querySelectorAll<HTMLElement>('[data-workflow-field-key]') ?? [],
@@ -257,7 +275,7 @@ export function WorkflowFormPanel({
       window.clearTimeout(timer);
       removeHighlight?.();
     };
-  }, [activeFields, externalActions, fieldsOpen, form.data?.available, form.isError, form.isLoading, navigationRequest?.requestId, navigationRequest?.target.kind, readOnly, submitted, values]);
+  }, [activeFields, externalActions, fieldsOpen, form.data?.available, form.isError, form.isLoading, navigationRequest?.requestId, navigationRequest?.target.kind, readOnly, submitted, templateCode, values]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['work-item-form', workItemId] });
@@ -268,13 +286,28 @@ export function WorkflowFormPanel({
     onChanged?.();
   };
 
+  function handleWorkflowFormMutationError(error: unknown, fallbackTitle: string) {
+    const fieldErrors = workflowFormApiFieldErrors(error);
+    if (!Object.keys(fieldErrors).length) {
+      toast.error(fallbackTitle, error);
+      return;
+    }
+    setErrors(fieldErrors);
+    setFieldsOpen(true);
+    if (optionalFields.some((field) => fieldErrors[field.field_key])) setOptionalFieldsOpen(true);
+    toast.warn({
+      title: 'Dữ liệu hồ sơ chưa hợp lệ',
+      description: [...new Set(Object.values(fieldErrors))].slice(0, 4).join('; '),
+    });
+  }
+
   const saveDraft = useMutation({
     mutationFn: () => put<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/draft`, { answers: values }),
     onSuccess: () => {
       invalidate();
       toast.success('Đã lưu nháp hồ sơ nghiệp vụ');
     },
-    onError: (error) => toast.error('Không lưu được hồ sơ nghiệp vụ', error),
+    onError: (error) => handleWorkflowFormMutationError(error, 'Không lưu được hồ sơ nghiệp vụ'),
   });
 
   const submitForm = useMutation({
@@ -289,7 +322,7 @@ export function WorkflowFormPanel({
         toast.success('Đã chốt hồ sơ nghiệp vụ');
       }
     },
-    onError: (error) => toast.error('Không chốt được hồ sơ nghiệp vụ', error),
+    onError: (error) => handleWorkflowFormMutationError(error, 'Không chốt được hồ sơ nghiệp vụ'),
   });
 
   const amendForm = useMutation({
@@ -314,7 +347,7 @@ export function WorkflowFormPanel({
         toast.warn({ title: 'Hồ sơ đã có phiên bản mới', description: 'Nội dung đang nhập vẫn được giữ. Hãy sao chép phần cần thiết, huỷ chỉnh sửa rồi mở lại phiên bản mới nhất.' });
         return;
       }
-      toast.error('Không lưu được nội dung chỉnh sửa', error);
+      handleWorkflowFormMutationError(error, 'Không lưu được nội dung chỉnh sửa');
     },
   });
 
@@ -401,9 +434,12 @@ export function WorkflowFormPanel({
   function setFieldValue(field: WorkflowFormField, value: unknown) {
     setValues((current) => ({ ...current, [field.field_key]: value }));
     setErrors((current) => {
-      if (!current[field.field_key]) return current;
-      const { [field.field_key]: _removed, ...rest } = current;
-      return rest;
+      const clearedKeys = new Set([
+        field.field_key,
+        ...workflowTopLevelOtherDetailDependentKeys(templateCode, field.field_key),
+      ]);
+      if (![...clearedKeys].some((key) => current[key])) return current;
+      return Object.fromEntries(Object.entries(current).filter(([key]) => !clearedKeys.has(key)));
     });
   }
 
@@ -411,13 +447,13 @@ export function WorkflowFormPanel({
     const nextErrors: FormErrors = {};
     activeFields.forEach((field) => {
       const value = values[field.field_key];
-      const error = validateFieldValue(field, value);
+      const error = validateFieldValue(templateCode, field, value, values);
       if (error) nextErrors[field.field_key] = error;
     });
     setErrors(nextErrors);
-    const labels = activeFields.filter((field) => nextErrors[field.field_key]).map((field) => field.label);
-    if (labels.length) {
-      toast.warn({ title: 'Thiếu thông tin nghiệp vụ', description: labels.join(', ') });
+    const issues = [...new Set(Object.values(nextErrors))];
+    if (issues.length) {
+      toast.warn({ title: 'Dữ liệu hồ sơ chưa hợp lệ', description: issues.slice(0, 4).join('; ') });
       return false;
     }
     return true;
@@ -633,8 +669,10 @@ export function WorkflowFormPanel({
                 {coreFields.map((field) => (
                   <WorkflowFieldControl
                     key={field.field_key}
+                    templateCode={templateCode}
                     field={field}
                     value={values[field.field_key]}
+                    formValues={values}
                     evidence={evidence}
                     error={errors[field.field_key]}
                     disabled={readOnly || (submitted && !amending) || formActionPending}
@@ -660,8 +698,10 @@ export function WorkflowFormPanel({
                       {optionalFields.map((field) => (
                         <WorkflowFieldControl
                           key={field.field_key}
+                          templateCode={templateCode}
                           field={field}
                           value={values[field.field_key]}
+                          formValues={values}
                           evidence={evidence}
                           error={errors[field.field_key]}
                           disabled={readOnly || (submitted && !amending) || formActionPending}
@@ -2079,27 +2119,32 @@ function signaturePurposeLabel(purpose?: string) {
 }
 
 function WorkflowFieldControl({
+  templateCode,
   field,
   value,
+  formValues,
   evidence,
   error,
   disabled,
   displayOnly,
   onChange,
 }: {
+  templateCode?: string;
   field: WorkflowFormField;
   value: unknown;
+  formValues: AnyRecord;
   evidence: EvidenceRecord[];
   error?: string;
   disabled: boolean;
   displayOnly: boolean;
   onChange: (value: unknown) => void;
 }) {
+  const required = field.required || workflowTopLevelOtherDetailRequired(templateCode, field.field_key, formValues);
   const controlClassName = clsx(
     'mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100',
     error ? 'border-rose-300 bg-rose-50' : 'border-line bg-white',
   );
-  const fieldContent = renderFieldControl(field, value, evidence, disabled, displayOnly, Boolean(error), controlClassName, onChange);
+  const fieldContent = renderFieldControl(templateCode, field, value, evidence, disabled, displayOnly, Boolean(error), controlClassName, onChange);
   return (
     <div
       data-workflow-field-key={field.field_key}
@@ -2107,7 +2152,7 @@ function WorkflowFieldControl({
       className="min-w-0 scroll-mt-24 rounded-md outline-none"
     >
       <span className="text-sm font-semibold text-slate-700">{field.label}</span>
-      {field.required ? <span className="ml-1 text-rose-600">*</span> : null}
+      {required ? <span className="ml-1 text-rose-600">*</span> : null}
       {fieldContent}
       {field.help_text ? <p className="mt-1 text-xs text-slate-500">{field.help_text}</p> : null}
       {error ? <p className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}
@@ -2116,6 +2161,7 @@ function WorkflowFieldControl({
 }
 
 function renderFieldControl(
+  templateCode: string | undefined,
   field: WorkflowFormField,
   value: unknown,
   evidence: EvidenceRecord[],
@@ -2129,11 +2175,42 @@ function renderFieldControl(
     return <textarea className={controlClassName} rows={4} value={textValue(value)} disabled={disabled} onChange={(event) => onChange(event.target.value)} />;
   }
   if (field.field_type === 'select') {
+    const otherTextConfig = workflowSelectOtherTextConfig(templateCode, field);
+    const supportsOtherText = workflowSelectSupportsOtherText(templateCode, field);
+    const selectValue = supportsOtherText ? workflowSelectOptionValue(templateCode, field, value) : textValue(value);
+    const showOtherText = supportsOtherText && selectValue === 'other';
     return (
-      <select className={controlClassName} value={textValue(value)} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Chọn</option>
-        {fieldOptions(field).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
+      <>
+        <select
+          className={controlClassName}
+          value={selectValue}
+          disabled={disabled}
+          aria-invalid={invalid || undefined}
+          onChange={(event) => onChange(supportsOtherText
+            ? workflowSelectOptionChangeValue(templateCode, field, value, event.target.value)
+            : event.target.value)}
+        >
+          <option value="">Chọn</option>
+          {fieldOptions(field).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+        {showOtherText ? (
+          <label className="mt-2 block min-w-0">
+            <span className="text-xs font-semibold text-slate-600">
+              {otherTextConfig?.inputLabel}<span className="ml-1 text-rose-600">*</span>
+            </span>
+            <input
+              type="text"
+              className={controlClassName}
+              value={workflowSelectOtherTextValue(templateCode, field, value)}
+              disabled={disabled}
+              maxLength={otherTextConfig?.maxLength}
+              placeholder={otherTextConfig?.placeholder}
+              aria-invalid={invalid || undefined}
+              onChange={(event) => onChange(workflowSelectOtherTextChangeValue(templateCode, field, event.target.value))}
+            />
+          </label>
+        ) : null}
+      </>
     );
   }
   if (field.field_type === 'multi_select') {
@@ -2171,9 +2248,9 @@ function renderFieldControl(
   }
   if (field.field_type === 'structured_list') {
     if (field.field_key === 'checklist_items') {
-      return <ChecklistStructuredListControl field={field} value={value} evidence={evidence} disabled={disabled} displayOnly={displayOnly} invalid={invalid} onChange={onChange} />;
+      return <ChecklistStructuredListControl templateCode={templateCode} field={field} value={value} evidence={evidence} disabled={disabled} displayOnly={displayOnly} invalid={invalid} onChange={onChange} />;
     }
-    return <StructuredListControl field={field} value={value} evidence={evidence} disabled={disabled} displayOnly={displayOnly} invalid={invalid} onChange={onChange} />;
+    return <StructuredListControl templateCode={templateCode} field={field} value={value} evidence={evidence} disabled={disabled} displayOnly={displayOnly} invalid={invalid} onChange={onChange} />;
   }
   if (field.field_type === 'currency') {
     return (
@@ -2226,6 +2303,17 @@ function arrayValue(value: unknown) {
   return [];
 }
 
+function workflowFormApiFieldErrors(error: unknown): FormErrors {
+  if (!(error instanceof ApiError) || !error.details || typeof error.details !== 'object' || Array.isArray(error.details)) return {};
+  const rawFields = (error.details as AnyRecord).fields;
+  if (!rawFields || typeof rawFields !== 'object' || Array.isArray(rawFields)) return {};
+  return Object.fromEntries(
+    Object.entries(rawFields as AnyRecord)
+      .map(([key, value]) => [key, String(value ?? '').trim()] as const)
+      .filter(([, value]) => Boolean(value)),
+  );
+}
+
 export function workflowFormFieldIsOptional(field: WorkflowFormField) {
   return field.validation_json?.capture_mode === 'optional';
 }
@@ -2238,21 +2326,18 @@ function valueEmpty(field: WorkflowFormField, value: unknown) {
   return String(value).trim() === '';
 }
 
-function validateFieldValue(field: WorkflowFormField, value: unknown) {
-  if (field.required && valueEmpty(field, value)) return `${field.label} là bắt buộc`;
+function validateFieldValue(templateCode: string | undefined, field: WorkflowFormField, value: unknown, answers: AnyRecord) {
+  const required = field.required || workflowTopLevelOtherDetailRequired(templateCode, field.field_key, answers);
+  if (required && valueEmpty(field, value)) return `${field.label} là bắt buộc`;
+  const otherTextIssue = workflowSelectOtherTextIssue(templateCode, field, value);
+  if (otherTextIssue) return otherTextIssue;
   if (field.field_type !== 'structured_list' || valueEmpty(field, value)) return '';
   const fields = structuredItemFields(field);
   const rows = structuredRows(value);
   for (const [rowIndex, row] of rows.entries()) {
     for (const spec of fields) {
-      if (!spec.required) continue;
-      const cellValue = row[spec.key];
-      if (cellValue === null || cellValue === undefined || String(cellValue).trim() === '') {
-        return `${field.label} dòng ${rowIndex + 1}: ${spec.label} là bắt buộc`;
-      }
-    }
-    if (field.field_key === 'checklist_items' && !['done', 'not_applicable'].includes(String(row.status ?? ''))) {
-      return `${field.label} dòng ${rowIndex + 1}: trạng thái phải là Hoàn tất hoặc Không áp dụng trước khi chốt`;
+      const issue = structuredCellIssue(templateCode, field.field_key, spec, row, field.field_key === 'checklist_items');
+      if (issue) return `${field.label} dòng ${rowIndex + 1}: ${issue}`;
     }
   }
   return '';
@@ -2267,9 +2352,14 @@ type StructuredFieldSpec = {
   currencyCode?: string;
   allowNegative?: boolean;
   maximumFractionDigits?: number;
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
 };
 
 function StructuredListControl({
+  templateCode,
   field,
   value,
   evidence,
@@ -2278,6 +2368,7 @@ function StructuredListControl({
   invalid,
   onChange,
 }: {
+  templateCode?: string;
   field: WorkflowFormField;
   value: unknown;
   evidence: EvidenceRecord[];
@@ -2300,6 +2391,8 @@ function StructuredListControl({
   };
   return (
     <StructuredListTable
+      templateCode={templateCode}
+      fieldKey={field.field_key}
       label={field.label}
       rows={rows}
       specs={specs}
@@ -2316,6 +2409,7 @@ function StructuredListControl({
 }
 
 function ChecklistStructuredListControl({
+  templateCode,
   field,
   value,
   evidence,
@@ -2324,6 +2418,7 @@ function ChecklistStructuredListControl({
   invalid,
   onChange,
 }: {
+  templateCode?: string;
   field: WorkflowFormField;
   value: unknown;
   evidence: EvidenceRecord[];
@@ -2348,6 +2443,8 @@ function ChecklistStructuredListControl({
 
   return (
     <StructuredListTable
+      templateCode={templateCode}
+      fieldKey={field.field_key}
       label={field.label}
       rows={rows}
       specs={specs}
@@ -2373,6 +2470,8 @@ function ChecklistStructuredListControl({
 }
 
 function StructuredListTable({
+  templateCode,
+  fieldKey,
   label,
   rows,
   specs,
@@ -2387,6 +2486,8 @@ function StructuredListTable({
   onRemoveRow,
   onUpdateCell,
 }: {
+  templateCode?: string;
+  fieldKey: string;
   label: string;
   rows: AnyRecord[];
   specs: StructuredFieldSpec[];
@@ -2484,14 +2585,14 @@ function StructuredListTable({
                   <th scope="col" className="border-b border-line px-2 py-2 text-center">#</th>
                   {specs.map((spec) => (
                     <th key={spec.key} scope="col" className="border-b border-l border-line px-2 py-2 align-bottom">
-                      {spec.label}{spec.required ? <span className="ml-1 text-rose-600">*</span> : null}
+                      {spec.label}{structuredSpecRequired(templateCode, fieldKey, rows, spec) ? <span className="ml-1 text-rose-600">*</span> : null}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-line bg-white">
                 {rows.map((row, rowIndex) => {
-                  const rowInvalid = structuredRowInvalid(specs, row, invalid, checklist);
+                  const rowInvalid = structuredRowInvalid(templateCode, fieldKey, specs, row, invalid, checklist);
                   return (
                     <tr key={rowIndex} data-structured-row-index={rowIndex} className={rowInvalid ? 'bg-rose-50/50' : undefined}>
                       {!displayOnly ? (
@@ -2503,12 +2604,14 @@ function StructuredListTable({
                       {specs.map((spec) => (
                         <td key={spec.key} className="border-l border-line p-2 align-top">
                           <StructuredCell
+                            required={spec.required || workflowStructuredOtherDetailRequired(templateCode, fieldKey, row, spec.key)}
                             spec={spec}
                             value={row[spec.key]}
                             evidence={evidence}
                             disabled={disabled}
                             displayOnly={displayOnly}
-                            invalid={structuredCellInvalid(spec, row[spec.key], invalid, checklist)}
+                            invalid={structuredCellInvalid(templateCode, fieldKey, spec, row, invalid, checklist)}
+                            issue={invalid ? structuredCellIssue(templateCode, fieldKey, spec, row, checklist) : ''}
                             showLabel={false}
                             onChange={(nextValue) => onUpdateCell(rowIndex, spec.key, nextValue)}
                           />
@@ -2530,7 +2633,7 @@ function StructuredListTable({
 
           <div className="space-y-2 md:hidden">
             {rows.map((row, rowIndex) => {
-              const rowInvalid = structuredRowInvalid(specs, row, invalid, checklist);
+              const rowInvalid = structuredRowInvalid(templateCode, fieldKey, specs, row, invalid, checklist);
               return (
                 <section
                   key={rowIndex}
@@ -2550,12 +2653,14 @@ function StructuredListTable({
                     {specs.map((spec) => (
                       <StructuredCell
                         key={spec.key}
+                        required={spec.required || workflowStructuredOtherDetailRequired(templateCode, fieldKey, row, spec.key)}
                         spec={spec}
                         value={row[spec.key]}
                         evidence={evidence}
                         disabled={disabled}
                         displayOnly={displayOnly}
-                        invalid={structuredCellInvalid(spec, row[spec.key], invalid, checklist)}
+                        invalid={structuredCellInvalid(templateCode, fieldKey, spec, row, invalid, checklist)}
+                        issue={invalid ? structuredCellIssue(templateCode, fieldKey, spec, row, checklist) : ''}
                         showLabel
                         onChange={(nextValue) => onUpdateCell(rowIndex, spec.key, nextValue)}
                       />
@@ -2661,21 +2766,25 @@ function checklistStatsFromRows(rows: AnyRecord[]): ChecklistStats {
 }
 
 function StructuredCell({
+  required,
   spec,
   value,
   evidence,
   disabled,
   displayOnly,
   invalid,
+  issue,
   showLabel,
   onChange,
 }: {
+  required: boolean;
   spec: StructuredFieldSpec;
   value: unknown;
   evidence: EvidenceRecord[];
   disabled: boolean;
   displayOnly: boolean;
   invalid: boolean;
+  issue: string;
   showLabel: boolean;
   onChange: (value: string) => void;
 }) {
@@ -2689,7 +2798,7 @@ function StructuredCell({
     return (
       <div className="min-w-0">
         <span className={clsx('text-xs font-semibold text-slate-600', !showLabel && 'sr-only')}>
-          {spec.label}{spec.required ? <span className="ml-1 text-rose-600">*</span> : null}
+          {spec.label}{required ? <span className="ml-1 text-rose-600">*</span> : null}
         </span>
         <p className={clsx('whitespace-pre-wrap break-words text-sm text-slate-700', showLabel && 'mt-1')}>
           {structuredCellDisplayValue(spec, value, evidence)}
@@ -2700,7 +2809,7 @@ function StructuredCell({
   return (
     <label className="block min-w-0">
       <span className={clsx('text-xs font-semibold text-slate-600', !showLabel && 'sr-only')}>
-        {spec.label}{spec.required ? <span className="ml-1 text-rose-600">*</span> : null}
+        {spec.label}{required ? <span className="ml-1 text-rose-600">*</span> : null}
       </span>
       {spec.type === 'textarea' ? (
         <textarea className={className} rows={2} value={textValue(value)} disabled={disabled} aria-invalid={invalid || undefined} onChange={(event) => onChange(event.target.value)} />
@@ -2740,6 +2849,7 @@ function StructuredCell({
           onChange={(event) => onChange(event.target.value)}
         />
       )}
+      {issue ? <p className="mt-1 text-xs font-medium text-rose-700">{issue}</p> : null}
     </label>
   );
 }
@@ -2768,14 +2878,73 @@ function structuredRowDeleteSummary(row: AnyRecord, specs: StructuredFieldSpec[]
   return '';
 }
 
-function structuredCellInvalid(spec: StructuredFieldSpec, value: unknown, listInvalid: boolean, checklist: boolean) {
-  if (!listInvalid) return false;
-  if (spec.required && textValue(value).trim() === '') return true;
-  return checklist && spec.key === 'status' && !['done', 'not_applicable'].includes(textValue(value));
+function structuredCellIssue(
+  templateCode: string | undefined,
+  fieldKey: string,
+  spec: StructuredFieldSpec,
+  row: AnyRecord,
+  checklist: boolean,
+) {
+  const rawValue = row[spec.key];
+  const text = textValue(rawValue).trim();
+  const required = spec.required || workflowStructuredOtherDetailRequired(templateCode, fieldKey, row, spec.key);
+  if (!text) return required ? `${spec.label} là bắt buộc` : '';
+
+  if (spec.type === 'text' || spec.type === 'textarea') {
+    const length = Array.from(text).length;
+    if (spec.minLength !== undefined && length < spec.minLength) return `${spec.label} phải có ít nhất ${spec.minLength} ký tự`;
+    if (spec.maxLength !== undefined && length > spec.maxLength) return `${spec.label} không được vượt quá ${spec.maxLength} ký tự`;
+  }
+  if (spec.type === 'number' || spec.type === 'currency') {
+    const numeric = Number(text);
+    if (!Number.isFinite(numeric)) return `${spec.label} phải là số`;
+    if (spec.min !== undefined && numeric < spec.min) return `${spec.label} phải lớn hơn hoặc bằng ${spec.min}`;
+    if (spec.max !== undefined && numeric > spec.max) return `${spec.label} phải nhỏ hơn hoặc bằng ${spec.max}`;
+  }
+  if (spec.type === 'date') {
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(text) ? new Date(`${text}T00:00:00Z`) : null;
+    if (!date || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text) return `${spec.label} không hợp lệ`;
+  }
+  if (spec.type === 'select' && spec.options?.length && !spec.options.some((option) => option.value === text)) {
+    return `${spec.label} không nằm trong schema`;
+  }
+  if (checklist && spec.key === 'status' && !['done', 'not_applicable'].includes(text)) {
+    return 'Trạng thái phải là Hoàn tất hoặc Không áp dụng trước khi chốt';
+  }
+  return '';
 }
 
-function structuredRowInvalid(specs: StructuredFieldSpec[], row: AnyRecord, listInvalid: boolean, checklist: boolean) {
-  return specs.some((spec) => structuredCellInvalid(spec, row[spec.key], listInvalid, checklist));
+function structuredSpecRequired(
+  templateCode: string | undefined,
+  fieldKey: string,
+  rows: AnyRecord[],
+  spec: StructuredFieldSpec,
+) {
+  return Boolean(spec.required)
+    || rows.some((row) => workflowStructuredOtherDetailRequired(templateCode, fieldKey, row, spec.key));
+}
+
+function structuredCellInvalid(
+  templateCode: string | undefined,
+  fieldKey: string,
+  spec: StructuredFieldSpec,
+  row: AnyRecord,
+  listInvalid: boolean,
+  checklist: boolean,
+) {
+  if (!listInvalid) return false;
+  return Boolean(structuredCellIssue(templateCode, fieldKey, spec, row, checklist));
+}
+
+function structuredRowInvalid(
+  templateCode: string | undefined,
+  fieldKey: string,
+  specs: StructuredFieldSpec[],
+  row: AnyRecord,
+  listInvalid: boolean,
+  checklist: boolean,
+) {
+  return specs.some((spec) => structuredCellInvalid(templateCode, fieldKey, spec, row, listInvalid, checklist));
 }
 
 function structuredColumnWidth(spec: StructuredFieldSpec) {
@@ -2805,6 +2974,12 @@ function structuredRows(value: unknown): AnyRecord[] {
   return value.filter((row): row is AnyRecord => Boolean(row) && typeof row === 'object' && !Array.isArray(row));
 }
 
+function optionalFiniteNumber(value: unknown) {
+  if (value === null || value === undefined || String(value).trim() === '') return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
 function structuredItemFields(field: WorkflowFormField): StructuredFieldSpec[] {
   const rawFields = Array.isArray(field.validation_json?.item_fields) ? field.validation_json.item_fields : [];
   return rawFields
@@ -2817,6 +2992,10 @@ function structuredItemFields(field: WorkflowFormField): StructuredFieldSpec[] {
       currencyCode: spec.currency_code ? String(spec.currency_code) : undefined,
       allowNegative: Boolean(spec.allow_negative),
       maximumFractionDigits: spec.maximum_fraction_digits === undefined ? undefined : Number(spec.maximum_fraction_digits),
+      minLength: optionalFiniteNumber(spec.min_length),
+      maxLength: optionalFiniteNumber(spec.max_length),
+      min: optionalFiniteNumber(spec.min),
+      max: optionalFiniteNumber(spec.max),
       options: Array.isArray(spec.options)
         ? spec.options
             .filter((option): option is AnyRecord => Boolean(option) && typeof option === 'object' && !Array.isArray(option) && Boolean(option.value))

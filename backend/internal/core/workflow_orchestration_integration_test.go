@@ -401,6 +401,139 @@ func TestWorkflowFormValidationNormalizesAndRejectsBadInput(t *testing.T) {
 	}
 }
 
+func TestWorkflowSelectOtherTextRegistryIsScoped(t *testing.T) {
+	service := NewService(&Repository{}, "test-secret")
+	tests := []struct {
+		formCode string
+		fieldKey string
+	}{
+		{formCode: "client_design_style_brief", fieldKey: "style_direction"},
+		{formCode: "client_survey_work_package", fieldKey: "style_direction"},
+		{formCode: "client_boq_owner_submission", fieldKey: "sent_channel"},
+		{formCode: "client_hardcopy_dispatch", fieldKey: "delivery_method"},
+		{formCode: "builtin_construction_daily_report", fieldKey: "construction_scope"},
+		{formCode: "builtin_construction_daily_report", fieldKey: "weather"},
+		{formCode: "builtin_subcontractor_checklist", fieldKey: "work_package"},
+		{formCode: "client_subcontractor_acceptance_package", fieldKey: "work_package"},
+		{formCode: "builtin_daily_report", fieldKey: "planning_scope"},
+		{formCode: "builtin_checklist", fieldKey: "planning_scope"},
+		{formCode: "client_owner_soft_file_submission", fieldKey: "delivery_channel"},
+		{formCode: "client_procurement_takeoff_review", fieldKey: "takeoff_source"},
+	}
+	selectField := func(fieldKey string) Record {
+		return Record{
+			"field_key":  fieldKey,
+			"label":      fieldKey,
+			"field_type": "select",
+			"required":   true,
+			"options_json": []any{
+				map[string]any{"value": "catalog", "label": "Trong danh mục"},
+				map[string]any{"value": "other", "label": "Khác"},
+			},
+			"validation_json": map[string]any{},
+		}
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.formCode+"."+tt.fieldKey, func(t *testing.T) {
+			instance := Record{"form_code": tt.formCode}
+			field := selectField(tt.fieldKey)
+			draft, err := service.validateWorkflowFormAnswers(context.Background(), instance, []Record{field}, Record{tt.fieldKey: "other"}, false)
+			if err != nil || draft[tt.fieldKey] != "other" {
+				t.Fatalf("draft other = %#v, err=%v", draft, err)
+			}
+			_, err = service.validateWorkflowFormAnswers(context.Background(), instance, []Record{field}, Record{tt.fieldKey: "other"}, true)
+			assertValidationError(t, err)
+			answers, err := service.validateWorkflowFormAnswers(context.Background(), instance, []Record{field}, Record{tt.fieldKey: "  Giá trị tùy chỉnh  "}, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if answers[tt.fieldKey] != "Giá trị tùy chỉnh" {
+				t.Fatalf("custom answer = %#v", answers[tt.fieldKey])
+			}
+		})
+	}
+
+	styleField := selectField("style_direction")
+	_, err := service.validateWorkflowFormAnswers(context.Background(), Record{"form_code": "client_survey_work_package"}, []Record{styleField}, Record{"style_direction": strings.Repeat("x", 301)}, true)
+	assertValidationError(t, err)
+	_, err = service.validateWorkflowFormAnswers(context.Background(), Record{"form_code": "unrelated_template"}, []Record{styleField}, Record{"style_direction": "custom"}, true)
+	assertValidationError(t, err)
+	unsupportedField := selectField("unsupported_field")
+	_, err = service.validateWorkflowFormAnswers(context.Background(), Record{"form_code": "client_survey_work_package"}, []Record{unsupportedField}, Record{"unsupported_field": "custom"}, true)
+	assertValidationError(t, err)
+}
+
+func TestWorkflowOtherDetailRulesRequireExistingFieldsOnSubmit(t *testing.T) {
+	service := NewService(&Repository{}, "test-secret")
+	ownerFields := []Record{
+		{
+			"field_key": "handover_scope", "label": "Phạm vi kiểm tra", "field_type": "select", "required": true,
+			"options_json": []any{map[string]any{"value": "area"}, map[string]any{"value": "other"}}, "validation_json": map[string]any{},
+		},
+		{"field_key": "scope_detail", "label": "Chi tiết phạm vi", "field_type": "text", "required": false, "validation_json": map[string]any{"max_length": 240}},
+	}
+	ownerInstance := Record{"form_code": "builtin_owner_client_checklist"}
+	draft, err := service.validateWorkflowFormAnswers(context.Background(), ownerInstance, ownerFields, Record{"handover_scope": "other"}, false)
+	if err != nil || draft["handover_scope"] != "other" {
+		t.Fatalf("owner draft = %#v, err=%v", draft, err)
+	}
+	_, err = service.validateWorkflowFormAnswers(context.Background(), ownerInstance, ownerFields, Record{"handover_scope": "other"}, true)
+	assertValidationError(t, err)
+	ownerAnswers, err := service.validateWorkflowFormAnswers(context.Background(), ownerInstance, ownerFields, Record{"handover_scope": "other", "scope_detail": "  Khu vực sân thượng  "}, true)
+	if err != nil || ownerAnswers["scope_detail"] != "Khu vực sân thượng" {
+		t.Fatalf("owner answers = %#v, err=%v", ownerAnswers, err)
+	}
+
+	materialField := Record{
+		"field_key": "material_usage_items", "label": "Vật tư sử dụng", "field_type": "structured_list", "required": false,
+		"validation_json": map[string]any{"item_fields": []any{
+			map[string]any{"key": "source", "label": "Nguồn", "type": "select", "required": true, "options": []any{map[string]any{"value": "site_balance"}, map[string]any{"value": "other"}}},
+			map[string]any{"key": "note", "label": "Ghi chú", "type": "textarea", "required": false},
+		}},
+	}
+	constructionInstance := Record{"form_code": "builtin_construction_daily_report"}
+	materialOther := Record{"material_usage_items": []any{map[string]any{"source": "other", "note": ""}}}
+	if _, err = service.validateWorkflowFormAnswers(context.Background(), constructionInstance, []Record{materialField}, materialOther, false); err != nil {
+		t.Fatalf("material draft err=%v", err)
+	}
+	_, err = service.validateWorkflowFormAnswers(context.Background(), constructionInstance, []Record{materialField}, materialOther, true)
+	assertValidationError(t, err)
+	materialAnswers, err := service.validateWorkflowFormAnswers(context.Background(), constructionInstance, []Record{materialField}, Record{
+		"material_usage_items": []any{map[string]any{"source": "other", "note": "  Nhà cung cấp giao trực tiếp  "}},
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	materialRows := materialAnswers["material_usage_items"].([]Record)
+	if materialRows[0]["note"] != "Nhà cung cấp giao trực tiếp" {
+		t.Fatalf("material answers = %#v", materialAnswers)
+	}
+
+	blockersField := Record{
+		"field_key": "blockers", "label": "Vướng mắc", "field_type": "structured_list", "required": false,
+		"validation_json": map[string]any{"item_fields": []any{
+			map[string]any{"key": "content", "label": "Nội dung", "type": "text", "required": true},
+			map[string]any{"key": "impact", "label": "Ảnh hưởng", "type": "select", "required": true, "options": []any{map[string]any{"value": "other"}}},
+		}},
+	}
+	if _, err = service.validateWorkflowFormAnswers(context.Background(), constructionInstance, []Record{blockersField}, Record{
+		"blockers": []any{map[string]any{"content": "Giới hạn giờ thi công", "impact": "other"}},
+	}, true); err != nil {
+		t.Fatalf("blocker impact other must remain catalog-only without a detail requirement: %v", err)
+	}
+}
+
+func TestWorkflowPDFOptionLabelPreservesCustomSelectText(t *testing.T) {
+	options := []any{
+		map[string]any{"value": "modern", "label": "Hiện đại"},
+		map[string]any{"value": "other", "label": "Khác"},
+	}
+	if got := workflowPDFOptionLabel(options, "Japandi tông gỗ sáng"); got != "Japandi tông gỗ sáng" {
+		t.Fatalf("custom style PDF label = %q", got)
+	}
+}
+
 func TestWorkflowFormStructuredListValidation(t *testing.T) {
 	service := NewService(&Repository{}, "test-secret")
 	fields := []Record{
@@ -452,6 +585,88 @@ func TestWorkflowFormStructuredListValidation(t *testing.T) {
 	if number(items[0]["amount"]) != 1250000.25 {
 		t.Fatalf("normalized currency amount = %#v", items[0]["amount"])
 	}
+}
+
+func TestSurveyWorkPackageDraftAndDimensionAreaCompatibility(t *testing.T) {
+	service := NewService(&Repository{}, "test-secret")
+	fields := []Record{
+		{
+			"field_key": "summary", "label": "Yêu cầu", "field_type": "text", "required": true,
+			"validation_json": map[string]any{"min_length": float64(3), "max_length": float64(160)},
+		},
+		{
+			"field_key": "dimension_items", "label": "Kích thước chính", "field_type": "structured_list", "required": true,
+			"validation_json": map[string]any{
+				"min_items": float64(1),
+				"item_fields": []any{
+					map[string]any{"key": "area", "label": "Khu vực", "type": "text", "required": true, "min_length": float64(2), "max_length": float64(160)},
+					map[string]any{"key": "dimension", "label": "Kích thước", "type": "text", "required": true},
+					map[string]any{"key": "unit", "label": "ĐVT", "type": "text", "required": true},
+				},
+			},
+		},
+		{
+			"field_key": "risk_items", "label": "Danh sách rủi ro", "field_type": "structured_list", "required": true,
+			"validation_json": map[string]any{
+				"min_items": float64(1),
+				"item_fields": []any{
+					map[string]any{"key": "risk", "label": "Rủi ro", "type": "textarea", "required": true, "min_length": float64(3)},
+				},
+			},
+		},
+	}
+	instance := Record{"form_code": "client_survey_work_package"}
+	draftAnswers := Record{
+		"summary":         "x",
+		"dimension_items": []any{map[string]any{"area": "1", "dimension": "1", "unit": "m"}},
+		"risk_items":      []any{map[string]any{"risk": "1"}},
+	}
+	draft, err := service.validateWorkflowFormAnswers(context.Background(), instance, fields, draftAnswers, false)
+	if err != nil {
+		t.Fatalf("short but structurally valid draft must save: %v", err)
+	}
+	if draft["summary"] != "x" {
+		t.Fatalf("draft summary = %#v, want x", draft["summary"])
+	}
+
+	validSubmit := Record{
+		"summary":         "Yêu cầu khảo sát",
+		"dimension_items": []any{map[string]any{"dimension": "1", "unit": "m"}},
+		"risk_items":      []any{map[string]any{"risk": "Rủi ro kết cấu"}},
+	}
+	answers, err := service.validateWorkflowFormAnswers(context.Background(), instance, fields, validSubmit, true)
+	if err != nil {
+		t.Fatalf("survey submit must allow omitted area: %v", err)
+	}
+	dimensions := answers["dimension_items"].([]Record)
+	if _, exists := dimensions[0]["area"]; exists {
+		t.Fatalf("omitted area must remain omitted, got %#v", dimensions[0])
+	}
+
+	validSubmit["dimension_items"] = []any{map[string]any{"area": "1", "dimension": "1", "unit": "m"}}
+	if _, err = service.validateWorkflowFormAnswers(context.Background(), instance, fields, validSubmit, true); err != nil {
+		t.Fatalf("survey submit must allow one-character area: %v", err)
+	}
+
+	invalidRisk := Record{
+		"summary":         "Yêu cầu khảo sát",
+		"dimension_items": []any{map[string]any{"area": "1", "dimension": "1", "unit": "m"}},
+		"risk_items":      []any{map[string]any{"risk": "1"}},
+	}
+	_, err = service.validateWorkflowFormAnswers(context.Background(), instance, fields, invalidRisk, true)
+	assertValidationError(t, err)
+	var statusErr StatusError
+	if !errors.As(err, &statusErr) {
+		t.Fatalf("submit error = %#v", err)
+	}
+	details := recordFromAny(statusErr.Details)
+	fieldErrors := recordFromAny(details["fields"])
+	if got := fmt.Sprint(fieldErrors["risk_items"]); !strings.Contains(got, "Rủi ro phải có ít nhất 3 ký tự") {
+		t.Fatalf("risk error = %q", got)
+	}
+
+	_, err = service.validateWorkflowFormAnswers(context.Background(), Record{"form_code": "another_form"}, fields, validSubmit, true)
+	assertValidationError(t, err)
 }
 
 func TestSiteRiskAssessmentDefaultsMissingCategoryAndPreservesExistingValue(t *testing.T) {

@@ -33,13 +33,15 @@ export class ApiError extends Error {
   code: string;
   status: number;
   retryAfterMs?: number;
+  details?: unknown;
 
-  constructor(message: string, code = 'API_ERROR', status = 500, retryAfterMs?: number) {
+  constructor(message: string, code = 'API_ERROR', status = 500, retryAfterMs?: number, details?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.code = code;
     this.status = status;
     this.retryAfterMs = retryAfterMs;
+    this.details = details;
   }
 }
 
@@ -84,6 +86,7 @@ async function request<T>(path: string, init: RequestInit = {}, allowRefresh: bo
       json?.error?.code,
       res.status,
       parseRetryAfter(res.headers.get('Retry-After')),
+      json?.error?.details,
     );
   }
   return json.data;
@@ -99,6 +102,102 @@ export function post<T>(path: string, body?: unknown) {
 
 export function postForm<T>(path: string, body: FormData) {
   return api<T>(path, { method: 'POST', body });
+}
+
+export type UploadProgress = {
+  loaded: number;
+  total: number;
+  percent: number;
+};
+
+export function postFormWithProgress<T>(
+  path: string,
+  body: FormData,
+  onProgress?: (progress: UploadProgress) => void,
+  signal?: AbortSignal,
+) {
+  return uploadFormRequest<T>(path, body, onProgress, signal, true);
+}
+
+async function uploadFormRequest<T>(
+  path: string,
+  body: FormData,
+  onProgress: ((progress: UploadProgress) => void) | undefined,
+  signal: AbortSignal | undefined,
+  allowRefresh: boolean,
+): Promise<T> {
+  try {
+    return await xhrFormRequest<T>(path, body, onProgress, signal);
+  } catch (error) {
+    if (allowRefresh && error instanceof ApiError && shouldRefresh(path, error.status, error.code)) {
+      const refreshedToken = await refreshAccessToken();
+      if (refreshedToken) return uploadFormRequest<T>(path, body, onProgress, signal, false);
+    }
+    throw error;
+  }
+}
+
+function xhrFormRequest<T>(
+  path: string,
+  body: FormData,
+  onProgress?: (progress: UploadProgress) => void,
+  signal?: AbortSignal,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let settled = false;
+
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener('abort', abortUpload);
+      callback();
+    };
+    const abortUpload = () => xhr.abort();
+
+    xhr.open('POST', `${API_URL}${path}`);
+    xhr.withCredentials = true;
+    const token = getToken();
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    xhr.upload.onprogress = (event) => {
+      const total = event.lengthComputable ? event.total : 0;
+      const percent = total > 0 ? Math.min(100, Math.round((event.loaded / total) * 100)) : 0;
+      onProgress?.({ loaded: event.loaded, total, percent });
+    };
+
+    xhr.onload = () => {
+      const json = parseApiEnvelope<T>(xhr.responseText);
+      if (xhr.status >= 200 && xhr.status < 300 && json?.success) {
+        finish(() => resolve(json.data));
+        return;
+      }
+      finish(() => reject(new ApiError(
+        json?.error?.message ?? 'Không gọi được API',
+        json?.error?.code,
+        xhr.status,
+        parseRetryAfter(xhr.getResponseHeader('Retry-After')),
+        json?.error?.details,
+      )));
+    };
+    xhr.onerror = () => finish(() => reject(new ApiError('Không kết nối được máy chủ', 'NETWORK_ERROR', 0)));
+    xhr.onabort = () => finish(() => reject(new ApiError('Đã huỷ tải tệp', 'UPLOAD_ABORTED', 0)));
+
+    if (signal?.aborted) {
+      finish(() => reject(new ApiError('Đã huỷ tải tệp', 'UPLOAD_ABORTED', 0)));
+      return;
+    }
+    signal?.addEventListener('abort', abortUpload, { once: true });
+    xhr.send(body);
+  });
+}
+
+function parseApiEnvelope<T>(value: string): ApiEnvelope<T> | null {
+  try {
+    return JSON.parse(value) as ApiEnvelope<T>;
+  } catch {
+    return null;
+  }
 }
 
 export function put<T>(path: string, body?: unknown) {
@@ -159,6 +258,7 @@ async function downloadBlobRequest(path: string, allowRefresh: boolean) {
         json?.error?.code,
         res.status,
         parseRetryAfter(res.headers.get('Retry-After')),
+        json?.error?.details,
       );
     }
     const text = await res.text().catch(() => '');

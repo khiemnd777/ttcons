@@ -23,9 +23,19 @@ test('completion requirement rows expose keyboard actions and explicit instructi
 test('evidence requirement navigation opens and focuses the matching uploader', async () => {
   const evidencePanel = await source('../src/modules/work-items/EvidencePanel.tsx');
 
-  assert.match(evidencePanel, /setEvidenceType\(navigationRequest\.target\.evidenceType \?\? 'photo'\)/);
+  assert.match(evidencePanel, /setRequirementEvidenceType\(navigationRequest\.target\.evidenceType \?\? null\)/);
   assert.match(evidencePanel, /setUploadOpen\(true\)/);
   assert.match(evidencePanel, /revealWorkItemRequirementTarget\(uploadFormRef\.current, fileInputRef\.current\)/);
+  assert.match(evidencePanel, /requirementEvidenceType === 'photo' && classification\.evidenceType === 'document'/);
+});
+
+test('completion errors dispatch the backend-owned missing requirement target', async () => {
+  const detail = await source('../src/modules/work-items/WorkItemDetailDialog.tsx');
+
+  assert.match(
+    detail,
+    /variables\.action === 'complete'[\s\S]*completionRequirementNavigationFromError\(detailItem, error\)[\s\S]*navigateToRequirement\(target\)/,
+  );
 });
 
 test('workflow-form navigation targets the first issue, checklist field, or submit action', async () => {
