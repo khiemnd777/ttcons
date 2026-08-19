@@ -52,7 +52,7 @@ Production overlay phải thay image bằng immutable digest, thay origin/proxy 
 
 ## Runtime Secret
 
-Bốn key ứng dụng tối thiểu hiện tại:
+Các key ứng dụng bắt buộc hiện tại:
 
 - `database_url`: absolute `postgres://`/`postgresql://` URL của runtime role ít quyền, chỉ có DML/quyền cần thiết cho API và không có quyền DDL/schema owner;
 - `migration_database_url`: URL của role migration có quyền DDL/owner cần cho custom migration runner; key này chỉ được mount vào schema Job;
@@ -60,7 +60,9 @@ Bốn key ứng dụng tối thiểu hiện tại:
 - `redis_cache_url`: absolute `redis://`/`rediss://` URL tới managed Redis riêng cho cache dữ liệu có thể tái tạo; không dùng chung rate limiting/SSE;
 - `jwt_secret`: ít nhất 32 byte ngẫu nhiên.
 
-Secret được mount read-only mode `0440` qua supplemental group. Backend chỉ đọc `database_url`, `redis_url`, `redis_cache_url`, `jwt_secret`; schema Job chỉ đọc `migration_database_url`. Storage migration Job dùng runtime `database_url` vì chỉ đọc/update metadata, không cần DDL. Cách này giữ kiểm tra bounded/non-empty/NUL/trailing-newline hiện có, giảm blast radius và không đặt secret trực tiếp trong ConfigMap hay Pod spec.
+Key `smtp_password` là tùy chọn khi khôi phục tài khoản bị tắt hoặc SMTP relay không yêu cầu xác thực. Khi `AUTH_RECOVERY_ENABLED=true` và có `SMTP_USERNAME`, external secret controller phải cấp key này; backend sẽ fail-closed nếu thiếu hoặc cấu hình SMTP không hợp lệ.
+
+Các secret runtime chính được mount read-only mode `0440` qua supplemental group. Backend đọc `database_url`, `redis_url`, `redis_cache_url`, `jwt_secret`; `smtp_password` là optional Secret reference; schema Job chỉ đọc `migration_database_url`. Storage migration Job dùng runtime `database_url` vì chỉ đọc/update metadata, không cần DDL. Cách này giữ giảm blast radius và không đặt giá trị secret trực tiếp trong ConfigMap hay Pod spec.
 
 Storage runtime dùng contract đã xác nhận:
 
@@ -81,6 +83,8 @@ kubectl -n consflow create secret generic consflow-runtime-secrets \
   --from-file=jwt_secret=/secure/runtime/jwt_secret \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
+
+Khi bật SMTP có xác thực, thêm `--from-file=smtp_password=/secure/runtime/smtp_password`. Không tạo key này với giá trị rỗng hoặc placeholder.
 
 Nếu không dùng workload identity, thêm `--from-file=aws_access_key_id=...`, `--from-file=aws_secret_access_key=...` và chỉ thêm session token khi provider cấp temporary credential. Không chạy lệnh này với `--from-literal` trong shared terminal/history. Với production thật, external secret controller nên là owner của Secret. Workload-identity overlay thêm service-account annotation/projected token cần thiết và phải chứng minh một S3 read/write/delete probe trên staging trước rollout; base giữ `automountServiceAccountToken=false` để không cấp Kubernetes API token rộng ngoài ý muốn.
 
@@ -209,7 +213,7 @@ Chỉ sau khi dry-run pass, tạo overlay thứ hai có tên khác và JSON patc
    kubectl kustomize /secure/consflow/migration-overlay >/dev/null
    ```
 
-2. Xác nhận Secret có đủ bốn key, runtime backend không mount `migration_database_url`, schema Job không mount `database_url`, và từng workload identity có thể mount; không in data bằng `kubectl get secret -o yaml` vào shared logs.
+2. Xác nhận Secret có đủ các key bắt buộc và `smtp_password` khi SMTP dùng xác thực; runtime backend không mount `migration_database_url`, schema Job không mount `database_url`, và từng workload identity có thể mount; không in data bằng `kubectl get secret -o yaml` vào shared logs.
 3. Xác nhận S3 object inventory/migration đã pass. Trên staging, backend startup preflight phải log `event=storage_preflight provider=s3 status=ready`; sau rollout tiếp tục chứng minh cross-replica protected upload/download.
 4. Tính database connection upper bound. Với baseline hai backend pod và `DB_MAX_OPEN_CONNS=20`, application có thể mở 40 connection; giữ thêm migration, operator, monitoring và provider failover headroom.
 5. Xác nhận migration của release là backward-compatible theo expand-contract. Advisory lock chống hai runner, không biến migration phá vỡ binary cũ thành an toàn.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/mail"
 	"net/url"
 	"os"
 	"strconv"
@@ -52,6 +53,17 @@ type Config struct {
 	AuthRefreshTokenHours          int64
 	AuthRefreshCookieSecure        bool
 	AuthRefreshCookieSameSite      string
+	AuthRecoveryEnabled            bool
+	AuthRecoveryTokenTTL           time.Duration
+	AuthRecoveryVerifyTTL          time.Duration
+	SMTPHost                       string
+	SMTPPort                       int
+	SMTPUsername                   string
+	SMTPPassword                   string
+	SMTPFromAddress                string
+	SMTPFromName                   string
+	SMTPTLSMode                    string
+	SMTPTimeout                    time.Duration
 	TrustedProxies                 []string
 	HTTPReadTimeout                time.Duration
 	HTTPWriteTimeout               time.Duration
@@ -89,6 +101,8 @@ type Config struct {
 	invalidEnvironment             []string
 	secretEnvironmentErrors        []string
 	defaultSecretEnvironment       []string
+	accountRecoveryInvalidEnv      []string
+	accountRecoverySecretErrors    []string
 }
 
 const maxSecretFileBytes = 64 * 1024
@@ -99,6 +113,9 @@ func Load() Config {
 	redisURL := getenvSecretTracked("REDIS_URL", "redis://localhost:6379/0", validation)
 	redisCacheURL := getenvOptionalSecretTracked("REDIS_CACHE_URL", validation)
 	jwtSecret := getenvSecretTracked("JWT_SECRET", "consflow-local-dev-secret", validation)
+	authRecoveryEnabled := getenvBoolTracked("AUTH_RECOVERY_ENABLED", false, validation)
+	recoveryValidation := &envValidation{}
+	smtpPassword := getenvOptionalSecretAllowEmptyTracked("SMTP_PASSWORD", recoveryValidation)
 	cfg := Config{
 		AppEnv:                         strings.ToLower(strings.TrimSpace(getenv("APP_ENV", "development"))),
 		Port:                           getenv("PORT", "8080"),
@@ -125,6 +142,17 @@ func Load() Config {
 		AuthRefreshTokenHours:          getenvInt64Tracked("AUTH_REFRESH_TOKEN_HOURS", 24*7, validation),
 		AuthRefreshCookieSecure:        getenvBoolTracked("AUTH_REFRESH_COOKIE_SECURE", false, validation),
 		AuthRefreshCookieSameSite:      getenv("AUTH_REFRESH_COOKIE_SAME_SITE", "Lax"),
+		AuthRecoveryEnabled:            authRecoveryEnabled,
+		AuthRecoveryTokenTTL:           getenvDurationTracked("AUTH_RECOVERY_TOKEN_TTL", 15*time.Minute, false, recoveryValidation),
+		AuthRecoveryVerifyTTL:          getenvDurationTracked("AUTH_RECOVERY_VERIFY_TTL", 24*time.Hour, false, recoveryValidation),
+		SMTPHost:                       strings.TrimSpace(os.Getenv("SMTP_HOST")),
+		SMTPPort:                       getenvIntTracked("SMTP_PORT", 587, recoveryValidation),
+		SMTPUsername:                   strings.TrimSpace(os.Getenv("SMTP_USERNAME")),
+		SMTPPassword:                   smtpPassword,
+		SMTPFromAddress:                strings.ToLower(strings.TrimSpace(os.Getenv("SMTP_FROM_ADDRESS"))),
+		SMTPFromName:                   strings.TrimSpace(getenv("SMTP_FROM_NAME", "Consflow")),
+		SMTPTLSMode:                    strings.ToLower(strings.TrimSpace(getenv("SMTP_TLS_MODE", "starttls"))),
+		SMTPTimeout:                    getenvDurationTracked("SMTP_TIMEOUT", 10*time.Second, false, recoveryValidation),
 		TrustedProxies:                 getenvCSV("TRUSTED_PROXY_CIDRS"),
 		HTTPReadTimeout:                getenvDurationTracked("HTTP_READ_TIMEOUT", 15*time.Second, false, validation),
 		// SSE responses are intentionally long-lived, so the global write deadline is disabled by default.
@@ -176,6 +204,8 @@ func Load() Config {
 	cfg.invalidEnvironment = validation.invalid
 	cfg.secretEnvironmentErrors = validation.secretErrors
 	cfg.defaultSecretEnvironment = validation.secretDefaults
+	cfg.accountRecoveryInvalidEnv = recoveryValidation.invalid
+	cfg.accountRecoverySecretErrors = recoveryValidation.secretErrors
 	return cfg
 }
 
@@ -270,6 +300,58 @@ func (c Config) Validate() error {
 		if c.AutoMigrate {
 			return fmt.Errorf("AUTO_MIGRATE must be false in production; run the dedicated migration job before backend startup")
 		}
+	}
+	return nil
+}
+
+// AccountRecoveryConfigurationError validates the optional mail subsystem
+// independently from startup-critical configuration. Callers should disable
+// only account recovery when this returns an error; the rest of the backend
+// remains available.
+func (c Config) AccountRecoveryConfigurationError() error {
+	if !c.AuthRecoveryEnabled {
+		return nil
+	}
+	if len(c.accountRecoverySecretErrors) > 0 {
+		return fmt.Errorf("invalid account recovery secret configuration: %s", strings.Join(c.accountRecoverySecretErrors, "; "))
+	}
+	if len(c.accountRecoveryInvalidEnv) > 0 {
+		return fmt.Errorf("invalid account recovery environment variables: %s", strings.Join(c.accountRecoveryInvalidEnv, ", "))
+	}
+	return c.validateAccountRecovery(strings.ToLower(strings.TrimSpace(c.AppEnv)))
+}
+
+func (c Config) validateAccountRecovery(appEnv string) error {
+	if !c.AuthRecoveryEnabled {
+		return nil
+	}
+	if strings.TrimSpace(c.SMTPHost) == "" || containsPlaceholder(c.SMTPHost) {
+		return fmt.Errorf("SMTP_HOST must be configured without CHANGE_ME when account recovery is enabled")
+	}
+	if c.SMTPPort < 1 || c.SMTPPort > 65535 {
+		return fmt.Errorf("SMTP_PORT must be between 1 and 65535")
+	}
+	if c.AuthRecoveryTokenTTL <= 0 || c.AuthRecoveryVerifyTTL <= 0 || c.SMTPTimeout <= 0 {
+		return fmt.Errorf("account recovery and SMTP timeouts must be positive")
+	}
+	if c.SMTPTLSMode != "starttls" && c.SMTPTLSMode != "tls" && c.SMTPTLSMode != "none" {
+		return fmt.Errorf("SMTP_TLS_MODE must be starttls, tls, or none")
+	}
+	if appEnv == "production" && c.SMTPTLSMode == "none" {
+		return fmt.Errorf("SMTP_TLS_MODE must use starttls or tls in production")
+	}
+	from, err := mail.ParseAddress(strings.ToLower(strings.TrimSpace(c.SMTPFromAddress)))
+	if err != nil || from.Address != strings.ToLower(strings.TrimSpace(c.SMTPFromAddress)) {
+		return fmt.Errorf("SMTP_FROM_ADDRESS must be a valid bare email address")
+	}
+	if strings.TrimSpace(c.SMTPUsername) == "" && c.SMTPPassword != "" || strings.TrimSpace(c.SMTPUsername) != "" && c.SMTPPassword == "" {
+		return fmt.Errorf("SMTP_USERNAME and SMTP_PASSWORD must be configured together")
+	}
+	if containsPlaceholder(c.SMTPUsername) || containsPlaceholder(c.SMTPPassword) || containsPlaceholder(c.SMTPFromAddress) {
+		return fmt.Errorf("SMTP credentials and sender must not contain CHANGE_ME")
+	}
+	if strings.ContainsAny(c.SMTPFromName, "\r\n") {
+		return fmt.Errorf("SMTP_FROM_NAME must not contain line breaks")
 	}
 	return nil
 }
@@ -507,6 +589,42 @@ func getenvOptionalSecretTracked(key string, validation *envValidation) string {
 	}
 	value, err := readSecretFile(filePath)
 	if err != nil {
+		validation.markSecretError(fmt.Sprintf("%s: %v", fileKey, err))
+		return ""
+	}
+	return value
+}
+
+// getenvOptionalSecretAllowEmptyTracked treats empty direct or file values as
+// absent so Compose can mount /dev/null while the feature is disabled. A
+// non-empty configured file remains fail-closed and conflicts with a non-empty
+// direct value.
+func getenvOptionalSecretAllowEmptyTracked(key string, validation *envValidation) string {
+	directValue, directSet := os.LookupEnv(key)
+	if directSet && strings.TrimSpace(directValue) == "" {
+		directSet = false
+	}
+	fileKey := key + "_FILE"
+	filePath, fileSet := os.LookupEnv(fileKey)
+	if directSet && fileSet {
+		validation.markSecretError(fmt.Sprintf("%s and %s must not both be set", key, fileKey))
+		return ""
+	}
+	if directSet {
+		return directValue
+	}
+	if !fileSet {
+		return ""
+	}
+	if strings.TrimSpace(filePath) == "" {
+		validation.markSecretError(fmt.Sprintf("%s must name a readable secret file", fileKey))
+		return ""
+	}
+	value, err := readSecretFile(filePath)
+	if err != nil {
+		if strings.Contains(err.Error(), "secret file is empty") {
+			return ""
+		}
 		validation.markSecretError(fmt.Sprintf("%s: %v", fileKey, err))
 		return ""
 	}

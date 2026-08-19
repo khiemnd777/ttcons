@@ -26,6 +26,16 @@ data:
   AUTH_REFRESH_TOKEN_HOURS: "168"
   AUTH_REFRESH_COOKIE_SECURE: "true"
   AUTH_REFRESH_COOKIE_SAME_SITE: Lax
+  AUTH_RECOVERY_ENABLED: "false"
+  AUTH_RECOVERY_TOKEN_TTL: 15m
+  AUTH_RECOVERY_VERIFY_TTL: 24h
+  SMTP_HOST: ""
+  SMTP_PORT: "587"
+  SMTP_USERNAME: ""
+  SMTP_FROM_ADDRESS: ""
+  SMTP_FROM_NAME: Consflow
+  SMTP_TLS_MODE: starttls
+  SMTP_TIMEOUT: 10s
   # Replace both proxy CIDR placeholders in a production overlay. The invalid
   # backend value deliberately prevents an unreviewed base from starting.
   TRUSTED_PROXY_CIDRS: REPLACE_WITH_IMMEDIATE_ADMIN_POD_OR_MESH_CIDR

@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LogIn } from 'lucide-react';
-import { BrandLogo } from '../../components/BrandLogo';
-import { PoweredBySignature } from '../../components/PoweredBySignature';
 import { useAuth } from '../../lib/auth/AuthContext';
+import { AuthCard } from './AuthCard';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -37,14 +36,7 @@ export function LoginPage() {
   if (user) return <Navigate to="/" replace />;
 
   return (
-    <div className="grid min-h-screen place-items-center bg-surface px-4">
-      <div className="w-full max-w-md rounded-lg border border-line bg-white p-6 shadow-panel">
-        <div className="mb-6">
-          <BrandLogo size={112} className="mb-5" />
-          <h1 className="text-2xl font-semibold text-ink">Đăng nhập</h1>
-          <p className="mt-1 text-sm text-slate-600">Dùng tài khoản demo để vào Thủ Thiêm Workflow.</p>
-        </div>
-
+    <AuthCard title="Đăng nhập" description="Dùng tài khoản của anh/chị để vào Thủ Thiêm Workflow.">
         <form
           className="space-y-4"
           onSubmit={form.handleSubmit(async (values) => {
@@ -77,7 +69,10 @@ export function LoginPage() {
             <input className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm focus-ring" {...form.register('email')} />
           </label>
           <label className="block">
-            <span className="text-sm font-semibold text-slate-700">Mật khẩu</span>
+            <span className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-700">
+              Mật khẩu
+              <Link className="text-xs text-blue-700 hover:text-blue-800" to="/forgot-password">Quên mật khẩu?</Link>
+            </span>
             <input type="password" className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm focus-ring" {...form.register('password')} />
           </label>
           {error ? <p className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
@@ -86,10 +81,6 @@ export function LoginPage() {
             Đăng nhập
           </button>
         </form>
-        <div className="mt-6 border-t border-line pt-4">
-          <PoweredBySignature />
-        </div>
-      </div>
-    </div>
+    </AuthCard>
   );
 }

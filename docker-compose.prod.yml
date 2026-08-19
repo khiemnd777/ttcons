@@ -129,6 +129,17 @@ services:
       REDIS_CACHE_URL_FILE: /run/secrets/redis_cache_url
       JWT_SECRET_FILE: /run/secrets/jwt_secret
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is required}"
+      AUTH_RECOVERY_ENABLED: "${AUTH_RECOVERY_ENABLED:-false}"
+      AUTH_RECOVERY_TOKEN_TTL: "${AUTH_RECOVERY_TOKEN_TTL:-15m}"
+      AUTH_RECOVERY_VERIFY_TTL: "${AUTH_RECOVERY_VERIFY_TTL:-24h}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USERNAME: "${SMTP_USERNAME:-}"
+      SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+      SMTP_FROM_ADDRESS: "${SMTP_FROM_ADDRESS:-}"
+      SMTP_FROM_NAME: "${SMTP_FROM_NAME:-Consflow}"
+      SMTP_TLS_MODE: "${SMTP_TLS_MODE:-starttls}"
+      SMTP_TIMEOUT: "${SMTP_TIMEOUT:-10s}"
       MIGRATIONS_DIR: /app/migrations
       AUTO_MIGRATE: "false"
       STORAGE_PROVIDER: "s3"
@@ -213,6 +224,7 @@ services:
       - redis_url
       - redis_cache_url
       - jwt_secret
+      - smtp_password
     expose:
       - "8080"
     networks:
@@ -307,6 +319,8 @@ secrets:
     file: "${REDIS_CACHE_URL_FILE:?REDIS_CACHE_URL_FILE is required}"
   jwt_secret:
     file: "${JWT_SECRET_FILE:?JWT_SECRET_FILE is required}"
+  smtp_password:
+    file: "${SMTP_PASSWORD_FILE:-/dev/null}"
 
 volumes:
   consflow_postgres:

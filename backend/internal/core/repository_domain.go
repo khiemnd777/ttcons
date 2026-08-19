@@ -50,6 +50,8 @@ func (r *Repository) GetOwnProfile(ctx context.Context, userID string) (Record, 
 	return r.QueryOne(ctx, `
 		SELECT account.id::text,account.email,account.full_name,account.status,
 			account.created_at,account.updated_at,
+			COALESCE(CASE WHEN account.recovery_email_verified_at IS NOT NULL THEN account.recovery_email END,'') AS recovery_email_private,
+			COALESCE(pending.target_email,'') AS pending_recovery_email_private,
 			COALESCE(profile.phone,'') AS phone,
 			COALESCE(profile.department,'') AS department,
 			COALESCE(profile.position,'') AS position
@@ -62,6 +64,17 @@ func (r *Repository) GetOwnProfile(ctx context.Context, userID string) (Record, 
 			ORDER BY CASE WHEN staff.status='active' THEN 0 ELSE 1 END,staff.updated_at DESC,staff.id
 			LIMIT 1
 		) profile ON true
+		LEFT JOIN LATERAL (
+			SELECT token.target_email
+			FROM auth_email_tokens token
+			WHERE token.user_id=account.id
+			  AND token.purpose='verify_recovery_email'
+			  AND token.consumed_at IS NULL
+			  AND token.invalidated_at IS NULL
+			  AND token.expires_at > now()
+			ORDER BY token.created_at DESC,token.id
+			LIMIT 1
+		) pending ON true
 		WHERE account.id=$1
 		  AND account.status='active'
 	`, userID)
@@ -202,8 +215,16 @@ func (r *Repository) ChangeOwnPassword(ctx context.Context, userID, actorName, p
 	`, userID); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE auth_email_tokens
+		SET invalidated_at=now()
+		WHERE user_id=$1 AND consumed_at IS NULL AND invalidated_at IS NULL
+	`, userID); err != nil {
+		return err
+	}
 	if err := addAuditTx(ctx, tx, "", userID, actorName, "user_password_changed", "user_account", userID, "Người dùng đổi mật khẩu", Record{
-		"session_revoked": true,
+		"session_revoked":                 true,
+		"account_recovery_tokens_revoked": true,
 	}); err != nil {
 		return err
 	}

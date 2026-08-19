@@ -121,6 +121,63 @@ func (h *Handler) ChangeOwnPassword(c *fiber.Ctx) error {
 	return response.OK(c, result, "Đã đổi mật khẩu")
 }
 
+func (h *Handler) UpdateRecoveryEmail(c *fiber.Ctx) error {
+	var req UpdateRecoveryEmailRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu email khôi phục không hợp lệ")
+	}
+	result, err := h.service.RequestRecoveryEmailVerification(c.Context(), actorID(c), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã gửi email xác minh")
+}
+
+func (h *Handler) RemoveRecoveryEmail(c *fiber.Ctx) error {
+	var req RemoveRecoveryEmailRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu gỡ email khôi phục không hợp lệ")
+	}
+	result, err := h.service.RemoveRecoveryEmail(c.Context(), actorID(c), actorName(c), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã gỡ email khôi phục")
+}
+
+func (h *Handler) VerifyRecoveryEmail(c *fiber.Ctx) error {
+	var req VerifyRecoveryEmailRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xác minh không hợp lệ")
+	}
+	result, err := h.service.VerifyRecoveryEmail(c.Context(), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã xác minh email khôi phục")
+}
+
+func (h *Handler) ForgotPassword(c *fiber.Ctx) error {
+	var req ForgotPasswordRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu yêu cầu khôi phục không hợp lệ")
+	}
+	return response.OK(c, h.service.ForgotPassword(c.Context(), req), forgotPasswordAcceptedMessage)
+}
+
+func (h *Handler) ResetPassword(c *fiber.Ctx) error {
+	var req ResetPasswordRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đặt lại mật khẩu không hợp lệ")
+	}
+	result, err := h.service.ResetPassword(c.Context(), req)
+	if err != nil {
+		return err
+	}
+	h.clearRefreshCookie(c)
+	return response.OK(c, result, "Đã đặt lại mật khẩu")
+}
+
 func (h *Handler) setRefreshCookie(c *fiber.Ctx, token string, expiresAtText string) {
 	expiresAt, err := time.Parse(time.RFC3339, expiresAtText)
 	if err != nil {
@@ -4262,23 +4319,11 @@ func (h *Handler) ListStaff(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"staff.view"}); err != nil {
 		return err
 	}
-	return h.list(c, `
-		SELECT s.*,
-			COALESCE((
-				SELECT jsonb_agg(jsonb_build_object(
-					'id', r.id::text,
-					'name', r.name,
-					'display_name', r.display_name,
-					'project_id', COALESCE(ur.project_id::text, '')
-				) ORDER BY r.display_name)
-				FROM user_roles ur
-				JOIN roles r ON r.id=ur.role_id
-				WHERE ur.user_id=s.user_id
-			), '[]'::jsonb) AS user_roles
-		FROM staff s
-		WHERE s.status <> 'deleted'
-		ORDER BY s.full_name
-	`)
+	rows, err := h.service.ListStaff(c.Context(), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
 }
 func (h *Handler) CreateStaff(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"staff.create"}); err != nil {
@@ -4290,7 +4335,20 @@ func (h *Handler) UpdateStaff(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"staff.update"}); err != nil {
 		return err
 	}
-	return h.update(c, "staff", staffColumns())
+	var req UpdateStaffRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu nhân sự không hợp lệ")
+	}
+	if req.hasAccountSecurityChange() {
+		if err := h.requirePermission(c, []string{"staff.account_security.manage"}); err != nil {
+			return err
+		}
+	}
+	row, err := h.service.UpdateStaff(c.Context(), c.Params("id"), actorID(c), actorName(c), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row, "Đã cập nhật nhân sự")
 }
 func (h *Handler) ListRoles(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"role.view"}); err != nil {

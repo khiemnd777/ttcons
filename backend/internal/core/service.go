@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"consflow/backend/internal/shared/mailer"
 	sharedstorage "consflow/backend/internal/shared/storage"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -52,6 +53,12 @@ type Service struct {
 	refreshTokenTTL             time.Duration
 	refreshCookieSecure         bool
 	refreshCookieSameSite       string
+	recoveryEnabled             bool
+	recoveryTokenTTL            time.Duration
+	recoveryVerifyTTL           time.Duration
+	frontendOrigin              string
+	mailSender                  mailer.Sender
+	recoveryDeliverySlots       chan struct{}
 }
 
 func NewService(repo *Repository, jwtSecret string) *Service {
@@ -68,6 +75,9 @@ func NewService(repo *Repository, jwtSecret string) *Service {
 		accessTokenTTL:              defaultAccessTokenTTL,
 		refreshTokenTTL:             defaultRefreshTokenTTL,
 		refreshCookieSameSite:       defaultRefreshCookieSameSite,
+		recoveryTokenTTL:            15 * time.Minute,
+		recoveryVerifyTTL:           24 * time.Hour,
+		recoveryDeliverySlots:       make(chan struct{}, 16),
 	}
 }
 
@@ -204,6 +214,20 @@ func (s *Service) ConfigureAuth(accessTokenMinutes int64, refreshTokenHours int6
 	s.refreshCookieSameSite = refreshCookieSameSite
 }
 
+func (s *Service) ConfigureAccountRecovery(enabled bool, sender mailer.Sender, frontendOrigin string, tokenTTL, verifyTTL time.Duration) {
+	if tokenTTL <= 0 {
+		tokenTTL = 15 * time.Minute
+	}
+	if verifyTTL <= 0 {
+		verifyTTL = 24 * time.Hour
+	}
+	s.recoveryEnabled = enabled
+	s.mailSender = sender
+	s.frontendOrigin = strings.TrimRight(strings.TrimSpace(frontendOrigin), "/")
+	s.recoveryTokenTTL = tokenTTL
+	s.recoveryVerifyTTL = verifyTTL
+}
+
 func (s *Service) Login(ctx context.Context, req LoginRequest, userAgent string, ipAddress string) (Record, error) {
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 	if req.Email == "" || req.Password == "" {
@@ -229,6 +253,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, userAgent string,
 	if err != nil {
 		return nil, err
 	}
+	s.shapeOwnProfile(profile)
 	refreshToken, err := newSessionToken()
 	if err != nil {
 		return nil, err
@@ -259,6 +284,7 @@ func (s *Service) Me(ctx context.Context, userID string) (Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.shapeOwnProfile(user)
 	roles, _ := s.repo.UserRoles(ctx, userID)
 	permissions, _ := s.repo.UserPermissions(ctx, userID)
 	user["roles"] = roles
@@ -309,11 +335,8 @@ func (s *Service) ChangeOwnPassword(ctx context.Context, userID, actorName strin
 	if !passwordMatches(currentHash, req.CurrentPassword) {
 		return nil, validationError("Mật khẩu hiện tại không đúng", Record{"field": "current_password"})
 	}
-	if req.NewPassword != req.NewPasswordConfirmation {
-		return nil, validationError("Mật khẩu xác nhận không khớp", Record{"field": "new_password_confirmation"})
-	}
-	if count := len([]rune(req.NewPassword)); count < 8 || len([]byte(req.NewPassword)) > 72 {
-		return nil, validationError("Mật khẩu mới phải có ít nhất 8 ký tự và không vượt quá 72 byte", Record{"field": "new_password"})
+	if err := validateNewPassword(req.NewPassword, req.NewPasswordConfirmation); err != nil {
+		return nil, err
 	}
 	if passwordMatches(currentHash, req.NewPassword) {
 		return nil, validationError("Mật khẩu mới phải khác mật khẩu hiện tại", Record{"field": "new_password"})

@@ -4,7 +4,7 @@ import { ChevronDown, X } from 'lucide-react';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { useToast } from '../../components/ToastProvider';
 
-type FieldType = 'text' | 'number' | 'currency' | 'date' | 'textarea' | 'select' | 'multi-select' | 'checkbox';
+type FieldType = 'text' | 'email' | 'password' | 'number' | 'currency' | 'date' | 'textarea' | 'select' | 'multi-select' | 'checkbox';
 type FieldOption = { label: string; value: string };
 export type FormValues = Record<string, any>;
 
@@ -256,7 +256,7 @@ export function SimpleForm({
   }
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit}>
+    <form className="space-y-4" noValidate onSubmit={handleSubmit}>
       <div className={clsx(renderAside && 'grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]')}>
         <div className="space-y-4">
           {sections?.length ? sections.map((section) => {

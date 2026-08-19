@@ -117,6 +117,11 @@ aws_env = backend_container.fetch("env").select { |item| item["name"]&.start_wit
   assert(item.dig("valueFrom", "secretKeyRef", "optional") == true,
          "#{key} must remain optional so the default credential chain can use workload identity")
 end
+smtp_password_env = backend_container.fetch("env").find { |item| item["name"] == "SMTP_PASSWORD" }
+assert(smtp_password_env&.dig("valueFrom", "secretKeyRef", "name") == "consflow-runtime-secrets",
+       "SMTP_PASSWORD must come from the runtime Secret")
+assert(smtp_password_env.dig("valueFrom", "secretKeyRef", "optional") == true,
+       "SMTP_PASSWORD must remain optional while account recovery is disabled or the relay is unauthenticated")
 assert(backend_container.dig("livenessProbe", "httpGet", "path") == "/api/health",
        "backend liveness must use dependency-free /api/health")
 assert(backend_container.dig("readinessProbe", "httpGet", "path") == "/api/ready",

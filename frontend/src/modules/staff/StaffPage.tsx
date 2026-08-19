@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Plus, Search, ShieldCheck } from 'lucide-react';
 import { get, post, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -8,7 +9,6 @@ import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { FormDrawer } from '../../components/FormDrawer';
 import { useToast } from '../../components/ToastProvider';
-import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RowActions } from '../../components/RowActions';
 import { Dialog } from '../../components/Dialog';
 import { SimpleForm } from '../_shared/SimpleForm';
@@ -27,7 +27,15 @@ type StaffRow = Record<string, any> & {
   user_id?: string;
   full_name: string;
   email: string;
+  has_recovery_email?: boolean;
+  recovery_email_masked?: string;
   user_roles?: StaffRole[];
+};
+
+type UpdateStaffResponse = StaffRow & {
+  password_changed?: boolean;
+  recovery_email_changed?: boolean;
+  reauth_required?: boolean;
 };
 
 type RoleRow = Record<string, any> & {
@@ -45,13 +53,15 @@ type ProjectOption = Record<string, any> & {
 
 export function StaffPage() {
   const [open, setOpen] = useState(false);
-  const [dialog, setDialog] = useState<{ mode: 'view' | 'edit'; record: StaffRow } | null>(null);
+  const [dialog, setDialog] = useState<StaffRow | null>(null);
   const [roleDialog, setRoleDialog] = useState<StaffRow | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { hasPermission } = useAuth();
+  const navigate = useNavigate();
+  const { logout, hasPermission } = useAuth();
   const canCreate = hasPermission('staff.create');
   const canUpdate = hasPermission('staff.update');
+  const canManageAccountSecurity = hasPermission('staff.account_security.manage');
   const canAssign = hasPermission('permission.assign');
 
   const staff = useQuery({ queryKey: ['staff'], queryFn: () => get<StaffRow[]>('/staff') });
@@ -68,10 +78,21 @@ export function StaffPage() {
     onError: (error) => toast.error('Không tạo được nhân sự', error),
   });
   const update = useMutation({
-    mutationFn: ({ staffId, values }: { staffId: string; values: Record<string, any> }) => put(`/staff/${staffId}`, values),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staff'] });
+    mutationFn: ({ staffId, values }: { staffId: string; values: Record<string, any> }) => put<UpdateStaffResponse>(`/staff/${staffId}`, values),
+    onSuccess: async (result) => {
+      if (result.reauth_required) {
+        setDialog(null);
+        toast.success('Đã cập nhật nhân sự và mật khẩu. Vui lòng đăng nhập lại.');
+        await logout();
+        navigate('/login', { replace: true });
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ['staff'] });
       setDialog(null);
+      if (result.password_changed || result.recovery_email_changed) {
+        toast.success('Đã cập nhật thông tin và bảo mật tài khoản nhân sự');
+        return;
+      }
       toast.success('Đã cập nhật nhân sự');
     },
     onError: (error) => toast.error('Không cập nhật được nhân sự', error),
@@ -93,6 +114,30 @@ export function StaffPage() {
     { name: 'department', label: 'Phòng ban', defaultValue: record?.department ?? 'Dự án', required: true },
     { name: 'position', label: 'Chức vụ', defaultValue: record?.position ?? 'Nhân viên', required: true },
     { name: 'status', label: 'Trạng thái', type: 'select' as const, defaultValue: record?.status ?? 'active', required: true, options: enumOptions('status', ['active', 'inactive']) },
+  ];
+
+  const staffEditFields = (record: StaffRow) => [
+    ...staffFields(record),
+    ...(canManageAccountSecurity && record.user_id ? [
+      {
+        name: 'new_password',
+        label: 'Mật khẩu mới',
+        type: 'password' as const,
+        defaultValue: '',
+        placeholder: 'Để trống nếu không thay đổi',
+        helperText: 'Tối thiểu 8 ký tự, tối đa 72 byte. Lưu mật khẩu mới sẽ đăng xuất tài khoản này khỏi mọi thiết bị.',
+        validate: validateOptionalPassword,
+      },
+      {
+        name: 'recovery_email',
+        label: 'Email khôi phục mới',
+        type: 'email' as const,
+        defaultValue: '',
+        placeholder: 'Nhập email mới; để trống nếu không thay đổi',
+        helperText: recoveryEmailHelperText(record),
+        validate: validateOptionalRecoveryEmail,
+      },
+    ] : []),
   ];
 
   return (
@@ -121,7 +166,7 @@ export function StaffPage() {
             key: 'actions',
             header: 'Action',
             render: (row) => (
-              <RowActions onView={() => setDialog({ mode: 'view', record: row })} onEdit={canUpdate ? () => setDialog({ mode: 'edit', record: row }) : undefined}>
+              <RowActions onEdit={canUpdate ? () => setDialog(row) : undefined}>
                 {canAssign ? (
                   <button
                     title={row.user_id ? 'Gán vai trò' : 'Nhân sự chưa liên kết tài khoản'}
@@ -141,24 +186,47 @@ export function StaffPage() {
       <FormDrawer open={open} title="Tạo nhân sự" onClose={() => setOpen(false)}>
         <SimpleForm fields={staffFields()} onSubmit={(values) => create.mutateAsync(values)} />
       </FormDrawer>
-      <RecordDetailDialog
-        open={dialog?.mode === 'view'}
-        title="Chi tiết nhân sự"
-        record={dialog?.record ?? null}
+      <Dialog
+        open={Boolean(dialog)}
+        title="Chỉnh sửa nhân sự"
+        description={dialog ? `${dialog.full_name} · ${dialog.email}` : undefined}
+        size="lg"
         onClose={() => setDialog(null)}
-        fields={[
-          { key: 'full_name', label: 'Họ tên' },
-          { key: 'email', label: 'Email' },
-          { key: 'phone', label: 'Điện thoại' },
-          { key: 'department', label: 'Phòng ban' },
-          { key: 'position', label: 'Chức vụ' },
-          { key: 'roles', label: 'Role', render: (row) => <RoleSummary roles={row.user_roles ?? []} /> },
-          { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
-        ]}
-      />
-      <FormDrawer open={dialog?.mode === 'edit'} title="Chỉnh sửa nhân sự" onClose={() => setDialog(null)}>
-        {dialog?.record ? <SimpleForm submitLabel="Lưu thay đổi" fields={staffFields(dialog.record)} onSubmit={(values) => update.mutateAsync({ staffId: dialog.record.id, values })} /> : null}
-      </FormDrawer>
+      >
+        {dialog ? (
+          <>
+            {canManageAccountSecurity && !dialog.user_id ? (
+              <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-semibold">Chưa thể quản trị bảo mật tài khoản</p>
+                  <p className="mt-1 text-xs leading-5">Nhân sự chưa liên kết tài khoản đăng nhập. Anh/chị vẫn có thể cập nhật thông tin nhân sự bên dưới.</p>
+                </div>
+              </div>
+            ) : null}
+            <SimpleForm
+              submitLabel="Lưu thay đổi"
+              cancelLabel="Hủy"
+              layout="two-column"
+              fields={staffEditFields(dialog)}
+              sections={[
+                {
+                  title: 'Thông tin nhân sự',
+                  description: 'Thông tin liên hệ và hồ sơ công việc.',
+                  fields: ['full_name', 'email', 'phone', 'department', 'position', 'status'],
+                },
+                ...(canManageAccountSecurity && dialog.user_id ? [{
+                  title: 'Bảo mật tài khoản',
+                  description: 'Các trường không bắt buộc; để trống để giữ nguyên. Thay đổi được áp dụng trực tiếp, không gửi email xác nhận.',
+                  fields: ['new_password', 'recovery_email'],
+                }] : []),
+              ]}
+              onCancel={() => setDialog(null)}
+              onSubmit={(values) => update.mutateAsync({ staffId: dialog.id, values })}
+            />
+          </>
+        ) : null}
+      </Dialog>
       <StaffRoleDialog
         staff={roleDialog}
         roles={(roles.data ?? []).filter(isAssignableAppRole)}
@@ -176,6 +244,34 @@ export function StaffPage() {
       />
     </>
   );
+}
+
+function recoveryEmailHelperText(record: StaffRow) {
+  if (record.recovery_email_masked) {
+    return `Hiện tại: ${record.recovery_email_masked} · Đã xác minh. Để trống để giữ nguyên. Email mới được xác minh ngay, không gửi email xác nhận.`;
+  }
+  if (record.has_recovery_email) {
+    return 'Đã thiết lập email khôi phục. Để trống để giữ nguyên. Email mới được xác minh ngay, không gửi email xác nhận.';
+  }
+  return 'Chưa thiết lập email khôi phục. Email mới được xác minh ngay, không gửi email xác nhận.';
+}
+
+function validateOptionalPassword(value: unknown) {
+  const password = String(value ?? '');
+  if (!password) return undefined;
+  if (Array.from(password).length < 8 || new TextEncoder().encode(password).length > 72) {
+    return 'Mật khẩu mới phải có ít nhất 8 ký tự và không vượt quá 72 byte';
+  }
+  return undefined;
+}
+
+function validateOptionalRecoveryEmail(value: unknown) {
+  const email = String(value ?? '').trim();
+  if (!email) return undefined;
+  if (email.length > 254 || /\s/.test(email) || !/^[^@]+@[^@]+$/.test(email)) {
+    return 'Email khôi phục không hợp lệ';
+  }
+  return undefined;
 }
 
 function RoleSummary({ roles }: { roles: StaffRole[] }) {

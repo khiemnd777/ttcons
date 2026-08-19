@@ -25,6 +25,79 @@ func TestConfigValidateTrustedProxiesAndMode(t *testing.T) {
 	}
 }
 
+func TestAccountRecoveryConfigurationDegradesWithoutBlockingStartup(t *testing.T) {
+	base := Config{
+		AppEnv:                "development",
+		RateLimitMode:         "enforce",
+		DBMaxOpenConns:        20,
+		DBMaxIdleConns:        10,
+		StoragePath:           t.TempDir(),
+		AuthRecoveryEnabled:   true,
+		AuthRecoveryTokenTTL:  15 * time.Minute,
+		AuthRecoveryVerifyTTL: 24 * time.Hour,
+		SMTPPort:              587,
+		SMTPTLSMode:           "starttls",
+		SMTPTimeout:           10 * time.Second,
+	}
+	if err := base.Validate(); err != nil {
+		t.Fatalf("invalid optional recovery mail blocked startup: %v", err)
+	}
+	if err := base.AccountRecoveryConfigurationError(); err == nil || !strings.Contains(err.Error(), "SMTP_HOST") {
+		t.Fatalf("enabled recovery without SMTP host module error=%v", err)
+	}
+	base.SMTPHost = "smtp.example.com"
+	base.SMTPFromAddress = "no-reply@example.com"
+	if err := base.AccountRecoveryConfigurationError(); err != nil {
+		t.Fatalf("valid unauthenticated SMTP relay rejected: %v", err)
+	}
+	base.SMTPUsername = "mailer"
+	if err := base.Validate(); err != nil {
+		t.Fatalf("invalid optional recovery credentials blocked startup: %v", err)
+	}
+	if err := base.AccountRecoveryConfigurationError(); err == nil || !strings.Contains(err.Error(), "SMTP_USERNAME") {
+		t.Fatalf("SMTP username without password error=%v", err)
+	}
+	base.SMTPPassword = "secret"
+	base.SMTPTLSMode = "invalid"
+	if err := base.Validate(); err != nil {
+		t.Fatalf("invalid optional recovery TLS blocked startup: %v", err)
+	}
+	if err := base.AccountRecoveryConfigurationError(); err == nil || !strings.Contains(err.Error(), "SMTP_TLS_MODE") {
+		t.Fatalf("invalid SMTP TLS mode error=%v", err)
+	}
+}
+
+func TestLoadIsolatesEnabledRecoverySecretErrorsFromStartup(t *testing.T) {
+	clearSecretFileEnvironment(t)
+	unsetEnvironment(t, "SMTP_PASSWORD")
+	t.Setenv("AUTH_RECOVERY_ENABLED", "true")
+	t.Setenv("SMTP_HOST", "smtp.example.com")
+	t.Setenv("SMTP_FROM_ADDRESS", "no-reply@example.com")
+	t.Setenv("SMTP_PASSWORD_FILE", filepath.Join(t.TempDir(), "missing-smtp-secret"))
+	t.Setenv("STORAGE_PATH", t.TempDir())
+	cfg := Load()
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("invalid optional recovery secret blocked startup: %v", err)
+	}
+	if err := cfg.AccountRecoveryConfigurationError(); err == nil || !strings.Contains(err.Error(), "SMTP_PASSWORD_FILE") {
+		t.Fatalf("recovery secret error=%v, want SMTP_PASSWORD_FILE", err)
+	}
+}
+
+func TestLoadAllowsEmptyOptionalSMTPSecretWhileRecoveryDisabled(t *testing.T) {
+	clearSecretFileEnvironment(t)
+	unsetEnvironment(t, "SMTP_PASSWORD")
+	t.Setenv("SMTP_PASSWORD", "")
+	t.Setenv("STORAGE_PATH", t.TempDir())
+	cfg := Load()
+	if cfg.SMTPPassword != "" {
+		t.Fatalf("SMTPPassword=%q, want empty", cfg.SMTPPassword)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("disabled recovery rejected empty optional SMTP secret: %v", err)
+	}
+}
+
 func TestConfigValidateRejectsIdlePoolLargerThanOpenPool(t *testing.T) {
 	cfg := Config{AppEnv: "development", RateLimitMode: "enforce", DBMaxOpenConns: 5, DBMaxIdleConns: 6}
 	if err := cfg.Validate(); err == nil {
@@ -556,7 +629,7 @@ func setValidProductionEnvironment(t *testing.T) {
 
 func clearSecretFileEnvironment(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"DATABASE_URL_FILE", "REDIS_URL_FILE", "REDIS_CACHE_URL_FILE", "JWT_SECRET_FILE"} {
+	for _, key := range []string{"DATABASE_URL_FILE", "REDIS_URL_FILE", "REDIS_CACHE_URL_FILE", "JWT_SECRET_FILE", "SMTP_PASSWORD_FILE"} {
 		unsetEnvironment(t, key)
 	}
 }

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,187 @@ import (
 	"consflow/backend/internal/shared/middleware"
 
 	"github.com/gofiber/fiber/v2"
+	"golang.org/x/crypto/bcrypt"
 )
+
+func TestAdminStaffAccountSecurityManagement(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	suffix := newID()
+	actorID := newID()
+	targetUserID := newID()
+	targetStaffID := newID()
+	actorStaffID := newID()
+	unlinkedStaffID := newID()
+	limitedRoleID := ensureRole(t, db, "staff_security_limited_"+suffix[:8], "Staff Security Limited")
+	staffViewPermissionID := ensurePermission(t, db, "staff.view", "Xem nhân sự", "staff")
+	staffUpdatePermissionID := ensurePermission(t, db, "staff.update", "Sửa nhân sự", "staff")
+	staffSecurityPermissionID := ensurePermission(t, db, "staff.account_security.manage", "Quản trị bảo mật tài khoản nhân sự", "staff")
+	actorEmail := "staff-security-actor-" + suffix[:8] + "@test.local"
+	targetEmail := "staff-security-target-" + suffix[:8] + "@test.local"
+	recoveryEmail := "staff-security-recovery-" + suffix[:8] + "@example.com"
+	newPassword := "Admin-Reset-123!"
+
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE actor_id=$1`, actorID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM auth_email_tokens WHERE user_id IN ($1,$2)`, actorID, targetUserID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM auth_sessions WHERE user_id IN ($1,$2)`, actorID, targetUserID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1`, actorID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id IN ($1,$2,$3)`, targetStaffID, actorStaffID, unlinkedStaffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id IN ($1,$2)`, actorID, targetUserID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, limitedRoleID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, limitedRoleID)
+	})
+
+	mustExec(t, db, `
+		INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2),($1,$3)
+		ON CONFLICT DO NOTHING
+	`, limitedRoleID, staffViewPermissionID, staffUpdatePermissionID)
+	mustExec(t, db, `
+		INSERT INTO users (id,email,password_hash,full_name,status) VALUES
+			($1,$2,'demo:actor-password','Security Actor','active'),
+			($3,$4,'demo:target-password','Security Target','inactive')
+	`, actorID, actorEmail, targetUserID, targetEmail)
+	mustExec(t, db, `
+		INSERT INTO staff (id,user_id,full_name,email,department,position,status) VALUES
+			($1,$2,'Security Target',$3,'Dự án','Nhân viên','inactive'),
+			($4,$5,'Security Actor',$6,'Công nghệ','Admin','active'),
+			($7,NULL,'Unlinked Staff',$8,'Dự án','Nhân viên','active')
+	`, targetStaffID, targetUserID, targetEmail, actorStaffID, actorID, actorEmail, unlinkedStaffID, "unlinked-"+suffix[:8]+"@test.local")
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2)`, actorID, limitedRoleID)
+	mustExec(t, db, `
+		INSERT INTO auth_sessions (user_id,refresh_token_hash,access_token_id,expires_at)
+		VALUES ($1,$2,$3,now()+interval '1 day')
+	`, targetUserID, strings.Repeat("a", 56)+suffix[:8], "target-session-"+suffix)
+	mustExec(t, db, `
+		INSERT INTO auth_email_tokens (user_id,purpose,token_hash,target_email,expires_at)
+		VALUES ($1,'reset_password',$2,$3,now()+interval '15 minutes')
+	`, targetUserID, strings.Repeat("b", 56)+suffix[:8], "old-recovery-"+suffix[:8]+"@example.com")
+
+	handler := NewHandler(service)
+	app := fiber.New(fiber.Config{ErrorHandler: ErrorHandler})
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user_id", actorID)
+		c.Locals("email", actorEmail)
+		return c.Next()
+	})
+	app.Get("/staff", handler.ListStaff)
+	app.Put("/staff/:id", handler.UpdateStaff)
+	deniedRequest := httptest.NewRequest(http.MethodPut, "/staff/"+targetStaffID, strings.NewReader(`{"new_password":"Denied-Reset-123!"}`))
+	deniedRequest.Header.Set("Content-Type", "application/json")
+	deniedResponse, err := app.Test(deniedRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deniedResponse.StatusCode != http.StatusForbidden {
+		t.Fatalf("sensitive staff update status=%d, want %d without staff.account_security.manage", deniedResponse.StatusCode, http.StatusForbidden)
+	}
+
+	fullName := "Security Target Updated"
+	result, err := service.UpdateStaff(ctx, targetStaffID, actorID, actorEmail, UpdateStaffRequest{
+		FullName:      &fullName,
+		NewPassword:   newPassword,
+		RecoveryEmail: recoveryEmail,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result["password_changed"] != true || result["recovery_email_changed"] != true || result["reauth_required"] != false || result["has_recovery_email"] != true {
+		t.Fatalf("unexpected security update response: %#v", result)
+	}
+
+	var passwordHash, storedRecoveryEmail, targetStatus, targetStaffStatus, verifiedAt string
+	if err := db.QueryRowContext(ctx, `
+		SELECT account.password_hash,account.recovery_email,account.status,person.status,account.recovery_email_verified_at::text
+		FROM users account
+		JOIN staff person ON person.user_id=account.id
+		WHERE account.id=$1 AND person.id=$2
+	`, targetUserID, targetStaffID).Scan(&passwordHash, &storedRecoveryEmail, &targetStatus, &targetStaffStatus, &verifiedAt); err != nil {
+		t.Fatal(err)
+	}
+	if bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(newPassword)) != nil {
+		t.Fatal("admin password reset was not stored as a bcrypt hash")
+	}
+	if storedRecoveryEmail != recoveryEmail || verifiedAt == "" {
+		t.Fatalf("recovery email state=%q verified_at=%q", storedRecoveryEmail, verifiedAt)
+	}
+	if targetStatus != "inactive" || targetStaffStatus != "inactive" {
+		t.Fatalf("security update changed inactive state: user=%q staff=%q", targetStatus, targetStaffStatus)
+	}
+
+	readStaff := func() []Record {
+		t.Helper()
+		listResponse, err := app.Test(httptest.NewRequest(http.MethodGet, "/staff", nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if listResponse.StatusCode != http.StatusOK {
+			t.Fatalf("list staff status=%d, want %d", listResponse.StatusCode, http.StatusOK)
+		}
+		var body struct {
+			Data []Record `json:"data"`
+		}
+		if err := json.NewDecoder(listResponse.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		return body.Data
+	}
+	findTargetStaff := func(rows []Record) Record {
+		t.Helper()
+		for _, row := range rows {
+			if fmt.Sprint(row["id"]) == targetStaffID {
+				return row
+			}
+		}
+		t.Fatalf("target staff %s missing from list", targetStaffID)
+		return nil
+	}
+
+	limitedRow := findTargetStaff(readStaff())
+	if limitedRow["has_recovery_email"] != true {
+		t.Fatalf("limited staff list recovery state=%#v, want true", limitedRow["has_recovery_email"])
+	}
+	if _, exposed := limitedRow["recovery_email_masked"]; exposed {
+		t.Fatal("masked recovery email exposed without staff.account_security.manage")
+	}
+
+	mustExec(t, db, `INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, limitedRoleID, staffSecurityPermissionID)
+	privilegedRow := findTargetStaff(readStaff())
+	if got, want := fmt.Sprint(privilegedRow["recovery_email_masked"]), "sta***@e**.com"; got != want {
+		t.Fatalf("masked recovery email=%q, want %q", got, want)
+	}
+	if _, exposed := privilegedRow["recovery_email_private"]; exposed {
+		t.Fatal("private recovery email leaked through staff list")
+	}
+	if _, exposed := privilegedRow["recovery_email"]; exposed {
+		t.Fatal("full recovery email leaked through staff list")
+	}
+
+	assertCount(t, db, `SELECT COUNT(*) FROM auth_sessions WHERE user_id=$1 AND revoked_at IS NOT NULL`, 1, targetUserID)
+	assertCount(t, db, `SELECT COUNT(*) FROM auth_email_tokens WHERE user_id=$1 AND invalidated_at IS NOT NULL`, 1, targetUserID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE actor_id=$1 AND event_type IN ('staff_updated_by_admin','user_password_changed_by_admin','user_recovery_email_set_by_admin')`, 3, actorID)
+
+	var auditMetadata string
+	if err := db.QueryRowContext(ctx, `SELECT string_agg(metadata_json::text,' ') FROM audit_logs WHERE actor_id=$1`, actorID).Scan(&auditMetadata); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(auditMetadata, newPassword) || strings.Contains(auditMetadata, recoveryEmail) {
+		t.Fatalf("security secret leaked into audit metadata: %s", auditMetadata)
+	}
+
+	if _, err := service.UpdateStaff(ctx, unlinkedStaffID, actorID, actorEmail, UpdateStaffRequest{NewPassword: newPassword}); err == nil {
+		t.Fatal("expected unlinked staff account-security update to fail")
+	}
+	selfResult, err := service.UpdateStaff(ctx, actorStaffID, actorID, actorEmail, UpdateStaffRequest{NewPassword: "Actor-Reset-123!"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selfResult["reauth_required"] != true {
+		t.Fatalf("self password reset response=%#v, want reauth_required=true", selfResult)
+	}
+}
 
 func TestProjectOperationsAccessPolicy(t *testing.T) {
 	db := openProjectOperationsTestDB(t)

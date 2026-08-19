@@ -14,6 +14,9 @@ const ProjectDetailPage = lazy(() => import('../modules/projects/ProjectDetailPa
 const ProjectWorkspaceLayout = lazy(() => import('../modules/projects/ProjectWorkspaceLayout').then(({ ProjectWorkspaceLayout }) => ({ default: ProjectWorkspaceLayout })));
 const MyWorkPage = lazy(() => import('../modules/my-work/MyWorkPage').then(({ MyWorkPage }) => ({ default: MyWorkPage })));
 const ProfilePage = lazy(() => import('../modules/profile/ProfilePage').then(({ ProfilePage }) => ({ default: ProfilePage })));
+const ForgotPasswordPage = lazy(() => import('../modules/auth/ForgotPasswordPage').then(({ ForgotPasswordPage }) => ({ default: ForgotPasswordPage })));
+const ResetPasswordPage = lazy(() => import('../modules/auth/ResetPasswordPage').then(({ ResetPasswordPage }) => ({ default: ResetPasswordPage })));
+const VerifyRecoveryEmailPage = lazy(() => import('../modules/auth/VerifyRecoveryEmailPage').then(({ VerifyRecoveryEmailPage }) => ({ default: VerifyRecoveryEmailPage })));
 const WorkItemDetailPage = lazy(() => import('../modules/work-items/WorkItemDetailPage').then(({ WorkItemDetailPage }) => ({ default: WorkItemDetailPage })));
 const PipelineBuilderPage = lazy(() => import('../modules/pipeline-builder/PipelineBuilderPage').then(({ PipelineBuilderPage }) => ({ default: PipelineBuilderPage })));
 const WorkflowFormsPage = lazy(() => import('../modules/workflow-forms/WorkflowFormsPage').then(({ WorkflowFormsPage }) => ({ default: WorkflowFormsPage })));
@@ -75,6 +78,9 @@ function guarded(element: ReactNode, permissions?: string[], focus = false) {
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/forgot-password', element: <RouteModuleBoundary focus><ForgotPasswordPage /></RouteModuleBoundary> },
+  { path: '/reset-password', element: <RouteModuleBoundary focus><ResetPasswordPage /></RouteModuleBoundary> },
+  { path: '/verify-recovery-email', element: <RouteModuleBoundary focus><VerifyRecoveryEmailPage /></RouteModuleBoundary> },
   {
     element: <RequireAuth />,
     children: [

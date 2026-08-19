@@ -79,6 +79,12 @@ spec:
               value: /var/run/secrets/consflow/redis_cache_url
             - name: JWT_SECRET_FILE
               value: /var/run/secrets/consflow/jwt_secret
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: consflow-runtime-secrets
+                  key: smtp_password
+                  optional: true
             # The AWS SDK v2 default credential chain also supports a reviewed
             # workload-identity overlay. These optional static keys are the
             # portable S3-compatible fallback and still come only from Secret.

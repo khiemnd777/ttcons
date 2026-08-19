@@ -39,6 +39,10 @@ export type User = {
   department?: string;
   position?: string;
   status?: string;
+  recovery_email_available?: boolean;
+  recovery_email_verified?: boolean;
+  recovery_email_masked?: string;
+  pending_recovery_email_masked?: string;
 };
 
 export type Project = AnyRecord & {

@@ -33,6 +33,41 @@ type ChangeOwnPasswordRequest struct {
 	NewPasswordConfirmation string `json:"new_password_confirmation"`
 }
 
+type UpdateStaffRequest struct {
+	UserID        *string `json:"user_id"`
+	FullName      *string `json:"full_name"`
+	Email         *string `json:"email"`
+	Phone         *string `json:"phone"`
+	Department    *string `json:"department"`
+	Position      *string `json:"position"`
+	Status        *string `json:"status"`
+	NewPassword   string  `json:"new_password"`
+	RecoveryEmail string  `json:"recovery_email"`
+}
+
+type UpdateRecoveryEmailRequest struct {
+	RecoveryEmail   string `json:"recovery_email"`
+	CurrentPassword string `json:"current_password"`
+}
+
+type RemoveRecoveryEmailRequest struct {
+	CurrentPassword string `json:"current_password"`
+}
+
+type VerifyRecoveryEmailRequest struct {
+	Token string `json:"token"`
+}
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+type ResetPasswordRequest struct {
+	Token                   string `json:"token"`
+	NewPassword             string `json:"new_password"`
+	NewPasswordConfirmation string `json:"new_password_confirmation"`
+}
+
 type ActionRequest struct {
 	Comment string `json:"comment"`
 	Reason  string `json:"reason"`

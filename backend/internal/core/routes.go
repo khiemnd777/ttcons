@@ -3,9 +3,11 @@ package core
 import (
 	"context"
 	"database/sql"
+	"log"
 	"sync"
 
 	"consflow/backend/internal/shared/config"
+	"consflow/backend/internal/shared/mailer"
 	"consflow/backend/internal/shared/middleware"
 	sharedstorage "consflow/backend/internal/shared/storage"
 
@@ -20,6 +22,15 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 		return nil, err
 	}
 	service.ConfigureAuth(cfg.AuthAccessTokenMinutes, cfg.AuthRefreshTokenHours, cfg.AuthRefreshCookieSecure, cfg.AuthRefreshCookieSameSite)
+	recoverySender, recoveryConfigErr := newAccountRecoverySender(cfg)
+	if recoveryConfigErr != nil {
+		log.Printf("level=warn component=account_recovery operation=configure status=unavailable error=%q", recoveryConfigErr.Error())
+	} else if _, preview := recoverySender.(*mailer.PreviewSender); preview {
+		log.Printf("level=warn component=account_recovery operation=configure status=ready provider=preview delivery=discarded")
+	} else if recoverySender != nil {
+		log.Printf("level=info component=account_recovery operation=configure status=ready provider=smtp")
+	}
+	service.ConfigureAccountRecovery(recoverySender != nil, recoverySender, cfg.FrontendOrigin, cfg.AuthRecoveryTokenTTL, cfg.AuthRecoveryVerifyTTL)
 	service.ConfigureActivityStreaming(redisClient, cfg.SSEBrokerChannel, cfg.RedisOperationTimeout, cfg.SSEMaxConnections, cfg.SSEMaxConnectionsPerIP, cfg.SSEMaxConnectionsPerActor, cfg.SSEVisibilityTimeout, cfg.SSEMaxConnectionLifetime)
 	service.ConfigureProjectExplorerCache(redisCacheClient, ProjectExplorerCacheConfig{
 		Mode:             cfg.ProjectExplorerCacheMode,
@@ -48,6 +59,9 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	api.Post("/auth/login", h.Login)
 	api.Post("/auth/refresh", h.Refresh)
 	api.Post("/auth/logout", h.Logout)
+	api.Post("/auth/password/forgot", h.ForgotPassword)
+	api.Post("/auth/password/reset", h.ResetPassword)
+	api.Post("/auth/recovery-email/verify", h.VerifyRecoveryEmail)
 
 	protected := api.Group("",
 		middleware.AuthClaimsRequired(cfg.JWTSecret),
@@ -58,6 +72,8 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Get("/auth/me", h.Me)
 	protected.Put("/auth/profile", h.UpdateOwnProfile)
 	protected.Put("/auth/password", h.ChangeOwnPassword)
+	protected.Put("/auth/recovery-email", h.UpdateRecoveryEmail)
+	protected.Delete("/auth/recovery-email", h.RemoveRecoveryEmail)
 
 	protected.Get("/projects", h.ListProjects)
 	protected.Get("/projects/explorer", h.ProjectExplorer)
@@ -473,6 +489,22 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 			service.CloseActivityStreaming()
 		})
 	}, nil
+}
+
+func newAccountRecoverySender(cfg config.Config) (mailer.Sender, error) {
+	if !cfg.AuthRecoveryEnabled {
+		return nil, nil
+	}
+	if err := cfg.AccountRecoveryConfigurationError(); err != nil {
+		if cfg.AppEnv == "development" || cfg.AppEnv == "test" {
+			return mailer.NewPreview(), nil
+		}
+		return nil, err
+	}
+	return mailer.NewSMTP(mailer.SMTPConfig{
+		Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername, Password: cfg.SMTPPassword,
+		FromAddress: cfg.SMTPFromAddress, FromName: cfg.SMTPFromName, TLSMode: cfg.SMTPTLSMode, Timeout: cfg.SMTPTimeout,
+	})
 }
 
 func rateLimitPolicies(values config.RateLimitPolicies) middleware.RateLimitPolicies {
