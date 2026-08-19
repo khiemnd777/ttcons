@@ -51,12 +51,12 @@ export function CoreDataPage() {
   return (
     <>
       <PageHeader
-        title="Dữ liệu lõi"
-        description="Chuẩn hoá khách hàng, nhà cung cấp, thầu phụ và đối tác dùng trong công trình, mua sắm, nghiệm thu và kế toán."
+        title="Danh mục đối tác"
+        description="Quản lý khách hàng, nhà cung cấp, thầu phụ và các đơn vị phối hợp."
         actions={
           <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setDialog({ mode: 'create' })}>
             <Plus className="h-4 w-4" />
-            Đối tác
+            Thêm đối tác
           </button>
         }
       />

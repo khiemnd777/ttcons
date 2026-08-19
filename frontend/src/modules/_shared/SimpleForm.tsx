@@ -183,7 +183,7 @@ export function SimpleForm({
                   aria-invalid={Boolean(error)}
                   disabled={disabled}
                 >
-                  <option value="">Chọn</option>
+                  <option value="">{field.placeholder ?? 'Chọn'}</option>
                   {field.options?.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}

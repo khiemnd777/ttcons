@@ -33,6 +33,7 @@
 - Submitted incoming acceptance is only a selectable receipt source. A linked receipt cannot exceed `accepted_quantity - previously linked receive movements`; acceptance never posts stock by itself.
 - Procurement accepted-vs-stocked progress also recognizes historical explicit receive movements linked to the originating `boq_item`; this compatibility source is capped at accepted quantity and blocks duplicate acceptance-linked receipts.
 - The stock workspace has four explicit sources of truth: warehouse positions, posted documents/ledger, project site/surplus balance and active material catalog.
+- Material creation presents `default_supplier_partner_id` as `Nhà cung cấp tham khảo` because a selected quotation supplier still takes precedence; `default_supplier` is the conditional `Tên nhà cung cấp khác` fallback. The naming is presentation-only and does not change supplier validation, snapshots or procurement grouping.
 - Material snapshot submit applies site balance usage but does not create warehouse movement by itself.
 - Surplus handling can be partial and must keep remaining/handled state consistent.
 - Returning only part of the available site material leaves `surplus_status='partial'` when a positive surplus remains; it becomes `handled` only when no surplus remains. Stock SQL binds quantities explicitly as numeric to avoid PostgreSQL parameter type ambiguity.

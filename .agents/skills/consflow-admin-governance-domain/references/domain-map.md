@@ -11,7 +11,7 @@
 ## Routes
 
 - Auth, personal profile and account recovery: existing auth/profile routes plus public `POST /auth/password/forgot`, `POST /auth/password/reset`, `POST /auth/recovery-email/verify`, protected `PUT|DELETE /auth/recovery-email`; product pages `/profile`, `/forgot-password`, `/reset-password`, `/verify-recovery-email`
-- Core data: `/partners`
+- Product navigation `Đối tác`, page title `Danh mục đối tác`: frontend route `/core-data`; API `/partners`
 - Staff/RBAC: `/staff`, `/roles`, `/permissions`, `/roles/:id/permissions`, `/users/:id/roles`
 - Project membership governance: `/projects/:id/members`, `/projects/:id/members/:memberId`
 - Audit/settings: `/audit-logs`, `/projects/:id/audit-logs`, `/settings`
@@ -43,6 +43,7 @@
 - Staff report is a project-allocation view: only active staff memberships in accessible non-cancelled projects are returned and distinct accessible projects are counted. Full-company staff is available only through the `staff.view` Staff module.
 - `project.member.manage` is granted to Admin/Director/PM and always combined with project scope. Project member responses expose server capabilities; mutation synchronizes only project-scoped `user_roles`, never removes global roles, never exposes Admin/Director as assignable project roles, and writes project audit.
 - Partner catalog updates preserve downstream snapshots for historical documents.
+- Partner management is presented as `Đối tác` in global navigation and `Danh mục đối tác` on the page. These labels do not rename the compatibility `/core-data` route, `/partners` API, `partners` table, `catalog.view|manage` permissions or downstream snapshot fields.
 - Project setup presents the active `client` partner selector as `Chọn chủ đầu tư có sẵn` and its selected summary as `Chủ đầu tư đã chọn`; these user-facing labels do not change active/type filtering, `partner_id`, name snapshot behavior or catalog governance.
 - Session refresh/revoke lifecycle remains DB-backed and revocable.
 - Personal Profile is actor-owned and permission-free after authentication: neither self-service mutation accepts a target user ID. `/auth/me` uses `users` for login identity and a preferred non-deleted linked `staff` row for phone/department/position. Profile writes mirror full name/email/phone to every linked non-deleted staff row in one audit-atomic transaction, never create governance staff implicitly, and leave department/position/roles read-only. Email change requires the current password; password change requires current/matching confirmation and persists bcrypt only. Either sensitive change revokes every session and clears the refresh cookie so the JWT email used by later audit cannot remain stale. Audit records changed field names/session outcome only and never password material; historical audit/activity actor snapshots are not rewritten.

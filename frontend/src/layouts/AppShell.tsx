@@ -58,7 +58,7 @@ const navGroups: NavGroup[] = [
   {
     title: 'Quản trị',
     items: [
-      { to: '/core-data', label: 'Dữ liệu lõi', icon: Database, permissions: ['catalog.view'] },
+      { to: '/core-data', label: 'Đối tác', icon: Database, permissions: ['catalog.view'] },
       { to: '/staff', label: 'Nhân sự', icon: Users, permissions: ['staff.view'] },
       { to: '/roles', label: 'Vai trò', icon: ShieldCheck, permissions: ['role.view'] },
       { to: '/audit', label: 'Nhật ký hệ thống', icon: FileClock, permissions: ['audit.view'] },
