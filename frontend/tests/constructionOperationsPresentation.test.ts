@@ -59,9 +59,14 @@ test('construction report exposes protected saved evidence preview and the appro
   assert.match(source, /Thử lại thumbnail/);
   assert.match(source, /<EvidenceRecordViewerDialog/);
   assert.match(source, /isImageEvidence\(record\) \|\| isInlinePdfEvidence\(record\)/);
+  assert.match(source, /isInlineWordEvidence\(record\)/);
+  assert.match(source, /isInlineSpreadsheetEvidence\(record\)/);
   assert.match(source, /pdf \? 'Xem PDF'/);
+  assert.match(source, /word \? 'Xem Word'/);
+  assert.match(source, /spreadsheet \? 'Xem Excel'/);
   assert.match(source, /<EvidenceDraftViewerDialog/);
   assert.match(source, /showWorkItem/);
+  assert.match(source, /onOpenFile=\{viewerRecord \? \(\) => void openEvidenceFile\(viewerRecord\)/);
   assert.match(source, /onPreviewPhoto=\{\(draft, previewURL\) => setEvidenceViewer/);
   assert.match(source, /onRetry=\{viewerRecord \? \(\) => setEvidencePreviewRetryKey/);
   assert.doesNotMatch(source, /import \{ EvidenceViewerDialog \}/);

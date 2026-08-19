@@ -26,3 +26,15 @@ test('project evidence uses seven desktop tracks and stacked labels below xl', (
   assert.match(gallerySource, /text-slate-400 xl:hidden/);
   assert.match(gallerySource, /grid-cols-\[6rem_minmax\(0,1fr\)\]/);
 });
+
+test('shared evidence presentations expose one explicit open action without a duplicate detail button', () => {
+  assert.doesNotMatch(gallerySource, />\s*Chi tiết\s*</);
+  assert.equal((gallerySource.match(/onClick=\{onSelect\}/g) ?? []).length, 2);
+  assert.match(gallerySource, /aria-label=\{`Xem chi tiết hồ sơ \$\{title\}`\}/);
+  assert.match(gallerySource, /function evidenceOpenLabel/);
+  assert.match(gallerySource, /return 'Xem ảnh'/);
+  assert.match(gallerySource, /return 'Xem PDF'/);
+  assert.match(gallerySource, /return 'Xem Word'/);
+  assert.match(gallerySource, /return 'Xem Excel'/);
+  assert.match(gallerySource, /return 'Mở tệp'/);
+});

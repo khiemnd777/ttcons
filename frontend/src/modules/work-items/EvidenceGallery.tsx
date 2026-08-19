@@ -14,6 +14,8 @@ import {
   formatEvidenceFileSize,
   isImageEvidence,
   isInlinePdfEvidence,
+  isInlineSpreadsheetEvidence,
+  isInlineWordEvidence,
   isPdfEvidence,
   originalFilename,
   type EvidenceReviewAction,
@@ -305,9 +307,6 @@ function EvidenceListRow({
         : DEFAULT_EVIDENCE_LIST_GRID_CLASS,
     )}>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100" onClick={onSelect}>
-          Chi tiết
-        </button>
         <button
           type="button"
           className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
@@ -410,10 +409,7 @@ function EvidenceCard({
         <span className={clsx('rounded-md px-2 py-0.5 text-xs font-semibold', isProtectedStorageProvider(record.storage_provider) ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>
           {isProtectedStorageProvider(record.storage_provider) ? 'Tệp được bảo vệ' : 'Liên kết ngoài'}
         </span>
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100" onClick={onSelect}>
-            Chi tiết
-          </button>
+        <div className="flex justify-end">
           <button
             type="button"
             className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
@@ -519,11 +515,16 @@ function isDocumentEvidence(record: EvidenceRecord) {
 }
 
 function canPreviewEvidenceInApp(record: EvidenceRecord) {
-  return isImageEvidence(record) || isInlinePdfEvidence(record);
+  return isImageEvidence(record)
+    || isInlinePdfEvidence(record)
+    || isInlineWordEvidence(record)
+    || isInlineSpreadsheetEvidence(record);
 }
 
 function evidenceOpenLabel(record: EvidenceRecord) {
   if (isImageEvidence(record)) return 'Xem ảnh';
   if (isInlinePdfEvidence(record)) return 'Xem PDF';
+  if (isInlineWordEvidence(record)) return 'Xem Word';
+  if (isInlineSpreadsheetEvidence(record)) return 'Xem Excel';
   return 'Mở tệp';
 }

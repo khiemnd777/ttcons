@@ -11,7 +11,14 @@ import type { ConstructionWorkspace, EvidenceRecord, ProjectEvidencePage, Projec
 import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
 import { isProtectedStorageProvider } from '../../lib/utils/protectedStorage';
 import { statusLabel } from '../../lib/utils/status';
-import { EvidenceDraftViewerDialog, EvidenceRecordViewerDialog, isImageEvidence, isInlinePdfEvidence } from '../_shared/EvidenceRecordViewerDialog';
+import {
+  EvidenceDraftViewerDialog,
+  EvidenceRecordViewerDialog,
+  isImageEvidence,
+  isInlinePdfEvidence,
+  isInlineSpreadsheetEvidence,
+  isInlineWordEvidence,
+} from '../_shared/EvidenceRecordViewerDialog';
 import { useEvidencePreviewUrls } from '../work-items/EvidenceGallery';
 import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
 import { ConstructionReportLinkedComposer, createReportLinkedDraft, reportLinkedSubmitLabel, validateReportLinkedDrafts, type ReportLinkedDraft } from './ConstructionReportLinkedComposer';
@@ -342,7 +349,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
 	                {!workItemId ? <InfoState title="Chưa chọn hạng mục thi công" description="Chọn hạng mục đang thực hiện trước khi chụp hoặc tải ảnh hiện trường." /> : null}
                 {workItemId && evidence.isLoading ? <LoadingSpinner label="Đang tải minh chứng của công việc..." /> : null}
                 {workItemId && evidence.isError ? <InlineError message="Không tải được minh chứng của công việc." onRetry={() => evidence.refetch()} /> : null}
-	                {workItemId && evidence.isSuccess && evidenceOptions.length ? <details className="rounded-lg border border-line bg-slate-50 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Chọn từ minh chứng đã có · {selectedEvidenceIds.length} đã chọn</summary><div className="mt-3 grid gap-2 sm:grid-cols-2">{evidenceOptions.map((record) => <ExistingEvidenceOption key={record.id} record={record} selected={selectedEvidenceIds.includes(record.id)} primary={primaryEvidenceId === record.id} previewURL={selectedEvidencePreviews.urls[record.id]} previewPending={selectedEvidencePreviews.loadingIds.has(record.id)} previewFailed={selectedEvidencePreviews.errorIds.has(record.id)} onToggle={() => toggleEvidence(record.id)} onPrimary={() => setPrimaryEvidenceId(record.id)} onOpen={() => isImageEvidence(record) || isInlinePdfEvidence(record) ? setEvidenceViewer({ source: 'stored', record }) : void openEvidenceFile(record)} onRetry={() => setEvidencePreviewRetryKey((current) => current + 1)} />)}</div></details> : null}
+	                {workItemId && evidence.isSuccess && evidenceOptions.length ? <details className="rounded-lg border border-line bg-slate-50 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Chọn từ minh chứng đã có · {selectedEvidenceIds.length} đã chọn</summary><div className="mt-3 grid gap-2 sm:grid-cols-2">{evidenceOptions.map((record) => <ExistingEvidenceOption key={record.id} record={record} selected={selectedEvidenceIds.includes(record.id)} primary={primaryEvidenceId === record.id} previewURL={selectedEvidencePreviews.urls[record.id]} previewPending={selectedEvidencePreviews.loadingIds.has(record.id)} previewFailed={selectedEvidencePreviews.errorIds.has(record.id)} onToggle={() => toggleEvidence(record.id)} onPrimary={() => setPrimaryEvidenceId(record.id)} onOpen={() => isImageEvidence(record) || isInlinePdfEvidence(record) || isInlineWordEvidence(record) || isInlineSpreadsheetEvidence(record) ? setEvidenceViewer({ source: 'stored', record }) : void openEvidenceFile(record)} onRetry={() => setEvidencePreviewRetryKey((current) => current + 1)} />)}</div></details> : null}
 	                <ConstructionEvidenceCapture drafts={uploads} onChange={(next) => { setUploads(next); clearError('evidence_ids'); }} hasSource={Boolean(workItemId)} disabled={saving} hint="Ảnh được tải lên theo hạng mục trước khi lưu báo cáo; nếu lưu thất bại, ảnh vẫn được giữ trong hồ sơ hạng mục." onPreviewPhoto={(draft, previewURL) => setEvidenceViewer({ source: 'draft', draft, previewURL })} />
 	                {errors.evidence_ids ? <p className="text-xs font-medium text-rose-700">{errors.evidence_ids}</p> : null}
               </div>
@@ -367,6 +374,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
         previewLoading={viewerLoading}
         previewError={viewerError}
         showWorkItem
+        onOpenFile={viewerRecord ? () => void openEvidenceFile(viewerRecord) : undefined}
         onRetry={viewerRecord ? () => setEvidencePreviewRetryKey((current) => current + 1) : undefined}
         onClose={() => setEvidenceViewer(null)}
       />
@@ -399,7 +407,10 @@ function ExistingEvidenceOption({ record, selected, primary, previewURL, preview
   const rejected = record.status === 'rejected';
   const image = isImageEvidence(record);
   const pdf = isInlinePdfEvidence(record);
-  const openLabel = image ? 'Xem ảnh' : pdf ? 'Xem PDF' : 'Mở tệp';
+  const word = isInlineWordEvidence(record);
+  const spreadsheet = isInlineSpreadsheetEvidence(record);
+  const openLabel = image ? 'Xem ảnh' : pdf ? 'Xem PDF' : word ? 'Xem Word' : spreadsheet ? 'Xem Excel' : 'Mở tệp';
+  const typeLabel = image ? 'Ảnh' : pdf ? 'PDF' : word ? 'Word' : spreadsheet ? 'Excel' : 'Tài liệu';
   const title = record.name || record.title || 'Minh chứng';
   return (
     <article className={clsx('min-w-0 rounded-lg border p-3', selected ? 'border-blue-300 bg-blue-50' : 'border-line bg-white')}>
@@ -410,7 +421,7 @@ function ExistingEvidenceOption({ record, selected, primary, previewURL, preview
         </button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-ink">{title}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} /><span className="text-xs text-slate-500">{image ? 'Ảnh' : pdf ? 'PDF' : 'Tài liệu'}</span></div>
+          <div className="mt-1 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} /><span className="text-xs text-slate-500">{typeLabel}</span></div>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <button type="button" className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline" onClick={onOpen}><Eye className="h-3.5 w-3.5" /> {openLabel}</button>
             {previewFailed ? <button type="button" className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 hover:underline" onClick={onRetry}><RefreshCw className="h-3.5 w-3.5" /> Thử lại thumbnail</button> : null}

@@ -8,12 +8,24 @@ import { compactDateTime, evidenceLabel, visibilityLabel } from '../work-items/w
 import {
   evidenceMediaType,
   isImageEvidence,
+  isInlineSpreadsheetEvidence,
   isInlinePdfEvidence,
+  isInlineWordEvidence,
+  isLegacySpreadsheetEvidence,
+  isLegacyWordEvidence,
   originalFilename,
+  type EvidenceMediaType,
 } from './evidenceMedia';
 import { EvidenceViewerDialog } from './EvidenceViewerDialog';
 
-export { isImageEvidence, isInlinePdfEvidence, isPdfEvidence, originalFilename } from './evidenceMedia';
+export {
+  isImageEvidence,
+  isInlinePdfEvidence,
+  isInlineSpreadsheetEvidence,
+  isInlineWordEvidence,
+  isPdfEvidence,
+  originalFilename,
+} from './evidenceMedia';
 
 export type EvidenceReviewAction = 'accept' | 'reject';
 
@@ -48,53 +60,63 @@ export function EvidenceRecordViewerDialog({
   onClose,
   onReview,
 }: EvidenceRecordViewerDialogProps) {
-  const pdfPreview = useProtectedPdfPreview(record);
+  const inlineMediaType = record ? inlineEvidenceMediaType(record) : undefined;
+  const protectedPreview = useProtectedEvidencePreview(record, inlineMediaType);
   if (!record) return null;
   const reviewable = canReview
     && Boolean(onReview)
     && Boolean(onReviewCommentChange)
     && ['draft', 'submitted', 'pending'].includes(String(record.status));
-  const mediaType = evidenceMediaType(record);
-  const imageEvidence = mediaType === 'photo';
-  const inlinePdf = mediaType === 'pdf' && isInlinePdfEvidence(record);
+  const detectedMediaType = evidenceMediaType(record);
+  const imageEvidence = detectedMediaType === 'photo';
+  const inlinePdf = inlineMediaType === 'pdf';
+  const inlineOffice = inlineMediaType === 'word' || inlineMediaType === 'spreadsheet';
   const protectedFile = isProtectedStorageProvider(record.storage_provider) && Boolean(record.storage_key);
   const openableDocument = !imageEvidence && Boolean(onOpenFile) && (protectedFile || Boolean(record.file_url));
-  const mediaAction = inlinePdf && pdfPreview.previewUrl ? (
+  const openActionLabel = inlinePdf ? 'Mở tab' : inlineOffice ? 'Mở tệp gốc' : 'Mở tệp';
+  const mediaAction = inlineMediaType && protectedPreview.previewUrl ? (
     <a
-      href={pdfPreview.previewUrl}
+      href={protectedPreview.previewUrl}
       target="_blank"
-      rel="noreferrer"
+      rel="noopener noreferrer"
       className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
     >
       <ExternalLink className="h-4 w-4" />
-      Mở tab
+      {openActionLabel}
     </a>
   ) : openableDocument ? (
     <button
       type="button"
-      className={inlinePdf
+      className={inlineMediaType
         ? 'inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50'
         : 'inline-flex items-center gap-2 rounded-md bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-800'}
       onClick={onOpenFile}
     >
       <ExternalLink className="h-4 w-4" />
-      {inlinePdf ? 'Mở tab' : 'Mở tệp'}
+      {openActionLabel}
     </button>
   ) : undefined;
+  const legacyOfficeMessage = isLegacyWordEvidence(record)
+    ? 'Định dạng Word đời cũ (.doc) chưa hỗ trợ đọc trực tiếp. Mở tệp gốc bằng ứng dụng tương thích.'
+    : isLegacySpreadsheetEvidence(record)
+      ? 'Định dạng Excel đời cũ (.xls) chưa hỗ trợ đọc trực tiếp. Mở tệp gốc bằng ứng dụng tương thích.'
+      : undefined;
 
   return (
     <EvidenceViewerDialog
       open
       name={evidenceRecordTitle(record)}
-      previewUrl={inlinePdf ? pdfPreview.previewUrl : previewUrl}
-      mediaType={inlinePdf ? 'pdf' : (imageEvidence ? 'photo' : 'document')}
-      loading={inlinePdf ? pdfPreview.loading : previewLoading}
-      error={inlinePdf ? pdfPreview.error : previewError}
+      previewUrl={inlinePdf ? protectedPreview.previewUrl : previewUrl}
+      fileBlob={inlineOffice ? protectedPreview.blob : undefined}
+      mediaType={inlineMediaType ?? (imageEvidence ? 'photo' : 'document')}
+      loading={inlineMediaType ? protectedPreview.loading : previewLoading}
+      error={inlineMediaType ? protectedPreview.error : previewError}
       caption={record.caption}
-      metadata={[evidenceLabel(record.evidence_type), record.mime_type ?? '', record.file_size ? formatEvidenceFileSize(record.file_size) : ''].filter(Boolean)}
+      metadata={[evidenceMediaLabel(record, detectedMediaType), record.mime_type ?? '', record.file_size ? formatEvidenceFileSize(record.file_size) : ''].filter(Boolean)}
       headerStatus={<StatusBadge status={record.status} />}
       mediaAction={mediaAction}
-      onRetry={inlinePdf ? pdfPreview.retry : onRetry}
+      documentUnavailableText={legacyOfficeMessage}
+      onRetry={inlineMediaType ? protectedPreview.retry : onRetry}
       onClose={onClose}
       footer={(
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -284,15 +306,17 @@ export function formatEvidenceFileSize(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function useProtectedPdfPreview(record: EvidenceRecord | null) {
+function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: 'pdf' | 'word' | 'spreadsheet') {
   const [retryKey, setRetryKey] = useState(0);
   const [state, setState] = useState<{
     recordId?: string;
+    mediaType?: 'pdf' | 'word' | 'spreadsheet';
+    blob?: Blob;
     previewUrl?: string;
     loading: boolean;
     error?: string;
   }>({ loading: false });
-  const eligible = Boolean(record && isInlinePdfEvidence(record));
+  const eligible = Boolean(record && mediaType);
   const recordId = eligible ? record?.id : undefined;
   const storageKey = eligible ? record?.storage_key : undefined;
   const updatedAt = eligible ? record?.updated_at : undefined;
@@ -305,34 +329,58 @@ function useProtectedPdfPreview(record: EvidenceRecord | null) {
 
     let cancelled = false;
     let objectUrl = '';
-    setState({ recordId, loading: true });
+    setState({ recordId, mediaType, loading: true });
 
-    async function loadPdf() {
+    async function loadEvidenceFile() {
       try {
         const blob = await downloadBlob(`/evidence/${recordId}/file`);
         if (cancelled) return;
-        const pdfBlob = blob.type.toLowerCase().includes('pdf')
-          ? blob
-          : blob.slice(0, blob.size, 'application/pdf');
-        objectUrl = URL.createObjectURL(pdfBlob);
-        setState({ recordId, previewUrl: objectUrl, loading: false });
+        const normalizedBlob = normalizeEvidenceBlob(blob, mediaType);
+        objectUrl = URL.createObjectURL(normalizedBlob);
+        setState({ recordId, mediaType, blob: normalizedBlob, previewUrl: objectUrl, loading: false });
       } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : 'Vui lòng thử lại.';
-        setState({ recordId, loading: false, error: `Không tải được PDF. ${message}` });
+        const label = mediaType === 'pdf' ? 'PDF' : mediaType === 'word' ? 'Word' : 'Excel';
+        setState({ recordId, mediaType, loading: false, error: `Không tải được ${label}. ${message}` });
       }
     }
 
-    void loadPdf();
+    void loadEvidenceFile();
     return () => {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [recordId, retryKey, storageKey, updatedAt]);
+  }, [mediaType, recordId, retryKey, storageKey, updatedAt]);
 
-  const currentState = state.recordId === recordId ? state : { loading: Boolean(recordId) };
+  const currentState = state.recordId === recordId && state.mediaType === mediaType ? state : { loading: Boolean(recordId) };
   return {
     ...currentState,
     retry: () => setRetryKey((current) => current + 1),
   };
+}
+
+function inlineEvidenceMediaType(record: EvidenceRecord): 'pdf' | 'word' | 'spreadsheet' | undefined {
+  if (isInlinePdfEvidence(record)) return 'pdf';
+  if (isInlineWordEvidence(record)) return 'word';
+  if (isInlineSpreadsheetEvidence(record)) return 'spreadsheet';
+  return undefined;
+}
+
+function evidenceMediaLabel(record: EvidenceRecord, mediaType: EvidenceMediaType) {
+  if (mediaType === 'pdf') return 'PDF';
+  if (mediaType === 'word' || isLegacyWordEvidence(record)) return 'Word';
+  if (mediaType === 'spreadsheet' || isLegacySpreadsheetEvidence(record)) return 'Excel';
+  return evidenceLabel(record.evidence_type);
+}
+
+function normalizeEvidenceBlob(blob: Blob, mediaType?: 'pdf' | 'word' | 'spreadsheet') {
+  const expectedMimeType = mediaType === 'pdf'
+    ? 'application/pdf'
+    : mediaType === 'word'
+      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : mediaType === 'spreadsheet'
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : blob.type;
+  return blob.type.toLowerCase() === expectedMimeType ? blob : blob.slice(0, blob.size, expectedMimeType);
 }

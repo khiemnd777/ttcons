@@ -1,12 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { FileText, Image as ImageIcon, Info, Loader2, RefreshCw, X } from 'lucide-react';
 import { EvidencePdfViewer } from './EvidencePdfViewer';
+import { EvidenceSpreadsheetViewer } from './EvidenceSpreadsheetViewer';
+import { EvidenceWordViewer } from './EvidenceWordViewer';
+import type { EvidenceMediaType } from './evidenceMedia';
 
 export type EvidenceViewerDialogProps = {
   open: boolean;
   name: string;
   previewUrl?: string;
-  mediaType: 'photo' | 'pdf' | 'document';
+  fileBlob?: Blob;
+  mediaType: EvidenceMediaType;
   loading?: boolean;
   error?: string;
   caption?: string;
@@ -25,6 +29,7 @@ export function EvidenceViewerDialog({
   open,
   name,
   previewUrl,
+  fileBlob,
   mediaType,
   loading = false,
   error,
@@ -33,7 +38,7 @@ export function EvidenceViewerDialog({
   metadata = [],
   headerStatus,
   mediaAction,
-  documentUnavailableText = 'Chưa có tệp có thể mở.',
+  documentUnavailableText,
   details,
   footer,
   onRetry,
@@ -77,7 +82,7 @@ export function EvidenceViewerDialog({
             {description ? <p className="mt-1.5 text-xs leading-5 text-slate-500">{description}</p> : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {mediaType === 'pdf' ? mediaAction : null}
+            {['pdf', 'word', 'spreadsheet'].includes(mediaType) ? mediaAction : null}
             {headerStatus}
             <button type="button" className="rounded-md p-2 text-slate-500 hover:bg-slate-100" onClick={onClose} aria-label="Đóng"><X className="h-5 w-5" /></button>
           </div>
@@ -101,6 +106,22 @@ export function EvidenceViewerDialog({
                   error={error}
                   onRetry={onRetry}
                 />
+              ) : mediaType === 'word' ? (
+                <EvidenceWordViewer
+                  name={name}
+                  blob={fileBlob}
+                  loading={loading}
+                  error={error}
+                  onRetry={onRetry}
+                />
+              ) : mediaType === 'spreadsheet' ? (
+                <EvidenceSpreadsheetViewer
+                  name={name}
+                  blob={fileBlob}
+                  loading={loading}
+                  error={error}
+                  onRetry={onRetry}
+                />
               ) : (
                 <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-line bg-slate-50 px-6 py-8 text-center sm:min-h-[22rem]">
                   <span className="grid h-20 w-20 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm">
@@ -108,7 +129,8 @@ export function EvidenceViewerDialog({
                   </span>
                   <p className="mt-5 max-w-xl break-words text-base font-semibold leading-6 text-ink">{name}</p>
                   {metadata.length ? <p className="mt-2 text-sm text-slate-500">{metadata.filter(Boolean).join(' · ')}</p> : null}
-                  {mediaAction ? <div className="mt-5">{mediaAction}</div> : <p className="mt-4 text-sm font-medium text-slate-500">{documentUnavailableText}</p>}
+                  {documentUnavailableText ? <p className="mt-4 max-w-xl text-sm font-medium leading-6 text-slate-500">{documentUnavailableText}</p> : null}
+                  {mediaAction ? <div className="mt-5">{mediaAction}</div> : !documentUnavailableText ? <p className="mt-4 text-sm font-medium text-slate-500">Chưa có tệp có thể mở.</p> : null}
                 </div>
               )}
               {caption ? <div className="mt-3 flex items-start gap-2 rounded-md border border-blue-100 bg-blue-50/70 p-3 text-sm leading-6 text-slate-700"><Info className="mt-1 h-4 w-4 shrink-0 text-blue-700" /><p className="whitespace-pre-wrap break-words">{caption}</p></div> : null}
