@@ -3,7 +3,9 @@ name: Release production
 on:
   push:
     tags:
-      - "v????-??-??.*"
+      # GitHub ref filters do not support repeated bare `?` wildcards. Keep the
+      # trigger broad and let validate-release-tag.sh enforce vYYYY-MM-DD.N.
+      - "v*"
 
 concurrency:
   group: production-release
