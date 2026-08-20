@@ -445,6 +445,8 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 
 	protected.Get("/audit-logs", h.AuditLogs)
 	protected.Get("/projects/:id/audit-logs", h.ProjectAuditLogs)
+	protected.Get("/event-logs", h.EventLogs)
+	protected.Get("/event-logs/:id", h.EventLogDetail)
 	protected.Get("/statistics/options", h.StatisticsOptions)
 	protected.Get("/statistics/projects", h.ProjectStatistic)
 	protected.Get("/statistics/projects/export", h.ProjectStatisticExport)

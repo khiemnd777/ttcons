@@ -179,7 +179,7 @@ services:
       PROJECT_EXPLORER_CACHE_MAX_VALUE_BYTES: "${PROJECT_EXPLORER_CACHE_MAX_VALUE_BYTES:-262144}"
       RATE_LIMIT_REDIS_MAX_IN_FLIGHT: "${RATE_LIMIT_REDIS_MAX_IN_FLIGHT:-32}"
       RATE_LIMIT_ENABLED: "${RATE_LIMIT_ENABLED:-true}"
-      RATE_LIMIT_MODE: "${RATE_LIMIT_MODE:-observe}"
+      RATE_LIMIT_MODE: "${RATE_LIMIT_MODE:-enforce}"
       RATE_LIMIT_LOCAL_MAX_KEYS: "${RATE_LIMIT_LOCAL_MAX_KEYS:-10000}"
       RATE_LIMIT_IP_AUTH_LIMIT: "${RATE_LIMIT_IP_AUTH_LIMIT:-10}"
       RATE_LIMIT_IP_AUTH_BURST: "${RATE_LIMIT_IP_AUTH_BURST:-10}"
@@ -258,14 +258,13 @@ services:
   admin:
     <<: *common-runtime
     container_name: admin
+    user: "101:101"
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
         VITE_API_URL: /api
     environment:
-      NGINX_ENVSUBST_FILTER: "^(SERVER_NAME|TRUSTED_PROXY_CIDR|REAL_IP_HEADER)$"
-      SERVER_NAME: "${SERVER_NAME:?SERVER_NAME is required}"
       TRUSTED_PROXY_CIDR: "${TRUSTED_PROXY_CIDR:?TRUSTED_PROXY_CIDR is required}"
       REAL_IP_HEADER: "${REAL_IP_HEADER:-X-Forwarded-For}"
     ports:
@@ -285,10 +284,9 @@ services:
     stop_grace_period: 20s
     read_only: true
     tmpfs:
-      - /etc/nginx/conf.d:rw,noexec,nosuid,size=1m
-      - /var/cache/nginx:rw,noexec,nosuid,size=64m
-      - /var/run:rw,noexec,nosuid,size=1m
-      - /tmp:rw,noexec,nosuid,size=16m
+      - /config:rw,noexec,nosuid,uid=101,gid=101,mode=0700,size=1m
+      - /data:rw,noexec,nosuid,uid=101,gid=101,mode=0700,size=16m
+      - /tmp:rw,noexec,nosuid,uid=101,gid=101,mode=0700,size=16m
     mem_limit: "${ADMIN_MEMORY_LIMIT:-256m}"
     cpus: "${ADMIN_CPU_LIMIT:-1.0}"
     pids_limit: 128

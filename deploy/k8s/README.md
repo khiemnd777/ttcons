@@ -21,7 +21,7 @@ Docker Compose production vẫn là topology single-host được kiểm soát. 
 
 | Area | Existing owner | Collision | Contract in this baseline |
 |---|---|---|---|
-| Gateway DNS | `frontend/nginx.conf` dùng Docker resolver `127.0.0.11` | Image nguyên trạng sẽ trả `502` trong Kubernetes | Init container kiểm tra template, loại Docker-only resolver/dynamic variable và render `proxy_pass http://backend:8080` tới stable ClusterIP Service; frontend source không đổi |
+| Gateway DNS | `frontend/Caddyfile` dùng upstream `backend:8080` | Gateway phải hoạt động giống nhau trong Docker và Kubernetes | Caddy dùng DNS runtime của nền tảng và gọi thẳng stable ClusterIP Service; không có init container hay template render riêng cho Kubernetes |
 | Schema migration | `consflow-migrate`, PostgreSQL advisory lock | Migration theo từng pod/init container sẽ chạy lặp và có thể đụng binary cũ | Một release-unique Job với credential DDL/owner riêng chạy trước rollout; backend chỉ mount runtime DML credential, không có migration init container và luôn `AUTO_MIGRATE=false` |
 | Database pool | `DB_MAX_OPEN_CONNS` là theo process | Scale replica nhân tổng connection | Capacity gate dùng `backend replicas × DB_MAX_OPEN_CONNS + migration/ops headroom` |
 | Redis/SSE | Redis Pub/Sub có shared fanout; limiter/SSE caps có local process state | Redis outage hoặc scale-out làm local fallback/caps khác với global quota | Redis managed là production dependency; test cross-replica fanout/reconnect/failover và tính quota theo tổng pod trước mở traffic |
@@ -135,9 +135,6 @@ patches:
         path: /data/FRONTEND_ORIGIN
         value: https://workflow.company.example
       - op: replace
-        path: /data/SERVER_NAME
-        value: workflow.company.example
-      - op: replace
         path: /data/TRUSTED_PROXY_CIDR
         value: 10.20.0.0/24
       - op: replace
@@ -154,9 +151,9 @@ patches:
         value: https://s3.ap-southeast-1.amazonaws.com
 ```
 
-Không thêm `namePrefix`/`nameSuffix` vào application overlay: K8s-specific Nginx config cố ý target exact stable Service `backend`. Release-unique `nameSuffix` chỉ áp dụng cho one-shot operator Jobs.
+Không thêm `namePrefix`/`nameSuffix` vào application overlay: Caddy cố ý target exact stable Service `backend`. Release-unique `nameSuffix` chỉ áp dụng cho one-shot operator Jobs.
 
-`TRUSTED_PROXY_CIDR` là peer trực tiếp tới admin/Nginx. `TRUSTED_PROXY_CIDRS` là peer trực tiếp từ admin/service-mesh tới Fiber. Không dùng toàn VPC CIDR chỉ vì thuận tiện; xác minh actual source address sau kube-proxy/CNI/mesh và giữ allowlist nhỏ nhất.
+`TRUSTED_PROXY_CIDR` là peer trực tiếp tới admin/Caddy. `TRUSTED_PROXY_CIDRS` là peer trực tiếp từ admin/service-mesh tới Fiber. Không dùng toàn VPC CIDR chỉ vì thuận tiện; xác minh actual source address sau kube-proxy/CNI/mesh và giữ allowlist nhỏ nhất.
 
 AWS S3 có thể để endpoint rỗng và dùng regional resolver của SDK. S3-compatible/MinIO thường cần HTTPS endpoint riêng và `STORAGE_S3_USE_PATH_STYLE=true`; chỉ dùng các giá trị đã kiểm thử với conditional create/checksum behavior của provider.
 
@@ -265,7 +262,7 @@ Nếu migration chưa expand-contract, không cho old/new overlap:
 
 - `replicas: 2`, `maxUnavailable: 1`, `maxSurge: 0`, required host anti-affinity, zone spread và PDB `minAvailable: 1` giữ ít nhất một replica phục vụ khi thay pod/drain tự nguyện và không deadlock rollout trên hai node. Cluster một node sẽ để replica thứ hai Pending thay vì tạo ảo giác HA.
 - Liveness backend dùng dependency-free `/api/health`; readiness dùng DB-aware `/api/ready`. Redis degradation không làm readiness fail: monitor Redis riêng và coi local limiter/SSE fallback kéo dài là incident.
-- Redis Pub/Sub chuyển invalidation giữa pod khi Redis hoạt động. Process/IP/actor SSE caps, Nginx `sse_global` và local limiter fallback vẫn là **per pod**; tổng cluster tăng theo replica và phải được edge/distributed quota giới hạn.
+- Redis Pub/Sub chuyển invalidation giữa pod khi Redis hoạt động. Process/IP/actor SSE caps và local limiter fallback vẫn là **per backend pod**; tổng cluster tăng theo replica và phải được managed edge/distributed quota giới hạn. Standard Caddy không bổ sung một connection cap riêng.
 - `SSE_MAX_CONNECTION_LIFETIME` tạo reconnect/revalidation định kỳ. Staging phải chứng minh một client trên pod A nhận event phát từ pod B, reconnect qua pod khác, và failover không làm lộ project scope.
 - Backend Service có annotation scrape `/metrics`. NetworkPolicy chỉ cho collector mang đủ namespace+pod label truy cập `backend:8080`; không route endpoint này qua admin/Ingress.
 - `optional/hpa.yaml` không nằm trong base. Required hostname anti-affinity cần ít nhất một schedulable node cho mỗi replica; trước khi bật HPA phải có node capacity tới `maxReplicas` hoặc một overlay affinity khác đã review. Đồng thời Metrics Server phải ổn định, resource requests phản ánh tải thật, DB/Redis/object-store capacity chịu được `maxReplicas`, và scale-down SSE drain đã pass. CPU/memory HPA không đại diện trực tiếp cho queue/SSE demand.

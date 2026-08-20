@@ -1,0 +1,179 @@
+{
+	admin off
+	persist_config off
+	auto_https off
+
+	servers :8080 {
+		name admin_gateway
+		protocols h1
+		trusted_proxies static {$TRUSTED_PROXY_CIDR}
+		client_ip_headers {$REAL_IP_HEADER}
+		trusted_proxies_strict
+		timeouts {
+			read_body 30s
+			read_header 10s
+			write 0s
+			idle 30s
+		}
+		max_header_size 64KiB
+	}
+}
+
+(backend_proxy) {
+	reverse_proxy backend:8080 {
+		header_up X-Real-IP {client_ip}
+		header_up X-Forwarded-For {client_ip}
+		header_up X-Forwarded-Proto https
+		header_up X-Request-ID {http.request.uuid}
+		header_up -Connection
+
+		transport http {
+			dial_timeout 3s
+			response_header_timeout {args[0]}
+			read_timeout {args[0]}
+			write_timeout {args[1]}
+		}
+	}
+}
+
+:8080 {
+	root * /usr/share/caddy
+
+	log {
+		output stdout
+		format json
+	}
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	@gateway_health path /gateway-health
+	handle @gateway_health {
+		log_skip
+		respond "" 204
+	}
+
+	# Prometheus scrapes backend:8080 on the private service network. Never
+	# forward or serve this exact path from the public admin origin.
+	@metrics path /metrics
+	handle @metrics {
+		log_skip
+		respond "" 404
+	}
+
+	@api_health path /api/health /api/ready
+	handle @api_health {
+		request_body {
+			max_size 1KiB
+		}
+		import backend_proxy 10s 10s
+	}
+
+	@auth_login path /api/auth/login
+	handle @auth_login {
+		request_body {
+			max_size 64KiB
+		}
+		import backend_proxy 30s 30s
+	}
+
+	@auth_session path /api/auth/password/forgot /api/auth/password/reset /api/auth/recovery-email/verify /api/auth/refresh /api/auth/logout
+	handle @auth_session {
+		request_body {
+			max_size 16KiB
+		}
+		import backend_proxy 30s 30s
+	}
+
+	@sse path_regexp sse ^/api/(projects/progress-board/stream|projects/[^/]+/activity/stream|me/activity-attention/stream)$
+	handle @sse {
+		request_body {
+			max_size 1KiB
+		}
+		header {
+			Cache-Control "no-cache, no-transform"
+			X-Accel-Buffering no
+		}
+		reverse_proxy backend:8080 {
+			header_up X-Real-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up X-Forwarded-Proto https
+			header_up X-Request-ID {http.request.uuid}
+			header_up -Connection
+			flush_interval -1
+			stream_timeout 6m
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 75s
+				read_timeout 75s
+				write_timeout 10s
+			}
+		}
+	}
+
+	@upload path_regexp upload ^/api/(work-items/[^/]+/evidence/upload|daily-reports/[^/]+/evidence/upload|payables/[^/]+/input-invoices/upload|receivables/[^/]+/output-invoices/upload)$
+	handle @upload {
+		request_body {
+			max_size 11MiB
+		}
+		import backend_proxy 60s 60s
+	}
+
+	@heavy path_regexp heavy ^/api/(pipeline-templates/[^/]+/pdf|workflow-form-instances/[^/]+/pdf-exports|workflow-form-pdf-exports/[^/]+/file|evidence/[^/]+/file|input-invoices/[^/]+/file|output-invoices/[^/]+/file|reports/(cashflow|tax|profit|projects|warehouse|procurement|accounting|staff)/export)$
+	handle @heavy {
+		request_body {
+			max_size 2MiB
+		}
+		import backend_proxy 120s 120s
+	}
+
+	handle /api/* {
+		request_body {
+			max_size 2MiB
+		}
+		import backend_proxy 60s 30s
+	}
+
+	handle /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	@index path /index.html
+	handle @index {
+		header Cache-Control "no-store"
+		file_server
+	}
+
+	handle {
+		header Cache-Control "no-store"
+		try_files {path} /index.html
+		file_server
+	}
+
+	handle_errors 413 {
+		header {
+			-Server
+			X-Content-Type-Options nosniff
+			X-Frame-Options SAMEORIGIN
+			Referrer-Policy strict-origin-when-cross-origin
+		}
+		respond "" 413
+	}
+
+	handle_errors 502 504 {
+		header {
+			-Server
+			Content-Type application/json
+			Retry-After 5
+			X-Content-Type-Options nosniff
+			X-Frame-Options SAMEORIGIN
+			Referrer-Policy strict-origin-when-cross-origin
+		}
+		respond `{"success":false,"error":{"code":"SERVICE_UNAVAILABLE","message":"Dịch vụ đang quá tải hoặc tạm thời không sẵn sàng."}}` 503
+	}
+}

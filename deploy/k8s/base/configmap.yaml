@@ -39,7 +39,6 @@ data:
   # Replace both proxy CIDR placeholders in a production overlay. The invalid
   # backend value deliberately prevents an unreviewed base from starting.
   TRUSTED_PROXY_CIDRS: REPLACE_WITH_IMMEDIATE_ADMIN_POD_OR_MESH_CIDR
-  SERVER_NAME: workflow.example.invalid
   TRUSTED_PROXY_CIDR: REPLACE_WITH_IMMEDIATE_LOAD_BALANCER_CIDR
   REAL_IP_HEADER: X-Forwarded-For
   HTTP_READ_TIMEOUT: 15s

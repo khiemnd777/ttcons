@@ -6,6 +6,7 @@ import {
   SSE_STABLE_CONNECTION_MS,
   streamStatusAfterFailure,
 } from './backpressure';
+import { resolveRequestID } from './requestID';
 
 export type ApiEnvelope<T> = {
   success: boolean;
@@ -34,14 +35,16 @@ export class ApiError extends Error {
   status: number;
   retryAfterMs?: number;
   details?: unknown;
+  requestId?: string;
 
-  constructor(message: string, code = 'API_ERROR', status = 500, retryAfterMs?: number, details?: unknown) {
+  constructor(message: string, code = 'API_ERROR', status = 500, retryAfterMs?: number, details?: unknown, requestId?: string | null) {
     super(message);
     this.name = 'ApiError';
     this.code = code;
     this.status = status;
     this.retryAfterMs = retryAfterMs;
     this.details = details;
+    this.requestId = resolveRequestID(details, requestId);
   }
 }
 
@@ -87,6 +90,7 @@ async function request<T>(path: string, init: RequestInit = {}, allowRefresh: bo
       res.status,
       parseRetryAfter(res.headers.get('Retry-After')),
       json?.error?.details,
+      res.headers.get('X-Request-ID'),
     );
   }
   return json.data;
@@ -178,6 +182,7 @@ function xhrFormRequest<T>(
         xhr.status,
         parseRetryAfter(xhr.getResponseHeader('Retry-After')),
         json?.error?.details,
+        xhr.getResponseHeader('X-Request-ID') ?? undefined,
       )));
     };
     xhr.onerror = () => finish(() => reject(new ApiError('Không kết nối được máy chủ', 'NETWORK_ERROR', 0)));
@@ -259,6 +264,7 @@ async function downloadBlobRequest(path: string, allowRefresh: boolean) {
         res.status,
         parseRetryAfter(res.headers.get('Retry-After')),
         json?.error?.details,
+        res.headers.get('X-Request-ID'),
       );
     }
     const text = await res.text().catch(() => '');
@@ -267,6 +273,8 @@ async function downloadBlobRequest(path: string, allowRefresh: boolean) {
       'DOWNLOAD_ERROR',
       res.status,
       parseRetryAfter(res.headers.get('Retry-After')),
+      undefined,
+      res.headers.get('X-Request-ID'),
     );
   }
   return res.blob();
@@ -338,6 +346,8 @@ async function openSSE(path: string, signal: AbortSignal, allowRefresh: boolean)
       'STREAM_ERROR',
       res.status,
       parseRetryAfter(res.headers.get('Retry-After')),
+      undefined,
+      res.headers.get('X-Request-ID'),
     );
   }
   return res as Response & { body: ReadableStream<Uint8Array> };

@@ -50,6 +50,8 @@ assert(config.dig("data", "TRUSTED_PROXY_CIDRS")&.start_with?("REPLACE_"),
        "base backend proxy trust must fail closed until overlaid")
 assert(config.dig("data", "TRUSTED_PROXY_CIDR")&.start_with?("REPLACE_"),
        "base gateway proxy trust must fail closed until overlaid")
+assert(!config.fetch("data", {}).key?("SERVER_NAME"),
+       "managed-edge Caddy origin must not request or manage a public hostname/TLS certificate")
 
 %w[admin backend].each do |name|
   deployment = named(rendered, "Deployment", name)
@@ -165,13 +167,28 @@ assert(backend_ingress.all? { |rule| rule.dig("ports", 0, "port") == 8080 },
        "backend ingress policy must allow only container port 8080")
 
 admin = named(rendered, "Deployment", "admin")
-init = admin.dig("spec", "template", "spec", "initContainers").find do |item|
-  item["name"] == "render-kubernetes-nginx-config"
+admin_pod = admin.dig("spec", "template", "spec")
+assert(admin_pod.fetch("initContainers", []).empty?,
+       "standard Caddy must use cluster DNS directly without a config-render init container")
+assert(admin_pod.dig("securityContext", "fsGroup") == 101,
+       "admin must grant Caddy UID 101 write access to its ephemeral storage")
+admin_container = admin_pod.fetch("containers").find { |item| item["name"] == "admin" }
+assert(admin_container&.fetch("command") == ["/usr/bin/caddy"], "admin must run the Caddy binary")
+assert(admin_container.fetch("args") == ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
+       "admin must run the reviewed image Caddyfile")
+admin_env = admin_container.fetch("env").to_h { |item| [item["name"], item] }
+%w[TRUSTED_PROXY_CIDR REAL_IP_HEADER].each do |key|
+  assert(admin_env.dig(key, "valueFrom", "configMapKeyRef", "name") == "consflow-runtime",
+         "admin must source #{key} from consflow-runtime")
 end
-assert(init, "admin must render a Kubernetes-specific Nginx upstream")
-render_script = init.fetch("args").join("\n")
-assert(render_script.include?("proxy_pass http://backend:8080;"), "admin must use the stable backend Service")
-assert(render_script.include?("resolver 127\\.0\\.0\\.11"), "admin render guard must remove Docker-only DNS")
+admin_mounts = admin_container.fetch("volumeMounts", []).to_h { |mount| [mount["mountPath"], mount["name"]] }
+assert(admin_mounts["/config"] == "caddy-config", "admin must provide Caddy's writable config directory")
+assert(admin_mounts["/data"] == "caddy-data", "admin must provide Caddy's writable data directory")
+admin_volumes = admin_pod.fetch("volumes", []).to_h { |volume| [volume["name"], volume] }
+assert(admin_volumes.dig("caddy-config", "emptyDir", "sizeLimit") == "1Mi",
+       "admin must bound Caddy's ephemeral config volume")
+assert(admin_volumes.dig("caddy-data", "emptyDir", "sizeLimit") == "16Mi",
+       "admin must bound Caddy's ephemeral data volume")
 
 job = migration_docs.find { |document| document["kind"] == "Job" }
 assert(job, "migration manifest must define a Job")

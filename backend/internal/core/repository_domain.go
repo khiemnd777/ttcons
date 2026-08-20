@@ -388,13 +388,13 @@ func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, 
 		if requestedKeys["settings.update"] {
 			return nil, validationError("Quản trị viên chỉ được xem Thiết lập hệ thống", Record{"permission": "settings.update"})
 		}
-		for _, required := range []string{"settings.view", "seal.use", "seal.manage"} {
+		for _, required := range []string{"settings.view", "seal.use", "seal.manage", "event_log.view"} {
 			if !requestedKeys[required] {
 				return nil, validationError("Không thể gỡ quyền cấu hình bắt buộc của Quản trị viên", Record{"permission": required})
 			}
 		}
 	} else {
-		for _, reserved := range []string{"settings.view", "settings.update", "seal.manage"} {
+		for _, reserved := range []string{"settings.view", "settings.update", "seal.manage", "event_log.view"} {
 			if requestedKeys[reserved] {
 				return nil, validationError("Quyền này chỉ dành cho Quản trị viên hoặc Nhà phát triển", Record{"permission": reserved})
 			}

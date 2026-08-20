@@ -40,6 +40,7 @@ const StaffPage = lazy(() => import('../modules/staff/StaffPage').then(({ StaffP
 const RolesPage = lazy(() => import('../modules/rbac/RolesPage').then(({ RolesPage }) => ({ default: RolesPage })));
 const PermissionsPage = lazy(() => import('../modules/rbac/PermissionsPage').then(({ PermissionsPage }) => ({ default: PermissionsPage })));
 const AuditPage = lazy(() => import('../modules/audit/AuditPage').then(({ AuditPage }) => ({ default: AuditPage })));
+const EventLogsPage = lazy(() => import('../modules/event-logs/EventLogsPage').then(({ EventLogsPage }) => ({ default: EventLogsPage })));
 const ReportsPage = lazy(() => import('../modules/reports/ReportsPage').then(({ ReportsPage }) => ({ default: ReportsPage })));
 const WorkReportsPage = lazy(() => import('../modules/work-reports/WorkReportsPage').then(({ WorkReportsPage }) => ({ default: WorkReportsPage })));
 const SettingsPage = lazy(() => import('../modules/settings/SettingsPage').then(({ SettingsPage }) => ({ default: SettingsPage })));
@@ -133,6 +134,7 @@ export const router = createBrowserRouter([
       { path: '/roles', element: guarded(<RolesPage />, ['role.view']) },
       { path: '/permissions', element: guarded(<PermissionsPage />, ['permission.view']) },
       { path: '/audit', element: guarded(<AuditPage />, ['audit.view']) },
+      { path: '/event-logs', element: guarded(<EventLogsPage />, ['event_log.view']) },
       { path: '/reports', element: guarded(<WorkReportsPage />, ['work_report.view']) },
       { path: '/reports/:reportKey', element: guarded(<LegacyStatisticsRedirect />, ['statistics.view']) },
       { path: '/statistics', element: guarded(<ReportsPage />, ['statistics.view']) },

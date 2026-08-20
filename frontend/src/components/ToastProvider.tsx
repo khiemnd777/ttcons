@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import clsx from 'clsx';
+import { ApiError } from '../lib/api/client';
 
 type ToastVariant = 'success' | 'warn' | 'error' | 'info';
 
@@ -39,6 +40,11 @@ function normalizeToast(input: ToastInput) {
 
 function errorDescription(error: unknown) {
   if (!error) return undefined;
+  if (error instanceof ApiError && error.message) {
+    return error.status >= 500 && error.requestId
+      ? `${error.message} Mã tra cứu: ${error.requestId}`
+      : error.message;
+  }
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === 'string') return error;
   return 'Vui lòng thử lại hoặc kiểm tra dữ liệu đầu vào.';

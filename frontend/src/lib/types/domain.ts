@@ -29,6 +29,50 @@ export type AuditLogPage = {
   };
 };
 
+export type EventLogRecord = AnyRecord & {
+  id: string;
+  category: 'unexpected_5xx' | 'panic' | 'controlled_503';
+  http_status: number;
+  error_code: string;
+  method: string;
+  route_template: string;
+  request_class: string;
+  request_id: string;
+  actor_id?: string;
+  actor_email?: string;
+  project_id?: string;
+  project_code?: string;
+  project_name?: string;
+  duration_ms: number;
+  error_type?: string;
+  error_fingerprint: string;
+  message_preview?: string;
+  internal_message?: string;
+  stack_trace?: string;
+  created_at: string;
+};
+
+export type EventLogPage = {
+  items: EventLogRecord[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  summary: {
+    unexpected_5xx: number;
+    panic: number;
+    controlled_503: number;
+  };
+  options: {
+    categories: string[];
+    statuses: number[];
+    methods: string[];
+    routes: string[];
+    actors: string[];
+    projects: Array<{ id: string; code: string; name: string }>;
+  };
+};
+
 export type User = {
   id: string;
   email: string;

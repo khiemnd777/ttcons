@@ -78,6 +78,9 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Build and validate production Caddy gateway image
+        run: docker build --build-arg VITE_API_URL=/api -t consflow-admin-ci frontend
+
       - name: Check frontend bundle budget
         working-directory: frontend
         run: npm run check:bundle-budget

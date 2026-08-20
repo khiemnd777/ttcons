@@ -14,12 +14,13 @@ ENV VITE_API_URL=${VITE_API_URL}
 
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM caddy:2.11.3-alpine
 
-RUN rm -f /etc/nginx/conf.d/default.conf
-COPY nginx-main.conf /etc/nginx/nginx.conf
-COPY nginx.conf /etc/nginx/templates/default.conf.template
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/dist /usr/share/caddy
+
+RUN TRUSTED_PROXY_CIDR=127.0.0.1/32 REAL_IP_HEADER=X-Forwarded-For \
+  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
 EXPOSE 8080
 

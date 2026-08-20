@@ -1,6 +1,6 @@
 # Production And DDoS Operations Runbook
 
-Runbook này vận hành Consflow sau managed CDN/DDoS protection và WAF. Các giới hạn Nginx trong repository bảo vệ origin ở lớp HTTP; chúng không hấp thụ được tấn công volumetric L3/L4. Không đưa origin trực tiếp ra Internet.
+Runbook này vận hành Consflow sau managed CDN/DDoS protection và WAF. Standard Caddy trong repository giới hạn body/timeout, chuẩn hóa proxy và phục vụ frontend; rate/connection quota được thực thi ở managed edge và backend. Các lớp này không hấp thụ được tấn công volumetric L3/L4 tại origin. Không đưa origin trực tiếp ra Internet.
 
 ## Kiến trúc bắt buộc
 
@@ -8,7 +8,7 @@ Runbook này vận hành Consflow sau managed CDN/DDoS protection và WAF. Các 
 Internet
   -> Managed CDN / DDoS protection / WAF / TLS
   -> Firewall chỉ cho phép CIDR của proxy tới origin
-  -> admin:8080 (Nginx static frontend + /api reverse proxy)
+  -> admin:8080 (Caddy static frontend + /api reverse proxy)
   -> backend:8080 (internal Docker network)
   -> PostgreSQL:5432 và Redis:6379 (internal Docker network)
 ```
@@ -25,9 +25,9 @@ Repo cũng có baseline application multi-node tại [`deploy/k8s`](../../deploy
 2. Tạo thư mục `.env.prod.secrets` chỉ owner truy cập và tạo đủ bảy file được `.env.prod` tham chiếu: `postgres_password`, `database_url`, `redis_password`, `redis_url`, `redis_cache_password`, `redis_cache_url`, `jwt_secret`. Tên thư mục theo mẫu `.env.*` nên đã được `.gitignore` loại trừ.
 3. Tạo mật khẩu/JWT bằng nguồn ngẫu nhiên bảo mật; JWT secret tối thiểu 32 byte. `redis_url` dành riêng cho rate limiting/SSE, còn `redis_cache_url` trỏ tới Redis cache có thể tái tạo và không được dùng chung. URL-encode mật khẩu trong các URL; password trong URL phải tương ứng với file password của service.
 4. Đặt `FRONTEND_ORIGIN` thành HTTPS origin người dùng thật.
-5. Đặt `TRUSTED_PROXY_CIDR` đúng subnet của proxy/load balancer kết nối trực tiếp tới Nginx và `REAL_IP_HEADER` đúng header do proxy đó ghi đè. Không tin header client khi origin còn nhận kết nối trực tiếp.
+5. Đặt `TRUSTED_PROXY_CIDR` đúng subnet của proxy/load balancer kết nối trực tiếp tới Caddy và `REAL_IP_HEADER` đúng header do proxy đó ghi đè. Caddy parse chuỗi forwarded IP từ phải sang trái và chỉ tin header từ peer thuộc CIDR này. Không tin header client khi origin còn nhận kết nối trực tiếp.
 6. Giữ `ADMIN_BIND_ADDRESS=127.0.0.1` nếu proxy chạy cùng host. Chỉ dùng private interface hoặc `0.0.0.0` sau khi firewall đã allowlist proxy CIDR và từ chối mọi nguồn khác.
-7. Chọn `APP_INTERNAL_SUBNET` không trùng với host/VPC. Backend chỉ tin forwarded IP từ subnet Docker này; Nginx ghi đè `X-Forwarded-For` bằng client IP đã chuẩn hóa trước khi chuyển tiếp.
+7. Chọn `APP_INTERNAL_SUBNET` không trùng với host/VPC. Backend chỉ tin forwarded IP từ subnet Docker này; Caddy ghi đè `X-Forwarded-For` bằng client IP đã chuẩn hóa trước khi chuyển tiếp.
 
 File mẫu không chứa production secret. Tạo file môi trường, thư mục secret chỉ owner có thể traverse và các source file có quyền đọc portable cho UID trong container:
 
@@ -79,7 +79,7 @@ curl -fsS http://127.0.0.1:8080/api/ready
 
 `/api/health` là liveness. `/api/ready` là readiness có kiểm tra dependency và được dùng bởi production Compose. Không đưa một backend chưa ready vào luồng phục vụ.
 
-Backend có endpoint Prometheus `GET /metrics` trên listener nội bộ. Collector phải chạy trong private service network và scrape `http://backend:8080/metrics`; không mở port backend ra host/Internet. Nginx public origin chặn exact path này bằng `404`, vì vậy kiểm tra từ origin host phải cho kết quả `404`:
+Backend có endpoint Prometheus `GET /metrics` trên listener nội bộ. Collector phải chạy trong private service network và scrape `http://backend:8080/metrics`; không mở port backend ra host/Internet. Caddy public origin chặn exact path này bằng `404`, vì vậy kiểm tra từ origin host phải cho kết quả `404`:
 
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/metrics
@@ -97,29 +97,29 @@ PostgreSQL là hard startup/readiness dependency. Redis chỉ dùng `service_sta
 
 Sau deploy, xác minh từ một máy ngoài allowlist rằng origin port, `8080`, `5432` và `6379` đều không truy cập được. Người dùng chỉ truy cập hostname HTTPS của managed edge.
 
-## Chính sách tại origin
+## Chính sách phối hợp tại edge, Caddy và backend
 
-| Nhóm route | Giới hạn khởi đầu theo client IP | Kết nối đồng thời | Body tối đa |
-|---|---:|---:|---:|
-| Health/readiness | 5 request/giây | 5 | 1 KiB |
-| Login | 5 request/phút, burst 5 | 5 | 64 KiB |
-| Refresh/logout | 30 request/phút, burst 10 | 5 | 16 KiB |
-| API thông thường | 20 request/giây, burst 40 | 20 | 2 MiB |
-| Upload evidence/invoice | 6 request/phút, burst 2 | 2 | 11 MiB |
-| PDF/report export và protected file download | 12 request/phút, burst 3 | 4 | 2 MiB |
-| Mở SSE | 6 request/phút, burst 2 | 4/client, 300 toàn gateway | 1 KiB |
+| Nhóm route | Managed-edge baseline theo client IP | Backend enforcement | Caddy body tối đa |
+|---|---:|---|---:|
+| Health/readiness | 5 request/giây, 5 đồng thời | IP general bucket | 1 KiB |
+| Login | 5 request/phút, burst 5, 5 đồng thời | IP auth bucket | 64 KiB |
+| Refresh/logout | 30 request/phút, burst 10, 5 đồng thời | IP auth và actor auth buckets | 16 KiB |
+| API thông thường | 20 request/giây, burst 40, 20 đồng thời | IP và actor general buckets | 2 MiB |
+| Upload evidence/invoice | 6 request/phút, burst 2, 2 đồng thời | IP/actor upload buckets và upload semaphore | 11 MiB |
+| PDF/report export và protected file download | 12 request/phút, burst 3, 4 đồng thời | IP/actor export buckets và export/report semaphore | 2 MiB |
+| Mở SSE | 6 request/phút, burst 2, 4 đồng thời | IP/actor SSE buckets; process/IP/actor connection caps | 1 KiB |
 
-Request vượt ngân sách trả `429` và `Retry-After`. Khi upstream không kết nối được hoặc timeout, gateway trả `503` và `Retry-After`. SSE tắt proxy buffering, có read timeout 75 giây và dựa vào heartbeat backend để giữ kết nối.
+Request vượt ngân sách managed edge/backend trả `429` và `Retry-After`. Khi upstream không kết nối được hoặc timeout, Caddy trả envelope `503` và `Retry-After: 5`. SSE dùng immediate flushing, upstream read timeout 75 giây và heartbeat backend để giữ kết nối.
 
-Protected evidence, input/output invoice và workflow-form PDF downloads dùng cùng heavy request/connection budget với PDF/report export; file vẫn đi qua route authorization hiện hữu, không được Nginx cache. `SSE_MAX_CONNECTION_LIFETIME` là cận trên của thời hạn kết nối (mặc định 5 phút); mỗi connection chọn ngẫu nhiên trong 80-100% cận này, tức khoảng 4-5 phút ở cấu hình mặc định, để reconnect/revalidate định kỳ mà không tạo một đợt reconnect đồng loạt. Client tiếp tục tôn trọng backoff và `Retry-After`.
+Protected evidence, input/output invoice và workflow-form PDF downloads dùng cùng heavy request/concurrency class với PDF/report export; file vẫn đi qua route authorization hiện hữu và không được Caddy cache. `SSE_MAX_CONNECTION_LIFETIME` là cận trên của thời hạn kết nối (mặc định 5 phút); mỗi connection chọn ngẫu nhiên trong 80-100% cận này, tức khoảng 4-5 phút ở cấu hình mặc định, để reconnect/revalidate định kỳ mà không tạo một đợt reconnect đồng loạt. Client tiếp tục tôn trọng backoff và `Retry-After`.
 
-Effective SSE cap là `min(Nginx global SSE cap, SSE_MAX_CONNECTIONS)`, mặc định `min(300, 300) = 300`. Mỗi proxied SSE giữ xấp xỉ hai Nginx connections: một client-to-gateway và một gateway-to-backend. Với `worker_connections=4096`, 300 SSE dùng khoảng 600 connection slots, giữ phần lớn headroom cho API/static traffic và overhead ngay cả khi chỉ có một worker. Main Nginx config đặt `worker_rlimit_nofile=8192`; Compose đặt soft/hard `nofile=8192`. Khi chỉnh cap, phải bảo đảm `2 × active SSE + ordinary client connections + ordinary upstream connections + overhead` thấp hơn tổng worker connection budget và không vượt file-descriptor limit của từng worker.
+Backend giữ `SSE_MAX_CONNECTIONS` mặc định 300 trên mỗi process, cùng cap theo IP và actor. Standard Caddy không có connection limiter riêng; managed edge phải giữ cap mở SSE và tổng quota theo capacity plan. Mỗi proxied SSE vẫn giữ xấp xỉ hai HTTP connections, nên Compose giữ soft/hard `nofile=8192`; theo dõi active connection, memory và goroutine trước khi tăng backend cap.
 
-Nginx ghi toàn bộ `5xx` và lấy mẫu khoảng 1% response `2xx`/`3xx`/`4xx`; Docker xoay log theo `LOG_MAX_SIZE` và `LOG_MAX_FILES`. Managed edge phải giữ access/security log đầy đủ theo chính sách lưu trữ của tổ chức.
+Caddy ghi access request dạng JSON ra stdout; probe `/gateway-health` và exact `/metrics` được chủ động bỏ qua để tránh nhiễu, còn các request ứng dụng/static và toàn bộ `5xx` đều được ghi. Sensitive credential headers giữ cơ chế redaction mặc định. Docker xoay log theo `LOG_MAX_SIZE` và `LOG_MAX_FILES`. Managed edge phải giữ access/security log đầy đủ theo chính sách lưu trữ của tổ chức.
 
 Các ngưỡng trên là baseline. Điều chỉnh bằng staging load test và số liệu thật; không nới quota để xử lý một đợt tấn công đang diễn ra.
 
-Lần deploy đầu giữ `RATE_LIMIT_MODE=observe`, kiểm tra metric/log staging, sau đó chuyển thành `enforce`. Semaphore upload/export/report và giới hạn SSE của backend vẫn hoạt động theo các giá trị trong `.env.prod`.
+Production Compose và Kubernetes giữ `RATE_LIMIT_MODE=enforce`. Một staging overlay có thể chủ động dùng `observe` để hiệu chỉnh policy trước cutover, nhưng không đưa origin production vào traffic khi backend limiter chưa enforce và managed-edge quota chưa được xác nhận. Semaphore upload/export/report và giới hạn SSE của backend vẫn hoạt động theo các giá trị authoritative trong system settings/configuration.
 
 Backend có hai lớp bucket riêng: `RATE_LIMIT_IP_*` chạy trước JWT/session DB; sau khi JWT claims hợp lệ, `RATE_LIMIT_ACTOR_*` chạy trước kiểm tra `AuthSessionActive` authoritative trong PostgreSQL. Mỗi policy có `LIMIT`, `BURST` và `WINDOW`; file `.env.prod.example` liệt kê đầy đủ baseline cho `AUTH`, `GENERAL`, `UPLOAD`, `EXPORT` và `SSE`. `RATE_LIMIT_REDIS_MAX_IN_FLIGHT` giới hạn số lượt limiter đồng thời được phép chờ Redis để tránh Redis outage giữ quá nhiều request/goroutine. Khi Redis bận, lỗi hoặc đã hết admission budget, backend dùng local bounded fallback theo `RATE_LIMIT_LOCAL_MAX_KEYS`; theo dõi header `X-RateLimit-Source: local-fallback` và xử lý Redis thay vì để fallback kéo dài.
 
@@ -171,8 +171,8 @@ Trước deploy, ghi image/commit hiện tại và xác nhận backup theo `docs
 
 ## Giới hạn còn lại
 
-- Limiter Nginx là theo client IP đã chuẩn hóa; quota theo user/account và distributed limiter phải do backend/edge cung cấp.
+- Standard Caddy không có rate/connection limiter tích hợp; quota ngoài cùng phải do managed edge thực thi, còn quota IP/actor phân tán và load shedding thuộc backend.
 - `TRUSTED_PROXY_CIDR` nhận một subnet của proxy trực tiếp. Nếu provider có nhiều dải, đặt một load balancer đáng tin cậy trong subnet xác định trước origin hoặc mở rộng cấu hình sau khi review danh sách CIDR chính thức.
-- Production Compose hiện chạy một backend. Kubernetes baseline có hai backend nhưng chỉ được đưa vào production sau khi local objects đã migrate sang S3-compatible storage và cross-replica upload/download/SSE delivery/reconnect/failover đã pass. SSE fanout dùng shared Redis Pub/Sub qua `SSE_BROKER_CHANNEL`; khi Redis outage, fanout và limiter fallback trở thành pod-local. Process/IP/actor SSE caps và Nginx `sse_global` cũng là per-pod, nên total cluster capacity/quota phải được capacity-plan và giới hạn thêm tại managed edge.
+- Production Compose hiện chạy một backend. Kubernetes baseline có hai backend nhưng chỉ được đưa vào production sau khi local objects đã migrate sang S3-compatible storage và cross-replica upload/download/SSE delivery/reconnect/failover đã pass. SSE fanout dùng shared Redis Pub/Sub qua `SSE_BROKER_CHANNEL`; khi Redis outage, fanout và limiter fallback trở thành pod-local. Process/IP/actor SSE caps cũng là per-backend-pod, nên total cluster capacity/quota phải được capacity-plan và giới hạn thêm tại managed edge.
 - Docker Compose secrets trên một host vẫn là bind-mounted files; người có quyền root/Docker socket hoặc đọc các file nguồn vẫn có thể lấy secret. Cần secret manager, phân quyền host và rotation runbook để giảm rủi ro này.
 - Resource limit và HTTP load shedding giảm blast radius nhưng không thay thế capacity planning, backup, observability hoặc diễn tập sự cố.

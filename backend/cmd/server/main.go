@@ -11,6 +11,7 @@ import (
 	"consflow/backend/internal/shared/cache"
 	"consflow/backend/internal/shared/config"
 	"consflow/backend/internal/shared/db"
+	"consflow/backend/internal/shared/eventlog"
 	"consflow/backend/internal/shared/migrations"
 	"consflow/backend/internal/shared/observability"
 	sharedstorage "consflow/backend/internal/shared/storage"
@@ -133,18 +134,26 @@ func main() {
 		defer redisCacheClient.Close()
 	}
 
+	eventLogStore := eventlog.NewStore(conn)
+	stopEventLogRetention := eventLogStore.StartRetention(context.Background())
+	defer stopEventLogRetention()
+
 	runtimeMetrics := observability.New(conn)
-	app := fiber.New(serverConfig(cfg))
+	app := fiber.New(serverConfig(cfg, eventLogStore))
 	app.Use(runtimeMetrics.Middleware())
-	app.Use(recover.New())
+	app.Use(recover.New(recover.Config{
+		EnableStackTrace:  true,
+		StackTraceHandler: observability.PanicStackTraceHandler,
+	}))
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.FrontendOrigin + ",http://localhost:5173,http://127.0.0.1:5173",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 		AllowCredentials: true,
-		ExposeHeaders:    "Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Source, X-RateLimit-Observed",
+		ExposeHeaders:    "Retry-After, X-Request-ID, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Source, X-RateLimit-Observed",
 	}))
 	app.Use(requestid.New())
+	app.Use(observability.EventCaptureMiddleware(eventLogStore))
 	app.Use(fiberlogger.New(fiberlogger.Config{
 		Format: "event=http_request time=${time} status=${status} method=${method} path=${path} req_id=${locals:requestid} latency=${latency}\n",
 	}))
@@ -191,7 +200,11 @@ func main() {
 	}
 }
 
-func serverConfig(cfg config.Config) fiber.Config {
+func serverConfig(cfg config.Config, recorders ...eventlog.Recorder) fiber.Config {
+	var recorder eventlog.Recorder
+	if len(recorders) > 0 {
+		recorder = recorders[0]
+	}
 	return fiber.Config{
 		AppName:                      "consflow",
 		BodyLimit:                    int(cfg.MaxUploadBytes + 1024*1024),
@@ -202,6 +215,6 @@ func serverConfig(cfg config.Config) fiber.Config {
 		ProxyHeader:                  fiber.HeaderXForwardedFor,
 		EnableTrustedProxyCheck:      true,
 		TrustedProxies:               cfg.TrustedProxies,
-		ErrorHandler:                 observability.ErrorHandler(core.ErrorHandler),
+		ErrorHandler:                 observability.ErrorHandler(core.ErrorHandler, recorder),
 	}
 }

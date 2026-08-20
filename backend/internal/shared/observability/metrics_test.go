@@ -1,7 +1,10 @@
 package observability
 
 import (
+	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"os"
@@ -12,9 +15,76 @@ import (
 	"testing"
 	"time"
 
+	"consflow/backend/internal/shared/eventlog"
+	"consflow/backend/internal/shared/response"
+
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
+type memoryEventRecorder struct {
+	entries []eventlog.Entry
+}
+
+func (r *memoryEventRecorder) Record(_ context.Context, entry eventlog.Entry) error {
+	r.entries = append(r.entries, entry)
+	return nil
+}
+
+func TestEventCaptureRecordsBackendFailuresAndSkipsProbes(t *testing.T) {
+	recorder := &memoryEventRecorder{}
+	app := fiber.New(fiber.Config{ErrorHandler: ErrorHandler(func(c *fiber.Ctx, err error) error {
+		return response.Fail(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "Đã xảy ra lỗi hệ thống")
+	}, recorder)})
+	app.Use(recover.New(recover.Config{EnableStackTrace: true, StackTraceHandler: PanicStackTraceHandler}))
+	app.Use(requestid.New())
+	app.Use(EventCaptureMiddleware(recorder))
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user_id", "10000000-0000-0000-0000-000000000001")
+		c.Locals("email", "admin@consflow.local")
+		return c.Next()
+	})
+	app.Get("/api/projects/:id/report", func(c *fiber.Ctx) error {
+		return response.Fail(c, fiber.StatusServiceUnavailable, "SERVER_BUSY", "Hệ thống đang bận")
+	})
+	app.Get("/api/failure", func(c *fiber.Ctx) error {
+		return errors.New("password=private-value")
+	})
+	app.Get("/api/panic", func(c *fiber.Ctx) error {
+		panic("token=panic-secret")
+	})
+	app.Get("/api/ready", func(c *fiber.Ctx) error {
+		return response.Fail(c, fiber.StatusServiceUnavailable, "NOT_READY", "Chưa sẵn sàng")
+	})
+
+	requests := []string{
+		"/api/projects/30000000-0000-0000-0000-000000000020/report",
+		"/api/failure",
+		"/api/panic",
+		"/api/ready",
+	}
+	for index, path := range requests {
+		request := httptest.NewRequest(fiber.MethodGet, path, nil)
+		request.Header.Set("X-Request-ID", fmt.Sprintf("event-request-%d", index))
+		if _, err := app.Test(request); err != nil {
+			t.Fatalf("request %s: %v", path, err)
+		}
+	}
+	if len(recorder.entries) != 3 {
+		t.Fatalf("captured entries=%d, want 3", len(recorder.entries))
+	}
+	if recorder.entries[0].Category != eventlog.CategoryControlled503 || recorder.entries[0].ProjectID != "30000000-0000-0000-0000-000000000020" {
+		t.Fatalf("controlled entry=%#v", recorder.entries[0])
+	}
+	if recorder.entries[1].Category != eventlog.CategoryUnexpected5xx || strings.Contains(recorder.entries[1].InternalMessage, "private-value") {
+		t.Fatalf("unexpected entry=%#v", recorder.entries[1])
+	}
+	if recorder.entries[2].Category != eventlog.CategoryPanic || recorder.entries[2].StackTrace == "" || strings.Contains(recorder.entries[2].InternalMessage, "panic-secret") {
+		t.Fatalf("panic entry=%#v", recorder.entries[2])
+	}
+}
 
 func TestMetricsUseRegisteredRouteTemplateWithoutSensitiveValues(t *testing.T) {
 	database, err := sql.Open("pgx", "postgres://metrics-user:metrics-password@invalid.local/metrics-db")
@@ -140,23 +210,23 @@ func TestProjectExplorerCacheMetricsUseBoundedLabels(t *testing.T) {
 	assertContains(t, body, `consflow_project_explorer_cache_shadow_mismatch_total 1`)
 }
 
-func TestProductionNginxExplicitlyDeniesMetricsProxy(t *testing.T) {
-	path := filepath.Join("..", "..", "..", "..", "frontend", "nginx.conf")
+func TestProductionCaddyExplicitlyDeniesMetricsProxy(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "..", "frontend", "Caddyfile")
 	content, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("read production nginx config: %v", err)
+		t.Fatalf("read production Caddy config: %v", err)
 	}
-	blockPattern := regexp.MustCompile(`(?s)location\s*=\s*/metrics\s*\{([^}]*)\}`)
+	blockPattern := regexp.MustCompile(`(?s)@metrics\s+path\s+/metrics\s+handle\s+@metrics\s*\{([^}]*)\}`)
 	match := blockPattern.FindSubmatch(content)
 	if len(match) != 2 {
-		t.Fatal("production Nginx must contain an explicit exact-match /metrics deny block")
+		t.Fatal("production Caddy must contain an explicit exact-match /metrics deny block")
 	}
 	block := string(match[1])
-	if strings.Contains(block, "proxy_pass") {
-		t.Fatal("production Nginx /metrics block must not proxy to backend")
+	if strings.Contains(block, "reverse_proxy") {
+		t.Fatal("production Caddy /metrics block must not proxy to backend")
 	}
-	if !strings.Contains(block, "return 404") {
-		t.Fatal("production Nginx /metrics block must return 404")
+	if !strings.Contains(block, `respond "" 404`) {
+		t.Fatal("production Caddy /metrics block must return 404")
 	}
 }
 

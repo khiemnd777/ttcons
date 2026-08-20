@@ -1,5 +1,38 @@
 # Current States
 
+## Active Plan: Migrate production origin gateway from Nginx to Caddy
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; PRODUCTION DEPLOYMENT NOT VERIFIED (approved by user on 2026-08-20)
+
+### Will be done
+
+- Replace the production `admin` image's Nginx gateway with pinned standard Caddy while preserving service name, port `8080`, SPA/static behavior, private backend routing and managed-edge TLS termination.
+- Preserve `/gateway-health`, exact public `/metrics` deny, trusted-client-IP normalization, request IDs, security/cache headers, route-specific body limits, SSE streaming and controlled upstream-unavailable responses.
+- Keep development on Vite; switch Production Compose backend rate limiting to `enforce` and retain Docker log rotation without adding non-standard Caddy modules.
+- Simplify the Kubernetes admin pod by removing the Nginx-specific render init container while preserving non-root, read-only, probe, resource, affinity, NetworkPolicy and stable `backend:8080` contracts.
+- Update focused tests, CI gateway validation, production/Kubernetes runbooks and the mandatory module/backend maps.
+- Validate Caddy adaptation, production image build and smoke behavior, Production Compose shape, Kubernetes render assertions, focused backend tests and whitespace. Browser/UAT remains skipped because no UI behavior changes.
+
+### Done
+
+- Review package and three migration decisions approved: standard Caddy without third-party rate-limit modules; TLS remains at the managed edge; production/Kubernetes migrate while development remains on Vite and gateway access logs become JSON.
+- Mandatory module-memory and Docker Ops instructions loaded; owner code, Compose, Kubernetes, observability test and operations documentation inspected.
+- Baseline revision `2a178e7` was clean. Existing Kubernetes render assertions passed and focused observability tests passed with a sandbox-local Go cache.
+- Replaced both Nginx configs and the production image stage with pinned `caddy:2.11.3-alpine`; image build now validates the reviewed `Caddyfile` and CI builds that production image.
+- Preserved port `8080`, managed-edge TLS, strict trusted-proxy client-IP normalization, generated request IDs, route-specific body/timeouts, immediate SSE flushing, exact public `/metrics` deny, immutable assets, no-store SPA fallback and controlled JSON `503` responses.
+- Production Compose now runs Caddy as UID/GID `101:101` with a read-only root filesystem, owner-only bounded tmpfs for `/config`, `/data` and `/tmp`, and backend rate limiting defaulted to `enforce`; development Compose/Vite is unchanged.
+- Kubernetes admin pods run the same image Caddyfile directly against stable `backend:8080`; the Nginx render init container and `SERVER_NAME` contract were removed while UID/GID/fsGroup, probes, resources, affinity, PDB, NetworkPolicy and bounded ephemeral storage remain asserted.
+- Updated the focused observability contract test, Kubernetes deterministic render checks, production/Kubernetes operations documentation and all matched central/backend/root-cause maps.
+- Final current-tree checks passed on 2026-08-20: Caddy adaptation; production image build; production and development Compose configuration; Kubernetes render/11-object deterministic contract; focused `go test ./internal/shared/observability`; and `git diff --check`.
+- Final isolated Docker smoke used the built image as UID/GID 101 with a read-only root: `/gateway-health` returned `204`, exact `/metrics` returned `404`, SPA deep-link returned `200` with `no-store`, trusted forwarded IP/proto/request UUID reached a consuming mock backend, reviewed SSE emitted immediately, an oversized login body returned `413`, an unavailable upstream returned the JSON `503` envelope with `Retry-After: 5`, and access output was JSON without storage/runtime errors.
+
+### Skipped / remaining acceptance
+
+- No production host, managed edge/WAF policy or Kubernetes cluster was changed or exercised. Firewall allowlists, edge rate/connection quotas, real proxy CIDRs, rollout/drain behavior and cross-replica SSE remain production acceptance gates.
+- Browser/UAT was not run because this migration changes no UI behavior. The production frontend compilation is technically verified, but no new UX acceptance claim is made.
+- No database schema or migration changed, and no migration command was run for this gateway-only work.
+- The production frontend dependency install reported the repository's existing npm audit warning (1 moderate and 3 high vulnerabilities); this migration did not attempt dependency remediation.
+
 ## Active Plan: Typed system settings, Developer governance, seal table, local login defaults
 
 Status: IMPLEMENTED AND TECHNICALLY VERIFIED; NOT UX ACCEPTED (approved by user on 2026-08-19)

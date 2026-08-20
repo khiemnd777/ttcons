@@ -1,23 +1,33 @@
 package observability
 
 import (
+	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
 
+	"consflow/backend/internal/shared/eventlog"
 	consflowmiddleware "consflow/backend/internal/shared/middleware"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-const unmatchedRoute = "__unmatched__"
+const (
+	unmatchedRoute         = "__unmatched__"
+	eventCaptureStartedKey = "event_log_started_at"
+	panicValueKey          = "event_log_panic_value"
+	panicStackKey          = "event_log_panic_stack"
+)
 
 type Metrics struct {
 	registry                     *prometheus.Registry
@@ -160,7 +170,27 @@ func (m *Metrics) Handler() fiber.Handler {
 	return adaptor.HTTPHandler(handler)
 }
 
-func ErrorHandler(next fiber.ErrorHandler) fiber.ErrorHandler {
+func EventCaptureMiddleware(recorder eventlog.Recorder) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Locals(eventCaptureStartedKey, time.Now())
+		err := c.Next()
+		if err == nil && shouldCaptureEvent(c) {
+			recordEvent(c, nil, recorder)
+		}
+		return err
+	}
+}
+
+func PanicStackTraceHandler(c *fiber.Ctx, recovered any) {
+	c.Locals(panicValueKey, fmt.Sprint(recovered))
+	c.Locals(panicStackKey, string(debug.Stack()))
+}
+
+func ErrorHandler(next fiber.ErrorHandler, recorders ...eventlog.Recorder) fiber.ErrorHandler {
+	var recorder eventlog.Recorder
+	if len(recorders) > 0 {
+		recorder = recorders[0]
+	}
 	return func(c *fiber.Ctx, err error) error {
 		handledErr := next(c, err)
 		requestID := "-"
@@ -174,8 +204,133 @@ func ErrorHandler(next fiber.ErrorHandler) fiber.ErrorHandler {
 			routeTemplate(c),
 			requestID,
 		)
+		if shouldCaptureEvent(c) {
+			recordEvent(c, err, recorder)
+		}
 		return handledErr
 	}
+}
+
+type responseErrorEnvelope struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+func shouldCaptureEvent(c *fiber.Ctx) bool {
+	if c == nil {
+		return false
+	}
+	switch c.Path() {
+	case "/metrics", "/api/health", "/api/ready":
+		return false
+	}
+	status := c.Response().StatusCode()
+	return status >= fiber.StatusInternalServerError && status <= 599
+}
+
+func recordEvent(c *fiber.Ctx, requestErr error, recorder eventlog.Recorder) {
+	if recorder == nil {
+		return
+	}
+	status := c.Response().StatusCode()
+	category := eventlog.CategoryUnexpected5xx
+	if status == fiber.StatusServiceUnavailable {
+		category = eventlog.CategoryControlled503
+	}
+	stackTrace := fmt.Sprint(c.Locals(panicStackKey))
+	if stackTrace != "" && stackTrace != "<nil>" {
+		category = eventlog.CategoryPanic
+	}
+
+	errorCode, publicMessage := responseError(c)
+	errorType, internalMessage := eventlog.Diagnostic(requestErr)
+	if requestErr == nil {
+		internalMessage = publicMessage
+	}
+	if category == eventlog.CategoryPanic {
+		errorType = "panic"
+		if panicValue := fmt.Sprint(c.Locals(panicValueKey)); panicValue != "" && panicValue != "<nil>" {
+			internalMessage = panicValue
+		}
+	}
+
+	requestID := localString(c, "requestid")
+	entry := eventlog.Entry{
+		Category:        category,
+		HTTPStatus:      status,
+		ErrorCode:       errorCode,
+		Method:          normalizedMethod(c.Method()),
+		RouteTemplate:   routeTemplate(c),
+		RequestClass:    string(consflowmiddleware.ClassifyRequest(c.Method(), c.Path())),
+		RequestID:       requestID,
+		ActorID:         localString(c, "user_id"),
+		ActorEmail:      localString(c, "email"),
+		ProjectID:       projectIDFromRoute(c),
+		DurationMS:      eventDuration(c),
+		ErrorType:       errorType,
+		InternalMessage: eventlog.SanitizeMessage(internalMessage),
+		StackTrace:      eventlog.SanitizeStack(stackTrace),
+	}
+	if err := recorder.Record(context.Background(), entry); err != nil {
+		log.Printf(
+			"event=event_log_fallback category=%s status=%d error_code=%s method=%s route=%s request_id=%s fingerprint=%s persist_error=%q",
+			entry.Category,
+			status,
+			safeLogValue(entry.ErrorCode),
+			entry.Method,
+			entry.RouteTemplate,
+			safeLogValue(requestID),
+			eventlog.Fingerprint(entry),
+			eventlog.SanitizeMessage(err.Error()),
+		)
+	}
+}
+
+func localString(c *fiber.Ctx, key string) string {
+	value := c.Locals(key)
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
+}
+
+func responseError(c *fiber.Ctx) (code, message string) {
+	var envelope responseErrorEnvelope
+	if err := json.Unmarshal(c.Response().Body(), &envelope); err == nil {
+		code = strings.TrimSpace(envelope.Error.Code)
+		message = strings.TrimSpace(envelope.Error.Message)
+	}
+	if code == "" {
+		code = "INTERNAL_ERROR"
+	}
+	return code, message
+}
+
+func projectIDFromRoute(c *fiber.Ctx) string {
+	route := routeTemplate(c)
+	const projectPrefix = "/api/projects/:id"
+	if route != projectPrefix && !strings.HasPrefix(route, projectPrefix+"/") {
+		return ""
+	}
+	projectID := strings.TrimSpace(c.Params("id"))
+	if _, err := uuid.Parse(projectID); err != nil {
+		return ""
+	}
+	return projectID
+}
+
+func eventDuration(c *fiber.Ctx) int64 {
+	startedAt, ok := c.Locals(eventCaptureStartedKey).(time.Time)
+	if !ok || startedAt.IsZero() {
+		return 0
+	}
+	duration := time.Since(startedAt).Milliseconds()
+	if duration < 0 {
+		return 0
+	}
+	return duration
 }
 
 func routeTemplate(c *fiber.Ctx) string {

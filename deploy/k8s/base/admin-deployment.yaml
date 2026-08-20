@@ -59,16 +59,11 @@ spec:
             matchLabels:
               app.kubernetes.io/name: admin
               app.kubernetes.io/instance: consflow
-      initContainers:
-        - name: render-kubernetes-nginx-config
+      containers:
+        - name: admin
           image: registry.example.invalid/consflow/admin:replace-me
           imagePullPolicy: IfNotPresent
           env:
-            - name: SERVER_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: consflow-runtime
-                  key: SERVER_NAME
             - name: TRUSTED_PROXY_CIDR
               valueFrom:
                 configMapKeyRef:
@@ -79,47 +74,8 @@ spec:
                 configMapKeyRef:
                   name: consflow-runtime
                   key: REAL_IP_HEADER
-          command: ["/bin/sh", "-ec"]
-          args:
-            - |
-              source=/etc/nginx/templates/default.conf.template
-              patched=/work/default.conf.template
-              rendered=/conf/default.conf
-              grep -Fq 'resolver 127.0.0.11 ipv6=off valid=10s;' "$source"
-              grep -Fq 'set $backend_upstream http://backend:8080;' "$source"
-              sed \
-                -e '/^[[:space:]]*resolver 127\.0\.0\.11 ipv6=off valid=10s;$/d' \
-                -e '/^[[:space:]]*set \$backend_upstream http:\/\/backend:8080;$/d' \
-                -e 's#proxy_pass \$backend_upstream;#proxy_pass http://backend:8080;#g' \
-                "$source" > "$patched"
-              ! grep -Fq '$backend_upstream' "$patched"
-              envsubst '${SERVER_NAME} ${TRUSTED_PROXY_CIDR} ${REAL_IP_HEADER}' \
-                < "$patched" > "$rendered"
-              grep -Fq 'proxy_pass http://backend:8080;' "$rendered"
-              chmod 0444 "$rendered"
-          resources:
-            requests:
-              cpu: 10m
-              memory: 16Mi
-            limits:
-              cpu: 100m
-              memory: 64Mi
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
-          volumeMounts:
-            - name: nginx-template-work
-              mountPath: /work
-            - name: nginx-conf
-              mountPath: /conf
-      containers:
-        - name: admin
-          image: registry.example.invalid/consflow/admin:replace-me
-          imagePullPolicy: IfNotPresent
-          command: ["/usr/sbin/nginx"]
-          args: ["-g", "daemon off;"]
+          command: ["/usr/bin/caddy"]
+          args: ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
           ports:
             - name: http
               containerPort: 8080
@@ -162,28 +118,19 @@ spec:
             capabilities:
               drop: ["ALL"]
           volumeMounts:
-            - name: nginx-conf
-              mountPath: /etc/nginx/conf.d
-              readOnly: true
-            - name: nginx-cache
-              mountPath: /var/cache/nginx
-            - name: nginx-run
-              mountPath: /var/run
+            - name: caddy-config
+              mountPath: /config
+            - name: caddy-data
+              mountPath: /data
             - name: tmp
               mountPath: /tmp
       volumes:
-        - name: nginx-template-work
+        - name: caddy-config
           emptyDir:
             sizeLimit: 1Mi
-        - name: nginx-conf
+        - name: caddy-data
           emptyDir:
-            sizeLimit: 1Mi
-        - name: nginx-cache
-          emptyDir:
-            sizeLimit: 64Mi
-        - name: nginx-run
-          emptyDir:
-            sizeLimit: 1Mi
+            sizeLimit: 16Mi
         - name: tmp
           emptyDir:
             sizeLimit: 16Mi

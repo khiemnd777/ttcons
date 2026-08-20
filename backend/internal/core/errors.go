@@ -67,5 +67,5 @@ func ErrorHandler(c *fiber.Ctx, err error) error {
 	if errors.Is(err, sql.ErrNoRows) {
 		return response.Fail(c, fiber.StatusNotFound, "NOT_FOUND", "Không tìm thấy dữ liệu")
 	}
-	return response.Fail(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+	return response.Fail(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "Đã xảy ra lỗi hệ thống. Vui lòng thử lại.")
 }
