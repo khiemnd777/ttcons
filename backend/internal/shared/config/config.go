@@ -34,6 +34,7 @@ type Config struct {
 	RedisURL                       string
 	RedisCacheURL                  string
 	JWTSecret                      string
+	SettingsEncryptionKey          string
 	FrontendOrigin                 string
 	MigrationsDir                  string
 	AutoMigrate                    bool
@@ -113,6 +114,7 @@ func Load() Config {
 	redisURL := getenvSecretTracked("REDIS_URL", "redis://localhost:6379/0", validation)
 	redisCacheURL := getenvOptionalSecretTracked("REDIS_CACHE_URL", validation)
 	jwtSecret := getenvSecretTracked("JWT_SECRET", "consflow-local-dev-secret", validation)
+	settingsEncryptionKey := getenvOptionalSecretTracked("SETTINGS_ENCRYPTION_KEY", validation)
 	authRecoveryEnabled := getenvBoolTracked("AUTH_RECOVERY_ENABLED", false, validation)
 	recoveryValidation := &envValidation{}
 	smtpPassword := getenvOptionalSecretAllowEmptyTracked("SMTP_PASSWORD", recoveryValidation)
@@ -123,6 +125,7 @@ func Load() Config {
 		RedisURL:                       redisURL,
 		RedisCacheURL:                  redisCacheURL,
 		JWTSecret:                      jwtSecret,
+		SettingsEncryptionKey:          settingsEncryptionKey,
 		FrontendOrigin:                 getenv("FRONTEND_ORIGIN", "http://localhost:5173"),
 		MigrationsDir:                  getenv("MIGRATIONS_DIR", "migrations"),
 		AutoMigrate:                    getenvBoolTracked("AUTO_MIGRATE", true, validation),
@@ -209,7 +212,122 @@ func Load() Config {
 	return cfg
 }
 
+// ValidateBootstrap validates only configuration that must be trustworthy
+// before the application can connect to PostgreSQL and load database-backed
+// runtime settings. Runtime policy validation remains in Validate.
+func (c Config) ValidateBootstrap() error {
+	appEnv := strings.ToLower(strings.TrimSpace(c.AppEnv))
+	switch appEnv {
+	case "development", "test", "staging", "production":
+	default:
+		return fmt.Errorf("APP_ENV must be one of development, test, staging, or production")
+	}
+	if len(c.secretEnvironmentErrors) > 0 {
+		return fmt.Errorf("invalid secret configuration: %s", strings.Join(c.secretEnvironmentErrors, "; "))
+	}
+	if c.SettingsEncryptionKey != "" && len([]byte(c.SettingsEncryptionKey)) < 32 {
+		return fmt.Errorf("SETTINGS_ENCRYPTION_KEY must be at least 32 bytes when configured")
+	}
+	for _, key := range c.invalidEnvironment {
+		if bootstrapEnvironmentKey(key) {
+			return fmt.Errorf("invalid bootstrap environment variable: %s", key)
+		}
+	}
+	if c.AutoMigrate && c.MigrationLockTimeout > 0 && c.MigrationTimeout > 0 && c.MigrationLockTimeout >= c.MigrationTimeout {
+		return fmt.Errorf("MIGRATION_LOCK_TIMEOUT must be less than MIGRATION_TIMEOUT when AUTO_MIGRATE is true")
+	}
+	if err := c.validateStorage(); err != nil {
+		return err
+	}
+	if appEnv == "production" && c.StorageWriteProvider() != "s3" {
+		return fmt.Errorf("STORAGE_PROVIDER must be s3 in production")
+	}
+	for _, proxy := range c.TrustedProxies {
+		if net.ParseIP(proxy) == nil {
+			if _, _, err := net.ParseCIDR(proxy); err != nil {
+				return fmt.Errorf("TRUSTED_PROXY_CIDRS contains invalid IP or CIDR %q", proxy)
+			}
+		}
+	}
+	if appEnv != "production" {
+		return nil
+	}
+	if len(c.defaultSecretEnvironment) > 0 {
+		return fmt.Errorf("missing production secret configuration: %s", strings.Join(c.defaultSecretEnvironment, ", "))
+	}
+	if strings.TrimSpace(c.DatabaseURL) == "" || containsPlaceholder(c.DatabaseURL) {
+		return fmt.Errorf("DATABASE_URL must not contain CHANGE_ME in production")
+	}
+	databaseURL, err := url.Parse(c.DatabaseURL)
+	if err != nil || (databaseURL.Scheme != "postgres" && databaseURL.Scheme != "postgresql") || databaseURL.Host == "" {
+		return fmt.Errorf("DATABASE_URL must be an absolute postgres:// or postgresql:// URL in production")
+	}
+	if strings.TrimSpace(c.RedisURL) == "" || containsPlaceholder(c.RedisURL) {
+		return fmt.Errorf("REDIS_URL must not contain CHANGE_ME in production")
+	}
+	redisURL, err := url.Parse(c.RedisURL)
+	if err != nil || (redisURL.Scheme != "redis" && redisURL.Scheme != "rediss") || redisURL.Host == "" {
+		return fmt.Errorf("REDIS_URL must be an absolute redis:// or rediss:// URL in production")
+	}
+	if strings.TrimSpace(c.JWTSecret) == "" || containsPlaceholder(c.JWTSecret) {
+		return fmt.Errorf("JWT_SECRET must not contain CHANGE_ME in production")
+	}
+	if len([]byte(c.JWTSecret)) < 32 {
+		return fmt.Errorf("JWT_SECRET must be at least 32 bytes in production")
+	}
+	if strings.TrimSpace(c.SettingsEncryptionKey) == "" || containsPlaceholder(c.SettingsEncryptionKey) {
+		return fmt.Errorf("SETTINGS_ENCRYPTION_KEY must be configured without CHANGE_ME in production")
+	}
+	if len([]byte(c.SettingsEncryptionKey)) < 32 {
+		return fmt.Errorf("SETTINGS_ENCRYPTION_KEY must be at least 32 bytes in production")
+	}
+	frontendURL, err := url.Parse(c.FrontendOrigin)
+	if err != nil || frontendURL.Scheme != "https" || frontendURL.Host == "" {
+		return fmt.Errorf("FRONTEND_ORIGIN must be an absolute HTTPS URL in production")
+	}
+	if len(c.TrustedProxies) == 0 {
+		return fmt.Errorf("TRUSTED_PROXY_CIDRS must not be empty in production")
+	}
+	if !c.AuthRefreshCookieSecure {
+		return fmt.Errorf("AUTH_REFRESH_COOKIE_SECURE must be true in production")
+	}
+	if c.AutoMigrate {
+		return fmt.Errorf("AUTO_MIGRATE must be false in production; run the dedicated migration job before backend startup")
+	}
+	return nil
+}
+
+// MarkRuntimeSettingsDatabaseBacked discards parse errors from legacy runtime
+// environment variables after authoritative values have been loaded from the
+// database. Bootstrap, storage and deployment errors remain fail-closed.
+func (c *Config) MarkRuntimeSettingsDatabaseBacked() {
+	filtered := make([]string, 0, len(c.invalidEnvironment))
+	for _, key := range c.invalidEnvironment {
+		if bootstrapEnvironmentKey(key) {
+			filtered = append(filtered, key)
+		}
+	}
+	c.invalidEnvironment = filtered
+	c.accountRecoveryInvalidEnv = nil
+	c.accountRecoverySecretErrors = nil
+}
+
+func bootstrapEnvironmentKey(key string) bool {
+	switch key {
+	case "AUTO_MIGRATE", "MIGRATION_LOCK_TIMEOUT", "MIGRATION_TIMEOUT",
+		"STORAGE_OPERATION_TIMEOUT", "STORAGE_MIGRATION_TIMEOUT",
+		"STORAGE_S3_USE_PATH_STYLE", "STORAGE_S3_ALLOW_INSECURE_ENDPOINT",
+		"AUTH_REFRESH_COOKIE_SECURE":
+		return true
+	default:
+		return false
+	}
+}
+
 func (c Config) Validate() error {
+	if err := c.ValidateBootstrap(); err != nil {
+		return err
+	}
 	appEnv := strings.ToLower(strings.TrimSpace(c.AppEnv))
 	switch appEnv {
 	case "development", "test", "staging", "production":

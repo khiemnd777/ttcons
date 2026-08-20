@@ -2601,6 +2601,7 @@ export type SurplusHandlingResponse = {
   material_balances?: ProjectMaterialBalance[];
   warehouses?: Warehouse[];
   handlings?: SurplusHandlingRecord[];
+  handling_options?: Array<'return_to_warehouse' | 'return_to_subcontractor' | string>;
 };
 
 export type IncomingAcceptanceItem = ProjectOperationsRecord & {

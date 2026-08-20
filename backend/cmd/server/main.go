@@ -25,7 +25,7 @@ import (
 
 func main() {
 	cfg := config.Load()
-	if err := cfg.Validate(); err != nil {
+	if err := cfg.ValidateBootstrap(); err != nil {
 		log.Fatalf("invalid configuration: %v", err)
 	}
 	storageRuntime, err := sharedstorage.NewRuntime(context.Background(), sharedstorage.RuntimeConfig{
@@ -83,6 +83,26 @@ func main() {
 		log.Printf("event=database_migrations applied=%d skipped=%d", len(result.Applied), len(result.Skipped))
 	}
 
+	bootstrapContext, cancelBootstrap := context.WithTimeout(context.Background(), 30*time.Second)
+	bootstrapConn, err := db.Connect(bootstrapContext, cfg.DatabaseURL, db.Options{
+		MaxOpenConns: 2,
+		MaxIdleConns: 1,
+	})
+	if err != nil {
+		cancelBootstrap()
+		log.Fatalf("connect postgres for system settings: %v", err)
+	}
+	settingsStore := core.NewSystemSettingsStore(bootstrapConn, cfg)
+	cfg, err = settingsStore.Bootstrap(bootstrapContext, cfg)
+	closeBootstrapErr := bootstrapConn.Close()
+	cancelBootstrap()
+	if err != nil {
+		log.Fatalf("bootstrap database-backed system settings: %v", err)
+	}
+	if closeBootstrapErr != nil {
+		log.Printf("close system settings bootstrap connection: %v", closeBootstrapErr)
+	}
+
 	connectContext, cancelConnect := context.WithTimeout(context.Background(), 10*time.Second)
 	conn, err := db.Connect(connectContext, cfg.DatabaseURL, db.Options{
 		MaxOpenConns:     cfg.DBMaxOpenConns,
@@ -97,6 +117,7 @@ func main() {
 		log.Fatalf("connect postgres: %v", err)
 	}
 	defer conn.Close()
+	settingsStore.Rebind(conn)
 
 	redisClient, err := cache.Connect(context.Background(), cfg.RedisURL, cfg.RedisOperationTimeout)
 	if err != nil {
@@ -129,7 +150,7 @@ func main() {
 	}))
 	app.Get("/metrics", runtimeMetrics.Handler())
 
-	closeRoutes, err := core.RegisterRoutes(app, conn, redisClient, redisCacheClient, cfg, storageRuntime.Registry, runtimeMetrics)
+	closeRoutes, err := core.RegisterRoutes(app, conn, redisClient, redisCacheClient, cfg, storageRuntime.Registry, runtimeMetrics, settingsStore)
 	if err != nil {
 		log.Fatalf("register routes: %v", err)
 	}

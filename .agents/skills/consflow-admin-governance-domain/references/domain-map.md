@@ -5,7 +5,7 @@
 - Frontend modules: `frontend/src/modules/auth`, `frontend/src/modules/profile`, `frontend/src/modules/staff`, `frontend/src/modules/rbac`, `frontend/src/modules/core-data`, `frontend/src/modules/audit`, `frontend/src/modules/settings`
 - Frontend auth/navigation: `frontend/src/lib/auth/AuthContext.tsx`, `frontend/src/app/router.tsx`, `frontend/src/layouts/AppShell.tsx`
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `repository.go`, `types.go`
+- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `repository.go`, `types.go`, `system_settings_definitions.go`, `system_settings_store.go`
 - Shared auth: `backend/internal/shared/middleware`, `backend/internal/shared/config`
 
 ## Routes
@@ -14,7 +14,7 @@
 - Product navigation `Đối tác`, page title `Danh mục đối tác`: frontend route `/core-data`; API `/partners`
 - Staff/RBAC: `/staff`, `/roles`, `/permissions`, `/roles/:id/permissions`, `/users/:id/roles`
 - Project membership governance: `/projects/:id/members`, `/projects/:id/members/:memberId`
-- Audit/settings: `/audit-logs`, `/projects/:id/audit-logs`, `/settings`
+- Audit/settings: `/audit-logs`, `/projects/:id/audit-logs`, `GET|PUT /settings`, `GET /settings/backup`, `POST /settings/backup/preview|restore`
 - Statistics governance: `/statistics/options`, `/statistics/staff` and `/statistics/staff/export`; authored-report governance: `/work-reports/*`; legacy Dashboard/professional-report routes remain `/reports/*`
 
 ## Tables And Migrations
@@ -22,8 +22,8 @@
 - `users`, `staff`, `roles`, `permissions`, `user_roles`, `role_permissions`, `project_members`
 - `auth_sessions`, `auth_email_tokens`; users-only `users.recovery_email` and `users.recovery_email_verified_at` from V107; token retention indexes from V108; Admin-only default `staff.account_security.manage` grant from V109
 - `partners`
-- `system_settings`, `audit_logs`
-- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, external-only client access in `V89`, actor/project explorer cache revisions/outbox retention in `V97`-`V100`, revision-scoped workflow-form confirmations in `V101`, and `statistics.*`/`work_report.*` separation plus authored-report history in `V106`
+- typed/versioned `system_settings`, `audit_logs`
+- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, external-only client access in `V89`, actor/project explorer cache revisions/outbox retention in `V97`-`V100`, revision-scoped workflow-form confirmations in `V101`, `statistics.*`/`work_report.*` separation plus authored-report history in `V106`, and typed settings plus system Developer role in `V110`
 
 ## Invariants
 
@@ -34,6 +34,9 @@
 - Audit read APIs are server-filtered and page-number paginated, return project labels plus permission-scoped filter options, use global `ProjectAccessFilter` or project `requireProjectPermission`, and expose metadata read-only. Audit persistence is centralized in `backend/internal/core/audit.go`: critical governance/workflow/finance and quality approval/terminal mutations use the same DB transaction and fail closed; classified non-critical operational events remain best-effort but emit structured failure logs. Metadata serialization and insert errors must never be silently discarded on a critical transition.
 - Activity reply/reaction/edit/withdraw endpoints remain protected and reuse `ActivityVisibleToUser`; edit/withdraw additionally require exact author ownership, activity type `comment`, an unwithdrawn row and the 15-minute server window. UI capability flags never replace backend enforcement, managers receive no override, and no new global permission is introduced.
 - Frontend navigation and row actions mirror permissions but do not replace backend enforcement.
+- V110 reserves Settings governance by capability and system role: Developer owns `settings.view|settings.update|seal.manage`; Admin retains `settings.view|seal.manage` but cannot receive `settings.update`; other roles cannot receive these reserved Settings/seal-management permissions. The backend role-permission replacement path enforces the same boundary, while frontend visibility is presentation only. Local seed supplies `developer@consflow.local`; migration never creates a production user.
+- System settings use an explicit typed registry, optimistic row versions and fail-closed audit in one transaction. Legacy runtime environment values are imported only when a row is missing, then PostgreSQL is authoritative. Sensitive `SMTP_PASSWORD` has no plaintext JSON value and is AES-GCM encrypted with the core `.env`/secret-file `SETTINGS_ENCRYPTION_KEY`; bootstrap, connection, storage and root-secret fields remain outside the database and read-only in the API/UI.
+- Settings JSON backup is a portability aid for database/UI policy only, not a database dump. `settings.view` may export all non-sensitive registry values plus secret configured-state metadata; neither plaintext/ciphertext secrets nor core `.env`, seals, identities or business records enter the document. `settings.update` alone may preview/restore. Preview is no-write; restore recomputes the file hash, checks expected row versions, rejects core/secret/invalid-known payloads, warns and skips unknown compatibility keys, preserves missing/current secret values, and commits all changed known settings plus per-row/summary audit in one transaction. No backup artifact is stored server-side.
 - Work-item detail may expose the permission catalog name/description as presentation metadata, but authorization continues to use the raw snapshotted key through backend permission helpers. User-facing requirement text must not reveal raw keys; missing catalog metadata falls back to generic administrator guidance. V96 standardizes `planning.edit` as `Cập nhật kế hoạch` / `Cập nhật nội dung kế hoạch được phân công` without adding or removing any role grant.
 - Submitted workflow-form amendment capability is server-owned and combines `CanActOnWorkItem` with the work item's snapshotted required permission; the UI `can_amend` flag only controls presentation. Amendment does not grant managers/directors a new override and does not require the historical work item to remain the current pipeline node. The atomic `workflow_form_amended` audit stores actor, mandatory reason, from/to revision and exact field-label-aware before/after changes; audit failure rolls back the content revision. Later signatures, seals and PDFs remain separately attributable to their form revision.
 - My Work is one adaptive actor-scoped role workbench, not one page per role. List/detail `readiness`, capabilities and `available_actions` are actor-specific presentation hints only. `pending_approval` retains requester separation, required decision roles and project scope; `upcoming` work remains visible but current-time/current-node backend gates deny every mutation path. The authenticated SSE still exposes invalidation-only `work_queue_changed`. No new global permission, role filter, manager override, table or migration is introduced.

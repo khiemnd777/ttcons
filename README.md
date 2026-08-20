@@ -118,6 +118,7 @@ Rule bắt buộc cho agent:
 Tất cả dùng mật khẩu `123456`.
 
 - admin@consflow.local
+- developer@consflow.local
 - pm@consflow.local
 - qs@consflow.local
 - accounting@consflow.local
@@ -185,4 +186,4 @@ Các nhóm route chính:
 - Custom migration runner tạo đầy đủ nhóm bảng domain trong prompt và ghi lịch sử vào `schema_migrations`.
 - Seed data dùng UUID cố định để demo flow ổn định.
 - Ent schema hiện scaffold các entity lõi; repository SQL đang chạy runtime để bao phủ nhanh toàn bộ domain rộng.
-- Business rules demo đã có ở backend: block node thi công khi chưa đủ vật tư hoặc chưa thu đủ 30%, nghiệm thu fail tạo punch list/rework, handover closure checker.
+- Business rules demo đã có ở backend: block node thi công khi chưa đủ vật tư hoặc chưa thu đủ tỷ lệ cấu hình `client_payment_min_percent` (mặc định 30%), nghiệm thu fail tạo punch list/rework, handover closure checker.

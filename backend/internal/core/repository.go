@@ -13,11 +13,16 @@ import (
 )
 
 type Repository struct {
-	db *sql.DB
+	db             *sql.DB
+	systemSettings *SystemSettingsStore
 }
 
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
+}
+
+func (r *Repository) ConfigureSystemSettings(store *SystemSettingsStore) {
+	r.systemSettings = store
 }
 
 func (r *Repository) Query(ctx context.Context, query string, args ...any) ([]Record, error) {

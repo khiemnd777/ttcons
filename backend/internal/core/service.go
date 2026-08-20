@@ -4349,7 +4349,15 @@ func (s *Service) surplusHandlingResponse(ctx context.Context, item Record) (Rec
 		"material_balances": balances,
 		"warehouses":        warehouses,
 		"handlings":         handlings,
+		"handling_options":  s.surplusHandlingOptions(ctx),
 	}, nil
+}
+
+func (s *Service) surplusHandlingOptions(ctx context.Context) []string {
+	if s.repo.systemSettings == nil {
+		return []string{"return_to_warehouse", "return_to_subcontractor"}
+	}
+	return s.repo.systemSettings.SurplusHandlingOptions(ctx)
 }
 
 func (s *Service) normalizeSurplusHandlingRequest(ctx context.Context, item Record, req SurplusHandlingRequest, submit bool) (Record, error) {
@@ -4388,6 +4396,9 @@ func (s *Service) normalizeSurplusHandlingRequest(ctx context.Context, item Reco
 	}
 	if !statusIn(handlingType, "return_to_warehouse", "return_to_subcontractor") {
 		return nil, validationError("Loại xử lý vật tư dư không hợp lệ", Record{"handling_type": handlingType})
+	}
+	if !statusIn(handlingType, s.surplusHandlingOptions(ctx)...) {
+		return nil, validationError("Loại xử lý vật tư dư đang bị tắt trong thiết lập hệ thống", Record{"handling_type": handlingType})
 	}
 	unit := strings.TrimSpace(req.Unit)
 	if unit == "" {

@@ -15,8 +15,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *redis.Client, cfg config.Config, storageRegistry *sharedstorage.Registry, cacheObserver ProjectExplorerCacheObserver) (func(), error) {
+func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *redis.Client, cfg config.Config, storageRegistry *sharedstorage.Registry, cacheObserver ProjectExplorerCacheObserver, settingsStore *SystemSettingsStore) (func(), error) {
 	repo := NewRepository(db)
+	repo.ConfigureSystemSettings(settingsStore)
 	service := NewService(repo, cfg.JWTSecret)
 	if err := service.ConfigureStorage(storageRegistry, cfg.StorageWriteProvider(), cfg.MaxUploadBytes); err != nil {
 		return nil, err
@@ -481,6 +482,10 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Get("/reports/staff", h.StaffReport)
 	protected.Get("/reports/staff/export", h.StaffReportCSV)
 	protected.Get("/settings", h.Settings)
+	protected.Put("/settings", h.UpdateSettings)
+	protected.Get("/settings/backup", h.DownloadSettingsBackup)
+	protected.Post("/settings/backup/preview", h.PreviewSettingsBackupRestore)
+	protected.Post("/settings/backup/restore", h.RestoreSettingsBackup)
 
 	var closeOnce sync.Once
 	return func() {

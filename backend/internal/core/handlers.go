@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -4469,7 +4470,107 @@ func (h *Handler) Settings(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"settings.view"}); err != nil {
 		return err
 	}
-	return h.list(c, `SELECT * FROM system_settings ORDER BY key`)
+	canUpdate, err := h.service.repo.CanUsePermission(c.Context(), actorID(c), []string{"settings.update"})
+	if err != nil {
+		return err
+	}
+	if h.service.repo.systemSettings == nil {
+		return errors.New("system settings store is not configured")
+	}
+	result, err := h.service.repo.systemSettings.List(c.Context(), canUpdate)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result)
+}
+
+func (h *Handler) UpdateSettings(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"settings.update"}); err != nil {
+		return err
+	}
+	var request struct {
+		Updates []SystemSettingUpdateRequest `json:"updates"`
+	}
+	if err := json.Unmarshal(c.Body(), &request); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu cấu hình không hợp lệ")
+	}
+	if h.service.repo.systemSettings == nil {
+		return errors.New("system settings store is not configured")
+	}
+	result, err := h.service.repo.systemSettings.Update(c.Context(), request.Updates, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã lưu thiết lập hệ thống")
+}
+
+func (h *Handler) DownloadSettingsBackup(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"settings.view"}); err != nil {
+		return err
+	}
+	if h.service.repo.systemSettings == nil {
+		return errors.New("system settings store is not configured")
+	}
+	raw, filename, metadata, err := h.service.repo.systemSettings.ExportBackup(c.Context())
+	if err != nil {
+		return err
+	}
+	if err := h.service.repo.AddAudit(c.Context(), "", actorID(c), actorName(c), "system_settings_backup_exported", "system_settings_backup", "", "Đã tải bản sao thiết lập hệ thống", metadata); err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, "application/json; charset=utf-8")
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf("attachment; filename=%q; filename*=UTF-8''%s", filename, url.PathEscape(filename)))
+	return c.Send(raw)
+}
+
+func (h *Handler) PreviewSettingsBackupRestore(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"settings.update"}); err != nil {
+		return err
+	}
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Tệp JSON bản sao cấu hình là bắt buộc")
+	}
+	raw, err := readSystemSettingsBackupUpload(fileHeader)
+	if err != nil {
+		return err
+	}
+	if h.service.repo.systemSettings == nil {
+		return errors.New("system settings store is not configured")
+	}
+	result, err := h.service.repo.systemSettings.PreviewBackupRestore(c.Context(), raw)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result)
+}
+
+func (h *Handler) RestoreSettingsBackup(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"settings.update"}); err != nil {
+		return err
+	}
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Tệp JSON bản sao cấu hình là bắt buộc")
+	}
+	raw, err := readSystemSettingsBackupUpload(fileHeader)
+	if err != nil {
+		return err
+	}
+	expectedVersions := map[string]int64{}
+	if err := json.Unmarshal([]byte(c.FormValue("expected_versions")), &expectedVersions); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Danh sách phiên bản thiết lập không hợp lệ")
+	}
+	if h.service.repo.systemSettings == nil {
+		return errors.New("system settings store is not configured")
+	}
+	result, err := h.service.repo.systemSettings.RestoreBackup(
+		c.Context(), raw, c.FormValue("preview_hash"), expectedVersions, actorID(c), actorName(c),
+	)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã khôi phục thiết lập hệ thống")
 }
 
 func (h *Handler) list(c *fiber.Ctx, query string, args ...any) error {

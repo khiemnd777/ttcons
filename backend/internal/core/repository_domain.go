@@ -361,26 +361,50 @@ func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, 
 	defer tx.Rollback()
 
 	var roleIDText string
+	var roleName string
 	var roleDisplayName string
 	var externalOnly bool
-	if err := tx.QueryRowContext(ctx, `SELECT id::text,display_name,external_only FROM roles WHERE id=$1 FOR UPDATE`, roleID).Scan(&roleIDText, &roleDisplayName, &externalOnly); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT id::text,name,display_name,external_only FROM roles WHERE id=$1 FOR UPDATE`, roleID).Scan(&roleIDText, &roleName, &roleDisplayName, &externalOnly); err != nil {
 		return nil, err
 	}
 	if externalOnly {
 		return nil, validationError("Vai trò đối tác ngoài App không được gán quyền", Record{"role_id": roleIDText, "role": roleDisplayName})
+	}
+	if roleName == "developer" {
+		return nil, validationError("Vai trò Nhà phát triển luôn có toàn quyền và không cho phép sửa bộ quyền", Record{"role_id": roleIDText})
+	}
+	requestedKeys := map[string]bool{}
+	for _, permissionID := range permissionIDs {
+		var permissionKey string
+		if err := tx.QueryRowContext(ctx, `SELECT key FROM permissions WHERE id=$1`, permissionID).Scan(&permissionKey); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, validationError("Quyền không tồn tại", Record{"permission_id": permissionID})
+			}
+			return nil, err
+		}
+		requestedKeys[permissionKey] = true
+	}
+	if roleName == "admin" {
+		if requestedKeys["settings.update"] {
+			return nil, validationError("Quản trị viên chỉ được xem Thiết lập hệ thống", Record{"permission": "settings.update"})
+		}
+		for _, required := range []string{"settings.view", "seal.use", "seal.manage"} {
+			if !requestedKeys[required] {
+				return nil, validationError("Không thể gỡ quyền cấu hình bắt buộc của Quản trị viên", Record{"permission": required})
+			}
+		}
+	} else {
+		for _, reserved := range []string{"settings.view", "settings.update", "seal.manage"} {
+			if requestedKeys[reserved] {
+				return nil, validationError("Quyền này chỉ dành cho Quản trị viên hoặc Nhà phát triển", Record{"permission": reserved})
+			}
+		}
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, roleID); err != nil {
 		return nil, err
 	}
 	assigned := 0
 	for _, permissionID := range permissionIDs {
-		var exists int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM permissions WHERE id=$1`, permissionID).Scan(&exists); err != nil {
-			return nil, err
-		}
-		if exists == 0 {
-			return nil, validationError("Quyền không tồn tại", Record{"permission_id": permissionID})
-		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, roleID, permissionID); err != nil {
 			return nil, err
 		}
@@ -11915,8 +11939,12 @@ func (r *Repository) nodeBlockers(ctx context.Context, node Record) []string {
 			if len(rows) > 0 {
 				received = number(rows[0]["received"])
 			}
-			if contractAmount > 0 && received/contractAmount < 0.30 {
-				blockers = append(blockers, "Chưa thu đủ tối thiểu 30% giá trị hợp đồng để bắt đầu thi công")
+			minimumPercent := 30.0
+			if r.systemSettings != nil {
+				minimumPercent = r.systemSettings.ClientPaymentMinPercent(ctx)
+			}
+			if contractAmount > 0 && received/contractAmount < minimumPercent/100 {
+				blockers = append(blockers, fmt.Sprintf("Chưa thu đủ tối thiểu %s%% giá trị hợp đồng để bắt đầu thi công", strconv.FormatFloat(minimumPercent, 'f', -1, 64)))
 			}
 		}
 		missing, _ := r.Query(ctx, `

@@ -46,6 +46,7 @@ INSERT INTO users (id, email, password_hash, full_name, status) VALUES
 ('10000000-0000-0000-0000-000000000014','sales@consflow.local','demo:123456','Trần Vy Sale','active'),
 ('10000000-0000-0000-0000-000000000015','legal@consflow.local','demo:123456','Lê Quang Pháp lý','active'),
 ('10000000-0000-0000-0000-000000000016','contract@consflow.local','demo:123456','Vũ An Hợp đồng','active'),
+('10000000-0000-0000-0000-000000000017','developer@consflow.local','demo:123456','Nhà phát triển hệ thống','active'),
 ('79900000-0000-0000-0000-000000000001','accounting.backfill@system.local','system-disabled','Hệ thống chuyển đổi sổ kế toán','inactive');
 
 INSERT INTO roles (id, name, display_name, description, system_role) VALUES
@@ -65,7 +66,8 @@ INSERT INTO roles (id, name, display_name, description, system_role) VALUES
 ('20000000-0000-0000-0000-000000000014','design','Thiết kế','Phụ trách phương án và hồ sơ thiết kế',true),
 ('20000000-0000-0000-0000-000000000015','sales','Sale','Phụ trách phối hợp khách hàng, BOQ và hồ sơ thương mại',true),
 ('20000000-0000-0000-0000-000000000016','legal','Pháp lý','Phụ trách rà soát pháp lý hợp đồng',true),
-('20000000-0000-0000-0000-000000000017','contract_officer','Bộ phận HĐ','Phụ trách lập, luân chuyển, ký và lưu hồ sơ hợp đồng',true);
+('20000000-0000-0000-0000-000000000017','contract_officer','Bộ phận HĐ','Phụ trách lập, luân chuyển, ký và lưu hồ sơ hợp đồng',true),
+('20000000-0000-0000-0000-000000000018','developer','Nhà phát triển','Quản trị kỹ thuật và thiết lập hệ thống',true);
 
 UPDATE roles
 SET external_only=(name='client');
@@ -106,7 +108,8 @@ SET description='Đặt mật khẩu và email khôi phục đã xác minh cho t
 WHERE key='staff.account_security.manage';
 
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name = 'admin'
+SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
+WHERE r.name = 'developer' OR (r.name = 'admin' AND p.key <> 'settings.update')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id,permission_id)
@@ -130,7 +133,7 @@ DELETE FROM role_permissions role_permission
 USING roles role,permissions permission
 WHERE role_permission.role_id=role.id
   AND role_permission.permission_id=permission.id
-  AND role.name <> 'admin'
+  AND role.name NOT IN ('admin','developer')
   AND (permission.key LIKE 'accounting.%' OR permission.key IN ('accounting.view','report.finance.view'));
 
 INSERT INTO role_permissions (role_id,permission_id)
@@ -281,7 +284,7 @@ DELETE FROM role_permissions role_permission
 USING roles role,permissions permission
 WHERE role_permission.role_id=role.id
   AND role_permission.permission_id=permission.id
-  AND role.name <> 'admin'
+  AND role.name NOT IN ('admin','developer')
   AND (permission.key LIKE 'accounting.%' OR permission.key IN ('accounting.view','report.finance.view'));
 
 INSERT INTO staff (id, user_id, full_name, email, phone, department, position, status) VALUES
@@ -300,11 +303,13 @@ INSERT INTO staff (id, user_id, full_name, email, phone, department, position, s
 ('21000000-0000-0000-0000-000000000013','10000000-0000-0000-0000-000000000013','Nguyễn Hà Thiết kế','design@consflow.local','0900000013','Thiết kế','Design Lead','active'),
 ('21000000-0000-0000-0000-000000000014','10000000-0000-0000-0000-000000000014','Trần Vy Sale','sales@consflow.local','0900000014','Kinh doanh','Sales Lead','active'),
 ('21000000-0000-0000-0000-000000000015','10000000-0000-0000-0000-000000000015','Lê Quang Pháp lý','legal@consflow.local','0900000015','Pháp lý','Legal Reviewer','active'),
-('21000000-0000-0000-0000-000000000016','10000000-0000-0000-0000-000000000016','Vũ An Hợp đồng','contract@consflow.local','0900000016','Hợp đồng','Contract Officer','active');
+('21000000-0000-0000-0000-000000000016','10000000-0000-0000-0000-000000000016','Vũ An Hợp đồng','contract@consflow.local','0900000016','Hợp đồng','Contract Officer','active'),
+('21000000-0000-0000-0000-000000000017','10000000-0000-0000-0000-000000000017','Nhà phát triển hệ thống','developer@consflow.local','0900000017','Công nghệ','Developer','active');
 
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id FROM users u JOIN roles r ON
   (u.email='admin@consflow.local' AND r.name='admin') OR
+  (u.email='developer@consflow.local' AND r.name='developer') OR
   (u.email='pm@consflow.local' AND r.name='pm') OR
   (u.email='qs@consflow.local' AND r.name='qs') OR
   (u.email='accounting@consflow.local' AND r.name='accounting') OR
@@ -749,9 +754,9 @@ INSERT INTO audit_logs (project_id, actor_id, actor_name, event_type, target_typ
 ('30000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000005','Phạm Long Thủ kho','warehouse_issued','stock_movement',NULL,'Xuất 800m dây điện Cadivi ra công trình Q1','{"material":"Dây điện Cadivi","quantity":800}'),
 ('30000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000006','Đặng Khoa Giám sát','replanning_triggered','issue','70000000-0000-0000-0000-000000000001','Issue lớn yêu cầu replanning vì hiện trạng khác khảo sát','{"impact_scope":"boq","budget_impact":45000000}');
 
-INSERT INTO system_settings (key, value_json, description) VALUES
-('client_payment_min_percent','{"construction":30}','Tỷ lệ thu tiền tối thiểu trước khi bắt đầu node thi công'),
-('surplus_handling_options','["store","return_to_subcontractor"]','Cách xử lý vật tư dư sau thi công');
+INSERT INTO system_settings (key, value_json, description, category, value_type, is_secret, requires_restart, source) VALUES
+('client_payment_min_percent','30','Tỷ lệ thu tiền tối thiểu trước khi bắt đầu node thi công','business','number',false,false,'business_default'),
+('surplus_handling_options','["return_to_warehouse","return_to_subcontractor"]','Cách xử lý vật tư dư sau thi công','business','multi_select',false,false,'business_default');
 
 -- Full workflow/form coverage demo project.
 -- This section is intentionally seeded as runtime data, not migrations:

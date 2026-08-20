@@ -14,23 +14,15 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
-const demoAccounts = [
-  'admin@consflow.local',
-  'pm@consflow.local',
-  'qs@consflow.local',
-  'accounting@consflow.local',
-  'warehouse@consflow.local',
-  'supervisor@consflow.local',
-  'director@consflow.local',
-];
-
 export function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: demoAccounts[0], password: '123456' },
+    defaultValues: import.meta.env.DEV
+      ? { email: 'admin@consflow.local', password: '123456' }
+      : { email: '', password: '' },
   });
 
   if (user) return <Navigate to="/" replace />;
@@ -49,21 +41,6 @@ export function LoginPage() {
             }
           })}
         >
-          <label className="block">
-            <span className="text-sm font-semibold text-slate-700">Tài khoản demo</span>
-            <select
-              className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm focus-ring"
-              onChange={(event) => {
-                form.setValue('email', event.target.value);
-                form.setValue('password', '123456');
-              }}
-              value={form.watch('email')}
-            >
-              {demoAccounts.map((email) => (
-                <option key={email}>{email}</option>
-              ))}
-            </select>
-          </label>
           <label className="block">
             <span className="text-sm font-semibold text-slate-700">Email</span>
             <input className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm focus-ring" {...form.register('email')} />

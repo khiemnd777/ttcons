@@ -166,6 +166,7 @@ func TestProductionConfigValidationFailsClosed(t *testing.T) {
 		DatabaseURL:             "postgres://consflow:strong-password@postgres:5432/consflow?sslmode=disable",
 		RedisURL:                "redis://:strong-password@redis:6379/0",
 		JWTSecret:               "0123456789abcdef0123456789abcdef",
+		SettingsEncryptionKey:   "settings-key-0123456789abcdef0123456789",
 		FrontendOrigin:          "https://workflow.example.com",
 		AuthRefreshCookieSecure: true,
 		TrustedProxies:          []string{"172.30.0.0/24"},
@@ -315,6 +316,7 @@ func TestProductionS3EndpointRequiresHTTPSOrExplicitOverride(t *testing.T) {
 		DatabaseURL:             "postgres://consflow:strong-password@postgres:5432/consflow?sslmode=disable",
 		RedisURL:                "redis://:strong-password@redis:6379/0",
 		JWTSecret:               "0123456789abcdef0123456789abcdef",
+		SettingsEncryptionKey:   "settings-key-0123456789abcdef0123456789",
 		FrontendOrigin:          "https://workflow.example.com",
 		AuthRefreshCookieSecure: true,
 		TrustedProxies:          []string{"172.30.0.0/24"},
@@ -452,10 +454,12 @@ func TestLoadSecretValuesFromFiles(t *testing.T) {
 	databaseURL := "postgres://consflow:file-password@postgres:5432/consflow?sslmode=disable"
 	redisURL := "redis://:file-password@redis:6379/0"
 	jwtSecret := "file-secret-0123456789abcdef01234567"
+	settingsKey := "file-settings-key-0123456789abcdef01234567"
 	files := map[string]string{
-		"DATABASE_URL": databaseURL + "\n",
-		"REDIS_URL":    redisURL + "\r\n",
-		"JWT_SECRET":   jwtSecret + "\n",
+		"DATABASE_URL":            databaseURL + "\n",
+		"REDIS_URL":               redisURL + "\r\n",
+		"JWT_SECRET":              jwtSecret + "\n",
+		"SETTINGS_ENCRYPTION_KEY": settingsKey + "\n",
 	}
 	for key, value := range files {
 		unsetEnvironment(t, key)
@@ -470,8 +474,8 @@ func TestLoadSecretValuesFromFiles(t *testing.T) {
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("valid file-backed production config rejected: %v", err)
 	}
-	if cfg.DatabaseURL != databaseURL || cfg.RedisURL != redisURL || cfg.JWTSecret != jwtSecret {
-		t.Fatalf("resolved secrets = (%q, %q, %q), want (%q, %q, %q)", cfg.DatabaseURL, cfg.RedisURL, cfg.JWTSecret, databaseURL, redisURL, jwtSecret)
+	if cfg.DatabaseURL != databaseURL || cfg.RedisURL != redisURL || cfg.JWTSecret != jwtSecret || cfg.SettingsEncryptionKey != settingsKey {
+		t.Fatalf("file-backed secret resolution mismatch")
 	}
 }
 
@@ -617,6 +621,7 @@ func setValidProductionEnvironment(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://consflow:strong-password@postgres:5432/consflow?sslmode=disable")
 	t.Setenv("REDIS_URL", "redis://:strong-password@redis:6379/0")
 	t.Setenv("JWT_SECRET", "0123456789abcdef0123456789abcdef")
+	t.Setenv("SETTINGS_ENCRYPTION_KEY", "settings-key-0123456789abcdef0123456789")
 	t.Setenv("FRONTEND_ORIGIN", "https://workflow.example.com")
 	t.Setenv("TRUSTED_PROXY_CIDRS", "172.30.0.0/24")
 	t.Setenv("AUTH_REFRESH_COOKIE_SECURE", "true")
@@ -629,7 +634,7 @@ func setValidProductionEnvironment(t *testing.T) {
 
 func clearSecretFileEnvironment(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"DATABASE_URL_FILE", "REDIS_URL_FILE", "REDIS_CACHE_URL_FILE", "JWT_SECRET_FILE", "SMTP_PASSWORD_FILE"} {
+	for _, key := range []string{"DATABASE_URL_FILE", "REDIS_URL_FILE", "REDIS_CACHE_URL_FILE", "JWT_SECRET_FILE", "SETTINGS_ENCRYPTION_KEY_FILE", "SMTP_PASSWORD_FILE"} {
 		unsetEnvironment(t, key)
 	}
 }

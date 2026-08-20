@@ -41,7 +41,7 @@ type SurplusPayload = {
   comment: string;
 };
 
-const handlingOptions = [
+const allHandlingOptions = [
   { value: 'return_to_warehouse', label: 'Lưu kho' },
   { value: 'return_to_subcontractor', label: 'Trả thầu phụ' },
 ];
@@ -76,6 +76,10 @@ export function SurplusHandlingPanel({
   const balances = handlingQuery.data?.material_balances ?? [];
   const warehouses = handlingQuery.data?.warehouses ?? [];
   const handlings = handlingQuery.data?.handlings ?? [];
+  const handlingOptions = useMemo(() => {
+    const allowed = handlingQuery.data?.handling_options ?? allHandlingOptions.map((option) => option.value);
+    return allHandlingOptions.filter((option) => allowed.includes(option.value));
+  }, [handlingQuery.data?.handling_options]);
   const evidenceOptions = useMemo(() => evidence.filter((item) => item.status !== 'rejected'), [evidence]);
   const pendingBalances = useMemo(
     () => balances.filter((balance) => Number(balance.surplus_quantity ?? 0) > 0),
@@ -92,10 +96,10 @@ export function SurplusHandlingPanel({
     );
     for (const balance of pendingBalances) {
       const saved = draftByBalance.get(String(balance.id));
-      next[String(balance.id)] = saved ? draftFromRecord(saved) : defaultDraft(balance);
+      next[String(balance.id)] = saved ? draftFromRecord(saved, handlingOptions) : defaultDraft(balance, handlingOptions);
     }
     setDrafts(next);
-  }, [handlings, pendingBalances]);
+  }, [handlings, pendingBalances, handlingOptions]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['surplus-handlings', workItemId] });
@@ -226,7 +230,7 @@ export function SurplusHandlingPanel({
         {pendingBalances.length ? (
           <div className="divide-y divide-line border-y border-line">
             {pendingBalances.map((balance) => {
-              const draft = drafts[String(balance.id)] ?? defaultDraft(balance);
+              const draft = drafts[String(balance.id)] ?? defaultDraft(balance, handlingOptions);
               return (
                 <SurplusRow
                   key={balance.id}
@@ -234,6 +238,7 @@ export function SurplusHandlingPanel({
                   draft={draft}
                   warehouses={warehouses}
                   evidence={evidenceOptions}
+                  handlingOptions={handlingOptions}
                   disabled={actionPending}
                   onChange={(patch) => updateDraft(String(balance.id), patch)}
                   onSave={() => saveDraft.mutate({ balance, draft })}
@@ -282,6 +287,7 @@ function SurplusRow({
   draft,
   warehouses,
   evidence,
+  handlingOptions,
   disabled,
   onChange,
   onSave,
@@ -293,6 +299,7 @@ function SurplusRow({
   draft: Draft;
   warehouses: Warehouse[];
   evidence: EvidenceRecord[];
+  handlingOptions: typeof allHandlingOptions;
   disabled: boolean;
   onChange: (patch: Partial<Draft>) => void;
   onSave: () => void;
@@ -434,11 +441,11 @@ function SurplusRow({
   );
 }
 
-function defaultDraft(balance: ProjectMaterialBalance): Draft {
+function defaultDraft(balance: ProjectMaterialBalance, handlingOptions: typeof allHandlingOptions): Draft {
   return {
     id: '',
     site_balance_id: String(balance.id),
-    handling_type: 'return_to_warehouse',
+    handling_type: handlingOptions[0]?.value ?? '',
     quantity: String(balance.surplus_quantity ?? 0),
     unit: balance.unit ?? '',
     warehouse_id: '',
@@ -449,11 +456,15 @@ function defaultDraft(balance: ProjectMaterialBalance): Draft {
   };
 }
 
-function draftFromRecord(record: SurplusHandlingRecord): Draft {
+function draftFromRecord(record: SurplusHandlingRecord, handlingOptions: typeof allHandlingOptions): Draft {
+  const fallback = handlingOptions[0]?.value ?? '';
+  const handlingType = handlingOptions.some((option) => option.value === record.handling_type)
+    ? record.handling_type
+    : fallback;
   return {
     id: String(record.id),
     site_balance_id: String(record.site_balance_id),
-    handling_type: record.handling_type || 'return_to_warehouse',
+    handling_type: handlingType,
     quantity: String(record.quantity ?? 0),
     unit: record.unit ?? '',
     warehouse_id: record.warehouse_id ?? '',
@@ -476,7 +487,7 @@ function formatQty(value: number) {
 }
 
 function handlingLabel(value: string) {
-  return handlingOptions.find((option) => option.value === value)?.label ?? value;
+  return allHandlingOptions.find((option) => option.value === value)?.label ?? value;
 }
 
 function warehouseLabel(warehouse: Warehouse) {
