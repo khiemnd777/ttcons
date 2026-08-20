@@ -25,6 +25,7 @@ Status: IMPLEMENTED AND TECHNICALLY VERIFIED LOCALLY; PRODUCTION INPUTS AND EXEC
 - Updated the production runbook, README, Makefile, CI validation step, central runtime map and root-cause triage map for the canonical operator workflow.
 - Current uncommitted working-tree checks on 2026-08-20 passed: Bash syntax; release-tag tests; production-tooling end-to-end test; full `go test ./...`; frontend production build; workflow YAML parsing; generated-secret leak scan; ignored-path/mode checks; and `git diff --check`. `shellcheck` was unavailable and therefore skipped.
 - The real canonical config intentionally fails `make production-check` while provider-controlled placeholders remain unresolved; no incomplete configuration can be rendered or provisioned.
+- PR validation initially exposed two CI-runner issues rather than a production-code regression: the backend Makefile exported unset variables as empty values, and DB-backed packages raced on one shared PostgreSQL service. The approved correction runs backend packages directly with `go test -p 1 ./...`; GitHub revalidation is pending.
 
 ### Skipped / remaining acceptance
 
