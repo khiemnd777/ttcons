@@ -2,7 +2,7 @@
 
 ## Active Plan: Canonical production bootstrap and operator commands
 
-Status: IMPLEMENTED AND TECHNICALLY VERIFIED LOCALLY AND IN PR CI; EXTERNAL PRODUCTION SETUP IN PROGRESS (approved by user on 2026-08-20)
+Status: PRODUCTION DEPLOYED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-20)
 
 ### Will be done
 
@@ -31,16 +31,22 @@ Status: IMPLEMENTED AND TECHNICALLY VERIFIED LOCALLY AND IN PR CI; EXTERNAL PROD
 - Vietnix S3 credentials authenticate successfully to `tt-dnh-consflow-prod` with region `vn-hcm-1` and virtual-host addressing. The empty bucket initially granted anonymous listing; its ACL was changed to private, authenticated temporary put/get/delete passed with zero objects left behind, and anonymous access now returns HTTP `403`.
 - Created GitHub Environment `production`, uploaded exactly five raw deploy-transport secrets (`VPS_HOST`, `VPS_PORT`, `VPS_USER`, `VPS_SSH_PRIVATE_KEY`, `VPS_SSH_KNOWN_HOSTS`) and limited deployments to tag pattern `v*`; the exact workflow validator still enforces `vYYYY-MM-DD.N` and main ancestry.
 - GitHub rejected required-reviewer protection for this private repository with HTTP `422` because the current billing plan does not support it. No manual approval gate is active; a valid release tag will deploy automatically after validation unless the repository plan is upgraded and a reviewer is configured.
+- Installed the dedicated public key through the rotated root password without logging or persisting the password, immediately cleared the clipboard, and verified pinned key-only SSH. The VPS is CentOS Stream 9; `tar` and Docker CE `29.7.2` plus Compose `v5.5.0` were installed from Docker's official RPM repository after matching GPG fingerprint `060A 61C5 1B55 8A7F 742B 77AA C52F EB6B 621E 9F35`.
+- Provisioned `/opt/consflow/shared` through the canonical operator command. Docker is enabled/active, the VPS had approximately 55 GB free disk and 7.2 GiB available RAM at provision time, firewalld was inactive and SELinux was disabled.
+- Merged PR [#1](https://github.com/khiemnd777/ttcons/pull/1) into `main` at `703ae825ae251df9a083ee6415cf3f13f33d7ee4`; push/merge to `main` triggered no deployment. Annotated tag `v2026-08-20.1` then triggered GitHub Actions run `32358994866`, whose tag validation, full validation, immutable backend/admin image build and VPS deploy all passed.
+- Independent production smoke passed: HTTP `308` to HTTPS, TLS verification result `0`, root `200`, gateway health `204`, `/api/ready` reported service/database ready, and the production database recorded `112` migrations with numeric max version `112`. Let's Encrypt certificate SAN is `tt-dnh.com`, valid from 2026-08-20 through 2026-11-18.
+- Verified the bootstrapped account can log in with role `Admin` and log out without printing the password or token. The VPS first-use bootstrap password source was then truncated to zero bytes, `BOOTSTRAP_ADMIN_PASSWORD_FILE` was set to `/dev/null`, and an image-local bootstrap rerun returned `status=already_exists` without reading/resetting the password.
 
 ### Skipped / remaining acceptance
 
-- No VPS provisioning, merge, tag creation, GHCR build, production migration/Admin bootstrap or deployment has run yet.
-- The first password-based `ssh-copy-id` attempt was rejected and installed no key. The user confirmed that password was rotated and confirmed the VPS ED25519 fingerprint; the canonical config pins it. Installing the public key is pending only because the current local clipboard is empty.
-- DNS A resolves `tt-dnh.com` to `160.30.113.13`, but ports 80/443 are not serving yet. Public Caddy/ACME, production smoke/login and rollback remain unverified.
+- Required-reviewer protection is not active because the current GitHub billing plan rejected it; valid release tags deploy automatically after all workflow gates pass.
+- No production rollback drill or disaster-recovery restore was executed. Database rollback remains explicitly manual/fail-closed.
+- Browser/UAT was not run because the delivery change has no new UI behavior; production UI is therefore `NOT UX ACCEPTED` despite successful HTTPS/API/login smoke.
+- The CentOS SSH server negotiated no post-quantum key exchange and the host has no swap configured. These are host-hardening/operations follow-ups, not blockers for the verified release.
 
 ## Active Plan: Tag-gated VPS production release, Caddy Auto HTTPS, S3 and Admin bootstrap
 
-Status: IMPLEMENTED AND TECHNICALLY VERIFIED LOCALLY AND IN PR CI; VPS PROVISIONING AND RELEASE PENDING (approved by user on 2026-08-20)
+Status: PRODUCTION DEPLOYED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-20)
 
 ### Will be done
 
@@ -70,13 +76,17 @@ Status: IMPLEMENTED AND TECHNICALLY VERIFIED LOCALLY AND IN PR CI; VPS PROVISION
 - The approved test/invariant reconciliation and ephemeral GHCR authentication change pass local focused/full backend, frontend, workflow, release-tag, production-tooling and bundle checks on the current source state. GitHub Actions run `32354371208` passed the same PR validation surface on pushed revision `c6030aa`.
 - Created GitHub Environment `production`, uploaded exactly the five deploy-transport secrets and set the custom deployment tag policy to `v*`. Required-reviewer configuration remains unavailable on the current private-repository billing plan; HTTP `422` was returned and no approval gate was applied.
 - Final isolated Caddy smoke used the current built image as its default UID/GID 101 with read-only root, all Linux capabilities dropped and container-scoped low-port sysctl: local Automatic HTTPS returned 200 and loopback health returned 204. The public domain/ACME path was intentionally not exercised before DNS cutover.
+- Provisioned the CentOS Stream 9 VPS over pinned key-only SSH, installed verified official Docker CE/Compose RPMs, and placed runtime secrets only under `/opt/consflow/shared`; the rotated root password was never placed in GitHub or a local file and the clipboard was cleared immediately after public-key installation.
+- Merged the validated tree into `main` at `703ae825ae251df9a083ee6415cf3f13f33d7ee4`, then created annotated tag `v2026-08-20.1`. GitHub Actions run `32358994866` passed tag/main-ancestry validation, the full validation suite, digest-pinned GHCR builds, fail-closed VPS deployment and public HTTPS verification.
+- Production `current` points to `/opt/consflow/releases/v2026-08-20.1`; PostgreSQL, both Redis services, backend and Caddy/admin became healthy. All `112` migrations are recorded through V112, Admin bootstrap completed, subsequent login/role/logout smoke passed, and the post-bootstrap password source was disabled with a verified `already_exists` no-op rerun.
+- Independent public checks confirmed `http://tt-dnh.com` redirects with `308`, `https://tt-dnh.com/` returns `200`, `/gateway-health` returns `204`, `/api/ready` reports database `ok`, and the Let's Encrypt certificate covers `tt-dnh.com` through 2026-11-18.
 
 ### Skipped / remaining acceptance
 
-- DNS A is ready, the Vietnix bucket exists/authenticates/is private, GitHub Environment/secrets/tag policy are configured, and the user confirmed password rotation plus the pinned ED25519 fingerprint. VPS Docker/firewall/key-only SSH/runtime secrets are not provisioned because the rotated root password is not currently present in the local clipboard; no tag, GHCR package or production deployment exists yet.
-- Workflow YAML and local release components are technically checked, and PR validation passed on GitHub-hosted Actions. The real tag build and Environment deploy path have not run.
-- Public Caddy ACME issuance, HTTP redirect, production migration/bootstrap, login and rollback are not verified until those external prerequisites are complete. Real Vietnix S3 write/read/delete and private-access preflight passed independently.
-- Browser/UAT is out of scope because there is no UI behavior change.
+- Required-reviewer protection remains unavailable on the current GitHub billing plan, so the production Environment does not provide a manual approval pause.
+- No rollback drill or database restore was run; rollback remains an operator-controlled acceptance item.
+- Browser/UAT is out of scope because there is no UI behavior change, so the production UI remains `NOT UX ACCEPTED`.
+- Host-hardening follow-ups remain: evaluate an OpenSSH version/configuration with post-quantum key exchange and decide whether this 8 GiB single host should have swap.
 
 ## Active Plan: Migrate production origin gateway from Nginx to Caddy
 

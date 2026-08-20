@@ -8,7 +8,7 @@ Runbook này là nguồn vận hành chính cho single-host VPS `160.30.113.13`.
 - HTTPS: Caddy tự cấp/gia hạn chứng chỉ; certificate state nằm trong named volumes `consflow_caddy_data` và `consflow_caddy_config`.
 - S3: private bucket `tt-dnh-consflow-prod`, Region `vn-hcm-1` và access key riêng đã được xác thực bằng probe put/get/delete; anonymous access phải tiếp tục trả `403`.
 - VPS: cần Docker Engine, Docker Compose plugin, SSH key và host key đã pin.
-- GitHub: cần GHCR packages, Environment `production`, required reviewer và các environment secrets.
+- GitHub: cần GHCR packages, Environment `production`, tag deployment policy và các environment secrets. Required reviewer chỉ là gate bắt buộc khi billing plan của private repository hỗ trợ; nếu không, tag hợp lệ sẽ deploy tự động sau validation.
 
 ## Quy trình operator chính
 
@@ -52,6 +52,11 @@ Command này render `.env.prod` và các file secret trong thư mục tạm mode
 truyền thẳng sang VPS, cài Docker/Compose trên Linux apt-based khi thiếu, cài cấu
 hình vào `/opt/consflow/shared`, rồi xóa payload tạm.
 Nó không nhận, lưu hoặc đưa mật khẩu VPS lên GitHub.
+
+VPS hiện tại là CentOS Stream 9. Trên host `dnf`/RPM, cài `tar`, Docker Engine và
+Compose plugin từ repository chính thức của Docker trước khi chạy command; luôn
+đối chiếu fingerprint Docker RPM GPG key với tài liệu chính thức. Operator command
+fail-closed thay vì tự thêm repository trên hệ không phải apt.
 
 Chỉ năm deploy transport secrets được đưa lên GitHub, ở scope operator chọn rõ:
 
@@ -228,7 +233,8 @@ GitHub Pro cho phép Environment Secrets trên private repository, nhưng requir
 reviewer cho private environment cần gói hỗ trợ tương ứng; nếu chưa có, dùng scope
 `repository` và xem đó là deploy không có GitHub Environment approval gate.
 
-Tạo Environment `production`, bật required reviewer và khai báo:
+Tạo Environment `production`, giới hạn deployment tag `v*`, bật required reviewer
+nếu plan hỗ trợ và khai báo:
 
 - `VPS_HOST=160.30.113.13`
 - `VPS_PORT=22` hoặc SSH port thực tế
@@ -270,7 +276,8 @@ Luồng thực tế:
 pull_request vào main -> validation
 push main              -> không chạy Actions
 push tag hợp lệ        -> validation -> build/push GHCR theo tag
-                        -> chờ reviewer duyệt Environment production
+                        -> Environment production (chờ reviewer nếu plan hỗ trợ;
+                           current private-repo plan không có manual approval)
                         -> đăng nhập GHCR tạm bằng job token
                         -> deploy đúng image digest lên VPS, xóa credential tạm
 ```
