@@ -174,12 +174,16 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           port="${VPS_PORT:-22}"
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "$port" \
+          test -n "$GHCR_TOKEN"
+          [[ "$GHCR_USERNAME" =~ ^[A-Za-z0-9-]+$ ]]
+          printf '%s' "$GHCR_TOKEN" | ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "$port" \
             "$VPS_USER@$VPS_HOST" \
-            "bash '/opt/consflow/releases/$RELEASE_TAG/deploy/vps/deploy-production.sh' '$RELEASE_TAG' '$BACKEND_IMAGE' '$ADMIN_IMAGE'"
+            "set -Eeuo pipefail; umask 077; auth_dir=\$(mktemp -d); token_file=\$(mktemp); cleanup() { rm -rf \"\$auth_dir\" \"\$token_file\"; }; trap cleanup EXIT; export DOCKER_CONFIG=\"\$auth_dir\"; cat > \"\$token_file\"; docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin < \"\$token_file\" >/dev/null; bash '/opt/consflow/releases/$RELEASE_TAG/deploy/vps/deploy-production.sh' '$RELEASE_TAG' '$BACKEND_IMAGE' '$ADMIN_IMAGE'"
 
       - name: Verify public HTTPS
         shell: bash

@@ -61,9 +61,7 @@ trap cleanup EXIT
 bash "$script_dir/render-production-config.sh" "$work_dir/payload" >/dev/null
 install -m 700 "$script_dir/vps-bootstrap-remote.sh" "$work_dir/payload/vps-bootstrap-remote.sh"
 printf '%s\n' "$VPS_USER" > "$work_dir/payload/deploy_user"
-printf '%s\n' "$GHCR_USERNAME" > "$work_dir/payload/ghcr_username"
-printf '%s\n' "$GHCR_READ_TOKEN" > "$work_dir/payload/ghcr_token"
-chmod 600 "$work_dir/payload/deploy_user" "$work_dir/payload/ghcr_username" "$work_dir/payload/ghcr_token"
+chmod 600 "$work_dir/payload/deploy_user"
 tar -C "$work_dir/payload" -czf "$archive" .
 chmod 600 "$archive"
 
@@ -89,7 +87,7 @@ target="$VPS_USER@$VPS_HOST"
 
 if [[ "$dry_run" == true ]]; then
   printf 'DRY RUN: validated and rendered the encrypted-transport VPS payload for %s:%s\n' "$target" "$VPS_PORT"
-  printf 'DRY RUN: would install Docker/Compose, GHCR login and /opt/consflow/shared through pinned key-only SSH\n'
+  printf 'DRY RUN: would install Docker/Compose and /opt/consflow/shared through pinned key-only SSH\n'
   exit 0
 fi
 

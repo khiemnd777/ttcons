@@ -6,7 +6,6 @@ stage_dir="${1:-}"
 [[ "${EUID:-$(id -u)}" -eq 0 ]] || { echo "VPS bootstrap must run as root or passwordless sudo" >&2; exit 1; }
 
 deploy_user="$(tr -d '\r\n' < "$stage_dir/deploy_user")"
-ghcr_username="$(tr -d '\r\n' < "$stage_dir/ghcr_username")"
 [[ "$deploy_user" =~ ^[a-z_][a-z0-9_-]*[$]?$ || "$deploy_user" == root ]] || { echo "invalid deploy user" >&2; exit 1; }
 id "$deploy_user" >/dev/null 2>&1 || { echo "deploy user does not exist: $deploy_user" >&2; exit 1; }
 
@@ -47,16 +46,8 @@ if [[ "$deploy_user" != root ]]; then
   usermod -aG docker "$deploy_user"
 fi
 
-if [[ "$deploy_user" == root ]]; then
-  docker login ghcr.io --username "$ghcr_username" --password-stdin < "$stage_dir/ghcr_token" >/dev/null
-else
-  deploy_home="$(getent passwd "$deploy_user" | cut -d: -f6)"
-  install -d -m 0700 -o "$deploy_user" -g "$deploy_group" "$deploy_home/.docker"
-  runuser -u "$deploy_user" -- env HOME="$deploy_home" docker login ghcr.io --username "$ghcr_username" --password-stdin < "$stage_dir/ghcr_token" >/dev/null
-fi
-
 test -r /opt/consflow/shared/.env.prod
 test -r /opt/consflow/shared/secrets/database_url
 test -r /opt/consflow/shared/secrets/aws_credentials
 docker compose version >/dev/null
-echo "PASS: VPS runtime, GHCR login and /opt/consflow production inputs provisioned"
+echo "PASS: VPS runtime and /opt/consflow production inputs provisioned"

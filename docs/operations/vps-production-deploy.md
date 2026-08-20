@@ -4,9 +4,9 @@ Runbook này là nguồn vận hành chính cho single-host VPS `160.30.113.13`.
 
 ## Trạng thái prerequisite
 
-- Domain: chờ đơn vị quản lý DNS cấu hình theo yêu cầu bên dưới.
+- Domain: bản ghi A của `tt-dnh.com` đã trỏ tới `160.30.113.13`; vẫn phải kiểm tra lại ngay trước release.
 - HTTPS: Caddy tự cấp/gia hạn chứng chỉ; certificate state nằm trong named volumes `consflow_caddy_data` và `consflow_caddy_config`.
-- S3: Region đã xác nhận là `vn-hcm-1`; chờ Vietnix tạo private bucket `tt-dnh-consflow-prod` và cấp access key riêng.
+- S3: private bucket `tt-dnh-consflow-prod`, Region `vn-hcm-1` và access key riêng đã được xác thực bằng probe put/get/delete; anonymous access phải tiếp tục trả `403`.
 - VPS: cần Docker Engine, Docker Compose plugin, SSH key và host key đã pin.
 - GitHub: cần GHCR packages, Environment `production`, required reviewer và các environment secrets.
 
@@ -30,7 +30,7 @@ bash deploy/scripts/bootstrap-production.sh --import-legacy-bundle /path/to/lega
 
 Command sinh password/khóa còn thiếu bằng `openssl rand`, tạo một SSH deploy key
 riêng, thu ED25519 host key dưới dạng candidate và không ghi đè giá trị đã có.
-Operator phải nhập S3 key, GHCR read token và fingerprint đã đối chiếu qua console
+Operator phải nhập S3 key và fingerprint đã đối chiếu qua console
 vào `deploy/config/production.env`, sau đó chạy:
 
 ```bash
@@ -49,8 +49,8 @@ make production-provision
 ```
 
 Command này render `.env.prod` và các file secret trong thư mục tạm mode `0700`,
-truyền thẳng sang VPS, cài Docker/Compose trên Linux apt-based khi thiếu, đăng nhập
-GHCR bằng read token, cài cấu hình vào `/opt/consflow/shared`, rồi xóa payload tạm.
+truyền thẳng sang VPS, cài Docker/Compose trên Linux apt-based khi thiếu, cài cấu
+hình vào `/opt/consflow/shared`, rồi xóa payload tạm.
 Nó không nhận, lưu hoặc đưa mật khẩu VPS lên GitHub.
 
 Chỉ năm deploy transport secrets được đưa lên GitHub, ở scope operator chọn rõ:
@@ -62,7 +62,7 @@ make production-github-secrets SCOPE=environment
 ```
 
 Các command trên upload raw multiline SSH key/known-hosts; không dùng Base64.
-PostgreSQL, Redis, JWT, settings encryption, S3, GHCR và Admin bootstrap secrets
+PostgreSQL, Redis, JWT, settings encryption, S3 và Admin bootstrap secrets
 không được upload lên GitHub.
 
 ## Yêu cầu DNS gửi nhà cung cấp domain
@@ -214,13 +214,10 @@ docker compose --project-name consflow-prod \
 
 Không chạy command này trước migration V112. Khi chạy thủ công, shell còn phải có `RELEASE_TAG`, `BACKEND_IMAGE` và `ADMIN_IMAGE` đúng release; quy trình GitHub/deploy script đã inject ba giá trị này. Command không phải API và không được dùng như công cụ reset mật khẩu.
 
-Đăng nhập GHCR trên VPS một lần bằng deploy token chỉ có `read:packages`:
-
-```bash
-docker login ghcr.io
-```
-
-Không dùng personal token có quyền ghi repository trên production host.
+Không lưu GHCR PAT/deploy token dài hạn trên VPS. Release job dùng `GITHUB_TOKEN`
+ngắn hạn với `packages: read`, truyền nó qua SSH stdin vào một `DOCKER_CONFIG`
+tạm mode `0700`, pull hai image digest rồi xóa toàn bộ credential khi remote shell
+kết thúc. Token này do GitHub cấp riêng cho job và không phải Environment Secret.
 
 ## GitHub Environment và SSH
 
@@ -274,7 +271,8 @@ pull_request vào main -> validation
 push main              -> không chạy Actions
 push tag hợp lệ        -> validation -> build/push GHCR theo tag
                         -> chờ reviewer duyệt Environment production
-                        -> deploy đúng image digest lên VPS
+                        -> đăng nhập GHCR tạm bằng job token
+                        -> deploy đúng image digest lên VPS, xóa credential tạm
 ```
 
 Deploy script thực hiện: validate Compose → pull digest → start dependency → kiểm tra secret mounts → drain backend/admin → migrate V112+ → bootstrap Admin → start/wait backend → start/wait Caddy. GitHub runner cuối cùng gọi HTTPS `/gateway-health` và `/api/ready`. Backend không publish host port; nó dùng `app_internal` cho Caddy/PostgreSQL/Redis và network `backend_egress` riêng chỉ để đi outbound tới Vietnix S3/SMTP.

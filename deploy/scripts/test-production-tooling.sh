@@ -39,7 +39,6 @@ chmod 600 "$PRODUCTION_KNOWN_HOSTS"
 # shellcheck source=deploy/scripts/production-env-lib.sh
 . "$script_dir/production-env-lib.sh"
 production_set_config_value VPS_HOST_KEY_FINGERPRINT "$(ssh-keygen -lf "$PRODUCTION_KNOWN_HOSTS" | awk '$NF == "(ED25519)" { print $2; exit }')"
-production_set_config_value GHCR_READ_TOKEN test-read-packages-token
 production_set_config_value S3_ACCESS_KEY test-vietnix-access-key
 production_set_config_value S3_SECRET_KEY test-vietnix-secret-key
 production_load_config
@@ -48,6 +47,19 @@ bash "$script_dir/validate-production-config.sh" --all
 bash "$script_dir/configure-github-secrets.sh" --scope repository --dry-run >/dev/null
 bash "$script_dir/configure-github-secrets.sh" --scope environment --dry-run >/dev/null
 bash "$script_dir/provision-vps.sh" --dry-run >/dev/null
+
+release_workflow="$repo_root/.github/workflows/release.yml"
+legacy_ghcr_pattern='GHCR_READ_''TOKEN|ghcr_''token'
+if grep -R -E "$legacy_ghcr_pattern" \
+  "$repo_root/deploy/config/production.env.example" \
+  "$repo_root/deploy/scripts" \
+  "$release_workflow" >/dev/null; then
+  echo "long-lived GHCR credentials must not be part of production provisioning" >&2
+  exit 1
+fi
+grep -Fq 'GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}' "$release_workflow"
+grep -Fq 'export DOCKER_CONFIG=\"\$auth_dir\"' "$release_workflow"
+grep -Fq 'cat > \"\$token_file\"' "$release_workflow"
 
 rendered="$test_root/rendered"
 bash "$script_dir/render-production-config.sh" "$rendered" >/dev/null

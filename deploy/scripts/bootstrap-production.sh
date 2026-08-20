@@ -142,7 +142,7 @@ fi
 
 pending=false
 production_load_config
-for key in VPS_HOST_KEY_FINGERPRINT GHCR_READ_TOKEN S3_ACCESS_KEY S3_SECRET_KEY; do
+for key in VPS_HOST_KEY_FINGERPRINT S3_ACCESS_KEY S3_SECRET_KEY; do
   if production_is_placeholder "${!key:-}"; then
     printf 'PENDING: %s\n' "$key"
     pending=true

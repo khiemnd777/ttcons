@@ -66,8 +66,6 @@ case "$mode" in
   --provision|--all)
     validate_runtime
     validate_ssh
-    production_require_value GHCR_USERNAME
-    production_require_value GHCR_READ_TOKEN
     ;;
 esac
 
