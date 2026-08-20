@@ -2,6 +2,8 @@
 
 This runbook is the operational checklist for deploying Consflow without changing repository behavior or storing production secrets in git.
 
+The active tag-gated single-host VPS procedure is [`docs/operations/vps-production-deploy.md`](../operations/vps-production-deploy.md). It deploys digest-pinned GHCR images, runs V112 and the Admin bootstrap before application startup, and records each successful release under `/opt/consflow/releases/<tag>/release.env`. The older manual commands below remain reference material; do not use their local `build` or managed-edge assumptions for `tt-dnh.com`.
+
 This document keeps the controlled Docker Compose single-host procedure below. For the multi-node Kubernetes application baseline, external managed PostgreSQL/Redis/S3 prerequisites, release-unique migration Job, expand-contract gate, rollout, PDB/topology behavior, secret rotation and rollback checks, use [`deploy/k8s/README.md`](../../deploy/k8s/README.md). Do not mix the two deployment procedures in one release.
 
 ## Pre-Deploy Checks

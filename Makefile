@@ -5,7 +5,7 @@ COMPOSE ?= docker compose --env-file $(ENV_FILE)
 SERVICE ?=
 BACKEND_GOCACHE ?= $(CURDIR)/backend/.gocache
 
-.PHONY: check-local-env up down restart build run log test backend-test backend-fmt frontend-build migrate-check docker-config
+.PHONY: check-local-env up down restart build run log test backend-test backend-fmt frontend-build migrate-check docker-config production-bootstrap production-check production-render production-github-secrets production-provision release
 
 check-local-env:
 	@test -f "$(ENV_FILE)" || (echo "Missing $(ENV_FILE); copy .env.example to $(ENV_FILE) and configure it."; exit 1)
@@ -54,3 +54,23 @@ migrate-check:
 
 docker-config: check-local-env
 	$(COMPOSE) config
+
+production-bootstrap:
+	bash deploy/scripts/bootstrap-production.sh
+
+production-check:
+	bash deploy/scripts/validate-production-config.sh --all
+
+production-render:
+	@test -n "$(OUTPUT)" || (echo "OUTPUT is required, for example: make production-render OUTPUT=/tmp/consflow-production"; exit 1)
+	bash deploy/scripts/render-production-config.sh "$(OUTPUT)"
+
+production-github-secrets:
+	@test -n "$(SCOPE)" || (echo "SCOPE is required: repository or environment"; exit 1)
+	bash deploy/scripts/configure-github-secrets.sh --scope "$(SCOPE)"
+
+production-provision:
+	bash deploy/scripts/provision-vps.sh
+
+release:
+	bash deploy/scripts/release-tag.sh "$(TAG)"

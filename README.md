@@ -73,6 +73,8 @@ tiếp, `backend/Makefile` nạp cùng `.env`. `STORAGE_PROVIDER=s3` sử dụng
 và không khởi tạo local storage.
 Production Compose và Kubernetes bắt buộc S3, không mount object-storage path.
 
+Single-host production tại `tt-dnh.com` dùng Caddy Automatic HTTPS, image GHCR gắn tag `vYYYY-MM-DD.N`, one-shot migration và Admin bootstrap trước khi backend khởi động. Push vào `main` không chạy GitHub Actions; pull request chạy validation, còn tag hợp lệ mới tạo release và chờ duyệt Environment `production`. Operator dùng canonical ignored config `deploy/config/production.env` qua `make production-bootstrap`, `make production-check`, `make production-provision`, `make production-github-secrets SCOPE=...` và `make release TAG=...`; runtime secrets đi thẳng tới VPS, không được Base64/upload lên GitHub. Xem [`docs/operations/vps-production-deploy.md`](docs/operations/vps-production-deploy.md).
+
 Production Compose là topology single-host có kiểm soát. Baseline Kubernetes cho hai replica `admin`/`backend`, external managed PostgreSQL/Redis/S3, migration Job và các rollout gate nằm tại [`deploy/k8s/README.md`](deploy/k8s/README.md); manifests cố ý fail-closed và không tự deploy cluster.
 
 Seed data thủ công nếu cần reset dữ liệu:

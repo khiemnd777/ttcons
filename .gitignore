@@ -20,6 +20,12 @@ backend/uploads/
 !.env.example
 !.env.prod.example
 
+# canonical local production operator inputs (never commit)
+deploy/config/production.env
+deploy/config/production_id_ed25519
+deploy/config/production_id_ed25519.pub
+deploy/config/production_known_hosts
+
 # go
 backend/.gocache/
 backend/.gomodcache/

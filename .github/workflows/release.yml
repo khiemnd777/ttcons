@@ -1,0 +1,189 @@
+name: Release production
+
+on:
+  push:
+    tags:
+      - "v????-??-??.*"
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate-tag:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.release.outputs.commit }}
+    steps:
+      - name: Checkout tag history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag and main ancestry
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/validate-release-tag.sh "$GITHUB_REF_NAME" >/dev/null
+          git fetch --no-tags origin main
+          tag_commit="$(git rev-list -n 1 "refs/tags/$GITHUB_REF_NAME")"
+          git merge-base --is-ancestor "$tag_commit" origin/main
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          echo "commit=$tag_commit" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: validate-tag
+    uses: ./.github/workflows/validate.yml
+
+  build-images:
+    name: Build immutable images
+    needs: [validate-tag, validate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      backend_ref: ${{ steps.refs.outputs.backend_ref }}
+      admin_ref: ${{ steps.refs.outputs.admin_ref }}
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-tag.outputs.commit }}
+
+      - name: Resolve lowercase GHCR names
+        id: images
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          echo "backend=ghcr.io/${repository}-backend" >> "$GITHUB_OUTPUT"
+          echo "admin=ghcr.io/${repository}-admin" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend
+        id: backend
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: ${{ steps.images.outputs.backend }}:${{ needs.validate-tag.outputs.tag }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.validate-tag.outputs.commit }}
+            org.opencontainers.image.version=${{ needs.validate-tag.outputs.tag }}
+
+      - name: Build and push admin
+        id: admin
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: true
+          build-args: VITE_API_URL=/api
+          tags: ${{ steps.images.outputs.admin }}:${{ needs.validate-tag.outputs.tag }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.validate-tag.outputs.commit }}
+            org.opencontainers.image.version=${{ needs.validate-tag.outputs.tag }}
+
+      - name: Export digest-pinned references
+        id: refs
+        shell: bash
+        env:
+          BACKEND_IMAGE: ${{ steps.images.outputs.backend }}
+          BACKEND_DIGEST: ${{ steps.backend.outputs.digest }}
+          ADMIN_IMAGE: ${{ steps.images.outputs.admin }}
+          ADMIN_DIGEST: ${{ steps.admin.outputs.digest }}
+        run: |
+          set -euo pipefail
+          echo "backend_ref=${BACKEND_IMAGE}@${BACKEND_DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "admin_ref=${ADMIN_IMAGE}@${ADMIN_DIGEST}" >> "$GITHUB_OUTPUT"
+
+  deploy-production:
+    name: Deploy VPS production
+    needs: [validate-tag, build-images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    environment:
+      name: production
+      url: https://tt-dnh.com
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-tag.outputs.commit }}
+
+      - name: Configure pinned SSH host
+        shell: bash
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_SSH_PRIVATE_KEY"
+          test -n "$VPS_SSH_KNOWN_HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Upload release bundle
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.validate-tag.outputs.tag }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_HOST"
+          test -n "$VPS_USER"
+          port="${VPS_PORT:-22}"
+          bundle="/tmp/consflow-${RELEASE_TAG}.tgz"
+          tar -czf "$bundle" docker-compose.prod.yml deploy/vps scripts/validate-release-tag.sh
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "$port" \
+            "$VPS_USER@$VPS_HOST" "install -d -m 0750 '/opt/consflow/releases/$RELEASE_TAG'"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -P "$port" \
+            "$bundle" "$VPS_USER@$VPS_HOST:/opt/consflow/releases/$RELEASE_TAG/release.tgz"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "$port" \
+            "$VPS_USER@$VPS_HOST" "tar -xzf '/opt/consflow/releases/$RELEASE_TAG/release.tgz' -C '/opt/consflow/releases/$RELEASE_TAG' && rm '/opt/consflow/releases/$RELEASE_TAG/release.tgz'"
+
+      - name: Run fail-closed production deployment
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.validate-tag.outputs.tag }}
+          BACKEND_IMAGE: ${{ needs.build-images.outputs.backend_ref }}
+          ADMIN_IMAGE: ${{ needs.build-images.outputs.admin_ref }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          port="${VPS_PORT:-22}"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "$port" \
+            "$VPS_USER@$VPS_HOST" \
+            "bash '/opt/consflow/releases/$RELEASE_TAG/deploy/vps/deploy-production.sh' '$RELEASE_TAG' '$BACKEND_IMAGE' '$ADMIN_IMAGE'"
+
+      - name: Verify public HTTPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors \
+            --output /dev/null https://tt-dnh.com/gateway-health
+          curl --fail --silent --show-error --retry 6 --retry-delay 5 --retry-all-errors \
+            --output /dev/null https://tt-dnh.com/api/ready
