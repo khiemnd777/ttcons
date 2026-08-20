@@ -38,10 +38,6 @@ func TestAccountingPostingSourceFlowsAndSafeCorrection(t *testing.T) {
 		VALUES ($1,'accounting-posting@test.local','test','Kế toán kiểm thử','active')
 	`, actorID)
 	mustAccountingExec(t, ctx, database, `
-		INSERT INTO roles (name,display_name,system_role)
-		VALUES ('admin','Quản trị viên',true)
-	`)
-	mustAccountingExec(t, ctx, database, `
 		INSERT INTO user_roles (user_id,role_id)
 		SELECT $1,id FROM roles WHERE name='admin'
 	`, actorID)

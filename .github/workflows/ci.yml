@@ -2,88 +2,13 @@ name: CI
 
 on:
   pull_request:
-  push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   validate:
-    name: Validate
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: consflow_test
-          POSTGRES_USER: consflow_test
-          POSTGRES_PASSWORD: consflow_test_password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U consflow_test -d consflow_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-      redis-cache:
-        image: redis:7-alpine
-        ports:
-          - 6380:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Check backend format
-        run: test -z "$(gofmt -l backend/cmd backend/internal backend/ent)"
-
-      - name: Check migrations
-        working-directory: backend
-        run: make migrate-check
-
-      - name: Test backend
-        working-directory: backend
-        env:
-          CONSFLOW_TEST_DATABASE_URL: postgres://consflow_test:consflow_test_password@127.0.0.1:5432/consflow_test?sslmode=disable
-          CONSFLOW_TEST_REDIS_CACHE_URL: redis://127.0.0.1:6380/0
-        run: make test
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Test frontend
-        working-directory: frontend
-        run: npm test
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
-
-      - name: Build and validate production Caddy gateway image
-        run: docker build --build-arg VITE_API_URL=/api -t consflow-admin-ci frontend
-
-      - name: Check frontend bundle budget
-        working-directory: frontend
-        run: npm run check:bundle-budget
-
-      - name: Check whitespace
-        run: git diff --check
+    uses: ./.github/workflows/validate.yml

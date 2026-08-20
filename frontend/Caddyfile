@@ -1,11 +1,9 @@
 {
 	admin off
 	persist_config off
-	auto_https off
 
-	servers :8080 {
-		name admin_gateway
-		protocols h1
+	servers {
+		protocols h1 h2
 		trusted_proxies static {$TRUSTED_PROXY_CIDR}
 		client_ip_headers {$REAL_IP_HEADER}
 		trusted_proxies_strict
@@ -36,7 +34,7 @@
 	}
 }
 
-:8080 {
+{$APP_SITE_ADDRESS::8080} {
 	root * /usr/share/caddy
 
 	log {
@@ -46,6 +44,7 @@
 
 	header {
 		-Server
+		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options nosniff
 		X-Frame-Options SAMEORIGIN
 		Referrer-Policy strict-origin-when-cross-origin
@@ -176,4 +175,13 @@
 		}
 		respond `{"success":false,"error":{"code":"SERVICE_UNAVAILABLE","message":"Dịch vụ đang quá tải hoặc tạm thời không sẵn sàng."}}` 503
 	}
+}
+
+# Docker single-host production uses this loopback-only listener for container
+# health checks while the public site listens on the automatic HTTPS address.
+# Kubernetes continues to probe /gateway-health on its :8080 application site.
+http://127.0.0.1:8081 {
+	log_skip
+	respond /gateway-health "" 204
+	respond "" 404
 }

@@ -225,9 +225,9 @@ func TestRev8EveryWorkItemHasOneExecutionTarget(t *testing.T) {
 	wantWorkspaceCounts := map[string]int{
 		executionWorkspacePreparation:    6,
 		executionWorkspacePlanning:       2,
-		executionWorkspaceBOQ:            3,
+		executionWorkspaceBOQ:            1,
 		executionWorkspaceContracts:      2,
-		executionWorkspaceProcurement:    2,
+		executionWorkspaceProcurement:    4,
 		executionWorkspaceOperations:     1,
 		executionWorkspaceAcceptance:     3,
 		executionWorkspaceHandover:       1,

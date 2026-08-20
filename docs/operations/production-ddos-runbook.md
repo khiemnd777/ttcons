@@ -1,8 +1,10 @@
-# Production And DDoS Operations Runbook
+# Managed-Edge And DDoS Hardening Runbook
 
-Runbook này vận hành Consflow sau managed CDN/DDoS protection và WAF. Standard Caddy trong repository giới hạn body/timeout, chuẩn hóa proxy và phục vụ frontend; rate/connection quota được thực thi ở managed edge và backend. Các lớp này không hấp thụ được tấn công volumetric L3/L4 tại origin. Không đưa origin trực tiếp ra Internet.
+Baseline VPS hiện tại dùng Caddy Automatic HTTPS trực tiếp theo [`vps-production-deploy.md`](vps-production-deploy.md). Tài liệu này là lớp hardening khi bổ sung managed CDN/DDoS protection/WAF sau đó; các lệnh managed-edge HTTP `:8080` cũ bên dưới không phải quy trình deploy hiện hành cho `tt-dnh.com`.
 
-## Kiến trúc bắt buộc
+Standard Caddy giới hạn body/timeout, chuẩn hóa proxy và phục vụ frontend; backend thực thi IP/actor quota. Direct origin không hấp thụ được tấn công volumetric L3/L4. Khi managed edge được duyệt, phải thay đổi đồng bộ DNS, firewall, `TRUSTED_PROXY_CIDR`, real-IP header và TLS topology qua một release riêng.
+
+## Kiến trúc mục tiêu khi bổ sung managed edge
 
 ```text
 Internet
@@ -13,7 +15,7 @@ Internet
   -> PostgreSQL:5432 và Redis:6379 (internal Docker network)
 ```
 
-Production Compose chỉ publish service `admin`. `backend`, `postgres` và `redis` chỉ dùng network `app_internal`; không tạo host port cho ba service này. TLS kết thúc tại managed edge hoặc load balancer do đơn vị vận hành quản lý.
+Production Compose chỉ publish service `admin`; baseline trực tiếp publish TCP `80/443`. `backend`, `postgres` và `redis` chỉ dùng network `app_internal`; không tạo host port cho ba service này. Trong overlay managed-edge tương lai, có thể chuyển TLS termination ra edge sau review riêng.
 
 Local `docker-compose.yml` cũng bind `admin`, backend, PostgreSQL và Redis vào `127.0.0.1`. Nếu cần kiểm thử từ thiết bị trong LAN, tạo Compose override hẹp cho đúng interface/IP và review firewall trước khi chạy; không đổi bind mặc định thành mọi interface.
 

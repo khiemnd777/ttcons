@@ -2276,7 +2276,7 @@ func TestWorkflowFormSubmitSatisfiesChecklistGate(t *testing.T) {
 		Answers: Record{
 			"check_date":     "2026-07-10",
 			"checked_by":     "Worker",
-			"planning_scope": "other",
+			"planning_scope": "design",
 			"checklist_items": []any{
 				map[string]any{"title": "Đã kiểm tra checklist", "assignee_role": "PM", "status": "done", "comment": "Đạt"},
 			},
@@ -2501,15 +2501,22 @@ func TestWorkflowFormSealAssetsAreReusableArchivedAndSeparateFromSignatures(t *t
 		t.Fatal("expected seal.manage permission to be required")
 	}
 
+	// seal.manage is intentionally reserved for Admin/Developer. Keep the
+	// ordinary worker on seal.use and use the PM fixture as the catalog manager.
+	mustExec(t, db, `
+		INSERT INTO user_roles (user_id, role_id)
+		SELECT $1, id FROM roles WHERE name='admin'
+		ON CONFLICT DO NOTHING
+	`, fixture.pmID)
 	mustExec(t, db, `
 		INSERT INTO role_permissions (role_id, permission_id)
 		SELECT assignment.role_id, permission.id
 		FROM user_roles assignment
-		JOIN permissions permission ON permission.key IN ('seal.use','seal.manage')
+		JOIN permissions permission ON permission.key='seal.use'
 		WHERE assignment.user_id=$1
 		ON CONFLICT DO NOTHING
 	`, fixture.workerID)
-	asset, err := service.CreateSealAsset(ctx, "Dấu tròn TTCons", testMultipartFileHeader(t, "file", "ttcons-seal.png", pngBytes), fixture.workerID, "Worker")
+	asset, err := service.CreateSealAsset(ctx, "Dấu tròn TTCons", testMultipartFileHeader(t, "file", "ttcons-seal.png", pngBytes), fixture.pmID, "PM")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2560,7 +2567,7 @@ func TestWorkflowFormSealAssetsAreReusableArchivedAndSeparateFromSignatures(t *t
 	assertCount(t, db, `SELECT COUNT(*) FROM workflow_form_events WHERE instance_id=$1 AND event_type='seal_applied'`, 2, instanceID)
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_type='workflow_form_seal_application' AND event_type='workflow_form_seal_applied' AND metadata_json->>'seal_asset_id'=$1`, 2, assetID)
 
-	archived, err := service.ArchiveSealAsset(ctx, assetID, fixture.workerID, "Worker")
+	archived, err := service.ArchiveSealAsset(ctx, assetID, fixture.pmID, "PM")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2574,7 +2581,7 @@ func TestWorkflowFormSealAssetsAreReusableArchivedAndSeparateFromSignatures(t *t
 	if recordByID(activeAssets, "id", assetID) != nil {
 		t.Fatalf("archived seal remained in active catalog: %#v", activeAssets)
 	}
-	allAssets, err := service.SealAssets(ctx, true, fixture.workerID)
+	allAssets, err := service.SealAssets(ctx, true, fixture.pmID)
 	if err != nil {
 		t.Fatal(err)
 	}

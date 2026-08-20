@@ -65,6 +65,14 @@ func TestRunBackfillsDuplicateOutgoingAcceptanceCodes(t *testing.T) {
 	if _, err := db.ExecContext(ctx, "DELETE FROM schema_migrations WHERE version = '26'"); err != nil {
 		t.Fatal(err)
 	}
+	// V93 installs a deferred constraint trigger on acceptance_records. Real
+	// databases apply V26 before V93; remove the later trigger while this test
+	// reconstructs the historical pre-V26 schema so V26 can be exercised alone.
+	if _, err := db.ExecContext(ctx, `
+		DROP TRIGGER IF EXISTS trg_acceptance_pdf_export_available ON acceptance_records
+	`); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := db.ExecContext(ctx, `
 		ALTER TABLE acceptance_records
 			DROP COLUMN IF EXISTS acceptance_code,
