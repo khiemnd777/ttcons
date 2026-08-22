@@ -293,10 +293,34 @@ func (h *Handler) DeleteProject(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"project.delete"}); err != nil {
 		return err
 	}
-	if err := h.service.DeleteProject(c.Context(), c.Params("id")); err != nil {
+	if err := h.service.DeleteProject(c.Context(), c.Params("id"), actorID(c), actorName(c)); err != nil {
 		return err
 	}
 	return response.OK(c, Record{"deleted": true})
+}
+
+func (h *Handler) PreviewProjectDeletion(c *fiber.Ctx) error {
+	var req ProjectDeletionPreviewRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xem trước xóa công trình không hợp lệ")
+	}
+	result, err := h.service.PreviewProjectDeletion(c.Context(), actorID(c), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã kiểm tra ảnh hưởng khi xóa công trình")
+}
+
+func (h *Handler) ExecuteProjectDeletion(c *fiber.Ctx) error {
+	var req ProjectDeletionExecuteRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xác nhận xóa công trình không hợp lệ")
+	}
+	result, err := h.service.ExecuteProjectDeletion(c.Context(), actorID(c), actorName(c), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã hủy các công trình được chọn")
 }
 
 func (h *Handler) ProjectMembers(c *fiber.Ctx) error {
@@ -399,6 +423,36 @@ func (h *Handler) UpdatePartner(c *fiber.Ctx) error {
 		return err
 	}
 	return response.OK(c, row)
+}
+
+func (h *Handler) PreviewPartnerDeletion(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"catalog.manage"}); err != nil {
+		return err
+	}
+	var req PartnerDeletionPreviewRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xem trước xóa đối tác không hợp lệ")
+	}
+	result, err := h.service.PreviewPartnerDeletion(c.Context(), actorID(c), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã kiểm tra ảnh hưởng khi xóa đối tác")
+}
+
+func (h *Handler) ExecutePartnerDeletion(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"catalog.manage"}); err != nil {
+		return err
+	}
+	var req PartnerDeletionExecuteRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xác nhận xóa đối tác không hợp lệ")
+	}
+	result, err := h.service.ExecutePartnerDeletion(c.Context(), actorID(c), actorName(c), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã vô hiệu hóa các đối tác được chọn")
 }
 
 func (h *Handler) ListTemplates(c *fiber.Ctx) error {

@@ -85,6 +85,8 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Get("/projects/progress-board/summary", h.ProjectProgressBoardSummary)
 	protected.Get("/projects/progress-board/stages/:stageKey", h.ProjectProgressBoardStage)
 	protected.Get("/projects/progress-board/stream", h.ProjectProgressBoardStream)
+	protected.Post("/projects/deletions/preview", h.PreviewProjectDeletion)
+	protected.Post("/projects/deletions/execute", h.ExecuteProjectDeletion)
 	protected.Get("/projects/:id", h.GetProject)
 	protected.Put("/projects/:id", h.UpdateProject)
 	protected.Delete("/projects/:id", h.DeleteProject)
@@ -94,6 +96,8 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Delete("/projects/:id/members/:memberId", h.DeactivateProjectMember)
 	protected.Get("/partners", h.ListPartners)
 	protected.Post("/partners", h.CreatePartner)
+	protected.Post("/partners/deletions/preview", h.PreviewPartnerDeletion)
+	protected.Post("/partners/deletions/execute", h.ExecutePartnerDeletion)
 	protected.Put("/partners/:id", h.UpdatePartner)
 
 	protected.Get("/pipeline-templates", h.ListTemplates)

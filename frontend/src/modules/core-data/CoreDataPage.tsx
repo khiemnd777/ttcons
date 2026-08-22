@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { DataTable } from '../../components/DataTable';
+import { DataTable, type DataTableRowKey } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
 import { PageHeader } from '../../components/PageHeader';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
@@ -11,6 +11,9 @@ import { get, post, put } from '../../lib/api/client';
 import type { Partner } from '../../lib/types/domain';
 import { SimpleForm, type FieldDef } from '../_shared/SimpleForm';
 import { outputPartnerTypeOptions, partnerTypeLabel, partnerTypeOptions, partnerTypesText } from './partnerUtils';
+import { useAuth } from '../../lib/auth/AuthContext';
+import { BulkSelectionBar } from '../../components/BulkSelectionBar';
+import { BulkDeleteDialog, type BulkDeletionResult } from '../../components/BulkDeleteDialog';
 
 type PartnerDialog = { mode: 'view' | 'edit'; record: Partner } | { mode: 'create'; record?: undefined } | null;
 type PartnerCatalogGroup = 'input' | 'output';
@@ -51,8 +54,12 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
   const [status, setStatus] = useState<'active' | 'inactive' | 'all'>('active');
   const [type, setType] = useState('');
   const [dialog, setDialog] = useState<PartnerDialog>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Set<DataTableRowKey>>(new Set());
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { hasPermission } = useAuth();
+  const canDelete = hasPermission('catalog.manage') && status === 'active';
   const config = partnerCatalogConfig[group];
   const partners = useQuery({
     queryKey: ['partners', group, status, type],
@@ -81,6 +88,7 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
 
   const rows = partners.data ?? [];
   const activeCount = useMemo(() => rows.filter((partner) => partner.active !== false).length, [rows]);
+  const selectedPartnerIDs = useMemo(() => Array.from(selectedKeys, String), [selectedKeys]);
 
   return (
     <>
@@ -95,6 +103,8 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
         }
       />
 
+      {canDelete ? <BulkSelectionBar count={selectedKeys.size} itemLabel="đối tác" actionLabel="Xóa đối tác đã chọn" onClear={() => setSelectedKeys(new Set())} onDelete={() => setDeleteOpen(true)} /> : null}
+
       <div className={`mb-4 grid gap-3 ${group === 'input' ? 'md:grid-cols-[1fr_auto]' : 'md:grid-cols-[1fr_auto_auto]'} md:items-end`}>
         <div className="grid gap-3 sm:grid-cols-3">
           <Metric label="Đang hiển thị" value={String(rows.length)} />
@@ -104,7 +114,7 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
         {group === 'output' ? (
           <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
             Loại
-            <select className={filterClassName} value={type} onChange={(event) => setType(event.target.value)}>
+            <select className={filterClassName} value={type} onChange={(event) => { setType(event.target.value); setSelectedKeys(new Set()); }}>
               <option value="">Tất cả đầu ra</option>
               {outputPartnerTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
@@ -112,7 +122,7 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
         ) : null}
         <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
           Trạng thái
-          <select className={filterClassName} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>
+          <select className={filterClassName} value={status} onChange={(event) => { setStatus(event.target.value as typeof status); setSelectedKeys(new Set()); }}>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="all">Tất cả</option>
@@ -129,6 +139,8 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
         searchPlaceholder="Tìm tên, mã, MST, liên hệ..."
         pageSize={10}
         defaultSort={{ key: 'name', direction: 'asc' }}
+        getRowKey={(row) => row.id}
+        selection={canDelete ? { selectedKeys, onSelectedKeysChange: setSelectedKeys, ariaLabel: `Chọn tất cả đối tác ${group === 'input' ? 'Đầu vào' : 'Đầu ra'} trên trang hiện tại` } : undefined}
         columns={[
           { key: 'partner_code', header: 'Mã', sortable: true },
           {
@@ -156,6 +168,20 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
           },
           { key: 'actions', header: 'Action', align: 'right', render: (row) => <RowActions onView={() => setDialog({ mode: 'view', record: row })} onEdit={() => setDialog({ mode: 'edit', record: row })} /> },
         ]}
+      />
+
+      <BulkDeleteDialog
+        kind="partner"
+        open={deleteOpen}
+        ids={selectedPartnerIDs}
+        onClose={() => setDeleteOpen(false)}
+        onSuccess={async (result: BulkDeletionResult) => {
+          setDeleteOpen(false);
+          setSelectedKeys(new Set());
+          await queryClient.invalidateQueries({ queryKey: ['partners'] });
+          toast.success({ title: `Đã xóa ${result.deleted_count} đối tác`, description: 'Đối tác đã chuyển sang Inactive; dữ liệu lịch sử vẫn được giữ nguyên.' });
+        }}
+        onError={(title, error) => toast.error(title, error)}
       />
 
       <RecordDetailDialog

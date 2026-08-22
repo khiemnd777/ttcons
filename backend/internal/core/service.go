@@ -612,14 +612,6 @@ func (s *Service) ProjectDetail(ctx context.Context, id string) (Record, error) 
 	return s.repo.GetProjectDetail(ctx, id)
 }
 
-func (s *Service) DeleteProject(ctx context.Context, id string) error {
-	if err := s.repo.Exec(ctx, `UPDATE projects SET status='cancelled', updated_at=now() WHERE id=$1`, id); err != nil {
-		return err
-	}
-	s.publishProjectProgressChanged(cleanID(id))
-	return nil
-}
-
 func (s *Service) ProjectMembers(ctx context.Context, projectID, actorID string, includeInactive bool) (Record, error) {
 	canManage, err := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"project.member.manage"})
 	if err != nil {

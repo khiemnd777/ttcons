@@ -12,7 +12,7 @@
 
 - Auth, personal profile and account recovery: existing auth/profile routes plus public `POST /auth/password/forgot`, `POST /auth/password/reset`, `POST /auth/recovery-email/verify`, protected `PUT|DELETE /auth/recovery-email`; product pages `/profile`, `/change-initial-password`, `/forgot-password`, `/reset-password`, `/verify-recovery-email`
 - Staff account import: Developer-only `POST /staff/imports/preview|execute`, browser-local Excel/CSV parsing, V113 `staff_account_imports` and `users.must_change_password`
-- Product navigation `Đầu vào` and `Đầu ra`: frontend routes `/core-data/input` and `/core-data/output`; compatibility `/core-data` redirects to input; shared API `/partners` accepts additive `group=input|output`
+- Product navigation `Đầu vào` and `Đầu ra`: frontend routes `/core-data/input` and `/core-data/output`; compatibility `/core-data` redirects to input; shared API `/partners` accepts additive `group=input|output`; controlled deletion uses `POST /partners/deletions/preview|execute`
 - Staff/RBAC: `/staff`, `/roles`, `/permissions`, `/roles/:id/permissions`, `/users/:id/roles`
 - Project membership governance: `/projects/:id/members`, `/projects/:id/members/:memberId`
 - Business audit/settings: `/audit-logs`, `/projects/:id/audit-logs`, `GET|PUT /settings`, `GET /settings/backup`, `POST /settings/backup/preview|restore`
@@ -23,9 +23,9 @@
 
 - `users`, `staff`, `roles`, `permissions`, `user_roles`, `role_permissions`, `project_members`
 - `auth_sessions`, `auth_email_tokens`; users-only `users.recovery_email` and `users.recovery_email_verified_at` from V107; token retention indexes from V108; Admin-only default `staff.account_security.manage` grant from V109
-- `partners`
+- `partners`, V116 `bulk_deletion_batches` for partner/project idempotent deletion results
 - typed/versioned `system_settings`, business `audit_logs`, runtime `event_logs`
-- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, external-only client access in `V89`, actor/project explorer cache revisions/outbox retention in `V97`-`V100`, revision-scoped workflow-form confirmations in `V101`, `statistics.*`/`work_report.*` separation plus authored-report history in `V106`, typed settings plus system Developer role in `V110`, sanitized Event Logs plus reserved permission in `V111`, and the production-safe base role/permission catalog in `V112`
+- Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, external-only client access in `V89`, actor/project explorer cache revisions/outbox retention in `V97`-`V100`, revision-scoped workflow-form confirmations in `V101`, `statistics.*`/`work_report.*` separation plus authored-report history in `V106`, typed settings plus system Developer role in `V110`, sanitized Event Logs plus reserved permission in `V111`, the production-safe base role/permission catalog in `V112`, and partner/project bulk deletion replay state in `V116`
 
 ## Invariants
 
@@ -51,6 +51,7 @@
 - `project.member.manage` is granted to Admin/Director/PM and always combined with project scope. Project member responses expose server capabilities; mutation synchronizes only project-scoped `user_roles`, never removes global roles, never exposes Admin/Director as assignable project roles, and writes project audit.
 - Partner catalog updates preserve downstream snapshots for historical documents.
 - Partner management is split into independent `Đầu vào` and `Đầu ra` global navigation entries. Input contains every partner with `client`; output contains every partner with at least one non-client type, so a multi-type partner may appear in both. Output exact-type choices exclude `client`. This presentation and additive query grouping do not rename the shared `/partners` API, `partners` table, `catalog.view|manage` permissions or downstream snapshot fields; `/core-data` remains a compatibility redirect.
+- Partner deletion is a global catalog soft transition, not removal from only the current group. `catalog.manage` exposes selection only on an active current page. Preview/execute accepts 1-100 unique UUIDs, binds actor/rows/impacts to a keyed HMAC, revalidates active/updated state, locks and updates the whole batch atomically, records per-partner plus batch audit and stores same-actor UUID idempotency replay in V116. It sets only `partners.active=false`; multi-type partners leave both Input and Output while every downstream FK, stored partner ID and immutable name/tax snapshot remains intact.
 - Project setup presents the active `client` partner selector as `Chọn chủ đầu tư có sẵn` and its selected summary as `Chủ đầu tư đã chọn`; these user-facing labels do not change active/type filtering, `partner_id`, name snapshot behavior or catalog governance.
 - Session refresh/revoke lifecycle remains DB-backed and revocable.
 - Every new password uses one canonical backend/frontend contract: non-whitespace, at least 8 Unicode code points and at most 72 UTF-8 bytes. Self change, recovery reset and Admin replacement require an exact confirmation; only initial Staff account creation intentionally omits confirmation. Replacing an existing account password must differ from its current bcrypt credential. Login and current-password fields validate presence only because they verify an existing credential rather than create one. All account-password UI controls use the shared eye-toggle component; the Staff initial-password suggestion is generated client-side with Web Crypto and never returned by the API or stored in audit metadata.

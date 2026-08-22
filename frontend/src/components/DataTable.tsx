@@ -1,8 +1,9 @@
-import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Search } from 'lucide-react';
 import { EmptyState } from './EmptyState';
 import { actionColumnsFirst, isActionColumn } from './tableActionColumns';
+import { SelectionCheckbox } from './SelectionCheckbox';
 
 export { actionColumnsFirst, isActionColumn } from './tableActionColumns';
 
@@ -374,33 +375,6 @@ export function DataTable<T extends Record<string, any>>({
         </div>
       ) : null}
     </div>
-  );
-}
-
-function SelectionCheckbox({
-  checked,
-  indeterminate = false,
-  ariaLabel,
-  onChange,
-}: {
-  checked: boolean;
-  indeterminate?: boolean;
-  ariaLabel: string;
-  onChange: () => void;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (ref.current) ref.current.indeterminate = indeterminate;
-  }, [indeterminate]);
-  return (
-    <input
-      ref={ref}
-      type="checkbox"
-      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-      checked={checked}
-      aria-label={ariaLabel}
-      onChange={onChange}
-    />
   );
 }
 

@@ -78,6 +78,26 @@ type StaffDeletionExecuteRequest struct {
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
+type PartnerDeletionPreviewRequest struct {
+	PartnerIDs []string `json:"partner_ids"`
+}
+
+type PartnerDeletionExecuteRequest struct {
+	PartnerDeletionPreviewRequest
+	PreviewHash    string `json:"preview_hash"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+type ProjectDeletionPreviewRequest struct {
+	ProjectIDs []string `json:"project_ids"`
+}
+
+type ProjectDeletionExecuteRequest struct {
+	ProjectDeletionPreviewRequest
+	PreviewHash    string `json:"preview_hash"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
 type UpdateStaffRequest struct {
 	UserID                  *string `json:"user_id"`
 	FullName                *string `json:"full_name"`

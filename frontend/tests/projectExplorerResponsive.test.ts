@@ -31,15 +31,16 @@ test('project explorer exposes equivalent desktop and mobile sort controls', asy
   assert.match(projectsPage, /rounded-sm text-left uppercase hover:text-ink focus-ring/);
 });
 
-test('project explorer keeps blank actions first and creation date after progress', async () => {
+test('project explorer keeps selection before actions and creation date after progress', async () => {
   const projectsPage = await source('../src/modules/projects/ProjectsPage.tsx');
   const domainTypes = await source('../src/lib/types/domain.ts');
 
-  assert.match(projectsPage, /<span><span className="sr-only">Thao tác<\/span><\/span>\s*<ProjectExplorerSortHeader label="Cây công trình"/);
+  assert.match(projectsPage, /selectable \? <SelectionCheckbox[^>]+> : null\}\s*<span><span className="sr-only">Thao tác<\/span><\/span>\s*<ProjectExplorerSortHeader label="Cây công trình"/);
   assert.match(projectsPage, /<span>Tiến độ<\/span>\s*<ProjectExplorerSortHeader label="Ngày tạo" sortKey="created_at"[^/]+\/>/);
   assert.match(projectsPage, /<span className="font-medium text-slate-500 lg:hidden">Ngày tạo: <\/span>\s*\{dateText\(project\.created_at\)\}/);
   assert.match(projectsPage, /const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-\[112px_minmax\(0,1\.6fr\)_135px_100px_112px_100px\]';/);
-  assert.equal((projectsPage.match(/\$\{PROJECT_EXPLORER_DESKTOP_GRID_CLASS\}/g) ?? []).length, 2);
+  assert.match(projectsPage, /const PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS = 'lg:grid-cols-\[32px_112px_minmax\(0,1\.6fr\)_135px_100px_112px_100px\]';/);
+  assert.equal((projectsPage.match(/selectable \? PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS : PROJECT_EXPLORER_DESKTOP_GRID_CLASS/g) ?? []).length, 2);
   assert.match(projectsPage, /className="flex min-w-0 items-center gap-2"/);
   assert.match(projectsPage, /className="h-1\.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100"/);
   assert.match(projectsPage, /className="shrink-0 text-xs font-semibold tabular-nums text-slate-600"/);

@@ -29,6 +29,9 @@ import { SimpleForm } from '../_shared/SimpleForm';
 import type { Partner, Project, ProjectExplorerPage } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { partnerOptions } from '../core-data/partnerUtils';
+import { BulkSelectionBar } from '../../components/BulkSelectionBar';
+import { BulkDeleteDialog, type BulkDeletionResult } from '../../components/BulkDeleteDialog';
+import { SelectionCheckbox } from '../../components/SelectionCheckbox';
 import {
   projectWorkspaceGroupPath,
   visibleProjectWorkspaceGroups,
@@ -44,6 +47,7 @@ import {
 } from './projectExplorerSort';
 
 const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-[112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
+const PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS = 'lg:grid-cols-[32px_112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
 
 export function ProjectsPage() {
   const [open, setOpen] = useState(false);
@@ -56,9 +60,12 @@ export function ProjectsPage() {
 	const [pageSize, setPageSize] = useState(25);
 	const [streamStatus, setStreamStatus] = useState<StreamStatus>('reconnecting');
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set());
+  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasAnyPermission, user } = useAuth();
+	const canDelete = hasAnyPermission(['project.delete']);
 	const explorerParams = useMemo(() => {
 		const params = new URLSearchParams({
 			page: String(page),
@@ -142,6 +149,10 @@ export function ProjectsPage() {
   );
   const statusOptions = projects.data?.options.statuses ?? [];
 	const filteredProjects = projects.data?.items ?? [];
+	const selectedVisibleCount = filteredProjects.filter((project) => selectedProjectIds.has(project.id)).length;
+	const allVisibleSelected = Boolean(filteredProjects.length && selectedVisibleCount === filteredProjects.length);
+	const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+	const selectedProjectIDs = useMemo(() => Array.from(selectedProjectIds), [selectedProjectIds]);
 
 	useEffect(() => {
 		const timer = window.setTimeout(() => {
@@ -150,6 +161,10 @@ export function ProjectsPage() {
 		}, 300);
 		return () => window.clearTimeout(timer);
 	}, [search]);
+
+	useEffect(() => {
+		setSelectedProjectIds(new Set());
+	}, [explorerParams]);
 
 	useEffect(() => {
 		let invalidateTimer: number | undefined;
@@ -179,6 +194,7 @@ export function ProjectsPage() {
 		const rows = projects.data?.items ?? [];
 		if (!rows.length) {
 			setExpandedProjectIds(new Set());
+			setSelectedProjectIds(new Set());
 			return;
 		}
     setExpandedProjectIds((current) => {
@@ -186,6 +202,10 @@ export function ProjectsPage() {
 			const retained = new Set(Array.from(current).filter((projectID) => visible.has(projectID)));
 			return retained;
     });
+		setSelectedProjectIds((current) => {
+			const visible = new Set(rows.map((project) => project.id));
+			return new Set(Array.from(current).filter((projectID) => visible.has(projectID)));
+		});
   }, [projects.data]);
 
   function toggleProject(projectId: string) {
@@ -196,6 +216,24 @@ export function ProjectsPage() {
       return next;
     });
   }
+
+	function toggleSelectedProject(projectId: string) {
+		setSelectedProjectIds((current) => {
+			const next = new Set(current);
+			if (next.has(projectId)) next.delete(projectId);
+			else next.add(projectId);
+			return next;
+		});
+	}
+
+	function toggleAllVisibleProjects() {
+		setSelectedProjectIds((current) => {
+			const next = new Set(current);
+			if (allVisibleSelected) filteredProjects.forEach((project) => next.delete(project.id));
+			else filteredProjects.forEach((project) => next.add(project.id));
+			return next;
+		});
+	}
 
   return (
     <>
@@ -210,6 +248,8 @@ export function ProjectsPage() {
         }
       />
 
+		{canDelete ? <BulkSelectionBar count={selectedProjectIds.size} itemLabel="công trình" actionLabel="Xóa công trình đã chọn" onClear={() => setSelectedProjectIds(new Set())} onDelete={() => setDeleteOpen(true)} /> : null}
+
       <section className="rounded-lg border border-line bg-white shadow-panel">
         <div className="border-b border-line p-4">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -219,7 +259,7 @@ export function ProjectsPage() {
                 className="w-full rounded-md border border-line bg-white py-2 pl-9 pr-3 text-sm focus-ring"
                 value={search}
                 placeholder="Tìm công trình, mã, chủ đầu tư"
-				onChange={(event) => setSearch(event.target.value)}
+				onChange={(event) => { setSearch(event.target.value); setSelectedProjectIds(new Set()); }}
               />
             </label>
             <select
@@ -254,6 +294,10 @@ export function ProjectsPage() {
 
         <ProjectExplorerHeader
           sort={projectSort}
+			selectable={canDelete}
+			allSelected={allVisibleSelected}
+			someSelected={someVisibleSelected}
+			onToggleAll={toggleAllVisibleProjects}
 			onSort={(key) => {
 				setProjectSort((current) => nextProjectExplorerSort(key, current));
 				setPage(1);
@@ -296,6 +340,9 @@ export function ProjectsPage() {
                   <ProjectExplorerRow
                     project={project}
                     expanded={expanded}
+					selectable={canDelete}
+					selected={selectedProjectIds.has(project.id)}
+					onSelectedChange={() => toggleSelectedProject(project.id)}
                     onToggle={() => toggleProject(project.id)}
                     onEdit={() => setEditingProject(project)}
                   />
@@ -322,6 +369,23 @@ export function ProjectsPage() {
 			/>
 		) : null}
       </section>
+
+		<BulkDeleteDialog
+			kind="project"
+			open={deleteOpen}
+			ids={selectedProjectIDs}
+			onClose={() => setDeleteOpen(false)}
+			onSuccess={async (result: BulkDeletionResult) => {
+				setDeleteOpen(false);
+				setSelectedProjectIds(new Set());
+				await Promise.all([
+					queryClient.invalidateQueries({ queryKey: ['projects'] }),
+					queryClient.invalidateQueries({ queryKey: ['project-explorer'] }),
+				]);
+				toast.success({ title: `Đã xóa ${result.deleted_count} công trình`, description: 'Công trình đã chuyển sang Đã hủy; toàn bộ lịch sử nghiệp vụ vẫn được giữ nguyên.' });
+			}}
+			onError={(title, error) => toast.error(title, error)}
+		/>
 
       <FormDrawer open={open} title="Tạo công trình mới" onClose={() => setOpen(false)}>
         <SimpleForm
@@ -578,13 +642,23 @@ function nonNegativeCount(value: unknown) {
 
 function ProjectExplorerHeader({
   sort,
+  selectable,
+  allSelected,
+  someSelected,
+  onToggleAll,
   onSort,
 }: {
   sort: ProjectExplorerSort | null;
+  selectable: boolean;
+  allSelected: boolean;
+  someSelected: boolean;
+  onToggleAll: () => void;
   onSort: (key: ProjectExplorerSortKey) => void;
 }) {
+  const gridClass = selectable ? PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS : PROJECT_EXPLORER_DESKTOP_GRID_CLASS;
   return (
-    <div className={`hidden ${PROJECT_EXPLORER_DESKTOP_GRID_CLASS} gap-3 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid`}>
+    <div className={`hidden ${gridClass} gap-3 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid`}>
+      {selectable ? <SelectionCheckbox checked={allSelected} indeterminate={someSelected} ariaLabel="Chọn tất cả công trình trên trang hiện tại" onChange={onToggleAll} /> : null}
       <span><span className="sr-only">Thao tác</span></span>
       <ProjectExplorerSortHeader label="Cây công trình" sortKey="project" sort={sort} onSort={onSort} />
       <ProjectExplorerSortHeader label="Trạng thái" sortKey="status" sort={sort} onSort={onSort} />
@@ -633,16 +707,24 @@ function ProjectExplorerSortHeader({
 function ProjectExplorerRow({
   project,
   expanded,
+  selectable,
+  selected,
+  onSelectedChange,
   onToggle,
   onEdit,
 }: {
   project: Project;
   expanded: boolean;
+  selectable: boolean;
+  selected: boolean;
+  onSelectedChange: () => void;
   onToggle: () => void;
   onEdit: () => void;
 }) {
+  const gridClass = selectable ? PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS : PROJECT_EXPLORER_DESKTOP_GRID_CLASS;
   return (
-    <div className={`grid gap-3 px-4 py-3 ${PROJECT_EXPLORER_DESKTOP_GRID_CLASS} lg:items-center`}>
+    <div className={`relative grid gap-3 px-4 py-3 ${selectable ? 'pl-12' : ''} ${selected ? 'bg-blue-50/60' : ''} ${gridClass} lg:items-center lg:pl-4`}>
+      {selectable ? <div className="absolute left-4 top-4 lg:static"><SelectionCheckbox checked={selected} ariaLabel={`Chọn công trình ${project.code} · ${project.name}`} onChange={onSelectedChange} /></div> : null}
       <div className="flex items-center justify-start gap-2">
         <button
           type="button"
