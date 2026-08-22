@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { StatusBadge } from '../../components/StatusBadge';
+import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 import { dateText } from '../../lib/utils/format';
 import type { WorkItem } from '../../lib/types/domain';
 import { asArray, departmentLabel, hasWorkflowFormSummary, isWorkOverdue, numberValue, workItemIsUpcoming, workItemWorkflowContext, workTypeLabel, workflowFormChipText, workflowFormStatusLabel } from './workItemPresentation';
@@ -41,7 +42,7 @@ export function WorkItemCard({
           <p className="mt-1 line-clamp-2 text-xs font-medium text-slate-600">{context.path}</p>
           {item.description && !compact ? <p className="mt-1 line-clamp-2 text-sm text-slate-600">{item.description}</p> : null}
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-            <span>Phụ trách: {item.assignee_name ?? (asArray<string>(item.role_ids).join(', ') || '-')}</span>
+            <span>Phụ trách: {item.assignee_name ? <IdentityReferenceLabel name={item.assignee_name} deleted={item.assignee_account_deleted} liveOwnership /> : (asArray<string>(item.role_ids).join(', ') || '-')}</span>
             <span>Hạn: {dateText(item.due_at)}</span>
             <span>Minh chứng: {numberValue(item.evidence_count)}</span>
             {hasWorkflowFormSummary(item) ? <span>Hồ sơ: {item.workflow_form_required ? 'Bắt buộc' : 'Tùy chọn'}</span> : null}

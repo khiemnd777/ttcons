@@ -6,6 +6,7 @@ import { Dialog } from '../../components/Dialog';
 import { PageHeader } from '../../components/PageHeader';
 import { RowActions } from '../../components/RowActions';
 import { StatusBadge } from '../../components/StatusBadge';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import { get, post, postForm, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -139,13 +140,13 @@ function SealTable({ rows, loading, error, onRetry, onUpload, onArchive }: { row
           { key: 'thumbnail', header: 'Hình con dấu', className: 'w-36', render: (row) => <SealAssetPreview path={`/seal-assets/${row.id}/file`} alt={row.name} className="h-16 w-28" /> },
           { key: 'name', header: 'Tên con dấu', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.name}</span> },
           { key: 'dimensions', header: 'Kích thước', render: (row) => <span className="whitespace-nowrap">{row.width_px} × {row.height_px} px<br /><span className="text-xs text-slate-500">{fileSizeText(row.file_size)}</span></span> },
-          { key: 'uploaded_by_name', header: 'Người tải', sortable: true },
+          { key: 'uploaded_by_name', header: 'Người tải', sortable: true, render: (row) => identityReferenceText(row.uploaded_by_name, row.uploaded_by_account_deleted) },
           { key: 'created_at', header: 'Ngày tải', sortable: true, render: (row) => dateText(row.created_at) },
           { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} label={row.status === 'active' ? 'Đang dùng' : 'Ngừng dùng'} /> },
         ]}
         empty="Chưa có tài nguyên con dấu."
         emptyAction={<button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={onUpload}>Thêm con dấu đầu tiên</button>}
-        renderMobileCard={(row) => <article className="rounded-lg border border-line bg-white p-3"><div className="flex gap-3"><SealAssetPreview path={`/seal-assets/${row.id}/file`} alt={row.name} className="h-20 w-24 shrink-0" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{row.name}</p><p className="mt-1 text-xs text-slate-500">{row.width_px} × {row.height_px} px · {fileSizeText(row.file_size)}</p><div className="mt-2"><StatusBadge status={row.status} label={row.status === 'active' ? 'Đang dùng' : 'Ngừng dùng'} /></div></div>{row.status === 'active' ? <button className="self-start rounded-md border border-amber-200 p-2 text-amber-700" aria-label="Ngừng sử dụng" onClick={() => onArchive(row)}><Archive className="h-4 w-4" /></button> : null}</div><p className="mt-3 text-xs text-slate-500">Tải bởi {row.uploaded_by_name} · {dateText(row.created_at)}</p></article>}
+        renderMobileCard={(row) => <article className="rounded-lg border border-line bg-white p-3"><div className="flex gap-3"><SealAssetPreview path={`/seal-assets/${row.id}/file`} alt={row.name} className="h-20 w-24 shrink-0" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{row.name}</p><p className="mt-1 text-xs text-slate-500">{row.width_px} × {row.height_px} px · {fileSizeText(row.file_size)}</p><div className="mt-2"><StatusBadge status={row.status} label={row.status === 'active' ? 'Đang dùng' : 'Ngừng dùng'} /></div></div>{row.status === 'active' ? <button className="self-start rounded-md border border-amber-200 p-2 text-amber-700" aria-label="Ngừng sử dụng" onClick={() => onArchive(row)}><Archive className="h-4 w-4" /></button> : null}</div><p className="mt-3 text-xs text-slate-500">Tải bởi {identityReferenceText(row.uploaded_by_name, row.uploaded_by_account_deleted)} · {dateText(row.created_at)}</p></article>}
       />
     </section>
   );

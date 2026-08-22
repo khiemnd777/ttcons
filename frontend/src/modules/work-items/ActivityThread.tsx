@@ -25,6 +25,7 @@ import {
 import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
 import { Dialog } from '../../components/Dialog';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { ApiError, get, post, put, streamSSE, type StreamStatus } from '../../lib/api/client';
 import { useToast } from '../../components/ToastProvider';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -843,7 +844,7 @@ function ChatMessage({
     return (
       <div className="flex justify-center py-1">
         <span className="max-w-[90%] rounded-full bg-slate-200/80 px-3 py-1 text-center text-[11px] text-slate-500">
-          {item.actor_name ?? 'Hệ thống'} · {activityLabel(item.activity_type)}{comment ? ` · ${comment}` : ''} · {compactDateTime(item.created_at)}
+          {identityReferenceText(item.actor_name, item.actor_account_deleted, 'Hệ thống')} · {activityLabel(item.activity_type)}{comment ? ` · ${comment}` : ''} · {compactDateTime(item.created_at)}
         </span>
       </div>
     );
@@ -865,7 +866,7 @@ function ChatMessage({
       <div className={clsx('max-w-[82%] sm:max-w-[72%]', own && 'text-right')}>
         {!compact ? (
           <div className={clsx('mb-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500', own && 'justify-end')}>
-            <span className="font-semibold text-slate-700">{own ? 'Bạn' : item.actor_name ?? 'Hệ thống'}</span>
+            <span className="font-semibold text-slate-700">{own ? 'Bạn' : identityReferenceText(item.actor_name, item.actor_account_deleted, 'Hệ thống')}</span>
             <span>{compactDateTime(item.created_at)}</span>
           </div>
         ) : null}
@@ -1015,7 +1016,7 @@ function ActivityCard({
             {resolved ? <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Đã xử lý</span> : null}
           </div>
           <p className="mt-1.5 truncate text-xs text-slate-500">
-            <span className="font-semibold text-slate-700">{item.actor_name ?? 'Hệ thống'}</span>
+            <span className="font-semibold text-slate-700">{identityReferenceText(item.actor_name, item.actor_account_deleted, 'Hệ thống')}</span>
             {' · '}{item.target_label ?? item.work_item_title ?? scopeTypeLabel(item.scope_type ?? 'project')}
             {' · '}{compactDateTime(item.created_at)}
             {item.edited_at && !withdrawn ? ' · đã chỉnh sửa' : ''}

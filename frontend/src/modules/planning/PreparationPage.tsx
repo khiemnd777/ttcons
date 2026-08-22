@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ChevronDown, ChevronRight, FileCheck2, Search } from 'lucide-react';
 import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -423,7 +424,9 @@ function preparationFilterMatches(item: WorkItem, filter: PreparationFilter) {
 }
 
 function workItemOwner(item: WorkItem) {
-  return item.assignee_name ?? (asArray<string>(item.role_ids).join(', ') || '-');
+  if (!item.assignee_name) return asArray<string>(item.role_ids).join(', ') || '-';
+  const label = identityReferenceText(item.assignee_name, item.assignee_account_deleted);
+  return item.assignee_account_deleted ? `${label} · Cần phân công lại` : label;
 }
 
 function withTask(pathname: string, search: string, taskId: string) {

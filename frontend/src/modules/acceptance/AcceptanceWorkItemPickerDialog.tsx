@@ -3,6 +3,7 @@ import { Check, ChevronDown, ChevronUp, Loader2, RefreshCw, Search } from 'lucid
 import clsx from 'clsx';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { StatusBadge } from '../../components/StatusBadge';
 import type { WorkItem } from '../../lib/types/domain';
 import { groupAcceptanceWorkItems } from './acceptanceWorkItemPicker';
@@ -118,7 +119,10 @@ function WorkItemList({ items, selection, requiredWorkItemId, onSelect }: { item
       {items.map((item) => {
         const selected = selection === item.id;
         const disabled = Boolean(requiredWorkItemId && requiredWorkItemId !== item.id);
-        const context = [item.run_node_name, item.assignee_name ? `Phụ trách: ${item.assignee_name}` : ''].filter(Boolean).join(' · ');
+        const assignee = item.assignee_name
+          ? `Phụ trách: ${identityReferenceText(item.assignee_name, item.assignee_account_deleted)}${item.assignee_account_deleted ? ' · Cần phân công lại' : ''}`
+          : '';
+        const context = [item.run_node_name, assignee].filter(Boolean).join(' · ');
         return (
           <button
             key={item.id}

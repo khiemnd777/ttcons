@@ -10,6 +10,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { ListSection } from '../../components/ListSection';
 import { RowActions } from '../../components/RowActions';
 import { StatusBadge } from '../../components/StatusBadge';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { dateText } from '../../lib/utils/format';
 import type { PlanningChecklistItem } from '../../lib/types/domain';
@@ -239,7 +240,7 @@ export function PlanningChecklistsPage() {
               ),
             },
             { key: 'planning_scope', header: 'Phạm vi', sortable: true, render: (row) => planningScopeLabel(row.planning_scope) },
-            { key: 'checked_by', header: 'Người kiểm tra', sortable: true, render: (row) => row.checked_by || row.submitted_by_name || '-' },
+            { key: 'checked_by', header: 'Người kiểm tra', sortable: true, render: (row) => row.checked_by || identityReferenceText(row.submitted_by_name, row.submitted_by_account_deleted) },
             {
               key: 'items',
               header: 'Hoàn tất / Tổng',
@@ -341,14 +342,14 @@ function PlanningChecklistDetailDialog({
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <DetailPill label="Trạng thái" value={<StatusBadge status={checklist.status} />} />
             <DetailPill label="Ngày kiểm tra" value={dateText(checklist.check_date)} />
-            <DetailPill label="Người kiểm tra" value={checklist.checked_by || checklist.submitted_by_name || '-'} />
+            <DetailPill label="Người kiểm tra" value={checklist.checked_by || identityReferenceText(checklist.submitted_by_name, checklist.submitted_by_account_deleted)} />
             <DetailPill label="Cập nhật" value={compactDateTime(checklist.updated_at)} />
           </div>
           <section className="rounded-md border border-line bg-slate-50 p-3">
             <p className="text-sm font-semibold text-ink">{checklistTitle(checklist)}</p>
             <div className="mt-2 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
               <p>Phạm vi: <span className="font-semibold text-ink">{planningScopeLabel(checklist.planning_scope)}</span></p>
-              <p>Người gửi: <span className="font-semibold text-ink">{checklist.submitted_by_name || '-'}</span></p>
+              <p>Người gửi: <span className="font-semibold text-ink">{identityReferenceText(checklist.submitted_by_name, checklist.submitted_by_account_deleted)}</span></p>
               <p>Node: <span className="font-semibold text-ink">{checklist.run_node_name ?? '-'}</span></p>
               <p>Bước: <span className="font-semibold text-ink">{checklist.run_step_name ?? '-'}</span></p>
             </div>

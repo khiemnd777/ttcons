@@ -9,7 +9,8 @@ import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } fro
 import { ConstructionEvidenceButton } from './ConstructionEvidenceButton';
 import { FieldBlock, SectionTitle, controlClass, errorSummary, requiredErrors, type FormErrors } from './ConstructionFormControls';
 import { createConstructionCheck, uploadConstructionEvidenceItems } from './constructionWorkspaceApi';
-import { checkStatusLabel, dateTimeText, optionalISO, toDateTimeInput } from './constructionWorkspaceUtils';
+import { checkStatusLabel, constructionActionAssigneeLabel, dateTimeText, optionalISO, toDateTimeInput } from './constructionWorkspaceUtils';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { EvidenceGallery } from '../work-items/EvidenceGallery';
 
 export type CheckDialogState =
@@ -199,7 +200,7 @@ function CheckViewDialog({ check, workspace, canEdit, canPerform, onClose, onEdi
         <div><SectionTitle>Kết quả và ghi chú</SectionTitle><div className="mt-3 rounded-lg border border-line bg-slate-50 p-4"><p className="font-semibold text-ink">{checkStatusLabel(check)}</p><p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{check.note || (check.status === 'pending' ? 'Chưa ghi kết quả.' : 'Không có ghi chú.')}</p></div></div>
         <div><SectionTitle>Hình ảnh hiện trạng</SectionTitle><div className="mt-3"><EvidenceGallery evidence={check.context_evidence ?? []} emptyTitle="Chưa có ảnh hiện trạng" showControls={false} /></div></div>
         <div><SectionTitle>Minh chứng kết quả</SectionTitle><div className="mt-3">{check.result_evidence?.length ? <EvidenceGallery evidence={check.result_evidence} emptyTitle="Chưa có minh chứng kết quả" showControls={false} /> : check.status === 'completed' ? <ConstructionEvidenceButton evidenceId={check.evidence_id} name={check.evidence_name} label="Minh chứng kết quả" /> : <EvidenceGallery evidence={[]} emptyTitle="Chưa có minh chứng kết quả" showControls={false} />}</div></div>
-        {linkedAction ? <div><SectionTitle>Việc phát sinh</SectionTitle><button type="button" className="mt-3 flex w-full items-center justify-between rounded-lg border border-rose-200 bg-rose-50 p-4 text-left hover:bg-rose-100" onClick={() => onViewAction(linkedAction)}><span><span className="block font-semibold text-rose-800">{linkedAction.title}</span><span className="mt-1 block text-sm text-rose-700">{linkedAction.assigned_user_name || 'Chưa giao người xử lý'} · {dateTimeText(linkedAction.due_at)}</span></span><span className="text-sm font-semibold text-rose-700">Xem việc</span></button></div> : null}
+        {linkedAction ? <div><SectionTitle>Việc phát sinh</SectionTitle><button type="button" className="mt-3 flex w-full items-center justify-between rounded-lg border border-rose-200 bg-rose-50 p-4 text-left hover:bg-rose-100" onClick={() => onViewAction(linkedAction)}><span><span className="block font-semibold text-rose-800">{linkedAction.title}</span><span className="mt-1 block text-sm text-rose-700">{constructionActionAssigneeLabel(linkedAction, 'Chưa giao người xử lý')} · {dateTimeText(linkedAction.due_at)}</span></span><span className="text-sm font-semibold text-rose-700">Xem việc</span></button></div> : null}
       </div>
       <aside className="space-y-4 rounded-lg border border-line bg-slate-50 p-4 lg:self-start">
         {check.source_handoff_item_id ? <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2"><p className="text-xs font-semibold text-blue-800">Từ kế hoạch thi công · revision {check.handoff_revision_no ?? 1}</p><p className="mt-1 text-xs text-blue-700">{check.handoff_title || check.handoff_source_node_name || 'Bàn giao kế hoạch'}</p></div> : null}
@@ -207,8 +208,8 @@ function CheckViewDialog({ check, workspace, canEdit, canPerform, onClose, onEdi
         <Detail label="Vị trí" value={check.location || 'Chưa ghi'} />
         <Detail label="Mẫu" value={check.template_name || 'Không dùng mẫu'} />
         <Detail label="Lịch kiểm tra" value={dateTimeText(check.scheduled_at)} />
-        <Detail label="Người yêu cầu" value={check.requested_by_name || '—'} />
-        <Detail label="Người kiểm tra" value={check.checked_by_name || 'Chưa thực hiện'} />
+        <Detail label="Người yêu cầu" value={identityReferenceText(check.requested_by_name, check.requested_by_account_deleted)} />
+        <Detail label="Người kiểm tra" value={identityReferenceText(check.checked_by_name, check.checked_by_account_deleted, 'Chưa thực hiện')} />
         <Detail label="Thời điểm kết quả" value={dateTimeText(check.checked_at)} />
         {check.technical_rfi_id ? <p className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-700">Đồng bộ từ RFI QA/QC; chỉnh sửa tại hồ sơ nguồn.</p> : null}
         {check.source_handoff_item_id ? <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">Kiểm tra được sinh từ snapshot Planning; thay đổi bằng revision bàn giao mới.</p> : null}

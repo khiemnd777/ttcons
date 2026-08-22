@@ -1,4 +1,5 @@
 import type { ApprovalRequest } from '../lib/types/domain';
+import { identityReferenceText } from './identityReference.ts';
 
 export type ApprovalDecisionAction = 'approve' | 'request-change' | 'reject';
 
@@ -11,7 +12,7 @@ export function approvalRequiresComment(request: ApprovalRequest) {
 }
 
 export function approvalRequesterLabel(request: ApprovalRequest) {
-  return request.requested_by_name?.trim() || 'Chưa xác định người gửi';
+  return identityReferenceText(request.requested_by_name, request.requested_by_account_deleted, 'Chưa xác định người gửi');
 }
 
 export function approvalRequiredRolesLabel(request: ApprovalRequest) {

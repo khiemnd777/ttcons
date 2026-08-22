@@ -7,6 +7,7 @@ import { CurrencyInput } from '../../components/CurrencyInput';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import { ApiError, del, downloadBlob, get, post, postForm, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -1066,7 +1067,7 @@ export function WorkflowFormEventsPanel({ events }: { events: AnyRecord[] }) {
           return (
             <article key={String(event.id)} className="px-3 py-2.5">
               <p className="text-xs font-semibold text-ink">{workflowFormEventLabel(event.event_type)}</p>
-              <p className="mt-1 text-xs text-slate-500">{event.actor_name ?? 'Hệ thống'} · {compactDateTime(event.created_at)}</p>
+              <p className="mt-1 text-xs text-slate-500">{identityReferenceText(event.actor_name, event.actor_account_deleted, 'Hệ thống')} · {compactDateTime(event.created_at)}</p>
               {event.event_type === 'amended' ? (
                 <div className="mt-2 rounded-md border border-amber-100 bg-amber-50 p-2 text-xs text-slate-700">
                   <p className="font-semibold text-amber-900">Phiên bản {String(event.metadata_json?.from_revision ?? '?')} → {String(event.metadata_json?.to_revision ?? '?')}</p>

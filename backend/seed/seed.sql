@@ -91,7 +91,7 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('contract.view','Xem hợp đồng','contract'),('contract.create','Tạo và sửa hợp đồng','contract'),('contract.review','Review hợp đồng','contract'),('contract.approve','Duyệt hợp đồng','contract'),('contract.sign','Ký và kích hoạt hợp đồng','contract'),('contract.milestone_manage','Quản lý milestone hợp đồng','contract'),('contract.retention_release','Giải phóng giữ lại','contract'),
 ('contract.dispatch','Gửi hồ sơ hợp đồng giấy','contract'),('contract.scan_manage','Quản lý bản scan hợp đồng','contract'),('contract.variation.propose','Đề xuất phát sinh thi công','contract'),('contract.variation_qs_review','QS rà soát phát sinh','contract'),('contract.variation_purchase','Mua hàng xử lý phát sinh','contract'),
 ('catalog.view','Xem dữ liệu lõi','catalog'),('catalog.manage','Quản lý dữ liệu lõi','catalog'),
-('staff.view','Xem nhân sự','staff'),('staff.create','Tạo nhân sự','staff'),('staff.update','Sửa nhân sự','staff'),('staff.account_security.manage','Quản trị bảo mật tài khoản nhân sự','staff'),('role.view','Xem role','rbac'),('role.create','Tạo role','rbac'),('role.update','Sửa role','rbac'),('permission.view','Xem permission','rbac'),('permission.assign','Gán quyền','rbac'),
+('staff.view','Xem nhân sự','staff'),('staff.create','Tạo nhân sự','staff'),('staff.update','Sửa nhân sự','staff'),('staff.delete','Xóa nhân sự','staff'),('staff.account_security.manage','Quản trị bảo mật tài khoản nhân sự','staff'),('staff.import','Import tài khoản nhân sự','staff'),('role.view','Xem role','rbac'),('role.create','Tạo role','rbac'),('role.update','Sửa role','rbac'),('permission.view','Xem permission','rbac'),('permission.assign','Gán quyền','rbac'),
 ('audit.view','Xem audit','audit'),('event_log.view','Xem nhật ký sự kiện','event_log'),('report.view','Xem báo cáo','report'),('report.finance.view','Xem báo cáo tài chính','report'),
 ('statistics.view','Xem thống kê','statistics'),('statistics.export','Xuất dữ liệu thống kê','statistics'),
 ('work_report.view','Xem báo cáo công việc','work_report'),('work_report.create','Lập báo cáo công việc','work_report'),('work_report.submit','Gửi báo cáo công việc','work_report'),('work_report.review','Xem xét báo cáo công việc','work_report'),('work_report.export','Xuất báo cáo công việc','work_report'),('work_report.manage','Quản lý báo cáo công việc','work_report'),
@@ -109,7 +109,7 @@ WHERE key='staff.account_security.manage';
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
-WHERE r.name = 'developer' OR (r.name = 'admin' AND p.key <> 'settings.update')
+WHERE r.name = 'developer' OR (r.name = 'admin' AND p.key NOT IN ('settings.update','staff.import'))
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id,permission_id)

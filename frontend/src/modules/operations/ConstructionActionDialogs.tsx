@@ -1,6 +1,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { AlertTriangle, CalendarDays, CheckCircle2, GitPullRequestArrow, Loader2, Pencil, ShieldCheck, Wrench } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import { post, put } from '../../lib/api/client';
 import type { ConstructionActionItem, ConstructionCheck, ConstructionDailyReportSource, ConstructionWorkspace } from '../../lib/types/domain';
@@ -10,7 +11,7 @@ import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } fro
 import { ConstructionEvidenceButton } from './ConstructionEvidenceButton';
 import { FieldBlock, SectionTitle, controlClass, errorSummary, requiredErrors, type FormErrors } from './ConstructionFormControls';
 import { createConstructionAction, uploadConstructionEvidence } from './constructionWorkspaceApi';
-import { actionStatusLabel, constructionImpactHelperText, dateTimeText, eventLabel, impactLabel, isConstructionActionEditable, optionalISO, toDateTimeInput } from './constructionWorkspaceUtils';
+import { actionStatusLabel, constructionActionAssigneeLabel, constructionImpactHelperText, dateTimeText, eventLabel, impactLabel, isConstructionActionEditable, optionalISO, toDateTimeInput } from './constructionWorkspaceUtils';
 
 export type ActionDialogState =
   | { type: 'create'; sourceReport?: ConstructionDailyReportSource }
@@ -131,7 +132,7 @@ function ActionViewDialog({ action, workspace, canEdit, canResolve, canVerify, c
         <div><SectionTitle>Lịch sử xử lý</SectionTitle><Timeline action={action} /></div>
       </div>
       <aside className="space-y-4 rounded-lg border border-line bg-slate-50 p-4 lg:self-start">
-        <Detail label="Người xử lý" value={action.assigned_user_name || 'Chưa xác định'} />
+        <Detail label="Người xử lý" value={constructionActionAssigneeLabel(action)} />
         <Detail label="Hạn xử lý" value={dateTimeText(action.due_at)} />
         <Detail label="Mức ưu tiên" value={action.priority === 'urgent' ? 'Gấp' : 'Bình thường'} />
         <Detail label="Ảnh hưởng" value={impactLabel(action.impact_scope)} />
@@ -212,7 +213,7 @@ function VerificationDialog({ action, onClose, onSaved }: Props & { action: Cons
 
 function Timeline({ action }: { action: ConstructionActionItem }) {
   if (!action.events?.length) return <p className="mt-3 rounded-lg border border-dashed border-line p-4 text-sm text-slate-500">Chưa có sự kiện xử lý.</p>;
-  return <ol className="mt-3 space-y-0">{action.events.map((event, index) => <li key={event.id} className="relative grid grid-cols-[1.25rem_minmax(0,1fr)] gap-3 pb-4 last:pb-0"><span className="relative z-10 mt-1 h-3 w-3 rounded-full bg-blue-600 ring-4 ring-blue-50" />{index < action.events.length - 1 ? <span className="absolute left-[5px] top-4 h-full w-px bg-slate-200" /> : null}<div><p className="text-sm font-semibold text-ink">{eventLabel(event.event_type)}</p><p className="mt-0.5 text-xs text-slate-500">{event.actor_name || 'Hệ thống'} · {dateTimeText(event.created_at)}</p>{event.comment ? <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{event.comment}</p> : null}{event.evidence_id ? <div className="mt-2"><ConstructionEvidenceButton evidenceId={event.evidence_id} name={event.evidence_name} label="Minh chứng sự kiện" /></div> : null}</div></li>)}</ol>;
+  return <ol className="mt-3 space-y-0">{action.events.map((event, index) => <li key={event.id} className="relative grid grid-cols-[1.25rem_minmax(0,1fr)] gap-3 pb-4 last:pb-0"><span className="relative z-10 mt-1 h-3 w-3 rounded-full bg-blue-600 ring-4 ring-blue-50" />{index < action.events.length - 1 ? <span className="absolute left-[5px] top-4 h-full w-px bg-slate-200" /> : null}<div><p className="text-sm font-semibold text-ink">{eventLabel(event.event_type)}</p><p className="mt-0.5 text-xs text-slate-500">{identityReferenceText(event.actor_name, event.actor_account_deleted, 'Hệ thống')} · {dateTimeText(event.created_at)}</p>{event.comment ? <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{event.comment}</p> : null}{event.evidence_id ? <div className="mt-2"><ConstructionEvidenceButton evidenceId={event.evidence_id} name={event.evidence_name} label="Minh chứng sự kiện" /></div> : null}</div></li>)}</ol>;
 }
 
 function Detail({ label, value }: { label: string; value: string }) { return <div><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 text-sm font-medium text-slate-700">{value}</p></div>; }

@@ -111,7 +111,7 @@ func (r *Repository) ProjectConstructionHandoff(ctx context.Context, projectID s
 
 	handoffs, err := r.Query(ctx, `
 		SELECT h.*,source_node.name AS source_node_name,target_node.name AS target_node_name,
-			u.full_name AS activated_by_name
+			u.full_name AS activated_by_name,COALESCE(u.deleted_at IS NOT NULL,false) AS activated_by_account_deleted
 		FROM construction_handoffs h
 		LEFT JOIN pipeline_run_nodes source_node ON source_node.id=h.source_run_node_id
 		JOIN pipeline_run_nodes target_node ON target_node.id=h.target_run_node_id
@@ -124,7 +124,9 @@ func (r *Repository) ProjectConstructionHandoff(ctx context.Context, projectID s
 	}
 	for _, handoff := range handoffs {
 		items, queryErr := r.Query(ctx, `
-			SELECT i.*,u.full_name AS assigned_user_name,w.status AS work_item_status,c.status AS check_status,c.result AS check_result
+			SELECT i.*,u.full_name AS assigned_user_name,
+				COALESCE(u.deleted_at IS NOT NULL,false) AS assigned_user_account_deleted,
+				w.status AS work_item_status,c.status AS check_status,c.result AS check_result
 			FROM construction_handoff_items i
 			LEFT JOIN users u ON u.id=i.assigned_user_id
 			JOIN work_items w ON w.id=i.generated_work_item_id
@@ -521,7 +523,8 @@ func (r *Repository) ActivateConstructionHandoff(ctx context.Context, projectID,
 
 func (r *Repository) GetConstructionHandoff(ctx context.Context, handoffID string, idempotent bool) (Record, error) {
 	handoff, err := r.QueryOne(ctx, `
-		SELECT h.*,source_node.name AS source_node_name,target_node.name AS target_node_name,u.full_name AS activated_by_name
+		SELECT h.*,source_node.name AS source_node_name,target_node.name AS target_node_name,
+			u.full_name AS activated_by_name,COALESCE(u.deleted_at IS NOT NULL,false) AS activated_by_account_deleted
 		FROM construction_handoffs h
 		LEFT JOIN pipeline_run_nodes source_node ON source_node.id=h.source_run_node_id
 		JOIN pipeline_run_nodes target_node ON target_node.id=h.target_run_node_id
@@ -532,7 +535,9 @@ func (r *Repository) GetConstructionHandoff(ctx context.Context, handoffID strin
 		return nil, err
 	}
 	items, err := r.Query(ctx, `
-		SELECT i.*,u.full_name AS assigned_user_name,w.status AS work_item_status,c.status AS check_status,c.result AS check_result
+		SELECT i.*,u.full_name AS assigned_user_name,
+			COALESCE(u.deleted_at IS NOT NULL,false) AS assigned_user_account_deleted,
+			w.status AS work_item_status,c.status AS check_status,c.result AS check_result
 		FROM construction_handoff_items i
 		LEFT JOIN users u ON u.id=i.assigned_user_id
 		LEFT JOIN work_items w ON w.id=i.generated_work_item_id

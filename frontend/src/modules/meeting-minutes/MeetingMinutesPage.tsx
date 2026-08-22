@@ -10,6 +10,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { ListSection } from '../../components/ListSection';
 import { RowActions } from '../../components/RowActions';
 import { StatusBadge } from '../../components/StatusBadge';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { dateText } from '../../lib/utils/format';
 import type { MeetingMinutesItem } from '../../lib/types/domain';
@@ -310,7 +311,7 @@ function MeetingMinutesDetailDialog({
             <p className="text-sm font-semibold text-ink">{meetingTitle(meeting)}</p>
             <div className="mt-2 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
               <p>Địa điểm: <span className="font-semibold text-ink">{meeting.location || '-'}</span></p>
-              <p>Người gửi: <span className="font-semibold text-ink">{meeting.submitted_by_name || '-'}</span></p>
+              <p>Người gửi: <span className="font-semibold text-ink">{identityReferenceText(meeting.submitted_by_name, meeting.submitted_by_account_deleted)}</span></p>
               <p>Node: <span className="font-semibold text-ink">{meeting.run_node_name ?? '-'}</span></p>
               <p>Bước: <span className="font-semibold text-ink">{meeting.run_step_name ?? '-'}</span></p>
             </div>

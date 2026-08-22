@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CheckCircle2, ClipboardCheck, Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog } from '../../components/Dialog';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { get, post } from '../../lib/api/client';
@@ -14,7 +15,11 @@ import type {
   ConstructionHandoffWorkspace,
 } from '../../lib/types/domain';
 
-type EditableItem = ConstructionHandoffCandidate & { local_id: string };
+type EditableItem = ConstructionHandoffCandidate & {
+  local_id: string;
+  assigned_user_name?: string;
+  assigned_user_account_deleted?: boolean;
+};
 
 export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId: string; currentNode?: Record<string, any> }) {
   const { hasAnyPermission } = useAuth();
@@ -157,7 +162,7 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
                   <div>
                     <p className="font-semibold text-ink">Đã kích hoạt revision {latest.revision_no}</p>
-                    <p className="mt-1 text-xs leading-5 text-slate-600">{latest.title} · {latest.activated_by_name || 'Người lập kế hoạch'}</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-600">{latest.title} · {identityReferenceText(latest.activated_by_name, latest.activated_by_account_deleted, 'Người lập kế hoạch')}</p>
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -234,7 +239,7 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
                   <Field label="Thời điểm dự kiến"><input disabled={readOnly} type="datetime-local" className={controlClass(false, readOnly)} value={toDateTimeInput(item.scheduled_at)} onChange={(event) => updateItem(setItems, item.local_id, { scheduled_at: event.target.value })} /></Field>
                   <Field label="Tiêu chí đạt" required error={errors[`${item.local_id}.criteria`]} className="xl:col-span-2"><textarea disabled={readOnly} rows={2} className={controlClass(Boolean(errors[`${item.local_id}.criteria`]), readOnly)} value={criterionText(item)} onChange={(event) => updateCriterion(setItems, item.local_id, event.target.value)} /></Field>
                   <Field label="Vai trò giám sát"><select disabled={readOnly} className={controlClass(false, readOnly)} value={item.responsible_role || 'QA/QC'} onChange={(event) => updateItem(setItems, item.local_id, { responsible_role: event.target.value })}>{!['QA/QC', 'Giám sát', 'PM'].includes(item.responsible_role) && item.responsible_role ? <option value={item.responsible_role}>{item.responsible_role}</option> : null}<option value="QA/QC">QA/QC</option><option value="Giám sát">Giám sát</option><option value="PM">PM</option></select></Field>
-                  <Field label="Người giám sát"><select disabled={readOnly} className={controlClass(false, readOnly)} value={item.assigned_user_id ?? ''} onChange={(event) => updateItem(setItems, item.local_id, { assigned_user_id: event.target.value })}><option value="">Theo vai trò</option>{handoff.data?.participants?.map((participant) => <option key={participant.id} value={participant.id}>{participant.full_name}</option>)}</select></Field>
+                  <Field label="Người giám sát"><select disabled={readOnly} className={controlClass(false, readOnly)} value={item.assigned_user_id ?? ''} onChange={(event) => updateItem(setItems, item.local_id, { assigned_user_id: event.target.value })}><option value="">Theo vai trò</option>{item.assigned_user_id && !(handoff.data?.participants ?? []).some((participant) => participant.id === item.assigned_user_id) ? <option value={item.assigned_user_id}>{identityReferenceText(item.assigned_user_name, item.assigned_user_account_deleted, 'Tài khoản không còn hoạt động')}{item.assigned_user_account_deleted ? ' · Cần phân công lại' : ''}</option> : null}{handoff.data?.participants?.map((participant) => <option key={participant.id} value={participant.id}>{participant.full_name}</option>)}</select></Field>
                 </div>
                 <label className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-700"><input disabled={readOnly} type="checkbox" checked={Boolean(item.evidence_required)} onChange={(event) => updateEvidenceRequired(setItems, item.local_id, event.target.checked)} /> Bắt buộc minh chứng khi ghi kết quả</label>
               </article>
@@ -276,6 +281,8 @@ function editableHandoffItem(item: ConstructionHandoffItem): EditableItem {
     scheduled_at: item.scheduled_at,
     responsible_role: item.responsible_role_ids?.[0] || 'QA/QC',
     assigned_user_id: item.assigned_user_id,
+    assigned_user_name: item.assigned_user_name,
+    assigned_user_account_deleted: item.assigned_user_account_deleted,
     evidence_required: item.evidence_required,
     criteria: item.criteria_jsonb ?? [],
   };

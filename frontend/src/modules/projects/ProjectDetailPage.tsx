@@ -29,6 +29,7 @@ import { CurrencyText } from '../../components/CurrencyText';
 import { EmptyState } from '../../components/EmptyState';
 import { DataTable } from '../../components/DataTable';
 import { EnumChip } from '../../components/EnumChip';
+import { IdentityReferenceLabel, identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import { dateText, percent } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
@@ -82,7 +83,8 @@ function isOpenWorkItem(item: WorkItem) {
 }
 
 function workOwner(item: WorkItem) {
-  return item.assignee_name ?? item.owner_name ?? item.responsible_name ?? item.department_name ?? departmentLabel(item.department) ?? '-';
+  if (item.assignee_name) return identityReferenceText(item.assignee_name, item.assignee_account_deleted);
+  return item.owner_name ?? item.responsible_name ?? item.department_name ?? departmentLabel(item.department) ?? '-';
 }
 
 function workDueDate(item: WorkItem) {
@@ -191,7 +193,7 @@ export function ProjectDetailPage() {
         description={
           [
             project.client_name ? `Chủ đầu tư: ${project.client_name}` : null,
-            project.pm_name ? `Phụ trách: ${project.pm_name}` : null,
+            project.pm_name ? `Phụ trách: ${identityReferenceText(project.pm_name, project.pm_account_deleted)}${project.pm_account_deleted ? ' · Cần phân công lại' : ''}` : null,
             project.status ? `Trạng thái: ${statusLabel(project.status)}` : null,
             project.planned_end_date ? `Kết thúc: ${dateText(project.planned_end_date)}` : null,
           ].filter(Boolean).join(' · ')
@@ -1168,7 +1170,7 @@ function WorkflowWorkMobileCard({
 
 function workflowWorkOwnerLabel(item: WorkItem) {
   const roleLabels = asArray<string>(item.role_ids).filter(Boolean).join(', ');
-  return item.assignee_name
+  return (item.assignee_name ? identityReferenceText(item.assignee_name, item.assignee_account_deleted) : undefined)
     ?? item.owner_name
     ?? item.responsible_name
     ?? (roleLabels || item.department_name || departmentLabel(item.department) || '-');
@@ -1318,7 +1320,7 @@ function ProjectAuditPanel({ projectId, initialRows }: { projectId: string; init
                 <ChevronRight className="hidden h-4 w-4 text-blue-700 md:block" />
                 <span className="text-xs text-slate-500">{compactDateTime(row.created_at)}</span>
                 <span><EnumChip group="event_type" value={row.event_type} /></span>
-                <span className="text-sm text-slate-700">{row.actor_name ?? '-'}</span>
+                <IdentityReferenceLabel name={row.actor_name} deleted={row.actor_account_deleted} className="text-sm text-slate-700" />
                 <span><EnumChip group="target_type" value={row.target_type} /></span>
                 <p className="text-sm leading-5 text-slate-600 md:col-span-5">{row.description ?? '-'}</p>
               </Link>

@@ -4344,6 +4344,78 @@ func (h *Handler) CreateStaff(c *fiber.Ctx) error {
 	}
 	return response.Created(c, row)
 }
+func (h *Handler) PreviewStaffAccountImport(c *fiber.Ctx) error {
+	if err := h.requireStaffAccountImportPermissions(c); err != nil {
+		return err
+	}
+	var req StaffAccountImportPreviewRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xem trước import không hợp lệ")
+	}
+	result, err := h.service.PreviewStaffAccountImport(c.Context(), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã kiểm tra danh sách import")
+}
+func (h *Handler) ExecuteStaffAccountImport(c *fiber.Ctx) error {
+	if err := h.requireStaffAccountImportPermissions(c); err != nil {
+		return err
+	}
+	var req StaffAccountImportExecuteRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu thực thi import không hợp lệ")
+	}
+	result, err := h.service.ExecuteStaffAccountImport(c.Context(), actorID(c), actorName(c), req)
+	if err != nil {
+		return err
+	}
+	return response.Created(c, result)
+}
+func (h *Handler) requireStaffAccountImportPermissions(c *fiber.Ctx) error {
+	for _, permission := range []string{"staff.import", "staff.create", "staff.account_security.manage", "permission.assign"} {
+		if err := h.requirePermission(c, []string{permission}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (h *Handler) PreviewStaffDeletion(c *fiber.Ctx) error {
+	if err := h.requireStaffDeletionPermissions(c); err != nil {
+		return err
+	}
+	var req StaffDeletionPreviewRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xem trước xóa nhân sự không hợp lệ")
+	}
+	result, err := h.service.PreviewStaffDeletion(c.Context(), actorID(c), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã kiểm tra ảnh hưởng khi xóa nhân sự")
+}
+func (h *Handler) ExecuteStaffDeletion(c *fiber.Ctx) error {
+	if err := h.requireStaffDeletionPermissions(c); err != nil {
+		return err
+	}
+	var req StaffDeletionExecuteRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu xác nhận xóa nhân sự không hợp lệ")
+	}
+	result, err := h.service.ExecuteStaffDeletion(c.Context(), actorID(c), actorName(c), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, "Đã xóa nhân sự và vô hiệu hóa tài khoản liên quan")
+}
+func (h *Handler) requireStaffDeletionPermissions(c *fiber.Ctx) error {
+	for _, permission := range []string{"staff.delete", "staff.account_security.manage"} {
+		if err := h.requirePermission(c, []string{permission}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func (h *Handler) UpdateStaff(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"staff.update"}); err != nil {
 		return err

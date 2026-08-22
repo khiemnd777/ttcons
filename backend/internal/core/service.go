@@ -11535,7 +11535,7 @@ func (s *Service) AuditLogs(ctx context.Context, projectID, actorID string, filt
 		return nil, err
 	}
 
-	fromSQL := "FROM audit_logs al JOIN projects p ON p.id=al.project_id"
+	fromSQL := "FROM audit_logs al JOIN projects p ON p.id=al.project_id LEFT JOIN users audit_actor ON audit_actor.id=al.actor_id"
 	scopeConditions := make([]string, 0, 3)
 	scopeArgs := make([]any, 0, 3)
 	if projectID != "" {
@@ -11595,7 +11595,8 @@ func (s *Service) AuditLogs(ctx context.Context, projectID, actorID string, filt
 	itemArgs := append([]any(nil), args...)
 	itemArgs = append(itemArgs, filter.PageSize, offset)
 	items, err := s.repo.Query(ctx, fmt.Sprintf(`
-		SELECT al.*, p.code AS project_code, p.name AS project_name
+		SELECT al.*, p.code AS project_code, p.name AS project_name,
+			COALESCE(audit_actor.deleted_at IS NOT NULL, false) AS actor_account_deleted
 		%s
 		WHERE %s
 		ORDER BY al.created_at DESC, al.id DESC

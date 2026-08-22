@@ -22,6 +22,7 @@ import { Link } from 'react-router-dom';
 import { EmptyState } from '../../components/EmptyState';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
+import { IdentityReferenceLabel, identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { get, streamSSE, type StreamStatus } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import type {
@@ -191,7 +192,7 @@ export function ProjectProgressPage() {
             >
               <option value="">Tất cả phụ trách</option>
               {(summaryQuery.data?.pm_options ?? []).map((option) => (
-                <option key={option.id} value={option.id}>{option.name}</option>
+                <option key={option.id} value={option.id}>{identityReferenceText(option.name, option.account_deleted)}</option>
               ))}
             </select>
           </label>
@@ -519,7 +520,7 @@ function ProgressCard({ item }: { item: ProjectProgressItem }) {
       {item.client_name ? <p className="mt-1.5 truncate text-xs text-slate-500">{item.client_name}</p> : null}
       <div className="mt-3 flex items-center gap-2 text-xs text-slate-600">
         <UserRound className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">{item.pm_name || 'Chưa phân công'}</span>
+        <IdentityReferenceLabel name={item.pm_name} deleted={item.pm_account_deleted} liveOwnership fallback="Chưa phân công" className="truncate" />
       </div>
       <div className="mt-2 rounded-md bg-slate-50 px-2 py-1.5 text-xs text-slate-600">
         <span className="font-medium text-slate-700">{item.current_node_name || 'Chưa khởi động quy trình'}</span>

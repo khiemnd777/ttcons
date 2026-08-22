@@ -17,6 +17,14 @@ type countingSessionValidator struct {
 	active bool
 }
 
+type initialPasswordValidatorStub struct {
+	required bool
+}
+
+func (v initialPasswordValidatorStub) InitialPasswordChangeRequired(context.Context, string) (bool, error) {
+	return v.required, nil
+}
+
 func (v *countingSessionValidator) AuthSessionActive(context.Context, string, string, string) (bool, error) {
 	v.calls.Add(1)
 	return v.active, nil
@@ -147,5 +155,32 @@ func TestAuthRequiredCompatibilityStillValidatesSession(t *testing.T) {
 	response, err := app.Test(authenticatedRequest(fiber.MethodGet, "/protected", signedAuthToken(t, secret)))
 	if err != nil || response.StatusCode != fiber.StatusOK || validator.calls.Load() != 1 {
 		t.Fatalf("compatibility auth status=%v err=%v session_calls=%d", response.StatusCode, err, validator.calls.Load())
+	}
+}
+
+func TestInitialPasswordChangeGuardAllowsOnlyProfileReadAndPasswordChange(t *testing.T) {
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("user_id", "10000000-0000-0000-0000-000000000001")
+		return c.Next()
+	})
+	app.Use(InitialPasswordChanged(initialPasswordValidatorStub{required: true}))
+	app.Get("/api/auth/me", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusOK) })
+	app.Put("/api/auth/password", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusOK) })
+	app.Get("/api/staff", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusOK) })
+
+	for _, test := range []struct {
+		method string
+		path   string
+		status int
+	}{
+		{method: fiber.MethodGet, path: "/api/auth/me", status: fiber.StatusOK},
+		{method: fiber.MethodPut, path: "/api/auth/password", status: fiber.StatusOK},
+		{method: fiber.MethodGet, path: "/api/staff", status: fiber.StatusForbidden},
+	} {
+		response, err := app.Test(httptest.NewRequest(test.method, test.path, nil))
+		if err != nil || response.StatusCode != test.status {
+			t.Fatalf("%s %s status=%v err=%v, want %d", test.method, test.path, response.StatusCode, err, test.status)
+		}
 	}
 }

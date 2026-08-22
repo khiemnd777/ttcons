@@ -71,8 +71,9 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 		concurrencyGuards.Middleware(),
 	)
 	protected.Get("/auth/me", h.Me)
-	protected.Put("/auth/profile", h.UpdateOwnProfile)
 	protected.Put("/auth/password", h.ChangeOwnPassword)
+	protected.Use(middleware.InitialPasswordChanged(repo))
+	protected.Put("/auth/profile", h.UpdateOwnProfile)
 	protected.Put("/auth/recovery-email", h.UpdateRecoveryEmail)
 	protected.Delete("/auth/recovery-email", h.RemoveRecoveryEmail)
 
@@ -435,6 +436,10 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 
 	protected.Get("/staff", h.ListStaff)
 	protected.Post("/staff", h.CreateStaff)
+	protected.Post("/staff/imports/preview", h.PreviewStaffAccountImport)
+	protected.Post("/staff/imports/execute", h.ExecuteStaffAccountImport)
+	protected.Post("/staff/deletions/preview", h.PreviewStaffDeletion)
+	protected.Post("/staff/deletions/execute", h.ExecuteStaffDeletion)
 	protected.Put("/staff/:id", h.UpdateStaff)
 	protected.Get("/roles", h.ListRoles)
 	protected.Post("/roles", h.CreateRole)

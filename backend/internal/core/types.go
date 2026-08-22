@@ -44,6 +44,40 @@ type CreateStaffRequest struct {
 	RecoveryEmail string `json:"recovery_email"`
 }
 
+type StaffAccountImportRowRequest struct {
+	RowNumber     int    `json:"row_number"`
+	FullName      string `json:"full_name"`
+	LoginEmail    string `json:"login_email"`
+	Password      string `json:"password"`
+	RecoveryEmail string `json:"recovery_email"`
+	Phone         string `json:"phone"`
+	Department    string `json:"department"`
+	Position      string `json:"position"`
+	RoleCode      string `json:"role_code"`
+}
+
+type StaffAccountImportPreviewRequest struct {
+	SourceFilename  string                         `json:"source_filename"`
+	SourceSizeBytes int64                          `json:"source_size_bytes"`
+	Rows            []StaffAccountImportRowRequest `json:"rows"`
+}
+
+type StaffAccountImportExecuteRequest struct {
+	StaffAccountImportPreviewRequest
+	PreviewHash    string `json:"preview_hash"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+type StaffDeletionPreviewRequest struct {
+	StaffIDs []string `json:"staff_ids"`
+}
+
+type StaffDeletionExecuteRequest struct {
+	StaffDeletionPreviewRequest
+	PreviewHash    string `json:"preview_hash"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
 type UpdateStaffRequest struct {
 	UserID                  *string `json:"user_id"`
 	FullName                *string `json:"full_name"`

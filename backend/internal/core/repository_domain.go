@@ -32,7 +32,7 @@ type workflowAutomationOutcome struct {
 
 func (r *Repository) FindUserByEmail(ctx context.Context, email string) (Record, error) {
 	return r.QueryOne(ctx, `
-		SELECT id, email, password_hash, full_name, status, created_at, updated_at
+		SELECT id, email, password_hash, full_name, status, must_change_password, created_at, updated_at
 		FROM users
 		WHERE email=$1
 		  AND status='active'
@@ -48,7 +48,7 @@ func (r *Repository) FindUserByEmail(ctx context.Context, email string) (Record,
 
 func (r *Repository) GetOwnProfile(ctx context.Context, userID string) (Record, error) {
 	return r.QueryOne(ctx, `
-		SELECT account.id::text,account.email,account.full_name,account.status,
+		SELECT account.id::text,account.email,account.full_name,account.status,account.must_change_password,
 			account.created_at,account.updated_at,
 			COALESCE(CASE WHEN account.recovery_email_verified_at IS NOT NULL THEN account.recovery_email END,'') AS recovery_email_private,
 			COALESCE(pending.target_email,'') AS pending_recovery_email_private,
@@ -195,7 +195,7 @@ func (r *Repository) ChangeOwnPassword(ctx context.Context, userID, actorName, p
 
 	result, err := tx.ExecContext(ctx, `
 		UPDATE users
-		SET password_hash=$2,updated_at=now()
+		SET password_hash=$2,must_change_password=false,updated_at=now()
 		WHERE id=$1 AND status='active'
 	`, userID, passwordHash)
 	if err != nil {
@@ -229,6 +229,16 @@ func (r *Repository) ChangeOwnPassword(ctx context.Context, userID, actorName, p
 		return err
 	}
 	return tx.Commit()
+}
+
+func (r *Repository) InitialPasswordChangeRequired(ctx context.Context, userID string) (bool, error) {
+	var required bool
+	err := r.db.QueryRowContext(ctx, `
+		SELECT must_change_password
+		FROM users
+		WHERE id=$1 AND status='active'
+	`, userID).Scan(&required)
+	return required, err
 }
 
 func (r *Repository) UserRoles(ctx context.Context, userID string) ([]string, error) {
@@ -385,16 +395,16 @@ func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, 
 		requestedKeys[permissionKey] = true
 	}
 	if roleName == "admin" {
-		if requestedKeys["settings.update"] {
-			return nil, validationError("Quản trị viên chỉ được xem Thiết lập hệ thống", Record{"permission": "settings.update"})
+		if requestedKeys["settings.update"] || requestedKeys["staff.import"] {
+			return nil, validationError("Quyền chỉ dành cho Nhà phát triển", Record{"permissions": []string{"settings.update", "staff.import"}})
 		}
-		for _, required := range []string{"settings.view", "seal.use", "seal.manage", "event_log.view"} {
+		for _, required := range []string{"settings.view", "seal.use", "seal.manage", "event_log.view", "staff.delete"} {
 			if !requestedKeys[required] {
 				return nil, validationError("Không thể gỡ quyền cấu hình bắt buộc của Quản trị viên", Record{"permission": required})
 			}
 		}
 	} else {
-		for _, reserved := range []string{"settings.view", "settings.update", "seal.manage", "event_log.view"} {
+		for _, reserved := range []string{"settings.view", "settings.update", "seal.manage", "event_log.view", "staff.import", "staff.delete"} {
 			if requestedKeys[reserved] {
 				return nil, validationError("Quyền này chỉ dành cho Quản trị viên hoặc Nhà phát triển", Record{"permission": reserved})
 			}
@@ -1022,7 +1032,8 @@ func (r *Repository) ListPendingApprovalRequests(ctx context.Context, actorID, p
 		args = append(args, projectID)
 	}
 	return r.Query(ctx, fmt.Sprintf(`
-		SELECT ar.*, p.name AS project_name, u.full_name AS requested_by_name,
+		SELECT ar.*,p.name AS project_name,u.full_name AS requested_by_name,
+			COALESCE(u.deleted_at IS NOT NULL,false) AS requested_by_account_deleted,
 			COALESCE(prn.name, wi.title, ar.reason, 'Yêu cầu phê duyệt') AS target_name
 		FROM approval_requests ar
 		JOIN projects p ON p.id=ar.project_id AND p.status <> 'cancelled'
@@ -1205,6 +1216,7 @@ func (r *Repository) listProjectWorkItems(ctx context.Context, projectID, userID
 			rs.name AS run_step_name, rs.order_index AS run_step_order_index,
 			rs.business_code AS run_step_business_code,
 			s.full_name AS assignee_name,
+			COALESCE(s.status='deleted', false) AS assignee_account_deleted,
 			COALESCE((SELECT COUNT(*) FROM evidence_records er WHERE er.work_item_id=wi.id AND er.status <> 'rejected'),0) AS evidence_count,
 			wfi.id AS workflow_form_instance_id,
 			wfi.status AS workflow_form_status,
@@ -1319,6 +1331,7 @@ func (r *Repository) ListMyWorkItems(ctx context.Context, userID string) ([]Reco
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT wi.*, p.name AS project_name, p.code AS project_code, rn.name AS run_node_name, rs.name AS run_step_name,
 			s.full_name AS assignee_name,
+			COALESCE(s.status='deleted', false) AS assignee_account_deleted,
 			COALESCE((SELECT COUNT(*) FROM evidence_records er WHERE er.work_item_id=wi.id AND er.status <> 'rejected'),0) AS evidence_count,
 			wfi.id AS workflow_form_instance_id,
 			wfi.status AS workflow_form_status,
@@ -1457,6 +1470,7 @@ func activityConversationSelectSQL(userExpression string) string {
 			'id', parent_wia.id,
 			'actor_id', parent_wia.actor_id,
 			'actor_name', COALESCE(parent_actor.full_name, 'Hệ thống'),
+			'actor_account_deleted', COALESCE(parent_actor.deleted_at IS NOT NULL, false),
 			'activity_type', parent_wia.activity_type,
 			'comment', CASE WHEN parent_wia.withdrawn_at IS NULL THEN parent_wia.comment ELSE NULL END,
 			'withdrawn', parent_wia.withdrawn_at IS NOT NULL,
@@ -1555,6 +1569,7 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 			wia.*,
 			wi.title AS work_item_title,
 			u.full_name AS actor_name,
+			COALESCE(u.deleted_at IS NOT NULL, false) AS actor_account_deleted,
 			COALESCE(
 				CASE
 					WHEN wia.scope_type='project' THEN p.code || ' · ' || p.name
@@ -1641,6 +1656,7 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 			rs.name AS run_step_name, rs.order_index AS run_step_order_index,
 			rs.business_code AS run_step_business_code,
 			s.full_name AS assignee_name,
+			COALESCE(s.status='deleted', false) AS assignee_account_deleted,
 			pr.current_node_id AS pipeline_current_node_id,
 			rn.status AS run_node_status,
 			wfi.id AS workflow_form_instance_id,
@@ -1699,7 +1715,7 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 		visibilitySQL = "wia.visibility='client'"
 	}
 	activities, _ := r.Query(ctx, fmt.Sprintf(`
-		SELECT wia.*, u.full_name AS actor_name, %s, %s
+		SELECT wia.*, u.full_name AS actor_name, COALESCE(u.deleted_at IS NOT NULL, false) AS actor_account_deleted, %s, %s
 		FROM work_item_activities wia
 		LEFT JOIN users u ON u.id=wia.actor_id
 		%s
@@ -1710,7 +1726,7 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 		LIMIT 100
 	`, activityAttachmentSelectSQL(), activityConversationSelectSQL("NULL::uuid"), activityAttachmentJoinSQL(), activityConversationJoinSQL("NULL::uuid"), visibilitySQL), workItemID)
 	evidence, _ := r.Query(ctx, `
-		SELECT er.*, u.full_name AS submitted_by_name, d.name AS document_name
+		SELECT er.*, u.full_name AS submitted_by_name, COALESCE(u.deleted_at IS NOT NULL, false) AS submitted_by_account_deleted, d.name AS document_name
 		FROM evidence_records er
 		LEFT JOIN users u ON u.id=er.submitted_by
 		LEFT JOIN documents d ON d.id=er.document_id
@@ -1724,7 +1740,7 @@ func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, c
 		ORDER BY updated_at DESC, created_at DESC
 	`, workItemID)
 	assignments, _ := r.Query(ctx, `
-		SELECT wia.*, s.full_name AS staff_name, r.display_name AS role_display_name
+		SELECT wia.*, s.full_name AS staff_name, COALESCE(s.status='deleted', false) AS staff_account_deleted, r.display_name AS role_display_name
 		FROM work_item_assignments wia
 		LEFT JOIN staff s ON s.id=wia.staff_id
 		LEFT JOIN roles r ON r.id=wia.role_id
@@ -1742,6 +1758,7 @@ func (r *Repository) GetWorkItemByRunStep(ctx context.Context, stepID string) (R
 	return r.QueryOne(ctx, `
 		SELECT wi.*, p.name AS project_name, p.code AS project_code, rn.name AS run_node_name, rs.name AS run_step_name,
 			s.full_name AS assignee_name,
+			COALESCE(s.status='deleted', false) AS assignee_account_deleted,
 			wfi.id AS workflow_form_instance_id,
 			wfi.status AS workflow_form_status,
 			wfi.form_type AS workflow_form_type,
@@ -1794,7 +1811,10 @@ func (r *Repository) GetEvidenceDetail(ctx context.Context, evidenceID string) (
 
 func getEvidenceDetail(ctx context.Context, db queryContext, evidenceID string) (Record, error) {
 	return queryOneRecord(ctx, db, `
-		SELECT er.*, wi.title AS work_item_title, wi.status AS work_item_status, u.full_name AS submitted_by_name, reviewer.full_name AS reviewed_by_name, d.name AS document_name
+		SELECT er.*, wi.title AS work_item_title, wi.status AS work_item_status,
+			u.full_name AS submitted_by_name,COALESCE(u.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
+			reviewer.full_name AS reviewed_by_name,COALESCE(reviewer.deleted_at IS NOT NULL,false) AS reviewed_by_account_deleted,
+			d.name AS document_name
 		FROM evidence_records er
 		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
 		LEFT JOIN users u ON u.id=er.submitted_by
@@ -1935,6 +1955,7 @@ func (r *Repository) PlanningDailyReports(ctx context.Context, filter PlanningDa
 				wfi.current_revision,
 				wfi.submitted_by,
 				u.full_name AS submitted_by_name,
+				COALESCE(u.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
 				wfi.submitted_at,
 				wfi.updated_at,
 				wft.code AS template_code,
@@ -2156,6 +2177,7 @@ func (r *Repository) PlanningMeetingMinutes(ctx context.Context, filter Planning
 				wfi.current_revision,
 				wfi.submitted_by,
 				u.full_name AS submitted_by_name,
+				COALESCE(u.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
 				wfi.submitted_at,
 				wfi.updated_at,
 				wft.code AS template_code,
@@ -2403,6 +2425,7 @@ func (r *Repository) PlanningChecklists(ctx context.Context, filter PlanningChec
 				wfi.current_revision,
 				wfi.submitted_by,
 				u.full_name AS submitted_by_name,
+				COALESCE(u.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
 				wfi.submitted_at,
 				wfi.updated_at,
 				wft.code AS template_code,
@@ -2610,7 +2633,7 @@ func getWorkflowFormInstanceDetail(ctx context.Context, db queryContext, instanc
 		answers[fieldKey] = value
 	}
 	events, err := queryRecords(ctx, db, `
-		SELECT wfe.*, u.full_name AS actor_name
+		SELECT wfe.*, u.full_name AS actor_name, COALESCE(u.deleted_at IS NOT NULL, false) AS actor_account_deleted
 		FROM workflow_form_events wfe
 		LEFT JOIN users u ON u.id=wfe.actor_id
 		WHERE wfe.instance_id=$1
@@ -2730,7 +2753,9 @@ func decodeWorkflowFormAnswerValue(value any) (any, error) {
 
 func (r *Repository) GetSubcontractorReconciliation(ctx context.Context, workItemID string) (Record, error) {
 	reconciliation, err := r.QueryOne(ctx, `
-		SELECT scr.*, submitted.full_name AS submitted_by_name, updated.full_name AS updated_by_name
+		SELECT scr.*,
+			submitted.full_name AS submitted_by_name,COALESCE(submitted.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
+			updated.full_name AS updated_by_name,COALESCE(updated.deleted_at IS NOT NULL,false) AS updated_by_account_deleted
 		FROM subcontractor_checklist_reconciliations scr
 		LEFT JOIN users submitted ON submitted.id=scr.submitted_by
 		LEFT JOIN users updated ON updated.id=scr.updated_by
@@ -2911,9 +2936,9 @@ func (r *Repository) ListProjectAcceptanceRecords(ctx context.Context, projectID
 	return r.Query(ctx, `
 		SELECT
 			ar.*,
-			requested.full_name AS requested_by_name,
-			submitted.full_name AS submitted_by_name,
-			approved.full_name AS approved_by_name,
+			requested.full_name AS requested_by_name,COALESCE(requested.deleted_at IS NOT NULL,false) AS requested_by_account_deleted,
+			submitted.full_name AS submitted_by_name,COALESCE(submitted.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
+			approved.full_name AS approved_by_name,COALESCE(approved.deleted_at IS NOT NULL,false) AS approved_by_account_deleted,
 			wi.title AS work_item_title,
 			wfi.title AS workflow_form_title,
 			wfpe.file_name AS pdf_file_name,
@@ -2941,9 +2966,9 @@ func (r *Repository) ListAcceptanceRecordsForWorkItem(ctx context.Context, workI
 	return r.Query(ctx, `
 		SELECT
 			ar.*,
-			requested.full_name AS requested_by_name,
-			submitted.full_name AS submitted_by_name,
-			approved.full_name AS approved_by_name,
+			requested.full_name AS requested_by_name,COALESCE(requested.deleted_at IS NOT NULL,false) AS requested_by_account_deleted,
+			submitted.full_name AS submitted_by_name,COALESCE(submitted.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
+			approved.full_name AS approved_by_name,COALESCE(approved.deleted_at IS NOT NULL,false) AS approved_by_account_deleted,
 			wi.title AS work_item_title,
 			wfi.title AS workflow_form_title,
 			wfpe.file_name AS pdf_file_name,
@@ -2971,9 +2996,9 @@ func (r *Repository) GetAcceptanceDetail(ctx context.Context, acceptanceID strin
 	record, err := r.QueryOne(ctx, `
 		SELECT
 			ar.*,
-			requested.full_name AS requested_by_name,
-			submitted.full_name AS submitted_by_name,
-			approved.full_name AS approved_by_name,
+			requested.full_name AS requested_by_name,COALESCE(requested.deleted_at IS NOT NULL,false) AS requested_by_account_deleted,
+			submitted.full_name AS submitted_by_name,COALESCE(submitted.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
+			approved.full_name AS approved_by_name,COALESCE(approved.deleted_at IS NOT NULL,false) AS approved_by_account_deleted,
 			wi.title AS work_item_title,
 			wfi.title AS workflow_form_title,
 			wfpe.file_name AS pdf_file_name
@@ -3312,7 +3337,9 @@ func (r *Repository) SubmitAcceptance(ctx context.Context, acceptanceID, actorID
 
 func (r *Repository) GetOwnerClientReconciliation(ctx context.Context, workItemID string) (Record, error) {
 	reconciliation, err := r.QueryOne(ctx, `
-		SELECT ocr.*, submitted.full_name AS submitted_by_name, updated.full_name AS updated_by_name
+		SELECT ocr.*,
+			submitted.full_name AS submitted_by_name,COALESCE(submitted.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
+			updated.full_name AS updated_by_name,COALESCE(updated.deleted_at IS NOT NULL,false) AS updated_by_account_deleted
 		FROM owner_client_checklist_reconciliations ocr
 		LEFT JOIN users submitted ON submitted.id=ocr.submitted_by
 		LEFT JOIN users updated ON updated.id=ocr.updated_by
@@ -3491,7 +3518,9 @@ func (r *Repository) SaveOwnerClientReconciliation(ctx context.Context, item Rec
 
 func (r *Repository) GetMaterialSnapshot(ctx context.Context, workItemID string) (Record, error) {
 	snapshot, err := r.QueryOne(ctx, `
-		SELECT mbs.*, submitted.full_name AS submitted_by_name, updated.full_name AS updated_by_name
+		SELECT mbs.*,
+			submitted.full_name AS submitted_by_name,COALESCE(submitted.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
+			updated.full_name AS updated_by_name,COALESCE(updated.deleted_at IS NOT NULL,false) AS updated_by_account_deleted
 		FROM material_before_after_snapshots mbs
 		LEFT JOIN users submitted ON submitted.id=mbs.submitted_by
 		LEFT JOIN users updated ON updated.id=mbs.updated_by
@@ -4101,8 +4130,8 @@ func (r *Repository) ListIncomingAcceptancesForProject(ctx context.Context, proj
 			w.name AS warehouse_name,
 			pr.request_code AS procurement_request_code,
 			pr.title AS procurement_request_title,
-			cb.full_name AS created_by_name,
-			sb.full_name AS submitted_by_name,
+			cb.full_name AS created_by_name,COALESCE(cb.deleted_at IS NOT NULL,false) AS created_by_account_deleted,
+			sb.full_name AS submitted_by_name,COALESCE(sb.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
 			COALESCE(item_counts.item_count, 0) AS item_count
 		FROM incoming_acceptance_records iar
 		LEFT JOIN warehouses w ON w.id=iar.warehouse_id
@@ -4127,8 +4156,8 @@ func (r *Repository) ListIncomingAcceptancesForWorkItem(ctx context.Context, wor
 			w.name AS warehouse_name,
 			pr.request_code AS procurement_request_code,
 			pr.title AS procurement_request_title,
-			cb.full_name AS created_by_name,
-			sb.full_name AS submitted_by_name,
+			cb.full_name AS created_by_name,COALESCE(cb.deleted_at IS NOT NULL,false) AS created_by_account_deleted,
+			sb.full_name AS submitted_by_name,COALESCE(sb.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
 			COALESCE(item_counts.item_count, 0) AS item_count
 		FROM incoming_acceptance_records iar
 		LEFT JOIN warehouses w ON w.id=iar.warehouse_id
@@ -4153,8 +4182,8 @@ func (r *Repository) GetIncomingAcceptance(ctx context.Context, acceptanceID str
 			w.name AS warehouse_name,
 			pr.request_code AS procurement_request_code,
 			pr.title AS procurement_request_title,
-			cb.full_name AS created_by_name,
-			sb.full_name AS submitted_by_name
+			cb.full_name AS created_by_name,COALESCE(cb.deleted_at IS NOT NULL,false) AS created_by_account_deleted,
+			sb.full_name AS submitted_by_name,COALESCE(sb.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted
 		FROM incoming_acceptance_records iar
 		LEFT JOIN warehouses w ON w.id=iar.warehouse_id
 		LEFT JOIN procurement_requests pr ON pr.id=iar.procurement_request_id
@@ -5716,15 +5745,16 @@ func workflowAnswerRecordList(value any) []Record {
 }
 
 func (r *Repository) ListSealAssets(ctx context.Context, includeArchived bool) ([]Record, error) {
-	statusFilter := "WHERE status='active'"
+	statusFilter := "WHERE asset.status='active'"
 	if includeArchived {
 		statusFilter = ""
 	}
 	return r.Query(ctx, `
-		SELECT *
-		FROM seal_assets
+		SELECT asset.*,COALESCE(uploader.deleted_at IS NOT NULL,false) AS uploaded_by_account_deleted
+		FROM seal_assets asset
+		LEFT JOIN users uploader ON uploader.id=asset.uploaded_by
 		`+statusFilter+`
-		ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, created_at DESC, id
+		ORDER BY CASE asset.status WHEN 'active' THEN 0 ELSE 1 END, asset.created_at DESC, asset.id
 	`)
 }
 
@@ -8066,6 +8096,7 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 			to_char(wia.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
 			wi.title AS work_item_title,
 			u.full_name AS actor_name,
+			COALESCE(u.deleted_at IS NOT NULL, false) AS actor_account_deleted,
 			COALESCE(mention_state.mentions, '[]'::jsonb) AS mentions,
 				(wia.withdrawn_at IS NULL AND COALESCE(mention_state.mentioned_me, false)) AS mentioned_me,
 			%s,
@@ -8136,7 +8167,8 @@ func profileIsClient(profile workItemAccessProfile) bool {
 func (r *Repository) ProjectOperationsApprovals(ctx context.Context, projectID string, profile workItemAccessProfile) ([]Record, error) {
 	if profile.IsManager {
 		return r.Query(ctx, `
-			SELECT ar.*, u.full_name AS requested_by_name
+			SELECT ar.*, u.full_name AS requested_by_name,
+				COALESCE(u.deleted_at IS NOT NULL,false) AS requested_by_account_deleted
 			FROM approval_requests ar
 			LEFT JOIN users u ON u.id=ar.requested_by
 			WHERE ar.project_id=$1
@@ -8148,7 +8180,8 @@ func (r *Repository) ProjectOperationsApprovals(ctx context.Context, projectID s
 	}
 	args := append([]any{projectID, profile.UserID}, workItemScopeArgs(profile, false, true)...)
 	return r.Query(ctx, fmt.Sprintf(`
-		SELECT ar.*, u.full_name AS requested_by_name
+		SELECT ar.*, u.full_name AS requested_by_name,
+			COALESCE(u.deleted_at IS NOT NULL,false) AS requested_by_account_deleted
 		FROM approval_requests ar
 		LEFT JOIN users u ON u.id=ar.requested_by
 		LEFT JOIN work_items wi ON wi.approval_request_id=ar.id AND wi.status <> 'cancelled'
@@ -8167,7 +8200,8 @@ func (r *Repository) ProjectOperationsApprovals(ctx context.Context, projectID s
 func (r *Repository) ProjectOperationsEvidence(ctx context.Context, projectID string, profile workItemAccessProfile) ([]Record, error) {
 	args := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
 	return r.Query(ctx, fmt.Sprintf(`
-		SELECT er.*, wi.title AS work_item_title, u.full_name AS submitted_by_name, d.name AS document_name
+		SELECT er.*, wi.title AS work_item_title,u.full_name AS submitted_by_name,
+			COALESCE(u.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,d.name AS document_name
 		FROM evidence_records er
 		JOIN work_items wi ON wi.id=er.work_item_id
 		LEFT JOIN users u ON u.id=er.submitted_by
@@ -8266,7 +8300,9 @@ func (r *Repository) ListProjectEvidence(ctx context.Context, projectID string, 
 			wi.approval_request_id AS work_item_approval_request_id,
 			rn.name AS run_node_name,
 			u.full_name AS submitted_by_name,
+			COALESCE(u.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
 			reviewer.full_name AS reviewed_by_name,
+			COALESCE(reviewer.deleted_at IS NOT NULL,false) AS reviewed_by_account_deleted,
 			d.name AS document_name,
 			CASE WHEN er.status IN ('draft','submitted') THEN 0 ELSE 1 END AS review_priority
 		FROM evidence_records er
@@ -8752,7 +8788,7 @@ func (r *Repository) ListProjects(ctx context.Context, userID string) ([]Record,
 		return nil, err
 	}
 	return r.Query(ctx, fmt.Sprintf(`
-		SELECT p.*, s.full_name AS pm_name, t.name AS pipeline_template_name,
+		SELECT p.*, s.full_name AS pm_name, COALESCE(s.status='deleted', false) AS pm_account_deleted, t.name AS pipeline_template_name,
 			pt.name AS partner_name, pt.tax_code AS partner_tax_code,
 			COALESCE((SELECT COUNT(*) FROM issues i WHERE i.project_id=p.id AND i.status IN ('open','in_progress')),0) AS open_issues,
 			COALESCE((SELECT COUNT(*) FROM approval_requests ar WHERE ar.project_id=p.id AND ar.status='pending'),0) AS pending_approvals
@@ -8781,6 +8817,7 @@ func (r *Repository) ProjectProgressBoard(ctx context.Context, userID string) ([
 			p.planned_start_date,
 			p.planned_end_date,
 			COALESCE(s.full_name, '') AS pm_name,
+			COALESCE(s.status='deleted', false) AS pm_account_deleted,
 			COALESCE(pr.id::text, '') AS pipeline_run_id,
 			COALESCE(pr.status, '') AS pipeline_run_status,
 			COALESCE(rn.id::text, '') AS current_node_id,
@@ -8844,7 +8881,7 @@ func (r *Repository) ProjectVisibleProjectIDs(ctx context.Context, userID string
 }
 
 func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, includeInactive bool) ([]Record, error) {
-	activeFilter := "AND pm.active"
+	activeFilter := "AND pm.active AND s.status <> 'deleted'"
 	if includeInactive {
 		activeFilter = ""
 	}
@@ -8852,6 +8889,7 @@ func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, i
 		SELECT pm.id::text, pm.project_id::text, pm.staff_id::text,
 			COALESCE(s.user_id::text, '') AS user_id,
 			s.full_name, s.email, s.phone, s.department, s.position,
+			COALESCE(s.status='deleted', false) AS account_deleted,
 			pm.role_ids, pm.active, pm.notes, pm.created_at, pm.updated_at,
 			(pm.staff_id=p.pm_staff_id) AS is_project_manager,
 			COALESCE((
@@ -8890,7 +8928,7 @@ func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, i
 			), '[]'::jsonb) AS project_roles
 		FROM project_members pm
 		JOIN projects p ON p.id=pm.project_id AND p.status <> 'cancelled'
-		JOIN staff s ON s.id=pm.staff_id AND s.status <> 'deleted'
+		JOIN staff s ON s.id=pm.staff_id
 		WHERE pm.project_id=$1 %s
 		ORDER BY pm.active DESC, lower(s.full_name), pm.created_at DESC
 	`, activeFilter), projectID)
@@ -9250,7 +9288,7 @@ func (r *Repository) GetProjectDetail(ctx context.Context, id string) (Record, e
 
 func (r *Repository) GetProjectSummary(ctx context.Context, id string) (Record, error) {
 	return r.QueryOne(ctx, `
-		SELECT p.*, s.full_name AS pm_name, t.name AS pipeline_template_name,
+		SELECT p.*, s.full_name AS pm_name, COALESCE(s.status='deleted', false) AS pm_account_deleted, t.name AS pipeline_template_name,
 			pt.name AS partner_name, pt.tax_code AS partner_tax_code
 		FROM projects p
 		LEFT JOIN staff s ON s.id=p.pm_staff_id
@@ -12057,10 +12095,13 @@ func (r *Repository) ListProjectBOQ(ctx context.Context, projectID string) ([]Re
 			COALESCE((
 				SELECT jsonb_agg(to_jsonb(price_events) ORDER BY price_events.created_at DESC)
 				FROM (
-					SELECT id, event_type, price_source, from_unit_price, to_unit_price, revision_no, comment, actor_name, created_at
-					FROM boq_unit_price_events
-					WHERE boq_item_id=b.id
-					ORDER BY created_at DESC
+					SELECT event.id,event.event_type,event.price_source,event.from_unit_price,event.to_unit_price,
+						event.revision_no,event.comment,event.actor_name,
+						COALESCE(actor.deleted_at IS NOT NULL,false) AS actor_account_deleted,event.created_at
+					FROM boq_unit_price_events event
+					LEFT JOIN users actor ON actor.id=event.actor_id
+					WHERE event.boq_item_id=b.id
+					ORDER BY event.created_at DESC
 					LIMIT 5
 				) price_events
 			), '[]'::jsonb) AS price_events,
@@ -12111,10 +12152,13 @@ func (r *Repository) GetBOQItemDetail(ctx context.Context, itemID string) (Recor
 			COALESCE((
 				SELECT jsonb_agg(to_jsonb(price_events) ORDER BY price_events.created_at DESC)
 				FROM (
-					SELECT id, event_type, price_source, from_unit_price, to_unit_price, revision_no, comment, actor_name, created_at
-					FROM boq_unit_price_events
-					WHERE boq_item_id=b.id
-					ORDER BY created_at DESC
+					SELECT event.id,event.event_type,event.price_source,event.from_unit_price,event.to_unit_price,
+						event.revision_no,event.comment,event.actor_name,
+						COALESCE(actor.deleted_at IS NOT NULL,false) AS actor_account_deleted,event.created_at
+					FROM boq_unit_price_events event
+					LEFT JOIN users actor ON actor.id=event.actor_id
+					WHERE event.boq_item_id=b.id
+					ORDER BY event.created_at DESC
 					LIMIT 20
 				) price_events
 			), '[]'::jsonb) AS price_events,
@@ -13078,6 +13122,7 @@ func (r *Repository) ListProjectProcurementRequests(ctx context.Context, project
 		SELECT
 			pr.*,
 			u.full_name AS requested_by_name,
+			COALESCE(u.deleted_at IS NOT NULL,false) AS requested_by_account_deleted,
 			COALESCE(item_counts.item_count, 0) AS item_count
 		FROM procurement_requests pr
 		LEFT JOIN users u ON u.id=pr.requested_by
@@ -13381,8 +13426,13 @@ func (r *Repository) GetContractDetail(ctx context.Context, contractID string) (
 	variations, err := r.Query(ctx, `
 		SELECT variation.*,
 			COALESCE((
-				SELECT jsonb_agg(to_jsonb(event) ORDER BY event.created_at,event.id)
-				FROM contract_variation_events event WHERE event.variation_id=variation.id
+				SELECT jsonb_agg(to_jsonb(event_row) ORDER BY event_row.created_at,event_row.id)
+				FROM (
+					SELECT event.*,COALESCE(actor.deleted_at IS NOT NULL,false) AS actor_account_deleted
+					FROM contract_variation_events event
+					LEFT JOIN users actor ON actor.id=event.actor_id
+					WHERE event.variation_id=variation.id
+				) event_row
 			),'[]'::jsonb) AS events
 		FROM contract_variations variation
 		WHERE variation.contract_id=$1
@@ -14652,7 +14702,8 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 	checks, err := r.Query(ctx, `
 		SELECT c.*,t.name AS template_name,w.title AS work_item_title,
 			e.name AS evidence_name,e.evidence_type,
-			rq.full_name AS requested_by_name,ck.full_name AS checked_by_name,
+			rq.full_name AS requested_by_name,COALESCE(rq.deleted_at IS NOT NULL,false) AS requested_by_account_deleted,
+			ck.full_name AS checked_by_name,COALESCE(ck.deleted_at IS NOT NULL,false) AS checked_by_account_deleted,
 			dr.report_date AS source_report_date,dr.weather AS source_report_weather,
 			hi.handoff_id,hi.source_field_key AS handoff_source_field_key,hi.source_item_index AS handoff_source_item_index,
 			h.title AS handoff_title,h.revision_no AS handoff_revision_no,h.source_run_node_id,h.target_run_node_id,
@@ -14709,7 +14760,8 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 	}
 	actions, err := r.Query(ctx, `
 		SELECT a.*,w.title AS work_item_title,c.title AS source_check_title,
-			u.full_name AS assigned_user_name,b.name AS before_evidence_name,re.name AS resolution_evidence_name,
+			u.full_name AS assigned_user_name,COALESCE(u.deleted_at IS NOT NULL,false) AS assigned_user_account_deleted,
+			b.name AS before_evidence_name,re.name AS resolution_evidence_name,
 			rp.status AS impact_status,
 			variation.id AS linked_variation_id,variation.variation_code AS linked_variation_code,
 			variation.status AS linked_variation_status,variation.priority AS linked_variation_priority,
@@ -14740,7 +14792,7 @@ func (r *Repository) ProjectConstructionWorkspace(ctx context.Context, projectID
 	}
 	for _, action := range actions {
 		events, err := r.Query(ctx, `
-			SELECT ev.*,u.full_name AS actor_name,e.name AS evidence_name
+			SELECT ev.*,u.full_name AS actor_name,COALESCE(u.deleted_at IS NOT NULL, false) AS actor_account_deleted,e.name AS evidence_name
 			FROM construction_action_events ev
 			LEFT JOIN users u ON u.id=ev.actor_id
 			LEFT JOIN evidence_records e ON e.id=ev.evidence_id
@@ -15476,6 +15528,7 @@ func (r *Repository) ProjectQualityWorkspace(ctx context.Context, projectID stri
 	}
 	plans, err := r.Query(ctx, `
 		SELECT rp.*,u.full_name AS assigned_user_name,
+			COALESCE(u.deleted_at IS NOT NULL,false) AS assigned_user_account_deleted,
 			COALESCE(stats.pending_count,0) AS pending_count,COALESCE(stats.overdue_count,0) AS overdue_count,COALESCE(stats.completed_count,0) AS completed_count
 		FROM construction_recurring_plans rp
 		LEFT JOIN users u ON u.id=rp.assigned_user_id
@@ -15493,6 +15546,7 @@ func (r *Repository) ProjectQualityWorkspace(ctx context.Context, projectID stri
 	}
 	occurrences, err := r.Query(ctx, `
 		SELECT o.*,p.plan_code,p.title AS plan_title,p.evidence_required,p.responsible_role,u.full_name AS assigned_user_name,
+			COALESCE(u.deleted_at IS NOT NULL,false) AS assigned_user_account_deleted,
 			CASE WHEN o.status='pending' AND o.occurrence_date<CURRENT_DATE THEN 'overdue' ELSE o.status END AS effective_status
 		FROM construction_recurring_occurrences o
 		JOIN construction_recurring_plans p ON p.id=o.plan_id
@@ -16597,7 +16651,8 @@ func (r *Repository) StockMovements(ctx context.Context, userID, projectID, ware
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT sm.*, m.code AS material_code, m.name AS material_name,
 			w.name AS warehouse_name, tw.name AS target_warehouse_name,
-			p.name AS project_name, u.full_name AS created_by_name,
+			p.name AS project_name,u.full_name AS created_by_name,
+			COALESCE(u.deleted_at IS NOT NULL,false) AS created_by_account_deleted,
 			sd.document_code
 		FROM stock_movements sm
 		JOIN materials m ON m.id=sm.material_id AND m.active
@@ -16621,7 +16676,8 @@ func (r *Repository) ListStockDocuments(ctx context.Context, userID, projectID s
 	args := append([]any{cleanID(projectID)}, scopeArgs...)
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT sd.*, sw.name AS source_warehouse_name, tw.name AS target_warehouse_name,
-			p.name AS project_name, u.full_name AS created_by_name,
+			p.name AS project_name,u.full_name AS created_by_name,
+			COALESCE(u.deleted_at IS NOT NULL,false) AS created_by_account_deleted,
 			COALESCE(items.item_count,0) AS item_count,
 			COALESCE(items.total_quantity,0) AS total_quantity
 		FROM stock_documents sd
@@ -16643,7 +16699,8 @@ func (r *Repository) ListStockDocuments(ctx context.Context, userID, projectID s
 func (r *Repository) GetStockDocument(ctx context.Context, documentID string) (Record, error) {
 	document, err := r.QueryOne(ctx, `
 		SELECT sd.*, sw.name AS source_warehouse_name, tw.name AS target_warehouse_name,
-			p.name AS project_name, u.full_name AS created_by_name
+			p.name AS project_name,u.full_name AS created_by_name,
+			COALESCE(u.deleted_at IS NOT NULL,false) AS created_by_account_deleted
 		FROM stock_documents sd
 		LEFT JOIN warehouses sw ON sw.id=sd.source_warehouse_id
 		LEFT JOIN warehouses tw ON tw.id=sd.target_warehouse_id

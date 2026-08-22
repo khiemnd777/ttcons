@@ -31,7 +31,7 @@ import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavig
 import { ConstructionReportLinkedComposer, type ReportLinkedDraft } from './ConstructionReportLinkedComposer';
 import { createConstructionAction, createConstructionCheck, uploadConstructionEvidenceItems } from './constructionWorkspaceApi';
 import { constructionReportViewModel } from './constructionReportViewModel';
-import { actionStatusLabel, checkStatusLabel, dateTimeText, optionalISO } from './constructionWorkspaceUtils';
+import { actionStatusLabel, checkStatusLabel, constructionActionAssigneeLabel, dateTimeText, optionalISO } from './constructionWorkspaceUtils';
 
 type ConstructionReportDetailDialogProps = {
   open: boolean;
@@ -253,7 +253,7 @@ function RelatedConstructionSection({ loading, error, workspace, checks, actions
 }
 
 function LinkedActionRow({ action, onOpen, nested = false }: { action: ConstructionActionItem; onOpen: () => void; nested?: boolean }) {
-  return <button type="button" className={`flex w-full items-start justify-between gap-4 rounded-lg border p-3 text-left hover:bg-slate-50 ${nested ? 'border-slate-200 bg-slate-50/60' : 'border-amber-200 bg-white'}`} onClick={onOpen}><span className="flex min-w-0 gap-3"><span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-700"><Wrench className="h-4 w-4" /></span><span className="min-w-0"><span className="block font-semibold text-ink">{action.title}</span><span className="mt-1 block text-xs text-slate-500">{action.assigned_user_name || 'Chưa giao người xử lý'} · {resolutionState(action)}</span></span></span><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${action.status === 'done' ? 'bg-emerald-100 text-emerald-700' : action.status === 'waiting_confirmation' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{actionStatusLabel(action.status)}</span></button>;
+  return <button type="button" className={`flex w-full items-start justify-between gap-4 rounded-lg border p-3 text-left hover:bg-slate-50 ${nested ? 'border-slate-200 bg-slate-50/60' : 'border-amber-200 bg-white'}`} onClick={onOpen}><span className="flex min-w-0 gap-3"><span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-700"><Wrench className="h-4 w-4" /></span><span className="min-w-0"><span className="block font-semibold text-ink">{action.title}</span><span className="mt-1 block text-xs text-slate-500">{constructionActionAssigneeLabel(action, 'Chưa giao người xử lý')} · {resolutionState(action)}</span></span></span><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${action.status === 'done' ? 'bg-emerald-100 text-emerald-700' : action.status === 'waiting_confirmation' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{actionStatusLabel(action.status)}</span></button>;
 }
 
 function resolutionState(action: ConstructionActionItem) {

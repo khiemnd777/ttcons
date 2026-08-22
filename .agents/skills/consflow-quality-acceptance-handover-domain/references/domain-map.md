@@ -40,6 +40,7 @@
 - RFI inspection requires project-owned evidence. A rejected RFI creates a linked NCR and draft rework record atomically instead of losing the failed inspection history.
 - NCR follows `open -> root_cause -> corrective_action -> reinspection -> closed`; closure requires an accepted/conditional reinspection RFI and completed linked rework.
 - Quality recurring occurrences are idempotent per plan/date and evidence-gated when completed or skipped.
+- Staff soft-delete preserves every acceptance, incoming-acceptance, evidence, check, recurring-plan/occurrence and handover reference. Dynamic requested/submitted/approved/created/checked/assigned names expose companion deletion flags; live deleted work-item and recurring assignees show `Cần phân công lại`, while immutable acceptance/form/PDF/signature snapshots remain unchanged. Account deletion does not alter pass/fail, rework, evidence or handover readiness state.
 - Incoming acceptance records deliveries and quality decisions but does not automatically create warehouse movement.
 - A submitted incoming-acceptance item can prefill an explicit multi-line stock receipt. Linked receipt movements are capped by its remaining accepted quantity, preserve the acceptance item as source and do not rewrite acceptance history.
 - Outgoing acceptance preserves final result, signature/document gates, punch list/rework history, and handover compatibility.

@@ -10,6 +10,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { ListSection } from '../../components/ListSection';
 import { RowActions } from '../../components/RowActions';
 import { StatusBadge } from '../../components/StatusBadge';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { dateText, percent } from '../../lib/utils/format';
 import type { PlanningDailyReportItem } from '../../lib/types/domain';
@@ -216,7 +217,7 @@ export function PlanningDailyReportsPage() {
                 </div>
               ),
             },
-            { key: 'reported_by', header: 'Reporter', sortable: true, render: (row) => row.reported_by || row.submitted_by_name || '-' },
+            { key: 'reported_by', header: 'Reporter', sortable: true, render: (row) => row.reported_by || identityReferenceText(row.submitted_by_name, row.submitted_by_account_deleted) },
             {
               key: 'summary',
               header: 'Đã làm / Sẽ làm',
@@ -285,7 +286,7 @@ function PlanningDailyReportDetailDialog({
     <Dialog
       open={Boolean(report)}
       title="Chi tiết daily report kế hoạch"
-      description={report ? `${report.project_name} · ${dateText(report.report_date)} · ${report.reported_by || report.submitted_by_name || '-'}` : undefined}
+      description={report ? `${report.project_name} · ${dateText(report.report_date)} · ${report.reported_by || identityReferenceText(report.submitted_by_name, report.submitted_by_account_deleted)}` : undefined}
       size="xl"
       onClose={onClose}
       footer={report ? (

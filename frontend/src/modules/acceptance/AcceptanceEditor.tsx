@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Circle, ClipboardCheck, FileText, Image as ImageIcon, Link2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { postForm } from '../../lib/api/client';
@@ -194,7 +195,7 @@ export function AcceptanceEditor({
               <div className="min-w-0">
                 <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-blue-700"><Link2 className="h-3.5 w-3.5" /> Nguồn công việc</p>
                 <p className="mt-1 truncate text-sm font-semibold text-ink">{selectedWorkItem?.title || selectedWorkItem?.name || 'Công việc đã liên kết'}</p>
-                {selectedWorkItem ? <div className="mt-1 flex flex-wrap items-center gap-2"><StatusBadge status={selectedWorkItem.status} />{selectedWorkItem.run_node_name ? <span className="text-xs text-slate-600">Giai đoạn: {selectedWorkItem.run_node_name}</span> : null}{selectedWorkItem.assignee_name ? <span className="text-xs text-slate-600">Phụ trách: {selectedWorkItem.assignee_name}</span> : null}</div> : null}
+                {selectedWorkItem ? <div className="mt-1 flex flex-wrap items-center gap-2"><StatusBadge status={selectedWorkItem.status} />{selectedWorkItem.run_node_name ? <span className="text-xs text-slate-600">Giai đoạn: {selectedWorkItem.run_node_name}</span> : null}{selectedWorkItem.assignee_name ? <span className="text-xs text-slate-600">Phụ trách: {identityReferenceText(selectedWorkItem.assignee_name, selectedWorkItem.assignee_account_deleted)}{selectedWorkItem.assignee_account_deleted ? ' · Cần phân công lại' : ''}</span> : null}</div> : null}
               </div>
               {!fixedWorkItem && !evidenceSourceWorkItemId ? <button type="button" disabled={disabled} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50" onClick={() => openWorkItemPicker('change')}><Pencil className="h-4 w-4" /> Thay đổi</button> : null}
               {!fixedWorkItem && evidenceSourceWorkItemId ? <span className="shrink-0 text-xs font-semibold text-slate-500">Đã khóa theo minh chứng</span> : null}

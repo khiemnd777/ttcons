@@ -211,6 +211,7 @@ func myWorkItemsBaseSQL() string {
 				rs.name AS run_step_name, rs.order_index AS run_step_order_index,
 				rs.business_code AS run_step_business_code,
 				s.full_name AS assignee_name,
+				COALESCE(s.status='deleted', false) AS assignee_account_deleted,
 				pr.current_node_id AS pipeline_current_node_id, rn.status AS run_node_status,
 				COALESCE(pr.engine_version, 1) AS pipeline_engine_version,
 				COALESCE((SELECT COUNT(*) FROM evidence_records er WHERE er.work_item_id=wi.id AND er.status <> 'rejected'),0) AS evidence_count,

@@ -14,6 +14,7 @@ import { useToast } from '../../components/ToastProvider';
 import { RowActions } from '../../components/RowActions';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { Dialog } from '../../components/Dialog';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { currency } from '../../lib/utils/format';
 import { SupplierQuotationWorkspace } from './SupplierQuotationWorkspace';
@@ -720,7 +721,7 @@ function PriceEventRow({ event }: { event: BOQUnitPriceEvent }) {
         <span className="text-xs font-semibold text-slate-500">lần {event.revision_no}</span>
       </div>
       <p className="mt-1 text-xs text-slate-500">
-        {event.actor_name ?? 'Hệ thống'} · {compactDateTime(event.created_at)}
+        {identityReferenceText(event.actor_name, event.actor_account_deleted, 'Hệ thống')} · {compactDateTime(event.created_at)}
       </p>
       <p className="mt-1 text-sm text-slate-700">
         {event.from_unit_price !== null && event.from_unit_price !== undefined ? `${currency(event.from_unit_price)} → ` : ''}

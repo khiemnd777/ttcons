@@ -131,7 +131,8 @@ func (r *Repository) AccountingTaxPeriod(ctx context.Context, periodID string) (
 		SELECT adjustment.*,project.code AS project_code,project.name AS project_name,
 			tax.tax_code,tax.name AS tax_name,offset_account.account_code AS offset_account_code,
 			offset_account.name AS offset_account_name,journal.entry_no AS journal_entry_no,
-			reversal_journal.entry_no AS reversal_journal_entry_no,creator.full_name AS created_by_name
+		reversal_journal.entry_no AS reversal_journal_entry_no,creator.full_name AS created_by_name,
+		COALESCE(creator.deleted_at IS NOT NULL,false) AS created_by_account_deleted
 		FROM tax_adjustments adjustment
 		LEFT JOIN projects project ON project.id=adjustment.project_id
 		JOIN tax_codes tax ON tax.id=adjustment.tax_code_id
@@ -146,7 +147,8 @@ func (r *Repository) AccountingTaxPeriod(ctx context.Context, periodID string) (
 		return nil, err
 	}
 	returns, err := queryTx(ctx, tx, `
-		SELECT snapshot.*,prepared.full_name AS prepared_by_name
+		SELECT snapshot.*,prepared.full_name AS prepared_by_name,
+			COALESCE(prepared.deleted_at IS NOT NULL,false) AS prepared_by_account_deleted
 		FROM vat_return_snapshots snapshot
 		LEFT JOIN users prepared ON prepared.id=snapshot.prepared_by
 		WHERE snapshot.tax_period_id=$1
@@ -156,7 +158,9 @@ func (r *Repository) AccountingTaxPeriod(ctx context.Context, periodID string) (
 		return nil, err
 	}
 	events, err := queryTx(ctx, tx, `
-		SELECT event.* FROM tax_period_events event
+		SELECT event.*,COALESCE(actor.deleted_at IS NOT NULL,false) AS actor_account_deleted
+		FROM tax_period_events event
+		LEFT JOIN users actor ON actor.id=event.actor_id
 		WHERE event.tax_period_id=$1 ORDER BY event.created_at DESC,event.id DESC
 	`, periodID)
 	if err != nil {
@@ -165,7 +169,8 @@ func (r *Repository) AccountingTaxPeriod(ctx context.Context, periodID string) (
 	payments, err := queryTx(ctx, tx, `
 		SELECT payment.*,project.code AS project_code,project.name AS project_name,
 			journal.id AS journal_entry_id,journal.entry_no AS journal_entry_no,
-			creator.full_name AS created_by_name,approver.full_name AS approved_by_name
+			creator.full_name AS created_by_name,COALESCE(creator.deleted_at IS NOT NULL,false) AS created_by_account_deleted,
+			approver.full_name AS approved_by_name,COALESCE(approver.deleted_at IS NOT NULL,false) AS approved_by_account_deleted
 		FROM payments payment
 		JOIN projects project ON project.id=payment.project_id
 		LEFT JOIN journal_entries journal ON journal.source_type='payment' AND journal.source_id=payment.id

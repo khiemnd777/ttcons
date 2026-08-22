@@ -50,8 +50,9 @@ type ProjectProgressStageRequest struct {
 }
 
 type ProjectProgressPMOption struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	AccountDeleted bool   `json:"account_deleted"`
 }
 
 type ProjectProgressSummaryResponse struct {
@@ -288,11 +289,11 @@ func (r *Repository) ProjectProgressBoardSummary(ctx context.Context, actorID st
 			), '{}'::jsonb) AS stage_counts,
 			COALESCE((
 				SELECT jsonb_agg(
-					jsonb_build_object('id', option.pm_staff_id::text, 'name', option.pm_name)
+					jsonb_build_object('id', option.pm_staff_id::text, 'name', option.pm_name, 'account_deleted', option.pm_account_deleted)
 					ORDER BY lower(option.pm_name), option.pm_staff_id
 				)
 				FROM (
-					SELECT DISTINCT pm_staff_id, pm_name
+					SELECT DISTINCT pm_staff_id, pm_name, pm_account_deleted
 					FROM scoped_projects
 					WHERE pm_staff_id IS NOT NULL
 				) option
@@ -353,6 +354,7 @@ func (r *Repository) ProjectProgressBoardStage(ctx context.Context, actorID stri
 						stage_project.planned_start_date,
 						stage_project.planned_end_date,
 						stage_project.pm_name,
+						stage_project.pm_account_deleted,
 						stage_project.pipeline_run_id,
 						stage_project.pipeline_run_status,
 						stage_project.current_node_id,
@@ -434,6 +436,7 @@ func (r *Repository) projectProgressFilteredCTE(ctx context.Context, actorID str
 				p.created_at,
 				p.pm_staff_id,
 				COALESCE(staff.full_name, '') AS pm_name,
+				COALESCE(staff.status='deleted', false) AS pm_account_deleted,
 				COALESCE(run.id::text, '') AS pipeline_run_id,
 				COALESCE(run.status, '') AS pipeline_run_status,
 				COALESCE(node.id::text, '') AS current_node_id,
@@ -495,7 +498,7 @@ func projectProgressSummaryFromRecord(row Record) ProjectProgressSummaryResponse
 			if id == "" {
 				continue
 			}
-			pmOptions = append(pmOptions, ProjectProgressPMOption{ID: id, Name: strings.TrimSpace(fmt.Sprint(option["name"]))})
+			pmOptions = append(pmOptions, ProjectProgressPMOption{ID: id, Name: strings.TrimSpace(fmt.Sprint(option["name"])), AccountDeleted: boolValue(option["account_deleted"])})
 		}
 	}
 	statusOptions := make([]string, 0)

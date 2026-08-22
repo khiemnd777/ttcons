@@ -226,11 +226,11 @@ func activeAdminRoleID(ctx context.Context, tx *sql.Tx) (string, error) {
 	if err := tx.QueryRowContext(ctx, `
 		SELECT
 			COUNT(*) FILTER (
-				WHERE permission.key <> 'settings.update'
+				WHERE permission.key NOT IN ('settings.update','staff.import')
 				  AND assignment.permission_id IS NULL
 			),
 			COUNT(*) FILTER (
-				WHERE permission.key = 'settings.update'
+				WHERE permission.key IN ('settings.update','staff.import')
 				  AND assignment.permission_id IS NOT NULL
 			)
 		FROM permissions permission
@@ -241,7 +241,7 @@ func activeAdminRoleID(ctx context.Context, tx *sql.Tx) (string, error) {
 		return "", fmt.Errorf("verify production Admin permissions: %w", err)
 	}
 	if missingPermissions != 0 || forbiddenPermissions != 0 {
-		return "", errors.New("production Admin permission catalog is incomplete or violates reserved Settings permissions")
+		return "", errors.New("production Admin permission catalog is incomplete or violates Developer-reserved permissions")
 	}
 	return roleID, nil
 }

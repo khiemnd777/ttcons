@@ -70,7 +70,9 @@ func (r *Repository) ProjectFinanceTasks(ctx context.Context, projectID string) 
 func (r *Repository) ProjectMaterialCosts(ctx context.Context, projectID string) ([]Record, error) {
 	return r.Query(ctx, `
 		SELECT cost.*,procurement.request_code,acceptance.acceptance_code,stock.document_code,
-		       creator.full_name AS created_by_name,submitter.full_name AS submitted_by_name,reviewer.full_name AS reviewed_by_name
+		       creator.full_name AS created_by_name,COALESCE(creator.deleted_at IS NOT NULL,false) AS created_by_account_deleted,
+		       submitter.full_name AS submitted_by_name,COALESCE(submitter.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
+		       reviewer.full_name AS reviewed_by_name,COALESCE(reviewer.deleted_at IS NOT NULL,false) AS reviewed_by_account_deleted
 		FROM project_material_costs cost
 		LEFT JOIN procurement_requests procurement ON procurement.id=cost.procurement_request_id
 		LEFT JOIN incoming_acceptance_records acceptance ON acceptance.id=cost.incoming_acceptance_id
@@ -85,8 +87,10 @@ func (r *Repository) ProjectMaterialCosts(ctx context.Context, projectID string)
 
 func (r *Repository) ProjectCashRequests(ctx context.Context, projectID string) ([]Record, error) {
 	return r.Query(ctx, `
-		SELECT request.*,creator.full_name AS created_by_name,submitter.full_name AS submitted_by_name,
-		       approver.full_name AS approved_by_name,processor.full_name AS processed_by_name
+		SELECT request.*,creator.full_name AS created_by_name,COALESCE(creator.deleted_at IS NOT NULL,false) AS created_by_account_deleted,
+		       submitter.full_name AS submitted_by_name,COALESCE(submitter.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
+		       approver.full_name AS approved_by_name,COALESCE(approver.deleted_at IS NOT NULL,false) AS approved_by_account_deleted,
+		       processor.full_name AS processed_by_name,COALESCE(processor.deleted_at IS NOT NULL,false) AS processed_by_account_deleted
 		FROM project_cash_requests request
 		LEFT JOIN users creator ON creator.id=request.created_by
 		LEFT JOIN users submitter ON submitter.id=request.submitted_by

@@ -252,7 +252,7 @@ func (r *Repository) ResetPasswordWithToken(ctx context.Context, tokenHash, pass
 	if passwordMatches(currentPasswordHash, passwordValue) {
 		return validationError("Mật khẩu mới phải khác mật khẩu hiện tại", Record{"field": "new_password"})
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE users SET password_hash=$2,updated_at=now() WHERE id=$1`, userID, passwordHash); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET password_hash=$2,must_change_password=false,updated_at=now() WHERE id=$1`, userID, passwordHash); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `

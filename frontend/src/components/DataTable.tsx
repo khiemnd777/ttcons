@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { AlertCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Search } from 'lucide-react';
 import { EmptyState } from './EmptyState';
@@ -8,6 +8,12 @@ export { actionColumnsFirst, isActionColumn } from './tableActionColumns';
 
 export type SortDirection = 'asc' | 'desc';
 export type DataTableSort = { key: string; direction: SortDirection };
+export type DataTableRowKey = string | number;
+export type DataTableSelection = {
+  selectedKeys: ReadonlySet<DataTableRowKey>;
+  onSelectedKeysChange: (keys: Set<DataTableRowKey>) => void;
+  ariaLabel?: string;
+};
 type SortValue = string | number | boolean | Date | null | undefined;
 
 export type Column<T> = {
@@ -41,6 +47,7 @@ export function DataTable<T extends Record<string, any>>({
   onSortStateChange,
   getRowKey,
   renderMobileCard,
+  selection,
 }: {
   rows: T[];
   columns: Column<T>[];
@@ -59,6 +66,7 @@ export function DataTable<T extends Record<string, any>>({
   onSortStateChange?: (sort: DataTableSort | null) => void;
   getRowKey?: (row: T, index: number) => string | number;
   renderMobileCard?: (row: T) => ReactNode;
+  selection?: DataTableSelection;
 }) {
   const [internalQuery, setInternalQuery] = useState('');
   const query = searchQuery ?? internalQuery;
@@ -106,10 +114,19 @@ export function DataTable<T extends Record<string, any>>({
   const sortableColumns = columns.filter((column) => column.sortable || column.sortValue);
   const mobileSortValue = sort ? `${sort.key}:${sort.direction}` : '';
   const orderedColumns = useMemo(() => actionColumnsFirst(columns), [columns]);
+  const rowKey = (row: T, index: number): DataTableRowKey => getRowKey?.(row, index) ?? row.id ?? index;
+  const visibleRowKeys = visibleRows.map(rowKey);
+  const selectedVisibleCount = selection ? visibleRowKeys.filter((key) => selection.selectedKeys.has(key)).length : 0;
+  const allVisibleSelected = Boolean(selection && visibleRowKeys.length && selectedVisibleCount === visibleRowKeys.length);
+  const someVisibleSelected = Boolean(selection && selectedVisibleCount > 0 && !allVisibleSelected);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [query, currentPageSize, rows.length, sort?.key, sort?.direction]);
+
+  useEffect(() => {
+    if (selection?.selectedKeys.size) selection.onSelectedKeysChange(new Set());
+  }, [query, currentPageSize, currentPage, rows.length, sort?.key, sort?.direction]);
 
   if (!enhanced && !rows.length) return <EmptyState title={empty} action={emptyAction} />;
 
@@ -118,7 +135,21 @@ export function DataTable<T extends Record<string, any>>({
     else setInternalQuery('');
   };
 
-  const rowKey = (row: T, index: number) => getRowKey?.(row, index) ?? row.id ?? index;
+  const toggleVisibleRows = () => {
+    if (!selection) return;
+    const next = new Set(selection.selectedKeys);
+    if (allVisibleSelected) visibleRowKeys.forEach((key) => next.delete(key));
+    else visibleRowKeys.forEach((key) => next.add(key));
+    selection.onSelectedKeysChange(next);
+  };
+
+  const toggleRow = (key: DataTableRowKey) => {
+    if (!selection) return;
+    const next = new Set(selection.selectedKeys);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    selection.onSelectedKeysChange(next);
+  };
 
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
@@ -218,6 +249,16 @@ export function DataTable<T extends Record<string, any>>({
         <table className="min-w-full divide-y divide-line">
           <thead className="bg-slate-50">
             <tr>
+              {selection ? (
+                <th className="w-12 px-3 py-3 text-center">
+                  <SelectionCheckbox
+                    checked={allVisibleSelected}
+                    indeterminate={someVisibleSelected}
+                    ariaLabel={selection.ariaLabel ?? 'Chọn tất cả dòng trên trang hiện tại'}
+                    onChange={toggleVisibleRows}
+                  />
+                </th>
+              ) : null}
               {orderedColumns.map((column) => {
                 const actionColumn = isActionColumn(column);
                 const canSort = !actionColumn && Boolean(column.sortable || column.sortValue);
@@ -247,7 +288,16 @@ export function DataTable<T extends Record<string, any>>({
           </thead>
           <tbody className="divide-y divide-line">
             {visibleRows.map((row, index) => (
-              <tr key={rowKey(row, index)} className="hover:bg-slate-50">
+              <tr key={rowKey(row, index)} className={clsx('hover:bg-slate-50', selection?.selectedKeys.has(rowKey(row, index)) && 'bg-blue-50/60')}>
+                {selection ? (
+                  <td className="w-12 px-3 py-3 text-center">
+                    <SelectionCheckbox
+                      checked={selection.selectedKeys.has(rowKey(row, index))}
+                      ariaLabel={`Chọn dòng ${String(row.full_name ?? row.name ?? row.email ?? index + 1)}`}
+                      onChange={() => toggleRow(rowKey(row, index))}
+                    />
+                  </td>
+                ) : null}
                 {orderedColumns.map((column) => (
                   <td key={column.key} className={clsx('px-4 py-3 text-sm text-slate-700', alignClass(column.align), column.className)}>
                     {column.render ? column.render(row) : row[column.key] ?? '-'}
@@ -260,7 +310,20 @@ export function DataTable<T extends Record<string, any>>({
       </div>
       {renderMobileCard ? (
         <div className="space-y-3 bg-slate-50/70 p-3 md:hidden">
-          {visibleRows.map((row, index) => <div key={rowKey(row, index)}>{renderMobileCard(row)}</div>)}
+          {visibleRows.map((row, index) => (
+            <div key={rowKey(row, index)} className={clsx(selection && 'flex items-start gap-3')}>
+              {selection ? (
+                <div className="pt-4">
+                  <SelectionCheckbox
+                    checked={selection.selectedKeys.has(rowKey(row, index))}
+                    ariaLabel={`Chọn dòng ${String(row.full_name ?? row.name ?? row.email ?? index + 1)}`}
+                    onChange={() => toggleRow(rowKey(row, index))}
+                  />
+                </div>
+              ) : null}
+              <div className="min-w-0 flex-1">{renderMobileCard(row)}</div>
+            </div>
+          ))}
         </div>
       ) : null}
       </>
@@ -311,6 +374,33 @@ export function DataTable<T extends Record<string, any>>({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function SelectionCheckbox({
+  checked,
+  indeterminate = false,
+  ariaLabel,
+  onChange,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  ariaLabel: string;
+  onChange: () => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+      checked={checked}
+      aria-label={ariaLabel}
+      onChange={onChange}
+    />
   );
 }
 

@@ -29,6 +29,7 @@
 
 - Warehouse remains the canonical stock ledger. Presentation-only `?task=` context may link a workflow item into the warehouse workspace, but it never creates or posts stock, bypasses incoming acceptance or changes balance/movement traceability; all stock mutations remain source-domain actions.
 - Every stock operation keeps source, target, actor, quantity, material, and project traceability.
+- Soft-deleting the creator/submitting account never changes or deletes a stock document, stock movement, site balance or material snapshot. Dynamic stock-document creator and material-snapshot submitter names keep their original fields plus companion deletion flags for the shared deleted-account label; active warehouse/member selectors continue to exclude deleted identities.
 - Posted stock documents are multi-line and atomic. Transfer documents require distinct active source/target warehouses, lock both balances in stable order and count the same quantity out of the source and into the target.
 - Submitted incoming acceptance is only a selectable receipt source. A linked receipt cannot exceed `accepted_quantity - previously linked receive movements`; acceptance never posts stock by itself.
 - Procurement accepted-vs-stocked progress also recognizes historical explicit receive movements linked to the originating `boq_item`; this compatibility source is capped at accepted quantity and blocks duplicate acceptance-linked receipts.

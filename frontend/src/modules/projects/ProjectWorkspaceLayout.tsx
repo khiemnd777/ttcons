@@ -21,6 +21,7 @@ import clsx from 'clsx';
 import { BrandHomeLink } from '../../components/BrandLogo';
 import { PoweredBySignature } from '../../components/PoweredBySignature';
 import { StatusBadge } from '../../components/StatusBadge';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { get } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import type {
@@ -93,7 +94,7 @@ export function ProjectWorkspaceLayout() {
                 <p className="truncate text-xs text-slate-500">
                   {[
                     project?.client_name ? `Chủ đầu tư: ${project.client_name}` : null,
-                    project?.pm_name ? `Phụ trách: ${project.pm_name}` : null,
+                    project?.pm_name ? `Phụ trách: ${identityReferenceText(project.pm_name, project.pm_account_deleted)}${project.pm_account_deleted ? ' · Cần phân công lại' : ''}` : null,
                     project?.status ? `Trạng thái: ${statusLabel(project.status)}` : null,
                   ].filter(Boolean).join(' · ') || (workItemDetail ? 'Hồ sơ công việc và điều kiện điều phối' : 'Cây nghiệp vụ là menu chính trong phạm vi công trình')}
                 </p>

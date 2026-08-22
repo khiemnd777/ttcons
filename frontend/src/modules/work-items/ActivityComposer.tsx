@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { ChevronUp, Loader2, MessageSquarePlus, Plus, Send, X } from 'lucide-react';
 import clsx from 'clsx';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import type { ActivityAttachmentPayload, ActivityMentionPayload, ActivityPayload, WorkItemActivity } from '../../lib/types/domain';
 import { enumLabel, statusLabel } from '../../lib/utils/status';
@@ -264,7 +265,7 @@ export function ActivityComposer({
         {replying && replyTo ? (
           <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-left">
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-blue-800">Đang trả lời {replyTo.actor_name ?? 'thành viên công trình'}</p>
+              <p className="text-xs font-semibold text-blue-800">Đang trả lời {identityReferenceText(replyTo.actor_name, replyTo.actor_account_deleted, 'thành viên công trình')}</p>
               <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">{replyTo.comment || activityLabelForReply(replyTo.activity_type)}</p>
               <p className="mt-0.5 truncate text-[11px] text-slate-500">{replyTo.target_label ?? 'Công trình'} · {visibilityOptions.find((option) => option.value === replyTo.visibility)?.label ?? replyTo.visibility}</p>
             </div>
@@ -394,7 +395,7 @@ export function ActivityComposer({
             value={comment}
             onBlur={() => setTouched(true)}
             onChange={(event) => setComment(event.target.value)}
-            placeholder={editing ? 'Nhập nội dung chỉnh sửa...' : replying ? `Trả lời ${replyTo?.actor_name ?? 'thành viên công trình'}...` : 'Nhắn vào thảo luận công trình...'}
+            placeholder={editing ? 'Nhập nội dung chỉnh sửa...' : replying ? `Trả lời ${identityReferenceText(replyTo?.actor_name, replyTo?.actor_account_deleted, 'thành viên công trình')}...` : 'Nhắn vào thảo luận công trình...'}
           />
           <div className="flex flex-wrap items-center gap-1.5 border-t border-line px-2 py-2">
             {editing ? <span className="rounded-md bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-700">✎ Chỉnh sửa</span> : replying ? <span className="rounded-md bg-blue-50 px-2 py-1.5 text-xs font-semibold text-blue-700">↩ Phản hồi</span> : (

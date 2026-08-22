@@ -17,6 +17,7 @@ const ProfilePage = lazy(() => import('../modules/profile/ProfilePage').then(({ 
 const ForgotPasswordPage = lazy(() => import('../modules/auth/ForgotPasswordPage').then(({ ForgotPasswordPage }) => ({ default: ForgotPasswordPage })));
 const ResetPasswordPage = lazy(() => import('../modules/auth/ResetPasswordPage').then(({ ResetPasswordPage }) => ({ default: ResetPasswordPage })));
 const VerifyRecoveryEmailPage = lazy(() => import('../modules/auth/VerifyRecoveryEmailPage').then(({ VerifyRecoveryEmailPage }) => ({ default: VerifyRecoveryEmailPage })));
+const InitialPasswordChangePage = lazy(() => import('../modules/auth/InitialPasswordChangePage').then(({ InitialPasswordChangePage }) => ({ default: InitialPasswordChangePage })));
 const WorkItemDetailPage = lazy(() => import('../modules/work-items/WorkItemDetailPage').then(({ WorkItemDetailPage }) => ({ default: WorkItemDetailPage })));
 const PipelineBuilderPage = lazy(() => import('../modules/pipeline-builder/PipelineBuilderPage').then(({ PipelineBuilderPage }) => ({ default: PipelineBuilderPage })));
 const WorkflowFormsPage = lazy(() => import('../modules/workflow-forms/WorkflowFormsPage').then(({ WorkflowFormsPage }) => ({ default: WorkflowFormsPage })));
@@ -49,7 +50,16 @@ function RequireAuth() {
   const { user, loading } = useAuth();
   if (loading) return <div className="p-6"><LoadingSpinner /></div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (user.must_change_password) return <Navigate to="/change-initial-password" replace />;
   return <AppShell />;
+}
+
+function RequireInitialPasswordChange() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="p-6"><LoadingSpinner /></div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!user.must_change_password) return <Navigate to="/" replace />;
+  return <RouteModuleBoundary focus><InitialPasswordChangePage /></RouteModuleBoundary>;
 }
 
 function RequirePermission({ permissions, children }: { permissions?: string[]; children: ReactNode }) {
@@ -82,6 +92,7 @@ export const router = createBrowserRouter([
   { path: '/forgot-password', element: <RouteModuleBoundary focus><ForgotPasswordPage /></RouteModuleBoundary> },
   { path: '/reset-password', element: <RouteModuleBoundary focus><ResetPasswordPage /></RouteModuleBoundary> },
   { path: '/verify-recovery-email', element: <RouteModuleBoundary focus><VerifyRecoveryEmailPage /></RouteModuleBoundary> },
+  { path: '/change-initial-password', element: <RequireInitialPasswordChange /> },
   {
     element: <RequireAuth />,
     children: [

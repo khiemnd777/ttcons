@@ -23,6 +23,10 @@ type SessionValidator interface {
 	AuthSessionActive(ctx context.Context, userID, sessionID, accessTokenID string) (bool, error)
 }
 
+type InitialPasswordValidator interface {
+	InitialPasswordChangeRequired(ctx context.Context, userID string) (bool, error)
+}
+
 func AuthRequired(secret string, validators ...SessionValidator) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		verified, err := verifyAuthClaims(c, secret)
@@ -56,6 +60,31 @@ func AuthSessionRequired(validators ...SessionValidator) fiber.Handler {
 		}
 		return c.Next()
 	}
+}
+
+func InitialPasswordChanged(validator InitialPasswordValidator) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if validator == nil || initialPasswordChangePathAllowed(c.Method(), c.Path()) {
+			return c.Next()
+		}
+		userID := fmt.Sprint(c.Locals("user_id"))
+		if userID == "" {
+			return response.Fail(c, fiber.StatusUnauthorized, "INVALID_TOKEN", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn")
+		}
+		required, err := validator.InitialPasswordChangeRequired(c.Context(), userID)
+		if err != nil {
+			return err
+		}
+		if required {
+			return response.Fail(c, fiber.StatusForbidden, "PASSWORD_CHANGE_REQUIRED", "Anh/chị cần đổi mật khẩu ban đầu trước khi tiếp tục")
+		}
+		return c.Next()
+	}
+}
+
+func initialPasswordChangePathAllowed(method, path string) bool {
+	return (method == fiber.MethodGet && path == "/api/auth/me") ||
+		(method == fiber.MethodPut && path == "/api/auth/password")
 }
 
 func verifyAuthClaims(c *fiber.Ctx, secret string) (bool, error) {

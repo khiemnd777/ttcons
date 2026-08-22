@@ -208,6 +208,7 @@ func (r *Repository) ProjectExplorerRows(ctx context.Context, projectIDs []strin
 			p.created_at,
 			p.updated_at,
 			COALESCE(s.full_name, '') AS pm_name,
+			COALESCE(s.status='deleted', false) AS pm_account_deleted,
 			COALESCE(t.name, '') AS pipeline_template_name,
 			COALESCE(pt.name, '') AS partner_name,
 			COALESCE(pt.tax_code, '') AS partner_tax_code,

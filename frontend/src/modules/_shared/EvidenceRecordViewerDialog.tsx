@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, ChevronRight, ExternalLink, Loader2, XCircle } from 'lucide-react';
 import { StatusBadge } from '../../components/StatusBadge';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { downloadBlob } from '../../lib/api/client';
 import type { EvidenceRecord } from '../../lib/types/domain';
 import { isProtectedStorageProvider } from '../../lib/utils/protectedStorage';
@@ -165,9 +166,9 @@ export function EvidenceRecordViewerDialog({
           <section aria-labelledby="evidence-review-heading">
             <h3 id="evidence-review-heading" className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Gửi và rà soát</h3>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4 border-y border-line py-3">
-              <EvidenceInfoItem label="Người gửi" value={record.submitted_by_name ?? record.uploaded_by ?? '-'} />
+              <EvidenceInfoItem label="Người gửi" value={identityReferenceText(record.submitted_by_name ?? record.uploaded_by, record.submitted_by_account_deleted, '-')} />
               <EvidenceInfoItem label="Thời điểm gửi" value={compactDateTime(record.created_at)} />
-              <EvidenceInfoItem label="Người rà soát" value={record.reviewed_by_name ?? record.reviewed_by ?? '-'} />
+              <EvidenceInfoItem label="Người rà soát" value={identityReferenceText(record.reviewed_by_name ?? record.reviewed_by, record.reviewed_by_account_deleted, '-')} />
               <EvidenceInfoItem label="Thời điểm rà soát" value={compactDateTime(record.reviewed_at)} />
             </div>
           </section>

@@ -348,6 +348,10 @@ func (s *Service) ExportWorkReports(ctx context.Context, filter WorkReportFilter
 	for _, row := range rows {
 		row["report_type_label"] = "Báo cáo thi công ngày"
 		row["status_label"] = workReportStatusLabel(fmt.Sprint(row["status"]))
+		row["author_name"] = deletedAccountDisplayName(row["author_name"], boolValue(row["author_account_deleted"]))
+		if strings.TrimSpace(fmt.Sprint(row["recipient_name"])) != "" {
+			row["recipient_name"] = deletedAccountDisplayName(row["recipient_name"], boolValue(row["recipient_account_deleted"]))
+		}
 	}
 	result, err := generateTabularExport(definition, rows, format, time.Now())
 	if err != nil {
@@ -355,6 +359,14 @@ func (s *Service) ExportWorkReports(ctx context.Context, filter WorkReportFilter
 	}
 	s.repo.AddAuditBestEffort(ctx, cleanID(filter.ProjectID), actorID, actorName, "work_reports_exported", "work_report", "", "Xuất sổ đăng ký báo cáo", Record{"format": strings.ToLower(strings.TrimSpace(format)), "scope": filter.Scope, "project_id": cleanID(filter.ProjectID), "row_count": len(rows)})
 	return result, nil
+}
+
+func deletedAccountDisplayName(name any, deleted bool) string {
+	value := strings.TrimSpace(fmt.Sprint(name))
+	if value == "" || !deleted {
+		return value
+	}
+	return value + " (tài khoản đã xoá)"
 }
 
 func (s *Service) ExportWorkReportPDF(ctx context.Context, reportID string, revisionNo int, actorID, actorName string) (tabularExportResult, error) {

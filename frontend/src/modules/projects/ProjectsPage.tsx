@@ -23,6 +23,7 @@ import { FormDrawer } from '../../components/FormDrawer';
 import { useToast } from '../../components/ToastProvider';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
+import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { SimpleForm } from '../_shared/SimpleForm';
 import type { Partner, Project, ProjectExplorerPage } from '../../lib/types/domain';
@@ -682,7 +683,7 @@ function ProjectExplorerRow({
       </div>
 
       <div><StatusBadge status={project.status} /></div>
-      <div className="text-sm text-slate-700">{project.pm_name ?? '-'}</div>
+      <div className="text-sm text-slate-700"><IdentityReferenceLabel name={project.pm_name} deleted={project.pm_account_deleted} liveOwnership /></div>
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
           <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">

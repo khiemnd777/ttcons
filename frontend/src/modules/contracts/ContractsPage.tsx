@@ -24,6 +24,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { PageHeader } from '../../components/PageHeader';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { StatusBadge } from '../../components/StatusBadge';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import { get, post, postForm } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -1060,7 +1061,7 @@ function VariationTable({ contract, canReview, canApprove, canCreate, canQS, can
               <div className="space-y-1">
                 {row.events.slice(-4).map((event) => (
                   <div key={event.id} className="text-xs text-slate-600">
-                    {event.actor_name || 'Hệ thống'} · {statusLabel(event.to_status || event.event_type)}{event.comment ? ` · ${event.comment}` : ''}
+                    {identityReferenceText(event.actor_name, event.actor_account_deleted, 'Hệ thống')} · {statusLabel(event.to_status || event.event_type)}{event.comment ? ` · ${event.comment}` : ''}
                   </div>
                 ))}
               </div>

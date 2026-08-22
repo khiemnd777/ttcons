@@ -1,4 +1,5 @@
 import type { ConstructionActionItem, ConstructionCheck, ConstructionWorkspace } from '../../lib/types/domain';
+import { identityReferenceText } from '../../components/identityReference.ts';
 
 export const constructionImpactHelperText = 'Chỉ phân loại ảnh hưởng kỹ thuật. Muốn mở luồng thương mại, dùng “Đề xuất phát sinh”.';
 
@@ -36,6 +37,16 @@ export function checkStatusLabel(check: ConstructionCheck) {
 
 export function actionStatusLabel(status: ConstructionActionItem['status']) {
   return ({ open: 'Cần xử lý', waiting_confirmation: 'Chờ xác nhận', done: 'Đã xong', cancelled: 'Đã hủy' } as const)[status];
+}
+
+export function constructionActionAssigneeLabel(action: Pick<ConstructionActionItem, 'assigned_user_name' | 'assigned_user_account_deleted'>, fallback = 'Chưa xác định') {
+  const label = identityReferenceText(action.assigned_user_name, action.assigned_user_account_deleted, fallback);
+  return action.assigned_user_account_deleted ? `${label} · Cần phân công lại` : label;
+}
+
+export function constructionCheckActorLabel(check: ConstructionCheck) {
+  if (check.checked_by_name) return identityReferenceText(check.checked_by_name, check.checked_by_account_deleted);
+  return identityReferenceText(check.requested_by_name, check.requested_by_account_deleted, 'Chưa xác định người thực hiện');
 }
 
 export function constructionCheckFilterWorkItems(workspace: Pick<ConstructionWorkspace, 'checks' | 'work_items'>) {

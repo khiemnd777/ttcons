@@ -3,6 +3,7 @@ import { ArrowUpRight, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X }
 import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
 import { StatusBadge } from '../../components/StatusBadge';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { dateText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import type { WorkItem } from '../../lib/types/domain';
@@ -404,7 +405,7 @@ function buildOwnerOptions(rows: WorkItem[]) {
 function workOwnerOptions(item: WorkItem): Array<{ value: string; label: string }> {
   const options: Array<{ value: string; label: string }> = [];
   if (item.assignee_name) {
-    options.push({ value: `assignee:${item.assignee_staff_id ?? item.assignee_name}`, label: item.assignee_name });
+    options.push({ value: `assignee:${item.assignee_staff_id ?? item.assignee_name}`, label: identityReferenceText(item.assignee_name, item.assignee_account_deleted) });
   }
   asArray<string>(item.role_ids).filter(Boolean).forEach((role) => {
     options.push({ value: `role:${role}`, label: `Vai trò: ${role}` });
@@ -420,7 +421,7 @@ function workOwnerOptions(item: WorkItem): Array<{ value: string; label: string 
 function workOwnerPresentation(item: WorkItem) {
   const roles = asArray<string>(item.role_ids).filter(Boolean);
   if (item.assignee_name) {
-    return { primary: item.assignee_name, secondary: roles.length ? `Vai trò: ${roles.join(', ')}` : undefined };
+    return { primary: identityReferenceText(item.assignee_name, item.assignee_account_deleted), secondary: item.assignee_account_deleted ? 'Cần phân công lại' : roles.length ? `Vai trò: ${roles.join(', ')}` : undefined };
   }
   if (roles.length) return { primary: roles.join(', '), secondary: 'Vai trò yêu cầu' };
   if (item.department_name || item.department) {

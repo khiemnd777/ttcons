@@ -24,6 +24,7 @@ import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { RowActions } from '../../components/RowActions';
 import { useToast } from '../../components/ToastProvider';
+import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 
 type MemberDialog =
   | { mode: 'view'; member: ProjectMember }
@@ -281,7 +282,7 @@ function MemberIdentity({ member }: { member: ProjectMember }) {
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">{initials(member.full_name)}</span>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
-          <p className="truncate font-semibold text-ink">{member.full_name}</p>
+          <p className="truncate font-semibold text-ink"><IdentityReferenceLabel name={member.full_name} deleted={member.account_deleted} /></p>
           {member.is_project_manager ? <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-blue-700">PM chính</span> : null}
         </div>
         {member.email ? <p className="truncate text-xs text-slate-500">{member.email}</p> : null}

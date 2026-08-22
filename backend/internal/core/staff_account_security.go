@@ -266,7 +266,7 @@ func (s *Service) UpdateStaff(ctx context.Context, staffID, actorID, actorName s
 	}
 	if req.Status != nil {
 		value := strings.ToLower(strings.TrimSpace(*req.Status))
-		if !statusIn(value, "active", "inactive", "deleted") {
+		if !statusIn(value, "active", "inactive") {
 			return nil, validationError("Trạng thái nhân sự không hợp lệ", Record{"field": "status"})
 		}
 		req.Status = &value

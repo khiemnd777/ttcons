@@ -3,6 +3,7 @@ import { CheckCircle2, ExternalLink, Eye, FileText, Image as ImageIcon, Search }
 import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
 import { StatusBadge } from '../../components/StatusBadge';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob } from '../../lib/api/client';
 import type { EvidenceRecord } from '../../lib/types/domain';
@@ -321,7 +322,7 @@ function EvidenceListRow({
         <>
           <ProjectEvidenceTextCell label="Giai đoạn" value={record.run_node_name} />
           <ProjectEvidenceTextCell label="Đầu việc" value={record.work_item_title} />
-          <ProjectEvidenceTextCell label="Người gửi" value={record.submitted_by_name ?? record.uploaded_by} />
+          <ProjectEvidenceTextCell label="Người gửi" value={identityReferenceText(record.submitted_by_name ?? record.uploaded_by, record.submitted_by_account_deleted)} />
           <div className="grid min-w-0 grid-cols-[6rem_minmax(0,1fr)] items-start gap-2 text-xs text-slate-600 xl:block xl:text-sm">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 xl:hidden">Thời gian</span>
             <span>{compactDateTime(record.created_at)}</span>

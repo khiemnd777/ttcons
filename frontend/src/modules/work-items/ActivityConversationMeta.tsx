@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SmilePlus } from 'lucide-react';
 import clsx from 'clsx';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import type { ActivityReactionSummary, ActivityReplyPreview } from '../../lib/types/domain';
 import { activityLabel } from './workItemPresentation';
 
@@ -10,7 +11,7 @@ export function ActivityReplyQuote({ replyTo, onOpen }: { replyTo?: ActivityRepl
   if (!replyTo) return null;
   const body = (
     <>
-      <span className="block truncate text-[11px] font-semibold text-slate-600">↩ {replyTo.actor_name ?? 'Hệ thống'}</span>
+      <span className="block truncate text-[11px] font-semibold text-slate-600">↩ {identityReferenceText(replyTo.actor_name, replyTo.actor_account_deleted, 'Hệ thống')}</span>
       <span className="mt-0.5 block line-clamp-2 text-xs leading-5 text-slate-500">
         {replyTo.withdrawn ? 'Tin nhắn đã được thu hồi' : replyTo.comment || activityLabel(replyTo.activity_type)}
       </span>

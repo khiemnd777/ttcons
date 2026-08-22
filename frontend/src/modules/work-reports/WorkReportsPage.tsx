@@ -21,6 +21,7 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { dateText } from '../../lib/utils/format';
 import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { constructionReportViewModel } from '../operations/constructionReportViewModel';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 
 type WorkReportStatus = 'draft' | 'recorded' | 'submitted' | 'needs_changes' | 'acknowledged';
 type WorkReportScope = 'mine' | 'review' | 'all';
@@ -35,8 +36,10 @@ type WorkReportRow = Record<string, any> & {
   report_date: string;
   author_id: string;
   author_name: string;
+  author_account_deleted?: boolean;
   recipient_id?: string;
   recipient_name?: string;
+  recipient_account_deleted?: boolean;
   status: WorkReportStatus;
   current_revision_no: number;
   submitted_at?: string;
@@ -226,8 +229,8 @@ export function WorkReportsPage() {
             { key: 'action', header: '', action: true, render: (row) => <button type="button" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-900" onClick={() => setSelectedSourceID(row.source_id)}><Eye className="h-4 w-4" /><span className="sr-only">Xem </span>Chi tiết</button> },
             { key: 'report_date', header: 'Ngày báo cáo', sortable: true, render: (row) => <span className="font-semibold text-ink">{dateText(row.report_date)}</span> },
             { key: 'project_name', header: 'Công trình', sortable: true, render: (row) => <div><p className="font-semibold text-ink">{row.project_name}</p><p className="text-xs text-slate-500">{row.project_code}</p></div> },
-            { key: 'author_name', header: 'Người lập', sortable: true },
-            { key: 'recipient_name', header: 'Gửi đến', sortable: true, render: (row) => row.recipient_name || 'Chưa gửi' },
+            { key: 'author_name', header: 'Người lập', sortable: true, render: (row) => identityReferenceText(row.author_name, row.author_account_deleted) },
+            { key: 'recipient_name', header: 'Gửi đến', sortable: true, render: (row) => row.recipient_name ? identityReferenceText(row.recipient_name, row.recipient_account_deleted) : 'Chưa gửi' },
             { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <WorkReportStatusBadge status={row.status} /> },
             { key: 'current_revision_no', header: 'Lần gửi', align: 'right', sortable: true, render: (row) => Number(row.current_revision_no) > 0 ? `Lần ${row.current_revision_no}` : '—' },
           ]}
@@ -389,8 +392,8 @@ function WorkReportDialog({
         <div className="space-y-5">
           <div className="grid gap-3 rounded-lg border border-line bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-5">
             <DetailMetric label="Trạng thái" value={<WorkReportStatusBadge status={detail.status} />} />
-            <DetailMetric label="Người lập" value={detail.author_name || '—'} />
-            <DetailMetric label="Gửi đến" value={detail.recipient_name || 'Chưa gửi'} />
+            <DetailMetric label="Người lập" value={identityReferenceText(detail.author_name, detail.author_account_deleted)} />
+            <DetailMetric label="Gửi đến" value={detail.recipient_name ? identityReferenceText(detail.recipient_name, detail.recipient_account_deleted) : 'Chưa gửi'} />
             <DetailMetric label="Tiến độ ghi nhận" value={`${Number(detail.progress_percent ?? 0)}%`} />
             <DetailMetric label="Lần gửi hiện tại" value={Number(detail.current_revision_no) > 0 ? `Lần ${detail.current_revision_no}` : 'Chưa gửi'} />
           </div>
@@ -452,7 +455,7 @@ function WorkReportDialog({
                       <p className="font-semibold text-ink">{eventLabel(String(event.event_type))} · Lần {event.revision_no}</p>
                       <time className="text-xs text-slate-500">{dateTimeText(event.created_at)}</time>
                     </div>
-                    <p className="mt-1 text-slate-600">{event.actor_name || 'Không rõ người thực hiện'}{event.comment ? ` — ${event.comment}` : ''}</p>
+                    <p className="mt-1 text-slate-600">{identityReferenceText(event.actor_name, event.actor_account_deleted, 'Không rõ người thực hiện')}{event.comment ? ` — ${event.comment}` : ''}</p>
                   </article>
                 ))}
               </div>
@@ -466,7 +469,7 @@ function WorkReportDialog({
                 {detail.revisions.map((revision) => (
                   <article key={revision.id} className="rounded-md border border-line p-3">
                     <p className="font-semibold text-ink">Lần {revision.revision_no}</p>
-                    <p className="mt-1 text-xs text-slate-500">{dateTimeText(revision.submitted_at)} · {revision.submitted_by_name || detail.author_name}</p>
+                    <p className="mt-1 text-xs text-slate-500">{dateTimeText(revision.submitted_at)} · {identityReferenceText(revision.submitted_by_name || detail.author_name, revision.submitted_by_account_deleted ?? detail.author_account_deleted)}</p>
                     {revision.comment ? <p className="mt-2 text-sm text-slate-600">{revision.comment}</p> : null}
                     <p className="mt-2 truncate font-mono text-[10px] text-slate-400" title={revision.snapshot_sha256}>SHA-256 {revision.snapshot_sha256}</p>
                     {canExport && detail.work_report_id ? (
@@ -492,7 +495,7 @@ function WorkReportCard({ row, onOpen }: { row: WorkReportRow; onOpen: () => voi
         <div><p className="text-xs font-semibold text-slate-500">{dateText(row.report_date)}</p><h3 className="mt-1 font-semibold text-ink">{row.project_name}</h3><p className="text-xs text-slate-500">{row.project_code}</p></div>
         <WorkReportStatusBadge status={row.status} />
       </div>
-      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-slate-500">Người lập</dt><dd className="font-medium text-ink">{row.author_name}</dd></div><div><dt className="text-xs text-slate-500">Gửi đến</dt><dd className="font-medium text-ink">{row.recipient_name || 'Chưa gửi'}</dd></div></dl>
+      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-slate-500">Người lập</dt><dd className="font-medium text-ink">{identityReferenceText(row.author_name, row.author_account_deleted)}</dd></div><div><dt className="text-xs text-slate-500">Gửi đến</dt><dd className="font-medium text-ink">{row.recipient_name ? identityReferenceText(row.recipient_name, row.recipient_account_deleted) : 'Chưa gửi'}</dd></div></dl>
       <button type="button" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-blue-700" onClick={onOpen}><Eye className="h-4 w-4" /> Xem chi tiết</button>
     </article>
   );

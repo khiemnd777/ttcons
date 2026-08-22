@@ -7,6 +7,7 @@ export type AuditLogRecord = AnyRecord & {
   project_name?: string;
   actor_id?: string;
   actor_name?: string;
+  actor_account_deleted?: boolean;
   event_type: string;
   target_type?: string;
   target_id?: string;
@@ -83,6 +84,7 @@ export type User = {
   department?: string;
   position?: string;
   status?: string;
+  must_change_password?: boolean;
   recovery_email_available?: boolean;
   recovery_email_verified?: boolean;
   recovery_email_masked?: string;
@@ -98,6 +100,7 @@ export type Project = AnyRecord & {
   partner_name?: string;
   partner_tax_code?: string;
   pm_name?: string;
+  pm_account_deleted?: boolean;
   status: string;
   progress_percent: number;
 	workflow_entry_mode: 'survey_required' | 'client_boq';
@@ -141,6 +144,7 @@ export type ProjectProgressItem = {
   planned_start_date?: string | null;
   planned_end_date?: string | null;
   pm_name?: string;
+  pm_account_deleted?: boolean;
   pipeline_run_id?: string;
   pipeline_run_status?: string;
   current_node_id?: string;
@@ -164,6 +168,7 @@ export type ProjectProgressBoardResponse = {
 export type ProjectProgressPMOption = {
   id: string;
   name: string;
+  account_deleted?: boolean;
 };
 
 export type ProjectProgressSummaryResponse = {
@@ -206,6 +211,7 @@ export type ProjectMember = {
   project_roles: ProjectMemberAccessRole[];
   notes?: string;
   active: boolean;
+  account_deleted?: boolean;
   is_project_manager: boolean;
   created_at?: string;
   updated_at?: string;
@@ -401,6 +407,16 @@ export type ProjectOperationsRecord = AnyRecord & {
   project_id?: string;
   created_at?: string;
   updated_at?: string;
+  actor_account_deleted?: boolean;
+  created_by_account_deleted?: boolean;
+  submitted_by_account_deleted?: boolean;
+  updated_by_account_deleted?: boolean;
+  requested_by_account_deleted?: boolean;
+  reviewed_by_account_deleted?: boolean;
+  approved_by_account_deleted?: boolean;
+  uploaded_by_account_deleted?: boolean;
+  checked_by_account_deleted?: boolean;
+  assigned_user_account_deleted?: boolean;
 };
 
 export type BOQUnitPriceEvent = ProjectOperationsRecord & {
@@ -412,6 +428,7 @@ export type BOQUnitPriceEvent = ProjectOperationsRecord & {
   revision_no: number;
   comment?: string;
   actor_name?: string;
+  actor_account_deleted?: boolean;
 };
 
 export type BOQItem = ProjectOperationsRecord & {
@@ -821,6 +838,7 @@ export type ConstructionHandoffItem = ProjectOperationsRecord & {
   responsible_role_ids: string[];
   assigned_user_id?: string;
   assigned_user_name?: string;
+  assigned_user_account_deleted?: boolean;
   evidence_required: boolean;
   criteria_jsonb: ConstructionCheckCriterion[];
   generated_work_item_id: string;
@@ -844,6 +862,7 @@ export type ConstructionHandoff = ProjectOperationsRecord & {
   notes?: string;
   status: 'draft' | 'activated' | 'cancelled';
   activated_by_name?: string;
+  activated_by_account_deleted?: boolean;
   activated_at?: string;
   items: ConstructionHandoffItem[];
   idempotent_replay?: boolean;
@@ -896,7 +915,9 @@ export type ConstructionCheck = ProjectOperationsRecord & {
   context_evidence: Array<EvidenceRecord & { evidence_role?: 'context'; sort_order?: number }>;
   result_evidence: Array<EvidenceRecord & { evidence_role?: 'result'; sort_order?: number }>;
   requested_by_name?: string;
+  requested_by_account_deleted?: boolean;
   checked_by_name?: string;
+  checked_by_account_deleted?: boolean;
   checked_at?: string;
   technical_rfi_id?: string;
   source_handoff_item_id?: string;
@@ -930,6 +951,7 @@ export type ConstructionActionItem = ProjectOperationsRecord & {
   priority: 'normal' | 'urgent';
   assigned_user_id: string;
   assigned_user_name?: string;
+  assigned_user_account_deleted?: boolean;
   due_at?: string;
   status: 'open' | 'waiting_confirmation' | 'done' | 'cancelled';
   impact_scope: 'none' | 'timeline' | 'budget' | 'design_scope';
@@ -1007,6 +1029,7 @@ export type WorkItemActivity = ProjectOperationsRecord & {
   scope_id?: string;
   actor_id?: string;
   actor_name?: string;
+  actor_account_deleted?: boolean;
   activity_type: string;
   visibility?: 'internal' | 'project' | 'client' | string;
   comment?: string;
@@ -1038,6 +1061,7 @@ export type ActivityReplyPreview = {
   id: string;
   actor_id?: string;
   actor_name?: string;
+  actor_account_deleted?: boolean;
   activity_type: string;
   comment?: string;
   created_at?: string;
@@ -2105,6 +2129,7 @@ export type PlanningDailyReportItem = AnyRecord & {
   pdf_export_count?: number;
   submitted_by?: string;
   submitted_by_name?: string;
+  submitted_by_account_deleted?: boolean;
   submitted_at?: string;
   updated_at?: string;
   answers?: AnyRecord;
@@ -2150,6 +2175,7 @@ export type MeetingMinutesItem = AnyRecord & {
   pdf_export_count?: number;
   submitted_by?: string;
   submitted_by_name?: string;
+  submitted_by_account_deleted?: boolean;
   submitted_at?: string;
   updated_at?: string;
   answers?: AnyRecord;
@@ -2542,6 +2568,11 @@ export type Warehouse = ProjectOperationsRecord & {
   location?: string;
   type?: string;
   active?: boolean;
+  submitted_by?: string;
+  submitted_by_name?: string;
+  submitted_by_account_deleted?: boolean;
+  submitted_at?: string;
+  updated_at?: string;
 };
 
 export type StockPosition = ProjectOperationsRecord & {
@@ -2822,6 +2853,7 @@ export type WorkItem = ProjectOperationsRecord & {
   role_ids?: string[];
   assignee_staff_id?: string;
   assignee_name?: string;
+  assignee_account_deleted?: boolean;
   watcher_staff_ids?: string[];
   planned_start_at?: string;
   due_at?: string;

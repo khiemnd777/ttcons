@@ -12,6 +12,7 @@ import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
+import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 import type { AuditLogPage, AuditLogRecord } from '../../lib/types/domain';
 import { enumLabel } from '../../lib/utils/status';
 
@@ -218,7 +219,7 @@ export function AuditPage({ scoped = false }: { scoped?: boolean }) {
         fields={[
           { key: 'created_at', label: 'Thời gian', render: (row) => auditDateTime(row.created_at) },
           { key: 'project_name', label: 'Công trình', hidden: () => scoped, render: (row) => `${row.project_code ?? '-'} · ${row.project_name ?? '-'}` },
-          { key: 'actor_name', label: 'Người thực hiện' },
+          { key: 'actor_name', label: 'Người thực hiện', render: (row) => <IdentityReferenceLabel name={row.actor_name} deleted={row.actor_account_deleted} /> },
           { key: 'event_type', label: 'Sự kiện', render: (row) => <EnumChip group="event_type" value={row.event_type} /> },
           { key: 'target_type', label: 'Đối tượng', render: (row) => <EnumChip group="target_type" value={row.target_type} /> },
           { key: 'target_id', label: 'ID đối tượng', render: (row) => <code className="select-all break-all text-xs">{row.target_id ?? '-'}</code> },
@@ -236,7 +237,7 @@ function AuditList({ rows, scoped, onSelect }: { rows: AuditLogRecord[]; scoped:
     { key: 'created_at', header: 'Thời gian', render: (row: AuditLogRecord) => <span className="whitespace-nowrap text-xs leading-5">{auditDateTime(row.created_at)}</span> },
     ...(!scoped ? [{ key: 'project_name', header: 'Công trình', render: (row: AuditLogRecord) => <div className="min-w-40"><p className="font-semibold text-ink">{row.project_code ?? '-'}</p><p className="text-xs text-slate-500">{row.project_name ?? '-'}</p></div> }] : []),
     { key: 'event_type', header: 'Sự kiện', render: (row: AuditLogRecord) => <EnumChip group="event_type" value={row.event_type} /> },
-    { key: 'actor_name', header: 'Người thực hiện', render: (row: AuditLogRecord) => row.actor_name ?? '-' },
+    { key: 'actor_name', header: 'Người thực hiện', render: (row: AuditLogRecord) => <IdentityReferenceLabel name={row.actor_name} deleted={row.actor_account_deleted} /> },
     { key: 'target_type', header: 'Đối tượng', render: (row: AuditLogRecord) => <div className="min-w-32 space-y-1"><EnumChip group="target_type" value={row.target_type} />{row.target_id ? <p className="font-mono text-[11px] text-slate-400">{shortID(row.target_id)}</p> : null}</div> },
     { key: 'description', header: 'Nội dung', render: (row: AuditLogRecord) => <p className="max-w-xl text-sm leading-5 text-slate-700">{row.description || '-'}</p> },
     { key: 'action', header: '', align: 'right' as const, render: (row: AuditLogRecord) => <button className="rounded-md p-2 text-blue-700 hover:bg-blue-50" onClick={() => onSelect(row)} type="button" aria-label="Xem chi tiết"><ChevronRight className="h-4 w-4" /></button> },
@@ -250,7 +251,7 @@ function AuditList({ rows, scoped, onSelect }: { rows: AuditLogRecord[]; scoped:
             <div className="flex items-start justify-between gap-2"><EnumChip group="event_type" value={row.event_type} /><span className="text-xs text-slate-500">{auditDateTime(row.created_at)}</span></div>
             <p className="mt-2 text-sm leading-5 text-slate-700">{row.description || '-'}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              <span>{row.actor_name ?? '-'}</span><EnumChip group="target_type" value={row.target_type} />
+              <IdentityReferenceLabel name={row.actor_name} deleted={row.actor_account_deleted} /><EnumChip group="target_type" value={row.target_type} />
               {!scoped && row.project_code ? <span>{row.project_code}</span> : null}
             </div>
           </button>

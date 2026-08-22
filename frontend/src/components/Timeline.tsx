@@ -1,5 +1,6 @@
 import { EnumChip } from './EnumChip';
 import { EmptyState } from './EmptyState';
+import { IdentityReferenceLabel } from './IdentityReferenceLabel';
 
 export function Timeline({ events, onSelect }: { events: Record<string, any>[]; onSelect?: (event: Record<string, any>) => void }) {
   if (!events.length) return <EmptyState title="Chưa có sự kiện audit" />;
@@ -14,7 +15,7 @@ export function Timeline({ events, onSelect }: { events: Record<string, any>[]; 
             </div>
             <p className="mt-1 text-sm text-slate-600">{event.description}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              {event.actor_name ? <span>Người thực hiện: {event.actor_name}</span> : null}
+              {event.actor_name ? <span>Người thực hiện: <IdentityReferenceLabel name={event.actor_name} deleted={event.actor_account_deleted} /></span> : null}
               {event.target_type ? <EnumChip group="target_type" value={event.target_type} /> : null}
               {onSelect ? (
                 <button className="ml-auto font-semibold text-blue-700 hover:underline" onClick={() => onSelect(event)} type="button">

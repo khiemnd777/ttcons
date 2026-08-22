@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
+import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import { get, post, put } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
@@ -210,7 +211,7 @@ export function SubcontractorReconciliationPanel({
 
         {locked ? (
           <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            Đã gửi bởi {record.submitted_by_name ?? 'người dùng'} {record.submitted_at ? `ngày ${dateText(record.submitted_at)}` : ''}.
+            Đã gửi bởi {identityReferenceText(record.submitted_by_name, record.submitted_by_account_deleted, 'người dùng')} {record.submitted_at ? `ngày ${dateText(record.submitted_at)}` : ''}.
           </div>
         ) : null}
 

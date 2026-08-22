@@ -1,5 +1,33 @@
 # Current States
 
+## Active Plan: Import tài khoản nhân sự production
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-22)
+
+### Will be done
+
+- Add Developer-only `staff.import` governance, an atomic import-batch record, and `users.must_change_password` through custom migration V113 plus seed parity.
+- Add authoritative preview and execute APIs for structured XLSX/CSV rows: at most 100 active staff/accounts, one allowed global role per row, canonical password/profile validation, all-or-nothing persistence, idempotency and fail-closed audit without storing raw files or secret fields.
+- Require imported users to change their initial password after login before any other protected application action; keep the database session lifecycle authoritative and revoke sessions after the change.
+- Add the Staff import dialog, browser-local XLSX/CSV parsing, current-role template download, preview/error/success states and permission-aligned action visibility.
+- Add focused backend/frontend/migration coverage, update central/backend/frontend/Admin Governance maps, and run non-browser technical verification. Browser/UAT remains skipped unless explicitly authorized.
+
+### Done
+
+- User approved the review package and Mockup as Text, including client-side file parsing, server-side authoritative preview/execute, atomic activation, restricted-role handling and the recommended first-login password-change gate.
+- Loaded the mandatory module-memory, Repo Architect, Impact Analysis, Admin Governance, Backend, Frontend and Database instructions and mapped the change to Staff / RBAC / account security.
+- Confirmed current source has linked Staff-account creation, canonical password validation, DB-backed sessions and role assignment, but no import route/UI, no `staff.import` permission and no first-login password-change state.
+- Added custom migration V113 with Developer-only `staff.import`, a database assignment trigger, `users.must_change_password` and secret-free/idempotent `staff_account_imports`; updated seed parity and Admin bootstrap completeness for the new Developer-reserved capability.
+- Added protected preview/execute endpoints requiring all four approved permissions. Backend validation normalizes the exact eight-column contract, reports row errors without echoing passwords, rejects duplicate/existing accounts and restricted/external roles, binds valid previews to a server-keyed HMAC, then atomically creates active User/Staff/global-role/audit state with UUID idempotency.
+- Added a DB-authoritative initial-password guard. Imported users may read `/auth/me` and change their own password, while every other protected action is denied until self-change or recovery reset clears the flag; password changes continue to revoke all sessions.
+- Added the Staff Import action/dialog, browser-local Web Worker parsing for `.xlsx`/`.csv`, formula/header/size/row limits, dynamic Excel/CSV templates, current allowed-role sheet, masked/no-password preview, desktop table/mobile cards, explicit confirmation and success/error states.
+- Updated central/backend/frontend/Admin Governance maps and added backend integration/middleware plus frontend source-contract coverage.
+- Current working-tree verification passed: fresh PostgreSQL applied all migrations including V113; import integration tests covered preview masking, atomic persistence, activation, role assignment, same-actor-only idempotent replay, reserved RBAC and initial-password clearing; full backend `go test -p 1 ./...` passed; seed SQL ran successfully with `developer:1` and no other `staff.import` grant; frontend production build, all 221 tests, bundle budget, agent-artifact validation and `git diff --check` passed. The disposable test database was removed.
+
+### Skipped / remaining acceptance
+
+- No browser/UAT is authorized in this turn, so the interface will remain `NOT UX ACCEPTED` even if source checks, tests and builds pass.
+
 ## Active Plan: Ưu tiên Dashboard trong điều hướng Công việc
 
 Status: TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-21)

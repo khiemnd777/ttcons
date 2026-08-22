@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, Plus, Search, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Plus, Search, ShieldCheck, Trash2, Upload, X } from 'lucide-react';
 import { get, post, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { PageHeader } from '../../components/PageHeader';
-import { DataTable } from '../../components/DataTable';
+import { DataTable, type DataTableRowKey } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { RowActions } from '../../components/RowActions';
@@ -19,6 +19,9 @@ import {
   passwordConfirmationMessage,
   passwordValidationMessage,
 } from '../../lib/security/password';
+import { StaffImportDialog } from './StaffImportDialog';
+import type { StaffImportResult } from './staffImportTypes';
+import { StaffDeleteDialog, type StaffDeletionResult } from './StaffDeleteDialog';
 
 type StaffRole = {
   id: string;
@@ -59,8 +62,11 @@ type ProjectOption = Record<string, any> & {
 
 export function StaffPage() {
   const [open, setOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [dialog, setDialog] = useState<StaffRow | null>(null);
   const [roleDialog, setRoleDialog] = useState<StaffRow | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Set<DataTableRowKey>>(new Set());
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const queryClient = useQueryClient();
   const toast = useToast();
   const navigate = useNavigate();
@@ -69,9 +75,11 @@ export function StaffPage() {
   const canUpdate = hasPermission('staff.update');
   const canManageAccountSecurity = hasPermission('staff.account_security.manage');
   const canAssign = hasPermission('permission.assign');
+  const canImport = hasPermission('staff.import') && canCreate && canAssign;
+  const canDelete = hasPermission('staff.delete') && canManageAccountSecurity;
 
   const staff = useQuery({ queryKey: ['staff'], queryFn: () => get<StaffRow[]>('/staff') });
-  const roles = useQuery({ queryKey: ['roles'], queryFn: () => get<RoleRow[]>('/roles'), enabled: canAssign });
+  const roles = useQuery({ queryKey: ['roles'], queryFn: () => get<RoleRow[]>('/roles'), enabled: canAssign || canImport });
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<ProjectOption[]>('/projects'), enabled: canAssign });
 
   const create = useMutation({
@@ -184,14 +192,47 @@ export function StaffPage() {
 
   const createFields = useMemo(staffCreateFields, []);
   const editFields = useMemo(() => dialog ? staffEditFields(dialog) : [], [canManageAccountSecurity, dialog]);
+  const selectedStaffIDs = useMemo(() => Array.from(selectedKeys, String), [selectedKeys]);
+
+  const rowActions = (row: StaffRow) => (
+    <RowActions onEdit={canUpdate ? () => setDialog(row) : undefined}>
+      {canAssign ? (
+        <button
+          title={row.user_id ? 'Gán vai trò' : 'Nhân sự chưa liên kết tài khoản'}
+          aria-label="Gán vai trò"
+          className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={() => setRoleDialog(row)}
+          disabled={!row.user_id}
+        >
+          <ShieldCheck className="h-4 w-4" />
+        </button>
+      ) : null}
+    </RowActions>
+  );
 
   return (
     <>
       <PageHeader
         title="Nhân sự"
         description="Quản lý nhân sự, phòng ban, chức vụ, trạng thái hoạt động và phân công vào công trình theo role."
-        actions={canCreate ? <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />Nhân sự</button> : null}
+        actions={(canCreate || canImport) ? (
+          <>
+            {canImport ? <button className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4" />Import</button> : null}
+            {canCreate ? <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />Nhân sự</button> : null}
+          </>
+        ) : null}
       />
+      {canDelete && selectedKeys.size > 0 ? (
+        <div className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 shadow-xl sm:static sm:mb-3 sm:flex-row sm:items-center sm:justify-between sm:shadow-none">
+          <div className="flex items-center gap-2 text-sm font-semibold text-blue-900">
+            <button type="button" className="rounded-md p-1 text-blue-700 hover:bg-blue-100" aria-label="Bỏ chọn tất cả" onClick={() => setSelectedKeys(new Set())}><X className="h-4 w-4" /></button>
+            Đã chọn {selectedKeys.size} nhân sự
+          </div>
+          <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-700" onClick={() => setDeleteOpen(true)}>
+            <Trash2 className="h-4 w-4" />Xóa nhân sự đã chọn
+          </button>
+        </div>
+      ) : null}
       <DataTable
         rows={staff.data ?? []}
         loading={staff.isLoading}
@@ -200,6 +241,9 @@ export function StaffPage() {
         searchPlaceholder="Tìm nhân sự..."
         pageSize={12}
         defaultSort={{ key: 'full_name' }}
+        getRowKey={(row) => row.id}
+        selection={canDelete ? { selectedKeys, onSelectedKeysChange: setSelectedKeys, ariaLabel: 'Chọn tất cả nhân sự trên trang hiện tại' } : undefined}
+        renderMobileCard={(row) => <StaffMobileCard row={row} actions={rowActions(row)} />}
         columns={[
           { key: 'full_name', header: 'Họ tên', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.full_name}</span> },
           { key: 'email', header: 'Email', sortable: true },
@@ -210,23 +254,40 @@ export function StaffPage() {
           {
             key: 'actions',
             header: 'Action',
-            render: (row) => (
-              <RowActions onEdit={canUpdate ? () => setDialog(row) : undefined}>
-                {canAssign ? (
-                  <button
-                    title={row.user_id ? 'Gán vai trò' : 'Nhân sự chưa liên kết tài khoản'}
-                    aria-label="Gán vai trò"
-                    className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                    onClick={() => setRoleDialog(row)}
-                    disabled={!row.user_id}
-                  >
-                    <ShieldCheck className="h-4 w-4" />
-                  </button>
-                ) : null}
-              </RowActions>
-            ),
+            render: rowActions,
           },
         ]}
+      />
+      <StaffDeleteDialog
+        open={deleteOpen}
+        staffIDs={selectedStaffIDs}
+        onClose={() => setDeleteOpen(false)}
+        onSuccess={async (result: StaffDeletionResult) => {
+          setDeleteOpen(false);
+          setSelectedKeys(new Set());
+          await queryClient.invalidateQueries();
+          toast.success({
+            title: `Đã xóa ${result.deleted_count} nhân sự`,
+            description: `${result.memberships_deactivated} membership đã ngừng hoạt động; ${result.sessions_revoked} phiên đăng nhập đã bị thu hồi.`,
+          });
+        }}
+        onError={(title, error) => toast.error(title, error)}
+      />
+      <StaffImportDialog
+        open={importOpen}
+        roles={roles.data ?? []}
+        rolesLoading={roles.isLoading}
+        rolesError={roles.error}
+        onClose={() => setImportOpen(false)}
+        onSuccess={async (result: StaffImportResult) => {
+          setImportOpen(false);
+          await queryClient.invalidateQueries({ queryKey: ['staff'] });
+          toast.success({
+            title: `Đã tạo và kích hoạt ${result.created_count} tài khoản`,
+            description: `${result.role_assignment_count} vai trò đã gán. Người dùng phải đổi mật khẩu ở lần đăng nhập đầu tiên.`,
+          });
+        }}
+        onError={(title, error) => toast.error(title, error)}
       />
       <Dialog
         open={open}
@@ -313,6 +374,22 @@ export function StaffPage() {
         onRetryProjects={() => { void projects.refetch(); }}
       />
     </>
+  );
+}
+
+function StaffMobileCard({ row, actions }: { row: StaffRow; actions: ReactNode }) {
+  return (
+    <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{row.full_name}</p><p className="mt-1 truncate text-xs text-slate-500">{row.email}</p></div>
+        {actions}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+        <div><p className="font-medium text-slate-400">Phòng ban</p><p className="mt-1 text-slate-700">{String(row.department ?? '').trim() || '—'}</p></div>
+        <div><p className="font-medium text-slate-400">Chức vụ</p><p className="mt-1 text-slate-700">{String(row.position ?? '').trim() || '—'}</p></div>
+      </div>
+      <div className="mt-3 flex items-end justify-between gap-3"><RoleSummary roles={row.user_roles ?? []} /><StatusBadge status={row.status} /></div>
+    </article>
   );
 }
 

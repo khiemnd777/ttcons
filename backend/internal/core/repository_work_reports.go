@@ -81,13 +81,16 @@ func (r *Repository) WorkReports(ctx context.Context, actorID string, filter Wor
 			source.report_date,
 			source.reported_by::text AS author_id,
 			author.full_name AS author_name,
+			COALESCE(author.deleted_at IS NOT NULL, false) AS author_account_deleted,
 			report.recipient_id::text AS recipient_id,
 			recipient.full_name AS recipient_name,
+			COALESCE(recipient.deleted_at IS NOT NULL, false) AS recipient_account_deleted,
 			%s AS status,
 			COALESCE(report.current_revision_no,0) AS current_revision_no,
 			report.submitted_at,
 			report.reviewed_by::text AS reviewed_by,
 			reviewer.full_name AS reviewed_by_name,
+			COALESCE(reviewer.deleted_at IS NOT NULL, false) AS reviewed_by_account_deleted,
 			report.reviewed_at,
 			report.review_comment,
 			source.report_delivery_eligible,
@@ -119,10 +122,10 @@ func (r *Repository) WorkReportSource(ctx context.Context, sourceID string) (Rec
 	return r.QueryOne(ctx, `
 		SELECT source.*,source.id::text AS source_id,source.project_id::text AS project_id,
 			source.reported_by::text AS author_id,project.code AS project_code,project.name AS project_name,
-			author.full_name AS author_name,work_item.title AS work_item_title,
+			author.full_name AS author_name,COALESCE(author.deleted_at IS NOT NULL, false) AS author_account_deleted,work_item.title AS work_item_title,
 			report.id::text AS work_report_id,report.recipient_id::text AS recipient_id,
-			recipient.full_name AS recipient_name,report.status,report.current_revision_no,
-			report.submitted_at,report.reviewed_by::text AS reviewed_by,reviewer.full_name AS reviewed_by_name,
+			recipient.full_name AS recipient_name,COALESCE(recipient.deleted_at IS NOT NULL, false) AS recipient_account_deleted,report.status,report.current_revision_no,
+			report.submitted_at,report.reviewed_by::text AS reviewed_by,reviewer.full_name AS reviewed_by_name,COALESCE(reviewer.deleted_at IS NOT NULL, false) AS reviewed_by_account_deleted,
 			report.reviewed_at,report.review_comment
 		FROM operation_daily_reports source
 		JOIN projects project ON project.id=source.project_id
@@ -178,7 +181,7 @@ func (r *Repository) WorkReportStatusForSource(ctx context.Context, sourceID str
 func (r *Repository) WorkReportHistory(ctx context.Context, reportID string) ([]Record, []Record, error) {
 	revisions, err := r.Query(ctx, `
 		SELECT revision.id::text AS id,revision.revision_no,revision.snapshot_json,revision.snapshot_sha256,
-			revision.submitted_by::text AS submitted_by,submitter.full_name AS submitted_by_name,
+			revision.submitted_by::text AS submitted_by,submitter.full_name AS submitted_by_name,COALESCE(submitter.deleted_at IS NOT NULL, false) AS submitted_by_account_deleted,
 			revision.submitted_at,revision.comment
 		FROM work_report_revisions revision
 		LEFT JOIN users submitter ON submitter.id=revision.submitted_by
@@ -190,7 +193,7 @@ func (r *Repository) WorkReportHistory(ctx context.Context, reportID string) ([]
 	}
 	events, err := r.Query(ctx, `
 		SELECT event.id::text AS id,event.revision_no,event.event_type,event.actor_id::text AS actor_id,
-			actor.full_name AS actor_name,event.comment,event.metadata_json,event.created_at
+			actor.full_name AS actor_name,COALESCE(actor.deleted_at IS NOT NULL, false) AS actor_account_deleted,event.comment,event.metadata_json,event.created_at
 		FROM work_report_events event
 		LEFT JOIN users actor ON actor.id=event.actor_id
 		WHERE event.report_id=$1
