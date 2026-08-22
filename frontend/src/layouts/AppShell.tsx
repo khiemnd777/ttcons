@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
   BarChart3,
   BriefcaseBusiness,
   Building2,
   Bug,
   ClipboardList,
   Calculator,
-  Database,
   FileClock,
   FileText,
   GitBranch,
@@ -40,8 +41,8 @@ const navGroups: NavGroup[] = [
   {
     title: 'Công việc',
     items: [
-      { to: '/my-work', label: 'Bàn làm việc', icon: BriefcaseBusiness },
       { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permissions: ['report.view'] },
+      { to: '/my-work', label: 'Bàn làm việc', icon: BriefcaseBusiness },
       { to: '/progress', label: 'Tiến trình', icon: Kanban, permissions: ['project.view'] },
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
       { to: '/reports', label: 'Báo cáo', icon: FileText, permissions: ['work_report.view'] },
@@ -59,7 +60,8 @@ const navGroups: NavGroup[] = [
   {
     title: 'Quản trị',
     items: [
-      { to: '/core-data', label: 'Đối tác', icon: Database, permissions: ['catalog.view'] },
+      { to: '/core-data/input', label: 'Đầu vào', icon: ArrowDownToLine, permissions: ['catalog.view'] },
+      { to: '/core-data/output', label: 'Đầu ra', icon: ArrowUpFromLine, permissions: ['catalog.view'] },
       { to: '/staff', label: 'Nhân sự', icon: Users, permissions: ['staff.view'] },
       { to: '/roles', label: 'Vai trò', icon: ShieldCheck, permissions: ['role.view'] },
       { to: '/audit', label: 'Audit nghiệp vụ', icon: FileClock, permissions: ['audit.view'] },

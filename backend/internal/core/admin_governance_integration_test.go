@@ -15,6 +15,76 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+func TestPartnerCatalogGroupFilters(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	suffix := newID()
+	clientID := newID()
+	supplierID := newID()
+	mixedID := newID()
+	inactiveOutputID := newID()
+	partnerIDs := []string{clientID, supplierID, mixedID, inactiveOutputID}
+
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM partners WHERE id = ANY($1::uuid[])`, partnerIDs)
+	})
+
+	mustExec(t, db, `
+		INSERT INTO partners (id,partner_code,name,partner_types,active) VALUES
+			($1,$2,'Input Client','["client"]'::jsonb,true),
+			($3,$4,'Output Supplier','["supplier"]'::jsonb,true),
+			($5,$6,'Mixed Partner','["client","supplier"]'::jsonb,true),
+			($7,$8,'Inactive Output','["service_provider"]'::jsonb,false)
+	`, clientID, "INPUT-"+suffix[:8], supplierID, "OUTPUT-"+suffix[:8], mixedID, "MIXED-"+suffix[:8], inactiveOutputID, "INACTIVE-"+suffix[:8])
+
+	inputRows, err := service.ListPartners(ctx, PartnerFilter{Group: "input", Status: "active"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recordByID(inputRows, "id", clientID) == nil || recordByID(inputRows, "id", mixedID) == nil {
+		t.Fatalf("input group must contain client and mixed partners: %#v", inputRows)
+	}
+	if recordByID(inputRows, "id", supplierID) != nil || recordByID(inputRows, "id", inactiveOutputID) != nil {
+		t.Fatalf("input group returned an output-only or inactive partner: %#v", inputRows)
+	}
+
+	outputRows, err := service.ListPartners(ctx, PartnerFilter{Group: "output", Status: "active"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recordByID(outputRows, "id", supplierID) == nil || recordByID(outputRows, "id", mixedID) == nil {
+		t.Fatalf("output group must contain supplier and mixed partners: %#v", outputRows)
+	}
+	if recordByID(outputRows, "id", clientID) != nil || recordByID(outputRows, "id", inactiveOutputID) != nil {
+		t.Fatalf("output group returned a client-only or inactive partner: %#v", outputRows)
+	}
+
+	supplierRows, err := service.ListPartners(ctx, PartnerFilter{Group: "output", Type: "supplier", Status: "active"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recordByID(supplierRows, "id", supplierID) == nil || recordByID(supplierRows, "id", mixedID) == nil {
+		t.Fatalf("output supplier filter must retain supplier and mixed partners: %#v", supplierRows)
+	}
+
+	inactiveRows, err := service.ListPartners(ctx, PartnerFilter{Group: "output", Status: "inactive"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recordByID(inactiveRows, "id", inactiveOutputID) == nil || recordByID(inactiveRows, "id", supplierID) != nil {
+		t.Fatalf("inactive output filter returned an unexpected set: %#v", inactiveRows)
+	}
+
+	_, err = service.ListPartners(ctx, PartnerFilter{Group: "unknown"})
+	assertValidationError(t, err)
+	_, err = service.ListPartners(ctx, PartnerFilter{Group: "input", Type: "supplier"})
+	assertValidationError(t, err)
+	_, err = service.ListPartners(ctx, PartnerFilter{Group: "output", Type: "client"})
+	assertValidationError(t, err)
+}
+
 func TestAdminStaffAccountSecurityManagement(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

@@ -712,6 +712,18 @@ func (r *Repository) ListPartners(ctx context.Context, filter PartnerFilter) ([]
 		args = append(args, filter.Type)
 		conditions = append(conditions, fmt.Sprintf("partner_types ? $%d", len(args)))
 	}
+	switch filter.Group {
+	case "input":
+		conditions = append(conditions, "partner_types ? 'client'")
+	case "output":
+		outputTypes := vendorPartnerTypes()
+		placeholders := make([]string, 0, len(outputTypes))
+		for _, partnerType := range outputTypes {
+			args = append(args, partnerType)
+			placeholders = append(placeholders, fmt.Sprintf("$%d", len(args)))
+		}
+		conditions = append(conditions, fmt.Sprintf("partner_types ?| ARRAY[%s]", strings.Join(placeholders, ",")))
+	}
 	if filter.Query != "" {
 		args = append(args, "%"+filter.Query+"%")
 		conditions = append(conditions, fmt.Sprintf(`(

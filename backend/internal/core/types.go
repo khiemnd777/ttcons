@@ -137,6 +137,7 @@ type HandoverChecklistItemRequest struct {
 type PartnerFilter struct {
 	Query  string
 	Type   string
+	Group  string
 	Status string
 }
 

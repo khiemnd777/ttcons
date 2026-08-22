@@ -18,6 +18,10 @@ test('standard shell exposes the permission-filtered navigation on mobile', asyn
   assert.match(appShell, /document\.body\.style\.overflow = 'hidden'/);
   assert.ok((appShell.match(/<AppNavigation/g) ?? []).length >= 2, 'desktop and mobile must share AppNavigation');
   assert.match(appShell, /to: '\/dashboard', label: 'Dashboard'/);
+  const dashboardIndex = appShell.indexOf("{ to: '/dashboard'");
+  const myWorkIndex = appShell.indexOf("{ to: '/my-work'");
+  assert.ok(dashboardIndex >= 0 && myWorkIndex >= 0, 'Dashboard and Bàn làm việc must both be registered');
+  assert.ok(dashboardIndex < myWorkIndex, 'Dashboard must appear before Bàn làm việc');
   assert.match(appShell, /to: '\/audit', label: 'Audit nghiệp vụ'.*permissions: \['audit\.view'\]/);
   assert.match(appShell, /to: '\/event-logs', label: 'Nhật ký sự kiện'.*permissions: \['event_log\.view'\]/);
   assert.doesNotMatch(appShell, /to: '\/dashboard', label: 'Điều hành'/);

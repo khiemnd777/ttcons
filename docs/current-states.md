@@ -1,5 +1,58 @@
 # Current States
 
+## Active Plan: Ưu tiên Dashboard trong điều hướng Công việc
+
+Status: TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-21)
+
+### Will be done
+
+- Place permission-filtered `Dashboard` before `Bàn làm việc` in the shared desktop/mobile AppShell navigation.
+- Preserve `/my-work` as the authenticated landing page and preserve every existing route, permission, icon and active-state behavior.
+- Add focused source-contract coverage for the order, update the central/frontend/Reporting Analytics maps and run non-browser frontend validation.
+
+### Done
+
+- User approved the review package and Mockup as Text.
+- Confirmed `frontend/src/layouts/AppShell.tsx` is the shared desktop/mobile navigation owner and `frontend/src/app/router.tsx` independently keeps `/my-work` as the authenticated landing page.
+- Loaded the mandatory central/frontend/Reporting Analytics maps and the Frontend UI guardrails.
+- Moved the permission-filtered `Dashboard` entry before `Bàn làm việc` in the shared `navGroups` configuration without changing routes, permissions, icons or authenticated landing behavior.
+- Added a focused source-contract assertion that both entries exist and `Dashboard` is registered first.
+- Updated the central module map, frontend UI map and Reporting Analytics domain map to match the new navigation order.
+- Current working-tree frontend state passes the focused AppShell test (2/2), the full frontend suite (212/212) and `npm run build`.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn and will remain skipped. Frontend technical checks will not establish UX acceptance.
+
+## Active Plan: Tách danh mục Đầu vào và Đầu ra
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-21)
+
+### Will be done
+
+- Replace the single `Đối tác` navigation entry with independent `Đầu vào` and `Đầu ra` entries, backed by `/core-data/input` and `/core-data/output`; preserve `/core-data` as a redirect to `Đầu vào`.
+- Reuse the partner catalog page with route-owned group configuration: `Đầu vào` contains partners with `client`; `Đầu ra` contains partners with any existing non-client type. A multi-type partner may appear in both groups.
+- Add an additive server-side `/partners?group=input|output` filter while preserving existing status, exact-type, permission, active-row and downstream snapshot behavior.
+- Keep the shared multi-select partner form, default new `Đầu vào` records to `client` and new `Đầu ra` records to `supplier`; keep the output-only type filter.
+- Add focused backend/frontend regression coverage, update the central/frontend/backend/Admin Governance maps, and run non-browser technical validation.
+
+### Done
+
+- User approved the review package, route plan, multi-type membership semantics, output type filter and implementation scope.
+- Mandatory central/frontend/backend/Admin Governance maps and Frontend, Backend, Impact Analysis and Git workflow instructions were loaded.
+- Baseline `main` worktree is clean before implementation. Current code has one `/core-data` route/navigation item and the backend supports only one exact partner `type` filter.
+- Replaced the single partner navigation entry with permission-equivalent `Đầu vào` and `Đầu ra` entries, added their keyed routes and kept `/core-data` as an authenticated redirect to input.
+- Reused `CoreDataPage` through group-owned titles, descriptions, metrics, empty states and create defaults. Input fixes the list group to `client`; output exposes only the existing non-client type choices while the create/edit form remains multi-select.
+- Added the validated additive backend `PartnerFilter.Group`, handler query parsing and PostgreSQL JSONB group conditions. Existing consumers with no group remain unchanged; multi-type partner membership is intentionally non-exclusive.
+- Added PostgreSQL-backed coverage for active/inactive input, output, exact output type, multi-type membership and invalid group/type combinations; updated focused frontend source-contract coverage.
+- Updated the central, frontend, backend and Admin Governance maps for the route, UI and API behavior.
+- Current combined working-tree state passes the focused PostgreSQL partner-group test, backend `make test`, all 212 frontend tests, frontend production build and `git diff --check`. The dedicated temporary PostgreSQL test database was removed after the run.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn and will remain skipped. Frontend technical checks will not establish UX acceptance.
+- No schema, migration or seed data changed, so migration/seed execution was not required.
+
 ## Active Plan: Canonical production bootstrap and operator commands
 
 Status: PRODUCTION DEPLOYED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-20)

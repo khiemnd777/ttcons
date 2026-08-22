@@ -11,6 +11,8 @@ export const partnerTypeOptions = [
   { value: 'other', label: 'Khác' },
 ];
 
+export const outputPartnerTypeOptions = partnerTypeOptions.filter((option) => option.value !== 'client');
+
 const partnerTypeLabelByValue = new Map(partnerTypeOptions.map((option) => [option.value, option.label]));
 
 export function partnerTypeLabel(value?: string) {
@@ -39,4 +41,4 @@ export function partnerOptions(partners: Partner[], allowedTypes: string[]) {
     .map((partner) => ({ label: partnerOptionLabel(partner), value: partner.id }));
 }
 
-export const vendorPartnerTypes = ['supplier', 'subcontractor', 'labor_team', 'transport', 'equipment_rental', 'service_provider', 'other'];
+export const vendorPartnerTypes = outputPartnerTypeOptions.map((option) => option.value);

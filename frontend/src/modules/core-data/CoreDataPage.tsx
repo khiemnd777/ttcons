@@ -10,19 +10,53 @@ import { useToast } from '../../components/ToastProvider';
 import { get, post, put } from '../../lib/api/client';
 import type { Partner } from '../../lib/types/domain';
 import { SimpleForm, type FieldDef } from '../_shared/SimpleForm';
-import { partnerTypeLabel, partnerTypeOptions, partnerTypesText } from './partnerUtils';
+import { outputPartnerTypeOptions, partnerTypeLabel, partnerTypeOptions, partnerTypesText } from './partnerUtils';
 
 type PartnerDialog = { mode: 'view' | 'edit'; record: Partner } | { mode: 'create'; record?: undefined } | null;
+type PartnerCatalogGroup = 'input' | 'output';
 
-export function CoreDataPage() {
+const partnerCatalogConfig: Record<PartnerCatalogGroup, {
+  title: string;
+  description: string;
+  actionLabel: string;
+  createDialogTitle: string;
+  defaultType: 'client' | 'supplier';
+  metricLabel: string;
+  metricValue: string;
+  empty: string;
+}> = {
+  input: {
+    title: 'Danh mục đầu vào',
+    description: 'Quản lý Khách hàng / CĐT.',
+    actionLabel: 'Thêm đầu vào',
+    createDialogTitle: 'Tạo đối tác đầu vào',
+    defaultType: 'client',
+    metricLabel: 'Nhóm',
+    metricValue: 'Khách hàng / CĐT',
+    empty: 'Chưa có đối tác đầu vào',
+  },
+  output: {
+    title: 'Danh mục đầu ra',
+    description: 'Quản lý nhà cung cấp, thầu phụ và các đơn vị thực hiện.',
+    actionLabel: 'Thêm đầu ra',
+    createDialogTitle: 'Tạo đối tác đầu ra',
+    defaultType: 'supplier',
+    metricLabel: 'Loại lọc',
+    metricValue: 'Tất cả đầu ra',
+    empty: 'Chưa có đối tác đầu ra',
+  },
+};
+
+export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
   const [status, setStatus] = useState<'active' | 'inactive' | 'all'>('active');
   const [type, setType] = useState('');
   const [dialog, setDialog] = useState<PartnerDialog>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
+  const config = partnerCatalogConfig[group];
   const partners = useQuery({
-    queryKey: ['partners', status, type],
-    queryFn: () => get<Partner[]>(`/partners?status=${encodeURIComponent(status)}${type ? `&type=${encodeURIComponent(type)}` : ''}`),
+    queryKey: ['partners', group, status, type],
+    queryFn: () => get<Partner[]>(`/partners?status=${encodeURIComponent(status)}&group=${group}${type ? `&type=${encodeURIComponent(type)}` : ''}`),
   });
 
   const createPartner = useMutation({
@@ -51,29 +85,31 @@ export function CoreDataPage() {
   return (
     <>
       <PageHeader
-        title="Danh mục đối tác"
-        description="Quản lý khách hàng, nhà cung cấp, thầu phụ và các đơn vị phối hợp."
+        title={config.title}
+        description={config.description}
         actions={
           <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setDialog({ mode: 'create' })}>
             <Plus className="h-4 w-4" />
-            Thêm đối tác
+            {config.actionLabel}
           </button>
         }
       />
 
-      <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
+      <div className={`mb-4 grid gap-3 ${group === 'input' ? 'md:grid-cols-[1fr_auto]' : 'md:grid-cols-[1fr_auto_auto]'} md:items-end`}>
         <div className="grid gap-3 sm:grid-cols-3">
           <Metric label="Đang hiển thị" value={String(rows.length)} />
           <Metric label="Active" value={String(activeCount)} />
-          <Metric label="Loại lọc" value={type ? partnerTypeLabel(type) : 'Tất cả'} />
+          <Metric label={config.metricLabel} value={type ? partnerTypeLabel(type) : config.metricValue} />
         </div>
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Loại
-          <select className={filterClassName} value={type} onChange={(event) => setType(event.target.value)}>
-            <option value="">Tất cả</option>
-            {partnerTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </label>
+        {group === 'output' ? (
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Loại
+            <select className={filterClassName} value={type} onChange={(event) => setType(event.target.value)}>
+              <option value="">Tất cả đầu ra</option>
+              {outputPartnerTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+        ) : null}
         <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
           Trạng thái
           <select className={filterClassName} value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>
@@ -89,7 +125,7 @@ export function CoreDataPage() {
         loading={partners.isLoading}
         error={partners.error}
         onRetry={() => void partners.refetch()}
-        empty="Chưa có đối tác"
+        empty={config.empty}
         searchPlaceholder="Tìm tên, mã, MST, liên hệ..."
         pageSize={10}
         defaultSort={{ key: 'name', direction: 'asc' }}
@@ -143,14 +179,14 @@ export function CoreDataPage() {
 
       <Dialog
         open={dialog?.mode === 'create' || dialog?.mode === 'edit'}
-        title={dialog?.mode === 'edit' ? 'Sửa đối tác' : 'Tạo đối tác'}
+        title={dialog?.mode === 'edit' ? 'Sửa đối tác' : config.createDialogTitle}
         onClose={() => setDialog(null)}
         size="lg"
       >
         <SimpleForm
           layout="two-column"
           submitLabel={dialog?.mode === 'edit' ? 'Lưu đối tác' : 'Tạo đối tác'}
-          fields={partnerFields(dialog?.mode === 'edit' ? dialog.record : undefined)}
+          fields={partnerFields(dialog?.mode === 'edit' ? dialog.record : undefined, config.defaultType)}
           onSubmit={(values) => {
             if (dialog?.mode === 'edit') {
               return updatePartner.mutateAsync({ id: dialog.record.id, values });
@@ -163,11 +199,11 @@ export function CoreDataPage() {
   );
 }
 
-function partnerFields(record?: Partner): FieldDef[] {
+function partnerFields(record: Partner | undefined, defaultType: 'client' | 'supplier'): FieldDef[] {
   return [
     { name: 'partner_code', label: 'Mã đối tác', defaultValue: record?.partner_code ?? `PT-${Date.now().toString().slice(-5)}`, required: true },
     { name: 'name', label: 'Tên đối tác', defaultValue: record?.name ?? '', required: true },
-    { name: 'partner_types', label: 'Loại', type: 'multi-select', defaultValue: record?.partner_types ?? ['supplier'], required: true, options: partnerTypeOptions, fullWidth: true },
+    { name: 'partner_types', label: 'Loại', type: 'multi-select', defaultValue: record?.partner_types ?? [defaultType], required: true, options: partnerTypeOptions, fullWidth: true },
     { name: 'tax_code', label: 'MST', defaultValue: record?.tax_code ?? '' },
     { name: 'contact_name', label: 'Người liên hệ', defaultValue: record?.contact_name ?? '' },
     { name: 'phone', label: 'Điện thoại', defaultValue: record?.phone ?? '' },

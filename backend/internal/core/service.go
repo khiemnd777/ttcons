@@ -518,9 +518,19 @@ func projectProgressStageKey(projectStatus, runID, runStatus, nodeType string) s
 func (s *Service) ListPartners(ctx context.Context, filter PartnerFilter) ([]Record, error) {
 	filter.Query = strings.TrimSpace(filter.Query)
 	filter.Type = strings.TrimSpace(filter.Type)
+	filter.Group = strings.TrimSpace(filter.Group)
 	filter.Status = strings.TrimSpace(filter.Status)
 	if filter.Type != "" && !validPartnerType(filter.Type) {
 		return nil, validationError("Loại đối tác không hợp lệ", Record{"partner_type": filter.Type})
+	}
+	if filter.Group != "" && !statusIn(filter.Group, "input", "output") {
+		return nil, validationError("Nhóm đối tác không hợp lệ", Record{"group": filter.Group})
+	}
+	if filter.Group == "input" && filter.Type != "" && filter.Type != "client" {
+		return nil, validationError("Loại đối tác không thuộc nhóm Đầu vào", Record{"group": filter.Group, "partner_type": filter.Type})
+	}
+	if filter.Group == "output" && filter.Type == "client" {
+		return nil, validationError("Loại đối tác không thuộc nhóm Đầu ra", Record{"group": filter.Group, "partner_type": filter.Type})
 	}
 	if filter.Status != "" && !statusIn(filter.Status, "active", "inactive", "all") {
 		return nil, validationError("Trạng thái đối tác không hợp lệ", Record{"status": filter.Status})

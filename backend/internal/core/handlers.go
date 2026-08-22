@@ -362,6 +362,7 @@ func (h *Handler) ListPartners(c *fiber.Ctx) error {
 	rows, err := h.service.ListPartners(c.Context(), PartnerFilter{
 		Query:  c.Query("q"),
 		Type:   c.Query("type"),
+		Group:  c.Query("group"),
 		Status: c.Query("status"),
 	})
 	if err != nil {

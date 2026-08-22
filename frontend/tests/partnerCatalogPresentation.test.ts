@@ -9,13 +9,24 @@ async function source(path: string) {
 test('partner catalog uses business-facing navigation and page labels', async () => {
   const appShell = await source('../src/layouts/AppShell.tsx');
   const page = await source('../src/modules/core-data/CoreDataPage.tsx');
+  const router = await source('../src/app/router.tsx');
+  const partnerUtils = await source('../src/modules/core-data/partnerUtils.ts');
 
-  assert.match(appShell, /to: '\/core-data', label: 'Đối tác'/);
+  assert.match(appShell, /to: '\/core-data\/input', label: 'Đầu vào'.*permissions: \['catalog\.view'\]/);
+  assert.match(appShell, /to: '\/core-data\/output', label: 'Đầu ra'.*permissions: \['catalog\.view'\]/);
+  assert.doesNotMatch(appShell, /to: '\/core-data', label: 'Đối tác'/);
   assert.doesNotMatch(appShell, /label: 'Dữ liệu lõi'/);
-  assert.match(page, /title="Danh mục đối tác"/);
-  assert.match(page, /Quản lý khách hàng, nhà cung cấp, thầu phụ và các đơn vị phối hợp\./);
-  assert.match(page, />\s*Thêm đối tác\s*<\/button>/);
-  assert.match(page, /get<Partner\[]>\(`\/partners\?status=/);
+  assert.match(router, /path: '\/core-data'.*<Navigate to="\/core-data\/input" replace \/>/);
+  assert.match(router, /path: '\/core-data\/input'.*<CoreDataPage key="partner-input" group="input" \/>/);
+  assert.match(router, /path: '\/core-data\/output'.*<CoreDataPage key="partner-output" group="output" \/>/);
+  assert.match(page, /title: 'Danh mục đầu vào'/);
+  assert.match(page, /title: 'Danh mục đầu ra'/);
+  assert.match(page, /actionLabel: 'Thêm đầu vào'/);
+  assert.match(page, /actionLabel: 'Thêm đầu ra'/);
+  assert.match(page, /get<Partner\[]>\(`\/partners\?status=.*&group=\$\{group\}/);
+  assert.match(page, /outputPartnerTypeOptions\.map/);
+  assert.match(partnerUtils, /outputPartnerTypeOptions = partnerTypeOptions\.filter\(\(option\) => option\.value !== 'client'\)/);
+  assert.match(partnerUtils, /vendorPartnerTypes = outputPartnerTypeOptions\.map/);
 });
 
 test('material catalog presents the linked supplier as a reference source', async () => {
