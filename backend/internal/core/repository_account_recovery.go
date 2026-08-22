@@ -222,16 +222,16 @@ func (r *Repository) CreatePasswordResetToken(ctx context.Context, userID, token
 	return true, nil
 }
 
-func (r *Repository) ResetPasswordWithToken(ctx context.Context, tokenHash, passwordHash string) error {
+func (r *Repository) ResetPasswordWithToken(ctx context.Context, tokenHash, passwordHash, passwordValue string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	var tokenID, userID, fullName string
+	var tokenID, userID, fullName, currentPasswordHash string
 	err = tx.QueryRowContext(ctx, `
-		SELECT token.id::text,account.id::text,account.full_name
+		SELECT token.id::text,account.id::text,account.full_name,account.password_hash
 		FROM auth_email_tokens token
 		JOIN users account ON account.id=token.user_id
 		WHERE token.token_hash=$1 AND token.purpose=$2
@@ -245,9 +245,12 @@ func (r *Repository) ResetPasswordWithToken(ctx context.Context, tokenHash, pass
 			WHERE assignment.user_id=account.id AND role.external_only
 		  )
 		FOR UPDATE OF token,account
-	`, tokenHash, passwordResetPurpose).Scan(&tokenID, &userID, &fullName)
+	`, tokenHash, passwordResetPurpose).Scan(&tokenID, &userID, &fullName, &currentPasswordHash)
 	if err != nil {
 		return err
+	}
+	if passwordMatches(currentPasswordHash, passwordValue) {
+		return validationError("Mật khẩu mới phải khác mật khẩu hiện tại", Record{"field": "new_password"})
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE users SET password_hash=$2,updated_at=now() WHERE id=$1`, userID, passwordHash); err != nil {
 		return err

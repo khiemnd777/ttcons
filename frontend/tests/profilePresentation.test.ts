@@ -39,6 +39,8 @@ test('profile page keeps personal and password edits in shared dialogs', async (
   assert.match(profile, /toast\.warn|warnInvalidFields/);
   assert.match(profile, /toast\.success/);
   assert.match(profile, /toast\.error/);
+  assert.match(profile, /passwordValueSchema/);
+  assert.match(profile, /<PasswordInput/);
 });
 
 test('auth context can refresh the user summary after a non-sensitive profile update', async () => {

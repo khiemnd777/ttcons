@@ -7,13 +7,18 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
-import { FormDrawer } from '../../components/FormDrawer';
 import { useToast } from '../../components/ToastProvider';
 import { RowActions } from '../../components/RowActions';
 import { Dialog } from '../../components/Dialog';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { isAssignableAppRole } from '../../lib/utils/roles';
 import { enumOptions } from '../../lib/utils/status';
+import {
+  generateSuggestedPassword,
+  PASSWORD_RULE_HELPER,
+  passwordConfirmationMessage,
+  passwordValidationMessage,
+} from '../../lib/security/password';
 
 type StaffRole = {
   id: string;
@@ -35,6 +40,7 @@ type StaffRow = Record<string, any> & {
 type UpdateStaffResponse = StaffRow & {
   password_changed?: boolean;
   recovery_email_changed?: boolean;
+  identity_changed?: boolean;
   reauth_required?: boolean;
 };
 
@@ -59,7 +65,7 @@ export function StaffPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const { logout, hasPermission } = useAuth();
-  const canCreate = hasPermission('staff.create');
+  const canCreate = hasPermission('staff.create') && hasPermission('staff.account_security.manage');
   const canUpdate = hasPermission('staff.update');
   const canManageAccountSecurity = hasPermission('staff.account_security.manage');
   const canAssign = hasPermission('permission.assign');
@@ -70,10 +76,10 @@ export function StaffPage() {
 
   const create = useMutation({
     mutationFn: (values: Record<string, any>) => post('/staff', values),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staff'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['staff'] });
       setOpen(false);
-      toast.success('Đã tạo nhân sự');
+      toast.success('Đã tạo nhân sự và tài khoản đăng nhập');
     },
     onError: (error) => toast.error('Không tạo được nhân sự', error),
   });
@@ -82,7 +88,9 @@ export function StaffPage() {
     onSuccess: async (result) => {
       if (result.reauth_required) {
         setDialog(null);
-        toast.success('Đã cập nhật nhân sự và mật khẩu. Vui lòng đăng nhập lại.');
+        toast.success(result.password_changed
+          ? 'Đã cập nhật nhân sự và mật khẩu. Vui lòng đăng nhập lại.'
+          : 'Đã cập nhật danh tính tài khoản. Vui lòng đăng nhập lại.');
         await logout();
         navigate('/login', { replace: true });
         return;
@@ -108,12 +116,38 @@ export function StaffPage() {
   });
 
   const staffFields = (record?: StaffRow) => [
-    { name: 'full_name', label: 'Họ tên', defaultValue: record?.full_name ?? 'Nhân sự mới', required: true },
-    { name: 'email', label: 'Email', defaultValue: record?.email ?? `staff${Date.now().toString().slice(-4)}@consflow.local`, required: true },
+    { name: 'full_name', label: 'Họ tên', defaultValue: record?.full_name ?? '', required: true },
+    { name: 'email', label: 'Email đăng nhập', type: 'email' as const, defaultValue: record?.email ?? '', required: true },
     { name: 'phone', label: 'Điện thoại', defaultValue: record?.phone ?? '' },
-    { name: 'department', label: 'Phòng ban', defaultValue: record?.department ?? 'Dự án', required: true },
-    { name: 'position', label: 'Chức vụ', defaultValue: record?.position ?? 'Nhân viên', required: true },
+    { name: 'department', label: 'Phòng ban', defaultValue: record?.department ?? '', placeholder: 'Không bắt buộc', helperText: 'Dùng cho phân công công việc theo phòng ban.' },
+    { name: 'position', label: 'Chức vụ', defaultValue: record?.position ?? '', placeholder: 'Không bắt buộc', helperText: 'Chỉ là chức danh hồ sơ, không cấp quyền hệ thống.' },
     { name: 'status', label: 'Trạng thái', type: 'select' as const, defaultValue: record?.status ?? 'active', required: true, options: enumOptions('status', ['active', 'inactive']) },
+  ];
+
+  const staffCreateFields = () => [
+    ...staffFields(),
+    {
+      name: 'password',
+      label: 'Mật khẩu ban đầu',
+      type: 'password' as const,
+      defaultValue: '',
+      required: true,
+      fullWidth: true,
+      helperText: PASSWORD_RULE_HELPER,
+      validate: (value: unknown) => passwordValidationMessage(String(value ?? ''), 'Mật khẩu'),
+      suggestValue: generateSuggestedPassword,
+      suggestLabel: 'Đề xuất mật khẩu',
+    },
+    {
+      name: 'recovery_email',
+      label: 'Email khôi phục',
+      type: 'email' as const,
+      defaultValue: '',
+      fullWidth: true,
+      placeholder: 'Không bắt buộc',
+      helperText: 'Nếu nhập, email này được xác minh ngay để nhân sự có thể khôi phục tài khoản.',
+      validate: validateOptionalRecoveryEmail,
+    },
   ];
 
   const staffEditFields = (record: StaffRow) => [
@@ -125,8 +159,16 @@ export function StaffPage() {
         type: 'password' as const,
         defaultValue: '',
         placeholder: 'Để trống nếu không thay đổi',
-        helperText: 'Tối thiểu 8 ký tự, tối đa 72 byte. Lưu mật khẩu mới sẽ đăng xuất tài khoản này khỏi mọi thiết bị.',
+        helperText: `${PASSWORD_RULE_HELPER} Lưu mật khẩu mới sẽ đăng xuất tài khoản này khỏi mọi thiết bị.`,
         validate: validateOptionalPassword,
+      },
+      {
+        name: 'new_password_confirmation',
+        label: 'Nhập lại mật khẩu mới',
+        type: 'password' as const,
+        defaultValue: '',
+        placeholder: 'Nhập lại nếu đổi mật khẩu',
+        validate: validateOptionalPasswordConfirmation,
       },
       {
         name: 'recovery_email',
@@ -139,6 +181,9 @@ export function StaffPage() {
       },
     ] : []),
   ];
+
+  const createFields = useMemo(staffCreateFields, []);
+  const editFields = useMemo(() => dialog ? staffEditFields(dialog) : [], [canManageAccountSecurity, dialog]);
 
   return (
     <>
@@ -158,8 +203,8 @@ export function StaffPage() {
         columns={[
           { key: 'full_name', header: 'Họ tên', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.full_name}</span> },
           { key: 'email', header: 'Email', sortable: true },
-          { key: 'department', header: 'Phòng ban', sortable: true },
-          { key: 'position', header: 'Chức vụ' },
+          { key: 'department', header: 'Phòng ban', sortable: true, render: (row) => optionalStaffValue(row.department) },
+          { key: 'position', header: 'Chức vụ', render: (row) => optionalStaffValue(row.position) },
           { key: 'roles', header: 'Role', filterValue: (row) => roleLabels(row).join(' '), render: (row) => <RoleSummary roles={row.user_roles ?? []} /> },
           { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
           {
@@ -183,9 +228,34 @@ export function StaffPage() {
           },
         ]}
       />
-      <FormDrawer open={open} title="Tạo nhân sự" onClose={() => setOpen(false)}>
-        <SimpleForm fields={staffFields()} onSubmit={(values) => create.mutateAsync(values)} />
-      </FormDrawer>
+      <Dialog
+        open={open}
+        title="Tạo nhân sự"
+        description="Tạo đồng thời hồ sơ nhân sự và tài khoản đăng nhập. Vai trò được gán riêng sau khi tạo."
+        size="lg"
+        onClose={() => setOpen(false)}
+      >
+        <SimpleForm
+          submitLabel="Tạo nhân sự & tài khoản"
+          cancelLabel="Hủy"
+          layout="two-column"
+          fields={createFields}
+          sections={[
+            {
+              title: 'Thông tin nhân sự',
+              description: 'Thông tin liên hệ và hồ sơ công việc.',
+              fields: ['full_name', 'email', 'phone', 'department', 'position', 'status'],
+            },
+            {
+              title: 'Tài khoản đăng nhập',
+              description: 'Mật khẩu được lưu dưới dạng mã băm; hệ thống không thể hiển thị lại sau khi tạo.',
+              fields: ['password', 'recovery_email'],
+            },
+          ]}
+          onCancel={() => setOpen(false)}
+          onSubmit={(values) => create.mutateAsync(values)}
+        />
+      </Dialog>
       <Dialog
         open={Boolean(dialog)}
         title="Chỉnh sửa nhân sự"
@@ -208,7 +278,7 @@ export function StaffPage() {
               submitLabel="Lưu thay đổi"
               cancelLabel="Hủy"
               layout="two-column"
-              fields={staffEditFields(dialog)}
+              fields={editFields}
               sections={[
                 {
                   title: 'Thông tin nhân sự',
@@ -218,7 +288,7 @@ export function StaffPage() {
                 ...(canManageAccountSecurity && dialog.user_id ? [{
                   title: 'Bảo mật tài khoản',
                   description: 'Các trường không bắt buộc; để trống để giữ nguyên. Thay đổi được áp dụng trực tiếp, không gửi email xác nhận.',
-                  fields: ['new_password', 'recovery_email'],
+                  fields: ['new_password', 'new_password_confirmation', 'recovery_email'],
                 }] : []),
               ]}
               onCancel={() => setDialog(null)}
@@ -259,10 +329,14 @@ function recoveryEmailHelperText(record: StaffRow) {
 function validateOptionalPassword(value: unknown) {
   const password = String(value ?? '');
   if (!password) return undefined;
-  if (Array.from(password).length < 8 || new TextEncoder().encode(password).length > 72) {
-    return 'Mật khẩu mới phải có ít nhất 8 ký tự và không vượt quá 72 byte';
-  }
-  return undefined;
+  return passwordValidationMessage(password);
+}
+
+function validateOptionalPasswordConfirmation(value: unknown, values: Record<string, any>) {
+  const password = String(values.new_password ?? '');
+  const confirmation = String(value ?? '');
+  if (!password && !confirmation) return undefined;
+  return passwordConfirmationMessage(confirmation, password);
 }
 
 function validateOptionalRecoveryEmail(value: unknown) {
@@ -272,6 +346,11 @@ function validateOptionalRecoveryEmail(value: unknown) {
     return 'Email khôi phục không hợp lệ';
   }
   return undefined;
+}
+
+function optionalStaffValue(value: unknown) {
+  const text = String(value ?? '').trim();
+  return text || <span className="text-slate-400">—</span>;
 }
 
 function RoleSummary({ roles }: { roles: StaffRole[] }) {

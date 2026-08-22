@@ -2,6 +2,7 @@ import { FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { ChevronDown, X } from 'lucide-react';
 import { CurrencyInput } from '../../components/CurrencyInput';
+import { PasswordInput } from '../../components/PasswordInput';
 import { useToast } from '../../components/ToastProvider';
 
 type FieldType = 'text' | 'email' | 'password' | 'number' | 'currency' | 'date' | 'textarea' | 'select' | 'multi-select' | 'checkbox';
@@ -26,6 +27,8 @@ export type FieldDef = {
   hiddenWhen?: (values: FormValues) => boolean;
   disabledWhen?: (values: FormValues) => boolean;
   validate?: (value: any, values: FormValues) => string | undefined;
+  suggestValue?: () => string;
+  suggestLabel?: string;
 };
 
 type FormErrors = Record<string, string>;
@@ -142,7 +145,7 @@ export function SimpleForm({
           const error = errors[field.name];
           const disabled = saving || Boolean(field.disabledWhen?.(values));
           const controlClassName = clsx(
-            'mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring',
+            'w-full rounded-md border px-3 py-2 text-sm focus-ring',
             error ? 'border-rose-300 bg-rose-50' : 'border-line',
             disabled && 'cursor-not-allowed bg-slate-100 text-slate-500',
           );
@@ -153,7 +156,7 @@ export function SimpleForm({
               {field.required ? <span className="ml-1 text-rose-600">*</span> : null}
               {field.type === 'textarea' ? (
                 <textarea
-                  className={clsx(controlClassName, 'min-h-24')}
+                  className={clsx(controlClassName, 'mt-1 min-h-24')}
                   placeholder={field.placeholder}
                   value={values[field.name] ?? ''}
                   onChange={(event) => setFieldValue(field, event.target.value)}
@@ -177,7 +180,7 @@ export function SimpleForm({
                 />
               ) : field.type === 'select' ? (
                 <select
-                  className={controlClassName}
+                  className={clsx(controlClassName, 'mt-1')}
                   value={values[field.name] ?? ''}
                   onChange={(event) => setFieldValue(field, event.target.value)}
                   aria-invalid={Boolean(error)}
@@ -211,10 +214,24 @@ export function SimpleForm({
                   />
                   {field.helperText ? <span className="text-xs text-slate-500">{field.helperText}</span> : null}
                 </span>
+              ) : field.type === 'password' ? (
+                <span className="mt-1 block">
+                  <PasswordInput
+                    autoComplete="new-password"
+                    className={controlClassName}
+                    placeholder={field.placeholder}
+                    value={values[field.name] ?? ''}
+                    onChange={(event) => setFieldValue(field, event.target.value)}
+                    invalid={Boolean(error)}
+                    disabled={disabled}
+                    onSuggest={field.suggestValue ? () => setFieldValue(field, field.suggestValue?.() ?? '') : undefined}
+                    suggestLabel={field.suggestLabel}
+                  />
+                </span>
               ) : (
                 <input
                   type={field.type ?? 'text'}
-                  className={controlClassName}
+                  className={clsx(controlClassName, 'mt-1')}
                   placeholder={field.placeholder}
                   value={values[field.name] ?? ''}
                   onChange={(event) => setFieldValue(field, event.target.value)}

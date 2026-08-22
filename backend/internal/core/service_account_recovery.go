@@ -210,7 +210,7 @@ func (s *Service) ResetPassword(ctx context.Context, req ResetPasswordRequest) (
 	if err != nil {
 		return nil, err
 	}
-	if err := s.repo.ResetPasswordWithToken(ctx, hashSessionToken(strings.TrimSpace(req.Token)), string(passwordHash)); err != nil {
+	if err := s.repo.ResetPasswordWithToken(ctx, hashSessionToken(strings.TrimSpace(req.Token)), string(passwordHash), req.NewPassword); err != nil {
 		if recoveryTokenNotFound(err) {
 			return nil, invalidRecoveryTokenError()
 		}
@@ -229,20 +229,6 @@ func normalizeRecoveryEmail(raw string) (string, error) {
 		return "", validationError("Email khôi phục không hợp lệ", Record{"field": "recovery_email"})
 	}
 	return email, nil
-}
-
-func validateNewPassword(password, confirmation string) error {
-	if password != confirmation {
-		return validationError("Mật khẩu xác nhận không khớp", Record{"field": "new_password_confirmation"})
-	}
-	return validatePasswordValue(password)
-}
-
-func validatePasswordValue(password string) error {
-	if count := len([]rune(password)); count < 8 || len([]byte(password)) > 72 {
-		return validationError("Mật khẩu mới phải có ít nhất 8 ký tự và không vượt quá 72 byte", Record{"field": "new_password"})
-	}
-	return nil
 }
 
 func recoveryUnavailableError() StatusError {

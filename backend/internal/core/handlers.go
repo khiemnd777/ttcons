@@ -4331,7 +4331,18 @@ func (h *Handler) CreateStaff(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"staff.create"}); err != nil {
 		return err
 	}
-	return h.create(c, "staff", staffColumns())
+	if err := h.requirePermission(c, []string{"staff.account_security.manage"}); err != nil {
+		return err
+	}
+	var req CreateStaffRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu nhân sự không hợp lệ")
+	}
+	row, err := h.service.CreateStaff(c.Context(), actorID(c), actorName(c), req)
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
 }
 func (h *Handler) UpdateStaff(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"staff.update"}); err != nil {

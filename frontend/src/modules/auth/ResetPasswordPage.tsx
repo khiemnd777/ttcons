@@ -5,17 +5,20 @@ import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 import { KeyRound } from 'lucide-react';
 import { z } from 'zod';
+import { PasswordInput } from '../../components/PasswordInput';
 import { useToast } from '../../components/ToastProvider';
 import { post } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
+import { PASSWORD_RULE_HELPER, passwordConfirmationMessage, passwordValueSchema } from '../../lib/security/password';
 import { AuthCard } from './AuthCard';
 import { clearRecoveryTokenFragment, recoveryTokenFromFragment } from './recoveryToken';
 
 const schema = z.object({
-  new_password: z.string().min(8, 'Mật khẩu mới phải có ít nhất 8 ký tự').refine((value) => new TextEncoder().encode(value).length <= 72, 'Mật khẩu mới không được vượt quá 72 byte'),
+  new_password: passwordValueSchema(),
   new_password_confirmation: z.string().min(1, 'Nhập lại mật khẩu mới'),
 }).superRefine((values, context) => {
-  if (values.new_password !== values.new_password_confirmation) context.addIssue({ code: 'custom', path: ['new_password_confirmation'], message: 'Mật khẩu xác nhận không khớp' });
+  const confirmationError = passwordConfirmationMessage(values.new_password_confirmation, values.new_password);
+  if (confirmationError) context.addIssue({ code: 'custom', path: ['new_password_confirmation'], message: confirmationError });
 });
 type Values = z.infer<typeof schema>;
 
@@ -51,9 +54,9 @@ export function ResetPasswordPage() {
         </div>
       ) : (
         <form className="space-y-4" onSubmit={form.handleSubmit((values) => resetPassword.mutate(values))} noValidate>
-          <PasswordInput label="Mật khẩu mới" error={form.formState.errors.new_password?.message} registration={form.register('new_password')} />
-          <PasswordInput label="Nhập lại mật khẩu mới" error={form.formState.errors.new_password_confirmation?.message} registration={form.register('new_password_confirmation')} />
-          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm leading-5 text-slate-600">Mật khẩu cần ít nhất 8 ký tự và không vượt quá 72 byte.</p>
+          <PasswordField label="Mật khẩu mới" error={form.formState.errors.new_password?.message} registration={form.register('new_password')} />
+          <PasswordField label="Nhập lại mật khẩu mới" error={form.formState.errors.new_password_confirmation?.message} registration={form.register('new_password_confirmation')} />
+          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm leading-5 text-slate-600">{PASSWORD_RULE_HELPER}</p>
           <button disabled={resetPassword.isPending} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
             <KeyRound className="h-4 w-4" />
             {resetPassword.isPending ? 'Đang cập nhật...' : 'Đặt lại mật khẩu'}
@@ -74,11 +77,18 @@ function InvalidLink() {
   );
 }
 
-function PasswordInput({ label, error, registration }: { label: string; error?: string; registration: ReturnType<ReturnType<typeof useForm<Values>>['register']> }) {
+function PasswordField({ label, error, registration }: { label: string; error?: string; registration: ReturnType<ReturnType<typeof useForm<Values>>['register']> }) {
   return (
     <label className="block text-sm font-semibold text-slate-700">
       {label} <span className="text-rose-600">*</span>
-      <input type="password" autoComplete="new-password" className={`mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring ${error ? 'border-rose-400 bg-rose-50' : 'border-line'}`} {...registration} />
+      <span className="mt-1 block">
+        <PasswordInput
+          autoComplete="new-password"
+          className={`w-full rounded-md border px-3 py-2 text-sm focus-ring ${error ? 'border-rose-400 bg-rose-50' : 'border-line'}`}
+          invalid={Boolean(error)}
+          {...registration}
+        />
+      </span>
       {error ? <span className="mt-1 block text-xs font-medium text-rose-600">{error}</span> : null}
     </label>
   );

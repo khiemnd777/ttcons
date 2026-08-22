@@ -280,6 +280,9 @@ func TestRecoveryEmailAndPasswordResetLifecycle(t *testing.T) {
 		t.Fatalf("reset recipient=%q, want verified recovery email", resetMessage.To)
 	}
 	resetToken := tokenFromMail(t, resetMessage)
+	if _, err := service.ResetPassword(ctx, ResetPasswordRequest{Token: resetToken, NewPassword: "old-secret", NewPasswordConfirmation: "old-secret"}); err == nil {
+		t.Fatal("recovery reset accepted the current password")
+	}
 	if _, err := service.ResetPassword(ctx, ResetPasswordRequest{Token: resetToken, NewPassword: "new-secret-123", NewPasswordConfirmation: "new-secret-123"}); err != nil {
 		t.Fatal(err)
 	}

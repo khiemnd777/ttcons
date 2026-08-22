@@ -4,12 +4,13 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LogIn } from 'lucide-react';
+import { PasswordInput } from '../../components/PasswordInput';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { AuthCard } from './AuthCard';
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().email('Email đăng nhập không hợp lệ'),
+  password: z.string().min(1, 'Nhập mật khẩu'),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -31,6 +32,7 @@ export function LoginPage() {
     <AuthCard title="Đăng nhập" description="Dùng tài khoản của anh/chị để vào Thủ Thiêm Workflow.">
         <form
           className="space-y-4"
+          noValidate
           onSubmit={form.handleSubmit(async (values) => {
             setError('');
             try {
@@ -43,14 +45,23 @@ export function LoginPage() {
         >
           <label className="block">
             <span className="text-sm font-semibold text-slate-700">Email</span>
-            <input className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm focus-ring" {...form.register('email')} />
+            <input type="email" autoComplete="email" className={`mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring ${form.formState.errors.email ? 'border-rose-400 bg-rose-50' : 'border-line'}`} {...form.register('email')} />
+            {form.formState.errors.email?.message ? <span className="mt-1 block text-xs font-medium text-rose-600">{form.formState.errors.email.message}</span> : null}
           </label>
           <label className="block">
             <span className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-700">
               Mật khẩu
               <Link className="text-xs text-blue-700 hover:text-blue-800" to="/forgot-password">Quên mật khẩu?</Link>
             </span>
-            <input type="password" className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm focus-ring" {...form.register('password')} />
+            <span className="mt-1 block">
+              <PasswordInput
+                autoComplete="current-password"
+                className={`w-full rounded-md border px-3 py-2 text-sm focus-ring ${form.formState.errors.password ? 'border-rose-400 bg-rose-50' : 'border-line'}`}
+                invalid={Boolean(form.formState.errors.password)}
+                {...form.register('password')}
+              />
+            </span>
+            {form.formState.errors.password?.message ? <span className="mt-1 block text-xs font-medium text-rose-600">{form.formState.errors.password.message}</span> : null}
           </label>
           {error ? <p className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
           <button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">

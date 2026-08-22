@@ -10,6 +10,8 @@ test('account recovery pages are public and login exposes the forgot-password en
   const router = await source('../src/app/router.tsx');
   const login = await source('../src/modules/auth/LoginPage.tsx');
 
+  assert.match(login, /<PasswordInput/);
+
   assert.match(router, /path: '\/forgot-password'[\s\S]*?<ForgotPasswordPage \/>/);
   assert.match(router, /path: '\/reset-password'[\s\S]*?<ResetPasswordPage \/>/);
   assert.match(router, /path: '\/verify-recovery-email'[\s\S]*?<VerifyRecoveryEmailPage \/>/);
@@ -20,6 +22,9 @@ test('recovery tokens use URL fragments and are removed from browser history', a
   const helper = await source('../src/modules/auth/recoveryToken.ts');
   const reset = await source('../src/modules/auth/ResetPasswordPage.tsx');
   const verify = await source('../src/modules/auth/VerifyRecoveryEmailPage.tsx');
+
+  assert.match(reset, /passwordValueSchema/);
+  assert.match(reset, /<PasswordInput/);
 
   assert.match(helper, /window\.location\.hash/);
   assert.match(helper, /window\.history\.replaceState/);

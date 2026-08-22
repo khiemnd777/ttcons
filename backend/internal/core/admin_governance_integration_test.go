@@ -98,11 +98,15 @@ func TestAdminStaffAccountSecurityManagement(t *testing.T) {
 	unlinkedStaffID := newID()
 	limitedRoleID := ensureRole(t, db, "staff_security_limited_"+suffix[:8], "Staff Security Limited")
 	staffViewPermissionID := ensurePermission(t, db, "staff.view", "Xem nhân sự", "staff")
+	staffCreatePermissionID := ensurePermission(t, db, "staff.create", "Tạo nhân sự", "staff")
 	staffUpdatePermissionID := ensurePermission(t, db, "staff.update", "Sửa nhân sự", "staff")
 	staffSecurityPermissionID := ensurePermission(t, db, "staff.account_security.manage", "Quản trị bảo mật tài khoản nhân sự", "staff")
 	actorEmail := "staff-security-actor-" + suffix[:8] + "@test.local"
 	targetEmail := "staff-security-target-" + suffix[:8] + "@test.local"
 	recoveryEmail := "staff-security-recovery-" + suffix[:8] + "@example.com"
+	createdEmail := "staff-created-" + suffix[:8] + "@test.local"
+	createdRecoveryEmail := "staff-created-recovery-" + suffix[:8] + "@example.com"
+	createdPassword := "Created-Staff-123!"
 	newPassword := "Admin-Reset-123!"
 
 	t.Cleanup(func() {
@@ -110,16 +114,18 @@ func TestAdminStaffAccountSecurityManagement(t *testing.T) {
 		_, _ = db.ExecContext(ctx, `DELETE FROM auth_email_tokens WHERE user_id IN ($1,$2)`, actorID, targetUserID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM auth_sessions WHERE user_id IN ($1,$2)`, actorID, targetUserID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1`, actorID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE email=$1`, createdEmail)
 		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id IN ($1,$2,$3)`, targetStaffID, actorStaffID, unlinkedStaffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE email=$1`, createdEmail)
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id IN ($1,$2)`, actorID, targetUserID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, limitedRoleID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, limitedRoleID)
 	})
 
 	mustExec(t, db, `
-		INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2),($1,$3)
+		INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2),($1,$3),($1,$4)
 		ON CONFLICT DO NOTHING
-	`, limitedRoleID, staffViewPermissionID, staffUpdatePermissionID)
+	`, limitedRoleID, staffViewPermissionID, staffUpdatePermissionID, staffCreatePermissionID)
 	mustExec(t, db, `
 		INSERT INTO users (id,email,password_hash,full_name,status) VALUES
 			($1,$2,'demo:actor-password','Security Actor','active'),
@@ -149,7 +155,21 @@ func TestAdminStaffAccountSecurityManagement(t *testing.T) {
 		return c.Next()
 	})
 	app.Get("/staff", handler.ListStaff)
+	app.Post("/staff", handler.CreateStaff)
 	app.Put("/staff/:id", handler.UpdateStaff)
+	createBody := fmt.Sprintf(`{"full_name":"Created Staff","email":"%s","phone":"0901234567","department":"   ","position":"","status":"active","password":"%s","recovery_email":"%s"}`, createdEmail, createdPassword, createdRecoveryEmail)
+	deniedCreateRequest := httptest.NewRequest(http.MethodPost, "/staff", strings.NewReader(createBody))
+	deniedCreateRequest.Header.Set("Content-Type", "application/json")
+	deniedCreateResponse, err := app.Test(deniedCreateRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deniedCreateResponse.StatusCode != http.StatusForbidden {
+		t.Fatalf("staff create status=%d, want %d without staff.account_security.manage", deniedCreateResponse.StatusCode, http.StatusForbidden)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM users WHERE email=$1`, 0, createdEmail)
+	assertCount(t, db, `SELECT COUNT(*) FROM staff WHERE email=$1`, 0, createdEmail)
+
 	deniedRequest := httptest.NewRequest(http.MethodPut, "/staff/"+targetStaffID, strings.NewReader(`{"new_password":"Denied-Reset-123!"}`))
 	deniedRequest.Header.Set("Content-Type", "application/json")
 	deniedResponse, err := app.Test(deniedRequest)
@@ -161,10 +181,14 @@ func TestAdminStaffAccountSecurityManagement(t *testing.T) {
 	}
 
 	fullName := "Security Target Updated"
+	blankOrganizationValue := "   "
 	result, err := service.UpdateStaff(ctx, targetStaffID, actorID, actorEmail, UpdateStaffRequest{
-		FullName:      &fullName,
-		NewPassword:   newPassword,
-		RecoveryEmail: recoveryEmail,
+		FullName:                &fullName,
+		Department:              &blankOrganizationValue,
+		Position:                &blankOrganizationValue,
+		NewPassword:             newPassword,
+		NewPasswordConfirmation: newPassword,
+		RecoveryEmail:           recoveryEmail,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -174,12 +198,14 @@ func TestAdminStaffAccountSecurityManagement(t *testing.T) {
 	}
 
 	var passwordHash, storedRecoveryEmail, targetStatus, targetStaffStatus, verifiedAt string
+	var targetDepartmentMissing, targetPositionMissing bool
 	if err := db.QueryRowContext(ctx, `
-		SELECT account.password_hash,account.recovery_email,account.status,person.status,account.recovery_email_verified_at::text
+		SELECT account.password_hash,account.recovery_email,account.status,person.status,account.recovery_email_verified_at::text,
+			person.department IS NULL,person.position IS NULL
 		FROM users account
 		JOIN staff person ON person.user_id=account.id
 		WHERE account.id=$1 AND person.id=$2
-	`, targetUserID, targetStaffID).Scan(&passwordHash, &storedRecoveryEmail, &targetStatus, &targetStaffStatus, &verifiedAt); err != nil {
+	`, targetUserID, targetStaffID).Scan(&passwordHash, &storedRecoveryEmail, &targetStatus, &targetStaffStatus, &verifiedAt, &targetDepartmentMissing, &targetPositionMissing); err != nil {
 		t.Fatal(err)
 	}
 	if bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(newPassword)) != nil {
@@ -190,6 +216,9 @@ func TestAdminStaffAccountSecurityManagement(t *testing.T) {
 	}
 	if targetStatus != "inactive" || targetStaffStatus != "inactive" {
 		t.Fatalf("security update changed inactive state: user=%q staff=%q", targetStatus, targetStaffStatus)
+	}
+	if !targetDepartmentMissing || !targetPositionMissing {
+		t.Fatalf("blank Staff organization values were not cleared to NULL: department_missing=%t position_missing=%t", targetDepartmentMissing, targetPositionMissing)
 	}
 
 	readStaff := func() []Record {
@@ -229,6 +258,48 @@ func TestAdminStaffAccountSecurityManagement(t *testing.T) {
 	}
 
 	mustExec(t, db, `INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, limitedRoleID, staffSecurityPermissionID)
+	createRequest := httptest.NewRequest(http.MethodPost, "/staff", strings.NewReader(createBody))
+	createRequest.Header.Set("Content-Type", "application/json")
+	createResponse, err := app.Test(createRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if createResponse.StatusCode != http.StatusCreated {
+		t.Fatalf("staff create status=%d, want %d", createResponse.StatusCode, http.StatusCreated)
+	}
+	var createdUserID, createdStaffID, createdPasswordHash, storedCreatedRecovery, createdVerifiedAt string
+	var createdDepartmentMissing, createdPositionMissing bool
+	if err := db.QueryRowContext(ctx, `
+		SELECT account.id::text,person.id::text,account.password_hash,account.recovery_email,account.recovery_email_verified_at::text,
+			person.department IS NULL,person.position IS NULL
+		FROM users account JOIN staff person ON person.user_id=account.id
+		WHERE account.email=$1 AND person.email=$1 AND account.full_name=person.full_name AND account.status=person.status
+	`, createdEmail).Scan(&createdUserID, &createdStaffID, &createdPasswordHash, &storedCreatedRecovery, &createdVerifiedAt, &createdDepartmentMissing, &createdPositionMissing); err != nil {
+		t.Fatal(err)
+	}
+	if bcrypt.CompareHashAndPassword([]byte(createdPasswordHash), []byte(createdPassword)) != nil {
+		t.Fatal("created staff password was not stored as bcrypt")
+	}
+	if storedCreatedRecovery != createdRecoveryEmail || createdVerifiedAt == "" {
+		t.Fatalf("created recovery email=%q verified_at=%q", storedCreatedRecovery, createdVerifiedAt)
+	}
+	if !createdDepartmentMissing || !createdPositionMissing {
+		t.Fatalf("created blank Staff organization values were not stored as NULL: department_missing=%t position_missing=%t", createdDepartmentMissing, createdPositionMissing)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM user_roles WHERE user_id=$1`, 0, createdUserID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE actor_id=$1 AND target_id IN ($2,$3) AND event_type IN ('user_account_created_by_admin','staff_created_with_account')`, 2, actorID, createdUserID, createdStaffID)
+	duplicateCreateRequest := httptest.NewRequest(http.MethodPost, "/staff", strings.NewReader(createBody))
+	duplicateCreateRequest.Header.Set("Content-Type", "application/json")
+	duplicateCreateResponse, err := app.Test(duplicateCreateRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if duplicateCreateResponse.StatusCode != http.StatusConflict {
+		t.Fatalf("duplicate staff create status=%d, want %d", duplicateCreateResponse.StatusCode, http.StatusConflict)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM users WHERE email=$1`, 1, createdEmail)
+	assertCount(t, db, `SELECT COUNT(*) FROM staff WHERE email=$1`, 1, createdEmail)
+
 	privilegedRow := findTargetStaff(readStaff())
 	if got, want := fmt.Sprint(privilegedRow["recovery_email_masked"]), "sta***@e**.com"; got != want {
 		t.Fatalf("masked recovery email=%q, want %q", got, want)
@@ -248,14 +319,37 @@ func TestAdminStaffAccountSecurityManagement(t *testing.T) {
 	if err := db.QueryRowContext(ctx, `SELECT string_agg(metadata_json::text,' ') FROM audit_logs WHERE actor_id=$1`, actorID).Scan(&auditMetadata); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(auditMetadata, newPassword) || strings.Contains(auditMetadata, recoveryEmail) {
+	if strings.Contains(auditMetadata, newPassword) || strings.Contains(auditMetadata, recoveryEmail) || strings.Contains(auditMetadata, createdPassword) || strings.Contains(auditMetadata, createdRecoveryEmail) {
 		t.Fatalf("security secret leaked into audit metadata: %s", auditMetadata)
 	}
+	if _, err := service.UpdateStaff(ctx, targetStaffID, actorID, actorEmail, UpdateStaffRequest{NewPassword: newPassword, NewPasswordConfirmation: newPassword}); err == nil {
+		t.Fatal("admin reset accepted the current password")
+	}
 
-	if _, err := service.UpdateStaff(ctx, unlinkedStaffID, actorID, actorEmail, UpdateStaffRequest{NewPassword: newPassword}); err == nil {
+	mustExec(t, db, `
+		INSERT INTO auth_sessions (user_id,refresh_token_hash,access_token_id,expires_at)
+		VALUES ($1,$2,$3,now()+interval '1 day')
+	`, targetUserID, strings.Repeat("c", 56)+suffix[:8], "identity-session-"+suffix)
+	identityEmail := "staff-security-renamed-" + suffix[:8] + "@test.local"
+	activeStatus := "active"
+	identityResult, err := service.UpdateStaff(ctx, targetStaffID, actorID, actorEmail, UpdateStaffRequest{Email: &identityEmail, Status: &activeStatus})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if identityResult["identity_changed"] != true || identityResult["reauth_required"] != false {
+		t.Fatalf("unexpected identity sync response: %#v", identityResult)
+	}
+	assertCount(t, db, `
+		SELECT COUNT(*) FROM users account JOIN staff person ON person.user_id=account.id
+		WHERE account.id=$1 AND person.id=$2 AND account.email=$3 AND person.email=$3 AND account.status='active' AND person.status='active'
+	`, 1, targetUserID, targetStaffID, identityEmail)
+	assertCount(t, db, `SELECT COUNT(*) FROM auth_sessions WHERE access_token_id=$1 AND revoked_at IS NOT NULL`, 1, "identity-session-"+suffix)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE actor_id=$1 AND target_id=$2 AND event_type='user_identity_synced_by_admin'`, 2, actorID, targetUserID)
+
+	if _, err := service.UpdateStaff(ctx, unlinkedStaffID, actorID, actorEmail, UpdateStaffRequest{NewPassword: newPassword, NewPasswordConfirmation: newPassword}); err == nil {
 		t.Fatal("expected unlinked staff account-security update to fail")
 	}
-	selfResult, err := service.UpdateStaff(ctx, actorStaffID, actorID, actorEmail, UpdateStaffRequest{NewPassword: "Actor-Reset-123!"})
+	selfResult, err := service.UpdateStaff(ctx, actorStaffID, actorID, actorEmail, UpdateStaffRequest{NewPassword: "Actor-Reset-123!", NewPasswordConfirmation: "Actor-Reset-123!"})
 	if err != nil {
 		t.Fatal(err)
 	}

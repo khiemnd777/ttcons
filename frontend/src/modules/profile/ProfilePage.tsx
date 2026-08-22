@@ -3,13 +3,15 @@ import { useMutation } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type FieldErrors, type UseFormRegisterReturn } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { BriefcaseBusiness, Building2, Eye, EyeOff, KeyRound, Mail, Pencil, Phone, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import { BriefcaseBusiness, Building2, KeyRound, Mail, Pencil, Phone, ShieldCheck, Trash2, UserRound } from 'lucide-react';
 import { z } from 'zod';
 import { Dialog } from '../../components/Dialog';
 import { PageHeader } from '../../components/PageHeader';
+import { PasswordInput } from '../../components/PasswordInput';
 import { useToast } from '../../components/ToastProvider';
 import { api, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
+import { PASSWORD_RULE_HELPER, passwordConfirmationMessage, passwordValueSchema } from '../../lib/security/password';
 import type { User } from '../../lib/types/domain';
 
 type ProfileFormValues = {
@@ -41,14 +43,11 @@ type ProfileUpdateResponse = {
 
 const passwordSchema = z.object({
   current_password: z.string().min(1, 'Nhập mật khẩu hiện tại'),
-  new_password: z.string()
-    .min(8, 'Mật khẩu mới phải có ít nhất 8 ký tự')
-    .refine((value) => new TextEncoder().encode(value).length <= 72, 'Mật khẩu mới không được vượt quá 72 byte'),
+  new_password: passwordValueSchema(),
   new_password_confirmation: z.string().min(1, 'Nhập lại mật khẩu mới'),
 }).superRefine((values, context) => {
-  if (values.new_password !== values.new_password_confirmation) {
-    context.addIssue({ code: 'custom', path: ['new_password_confirmation'], message: 'Mật khẩu xác nhận không khớp' });
-  }
+  const confirmationError = passwordConfirmationMessage(values.new_password_confirmation, values.new_password);
+  if (confirmationError) context.addIssue({ code: 'custom', path: ['new_password_confirmation'], message: confirmationError });
   if (values.current_password && values.current_password === values.new_password) {
     context.addIssue({ code: 'custom', path: ['new_password'], message: 'Mật khẩu mới phải khác mật khẩu hiện tại' });
   }
@@ -395,7 +394,7 @@ export function ProfilePage() {
             registration={passwordForm.register('new_password_confirmation')}
             error={passwordForm.formState.errors.new_password_confirmation?.message}
           />
-          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm leading-5 text-slate-600">Mật khẩu mới phải có ít nhất 8 ký tự. Sau khi đổi, hệ thống sẽ đăng xuất tài khoản khỏi tất cả thiết bị.</p>
+          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm leading-5 text-slate-600">{PASSWORD_RULE_HELPER} Sau khi đổi, hệ thống sẽ đăng xuất tài khoản khỏi tất cả thiết bị.</p>
         </form>
       </Dialog>
 
@@ -489,11 +488,16 @@ function PasswordField({ id, label, required, autoComplete, visible, onToggle, r
 }) {
   return (
     <FormField label={label} required={required} error={error}>
-      <span className="relative block">
-        <input id={id} type={visible ? 'text' : 'password'} autoComplete={autoComplete} className={`${inputClass(Boolean(error))} pr-11`} {...registration} />
-        <button type="button" className="absolute inset-y-0 right-0 grid w-10 place-items-center text-slate-500 hover:text-ink" onClick={onToggle} aria-label={visible ? `Ẩn ${label.toLowerCase()}` : `Hiện ${label.toLowerCase()}`}>
-          {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
+      <span className="block">
+        <PasswordInput
+          id={id}
+          autoComplete={autoComplete}
+          className={inputClass(Boolean(error))}
+          visible={visible}
+          onVisibilityChange={onToggle}
+          invalid={Boolean(error)}
+          {...registration}
+        />
       </span>
     </FormField>
   );
