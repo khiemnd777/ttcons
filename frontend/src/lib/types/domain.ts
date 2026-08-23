@@ -387,6 +387,7 @@ export type WorkflowFormManagedVersion = AnyRecord & {
   version_status: 'draft' | 'published' | 'archived' | string;
   schema_json?: AnyRecord;
   validation_json?: AnyRecord;
+  definition_hash?: string;
   published_at?: string;
   latest_published?: boolean;
   step_usage_count?: number;

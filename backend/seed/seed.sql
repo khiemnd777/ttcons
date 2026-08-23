@@ -74,8 +74,9 @@ SET external_only=(name='client');
 
 INSERT INTO permissions (id, key, name, module)
 SELECT gen_random_uuid(), key, name, module FROM (VALUES
-('project.view','Xem công trình','project'),('project.create','Tạo công trình','project'),('project.update','Cập nhật công trình','project'),('project.delete','Xóa công trình','project'),('project.member.manage','Quản lý thành viên công trình','project'),
+('project.view','Xem công trình','project'),('project.create','Tạo công trình','project'),('project.update','Cập nhật công trình','project'),('project.delete','Xóa công trình','project'),('project.member.manage','Quản lý thành viên công trình','project'),('project.import','Import công trình','project'),('project.export','Xuất công trình','project'),
 ('pipeline.view','Xem pipeline','pipeline'),('pipeline.create','Tạo pipeline','pipeline'),('pipeline.edit','Sửa pipeline','pipeline'),('pipeline.publish','Publish pipeline','pipeline'),('pipeline.run','Chạy pipeline','pipeline'),('pipeline.advance_node','Chuyển node','pipeline'),
+('workflow_definition.import','Import định nghĩa workflow','pipeline'),('workflow_definition.export','Xuất định nghĩa workflow','pipeline'),
 ('planning.view','Xem planning','planning'),('planning.edit','Cập nhật kế hoạch','planning'),
 ('boq.view','Xem BOQ','boq'),('boq.create','Tạo BOQ','boq'),('boq.update','Sửa BOQ','boq'),('boq.approve','Duyệt BOQ','boq'),
 ('procurement.view','Xem mua sắm','procurement'),('procurement.create','Tạo yêu cầu mua','procurement'),('procurement.approve','Duyệt mua','procurement'),('procurement.order','Đặt hàng','procurement'),('procurement.receive','Nhận hàng','procurement'),
@@ -184,8 +185,8 @@ JOIN permissions p ON (
     'catalog.view','audit.view','report.view','report.finance.view'
   ))
   OR (r.name='pm' AND p.key IN (
-    'project.view','project.update','project.member.manage',
-    'pipeline.view','pipeline.run','pipeline.advance_node','planning.view','planning.edit',
+    'project.view','project.update','project.member.manage','project.export',
+    'pipeline.view','pipeline.run','pipeline.advance_node','workflow_definition.export','planning.view','planning.edit',
     'boq.view','boq.create','boq.update','boq.approve',
     'procurement.view','procurement.create','procurement.approve','procurement.order',
     'warehouse.view',

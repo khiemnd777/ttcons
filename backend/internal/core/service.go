@@ -1893,6 +1893,24 @@ func (s *Service) UpdateWorkflowFormVersion(ctx context.Context, versionID strin
 	if err != nil {
 		return nil, err
 	}
+	schemaProvided := req.SchemaProvided || req.Schema != nil
+	validationProvided := req.ValidationProvided || req.Validation != nil
+	fieldsProvided := req.FieldsProvided || req.Fields != nil
+	if !schemaProvided || !validationProvided || !fieldsProvided {
+		existing, err := s.repo.WorkflowFormVersionDetail(ctx, versionID)
+		if err != nil {
+			return nil, err
+		}
+		if !schemaProvided {
+			normalized["schema_json"] = existing["schema_json"]
+		}
+		if !validationProvided {
+			normalized["validation_json"] = existing["validation_json"]
+		}
+		if !fieldsProvided {
+			normalized["fields"] = workflowFieldRecords(existing["fields"])
+		}
+	}
 	return s.repo.UpdateWorkflowFormVersion(ctx, versionID, normalized, actorID, actorName)
 }
 

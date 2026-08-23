@@ -471,10 +471,13 @@ type WorkflowFormTemplateRequest struct {
 }
 
 type WorkflowFormVersionRequest struct {
-	SourceVersionID string                     `json:"source_version_id"`
-	Schema          Record                     `json:"schema_json"`
-	Validation      Record                     `json:"validation_json"`
-	Fields          []WorkflowFormFieldRequest `json:"fields"`
+	SourceVersionID    string                     `json:"source_version_id"`
+	Schema             Record                     `json:"schema_json"`
+	Validation         Record                     `json:"validation_json"`
+	Fields             []WorkflowFormFieldRequest `json:"fields"`
+	SchemaProvided     bool                       `json:"-"`
+	ValidationProvided bool                       `json:"-"`
+	FieldsProvided     bool                       `json:"-"`
 }
 
 type WorkflowFormFieldRequest struct {

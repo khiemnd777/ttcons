@@ -144,6 +144,9 @@ func ClassifyRequest(method, path string) RequestClass {
 	if isHeavyFileDownloadRequest(method, path) {
 		return RequestClassExport
 	}
+	if method == fiber.MethodGet && (path == "/api/projects/imports/template" || path == "/api/workflow-definitions/imports/template") {
+		return RequestClassExport
+	}
 	if strings.HasSuffix(path, "/export") || strings.HasSuffix(path, "/pdf") || strings.Contains(path, "/pdf-exports") {
 		return RequestClassExport
 	}

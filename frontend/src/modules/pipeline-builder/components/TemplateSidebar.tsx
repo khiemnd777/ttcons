@@ -13,6 +13,8 @@ type TemplateSidebarProps = {
   children: ReactNode;
   showBackButton?: boolean;
   createTemplatePending: boolean;
+  canCreateTemplate: boolean;
+  canDeleteTemplate: boolean;
   deleteTemplatePendingId?: string;
   onBack: () => void;
   onCreateTemplate: () => void;
@@ -28,6 +30,8 @@ export function TemplateSidebar({
   children,
   showBackButton = true,
   createTemplatePending,
+  canCreateTemplate,
+  canDeleteTemplate,
   deleteTemplatePendingId,
   onBack,
   onCreateTemplate,
@@ -63,7 +67,7 @@ export function TemplateSidebar({
             </div>
             <button
               title="Tạo template"
-              disabled={createTemplatePending}
+              disabled={createTemplatePending || !canCreateTemplate}
               className="rounded-md bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:opacity-50"
               onClick={onCreateTemplate}
             >
@@ -96,7 +100,7 @@ export function TemplateSidebar({
                   </button>
                   <button
                     title="Xóa template"
-                    disabled={deleteTemplatePendingId === template.id}
+                    disabled={deleteTemplatePendingId === template.id || !canDeleteTemplate}
                     className="h-8 w-8 shrink-0 rounded-md p-2 text-slate-300 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
                     onClick={() => onDeleteTemplate(template)}
                   >

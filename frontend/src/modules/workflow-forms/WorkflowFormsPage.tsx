@@ -18,6 +18,7 @@ import {
   Search,
   Settings2,
   Trash2,
+  Download,
   UploadCloud,
   type LucideIcon,
 } from 'lucide-react';
@@ -29,6 +30,9 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { Dialog } from '../../components/Dialog';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { useToast } from '../../components/ToastProvider';
+import { useAuth } from '../../lib/auth/AuthContext';
+import { WorkflowDefinitionImportDialog } from '../workflow-definitions/WorkflowDefinitionImportDialog';
+import { WorkflowDefinitionExportDialog } from '../workflow-definitions/WorkflowDefinitionExportDialog';
 import { resolveCurrencyFractionDigits } from '../../lib/utils/currencyInput';
 import type {
   AnyRecord,
@@ -99,6 +103,7 @@ const blankTemplateForm: TemplateForm = {
 export function WorkflowFormsPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { hasPermission } = useAuth();
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [selectedVersionId, setSelectedVersionId] = useState('');
   const [search, setSearch] = useState('');
@@ -112,6 +117,12 @@ export function WorkflowFormsPage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation>(null);
+  const [definitionImportOpen, setDefinitionImportOpen] = useState(false);
+  const [definitionExportOpen, setDefinitionExportOpen] = useState(false);
+
+  const canEditDefinitions = hasPermission('pipeline.edit');
+  const canImportDefinitions = hasPermission('workflow_definition.import') && canEditDefinitions;
+  const canExportDefinitions = hasPermission('workflow_definition.export') && hasPermission('pipeline.view');
 
   const library = useQuery({
     queryKey: ['workflow-form-template-library'],
@@ -213,7 +224,11 @@ export function WorkflowFormsPage() {
   });
 
   const saveVersion = useMutation({
-    mutationFn: () => put<WorkflowFormManagedVersion>(`/workflow-form-versions/${selectedVersion?.version_id}`, { fields: draftFieldsPayload(draftFields) }),
+    mutationFn: () => put<WorkflowFormManagedVersion>(`/workflow-form-versions/${selectedVersion?.version_id}`, {
+      schema_json: selectedVersion?.schema_json ?? {},
+      validation_json: selectedVersion?.validation_json ?? {},
+      fields: draftFieldsPayload(draftFields),
+    }),
     onSuccess: () => {
       setDraftBaseline(draftFieldsFingerprint(draftFields));
       invalidate();
@@ -224,7 +239,11 @@ export function WorkflowFormsPage() {
 
   const publishVersion = useMutation({
     mutationFn: async () => {
-      await put<WorkflowFormManagedVersion>(`/workflow-form-versions/${selectedVersion?.version_id}`, { fields: draftFieldsPayload(draftFields) });
+      await put<WorkflowFormManagedVersion>(`/workflow-form-versions/${selectedVersion?.version_id}`, {
+        schema_json: selectedVersion?.schema_json ?? {},
+        validation_json: selectedVersion?.validation_json ?? {},
+        fields: draftFieldsPayload(draftFields),
+      });
       return post<WorkflowFormManagedVersion>(`/workflow-form-versions/${selectedVersion?.version_id}/publish`, {});
     },
     onSuccess: () => {
@@ -347,10 +366,11 @@ export function WorkflowFormsPage() {
         title="Workflow Forms"
         description="Tìm, cấu hình và phát hành biểu mẫu dùng trong các bước workflow."
         actions={
-          <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={openCreateTemplate}>
-            <Plus className="h-4 w-4" />
-            Tạo biểu mẫu
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {canImportDefinitions ? <button className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100" onClick={() => setDefinitionImportOpen(true)}><UploadCloud className="h-4 w-4" />Nhập dữ liệu</button> : null}
+            {canExportDefinitions ? <button className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50" disabled={!selectedVersion?.version_id} onClick={() => setDefinitionExportOpen(true)}><Download className="h-4 w-4" />Xuất dữ liệu</button> : null}
+            {canEditDefinitions ? <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={openCreateTemplate}><Plus className="h-4 w-4" />Tạo biểu mẫu</button> : null}
+          </div>
         }
       />
 
@@ -395,6 +415,7 @@ export function WorkflowFormsPage() {
                 draftDirty={draftDirty}
                 saving={saveVersion.isPending || publishVersion.isPending}
                 creatingVersion={createVersion.isPending}
+                canEdit={canEditDefinitions}
                 onEditTemplate={openEditTemplate}
                 onArchiveTemplate={() => setConfirmAction('archive-template')}
                 onCreateVersion={(sourceVersionId) => createVersion.mutate(sourceVersionId)}
@@ -439,6 +460,32 @@ export function WorkflowFormsPage() {
         open={Boolean(pendingNavigation) || routeBlocker.state === 'blocked'}
         onClose={closeUnsavedChangesDialog}
         onDiscard={discardDraftAndContinue}
+      />
+      <WorkflowDefinitionImportDialog
+        open={definitionImportOpen}
+        templateScope="form"
+        allowedScopes={['form']}
+        onClose={() => setDefinitionImportOpen(false)}
+        onSuccess={(result) => {
+          setDefinitionImportOpen(false);
+          invalidate();
+          const imported = result.forms[0];
+          if (imported) {
+            setSelectedTemplateId(imported.template_id);
+            setSelectedVersionId(imported.version_id);
+          }
+          toast.success(`Đã import ${result.form_count} Form ở trạng thái nháp`);
+        }}
+        onError={(title, error) => toast.error(title, error)}
+      />
+      <WorkflowDefinitionExportDialog
+        open={definitionExportOpen}
+        scope="form"
+        selectedID={selectedVersion?.version_id ?? ''}
+        selectedName={detail.data?.template_name}
+        onClose={() => setDefinitionExportOpen(false)}
+        onSuccess={() => toast.success('Đã xuất định nghĩa Form/Fields')}
+        onError={(title, error) => toast.error(title, error)}
       />
     </>
   );
@@ -566,6 +613,7 @@ function TemplateWorkspace({
   draftDirty,
   saving,
   creatingVersion,
+  canEdit,
   onEditTemplate,
   onArchiveTemplate,
   onCreateVersion,
@@ -583,6 +631,7 @@ function TemplateWorkspace({
   draftDirty: boolean;
   saving: boolean;
   creatingVersion: boolean;
+  canEdit: boolean;
   onEditTemplate: () => void;
   onArchiveTemplate: () => void;
   onCreateVersion: (sourceVersionId?: string) => void;
@@ -610,8 +659,8 @@ function TemplateWorkspace({
             <p className="mt-2 truncate font-mono text-xs text-slate-500">{template.template_code}</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={onEditTemplate}>Sửa thông tin</button>
-            {!draftSelected ? (
+            {canEdit ? <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={onEditTemplate}>Sửa thông tin</button> : null}
+            {canEdit && !draftSelected ? (
               <button
                 className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
                 onClick={() => onCreateVersion(selectedVersion?.version_id)}
@@ -621,7 +670,7 @@ function TemplateWorkspace({
                 {selectedVersion ? `Tạo bản nháp từ v${selectedVersion.version_no}` : 'Tạo phiên bản đầu tiên'}
               </button>
             ) : null}
-            <details className="relative">
+            {canEdit ? <details className="relative">
               <summary className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-md border border-line text-slate-600 hover:bg-slate-50" aria-label="Thao tác khác">
                 <MoreHorizontal className="h-4 w-4" />
               </summary>
@@ -635,7 +684,7 @@ function TemplateWorkspace({
                   <Archive className="h-4 w-4" /> Lưu trữ biểu mẫu
                 </button>
               </div>
-            </details>
+            </details> : null}
           </div>
         </div>
       </div>
@@ -662,7 +711,7 @@ function TemplateWorkspace({
             <div className="flex items-center gap-2">
               <StatusBadge status={selectedVersion.version_status} />
               {selectedVersion.latest_published ? <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Bản phát hành mới nhất</span> : null}
-              <details className="relative">
+              {canEdit ? <details className="relative">
                 <summary className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-md border border-line bg-white text-slate-600 hover:bg-slate-50" aria-label="Thao tác phiên bản">
                   <MoreHorizontal className="h-4 w-4" />
                 </summary>
@@ -676,7 +725,7 @@ function TemplateWorkspace({
                     <Archive className="h-4 w-4" /> Lưu trữ phiên bản
                   </button>
                 </div>
-              </details>
+              </details> : null}
             </div>
           ) : null}
         </div>
@@ -697,8 +746,8 @@ function TemplateWorkspace({
           {draftDirty ? <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800"><AlertTriangle className="h-3.5 w-3.5" />Chưa lưu</span> : null}
         </div>
         {!selectedVersion ? (
-          <EmptyState title="Biểu mẫu này chưa có phiên bản." action={<button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => onCreateVersion('')}>Tạo phiên bản đầu tiên</button>} />
-        ) : draftSelected ? (
+          <EmptyState title="Biểu mẫu này chưa có phiên bản." action={canEdit ? <button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => onCreateVersion('')}>Tạo phiên bản đầu tiên</button> : undefined} />
+        ) : draftSelected && canEdit ? (
           <DraftFieldEditor
             fields={draftFields}
             errors={fieldErrors}

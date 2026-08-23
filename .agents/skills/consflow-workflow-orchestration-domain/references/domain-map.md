@@ -3,15 +3,16 @@
 ## Owners
 
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`
+- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`; Workflow Definition data-package owners `handlers_workflow_definition_excel.go`, `workflow_definition_excel.go`, `data_package.go`, `xlsx_workbook.go`
 - Frontend routes: `frontend/src/app/router.tsx`
-- Frontend modules: `frontend/src/modules/pipeline-builder`, `frontend/src/modules/planning`, `frontend/src/modules/workflow-forms`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
+- Frontend modules: `frontend/src/modules/pipeline-builder`, `frontend/src/modules/planning`, `frontend/src/modules/workflow-forms`, `frontend/src/modules/workflow-definitions`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
 - Shared frontend contracts: `frontend/src/lib/api/client.ts`, `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
-- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`, `V70`, `V71`, `V83`-`V87`
+- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`, `V70`, `V71`, `V83`-`V87`, Workflow Definition governance `V118`, sensitive grant role-rename hardening `V119`, and XLSX/JSON import provenance `V120`
 
 ## Routes
 
 - Template builder: `/pipeline-templates`, `GET /pipeline-templates/:id/pdf`, `/pipeline-nodes`, `/pipeline-steps`, `/pipeline-edges`, `/pipeline-edge-conditions`
+- Workflow Definition XLSX/JSON: `GET /workflow-definitions/imports/template?scope&format`, `POST /workflow-definitions/imports/preview|execute`, `GET /workflow-definitions/export?format`
 - Runtime: read-only global snapshot `/projects/progress-board` and invalidation stream `/projects/progress-board/stream`; project execution `/projects/:id/start-pipeline`, `/projects/:id/pipeline-run`, `/pipeline-run-nodes/:id/*`, `/pipeline-run-steps/:id/submit`
 - Work items: `/work-items/:id`, `/work-items/:id/start|complete|block|resolve-blocker|request-review|request-approval|approve|reject|request-change`
 - Activity/evidence: `/work-items/:id/activity`, `/projects/:id/activity|activity/options|activity/read-all`, `/projects/:id/evidence`, `/activities/:id/read|resolve|reactions|message|withdraw`, `/work-items/:id/evidence`, `/evidence/:id/file|accept|reject`
@@ -24,10 +25,13 @@
 - `pipeline_runs`, `pipeline_run_nodes`, `pipeline_run_edges`, `pipeline_run_steps`
 - `work_items`, `work_item_assignments`, `work_item_activities`, `activity_mentions`, `activity_read_states`, `activity_reactions`, `activity_message_revisions`
 - `approval_rules`, `approval_requests`, `approval_actions`
-- `workflow_form_templates`, `workflow_form_versions`, `workflow_form_fields`, `workflow_form_instances`, `workflow_form_answers`, `workflow_form_events`, `workflow_form_signatures`, `workflow_form_pdf_confirmation_preferences`, `workflow_form_pdf_exports`, `workflow_form_pdf_export_deletions`
+- `workflow_form_templates`, `workflow_form_versions` including portable `definition_hash`, `workflow_form_fields`, `workflow_form_instances`, `workflow_form_answers`, `workflow_form_events`, `workflow_form_signatures`, `workflow_form_pdf_confirmation_preferences`, `workflow_form_pdf_exports`, `workflow_form_pdf_export_deletions`; V118 `workflow_definition_imports`
 - `evidence_records`, `documents`, `audit_logs`
 
 ## Invariants
+
+- Project data-package references are immutable identifiers, not workflow mutations: `pipeline_ref` binds template UUID, revision and definition hash; Form/Field references bind published active form version UUIDs. XLSX and nested JSON v1 share one canonical request. Project import must fail closed when no ready published Pipeline or no valid published Form/Fields exist, and execute rechecks the selected Pipeline under lock before creating the project master. Import never starts a run, copies runtime nodes/steps, creates work items/form instances/answers or advances any workflow. Export may expose selected/runtime refs plus mismatch/missing state in XLSX or JSON for historical diagnosis without rebinding either side.
+- Workflow Definition data packages provide definition portability, never runtime restore. The 12-sheet XLSX and nested `consflow.workflow-definition-package` JSON v1 replace package-internal UUID relationships with portable keys, stable role names and permission keys and feed the same validator/import transaction. JSON rejects duplicate, dangerous and unknown schema keys. Preview must block unresolved Form/Field/role/permission references, external-only roles, invalid graph/edge/surface semantics and target draft conflicts. Execute revalidates format/version/HMAC/reference fingerprint and creates only new draft Form versions and Pipeline revisions in one transaction, Forms before Pipelines; it never overwrites, publishes, starts a run, creates work items/Form instances, or rewrites historical definitions/runtime. Pipeline export with dependencies includes the exact referenced draft or published Form/Fields. Project readiness remains published-only, so imported drafts do not unblock project import until separately reviewed and published.
 
 - Published pipeline template revisions are structurally immutable; structural edits require a new draft revision in the same `template_family_id` lineage. Node, Step and Connector inspectors remain available for read-only inspection; Connector Inspector must hide Save and disable stored label, condition/config and priority fields. Presentation-only layout remains mutable for actors with `pipeline.edit`: node coordinates and stored connector port sides may change atomically, but connector endpoint node IDs, ordering, conditions, steps/forms, definition semantics and runtime copies may not. The layout route derives endpoint node IDs from the stored edge and writes an audit event.
 - Publish records `definition_hash`, `published_at`, and `published_by` together with its audit event in one fail-closed transaction; project runtime starts only from an exact published revision.

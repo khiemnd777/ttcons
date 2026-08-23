@@ -771,11 +771,25 @@ func (h *Handler) UpdateWorkflowFormVersion(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu workflow form version không hợp lệ")
 	}
+	markWorkflowFormVersionRequestPresence(c.Body(), &req)
 	version, err := h.service.UpdateWorkflowFormVersion(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
 	return response.OK(c, version)
+}
+
+func markWorkflowFormVersionRequestPresence(body []byte, req *WorkflowFormVersionRequest) {
+	if req == nil {
+		return
+	}
+	fields := map[string]json.RawMessage{}
+	if json.Unmarshal(body, &fields) != nil {
+		return
+	}
+	_, req.SchemaProvided = fields["schema_json"]
+	_, req.ValidationProvided = fields["validation_json"]
+	_, req.FieldsProvided = fields["fields"]
 }
 
 func (h *Handler) PublishWorkflowFormVersion(c *fiber.Ctx) error {

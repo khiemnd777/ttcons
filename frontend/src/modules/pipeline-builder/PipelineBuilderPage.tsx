@@ -17,6 +17,8 @@ import { EdgeInspectorPanel } from './components/EdgeInspectorPanel';
 import { DiagramCanvas } from './components/diagram/DiagramCanvas';
 import { autoLayoutPosition, nextNodePosition } from './components/diagram/diagramConstants';
 import type { DiagramEditingMode, NodePosition } from './components/diagram/diagramTypes';
+import { WorkflowDefinitionImportDialog } from '../workflow-definitions/WorkflowDefinitionImportDialog';
+import { WorkflowDefinitionExportDialog } from '../workflow-definitions/WorkflowDefinitionExportDialog';
 import {
   buildCreateEdgePayload,
   buildUpdateEdgeLayoutPayload,
@@ -84,6 +86,8 @@ export function PipelineBuilderPage() {
   const [nodeForm, setNodeForm] = useState<Record<string, any>>({});
   const [edgeForm, setEdgeForm] = useState<EdgeForm>({ label: '', condition_type: 'always', priority: '100', condition_config: {} });
   const [edgeSubmitAttempted, setEdgeSubmitAttempted] = useState(false);
+  const [definitionImportOpen, setDefinitionImportOpen] = useState(false);
+  const [definitionExportOpen, setDefinitionExportOpen] = useState(false);
 
   const templates = useQuery({ queryKey: ['pipeline-templates'], queryFn: () => get<PipelineTemplate[]>('/pipeline-templates') });
   const template = useQuery({
@@ -136,6 +140,10 @@ export function PipelineBuilderPage() {
   const templateStatus = String(template.data?.status ?? '');
   const isPublished = templateStatus === 'published';
   const hasPipelineEditPermission = hasPermission('pipeline.edit');
+  const canCreateTemplate = hasPermission('pipeline.create');
+  const canPublishTemplate = hasPermission('pipeline.publish') && templateStatus === 'draft';
+  const canImportDefinition = hasPermission('workflow_definition.import') && canCreateTemplate;
+  const canExportDefinition = hasPermission('workflow_definition.export') && hasPermission('pipeline.view');
   const canEditLayout = Boolean(template.data && hasPipelineEditPermission && (templateStatus === 'draft' || templateStatus === 'published'));
   const canEditStructure = Boolean(template.data && hasPipelineEditPermission && templateStatus === 'draft');
   const isReadOnly = Boolean(template.data && !canEditStructure);
@@ -919,6 +927,8 @@ export function PipelineBuilderPage() {
             expanded={templatesExpanded}
             showBackButton
             createTemplatePending={createTemplate.isPending}
+            canCreateTemplate={canCreateTemplate}
+            canDeleteTemplate={hasPipelineEditPermission}
             deleteTemplatePendingId={deleteTemplate.isPending ? deleteTemplateDialog?.id : undefined}
             onBack={goBack}
             onCreateTemplate={() => createTemplate.mutate()}
@@ -947,6 +957,10 @@ export function PipelineBuilderPage() {
         validationIssueCount={validationIssues.length}
         autoLayoutPending={autoLayout.isPending}
         canExportPDF={Boolean(selectedTemplateId && template.data) && !template.isLoading}
+        canImportDefinition={canImportDefinition}
+        canExportDefinition={canExportDefinition}
+        canCloneTemplate={canCreateTemplate}
+        canPublishTemplate={canPublishTemplate}
         exportPDFPending={exportPDF.isPending}
         deleteSelectionPending={deleteSelectionPending}
         onRenameTemplate={openRenameDialog}
@@ -955,6 +969,8 @@ export function PipelineBuilderPage() {
         onAutoLayout={() => { if (canEditLayout) autoLayout.mutate(); }}
         onValidatePipeline={validatePipeline}
         onExportPDF={() => exportPDF.mutate()}
+        onImportDefinition={() => setDefinitionImportOpen(true)}
+        onExportDefinition={() => setDefinitionExportOpen(true)}
         onDeleteSelection={deleteSelection}
         inspector={
           detailsNode ? (
@@ -1163,6 +1179,33 @@ export function PipelineBuilderPage() {
         </p>
         <p className="mt-3 text-sm leading-6 text-slate-600">Các pipeline run lịch sử vẫn được giữ lại.</p>
       </Dialog>
+
+      <WorkflowDefinitionImportDialog
+        open={definitionImportOpen}
+        templateScope="pipeline"
+        allowedScopes={['pipeline', 'bundle']}
+        onClose={() => setDefinitionImportOpen(false)}
+        onSuccess={(result) => {
+          setDefinitionImportOpen(false);
+          invalidate(result.pipelines[0]?.template_id);
+          const importedID = result.pipelines[0]?.template_id;
+          if (importedID) {
+            setSelectedTemplateId(importedID);
+            navigate(`/pipeline-builder/${importedID}`);
+          }
+          toast.success(`Đã import ${result.pipeline_count} Pipeline và ${result.form_count} Form ở trạng thái nháp`);
+        }}
+        onError={(title, error) => toast.error(title, error)}
+      />
+      <WorkflowDefinitionExportDialog
+        open={definitionExportOpen}
+        scope="pipeline"
+        selectedID={selectedTemplateId}
+        selectedName={template.data?.name}
+        onClose={() => setDefinitionExportOpen(false)}
+        onSuccess={() => toast.success('Đã xuất định nghĩa Pipeline và dependency')}
+        onError={(title, error) => toast.error(title, error)}
+      />
     </>
   );
 }

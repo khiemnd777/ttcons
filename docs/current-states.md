@@ -1,5 +1,68 @@
 # Current States
 
+## Active Plan: Import/Export định nghĩa Pipeline và Form/Fields bằng Excel
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-23)
+
+### Will be done
+
+- Add versioned multi-sheet Workflow Definition workbooks for `form`, `pipeline`, and dependency-complete `bundle` scopes. Relationships use portable package keys, permission keys and role names; source UUIDs remain provenance only.
+- Add protected template, preview, execute, and export endpoints with authoritative server validation, HMAC preview binding, reference fingerprinting, same-actor idempotency and one atomic draft-only import transaction.
+- Add `workflow_definition.import` and `workflow_definition.export`, a secret-free import batch table, portable Form definition hashes, and preserve published/runtime immutability. Imported definitions never publish, start runs, create work items or create form instances.
+- Block execution on an existing draft conflict or unresolved required Form/permission/role; allow empty-system Form/bundle bootstrap and keep export independent from global Project-import readiness.
+- Harden Pipeline clone engine-version preservation, Form schema/validation preservation and Pipeline/Form UI permission parity.
+- Add responsive shared Import/Export dialogs to Pipeline Builder and Workflow Forms, parse `.xlsx` locally in a Worker, expose blockers/mappings/warnings, and require explicit draft-only confirmation.
+- Update central/backend/frontend and Workflow/Admin/Project maps; run focused/full backend tests, frontend tests/build and whitespace checks. Browser/UAT remains skipped unless explicitly authorized.
+
+### Done
+
+- User approved the review package, Excel transport with canonical JSON semantics, full Form dependency export, draft-only/no-overwrite/no-auto-publish rules and the proposed RBAC boundary.
+- Loaded the mandatory module-memory, Repo Architect, Impact Analysis, Backend, Database, Frontend, Workflow Orchestration, Admin Governance and Project Planning instructions; mapped the current Pipeline/Form/Project Excel owner routes, services, repositories, tables and UI surfaces.
+- Confirmed the current source has Project Excel import/export and on-demand Pipeline PDF export, but no Pipeline/Form data workbook routes. Confirmed clone forces engine v2, Form UI can erase omitted schema/validation JSON, and current Pipeline/Form action gates drift from backend permissions.
+- Added protected Workflow Definition template/preview/execute/export routes and a versioned 12-sheet workbook for `form`, `pipeline` and dependency-complete `bundle`. Portable package keys own internal relations; source IDs/hashes are provenance. Export can include the exact draft or published Form/Fields referenced by the selected Pipeline.
+- Added authoritative server preview for package/sheet/graph/edge/surface/Form Field/role/permission references, external-only role rejection, existing draft conflicts, target lineage and exact published external Form refs. Execute revalidates a server-keyed HMAC/reference fingerprint and commits Forms before Pipelines in one same-actor UUID-idempotent transaction, with fail-closed per-entity/batch audit and no overwrite/publish/run/work-item/Form-instance side effects.
+- Added V118 `workflow_definition.import|export`, Form version portable `definition_hash`, secret-free `workflow_definition_imports` replay state and database assignment allowlists. Added V119 to prevent Project/Workflow Excel grants surviving a role rename outside Admin/Developer import or Admin/Developer/PM export allowlists; repository role-permission replacement and seed grants match the same boundary.
+- Hardened Form partial updates so omitted schema/validation/Fields are preserved, Form create/update/publish hash the current portable definition, and Pipeline clone preserves the source engine version. Pipeline/Form create/edit/publish/clone/import/export actions now mirror their backend permissions; published/non-editable Form fields remain read-only.
+- Added shared responsive Workflow Definition Import/Export dialogs and a browser Worker that accepts `.xlsx` only, enforces the exact 12-sheet/version/header/formula/10 MB/row-count contract, sends structured rows, shows entity actions/blockers/warnings and requires explicit draft-only/no-runtime confirmation.
+- Updated central/backend/frontend and Workflow Orchestration/Admin Governance/Project Planning maps. Project Excel readiness remains published-only, so imported drafts intentionally do not unblock project import/template until separately reviewed and published.
+- Current working-tree technical verification passed: V118 and V119 applied to the local development database; a separate clean PostgreSQL database applied all 119 migrations, passed full sequential DB-backed `go test -p 1 ./...`, then accepted the full seed and produced exactly Admin/Developer import plus Admin/Developer/PM export grants before the temporary database was removed. Focused DB coverage proves the 12-sheet package, portable hashes, edge field ownership, bundle import, draft-only/no-runtime persistence, exact draft dependency export, conflict handling, Form partial-update preservation, clone engine preservation, idempotency, audit, repository/DB RBAC and role-rename fail-closed behavior. The ordinary full backend suite also passed. Frontend passed 234/234 tests, the current production build and the 250 KiB gzip/139-chunk budget.
+- Rebuilt and restarted the local Docker stack through the required `down -> build -> run` sequence after a sandbox-only Docker Buildx activity-file denial was rerun with approved Docker access. PostgreSQL/Redis are healthy, the rebuilt backend reports database/service `ready`, and the rebuilt Admin frontend serves `/projects` with HTTP 200. This is a non-browser runtime smoke, not UX acceptance.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn, so the interface remains `NOT UX ACCEPTED`.
+
+## Active Plan: Import/Export Công trình bằng Excel
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-22)
+
+### Will be done
+
+- Add `project.import` and `project.export` governance plus a secret-free, same-actor idempotent project-import batch record through custom migration V117 and seed parity.
+- Add protected readiness, reference-backed template, authoritative preview/execute and project-scoped export endpoints. Import is create-only, max 100 rows, atomic, does not start Pipeline and does not create runtime/Form/member/business records.
+- Generate one multi-sheet XLSX contract containing instructions, project rows, export metadata, published-ready Pipeline references, active published Form versions/Fields and active client partners.
+- Block template download/import when published Pipeline or valid Form/Field reference data is missing; keep export available and mark incomplete historical references in the workbook.
+- Add responsive Import/Export dialogs on `/projects`, browser-local `.xlsx` parsing in a Worker, formula/header/version/size/row checks, preview/error/success states and permission-aligned actions.
+- Add focused backend/frontend/migration coverage, update central/backend/frontend and Project/Workflow/Reporting/Admin maps, then run non-browser technical verification. Browser/UAT remains skipped unless explicitly authorized.
+
+### Done
+
+- User approved the review package and Mockup as Text, including create-only/no-auto-start behavior, the seven-sheet workbook, read-only `contract_amount`, Admin/Developer import, scoped Admin/Developer/PM export and export-with-warning behavior when references are incomplete.
+- Loaded the mandatory module-memory, Repo Architect, Impact Analysis, Backend, Frontend, Project Planning, Workflow Orchestration, Reporting Analytics and Admin Governance instructions and mapped owner files/routes/tables.
+- Confirmed the current source has project CRUD/explorer, published Pipeline/Form governance, browser-local Staff import and single-sheet XLSX generation, but no project Excel routes, batch table, permissions or UI.
+- Added custom migration V117 and seed parity for `project.import` (Admin/Developer), `project.export` (Admin/Developer/PM), database/repository assignment guards and secret-free same-actor `project_excel_imports` replay state.
+- Added protected readiness/template/preview/execute/export routes before dynamic project routes. Preview uses exact versioned nine-column structured rows, current Pipeline/Form/Field/client references and a server-keyed hash; execute revalidates and atomically creates draft project masters plus fail-closed audits without starting Pipeline or creating runtime/work/Form/member/domain records.
+- Added a reusable multi-sheet Open XML generator and the seven-sheet project contract: Huong_dan, Cong_trinh, Thong_tin_xuat, Ref_Pipeline, Ref_Bieu_mau, Ref_Fields and Ref_Chu_dau_tu. Export keeps current explorer search/status/sort or max-100 selection, reuses project access scope, excludes cancelled rows and exposes missing/runtime-mismatched historical references without blocking export. VND import/export values remain exact integer strings; contract amount is read-only snapshot metadata.
+- Added permission-aware Import/Export actions and responsive shared dialogs on `/projects`. Import readiness blocks template/file/preview with direct Pipeline/Form update links, the browser Worker enforces `.xlsx`, version, exact header, formula, size and row contracts, server preview owns validity, and execute requires an explicit create-only/no-auto-start confirmation. Export supports current filters or selected rows and describes the complete reference workbook.
+- Updated the central/backend/frontend and Project Planning/Workflow Orchestration/Reporting Analytics/Admin Governance maps; added backend unit/PostgreSQL integration/migration coverage and frontend source-contract coverage.
+- Current working-tree technical verification passed: V117 applied to the local development database; migration manifest checked all 117 files; a clean temporary PostgreSQL database passed full `go test -p 1 ./...`; focused tests prove readiness, exact workbook package, preview/execute, atomic persistence, same-actor idempotency, no runtime/work/Form/member side effects, scoped export, export-concurrency classification and database RBAC; seed SQL ran on a separate clean database and produced exactly Admin/Developer import plus Admin/Developer/PM export grants; frontend passed 231/231 tests, production build and bundle budget; `git diff --check` passed. All temporary databases were removed.
+- A first full backend run against the long-lived development database exposed five unrelated stale-fixture collisions. None reproduced on either clean database; the clean full suite is the authoritative verification environment for this change.
+- Rebuilt and restarted the full local Docker stack through the required `down -> build -> run` sequence. PostgreSQL/Redis services are healthy, the rebuilt backend reports database/service `ready`, and the rebuilt Admin frontend serves `/projects` with HTTP 200. This is a non-browser runtime smoke, not UX acceptance.
+
+### Skipped / remaining acceptance
+
+- No browser/UAT is authorized in this turn, so the interface remains `NOT UX ACCEPTED` even if source checks, tests and builds pass.
+
 ## Active Plan: Import tài khoản nhân sự production
 
 Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-22)

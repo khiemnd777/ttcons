@@ -11,6 +11,8 @@ import {
   CircleDot,
   Folder,
   FolderOpen,
+  FileDown,
+  FileUp,
   Pencil,
   Plus,
   Search,
@@ -45,6 +47,8 @@ import {
   type ProjectExplorerSort,
   type ProjectExplorerSortKey,
 } from './projectExplorerSort';
+import { ProjectImportDialog } from './ProjectImportDialog';
+import { ProjectExportDialog } from './ProjectExportDialog';
 
 const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-[112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
 const PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS = 'lg:grid-cols-[32px_112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
@@ -62,10 +66,15 @@ export function ProjectsPage() {
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set());
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasAnyPermission, user } = useAuth();
 	const canDelete = hasAnyPermission(['project.delete']);
+	const canImport = hasAnyPermission(['project.import']);
+	const canExport = hasAnyPermission(['project.export']);
+	const canSelect = canDelete || canExport;
 	const explorerParams = useMemo(() => {
 		const params = new URLSearchParams({
 			page: String(page),
@@ -240,15 +249,39 @@ export function ProjectsPage() {
       <PageHeader
         title="Công trình"
         description="Chọn công trình trước, sau đó mở cây nghiệp vụ bên trong công trình."
+        horizontalFrom="xl"
         actions={
-          <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Tạo công trình
-          </button>
+          <>
+            {canExport ? (
+              <button className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setExportOpen(true)}>
+                <FileDown className="h-4 w-4" />
+                Xuất dữ liệu
+              </button>
+            ) : null}
+            {canImport ? (
+              <button className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setImportOpen(true)}>
+                <FileUp className="h-4 w-4" />
+                Nhập dữ liệu
+              </button>
+            ) : null}
+            <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Tạo công trình
+            </button>
+          </>
         }
       />
 
 		{canDelete ? <BulkSelectionBar count={selectedProjectIds.size} itemLabel="công trình" actionLabel="Xóa công trình đã chọn" onClear={() => setSelectedProjectIds(new Set())} onDelete={() => setDeleteOpen(true)} /> : null}
+		{canExport && !canDelete && selectedProjectIds.size > 0 ? (
+			<div className="mb-4 flex flex-col gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+				<p className="text-sm font-semibold text-blue-900">Đã chọn {selectedProjectIds.size} công trình trên trang hiện tại</p>
+				<div className="flex gap-2">
+					<button type="button" className="rounded-md border border-blue-200 bg-white px-3 py-1.5 text-sm font-semibold text-blue-800" onClick={() => setSelectedProjectIds(new Set())}>Bỏ chọn</button>
+					<button type="button" className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => setExportOpen(true)}>Xuất đã chọn</button>
+				</div>
+			</div>
+		) : null}
 
       <section className="rounded-lg border border-line bg-white shadow-panel">
         <div className="border-b border-line p-4">
@@ -294,7 +327,7 @@ export function ProjectsPage() {
 
         <ProjectExplorerHeader
           sort={projectSort}
-			selectable={canDelete}
+			selectable={canSelect}
 			allSelected={allVisibleSelected}
 			someSelected={someVisibleSelected}
 			onToggleAll={toggleAllVisibleProjects}
@@ -340,7 +373,7 @@ export function ProjectsPage() {
                   <ProjectExplorerRow
                     project={project}
                     expanded={expanded}
-					selectable={canDelete}
+					selectable={canSelect}
 					selected={selectedProjectIds.has(project.id)}
 					onSelectedChange={() => toggleSelectedProject(project.id)}
                     onToggle={() => toggleProject(project.id)}
@@ -384,6 +417,36 @@ export function ProjectsPage() {
 				]);
 				toast.success({ title: `Đã xóa ${result.deleted_count} công trình`, description: 'Công trình đã chuyển sang Đã hủy; toàn bộ lịch sử nghiệp vụ vẫn được giữ nguyên.' });
 			}}
+			onError={(title, error) => toast.error(title, error)}
+		/>
+
+		<ProjectImportDialog
+			open={importOpen}
+			onClose={() => setImportOpen(false)}
+			onSuccess={async (result) => {
+				setImportOpen(false);
+				setSelectedProjectIds(new Set());
+				await Promise.all([
+					queryClient.invalidateQueries({ queryKey: ['projects'] }),
+					queryClient.invalidateQueries({ queryKey: ['project-explorer'] }),
+				]);
+				toast.success({ title: `Đã tạo ${result.created_count} công trình`, description: 'Các công trình ở trạng thái Nháp; Pipeline chưa được khởi chạy.' });
+			}}
+			onError={(title, error) => toast.error(title, error)}
+		/>
+
+		<ProjectExportDialog
+			open={exportOpen}
+			selectedProjectIDs={selectedProjectIDs}
+			filteredCount={projects.data?.total ?? 0}
+			filters={{
+				search: debouncedSearch,
+				status: statusFilter,
+				sort: projectSort?.key ?? 'created_at',
+				direction: projectSort?.direction ?? 'desc',
+			}}
+			onClose={() => setExportOpen(false)}
+			onSuccess={(scope) => toast.success(scope === 'selected' ? 'Đã xuất các công trình được chọn' : 'Đã xuất công trình theo bộ lọc')}
 			onError={(title, error) => toast.error(title, error)}
 		/>
 

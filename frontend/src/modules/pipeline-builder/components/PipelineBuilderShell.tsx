@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
-import { CheckCircle2, Copy, Download, Pencil, Send, Trash2, Wand2 } from 'lucide-react';
+import { CheckCircle2, Copy, Download, Pencil, Send, Trash2, Upload, Wand2 } from 'lucide-react';
 import { StatusBadge } from '../../../components/StatusBadge';
 
 type PipelineBuilderShellProps = {
@@ -20,6 +20,10 @@ type PipelineBuilderShellProps = {
   validationIssueCount: number;
   autoLayoutPending: boolean;
   canExportPDF: boolean;
+  canImportDefinition: boolean;
+  canExportDefinition: boolean;
+  canCloneTemplate: boolean;
+  canPublishTemplate: boolean;
   exportPDFPending: boolean;
   deleteSelectionPending: boolean;
   onRenameTemplate: () => void;
@@ -28,6 +32,8 @@ type PipelineBuilderShellProps = {
   onAutoLayout: () => void;
   onValidatePipeline: () => void;
   onExportPDF: () => void;
+  onImportDefinition: () => void;
+  onExportDefinition: () => void;
   onDeleteSelection: () => void;
 };
 
@@ -48,6 +54,10 @@ export function PipelineBuilderShell({
   validationIssueCount,
   autoLayoutPending,
   canExportPDF,
+  canImportDefinition,
+  canExportDefinition,
+  canCloneTemplate,
+  canPublishTemplate,
   exportPDFPending,
   deleteSelectionPending,
   onRenameTemplate,
@@ -56,6 +66,8 @@ export function PipelineBuilderShell({
   onAutoLayout,
   onValidatePipeline,
   onExportPDF,
+  onImportDefinition,
+  onExportDefinition,
   onDeleteSelection,
 }: PipelineBuilderShellProps) {
   return (
@@ -82,11 +94,13 @@ export function PipelineBuilderShell({
               <p className="mt-1 line-clamp-1 text-sm text-slate-500">{templateDescription ?? 'Chọn template hoặc tạo template mới để bắt đầu.'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button title="Tạo revision nháp mới" disabled={!selectedTemplateId} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50" onClick={onCloneTemplate}>
+              {canImportDefinition ? <button title="Import Pipeline/Form thành bản nháp" className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100" onClick={onImportDefinition}><Upload className="h-4 w-4" />Nhập dữ liệu</button> : null}
+              {canExportDefinition ? <button title="Xuất định nghĩa Pipeline kèm Form/Fields" disabled={!selectedTemplateId} className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50" onClick={onExportDefinition}><Download className="h-4 w-4" />Xuất dữ liệu</button> : null}
+              <button title="Tạo revision nháp mới" disabled={!selectedTemplateId || !canCloneTemplate} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50" onClick={onCloneTemplate}>
                 <Copy className="h-4 w-4" />
                 Tạo revision
               </button>
-              <button title="Phát hành revision" disabled={!selectedTemplateId || isReadOnly} className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" onClick={onPublishTemplate}>
+              <button title="Phát hành revision" disabled={!selectedTemplateId || !canPublishTemplate} className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" onClick={onPublishTemplate}>
                 <Send className="h-4 w-4" />
                 Phát hành
               </button>

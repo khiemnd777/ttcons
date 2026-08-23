@@ -81,6 +81,8 @@ func TestClassifyRequest(t *testing.T) {
 		{fiber.MethodPost, "/api/auth/login", RequestClassAuth},
 		{fiber.MethodPost, "/api/work-items/1/evidence/upload", RequestClassUpload},
 		{fiber.MethodGet, "/api/reports/projects/export", RequestClassExport},
+		{fiber.MethodGet, "/api/projects/imports/template", RequestClassExport},
+		{fiber.MethodGet, "/api/workflow-definitions/imports/template", RequestClassExport},
 		{fiber.MethodPost, "/api/workflow-form-instances/1/pdf-exports", RequestClassExport},
 		{fiber.MethodGet, "/api/projects/1/activity/stream", RequestClassSSE},
 		{fiber.MethodGet, "/api/evidence/1/file", RequestClassExport},

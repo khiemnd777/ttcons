@@ -398,16 +398,22 @@ func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, 
 		if requestedKeys["settings.update"] || requestedKeys["staff.import"] {
 			return nil, validationError("Quyền chỉ dành cho Nhà phát triển", Record{"permissions": []string{"settings.update", "staff.import"}})
 		}
-		for _, required := range []string{"settings.view", "seal.use", "seal.manage", "event_log.view", "staff.delete"} {
+		for _, required := range []string{"settings.view", "seal.use", "seal.manage", "event_log.view", "staff.delete", "project.import", "project.export", "workflow_definition.import", "workflow_definition.export"} {
 			if !requestedKeys[required] {
 				return nil, validationError("Không thể gỡ quyền cấu hình bắt buộc của Quản trị viên", Record{"permission": required})
 			}
 		}
 	} else {
-		for _, reserved := range []string{"settings.view", "settings.update", "seal.manage", "event_log.view", "staff.import", "staff.delete"} {
+		for _, reserved := range []string{"settings.view", "settings.update", "seal.manage", "event_log.view", "staff.import", "staff.delete", "project.import", "workflow_definition.import"} {
 			if requestedKeys[reserved] {
 				return nil, validationError("Quyền này chỉ dành cho Quản trị viên hoặc Nhà phát triển", Record{"permission": reserved})
 			}
+		}
+		if roleName != "pm" && requestedKeys["project.export"] {
+			return nil, validationError("Quyền xuất công trình chỉ dành cho Quản trị viên, Nhà phát triển hoặc PM", Record{"permission": "project.export"})
+		}
+		if roleName != "pm" && requestedKeys["workflow_definition.export"] {
+			return nil, validationError("Quyền xuất định nghĩa workflow chỉ dành cho Quản trị viên, Nhà phát triển hoặc PM", Record{"permission": "workflow_definition.export"})
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, roleID); err != nil {
@@ -4702,12 +4708,14 @@ func workflowFormVersionDetailSQL(where string) string {
 			v.template_id,
 			t.code AS template_code,
 			t.name AS template_name,
+			t.description AS template_description,
 			t.form_type,
 			t.status AS template_status,
 			v.version_no,
 			v.status AS version_status,
 			v.schema_json,
 			v.validation_json,
+			COALESCE(v.definition_hash,'') AS definition_hash,
 			v.published_at,
 			v.created_by,
 			v.created_at,
@@ -4924,6 +4932,13 @@ func (r *Repository) CreateWorkflowFormVersion(ctx context.Context, templateID s
 	if err := insertWorkflowFormFieldsTx(ctx, tx, versionID, fields); err != nil {
 		return nil, err
 	}
+	definitionHash, err := workflowFormDefinitionHash(schemaJSON, validationJSON, fields)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE workflow_form_versions SET definition_hash=$2 WHERE id=$1`, versionID, definitionHash); err != nil {
+		return nil, err
+	}
 	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_created", "workflow_form_version", versionID, fmt.Sprintf("Tạo nháp biểu mẫu quy trình %s v%d", templateName, nextVersionNo), Record{"template_id": templateID, "source_version_id": sourceVersionID}); err != nil {
 		return nil, err
 	}
@@ -4971,6 +4986,13 @@ func (r *Repository) UpdateWorkflowFormVersion(ctx context.Context, versionID st
 	if err := insertWorkflowFormFieldsTx(ctx, tx, versionID, workflowFieldRecords(body["fields"])); err != nil {
 		return nil, err
 	}
+	definitionHash, err := workflowFormDefinitionHash(body["schema_json"], body["validation_json"], workflowFieldRecords(body["fields"]))
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE workflow_form_versions SET definition_hash=$2 WHERE id=$1`, versionID, definitionHash); err != nil {
+		return nil, err
+	}
 	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_updated", "workflow_form_version", versionID, fmt.Sprintf("Cập nhật nháp biểu mẫu quy trình %s v%d", templateName, versionNo), Record{"template_id": templateID}); err != nil {
 		return nil, err
 	}
@@ -5008,13 +5030,18 @@ func (r *Repository) PublishWorkflowFormVersion(ctx context.Context, versionID s
 	if fieldCount == 0 {
 		return nil, validationError("Phiên bản biểu mẫu quy trình cần ít nhất một trường trước khi phát hành")
 	}
+	definitionHash, err := workflowFormDefinitionHashTx(ctx, tx, versionID)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE workflow_form_versions
 		SET status='published',
+			definition_hash=$2,
 			published_at=COALESCE(published_at, now()),
 			updated_at=now()
 		WHERE id=$1
-	`, versionID); err != nil {
+	`, versionID, definitionHash); err != nil {
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_published", "workflow_form_version", versionID, fmt.Sprintf("Phát hành biểu mẫu quy trình %s v%d", templateName, versionNo), Record{"template_id": templateID, "field_count": fieldCount}); err != nil {
@@ -9446,7 +9473,7 @@ func (r *Repository) CloneTemplate(ctx context.Context, id, userID string) (Reco
 		"template_family_id": familyID,
 		"revision_no":        revisionNo,
 		"source_template_id": id,
-		"engine_version":     2,
+		"engine_version":     detail["engine_version"],
 	}
 	_, err = insertRecord(ctx, tx, "pipeline_templates", templateColumns(), body)
 	if err != nil {
