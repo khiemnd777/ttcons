@@ -13,12 +13,13 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import type { SealAsset } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { SealAssetPreview } from '../work-items/SealAssetPreview';
+import { SampleDataPanel } from './SampleDataPanel';
 import { SettingsBackupPanel } from './SettingsBackupPanel';
 
 const maxSealFileSize = 10 * 1024 * 1024;
 const acceptedSealTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
-type SettingsTab = 'seals' | 'system';
+type SettingsTab = 'seals' | 'system' | 'sample-data';
 type SettingOption = { value: string; label: string };
 type SystemSetting = {
   key: string; category: string; label: string; description: string;
@@ -44,6 +45,7 @@ export function SettingsPage() {
   const toast = useToast();
   const { hasPermission } = useAuth();
   const canManageSeals = hasPermission('seal.manage');
+  const canCreateSampleData = hasPermission('sample_data.create');
   const [tab, setTab] = useState<SettingsTab>(canManageSeals ? 'seals' : 'system');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [archiveCandidate, setArchiveCandidate] = useState<SealAsset | null>(null);
@@ -107,9 +109,11 @@ export function SettingsPage() {
       <div className="flex flex-wrap gap-2 border-b border-line" role="tablist" aria-label="Nhóm cấu hình">
         {canManageSeals ? <TabButton active={tab === 'seals'} onClick={() => setTab('seals')} icon={<Stamp className="h-4 w-4" />}>Con dấu</TabButton> : null}
         <TabButton active={tab === 'system'} onClick={() => setTab('system')} icon={<Settings2 className="h-4 w-4" />}>Thiết lập hệ thống</TabButton>
+        {canCreateSampleData ? <TabButton active={tab === 'sample-data'} onClick={() => setTab('sample-data')} icon={<Database className="h-4 w-4" />}>Dữ liệu mẫu</TabButton> : null}
       </div>
       {tab === 'seals' && canManageSeals ? <SealTable rows={seals.data ?? []} loading={seals.isLoading} error={seals.error} onRetry={() => seals.refetch()} onUpload={() => setUploadOpen(true)} onArchive={setArchiveCandidate} /> : null}
       {tab === 'system' ? <SystemSettingsPanel data={settings.data} loading={settings.isLoading} error={settings.error} onRetry={() => settings.refetch()} /> : null}
+      {tab === 'sample-data' && canCreateSampleData ? <SampleDataPanel /> : null}
 
       <Dialog open={uploadOpen} title="Thêm tài nguyên con dấu" description="Chấp nhận PNG, JPG hoặc WebP tối đa 10 MB. Hệ thống chuẩn hóa ảnh sang PNG để dùng ổn định trong PDF." onClose={closeUpload} footer={(
         <div className="flex justify-end gap-2">

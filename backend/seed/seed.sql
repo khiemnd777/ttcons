@@ -96,7 +96,7 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('audit.view','Xem audit','audit'),('event_log.view','Xem nhật ký sự kiện','event_log'),('report.view','Xem báo cáo','report'),('report.finance.view','Xem báo cáo tài chính','report'),
 ('statistics.view','Xem thống kê','statistics'),('statistics.export','Xuất dữ liệu thống kê','statistics'),
 ('work_report.view','Xem báo cáo công việc','work_report'),('work_report.create','Lập báo cáo công việc','work_report'),('work_report.submit','Gửi báo cáo công việc','work_report'),('work_report.review','Xem xét báo cáo công việc','work_report'),('work_report.export','Xuất báo cáo công việc','work_report'),('work_report.manage','Quản lý báo cáo công việc','work_report'),
-('settings.view','Xem cấu hình','settings'),('settings.update','Sửa cấu hình','settings'),
+('settings.view','Xem cấu hình','settings'),('settings.update','Sửa cấu hình','settings'),('sample_data.create','Tạo dữ liệu công trình mẫu','settings'),
 ('seal.use','Sử dụng con dấu','settings'),('seal.manage','Quản lý con dấu','settings')
 ) AS p(key, name, module);
 
@@ -110,7 +110,7 @@ WHERE key='staff.account_security.manage';
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
-WHERE r.name = 'developer' OR (r.name = 'admin' AND p.key NOT IN ('settings.update','staff.import'))
+WHERE r.name = 'developer' OR (r.name = 'admin' AND p.key NOT IN ('settings.update','staff.import','sample_data.create'))
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id,permission_id)

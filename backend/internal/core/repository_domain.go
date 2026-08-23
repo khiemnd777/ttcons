@@ -395,8 +395,8 @@ func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, 
 		requestedKeys[permissionKey] = true
 	}
 	if roleName == "admin" {
-		if requestedKeys["settings.update"] || requestedKeys["staff.import"] {
-			return nil, validationError("Quyền chỉ dành cho Nhà phát triển", Record{"permissions": []string{"settings.update", "staff.import"}})
+		if requestedKeys["settings.update"] || requestedKeys["staff.import"] || requestedKeys["sample_data.create"] {
+			return nil, validationError("Quyền chỉ dành cho Nhà phát triển", Record{"permissions": []string{"settings.update", "staff.import", "sample_data.create"}})
 		}
 		for _, required := range []string{"settings.view", "seal.use", "seal.manage", "event_log.view", "staff.delete", "project.import", "project.export", "workflow_definition.import", "workflow_definition.export"} {
 			if !requestedKeys[required] {
@@ -404,7 +404,7 @@ func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, 
 			}
 		}
 	} else {
-		for _, reserved := range []string{"settings.view", "settings.update", "seal.manage", "event_log.view", "staff.import", "staff.delete", "project.import", "workflow_definition.import"} {
+		for _, reserved := range []string{"settings.view", "settings.update", "seal.manage", "event_log.view", "staff.import", "staff.delete", "project.import", "workflow_definition.import", "sample_data.create"} {
 			if requestedKeys[reserved] {
 				return nil, validationError("Quyền này chỉ dành cho Quản trị viên hoặc Nhà phát triển", Record{"permission": reserved})
 			}

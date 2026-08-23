@@ -88,6 +88,12 @@
 - The contract workspace presents milestone obligations as Vietnamese payable/receivable labels without exposing raw obligation identifiers; eligibility, obligation creation and retention release still use the existing permission and server transition gates.
 - Handover readiness requires zero unconfirmed project material costs and zero cash requests outside `processed|cancelled` for Rev7 and older runtimes. Rev8 alone moves those two facts to the final `source.project_finance_close_ready` work-package gate, after physical handover; it never auto-confirms, cancels, posts or reconciles a finance record. Older `ap_reconciliation` and `ar_reconciliation` checklist codes remain compatibility aliases and never force-close legacy financial records.
 
+## Developer Sample Data
+
+- Completed samples create a signed/active historical contract package, confirmed project material cost, processed inbound/outbound project cash requests, fully settled payable/receivable schedules, approved payments and matching allocations.
+- Developer explicitly selects the completed sample's active accounting book from the current environment. Compatibility resolves postable bank/cost/revenue accounts by stable codes `1121`, `154`, `5111` inside that book and requires an already-open current accounting period; no accounting UUID is portable or fixed in application code.
+- Sample journals use that selected book and post only after balanced debit/credit lines exist. V122 stores `sample_data_generations.accounting_book_id` so idempotency cannot replay against a different source. Generation must not open/close tax or accounting periods and must not claim MISA synchronization.
+
 ## Cross-Domain Checks
 
 - Pair with commercial/procurement when payables, vendor invoices, advances, payment schedules, or procurement-linked source documents change.

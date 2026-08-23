@@ -59,6 +59,11 @@
 - Field checklist form flows remain separate from reconciliation and final acceptance workflows.
 - Work item actions preserve actor, comments, status, and activity history.
 
+## Developer Sample Data
+
+- A completed sample links incoming material acceptance and issue history into the construction work item, creates an eligible 100% daily report with protected evidence and closes the site material balance at zero surplus.
+- Planning samples leave unfinished construction-domain actions to the assigned actors; runtime progress alone must not fabricate future field ledgers.
+
 ## Cross-Domain Checks
 
 - Pair with commercial/procurement when actual quantities, subcontractor checklist data, owner/client checklist data, or reconciliation variance changes.

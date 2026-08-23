@@ -61,6 +61,12 @@
 - Readiness-owned checklist sources (`final_acceptance`, `warehouse_closure`, `ap_reconciliation`, `ar_reconciliation`) expose a read-only `Xem nguồn` dialog. It must show the exact backend criterion, result/count/amount/time from the last stored readiness snapshot, state that source data may have changed since that check, and offer only permission-allowed navigation to the source module. Evidence/document-linked checklist rows remain manual verification sources and must never be relabelled as automatic. They also expose read-only `Xem nguồn` from the exact item-linked record, including locked handed-over hồ sơ; internally stored `local|s3` evidence continues through the protected evidence-file route, which authorizes before provider-registry `Open` and streams without exposing an object key or filesystem path. `external`, `none` and unknown providers are not treated as protected evidence. Document URLs are opened only when present and safe, placeholder/missing targets are explicit, and `Cập nhật liên kết` is limited to mutable hồ sơ plus handover verification permission.
 - Handover checklist presentation maps automatic finance rows to `Chi phí vật tư công trình` and `Đề nghị thu/chi nội bộ`. New item codes are `project_material_costs` and `project_cash_requests`; stored legacy `ap_reconciliation`/`ar_reconciliation` codes keep compatibility but receive the new business labels and route to Tài chính công trình. Raw codes remain tooltip-only and unknown future codes fall back to `Nội dung khác`.
 
+## Developer Sample Data
+
+- Completed samples create passed incoming and final acceptance records linked to their runtime work items, forms/PDF and protected evidence, then a `handed_over` record with a verified source-backed checklist.
+- The selected Pipeline must expose portable incoming material acceptance, `outgoing_acceptance` and physical handover `handover/source.handover_completed` bindings. Handover history uses the completed bound work item/evidence rather than any template ID, revision, step ordinal or generic finance fallback.
+- Handover readiness asserts final acceptance, warehouse closure, paid/received finance and evidence history; sample metadata never waives a required source link.
+
 ## Cross-Domain Checks
 
 - Pair with construction operations when acceptance consumes work-item evidence, checklist results, site reports, or rework activity.

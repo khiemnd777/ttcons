@@ -69,6 +69,11 @@
 - Tax warnings for missing tax code/VAT arithmetic and the profit unclassified-cost warning can set the controlled ledger search to their exact backend warning flag. Aggregate-only or excluded-row warnings remain informational because their rows are not present in the active ledger.
 - Warehouse aggregate reports treat a completed source/target transfer as net zero across all warehouses while per-warehouse position queries subtract from the source and add to the target; legacy transfer rows without a target remain outbound-only.
 
+## Developer Sample Data
+
+- Sample projects remain inside ordinary project/report scope unless cancelled. Project explorer, detail and operational project statistics expose `is_sample`; UI and CSV/XLSX/PDF-compatible tabular rows label the sample flag rather than filtering it out.
+- Financial/report aggregates consume the same source ledgers as ordinary projects. Do not create a parallel sample-only report source or silently exclude sample amounts.
+
 ## Cross-Domain Checks
 
 - Pair with the source domain before changing report metrics, denominators, filters, statuses, warning logic, or CSV columns.

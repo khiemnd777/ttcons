@@ -321,7 +321,7 @@ func (r *Repository) report(ctx context.Context, kind, userID, projectID, requir
 	switch kind {
 	case "projects":
 		return r.Query(ctx, fmt.Sprintf(`
-			SELECT p.id AS project_id, p.name, p.status, p.progress_percent,
+			SELECT p.id AS project_id, p.name, p.status, p.progress_percent, p.is_sample,
 				(SELECT COUNT(*) FROM issues i WHERE i.project_id=p.id AND i.status IN ('open','in_progress')) AS open_issues,
 				(SELECT COUNT(*) FROM approval_requests ar WHERE ar.project_id=p.id AND ar.status='pending') AS pending_approvals
 			FROM projects p

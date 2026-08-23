@@ -34,6 +34,7 @@ import { partnerOptions } from '../core-data/partnerUtils';
 import { BulkSelectionBar } from '../../components/BulkSelectionBar';
 import { BulkDeleteDialog, type BulkDeletionResult } from '../../components/BulkDeleteDialog';
 import { SelectionCheckbox } from '../../components/SelectionCheckbox';
+import { SampleDataBadge } from '../../components/SampleDataBadge';
 import {
   projectWorkspaceGroupPath,
   visibleProjectWorkspaceGroups,
@@ -556,7 +557,7 @@ function ProjectEditSummary({ project }: { project: Project }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink">Tổng quan</h3>
-          <p className="mt-1 truncate text-xs text-slate-500">{project.code} · {project.name}</p>
+          <p className="mt-1 flex items-center gap-2 truncate text-xs text-slate-500"><span className="truncate">{project.code} · {project.name}</span>{project.is_sample ? <SampleDataBadge compact /> : null}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trạng thái</span>
@@ -818,8 +819,9 @@ function ProjectExplorerRow({
         </button>
         <FolderOpen className="mt-1 h-4 w-4 shrink-0 text-blue-700" />
         <div className="min-w-0">
-          <Link to={`/projects/${project.id}`} className="block truncate text-sm font-semibold text-ink hover:text-blue-700">
-            {project.code} · {project.name}
+          <Link to={`/projects/${project.id}`} className="flex min-w-0 items-center gap-2 text-sm font-semibold text-ink hover:text-blue-700">
+            <span className="truncate">{project.code} · {project.name}</span>
+            {project.is_sample ? <SampleDataBadge /> : null}
           </Link>
           <p className="mt-1 truncate text-xs text-slate-500">
             {project.client_name || project.partner_name || 'Chưa có chủ đầu tư'}

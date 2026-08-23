@@ -40,7 +40,7 @@ func statisticDefinition(kind string) (tabularDefinition, error) {
 	definitions := map[string]tabularDefinition{
 		"projects": {
 			Title: "Thống kê công trình và tiến độ", FileSlug: "thong-ke-cong-trinh",
-			Columns: []tabularColumn{{"name", "Công trình", false}, {"status", "Trạng thái", false}, {"progress_percent", "Tiến độ (%)", true}, {"open_issues", "Vấn đề mở", true}, {"pending_approvals", "Chờ duyệt", true}},
+			Columns: []tabularColumn{{"name", "Công trình", false}, {"is_sample", "Dữ liệu mẫu", false}, {"status", "Trạng thái", false}, {"progress_percent", "Tiến độ (%)", true}, {"open_issues", "Vấn đề mở", true}, {"pending_approvals", "Chờ duyệt", true}},
 		},
 		"warehouse": {
 			Title: "Thống kê vật tư và kho", FileSlug: "thong-ke-vat-tu-kho",

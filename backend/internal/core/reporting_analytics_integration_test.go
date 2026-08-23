@@ -193,6 +193,7 @@ func TestOperationalReportCSVIncludesExactlyReturnedRows(t *testing.T) {
 	payload, err := operationalReportCSV("projects", []Record{{
 		"project_id":        "project-1",
 		"name":              "CSV Project",
+		"is_sample":         false,
 		"status":            "in_progress",
 		"progress_percent":  42,
 		"open_issues":       2,
@@ -202,7 +203,7 @@ func TestOperationalReportCSVIncludesExactlyReturnedRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(payload)
-	if !strings.Contains(text, "project_id,name,status") || !strings.Contains(text, "project-1,CSV Project,in_progress,42,2,1") {
+	if !strings.Contains(text, "project_id,name,is_sample,status") || !strings.Contains(text, "project-1,CSV Project,false,in_progress,42,2,1") {
 		t.Fatalf("operational csv payload missing header or row: %s", text)
 	}
 }

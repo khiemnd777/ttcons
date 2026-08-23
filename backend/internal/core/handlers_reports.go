@@ -376,7 +376,7 @@ func cashflowCSV(data Record) ([]byte, error) {
 
 func operationalReportCSV(kind string, rows []Record) ([]byte, error) {
 	columns := map[string][]string{
-		"projects":    {"project_id", "name", "status", "progress_percent", "open_issues", "pending_approvals"},
+		"projects":    {"project_id", "name", "is_sample", "status", "progress_percent", "open_issues", "pending_approvals"},
 		"warehouse":   {"material_id", "name", "category", "stock_quantity", "surplus_quantity"},
 		"procurement": {"status", "budget_status", "total", "amount"},
 		"accounting":  {"project_id", "name", "payable_remaining", "receivable_remaining", "used_budget"},

@@ -58,6 +58,12 @@
 
 - Project metadata review/edit on `/projects` has one pencil entry point. Its unified dialog presents the current status, progress and partner snapshot/tax as read-only context above the editable metadata/template form; no separate eye/detail action or additional detail request exists, and the project-workspace folder action remains separate. The selector is labelled `Chọn chủ đầu tư có sẵn`, the read-only summary is `Chủ đầu tư đã chọn`, and the helper describes storing the current name in plain language.
 
+## Developer Sample Data
+
+- Sample projects carry `is_sample`, `sample_profile` and `sample_blueprint_version`. Draft is 0%; planning is limited to 5/10/15/25/40/65/90; completed is 100%.
+- Developer explicitly selects one compatible published Pipeline from the current environment. Planning executes its real design branch, keeps `boq_without_design` skipped/cancelled and floors the initial checkpoint to `progress * selected_step_count / 100`; no source UUID, revision, topology or fixed step count is authoritative. Subsequent workflow advancement keeps the normal progress engine authoritative.
+- Every active Staff whose current global role display name exactly matches a role required by the selected Pipeline becomes a project member; work-item role assignments preserve current and upcoming My Work visibility. Project-manager resolution uses the stable role key `pm`, not the mutable `PM` display label.
+
 ## Cross-Domain Checks
 
 - Pair with workflow orchestration when planning records are backed by workflow form instances, work items, signatures, or PDF exports.

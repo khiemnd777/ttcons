@@ -103,6 +103,9 @@ export type Project = AnyRecord & {
   pm_account_deleted?: boolean;
   status: string;
   progress_percent: number;
+	is_sample?: boolean;
+	sample_profile?: 'draft' | 'planning' | 'completed';
+	sample_blueprint_version?: number;
 	workflow_entry_mode: 'survey_required' | 'client_boq';
   planned_start_date?: string | null;
   planned_end_date?: string | null;
@@ -1835,6 +1838,7 @@ export type ReportOptions = ProjectScopeOptions;
 export type ProjectReportRow = AnyRecord & {
   project_id: string;
   name: string;
+  is_sample?: boolean;
   status: string;
   progress_percent: number;
   open_issues: number;

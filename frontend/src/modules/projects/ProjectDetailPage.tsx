@@ -195,6 +195,7 @@ export function ProjectDetailPage() {
             project.client_name ? `Chủ đầu tư: ${project.client_name}` : null,
             project.pm_name ? `Phụ trách: ${identityReferenceText(project.pm_name, project.pm_account_deleted)}${project.pm_account_deleted ? ' · Cần phân công lại' : ''}` : null,
             project.status ? `Trạng thái: ${statusLabel(project.status)}` : null,
+            project.is_sample ? 'Dữ liệu mẫu' : null,
             project.planned_end_date ? `Kết thúc: ${dateText(project.planned_end_date)}` : null,
           ].filter(Boolean).join(' · ')
         }

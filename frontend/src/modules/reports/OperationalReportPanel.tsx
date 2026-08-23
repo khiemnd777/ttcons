@@ -6,6 +6,7 @@ import { CurrencyText } from '../../components/CurrencyText';
 import { DataTable, type DataTableSort } from '../../components/DataTable';
 import { EnumChip } from '../../components/EnumChip';
 import { StatusBadge } from '../../components/StatusBadge';
+import { SampleDataBadge } from '../../components/SampleDataBadge';
 import { get } from '../../lib/api/client';
 import type {
   AccountingReportRow,
@@ -76,7 +77,7 @@ function operationalTable(
         getRowKey={(row) => row.project_id}
         renderMobileCard={(row) => <ProjectReportCard row={row} />}
         columns={[
-          { key: 'name', header: 'Công trình', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.name}</span> },
+          { key: 'name', header: 'Công trình', sortable: true, render: (row) => <span className="flex items-center gap-2 font-semibold text-ink"><span>{row.name}</span>{row.is_sample ? <SampleDataBadge /> : null}</span> },
           { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
           { key: 'progress_percent', header: 'Tiến độ', align: 'right', sortable: true, render: (row) => `${Number(row.progress_percent ?? 0)}%` },
           { key: 'open_issues', header: 'Vấn đề mở', align: 'right', sortable: true },
@@ -170,7 +171,7 @@ function ProjectReportCard({ row }: { row: ProjectReportRow }) {
   const progress = Math.max(0, Math.min(100, Number(row.progress_percent ?? 0)));
   return (
     <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
-      <h3 className="break-words font-semibold leading-5 text-ink">{row.name}</h3>
+      <div className="flex flex-wrap items-center gap-2"><h3 className="break-words font-semibold leading-5 text-ink">{row.name}</h3>{row.is_sample ? <SampleDataBadge /> : null}</div>
       <div className="mt-2"><StatusBadge status={row.status} /></div>
       <div className="mt-4">
         <div className="flex items-center justify-between gap-3 text-xs font-medium text-slate-500">

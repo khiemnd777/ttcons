@@ -49,6 +49,11 @@
 - Procurement, contract and invoice source IDs remain traceable on journals and budget movements. Commercial code must not insert or update posted journal lines, static budget actuals or paid balances outside the canonical accounting posting transaction.
 - An ordinary project material-cost record may reference a same-project procurement request as management evidence. Creating or confirming that cost never mutates the procurement status, stock ledger, legacy payable/invoice/journal, or MISA; only confirmed records affect the scope-warned project-management profit view.
 
+## Developer Sample Data
+
+- A completed sample materializes one coherent BOQ → supplier quotation/selection → procurement chain. Final BOQ price remains locked to the selected quotation item; procurement links the same supplier/material/BOQ source.
+- Sample partners and materials use unique project-derived codes and explicit simulated notes. Planning profiles do not pre-create unfinished commercial ledgers.
+
 ## Cross-Domain Checks
 
 - Pair with materials/warehouse when procurement receive, stock movement, material balance, or surplus handling can change.
