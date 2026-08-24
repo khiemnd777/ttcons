@@ -29,6 +29,23 @@ func (r *Repository) Query(ctx context.Context, query string, args ...any) ([]Re
 	return queryRecords(ctx, r.db, query, args...)
 }
 
+const readTransactionSettingsSQL = `SET LOCAL jit = off`
+
+func (r *Repository) beginReadTransactionWithJITDisabled(ctx context.Context) (*sql.Tx, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, err
+	}
+	// Actor-scoped operational queues can have complex access predicates whose
+	// JIT compilation costs more than their bounded execution. Keep the setting
+	// local to this read transaction so connection and server defaults are intact.
+	if _, err := tx.ExecContext(ctx, readTransactionSettingsSQL); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	return tx, nil
+}
+
 func queryRecords(ctx context.Context, db queryContext, query string, args ...any) ([]Record, error) {
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {

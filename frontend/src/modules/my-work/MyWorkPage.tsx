@@ -24,9 +24,8 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
-import type { ActivityAttentionItem, ApprovalRequest, WorkItem } from '../../lib/types/domain';
+import type { ActivityAttentionItem, ActivityAttentionSummary, ApprovalRequest, WorkItem } from '../../lib/types/domain';
 import { ApprovalPanel } from '../../components/ApprovalPanel';
-import { dateText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import { ActivityAttachments } from '../work-items/ActivityAttachments';
 import { ActivityReactionBar, ActivityReplyQuote } from '../work-items/ActivityConversationMeta';
@@ -37,9 +36,7 @@ import {
   asArray,
   activityLabel,
   compactDateTime,
-  departmentLabel,
   isWorkOverdue,
-  numberValue,
   priorityLabel,
   scopeTypeLabel,
   workItemIsUpcoming,
@@ -149,6 +146,7 @@ export function MyWorkPage() {
   const priority = searchParams.get('priority') ?? '';
   const search = searchParams.get('search') ?? '';
   const sort = searchParams.get('sort') ?? 'priority';
+  const roleSummary = uniqueRoleNames(user?.roles);
 
   useEffect(() => setSearchDraft(search), [search]);
 
@@ -176,9 +174,21 @@ export function MyWorkPage() {
     if (project) params.set('project_id', project);
     return `/me/activity-attention?${params.toString()}`;
   }, [project]);
+  const attentionSummaryPath = useMemo(() => {
+    const params = new URLSearchParams();
+    if (project) params.set('project_id', project);
+    const query = params.toString();
+    return `/me/activity-attention/summary${query ? `?${query}` : ''}`;
+  }, [project]);
+  const activityAttentionSummary = useQuery({
+    queryKey: ['activity-attention', 'summary', project],
+    queryFn: () => get<ActivityAttentionSummary>(attentionSummaryPath),
+    retry: false,
+  });
   const activityAttention = useQuery({
-    queryKey: ['activity-attention', project],
+    queryKey: ['activity-attention', 'list', project],
     queryFn: () => get<ActivityAttentionItem[]>(attentionPath),
+    enabled: mode === 'attention',
     retry: false,
   });
   const markAttentionRead = useMutation({
@@ -202,6 +212,13 @@ export function MyWorkPage() {
   }), [baseSummary, nodeApprovalCount]);
   const facets = firstPage?.facets ?? {};
   const attentionRows = useMemo(() => asArray<ActivityAttentionItem>(activityAttention.data), [activityAttention.data]);
+  const attentionTabCount = activityAttentionSummary.isLoading
+    ? '…'
+    : activityAttentionSummary.isError
+      ? '—'
+      : activityAttentionSummary.data?.has_more
+        ? '120+'
+        : activityAttentionSummary.data?.count ?? 0;
   const selectedItem = rows.find((item) => item.id === selectedWorkId) ?? rows[0] ?? null;
 
   useEffect(() => {
@@ -250,8 +267,9 @@ export function MyWorkPage() {
 
   function refreshAll() {
     void workItems.refetch();
-    void activityAttention.refetch();
-    void pendingNodeApprovals.refetch();
+    void activityAttentionSummary.refetch();
+    if (mode === 'attention') void activityAttention.refetch();
+    if (mode === 'work') void pendingNodeApprovals.refetch();
   }
 
   function openWorkItem(item: WorkItem) {
@@ -265,12 +283,12 @@ export function MyWorkPage() {
     <>
       <PageHeader
         title="Bàn làm việc"
-        description={`${user?.full_name ?? 'Người dùng'}${user?.roles?.length ? ` · ${user.roles.join(', ')}` : ''} · Mở thẳng đúng sổ nghiệp vụ cần xử lý`}
+        description={`${user?.full_name ?? 'Người dùng'}${roleSummary ? ` · ${roleSummary}` : ''} · Mở thẳng đúng sổ nghiệp vụ cần xử lý`}
         actions={(
           <div className="flex items-center gap-2">
             <LiveStatusBadge status={streamStatus} />
             <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={refreshAll}>
-              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || activityAttention.isFetching) && 'animate-spin')} />
+              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || activityAttentionSummary.isFetching || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
               Làm mới
             </button>
           </div>
@@ -281,11 +299,11 @@ export function MyWorkPage() {
 
       <div className="mt-4 flex gap-1 border-b border-line">
         <ModeTab active={mode === 'work'} label="Công việc" count={summary.total} onClick={() => updateParams({ mode: 'work' })} />
-        <ModeTab active={mode === 'attention'} label="Trao đổi cần phản hồi" count={attentionRows.length} onClick={() => updateParams({ mode: 'attention' })} />
+        <ModeTab active={mode === 'attention'} label="Trao đổi cần phản hồi" count={attentionTabCount} onClick={() => updateParams({ mode: 'attention' })} />
       </div>
 
       {mode === 'work' ? (
-        <section className="mt-4 rounded-lg border border-line bg-white p-4 shadow-panel">
+        <section className="mt-4">
           <FilterBar
             searchDraft={searchDraft}
             queue={queue}
@@ -314,7 +332,7 @@ export function MyWorkPage() {
             />
           ) : null}
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
             <WorkList
               rows={rows}
               selectedId={selectedItem?.id}
@@ -397,6 +415,10 @@ function validValue<T extends string>(value: string | null, values: readonly T[]
   return value && values.includes(value as T) ? value as T : fallback;
 }
 
+function uniqueRoleNames(roles?: string[]) {
+  return Array.from(new Set((roles ?? []).map((role) => role.trim()).filter(Boolean))).join(', ');
+}
+
 const emptySummary: MyWorkSummary = { total: 0, need_action: 0, in_progress: 0, overdue: 0, blocked: 0, waiting_decision: 0, waiting_approval: 0, upcoming: 0, done_today: 0 };
 
 function SummaryStrip({ summary, selected, onSelect }: { summary: MyWorkSummary; selected: SummaryBucket; onSelect: (bucket: SummaryBucket) => void }) {
@@ -430,7 +452,7 @@ function SummaryStrip({ summary, selected, onSelect }: { summary: MyWorkSummary;
   );
 }
 
-function ModeTab({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) {
+function ModeTab({ active, label, count, onClick }: { active: boolean; label: string; count: number | string; onClick: () => void }) {
   return (
     <button className={clsx('border-b-2 px-4 py-3 text-sm font-semibold', active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800')} onClick={onClick}>
       {label} <span className="ml-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{count}</span>
@@ -447,7 +469,7 @@ function FilterBar({ searchDraft, queue, project, status, deadline, workType, pr
   const workTypes = normalizeFacetOptions(facets.work_types, 'Loại việc');
   const priorities = normalizeFacetOptions(facets.priorities, 'Ưu tiên');
   return (
-    <div className="space-y-3 border-b border-line pb-4">
+    <div className="space-y-3 rounded-lg border border-line bg-white p-3">
       <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-blue-700" /><h2 className="text-sm font-semibold text-ink">Tìm công việc</h2></div>{hasFilters ? <button className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-blue-700" onClick={onReset}><X className="h-3.5 w-3.5" />Về mặc định</button> : null}</div>
       <div className="grid gap-2 md:grid-cols-[minmax(14rem,1fr)_minmax(12rem,18rem)_auto]">
         <form className="flex min-w-0" onSubmit={(event) => { event.preventDefault(); onSearch(); }}>
@@ -485,17 +507,16 @@ function WorkList({ rows, selectedId, loading, fetchingMore, error, total, hasMo
   rows: WorkItem[]; selectedId?: string; loading: boolean; fetchingMore: boolean; error: unknown; total: number; hasMore: boolean; filtered: boolean;
   onSelect: (id: string) => void; onOpen: (item: WorkItem) => void; onLoadMore: () => void; onReset: () => void; onRetry: () => void;
 }) {
-  if (loading) return <div className="rounded-md border border-line p-8"><LoadingSpinner /></div>;
+  if (loading) return <WorkListSkeleton />;
   if (error && !rows.length) return <SourceError title="Không tải được danh sách công việc" onRetry={onRetry} />;
   if (!rows.length) return <EmptyState title={filtered ? 'Không có công việc khớp bộ lọc' : 'Không có việc cần xử lý trong phạm vi này'} action={filtered ? <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700" onClick={onReset}>Xóa bộ lọc</button> : undefined} />;
   return (
     <div className="min-w-0">
-      <div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold text-ink">{total} việc</p>{error ? <span className="text-xs font-semibold text-rose-600">Chưa cập nhật được dữ liệu mới</span> : null}</div>
-      <div className="max-h-[720px] space-y-2 overflow-y-auto pr-1">
+      <div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold text-ink">{total} việc</p></div>
+      {error ? <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Chưa cập nhật được dữ liệu mới; đang giữ danh sách gần nhất.</span><button className="shrink-0 font-semibold text-amber-900 underline underline-offset-2" onClick={onRetry}>Thử lại</button></div> : null}
+      <div className="max-h-[720px] overflow-y-auto rounded-lg border border-line bg-white">
         {rows.map((item) => (
-          <div key={item.id} role="button" tabIndex={0} className={clsx('rounded-lg outline-none ring-offset-1', selectedId === item.id && 'ring-2 ring-blue-400')} onClick={() => onSelect(item.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelect(item.id); }}>
-            <WorkItemCard item={item} onOpen={() => onOpen(item)} />
-          </div>
+          <WorkItemCard key={item.id} item={item} selected={selectedId === item.id} onSelect={() => onSelect(item.id)} onOpen={() => onOpen(item)} />
         ))}
       </div>
       {hasMore ? <button className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" disabled={fetchingMore} onClick={onLoadMore}>{fetchingMore ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}Tải thêm · Đã hiển thị {rows.length}/{total}</button> : <p className="mt-3 text-center text-xs text-slate-500">Đã hiển thị {rows.length}/{total}</p>}
@@ -503,19 +524,32 @@ function WorkList({ rows, selectedId, loading, fetchingMore, error, total, hasMo
   );
 }
 
+function WorkListSkeleton() {
+  return (
+    <div className="min-w-0">
+      <div className="mb-2 h-5 w-16 animate-pulse rounded bg-slate-200" />
+      <div className="overflow-hidden rounded-lg border border-line bg-white" aria-label="Đang tải danh sách công việc">
+        {[0, 1, 2].map((row) => <div key={row} className="animate-pulse border-b border-line px-4 py-3 last:border-b-0"><div className="flex gap-3"><div className="h-5 w-20 rounded bg-slate-200" /><div className="h-5 w-1/2 rounded bg-slate-200" /></div><div className="mt-2 h-3 w-4/5 rounded bg-slate-100" /><div className="mt-2 h-3 w-2/3 rounded bg-slate-100" /></div>)}
+      </div>
+    </div>
+  );
+}
+
 function NextWorkPanel({ item, onOpen }: { item: WorkItem | null; onOpen: (item: WorkItem) => void }) {
-  if (!item) return <aside className="order-first rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 xl:order-last"><p className="text-sm font-semibold text-ink">Nơi làm việc</p><p className="mt-2 text-sm text-slate-600">Chọn một công việc để mở đúng sổ nghiệp vụ.</p></aside>;
+  if (!item) return <aside className="hidden rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 xl:block"><p className="text-sm font-semibold text-ink">Việc tiếp theo</p><p className="mt-2 text-sm text-slate-600">Chọn một công việc để xem hành động cần thực hiện.</p></aside>;
   const context = workItemWorkflowContext(item);
   const upcoming = workItemIsUpcoming(item);
+  const exceptionalPriority = item.priority && !['normal', 'low'].includes(item.priority);
   return (
-    <aside className="order-first rounded-lg border border-line bg-slate-50 p-4 xl:order-last xl:sticky xl:top-4 xl:self-start">
-      <div className="flex flex-wrap items-center gap-2"><StatusBadge status={isWorkOverdue(item) ? 'overdue' : item.status} />{upcoming ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">Sắp tới · chỉ xem</span> : null}{item.priority ? <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600">{priorityLabel(item.priority)}</span> : null}</div>
-      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Nơi làm việc</p>
+    <aside className="hidden rounded-lg border border-line bg-white p-4 xl:sticky xl:top-4 xl:block xl:self-start">
+      <div className="flex flex-wrap items-center gap-2"><StatusBadge status={isWorkOverdue(item) ? 'overdue' : item.status} />{upcoming ? <span className="text-xs font-semibold text-amber-700">Sắp tới · chỉ xem</span> : null}{exceptionalPriority ? <span className="text-xs font-semibold text-rose-700">{priorityLabel(item.priority)}</span> : null}</div>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Việc tiếp theo</p>
       <h3 className="mt-1 text-base font-semibold text-ink">{item.title}</h3>
-      <p className="mt-2 text-xs font-medium leading-5 text-slate-600">{context.path}</p>
-      <p className="mt-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">Thực hiện tại: {executionTargetWorkspaceLabel(item)}</p>
-      {upcoming ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Bước này chưa đến lượt. Có thể xem trước hồ sơ nhưng chưa thể bắt đầu hoặc cập nhật.</p> : item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-700">{item.blocked_reason}</p> : <p className="mt-3 text-sm leading-6 text-slate-600">{nextActionCopy(item)}</p>}
-      <div className="mt-4 space-y-2 text-sm"><ContextRow label="Dự án" value={context.project} /><ContextRow label="Node" value={context.node} /><ContextRow label="Bước" value={context.step} /><ContextRow label="Phụ trách" value={item.assignee_name ? identityReferenceText(item.assignee_name, item.assignee_account_deleted) : departmentLabel(item.department)} /><ContextRow label="Hạn" value={dateText(item.due_at)} /><ContextRow label="Minh chứng" value={numberValue(item.evidence_count)} /></div>
+      <p className="mt-2 line-clamp-2 text-xs font-medium leading-5 text-slate-600" title={context.path}>{context.path}</p>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Thực hiện tại</p>
+      <p className="mt-1 text-sm font-semibold text-blue-800">{executionTargetWorkspaceLabel(item)}</p>
+      {item.description ? <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p> : null}
+      {upcoming ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Bước này chưa đến lượt. Có thể xem trước hồ sơ nhưng chưa thể bắt đầu hoặc cập nhật.</p> : item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-700">Điểm chặn: {item.blocked_reason}</p> : <p className="mt-3 text-sm leading-6 text-slate-600">{nextActionCopy(item)}</p>}
       <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onOpen(item)}>{upcoming ? 'Xem trước công việc' : executionTargetActionLabel(item)} <ChevronRight className="h-4 w-4" /></button>
       {item.project_id ? <Link className="mt-2 inline-flex w-full justify-center rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${item.project_id}`}>Mở công trình</Link> : null}
     </aside>
@@ -569,7 +603,5 @@ function LiveStatusBadge({ status }: { status: StreamStatus }) {
   const label = status === 'connected' ? 'Đang trực tuyến' : status === 'reconnecting' ? 'Đang kết nối lại' : 'Mất kết nối · Làm mới thủ công';
   return <span className={clsx('inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-semibold', status === 'connected' ? 'bg-emerald-50 text-emerald-700' : status === 'reconnecting' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600')}><span className={clsx('h-2 w-2 rounded-full', status === 'connected' ? 'bg-emerald-500' : status === 'reconnecting' ? 'bg-amber-500' : 'bg-slate-400')} />{label}</span>;
 }
-
-function ContextRow({ label, value }: { label: string; value: string | number }) { return <div className="flex items-center justify-between gap-3 border-b border-line pb-2 last:border-0 last:pb-0"><span className="text-slate-500">{label}</span><span className="min-w-0 truncate text-right font-semibold text-ink">{value}</span></div>; }
 
 function SourceError({ title, onRetry }: { title: string; onRetry?: () => void }) { return <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"><p className="font-semibold">{title}</p>{onRetry ? <button className="mt-3 rounded-md border border-rose-200 bg-white px-3 py-2 font-semibold" onClick={onRetry}>Thử lại</button> : null}</div>; }

@@ -309,6 +309,20 @@ func TestActivityMentionsUnreadAndRoleScope(t *testing.T) {
 	if len(attention) != 1 || attention[0]["id"] != activityID || !boolValue(attention[0]["is_unread"]) || !boolValue(attention[0]["mentioned_me"]) {
 		t.Fatalf("attention = %#v", attention)
 	}
+	attentionSummary, err := service.MyActivityAttentionSummary(ctx, "", pmUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if attentionSummary.Count != 1 || attentionSummary.HasMore {
+		t.Fatalf("attention summary = %#v", attentionSummary)
+	}
+	projectAttentionSummary, err := service.MyActivityAttentionSummary(ctx, projectID, pmUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projectAttentionSummary != attentionSummary {
+		t.Fatalf("project attention summary = %#v, want %#v", projectAttentionSummary, attentionSummary)
+	}
 	outsideAttention, err := service.MyActivityAttention(ctx, ActivityAttentionFilter{Queue: "mentions"}, outsideUserID)
 	if err != nil {
 		t.Fatal(err)
@@ -375,6 +389,26 @@ func TestActivityMentionsUnreadAndRoleScope(t *testing.T) {
 	}
 	if len(unread) != 0 {
 		t.Fatalf("unread after mark read = %#v", unread)
+	}
+
+	mustExec(t, db, `
+		INSERT INTO work_item_activities(project_id,scope_type,scope_id,actor_id,activity_type,comment,visibility,metadata_json,created_at)
+		SELECT $1,'project',$1,$2,'question','Câu hỏi giới hạn ' || sequence_no,'project','{}'::jsonb,now() + (sequence_no * INTERVAL '1 millisecond')
+		FROM generate_series(1,121) sequence_no
+	`, projectID, actorUserID)
+	cappedSummary, err := service.MyActivityAttentionSummary(ctx, projectID, pmUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cappedSummary.Count != 120 || !cappedSummary.HasMore {
+		t.Fatalf("capped attention summary = %#v", cappedSummary)
+	}
+	cappedItems, err := service.MyActivityAttention(ctx, ActivityAttentionFilter{ProjectID: projectID, Limit: 120}, pmUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cappedItems) != 120 {
+		t.Fatalf("capped attention items = %d, want 120", len(cappedItems))
 	}
 }
 

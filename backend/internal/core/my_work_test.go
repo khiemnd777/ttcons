@@ -144,6 +144,81 @@ func TestMyWorkDecisionSQLPreservesAuthoritativeScopeParity(t *testing.T) {
 	}
 }
 
+func TestReadTransactionDisablesJITLocally(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	ctx := context.Background()
+
+	var before string
+	if err := db.QueryRowContext(ctx, `SELECT current_setting('jit')`).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, finish := range []string{"commit", "rollback"} {
+		t.Run(finish, func(t *testing.T) {
+			tx, err := NewRepository(db).beginReadTransactionWithJITDisabled(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var inside, readOnly string
+			if err := tx.QueryRowContext(ctx, `SELECT current_setting('jit'), current_setting('transaction_read_only')`).Scan(&inside, &readOnly); err != nil {
+				_ = tx.Rollback()
+				t.Fatal(err)
+			}
+			if inside != "off" {
+				_ = tx.Rollback()
+				t.Fatalf("transaction jit = %q, want off", inside)
+			}
+			if readOnly != "on" {
+				_ = tx.Rollback()
+				t.Fatalf("transaction_read_only = %q, want on", readOnly)
+			}
+			if finish == "commit" {
+				err = tx.Commit()
+			} else {
+				err = tx.Rollback()
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var after string
+			if err := db.QueryRowContext(ctx, `SELECT current_setting('jit')`).Scan(&after); err != nil {
+				t.Fatal(err)
+			}
+			if after != before {
+				t.Fatalf("connection jit after transaction = %q, want original %q", after, before)
+			}
+		})
+	}
+}
+
+func TestActivityAttentionQuerySelectsCandidatesBeforeEnrichment(t *testing.T) {
+	query, args := activityAttentionCandidatesSQL("10000000-0000-0000-0000-000000000001", workItemAccessProfile{
+		UserID:  "10000000-0000-0000-0000-000000000001",
+		StaffID: "20000000-0000-0000-0000-000000000002",
+	}, ActivityAttentionFilter{Queue: "all", Limit: 120})
+	if len(args) == 0 || args[len(args)-1] != 120 {
+		t.Fatalf("candidate args = %#v", args)
+	}
+	for _, fragment := range []string{
+		"WITH attention_candidates AS MATERIALIZED",
+		"selected_attention AS MATERIALIZED",
+		"candidate.mentioned_me OR candidate.is_question OR candidate.is_blocker OR candidate.is_reminder",
+		"LIMIT $",
+	} {
+		if !strings.Contains(query, fragment) {
+			t.Fatalf("candidate query missing %q", fragment)
+		}
+	}
+	for _, enrichment := range []string{"attachment_state", "conversation_state", "activity_reactions"} {
+		if strings.Contains(query, enrichment) {
+			t.Fatalf("candidate query must not enrich %q", enrichment)
+		}
+	}
+}
+
 func TestMyWorkItemAvailableActionsAreCapabilityAndStatusBound(t *testing.T) {
 	ready := Record{"status": "ready", "can_act": true, "can_decide": false}
 	actions := myWorkItemAvailableActions(ready)

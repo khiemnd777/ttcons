@@ -1349,99 +1349,6 @@ func (r *Repository) ListProjectWorkflowSidebarWorkItems(ctx context.Context, pr
 	`, workItemScopeSQL("wi", 2)), args...)
 }
 
-func (r *Repository) ListMyWorkItems(ctx context.Context, userID string) ([]Record, error) {
-	profile, err := r.WorkItemAccessProfile(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	args := workItemScopeArgs(profile, false, true)
-	return r.Query(ctx, fmt.Sprintf(`
-		SELECT wi.*, p.name AS project_name, p.code AS project_code, rn.name AS run_node_name, rs.name AS run_step_name,
-			s.full_name AS assignee_name,
-			COALESCE(s.status='deleted', false) AS assignee_account_deleted,
-			COALESCE((SELECT COUNT(*) FROM evidence_records er WHERE er.work_item_id=wi.id AND er.status <> 'rejected'),0) AS evidence_count,
-			wfi.id AS workflow_form_instance_id,
-			wfi.status AS workflow_form_status,
-			wfi.form_type AS workflow_form_type,
-			wfi.current_revision AS workflow_form_revision,
-			wfi.submitted_at AS workflow_form_submitted_at,
-			wfi.form_template_id AS workflow_form_template_id,
-			wfi.form_version_id AS workflow_form_version_id,
-			wfv.version_no AS workflow_form_version_no,
-			wfv.status AS workflow_form_version_status,
-			wft.code AS workflow_form_template_code,
-			wft.name AS workflow_form_template_name,
-			COALESCE(rs.form_required, false) AS workflow_form_required,
-			rs.form_version_id AS required_workflow_form_version_id,
-			rs.surface_kind,
-			rs.domain_action_key,
-			COALESCE(pr.engine_version, 1) AS pipeline_engine_version,
-			COALESCE((
-				SELECT jsonb_agg(scope)
-				FROM (
-					VALUES
-						('mine', (
-							wi.assignee_staff_id=NULLIF($3,'')::uuid
-							OR EXISTS (
-								SELECT 1
-								FROM work_item_assignments wias
-								WHERE wias.work_item_id=wi.id
-								  AND wias.assignment_type <> 'watcher'
-								  AND wias.staff_id=NULLIF($3,'')::uuid
-							)
-						)),
-						('department', (
-							NULLIF($4,'') IS NOT NULL
-							AND (
-								wi.department=$4
-								OR EXISTS (
-									SELECT 1
-									FROM work_item_assignments wias
-									WHERE wias.work_item_id=wi.id
-									  AND wias.assignment_type <> 'watcher'
-									  AND wias.department=$4
-								)
-							)
-						)),
-						('pending_approval', wi.status IN ('waiting_review','waiting_approval')),
-						('watching', (
-							wi.watcher_staff_ids ? $3
-							OR EXISTS (
-								SELECT 1
-								FROM work_item_assignments wias
-								WHERE wias.work_item_id=wi.id
-								  AND wias.assignment_type='watcher'
-								  AND wias.staff_id=NULLIF($3,'')::uuid
-							)
-						))
-				) AS queue(scope, matched)
-				WHERE matched
-			), '[]'::jsonb) AS queue_scopes
-		FROM work_items wi
-		JOIN projects p ON p.id=wi.project_id
-		LEFT JOIN pipeline_runs pr ON pr.id=wi.pipeline_run_id
-		LEFT JOIN pipeline_run_nodes rn ON rn.id=wi.run_node_id
-		LEFT JOIN pipeline_run_steps rs ON rs.id=wi.run_step_id
-		LEFT JOIN staff s ON s.id=wi.assignee_staff_id
-		LEFT JOIN workflow_form_instances wfi ON wfi.work_item_id=wi.id AND wfi.status <> 'cancelled'
-		LEFT JOIN workflow_form_versions wfv ON wfv.id=wfi.form_version_id
-		LEFT JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
-		WHERE wi.status <> 'cancelled' AND p.status <> 'cancelled'
-		  AND (%s)
-		ORDER BY
-			CASE wi.status
-				WHEN 'blocked' THEN 1
-				WHEN 'in_progress' THEN 2
-				WHEN 'ready' THEN 3
-				WHEN 'pending' THEN 4
-				ELSE 5
-			END,
-			wi.due_at NULLS LAST,
-			wi.created_at
-		LIMIT 200
-	`, workItemScopeSQL("wi", 1)), args...)
-}
-
 func activityAttachmentSelectSQL() string {
 	return "COALESCE(attachment_state.attachments, '[]'::jsonb) AS attachments"
 }
@@ -1536,14 +1443,20 @@ func activityConversationJoinSQL(userExpression string) string {
 	`, userExpression)
 }
 
-func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string, profile workItemAccessProfile, filter ActivityAttentionFilter) ([]Record, error) {
+func activityAttentionCandidatesSQL(userID string, profile workItemAccessProfile, filter ActivityAttentionFilter) (string, []any) {
 	projectAccess := projectAccessSQL("p", 2)
 	workItemAccess := workItemScopeSQL("wi", 5)
 	args := []any{userID, profile.IsAdmin || profile.IsDirector, profile.UserID, profile.StaffID}
 	args = append(args, workItemScopeArgs(profile, profile.IsManager, true)...)
 
-	mentioned := "COALESCE(mention_state.mentioned_me, false)"
-	unread := "(ars.user_id IS NOT NULL AND ars.read_at IS NULL)"
+	mentioned := `EXISTS (
+		SELECT 1 FROM activity_mentions candidate_mention
+		WHERE candidate_mention.activity_id=wia.id AND candidate_mention.recipient_user_id=$1
+	)`
+	unread := `EXISTS (
+		SELECT 1 FROM activity_read_states candidate_read
+		WHERE candidate_read.activity_id=wia.id AND candidate_read.user_id=$1 AND candidate_read.read_at IS NULL
+	)`
 	openQuestion := "(wia.activity_type='question' AND COALESCE(wia.metadata_json->>'answered_at', wia.metadata_json->>'resolved_at', wia.metadata_json->>'closed_at', '')='')"
 	openBlocker := "(wia.activity_type='blocker' AND COALESCE(wia.metadata_json->>'resolved_at', wia.metadata_json->>'closed_at', '')='')"
 	dueReminder := "(wia.activity_type='reminder' AND COALESCE(wia.metadata_json->>'completed_at', wia.metadata_json->>'done_at', wia.metadata_json->>'closed_at', '')='' AND COALESCE(wia.metadata_json->>'due_at', '') ~ '^\\d{4}-\\d{2}-\\d{2}' AND left(wia.metadata_json->>'due_at', 10)::date <= current_date + INTERVAL '7 days')"
@@ -1571,19 +1484,18 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 		args = append(args, filter.ProjectID)
 		conditions = append(conditions, fmt.Sprintf("wia.project_id=$%d::uuid", len(args)))
 	}
+	queueCondition := "(candidate.mentioned_me OR candidate.is_question OR candidate.is_blocker OR candidate.is_reminder)"
 	switch filter.Queue {
 	case "mentions":
-		conditions = append(conditions, mentioned)
+		queueCondition = "candidate.mentioned_me"
 	case "questions":
-		conditions = append(conditions, openQuestion)
+		queueCondition = "candidate.is_question"
 	case "blockers":
-		conditions = append(conditions, openBlocker)
+		queueCondition = "candidate.is_blocker"
 	case "reminders":
-		conditions = append(conditions, dueReminder)
+		queueCondition = "candidate.is_reminder"
 	case "unread":
-		conditions = append(conditions, unread)
-	default:
-		conditions = append(conditions, fmt.Sprintf("(%s OR %s OR %s OR %s)", mentioned, openQuestion, openBlocker, dueReminder))
+		queueCondition = "candidate.is_unread"
 	}
 	if filter.Limit <= 0 || filter.Limit > 200 {
 		filter.Limit = 80
@@ -1591,7 +1503,49 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 	args = append(args, filter.Limit)
 	limitPlaceholder := len(args)
 
-	return r.Query(ctx, fmt.Sprintf(`
+	return fmt.Sprintf(`
+		WITH attention_candidates AS MATERIALIZED (
+			SELECT
+				wia.id,
+				wia.created_at,
+				%s AS mentioned_me,
+				%s AS is_unread,
+				%s AS is_question,
+				%s AS is_blocker,
+				%s AS is_reminder
+			FROM work_item_activities wia
+			JOIN projects p ON p.id=wia.project_id
+			LEFT JOIN work_items wi ON wi.id=wia.work_item_id
+			WHERE %s
+		),
+		selected_attention AS MATERIALIZED (
+			SELECT candidate.*
+			FROM attention_candidates candidate
+			WHERE %s
+			ORDER BY
+				candidate.is_unread DESC,
+				CASE
+					WHEN candidate.mentioned_me THEN 1
+					WHEN candidate.is_question THEN 2
+					WHEN candidate.is_blocker THEN 3
+					WHEN candidate.is_reminder THEN 4
+					ELSE 5
+				END,
+				candidate.created_at DESC
+			LIMIT $%d
+		)
+	`, mentioned, unread, openQuestion, openBlocker, dueReminder, strings.Join(conditions, " AND "), queueCondition, limitPlaceholder), args
+}
+
+func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string, profile workItemAccessProfile, filter ActivityAttentionFilter) ([]Record, error) {
+	candidatesSQL, args := activityAttentionCandidatesSQL(userID, profile, filter)
+	tx, err := r.beginReadTransactionWithJITDisabled(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	items, err := queryRecords(ctx, tx, candidatesSQL+fmt.Sprintf(`
 		SELECT
 			wia.*,
 			wi.title AS work_item_title,
@@ -1615,24 +1569,25 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 				'Project'
 			) AS target_label,
 			COALESCE(mention_state.mentions, '[]'::jsonb) AS mentions,
-			COALESCE(mention_state.mentioned_me, false) AS mentioned_me,
+			candidate.mentioned_me,
 			%s,
 			%s,
 			ars.read_at,
-			%s AS is_unread,
+			candidate.is_unread,
 			COALESCE((
 				SELECT jsonb_agg(queue_name)
 				FROM (
 					VALUES
-						('mentions', %s),
-						('questions', %s),
-						('blockers', %s),
-						('reminders', %s),
-						('unread', %s)
+						('mentions', candidate.mentioned_me),
+						('questions', candidate.is_question),
+						('blockers', candidate.is_blocker),
+						('reminders', candidate.is_reminder),
+						('unread', candidate.is_unread)
 				) AS queues(queue_name, matched)
 				WHERE matched
 			), '[]'::jsonb) AS queue_types
-		FROM work_item_activities wia
+		FROM selected_attention candidate
+		JOIN work_item_activities wia ON wia.id=candidate.id
 		JOIN projects p ON p.id=wia.project_id
 		LEFT JOIN work_items wi ON wi.id=wia.work_item_id
 		LEFT JOIN users u ON u.id=wia.actor_id
@@ -1660,19 +1615,51 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 		LEFT JOIN payables pay ON pay.id=wia.scope_id AND wia.scope_type='payable'
 		LEFT JOIN receivables rec ON rec.id=wia.scope_id AND wia.scope_type='receivable'
 		LEFT JOIN payments pm ON pm.id=wia.scope_id AND wia.scope_type='payment'
-		WHERE %s
 		ORDER BY
-			%s DESC,
+			candidate.is_unread DESC,
 			CASE
-				WHEN %s THEN 1
-				WHEN %s THEN 2
-				WHEN %s THEN 3
-				WHEN %s THEN 4
+				WHEN candidate.mentioned_me THEN 1
+				WHEN candidate.is_question THEN 2
+				WHEN candidate.is_blocker THEN 3
+				WHEN candidate.is_reminder THEN 4
 				ELSE 5
 			END,
-			wia.created_at DESC
-		LIMIT $%d
-	`, activityAttachmentSelectSQL(), activityConversationSelectSQL("$1"), unread, mentioned, openQuestion, openBlocker, dueReminder, unread, activityAttachmentJoinSQL(), activityConversationJoinSQL("$1"), strings.Join(conditions, " AND "), unread, mentioned, openQuestion, openBlocker, dueReminder, limitPlaceholder), args...)
+			candidate.created_at DESC
+	`, activityAttachmentSelectSQL(), activityConversationSelectSQL("$1"), activityAttachmentJoinSQL(), activityConversationJoinSQL("$1")), args...)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *Repository) MyActivityAttentionSummary(ctx context.Context, userID string, profile workItemAccessProfile, projectID string) (ActivityAttentionSummary, error) {
+	const detailLimit = 120
+	candidatesSQL, args := activityAttentionCandidatesSQL(userID, profile, ActivityAttentionFilter{
+		Queue:     "all",
+		ProjectID: projectID,
+		Limit:     detailLimit + 1,
+	})
+	tx, err := r.beginReadTransactionWithJITDisabled(ctx)
+	if err != nil {
+		return ActivityAttentionSummary{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	row, err := queryOneRecord(ctx, tx, candidatesSQL+`
+		SELECT LEAST(COUNT(*), 120) AS count, COUNT(*) > 120 AS has_more
+		FROM selected_attention
+	`, args...)
+	if err != nil {
+		return ActivityAttentionSummary{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return ActivityAttentionSummary{}, err
+	}
+	hasMore, _ := row["has_more"].(bool)
+	return ActivityAttentionSummary{Count: int(number(row["count"])), HasMore: hasMore}, nil
 }
 
 func (r *Repository) GetWorkItemDetail(ctx context.Context, workItemID string, clientVisibleOnly ...bool) (Record, error) {

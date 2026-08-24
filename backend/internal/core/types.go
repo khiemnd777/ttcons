@@ -1061,6 +1061,11 @@ type ActivityAttentionFilter struct {
 	Limit     int
 }
 
+type ActivityAttentionSummary struct {
+	Count   int  `json:"count"`
+	HasMore bool `json:"has_more"`
+}
+
 type StockActionRequest struct {
 	ProjectID         string  `json:"project_id"`
 	WarehouseID       string  `json:"warehouse_id"`

@@ -154,6 +154,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Post("/projects/:id/activity/read-all", h.MarkProjectActivityRead)
 	protected.Get("/me/work-items", h.MyWorkItems)
 	protected.Get("/me/activity-attention/stream", h.MyActivityAttentionStream)
+	protected.Get("/me/activity-attention/summary", h.MyActivityAttentionSummary)
 	protected.Get("/me/activity-attention", h.MyActivityAttention)
 	protected.Get("/work-items/:id", h.GetWorkItem)
 	protected.Get("/work-items/:id/form", h.GetWorkItemForm)

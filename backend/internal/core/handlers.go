@@ -969,6 +969,14 @@ func (h *Handler) MyActivityAttention(c *fiber.Ctx) error {
 	return response.OK(c, items)
 }
 
+func (h *Handler) MyActivityAttentionSummary(c *fiber.Ctx) error {
+	summary, err := h.service.MyActivityAttentionSummary(c.Context(), c.Query("project_id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, summary)
+}
+
 func (h *Handler) ProjectOperations(c *fiber.Ctx) error {
 	operations, err := h.service.ProjectOperations(c.Context(), c.Params("id"), actorID(c), ProjectOperationsFilter{
 		View: c.Query("view"),

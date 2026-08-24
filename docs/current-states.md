@@ -1,5 +1,68 @@
 # Current States
 
+## Active Plan: Tối ưu Trao đổi cần phản hồi trên Bàn làm việc
+
+Status: IMPLEMENTED AND FOCUSED TECHNICALLY VERIFIED; FULL DB SUITE HAS UNRELATED FIXTURE FAILURES; UX NOT ACCEPTED (approved by user on 2026-08-24)
+
+### Will be done
+
+- Refactor `/me/activity-attention` theo hai pha: chọn tối đa 120 ứng viên theo đúng phạm vi/quyền/thứ tự hiện tại, sau đó mới enrich attachments, replies, reactions, mentions và nhãn đối tượng.
+- Chạy truy vấn attention trong read-only transaction với `SET LOCAL jit = off`, dùng chung helper với `/me/work-items`; không thay đổi cấu hình PostgreSQL, biến môi trường hay deployment.
+- Thêm `GET /me/activity-attention/summary?project_id=...` trả `{count, has_more}`, với `has_more=true` khi vượt ngưỡng chi tiết 120.
+- Giữ nguyên contract mảng của endpoint chi tiết, RBAC, project/client visibility, queue semantics, thứ tự và payload; không thêm migration/index nếu performance gate chưa chứng minh cần thiết.
+- Frontend luôn tải summary nhẹ cho badge, chỉ tải chi tiết khi mở tab `Trao đổi cần phản hồi`; badge hiển thị `…`, `—` hoặc `120+` theo trạng thái.
+- Xóa repository `ListMyWorkItems` legacy không có call site; bổ sung contract/integration/performance coverage và cập nhật central/backend/frontend/root-cause/Workflow/Project maps.
+- Chạy backend/frontend tests, frontend build, performance gate và `git diff --check`. Browser/UAT tiếp tục bị bỏ qua nếu không được ủy quyền riêng.
+
+### Done
+
+- User approved the review package and Mockup as Text, including the summary endpoint, lazy detail loading, removal of the dead legacy query and the no-migration gate.
+- Loaded the mandatory central/backend/frontend/root-cause, Workflow Orchestration and Project Planning maps plus the approved Consflow backend/frontend/impact instructions; confirmed My Work / Activity Attention owner files and preserved invariants.
+- Audit baseline confirmed the current attention query is fast at today's volume but crosses PostgreSQL's JIT cost threshold as activity grows; forcing that threshold locally measured about 6.68x overhead. Other audited modules remained below their performance gates, and the legacy `ListMyWorkItems` query had no call site.
+- Extracted shared `beginReadTransactionWithJITDisabled` in the repository layer and moved both My Work page reads and personal-attention reads onto read-only transactions with transaction-local `SET LOCAL jit=off`. Connection/server defaults remain unchanged after commit or rollback.
+- Refactored personal attention into materialized candidate selection followed by bounded enrichment. Queue predicates, actor/project/work-item/client scope and existing ordering are resolved before attachments, conversation, reactions, mentions and target labels; the existing detail route still returns the same array payload and accepts the same queue/project/limit contract.
+- Added `GET /me/activity-attention/summary?project_id=...`, sharing the detail authorization/scope path and returning a capped `{count,has_more}` probe over at most 121 candidates. Counts up to 120 are exact; more rows produce `120+` presentation without loading details.
+- Updated My Work so the lightweight summary stays active for the tab badge while enriched detail is enabled only in attention mode. Loading/error/capped badge states are `…`, `—` and `120+`; SSE and mutation invalidation refresh both query families, and manual refresh fetches detail only for the active attention tab. Existing panel filters/cards and their loaded-row counts remain unchanged.
+- Removed the uncalled legacy `Repository.ListMyWorkItems`; no active call site, route or response contract depended on it. Added backend candidate-query, summary/cap, RBAC/project-scope and transaction tests plus focused frontend source-contract coverage.
+- The isolated 1k/5k/10k performance gate passed. At 10,000 activities, summary p95 was 37.279 ms and detail p95 was 30.181 ms against 150/200 ms budgets, so no index, migration, cache or manual configuration was added.
+- Current working-tree validation passed for the relevant database-backed integration tests, read-transaction commit/rollback test, performance gate, full backend suite with optional DB tests skipped, frontend 242/242 tests, production build, 250 KiB/141-chunk budget and `git diff --check`.
+- The sequential full backend run against the long-lived development database was not green because of five pre-existing fixture/state failures: four duplicate accounting codes and one missing official workflow edge. A fresh-schema run cleared those failures but the repository's sample-data integration tests require seeded Developer/sample sources that migrations alone do not provide; the attempted disposable schema was removed. These failures did not reproduce in the focused attention/transaction/performance coverage and remain outside this change.
+- Updated central/backend/frontend/root-cause, Workflow Orchestration and Project Planning maps with the summary route, candidate-first execution, shared JIT helper, lazy detail UI and no-migration performance result.
+- Rebuilt and restarted the local Docker stack through the required `down -> build -> run` sequence after the sandbox-only Docker Buildx activity-file denial was rerun with approved Docker access. PostgreSQL and both Redis services are healthy, backend readiness returns HTTP 200, and the rebuilt Admin frontend serves `/my-work` with HTTP 200.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn and will remain skipped; frontend work remains `NOT UX ACCEPTED` until separately verified in-browser.
+- Production deployment was not requested and was not performed. Once this source state is released through the normal production pipeline, no manual database, JIT, environment or feature configuration is required.
+
+## Active Plan: Tăng tốc Bàn làm việc bằng JIT cục bộ
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-24)
+
+### Will be done
+
+- Run the four `/me/work-items` page queries in one read-only transaction and apply `SET LOCAL jit = off` only to that transaction.
+- Preserve the existing route, handler/service contract, actor/project scope, capability calculation, filters, totals, summary, facets, pagination and response payload.
+- Add focused PostgreSQL-backed coverage proving the transaction is read-only, JIT is off inside it and the connection-level setting is restored automatically afterward.
+- Update the backend/root-cause/workflow mapping with the durable query-execution contract.
+- Run focused and full backend validation plus a current local timing comparison. No frontend, schema, migration, seed or manual environment configuration is in scope.
+
+### Done
+
+- User approved the diagnosis and review package after local evidence showed `/api/me/work-items` at 3.28-3.46 seconds and isolated `summary`/`facets` JIT compilation at about 2.65 seconds.
+- A temporary read-only diagnostic proved service/repository timing changed from 2.93-3.21 seconds with JIT enabled to 38-42 ms with JIT disabled for the same actor and 2,395 work items; the temporary diagnostic source was removed.
+- Loaded the mandatory central/backend/root-cause/Workflow Orchestration maps plus Backend Workflow and Diagnose instructions. Confirmed the owner is `backend/internal/core/my_work_repository.go`; no frontend/API/schema contract change is required.
+- Implemented one read-only transaction for the four `/me/work-items` page reads and applied `SET LOCAL jit = off` only inside that transaction. The route, payload, actor/project scope, filters, capability calculation, totals, summary, facets and pagination remain unchanged; commit/rollback automatically restore the connection setting.
+- Added PostgreSQL-backed coverage for commit and rollback paths, proving `transaction_read_only = on`, JIT is off only inside the transaction and the original connection setting is restored. The existing page-contract integration coverage also passed.
+- Current working-tree verification passed: the focused database tests, the full backend suite using a workspace-local Go module cache and `git diff --check`. Post-change repository/service timing measured 96.9-114.7 ms for `need_action` and 44.7-46.4 ms for `all`, compared with the prior 2.93-3.21 seconds diagnostic baseline.
+- Updated the central, backend, root-cause and Workflow Orchestration maps with the durable transaction-local JIT contract. No frontend, API contract, schema, migration, seed or environment configuration changed.
+- Rebuilt and restarted the full local Docker stack through the required `down -> build -> run` sequence. PostgreSQL/Redis are healthy, all services are running and the rebuilt backend readiness endpoint returns HTTP 200. Production has not been deployed; once this source version is released through the normal production pipeline, no manual JIT/environment/database configuration is required.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT was not authorized in this turn and remains skipped; this backend-only performance change is `NOT UX ACCEPTED` until separately verified in-browser.
+- Production deployment was not requested and was not performed.
+
 ## Active Plan: Import/Export định nghĩa Pipeline và Form/Fields bằng Excel
 
 Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-23)

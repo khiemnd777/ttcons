@@ -1,20 +1,25 @@
 import clsx from 'clsx';
+import { ArrowUpRight } from 'lucide-react';
 import { StatusBadge } from '../../components/StatusBadge';
 import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 import { dateText } from '../../lib/utils/format';
 import type { WorkItem } from '../../lib/types/domain';
-import { asArray, departmentLabel, hasWorkflowFormSummary, isWorkOverdue, numberValue, workItemIsUpcoming, workItemWorkflowContext, workTypeLabel, workflowFormChipText, workflowFormStatusLabel } from './workItemPresentation';
+import { asArray, departmentLabel, hasWorkflowFormSummary, isWorkOverdue, numberValue, workItemIsUpcoming, workItemWorkflowContext, workTypeLabel, workflowFormStatusLabel } from './workItemPresentation';
 import { executionTargetActionLabel } from './workItemExecutionTarget';
 
 export function WorkItemCard({
   item,
   onOpen,
+  onSelect,
+  selected = false,
   compact = false,
   showWorkflowPrefix = false,
   displayStatus,
 }: {
   item: WorkItem;
   onOpen: () => void;
+  onSelect?: () => void;
+  selected?: boolean;
   compact?: boolean;
   showWorkflowPrefix?: boolean;
   displayStatus?: string;
@@ -23,41 +28,53 @@ export function WorkItemCard({
   const title = workItemTitle(item, showWorkflowPrefix);
   const context = workItemWorkflowContext(item);
   const upcoming = workItemIsUpcoming(item);
+  const ownerRoles = uniqueLabels(asArray<string>(item.role_ids));
+  const openLabel = upcoming ? 'Xem trước công việc' : executionTargetActionLabel(item);
   return (
-    <article className={clsx('rounded-md border border-line bg-white p-3', overdue && 'border-red-200 bg-red-50/50')}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
+    <article className={clsx(
+      'group relative flex border-b border-line transition-colors last:border-b-0',
+      selected ? 'bg-blue-50/70' : overdue ? 'bg-rose-50/40' : upcoming ? 'bg-amber-50/30' : 'bg-white hover:bg-slate-50',
+    )}>
+      {selected ? <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-blue-600" aria-hidden="true" /> : null}
+      <button
+        type="button"
+        className={clsx('min-w-0 flex-1 px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500', compact && 'py-2.5')}
+        aria-pressed={selected}
+        onClick={onSelect ?? onOpen}
+      >
+        <span className="flex min-w-0 flex-col gap-1.5">
+          <span className="flex min-w-0 flex-wrap items-center gap-2">
             <StatusBadge status={displayStatus ?? (overdue ? 'overdue' : item.status)} />
-            {upcoming ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">Sắp tới · chỉ xem</span> : null}
-            {item.project_code ? <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{item.project_code}</span> : null}
-            {item.department ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{departmentLabel(item.department)}</span> : null}
-            {hasWorkflowFormSummary(item) ? (
-              <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-                {workflowFormChipText(item)} · {workflowFormStatusLabel(item.workflow_form_status)}
-              </span>
-            ) : null}
-          </div>
-          <p className={clsx('mt-2 font-semibold text-ink', compact ? 'text-sm' : 'text-base')}>{title}</p>
-          <p className="mt-1 line-clamp-2 text-xs font-medium text-slate-600">{context.path}</p>
-          {item.description && !compact ? <p className="mt-1 line-clamp-2 text-sm text-slate-600">{item.description}</p> : null}
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-            <span>Phụ trách: {item.assignee_name ? <IdentityReferenceLabel name={item.assignee_name} deleted={item.assignee_account_deleted} liveOwnership /> : (asArray<string>(item.role_ids).join(', ') || '-')}</span>
-            <span>Hạn: {dateText(item.due_at)}</span>
-            <span>Minh chứng: {numberValue(item.evidence_count)}</span>
-            {hasWorkflowFormSummary(item) ? <span>Hồ sơ: {item.workflow_form_required ? 'Bắt buộc' : 'Tùy chọn'}</span> : null}
-          </div>
-        </div>
-        <button
-          className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
-          onClick={onOpen}
-        >
-          {upcoming ? 'Xem trước' : executionTargetActionLabel(item)}
-        </button>
-      </div>
-      {item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{item.blocked_reason}</p> : null}
+            <span className={clsx('min-w-0 flex-1 truncate font-semibold text-ink', compact ? 'text-sm' : 'text-[15px]')} title={title}>{title}</span>
+            {upcoming ? <span className="text-xs font-semibold text-amber-700">Sắp tới · chỉ xem</span> : null}
+          </span>
+          <span className="truncate text-xs font-medium text-slate-600" title={context.path}>{context.path}</span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+            <span className="inline-flex items-center gap-1">Phụ trách: {item.assignee_name ? <IdentityReferenceLabel name={item.assignee_name} deleted={item.assignee_account_deleted} liveOwnership /> : (ownerRoles.join(', ') || departmentLabel(item.department) || '—')}</span>
+            <span aria-hidden="true">·</span>
+            <span>{item.due_at ? `Hạn ${dateText(item.due_at)}` : 'Chưa có hạn'}</span>
+            <span aria-hidden="true">·</span>
+            <span>{numberValue(item.evidence_count)} minh chứng</span>
+            {hasWorkflowFormSummary(item) ? <><span aria-hidden="true">·</span><span>Hồ sơ {item.workflow_form_required ? 'bắt buộc' : 'tùy chọn'} · {workflowFormStatusLabel(item.workflow_form_status)}</span></> : null}
+          </span>
+          {item.blocked_reason ? <span className="line-clamp-1 text-xs font-medium text-rose-700" title={item.blocked_reason}>Điểm chặn: {item.blocked_reason}</span> : null}
+        </span>
+      </button>
+      <button
+        type="button"
+        className="m-2 ml-0 inline-flex w-10 shrink-0 items-center justify-center self-stretch rounded-md text-blue-700 outline-none hover:bg-blue-100 focus-visible:ring-2 focus-visible:ring-blue-500"
+        aria-label={openLabel}
+        title={openLabel}
+        onClick={onOpen}
+      >
+        <ArrowUpRight className="h-4 w-4" />
+      </button>
     </article>
   );
+}
+
+function uniqueLabels(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 function workItemTitle(item: WorkItem, showWorkflowPrefix: boolean) {

@@ -2354,27 +2354,44 @@ func (s *Service) MyActivityAttention(ctx context.Context, filter ActivityAttent
 	if !activityAttentionQueues[filter.Queue] {
 		return nil, validationError("Hàng đợi hoạt động không hợp lệ", Record{"queue": filter.Queue})
 	}
-	filter.ProjectID = cleanID(filter.ProjectID)
-	if filter.ProjectID != "" {
-		if !validActivityUUID(filter.ProjectID) {
-			return nil, validationError("project_id không hợp lệ", Record{"project_id": filter.ProjectID})
-		}
-		allowed, err := s.repo.CanViewProjectOperations(ctx, filter.ProjectID, actorID)
-		if err != nil {
-			return nil, err
-		}
-		if !allowed {
-			return nil, forbiddenError("Bạn không có quyền xem hoạt động của công trình này")
-		}
-	}
-	if filter.Limit <= 0 || filter.Limit > 200 {
-		filter.Limit = 80
-	}
-	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	projectID, profile, err := s.myActivityAttentionScope(ctx, filter.ProjectID, actorID)
 	if err != nil {
 		return nil, err
 	}
+	filter.ProjectID = projectID
+	if filter.Limit <= 0 || filter.Limit > 200 {
+		filter.Limit = 80
+	}
 	return s.repo.ListMyActivityAttention(ctx, actorID, profile, filter)
+}
+
+func (s *Service) MyActivityAttentionSummary(ctx context.Context, projectID, actorID string) (ActivityAttentionSummary, error) {
+	projectID, profile, err := s.myActivityAttentionScope(ctx, projectID, actorID)
+	if err != nil {
+		return ActivityAttentionSummary{}, err
+	}
+	return s.repo.MyActivityAttentionSummary(ctx, actorID, profile, projectID)
+}
+
+func (s *Service) myActivityAttentionScope(ctx context.Context, projectID, actorID string) (string, workItemAccessProfile, error) {
+	projectID = cleanID(projectID)
+	if projectID != "" {
+		if !validActivityUUID(projectID) {
+			return "", workItemAccessProfile{}, validationError("project_id không hợp lệ", Record{"project_id": projectID})
+		}
+		allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
+		if err != nil {
+			return "", workItemAccessProfile{}, err
+		}
+		if !allowed {
+			return "", workItemAccessProfile{}, forbiddenError("Bạn không có quyền xem hoạt động của công trình này")
+		}
+	}
+	profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return "", workItemAccessProfile{}, err
+	}
+	return projectID, profile, nil
 }
 
 const (

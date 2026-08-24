@@ -1175,6 +1175,11 @@ export type ActivityAttentionItem = WorkItemActivity & {
   queue_types?: Array<'mentions' | 'questions' | 'blockers' | 'reminders' | 'unread' | string>;
 };
 
+export type ActivityAttentionSummary = {
+  count: number;
+  has_more: boolean;
+};
+
 export type EvidenceRecord = ProjectOperationsRecord & {
   work_item_id: string;
   target_type?: string;

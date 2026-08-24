@@ -97,8 +97,14 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 	}
 	itemWhere := strings.Join(itemConditions, " AND ")
 
+	tx, err := r.beginReadTransactionWithJITDisabled(ctx)
+	if err != nil {
+		return myWorkItemsPageData{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	baseSQL := myWorkItemsBaseSQL()
-	totalRow, err := r.QueryOne(ctx, baseSQL+fmt.Sprintf(` SELECT COUNT(*) AS total FROM base_work WHERE %s`, itemWhere), itemArgs...)
+	totalRow, err := queryOneRecord(ctx, tx, baseSQL+fmt.Sprintf(` SELECT COUNT(*) AS total FROM base_work WHERE %s`, itemWhere), itemArgs...)
 	if err != nil {
 		return myWorkItemsPageData{}, err
 	}
@@ -106,7 +112,7 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 
 	pageArgs := append([]any{}, itemArgs...)
 	pageArgs = append(pageArgs, filter.Limit, offset)
-	items, err := r.Query(ctx, baseSQL+fmt.Sprintf(`
+	items, err := queryRecords(ctx, tx, baseSQL+fmt.Sprintf(`
 		SELECT * FROM base_work
 		WHERE %s
 		ORDER BY %s
@@ -116,7 +122,7 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 		return myWorkItemsPageData{}, err
 	}
 
-	summary, err := r.QueryOne(ctx, baseSQL+fmt.Sprintf(`
+	summary, err := queryOneRecord(ctx, tx, baseSQL+fmt.Sprintf(`
 		SELECT
 			COUNT(*) AS total,
 			COUNT(*) FILTER (WHERE %s) AS need_action,
@@ -134,7 +140,7 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 		return myWorkItemsPageData{}, err
 	}
 
-	facets, err := r.QueryOne(ctx, baseSQL+fmt.Sprintf(`
+	facets, err := queryOneRecord(ctx, tx, baseSQL+fmt.Sprintf(`
 		SELECT
 			COALESCE((SELECT jsonb_agg(row_value ORDER BY label) FROM (
 				SELECT project_name AS label, jsonb_build_object(
@@ -169,6 +175,9 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 	nextCursor := ""
 	if hasMore {
 		nextCursor = encodeMyWorkItemsCursor(nextOffset)
+	}
+	if err := tx.Commit(); err != nil {
+		return myWorkItemsPageData{}, err
 	}
 	return myWorkItemsPageData{
 		Items: items, Summary: summary, Facets: facets, Total: total, HasMore: hasMore, NextCursor: nextCursor,
