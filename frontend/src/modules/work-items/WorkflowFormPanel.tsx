@@ -65,6 +65,8 @@ export type WorkflowFormActionState = {
   readOnly: boolean;
   saving: boolean;
   submitting: boolean;
+  startsWorkItem: boolean;
+  saveLabel: string;
   submitLabel: string;
   validationIssueLabels: string[];
   title: string;
@@ -87,6 +89,7 @@ export function WorkflowFormPanel({
   workItemId,
   projectId,
   evidence,
+  workItemStatus,
   onChanged,
   readOnly = false,
   navigationRequest,
@@ -97,6 +100,7 @@ export function WorkflowFormPanel({
   workItemId: string;
   projectId?: string;
   evidence: EvidenceRecord[];
+  workItemStatus?: string;
   onChanged?: () => void;
   readOnly?: boolean;
   navigationRequest?: WorkItemRequirementNavigationRequest | null;
@@ -147,6 +151,7 @@ export function WorkflowFormPanel({
   );
   const instance = form.data?.instance;
   const submitted = instance?.status === 'submitted';
+  const startsWorkItem = !submitted && !readOnly && ['ready', 'needs_changes'].includes(String(workItemStatus ?? ''));
   const currentRevision = Number(instance?.current_revision ?? 0);
   const canAmend = Boolean(form.data?.capabilities?.can_amend) && submitted && !readOnly;
   const businessFormTitle = workflowFormPanelTitle(
@@ -306,7 +311,7 @@ export function WorkflowFormPanel({
     mutationFn: () => put<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/draft`, { answers: values }),
     onSuccess: () => {
       invalidate();
-      toast.success('Đã lưu nháp hồ sơ nghiệp vụ');
+      toast.success(startsWorkItem ? 'Đã bắt đầu đầu việc và lưu nháp hồ sơ nghiệp vụ' : 'Đã lưu nháp hồ sơ nghiệp vụ');
     },
     onError: (error) => handleWorkflowFormMutationError(error, 'Không lưu được hồ sơ nghiệp vụ'),
   });
@@ -316,11 +321,11 @@ export function WorkflowFormPanel({
     onSuccess: (result) => {
       invalidate();
       if (result.auto_transition?.status === 'advanced') {
-        toast.success('Đã xác nhận và chuyển sang bước tiếp theo');
+        toast.success(startsWorkItem ? 'Đã bắt đầu, xác nhận và chuyển sang bước tiếp theo' : 'Đã xác nhận và chuyển sang bước tiếp theo');
       } else if (result.auto_transition?.status === 'blocked') {
-        toast.warn({ title: 'Đã lưu lựa chọn nhưng chưa thể chuyển bước', description: result.auto_transition.message ?? 'Kiểm tra điều kiện connector và thử lại.' });
+        toast.warn({ title: startsWorkItem ? 'Đã bắt đầu và lưu lựa chọn nhưng chưa thể chuyển bước' : 'Đã lưu lựa chọn nhưng chưa thể chuyển bước', description: result.auto_transition.message ?? 'Kiểm tra điều kiện connector và thử lại.' });
       } else {
-        toast.success('Đã chốt hồ sơ nghiệp vụ');
+        toast.success(startsWorkItem ? 'Đã bắt đầu đầu việc và chốt hồ sơ nghiệp vụ' : 'Đã chốt hồ sơ nghiệp vụ');
       }
     },
     onError: (error) => handleWorkflowFormMutationError(error, 'Không chốt được hồ sơ nghiệp vụ'),
@@ -490,7 +495,10 @@ export function WorkflowFormPanel({
     if (validateBeforeSubmit()) amendForm.mutate();
   }
 
-  const submitLabel = form.data?.auto_advance_when_ready ? 'Xác nhận và tiếp tục' : 'Chốt hồ sơ';
+  const saveLabel = startsWorkItem ? 'Bắt đầu & lưu nháp' : 'Lưu nháp';
+  const submitLabel = startsWorkItem
+    ? (form.data?.auto_advance_when_ready ? 'Bắt đầu, xác nhận & tiếp tục' : 'Bắt đầu & chốt hồ sơ')
+    : (form.data?.auto_advance_when_ready ? 'Xác nhận và tiếp tục' : 'Chốt hồ sơ');
   const actionState = useMemo<WorkflowFormActionState>(() => ({
     available: Boolean(form.data?.available) && !form.isLoading && !form.isError,
     canAmend,
@@ -500,6 +508,8 @@ export function WorkflowFormPanel({
     readOnly,
     saving: saveDraft.isPending,
     submitting: submitForm.isPending,
+    startsWorkItem,
+    saveLabel,
     submitLabel,
     validationIssueLabels,
     title: businessFormTitle,
@@ -508,7 +518,7 @@ export function WorkflowFormPanel({
     currentRevision,
     updatedAt: instance?.updated_at,
     submittedAt: instance?.submitted_at,
-  }), [amendForm.isPending, amending, businessFormTitle, canAmend, currentRevision, form.data?.available, form.data?.version?.version_no, form.isError, form.isLoading, instance?.status, instance?.submitted_at, instance?.updated_at, readOnly, saveDraft.isPending, submitForm.isPending, submitLabel, submitted, validationIssueLabels]);
+  }), [amendForm.isPending, amending, businessFormTitle, canAmend, currentRevision, form.data?.available, form.data?.version?.version_no, form.isError, form.isLoading, instance?.status, instance?.submitted_at, instance?.updated_at, readOnly, saveDraft.isPending, saveLabel, startsWorkItem, submitForm.isPending, submitLabel, submitted, validationIssueLabels]);
 
   useImperativeHandle(actionRef, () => ({
     save: () => {
@@ -590,6 +600,7 @@ export function WorkflowFormPanel({
           onSubmit={() => {
             if (!readOnly && validateBeforeSubmit()) submitForm.mutate();
           }}
+          saveLabel={saveLabel}
           submitLabel={submitLabel}
         />
       </div>
@@ -945,6 +956,7 @@ function WorkflowFormActionCenter({
   showActions,
   onSave,
   onSubmit,
+  saveLabel,
   submitLabel,
 }: {
   title: string;
@@ -960,6 +972,7 @@ function WorkflowFormActionCenter({
   showActions: boolean;
   onSave: () => void;
   onSubmit: () => void;
+  saveLabel: string;
   submitLabel: string;
 }) {
   const blocked = !readOnly && !submitted && validationIssueLabels.length > 0;
@@ -998,7 +1011,7 @@ function WorkflowFormActionCenter({
             onClick={onSave}
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Lưu nháp
+            {saveLabel}
           </button>
           <button
             type="button"

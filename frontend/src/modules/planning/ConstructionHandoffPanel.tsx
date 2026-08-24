@@ -1,7 +1,7 @@
-import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CheckCircle2, ClipboardCheck, Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Dialog } from '../../components/Dialog';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
@@ -14,6 +14,10 @@ import type {
   ConstructionHandoffItem,
   ConstructionHandoffWorkspace,
 } from '../../lib/types/domain';
+import {
+  constructionHandoffIntentMatches,
+  consumeConstructionHandoffNavigationState,
+} from '../work-items/workItemNavigation';
 
 type EditableItem = ConstructionHandoffCandidate & {
   local_id: string;
@@ -26,6 +30,7 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
   const canManage = hasAnyPermission(['construction.handoff.manage']);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
@@ -42,6 +47,29 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
   });
   const latest = handoff.data?.handoffs?.[0];
   const latestMetrics = useMemo(() => handoffMetrics(latest), [latest]);
+  const handoffOpenIntent = constructionHandoffIntentMatches(location.state, projectId);
+
+  useEffect(() => {
+    if (!handoffOpenIntent || !handoff.data) return;
+    navigate(`${location.pathname}${location.search}${location.hash}`, {
+      replace: true,
+      state: consumeConstructionHandoffNavigationState(location.state),
+    });
+    if (!handoff.data.can_activate) {
+      toast.warn({ title: 'Chưa thể mở bàn giao thi công', description: handoff.data.reason || 'Hồ sơ chưa có hạng mục đủ điều kiện bàn giao.' });
+      return;
+    }
+    if (!canManage) {
+      toast.warn({ title: 'Không có quyền kích hoạt bàn giao', description: 'Cần quyền quản lý bàn giao thi công để thực hiện bước này.' });
+      return;
+    }
+    setReadOnly(false);
+    setTitle(handoff.data.suggested_title || 'Bàn giao kế hoạch thi công');
+    setNotes('');
+    setItems((handoff.data.candidates ?? []).map(editableCandidate));
+    setErrors({});
+    setOpen(true);
+  }, [canManage, handoff.data, handoffOpenIntent, location.hash, location.pathname, location.search, location.state, navigate, projectId, toast]);
 
   const activate = useMutation({
     mutationFn: () => post<ConstructionHandoff>(`/projects/${projectId}/construction-handoff/activate`, {
@@ -58,7 +86,7 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
         scheduled_at: toISO(item.scheduled_at),
         responsible_role: item.responsible_role || 'QA/QC',
         assigned_user_id: item.assigned_user_id ?? '',
-        evidence_required: Boolean(item.evidence_required),
+        evidence_required: true,
         criteria: normalizedCriteria(item),
       })),
     }),
@@ -68,6 +96,7 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
         queryClient.invalidateQueries({ queryKey: ['construction-workspace', projectId] }),
         queryClient.invalidateQueries({ queryKey: ['pipeline-run', projectId] }),
         queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['work-item'] }),
       ]);
       setOpen(false);
       toast.success({
@@ -241,9 +270,12 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
                   <Field label="Vai trò giám sát"><select disabled={readOnly} className={controlClass(false, readOnly)} value={item.responsible_role || 'QA/QC'} onChange={(event) => updateItem(setItems, item.local_id, { responsible_role: event.target.value })}>{!['QA/QC', 'Giám sát', 'PM'].includes(item.responsible_role) && item.responsible_role ? <option value={item.responsible_role}>{item.responsible_role}</option> : null}<option value="QA/QC">QA/QC</option><option value="Giám sát">Giám sát</option><option value="PM">PM</option></select></Field>
                   <Field label="Người giám sát"><select disabled={readOnly} className={controlClass(false, readOnly)} value={item.assigned_user_id ?? ''} onChange={(event) => updateItem(setItems, item.local_id, { assigned_user_id: event.target.value })}><option value="">Theo vai trò</option>{item.assigned_user_id && !(handoff.data?.participants ?? []).some((participant) => participant.id === item.assigned_user_id) ? <option value={item.assigned_user_id}>{identityReferenceText(item.assigned_user_name, item.assigned_user_account_deleted, 'Tài khoản không còn hoạt động')}{item.assigned_user_account_deleted ? ' · Cần phân công lại' : ''}</option> : null}{handoff.data?.participants?.map((participant) => <option key={participant.id} value={participant.id}>{participant.full_name}</option>)}</select></Field>
                 </div>
-                <label className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-700"><input disabled={readOnly} type="checkbox" checked={Boolean(item.evidence_required)} onChange={(event) => updateEvidenceRequired(setItems, item.local_id, event.target.checked)} /> Bắt buộc minh chứng khi ghi kết quả</label>
               </article>
             ))}
+          </div>
+          <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>Mọi hạng mục bắt buộc ít nhất 1 ảnh hoặc tài liệu khi ghi kết quả kiểm tra.</span>
           </div>
         </div>
       </Dialog>
@@ -268,7 +300,12 @@ function controlClass(error = false, disabled = false) {
 }
 
 function editableCandidate(candidate: ConstructionHandoffCandidate): EditableItem {
-  return { ...candidate, local_id: `${candidate.source_field_key}-${candidate.source_item_index}-${crypto.randomUUID()}` };
+  return {
+    ...candidate,
+    local_id: `${candidate.source_field_key}-${candidate.source_item_index}-${crypto.randomUUID()}`,
+    evidence_required: true,
+    criteria: (candidate.criteria ?? []).map((criterion) => ({ ...criterion, evidence_required: true })),
+  };
 }
 
 function editableHandoffItem(item: ConstructionHandoffItem): EditableItem {
@@ -302,16 +339,12 @@ function updateItem(setItems: Dispatch<SetStateAction<EditableItem[]>>, id: stri
 }
 
 function updateCriterion(setItems: Dispatch<SetStateAction<EditableItem[]>>, id: string, value: string) {
-  setItems((current) => current.map((item) => item.local_id === id ? { ...item, criteria: [{ title: item.title || value, criteria: value, evidence_required: Boolean(item.evidence_required) }] } : item));
-}
-
-function updateEvidenceRequired(setItems: Dispatch<SetStateAction<EditableItem[]>>, id: string, value: boolean) {
-  setItems((current) => current.map((item) => item.local_id === id ? { ...item, evidence_required: value, criteria: (item.criteria ?? []).map((criterion) => ({ ...criterion, evidence_required: value })) } : item));
+  setItems((current) => current.map((item) => item.local_id === id ? { ...item, criteria: [{ title: item.title || value, criteria: value, evidence_required: true }] } : item));
 }
 
 function normalizedCriteria(item: EditableItem): ConstructionCheckCriterion[] {
   const text = criterionText(item).trim();
-  return [{ title: item.title.trim() || text, criteria: text, evidence_required: Boolean(item.evidence_required) }];
+  return [{ title: item.title.trim() || text, criteria: text, evidence_required: true }];
 }
 
 function criterionText(item: EditableItem) {

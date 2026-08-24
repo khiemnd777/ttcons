@@ -360,6 +360,7 @@ function renderPrimaryPanel(
           workItemId={item.id}
           projectId={item.project_id}
           evidence={evidence}
+          workItemStatus={item.status}
           readOnly={readOnly}
           navigationRequest={navigationRequest}
           externalActions
@@ -486,7 +487,7 @@ function ApprovalPrimaryPanel({
         </div>
       </div>
       {hasWorkflowFormSummary(item) ? (
-        <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} navigationRequest={navigationRequest} />
+        <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} navigationRequest={navigationRequest} />
       ) : (
         <EmptyState title="Không có hồ sơ nghiệp vụ gắn với phê duyệt này." />
       )}

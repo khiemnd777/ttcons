@@ -1,5 +1,57 @@
 # Current States
 
+## Active Plan: Chuẩn hóa minh chứng hạng mục bàn giao thi công
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-24)
+
+### Will be done
+
+- Remove the misleading editable `Bắt buộc minh chứng` field from the exact `client_construction_handoff_plan.inspection_items` workflow-form presentation and from the Planning handoff activation panel.
+- Replace the control with one fixed explanation that every handed-off item requires at least one photo or document when the construction result is recorded, including narrow-screen presentation.
+- Normalize draft/submit answers and every new/revised Planning-to-Construction activation to `evidence_required=true`; keep the request/DB field for compatibility while preventing a client-supplied `false` from weakening the evidence contract.
+- Preserve published Form definitions, existing form/runtime references, immutable activated handoff snapshots and historical construction records. Do not edit V66, add a migration or backfill history.
+- Omit the obsolete nested field from new workflow-form PDF presentation, add focused backend/frontend regression coverage, update central/backend/frontend/root-cause and Planning/Workflow/Construction maps, then run current-tree backend/frontend validation. Browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the review package and Mockup as Text with `Ok triển khai`, including always-required evidence, removal of both editable controls and no historical rewrite.
+- Loaded the mandatory central/backend/frontend/root-cause, Project Planning, Workflow Orchestration and Construction Operations maps plus Backend/Frontend/Impact instructions; confirmed the exact form, activation, generated work-item/check and result-completion owners.
+- Confirmed the root cause: the published nested field accepts `false` and activation copies it to metadata, while the canonical Operations completion UI and backend already require at least one result evidence for every construction check.
+- Added an exact-template presentation compatibility rule for `client_construction_handoff_plan.inspection_items`: the workflow form omits the editable `evidence_required` column, shows one fixed always-required explanation and leaves the published field definition unchanged. The Planning activation dialog removes its checkbox, shows the same policy and submits normalized item/criterion values.
+- Added backend fail-closed normalization at both workflow-form answer save/submit and Planning activation. A client-supplied `false` now becomes `true` in the handoff item, generated work-item requirement and construction-check criteria; the PDF presentation also omits the obsolete choice. Existing request/DB fields, applied V66, activated snapshots and historical construction records remain untouched, so no migration or backfill was added.
+- Added focused frontend/backend/PDF and database-backed handoff regression coverage, then updated the central/backend/frontend/root-cause and Project Planning/Workflow Orchestration/Construction Operations maps with the fixed evidence invariant.
+- Current working-tree validation passed: focused frontend 7/7; full frontend 251/251; full backend `go test ./...`; focused backend default/PDF tests; local PostgreSQL-backed Planning handoff integration; frontend TypeScript/production build; 250 KiB gzip and 141-chunk bundle budget; Go formatting and `git diff --check`.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn, so the interface remains `NOT UX ACCEPTED` until separately verified in-browser.
+
+## Active Plan: Mở hồ sơ trực tiếp từ Kế hoạch công việc
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-24)
+
+### Will be done
+
+- Make the actionable `Tiếp tục hồ sơ` / `Xem hồ sơ` entry in `/projects/:id/planning` open the existing shared `WorkItemDetailDialog` owned by `ProjectTaskContext`; opening the dialog must not submit a form, complete a work item or bypass any server gate.
+- Carry the explicit open intent in transient React Router state, consume it once, and keep plain `?task=` deep links/refreshes presentation-only without auto-opening the dialog.
+- Normalize the Planning return path by removing stale `task` and `returnTo` parameters before creating the backend-owned `execution_target` URL, while preserving unrelated query parameters and the hash.
+- Preserve state-specific queue labels/actions, backend-owned execution targets, permissions, form/evidence/approval requirements and the existing top `Kiểm tra điều kiện & chốt bước` re-entry action.
+- Add focused regression coverage, update central/frontend/root-cause/Project Planning/Workflow Orchestration maps, then run frontend tests, production build and whitespace checks. Browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the diagnosis, proposed behavior and Mockup as Text with an explicit `OK triển khai`.
+- Loaded the mandatory central/frontend/root-cause, Project Planning and Workflow Orchestration maps plus the Frontend Workflow instructions; confirmed `PlanningPage.tsx`, `ProjectTaskContext.tsx`, `workItemNavigation.ts` and `workItemExecutionTarget.ts` as the owning frontend files.
+- Confirmed the current failure mode: the lower CTA navigates to the already-active Planning `execution_target` with the same `task`, while the shared dialog remains closed because only the top context button changes `detailOpen`.
+- Added a work-item-scoped router-state intent for embedded Planning execution targets. `ProjectTaskContext` consumes the matching intent once, opens its existing shared `WorkItemDetailDialog` and immediately replaces history state without the intent; plain `?task=` links and refreshes remain context-only.
+- Added Planning workspace return normalization that removes stale `task` and `returnTo` parameters while retaining unrelated query parameters and the hash. Domain targets, state-specific action labels, the top re-entry button and every server-owned permission/form/evidence/approval/completion gate remain unchanged.
+- Added focused navigation/intent/wiring regression coverage and updated the central/frontend/root-cause, Project Planning and Workflow Orchestration maps. No backend/API/schema/migration/seed contract changed, so no backend mapping or migration update was required.
+- Current working-tree frontend validation passed: focused navigation and execution-target tests 6/6, full frontend suite 248/248, production build, 250 KiB gzip/141-chunk budget and `git diff --check`.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn, so the interface remains `NOT UX ACCEPTED` until separately verified in-browser.
+
 ## Active Plan: Tối ưu Trao đổi cần phản hồi trên Bàn làm việc
 
 Status: IMPLEMENTED AND FOCUSED TECHNICALLY VERIFIED; FULL DB SUITE HAS UNRELATED FIXTURE FAILURES; UX NOT ACCEPTED (approved by user on 2026-08-24)

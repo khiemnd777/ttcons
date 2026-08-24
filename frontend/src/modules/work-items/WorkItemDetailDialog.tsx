@@ -1,5 +1,5 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -58,6 +58,7 @@ import {
 } from './workItemRequirements';
 import { firstFocusableRequirementControl, revealWorkItemRequirementTarget } from './workItemRequirementNavigation';
 import { executionTargetPath } from './workItemExecutionTarget';
+import { constructionHandoffNavigationState } from './workItemNavigation';
 import type { WorkItemWorkflowNavigation } from './workItemWorkflowNavigation';
 import {
   actionDescriptions,
@@ -129,6 +130,8 @@ export function WorkItemDetailWorkspace({
   const [startReasonAttempted, setStartReasonAttempted] = useState(false);
   const queryClient = useQueryClient();
   const toast = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
   const selectedWorkId = workItemId ?? item?.id ?? '';
   const navigationSequence = useRef(0);
   const workflowFormActionRef = useRef<WorkflowFormActionHandle | null>(null);
@@ -258,6 +261,15 @@ export function WorkItemDetailWorkspace({
     onClose?.();
   }
 
+  function openConstructionHandoff() {
+    if (!detailItem?.project_id) return;
+    const planningPath = `/projects/${encodeURIComponent(detailItem.project_id)}/planning`;
+    closeDialog();
+    navigate(planningPath, {
+      state: constructionHandoffNavigationState(detailItem.project_id, location.state),
+    });
+  }
+
   function navigateToRequirement(target: WorkItemRequirementNavigationTarget) {
     navigationSequence.current += 1;
     setNavigationRequest({ requestId: navigationSequence.current, target });
@@ -278,7 +290,7 @@ export function WorkItemDetailWorkspace({
     setAmendmentReasonAttempted(false);
   }, [selectedWorkId]);
 
-  const actions = permittedActions(detailItem);
+  const actions = permittedActions(detailItem, workflowFormActionState?.submitted);
   const evidence = asArray<EvidenceRecord>(detailItem?.evidence);
   const activities = asArray<WorkItemActivity>(detailItem?.activities);
   const attachmentOptions = buildActivityAttachmentOptions(evidence);
@@ -398,6 +410,7 @@ export function WorkItemDetailWorkspace({
               }}
               onSaveWorkflowFormAmendment={() => workflowFormActionRef.current?.saveAmendment()}
               onCancelWorkflowFormAmendment={() => workflowFormActionRef.current?.cancelAmendment()}
+              onOpenConstructionHandoff={openConstructionHandoff}
               onNavigateRequirement={navigateToRequirement}
               onClose={closeDialog}
               navigationRequest={navigationRequest}
@@ -505,12 +518,40 @@ export function WorkItemDetailWorkspace({
 }
 
 const decisionActions = new Set<WorkItemActionKey>(['approve', 'reject', 'request-change']);
+const constructionHandoffCompletionLabel = 'Kiểm tra điều kiện & chốt bước';
 
-function permittedActions(item?: WorkItem | null): WorkItemActionKey[] {
+function constructionHandoffNeedsActivation(item?: WorkItem | null, workflowFormSubmitted?: boolean) {
+  return Boolean(
+    item
+    && item.domain_action_key === 'construction.activate_handoff'
+    && (workflowFormSubmitted ?? item.workflow_form_status === 'submitted')
+    && item.business_source
+    && !item.business_source?.ready,
+  );
+}
+
+function workItemActionLabel(item: WorkItem, action: WorkItemActionKey) {
+  if (action === 'complete' && item.domain_action_key === 'construction.activate_handoff' && item.business_source?.ready) {
+    return constructionHandoffCompletionLabel;
+  }
+  return actionLabels[action];
+}
+
+function permittedActions(item?: WorkItem | null, workflowFormSubmitted?: boolean): WorkItemActionKey[] {
   if (!item || ['completed', 'cancelled'].includes(item.status)) return [];
 
-  const statusActions = availableActions(item.status);
+  let statusActions = availableActions(item.status);
   const serverActions = asArray<string>(item.available_actions);
+  const submitted = workflowFormSubmitted ?? item.workflow_form_status === 'submitted';
+  if (submitted) {
+    statusActions = statusActions.filter((action) => action !== 'start');
+    if (item.status === 'ready' && serverActions.includes('complete') && !statusActions.includes('complete')) {
+      statusActions = ['complete', ...statusActions];
+    }
+  }
+  if (constructionHandoffNeedsActivation(item, submitted)) {
+    statusActions = statusActions.filter((action) => action !== 'complete');
+  }
   if (Array.isArray(item.available_actions)) {
     const allowed = new Set(serverActions);
     return statusActions.filter((action) => allowed.has(action));
@@ -897,6 +938,7 @@ function WorkItemActionPanel({
   onRequestWorkflowFormAmendment,
   onSaveWorkflowFormAmendment,
   onCancelWorkflowFormAmendment,
+  onOpenConstructionHandoff,
   onNavigateRequirement,
   onClose,
   navigationRequest,
@@ -917,6 +959,7 @@ function WorkItemActionPanel({
   onRequestWorkflowFormAmendment: () => void;
   onSaveWorkflowFormAmendment: () => void;
   onCancelWorkflowFormAmendment: () => void;
+  onOpenConstructionHandoff: () => void;
   onNavigateRequirement: (target: WorkItemRequirementNavigationTarget) => void;
   onClose: () => void;
   navigationRequest: WorkItemRequirementNavigationRequest | null;
@@ -928,12 +971,19 @@ function WorkItemActionPanel({
   );
   const workflowFormCanAmend = Boolean(workflowFormActionState?.available && workflowFormActionState.canAmend && !workflowFormActionState.amending);
   const workflowFormIsAmending = Boolean(workflowFormActionState?.available && workflowFormActionState.amending);
+  const constructionHandoffActivationRequired = constructionHandoffNeedsActivation(item, workflowFormActionState?.submitted)
+    && !workItemIsUpcoming(item)
+    && (item.capabilities?.can_act ?? item.can_act) === true;
   const formIssueCount = workflowFormActionState?.validationIssueLabels.length ?? 0;
-  const primaryAction = workflowFormIsPrimary ? undefined : actions[0];
-  const secondaryActions = workflowFormIsPrimary ? actions : actions.slice(1);
+  const primaryAction = workflowFormIsPrimary || constructionHandoffActivationRequired ? undefined : actions[0];
+  const secondaryActions = workflowFormIsPrimary || constructionHandoffActivationRequired ? actions : actions.slice(1);
   const panelNextAction = workflowFormIsAmending
     ? `Lưu phiên bản chỉnh sửa ${workflowFormActionState?.currentRevision ? workflowFormActionState.currentRevision + 1 : ''}`.trim()
-    : workflowFormCanAmend
+    : constructionHandoffActivationRequired
+      ? 'Kích hoạt bàn giao thi công'
+      : actions[0] === 'complete' && item.domain_action_key === 'construction.activate_handoff'
+        ? constructionHandoffCompletionLabel
+        : workflowFormCanAmend
       ? 'Hồ sơ đã chốt · Có thể chỉnh sửa'
       : workflowFormIsPrimary
     ? formIssueCount
@@ -978,7 +1028,7 @@ function WorkItemActionPanel({
         ) : null}
       </div>
 
-      {workflowFormIsPrimary || actions.length ? (
+      {workflowFormIsPrimary || constructionHandoffActivationRequired || actions.length ? (
         <div className="mt-3 space-y-2">
           {workflowFormIsPrimary && formIssueCount ? (
             <button
@@ -1000,8 +1050,17 @@ function WorkItemActionPanel({
                 onSubmit={onSubmitWorkflowForm}
               />
             </div>
+          ) : constructionHandoffActivationRequired ? (
+            <button
+              type="button"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              onClick={onOpenConstructionHandoff}
+            >
+              Mở bàn giao thi công
+              <ArrowRight className="h-4 w-4" />
+            </button>
           ) : primaryAction ? (
-            <ActionButton action={primaryAction} primary submitting={submitting} onRunAction={onRunAction} />
+            <ActionButton action={primaryAction} label={workItemActionLabel(item, primaryAction)} primary submitting={submitting} onRunAction={onRunAction} />
           ) : null}
 
           <button
@@ -1032,7 +1091,7 @@ function WorkItemActionPanel({
               </summary>
               <div className="space-y-2 border-t border-line bg-white p-2">
                 {secondaryActions.map((action) => (
-                  <ActionButton key={action} action={action} submitting={submitting} onRunAction={onRunAction} />
+                  <ActionButton key={action} action={action} label={workItemActionLabel(item, action)} submitting={submitting} onRunAction={onRunAction} />
                 ))}
               </div>
             </details>
@@ -1141,7 +1200,7 @@ function WorkflowFormPrimaryActions({
       onClick={onSave}
     >
       {state?.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-      Lưu nháp
+      {state?.saveLabel ?? 'Lưu nháp'}
     </button>
   );
   const submitButton = (
@@ -1293,7 +1352,7 @@ function WorkItemSupportingTabs({
             onSubmit={onSubmitActivity}
           />
         ) : null}
-        {activeTab === 'form' ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} /> : null}
+        {activeTab === 'form' ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} readOnly={readOnly} navigationRequest={navigationRequest} /> : null}
       </div>
     </section>
   );
@@ -1438,11 +1497,13 @@ function ActivityTimelineItem({ activity }: { activity: WorkItemActivity }) {
 
 function ActionButton({
   action,
+  label,
   primary = false,
   submitting,
   onRunAction,
 }: {
   action: WorkItemActionKey;
+  label?: string;
   primary?: boolean;
   submitting: boolean;
   onRunAction: (action: WorkItemActionKey) => void;
@@ -1463,7 +1524,7 @@ function ActionButton({
       title={actionDescriptions[action]}
     >
       {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-      {actionLabels[action]}
+      {label ?? actionLabels[action]}
     </button>
   );
 }

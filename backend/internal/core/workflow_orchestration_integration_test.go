@@ -176,6 +176,83 @@ func TestWorkItemCanStartOutOfSequenceWithoutMovingRunPointer(t *testing.T) {
 	}
 }
 
+func TestWorkflowFormFirstWriteStartsCurrentWorkItemAtomicallyOnce(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	templateID := newID()
+	runID := newID()
+	runNodeID := newID()
+	runStepID := newID()
+	instanceID := newID()
+	defer func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM pipeline_templates WHERE id=$1`, templateID)
+	}()
+
+	mustExec(t, db, `INSERT INTO pipeline_templates (id,template_family_id,name,status) VALUES ($1,$1,'Workflow form start test','published')`, templateID)
+	mustExec(t, db, `UPDATE projects SET pipeline_template_id=$2 WHERE id=$1`, fixture.projectID, templateID)
+	mustExec(t, db, `INSERT INTO pipeline_runs (id,project_id,template_id,engine_version,status) VALUES ($1,$2,$3,4,'active')`, runID, fixture.projectID, templateID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (id,run_id,project_id,name,type,order_index,status,started_at)
+		VALUES ($1,$2,$3,'Node biểu mẫu','construction_planning',1,'in_progress',now())
+	`, runNodeID, runID, fixture.projectID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$1 WHERE id=$2`, runNodeID, runID)
+	mustExec(t, db, `UPDATE projects SET current_pipeline_run_id=$1 WHERE id=$2`, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_steps (id,run_node_id,project_id,name,step_type,order_index,status)
+		VALUES ($1,$2,$3,'Bước biểu mẫu','checklist',1,'pending')
+	`, runStepID, runNodeID, fixture.projectID)
+	mustExec(t, db, `
+		UPDATE work_items
+		SET pipeline_run_id=$2,run_node_id=$3,run_step_id=$4,status='ready',started_at=NULL
+		WHERE id=$1
+	`, fixture.itemID, runID, runNodeID, runStepID)
+	mustExec(t, db, `
+		INSERT INTO workflow_form_instances (
+			id,project_id,work_item_id,pipeline_run_id,run_node_id,run_step_id,
+			form_template_id,form_version_id,form_type,title,created_by
+		)
+		SELECT $1,$2,$3,$4,$5,$6,t.id,v.id,t.form_type,'Checklist bắt đầu đầu việc',$7
+		FROM workflow_form_templates t
+		JOIN workflow_form_versions v ON v.template_id=t.id
+		WHERE t.code='builtin_checklist' AND v.version_no=1 AND v.status='published'
+	`, instanceID, fixture.projectID, fixture.itemID, runID, runNodeID, runStepID, fixture.workerID)
+
+	if _, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{Answers: Record{}}, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("invalid submit must fail before starting the work item")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='ready' AND started_at IS NULL`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_run_steps WHERE id=$1 AND status='pending'`, 1, runStepID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='started'`, 0, fixture.itemID)
+
+	if _, err := service.SaveWorkflowFormDraft(ctx, instanceID, WorkflowFormSaveRequest{Answers: Record{}}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='in_progress' AND started_at IS NOT NULL`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_run_steps WHERE id=$1 AND status='in_progress'`, 1, runStepID)
+	assertCount(t, db, `
+		SELECT COUNT(*) FROM work_item_activities
+		WHERE work_item_id=$1 AND activity_type='started'
+		  AND from_status='ready' AND to_status='in_progress'
+		  AND metadata_json->>'source'='workflow_form_first_write'
+		  AND metadata_json->>'workflow_form_instance_id'=$2
+	`, 1, fixture.itemID, instanceID)
+	assertCount(t, db, `
+		SELECT COUNT(*) FROM audit_logs
+		WHERE target_type='work_item' AND target_id=$1 AND event_type='work_item_started'
+		  AND metadata_json->>'source'='workflow_form_first_write'
+	`, 1, fixture.itemID)
+
+	if _, err := service.SaveWorkflowFormDraft(ctx, instanceID, WorkflowFormSaveRequest{Answers: Record{"exceptions": "Không có"}}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='started'`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_type='work_item' AND target_id=$1 AND event_type='work_item_started'`, 1, fixture.itemID)
+}
+
 func TestSkipUnselectedBranchesSkipsOnlyExclusiveSubgraph(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
@@ -1161,6 +1238,53 @@ func TestWorkflowFormPDFOmitsSiteRiskCategoryFromNewPresentation(t *testing.T) {
 	}
 	if len(workflowPDFStructuredSpecs(otherDocument.Fields[0].Definition)) != 4 {
 		t.Fatalf("unrelated PDF field was changed: %#v", otherDocument.Fields[0].Definition)
+	}
+}
+
+func TestWorkflowFormPDFOmitsConstructionHandoffEvidenceToggle(t *testing.T) {
+	field := Record{
+		"field_key": clientConstructionInspectionItemsFieldKey, "label": "Hạng mục giám sát", "field_type": "structured_list",
+		"validation_json": Record{"item_fields": []any{
+			map[string]any{"key": "title", "label": "Nội dung kiểm tra", "type": "text"},
+			map[string]any{"key": "criteria", "label": "Tiêu chí đạt", "type": "textarea"},
+			map[string]any{"key": clientConstructionEvidenceRequiredFieldKey, "label": "Bắt buộc minh chứng", "type": "checkbox"},
+		}},
+	}
+	form := Record{
+		"instance": Record{"title": "Kích hoạt bàn giao thi công", "form_type": "checklist", "status": "submitted"},
+		"template": Record{"code": clientConstructionHandoffPlanFormCode, "name": "Kế hoạch giám sát và bàn giao thi công"},
+		"version":  Record{"version_no": 1},
+		"fields":   []Record{field},
+		"answers": Record{clientConstructionInspectionItemsFieldKey: []any{map[string]any{
+			"title": "Kiểm tra trần", "criteria": "Sai số không quá 3mm", clientConstructionEvidenceRequiredFieldKey: true,
+		}}},
+	}
+	document, err := buildWorkflowFormPDFDocument(form, WorkflowFormPDFContext{}, strings.Repeat("c", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(document.Fields) != 1 {
+		t.Fatalf("PDF fields = %#v, want one handoff item list", document.Fields)
+	}
+	specs := workflowPDFStructuredSpecs(document.Fields[0].Definition)
+	keys := make([]string, 0, len(specs))
+	for _, spec := range specs {
+		keys = append(keys, fmt.Sprint(spec["key"]))
+	}
+	if strings.Join(keys, ",") != "title,criteria" {
+		t.Fatalf("handoff PDF specs = %v, want evidence toggle omitted", keys)
+	}
+	if len(workflowPDFStructuredSpecs(field)) != 3 {
+		t.Fatalf("published handoff field definition was mutated: %#v", field)
+	}
+
+	form["template"] = Record{"code": "another_form", "name": "Biểu mẫu khác"}
+	otherDocument, err := buildWorkflowFormPDFDocument(form, WorkflowFormPDFContext{}, strings.Repeat("d", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(workflowPDFStructuredSpecs(otherDocument.Fields[0].Definition)) != 3 {
+		t.Fatalf("unrelated handoff-like PDF field was changed: %#v", otherDocument.Fields[0].Definition)
 	}
 }
 

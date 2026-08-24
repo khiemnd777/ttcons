@@ -14,8 +14,8 @@ import { ProjectBackLink } from '../../components/ProjectBackLink';
 import type { ProjectOperationsResponse, ProjectOperationsTimelineNode, WorkItem } from '../../lib/types/domain';
 import { enumLabel, statusLabel } from '../../lib/utils/status';
 import { ProjectWorkflowWorkspace } from '../projects/ProjectDetailPage';
-import { currentReturnTo } from '../work-items/workItemNavigation';
-import { executionTargetPath } from '../work-items/workItemExecutionTarget';
+import { currentReturnTo, currentWorkspaceReturnTo, projectTaskDetailNavigationState } from '../work-items/workItemNavigation';
+import { executionTargetNeedsEmbeddedWorkItem, executionTargetPath } from '../work-items/workItemExecutionTarget';
 import {
   asArray,
   hasWorkflowFormSummary,
@@ -127,7 +127,12 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
       return;
     }
     const enriched = operations.data?.work_items?.find((item) => item.id === workItem.id) ?? workItem;
-    navigate(executionTargetPath(enriched, currentReturnTo(location)));
+    const targetPath = executionTargetPath(enriched, currentWorkspaceReturnTo(location));
+    if (executionTargetNeedsEmbeddedWorkItem(enriched.execution_target)) {
+      navigate(targetPath, { state: projectTaskDetailNavigationState(enriched.id, location.state) });
+      return;
+    }
+    navigate(targetPath);
   }
 
   if (run.isLoading) return mode === 'planning' ? <PlanningWorkspaceLoading /> : <LoadingSpinner />;

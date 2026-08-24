@@ -54,6 +54,7 @@ func (s *Service) ActivateConstructionHandoff(ctx context.Context, projectID str
 		if raw.SourceFieldKey == "" {
 			raw.SourceFieldKey = "manual_handoff_items"
 		}
+		raw.EvidenceRequired = true
 		if raw.SourceItemIndex < 0 {
 			raw.SourceItemIndex = index
 		}
@@ -76,12 +77,10 @@ func (s *Service) ActivateConstructionHandoff(ctx context.Context, projectID str
 			return nil, err
 		}
 		if len(criteria) == 0 {
-			criteria = []ConstructionCheckCriterion{{Title: raw.Title, Criteria: "Thực hiện đúng hồ sơ và yêu cầu chất lượng đã duyệt", EvidenceRequired: raw.EvidenceRequired}}
+			criteria = []ConstructionCheckCriterion{{Title: raw.Title, Criteria: "Thực hiện đúng hồ sơ và yêu cầu chất lượng đã duyệt", EvidenceRequired: true}}
 		}
 		for criterionIndex := range criteria {
-			if raw.EvidenceRequired {
-				criteria[criterionIndex].EvidenceRequired = true
-			}
+			criteria[criterionIndex].EvidenceRequired = true
 		}
 		raw.Criteria = criteria
 		sourceKey := fmt.Sprintf("%s:%d", raw.SourceFieldKey, raw.SourceItemIndex)
@@ -255,12 +254,11 @@ func constructionHandoffCandidate(formCode, fieldKey string, index int, item Rec
 	location := strings.TrimSpace(fmt.Sprint(item["location"]))
 	role := strings.TrimSpace(fmt.Sprint(item["responsible_role"]))
 	scheduledAt := ""
-	evidenceRequired := boolValue(item["evidence_required"])
+	evidenceRequired := true
 	if formCode == "client_qa_construction_plan_checklist" {
 		title = strings.TrimSpace(fmt.Sprint(item["item"]))
 		criteriaText = strings.TrimSpace(fmt.Sprint(item["note"]))
 		role = "QA/QC"
-		evidenceRequired = cleanID(item["evidence_id"]) != ""
 	}
 	if formCode == "client_construction_assignment_meeting" {
 		title = strings.TrimSpace(fmt.Sprint(item["task"]))

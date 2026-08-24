@@ -5896,7 +5896,15 @@ func (s *Service) saveWorkflowForm(ctx context.Context, instanceID string, req W
 		return nil, err
 	}
 	saved, err := s.repo.SaveWorkflowForm(ctx, instanceID, normalized, strings.TrimSpace(req.Comment), submit, actorID, actorName)
-	if err != nil || !submit {
+	if err != nil {
+		return saved, err
+	}
+	if statusIn(fmt.Sprint(item["status"]), "ready", "needs_changes") {
+		if startedItem, detailErr := s.repo.GetWorkItemDetail(ctx, workItemID); detailErr == nil && fmt.Sprint(startedItem["status"]) == "in_progress" {
+			s.publishWorkItemChanged(startedItem, actorID)
+		}
+	}
+	if !submit {
 		return saved, err
 	}
 	saved["auto_transition"] = s.autoAdvanceSubmittedWorkflowForm(ctx, instance, actorID, actorName)

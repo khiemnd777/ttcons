@@ -39,6 +39,26 @@ function dimensionItemsField(): WorkflowFormField {
   };
 }
 
+function constructionHandoffItemsField(): WorkflowFormField {
+  return {
+    form_version_id: 'version',
+    field_key: 'inspection_items',
+    label: 'Hạng mục giám sát',
+    field_type: 'structured_list',
+    required: true,
+    help_text: 'Mỗi dòng sẽ sinh đúng một đầu việc và một kiểm tra khi kích hoạt bàn giao.',
+    validation_json: {
+      min_items: 1,
+      item_fields: [
+        { key: 'title', label: 'Nội dung kiểm tra', type: 'text', required: true },
+        { key: 'criteria', label: 'Tiêu chí đạt', type: 'textarea', required: true },
+        { key: 'responsible_role', label: 'Vai trò giám sát', type: 'select', required: true },
+        { key: 'evidence_required', label: 'Bắt buộc minh chứng', type: 'checkbox', required: false },
+      ],
+    },
+  };
+}
+
 test('hides the site-risk category without mutating the published field definition', () => {
   const stored = riskItemsField();
   const [effective] = effectiveWorkflowStructuredListFields([stored], 'client_site_risk_assessment');
@@ -76,6 +96,24 @@ test('makes only survey work-package area optional without mutating the publishe
 
 test('keeps survey dimension area required for unrelated forms', () => {
   const stored = dimensionItemsField();
+  const [effective] = effectiveWorkflowStructuredListFields([stored], 'another_form');
+  assert.strictEqual(effective, stored);
+});
+
+test('hides the construction handoff evidence toggle and presents one fixed evidence policy', () => {
+  const stored = constructionHandoffItemsField();
+  const [effective] = effectiveWorkflowStructuredListFields([stored], 'client_construction_handoff_plan');
+  const effectiveSpecs = effective.validation_json?.item_fields as Array<Record<string, unknown>>;
+  const storedSpecs = stored.validation_json?.item_fields as Array<Record<string, unknown>>;
+
+  assert.deepEqual(effectiveSpecs.map((spec) => spec.key), ['title', 'criteria', 'responsible_role']);
+  assert.match(effective.help_text ?? '', /Mọi hạng mục bắt buộc ít nhất 1 ảnh hoặc tài liệu/);
+  assert.deepEqual(storedSpecs.map((spec) => spec.key), ['title', 'criteria', 'responsible_role', 'evidence_required']);
+  assert.equal(stored.help_text, 'Mỗi dòng sẽ sinh đúng một đầu việc và một kiểm tra khi kích hoạt bàn giao.');
+});
+
+test('keeps the construction evidence toggle for unrelated form templates', () => {
+  const stored = constructionHandoffItemsField();
   const [effective] = effectiveWorkflowStructuredListFields([stored], 'another_form');
   assert.strictEqual(effective, stored);
 });

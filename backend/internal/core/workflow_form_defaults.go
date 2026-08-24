@@ -7,14 +7,24 @@ import (
 )
 
 const (
-	clientSiteRiskAssessmentFormCode = "client_site_risk_assessment"
-	clientSiteRiskItemsFieldKey      = "risk_items"
-	clientSiteRiskCategoryFieldKey   = "category"
-	clientSiteRiskDefaultCategory    = "other"
+	clientSiteRiskAssessmentFormCode           = "client_site_risk_assessment"
+	clientSiteRiskItemsFieldKey                = "risk_items"
+	clientSiteRiskCategoryFieldKey             = "category"
+	clientSiteRiskDefaultCategory              = "other"
+	clientConstructionHandoffPlanFormCode      = "client_construction_handoff_plan"
+	clientConstructionInspectionItemsFieldKey  = "inspection_items"
+	clientConstructionEvidenceRequiredFieldKey = "evidence_required"
 )
 
 func applyWorkflowFormAnswerDefaults(instance Record, answers Record) Record {
-	if answers == nil || strings.TrimSpace(fmt.Sprint(instance["form_code"])) != clientSiteRiskAssessmentFormCode {
+	if answers == nil {
+		return answers
+	}
+	formCode := strings.TrimSpace(fmt.Sprint(instance["form_code"]))
+	if formCode == clientConstructionHandoffPlanFormCode {
+		answers = applyConstructionHandoffEvidencePolicy(answers)
+	}
+	if formCode != clientSiteRiskAssessmentFormCode {
 		return answers
 	}
 	rawItems, exists := answers[clientSiteRiskItemsFieldKey]
@@ -45,6 +55,36 @@ func applyWorkflowFormAnswerDefaults(instance Record, answers Record) Record {
 	defaultedAnswers := cloneWorkflowFormRecord(answers)
 	defaultedAnswers[clientSiteRiskItemsFieldKey] = defaultedItems
 	return defaultedAnswers
+}
+
+func applyConstructionHandoffEvidencePolicy(answers Record) Record {
+	rawItems, exists := answers[clientConstructionInspectionItemsFieldKey]
+	if !exists {
+		return answers
+	}
+	items, err := workflowRecordList(rawItems)
+	if err != nil {
+		return answers
+	}
+
+	normalizedItems := make([]Record, len(items))
+	changed := false
+	for index, item := range items {
+		if boolValue(item[clientConstructionEvidenceRequiredFieldKey]) {
+			normalizedItems[index] = item
+			continue
+		}
+		normalizedItem := cloneWorkflowFormRecord(item)
+		normalizedItem[clientConstructionEvidenceRequiredFieldKey] = true
+		normalizedItems[index] = normalizedItem
+		changed = true
+	}
+	if !changed {
+		return answers
+	}
+	normalizedAnswers := cloneWorkflowFormRecord(answers)
+	normalizedAnswers[clientConstructionInspectionItemsFieldKey] = normalizedItems
+	return normalizedAnswers
 }
 
 func workflowFormSuggestedAnswers(instance Record, fields []Record, actorName string, now time.Time) Record {

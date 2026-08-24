@@ -471,8 +471,8 @@ func TestPlanningConstructionHandoffIsIdempotentAndTracksCheckResolution(t *test
 			{
 				SourceFieldKey: "inspection_items", SourceItemIndex: 0,
 				Title: "Kiểm tra cao độ trần", Location: "Khu A", ResponsibleRole: "QA/QC", AssignedUserID: fixture.workerID,
-				EvidenceRequired: true,
-				Criteria:         []ConstructionCheckCriterion{{Title: "Cao độ", Criteria: "Sai số không quá 3mm", EvidenceRequired: true}},
+				EvidenceRequired: false,
+				Criteria:         []ConstructionCheckCriterion{{Title: "Cao độ", Criteria: "Sai số không quá 3mm", EvidenceRequired: false}},
 			},
 			{
 				SourceFieldKey: "inspection_items", SourceItemIndex: 1,
@@ -498,6 +498,9 @@ func TestPlanningConstructionHandoffIsIdempotentAndTracksCheckResolution(t *test
 	assertCount(t, db, `SELECT COUNT(*) FROM construction_handoff_items WHERE project_id=$1`, 2, fixture.projectID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='construction_handoff_item'`, 2, fixture.projectID)
 	assertCount(t, db, `SELECT COUNT(*) FROM construction_checks WHERE project_id=$1 AND source_handoff_item_id IS NOT NULL`, 2, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_handoff_items WHERE project_id=$1 AND evidence_required`, 2, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='construction_handoff_item' AND COALESCE((evidence_requirement_json->>'required')::boolean,false)`, 2, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM construction_checks WHERE project_id=$1 AND source_handoff_item_id IS NOT NULL AND criteria_jsonb @> '[{"evidence_required":true}]'::jsonb`, 2, fixture.projectID)
 	afterIssues, err := repo.NodeCompletionIssues(ctx, Record{"id": planningNodeID, "run_id": runID, "type": "construction_planning", "status": "in_progress"})
 	if err != nil {
 		t.Fatal(err)

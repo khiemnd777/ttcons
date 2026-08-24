@@ -5312,6 +5312,9 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 	if statusIn(fromStatus, "cancelled") || (!submit && fromStatus == "submitted") || (submit && fromStatus == "submitted") {
 		return nil, validationError("Trạng thái biểu mẫu quy trình đã thay đổi, vui lòng tải lại", Record{"status": fromStatus})
 	}
+	if err := startWorkflowFormWorkItemTx(ctx, tx, instance, submit, actorID, actorName); err != nil {
+		return nil, err
+	}
 	revisionNo := int(number(instance["current_revision"]))
 	if submit {
 		revisionNo++
@@ -5457,6 +5460,110 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 		return nil, err
 	}
 	return r.GetWorkflowFormInstanceDetail(ctx, instanceID)
+}
+
+func startWorkflowFormWorkItemTx(ctx context.Context, tx *sql.Tx, instance Record, submit bool, actorID, actorName string) error {
+	workItemID := cleanID(instance["work_item_id"])
+	if workItemID == "" {
+		return nil
+	}
+	rows, err := queryTx(ctx, tx, `
+		SELECT
+			wi.*,
+			COALESCE(pr.engine_version, 1) AS pipeline_engine_version,
+			pr.current_node_id AS pipeline_current_node_id,
+			pr.status AS pipeline_run_status,
+			current_node.status AS pipeline_current_node_status,
+			target_node.status AS run_node_status
+		FROM work_items wi
+		LEFT JOIN pipeline_runs pr ON pr.id=wi.pipeline_run_id
+		LEFT JOIN pipeline_run_nodes current_node ON current_node.id=pr.current_node_id
+		LEFT JOIN pipeline_run_nodes target_node ON target_node.id=wi.run_node_id
+		WHERE wi.id=$1
+		FOR UPDATE OF wi
+	`, workItemID)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return sql.ErrNoRows
+	}
+	item := rows[0]
+	fromStatus := fmt.Sprint(item["status"])
+	if !statusIn(fromStatus, "ready", "needs_changes") {
+		return nil
+	}
+	if int(number(item["pipeline_engine_version"])) >= 2 && cleanID(item["pipeline_run_id"]) != "" {
+		currentNodeID := cleanID(item["pipeline_current_node_id"])
+		currentNodeStatus := fmt.Sprint(item["pipeline_current_node_status"])
+		targetNodeStatus := fmt.Sprint(item["run_node_status"])
+		targetIsCurrent := currentNodeID != "" && currentNodeID == cleanID(item["run_node_id"])
+		allowedEarlyExecution := workItemHasStarted(item) && !targetIsCurrent &&
+			statusIn(currentNodeStatus, "in_progress", "waiting_approval", "blocked") &&
+			statusIn(targetNodeStatus, "pending", "in_progress", "waiting_approval", "blocked")
+		if statusIn(fmt.Sprint(item["pipeline_run_status"]), "completed", "cancelled") ||
+			(!targetIsCurrent && !allowedEarlyExecution) ||
+			(targetIsCurrent && !statusIn(currentNodeStatus, "in_progress", "waiting_approval", "blocked")) {
+			return validationError("Đầu việc không còn thuộc node đang thực hiện của quy trình", Record{
+				"work_item_id":    workItemID,
+				"run_node_id":     item["run_node_id"],
+				"current_node_id": currentNodeID,
+			})
+		}
+	}
+
+	updated, err := queryTx(ctx, tx, `
+		UPDATE work_items
+		SET status='in_progress',
+			started_at=COALESCE(started_at, now()),
+			updated_by=NULLIF($3,'')::uuid,
+			updated_at=now()
+		WHERE id=$1 AND status=$2
+		RETURNING id
+	`, workItemID, fromStatus, actorID)
+	if err != nil {
+		return err
+	}
+	if len(updated) == 0 {
+		return validationError("Trạng thái đầu việc đã thay đổi, vui lòng tải lại trước khi lưu hồ sơ", Record{"expected_status": fromStatus})
+	}
+	if err := applyRunStepStatusTx(ctx, tx, item, "in_progress", actorID); err != nil {
+		return err
+	}
+
+	formAction := "draft_saved"
+	comment := "Bắt đầu đầu việc khi lưu nháp hồ sơ nghiệp vụ"
+	if submit {
+		formAction = "submitted"
+		comment = "Bắt đầu đầu việc khi chốt hồ sơ nghiệp vụ"
+	}
+	metadata := Record{
+		"action":                    "started",
+		"source":                    "workflow_form_first_write",
+		"workflow_form_action":      formAction,
+		"workflow_form_instance_id": instance["id"],
+		"workflow_form_version_id":  instance["form_version_id"],
+	}
+	rawMetadata, _ := json.Marshal(metadata)
+	projectID := cleanID(item["project_id"])
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, from_status, to_status, metadata_json)
+		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'started', $4, $5, 'in_progress', $6::jsonb)
+	`, workItemID, projectID, actorID, comment, fromStatus, string(rawMetadata)); err != nil {
+		return err
+	}
+	return addAuditTx(
+		ctx,
+		tx,
+		projectID,
+		actorID,
+		actorName,
+		"work_item_started",
+		"work_item",
+		workItemID,
+		workItemAuditDescription("started", item, ""),
+		metadata,
+	)
 }
 
 func (r *Repository) AmendWorkflowForm(ctx context.Context, instanceID string, answers Record, reason string, expectedRevision int, actorID, actorName string) (Record, error) {

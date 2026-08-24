@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle2, ExternalLink, GitBranch, X } from 'lucide-react';
@@ -7,7 +7,11 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { get } from '../../lib/api/client';
 import type { WorkItem } from '../../lib/types/domain';
 import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
-import { safeReturnPath } from '../work-items/workItemNavigation';
+import {
+  consumeProjectTaskDetailNavigationState,
+  projectTaskDetailIntentMatches,
+  safeReturnPath,
+} from '../work-items/workItemNavigation';
 import { executionTargetNeedsEmbeddedWorkItem, executionTargetWorkspaceLabel, workItemMatchesProject } from '../work-items/workItemExecutionTarget';
 
 export function ProjectTaskContext({ projectId }: { projectId: string }) {
@@ -19,12 +23,22 @@ export function ProjectTaskContext({ projectId }: { projectId: string }) {
   const returnTo = safeReturnPath(params.get('returnTo'));
   const contextEnabled = Boolean(taskId) && !location.pathname.endsWith('/preparation') && !location.pathname.includes('/work-items/');
   const [detailOpen, setDetailOpen] = useState(false);
+  const detailOpenIntent = projectTaskDetailIntentMatches(location.state, taskId);
   const task = useQuery({
     queryKey: ['work-item', taskId],
     queryFn: () => get<WorkItem>(`/work-items/${taskId}`),
     enabled: contextEnabled,
     retry: false,
   });
+
+  useEffect(() => {
+    if (!contextEnabled || !detailOpenIntent) return;
+    setDetailOpen(true);
+    navigate(`${location.pathname}${location.search}${location.hash}`, {
+      replace: true,
+      state: consumeProjectTaskDetailNavigationState(location.state),
+    });
+  }, [contextEnabled, detailOpenIntent, location.hash, location.pathname, location.search, location.state, navigate]);
 
   if (!contextEnabled) return null;
 

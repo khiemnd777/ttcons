@@ -304,14 +304,24 @@ func buildWorkflowFormPDFDocument(form Record, context WorkflowFormPDFContext, p
 }
 
 func workflowPDFPresentationField(templateCode string, field Record) Record {
-	if templateCode != clientSiteRiskAssessmentFormCode || strings.TrimSpace(fmt.Sprint(field["field_key"])) != clientSiteRiskItemsFieldKey || strings.TrimSpace(fmt.Sprint(field["field_type"])) != "structured_list" {
+	fieldKey := strings.TrimSpace(fmt.Sprint(field["field_key"]))
+	if strings.TrimSpace(fmt.Sprint(field["field_type"])) != "structured_list" {
+		return field
+	}
+	hiddenItemFieldKey := ""
+	switch {
+	case templateCode == clientSiteRiskAssessmentFormCode && fieldKey == clientSiteRiskItemsFieldKey:
+		hiddenItemFieldKey = clientSiteRiskCategoryFieldKey
+	case templateCode == clientConstructionHandoffPlanFormCode && fieldKey == clientConstructionInspectionItemsFieldKey:
+		hiddenItemFieldKey = clientConstructionEvidenceRequiredFieldKey
+	default:
 		return field
 	}
 	validation := workflowPDFRecord(field["validation_json"])
 	specs := workflowPDFRecords(validation["item_fields"])
 	filteredSpecs := make([]Record, 0, len(specs))
 	for _, spec := range specs {
-		if strings.TrimSpace(fmt.Sprint(spec["key"])) == clientSiteRiskCategoryFieldKey {
+		if strings.TrimSpace(fmt.Sprint(spec["key"])) == hiddenItemFieldKey {
 			continue
 		}
 		filteredSpecs = append(filteredSpecs, spec)
