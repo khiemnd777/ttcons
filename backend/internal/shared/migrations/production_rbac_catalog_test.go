@@ -25,7 +25,7 @@ func TestProductionRBACCatalogSupportsFreshDatabaseWithoutSeed(t *testing.T) {
 	assertRBACCount(t, ctx, database, `
 		SELECT COUNT(*)
 		FROM permissions permission
-		WHERE permission.key NOT IN ('settings.update','staff.import')
+		WHERE permission.key NOT IN ('settings.update','staff.import','sample_data.create')
 		  AND NOT EXISTS (
 			SELECT 1 FROM role_permissions assignment
 			JOIN roles role ON role.id=assignment.role_id AND role.name='admin'
@@ -54,6 +54,7 @@ func TestProductionRBACCatalogSupportsFreshDatabaseWithoutSeed(t *testing.T) {
 		JOIN permissions permission ON permission.id=assignment.permission_id
 		WHERE (permission.key='settings.update' AND role.name <> 'developer')
 		   OR (permission.key='staff.import' AND role.name <> 'developer')
+		   OR (permission.key='sample_data.create' AND role.name <> 'developer')
 		   OR (permission.key='staff.delete' AND role.name NOT IN ('admin','developer'))
 		   OR (permission.key='event_log.view' AND role.name NOT IN ('admin','developer'))
 		   OR (permission.key LIKE 'accounting.%' AND role.name NOT IN ('admin','developer'))

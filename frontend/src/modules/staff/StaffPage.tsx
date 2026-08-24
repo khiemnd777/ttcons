@@ -23,6 +23,7 @@ import { StaffImportDialog } from './StaffImportDialog';
 import type { StaffImportResult } from './staffImportTypes';
 import { StaffDeleteDialog, type StaffDeletionResult } from './StaffDeleteDialog';
 import { BulkSelectionBar } from '../../components/BulkSelectionBar';
+import { SampleDataBadge } from '../../components/SampleDataBadge';
 
 type StaffRole = {
   id: string;
@@ -39,6 +40,8 @@ type StaffRow = Record<string, any> & {
   has_recovery_email?: boolean;
   recovery_email_masked?: string;
   user_roles?: StaffRole[];
+  is_sample?: boolean;
+  sample_role_id?: string;
 };
 
 type UpdateStaffResponse = StaffRow & {
@@ -199,11 +202,11 @@ export function StaffPage() {
     <RowActions onEdit={canUpdate ? () => setDialog(row) : undefined}>
       {canAssign ? (
         <button
-          title={row.user_id ? 'Gán vai trò' : 'Nhân sự chưa liên kết tài khoản'}
+          title={row.is_sample ? 'Tài khoản mẫu được gán vai trò tự động theo công trình mẫu' : row.user_id ? 'Gán vai trò' : 'Nhân sự chưa liên kết tài khoản'}
           aria-label="Gán vai trò"
           className="rounded-md border border-line p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
           onClick={() => setRoleDialog(row)}
-          disabled={!row.user_id}
+          disabled={!row.user_id || row.is_sample}
         >
           <ShieldCheck className="h-4 w-4" />
         </button>
@@ -236,7 +239,7 @@ export function StaffPage() {
         selection={canDelete ? { selectedKeys, onSelectedKeysChange: setSelectedKeys, ariaLabel: 'Chọn tất cả nhân sự trên trang hiện tại' } : undefined}
         renderMobileCard={(row) => <StaffMobileCard row={row} actions={rowActions(row)} />}
         columns={[
-          { key: 'full_name', header: 'Họ tên', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.full_name}</span> },
+          { key: 'full_name', header: 'Họ tên', sortable: true, render: (row) => <span className="flex flex-wrap items-center gap-2 font-semibold text-ink"><span>{row.full_name}</span>{row.is_sample ? <SampleDataBadge compact /> : null}</span> },
           { key: 'email', header: 'Email', sortable: true },
           { key: 'department', header: 'Phòng ban', sortable: true, render: (row) => optionalStaffValue(row.department) },
           { key: 'position', header: 'Chức vụ', render: (row) => optionalStaffValue(row.position) },
@@ -372,7 +375,7 @@ function StaffMobileCard({ row, actions }: { row: StaffRow; actions: ReactNode }
   return (
     <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{row.full_name}</p><p className="mt-1 truncate text-xs text-slate-500">{row.email}</p></div>
+        <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold text-ink">{row.full_name}</p>{row.is_sample ? <SampleDataBadge compact /> : null}</div><p className="mt-1 truncate text-xs text-slate-500">{row.email}</p></div>
         {actions}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3 text-xs">

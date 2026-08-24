@@ -439,19 +439,40 @@ func (r *Repository) ReplaceUserRoles(ctx context.Context, userID string, roleID
 	}
 	defer tx.Rollback()
 
-	var userEmail string
-	if err := tx.QueryRowContext(ctx, `SELECT email FROM users WHERE id=$1 AND status <> 'deleted' FOR UPDATE`, userID).Scan(&userEmail); err != nil {
+	var userEmail, sampleRoleID string
+	var userIsSample bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT email,is_sample,COALESCE(sample_role_id::text,'')
+		FROM users WHERE id=$1 AND status <> 'deleted' FOR UPDATE
+	`, userID).Scan(&userEmail, &userIsSample, &sampleRoleID); err != nil {
 		return nil, err
 	}
 	projectID = cleanID(projectID)
+	projectIsSample := false
 	if projectID != "" {
-		var exists int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM projects WHERE id=$1 AND status <> 'cancelled'`, projectID).Scan(&exists); err != nil {
+		var exists bool
+		if err := tx.QueryRowContext(ctx, `
+			SELECT EXISTS(SELECT 1 FROM projects WHERE id=$1 AND status <> 'cancelled'),
+				COALESCE((SELECT is_sample FROM projects WHERE id=$1 AND status <> 'cancelled'),false)
+		`, projectID).Scan(&exists, &projectIsSample); err != nil {
 			return nil, err
 		}
-		if exists == 0 {
+		if !exists {
 			return nil, validationError("Công trình không tồn tại hoặc đã huỷ", Record{"project_id": projectID})
 		}
+	}
+	if userIsSample {
+		if projectID == "" {
+			return nil, validationError("Tài khoản mẫu không được gán vai trò toàn hệ thống", Record{"user_id": userID})
+		}
+		if !projectIsSample {
+			return nil, validationError("Tài khoản mẫu chỉ được gán vào công trình mẫu", Record{"user_id": userID, "project_id": projectID})
+		}
+		if len(roleIDs) != 1 || cleanID(roleIDs[0]) != sampleRoleID {
+			return nil, validationError("Tài khoản mẫu chỉ được dùng đúng vai trò mẫu của tài khoản", Record{"user_id": userID, "sample_role_id": sampleRoleID})
+		}
+	} else if projectIsSample {
+		return nil, validationError("Tài khoản thật không được gán vào công trình mẫu", Record{"user_id": userID, "project_id": projectID})
 	}
 	if projectID == "" {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1 AND project_id IS NULL`, userID); err != nil {
@@ -8916,6 +8937,7 @@ func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, i
 		SELECT pm.id::text, pm.project_id::text, pm.staff_id::text,
 			COALESCE(s.user_id::text, '') AS user_id,
 			s.full_name, s.email, s.phone, s.department, s.position,
+			COALESCE(u.is_sample,false) AS is_sample,
 			COALESCE(s.status='deleted', false) AS account_deleted,
 			pm.role_ids, pm.active, pm.notes, pm.created_at, pm.updated_at,
 			(pm.staff_id=p.pm_staff_id) AS is_project_manager,
@@ -8956,6 +8978,7 @@ func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, i
 		FROM project_members pm
 		JOIN projects p ON p.id=pm.project_id AND p.status <> 'cancelled'
 		JOIN staff s ON s.id=pm.staff_id
+		LEFT JOIN users u ON u.id=s.user_id
 		WHERE pm.project_id=$1 %s
 		ORDER BY pm.active DESC, lower(s.full_name), pm.created_at DESC
 	`, activeFilter), projectID)
@@ -8964,6 +8987,7 @@ func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, i
 func (r *Repository) ProjectMemberOptions(ctx context.Context, projectID string) (Record, error) {
 	staff, err := r.Query(ctx, `
 		SELECT s.id::text, s.user_id::text, s.full_name, s.email, s.department, s.position,
+			u.is_sample,
 			latest_member.id AS member_id, COALESCE(latest_member.active, false) AS member_active,
 			COALESCE((
 				SELECT jsonb_agg(jsonb_build_object(
@@ -8981,7 +9005,8 @@ func (r *Repository) ProjectMemberOptions(ctx context.Context, projectID string)
 				JOIN roles r ON r.id=ur.role_id
 				WHERE ur.user_id=s.user_id AND ur.project_id IS NULL
 			), '[]'::jsonb) AS global_roles
-		FROM staff s
+		FROM projects target_project
+		JOIN staff s ON true
 		JOIN users u ON u.id=s.user_id AND u.status='active'
 		LEFT JOIN LATERAL (
 			SELECT pm.id::text AS id, pm.active
@@ -8990,7 +9015,9 @@ func (r *Repository) ProjectMemberOptions(ctx context.Context, projectID string)
 			ORDER BY pm.active DESC, pm.created_at DESC, pm.id DESC
 			LIMIT 1
 		) latest_member ON true
-		WHERE s.status='active'
+		WHERE target_project.id=$1 AND target_project.status <> 'cancelled'
+		  AND s.status='active'
+		  AND u.is_sample=target_project.is_sample
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM user_roles assignment
@@ -9011,11 +9038,22 @@ func (r *Repository) ProjectMemberOptions(ctx context.Context, projectID string)
 				JOIN permissions p ON p.id=rp.permission_id
 				WHERE rp.role_id=r.id AND p.key='project.view'
 			) AS grants_project_view
-		FROM roles r
-		WHERE r.name NOT IN ('admin','director')
+		FROM projects target_project
+		JOIN roles r ON true
+		WHERE target_project.id=$1 AND target_project.status <> 'cancelled'
+		  AND r.name NOT IN ('admin','director')
 		  AND NOT r.external_only
+		  AND (NOT target_project.is_sample OR r.name <> 'developer')
+		  AND (
+			not target_project.is_sample
+			OR EXISTS (
+				SELECT 1 FROM users sample_account
+				WHERE sample_account.is_sample AND sample_account.sample_role_id=r.id
+				  AND sample_account.status='active' AND sample_account.deleted_at IS NULL
+			)
+		  )
 		ORDER BY lower(r.display_name)
-	`)
+	`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -9025,8 +9063,18 @@ func (r *Repository) ProjectMemberOptions(ctx context.Context, projectID string)
 			SELECT DISTINCT label
 			FROM (
 				SELECT r.display_name AS label
-				FROM roles r
-				WHERE NOT r.external_only
+				FROM projects target_project
+				JOIN roles r ON true
+				WHERE target_project.id=$1 AND target_project.status <> 'cancelled'
+				  AND NOT r.external_only
+				  AND (
+					not target_project.is_sample
+					OR EXISTS (
+						SELECT 1 FROM users sample_account
+						WHERE sample_account.is_sample AND sample_account.sample_role_id=r.id
+						  AND sample_account.status='active' AND sample_account.deleted_at IS NULL
+					)
+				  )
 				UNION ALL
 				SELECT project_label.label
 				FROM project_members pm
@@ -9061,7 +9109,7 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 	defer tx.Rollback()
 
 	projectRows, err := queryTx(ctx, tx, `
-		SELECT id::text, COALESCE(pm_staff_id::text, '') AS pm_staff_id
+		SELECT id::text, COALESCE(pm_staff_id::text, '') AS pm_staff_id,is_sample
 		FROM projects
 		WHERE id=$1 AND status <> 'cancelled'
 		FOR UPDATE
@@ -9073,7 +9121,8 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 		return nil, validationError("Công trình không tồn tại hoặc đã huỷ", Record{"project_id": projectID})
 	}
 	staffRows, err := queryTx(ctx, tx, `
-		SELECT s.id::text, s.full_name, COALESCE(s.user_id::text, '') AS user_id
+		SELECT s.id::text, s.full_name, COALESCE(s.user_id::text, '') AS user_id,
+			u.is_sample,COALESCE(u.sample_role_id::text,'') AS sample_role_id
 		FROM staff s
 		JOIN users u ON u.id=s.user_id AND u.status='active'
 		WHERE s.id=$1 AND s.status='active'
@@ -9094,6 +9143,27 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 	}
 	staffName := strings.TrimSpace(fmt.Sprint(staffRows[0]["full_name"]))
 	userID := cleanID(staffRows[0]["user_id"])
+	projectIsSample := boolValue(projectRows[0]["is_sample"])
+	userIsSample := boolValue(staffRows[0]["is_sample"])
+	sampleRoleID := cleanID(staffRows[0]["sample_role_id"])
+	if projectIsSample != userIsSample {
+		if projectIsSample {
+			return nil, validationError("Tài khoản thật không được gán vào công trình mẫu", Record{"staff_id": req.StaffID})
+		}
+		return nil, validationError("Tài khoản mẫu không được gán vào công trình thật", Record{"staff_id": req.StaffID})
+	}
+	if userIsSample {
+		if len(req.ProjectRoleIDs) != 1 || cleanID(req.ProjectRoleIDs[0]) != sampleRoleID {
+			return nil, validationError("Tài khoản mẫu chỉ được dùng đúng vai trò mẫu của tài khoản", Record{"staff_id": req.StaffID, "sample_role_id": sampleRoleID})
+		}
+		var sampleRoleName string
+		if err := tx.QueryRowContext(ctx, `SELECT display_name FROM roles WHERE id=$1`, sampleRoleID).Scan(&sampleRoleName); err != nil {
+			return nil, err
+		}
+		if len(req.RoleIDs) != 1 || !strings.EqualFold(strings.TrimSpace(req.RoleIDs[0]), strings.TrimSpace(sampleRoleName)) {
+			return nil, validationError("Vai trò vận hành của tài khoản mẫu phải khớp vai trò hệ thống", Record{"staff_id": req.StaffID, "role": sampleRoleName})
+		}
+	}
 	for _, roleLabel := range req.RoleIDs {
 		var externalOnly bool
 		if err := tx.QueryRowContext(ctx, `

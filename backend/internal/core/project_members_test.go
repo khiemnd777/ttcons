@@ -195,3 +195,79 @@ func TestProjectMemberOptionsAndSaveExcludeExternalOnlyRoles(t *testing.T) {
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM project_members WHERE project_id=$1`, 0, projectID)
 }
+
+func TestProjectMemberSampleAccountIsolation(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	suffix := strings.ReplaceAll(newID()[:8], "-", "")
+	roleID := newID()
+	realUserID, realStaffID := newID(), newID()
+	sampleUserID, sampleStaffID := newID(), newID()
+	realProjectID, sampleProjectID := newID(), newID()
+	roleKey := "sample_scope_" + suffix
+	roleName := "Vai trò cách ly " + suffix
+	projectViewPermissionID := ensurePermission(t, db, "project.view", "Xem công trình", "project")
+
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id IN ($1,$2)`, realUserID, sampleUserID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM project_members WHERE project_id IN ($1,$2)`, realProjectID, sampleProjectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE project_id IN ($1,$2)`, realProjectID, sampleProjectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id IN ($1,$2)`, realProjectID, sampleProjectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id IN ($1,$2)`, realStaffID, sampleStaffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id IN ($1,$2)`, realUserID, sampleUserID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, roleID)
+	})
+
+	mustExec(t, db, `INSERT INTO roles (id,name,display_name,system_role,external_only) VALUES ($1,$2,$3,false,false)`, roleID, roleKey, roleName)
+	mustExec(t, db, `INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2)`, roleID, projectViewPermissionID)
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'x','Người dùng thật','active')`, realUserID, "real-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status,is_sample,sample_role_id) VALUES ($1,$2,'x',$3,'active',true,$4)`, sampleUserID, roleKey+"@dev.local", roleName, roleID)
+	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,status) VALUES ($1,$2,'Người dùng thật',$3,'active'),($4,$5,$6,$7,'active')`, realStaffID, realUserID, "real-staff-"+suffix+"@test.local", sampleStaffID, sampleUserID, roleName, roleKey+"@dev.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status) VALUES ($1,'Công trình thật',$2,'Client','planning')`, realProjectID, "REAL-"+suffix)
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status,is_sample,sample_profile,sample_blueprint_version) VALUES ($1,'Công trình mẫu',$2,'Client','draft',true,'draft',3)`, sampleProjectID, "SAMPLE-"+suffix)
+
+	realOptions, err := repo.ProjectMemberOptions(ctx, realProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sampleOptions, err := repo.ProjectMemberOptions(ctx, sampleProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range realOptions["staff"].([]Record) {
+		if cleanID(row["id"]) == sampleStaffID {
+			t.Fatalf("sample staff leaked into real project options: %#v", row)
+		}
+	}
+	foundSample := false
+	for _, row := range sampleOptions["staff"].([]Record) {
+		if cleanID(row["id"]) == realStaffID {
+			t.Fatalf("real staff leaked into sample project options: %#v", row)
+		}
+		foundSample = foundSample || cleanID(row["id"]) == sampleStaffID
+	}
+	if !foundSample {
+		t.Fatalf("sample staff missing from sample project options: %#v", sampleOptions["staff"])
+	}
+
+	request := ProjectMemberMutationRequest{RoleIDs: []string{roleName}, ProjectRoleIDs: []string{roleID}}
+	request.StaffID = realStaffID
+	if _, err := repo.SaveProjectMember(ctx, sampleProjectID, "", request, "", "Integration Test"); err == nil {
+		t.Fatal("expected real staff assignment to sample project to fail")
+	}
+	request.StaffID = sampleStaffID
+	if _, err := repo.SaveProjectMember(ctx, realProjectID, "", request, "", "Integration Test"); err == nil {
+		t.Fatal("expected sample staff assignment to real project to fail")
+	}
+	member, err := repo.SaveProjectMember(ctx, sampleProjectID, "", request, "", "Integration Test")
+	if err != nil || !boolValue(member["is_sample"]) {
+		t.Fatalf("sample staff assignment to sample project failed: member=%#v err=%v", member, err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO user_roles (user_id,role_id,project_id) VALUES ($1,$2,NULL)`, sampleUserID, roleID); err == nil {
+		t.Fatal("database allowed a global role for a sample user")
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO project_members (project_id,staff_id,role_ids) VALUES ($1,$2,'[]'::jsonb)`, realProjectID, sampleStaffID); err == nil {
+		t.Fatal("database allowed a sample member in a real project")
+	}
+}

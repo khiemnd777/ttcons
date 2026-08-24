@@ -172,6 +172,7 @@ export type ProjectProgressPMOption = {
   id: string;
   name: string;
   account_deleted?: boolean;
+  is_sample?: boolean;
 };
 
 export type ProjectProgressSummaryResponse = {
@@ -229,6 +230,7 @@ export type ProjectMemberStaffOption = {
   position?: string;
   member_id?: string;
   member_active?: boolean;
+  is_sample?: boolean;
   global_roles: ProjectMemberAccessRole[];
 };
 

@@ -10,13 +10,17 @@ import (
 	"image/draw"
 	"image/png"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"codeberg.org/go-pdf/fpdf"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
+
+var sampleRoleKeyPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 
 func (s *Service) SampleDataOptions(ctx context.Context) (SampleDataOptions, error) {
 	blueprints, err := s.repo.ListPublishedSampleDataBlueprints(ctx)
@@ -46,6 +50,40 @@ func (s *Service) SampleDataOptions(ctx context.Context) (SampleDataOptions, err
 	return options, nil
 }
 
+func (s *Service) CreateSampleDataUsers(ctx context.Context, req SampleDataUserCreateRequest, actorID, actorName string) (Record, error) {
+	pipelineID, err := uuid.Parse(strings.TrimSpace(req.PipelineTemplateID))
+	if err != nil {
+		return nil, validationError("Pipeline tạo tài khoản mẫu không hợp lệ", Record{"field": "pipeline_template_id"})
+	}
+	blueprint, err := s.repo.LoadSampleDataBlueprint(ctx, pipelineID.String())
+	if err != nil {
+		return nil, err
+	}
+	option := sampleDataPipelineCompatibility(blueprint)
+	if !option.SampleUsersProvisionable {
+		return nil, validationError("Pipeline chưa đủ điều kiện tạo tài khoản mẫu", Record{
+			"pipeline_template_id": pipelineID.String(), "blockers": option.Blockers,
+		})
+	}
+	expectedRoles := make([]sampleDataRoleAccount, 0, len(option.RoleCoverage))
+	for _, coverage := range option.RoleCoverage {
+		for _, role := range blueprint.Roles {
+			if role.RoleID == coverage.RoleID {
+				expectedRoles = append(expectedRoles, role)
+				break
+			}
+		}
+	}
+	if len(expectedRoles) == 0 {
+		return nil, validationError("Pipeline chưa khai báo vai trò hợp lệ cho dữ liệu mẫu")
+	}
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(sampleDataUserPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.CreateSampleDataUsers(ctx, expectedRoles, string(passwordHash), actorID, actorName)
+}
+
 func sampleDataPipelineCompatibility(blueprint sampleDataBlueprint) SampleDataPipelineOption {
 	option := SampleDataPipelineOption{
 		ID: cleanID(blueprint.Template["id"]), Name: strings.TrimSpace(fmt.Sprint(blueprint.Template["name"])),
@@ -54,20 +92,30 @@ func sampleDataPipelineCompatibility(blueprint sampleDataBlueprint) SampleDataPi
 		SelectedStepCount: sampleSelectedStepCount(blueprint), Blockers: []SampleDataBlocker{},
 		RoleCoverage: []SampleDataRoleCoverage{}, MissingRoles: []string{},
 	}
-	addBlocker := func(code, message string) {
+	structureCompatible := true
+	usersProvisionable := true
+	addStructureBlocker := func(code, message string) {
 		option.Blockers = append(option.Blockers, SampleDataBlocker{Code: code, Message: message})
+		structureCompatible = false
+		usersProvisionable = false
+	}
+	addRoleBlocker := func(code, message string, blocksProvisioning bool) {
+		option.Blockers = append(option.Blockers, SampleDataBlocker{Code: code, Message: message})
+		if blocksProvisioning {
+			usersProvisionable = false
+		}
 	}
 	if strings.TrimSpace(fmt.Sprint(blueprint.Template["status"])) != "published" {
-		addBlocker("PIPELINE_NOT_PUBLISHED", "Pipeline chưa được phát hành")
+		addStructureBlocker("PIPELINE_NOT_PUBLISHED", "Pipeline chưa được phát hành")
 	}
 	if option.DefinitionHash == "" {
-		addBlocker("PIPELINE_HASH_MISSING", "Pipeline chưa có definition hash sau khi phát hành")
+		addStructureBlocker("PIPELINE_HASH_MISSING", "Pipeline chưa có definition hash sau khi phát hành")
 	}
 	if option.SelectedStepCount == 0 {
-		addBlocker("DESIGN_BRANCH_EMPTY", "Nhánh Có thiết kế chưa có bước thực hiện")
+		addStructureBlocker("DESIGN_BRANCH_EMPTY", "Nhánh Có thiết kế chưa có bước thực hiện")
 	}
 	if !sampleBlueprintHasNode(blueprint, "boq_without_design") {
-		addBlocker("NO_DESIGN_BRANCH_MISSING", "Thiếu nhánh Không thiết kế để đánh dấu bỏ qua")
+		addStructureBlocker("NO_DESIGN_BRANCH_MISSING", "Thiếu nhánh Không thiết kế để đánh dấu bỏ qua")
 	}
 	for _, binding := range []struct {
 		code, message, node, surface, action string
@@ -82,7 +130,7 @@ func sampleDataPipelineCompatibility(blueprint sampleDataBlueprint) SampleDataPi
 			present = sampleBlueprintHasStepBinding(blueprint, binding.surface, binding.action)
 		}
 		if !present {
-			addBlocker(binding.code, binding.message)
+			addStructureBlocker(binding.code, binding.message)
 		}
 	}
 	for _, node := range blueprint.Nodes {
@@ -94,22 +142,97 @@ func sampleDataPipelineCompatibility(blueprint sampleDataBlueprint) SampleDataPi
 				continue
 			}
 			if cleanID(step.Record["form_version_id"]) == "" {
-				addBlocker("FORM_REFERENCE_MISSING", fmt.Sprintf("Bước %s chưa tham chiếu phiên bản biểu mẫu", step.Record["name"]))
+				addStructureBlocker("FORM_REFERENCE_MISSING", fmt.Sprintf("Bước %s chưa tham chiếu phiên bản biểu mẫu", step.Record["name"]))
 			} else if strings.TrimSpace(fmt.Sprint(step.Record["form_version_status"])) != "published" {
-				addBlocker("FORM_VERSION_NOT_PUBLISHED", fmt.Sprintf("Biểu mẫu của bước %s chưa được phát hành", step.Record["name"]))
+				addStructureBlocker("FORM_VERSION_NOT_PUBLISHED", fmt.Sprintf("Biểu mẫu của bước %s chưa được phát hành", step.Record["name"]))
 			}
 		}
 	}
-	for _, roleName := range sampleRequiredRoles(blueprint) {
-		count := len(blueprint.Actors[roleName])
-		option.RoleCoverage = append(option.RoleCoverage, SampleDataRoleCoverage{RoleName: roleName, StaffCount: count, Ready: count > 0})
-		if count == 0 {
+	requiredRoles := sampleRequiredRoles(blueprint)
+	if len(requiredRoles) == 0 {
+		addStructureBlocker("ROLE_REQUIREMENT_MISSING", "Nhánh Có thiết kế chưa khai báo vai trò thực hiện")
+	}
+	rolesReady := true
+	for _, roleName := range requiredRoles {
+		matches := sampleRoleMatches(blueprint, roleName)
+		coverage := SampleDataRoleCoverage{RoleName: roleName, Status: "blocked", Message: "Vai trò chưa thể dùng để tạo tài khoản mẫu"}
+		if len(matches) == 0 {
+			rolesReady = false
 			option.MissingRoles = append(option.MissingRoles, roleName)
-			addBlocker("ROLE_STAFF_MISSING", "Thiếu nhân sự đang hoạt động cho vai trò "+roleName)
+			coverage.Message = "Không tìm thấy vai trò tương ứng trong hệ thống"
+			addRoleBlocker("ROLE_NOT_FOUND", "Không tìm thấy vai trò hệ thống cho nhãn "+roleName, true)
+			option.RoleCoverage = append(option.RoleCoverage, coverage)
+			continue
+		}
+		if len(matches) > 1 {
+			rolesReady = false
+			coverage.Message = "Có nhiều vai trò trùng tên hiển thị"
+			addRoleBlocker("ROLE_AMBIGUOUS", "Có nhiều vai trò hệ thống trùng nhãn "+roleName, true)
+			option.RoleCoverage = append(option.RoleCoverage, coverage)
+			continue
+		}
+		role := matches[0]
+		coverage.RoleID, coverage.RoleKey, coverage.RoleName = role.RoleID, role.RoleKey, role.RoleName
+		coverage.Email = sampleRoleEmail(role.RoleKey)
+		if role.ExternalOnly || sampleRoleRestricted(role.RoleKey) {
+			rolesReady = false
+			coverage.Message = "Vai trò quản trị hoặc đối tác không được tạo tài khoản mẫu"
+			addRoleBlocker("SAMPLE_ROLE_RESTRICTED", "Vai trò không được phép tạo tài khoản mẫu: "+role.RoleName, true)
+		} else if !validSampleRoleKey(role.RoleKey) {
+			rolesReady = false
+			coverage.Message = "Mã vai trò không thể dùng để tạo email @dev.local"
+			addRoleBlocker("SAMPLE_ROLE_EMAIL_INVALID", "Mã vai trò không hợp lệ để tạo email mẫu: "+role.RoleKey, true)
+		} else if role.UserID == "" {
+			rolesReady = false
+			option.MissingRoles = append(option.MissingRoles, role.RoleName)
+			if role.EmailConflict {
+				coverage.Message = "Email mẫu đã được một tài khoản khác sử dụng"
+				addRoleBlocker("SAMPLE_EMAIL_CONFLICT", "Email "+coverage.Email+" đã được một tài khoản khác sử dụng", true)
+			} else {
+				coverage.Status = "missing"
+				coverage.Message = "Chưa tạo tài khoản mẫu"
+				addRoleBlocker("SAMPLE_ACCOUNT_MISSING", "Chưa có tài khoản mẫu cho vai trò "+role.RoleName, false)
+			}
+		} else if !sampleRoleAccountReady(role) {
+			rolesReady = false
+			coverage.Message = "Tài khoản mẫu hiện có bị lệch email, trạng thái hoặc hồ sơ nhân sự"
+			addRoleBlocker("SAMPLE_ACCOUNT_NOT_READY", "Tài khoản mẫu chưa đúng cấu hình cho vai trò "+role.RoleName, true)
+		} else {
+			coverage.Status = "ready"
+			coverage.Message = "Tài khoản mẫu sẵn sàng"
+			coverage.StaffCount = 1
+			coverage.Ready = true
+		}
+		option.RoleCoverage = append(option.RoleCoverage, coverage)
+	}
+	option.StructureCompatible = structureCompatible
+	option.SampleUsersProvisionable = structureCompatible && usersProvisionable
+	option.SampleUsersReady = rolesReady && len(option.RoleCoverage) > 0
+	option.Compatible = option.StructureCompatible && option.SampleUsersReady
+	return option
+}
+
+func sampleRoleMatches(blueprint sampleDataBlueprint, roleLabel string) []sampleDataRoleAccount {
+	matches := []sampleDataRoleAccount{}
+	for _, role := range blueprint.Roles {
+		if strings.EqualFold(strings.TrimSpace(role.RoleName), strings.TrimSpace(roleLabel)) {
+			matches = append(matches, role)
 		}
 	}
-	option.Compatible = len(option.Blockers) == 0
-	return option
+	return matches
+}
+
+func sampleRoleRestricted(roleKey string) bool {
+	switch strings.ToLower(strings.TrimSpace(roleKey)) {
+	case "admin", "developer":
+		return true
+	default:
+		return false
+	}
+}
+
+func validSampleRoleKey(roleKey string) bool {
+	return sampleRoleKeyPattern.MatchString(strings.ToLower(strings.TrimSpace(roleKey)))
 }
 
 func sampleDataAccountingCompatibility(accounting sampleDataAccountingContext) SampleDataAccountingBookOption {
@@ -305,8 +428,8 @@ func buildSampleDataPlan(blueprint sampleDataBlueprint, accounting *sampleDataAc
 		ProgressPercent: req.ProgressPercent, ProjectCode: fmt.Sprintf("DEMO-%s-%s-%s", prefix, now.Format("060102150405"), suffix),
 		ProjectName: title + " · " + now.Format("02/01/2006 15:04"), ProjectStatus: status,
 		TemplateID: cleanID(blueprint.Template["id"]), TemplateHash: cleanOptionalText(blueprint.Template["definition_hash"]),
-		TemplateRevision: int(number(blueprint.Template["revision_no"])), Edges: blueprint.Edges, Actors: blueprint.Actors,
-		ActorID: actorID, ActorName: actorName, IdempotencyKey: idempotencyKey,
+		TemplateRevision: int(number(blueprint.Template["revision_no"])), Edges: blueprint.Edges,
+		Actors: map[string][]sampleDataStaffActor{}, GeneratorID: actorID, GeneratorName: actorName, IdempotencyKey: idempotencyKey,
 		SelectedStepCount: sampleSelectedStepCount(blueprint),
 	}
 	if accounting != nil {
@@ -318,8 +441,15 @@ func buildSampleDataPlan(blueprint sampleDataBlueprint, accounting *sampleDataAc
 	if req.Profile == "completed" {
 		plan.CompletedAt = now.Format(time.RFC3339)
 	}
+	for _, roleLabel := range sampleRequiredRoles(blueprint) {
+		actors := sampleActorsForRoleLabel(blueprint, roleLabel)
+		if len(actors) == 0 {
+			return sampleDataPlan{}, validationError("Thiếu tài khoản mẫu đúng vai trò cho Pipeline", Record{"role": roleLabel})
+		}
+		plan.Actors[roleLabel] = []sampleDataStaffActor{actors[0]}
+	}
 	seenActors := map[string]bool{}
-	for _, actors := range blueprint.Actors {
+	for _, actors := range plan.Actors {
 		for _, actor := range actors {
 			key := actor.StaffID + ":" + actor.RoleID
 			if !seenActors[key] {
@@ -334,6 +464,18 @@ func buildSampleDataPlan(blueprint sampleDataBlueprint, accounting *sampleDataAc
 		}
 		return plan.AllActors[i].StaffID < plan.AllActors[j].StaffID
 	})
+	if len(plan.AllActors) == 0 {
+		return sampleDataPlan{}, validationError("Pipeline chưa có tài khoản mẫu sẵn sàng")
+	}
+	simulatedActor := plan.AllActors[0]
+	for _, actor := range plan.AllActors {
+		if strings.EqualFold(actor.RoleKey, "pm") {
+			simulatedActor = actor
+			break
+		}
+	}
+	plan.ActorID = simulatedActor.UserID
+	plan.ActorName = simulatedActor.FullName
 	if req.Profile == "draft" {
 		return plan, nil
 	}
@@ -357,10 +499,14 @@ func buildSampleDataPlan(blueprint sampleDataBlueprint, accounting *sampleDataAc
 				if len(roles) == 0 {
 					roles = stringSlice(nodeDefinition.Record["responsible_role_ids"])
 				}
-				if len(roles) == 0 || len(blueprint.Actors[roles[0]]) == 0 {
+				actors := []sampleDataStaffActor{}
+				if len(roles) > 0 {
+					actors = sampleActorsForRoleLabel(blueprint, roles[0])
+				}
+				if len(roles) == 0 || len(actors) == 0 {
 					return sampleDataPlan{}, validationError("Thiếu nhân sự đúng vai trò cho bước dữ liệu mẫu", Record{"step": stepDefinition.Record["name"], "roles": roles})
 				}
-				step.Actor = blueprint.Actors[roles[0]][0]
+				step.Actor = actors[0]
 				step.Completed = selectedOrdinal < completedStepCount
 				if step.Completed {
 					step.Status, step.WorkStatus = "submitted", "completed"
@@ -395,6 +541,15 @@ func buildSampleDataPlan(blueprint sampleDataBlueprint, accounting *sampleDataAc
 		plan.CurrentNodeID = ""
 	}
 	return plan, nil
+}
+
+func sampleActorsForRoleLabel(blueprint sampleDataBlueprint, roleLabel string) []sampleDataStaffActor {
+	for name, actors := range blueprint.Actors {
+		if strings.EqualFold(strings.TrimSpace(name), strings.TrimSpace(roleLabel)) {
+			return actors
+		}
+	}
+	return nil
 }
 
 func sampleFormFieldValue(field Record, projectCode string, now time.Time) any {

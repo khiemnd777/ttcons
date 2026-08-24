@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestCreateCompletedSampleDataProjectIntegration(t *testing.T) {
@@ -26,7 +27,34 @@ func TestCreateCompletedSampleDataProjectIntegration(t *testing.T) {
 	`).Scan(&actorID, &actorName); err != nil {
 		t.Fatal(err)
 	}
-	pipeline, accountingBook := sampleDataIntegrationSources(t, ctx, service, true)
+	pipeline, accountingBook := sampleDataIntegrationSources(t, ctx, service, actorID, actorName, true)
+	reprovisioned, err := service.CreateSampleDataUsers(ctx, SampleDataUserCreateRequest{PipelineTemplateID: pipeline.ID}, actorID, actorName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if int(number(reprovisioned["created_count"])) != 0 || int(number(reprovisioned["existing_count"])) != len(pipeline.RoleCoverage) {
+		t.Fatalf("sample user provisioning must be idempotent: %#v", reprovisioned)
+	}
+	var sampleUserCount, sampleRoleCount, globalRoleCount, mustChangeCount int
+	var passwordHash string
+	if err := database.QueryRowContext(ctx, `
+		SELECT COUNT(*),COUNT(DISTINCT sample_role_id),
+			COUNT(*) FILTER (WHERE must_change_password),
+			COALESCE((SELECT password_hash FROM users WHERE is_sample ORDER BY created_at,id LIMIT 1),'')
+		FROM users WHERE is_sample
+	`).Scan(&sampleUserCount, &sampleRoleCount, &mustChangeCount, &passwordHash); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM user_roles assignment JOIN users account ON account.id=assignment.user_id
+		WHERE account.is_sample AND assignment.project_id IS NULL
+	`).Scan(&globalRoleCount); err != nil {
+		t.Fatal(err)
+	}
+	if sampleUserCount == 0 || sampleUserCount != sampleRoleCount || mustChangeCount != 0 || globalRoleCount != 0 ||
+		bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(sampleDataUserPassword)) != nil {
+		t.Fatalf("sample user provisioning mismatch users=%d roles=%d must_change=%d global_roles=%d", sampleUserCount, sampleRoleCount, mustChangeCount, globalRoleCount)
+	}
 	blueprint, err := repo.LoadSampleDataBlueprint(ctx, pipeline.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -88,7 +116,7 @@ func TestCreatePlanningSampleDataAssignmentsIntegration(t *testing.T) {
 	`).Scan(&actorID, &actorName); err != nil {
 		t.Fatal(err)
 	}
-	pipeline, _ := sampleDataIntegrationSources(t, ctx, service, false)
+	pipeline, _ := sampleDataIntegrationSources(t, ctx, service, actorID, actorName, false)
 	blueprint, err := repo.LoadSampleDataBlueprint(ctx, pipeline.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -132,13 +160,12 @@ func TestCreatePlanningSampleDataAssignmentsIntegration(t *testing.T) {
 
 	var workItemID, roleName, assigneeUserID string
 	if err := database.QueryRowContext(ctx, `
-		SELECT work.id::text,assignment.role_name,staff.user_id::text
+		SELECT work.id::text,role_assignment.role_name,staff.user_id::text
 		FROM work_items work
-		JOIN work_item_assignments assignment ON assignment.work_item_id=work.id AND assignment.assignment_type='role'
-		JOIN roles role ON role.display_name=assignment.role_name
-		JOIN user_roles user_role ON user_role.role_id=role.id AND user_role.project_id IS NULL
-		JOIN staff ON staff.user_id=user_role.user_id AND staff.status='active'
-		JOIN users actor ON actor.id=staff.user_id AND actor.status='active'
+		JOIN work_item_assignments role_assignment ON role_assignment.work_item_id=work.id AND role_assignment.assignment_type='role'
+		JOIN work_item_assignments assignee_assignment ON assignee_assignment.work_item_id=work.id AND assignee_assignment.assignment_type='assignee'
+		JOIN staff ON staff.id=assignee_assignment.staff_id AND staff.status='active'
+		JOIN users actor ON actor.id=staff.user_id AND actor.status='active' AND actor.is_sample
 		WHERE work.project_id=$1 AND work.status='ready'
 		ORDER BY staff.id
 		LIMIT 1
@@ -154,6 +181,19 @@ func TestCreatePlanningSampleDataAssignmentsIntegration(t *testing.T) {
 	items, _ := myWork["items"].([]Record)
 	if recordByID(items, "id", workItemID) == nil {
 		t.Fatalf("ready work item %s for role %s is missing from assignee My Work: %#v", workItemID, roleName, myWork)
+	}
+	var realMembers, unscopedRoles, scopedRoles, realBusinessActors int
+	if err := database.QueryRowContext(ctx, `
+		SELECT
+			(SELECT COUNT(*) FROM project_members member JOIN staff profile ON profile.id=member.staff_id JOIN users account ON account.id=profile.user_id WHERE member.project_id=$1 AND NOT account.is_sample),
+			(SELECT COUNT(*) FROM project_members member JOIN staff profile ON profile.id=member.staff_id JOIN user_roles assignment ON assignment.user_id=profile.user_id WHERE member.project_id=$1 AND assignment.project_id IS NULL),
+			(SELECT COUNT(*) FROM project_members member JOIN staff profile ON profile.id=member.staff_id JOIN user_roles assignment ON assignment.user_id=profile.user_id WHERE member.project_id=$1 AND assignment.project_id=$1),
+			(SELECT COUNT(*) FROM work_items work JOIN users business_actor ON business_actor.id=work.created_by WHERE work.project_id=$1 AND NOT business_actor.is_sample)
+	`, projectID).Scan(&realMembers, &unscopedRoles, &scopedRoles, &realBusinessActors); err != nil {
+		t.Fatal(err)
+	}
+	if realMembers != 0 || unscopedRoles != 0 || scopedRoles == 0 || realBusinessActors != 0 {
+		t.Fatalf("sample isolation mismatch real_members=%d unscoped_roles=%d scoped_roles=%d real_business_actors=%d", realMembers, unscopedRoles, scopedRoles, realBusinessActors)
 	}
 }
 
@@ -174,6 +214,11 @@ func TestSampleDataPipelineCompatibilityDoesNotDependOnEnvironmentIDsOrRevision(
 			"id": uuid.NewString(), "name": "Pipeline imported in another environment", "status": "published",
 			"revision_no": 3, "engine_version": 1, "definition_hash": "environment-specific-hash",
 		},
+		Roles: []sampleDataRoleAccount{{
+			RoleID: actor.RoleID, RoleKey: actor.RoleKey, RoleName: actor.RoleName,
+			UserID: actor.UserID, StaffID: actor.StaffID, Email: sampleRoleEmail(actor.RoleKey),
+			UserStatus: "active", StaffStatus: "active",
+		}},
 		Actors: map[string][]sampleDataStaffActor{roleName: {actor}},
 		Nodes: []sampleDataNodeDefinition{
 			{Record: Record{"id": uuid.NewString(), "business_code": "boq_without_design"}},
@@ -205,6 +250,19 @@ func TestSampleDataPipelineCompatibilityDoesNotDependOnEnvironmentIDsOrRevision(
 		t.Fatalf("nil definition hash must fail closed: %#v", missingHash)
 	}
 	blueprint.Template["definition_hash"] = option.DefinitionHash
+	readyRole := blueprint.Roles[0]
+	blueprint.Roles[0].UserID = ""
+	blueprint.Roles[0].StaffID = ""
+	blueprint.Roles[0].Email = ""
+	blueprint.Roles[0].EmailConflict = true
+	blueprint.Actors = map[string][]sampleDataStaffActor{}
+	conflictingEmail := sampleDataPipelineCompatibility(blueprint)
+	if !conflictingEmail.StructureCompatible || conflictingEmail.SampleUsersProvisionable || conflictingEmail.SampleUsersReady ||
+		!hasSampleDataBlocker(conflictingEmail.Blockers, "SAMPLE_EMAIL_CONFLICT") {
+		t.Fatalf("sample email conflicts must block provisioning without changing structural compatibility: %#v", conflictingEmail)
+	}
+	blueprint.Roles[0] = readyRole
+	blueprint.Actors = map[string][]sampleDataStaffActor{roleName: {actor}}
 
 	accounting := &sampleDataAccountingContext{
 		ID: uuid.NewString(), BankAccountID: uuid.NewString(), CostAccountID: uuid.NewString(), RevenueAccountID: uuid.NewString(),
@@ -226,9 +284,21 @@ func TestSampleDataPipelineCompatibilityDoesNotDependOnEnvironmentIDsOrRevision(
 	if plan.SelectedStepCount != 5 || completed != 3 {
 		t.Fatalf("dynamic progress should floor 65%% of 5 steps to 3, got selected=%d completed=%d", plan.SelectedStepCount, completed)
 	}
+	if plan.ActorID != actor.UserID || plan.GeneratorID != actor.UserID {
+		t.Fatalf("sample actor/generator identity mismatch: %#v", plan)
+	}
 }
 
-func sampleDataIntegrationSources(t *testing.T, ctx context.Context, service *Service, requireAccounting bool) (SampleDataPipelineOption, SampleDataAccountingBookOption) {
+func hasSampleDataBlocker(blockers []SampleDataBlocker, code string) bool {
+	for _, blocker := range blockers {
+		if blocker.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+func sampleDataIntegrationSources(t *testing.T, ctx context.Context, service *Service, actorID, actorName string, requireAccounting bool) (SampleDataPipelineOption, SampleDataAccountingBookOption) {
 	t.Helper()
 	options, err := service.SampleDataOptions(ctx)
 	if err != nil {
@@ -236,13 +306,30 @@ func sampleDataIntegrationSources(t *testing.T, ctx context.Context, service *Se
 	}
 	var selectedPipeline SampleDataPipelineOption
 	for _, pipeline := range options.Pipelines {
+		if pipeline.Compatible || pipeline.SampleUsersProvisionable {
+			selectedPipeline = pipeline
+			break
+		}
+	}
+	if selectedPipeline.ID == "" {
+		t.Fatalf("test environment has no provisionable published Pipeline: %#v", options.Pipelines)
+	}
+	if _, err := service.CreateSampleDataUsers(ctx, SampleDataUserCreateRequest{PipelineTemplateID: selectedPipeline.ID}, actorID, actorName); err != nil {
+		t.Fatalf("provision sample users: %v", err)
+	}
+	options, err = service.SampleDataOptions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedPipeline = SampleDataPipelineOption{}
+	for _, pipeline := range options.Pipelines {
 		if pipeline.Compatible {
 			selectedPipeline = pipeline
 			break
 		}
 	}
 	if selectedPipeline.ID == "" {
-		t.Fatalf("test environment has no compatible published Pipeline: %#v", options.Pipelines)
+		t.Fatalf("test environment has no compatible Pipeline after provisioning: %#v", options.Pipelines)
 	}
 	var selectedBook SampleDataAccountingBookOption
 	for _, book := range options.AccountingBooks {

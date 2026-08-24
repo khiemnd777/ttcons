@@ -88,30 +88,63 @@ func (r *Repository) LoadSampleDataBlueprint(ctx context.Context, templateID str
 		}
 		blueprint.Nodes = append(blueprint.Nodes, node)
 	}
-	actorRows, err := r.Query(ctx, `
-		SELECT staff.id::text AS staff_id,staff.user_id::text AS user_id,staff.full_name,
-			COALESCE(staff.department,'') AS department,role.id::text AS role_id,
-			role.name AS role_key,role.display_name AS role_name
-		FROM staff
-		JOIN users actor ON actor.id=staff.user_id AND actor.status='active'
-		JOIN user_roles assignment ON assignment.user_id=actor.id AND assignment.project_id IS NULL
-		JOIN roles role ON role.id=assignment.role_id AND NOT role.external_only
-		WHERE staff.status='active'
-		ORDER BY lower(role.display_name),lower(staff.full_name),staff.id
+	roleRows, err := r.Query(ctx, `
+		SELECT role.id::text AS role_id,role.name AS role_key,role.display_name AS role_name,role.external_only,
+			COALESCE(account.id::text,'') AS user_id,COALESCE(account.email,'') AS email,
+			COALESCE(account.status,'') AS user_status,(account.deleted_at IS NOT NULL) AS user_deleted,
+			COALESCE(profile.id::text,'') AS staff_id,COALESCE(profile.full_name,'') AS full_name,
+			COALESCE(profile.department,'') AS department,COALESCE(profile.status,'') AS staff_status,
+			(profile.deleted_at IS NOT NULL) AS staff_deleted,
+			EXISTS (
+				SELECT 1 FROM users conflicting
+				WHERE lower(conflicting.email)=lower(role.name || '@dev.local')
+				  AND conflicting.id IS DISTINCT FROM account.id
+			) AS email_conflict
+		FROM roles role
+		LEFT JOIN users account ON account.is_sample AND account.sample_role_id=role.id
+		LEFT JOIN LATERAL (
+			SELECT staff.id,staff.full_name,staff.department,staff.status,staff.deleted_at
+			FROM staff
+			WHERE staff.user_id=account.id
+			ORDER BY CASE WHEN staff.status='active' AND staff.deleted_at IS NULL THEN 0 ELSE 1 END,
+				staff.created_at,staff.id
+			LIMIT 1
+		) profile ON true
+		ORDER BY lower(role.display_name),role.id
 	`)
 	if err != nil {
 		return sampleDataBlueprint{}, err
 	}
-	for _, row := range actorRows {
-		actor := sampleDataStaffActor{
-			StaffID: cleanID(row["staff_id"]), UserID: cleanID(row["user_id"]),
-			FullName: strings.TrimSpace(fmt.Sprint(row["full_name"])),
-			RoleID:   cleanID(row["role_id"]), RoleName: strings.TrimSpace(fmt.Sprint(row["role_name"])),
-			RoleKey: strings.TrimSpace(fmt.Sprint(row["role_key"])), Department: strings.TrimSpace(fmt.Sprint(row["department"])),
+	for _, row := range roleRows {
+		role := sampleDataRoleAccount{
+			RoleID: cleanID(row["role_id"]), RoleKey: strings.TrimSpace(fmt.Sprint(row["role_key"])),
+			RoleName: strings.TrimSpace(fmt.Sprint(row["role_name"])), ExternalOnly: boolValue(row["external_only"]),
+			UserID: cleanID(row["user_id"]), StaffID: cleanID(row["staff_id"]), Email: strings.TrimSpace(fmt.Sprint(row["email"])),
+			UserStatus: strings.TrimSpace(fmt.Sprint(row["user_status"])), StaffStatus: strings.TrimSpace(fmt.Sprint(row["staff_status"])),
+			UserDeleted: boolValue(row["user_deleted"]), StaffDeleted: boolValue(row["staff_deleted"]),
+			EmailConflict: boolValue(row["email_conflict"]),
 		}
-		blueprint.Actors[actor.RoleName] = append(blueprint.Actors[actor.RoleName], actor)
+		blueprint.Roles = append(blueprint.Roles, role)
+		if !sampleRoleAccountReady(role) {
+			continue
+		}
+		actor := sampleDataStaffActor{
+			StaffID: role.StaffID, UserID: role.UserID, FullName: strings.TrimSpace(fmt.Sprint(row["full_name"])),
+			RoleID: role.RoleID, RoleName: role.RoleName, RoleKey: role.RoleKey,
+			Department: strings.TrimSpace(fmt.Sprint(row["department"])),
+		}
+		blueprint.Actors[role.RoleName] = []sampleDataStaffActor{actor}
 	}
 	return blueprint, nil
+}
+
+func sampleRoleAccountReady(role sampleDataRoleAccount) bool {
+	return role.UserID != "" && role.StaffID != "" && role.UserStatus == "active" && role.StaffStatus == "active" &&
+		!role.UserDeleted && !role.StaffDeleted && !role.EmailConflict && strings.EqualFold(role.Email, sampleRoleEmail(role.RoleKey))
+}
+
+func sampleRoleEmail(roleKey string) string {
+	return strings.ToLower(strings.TrimSpace(roleKey)) + "@dev.local"
 }
 
 func (r *Repository) ListSampleDataAccountingContexts(ctx context.Context) ([]sampleDataAccountingContext, error) {
@@ -178,6 +211,131 @@ func sampleRequiredRoles(blueprint sampleDataBlueprint) []string {
 	return roles
 }
 
+func (r *Repository) CreateSampleDataUsers(ctx context.Context, expectedRoles []sampleDataRoleAccount, passwordHash, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext('consflow-sample-users'))`); err != nil {
+		return nil, err
+	}
+
+	createdCount := 0
+	existingCount := 0
+	items := make([]Record, 0, len(expectedRoles))
+	roleKeys := make([]string, 0, len(expectedRoles))
+	for _, expected := range expectedRoles {
+		var roleKey, roleName string
+		var externalOnly bool
+		if err := tx.QueryRowContext(ctx, `
+			SELECT name,display_name,external_only
+			FROM roles WHERE id=$1 FOR SHARE
+		`, expected.RoleID).Scan(&roleKey, &roleName, &externalOnly); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, validationError("Vai trò của Pipeline không còn tồn tại", Record{"role_id": expected.RoleID})
+			}
+			return nil, err
+		}
+		roleKey = strings.TrimSpace(roleKey)
+		roleName = strings.TrimSpace(roleName)
+		if !strings.EqualFold(roleKey, expected.RoleKey) || !strings.EqualFold(roleName, expected.RoleName) {
+			return nil, conflictError("Vai trò đã thay đổi trong lúc tạo tài khoản mẫu", Record{"role_id": expected.RoleID})
+		}
+		if externalOnly || sampleRoleRestricted(roleKey) || !validSampleRoleKey(roleKey) {
+			return nil, validationError("Vai trò không đủ điều kiện tạo tài khoản mẫu", Record{"role_id": expected.RoleID, "role_key": roleKey})
+		}
+		email := sampleRoleEmail(roleKey)
+		roleKeys = append(roleKeys, roleKey)
+
+		var userID, currentEmail, userStatus string
+		var userDeleted bool
+		err := tx.QueryRowContext(ctx, `
+			SELECT id::text,email,status,(deleted_at IS NOT NULL)
+			FROM users
+			WHERE is_sample AND sample_role_id=$1
+			FOR UPDATE
+		`, expected.RoleID).Scan(&userID, &currentEmail, &userStatus, &userDeleted)
+		if err == nil {
+			var conflictingEmail bool
+			if err := tx.QueryRowContext(ctx, `
+				SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=lower($1) AND id<>$2)
+			`, email, userID).Scan(&conflictingEmail); err != nil {
+				return nil, err
+			}
+			var staffID, staffStatus string
+			var staffDeleted bool
+			staffErr := tx.QueryRowContext(ctx, `
+				SELECT id::text,status,(deleted_at IS NOT NULL)
+				FROM staff
+				WHERE user_id=$1
+				ORDER BY CASE WHEN status='active' AND deleted_at IS NULL THEN 0 ELSE 1 END,created_at,id
+				LIMIT 1
+				FOR UPDATE
+			`, userID).Scan(&staffID, &staffStatus, &staffDeleted)
+			if staffErr != nil && !errors.Is(staffErr, sql.ErrNoRows) {
+				return nil, staffErr
+			}
+			if userStatus != "active" || userDeleted || conflictingEmail || !strings.EqualFold(currentEmail, email) || staffErr != nil || staffStatus != "active" || staffDeleted {
+				return nil, conflictError("Tài khoản mẫu hiện có không còn đúng cấu hình chuẩn", Record{"role_id": expected.RoleID, "role": roleName, "email": email})
+			}
+			existingCount++
+			items = append(items, Record{"role_id": expected.RoleID, "role_key": roleKey, "role_name": roleName, "email": email, "user_id": userID, "staff_id": staffID, "status": "existing"})
+			continue
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+		var emailInUse bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=lower($1))`, email).Scan(&emailInUse); err != nil {
+			return nil, err
+		}
+		if emailInUse {
+			return nil, conflictError("Email dành cho tài khoản mẫu đã được tài khoản khác sử dụng", Record{"role_id": expected.RoleID, "role": roleName, "email": email})
+		}
+		if err := tx.QueryRowContext(ctx, `
+			INSERT INTO users (email,password_hash,full_name,status,must_change_password,is_sample,sample_role_id)
+			VALUES ($1,$2,$3,'active',false,true,$4)
+			RETURNING id::text
+		`, email, passwordHash, roleName, expected.RoleID).Scan(&userID); err != nil {
+			return nil, err
+		}
+		var staffID string
+		if err := tx.QueryRowContext(ctx, `
+			INSERT INTO staff (user_id,full_name,email,department,position,status)
+			VALUES ($1,$2,$3,'Dữ liệu mẫu',$2,'active')
+			RETURNING id::text
+		`, userID, roleName, email).Scan(&staffID); err != nil {
+			return nil, err
+		}
+		if err := addAuditTx(ctx, tx, "", actorID, actorName, "sample_user_created", "user_account", userID, "Nhà phát triển tạo tài khoản mẫu theo vai trò Pipeline", Record{
+			"staff_id": staffID, "role_id": expected.RoleID, "role_key": roleKey, "email": email, "must_change_password": false,
+		}); err != nil {
+			return nil, err
+		}
+		createdCount++
+		items = append(items, Record{"role_id": expected.RoleID, "role_key": roleKey, "role_name": roleName, "email": email, "user_id": userID, "staff_id": staffID, "status": "created"})
+	}
+
+	batchID := newID()
+	message := fmt.Sprintf("Đã tạo %d tài khoản mẫu; %d tài khoản đã tồn tại", createdCount, existingCount)
+	if createdCount == 0 {
+		message = fmt.Sprintf("Đã có đủ tài khoản mẫu cho %d/%d vai trò", existingCount, len(expectedRoles))
+	}
+	if err := addAuditTx(ctx, tx, "", actorID, actorName, "sample_users_provisioned", "sample_user_batch", batchID, message, Record{
+		"created_count": createdCount, "existing_count": existingCount, "role_count": len(expectedRoles), "role_keys": roleKeys,
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return Record{
+		"batch_id": batchID, "created_count": createdCount, "existing_count": existingCount,
+		"role_count": len(expectedRoles), "ready": true, "message": message, "items": items,
+	}, nil
+}
+
 func (r *Repository) FindSampleDataGeneration(ctx context.Context, idempotencyKey string) (Record, error) {
 	row, err := r.QueryOne(ctx, `
 		SELECT generation.*,project.name AS project_name,project.code AS project_code,
@@ -216,7 +374,7 @@ func (r *Repository) CreateSampleData(ctx context.Context, plan sampleDataPlan) 
 		if plan.Profile == "completed" {
 			sourceMismatch = sourceMismatch || existingAccountingBook != plan.AccountingBookID
 		}
-		if existingActor != plan.ActorID || existingProfile != plan.Profile || existingProgress != plan.ProgressPercent || sourceMismatch {
+		if existingActor != plan.GeneratorID || existingProfile != plan.Profile || existingProgress != plan.ProgressPercent || sourceMismatch {
 			return nil, conflictError("Khoá idempotency đã được dùng cho một yêu cầu tạo dữ liệu mẫu khác")
 		}
 		if existingProject == "" {
@@ -269,11 +427,11 @@ func (r *Repository) CreateSampleData(ctx context.Context, plan sampleDataPlan) 
 			id,idempotency_key,actor_id,profile,progress_percent,blueprint_version,
 			template_id,template_definition_hash,accounting_book_id,project_id,result_json
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
-	`, plan.GenerationID, plan.IdempotencyKey, plan.ActorID, plan.Profile, plan.ProgressPercent,
+	`, plan.GenerationID, plan.IdempotencyKey, plan.GeneratorID, plan.Profile, plan.ProgressPercent,
 		sampleDataBlueprintVersion, plan.TemplateID, plan.TemplateHash, plan.AccountingBookID, plan.ProjectID, string(resultJSON)); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, plan.ProjectID, plan.ActorID, plan.ActorName,
+	if err := addAuditTx(ctx, tx, plan.ProjectID, plan.GeneratorID, plan.GeneratorName,
 		"sample_project_generated", "project", plan.ProjectID,
 		"Nhà phát triển đã tạo công trình dữ liệu mẫu",
 		Record{"simulated": true, "profile": plan.Profile, "progress_percent": plan.ProgressPercent, "blueprint_version": sampleDataBlueprintVersion}); err != nil {
@@ -310,17 +468,20 @@ func samplePMStaffID(plan sampleDataPlan) string {
 func insertSampleProjectMembersTx(ctx context.Context, tx *sql.Tx, plan sampleDataPlan) error {
 	type membership struct {
 		staffID string
+		userID  string
 		roles   []string
+		roleIDs []string
 	}
 	byStaff := map[string]*membership{}
 	for roleName, actors := range plan.Actors {
 		for _, actor := range actors {
 			item := byStaff[actor.StaffID]
 			if item == nil {
-				item = &membership{staffID: actor.StaffID}
+				item = &membership{staffID: actor.StaffID, userID: actor.UserID}
 				byStaff[actor.StaffID] = item
 			}
 			item.roles = append(item.roles, roleName)
+			item.roleIDs = append(item.roleIDs, actor.RoleID)
 		}
 	}
 	staffIDs := make([]string, 0, len(byStaff))
@@ -337,6 +498,15 @@ func insertSampleProjectMembersTx(ctx context.Context, tx *sql.Tx, plan sampleDa
 			VALUES ($1,$2,$3::jsonb,'[]'::jsonb,true)
 		`, plan.ProjectID, staffID, string(raw)); err != nil {
 			return err
+		}
+		for _, roleID := range item.roleIDs {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO user_roles (user_id,role_id,project_id)
+				VALUES ($1,$2,$3)
+				ON CONFLICT DO NOTHING
+			`, item.userID, roleID, plan.ProjectID); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

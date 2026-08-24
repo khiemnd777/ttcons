@@ -33,3 +33,18 @@ func (h *Handler) CreateSampleDataProject(c *fiber.Ctx) error {
 	}
 	return response.Created(c, result)
 }
+
+func (h *Handler) CreateSampleDataUsers(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"sample_data.create"}); err != nil {
+		return err
+	}
+	var request SampleDataUserCreateRequest
+	if err := json.Unmarshal(c.Body(), &request); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu tạo tài khoản mẫu không hợp lệ")
+	}
+	result, err := h.service.CreateSampleDataUsers(c.Context(), request, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result)
+}

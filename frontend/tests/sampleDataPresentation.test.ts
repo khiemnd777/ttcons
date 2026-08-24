@@ -15,6 +15,7 @@ test('sample data tab and actions stay developer-permission gated', async () => 
   assert.match(settings, />Dữ liệu mẫu<\/TabButton>/);
   assert.match(settings, /tab === 'sample-data' && canCreateSampleData \? <SampleDataPanel/);
   assert.match(panel, /get<SampleDataOptions>\('\/settings\/sample-data\/options'\)/);
+  assert.match(panel, /post<SampleUserProvisionResult>\('\/settings\/sample-data\/users'/);
   assert.match(panel, /post<SampleDataResult>\('\/settings\/sample-data\/projects'/);
   assert.match(panel, /pipeline_template_id: pipelineID/);
   assert.match(panel, /accounting_book_id: profile === 'completed' \? accountingBookID : ''/);
@@ -34,14 +35,20 @@ test('sample data profile flow exposes approved progress and confirmation semant
   assert.match(panel, /Math\.floor\(finalProgress \* selectedPipeline\.selected_step_count \/ 100\)/);
   assert.doesNotMatch(panel, /Pipeline Rev8/);
   assert.doesNotMatch(panel, /20 bước/);
+  assert.match(panel, /Tài khoản mẫu theo vai trò/);
+  assert.match(panel, /Dev240489\./);
+  assert.match(panel, /Không tài khoản người dùng thật nào được thêm hoặc giao việc/);
 });
 
 test('sample identity is visible in project and operational-report presentation', async () => {
   const projects = await source('../src/modules/projects/ProjectsPage.tsx');
   const projectDetail = await source('../src/modules/projects/ProjectDetailPage.tsx');
   const reports = await source('../src/modules/reports/OperationalReportPanel.tsx');
+  const staff = await source('../src/modules/staff/StaffPage.tsx');
 
   assert.match(projects, /project\.is_sample \? <SampleDataBadge/);
   assert.match(projectDetail, /project\.is_sample \? 'Dữ liệu mẫu'/);
   assert.match(reports, /row\.is_sample \? <SampleDataBadge/);
+  assert.match(staff, /row\.is_sample \? <SampleDataBadge compact/);
+  assert.match(staff, /disabled=\{!row\.user_id \|\| row\.is_sample\}/);
 });

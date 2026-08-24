@@ -161,7 +161,8 @@ func (s *Service) ListStaff(ctx context.Context, actorID string) ([]Record, erro
 
 func (r *Repository) ListStaff(ctx context.Context) ([]Record, error) {
 	return r.Query(ctx, `
-		SELECT s.*,
+		SELECT s.*,COALESCE(account.is_sample,false) AS is_sample,
+			COALESCE(account.sample_role_id::text,'') AS sample_role_id,
 			CASE
 				WHEN account.recovery_email IS NOT NULL AND account.recovery_email_verified_at IS NOT NULL
 				THEN account.recovery_email

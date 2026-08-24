@@ -504,6 +504,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Get("/settings", h.Settings)
 	protected.Put("/settings", h.UpdateSettings)
 	protected.Get("/settings/sample-data/options", h.SampleDataOptions)
+	protected.Post("/settings/sample-data/users", h.CreateSampleDataUsers)
 	protected.Post("/settings/sample-data/projects", h.CreateSampleDataProject)
 	protected.Get("/settings/backup", h.DownloadSettingsBackup)
 	protected.Post("/settings/backup/preview", h.PreviewSettingsBackupRestore)

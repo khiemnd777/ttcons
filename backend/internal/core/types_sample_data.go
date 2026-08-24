@@ -1,6 +1,8 @@
 package core
 
-const sampleDataBlueprintVersion = 2
+const sampleDataBlueprintVersion = 3
+
+const sampleDataUserPassword = "Dev240489."
 
 var sampleDataPlanningProgressPresets = []int{5, 10, 15, 25, 40, 65, 90}
 
@@ -12,29 +14,41 @@ type SampleDataCreateRequest struct {
 	IdempotencyKey     string `json:"idempotency_key"`
 }
 
+type SampleDataUserCreateRequest struct {
+	PipelineTemplateID string `json:"pipeline_template_id"`
+}
+
 type SampleDataBlocker struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
 
 type SampleDataRoleCoverage struct {
+	RoleID     string `json:"role_id"`
+	RoleKey    string `json:"role_key"`
 	RoleName   string `json:"role_name"`
+	Email      string `json:"email"`
+	Status     string `json:"status"`
+	Message    string `json:"message"`
 	StaffCount int    `json:"staff_count"`
 	Ready      bool   `json:"ready"`
 }
 
 type SampleDataPipelineOption struct {
-	ID                string                   `json:"id"`
-	Name              string                   `json:"name"`
-	Revision          int                      `json:"revision"`
-	DefinitionHash    string                   `json:"definition_hash"`
-	EngineVersion     int                      `json:"engine_version"`
-	NodeCount         int                      `json:"node_count"`
-	SelectedStepCount int                      `json:"selected_step_count"`
-	Compatible        bool                     `json:"compatible"`
-	Blockers          []SampleDataBlocker      `json:"blockers"`
-	RoleCoverage      []SampleDataRoleCoverage `json:"role_coverage"`
-	MissingRoles      []string                 `json:"missing_roles"`
+	ID                       string                   `json:"id"`
+	Name                     string                   `json:"name"`
+	Revision                 int                      `json:"revision"`
+	DefinitionHash           string                   `json:"definition_hash"`
+	EngineVersion            int                      `json:"engine_version"`
+	NodeCount                int                      `json:"node_count"`
+	SelectedStepCount        int                      `json:"selected_step_count"`
+	StructureCompatible      bool                     `json:"structure_compatible"`
+	SampleUsersReady         bool                     `json:"sample_users_ready"`
+	SampleUsersProvisionable bool                     `json:"sample_users_provisionable"`
+	Compatible               bool                     `json:"compatible"`
+	Blockers                 []SampleDataBlocker      `json:"blockers"`
+	RoleCoverage             []SampleDataRoleCoverage `json:"role_coverage"`
+	MissingRoles             []string                 `json:"missing_roles"`
 }
 
 type SampleDataAccountingBookOption struct {
@@ -65,6 +79,21 @@ type sampleDataStaffActor struct {
 	Department string
 }
 
+type sampleDataRoleAccount struct {
+	RoleID        string
+	RoleKey       string
+	RoleName      string
+	ExternalOnly  bool
+	UserID        string
+	StaffID       string
+	Email         string
+	UserStatus    string
+	StaffStatus   string
+	UserDeleted   bool
+	StaffDeleted  bool
+	EmailConflict bool
+}
+
 type sampleDataStepDefinition struct {
 	Record
 	Fields []Record
@@ -79,6 +108,7 @@ type sampleDataBlueprint struct {
 	Template Record
 	Nodes    []sampleDataNodeDefinition
 	Edges    []Record
+	Roles    []sampleDataRoleAccount
 	Actors   map[string][]sampleDataStaffActor
 }
 
@@ -152,5 +182,7 @@ type sampleDataPlan struct {
 	AllActors         []sampleDataStaffActor
 	ActorID           string
 	ActorName         string
+	GeneratorID       string
+	GeneratorName     string
 	IdempotencyKey    string
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Database, Loader2, RefreshCw, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Database, Loader2, RefreshCw, UserPlus, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Dialog } from '../../components/Dialog';
 import { useToast } from '../../components/ToastProvider';
@@ -14,7 +14,12 @@ type SampleDataBlocker = {
 };
 
 type SampleRoleCoverage = {
+  role_id: string;
+  role_key: string;
   role_name: string;
+  email: string;
+  status: 'ready' | 'missing' | 'blocked';
+  message: string;
   staff_count: number;
   ready: boolean;
 };
@@ -27,6 +32,9 @@ type SamplePipelineOption = {
   engine_version: number;
   node_count: number;
   selected_step_count: number;
+  structure_compatible: boolean;
+  sample_users_ready: boolean;
+  sample_users_provisionable: boolean;
   compatible: boolean;
   blockers: SampleDataBlocker[];
   role_coverage: SampleRoleCoverage[];
@@ -64,6 +72,15 @@ type SampleDataResult = {
   replayed?: boolean;
 };
 
+type SampleUserProvisionResult = {
+  batch_id: string;
+  created_count: number;
+  existing_count: number;
+  role_count: number;
+  ready: boolean;
+  message: string;
+};
+
 const profileCards: Array<{ value: SampleProfile; title: string; description: string }> = [
   { value: 'draft', title: 'Công trình mới', description: 'Tạo hồ sơ công trình ở trạng thái Nháp, chưa khởi chạy quy trình.' },
   { value: 'planning', title: 'Đang lập kế hoạch', description: 'Khởi chạy nhánh Có thiết kế, giao việc đúng vai trò và đặt tiến độ đã chọn.' },
@@ -98,7 +115,7 @@ export function SampleDataPanel() {
 
   useEffect(() => {
     if (!options.data) return;
-    const compatible = options.data.pipelines.filter((item) => item.compatible);
+    const compatible = options.data.pipelines.filter((item) => item.sample_users_provisionable || item.compatible);
     setPipelineID((current) => options.data?.pipelines.some((item) => item.id === current)
       ? current
       : compatible.length === 1 ? compatible[0].id : '');
@@ -134,6 +151,25 @@ export function SampleDataPanel() {
     onError: (error) => toast.error('Không tạo được công trình dữ liệu mẫu', error),
   });
 
+  const createSampleUsers = useMutation({
+    mutationFn: () => post<SampleUserProvisionResult>('/settings/sample-data/users', { pipeline_template_id: pipelineID }),
+    onSuccess: async (result) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['settings', 'sample-data', 'options'] }),
+        queryClient.invalidateQueries({ queryKey: ['staff'] }),
+      ]);
+      if (result.created_count === 0) {
+        toast.success(result.message);
+      } else {
+        toast.success({
+          title: `Đã tạo ${result.created_count} tài khoản mẫu`,
+          description: `${result.role_count}/${result.role_count} vai trò đã sẵn sàng.`,
+        });
+      }
+    },
+    onError: (error) => toast.error('Không tạo được tài khoản mẫu', error),
+  });
+
   if (options.isLoading) {
     return <div className="flex items-center justify-center gap-2 rounded-lg border border-line bg-white py-16 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />Đang kiểm tra điều kiện tạo dữ liệu mẫu</div>;
   }
@@ -157,6 +193,7 @@ export function SampleDataPanel() {
   const finalProgress = profile === 'draft' ? 0 : profile === 'completed' ? 100 : progress;
   const selectedProfile = profileCards.find((item) => item.value === profile)!;
   const completedSteps = selectedPipeline ? Math.floor(finalProgress * selectedPipeline.selected_step_count / 100) : 0;
+  const missingSampleUsers = selectedPipeline?.role_coverage.filter((role) => role.status === 'missing').length ?? 0;
 
   const requestCreate = () => {
     if (!selectedPipeline) {
@@ -203,13 +240,13 @@ export function SampleDataPanel() {
             <p className="mt-1 text-xs text-slate-500">Pipeline import lên production có ID riêng; hãy chọn đúng bản cần dùng và kiểm tra trạng thái tương thích.</p>
             <select className="mt-3 w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-slate-800" value={pipelineID} onChange={(event) => setPipelineID(event.target.value)}>
               <option value="">Chọn Pipeline</option>
-              {data.pipelines.map((item) => <option key={item.id} value={item.id}>{item.name} · Rev{item.revision} · {item.compatible ? 'Tương thích' : 'Không tương thích'}</option>)}
+              {data.pipelines.map((item) => <option key={item.id} value={item.id}>{item.name} · Rev{item.revision} · {item.compatible ? 'Sẵn sàng' : item.sample_users_provisionable ? 'Cần tài khoản mẫu' : 'Không tương thích'}</option>)}
             </select>
             {data.pipelines.length === 0 ? <p className="mt-2 text-xs text-rose-700">Chưa có Pipeline nào ở trạng thái Đã phát hành.</p> : null}
             {selectedPipeline ? (
-              <div className={`mt-3 rounded-md border p-3 ${selectedPipeline.compatible ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+              <div className={`mt-3 rounded-md border p-3 ${selectedPipeline.compatible ? 'border-emerald-200 bg-emerald-50' : selectedPipeline.sample_users_provisionable ? 'border-amber-200 bg-amber-50' : 'border-rose-200 bg-rose-50'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span className={`font-semibold ${selectedPipeline.compatible ? 'text-emerald-800' : 'text-rose-800'}`}>{selectedPipeline.compatible ? 'Tương thích' : 'Không tương thích'}</span>
+                  <span className={`font-semibold ${selectedPipeline.compatible ? 'text-emerald-800' : selectedPipeline.sample_users_provisionable ? 'text-amber-800' : 'text-rose-800'}`}>{selectedPipeline.compatible ? 'Sẵn sàng' : selectedPipeline.sample_users_provisionable ? 'Cần tạo tài khoản mẫu' : 'Không tương thích'}</span>
                   <span className="text-slate-600">{selectedPipeline.node_count} node · {selectedPipeline.selected_step_count} bước nhánh Có thiết kế</span>
                 </div>
                 <p className="mt-1 break-all text-[11px] text-slate-500">Hash: {selectedPipeline.definition_hash || 'Chưa có'}</p>
@@ -219,7 +256,34 @@ export function SampleDataPanel() {
           </div>
 
           <div className="rounded-lg border border-line bg-white p-4">
-            <h3 className="text-sm font-semibold text-ink">2. Chọn loại hồ sơ</h3>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-ink">2. Tài khoản mẫu theo vai trò</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Chỉ tạo các vai trò Pipeline cần dùng. Tên tài khoản là tên vai trò, email có dạng &lt;role&gt;@dev.local và không được gán vai trò toàn hệ thống.</p>
+              </div>
+              {selectedPipeline?.sample_users_ready ? <span className="inline-flex shrink-0 items-center gap-1 rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Đủ {selectedPipeline.role_coverage.length}/{selectedPipeline.role_coverage.length}</span> : null}
+            </div>
+            {!selectedPipeline ? <p className="mt-3 rounded-md bg-slate-50 p-3 text-xs text-slate-500">Chọn Pipeline để xác định các vai trò cần tạo.</p> : (
+              <div className="mt-3 space-y-2">
+                {selectedPipeline.role_coverage.map((role) => (
+                  <div key={`${role.role_id}:${role.role_name}`} className="flex flex-col gap-2 rounded-md border border-line p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{role.role_name}</p><p className="mt-0.5 truncate text-xs text-slate-500">{role.email || role.message}</p></div>
+                    <span className={`shrink-0 rounded px-2 py-1 text-xs font-semibold ${role.status === 'ready' ? 'bg-emerald-50 text-emerald-700' : role.status === 'missing' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>{role.status === 'ready' ? 'Sẵn sàng' : role.status === 'missing' ? 'Chưa tạo' : 'Bị chặn'}</span>
+                  </div>
+                ))}
+                {selectedPipeline.sample_users_ready ? <p className="rounded-md bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">Đã có đủ tài khoản mẫu cho {selectedPipeline.role_coverage.length}/{selectedPipeline.role_coverage.length} vai trò.</p> : null}
+                {!selectedPipeline.sample_users_ready && selectedPipeline.sample_users_provisionable ? (
+                  <div className="flex flex-col gap-3 rounded-md border border-blue-100 bg-blue-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs leading-5 text-blue-900">Mật khẩu đăng nhập chung: <code className="rounded bg-white px-1.5 py-0.5 font-semibold">Dev240489.</code></p>
+                    <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={createSampleUsers.isPending || missingSampleUsers === 0} onClick={() => createSampleUsers.mutate()}>{createSampleUsers.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}Tạo {missingSampleUsers} tài khoản còn thiếu</button>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-line bg-white p-4">
+            <h3 className="text-sm font-semibold text-ink">3. Chọn loại hồ sơ</h3>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
               {profileCards.map((item) => (
                 <button key={item.value} type="button" className={`rounded-lg border p-4 text-left transition ${profile === item.value ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-100' : 'border-line bg-white hover:border-blue-200 hover:bg-slate-50'}`} aria-pressed={profile === item.value} onClick={() => setProfile(item.value)}>
@@ -233,7 +297,7 @@ export function SampleDataPanel() {
 
           {profile === 'planning' ? (
             <div className="rounded-lg border border-line bg-white p-4">
-              <h3 className="text-sm font-semibold text-ink">3. Chọn tiến độ lập kế hoạch</h3>
+              <h3 className="text-sm font-semibold text-ink">4. Chọn tiến độ lập kế hoạch</h3>
               <p className="mt-1 text-xs text-slate-500">Tiến độ được ánh xạ theo số bước thực tế của Pipeline đã chọn; 100% chỉ dành cho hồ sơ Đã hoàn thành.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {data.progress_presets.map((value) => <button key={value} type="button" aria-pressed={progress === value} className={`min-w-14 rounded-md border px-3 py-2 text-sm font-semibold ${progress === value ? 'border-blue-600 bg-blue-600 text-white' : 'border-line bg-white text-slate-700 hover:bg-slate-50'}`} onClick={() => setProgress(value)}>{value}%</button>)}
@@ -244,7 +308,7 @@ export function SampleDataPanel() {
 
           {profile === 'completed' ? (
             <div className="rounded-lg border border-line bg-white p-4">
-              <h3 className="text-sm font-semibold text-ink">3. Chọn sổ kế toán</h3>
+              <h3 className="text-sm font-semibold text-ink">4. Chọn sổ kế toán</h3>
               <p className="mt-1 text-xs text-slate-500">Hồ sơ hoàn thành sinh dữ liệu tài chính; sổ phải có tài khoản 1121, 154, 5111 và kỳ kế toán đang mở.</p>
               <select className="mt-3 w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-slate-800" value={accountingBookID} onChange={(event) => setAccountingBookID(event.target.value)}>
                 <option value="">Chọn sổ kế toán</option>
@@ -277,10 +341,10 @@ export function SampleDataPanel() {
             <div className="flex justify-between gap-3"><dt className="text-slate-500">Blueprint sinh mẫu</dt><dd className="font-semibold text-slate-700">v{data.blueprint_version}</dd></div>
           </dl>
           <div className="mt-3 space-y-2">
-            {selectedPipeline?.role_coverage.map((role) => <div key={role.role_name} className="flex items-center justify-between gap-3 text-xs"><span className="truncate text-slate-600">{role.role_name}</span><span className={`shrink-0 rounded px-2 py-0.5 font-semibold ${role.ready ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{role.staff_count} nhân sự</span></div>)}
-            {!selectedPipeline ? <p className="text-xs text-slate-500">Chọn Pipeline để xem độ phủ nhân sự theo vai trò.</p> : null}
+            {selectedPipeline?.role_coverage.map((role) => <div key={role.role_name} className="flex items-center justify-between gap-3 text-xs"><span className="truncate text-slate-600">{role.role_name}</span><span className={`shrink-0 rounded px-2 py-0.5 font-semibold ${role.ready ? 'bg-emerald-50 text-emerald-700' : role.status === 'missing' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>{role.ready ? '1 tài khoản mẫu' : role.status === 'missing' ? 'Chưa tạo' : 'Bị chặn'}</span></div>)}
+            {!selectedPipeline ? <p className="text-xs text-slate-500">Chọn Pipeline để xem độ phủ tài khoản mẫu theo vai trò.</p> : null}
           </div>
-          <p className="mt-4 text-xs leading-5 text-slate-500">Tất cả nhân sự đang hoạt động khớp vai trò sẽ được thêm vào công trình. Đầu việc hiện tại hiển thị tại Bàn làm việc; bước sau hiển thị ở Sắp tới.</p>
+          <p className="mt-4 text-xs leading-5 text-slate-500">Công trình mẫu chỉ nhận tài khoản có cờ dữ liệu mẫu; tài khoản người dùng thật không được thêm hoặc giao việc. Đầu việc hiện tại hiển thị tại Bàn làm việc; bước sau hiển thị ở Sắp tới.</p>
         </aside>
       </div>
 
@@ -290,7 +354,8 @@ export function SampleDataPanel() {
           <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Loại hồ sơ</dt><dd className="mt-1 font-semibold text-ink">{selectedProfile.title}</dd></div>
           <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tiến độ</dt><dd className="mt-1 font-semibold text-ink">{finalProgress}% · {completedSteps}/{selectedPipeline?.selected_step_count || 0} bước hoàn tất</dd></div>
           {profile === 'completed' ? <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sổ kế toán</dt><dd className="mt-1 font-semibold text-ink">{selectedAccountingBook?.code} · {selectedAccountingBook?.name}</dd></div> : null}
-          <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dữ liệu sinh kèm</dt><dd className="mt-1 leading-5 text-slate-700">{profile === 'draft' ? 'Thông tin công trình mẫu.' : profile === 'planning' ? 'Pipeline đã chọn, thành viên, giao việc, biểu mẫu và minh chứng ở các bước đã hoàn tất.' : 'Toàn bộ Pipeline đã chọn, biểu mẫu, phê duyệt, nghiệp vụ, tài chính, kho, nghiệm thu, bàn giao và minh chứng lịch sử.'}</dd></div>
+          <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dữ liệu sinh kèm</dt><dd className="mt-1 leading-5 text-slate-700">{profile === 'draft' ? 'Thông tin công trình mẫu và thành viên mẫu.' : profile === 'planning' ? 'Pipeline đã chọn, thành viên mẫu, giao việc, biểu mẫu và minh chứng ở các bước đã hoàn tất.' : 'Toàn bộ Pipeline đã chọn, tài khoản mẫu, biểu mẫu, phê duyệt, nghiệp vụ, tài chính, kho, nghiệm thu, bàn giao và minh chứng lịch sử.'}</dd></div>
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium leading-5 text-emerald-900">Không tài khoản người dùng thật nào được thêm hoặc giao việc trong công trình mẫu này.</div>
         </dl>
       </Dialog>
     </section>

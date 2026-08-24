@@ -62,7 +62,8 @@
 
 - Sample projects carry `is_sample`, `sample_profile` and `sample_blueprint_version`. Draft is 0%; planning is limited to 5/10/15/25/40/65/90; completed is 100%.
 - Developer explicitly selects one compatible published Pipeline from the current environment. Planning executes its real design branch, keeps `boq_without_design` skipped/cancelled and floors the initial checkpoint to `progress * selected_step_count / 100`; no source UUID, revision, topology or fixed step count is authoritative. Subsequent workflow advancement keeps the normal progress engine authoritative.
-- Every active Staff whose current global role display name exactly matches a role required by the selected Pipeline becomes a project member; work-item role assignments preserve current and upcoming My Work visibility. Project-manager resolution uses the stable role key `pm`, not the mutable `PM` display label.
+- Developer Sample Data never selects ordinary active Staff. Each required selected-Pipeline role display label must resolve unambiguously to one eligible current-environment role and one ready flagged sample User/Staff. Only those sample accounts become members, receive their exact role through project-scoped `user_roles`, and receive work assignments; Project-manager resolution still uses stable role key `pm`. The real Developer remains generation/audit provenance and does not become a sample project member or simulated business actor.
+- Project membership is sample-scope invariant. `ProjectMemberOptions` exposes only Staff whose linked `users.is_sample` equals the target `projects.is_sample`; `SaveProjectMember`, `ReplaceUserRoles` and V123 triggers reject sample-to-real and real-to-sample membership/PM/role mixing. Sample users may hold only their `sample_role_id` in sample-project scope and never a global role. Historical sample projects created before V123 are not rewritten.
 
 ## Cross-Domain Checks
 
