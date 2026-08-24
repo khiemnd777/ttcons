@@ -1,4 +1,5 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, logoutRequest, setAuthFailureHandler, setToken } from '../api/client';
 import type { User } from '../types/domain';
 
@@ -15,22 +16,27 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const replaceAuthenticatedIdentity = useCallback((nextUser: User | null) => {
+    queryClient.clear();
+    setUser(nextUser);
+  }, [queryClient]);
 
   useEffect(() => {
     setAuthFailureHandler(() => {
-      setUser(null);
+      replaceAuthenticatedIdentity(null);
     });
     api<User>('/auth/me')
-      .then(setUser)
+      .then(replaceAuthenticatedIdentity)
       .catch(() => {
         setToken(null);
-        setUser(null);
+        replaceAuthenticatedIdentity(null);
       })
       .finally(() => setLoading(false));
     return () => setAuthFailureHandler(null);
-  }, []);
+  }, [replaceAuthenticatedIdentity]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -42,11 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({ email, password }),
         });
         setToken(data.token);
-        setUser(data.user);
+        replaceAuthenticatedIdentity(data.user);
       },
       async logout() {
         await logoutRequest();
-        setUser(null);
+        replaceAuthenticatedIdentity(null);
       },
       async refreshUser() {
         const nextUser = await api<User>('/auth/me');
@@ -61,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return permissions.some((permission) => user?.permissions?.includes(permission));
       },
     }),
-    [user, loading],
+    [loading, replaceAuthenticatedIdentity, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -12,7 +12,6 @@ import {
   MessageSquare,
   RefreshCw,
   Search,
-  ShieldAlert,
   SlidersHorizontal,
   X,
 } from 'lucide-react';
@@ -44,10 +43,12 @@ import {
   workTypeLabel,
 } from '../work-items/workItemPresentation';
 
-type ModeKey = 'work' | 'attention';
-type QueueKey = 'mine' | 'department' | 'pending_approval' | 'watching' | 'all';
+type ModeKey = 'work' | 'approval' | 'attention';
+type WorkScopeKey = 'responsible' | 'mine' | 'department' | 'watching' | 'all';
+type LegacyQueueKey = WorkScopeKey | 'pending_approval';
 type AttentionQueueKey = 'all' | 'mentions' | 'questions' | 'blockers' | 'reminders' | 'unread';
 type SummaryBucket = 'all' | 'need_action' | 'in_progress' | 'overdue' | 'blocked' | 'waiting_decision' | 'upcoming' | 'done_today';
+type WorkQuickBucket = 'all' | 'need_action' | 'in_progress' | 'blocked' | 'upcoming';
 
 type FacetOption = string | {
   id?: string;
@@ -85,12 +86,12 @@ type MyWorkPageResponse = {
   next_cursor?: string;
 };
 
-const queues: Array<{ key: QueueKey; label: string; description: string }> = [
-  { key: 'mine', label: 'Của tôi', description: 'Được giao trực tiếp' },
-  { key: 'department', label: 'Phòng ban', description: 'Theo phòng ban hoặc vai trò' },
-  { key: 'pending_approval', label: 'Chờ tôi duyệt', description: 'Tôi có quyền quyết định' },
-  { key: 'watching', label: 'Đang theo dõi', description: 'Việc tôi đang quan sát' },
-  { key: 'all', label: 'Tất cả', description: 'Toàn bộ việc trong phạm vi' },
+const scopes: Array<{ key: WorkScopeKey; label: string }> = [
+  { key: 'responsible', label: 'Tôi phụ trách' },
+  { key: 'mine', label: 'Giao trực tiếp' },
+  { key: 'department', label: 'Phòng ban' },
+  { key: 'watching', label: 'Đang theo dõi' },
+  { key: 'all', label: 'Tất cả được phép xem' },
 ];
 
 const attentionQueues: Array<{ key: AttentionQueueKey; label: string; icon: typeof MessageSquare }> = [
@@ -135,10 +136,14 @@ export function MyWorkPage() {
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('reconnecting');
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
 
-  const mode = validValue<ModeKey>(searchParams.get('mode'), ['work', 'attention'], 'work');
-  const queue = validValue<QueueKey>(searchParams.get('queue'), ['mine', 'department', 'pending_approval', 'watching', 'all'], 'all');
+  const requestedMode = validValue<ModeKey>(searchParams.get('mode'), ['work', 'approval', 'attention'], 'work');
+  const requestedQueue = validValue<LegacyQueueKey>(searchParams.get('queue'), ['responsible', 'mine', 'department', 'pending_approval', 'watching', 'all'], 'responsible');
+  const requestedBucket = validValue<SummaryBucket>(searchParams.get('bucket'), ['all', 'need_action', 'in_progress', 'overdue', 'blocked', 'waiting_decision', 'upcoming', 'done_today'], 'need_action');
+  const legacyApprovalMode = requestedQueue === 'pending_approval' || requestedBucket === 'waiting_decision';
+  const mode: ModeKey = requestedMode === 'attention' ? 'attention' : requestedMode === 'approval' || legacyApprovalMode ? 'approval' : 'work';
+  const queue: WorkScopeKey = requestedQueue === 'pending_approval' ? 'responsible' : requestedQueue;
   const attentionQueue = validValue<AttentionQueueKey>(searchParams.get('attention'), ['all', 'mentions', 'questions', 'blockers', 'reminders', 'unread'], 'all');
-  const bucket = validValue<SummaryBucket>(searchParams.get('bucket'), ['all', 'need_action', 'in_progress', 'overdue', 'blocked', 'waiting_decision', 'upcoming', 'done_today'], 'need_action');
+  const bucket: SummaryBucket = requestedBucket === 'waiting_decision' ? 'all' : requestedBucket;
   const project = searchParams.get('project') ?? '';
   const status = searchParams.get('status') ?? '';
   const deadline = searchParams.get('deadline') ?? '';
@@ -152,20 +157,40 @@ export function MyWorkPage() {
 
   const filterKey = useMemo(() => ({ queue, bucket, project, status, deadline, workType, priority, search, sort }), [bucket, deadline, priority, project, queue, search, sort, status, workType]);
   const workItems = useInfiniteQuery({
-    queryKey: ['my-work-items', filterKey],
+    queryKey: ['my-work-items', user?.id, filterKey],
     initialPageParam: '',
     queryFn: ({ pageParam }) => get<MyWorkPageResponse>(buildWorkPath(filterKey, String(pageParam ?? ''))),
     getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor : undefined,
+    enabled: Boolean(user?.id),
+    retry: false,
+  });
+  const approvalFilterKey = useMemo(() => ({
+    queue: 'responsible' as WorkScopeKey,
+    bucket: 'waiting_decision' as SummaryBucket,
+    project,
+    status: '',
+    deadline: '',
+    workType: '',
+    priority: '',
+    search: '',
+    sort: 'priority',
+  }), [project]);
+  const approvalWorkItems = useInfiniteQuery({
+    queryKey: ['my-work-items', user?.id, 'approval', project],
+    initialPageParam: '',
+    queryFn: ({ pageParam }) => get<MyWorkPageResponse>(buildWorkPath(approvalFilterKey, String(pageParam ?? ''))),
+    getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor : undefined,
+    enabled: Boolean(user?.id) && mode === 'approval',
     retry: false,
   });
   const pendingNodeApprovals = useQuery({
-    queryKey: ['approvals', 'pending', 'decidable', project],
+    queryKey: ['approvals', 'pending', 'decidable', user?.id, project],
     queryFn: () => {
       const params = new URLSearchParams({ decidable_only: 'true' });
       if (project) params.set('project_id', project);
       return get<ApprovalRequest[]>(`/approvals/pending?${params.toString()}`);
     },
-    enabled: mode === 'work',
+    enabled: Boolean(user?.id),
     retry: false,
   });
 
@@ -181,14 +206,15 @@ export function MyWorkPage() {
     return `/me/activity-attention/summary${query ? `?${query}` : ''}`;
   }, [project]);
   const activityAttentionSummary = useQuery({
-    queryKey: ['activity-attention', 'summary', project],
+    queryKey: ['activity-attention', 'summary', user?.id, project],
     queryFn: () => get<ActivityAttentionSummary>(attentionSummaryPath),
+    enabled: Boolean(user?.id),
     retry: false,
   });
   const activityAttention = useQuery({
-    queryKey: ['activity-attention', 'list', project],
+    queryKey: ['activity-attention', 'list', user?.id, project],
     queryFn: () => get<ActivityAttentionItem[]>(attentionPath),
-    enabled: mode === 'attention',
+    enabled: Boolean(user?.id) && mode === 'attention',
     retry: false,
   });
   const markAttentionRead = useMutation({
@@ -203,13 +229,10 @@ export function MyWorkPage() {
 
   const firstPage = workItems.data?.pages[0];
   const rows = useMemo(() => dedupeWorkItems(workItems.data?.pages.flatMap((page) => page.items) ?? []), [workItems.data]);
-  const baseSummary = firstPage?.summary ?? emptySummary;
+  const approvalFirstPage = approvalWorkItems.data?.pages[0];
+  const approvalRows = useMemo(() => dedupeWorkItems(approvalWorkItems.data?.pages.flatMap((page) => page.items) ?? []), [approvalWorkItems.data]);
+  const summary = firstPage?.summary ?? emptySummary;
   const nodeApprovalCount = pendingNodeApprovals.data?.filter((request) => request.target_type === 'pipeline_run_node').length ?? 0;
-  const summary = useMemo(() => ({
-    ...baseSummary,
-    total: baseSummary.total + nodeApprovalCount,
-    waiting_decision: baseSummary.waiting_decision + nodeApprovalCount,
-  }), [baseSummary, nodeApprovalCount]);
   const facets = firstPage?.facets ?? {};
   const attentionRows = useMemo(() => asArray<ActivityAttentionItem>(activityAttention.data), [activityAttention.data]);
   const attentionTabCount = activityAttentionSummary.isLoading
@@ -219,28 +242,42 @@ export function MyWorkPage() {
       : activityAttentionSummary.data?.has_more
         ? '120+'
         : activityAttentionSummary.data?.count ?? 0;
-  const selectedItem = rows.find((item) => item.id === selectedWorkId) ?? rows[0] ?? null;
+  const workTabCount = workItems.isLoading
+    ? '…'
+    : workItems.isError && !firstPage
+      ? '—'
+      : firstPage?.total ?? 0;
+  const approvalTabCount = workItems.isLoading || pendingNodeApprovals.isLoading
+    ? '…'
+    : (workItems.isError && !firstPage) || (pendingNodeApprovals.isError && !pendingNodeApprovals.data)
+      ? '—'
+      : summary.waiting_decision + nodeApprovalCount;
+  const activeWorkRows = mode === 'approval' ? approvalRows : rows;
+  const selectedItem = activeWorkRows.find((item) => item.id === selectedWorkId) ?? activeWorkRows[0] ?? null;
 
   useEffect(() => {
-    if (!rows.length) setSelectedWorkId(null);
-    else if (!selectedWorkId || !rows.some((item) => item.id === selectedWorkId)) setSelectedWorkId(rows[0].id);
-  }, [rows, selectedWorkId]);
+    if (!activeWorkRows.length) setSelectedWorkId(null);
+    else if (!selectedWorkId || !activeWorkRows.some((item) => item.id === selectedWorkId)) setSelectedWorkId(activeWorkRows[0].id);
+  }, [activeWorkRows, selectedWorkId]);
 
-  useEffect(() => streamSSE('/me/activity-attention/stream', {
-    onStatus: setStreamStatus,
-    onEvent: (message) => {
-      if (message.event === 'attention_changed') queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
-      if (message.event === 'work_queue_changed' || message.event === 'work_item_changed') {
-        queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
-      }
-    },
-  }), [queryClient]);
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    return streamSSE('/me/activity-attention/stream', {
+      onStatus: setStreamStatus,
+      onEvent: (message) => {
+        if (message.event === 'attention_changed') queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
+        if (message.event === 'work_queue_changed' || message.event === 'work_item_changed') {
+          queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
+        }
+      },
+    });
+  }, [queryClient, user?.id]);
 
   function updateParams(changes: Record<string, string | null>) {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       Object.entries(changes).forEach(([key, value]) => {
-        if (!value || (key === 'mode' && value === 'work') || (key === 'queue' && value === 'all') || (key === 'bucket' && value === 'need_action') || (key === 'sort' && value === 'priority')) next.delete(key);
+        if (!value || (key === 'mode' && value === 'work') || (key === 'queue' && value === 'responsible') || (key === 'bucket' && value === 'need_action') || (key === 'sort' && value === 'priority')) next.delete(key);
         else next.set(key, value);
       });
       return next;
@@ -249,14 +286,13 @@ export function MyWorkPage() {
 
   function resetFilters() {
     setSearchDraft('');
-    updateParams({ queue: 'all', bucket: 'need_action', project: null, status: null, deadline: null, type: null, priority: null, search: null, sort: 'priority' });
+    updateParams({ queue: 'responsible', bucket: 'need_action', project: null, status: null, deadline: null, type: null, priority: null, search: null, sort: 'priority' });
   }
 
-  function selectBucket(nextBucket: SummaryBucket) {
+  function selectBucket(nextBucket: WorkQuickBucket) {
     updateParams({
       mode: 'work',
-      queue: nextBucket === 'waiting_decision' ? 'pending_approval' : 'all',
-      bucket: bucket === nextBucket ? 'all' : nextBucket,
+      bucket: nextBucket,
       status: null,
       deadline: null,
       type: null,
@@ -269,15 +305,18 @@ export function MyWorkPage() {
     void workItems.refetch();
     void activityAttentionSummary.refetch();
     if (mode === 'attention') void activityAttention.refetch();
-    if (mode === 'work') void pendingNodeApprovals.refetch();
+    if (mode === 'approval') void approvalWorkItems.refetch();
+    void pendingNodeApprovals.refetch();
   }
 
   function openWorkItem(item: WorkItem) {
     navigate(executionTargetPath(item, currentReturnTo(location)));
   }
 
-  const hasFilters = Boolean(bucket !== 'need_action' || queue !== 'all' || project || status || deadline || workType || priority || search || sort !== 'priority');
+  const hasFilters = Boolean(bucket !== 'need_action' || queue !== 'responsible' || project || status || deadline || workType || priority || search || sort !== 'priority');
   const total = firstPage?.total ?? summary.total ?? rows.length;
+  const approvalTotal = approvalFirstPage?.total ?? approvalRows.length;
+  const scopeLabel = scopes.find((item) => item.key === queue)?.label ?? 'Tôi phụ trách';
 
   return (
     <>
@@ -295,62 +334,88 @@ export function MyWorkPage() {
         )}
       />
 
-      <SummaryStrip summary={summary} selected={bucket} onSelect={selectBucket} />
-
-      <div className="mt-4 flex gap-1 border-b border-line">
-        <ModeTab active={mode === 'work'} label="Công việc" count={summary.total} onClick={() => updateParams({ mode: 'work' })} />
+      <div className="mt-4 flex gap-1 overflow-x-auto border-b border-line">
+        <ModeTab active={mode === 'work'} label="Công việc" count={workTabCount} onClick={() => updateParams({ mode: 'work', queue, bucket })} />
+        <ModeTab active={mode === 'approval'} label="Chờ tôi duyệt" count={approvalTabCount} onClick={() => updateParams({ mode: 'approval', queue, bucket })} />
         <ModeTab active={mode === 'attention'} label="Trao đổi cần phản hồi" count={attentionTabCount} onClick={() => updateParams({ mode: 'attention' })} />
       </div>
 
       {mode === 'work' ? (
         <section className="mt-4">
-          <FilterBar
-            searchDraft={searchDraft}
-            queue={queue}
-            project={project}
-            status={status}
-            deadline={deadline}
-            workType={workType}
-            priority={priority}
-            sort={sort}
-            facets={facets}
-            hasFilters={hasFilters}
-            advancedOpen={advancedFiltersOpen}
-            onSearchDraft={setSearchDraft}
-            onSearch={() => updateParams({ search: searchDraft.trim() || null, bucket: 'all' })}
-            onChange={(key, value) => updateParams({ [key]: value || null, bucket: 'all' })}
-            onReset={resetFilters}
-            onToggleAdvanced={() => setAdvancedFiltersOpen((open) => !open)}
-          />
+          <div className="grid gap-3 xl:grid-cols-[208px_minmax(0,1fr)_320px]">
+            <ScopeRail value={queue} onChange={(value) => updateParams({ queue: value, bucket: 'all' })} />
 
-          {(queue === 'pending_approval' || bucket === 'waiting_decision') ? (
-            <NodeApprovalLane
-              rows={(pendingNodeApprovals.data ?? []).filter((request) => request.target_type === 'pipeline_run_node')}
-              loading={pendingNodeApprovals.isLoading}
-              error={pendingNodeApprovals.error}
-              onRetry={() => void pendingNodeApprovals.refetch()}
-            />
-          ) : null}
+            <div className="min-w-0">
+              <WorkQuickFilters
+                summary={summary}
+                selected={bucket}
+                scopeLabel={scopeLabel}
+                loading={workItems.isLoading}
+                unavailable={workItems.isError && !firstPage}
+                onSelect={selectBucket}
+              />
 
-          <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <WorkList
-              rows={rows}
-              selectedId={selectedItem?.id}
-              loading={workItems.isLoading}
-              fetchingMore={workItems.isFetchingNextPage}
-              error={workItems.error}
-              total={total}
-              hasMore={Boolean(workItems.hasNextPage)}
-              filtered={hasFilters}
-              onSelect={setSelectedWorkId}
-              onOpen={openWorkItem}
-              onLoadMore={() => void workItems.fetchNextPage()}
-              onReset={resetFilters}
-              onRetry={() => void workItems.refetch()}
-            />
+              <FilterBar
+                searchDraft={searchDraft}
+                project={project}
+                status={status}
+                deadline={deadline}
+                workType={workType}
+                priority={priority}
+                sort={sort}
+                facets={facets}
+                hasFilters={hasFilters}
+                advancedOpen={advancedFiltersOpen}
+                onSearchDraft={setSearchDraft}
+                onSearch={() => updateParams({ search: searchDraft.trim() || null, bucket: 'all' })}
+                onChange={(key, value) => updateParams({ [key]: value || null, bucket: 'all' })}
+                onReset={resetFilters}
+                onToggleAdvanced={() => setAdvancedFiltersOpen((open) => !open)}
+              />
+
+              <div className="mt-3">
+                <WorkList
+                  rows={rows}
+                  selectedId={selectedItem?.id}
+                  loading={workItems.isLoading}
+                  fetchingMore={workItems.isFetchingNextPage}
+                  error={workItems.error}
+                  total={total}
+                  hasMore={Boolean(workItems.hasNextPage)}
+                  filtered={hasFilters}
+                  onSelect={setSelectedWorkId}
+                  onOpen={openWorkItem}
+                  onLoadMore={() => void workItems.fetchNextPage()}
+                  onReset={resetFilters}
+                  onRetry={() => void workItems.refetch()}
+                />
+              </div>
+            </div>
+
             <NextWorkPanel item={selectedItem} onOpen={openWorkItem} />
           </div>
         </section>
+      ) : mode === 'approval' ? (
+        <ApprovalWorkspace
+          workRows={approvalRows}
+          selectedItem={selectedItem}
+          workLoading={approvalWorkItems.isLoading}
+          workFetchingMore={approvalWorkItems.isFetchingNextPage}
+          workError={approvalWorkItems.error}
+          workTotal={approvalTotal}
+          workHasMore={Boolean(approvalWorkItems.hasNextPage)}
+          nodeRows={(pendingNodeApprovals.data ?? []).filter((request) => request.target_type === 'pipeline_run_node')}
+          nodeLoading={pendingNodeApprovals.isLoading}
+          nodeError={pendingNodeApprovals.error}
+          project={project}
+          projects={normalizeFacetOptions(facets.projects, 'Công trình')}
+          onProjectChange={(value) => updateParams({ project: value || null })}
+          onSelect={setSelectedWorkId}
+          onOpen={openWorkItem}
+          onLoadMore={() => void approvalWorkItems.fetchNextPage()}
+          onRetryWork={() => void approvalWorkItems.refetch()}
+          onRetryNodes={() => void pendingNodeApprovals.refetch()}
+        />
       ) : (
         <ActivityAttentionPanel
           rows={attentionRows}
@@ -366,6 +431,69 @@ export function MyWorkPage() {
       )}
 
     </>
+  );
+}
+
+function ApprovalWorkspace({ workRows, selectedItem, workLoading, workFetchingMore, workError, workTotal, workHasMore, nodeRows, nodeLoading, nodeError, project, projects, onProjectChange, onSelect, onOpen, onLoadMore, onRetryWork, onRetryNodes }: {
+  workRows: WorkItem[];
+  selectedItem: WorkItem | null;
+  workLoading: boolean;
+  workFetchingMore: boolean;
+  workError: unknown;
+  workTotal: number;
+  workHasMore: boolean;
+  nodeRows: ApprovalRequest[];
+  nodeLoading: boolean;
+  nodeError: unknown;
+  project: string;
+  projects: Array<{ value: string; label: string }>;
+  onProjectChange: (value: string) => void;
+  onSelect: (id: string) => void;
+  onOpen: (item: WorkItem) => void;
+  onLoadMore: () => void;
+  onRetryWork: () => void;
+  onRetryNodes: () => void;
+}) {
+  const empty = !workLoading && !nodeLoading && !workError && !nodeError && !workRows.length && !nodeRows.length;
+  return (
+    <section className="mt-4" aria-label="Công việc chờ tôi duyệt">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0">
+          <div className="flex flex-col gap-3 rounded-lg border border-line bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-sm font-semibold text-ink">Chờ tôi duyệt</h2>
+            <FilterSelect value={project} label="Tất cả công trình" options={projects} onChange={onProjectChange} />
+          </div>
+
+          {empty ? <div className="mt-4"><EmptyState title="Không có yêu cầu nào đang chờ anh duyệt." /></div> : (
+            <>
+              <section className="mt-4" aria-labelledby="work-approval-lane-title">
+                <h2 id="work-approval-lane-title" className="mb-2 text-sm font-semibold text-ink">Phê duyệt công việc</h2>
+                <WorkList
+                  rows={workRows}
+                  selectedId={selectedItem?.id}
+                  loading={workLoading}
+                  fetchingMore={workFetchingMore}
+                  error={workError}
+                  total={workTotal}
+                  hasMore={workHasMore}
+                  filtered={Boolean(project)}
+                  emptyTitle="Không có công việc nào đang chờ anh duyệt."
+                  onSelect={onSelect}
+                  onOpen={onOpen}
+                  onLoadMore={onLoadMore}
+                  onReset={() => onProjectChange('')}
+                  onRetry={onRetryWork}
+                />
+              </section>
+
+              <NodeApprovalLane rows={nodeRows} loading={nodeLoading} error={nodeError} onRetry={onRetryNodes} />
+            </>
+          )}
+        </div>
+
+        <NextWorkPanel item={selectedItem} onOpen={onOpen} />
+      </div>
+    </section>
   );
 }
 
@@ -385,7 +513,7 @@ function NodeApprovalLane({ rows, loading, error, onRetry }: { rows: ApprovalReq
 }
 
 function buildWorkPath(filters: {
-  queue: QueueKey;
+  queue: WorkScopeKey;
   bucket: SummaryBucket;
   project: string;
   status: string;
@@ -421,33 +549,45 @@ function uniqueRoleNames(roles?: string[]) {
 
 const emptySummary: MyWorkSummary = { total: 0, need_action: 0, in_progress: 0, overdue: 0, blocked: 0, waiting_decision: 0, waiting_approval: 0, upcoming: 0, done_today: 0 };
 
-function SummaryStrip({ summary, selected, onSelect }: { summary: MyWorkSummary; selected: SummaryBucket; onSelect: (bucket: SummaryBucket) => void }) {
-  const cards: Array<{ bucket: SummaryBucket; label: string; value: number; icon: typeof BriefcaseBusiness; activeClass: string }> = [
+function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable, onSelect }: {
+  summary: MyWorkSummary;
+  selected: SummaryBucket;
+  scopeLabel: string;
+  loading: boolean;
+  unavailable: boolean;
+  onSelect: (bucket: WorkQuickBucket) => void;
+}) {
+  const cards: Array<{ bucket: WorkQuickBucket; label: string; value: number; icon: typeof BriefcaseBusiness; activeClass: string }> = [
+    { bucket: 'all', label: 'Tất cả', value: summary.total, icon: BriefcaseBusiness, activeClass: 'border-blue-300 bg-blue-50 ring-blue-200' },
     { bucket: 'need_action', label: 'Làm ngay', value: summary.need_action, icon: BriefcaseBusiness, activeClass: 'border-blue-300 bg-blue-50 ring-blue-200' },
     { bucket: 'in_progress', label: 'Đang làm', value: summary.in_progress, icon: Clock3, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
-    { bucket: 'waiting_decision', label: 'Chờ tôi duyệt', value: summary.waiting_decision, icon: ShieldAlert, activeClass: 'border-amber-300 bg-amber-50 ring-amber-200' },
     { bucket: 'blocked', label: 'Bị chặn', value: summary.blocked, icon: AlertCircle, activeClass: 'border-rose-300 bg-rose-50 ring-rose-200' },
     { bucket: 'upcoming', label: 'Sắp tới · chỉ xem', value: summary.upcoming, icon: Clock3, activeClass: 'border-slate-300 bg-slate-50 ring-slate-200' },
   ];
   return (
-    <section className="flex gap-2 overflow-x-auto pb-1" aria-label="Tóm tắt công việc">
-      {cards.map((card) => {
-        const Icon = card.icon;
-        const active = selected === card.bucket;
-        return (
-          <button
-            key={card.bucket}
-            className={clsx(
-              'flex min-w-[10.5rem] flex-1 items-center justify-between gap-3 rounded-lg border bg-white px-3 py-3 text-left shadow-panel transition',
-              active ? `ring-1 ${card.activeClass}` : 'border-line hover:border-blue-200 hover:bg-slate-50',
-            )}
-            onClick={() => onSelect(card.bucket)}
-          >
-            <span><span className="block text-xs font-semibold text-slate-500">{card.label}</span><span className="mt-1 block text-xl font-semibold text-ink">{card.value}</span></span>
-            <Icon className={clsx('h-4 w-4', active ? 'text-blue-700' : 'text-slate-400')} />
-          </button>
-        );
-      })}
+    <section className="mb-3 rounded-lg border border-line bg-white p-3" aria-label="Bộ lọc nhanh công việc" aria-busy={loading}>
+      <h2 className="mb-2 text-sm font-semibold text-ink">Bộ lọc nhanh · {scopeLabel}</h2>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {cards.map((card) => {
+          const Icon = card.icon;
+          const active = selected === card.bucket;
+          return (
+            <button
+              key={card.bucket}
+              type="button"
+              aria-pressed={active}
+              className={clsx(
+                'flex min-w-[8.5rem] flex-1 items-center justify-between gap-3 rounded-md border bg-white px-3 py-2 text-left transition',
+                active ? `ring-1 ${card.activeClass}` : 'border-line hover:border-blue-200 hover:bg-slate-50',
+              )}
+              onClick={() => onSelect(card.bucket)}
+            >
+              <span><span className="block text-xs font-semibold text-slate-500">{card.label}</span><span className="mt-0.5 block text-lg font-semibold text-ink">{loading ? '…' : unavailable ? '—' : card.value}</span></span>
+              <Icon className={clsx('h-4 w-4', active ? 'text-blue-700' : 'text-slate-400')} />
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -460,8 +600,42 @@ function ModeTab({ active, label, count, onClick }: { active: boolean; label: st
   );
 }
 
-function FilterBar({ searchDraft, queue, project, status, deadline, workType, priority, sort, facets, hasFilters, advancedOpen, onSearchDraft, onSearch, onChange, onReset, onToggleAdvanced }: {
-  searchDraft: string; queue: QueueKey; project: string; status: string; deadline: string; workType: string; priority: string; sort: string; facets: MyWorkFacets; hasFilters: boolean; advancedOpen: boolean;
+function ScopeRail({ value, onChange }: { value: WorkScopeKey; onChange: (value: WorkScopeKey) => void }) {
+  return (
+    <aside className="min-w-0 rounded-lg border border-line bg-white p-3 xl:sticky xl:top-4 xl:self-start" aria-label="Phạm vi công việc">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-ink">Phạm vi</h2>
+        <span className="shrink-0 text-xs font-semibold text-blue-700 xl:hidden">{scopes.find((item) => item.key === value)?.label}</span>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible xl:pb-0">
+        {scopes.map((item) => {
+          const active = item.key === value;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              aria-pressed={active}
+              className={clsx(
+                'relative min-w-fit rounded-md border px-3 py-2 text-left transition xl:w-full',
+                active ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-transparent text-slate-700 hover:border-line hover:bg-slate-50',
+              )}
+              onClick={() => onChange(item.key)}
+            >
+              {active ? <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-blue-600" aria-hidden="true" /> : null}
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                {active ? <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-600" /> : <span className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+function FilterBar({ searchDraft, project, status, deadline, workType, priority, sort, facets, hasFilters, advancedOpen, onSearchDraft, onSearch, onChange, onReset, onToggleAdvanced }: {
+  searchDraft: string; project: string; status: string; deadline: string; workType: string; priority: string; sort: string; facets: MyWorkFacets; hasFilters: boolean; advancedOpen: boolean;
   onSearchDraft: (value: string) => void; onSearch: () => void; onChange: (key: string, value: string) => void; onReset: () => void; onToggleAdvanced: () => void;
 }) {
   const projects = normalizeFacetOptions(facets.projects, 'Công trình');
@@ -471,16 +645,15 @@ function FilterBar({ searchDraft, queue, project, status, deadline, workType, pr
   return (
     <div className="space-y-3 rounded-lg border border-line bg-white p-3">
       <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-blue-700" /><h2 className="text-sm font-semibold text-ink">Tìm công việc</h2></div>{hasFilters ? <button className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-blue-700" onClick={onReset}><X className="h-3.5 w-3.5" />Về mặc định</button> : null}</div>
-      <div className="grid gap-2 md:grid-cols-[minmax(14rem,1fr)_minmax(12rem,18rem)_auto]">
-        <form className="flex min-w-0" onSubmit={(event) => { event.preventDefault(); onSearch(); }}>
+      <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-[minmax(14rem,1fr)_minmax(12rem,18rem)_auto]">
+        <form className="flex min-w-0 md:col-span-2 2xl:col-span-1" onSubmit={(event) => { event.preventDefault(); onSearch(); }}>
           <div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input className="w-full rounded-l-md border border-line py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400" value={searchDraft} onChange={(event) => onSearchDraft(event.target.value)} placeholder="Tên việc, công trình..." /></div>
           <button className="rounded-r-md border border-l-0 border-line px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50" type="submit">Tìm</button>
         </form>
         <FilterSelect value={project} label="Tất cả công trình" options={projects} onChange={(value) => onChange('project', value)} />
         <button className={clsx('inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold', advancedOpen ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-line text-slate-700 hover:bg-slate-50')} onClick={onToggleAdvanced}><SlidersHorizontal className="h-4 w-4" />Bộ lọc thêm</button>
       </div>
-      {advancedOpen ? <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-6">
-        <FilterSelect value={queue} label="Tất cả phạm vi" options={queues.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => onChange('queue', value)} />
+      {advancedOpen ? <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-5">
         <FilterSelect value={status} label="Tất cả trạng thái" options={statuses.length ? statuses.map((item) => ({ ...item, label: statusLabel(item.value) })) : statusOptions} onChange={(value) => onChange('status', value)} />
         <FilterSelect value={deadline} label="Tất cả hạn việc" options={deadlineOptions} onChange={(value) => onChange('deadline', value)} />
         <FilterSelect value={workType} label="Tất cả loại việc" options={workTypes.map((item) => ({ ...item, label: workTypeLabel(item.value) }))} onChange={(value) => onChange('type', value)} />
@@ -503,13 +676,14 @@ function FilterSelect({ value, label, options, onChange }: { value: string; labe
   return <select className="min-w-0 rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700" value={value} onChange={(event) => onChange(event.target.value)}><option value="">{label}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
 }
 
-function WorkList({ rows, selectedId, loading, fetchingMore, error, total, hasMore, filtered, onSelect, onOpen, onLoadMore, onReset, onRetry }: {
+function WorkList({ rows, selectedId, loading, fetchingMore, error, total, hasMore, filtered, emptyTitle, onSelect, onOpen, onLoadMore, onReset, onRetry }: {
   rows: WorkItem[]; selectedId?: string; loading: boolean; fetchingMore: boolean; error: unknown; total: number; hasMore: boolean; filtered: boolean;
+  emptyTitle?: string;
   onSelect: (id: string) => void; onOpen: (item: WorkItem) => void; onLoadMore: () => void; onReset: () => void; onRetry: () => void;
 }) {
   if (loading) return <WorkListSkeleton />;
   if (error && !rows.length) return <SourceError title="Không tải được danh sách công việc" onRetry={onRetry} />;
-  if (!rows.length) return <EmptyState title={filtered ? 'Không có công việc khớp bộ lọc' : 'Không có việc cần xử lý trong phạm vi này'} action={filtered ? <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700" onClick={onReset}>Xóa bộ lọc</button> : undefined} />;
+  if (!rows.length) return <EmptyState title={emptyTitle ?? (filtered ? 'Không có công việc khớp bộ lọc' : 'Không có việc cần xử lý trong phạm vi này')} action={filtered ? <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700" onClick={onReset}>Xóa bộ lọc</button> : undefined} />;
   return (
     <div className="min-w-0">
       <div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold text-ink">{total} việc</p></div>

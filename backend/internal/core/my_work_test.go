@@ -9,6 +9,10 @@ import (
 )
 
 func TestNormalizeMyWorkItemsFilterAndCursor(t *testing.T) {
+	defaultFilter, _, err := normalizeMyWorkItemsFilter(MyWorkItemsFilter{})
+	if err != nil || defaultFilter.Queue != "responsible" {
+		t.Fatalf("default queue = %q, error = %v, want responsible", defaultFilter.Queue, err)
+	}
 	filter, offset, err := normalizeMyWorkItemsFilter(MyWorkItemsFilter{
 		Queue: " Pending_Approval ", Sort: " Due_Asc ", Bucket: " Waiting_Decision ", Limit: 25,
 		Cursor: encodeMyWorkItemsCursor(50),
@@ -292,6 +296,19 @@ func TestMyWorkItemsPageContractPaginationAndDecisionCapability(t *testing.T) {
 	if _, err := service.WorkItemAction(ctx, fixture.itemID, "request-review", WorkItemActionRequest{}, fixture.workerID, "Worker"); err != nil {
 		t.Fatal(err)
 	}
+	personalDecisionPage, err := service.MyWorkItems(ctx, MyWorkItemsFilter{
+		ProjectID: fixture.projectID, Queue: "responsible", Bucket: "waiting_decision", Limit: 20,
+	}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(personalDecisionPage["total"]) != 1 {
+		t.Fatalf("waiting-decision bucket must ignore the ordinary responsibility queue: %#v", personalDecisionPage)
+	}
+	personalDecisionSummary, _ := personalDecisionPage["summary"].(Record)
+	if number(personalDecisionSummary["total"]) != 0 || number(personalDecisionSummary["waiting_decision"]) != 1 {
+		t.Fatalf("decision summary must remain actor-decidable beside responsible totals: %#v", personalDecisionSummary)
+	}
 	var pmStaffID, workerRoleID string
 	if err := db.QueryRowContext(ctx, `SELECT id::text FROM staff WHERE user_id=$1`, fixture.pmID).Scan(&pmStaffID); err != nil {
 		t.Fatal(err)
@@ -345,6 +362,120 @@ func TestMyWorkItemsPageContractPaginationAndDecisionCapability(t *testing.T) {
 	}
 	if number(requesterPage["total"]) != 0 {
 		t.Fatalf("requester pending approval total = %v, want 0", requesterPage["total"])
+	}
+}
+
+func TestMyWorkResponsibleScopeExcludesAnotherAssigneeFromSameDepartment(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	suffix := newID()
+	projectID := newID()
+	actorID := newID()
+	actorStaffID := newID()
+	colleagueID := newID()
+	colleagueStaffID := newID()
+	actorRoleID := ensureRole(t, db, "scope_actor_"+suffix[:8], "Scope Actor "+suffix[:8])
+	colleagueRoleID := ensureRole(t, db, "scope_colleague_"+suffix[:8], "Scope Colleague "+suffix[:8])
+	department := "Shared Scope " + suffix[:8]
+
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id IN ($1,$2)`, actorID, colleagueID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id IN ($1,$2)`, actorStaffID, colleagueStaffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id IN ($1,$2)`, actorID, colleagueID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id IN ($1,$2)`, actorRoleID, colleagueRoleID)
+	})
+
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Scope Actor','active'),($3,$4,'demo:pw','Scope Colleague','active')`, actorID, "scope-actor-"+suffix+"@test.local", colleagueID, "scope-colleague-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,status) VALUES ($1,$2,'Scope Actor',$3,$4,'active'),($5,$6,'Scope Colleague',$7,$4,'active')`, actorStaffID, actorID, "scope-actor-staff-"+suffix+"@test.local", department, colleagueStaffID, colleagueID, "scope-colleague-staff-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status) VALUES ($1,'My Work Scope',$2,'Client','planning')`, projectID, "MWS-"+suffix[:8])
+	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,jsonb_build_array($3::text),true),($1,$4,jsonb_build_array($5::text),true)`, projectID, actorStaffID, "Scope Actor "+suffix[:8], colleagueStaffID, "Scope Colleague "+suffix[:8])
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id,project_id) VALUES ($1,$2,$3),($4,$5,$3)`, actorID, actorRoleID, projectID, colleagueID, colleagueRoleID)
+
+	insertFutureItem := func(title, workDepartment, roleName, assigneeStaffID string) string {
+		t.Helper()
+		itemID := newID()
+		mustExec(t, db, `
+			INSERT INTO work_items (
+				id,project_id,source_type,source_id,title,work_type,status,priority,department,role_ids,
+				assignee_staff_id,planned_start_at,created_by,updated_by
+			) VALUES (
+				$1,$2,'issue',$3,$4,'task','pending','normal',NULLIF($5,''),
+				CASE WHEN NULLIF($6,'') IS NULL THEN '[]'::jsonb ELSE jsonb_build_array($6) END,
+				NULLIF($7,'')::uuid,now()+interval '1 day',$8,$8
+			)
+		`, itemID, projectID, newID(), title, workDepartment, roleName, assigneeStaffID, actorID)
+		return itemID
+	}
+	actorRoleName := "Scope Actor " + suffix[:8]
+	colleagueRoleName := "Scope Colleague " + suffix[:8]
+	directID := insertFutureItem("Direct responsibility", department, actorRoleName, actorStaffID)
+	roleID := insertFutureItem("Role responsibility", "", actorRoleName, "")
+	departmentPoolID := insertFutureItem("Department pool responsibility", department, "", "")
+	colleagueItemID := insertFutureItem("Other assignee same department", department, colleagueRoleName, colleagueStaffID)
+	mustExec(t, db, `
+		INSERT INTO work_item_assignments (work_item_id,assignment_type,staff_id,role_name,department,created_by) VALUES
+			($1,'assignee',$2,NULL,NULL,$3),
+			($1,'role',NULL,$4,NULL,$3),
+			($5,'role',NULL,$4,NULL,$3),
+			($6,'department',NULL,NULL,$7,$3),
+			($8,'assignee',$9,NULL,NULL,$3),
+			($8,'role',NULL,$10,NULL,$3)
+	`, directID, actorStaffID, actorID, actorRoleName, roleID, departmentPoolID, department, colleagueItemID, colleagueStaffID, colleagueRoleName)
+
+	page, err := service.MyWorkItems(ctx, MyWorkItemsFilter{
+		Queue: "responsible", Bucket: "all", ProjectID: projectID, Limit: 20,
+	}, actorID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, _ := page["items"].([]Record)
+	for _, expectedID := range []string{directID, roleID, departmentPoolID} {
+		item := recordByID(items, "id", expectedID)
+		if item == nil {
+			t.Fatalf("responsible queue missing %s: %#v", expectedID, page)
+		}
+		if !stringSliceContains(stringSlice(item["queue_scopes"]), "responsible") {
+			t.Fatalf("responsible queue scope missing for %s: %#v", expectedID, item["queue_scopes"])
+		}
+	}
+	if recordByID(items, "id", colleagueItemID) != nil {
+		t.Fatalf("another assignee's same-department item leaked into responsible queue: %#v", items)
+	}
+	if number(page["total"]) != 3 {
+		t.Fatalf("responsible total = %v, want 3", page["total"])
+	}
+	summary, _ := page["summary"].(Record)
+	if number(summary["total"]) != 3 || number(summary["upcoming"]) != 3 {
+		t.Fatalf("responsible summary = %#v, want total=3 upcoming=3", summary)
+	}
+
+	departmentPage, err := service.MyWorkItems(ctx, MyWorkItemsFilter{
+		Queue: "department", Bucket: "all", ProjectID: projectID, Limit: 20,
+	}, actorID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	departmentItems, _ := departmentPage["items"].([]Record)
+	if recordByID(departmentItems, "id", colleagueItemID) == nil || recordByID(departmentItems, "id", departmentPoolID) == nil {
+		t.Fatalf("department queue must expose same-department colleague and pool work: %#v", departmentPage)
+	}
+	if recordByID(departmentItems, "id", directID) != nil || recordByID(departmentItems, "id", roleID) != nil {
+		t.Fatalf("department queue must not duplicate direct or role-only responsibility: %#v", departmentItems)
+	}
+	if number(departmentPage["total"]) != 2 {
+		t.Fatalf("department total = %v, want 2", departmentPage["total"])
+	}
+
+	allPage, err := service.MyWorkItems(ctx, MyWorkItemsFilter{
+		Queue: "all", Bucket: "all", ProjectID: projectID, Limit: 20,
+	}, actorID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(allPage["total"]) != 4 {
+		t.Fatalf("all-scope total = %v, want 4", allPage["total"])
 	}
 }
 

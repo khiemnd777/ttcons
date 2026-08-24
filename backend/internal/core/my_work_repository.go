@@ -40,15 +40,9 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 		itemArgs = append(itemArgs, value)
 		itemConditions = append(itemConditions, fmt.Sprintf(condition, len(itemArgs)))
 	}
-	switch filter.Queue {
-	case "mine":
-		itemConditions = append(itemConditions, "is_mine")
-	case "department":
-		itemConditions = append(itemConditions, "is_department")
-	case "pending_approval":
-		itemConditions = append(itemConditions, "can_decide AND status IN ('waiting_review','waiting_approval')")
-	case "watching":
-		itemConditions = append(itemConditions, "is_watching")
+	queueCondition := myWorkItemsQueueCondition(filter.Queue)
+	if queueCondition != "TRUE" && filter.Bucket != "waiting_decision" {
+		itemConditions = append(itemConditions, queueCondition)
 	}
 	if filter.Status != "" {
 		appendValue("status=$%d", filter.Status)
@@ -123,19 +117,20 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 	}
 
 	summary, err := queryOneRecord(ctx, tx, baseSQL+fmt.Sprintf(`
-		SELECT
-			COUNT(*) AS total,
-			COUNT(*) FILTER (WHERE %s) AS need_action,
-			COUNT(*) FILTER (WHERE status='in_progress') AS in_progress,
-			COUNT(*) FILTER (WHERE status NOT IN ('completed','cancelled') AND due_at < now()) AS overdue,
-			COUNT(*) FILTER (WHERE status='blocked') AS blocked,
-			COUNT(*) FILTER (WHERE can_decide AND status IN ('waiting_review','waiting_approval')) AS waiting_decision,
-			COUNT(*) FILTER (WHERE status IN ('waiting_review','waiting_approval')) AS waiting_approval,
-			COUNT(*) FILTER (WHERE is_future) AS upcoming,
-			COUNT(*) FILTER (WHERE status='completed' AND completed_at IS NOT NULL AND (completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date=(now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date) AS done_today
-		FROM base_work
-		WHERE %s
-	`, myWorkNeedActionSQL(), projectWhere), projectArgs...)
+			SELECT
+				COUNT(*) FILTER (WHERE %s) AS total,
+				COUNT(*) FILTER (WHERE %s AND %s) AS need_action,
+				COUNT(*) FILTER (WHERE %s AND status='in_progress') AS in_progress,
+				COUNT(*) FILTER (WHERE %s AND status NOT IN ('completed','cancelled') AND due_at < now()) AS overdue,
+				COUNT(*) FILTER (WHERE %s AND status='blocked') AS blocked,
+				COUNT(*) FILTER (WHERE can_decide AND status IN ('waiting_review','waiting_approval')) AS waiting_decision,
+				COUNT(*) FILTER (WHERE %s AND status IN ('waiting_review','waiting_approval')) AS waiting_approval,
+				COUNT(*) FILTER (WHERE %s AND is_future) AS upcoming,
+				COUNT(*) FILTER (WHERE %s AND status='completed' AND completed_at IS NOT NULL AND (completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date=(now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date) AS done_today
+			FROM base_work
+			WHERE %s
+		`, queueCondition, queueCondition, myWorkNeedActionSQL(), queueCondition, queueCondition, queueCondition,
+		queueCondition, queueCondition, queueCondition, projectWhere), projectArgs...)
 	if err != nil {
 		return myWorkItemsPageData{}, err
 	}
@@ -182,6 +177,23 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 	return myWorkItemsPageData{
 		Items: items, Summary: summary, Facets: facets, Total: total, HasMore: hasMore, NextCursor: nextCursor,
 	}, nil
+}
+
+func myWorkItemsQueueCondition(queue string) string {
+	switch queue {
+	case "responsible":
+		return "is_responsible"
+	case "mine":
+		return "is_mine"
+	case "department":
+		return "is_department"
+	case "pending_approval":
+		return "can_decide AND status IN ('waiting_review','waiting_approval')"
+	case "watching":
+		return "is_watching"
+	default:
+		return "TRUE"
+	}
 }
 
 func myWorkNeedActionSQL() string {
@@ -244,6 +256,9 @@ func myWorkItemsBaseSQL() string {
 						  AND wias.assignment_type='watcher' AND wias.staff_id=NULLIF($3,'')::uuid
 					)
 				), false) AS is_watching,
+				(%s) AS role_responsibility,
+				(%s) AS department_scope,
+				(%s) AS unassigned_department_responsibility,
 				COALESCE(NULLIF(ar.required_roles, '[]'::jsonb), wi.role_ids, '[]'::jsonb) AS decision_required_roles,
 				COALESCE(ar.requested_by, review_request.actor_id) AS decision_requested_by
 			FROM work_items wi
@@ -281,7 +296,8 @@ func myWorkItemsBaseSQL() string {
 					AND pipeline_run_id IS NOT NULL
 					AND pipeline_current_node_id IS DISTINCT FROM run_node_id
 				) AS is_early_execution,
-				(NOT is_mine AND NOT is_watching AND action_scope) AS is_department,
+				(is_mine OR role_responsibility OR unassigned_department_responsibility) AS is_responsible,
+				(NOT is_mine AND NOT is_watching AND department_scope) AS is_department,
 				(
 					action_scope AND status NOT IN ('completed','cancelled')
 					AND (
@@ -373,5 +389,94 @@ func myWorkItemsBaseSQL() string {
 				) AS can_decide
 			FROM scoped_work sw
 		)
-	`, workItemScopeSQL("wi", 6), workItemScopeSQL("wi", 1))
+	`, workItemScopeSQL("wi", 6), myWorkRoleResponsibilitySQL("wi", 2, 3),
+		myWorkDepartmentScopeSQL("wi", 4), myWorkUnassignedDepartmentResponsibilitySQL("wi", 4),
+		workItemScopeSQL("wi", 1))
+}
+
+func myWorkRoleResponsibilitySQL(alias string, userParam, staffParam int) string {
+	userID := fmt.Sprintf("NULLIF($%d,'')::uuid", userParam)
+	staffID := fmt.Sprintf("NULLIF($%d,'')::uuid", staffParam)
+	return fmt.Sprintf(`COALESCE((
+		EXISTS (
+			SELECT 1
+			FROM project_members pm
+			WHERE pm.project_id=%s.project_id AND pm.staff_id=%s AND pm.active
+			  AND (
+				EXISTS (
+					SELECT 1
+					FROM jsonb_array_elements_text(pm.role_ids) member_role(role_label)
+					JOIN jsonb_array_elements_text(%s.role_ids) work_role(role_label)
+					  ON work_role.role_label=member_role.role_label
+				)
+				OR EXISTS (
+					SELECT 1
+					FROM work_item_assignments assignment
+					CROSS JOIN LATERAL jsonb_array_elements_text(pm.role_ids) member_role(role_label)
+					WHERE assignment.work_item_id=%s.id
+					  AND assignment.assignment_type='role'
+					  AND assignment.role_name=member_role.role_label
+				)
+			  )
+		)
+		OR EXISTS (
+			SELECT 1
+			FROM user_roles user_role
+			JOIN roles role ON role.id=user_role.role_id
+			WHERE user_role.user_id=%s AND user_role.project_id=%s.project_id
+			  AND (
+				EXISTS (
+					SELECT 1 FROM jsonb_array_elements_text(%s.role_ids) work_role(role_label)
+					WHERE work_role.role_label IN (role.name, role.display_name, role.id::text)
+				)
+				OR EXISTS (
+					SELECT 1 FROM work_item_assignments assignment
+					WHERE assignment.work_item_id=%s.id AND assignment.assignment_type='role'
+					  AND assignment.role_name IN (role.name, role.display_name, role.id::text)
+				)
+			  )
+		)
+	), false)`, alias, staffID, alias, alias, userID, alias, alias, alias)
+}
+
+func myWorkDepartmentScopeSQL(alias string, departmentParam int) string {
+	department := fmt.Sprintf("$%d", departmentParam)
+	return fmt.Sprintf(`COALESCE((
+		NULLIF(%s,'') IS NOT NULL AND (
+			%s.department=%s
+			OR EXISTS (
+				SELECT 1 FROM work_item_assignments assignment
+				WHERE assignment.work_item_id=%s.id AND assignment.assignment_type='department'
+				  AND assignment.department=%s
+			)
+		)
+	), false)`, department, alias, department, alias, department)
+}
+
+func myWorkUnassignedDepartmentResponsibilitySQL(alias string, departmentParam int) string {
+	department := fmt.Sprintf("$%d", departmentParam)
+	return fmt.Sprintf(`COALESCE((
+		NULLIF(%s,'') IS NOT NULL
+		AND %s.assignee_staff_id IS NULL
+		AND NOT EXISTS (
+			SELECT 1 FROM work_item_assignments assignment
+			WHERE assignment.work_item_id=%s.id AND assignment.assignment_type='assignee'
+			  AND assignment.staff_id IS NOT NULL
+		)
+		AND (
+			EXISTS (
+				SELECT 1 FROM work_item_assignments assignment
+				WHERE assignment.work_item_id=%s.id AND assignment.assignment_type='department'
+				  AND assignment.department=%s
+			)
+			OR (
+				%s.department=%s
+				AND COALESCE(jsonb_array_length(%s.role_ids),0)=0
+				AND NOT EXISTS (
+					SELECT 1 FROM work_item_assignments assignment
+					WHERE assignment.work_item_id=%s.id AND assignment.assignment_type='role'
+				)
+			)
+		)
+	), false)`, department, alias, alias, alias, department, alias, department, alias, alias)
 }

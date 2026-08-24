@@ -1,5 +1,112 @@
 # Current States
 
+## Active Plan: Tách Phạm vi khỏi thanh lọc Bàn làm việc
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-24)
+
+### Will be done
+
+- Recompose the ordinary My Work workspace into three desktop regions: a dedicated `Phạm vi` rail, the work search/list column and the existing selected-work action inspector.
+- Keep the scope rail compact and sticky on desktop, and render the same choices as a horizontally scrollable section above the list on tablet/mobile.
+- Keep the scope rail label-only: remove the explanatory subtitle below the heading and below every scope choice while preserving the same labels and selected state.
+- Preserve the current URL-backed queue, summary-bucket, filter, API, responsibility, approval, readiness, authorization and execution-target contracts.
+- Add focused frontend source-contract coverage, update central/frontend/Workflow Orchestration maps and run frontend tests, production build, bundle budget and whitespace validation. Browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the review package and Mockup as Text with `OK triển khai`.
+- User approved the label-only scope-rail follow-up with `OK triển khai`; focused regression coverage has been added before the source change.
+- Removed the scope heading subtitle and all per-option descriptions. The same six labels, active marker, desktop rail, narrow-screen horizontal choices, URL query and queue behavior remain unchanged.
+- The label-only regression failed against the former subtitle implementation and now passes 8/8 in the focused My Work presentation file.
+- Confirmed current ownership in `frontend/src/modules/my-work/MyWorkPage.tsx`: the queue selector is nested in `FilterBar`, while the ordinary-work content grid currently owns only the list and the `Việc tiếp theo` inspector.
+- Added a focused source-contract regression that failed against the former two-region/dropdown layout and passed after the implementation.
+- Replaced the queue dropdown with one `ScopeRail`: at `xl` it is the sticky 208px left region in `Phạm vi | Danh sách | Hành động`; below `xl` it remains a dedicated section above the list with horizontally scrollable choices. The existing 320px selected-work inspector remains the desktop action region.
+- Kept search/project/advanced filters in the central shrinkable list region; their internal grid waits until `2xl` before using one row so the new center column does not overflow at ordinary desktop widths. The actor-decidable node-approval lane remains in the central list column.
+- Preserved the URL-backed queue, bucket and filter behavior, `/me/work-items` contract, summary semantics, responsibility classification, readiness, authorization and execution-target navigation. No backend, schema, migration or sample-data change was required for this layout-only plan.
+- Updated the central, frontend and Workflow Orchestration maps with the responsive three-region My Work contract; the label-only follow-up additionally updates the central/frontend presentation entries. No extra Workflow Orchestration invariant changed.
+- Current working-tree verification at HEAD `c4206a3` plus the listed changes passed: 260/260 frontend tests, TypeScript/Vite production build, the 250 KiB gzip bundle budget with 141 chunks and `git diff --check`. The My Work chunk is 9.5 KiB gzip.
+- Rebuilt and restarted the local Docker stack after the label-only follow-up. Frontend `/my-work` returned HTTP 200; backend `/api/health` returned `ok`; PostgreSQL and both Redis services were healthy.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn and remains `NOT UX ACCEPTED`.
+
+## Active Plan: Thu hẹp phạm vi mặc định Bàn làm việc
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-24)
+
+### Will be done
+
+- Add an additive `responsible` My Work queue for directly assigned work, matching project-role work and unassigned department-pool work, without treating another assignee's same-department work as personal responsibility.
+- Make `responsible` the visible/default frontend scope, preserve the selected scope when summary buckets change and keep `waiting_decision` actor-decidable independently.
+- Make ordinary summary counts follow the selected queue while preserving the current work-item action, project visibility, approval, readiness and mutation authorization contracts.
+- Add focused backend/frontend regression coverage, update central/backend/frontend/root-cause/Workflow Orchestration/Admin Governance maps, and run backend/frontend/build/performance/whitespace validation. No migration or sample-data rewrite is planned; browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the review package, impact matrix, proposed scope contract and Mockup as Text with `OK triển khai`.
+- Confirmed the current root cause in source and local PostgreSQL: the `upcoming` card forces `queue=all`, summary ignores queue, work-item visibility includes same-department project work, and every generated sample actor currently uses department `Dữ liệu mẫu`.
+- Confirmed the target sample-project split: three upcoming `Giám sát` responsibilities versus five upcoming items assigned to QS, QA/QC, Kế toán or PM.
+- Added the backend `responsible` queue as direct assignment, matching project role or an unassigned department pool. Another colleague's explicitly assigned same-department work remains available through `department`/`all` only. Existing list visibility and every readiness/action/mutation authorization gate remain unchanged.
+- Applied the selected queue to ordinary summary buckets and kept `waiting_decision` independently actor-decidable. The frontend now defaults to the visible `Tôi phụ trách` scope, keeps that scope when a summary bucket changes and exposes direct/department/watching/approval/all-visible alternatives in the primary filter row.
+- Added focused backend and frontend regressions. The current local sample project returns `responsible=3`, `department=5` and `all=8` upcoming items for the supervisor actor; focused backend tests passed and the frontend suite passed 258/258 tests.
+- Updated the central, backend, frontend, root-cause, Workflow Orchestration and Admin Governance maps. No schema, migration or sample-data change was required because this is an additive query/presentation classification over existing authorization scope.
+- Current working-tree verification at HEAD `c4206a3` plus the listed changes passed: focused database-backed My Work tests, 258/258 frontend tests, TypeScript/Vite production build, the 250 KiB gzip bundle budget with 141 chunks, `gofmt`, `git diff --check`, Docker image build and local stack startup. Frontend `/my-work` returned HTTP 200; backend `/api/health` returned `ok`; PostgreSQL and both Redis services were healthy.
+
+### Skipped / remaining acceptance
+
+- The full database-backed backend suite is not globally green for this working environment: four pre-existing accounting integration cases collided on unique request/payment codes and one workflow-template migration-shape case expected a missing legacy edge. The focused database-backed My Work regression passed independently after that run.
+- Browser/UAT is not authorized in this turn and remains `NOT UX ACCEPTED`.
+
+## Active Plan: Cô lập cache Bàn làm việc theo tài khoản
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-24)
+
+### Will be done
+
+- Clear frontend React Query data whenever the authenticated identity is established, changed, logged out or invalidated, so actor-owned responses cannot survive an account boundary.
+- Include the current User ID in the work-item, pending-approval and attention query keys; gate those reads until an authenticated actor exists and reconnect My Work SSE when the actor changes.
+- Keep the existing API/RBAC/workflow contracts and global 30-second same-actor freshness policy. Present summary-card first-load states as `…` and `—` instead of an unconfirmed zero.
+- Add focused regression coverage, update frontend/root-cause/Workflow Orchestration/Admin Governance maps, then run frontend tests, production build, bundle budget and whitespace checks. Browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the diagnosis, proposed behavior and Mockup as Text with `OK triển khai`.
+- Reproduced the report with `supervisor@dev.local`: backend `need_action`, `upcoming` and `all` responses consistently returned `summary.upcoming=8`, while only the cached default frontend query showed zero. A real React Query simulation with the application's 30-second freshness policy returned the prior zero without making a network call.
+- Confirmed the root cause in `AuthContext.tsx`, `main.tsx` and `MyWorkPage.tsx`: login/logout/auth failure did not clear the shared cache, and the four actor-owned My Work query families omitted User ID from their keys. The SSE reconnect state was not the source of the HTTP summary mismatch.
+- Implemented cache clearing at authentication bootstrap/failure/login/logout boundaries; actor-scoped and auth-gated the work, pending-approval and attention query keys; and made the attention SSE lifecycle actor-aware. Same-actor query freshness and common-prefix invalidation remain intact.
+- Summary cards now show `…` during the first work-query load and `—` after a first-load error, then render authoritative numeric values; a background-refresh error retains the last successful summary. The filtered `Công việc` badge behavior from the preceding plan remains unchanged.
+- Added focused auth-cache and My Work source-contract regression coverage; the focused run passed 8/8 tests.
+- Updated frontend/root-cause, Workflow Orchestration and Admin Governance maps with the authentication cache boundary, actor-scoped keys, actor-aware SSE and truthful summary-load contract. No backend/API/schema/migration/seed behavior changed.
+- Current working-tree verification at HEAD `c4206a3` plus the listed changes passed: 257/257 frontend tests, TypeScript and Vite production build, the 250 KiB gzip budget with 141 chunks, and `git diff --check`.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn and remains `NOT UX ACCEPTED`.
+
+## Active Plan: Đồng bộ số công việc với danh sách Bàn làm việc
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-24)
+
+### Will be done
+
+- Make the `Công việc` tab badge use the current `/me/work-items` page `total` instead of actor-wide `summary.total`, so its number matches the active queue, bucket and filters.
+- Preserve backend/API/RBAC/workflow state and summary-card semantics; add explicit loading/error badge states without changing any persisted data.
+- Add focused frontend regression coverage, update the frontend and Workflow Orchestration maps, then run frontend tests, production build, bundle budget and whitespace checks. Browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the diagnosis, proposed behavior and Mockup as Text with `OK triển khai`.
+- Reproduced the issue against the running local API as `pm@dev.local`: default `need_action` returned `total=0` while the same payload returned `summary.total=22`, composed of 14 completed/history and eight pending/upcoming records.
+- Loaded the mandatory central/backend/frontend/root-cause, Workflow Orchestration and Project Planning maps plus Diagnose and Frontend Workflow instructions; confirmed the frontend badge uses actor-wide `summary.total` while the list already uses the correctly filtered page `total`.
+- Updated the `Công việc` badge to use the current first-page `total`: the default actionable queue now presents zero for this PM, `Sắp tới` presents eight and the all-work view presents 22. First-load pending/error states use `…`/`—`, while a failed refresh retains the last successful count.
+- Kept the API payload, actor/project scope, summary cards, node-approval lane, workflow readiness and persisted data unchanged. Updated the frontend UI and Workflow Orchestration maps with the filtered-count contract; no backend/schema/migration/seed mapping changed.
+- Added focused source-contract regression coverage. Current working-tree frontend validation passed: 255/255 tests, TypeScript/production build, 250 KiB gzip budget with 141 chunks and `git diff --check`.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn and remains `NOT UX ACCEPTED`.
+
 ## Active Plan: Chuẩn hóa minh chứng hạng mục bàn giao thi công
 
 Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-24)

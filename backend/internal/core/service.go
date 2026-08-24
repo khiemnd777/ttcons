@@ -2331,7 +2331,8 @@ func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, act
 		item["execution_target"] = workItemExecutionTarget(item, nil)
 		for _, internalKey := range []string{
 			"action_scope", "decision_required_roles", "decision_requested_by",
-			"pipeline_current_node_id", "run_node_status", "is_mine", "is_department", "is_watching", "is_future",
+			"pipeline_current_node_id", "run_node_status", "is_responsible", "is_mine", "is_department", "is_watching",
+			"role_responsibility", "department_scope", "unassigned_department_responsibility", "is_future",
 		} {
 			delete(item, internalKey)
 		}

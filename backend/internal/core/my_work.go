@@ -11,7 +11,7 @@ import (
 )
 
 var myWorkQueues = map[string]bool{
-	"all": true, "mine": true, "department": true, "pending_approval": true, "watching": true,
+	"responsible": true, "all": true, "mine": true, "department": true, "pending_approval": true, "watching": true,
 }
 
 var myWorkDeadlines = map[string]bool{
@@ -40,7 +40,7 @@ var myWorkPriorities = map[string]bool{
 func normalizeMyWorkItemsFilter(filter MyWorkItemsFilter) (MyWorkItemsFilter, int, error) {
 	filter.Queue = strings.ToLower(strings.TrimSpace(filter.Queue))
 	if filter.Queue == "" {
-		filter.Queue = "all"
+		filter.Queue = "responsible"
 	}
 	if !myWorkQueues[filter.Queue] {
 		return filter, 0, validationError("Hàng đợi công việc không hợp lệ", Record{"queue": filter.Queue})
@@ -134,7 +134,10 @@ func parseMyWorkItemsCursor(cursor string) (int, error) {
 }
 
 func myWorkItemQueueScopes(item Record, canDecide bool) []string {
-	scopes := make([]string, 0, 4)
+	scopes := make([]string, 0, 5)
+	if boolValue(item["is_responsible"]) {
+		scopes = append(scopes, "responsible")
+	}
 	if boolValue(item["is_mine"]) {
 		scopes = append(scopes, "mine")
 	}

@@ -10,9 +10,9 @@ test('My Work loads the attention summary independently and details only in atte
   const page = await source('../src/modules/my-work/MyWorkPage.tsx');
 
   assert.match(page, /\/me\/activity-attention\/summary/);
-  assert.match(page, /queryKey: \['activity-attention', 'summary', project\]/);
-  assert.match(page, /queryKey: \['activity-attention', 'list', project\]/);
-  assert.match(page, /enabled: mode === 'attention'/);
+  assert.match(page, /queryKey: \['activity-attention', 'summary', user\?\.id, project\]/);
+  assert.match(page, /queryKey: \['activity-attention', 'list', user\?\.id, project\]/);
+  assert.match(page, /enabled: Boolean\(user\?\.id\) && mode === 'attention'/);
   assert.match(page, /if \(mode === 'attention'\) void activityAttention\.refetch\(\)/);
   assert.match(page, /activityAttentionSummary\.data\?\.has_more\s*\? '120\+'/);
   assert.match(page, /activityAttentionSummary\.isLoading\s*\? '…'/);
