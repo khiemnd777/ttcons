@@ -42,9 +42,10 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   const [variationSource, setVariationSource] = useState<ConstructionVariationSource | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { hasAnyPermission } = useAuth();
+  const { user, hasAnyPermission } = useAuth();
   const canViewOperations = hasAnyPermission(['operation.view']);
   const canReport = hasAnyPermission(['operation.report']);
+  const canSubmitWorkReport = hasAnyPermission(['work_report.submit']);
   const canViewFieldWorkspace = hasAnyPermission(['operation.view', 'quality.view', 'rework.view']);
   const canRequestCheck = hasAnyPermission(['construction.check.request']);
   const canCreateAction = hasAnyPermission(['construction.action.create']);
@@ -78,6 +79,21 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
     setSearchParams(next, { replace: true });
   }, [activeTab, searchParams, setSearchParams, tabs]);
 
+  useEffect(() => {
+    const requestedReportID = searchParams.get('report');
+    if (!requestedReportID || !reports.data) return;
+    const record = reports.data.find((item) => String(item.id) === requestedReportID);
+    const next = new URLSearchParams(searchParams);
+    next.delete('report');
+    next.set('tab', 'timeline');
+    setSearchParams(next, { replace: true });
+    if (record) {
+      setDialog({ type: 'report', mode: 'view', record });
+    } else {
+      toast.warn({ title: 'Không mở được báo cáo nguồn', description: 'Báo cáo không còn trong phạm vi truy cập hiện tại.' });
+    }
+  }, [reports.data, searchParams, setSearchParams, toast]);
+
   const invalidateReports = () => {
     queryClient.invalidateQueries({ queryKey: ['daily-reports', projectId] });
     queryClient.invalidateQueries({ queryKey: ['project-evidence', projectId] });
@@ -85,6 +101,8 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
     queryClient.invalidateQueries({ queryKey: ['construction-workspace', projectId] });
     queryClient.invalidateQueries({ queryKey: ['work-item'] });
     queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
+    queryClient.invalidateQueries({ queryKey: ['work-reports'] });
+    queryClient.invalidateQueries({ queryKey: ['work-report-detail'] });
   };
   const createReport = useMutation({
     mutationFn: async ({ values, uploads, linkedDrafts }: { values: ConstructionDailyReportCreatePayload; uploads: ConstructionEvidenceUploadDraft[]; linkedDrafts: ReportLinkedDraft[] }) => {
@@ -109,12 +127,19 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
       invalidateReports();
       setOpenReport(false);
       const transition = report.work_item_transition ?? {};
+      const delivery = report.delivery_transition ?? {};
       const autoStarted = transition.auto_started === true;
+      const submitted = delivery.submitted === true;
       const workItemTitle = String(transition.work_item_title ?? '').trim();
       const startedNotice = autoStarted ? `Đã bắt đầu ${workItemTitle ? `“${workItemTitle}”` : 'hạng mục liên quan'}. ` : '';
+      const deliveryNotice = submitted ? `Đã gửi cho ${String(delivery.recipient_name ?? 'người quản lý')}. ` : '';
       if (linkedFailures.length) {
-        setDialog({ type: 'report', mode: 'view', record: report, pendingLinkedDrafts: linkedFailures, linkedNotice: `Báo cáo đã lưu. ${startedNotice}${linkedFailures.length} kiểm tra/việc xử lý chưa được tạo. Dữ liệu lỗi được giữ lại để thử lại ngay tại đây.` });
-        toast.warn({ title: 'Báo cáo đã lưu một phần', description: `${startedNotice}${linkedCreated ? `Đã tạo ${linkedCreated} liên kết. ` : ''}Còn ${linkedFailures.length} liên kết cần thử lại.` });
+        setDialog({ type: 'report', mode: 'view', record: report, pendingLinkedDrafts: linkedFailures, linkedNotice: `Báo cáo đã lưu. ${deliveryNotice}${startedNotice}${linkedFailures.length} kiểm tra/việc xử lý chưa được tạo. Dữ liệu lỗi được giữ lại để thử lại ngay tại đây.` });
+        toast.warn({ title: 'Báo cáo đã lưu một phần', description: `${deliveryNotice}${startedNotice}${linkedCreated ? `Đã tạo ${linkedCreated} liên kết. ` : ''}Còn ${linkedFailures.length} liên kết cần thử lại.` });
+        return;
+      }
+      if (submitted) {
+        toast.success(`${startedNotice}Đã lưu và gửi báo cáo cho ${String(delivery.recipient_name ?? 'người quản lý')}${linkedCreated ? `; đã tạo ${linkedCreated} liên kết` : ''}`.trim());
         return;
       }
       if (autoStarted) {
@@ -132,8 +157,45 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
       const payload = { ...values, evidence_ids: evidenceIDs, primary_evidence_id: values.primary_evidence_id || uploadedEvidenceIDs[0] || evidenceIDs[0] || '' };
       return put<Record<string, any>>(`/daily-reports/${reportId}`, payload);
     },
-    onSuccess: () => { invalidateReports(); setDialog(null); toast.success('Đã cập nhật báo cáo thi công'); },
+    onSuccess: (report) => {
+      invalidateReports();
+      setDialog(null);
+      const delivery = report.delivery_transition ?? {};
+      toast.success(delivery.submitted === true ? `Đã cập nhật và gửi lại báo cáo cho ${String(delivery.recipient_name ?? 'người quản lý')}` : 'Đã cập nhật bản nháp báo cáo thi công');
+    },
     onError: (error) => toast.error('Không cập nhật được báo cáo thi công', error),
+  });
+  const quickSubmitReport = useMutation({
+    mutationFn: ({ reportId, recipientId }: { reportId: string; recipientId: string; recipientName: string }) => post<Record<string, any>>(`/work-reports/daily-reports/${reportId}/submit`, {
+      recipient_id: recipientId,
+      comment: '',
+    }),
+    onSuccess: (report, variables) => {
+      invalidateReports();
+      setDialog((current) => {
+        if (current?.type !== 'report' || String(current.record.id) !== variables.reportId) return current;
+        return {
+          ...current,
+          record: {
+            ...current.record,
+            ...report,
+            delivery_status: String(report.status ?? 'submitted'),
+            delivery_recipient_id: String(report.recipient_id ?? variables.recipientId),
+            delivery_recipient_name: String(report.recipient_name ?? variables.recipientName),
+            delivery_revision_no: report.current_revision_no,
+            delivery_review_comment: report.review_comment,
+            delivery_source_changed: false,
+          },
+        };
+      });
+      toast.success(String(report.current_revision_no ?? '') === '1'
+        ? `Đã gửi báo cáo cho ${variables.recipientName}`
+        : `Đã gửi lại báo cáo cho ${variables.recipientName}`);
+    },
+    onError: (error) => {
+      invalidateReports();
+      toast.error('Không gửi được báo cáo', error);
+    },
   });
   const addReportEvidence = useMutation({
     mutationFn: ({ reportId, workItemId, uploads }: { reportId: string; workItemId: string; uploads: ConstructionEvidenceUploadDraft[]; record: Record<string, any> }) => uploadReportEvidence(reportId, workItemId, uploads),
@@ -193,6 +255,9 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
     ]);
   }
 
+  const selectedReportLocked = Boolean(dialog?.record) && (dialog?.record?.report_delivery_eligible === false || ['recorded', 'submitted', 'acknowledged'].includes(String(dialog?.record?.delivery_status ?? '')));
+  const canDeliverSelectedReport = canSubmitWorkReport && String(dialog?.record?.reported_by ?? '') === String(user?.id ?? '');
+
   return <>
     <PageHeader title="Thi công" description="Ghi nhật ký, kiểm tra chất lượng và xử lý việc phát sinh ngay tại công trường." actions={<>{!global ? <ProjectBackLink projectId={projectId} /> : null}{global ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}{canReport ? <button disabled={!projectId || !constructionActive} title={!constructionActive ? 'Chỉ lập báo cáo khi quy trình đang ở Node Thi công' : undefined} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => constructionActive && setOpenReport(true)}><Plus className="h-4 w-4" /> Báo cáo hôm nay</button> : null}</>} />
     {construction.data && !constructionActive ? <ConstructionRuntimeBanner workspace={construction.data} /> : null}
@@ -201,9 +266,9 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
     {activeTab === 'timeline' && canViewOperations ? <DailyTimeline rows={timelineRows} workspace={canViewFieldWorkspace ? construction.data : undefined} loading={reports.isLoading} error={reports.error} createEnabled={constructionActive} onRetry={() => reports.refetch()} onCreate={() => constructionActive && setOpenReport(true)} onView={(record) => setDialog({ type: 'report', mode: 'view', record })} /> : null}
     {activeTab === 'checks' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="checks" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} /> : null}
     {activeTab === 'actions' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="actions" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} variationContext={variationContext.data} variationContextLoading={variationContext.isLoading} variationContextError={variationContext.isError} canViewContracts={canViewContracts} onRetryVariationContext={() => { void variationContext.refetch(); }} onProposeVariation={canProposeVariation ? setVariationSource : undefined} /> : null}
-    <ConstructionReportFormDialog open={openReport} projectId={projectId} suggestion={timelineRows[0] ?? null} workspace={construction.data} canCreateCheck={canRequestCheck} canCreateAction={canCreateAction} onSubmit={(values, uploads, linkedDrafts) => createReport.mutateAsync({ values, uploads, linkedDrafts })} onClose={() => setOpenReport(false)} />
-    <ConstructionReportDetailDialog open={dialog?.type === 'report' && dialog.mode === 'view'} projectId={projectId} record={dialog?.record ?? null} initialLinkedDrafts={dialog?.pendingLinkedDrafts} linkedNotice={dialog?.linkedNotice} canManage={canReport && constructionActive && Boolean(dialog?.record?.runtime_compliant)} canViewLinked={canViewFieldWorkspace} canCreateCheck={canRequestCheck && constructionActive} canCreateAction={canCreateAction && constructionActive} onEdit={() => dialog?.record && setDialog({ type: 'report', mode: 'edit', record: dialog.record })} onAddEvidence={() => dialog?.record && setDialog({ type: 'report-evidence', mode: 'edit', record: dialog.record })} onOpenCheck={openLinkedCheck} onOpenAction={openLinkedAction} onClose={() => setDialog(null)} />
-    <ConstructionReportFormDialog open={dialog?.type === 'report' && dialog.mode === 'edit'} projectId={projectId} mode="edit" record={dialog?.record ?? null} onSubmit={(values, uploads) => dialog?.record ? updateReport.mutateAsync({ reportId: dialog.record.id, values, uploads }) : Promise.resolve()} onClose={() => setDialog(null)} />
+    <ConstructionReportFormDialog open={openReport} projectId={projectId} suggestion={timelineRows[0] ?? null} workspace={construction.data} canCreateCheck={canRequestCheck} canCreateAction={canCreateAction} canSubmitWorkReport={canSubmitWorkReport} onSubmit={(values, uploads, linkedDrafts) => createReport.mutateAsync({ values, uploads, linkedDrafts })} onClose={() => setOpenReport(false)} />
+    <ConstructionReportDetailDialog open={dialog?.type === 'report' && dialog.mode === 'view'} projectId={projectId} record={dialog?.record ?? null} initialLinkedDrafts={dialog?.pendingLinkedDrafts} linkedNotice={dialog?.linkedNotice} canManage={canReport && constructionActive && !selectedReportLocked && Boolean(dialog?.record?.runtime_compliant)} canViewLinked={canViewFieldWorkspace} canCreateCheck={canRequestCheck && constructionActive} canCreateAction={canCreateAction && constructionActive} canDeliver={canDeliverSelectedReport} deliveryPending={quickSubmitReport.isPending} onDeliver={(recipientId, recipientName) => dialog?.record ? quickSubmitReport.mutateAsync({ reportId: String(dialog.record.id), recipientId, recipientName }) : Promise.resolve()} onEdit={() => dialog?.record && setDialog({ type: 'report', mode: 'edit', record: dialog.record })} onAddEvidence={() => dialog?.record && setDialog({ type: 'report-evidence', mode: 'edit', record: dialog.record })} onOpenCheck={openLinkedCheck} onOpenAction={openLinkedAction} onClose={() => setDialog(null)} />
+    <ConstructionReportFormDialog open={dialog?.type === 'report' && dialog.mode === 'edit'} projectId={projectId} mode="edit" record={dialog?.record ?? null} canSubmitWorkReport={canDeliverSelectedReport} onSubmit={(values, uploads) => dialog?.record ? updateReport.mutateAsync({ reportId: dialog.record.id, values, uploads }) : Promise.resolve()} onClose={() => setDialog(null)} />
     <ConstructionReportEvidenceDialog open={dialog?.type === 'report-evidence'} projectId={projectId} record={dialog?.record ?? null} onSubmit={(workItemId, uploads) => dialog?.record ? addReportEvidence.mutateAsync({ reportId: dialog.record.id, workItemId, uploads, record: dialog.record }) : Promise.resolve()} onClose={() => setDialog(null)} />
     <ConstructionVariationProposalDialog open={Boolean(variationSource)} projectId={projectId} context={variationContext.data} contextLoading={variationContext.isLoading} contextError={variationContext.isError} canViewContracts={canViewContracts} workspace={construction.data} sourceWorkItemId={variationSource?.workItemId} sourceAction={variationSource?.action} onRetryContext={() => { void variationContext.refetch(); }} onClose={() => setVariationSource(null)} onSaved={variationSaved} />
   </>;

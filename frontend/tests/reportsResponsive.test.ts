@@ -69,7 +69,7 @@ test('statistics use one global project scope and report-specific responsive car
   assert.match(reportFilters, /disabled=\{exporting \|\| exportDisabled\}/);
 });
 
-test('work report workspace exposes authored delivery, review and immutable revisions', async () => {
+test('work report workspace is a delivery register while source drafts stay in construction', async () => {
   const page = await source('../src/modules/work-reports/WorkReportsPage.tsx');
   const router = await source('../src/app/router.tsx');
   const shell = await source('../src/layouts/AppShell.tsx');
@@ -78,7 +78,9 @@ test('work report workspace exposes authored delivery, review and immutable revi
   assert.match(router, /path: '\/statistics\/:reportKey'/);
   assert.match(shell, /to: '\/reports', label: 'Báo cáo'.*work_report\.view/);
   assert.match(shell, /to: '\/statistics', label: 'Thống kê'.*statistics\.view/);
-  assert.match(page, /Báo cáo của tôi/);
+  assert.match(page, /key: 'mine', label: 'Đã gửi'/);
+  assert.match(page, /const canOpenSource = hasPermission\('operation\.view'\)/);
+  assert.match(page, /canOpenSource \? \[\{ key: 'source' as const, label: 'Nháp tại nguồn' \}\] : \[\]/);
   assert.match(page, /Chờ tôi xem/);
   assert.match(page, /hasPermission\('work_report\.create'\).*hasPermission\('operation\.report'\).*hasPermission\('operation\.view'\)/);
   assert.match(page, /Yêu cầu bổ sung/);
@@ -86,4 +88,8 @@ test('work report workspace exposes authored delivery, review and immutable revi
   assert.match(page, /PDF bản này/);
   assert.match(page, /endpoint="\/work-reports\/projects"/);
   assert.match(page, /format: ExportFormat/);
+  assert.match(page, /\/operations\?tab=timeline&report=\$\{encodeURIComponent\(row\.source_id\)\}/);
+  assert.match(page, /Mở tại Thi công/);
+  assert.doesNotMatch(page, /Gửi báo cáo cho người quản lý/);
+  assert.doesNotMatch(page, /\/work-reports\/daily-reports\/\$\{detail\.source_id\}\/submit/);
 });

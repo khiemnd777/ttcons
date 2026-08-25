@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
-  ClipboardList,
   Download,
   Eye,
   FilePlus2,
@@ -24,7 +23,7 @@ import { constructionReportViewModel } from '../operations/constructionReportVie
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 
 type WorkReportStatus = 'draft' | 'recorded' | 'submitted' | 'needs_changes' | 'acknowledged';
-type WorkReportScope = 'mine' | 'review' | 'all';
+type WorkReportScope = 'mine' | 'source' | 'review' | 'all';
 type ExportFormat = 'pdf' | 'xlsx' | 'csv';
 
 type WorkReportRow = Record<string, any> & {
@@ -59,11 +58,9 @@ type WorkReportDetail = WorkReportRow & {
   events?: Array<Record<string, any>>;
 };
 
-type Recipient = { id: string; full_name: string; position?: string };
-
 const statusOptions: Array<[string, string]> = [
   ['', 'Tất cả trạng thái'],
-  ['draft', 'Bản nháp'],
+  ['draft', 'Nháp tại nguồn'],
   ['submitted', 'Chờ xác nhận'],
   ['needs_changes', 'Yêu cầu bổ sung'],
   ['acknowledged', 'Đã xác nhận'],
@@ -78,12 +75,14 @@ export function WorkReportsPage() {
   const canReview = hasPermission('work_report.review') || hasPermission('work_report.manage');
   const canManage = hasPermission('work_report.manage');
   const canCreate = hasPermission('work_report.create') && hasPermission('operation.report') && hasPermission('operation.view');
+  const canOpenSource = hasPermission('operation.view');
   const canExport = hasPermission('work_report.export');
   const availableScopes = useMemo<Array<{ key: WorkReportScope; label: string }>>(() => [
-    { key: 'mine', label: 'Báo cáo của tôi' },
+    { key: 'mine', label: 'Đã gửi' },
+    ...(canOpenSource ? [{ key: 'source' as const, label: 'Nháp tại nguồn' }] : []),
     ...(canReview ? [{ key: 'review' as const, label: 'Chờ tôi xem' }] : []),
     ...(canManage ? [{ key: 'all' as const, label: 'Tất cả được phép xem' }] : []),
-  ], [canManage, canReview]);
+  ], [canManage, canOpenSource, canReview]);
   const [scope, setScope] = useState<WorkReportScope>('mine');
   const [draftFilters, setDraftFilters] = useState({ projectId: '', status: '', dateFrom: '', dateTo: '', search: '' });
   const [filters, setFilters] = useState(draftFilters);
@@ -128,6 +127,12 @@ export function WorkReportsPage() {
     setFilters(empty);
   }
 
+  function changeScope(nextScope: WorkReportScope) {
+    setScope(nextScope);
+    setFilters((current) => ({ ...current, status: nextScope === 'source' ? 'draft' : current.status === 'draft' ? '' : current.status }));
+    setDraftFilters((current) => ({ ...current, status: nextScope === 'source' ? 'draft' : current.status === 'draft' ? '' : current.status }));
+  }
+
   async function exportRegister() {
     setExporting(true);
     try {
@@ -144,6 +149,14 @@ export function WorkReportsPage() {
   }
 
   const rows = reports.data ?? [];
+
+  function openReport(row: WorkReportRow) {
+    if (!row.work_report_id) {
+      navigate(`/projects/${row.project_id}/operations?tab=timeline&report=${encodeURIComponent(row.source_id)}`);
+      return;
+    }
+    setSelectedSourceID(row.source_id);
+  }
 
   return (
     <div className="space-y-5">
@@ -164,7 +177,7 @@ export function WorkReportsPage() {
               <button
                 type="button"
                 className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                onClick={() => navigate('/operations?tab=reports')}
+                onClick={() => navigate('/operations?tab=timeline')}
               >
                 <FilePlus2 className="h-4 w-4" />
                 Lập báo cáo tại Thi công
@@ -205,7 +218,7 @@ export function WorkReportsPage() {
               role="tab"
               aria-selected={scope === item.key}
               className={clsx('whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold', scope === item.key ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-ink')}
-              onClick={() => setScope(item.key)}
+              onClick={() => changeScope(item.key)}
             >
               {item.label}
             </button>
@@ -218,15 +231,15 @@ export function WorkReportsPage() {
           error={reports.error}
           onRetry={() => void reports.refetch()}
           empty={scope === 'review' ? 'Không có báo cáo đang chờ anh xem' : 'Chưa có báo cáo trong phạm vi này'}
-          emptyAction={canCreate && scope === 'mine' ? (
-            <button type="button" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => navigate('/operations?tab=reports')}>Lập báo cáo tại Thi công</button>
+          emptyAction={canCreate && (scope === 'mine' || scope === 'source') ? (
+            <button type="button" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => navigate('/operations?tab=timeline')}>Lập báo cáo tại Thi công</button>
           ) : undefined}
           pageSize={10}
           defaultSort={{ key: 'report_date', direction: 'desc' }}
           getRowKey={(row) => row.source_id}
-          renderMobileCard={(row) => <WorkReportCard row={row} onOpen={() => setSelectedSourceID(row.source_id)} />}
+          renderMobileCard={(row) => <WorkReportCard row={row} onOpen={() => openReport(row)} />}
           columns={[
-            { key: 'action', header: '', action: true, render: (row) => <button type="button" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-900" onClick={() => setSelectedSourceID(row.source_id)}><Eye className="h-4 w-4" /><span className="sr-only">Xem </span>Chi tiết</button> },
+            { key: 'action', header: '', action: true, render: (row) => <button type="button" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-900" onClick={() => openReport(row)}><Eye className="h-4 w-4" />{row.work_report_id ? <><span className="sr-only">Xem </span>Chi tiết</> : 'Mở tại Thi công'}</button> },
             { key: 'report_date', header: 'Ngày báo cáo', sortable: true, render: (row) => <span className="font-semibold text-ink">{dateText(row.report_date)}</span> },
             { key: 'project_name', header: 'Công trình', sortable: true, render: (row) => <div><p className="font-semibold text-ink">{row.project_name}</p><p className="text-xs text-slate-500">{row.project_code}</p></div> },
             { key: 'author_name', header: 'Người lập', sortable: true, render: (row) => identityReferenceText(row.author_name, row.author_account_deleted) },
@@ -243,9 +256,9 @@ export function WorkReportsPage() {
         loading={detail.isLoading}
         error={detail.error}
         userID={user?.id ?? ''}
-        canSubmit={hasPermission('work_report.submit')}
         canReview={canReview}
         canManage={canManage}
+        canOpenSource={canOpenSource}
         canExport={canExport}
         onRefresh={async () => {
           await Promise.all([
@@ -265,9 +278,9 @@ function WorkReportDialog({
   loading,
   error,
   userID,
-  canSubmit,
   canReview,
   canManage,
+  canOpenSource,
   canExport,
   onRefresh,
   onClose,
@@ -277,52 +290,24 @@ function WorkReportDialog({
   loading: boolean;
   error: unknown;
   userID: string;
-  canSubmit: boolean;
   canReview: boolean;
   canManage: boolean;
+  canOpenSource: boolean;
   canExport: boolean;
   onRefresh: () => Promise<void>;
   onClose: () => void;
 }) {
   const navigate = useNavigate();
   const toast = useToast();
-  const [recipientID, setRecipientID] = useState('');
-  const [submitComment, setSubmitComment] = useState('');
   const [reviewComment, setReviewComment] = useState('');
   const [busyAction, setBusyAction] = useState('');
   const view = useMemo(() => constructionReportViewModel(detail ?? {}), [detail]);
-  const maySubmit = Boolean(detail && canSubmit && detail.author_id === userID && detail.report_delivery_eligible && (detail.status === 'draft' || detail.status === 'needs_changes'));
   const mayReview = Boolean(detail && canReview && detail.status === 'submitted' && (canManage || detail.recipient_id === userID));
-  const recipients = useQuery({
-    queryKey: ['work-report-recipients', detail?.project_id],
-    queryFn: () => get<Recipient[]>(`/work-reports/recipients?project_id=${detail?.project_id}`),
-    enabled: open && maySubmit && Boolean(detail?.project_id),
-    retry: false,
-  });
 
   useEffect(() => {
     if (!open) return;
-    setRecipientID(detail?.recipient_id ?? '');
-    setSubmitComment('');
     setReviewComment('');
-  }, [detail?.recipient_id, detail?.source_id, open]);
-
-  async function submitReport() {
-    if (!detail || !recipientID) {
-      toast.warn({ title: 'Chưa chọn người nhận', description: 'Chọn người quản lý sẽ nhận và phản hồi báo cáo.' });
-      return;
-    }
-    setBusyAction('submit');
-    try {
-      await post(`/work-reports/daily-reports/${detail.source_id}/submit`, { recipient_id: recipientID, comment: submitComment.trim() });
-      await onRefresh();
-      toast.success(detail.status === 'needs_changes' ? 'Đã gửi lại báo cáo' : 'Đã gửi báo cáo');
-    } catch (requestError) {
-      toast.error('Không gửi được báo cáo', requestError);
-    } finally {
-      setBusyAction('');
-    }
-  }
+  }, [detail?.source_id, open]);
 
   async function review(action: 'request-changes' | 'acknowledge') {
     if (!detail?.work_report_id) return;
@@ -364,7 +349,7 @@ function WorkReportDialog({
       onClose={onClose}
       footer={detail ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => navigate(`/projects/${detail.project_id}/operations`)}>Mở nguồn tại Thi công</button>
+          {canOpenSource ? <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => navigate(`/projects/${detail.project_id}/operations?tab=timeline&report=${encodeURIComponent(detail.source_id)}`)}>Mở nguồn tại Thi công</button> : <span />}
           <div className="flex flex-wrap justify-end gap-2">
             <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>Đóng</button>
             {mayReview ? (
@@ -376,11 +361,6 @@ function WorkReportDialog({
                   {busyAction === 'acknowledge' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Xác nhận đã xem
                 </button>
               </>
-            ) : null}
-            {maySubmit ? (
-              <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={Boolean(busyAction) || recipients.isLoading} onClick={() => void submitReport()}>
-                {busyAction === 'submit' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />} {detail.status === 'needs_changes' ? 'Gửi lại báo cáo' : 'Gửi báo cáo'}
-              </button>
             ) : null}
           </div>
         </div>
@@ -416,26 +396,6 @@ function WorkReportDialog({
             <ReportSection title="Nhân lực" items={view.crew} empty={detail.manpower_summary || 'Chưa ghi nhân lực'} tone="slate" />
             <ReportSection title="Vật tư sử dụng" items={view.materials} empty={detail.material_usage_summary || 'Chưa ghi vật tư'} tone="slate" />
           </div>
-
-          {maySubmit ? (
-            <section className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
-              <h3 className="font-semibold text-ink">{detail.status === 'needs_changes' ? 'Gửi lại cho người quản lý' : 'Gửi báo cáo cho người quản lý'}</h3>
-              <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                <label className="block">
-                  <span className="text-xs font-semibold text-slate-600">Người nhận <span className="text-rose-600">*</span></span>
-                  <select className={clsx('mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100', !recipientID ? 'border-amber-300' : 'border-line')} value={recipientID} onChange={(event) => setRecipientID(event.target.value)} disabled={recipients.isLoading}>
-                    <option value="">Chọn người nhận báo cáo</option>
-                    {(recipients.data ?? []).map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.full_name}{recipient.position ? ` · ${recipient.position}` : ''}</option>)}
-                  </select>
-                  {recipients.error ? <span className="mt-1 block text-xs text-rose-600">Không tải được danh sách người nhận.</span> : null}
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold text-slate-600">Ghi chú khi gửi</span>
-                  <textarea className="mt-1 min-h-20 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100" maxLength={2000} value={submitComment} onChange={(event) => setSubmitComment(event.target.value)} placeholder="Nội dung cần người nhận lưu ý..." />
-                </label>
-              </div>
-            </section>
-          ) : null}
 
           {mayReview ? (
             <section className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
@@ -496,7 +456,7 @@ function WorkReportCard({ row, onOpen }: { row: WorkReportRow; onOpen: () => voi
         <WorkReportStatusBadge status={row.status} />
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-slate-500">Người lập</dt><dd className="font-medium text-ink">{identityReferenceText(row.author_name, row.author_account_deleted)}</dd></div><div><dt className="text-xs text-slate-500">Gửi đến</dt><dd className="font-medium text-ink">{row.recipient_name ? identityReferenceText(row.recipient_name, row.recipient_account_deleted) : 'Chưa gửi'}</dd></div></dl>
-      <button type="button" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-blue-700" onClick={onOpen}><Eye className="h-4 w-4" /> Xem chi tiết</button>
+      <button type="button" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-blue-700" onClick={onOpen}><Eye className="h-4 w-4" /> {row.work_report_id ? 'Xem chi tiết' : 'Mở tại Thi công'}</button>
     </article>
   );
 }
@@ -506,7 +466,7 @@ function WorkReportStatusBadge({ status }: { status: WorkReportStatus }) {
     draft: 'bg-slate-100 text-slate-700', recorded: 'bg-slate-100 text-slate-500', submitted: 'bg-blue-50 text-blue-700', needs_changes: 'bg-amber-50 text-amber-700', acknowledged: 'bg-emerald-50 text-emerald-700',
   }[status];
   const label = {
-    draft: 'Bản nháp', recorded: 'Nhật ký lịch sử', submitted: 'Chờ xác nhận', needs_changes: 'Yêu cầu bổ sung', acknowledged: 'Đã xác nhận',
+    draft: 'Nháp tại nguồn', recorded: 'Nhật ký lịch sử', submitted: 'Chờ xác nhận', needs_changes: 'Yêu cầu bổ sung', acknowledged: 'Đã xác nhận',
   }[status];
   return <span className={clsx('inline-flex rounded-md px-2 py-1 text-xs font-semibold', style)}>{label}</span>;
 }

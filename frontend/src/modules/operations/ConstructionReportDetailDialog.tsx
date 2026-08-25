@@ -14,6 +14,7 @@ import {
   Package,
   Pencil,
   RefreshCw,
+  Send,
   Upload,
   Users,
   Wrench,
@@ -32,6 +33,7 @@ import { ConstructionReportLinkedComposer, type ReportLinkedDraft } from './Cons
 import { createConstructionAction, createConstructionCheck, uploadConstructionEvidenceItems } from './constructionWorkspaceApi';
 import { constructionReportViewModel } from './constructionReportViewModel';
 import { actionStatusLabel, checkStatusLabel, constructionActionAssigneeLabel, dateTimeText, optionalISO } from './constructionWorkspaceUtils';
+import { useWorkReportRecipients } from './useWorkReportRecipients';
 
 type ConstructionReportDetailDialogProps = {
   open: boolean;
@@ -47,10 +49,13 @@ type ConstructionReportDetailDialogProps = {
   onAddEvidence?: () => void;
   onOpenCheck?: (check: ConstructionCheck) => void;
   onOpenAction?: (action: ConstructionActionItem) => void;
+  canDeliver?: boolean;
+  deliveryPending?: boolean;
+  onDeliver?: (recipientId: string, recipientName: string) => Promise<unknown>;
   onClose: () => void;
 };
 
-export function ConstructionReportDetailDialog({ open, projectId, record, canManage = false, canViewLinked = false, canCreateCheck = false, canCreateAction = false, initialLinkedDrafts, linkedNotice, onEdit, onAddEvidence, onOpenCheck, onOpenAction, onClose }: ConstructionReportDetailDialogProps) {
+export function ConstructionReportDetailDialog({ open, projectId, record, canManage = false, canViewLinked = false, canCreateCheck = false, canCreateAction = false, initialLinkedDrafts, linkedNotice, onEdit, onAddEvidence, onOpenCheck, onOpenAction, canDeliver = false, deliveryPending = false, onDeliver, onClose }: ConstructionReportDetailDialogProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -60,11 +65,38 @@ export function ConstructionReportDetailDialog({ open, projectId, record, canMan
   const evidenceKey = report.evidenceIds.join(',');
   const sourceExists = Boolean(report.workItemId || report.workflowFormInstanceId);
   const manualReport = !report.workflowFormInstanceId;
+  const deliveryStatus = String(record?.delivery_status ?? '');
+  const sourceChangedAfterReview = record?.delivery_source_changed === true;
+  const needsSourceChange = deliveryStatus === 'needs_changes' && !sourceChangedAfterReview;
+  const deliveryCandidate = record?.report_delivery_eligible !== false
+    && canDeliver
+    && Boolean(onDeliver)
+    && (deliveryStatus === '' || deliveryStatus === 'draft' || (deliveryStatus === 'needs_changes' && sourceChangedAfterReview));
+  const recipients = useWorkReportRecipients(projectId, open && deliveryCandidate);
+  const [recipientId, setRecipientId] = useState('');
+  const selectedRecipient = recipients.data?.find((recipient) => recipient.id === recipientId);
+  const deliveryRecipientLabel = selectedRecipient?.recommendation_reason === 'project_pm'
+    ? `PM · ${selectedRecipient.full_name}`
+    : selectedRecipient?.full_name ?? 'người quản lý';
+  const deliveryButtonLabel = deliveryStatus === 'needs_changes'
+    ? `Gửi lại cho ${deliveryRecipientLabel}`
+    : `Gửi cho ${deliveryRecipientLabel}`;
 
   useEffect(() => {
     if (!open) return;
     setLinkedDrafts(initialLinkedDrafts ?? []);
   }, [initialLinkedDrafts, open, record?.id]);
+
+  useEffect(() => {
+    if (!open || !deliveryCandidate) {
+      setRecipientId('');
+      return;
+    }
+    setRecipientId((current) => {
+      if (current && recipients.data?.some((recipient) => recipient.id === current)) return current;
+      return recipients.recommendedRecipient?.id ?? '';
+    });
+  }, [deliveryCandidate, open, record?.id, recipients.data, recipients.recommendedRecipient?.id]);
 
   const operations = useQuery({
     queryKey: ['project-operations', projectId, 'full'],
@@ -150,6 +182,15 @@ export function ConstructionReportDetailDialog({ open, projectId, record, canMan
     navigate(workItemDetailPath(report.workItemId, currentReturnTo(location), projectId));
   }
 
+  async function deliverReport() {
+    if (!onDeliver || !selectedRecipient) return;
+    try {
+      await onDeliver(selectedRecipient.id, selectedRecipient.full_name);
+    } catch {
+      // The mutation owner displays the API error and refreshes stale delivery state.
+    }
+  }
+
   return (
     <Dialog
       open={open}
@@ -160,8 +201,16 @@ export function ConstructionReportDetailDialog({ open, projectId, record, canMan
       footer={(
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>Đóng</button>
-          {manualReport && canManage && onEdit ? <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={onEdit}><Pencil className="h-4 w-4" /> Sửa báo cáo</button> : null}
-          {report.workItemId ? <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={openSource}><ExternalLink className="h-4 w-4" /> Mở công việc liên quan</button> : null}
+          {manualReport && canManage && onEdit && !needsSourceChange ? <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={onEdit}><Pencil className="h-4 w-4" /> Sửa báo cáo</button> : null}
+          {report.workItemId ? <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={openSource}><ExternalLink className="h-4 w-4" /> Mở công việc liên quan</button> : null}
+          {needsSourceChange && manualReport && canManage && onEdit ? <button type="button" className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 sm:w-auto" onClick={onEdit}><Pencil className="h-4 w-4" /> Sửa theo yêu cầu</button> : null}
+          {deliveryCandidate && recipients.data && recipients.data.length > 1 ? <select aria-label="Người nhận báo cáo" className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-slate-700 sm:w-auto" value={recipientId} onChange={(event) => setRecipientId(event.target.value)}><option value="">Chọn người nhận</option>{recipients.data.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.full_name}{recipient.position ? ` · ${recipient.position}` : ''}{recipient.is_recommended ? ' · Đề xuất' : ''}</option>)}</select> : null}
+          {deliveryCandidate && recipients.isLoading ? <button type="button" disabled className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white opacity-60 sm:w-auto"><RefreshCw className="h-4 w-4 animate-spin" /> Đang xác định người nhận…</button> : null}
+          {deliveryCandidate && recipients.isError ? <button type="button" className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 sm:w-auto" onClick={() => void recipients.refetch()}><RefreshCw className="h-4 w-4" /> Không tải được người nhận · Thử lại</button> : null}
+          {deliveryCandidate && recipients.isSuccess && !recipients.data.length ? <span className="inline-flex items-center justify-center rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800">Chưa có người nhận hợp lệ</span> : null}
+          {deliveryCandidate && recipients.isSuccess && recipients.data.length ? <button type="button" disabled={!selectedRecipient || deliveryPending} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto" onClick={() => void deliverReport()}>{deliveryPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {deliveryPending ? 'Đang gửi…' : selectedRecipient ? deliveryButtonLabel : 'Chọn người nhận để gửi'}</button> : null}
+          {deliveryStatus === 'submitted' ? <span className="inline-flex items-center justify-center rounded-md bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">Đã gửi cho {String(record?.delivery_recipient_name ?? 'người quản lý')}</span> : null}
+          {deliveryStatus === 'acknowledged' ? <span className="inline-flex items-center justify-center rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">Người quản lý đã xác nhận</span> : null}
         </div>
       )}
     >

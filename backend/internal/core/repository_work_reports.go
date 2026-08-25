@@ -46,10 +46,13 @@ func (r *Repository) WorkReports(ctx context.Context, actorID string, filter Wor
 	statusExpression := `COALESCE(report.status,CASE WHEN source.report_delivery_eligible THEN 'draft' ELSE 'recorded' END)`
 	switch filter.Scope {
 	case "mine":
-		conditions = append(conditions, "source.reported_by="+addArg(actorID)+"::uuid")
+		conditions = append(conditions, "source.reported_by="+addArg(actorID)+"::uuid", "report.id IS NOT NULL")
+	case "source":
+		conditions = append(conditions, "source.reported_by="+addArg(actorID)+"::uuid", "source.report_delivery_eligible", "report.id IS NULL")
 	case "review":
 		conditions = append(conditions, "report.recipient_id="+addArg(actorID)+"::uuid", "report.status='submitted'")
 	case "all":
+		conditions = append(conditions, "report.id IS NOT NULL")
 	default:
 		return nil, validationError("Phạm vi báo cáo không hợp lệ", Record{"scope": filter.Scope})
 	}
@@ -119,63 +122,98 @@ func (r *Repository) WorkReports(ctx context.Context, actorID string, filter Wor
 }
 
 func (r *Repository) WorkReportSource(ctx context.Context, sourceID string) (Record, error) {
-	return r.QueryOne(ctx, `
+	row, err := r.QueryOne(ctx, `
 		SELECT source.*,source.id::text AS source_id,source.project_id::text AS project_id,
 			source.reported_by::text AS author_id,project.code AS project_code,project.name AS project_name,
 			author.full_name AS author_name,COALESCE(author.deleted_at IS NOT NULL, false) AS author_account_deleted,work_item.title AS work_item_title,
 			report.id::text AS work_report_id,report.recipient_id::text AS recipient_id,
 			recipient.full_name AS recipient_name,COALESCE(recipient.deleted_at IS NOT NULL, false) AS recipient_account_deleted,report.status,report.current_revision_no,
 			report.submitted_at,report.reviewed_by::text AS reviewed_by,reviewer.full_name AS reviewed_by_name,COALESCE(reviewer.deleted_at IS NOT NULL, false) AS reviewed_by_account_deleted,
-			report.reviewed_at,report.review_comment
+			report.reviewed_at,report.review_comment,revision.snapshot_sha256 AS delivery_snapshot_sha256
 		FROM operation_daily_reports source
 		JOIN projects project ON project.id=source.project_id
 		LEFT JOIN users author ON author.id=source.reported_by
 		LEFT JOIN work_items work_item ON work_item.id=source.work_item_id
 		LEFT JOIN work_reports report ON report.source_kind='operation_daily_report' AND report.source_id=source.id
+		LEFT JOIN work_report_revisions revision ON revision.report_id=report.id AND revision.revision_no=report.current_revision_no
 		LEFT JOIN users recipient ON recipient.id=report.recipient_id
 		LEFT JOIN users reviewer ON reviewer.id=report.reviewed_by
 		WHERE source.id=$1
 	`, sourceID)
+	if err != nil {
+		return nil, err
+	}
+	if err := annotateWorkReportDeliverySourceChanged(row); err != nil {
+		return nil, err
+	}
+	return row, nil
 }
 
 func (r *Repository) WorkReportRecipients(ctx context.Context, projectID, actorID string) ([]Record, error) {
 	return r.Query(ctx, `
-		SELECT DISTINCT user_account.id::text AS id,user_account.full_name,
-			COALESCE(staff.position,role.display_name) AS position
-		FROM users user_account
-		JOIN user_roles assignment ON assignment.user_id=user_account.id
-		JOIN roles role ON role.id=assignment.role_id AND NOT role.external_only
-		JOIN role_permissions role_permission ON role_permission.role_id=role.id
-		JOIN permissions permission ON permission.id=role_permission.permission_id
-		LEFT JOIN staff ON staff.user_id=user_account.id AND staff.status <> 'deleted'
-		WHERE user_account.status='active'
-		  AND user_account.id <> $2::uuid
-		  AND permission.key IN ('work_report.review','work_report.manage')
-		  AND (
-			role.name IN ('admin','director')
-			OR assignment.project_id=$1::uuid
-			OR EXISTS (
-				SELECT 1
-				FROM project_members member
-				JOIN staff member_staff ON member_staff.id=member.staff_id
-				WHERE member.project_id=$1::uuid AND member_staff.user_id=user_account.id AND member.active
-			)
-		  )
-		ORDER BY user_account.full_name
+		WITH eligible AS (
+			SELECT user_account.id,user_account.full_name,
+				COALESCE(MAX(staff.position),MIN(role.display_name)) AS position,
+				EXISTS (
+					SELECT 1
+					FROM projects project
+					JOIN staff project_pm ON project_pm.id=project.pm_staff_id AND project_pm.status <> 'deleted'
+					WHERE project.id=$1::uuid AND project_pm.user_id=user_account.id
+				) AS is_project_pm
+			FROM users user_account
+			JOIN user_roles assignment ON assignment.user_id=user_account.id
+			JOIN roles role ON role.id=assignment.role_id AND NOT role.external_only
+			JOIN role_permissions role_permission ON role_permission.role_id=role.id
+			JOIN permissions permission ON permission.id=role_permission.permission_id
+			LEFT JOIN staff ON staff.user_id=user_account.id AND staff.status <> 'deleted'
+			WHERE user_account.status='active'
+			  AND user_account.id <> $2::uuid
+			  AND permission.key IN ('work_report.review','work_report.manage')
+			  AND (
+				role.name IN ('admin','director')
+				OR assignment.project_id=$1::uuid
+				OR EXISTS (
+					SELECT 1
+					FROM project_members member
+					JOIN staff member_staff ON member_staff.id=member.staff_id
+					WHERE member.project_id=$1::uuid AND member_staff.user_id=user_account.id AND member.active
+				)
+				  )
+			GROUP BY user_account.id,user_account.full_name
+		), summary AS (
+			SELECT COUNT(*) AS recipient_count,COALESCE(bool_or(is_project_pm),false) AS has_project_pm
+			FROM eligible
+		)
+		SELECT eligible.id::text AS id,eligible.full_name,eligible.position,
+			(eligible.is_project_pm OR (NOT summary.has_project_pm AND summary.recipient_count=1)) AS is_recommended,
+			CASE
+				WHEN eligible.is_project_pm THEN 'project_pm'
+				WHEN NOT summary.has_project_pm AND summary.recipient_count=1 THEN 'only_eligible_recipient'
+				ELSE ''
+			END AS recommendation_reason
+		FROM eligible
+		CROSS JOIN summary
+		ORDER BY is_recommended DESC,eligible.full_name
 	`, projectID, actorID)
 }
 
 func (r *Repository) WorkReportStatusForSource(ctx context.Context, sourceID string) (string, error) {
-	var status string
-	err := r.db.QueryRowContext(ctx, `
+	return workReportStatusForSourceTx(ctx, r.db, sourceID)
+}
+
+func workReportStatusForSourceTx(ctx context.Context, db queryContext, sourceID string) (string, error) {
+	row, err := queryOneRecord(ctx, db, `
 		SELECT status
 		FROM work_reports
 		WHERE source_kind = 'operation_daily_report' AND source_id = $1
-	`, sourceID).Scan(&status)
+	`, sourceID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
-	return status, err
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprint(row["status"]), nil
 }
 
 func (r *Repository) WorkReportHistory(ctx context.Context, reportID string) ([]Record, []Record, error) {
@@ -226,6 +264,16 @@ func (r *Repository) SubmitWorkReport(ctx context.Context, sourceID, recipientID
 		return nil, err
 	}
 	defer tx.Rollback()
+	if _, err := r.submitWorkReportTx(ctx, tx, sourceID, recipientID, comment, actorID, actorName); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.WorkReportSource(ctx, sourceID)
+}
+
+func (r *Repository) submitWorkReportTx(ctx context.Context, tx *sql.Tx, sourceID, recipientID, comment, actorID, actorName string) (Record, error) {
 	source, err := queryOneRecord(ctx, tx, `
 		SELECT source.*,project.code AS project_code,project.name AS project_name,author.full_name AS author_name,
 			work_item.title AS work_item_title
@@ -273,6 +321,16 @@ func (r *Repository) SubmitWorkReport(ctx context.Context, sourceID, recipientID
 	if !recipientAllowed || recipientID == actorID {
 		return nil, validationError("Người nhận báo cáo không hợp lệ", Record{"recipient_id": recipientID})
 	}
+	var recipientName string
+	if err := tx.QueryRowContext(ctx, `SELECT full_name FROM users WHERE id=$1::uuid`, recipientID).Scan(&recipientName); err != nil {
+		return nil, err
+	}
+	snapshot := workReportSnapshot(source)
+	rawSnapshot, err := json.Marshal(snapshot)
+	if err != nil {
+		return nil, err
+	}
+	hash := sha256Hex(rawSnapshot)
 
 	existing, existingErr := queryOneRecord(ctx, tx, `SELECT * FROM work_reports WHERE source_kind='operation_daily_report' AND source_id=$1 FOR UPDATE`, sourceID)
 	revisionNo := 1
@@ -283,6 +341,13 @@ func (r *Repository) SubmitWorkReport(ctx context.Context, sourceID, recipientID
 			return nil, validationError("Báo cáo chỉ được gửi lại sau khi có yêu cầu bổ sung", Record{"status": existing["status"]})
 		}
 		reportID = cleanID(existing["id"])
+		var previousHash string
+		if err := tx.QueryRowContext(ctx, `SELECT snapshot_sha256 FROM work_report_revisions WHERE report_id=$1 AND revision_no=$2`, reportID, existing["current_revision_no"]).Scan(&previousHash); err != nil {
+			return nil, err
+		}
+		if previousHash == hash {
+			return nil, validationError("Báo cáo chưa có thay đổi sau yêu cầu bổ sung", Record{"reason": "unchanged_since_change_request"})
+		}
 		revisionNo = int(number(existing["current_revision_no"])) + 1
 		eventType = "resubmitted"
 		if _, err := tx.ExecContext(ctx, `
@@ -306,12 +371,6 @@ func (r *Repository) SubmitWorkReport(ctx context.Context, sourceID, recipientID
 		return nil, existingErr
 	}
 
-	snapshot := workReportSnapshot(source)
-	rawSnapshot, err := json.Marshal(snapshot)
-	if err != nil {
-		return nil, err
-	}
-	hash := sha256Hex(rawSnapshot)
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO work_report_revisions
 			(report_id,revision_no,snapshot_json,snapshot_sha256,submitted_by,comment)
@@ -328,10 +387,16 @@ func (r *Repository) SubmitWorkReport(ctx context.Context, sourceID, recipientID
 	if err := addAuditTx(ctx, tx, cleanID(source["project_id"]), actorID, actorName, "work_report_"+eventType, "work_report", reportID, "Gửi báo cáo thi công", Record{"source_id": sourceID, "revision_no": revisionNo, "recipient_id": recipientID}); err != nil {
 		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return r.WorkReportSource(ctx, sourceID)
+	return Record{
+		"mode":           "submit",
+		"submitted":      true,
+		"status":         "submitted",
+		"work_report_id": reportID,
+		"revision_no":    revisionNo,
+		"recipient_id":   recipientID,
+		"recipient_name": recipientName,
+		"event_type":     eventType,
+	}, nil
 }
 
 func (r *Repository) ReviewWorkReport(ctx context.Context, reportID, action, comment, actorID, actorName string, canManage bool) (Record, error) {
@@ -404,4 +469,22 @@ func workReportSnapshot(source Record) Record {
 		"photos":                    source["photos"],
 		"primary_evidence_id":       cleanID(source["primary_evidence_id"]),
 	}
+}
+
+func annotateWorkReportDeliverySourceChanged(source Record) error {
+	status := strings.TrimSpace(fmt.Sprint(source["delivery_status"]))
+	if status == "" {
+		status = strings.TrimSpace(fmt.Sprint(source["status"]))
+	}
+	source["delivery_source_changed"] = false
+	if status == "needs_changes" {
+		rawSnapshot, err := json.Marshal(workReportSnapshot(source))
+		if err != nil {
+			return err
+		}
+		previousHash := strings.TrimSpace(fmt.Sprint(source["delivery_snapshot_sha256"]))
+		source["delivery_source_changed"] = previousHash != "" && sha256Hex(rawSnapshot) != previousHash
+	}
+	delete(source, "delivery_snapshot_sha256")
+	return nil
 }

@@ -1,5 +1,36 @@
 # Current States
 
+## Active Plan: Gửi báo cáo cho người quản lý ngay tại Thi công
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-25)
+
+### Will be done
+
+- Keep `operation_daily_reports` as the mutable field source and `work_reports`/revisions/events as the immutable delivery lifecycle; do not add a second report-content editor or mutate historical revisions.
+- Add explicit `delivery.mode=draft|submit` to construction daily-report creation. `submit` must validate project-scoped `work_report.submit`, recipient eligibility and author identity, then create the source, auto-start the linked Work Item and persist the first immutable delivery revision/event/audit in the same PostgreSQL transaction.
+- Recommend the active eligible project PM as the default recipient, fall back to the sole eligible reviewer, and fail closed to draft-only UX when no recipient is available.
+- Make the Operations dialog primary CTA `Lưu & gửi cho …` with `Lưu nháp` secondary; keep edit/resubmission and historical source locks consistent with the existing lifecycle.
+- Turn `/reports` into the delivery/review register: formal authored reports are the default, unsent source rows live in an explicit `Nháp tại nguồn` scope and open the canonical Operations source instead of duplicating first-send controls.
+- Preserve Work Item completion/Node advancement, report review meaning, RBAC, export parity and linked construction check/action behavior. Add no schema migration unless implementation evidence proves one is necessary.
+- Add focused backend/frontend regressions, update central/backend/frontend/root-cause plus Construction Operations/Reporting/Workflow mappings, and validate the final working tree. Browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the review package, impact boundary and Mockup as Text with `OK triển khai`.
+- Confirmed the current split: Operations create has no delivery intent, `/reports` fabricates `draft` presentation from an eligible source with no `work_reports` row, and formal submit owns immutable revision/event/audit in a separate transaction.
+- Confirmed that submitted/acknowledged source rows are intentionally locked, so the approved UX keeps explicit `Lưu nháp` instead of sending every save unconditionally.
+- Extended construction report create/update with explicit `delivery.mode=draft|submit`. Source persistence, linked Work Item auto-start, immutable delivery revision/event and audits now commit or roll back in one PostgreSQL transaction; submitting never completes the Work Item or advances its Node.
+- Added project-scoped recipient recommendation: the active eligible project PM is preferred, the sole eligible reviewer is the fallback, duplicate role assignments are collapsed, and no eligible recipient leaves the form safely draft-only.
+- Made the Operations report dialog the canonical first-send/resubmit surface with `Lưu & gửi cho …` as the primary action and `Lưu nháp` as the secondary action. Historical or delivered sources remain locked, and the response/cache contract reports both delivery and Work Item transitions truthfully.
+- Reworked `/reports` as a formal delivery/review register. `Đã gửi` contains only formal authored reports; eligible unsent sources are separated into permission-gated `Nháp tại nguồn` and open the exact canonical Operations record. The former duplicate recipient/send form was removed from this UI while the backend compatibility route remains available.
+- Added PostgreSQL-backed regressions for PM recommendation, atomic rollback, first send, resubmission, immutable revisions/events/audits and source/formal scope separation. Added frontend contract regressions for canonical send/resubmit ownership, permission-gated source drafts and removal of duplicate submit controls.
+- Updated central/backend/frontend/root-cause mappings plus Construction Operations, Reporting Analytics and Workflow Orchestration domain maps. No schema migration, backfill or production-data rewrite was required.
+- Current working-tree verification at HEAD `12e8287` plus the listed dirty-tree changes passed: focused PostgreSQL integration tests against the local Consflow database; full backend `go test ./...`; 270/270 frontend tests; TypeScript/Vite production build; 250 KiB gzip bundle budget with 142 chunks; and `git diff --check`.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn and remains `NOT UX ACCEPTED`.
+
 ## Active Plan: Tự động bắt đầu đầu việc khi tạo báo cáo thi công
 
 Status: IMPLEMENTED AND FOCUSED TECHNICALLY VERIFIED; FULL BACKEND SUITE HAS OUT-OF-SCOPE FAILURES; UX NOT ACCEPTED (approved by user on 2026-08-25)

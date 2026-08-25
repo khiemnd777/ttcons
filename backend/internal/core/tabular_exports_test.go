@@ -76,6 +76,9 @@ func TestNormalizeWorkReportFilter(t *testing.T) {
 	if filter.Scope != "mine" || filter.Search != "tiến độ" {
 		t.Fatalf("unexpected normalized filter: %#v", filter)
 	}
+	if sourceFilter, err := normalizeWorkReportFilter(WorkReportFilter{Scope: "source"}); err != nil || sourceFilter.Scope != "source" {
+		t.Fatalf("source filter = %#v, %v", sourceFilter, err)
+	}
 	for _, invalid := range []WorkReportFilter{
 		{Scope: "team"},
 		{Status: "approved"},

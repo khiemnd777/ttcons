@@ -14,6 +14,12 @@ type WorkReportSubmitRequest struct {
 	Comment     string `json:"comment"`
 }
 
+type WorkReportDeliveryRequest struct {
+	Mode        string `json:"mode"`
+	RecipientID string `json:"recipient_id"`
+	Comment     string `json:"comment"`
+}
+
 type WorkReportReviewRequest struct {
 	Comment string `json:"comment"`
 }

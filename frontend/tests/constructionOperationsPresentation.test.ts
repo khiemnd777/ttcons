@@ -107,6 +107,34 @@ test('construction report explains and refreshes the atomic work-item auto start
   assert.doesNotMatch(page, /\/work-items\/\$\{[^}]+\}\/start/);
 });
 
+test('construction report owns first send and resubmit in the canonical source form', async () => {
+  const form = await readFile(new URL('../src/modules/operations/ConstructionReportFormDialog.tsx', import.meta.url), 'utf8');
+  const detail = await readFile(new URL('../src/modules/operations/ConstructionReportDetailDialog.tsx', import.meta.url), 'utf8');
+  const recipients = await readFile(new URL('../src/modules/operations/useWorkReportRecipients.ts', import.meta.url), 'utf8');
+  const page = await readFile(new URL('../src/modules/operations/OperationsPage.tsx', import.meta.url), 'utf8');
+
+  assert.match(recipients, /\/work-reports\/recipients\?project_id=\$\{projectId\}/);
+  assert.match(recipients, /is_recommended/);
+  assert.match(recipients, /recommendation_reason/);
+  assert.match(form, /useWorkReportRecipients/);
+  assert.match(form, /mode: deliveryMode/);
+  assert.match(form, /Lưu nháp/);
+  assert.match(form, /Lưu & gửi/);
+  assert.match(form, /Gửi lại sau yêu cầu bổ sung/);
+  assert.match(detail, /Gửi cho/);
+  assert.match(detail, /Gửi lại cho/);
+  assert.match(detail, /Sửa theo yêu cầu/);
+  assert.match(detail, /Đang xác định người nhận/);
+  assert.match(detail, /sm:w-auto/);
+  assert.match(page, /report\.delivery_transition/);
+  assert.match(page, /\/work-reports\/daily-reports\/\$\{reportId\}\/submit/);
+  assert.match(page, /queryKey: \['work-reports'\]/);
+  assert.match(page, /queryKey: \['work-report-detail'\]/);
+  assert.match(page, /searchParams\.get\('report'\)/);
+  assert.match(page, /canSubmitWorkReport/);
+  assert.match(page, /reported_by/);
+});
+
 test('shared evidence viewer keeps images in-app with loading, retry, decode failure and nested-dialog escape safety', async () => {
   const viewer = await readFile(new URL('../src/modules/_shared/EvidenceViewerDialog.tsx', import.meta.url), 'utf8');
   const recordViewer = await readFile(new URL('../src/modules/_shared/EvidenceRecordViewerDialog.tsx', import.meta.url), 'utf8');

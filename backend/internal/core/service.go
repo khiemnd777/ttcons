@@ -758,7 +758,11 @@ func (s *Service) CreateDailyReport(ctx context.Context, projectID string, req C
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.repo.CreateDailyReport(ctx, body, actorID, actorName)
+	delivery, err := s.normalizeConstructionReportDelivery(ctx, projectID, req.Delivery, actorID)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.repo.CreateDailyReport(ctx, body, delivery, actorID, actorName)
 	if err != nil {
 		return nil, err
 	}
@@ -951,18 +955,47 @@ func (s *Service) UpdateDailyReport(ctx context.Context, reportID string, req Co
 	if err != nil {
 		return nil, err
 	}
-	delete(body, "project_id")
-	delete(body, "reported_by")
-	row, err := s.repo.UpdateDailyReport(ctx, reportID, body)
+	delivery, err := s.normalizeConstructionReportDelivery(ctx, cleanID(current["project_id"]), req.Delivery, actorID)
 	if err != nil {
 		return nil, err
 	}
-	s.repo.AddAuditBestEffort(ctx, cleanID(current["project_id"]), actorID, actorName, "daily_report_updated", "daily_report", reportID, fmt.Sprintf("Cập nhật nhật ký ngày %s", row["report_date"]), Record{
-		"progress_percent": row["progress_percent"],
-		"work_item_id":     row["work_item_id"],
-		"evidence_count":   len(constructionReportStringList(row["photos"])),
-	})
+	delete(body, "project_id")
+	delete(body, "reported_by")
+	row, err := s.repo.UpdateDailyReportWithDelivery(ctx, reportID, body, delivery, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	return row, nil
+}
+
+func (s *Service) normalizeConstructionReportDelivery(ctx context.Context, projectID string, req WorkReportDeliveryRequest, actorID string) (WorkReportDeliveryRequest, error) {
+	req.Mode = strings.ToLower(strings.TrimSpace(req.Mode))
+	if req.Mode == "" {
+		req.Mode = "draft"
+	}
+	if req.Mode != "draft" && req.Mode != "submit" {
+		return req, validationError("Cách lưu báo cáo không hợp lệ", Record{"delivery.mode": req.Mode})
+	}
+	req.RecipientID = cleanID(req.RecipientID)
+	req.Comment = strings.TrimSpace(req.Comment)
+	if len([]rune(req.Comment)) > 2000 {
+		return req, validationError("Ghi chú gửi báo cáo không được vượt quá 2000 ký tự", Record{"delivery.comment": "too_long"})
+	}
+	if req.Mode == "draft" {
+		req.RecipientID = ""
+		return req, nil
+	}
+	if !validActivityUUID(req.RecipientID) {
+		return req, validationError("Người nhận báo cáo là bắt buộc", Record{"delivery.recipient_id": "required"})
+	}
+	allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, cleanID(projectID), []string{"work_report.submit"})
+	if err != nil {
+		return req, err
+	}
+	if !allowed {
+		return req, forbiddenError("Bạn không có quyền gửi báo cáo của công trình này")
+	}
+	return req, nil
 }
 
 func (s *Service) AddDailyReportEvidenceUpload(ctx context.Context, reportID, requestedWorkItemID string, req WorkItemEvidenceRequest, fileHeader *multipart.FileHeader, actorID, actorName string) (Record, error) {

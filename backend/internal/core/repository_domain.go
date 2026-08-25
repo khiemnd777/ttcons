@@ -17215,8 +17215,19 @@ func (r *Repository) CreateWarehouse(ctx context.Context, body Record) (Record, 
 }
 
 func (r *Repository) ListProjectDailyReports(ctx context.Context, projectID string) ([]Record, error) {
-	return r.Query(ctx, `
+	rows, err := r.Query(ctx, `
 		SELECT report.*,
+			project.code AS project_code,
+			project.name AS project_name,
+			author.full_name AS author_name,
+			work_item.title AS work_item_title,
+			delivery.id::text AS work_report_id,
+			delivery.status AS delivery_status,
+			delivery.recipient_id::text AS delivery_recipient_id,
+			recipient.full_name AS delivery_recipient_name,
+			delivery.current_revision_no AS delivery_revision_no,
+			delivery.review_comment AS delivery_review_comment,
+			delivery_revision.snapshot_sha256 AS delivery_snapshot_sha256,
 			(
 				report.work_item_id IS NOT NULL
 				AND EXISTS (
@@ -17230,12 +17241,27 @@ func (r *Repository) ListProjectDailyReports(ctx context.Context, projectID stri
 				)
 			) AS runtime_compliant
 		FROM operation_daily_reports report
+		JOIN projects project ON project.id=report.project_id
+		LEFT JOIN users author ON author.id=report.reported_by
+		LEFT JOIN work_items work_item ON work_item.id=report.work_item_id
+		LEFT JOIN work_reports delivery ON delivery.source_kind='operation_daily_report' AND delivery.source_id=report.id
+		LEFT JOIN work_report_revisions delivery_revision ON delivery_revision.report_id=delivery.id AND delivery_revision.revision_no=delivery.current_revision_no
+		LEFT JOIN users recipient ON recipient.id=delivery.recipient_id
 		WHERE report.project_id=$1
 		ORDER BY report.created_at DESC
 	`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		if err := annotateWorkReportDeliverySourceChanged(row); err != nil {
+			return nil, err
+		}
+	}
+	return rows, nil
 }
 
-func (r *Repository) CreateDailyReport(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+func (r *Repository) CreateDailyReport(ctx context.Context, body Record, delivery WorkReportDeliveryRequest, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -17357,11 +17383,76 @@ func (r *Repository) CreateDailyReport(ctx context.Context, body Record, actorID
 	); err != nil {
 		return nil, err
 	}
+	deliveryTransition := Record{"mode": "draft", "submitted": false, "status": "draft"}
+	if delivery.Mode == "submit" {
+		deliveryTransition, err = r.submitWorkReportTx(ctx, tx, cleanID(report["id"]), delivery.RecipientID, delivery.Comment, actorID, actorName)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	report["work_item_transition"] = transition
+	applyWorkReportDeliveryTransition(report, deliveryTransition)
 	return report, nil
+}
+
+func (r *Repository) UpdateDailyReportWithDelivery(ctx context.Context, id string, body Record, delivery WorkReportDeliveryRequest, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	current, err := queryOneRecord(ctx, tx, `SELECT * FROM operation_daily_reports WHERE id=$1 FOR UPDATE`, id)
+	if err != nil {
+		return nil, err
+	}
+	status, err := workReportStatusForSourceTx(ctx, tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if status != "" && status != "needs_changes" {
+		return nil, validationError("Báo cáo chỉ được chỉnh sửa khi chưa gửi hoặc đang được yêu cầu bổ sung", Record{"report_id": id, "status": status})
+	}
+	updated, err := updateRecord(ctx, tx, "operation_daily_reports", dailyReportColumns(), id, body)
+	if err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, cleanID(current["project_id"]), actorID, actorName, "daily_report_updated", "daily_report", id, fmt.Sprintf("Cập nhật nhật ký ngày %s", updated["report_date"]), Record{
+		"progress_percent": updated["progress_percent"],
+		"work_item_id":     updated["work_item_id"],
+		"evidence_count":   len(constructionReportStringList(updated["photos"])),
+	}); err != nil {
+		return nil, err
+	}
+	deliveryTransition := Record{"mode": "draft", "submitted": false, "status": status}
+	if status == "" {
+		deliveryTransition["status"] = "draft"
+	}
+	if delivery.Mode == "submit" {
+		deliveryTransition, err = r.submitWorkReportTx(ctx, tx, id, delivery.RecipientID, delivery.Comment, actorID, actorName)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	applyWorkReportDeliveryTransition(updated, deliveryTransition)
+	return updated, nil
+}
+
+func applyWorkReportDeliveryTransition(report, transition Record) {
+	report["delivery_transition"] = transition
+	report["delivery_status"] = transition["status"]
+	if boolValue(transition["submitted"]) {
+		report["work_report_id"] = transition["work_report_id"]
+		report["delivery_recipient_id"] = transition["recipient_id"]
+		report["delivery_recipient_name"] = transition["recipient_name"]
+		report["delivery_revision_no"] = transition["revision_no"]
+		report["delivery_review_comment"] = nil
+	}
 }
 
 func (r *Repository) UpdateDailyReport(ctx context.Context, id string, body Record) (Record, error) {

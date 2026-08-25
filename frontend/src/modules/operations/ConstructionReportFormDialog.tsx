@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Camera, ClipboardCheck, Eye, FileText, Image as ImageIcon, Loader2, Package, Plus, RefreshCw, Trash2, Users, Wrench } from 'lucide-react';
+import { AlertTriangle, Camera, ClipboardCheck, Eye, FileText, Image as ImageIcon, Loader2, Package, Plus, RefreshCw, Send, Trash2, Users, Wrench } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog } from '../../components/Dialog';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -23,6 +23,7 @@ import { useEvidencePreviewUrls } from '../work-items/EvidenceGallery';
 import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
 import { ConstructionReportLinkedComposer, createReportLinkedDraft, reportLinkedSubmitLabel, validateReportLinkedDrafts, type ReportLinkedDraft } from './ConstructionReportLinkedComposer';
 import { constructionReportEditModel } from './constructionReportViewModel';
+import { useWorkReportRecipients } from './useWorkReportRecipients';
 
 type CrewDraft = { crew_name: string; worker_count: string; work_hours: string; note: string };
 type MaterialDraft = { material_name: string; quantity: string; unit: string; note: string };
@@ -46,6 +47,11 @@ export type ConstructionDailyReportCreatePayload = {
   primary_evidence_id: string;
   manpower_summary: string;
   material_usage_summary: string;
+  delivery: {
+    mode: 'draft' | 'submit';
+    recipient_id: string;
+    comment: string;
+  };
 };
 
 type ConstructionReportFormDialogProps = {
@@ -57,11 +63,12 @@ type ConstructionReportFormDialogProps = {
   workspace?: ConstructionWorkspace;
   canCreateCheck?: boolean;
   canCreateAction?: boolean;
+  canSubmitWorkReport?: boolean;
   onClose: () => void;
   onSubmit: (payload: ConstructionDailyReportCreatePayload, uploads: ConstructionEvidenceUploadDraft[], linkedDrafts: ReportLinkedDraft[]) => Promise<unknown>;
 };
 
-export function ConstructionReportFormDialog({ open, projectId, mode = 'create', record = null, suggestion = null, workspace, canCreateCheck = false, canCreateAction = false, onClose, onSubmit }: ConstructionReportFormDialogProps) {
+export function ConstructionReportFormDialog({ open, projectId, mode = 'create', record = null, suggestion = null, workspace, canCreateCheck = false, canCreateAction = false, canSubmitWorkReport = false, onClose, onSubmit }: ConstructionReportFormDialogProps) {
   const toast = useToast();
   const [reportDate, setReportDate] = useState(todayText());
   const [weather, setWeather] = useState('Nắng');
@@ -86,6 +93,8 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   const [showLinkedErrors, setShowLinkedErrors] = useState(false);
   const [evidencePreviewRetryKey, setEvidencePreviewRetryKey] = useState(0);
   const [evidenceViewer, setEvidenceViewer] = useState<ReportEvidenceViewer | null>(null);
+  const [recipientId, setRecipientId] = useState('');
+  const [deliveryComment, setDeliveryComment] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -114,6 +123,8 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
     setShowLinkedErrors(false);
     setEvidencePreviewRetryKey(0);
     setEvidenceViewer(null);
+    setRecipientId(String(record?.delivery_recipient_id ?? ''));
+    setDeliveryComment('');
   }, [mode, open, record, suggestion]);
 
   const operations = useQuery({
@@ -130,6 +141,20 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   );
   const selectedWorkItem = workItems.find((item) => item.id === workItemId);
   const willAutoStartWorkItem = mode === 'create' && selectedWorkItem && ['pending', 'ready', 'needs_changes'].includes(selectedWorkItem.status);
+  const deliveryStatus = String(record?.delivery_status ?? '');
+  const mayDeliver = canSubmitWorkReport && (mode === 'create' || deliveryStatus === '' || deliveryStatus === 'draft' || deliveryStatus === 'needs_changes');
+  const recipients = useWorkReportRecipients(projectId, open && mayDeliver);
+  useEffect(() => {
+    if (!open || !mayDeliver || !recipients.data?.length) return;
+    setRecipientId((current) => {
+      if (current && recipients.data.some((recipient) => recipient.id === current)) return current;
+      return recipients.recommendedRecipient?.id ?? '';
+    });
+  }, [mayDeliver, open, recipients.data, recipients.recommendedRecipient?.id]);
+  const selectedRecipient = recipients.data?.find((recipient) => recipient.id === recipientId);
+  const deliverySubmitLabel = deliveryStatus === 'needs_changes'
+    ? `Lưu & gửi lại${selectedRecipient ? ` cho ${selectedRecipient.full_name}` : ''}`
+    : `Lưu & gửi${selectedRecipient ? ` cho ${selectedRecipient.full_name}` : ''}`;
   useEffect(() => {
     if (!open || mode !== 'create' || workItemId || workItems.length !== 1) return;
     selectWorkItem(workItems[0].id);
@@ -207,9 +232,12 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const deliveryMode: 'draft' | 'submit' = mayDeliver && submitter?.value === 'submit' ? 'submit' : 'draft';
     const nextErrors = validateReport({ reportDate, weather, progressPercent, doneItems, crewItems, materialItems });
 	    if (!workItemId) nextErrors.work_item_id = 'Hạng mục thi công đang thực hiện';
 	    if (!hasPhotoEvidence) nextErrors.evidence_ids = 'Ít nhất một ảnh hiện trường';
+    if (deliveryMode === 'submit' && !recipientId) nextErrors.delivery_recipient_id = 'Người nhận báo cáo';
     const linkedErrors = mode === 'create' ? validateReportLinkedDrafts(linkedDrafts, workItemId, selectedEvidenceIds.length + uploads.length > 0) : [];
     if (linkedErrors.length) setShowLinkedErrors(true);
     if (Object.keys(nextErrors).length || linkedErrors.length) {
@@ -244,6 +272,11 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
       primary_evidence_id: primaryEvidenceId,
       manpower_summary: manpowerSummary,
       material_usage_summary: materialSummary,
+      delivery: {
+        mode: deliveryMode,
+        recipient_id: deliveryMode === 'submit' ? recipientId : '',
+        comment: deliveryMode === 'submit' ? deliveryComment.trim() : '',
+      },
     };
     setSaving(true);
     try {
@@ -292,8 +325,9 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
         footer={(
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" disabled={saving} className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60" onClick={closeReportDialog}>Hủy</button>
-            <button type="submit" form="construction-report-form" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{saving ? 'Đang lưu...' : mode === 'edit' ? 'Lưu thay đổi' : reportLinkedSubmitLabel(linkedDrafts)}
+            {mayDeliver ? <button type="submit" form="construction-report-form" name="delivery_mode" value="draft" disabled={saving} className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60">{saving ? 'Đang lưu...' : 'Lưu nháp'}</button> : null}
+            <button type="submit" form="construction-report-form" name="delivery_mode" value={mayDeliver ? 'submit' : 'draft'} disabled={saving || (mayDeliver && (recipients.isLoading || !selectedRecipient))} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : mayDeliver ? <Send className="h-4 w-4" /> : null}{saving ? 'Đang lưu...' : mayDeliver ? deliverySubmitLabel : mode === 'edit' ? 'Lưu thay đổi' : reportLinkedSubmitLabel(linkedDrafts)}
             </button>
           </div>
         )}
@@ -368,6 +402,35 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
 
           {mode === 'create' && (canCreateCheck || canCreateAction) ? <ConstructionReportLinkedComposer mode="batch" drafts={linkedDrafts} onChange={setLinkedDrafts} workspace={workspace} sourceWorkItemId={workItemId} reportEvidence={selectedEvidence} reportEvidencePending={uploads.length > 0} primaryEvidenceId={primaryEvidenceId} canCreateCheck={canCreateCheck} canCreateAction={canCreateAction} showValidation={showLinkedErrors} /> : null}
         </div>
+        {mayDeliver ? (
+          <section className={clsx('rounded-lg border bg-blue-50/50 p-4', errors.delivery_recipient_id ? 'border-rose-300' : 'border-blue-200')} aria-labelledby="construction-report-delivery-heading">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div>
+                <h3 id="construction-report-delivery-heading" className="font-semibold text-ink">Gửi báo cáo</h3>
+                <p className="mt-0.5 text-xs leading-5 text-slate-600">Gửi ngay trong Thi công; sổ Báo cáo sẽ lưu bản gửi và lịch sử phản hồi bất biến.</p>
+              </div>
+              {deliveryStatus === 'needs_changes' ? <span className="self-start rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">Gửi lại sau yêu cầu bổ sung</span> : null}
+            </div>
+            {deliveryStatus === 'needs_changes' && record?.delivery_review_comment ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><strong>Nội dung cần bổ sung:</strong> {String(record.delivery_review_comment)}</div> : null}
+            {recipients.isLoading ? <div className="mt-3"><LoadingSpinner label="Đang xác định người nhận báo cáo..." /></div> : null}
+            {recipients.isError ? <div className="mt-3"><InlineError message="Không tải được người nhận báo cáo. Bạn vẫn có thể lưu nháp." onRetry={() => recipients.refetch()} /></div> : null}
+            {recipients.isSuccess && recipients.data.length === 0 ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">Chưa có người quản lý đủ quyền nhận báo cáo. Báo cáo chỉ có thể lưu nháp.</div> : null}
+            {recipients.isSuccess && recipients.data.length > 0 ? (
+              <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+                <Field label="Gửi đến" required error={errors.delivery_recipient_id} helper={selectedRecipient?.recommendation_reason === 'project_pm' ? 'PM chính của công trình được đề xuất tự động.' : selectedRecipient?.recommendation_reason === 'only_eligible_recipient' ? 'Người nhận hợp lệ duy nhất được đề xuất tự động.' : undefined}>
+                  <select className={inputClass(Boolean(errors.delivery_recipient_id))} value={recipientId} onChange={(event) => { setRecipientId(event.target.value); clearError('delivery_recipient_id'); }}>
+                    <option value="">Chọn người nhận báo cáo</option>
+                    {recipients.data.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.full_name}{recipient.position ? ` · ${recipient.position}` : ''}{recipient.is_recommended ? ' · Đề xuất' : ''}</option>)}
+                  </select>
+                </Field>
+                <details className="rounded-md border border-blue-100 bg-white px-3 py-2">
+                  <summary className="cursor-pointer text-sm font-semibold text-blue-700">Thêm ghi chú khi gửi <span className="font-normal text-slate-500">(tùy chọn)</span></summary>
+                  <textarea className={clsx(inputClass(false), 'mt-3 min-h-20')} maxLength={2000} value={deliveryComment} onChange={(event) => setDeliveryComment(event.target.value)} placeholder="Nội dung cần người nhận lưu ý..." />
+                </details>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
         </form>
       </Dialog>
       <EvidenceRecordViewerDialog

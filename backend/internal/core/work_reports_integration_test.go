@@ -7,6 +7,92 @@ import (
 	"testing"
 )
 
+func TestConstructionReportCreateAndSubmitIsAtomicAndRecommendsProjectPM(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	submitPermissionID := ensurePermission(t, db, "work_report.submit", "Gửi báo cáo", "work_report")
+	reviewPermissionID := ensurePermission(t, db, "work_report.review", "Xem xét báo cáo", "work_report")
+	var workerRoleID, pmRoleID, pmStaffID string
+	if err := db.QueryRowContext(ctx, `SELECT role_id::text FROM user_roles WHERE user_id=$1 LIMIT 1`, fixture.workerID).Scan(&workerRoleID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT role_id::text FROM user_roles WHERE user_id=$1 LIMIT 1`, fixture.pmID).Scan(&pmRoleID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT id::text FROM staff WHERE user_id=$1 AND status <> 'deleted'`, fixture.pmID).Scan(&pmStaffID); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, `INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2),($3,$4) ON CONFLICT DO NOTHING`, workerRoleID, submitPermissionID, pmRoleID, reviewPermissionID)
+	mustExec(t, db, `UPDATE projects SET pm_staff_id=$2 WHERE id=$1`, fixture.projectID, pmStaffID)
+
+	recipients, err := service.WorkReportRecipients(ctx, fixture.projectID, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recipients) == 0 || cleanID(recipients[0]["id"]) != fixture.pmID || !boolValue(recipients[0]["is_recommended"]) || fmt.Sprint(recipients[0]["recommendation_reason"]) != "project_pm" {
+		t.Fatalf("recommended recipients = %#v, want project PM first", recipients)
+	}
+
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo", Name: "Ảnh gửi báo cáo", FileURL: "https://example.com/report-submit.jpg", Visibility: "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := ConstructionDailyReportCreateRequest{
+		ReportDate: "2026-08-25", Weather: "Nắng", ProgressPercent: 45,
+		WorkItemID: fixture.itemID, DoneItems: []ConstructionDailyReportWorkItemRequest{{Title: "Hoàn thiện khu A"}},
+		EvidenceIDs: []string{cleanID(evidence["id"])}, PrimaryEvidenceID: cleanID(evidence["id"]),
+		Delivery: WorkReportDeliveryRequest{Mode: "submit", RecipientID: fixture.workerID},
+	}
+	if _, err := service.CreateDailyReport(ctx, fixture.projectID, req, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("self-recipient must fail the atomic create-and-submit mutation")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM operation_daily_reports WHERE project_id=$1 AND report_date='2026-08-25'`, 0, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='ready' AND started_at IS NULL`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='started'`, 0, fixture.itemID)
+
+	req.Delivery = WorkReportDeliveryRequest{Mode: "submit", RecipientID: fixture.pmID, Comment: "Báo cáo cuối ngày"}
+	created, err := service.CreateDailyReport(ctx, fixture.projectID, req, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !boolValue(recordFromAny(created["work_item_transition"])["auto_started"]) {
+		t.Fatalf("work item transition = %#v, want atomic auto start", created["work_item_transition"])
+	}
+	delivery := recordFromAny(created["delivery_transition"])
+	if !boolValue(delivery["submitted"]) || delivery["status"] != "submitted" || cleanID(delivery["recipient_id"]) != fixture.pmID || int(number(delivery["revision_no"])) != 1 {
+		t.Fatalf("delivery transition = %#v, want submitted revision 1", delivery)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_reports WHERE source_id=$1 AND status='submitted' AND recipient_id=$2`, 1, created["id"], fixture.pmID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_report_revisions revision JOIN work_reports report ON report.id=revision.report_id WHERE report.source_id=$1 AND revision.revision_no=1`, 1, created["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM work_report_events event JOIN work_reports report ON report.id=event.report_id WHERE report.source_id=$1 AND event.event_type='submitted'`, 1, created["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND target_id=$2 AND event_type='daily_report_created'`, 1, fixture.projectID, created["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='work_report_submitted'`, 1, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='in_progress'`, 1, fixture.itemID)
+
+	reportID := cleanID(delivery["work_report_id"])
+	if _, err := service.ReviewWorkReport(ctx, reportID, "request-changes", WorkReportReviewRequest{Comment: "Bổ sung ghi chú hiện trường"}, fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	req.DoneItems = []ConstructionDailyReportWorkItemRequest{{Title: "Hoàn thiện khu A và vệ sinh cuối ca"}}
+	req.FieldNotes = "Đã bổ sung theo phản hồi"
+	updated, err := service.UpdateDailyReport(ctx, cleanID(created["id"]), req, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resubmission := recordFromAny(updated["delivery_transition"])
+	if !boolValue(resubmission["submitted"]) || int(number(resubmission["revision_no"])) != 2 || resubmission["event_type"] != "resubmitted" {
+		t.Fatalf("resubmission transition = %#v, want atomic revision 2", resubmission)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_report_revisions WHERE report_id=$1`, 2, reportID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_report_events WHERE report_id=$1 AND event_type='resubmitted'`, 1, reportID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='in_progress'`, 1, fixture.itemID)
+}
+
 func TestWorkReportLifecycleKeepsImmutableSubmittedRevisions(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
@@ -44,6 +130,25 @@ func TestWorkReportLifecycleKeepsImmutableSubmittedRevisions(t *testing.T) {
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, reviewerID)
 	})
 
+	formalBeforeSubmit, err := service.WorkReports(ctx, WorkReportFilter{Scope: "mine"}, author.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceDrafts, err := service.WorkReports(ctx, WorkReportFilter{Scope: "source"}, author.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(formalBeforeSubmit) != 0 || len(sourceDrafts) != 1 || fmt.Sprint(sourceDrafts[0]["status"]) != "draft" {
+		t.Fatalf("report register split before submit = formal %#v source %#v", formalBeforeSubmit, sourceDrafts)
+	}
+	if _, err := service.SubmitWorkReport(ctx, sourceID, WorkReportSubmitRequest{RecipientID: author.userID}, author.userID, "Scoped User"); err == nil {
+		t.Fatal("saved-source quick submit must reject the author as recipient")
+	}
+	if _, err := service.SubmitWorkReport(ctx, sourceID, WorkReportSubmitRequest{RecipientID: reviewerID}, reviewerID, "Người quản lý"); err == nil {
+		t.Fatal("saved-source quick submit must reject an actor without submit permission and source authorship")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_reports WHERE source_id=$1`, 0, sourceID)
+
 	submitted, err := service.SubmitWorkReport(ctx, sourceID, WorkReportSubmitRequest{RecipientID: reviewerID, Comment: "Báo cáo cuối ngày"}, author.userID, "Scoped User")
 	if err != nil {
 		t.Fatal(err)
@@ -54,6 +159,21 @@ func TestWorkReportLifecycleKeepsImmutableSubmittedRevisions(t *testing.T) {
 	reportID := cleanID(submitted["work_report_id"])
 	if reportID == "" {
 		t.Fatal("submitted report must receive a lifecycle id")
+	}
+	if _, err := service.SubmitWorkReport(ctx, sourceID, WorkReportSubmitRequest{RecipientID: reviewerID}, author.userID, "Scoped User"); err == nil {
+		t.Fatal("a repeated or stale quick submit must not create a duplicate revision")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_report_revisions WHERE report_id=$1`, 1, reportID)
+	formalAfterSubmit, err := service.WorkReports(ctx, WorkReportFilter{Scope: "mine"}, author.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceAfterSubmit, err := service.WorkReports(ctx, WorkReportFilter{Scope: "source"}, author.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(formalAfterSubmit) != 1 || len(sourceAfterSubmit) != 0 {
+		t.Fatalf("report register split after submit = formal %#v source %#v", formalAfterSubmit, sourceAfterSubmit)
 	}
 
 	if _, err := service.UpdateDailyReport(ctx, sourceID, ConstructionDailyReportCreateRequest{}, author.userID, "Scoped User"); err == nil {
@@ -76,6 +196,29 @@ func TestWorkReportLifecycleKeepsImmutableSubmittedRevisions(t *testing.T) {
 	}
 	if fmt.Sprint(changes["status"]) != "needs_changes" {
 		t.Fatalf("request changes status = %#v", changes["status"])
+	}
+
+	unchangedRows, err := repo.ListProjectDailyReports(ctx, author.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unchangedRows) != 1 || boolValue(unchangedRows[0]["delivery_source_changed"]) {
+		t.Fatalf("unchanged delivery state = %#v, want source_changed=false", unchangedRows)
+	}
+	if _, err := service.SubmitWorkReport(ctx, sourceID, WorkReportSubmitRequest{RecipientID: reviewerID, Comment: "Đã bổ sung"}, author.userID, "Scoped User"); err == nil {
+		t.Fatal("unchanged report must not create another submitted revision")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_report_revisions WHERE report_id=$1`, 1, reportID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_report_events WHERE report_id=$1 AND event_type='resubmitted'`, 0, reportID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_reports WHERE id=$1 AND status='needs_changes' AND current_revision_no=1`, 1, reportID)
+
+	mustExec(t, db, `UPDATE operation_daily_reports SET work_summary='Đã làm: Hoàn thiện cốp pha và bổ sung khối lượng nghiệm thu' WHERE id=$1`, sourceID)
+	changedRows, err := repo.ListProjectDailyReports(ctx, author.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(changedRows) != 1 || !boolValue(changedRows[0]["delivery_source_changed"]) {
+		t.Fatalf("changed delivery state = %#v, want source_changed=true", changedRows)
 	}
 
 	resubmitted, err := service.SubmitWorkReport(ctx, sourceID, WorkReportSubmitRequest{RecipientID: reviewerID, Comment: "Đã bổ sung"}, author.userID, "Scoped User")

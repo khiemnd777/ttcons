@@ -177,7 +177,7 @@ func normalizeWorkReportFilter(filter WorkReportFilter) (WorkReportFilter, error
 	if filter.Scope == "" {
 		filter.Scope = "mine"
 	}
-	if filter.Scope != "mine" && filter.Scope != "review" && filter.Scope != "all" {
+	if filter.Scope != "mine" && filter.Scope != "source" && filter.Scope != "review" && filter.Scope != "all" {
 		return filter, validationError("Phạm vi báo cáo không hợp lệ", Record{"scope": filter.Scope})
 	}
 	filter.ProjectID = cleanID(filter.ProjectID)

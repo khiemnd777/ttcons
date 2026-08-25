@@ -412,6 +412,7 @@ type ConstructionDailyReportCreateRequest struct {
 	PrimaryEvidenceID string                                   `json:"primary_evidence_id"`
 	ManpowerSummary   string                                   `json:"manpower_summary"`
 	MaterialSummary   string                                   `json:"material_usage_summary"`
+	Delivery          WorkReportDeliveryRequest                `json:"delivery"`
 }
 
 type ConstructionDailyReportWorkItemRequest struct {
