@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 import { CurrencyInput } from '../../components/CurrencyInput';
@@ -11,14 +12,18 @@ type Props = {
   open: boolean;
   projectId: string;
   context?: ConstructionVariationContext;
+  contextLoading: boolean;
+  contextError: boolean;
+  canViewContracts: boolean;
   workspace?: ConstructionWorkspace;
   sourceWorkItemId?: string;
   sourceAction?: ConstructionActionItem;
+  onRetryContext: () => void;
   onClose: () => void;
   onSaved: () => Promise<void>;
 };
 
-export function ConstructionVariationProposalDialog({ open, projectId, context, workspace, sourceWorkItemId, sourceAction, onClose, onSaved }: Props) {
+export function ConstructionVariationProposalDialog({ open, projectId, context, contextLoading, contextError, canViewContracts, workspace, sourceWorkItemId, sourceAction, onRetryContext, onClose, onSaved }: Props) {
   const toast = useToast();
   const [values, setValues] = useState(initialValues(sourceWorkItemId, sourceAction));
   const [errors, setErrors] = useState<FormErrors>({});
@@ -75,6 +80,24 @@ export function ConstructionVariationProposalDialog({ open, projectId, context, 
   }
 
   const lockedWorkItem = Boolean(sourceWorkItemId || sourceAction?.work_item_id);
+  const checkingContext = contextLoading || (!context && !contextError);
+  if (checkingContext || contextError || !context?.available || !context.can_propose) {
+    const unavailable = Boolean(context && !context.available);
+    const missingPermission = Boolean(context?.available && !context.can_propose);
+    return (
+      <Dialog
+        open={open}
+        title={checkingContext ? 'Đang kiểm tra điều kiện đề xuất' : contextError ? 'Không tải được điều kiện đề xuất' : missingPermission ? 'Không có quyền đề xuất' : 'Chưa thể đề xuất'}
+        description={unavailable ? 'Công trình chưa có hợp đồng chủ đầu tư đang hiệu lực.' : undefined}
+        size="sm"
+        onClose={onClose}
+        footer={<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={onClose}>Đóng</button>{contextError ? <button type="button" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={onRetryContext}>Thử lại</button> : canViewContracts && unavailable ? <Link className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" to={`/projects/${projectId}/contracts`} onClick={onClose}>Mở hợp đồng</Link> : null}</div>}
+      >
+        {checkingContext ? <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600"><Loader2 className="h-5 w-5 animate-spin text-blue-600" /> Đang kiểm tra điều kiện đề xuất…</div> : contextError ? <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">Không thể xác nhận hợp đồng và quyền đề xuất lúc này. Hãy thử tải lại.</p> : missingPermission ? <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">Tài khoản hiện tại không có quyền gửi đề xuất phát sinh thương mại.</p> : <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600"><p>Hợp đồng cần được PM/Thương mại hoàn tất trước khi gửi đề xuất.</p><p className="mt-2 font-medium text-slate-700">Báo cáo, kiểm tra và xử lý hiện trường vẫn hoạt động bình thường.</p></div>}
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog
       open={open}

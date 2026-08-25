@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Eye, GitPullRequestArrow, Plus } from 'lucide-react';
+import { Eye, GitPullRequestArrow, Plus } from 'lucide-react';
 import { get, post, postForm, put } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { useToast } from '../../components/ToastProvider';
@@ -20,7 +20,7 @@ import { type ReportLinkedDraft } from './ConstructionReportLinkedComposer';
 import { constructionReportViewModel } from './constructionReportViewModel';
 import { createConstructionAction, createConstructionCheck, uploadConstructionEvidenceItems } from './constructionWorkspaceApi';
 import { optionalISO } from './constructionWorkspaceUtils';
-import { ConstructionWorkspacePanel, type ConstructionWorkspaceDialogRequest } from './ConstructionWorkspacePanel';
+import { ConstructionWorkspacePanel, type ConstructionVariationSource, type ConstructionWorkspaceDialogRequest } from './ConstructionWorkspacePanel';
 import { ConstructionVariationProposalDialog } from './ConstructionVariationProposalDialog';
 
 type OperationsTab = 'timeline' | 'checks' | 'actions';
@@ -39,7 +39,7 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   const [openReport, setOpenReport] = useState(false);
   const [dialog, setDialog] = useState<OperationsDialog | null>(null);
   const [workspaceDialogRequest, setWorkspaceDialogRequest] = useState<ConstructionWorkspaceDialogRequest | null>(null);
-  const [variationSource, setVariationSource] = useState<{ workItemId?: string; action?: ConstructionActionItem } | null>(null);
+  const [variationSource, setVariationSource] = useState<ConstructionVariationSource | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasAnyPermission } = useAuth();
@@ -62,7 +62,6 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   const activeActions = (construction.data?.actions ?? []).filter((row) => ['open', 'waiting_confirmation'].includes(row.status)).length;
   const variationRows = variationContext.data?.variations ?? [];
   const openVariations = variationRows.filter((variation) => !['rejected', 'incorporated'].includes(variation.status));
-  const sourceWorkItem = construction.data?.work_items.find((item) => item.report_eligible);
   const constructionActive = Boolean(construction.data?.runtime.construction_active);
   const tabs = useMemo(() => [
     canViewOperations ? { key: 'timeline' as const, label: 'Nhật ký' } : null,
@@ -84,6 +83,8 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
     queryClient.invalidateQueries({ queryKey: ['project-evidence', projectId] });
     queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
     queryClient.invalidateQueries({ queryKey: ['construction-workspace', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['work-item'] });
+    queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
   };
   const createReport = useMutation({
     mutationFn: async ({ values, uploads, linkedDrafts }: { values: ConstructionDailyReportCreatePayload; uploads: ConstructionEvidenceUploadDraft[]; linkedDrafts: ReportLinkedDraft[] }) => {
@@ -107,9 +108,17 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
     onSuccess: ({ report, linkedFailures, linkedCreated }) => {
       invalidateReports();
       setOpenReport(false);
+      const transition = report.work_item_transition ?? {};
+      const autoStarted = transition.auto_started === true;
+      const workItemTitle = String(transition.work_item_title ?? '').trim();
+      const startedNotice = autoStarted ? `Đã bắt đầu ${workItemTitle ? `“${workItemTitle}”` : 'hạng mục liên quan'}. ` : '';
       if (linkedFailures.length) {
-        setDialog({ type: 'report', mode: 'view', record: report, pendingLinkedDrafts: linkedFailures, linkedNotice: `Báo cáo đã lưu; ${linkedFailures.length} kiểm tra/việc xử lý chưa được tạo. Dữ liệu lỗi được giữ lại để thử lại ngay tại đây.` });
-        toast.warn({ title: 'Báo cáo đã lưu một phần', description: `${linkedCreated ? `Đã tạo ${linkedCreated} liên kết. ` : ''}Còn ${linkedFailures.length} liên kết cần thử lại.` });
+        setDialog({ type: 'report', mode: 'view', record: report, pendingLinkedDrafts: linkedFailures, linkedNotice: `Báo cáo đã lưu. ${startedNotice}${linkedFailures.length} kiểm tra/việc xử lý chưa được tạo. Dữ liệu lỗi được giữ lại để thử lại ngay tại đây.` });
+        toast.warn({ title: 'Báo cáo đã lưu một phần', description: `${startedNotice}${linkedCreated ? `Đã tạo ${linkedCreated} liên kết. ` : ''}Còn ${linkedFailures.length} liên kết cần thử lại.` });
+        return;
+      }
+      if (autoStarted) {
+        toast.success(`Đã lưu báo cáo và bắt đầu ${workItemTitle ? `“${workItemTitle}”` : 'hạng mục'}${linkedCreated ? `; đã tạo ${linkedCreated} liên kết` : ''}`);
         return;
       }
       toast.success(linkedCreated ? `Đã lưu báo cáo và tạo ${linkedCreated} liên kết` : 'Đã tạo báo cáo thi công hôm nay');
@@ -187,55 +196,35 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   return <>
     <PageHeader title="Thi công" description="Ghi nhật ký, kiểm tra chất lượng và xử lý việc phát sinh ngay tại công trường." actions={<>{!global ? <ProjectBackLink projectId={projectId} /> : null}{global ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}{canReport ? <button disabled={!projectId || !constructionActive} title={!constructionActive ? 'Chỉ lập báo cáo khi quy trình đang ở Node Thi công' : undefined} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => constructionActive && setOpenReport(true)}><Plus className="h-4 w-4" /> Báo cáo hôm nay</button> : null}</>} />
     {construction.data && !constructionActive ? <ConstructionRuntimeBanner workspace={construction.data} /> : null}
-    {canViewOperations || canViewContracts || canProposeVariation ? (
-      <ConstructionVariationBand
-        projectId={projectId}
-        context={variationContext.data}
-        openCount={openVariations.length}
-        urgentCount={openVariations.filter((variation) => variation.priority === 'urgent').length}
-        sourceWorkItemId={sourceWorkItem?.id}
-        canViewContracts={canViewContracts}
-        onPropose={() => sourceWorkItem && setVariationSource({ workItemId: sourceWorkItem.id })}
-      />
-    ) : null}
     <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg border border-line bg-white p-1" role="tablist" aria-label="Không gian thi công">{tabs.map((tab) => <button key={tab.key} role="tab" aria-selected={activeTab === tab.key} className={`shrink-0 rounded-md px-4 py-2 text-sm font-semibold transition ${activeTab === tab.key ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`} onClick={() => changeTab(tab.key)}>{tab.label}</button>)}</div>
+    {openVariations.length > 0 ? <ConstructionVariationStatus projectId={projectId} openCount={openVariations.length} urgentCount={openVariations.filter((variation) => variation.priority === 'urgent').length} canViewContracts={canViewContracts} /> : null}
     {activeTab === 'timeline' && canViewOperations ? <DailyTimeline rows={timelineRows} workspace={canViewFieldWorkspace ? construction.data : undefined} loading={reports.isLoading} error={reports.error} createEnabled={constructionActive} onRetry={() => reports.refetch()} onCreate={() => constructionActive && setOpenReport(true)} onView={(record) => setDialog({ type: 'report', mode: 'view', record })} /> : null}
-    {activeTab === 'checks' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="checks" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} onProposeVariation={canProposeVariation ? (action) => setVariationSource({ workItemId: action.work_item_id, action }) : undefined} /> : null}
-    {activeTab === 'actions' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="actions" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} onProposeVariation={canProposeVariation ? (action) => setVariationSource({ workItemId: action.work_item_id, action }) : undefined} /> : null}
+    {activeTab === 'checks' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="checks" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} /> : null}
+    {activeTab === 'actions' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="actions" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} variationContext={variationContext.data} variationContextLoading={variationContext.isLoading} variationContextError={variationContext.isError} canViewContracts={canViewContracts} onRetryVariationContext={() => { void variationContext.refetch(); }} onProposeVariation={canProposeVariation ? setVariationSource : undefined} /> : null}
     <ConstructionReportFormDialog open={openReport} projectId={projectId} suggestion={timelineRows[0] ?? null} workspace={construction.data} canCreateCheck={canRequestCheck} canCreateAction={canCreateAction} onSubmit={(values, uploads, linkedDrafts) => createReport.mutateAsync({ values, uploads, linkedDrafts })} onClose={() => setOpenReport(false)} />
     <ConstructionReportDetailDialog open={dialog?.type === 'report' && dialog.mode === 'view'} projectId={projectId} record={dialog?.record ?? null} initialLinkedDrafts={dialog?.pendingLinkedDrafts} linkedNotice={dialog?.linkedNotice} canManage={canReport && constructionActive && Boolean(dialog?.record?.runtime_compliant)} canViewLinked={canViewFieldWorkspace} canCreateCheck={canRequestCheck && constructionActive} canCreateAction={canCreateAction && constructionActive} onEdit={() => dialog?.record && setDialog({ type: 'report', mode: 'edit', record: dialog.record })} onAddEvidence={() => dialog?.record && setDialog({ type: 'report-evidence', mode: 'edit', record: dialog.record })} onOpenCheck={openLinkedCheck} onOpenAction={openLinkedAction} onClose={() => setDialog(null)} />
     <ConstructionReportFormDialog open={dialog?.type === 'report' && dialog.mode === 'edit'} projectId={projectId} mode="edit" record={dialog?.record ?? null} onSubmit={(values, uploads) => dialog?.record ? updateReport.mutateAsync({ reportId: dialog.record.id, values, uploads }) : Promise.resolve()} onClose={() => setDialog(null)} />
     <ConstructionReportEvidenceDialog open={dialog?.type === 'report-evidence'} projectId={projectId} record={dialog?.record ?? null} onSubmit={(workItemId, uploads) => dialog?.record ? addReportEvidence.mutateAsync({ reportId: dialog.record.id, workItemId, uploads, record: dialog.record }) : Promise.resolve()} onClose={() => setDialog(null)} />
-    <ConstructionVariationProposalDialog open={Boolean(variationSource)} projectId={projectId} context={variationContext.data} workspace={construction.data} sourceWorkItemId={variationSource?.workItemId} sourceAction={variationSource?.action} onClose={() => setVariationSource(null)} onSaved={variationSaved} />
+    <ConstructionVariationProposalDialog open={Boolean(variationSource)} projectId={projectId} context={variationContext.data} contextLoading={variationContext.isLoading} contextError={variationContext.isError} canViewContracts={canViewContracts} workspace={construction.data} sourceWorkItemId={variationSource?.workItemId} sourceAction={variationSource?.action} onRetryContext={() => { void variationContext.refetch(); }} onClose={() => setVariationSource(null)} onSaved={variationSaved} />
   </>;
 }
 
-function ConstructionVariationBand({ projectId, context, openCount, urgentCount, sourceWorkItemId, canViewContracts, onPropose }: {
+function ConstructionVariationStatus({ projectId, openCount, urgentCount, canViewContracts }: {
   projectId: string;
-  context?: ConstructionVariationContext;
   openCount: number;
   urgentCount: number;
-  sourceWorkItemId?: string;
   canViewContracts: boolean;
-  onPropose: () => void;
 }) {
   const query = new URLSearchParams({ tab: 'variations' });
-  if (sourceWorkItemId) query.set('source_work_item_id', sourceWorkItemId);
-  const canPropose = Boolean(context?.available && context.can_propose && sourceWorkItemId);
   return (
-    <section className="mb-4 flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-start gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-amber-100 text-amber-800"><AlertTriangle className="h-5 w-5" /></span>
-        <div>
-          <h2 className="text-sm font-semibold text-amber-950">Phát sinh ngoài kế hoạch</h2>
-          <p className="mt-1 text-xs leading-5 text-amber-900">
-            {context?.available
-              ? `${openCount} phát sinh đang xử lý${urgentCount ? ` · ${urgentCount} gấp` : ''}. Luồng: Đề xuất → QS → Mua hàng → PM/Giám đốc.`
-              : 'Cần hợp đồng chủ đầu tư đang hiệu lực trước khi lập phát sinh ngoài kế hoạch.'}
-          </p>
-        </div>
+    <section className="mb-4 flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Trạng thái phát sinh thương mại">
+      <div className="flex min-w-0 items-center gap-2 text-sm">
+        <GitPullRequestArrow className="h-4 w-4 shrink-0 text-slate-500" />
+        <span className="font-semibold text-slate-800">Phát sinh thương mại</span>
+        <span className="text-slate-600">{openCount} đang xử lý</span>
+        {urgentCount ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700">{urgentCount} gấp</span> : null}
       </div>
-      {canPropose ? <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-amber-800 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-900" onClick={onPropose}><GitPullRequestArrow className="h-4 w-4" /> Đề xuất phát sinh</button> : canViewContracts ? <Link className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-amber-800 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-900" to={`/projects/${projectId}/contracts?${query.toString()}`}><GitPullRequestArrow className="h-4 w-4" /> Xem phát sinh</Link> : <span className="rounded-md border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-800">Chưa thể đề xuất</span>}
+      {canViewContracts ? <Link className="inline-flex shrink-0 items-center text-sm font-semibold text-blue-700 hover:text-blue-800" to={`/projects/${projectId}/contracts?${query.toString()}`}>Xem phát sinh</Link> : null}
     </section>
   );
 }

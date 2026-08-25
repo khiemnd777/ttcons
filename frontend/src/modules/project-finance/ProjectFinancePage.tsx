@@ -19,6 +19,12 @@ import { currency, dateText } from '../../lib/utils/format';
 import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { ProjectScopeActions } from '../_shared/ProjectScopeActions';
 import { useParams, useSearchParams } from 'react-router-dom';
+import {
+  syncWorkItemMutationTransition,
+  withWorkItemMutationContext,
+  workItemAutoStartedNotice,
+  type WorkItemMutationResult,
+} from '../work-items/workItemMutationContext';
 
 type FinanceTab = 'overview' | 'tasks' | 'costs' | 'requests' | 'report';
 type FinanceRow = Record<string, any>;
@@ -36,6 +42,7 @@ export function ProjectFinancePage({ global = false }: { global?: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab') as FinanceTab | null;
   const requestedProjectId = searchParams.get('project') ?? '';
+  const taskId = searchParams.get('task')?.trim() ?? '';
   const [tab, setTab] = useState<FinanceTab>(tabs.some((item) => item.value === requestedTab) ? requestedTab! : 'overview');
   const [draftProjectId, setDraftProjectId] = useState(requestedProjectId);
   const [dialog, setDialog] = useState<'cost' | 'request' | null>(null);
@@ -59,12 +66,13 @@ export function ProjectFinancePage({ global = false }: { global?: boolean }) {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['project-finance', projectId] });
   const action = useMutation({
     mutationFn: ({ kind, row, actionName, comment }: { kind: 'cost' | 'request'; row: FinanceRow; actionName: string; comment: string }) =>
-      post(`/project-finance/${kind === 'cost' ? 'material-costs' : 'cash-requests'}/${row.id}/${actionName}`, { comment }),
-    onSuccess: async (_, variables) => {
+      post<WorkItemMutationResult>(`/project-finance/${kind === 'cost' ? 'material-costs' : 'cash-requests'}/${row.id}/${actionName}`, withWorkItemMutationContext({ comment }, taskId)),
+    onSuccess: async (result, variables) => {
       await refresh();
+      syncWorkItemMutationTransition(queryClient, result);
       setDetail(null);
       setActionPrompt(null);
-      toast.success(actionSuccessText(variables.kind, variables.actionName));
+      toast.success(`${actionSuccessText(variables.kind, variables.actionName)}.${workItemAutoStartedNotice(result)}`);
     },
     onError: (error) => toast.error('Không cập nhật được hồ sơ tài chính công trình', error),
   });
@@ -188,8 +196,8 @@ export function ProjectFinancePage({ global = false }: { global?: boolean }) {
         {data && tab === 'report' && reportVisible ? <ManagementReport data={data} canExport={canViewReport} onExport={exportReport} /> : null}
       </>}
 
-      <MaterialCostDialog open={dialog === 'cost'} projectId={projectId} options={options.data} onClose={() => setDialog(null)} onSaved={async () => { setDialog(null); await refresh(); }} />
-      <CashRequestDialog open={dialog === 'request'} projectId={projectId} onClose={() => setDialog(null)} onSaved={async () => { setDialog(null); await refresh(); }} />
+      <MaterialCostDialog open={dialog === 'cost'} projectId={projectId} workItemId={taskId} options={options.data} onClose={() => setDialog(null)} onSaved={async () => { setDialog(null); await refresh(); }} />
+      <CashRequestDialog open={dialog === 'request'} projectId={projectId} workItemId={taskId} onClose={() => setDialog(null)} onSaved={async () => { setDialog(null); await refresh(); }} />
       <FinanceDetailDialog detail={detail} onClose={() => setDetail(null)} onAction={(kind, row, actionName) => setActionPrompt({ kind, row, actionName })} pending={action.isPending} permissions={{ canCreateCost, canCreateRequest, canReviewCost, canApproveRequest, canProcessRequest }} />
       <FinanceActionConfirmDialog prompt={actionPrompt} pending={action.isPending} onClose={() => setActionPrompt(null)} onConfirm={(comment) => actionPrompt && action.mutate({ ...actionPrompt, comment })} />
     </div>
@@ -266,11 +274,12 @@ function ManagementReport({ data, canExport, onExport }: { data: ProjectFinanceW
   </div>;
 }
 
-function MaterialCostDialog({ open, projectId, options, onClose, onSaved }: { open: boolean; projectId: string; options?: ProjectFinanceOptions; onClose: () => void; onSaved: () => void }) {
+function MaterialCostDialog({ open, projectId, workItemId, options, onClose, onSaved }: { open: boolean; projectId: string; workItemId: string; options?: ProjectFinanceOptions; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [values, setValues] = useState({ source_key: '', vendor_name: '', invoice_number: '', invoice_date: '', description: '', amount_before_vat: '', vat_amount: '0', notes: '' });
   const [errors, setErrors] = useState<Record<string, boolean>>({});
-  const create = useMutation({ mutationFn: (payload: Record<string, any>) => post(`/projects/${projectId}/project-finance/material-costs`, payload), onSuccess: () => { toast.success('Đã lưu nháp chi phí vật tư'); onSaved(); }, onError: (error) => toast.error('Không lưu được chi phí vật tư', error) });
+  const create = useMutation({ mutationFn: (payload: Record<string, any>) => post<WorkItemMutationResult>(`/projects/${projectId}/project-finance/material-costs`, withWorkItemMutationContext(payload, workItemId)), onSuccess: (result) => { syncWorkItemMutationTransition(queryClient, result); toast.success(`Đã lưu nháp chi phí vật tư.${workItemAutoStartedNotice(result)}`); onSaved(); }, onError: (error) => toast.error('Không lưu được chi phí vật tư', error) });
   const total = Number(values.amount_before_vat || 0) + Number(values.vat_amount || 0);
   useEffect(() => { if (open) { setValues({ source_key: '', vendor_name: '', invoice_number: '', invoice_date: '', description: '', amount_before_vat: '', vat_amount: '0', notes: '' }); setErrors({}); } }, [open, projectId]);
   function submit(event: FormEvent) { event.preventDefault(); const next = { source_key: !values.source_key, vendor_name: !values.vendor_name.trim(), description: !values.description.trim(), amount_before_vat: Number(values.amount_before_vat) <= 0 }; setErrors(next); if (Object.values(next).some(Boolean)) { toast.warn({ title: 'Chưa đủ thông tin', description: 'Cần chọn hồ sơ nguồn, nhà cung cấp, nội dung và giá trị trước VAT.' }); return; } const [sourceKind, sourceId] = values.source_key.split(':'); create.mutate({ ...values, source_key: undefined, procurement_request_id: sourceKind === 'procurement' ? sourceId : '', incoming_acceptance_id: sourceKind === 'acceptance' ? sourceId : '', stock_document_id: sourceKind === 'stock' ? sourceId : '', amount_before_vat: Number(values.amount_before_vat), vat_amount: Number(values.vat_amount), total_amount: total }); }
@@ -288,11 +297,12 @@ function MaterialCostDialog({ open, projectId, options, onClose, onSaved }: { op
   </form></Dialog>;
 }
 
-function CashRequestDialog({ open, projectId, onClose, onSaved }: { open: boolean; projectId: string; onClose: () => void; onSaved: () => void }) {
+function CashRequestDialog({ open, projectId, workItemId, onClose, onSaved }: { open: boolean; projectId: string; workItemId: string; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [values, setValues] = useState({ direction: 'outbound', title: '', counterparty_name: '', amount: '', due_date: '', notes: '' });
   const [errors, setErrors] = useState<Record<string, boolean>>({});
-  const create = useMutation({ mutationFn: (payload: Record<string, any>) => post(`/projects/${projectId}/project-finance/cash-requests`, payload), onSuccess: () => { toast.success('Đã lưu nháp đề nghị thu/chi'); onSaved(); }, onError: (error) => toast.error('Không lưu được đề nghị thu/chi', error) });
+  const create = useMutation({ mutationFn: (payload: Record<string, any>) => post<WorkItemMutationResult>(`/projects/${projectId}/project-finance/cash-requests`, withWorkItemMutationContext(payload, workItemId)), onSuccess: (result) => { syncWorkItemMutationTransition(queryClient, result); toast.success(`Đã lưu nháp đề nghị thu/chi.${workItemAutoStartedNotice(result)}`); onSaved(); }, onError: (error) => toast.error('Không lưu được đề nghị thu/chi', error) });
   useEffect(() => { if (open) { setValues({ direction: 'outbound', title: '', counterparty_name: '', amount: '', due_date: '', notes: '' }); setErrors({}); } }, [open, projectId]);
   function submit(event: FormEvent) { event.preventDefault(); const next = { title: !values.title.trim(), counterparty_name: !values.counterparty_name.trim(), amount: Number(values.amount) <= 0 }; setErrors(next); if (Object.values(next).some(Boolean)) { toast.warn({ title: 'Chưa đủ thông tin', description: 'Cần nhập nội dung, đối tượng và số tiền.' }); return; } create.mutate({ ...values, amount: Number(values.amount) }); }
   return <Dialog open={open} title="Lập đề nghị thu/chi nội bộ" description="Hồ sơ được duyệt và bàn giao Kế toán; Consflow không tự ghi sổ hoặc ghi nhận đã thanh toán." onClose={onClose} size="lg" footer={<div className="flex justify-end gap-2"><button className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={onClose}>Hủy</button><button className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={create.isPending} onClick={() => document.getElementById('cash-request-form-submit')?.click()}>Lưu nháp</button></div>}><form className="grid gap-4 sm:grid-cols-2" onSubmit={submit}>

@@ -13,6 +13,7 @@ import { api, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { PASSWORD_RULE_HELPER, passwordConfirmationMessage, passwordValueSchema } from '../../lib/security/password';
 import type { User } from '../../lib/types/domain';
+import { uniqueRoleNames } from '../../lib/utils/roles';
 
 type ProfileFormValues = {
   full_name: string;
@@ -190,7 +191,7 @@ export function ProfilePage() {
     .slice(-2)
     .map((part) => part[0]?.toUpperCase())
     .join('') || 'U';
-  const roles = Array.from(new Set(user.roles ?? []));
+  const roles = uniqueRoleNames(user.roles);
   const emailChanged = profileForm.watch('email').trim().toLowerCase() !== user.email.toLowerCase();
 
   const openProfile = () => {

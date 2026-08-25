@@ -25,8 +25,8 @@ test('My Work renders compact semantic rows without nested interactive controls'
 test('My Work keeps detail copy in the desktop inspector and deduplicates header roles', async () => {
   const page = await source('../src/modules/my-work/MyWorkPage.tsx');
 
-  assert.match(page, /function uniqueRoleNames\(roles\?: string\[\]\)/);
-  assert.match(page, /new Set\(\(roles \?\? \[\]\)\.map/);
+  assert.match(page, /import \{ roleSummary as summarizeRoles \} from '\.\.\/\.\.\/lib\/utils\/roles'/);
+  assert.match(page, /const roleSummary = summarizeRoles\(user\?\.roles\)/);
   assert.match(page, /description=\{`\$\{user\?\.full_name.*\$\{roleSummary/);
   assert.doesNotMatch(page, /user\.roles\.join\(', '\)/);
   assert.match(page, /hidden rounded-lg border border-line bg-white p-4 xl:sticky/);
@@ -46,7 +46,7 @@ test('My Work provides compact loading and stale-data states', async () => {
 test('My Work tab count follows the currently displayed work query', async () => {
   const page = await source('../src/modules/my-work/MyWorkPage.tsx');
 
-  assert.match(page, /const workTabCount = workItems\.isLoading[\s\S]*workItems\.isError && !firstPage[\s\S]*firstPage\?\.total \?\? 0/);
+  assert.match(page, /const workTabCount = workItems\.isLoading[\s\S]*workItems\.isError && !firstPage[\s\S]*\(firstPage\?\.total \?\? 0\) \+ workflowActionTotal/);
   assert.match(page, /label="Công việc" count=\{workTabCount\}/);
   assert.doesNotMatch(page, /label="Công việc" count=\{summary\.total\}/);
 });
@@ -75,8 +75,12 @@ test('My Work presents source-backed quick filters inside the selected work scop
   assert.doesNotMatch(page.slice(page.indexOf('<PageHeader'), page.indexOf('<div className="mt-4 flex')), /<WorkQuickFilters/);
   assert.match(quickFilters, /aria-label="Bộ lọc nhanh công việc"/);
   assert.match(quickFilters, /Bộ lọc nhanh · \{scopeLabel\}/);
-  assert.match(quickFilters, /bucket: 'all', label: 'Tất cả', value: summary\.total/);
+  assert.match(quickFilters, /onClick=\{\(\) => onSelect\('all'\)\}/);
+  assert.match(quickFilters, /Xem tất cả/);
+  assert.match(quickFilters, /summary\.total/);
+  assert.doesNotMatch(quickFilters.slice(quickFilters.indexOf('const cards'), quickFilters.indexOf('return (')), /bucket: 'all'/);
   assert.match(quickFilters, /bucket: 'upcoming', label: 'Sắp tới · chỉ xem'/);
+  assert.match(quickFilters, /bucket: 'completed', label: 'Hoàn tất', value: summary\.completed/);
   assert.doesNotMatch(quickFilters, /waiting_decision|Chờ tôi duyệt/);
 });
 
@@ -100,7 +104,7 @@ test('My Work separates scope, list, and selected-work actions responsively', as
   assert.match(page, /aria-label="Phạm vi công việc"/);
   assert.match(page, /overflow-x-auto[\s\S]*xl:flex-col/);
   assert.match(page, /<div className="min-w-0">[\s\S]*<FilterBar[\s\S]*<WorkList/);
-  assert.match(page, /<NextWorkPanel item=\{selectedItem\}/);
+  assert.match(page, /<NextQueuePanel[\s\S]*item=\{selectedItem\}[\s\S]*workflowAction=\{selectedWorkflowAction\}/);
 });
 
 test('My Work scope rail keeps only concise scope labels', async () => {
@@ -117,9 +121,27 @@ test('My Work isolates actor queries and never presents placeholder zeroes as lo
   const page = await source('../src/modules/my-work/MyWorkPage.tsx');
 
   assert.match(page, /queryKey: \['my-work-items', user\?\.id, filterKey\]/);
+  assert.match(page, /queryKey: \['my-workflow-actions', user\?\.id, queue, project, search\]/);
   assert.match(page, /queryKey: \['approvals', 'pending', 'decidable', user\?\.id, project\]/);
   assert.match(page, /queryKey: \['activity-attention', 'summary', user\?\.id, project\]/);
   assert.match(page, /queryKey: \['activity-attention', 'list', user\?\.id, project\]/);
-  assert.match(page, /<WorkQuickFilters[\s\S]*loading=\{workItems\.isLoading\}[\s\S]*unavailable=\{workItems\.isError && !firstPage\}/);
+  assert.match(page, /<WorkQuickFilters[\s\S]*loading=\{workItems\.isLoading \|\| workflowActions\.isLoading\}[\s\S]*unavailable=\{\(workItems\.isError && !firstPage\)/);
   assert.match(page, /\{loading \? '…' : unavailable \? '—' : card\.value\}/);
+});
+
+test('My Work surfaces generic ready stage transitions as one-click business actions', async () => {
+  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const domain = await source('../src/lib/types/domain.ts');
+  const workList = page.slice(page.indexOf('function WorkList('), page.indexOf('function WorkListSkeleton('));
+
+  assert.match(domain, /export type MyWorkflowAction =/);
+  assert.match(page, /return `\/me\/workflow-actions\?\$\{params\.toString\(\)\}`/);
+  assert.match(page, /post\(`\/pipeline-run-nodes\/\$\{action\.run_node_id\}\/advance`, \{\}\)/);
+  assert.match(page, /summary\.need_action \+ workflowActionSummaryTotal/);
+  assert.match(workList, /workflowActions\.map[\s\S]*<WorkflowActionCard[\s\S]*rows\.map/);
+  assert.match(page, /Cần chốt giai đoạn/);
+  assert.match(page, /Đã đủ điều kiện để tiếp tục quy trình\./);
+  assert.match(page, /function NextQueuePanel\(/);
+  assert.match(page, /pending \? 'Đang chuyển…' : action\.action_label/);
+  assert.doesNotMatch(page, /Xác nhận chuyển giai đoạn/);
 });

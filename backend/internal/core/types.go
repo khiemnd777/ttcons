@@ -135,8 +135,18 @@ type ResetPasswordRequest struct {
 }
 
 type ActionRequest struct {
-	Comment string `json:"comment"`
-	Reason  string `json:"reason"`
+	Comment         string                  `json:"comment"`
+	Reason          string                  `json:"reason"`
+	WorkItemContext WorkItemMutationContext `json:"work_item_context"`
+}
+
+type WorkItemMutationContext struct {
+	WorkItemID string `json:"work_item_id"`
+	Intent     string `json:"intent"`
+}
+
+type WorkItemMutationRequest struct {
+	WorkItemContext WorkItemMutationContext `json:"work_item_context"`
 }
 
 type PipelineTemplateLayoutRequest struct {
@@ -184,13 +194,14 @@ type ReceivableCreateRequest struct {
 }
 
 type HandoverCreateRequest struct {
-	HandoverCode           string `json:"handover_code"`
-	FinalAcceptanceID      string `json:"final_acceptance_id"`
-	WorkflowFormInstanceID string `json:"workflow_form_instance_id"`
-	HandoverDate           string `json:"handover_date"`
-	ClientRepresentative   string `json:"client_representative"`
-	CompanyRepresentative  string `json:"company_representative"`
-	Notes                  string `json:"notes"`
+	HandoverCode           string                  `json:"handover_code"`
+	FinalAcceptanceID      string                  `json:"final_acceptance_id"`
+	WorkflowFormInstanceID string                  `json:"workflow_form_instance_id"`
+	HandoverDate           string                  `json:"handover_date"`
+	ClientRepresentative   string                  `json:"client_representative"`
+	CompanyRepresentative  string                  `json:"company_representative"`
+	Notes                  string                  `json:"notes"`
+	WorkItemContext        WorkItemMutationContext `json:"work_item_context"`
 }
 
 type HandoverChecklistItemRequest struct {
@@ -355,6 +366,12 @@ type MyWorkItemsFilter struct {
 	Limit     int
 }
 
+type MyWorkflowActionsFilter struct {
+	Queue     string
+	ProjectID string
+	Search    string
+}
+
 type PendingApprovalFilter struct {
 	ProjectID     string
 	DecidableOnly bool
@@ -493,8 +510,9 @@ type WorkflowFormFieldRequest struct {
 }
 
 type SubcontractorReconciliationRequest struct {
-	Comment string                                   `json:"comment"`
-	Items   []SubcontractorReconciliationItemRequest `json:"items"`
+	Comment         string                                   `json:"comment"`
+	Items           []SubcontractorReconciliationItemRequest `json:"items"`
+	WorkItemContext WorkItemMutationContext                  `json:"work_item_context"`
 }
 
 type SubcontractorReconciliationItemRequest struct {
@@ -506,8 +524,9 @@ type SubcontractorReconciliationItemRequest struct {
 }
 
 type OwnerClientReconciliationRequest struct {
-	Comment string                                 `json:"comment"`
-	Items   []OwnerClientReconciliationItemRequest `json:"items"`
+	Comment         string                                 `json:"comment"`
+	Items           []OwnerClientReconciliationItemRequest `json:"items"`
+	WorkItemContext WorkItemMutationContext                `json:"work_item_context"`
 }
 
 type OwnerClientReconciliationItemRequest struct {
@@ -522,6 +541,7 @@ type MaterialSnapshotRequest struct {
 	ConstructionArea string                        `json:"construction_area"`
 	Comment          string                        `json:"comment"`
 	Items            []MaterialSnapshotItemRequest `json:"items"`
+	WorkItemContext  WorkItemMutationContext       `json:"work_item_context"`
 }
 
 type MaterialSnapshotItemRequest struct {
@@ -543,17 +563,18 @@ type MaterialSnapshotItemRequest struct {
 }
 
 type SurplusHandlingRequest struct {
-	SiteBalanceID          string   `json:"site_balance_id"`
-	MaterialSnapshotID     string   `json:"material_snapshot_id"`
-	MaterialSnapshotItemID string   `json:"material_snapshot_item_id"`
-	HandlingType           string   `json:"handling_type"`
-	Quantity               *float64 `json:"quantity"`
-	Unit                   string   `json:"unit"`
-	WarehouseID            string   `json:"warehouse_id"`
-	CustodyLocation        string   `json:"custody_location"`
-	Condition              string   `json:"condition"`
-	EvidenceID             string   `json:"evidence_id"`
-	Comment                string   `json:"comment"`
+	SiteBalanceID          string                  `json:"site_balance_id"`
+	MaterialSnapshotID     string                  `json:"material_snapshot_id"`
+	MaterialSnapshotItemID string                  `json:"material_snapshot_item_id"`
+	HandlingType           string                  `json:"handling_type"`
+	Quantity               *float64                `json:"quantity"`
+	Unit                   string                  `json:"unit"`
+	WarehouseID            string                  `json:"warehouse_id"`
+	CustodyLocation        string                  `json:"custody_location"`
+	Condition              string                  `json:"condition"`
+	EvidenceID             string                  `json:"evidence_id"`
+	Comment                string                  `json:"comment"`
+	WorkItemContext        WorkItemMutationContext `json:"work_item_context"`
 }
 
 type IncomingAcceptanceRequest struct {
@@ -570,6 +591,7 @@ type IncomingAcceptanceRequest struct {
 	Result                 string                          `json:"result"`
 	Comment                string                          `json:"comment"`
 	Items                  []IncomingAcceptanceItemRequest `json:"items"`
+	WorkItemContext        WorkItemMutationContext         `json:"work_item_context"`
 }
 
 type IncomingAcceptanceItemRequest struct {
@@ -603,6 +625,7 @@ type AcceptanceRequest struct {
 	DocumentStatus           string                           `json:"document_status"`
 	Notes                    string                           `json:"notes"`
 	Checklist                []AcceptanceChecklistItemRequest `json:"checklist"`
+	WorkItemContext          WorkItemMutationContext          `json:"work_item_context"`
 }
 
 type AcceptanceChecklistItemRequest struct {
@@ -660,6 +683,7 @@ type SupplierQuotationRequest struct {
 	WarrantyTerms     string                         `json:"warranty_terms"`
 	Notes             string                         `json:"notes"`
 	Items             []SupplierQuotationItemRequest `json:"items"`
+	WorkItemContext   WorkItemMutationContext        `json:"work_item_context"`
 }
 
 type SupplierQuotationItemRequest struct {
@@ -676,61 +700,68 @@ type SupplierQuotationItemRequest struct {
 }
 
 type SupplierQuotationQualificationRequest struct {
-	TechnicalStatus  string `json:"technical_status"`
-	CommercialStatus string `json:"commercial_status"`
-	Comment          string `json:"comment"`
+	TechnicalStatus  string                  `json:"technical_status"`
+	CommercialStatus string                  `json:"commercial_status"`
+	Comment          string                  `json:"comment"`
+	WorkItemContext  WorkItemMutationContext `json:"work_item_context"`
 }
 
 type SupplierQuoteSelectionRequest struct {
-	DecisionReason string `json:"decision_reason"`
+	DecisionReason  string                  `json:"decision_reason"`
+	WorkItemContext WorkItemMutationContext `json:"work_item_context"`
 }
 
 type ContractRequest struct {
-	ContractCode          string  `json:"contract_code"`
-	Title                 string  `json:"title"`
-	ContractType          string  `json:"contract_type"`
-	Direction             string  `json:"direction"`
-	CounterpartyPartnerID string  `json:"counterparty_partner_id"`
-	CounterpartyName      string  `json:"counterparty_name"`
-	Currency              string  `json:"currency"`
-	OriginalAmount        float64 `json:"original_amount"`
-	AdvancePercent        float64 `json:"advance_percent"`
-	RetentionPercent      float64 `json:"retention_percent"`
-	WarrantyDays          int     `json:"warranty_days"`
-	SignedDate            string  `json:"signed_date"`
-	EffectiveDate         string  `json:"effective_date"`
-	ExpiryDate            string  `json:"expiry_date"`
+	ContractCode          string                  `json:"contract_code"`
+	Title                 string                  `json:"title"`
+	ContractType          string                  `json:"contract_type"`
+	Direction             string                  `json:"direction"`
+	CounterpartyPartnerID string                  `json:"counterparty_partner_id"`
+	CounterpartyName      string                  `json:"counterparty_name"`
+	Currency              string                  `json:"currency"`
+	OriginalAmount        float64                 `json:"original_amount"`
+	AdvancePercent        float64                 `json:"advance_percent"`
+	RetentionPercent      float64                 `json:"retention_percent"`
+	WarrantyDays          int                     `json:"warranty_days"`
+	SignedDate            string                  `json:"signed_date"`
+	EffectiveDate         string                  `json:"effective_date"`
+	ExpiryDate            string                  `json:"expiry_date"`
+	WorkItemContext       WorkItemMutationContext `json:"work_item_context"`
 }
 
 type ContractVersionRequest struct {
-	VersionLabel     string  `json:"version_label"`
-	Amount           float64 `json:"amount"`
-	ScopeSummary     string  `json:"scope_summary"`
-	CommercialTerms  Record  `json:"commercial_terms"`
-	PaymentTerms     Record  `json:"payment_terms"`
-	PlannedStartDate string  `json:"planned_start_date"`
-	PlannedEndDate   string  `json:"planned_end_date"`
-	DocumentID       string  `json:"document_id"`
-	Comment          string  `json:"comment"`
+	VersionLabel     string                  `json:"version_label"`
+	Amount           float64                 `json:"amount"`
+	ScopeSummary     string                  `json:"scope_summary"`
+	CommercialTerms  Record                  `json:"commercial_terms"`
+	PaymentTerms     Record                  `json:"payment_terms"`
+	PlannedStartDate string                  `json:"planned_start_date"`
+	PlannedEndDate   string                  `json:"planned_end_date"`
+	DocumentID       string                  `json:"document_id"`
+	Comment          string                  `json:"comment"`
+	WorkItemContext  WorkItemMutationContext `json:"work_item_context"`
 }
 
 type ContractVersionSignRequest struct {
-	WorkflowFormSignatureID string `json:"workflow_form_signature_id"`
-	Comment                 string `json:"comment"`
+	WorkflowFormSignatureID string                  `json:"workflow_form_signature_id"`
+	Comment                 string                  `json:"comment"`
+	WorkItemContext         WorkItemMutationContext `json:"work_item_context"`
 }
 
 type ContractDispatchRequest struct {
-	ContractVersionID string `json:"contract_version_id"`
-	RecipientName     string `json:"recipient_name"`
-	DeliveryMethod    string `json:"delivery_method"`
-	TrackingReference string `json:"tracking_reference"`
-	SentDocumentID    string `json:"sent_document_id"`
-	Note              string `json:"note"`
+	ContractVersionID string                  `json:"contract_version_id"`
+	RecipientName     string                  `json:"recipient_name"`
+	DeliveryMethod    string                  `json:"delivery_method"`
+	TrackingReference string                  `json:"tracking_reference"`
+	SentDocumentID    string                  `json:"sent_document_id"`
+	Note              string                  `json:"note"`
+	WorkItemContext   WorkItemMutationContext `json:"work_item_context"`
 }
 
 type ContractDispatchReceiveRequest struct {
-	ReturnedScanDocumentID string `json:"returned_scan_document_id"`
-	Note                   string `json:"note"`
+	ReturnedScanDocumentID string                  `json:"returned_scan_document_id"`
+	Note                   string                  `json:"note"`
+	WorkItemContext        WorkItemMutationContext `json:"work_item_context"`
 }
 
 type ContractMilestoneRequest struct {
@@ -882,6 +913,7 @@ type ConstructionHandoffActivateRequest struct {
 	SourceFormInstanceID string                           `json:"source_form_instance_id"`
 	SourceFormRevisionNo int                              `json:"source_form_revision_no"`
 	Items                []ConstructionHandoffItemRequest `json:"items"`
+	WorkItemContext      WorkItemMutationContext          `json:"work_item_context"`
 }
 
 type ConstructionCheckTemplateRequest struct {
@@ -1099,4 +1131,5 @@ type StockDocumentRequest struct {
 	DocumentDate      string                     `json:"document_date"`
 	Note              string                     `json:"note"`
 	Items             []StockDocumentItemRequest `json:"items"`
+	WorkItemContext   WorkItemMutationContext    `json:"work_item_context"`
 }

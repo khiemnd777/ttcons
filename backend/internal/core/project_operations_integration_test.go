@@ -93,6 +93,7 @@ func TestConstructionRuntimeRequiresActiveConstructionItemAndPhoto(t *testing.T)
 	runID := newID()
 	planningNodeID := newID()
 	constructionNodeID := newID()
+	constructionStepID := newID()
 	constructionItemID := newID()
 	mustExec(t, db, `
 		INSERT INTO pipeline_runs (id,project_id,template_id,status,engine_version)
@@ -108,11 +109,17 @@ func TestConstructionRuntimeRequiresActiveConstructionItemAndPhoto(t *testing.T)
 	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$2 WHERE id=$1`, runID, planningNodeID)
 	mustExec(t, db, `UPDATE work_items SET pipeline_run_id=$2,run_node_id=$3 WHERE id=$1`, fixture.itemID, runID, planningNodeID)
 	mustExec(t, db, `
-		INSERT INTO work_items
-			(id,project_id,pipeline_run_id,run_node_id,source_type,source_id,title,work_type,status,role_ids,evidence_requirement_json,created_by,updated_by)
+		INSERT INTO pipeline_run_steps
+			(id,run_node_id,project_id,name,step_type,required_role_ids,required_permission,order_index,status,business_code)
 		VALUES
-			($1,$2,$3,$4,'issue',$5,'Hạng mục thi công khu A','task','ready','["Đội thi công"]'::jsonb,'{"required_permission":"operation.report"}'::jsonb,$6,$6)
-	`, constructionItemID, fixture.projectID, runID, constructionNodeID, newID(), fixture.workerID)
+			($1,$2,$3,'Báo cáo thi công liên tục','daily_report','["Đội thi công"]'::jsonb,'operation.report',1,'ready','construction.item_reporting')
+	`, constructionStepID, constructionNodeID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO work_items
+			(id,project_id,pipeline_run_id,run_node_id,run_step_id,source_type,source_id,title,work_type,status,role_ids,evidence_requirement_json,created_by,updated_by)
+		VALUES
+			($1,$2,$3,$4,$5,'issue',$6,'Hạng mục thi công khu A','task','ready','["Đội thi công"]'::jsonb,'{"required_permission":"operation.report"}'::jsonb,$7,$7)
+	`, constructionItemID, fixture.projectID, runID, constructionNodeID, constructionStepID, newID(), fixture.workerID)
 
 	base := ConstructionDailyReportCreateRequest{
 		ReportDate: "2026-08-05", Weather: "Nắng", ProgressPercent: 25,
@@ -156,6 +163,51 @@ func TestConstructionRuntimeRequiresActiveConstructionItemAndPhoto(t *testing.T)
 	if cleanID(created["work_item_id"]) != constructionItemID {
 		t.Fatalf("created report work item = %v, want %s", created["work_item_id"], constructionItemID)
 	}
+	transition := recordFromAny(created["work_item_transition"])
+	if !boolValue(transition["auto_started"]) || transition["from_status"] != "ready" || transition["to_status"] != "in_progress" {
+		t.Fatalf("daily report work item transition = %#v, want ready -> in_progress auto start", transition)
+	}
+	if cleanID(transition["work_item_id"]) != constructionItemID || transition["work_item_title"] != "Hạng mục thi công khu A" {
+		t.Fatalf("daily report work item transition source = %#v, want linked construction item", transition)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='in_progress' AND started_at IS NOT NULL`, 1, constructionItemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_run_steps WHERE id=$1 AND status='in_progress'`, 1, constructionStepID)
+	assertCount(t, db, `
+		SELECT COUNT(*) FROM work_item_activities
+		WHERE work_item_id=$1 AND activity_type='started' AND from_status='ready' AND to_status='in_progress'
+		  AND metadata_json->>'source'='construction_daily_report_created'
+		  AND metadata_json->>'daily_report_id'=$2
+	`, 1, constructionItemID, cleanID(created["id"]))
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='work_item_started' AND target_id=$2`, 1, fixture.projectID, constructionItemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='daily_report_created' AND target_id=$2`, 1, fixture.projectID, cleanID(created["id"]))
+
+	second := base
+	second.ReportDate = "2026-08-06"
+	createdWhileInProgress, err := service.CreateDailyReport(ctx, fixture.projectID, second, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inProgressTransition := recordFromAny(createdWhileInProgress["work_item_transition"])
+	if boolValue(inProgressTransition["auto_started"]) || inProgressTransition["from_status"] != "in_progress" || inProgressTransition["to_status"] != "in_progress" {
+		t.Fatalf("in-progress daily report transition = %#v, want lifecycle no-op", inProgressTransition)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='started'`, 1, constructionItemID)
+
+	mustExec(t, db, `UPDATE work_items SET status='blocked',blocked_at=now(),blocked_reason='Chờ mặt bằng' WHERE id=$1`, constructionItemID)
+	mustExec(t, db, `UPDATE pipeline_run_steps SET status='blocked' WHERE id=$1`, constructionStepID)
+	blocked := base
+	blocked.ReportDate = "2026-08-07"
+	createdWhileBlocked, err := service.CreateDailyReport(ctx, fixture.projectID, blocked, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	blockedTransition := recordFromAny(createdWhileBlocked["work_item_transition"])
+	if boolValue(blockedTransition["auto_started"]) || blockedTransition["from_status"] != "blocked" || blockedTransition["to_status"] != "blocked" {
+		t.Fatalf("blocked daily report transition = %#v, want blocked lifecycle preserved", blockedTransition)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='blocked' AND blocked_reason='Chờ mặt bằng'`, 1, constructionItemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_run_steps WHERE id=$1 AND status='blocked'`, 1, constructionStepID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='started'`, 1, constructionItemID)
 	workspace, err = service.ProjectConstructionWorkspace(ctx, fixture.projectID)
 	if err != nil {
 		t.Fatal(err)
@@ -172,6 +224,57 @@ func TestConstructionRuntimeRequiresActiveConstructionItemAndPhoto(t *testing.T)
 	if !eligible {
 		t.Fatalf("construction item is not report eligible: %#v", workspace["work_items"])
 	}
+}
+
+func TestCreateDailyReportRequiresWorkItemActionScope(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	watcherUserID := newID()
+	watcherStaffID := newID()
+	watcherRoleID := ensureRole(t, db, "report_watcher_"+watcherUserID[:8], "Người theo dõi báo cáo")
+	operationReportID := ensurePermission(t, db, "operation.report", "Tạo daily report", "operation")
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, watcherStaffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, watcherUserID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, watcherRoleID)
+	})
+	mustExec(t, db, `INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, watcherRoleID, operationReportID)
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Report Watcher','active')`, watcherUserID, "report-watcher-"+watcherUserID+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,status) VALUES ($1,$2,'Report Watcher',$3,'Khác','active')`, watcherStaffID, watcherUserID, "report-watcher-staff-"+watcherUserID+"@test.local")
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2)`, watcherUserID, watcherRoleID)
+	mustExec(t, db, `UPDATE work_items SET watcher_staff_ids=jsonb_build_array($2::text) WHERE id=$1`, fixture.itemID, watcherStaffID)
+
+	canView, err := repo.CanViewWorkItem(ctx, fixture.itemID, watcherUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canAct, err := repo.CanActOnWorkItem(ctx, fixture.itemID, watcherUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !canView || canAct {
+		t.Fatalf("watcher access view/act = %v/%v, want true/false", canView, canAct)
+	}
+	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo", Name: "Ảnh phạm vi hành động", FileURL: "https://example.com/action-scope.jpg", Visibility: "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.CreateDailyReport(ctx, fixture.projectID, ConstructionDailyReportCreateRequest{
+		ReportDate: "2026-08-08", Weather: "Nắng", ProgressPercent: 15,
+		WorkItemID: fixture.itemID, DoneItems: []ConstructionDailyReportWorkItemRequest{{Title: "Theo dõi hiện trường"}},
+		EvidenceIDs: []string{cleanID(evidence["id"])},
+	}, watcherUserID, "Report Watcher")
+	if err == nil || !strings.Contains(err.Error(), "không có quyền thao tác") {
+		t.Fatalf("watcher create report error = %v, want action-scope denial", err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM operation_daily_reports WHERE project_id=$1`, 0, fixture.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='ready' AND started_at IS NULL`, 1, fixture.itemID)
 }
 
 func TestCreateDailyReportPersistsStructuredEvidenceAndRejectsMismatchedEvidence(t *testing.T) {

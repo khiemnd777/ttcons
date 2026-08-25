@@ -23,6 +23,7 @@ import {
   type AcceptanceDraft,
   type AcceptancePayload,
 } from '../acceptance/AcceptanceEditor';
+import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
 
 export function OutgoingAcceptancePanel({
   workItemId,
@@ -114,7 +115,8 @@ export function OutgoingAcceptancePanel({
       if (!record) return;
       setDraft(acceptanceDraftFromRecord(record));
       invalidate();
-      toast.success('Đã lưu nháp nghiệm thu đầu ra');
+      syncWorkItemMutationTransition(queryClient, record);
+      toast.success(`Đã lưu nháp nghiệm thu đầu ra.${workItemAutoStartedNotice(record)}`);
     },
     onError: (error) => toast.error('Không lưu được nghiệm thu đầu ra', error),
   });
@@ -129,7 +131,8 @@ export function OutgoingAcceptancePanel({
       if (!record) return;
       setDraft(createAcceptanceDraft({ workItemId, formInstanceId: formInstance?.id, pdfExportId: pdfExports[0]?.id, hasSignature: signatures.length > 0 }));
       invalidate();
-      toast.success('Đã gửi nghiệm thu đầu ra');
+      syncWorkItemMutationTransition(queryClient, record);
+      toast.success(`Đã gửi nghiệm thu đầu ra.${workItemAutoStartedNotice(record)}`);
     },
     onError: (error) => toast.error('Không gửi được nghiệm thu đầu ra', error),
   });

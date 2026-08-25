@@ -124,14 +124,16 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   });
   const workItems = useMemo(
     () => [...(operations.data?.work_items ?? [])]
-	      .filter((item) => item.status !== 'cancelled' && item.report_eligible === true)
+      .filter((item) => item.status !== 'cancelled' && item.report_eligible === true)
       .sort((left, right) => workItemRank(left) - workItemRank(right) || left.title.localeCompare(right.title, 'vi')),
     [operations.data?.work_items],
   );
-	  useEffect(() => {
-	    if (!open || mode !== 'create' || workItemId || workItems.length !== 1) return;
-	    selectWorkItem(workItems[0].id);
-	  }, [mode, open, workItemId, workItems]);
+  const selectedWorkItem = workItems.find((item) => item.id === workItemId);
+  const willAutoStartWorkItem = mode === 'create' && selectedWorkItem && ['pending', 'ready', 'needs_changes'].includes(selectedWorkItem.status);
+  useEffect(() => {
+    if (!open || mode !== 'create' || workItemId || workItems.length !== 1) return;
+    selectWorkItem(workItems[0].id);
+  }, [mode, open, workItemId, workItems]);
   const evidence = useQuery({
     queryKey: ['construction-report-create-evidence', projectId, workItemId],
     queryFn: () => get<ProjectEvidencePage>(`/projects/${projectId}/evidence?work_item_id=${encodeURIComponent(workItemId)}&limit=50`),
@@ -310,9 +312,9 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
             <Field label="Tiến độ báo cáo (%)" required error={errors.progress_percent}>
               <input type="number" min={0} max={100} className={inputClass(Boolean(errors.progress_percent))} value={progressPercent} onChange={(event) => { setProgressPercent(event.target.value); clearError('progress_percent'); }} />
             </Field>
-	            <Field label="Hạng mục thi công" required error={errors.work_item_id} helper="Chỉ hiển thị hạng mục thuộc Node Thi công đang hoạt động.">
+            <Field label="Hạng mục thi công" required error={errors.work_item_id} helper={willAutoStartWorkItem ? 'Khi lưu báo cáo, hạng mục sẽ chuyển sang “Đang làm”.' : 'Chỉ hiển thị hạng mục thuộc Node Thi công đang hoạt động.'}>
               <select disabled={operations.isLoading || operations.isError} className={inputClass(Boolean(errors.work_item_id))} value={workItemId} onChange={(event) => selectWorkItem(event.target.value)}>
-	                <option value="">{operations.isLoading ? 'Đang tải hạng mục...' : operations.isError ? 'Không tải được hạng mục' : workItems.length ? 'Chọn hạng mục' : 'Chưa có hạng mục Thi công khả dụng'}</option>
+                <option value="">{operations.isLoading ? 'Đang tải hạng mục...' : operations.isError ? 'Không tải được hạng mục' : workItems.length ? 'Chọn hạng mục' : 'Chưa có hạng mục Thi công khả dụng'}</option>
                 {workItems.map((item) => <option key={item.id} value={item.id}>{item.title} · {statusLabel(item.status)}</option>)}
               </select>
             </Field>

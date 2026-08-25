@@ -268,7 +268,7 @@ func TestBOQLifecycleHardeningAndProcurementLink(t *testing.T) {
 	if updated["status"] != "draft" || updated["work_item_name"] != "Updated draft" {
 		t.Fatalf("updated draft = %#v", updated)
 	}
-	submitted, err := service.BOQProjectAction(ctx, projectID, "submit", actorID, "boq@test.local")
+	submitted, err := service.BOQProjectAction(ctx, projectID, "submit", WorkItemMutationContext{}, actorID, "boq@test.local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +277,7 @@ func TestBOQLifecycleHardeningAndProcurementLink(t *testing.T) {
 	}
 	_, err = service.UpdateBOQ(ctx, draftID, Record{"work_item_name": "Bypass submitted"}, actorID, "boq@test.local")
 	assertValidationError(t, err)
-	_, err = service.BOQProjectAction(ctx, projectID, "approve", actorID, "boq@test.local")
+	_, err = service.BOQProjectAction(ctx, projectID, "approve", WorkItemMutationContext{}, actorID, "boq@test.local")
 	assertValidationError(t, err)
 	if _, err := service.LockBOQNormUnitPrice(ctx, draftID, BOQUnitPriceRequest{UnitPrice: 11, Comment: "norm"}, actorID, "boq@test.local"); err != nil {
 		t.Fatal(err)
@@ -287,7 +287,7 @@ func TestBOQLifecycleHardeningAndProcurementLink(t *testing.T) {
 	}
 	_, err = service.LockBOQFinalUnitPrice(ctx, draftID, BOQUnitPriceRequest{UnitPrice: 12, Comment: "must still be approved"}, actorID, "boq@test.local")
 	assertValidationError(t, err)
-	approved, err := service.BOQProjectAction(ctx, projectID, "approve", actorID, "boq@test.local")
+	approved, err := service.BOQProjectAction(ctx, projectID, "approve", WorkItemMutationContext{}, actorID, "boq@test.local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,10 +317,10 @@ func TestBOQLifecycleHardeningAndProcurementLink(t *testing.T) {
 	assertValidationError(t, err)
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='boq_revision_requested' AND target_id=$2 AND metadata_json->>'from_status'='approved' AND metadata_json->>'reason'='Bổ sung diễn giải theo hiện trường'`, 1, projectID, draftID)
 
-	if _, err := service.BOQProjectAction(ctx, projectID, "submit", actorID, "boq@test.local"); err != nil {
+	if _, err := service.BOQProjectAction(ctx, projectID, "submit", WorkItemMutationContext{}, actorID, "boq@test.local"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.BOQProjectAction(ctx, projectID, "approve", actorID, "boq@test.local"); err != nil {
+	if _, err := service.BOQProjectAction(ctx, projectID, "approve", WorkItemMutationContext{}, actorID, "boq@test.local"); err != nil {
 		t.Fatal(err)
 	}
 	requestID := newID()
@@ -446,14 +446,14 @@ func TestGenerateProcurementFromBOQRequiresFinalLockedApprovedItems(t *testing.T
 		t.Fatal(err)
 	}
 	mustExec(t, db, `UPDATE boq_items SET status='approved', approved_by=$2 WHERE id=$1`, approvedBOQID, actorID)
-	_, err := repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, "actor@test.local")
+	_, err := repo.GenerateProcurementFromBOQ(ctx, projectID, WorkItemMutationContext{}, actorID, "actor@test.local")
 	assertValidationError(t, err)
 
 	if _, err := repo.LockBOQFinalUnitPrice(ctx, approvedBOQID, 12, "final locked", actorID, "actor@test.local"); err != nil {
 		t.Fatal(err)
 	}
 
-	procurement, err := repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, "actor@test.local")
+	procurement, err := repo.GenerateProcurementFromBOQ(ctx, projectID, WorkItemMutationContext{}, actorID, "actor@test.local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,7 +469,7 @@ func TestGenerateProcurementFromBOQRequiresFinalLockedApprovedItems(t *testing.T
 	if cleanID(detail["procurement_request_id"]) != cleanID(requestID) || detail["procurement_request_status"] != "waiting_approval" || number(detail["active_procurement_count"]) != 1 || !boolValue(detail["has_active_procurement"]) {
 		t.Fatalf("generated procurement link = %#v", detail)
 	}
-	if _, err := repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, "actor@test.local"); err == nil {
+	if _, err := repo.GenerateProcurementFromBOQ(ctx, projectID, WorkItemMutationContext{}, actorID, "actor@test.local"); err == nil {
 		t.Fatal("expected duplicate procurement generation to report no eligible BOQ rows")
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_requests WHERE project_id=$1`, 1, projectID)
@@ -505,7 +505,7 @@ func TestSupplierQuotationSelectionLocksBOQAndSnapshotsProcurement(t *testing.T)
 	if _, err := repo.LockBOQNormUnitPrice(ctx, boqID, 105, "Approved norm", actorID, "commercial@test.local"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.BOQProjectAction(ctx, projectID, "approve", actorID, "commercial@test.local"); err != nil {
+	if _, err := service.BOQProjectAction(ctx, projectID, "approve", WorkItemMutationContext{}, actorID, "commercial@test.local"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -524,7 +524,7 @@ func TestSupplierQuotationSelectionLocksBOQAndSnapshotsProcurement(t *testing.T)
 		t.Fatal(err)
 	}
 	quotationID := cleanID(quotation["id"])
-	quotation, err = service.SubmitSupplierQuotation(ctx, quotationID, actorID, "commercial@test.local")
+	quotation, err = service.SubmitSupplierQuotation(ctx, quotationID, WorkItemMutationContext{}, actorID, "commercial@test.local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -547,7 +547,7 @@ func TestSupplierQuotationSelectionLocksBOQAndSnapshotsProcurement(t *testing.T)
 		t.Fatalf("selected BOQ snapshot = %#v", boq)
 	}
 
-	procurement, err := repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, "commercial@test.local")
+	procurement, err := repo.GenerateProcurementFromBOQ(ctx, projectID, WorkItemMutationContext{}, actorID, "commercial@test.local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -591,17 +591,17 @@ func TestContractLifecycleCreatesVersionedObligationsVariationAndRetention(t *te
 	}
 	versions := contract["versions"].([]Record)
 	versionID := cleanID(versions[0]["id"])
-	if _, err = service.ContractVersionAction(ctx, versionID, "submit", "Gửi review", actorID, "contract@test.local"); err != nil {
+	if _, err = service.ContractVersionAction(ctx, versionID, "submit", "Gửi review", WorkItemMutationContext{}, actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = service.ContractVersionAction(ctx, versionID, "approve", "Đã kiểm tra pháp lý và thương mại", actorID, "contract@test.local"); err != nil {
+	if _, err = service.ContractVersionAction(ctx, versionID, "approve", "Đã kiểm tra pháp lý và thương mại", WorkItemMutationContext{}, actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = service.ContractVersionAction(ctx, versionID, "sign", "Hai bên đã ký", actorID, "contract@test.local"); err != nil {
+	if _, err = service.ContractVersionAction(ctx, versionID, "sign", "Hai bên đã ký", WorkItemMutationContext{}, actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
 	seedContractExecutionReadiness(t, db, projectID, contractID, versionID, actorID)
-	contract, err = service.ActivateContract(ctx, contractID, "Kích hoạt hợp đồng", actorID, "contract@test.local")
+	contract, err = service.ActivateContract(ctx, contractID, "Kích hoạt hợp đồng", WorkItemMutationContext{}, actorID, "contract@test.local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -658,17 +658,17 @@ func TestContractLifecycleCreatesVersionedObligationsVariationAndRetention(t *te
 		t.Fatalf("variation version = %#v", versions[0])
 	}
 	newVersionID := cleanID(versions[0]["id"])
-	if _, err = service.ContractVersionAction(ctx, newVersionID, "submit", "Gửi review V2", actorID, "contract@test.local"); err != nil {
+	if _, err = service.ContractVersionAction(ctx, newVersionID, "submit", "Gửi review V2", WorkItemMutationContext{}, actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = service.ContractVersionAction(ctx, newVersionID, "approve", "Duyệt V2", actorID, "contract@test.local"); err != nil {
+	if _, err = service.ContractVersionAction(ctx, newVersionID, "approve", "Duyệt V2", WorkItemMutationContext{}, actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = service.ContractVersionAction(ctx, newVersionID, "sign", "Ký V2", actorID, "contract@test.local"); err != nil {
+	if _, err = service.ContractVersionAction(ctx, newVersionID, "sign", "Ký V2", WorkItemMutationContext{}, actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
 	seedContractExecutionReadiness(t, db, projectID, contractID, newVersionID, actorID)
-	if _, err = service.ActivateContract(ctx, contractID, "Kích hoạt V2", actorID, "contract@test.local"); err != nil {
+	if _, err = service.ActivateContract(ctx, contractID, "Kích hoạt V2", WorkItemMutationContext{}, actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM projects WHERE id=$1 AND contract_amount=1100000`, 1, projectID)

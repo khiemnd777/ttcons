@@ -15,6 +15,7 @@ import type {
   SurplusHandlingResponse,
   Warehouse,
 } from '../../lib/types/domain';
+import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
 
 type Draft = {
   id: string;
@@ -161,7 +162,8 @@ export function SurplusHandlingPanel({
     onSuccess: (record) => {
       if (!record) return;
       invalidate();
-      toast.success('Đã lưu nháp xử lý vật tư dư');
+      syncWorkItemMutationTransition(queryClient, record);
+      toast.success(`Đã lưu nháp xử lý vật tư dư.${workItemAutoStartedNotice(record)}`);
     },
     onError: (error) => toast.error('Không lưu được xử lý vật tư dư', error),
   });
@@ -175,7 +177,8 @@ export function SurplusHandlingPanel({
     onSuccess: (record) => {
       if (!record) return;
       invalidate();
-      toast.success('Đã gửi xử lý vật tư dư');
+      syncWorkItemMutationTransition(queryClient, record);
+      toast.success(`Đã gửi xử lý vật tư dư.${workItemAutoStartedNotice(record)}`);
     },
     onError: (error) => toast.error('Không gửi được xử lý vật tư dư', error),
   });

@@ -1,4 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CalendarDays, CheckCircle2, Loader2, Pencil, PlayCircle, Plus, Trash2 } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 import { useToast } from '../../components/ToastProvider';
@@ -12,6 +13,7 @@ import { createConstructionCheck, uploadConstructionEvidenceItems } from './cons
 import { checkStatusLabel, constructionActionAssigneeLabel, dateTimeText, optionalISO, toDateTimeInput } from './constructionWorkspaceUtils';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { EvidenceGallery } from '../work-items/EvidenceGallery';
+import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from '../work-items/workItemMutationContext';
 
 export type CheckDialogState =
   | { type: 'template' }
@@ -83,6 +85,7 @@ function TemplateDialog({ projectId, onClose, onSaved }: Props) {
 
 function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Props & { state: { type: 'create'; sourceReport?: ConstructionDailyReportSource } | { type: 'edit'; check: ConstructionCheck } }) {
   const toast = useToast();
+  const queryClient = useQueryClient();
   const check = state.type === 'edit' ? state.check : undefined;
   const sourceReport = state.type === 'create' ? state.sourceReport : undefined;
   const [values, setValues] = useState({ work_item_id: '', template_id: '', title: '', location: '', scheduled_at: '' });
@@ -158,9 +161,9 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
         criteria: criteria.map((item) => item.text.trim()).filter(Boolean).map((text) => ({ title: text, criteria: text, evidence_required: true })),
         context_evidence_ids: contextEvidenceIDs,
       };
-      if (check) await put(`/construction-checks/${check.id}`, body);
-      else await createConstructionCheck(projectId, body);
-      toast.success(check ? 'Đã cập nhật kiểm tra' : 'Đã tạo kiểm tra');
+      const result = check ? await put(`/construction-checks/${check.id}`, body) : await createConstructionCheck(projectId, body);
+      syncWorkItemMutationTransition(queryClient, result);
+      toast.success(`${check ? 'Đã cập nhật kiểm tra' : 'Đã tạo kiểm tra'}.${workItemAutoStartedNotice(result)}`);
       await onSaved();
     } catch (error) {
       toast.error(check ? 'Không cập nhật được kiểm tra' : 'Không tạo được kiểm tra', error);

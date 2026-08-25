@@ -24,7 +24,7 @@ var myWorkSorts = map[string]bool{
 
 var myWorkBuckets = map[string]bool{
 	"": true, "all": true, "need_action": true, "in_progress": true, "overdue": true,
-	"blocked": true, "waiting_decision": true, "upcoming": true, "done_today": true,
+	"blocked": true, "waiting_decision": true, "upcoming": true, "completed": true, "done_today": true,
 }
 
 var myWorkStatuses = map[string]bool{
@@ -95,6 +95,25 @@ func normalizeMyWorkItemsFilter(filter MyWorkItemsFilter) (MyWorkItemsFilter, in
 		offset = parsed
 	}
 	return filter, offset, nil
+}
+
+func normalizeMyWorkflowActionsFilter(filter MyWorkflowActionsFilter) (MyWorkflowActionsFilter, error) {
+	filter.Queue = strings.ToLower(strings.TrimSpace(filter.Queue))
+	if filter.Queue == "" {
+		filter.Queue = "responsible"
+	}
+	if !myWorkQueues[filter.Queue] {
+		return filter, validationError("Hàng đợi hành động quy trình không hợp lệ", Record{"queue": filter.Queue})
+	}
+	filter.ProjectID = cleanID(filter.ProjectID)
+	if filter.ProjectID != "" && !validActivityUUID(filter.ProjectID) {
+		return filter, validationError("project_id không hợp lệ", Record{"project_id": filter.ProjectID})
+	}
+	filter.Search = strings.TrimSpace(filter.Search)
+	if len([]rune(filter.Search)) > 200 {
+		return filter, validationError("Từ khóa tìm kiếm không được vượt quá 200 ký tự", nil)
+	}
+	return filter, nil
 }
 
 func validMyWorkToken(value string) bool {

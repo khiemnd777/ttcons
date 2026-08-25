@@ -16,6 +16,12 @@ import { ProjectSelector } from '../_shared/ProjectSelector';
 import { EnumChip } from '../../components/EnumChip';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { partnerOptions } from '../core-data/partnerUtils';
+import {
+  syncWorkItemMutationTransition,
+  withWorkItemMutationContext,
+  workItemAutoStartedNotice,
+  type WorkItemMutationResult,
+} from '../work-items/workItemMutationContext';
 
 type WarehouseTab = 'stock' | 'documents' | 'site' | 'materials';
 type RecordRow = Record<string, any>;
@@ -24,6 +30,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const { id } = useParams();
   const location = useLocation();
   const initialParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const taskId = initialParams.get('task')?.trim() ?? '';
   const { hasPermission } = useAuth();
   const [projectId, setProjectId] = useState(id ?? '');
   const [tab, setTab] = useState<WarehouseTab>(() => validTab(initialParams.get('tab')));
@@ -51,7 +58,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
     onError: (error) => toast.error('Không thêm được vật tư', error),
   });
   const createDocument = useMutation({
-    mutationFn: (values: RecordRow) => post<StockDocument>('/stock/documents', values),
+    mutationFn: (values: RecordRow) => post<StockDocument & WorkItemMutationResult>('/stock/documents', withWorkItemMutationContext(values, taskId)),
     onSuccess: async (record) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock-positions'] }),
@@ -60,7 +67,8 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
         queryClient.invalidateQueries({ queryKey: ['warehouse-receipt-options'] }),
         queryClient.invalidateQueries({ queryKey: ['procurement'] }),
       ]);
-      setOpenDocument(false); setDocumentId(record.id); setTab('documents'); toast.success(`Đã ghi nhận phiếu kho ${record.document_code}`);
+      syncWorkItemMutationTransition(queryClient, record);
+      setOpenDocument(false); setDocumentId(record.id); setTab('documents'); toast.success(`Đã ghi nhận phiếu kho ${record.document_code}.${workItemAutoStartedNotice(record)}`);
     },
     onError: (error) => toast.error('Không ghi nhận được phiếu kho', error),
   });

@@ -10,6 +10,12 @@ import type { BOQItem, Partner, SupplierQuoteComparison, SupplierQuotation } fro
 import { partnerOptions } from '../core-data/partnerUtils';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { dateText } from '../../lib/utils/format';
+import {
+  syncWorkItemMutationTransition,
+  withWorkItemMutationContext,
+  workItemAutoStartedNotice,
+  type WorkItemMutationResult,
+} from '../work-items/workItemMutationContext';
 
 type QuotationItemDraft = {
   enabled: boolean;
@@ -57,7 +63,7 @@ type QuotationErrors = Record<string, string>;
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function SupplierQuotationWorkspace({ projectId, boqItems, mode }: { projectId: string; boqItems: BOQItem[]; mode: 'quotes' | 'compare' }) {
+export function SupplierQuotationWorkspace({ projectId, workItemId, boqItems, mode }: { projectId: string; workItemId: string; boqItems: BOQItem[]; mode: 'quotes' | 'compare' }) {
   const { hasPermission } = useAuth();
   const canQualify = hasPermission('procurement.approve') || hasPermission('boq.approve');
   const canSelect = hasPermission('procurement.approve') || hasPermission('boq.approve');
@@ -95,46 +101,50 @@ export function SupplierQuotationWorkspace({ projectId, boqItems, mode }: { proj
 
   const save = useMutation({
     mutationFn: (draft: QuotationDraft) => {
-      const payload = quotationPayload(draft);
+      const payload = withWorkItemMutationContext(quotationPayload(draft), workItemId);
       return draft.id
-        ? put<SupplierQuotation>(`/supplier-quotations/${draft.id}`, payload)
-        : post<SupplierQuotation>(`/projects/${projectId}/supplier-quotations`, payload);
+        ? put<SupplierQuotation & WorkItemMutationResult>(`/supplier-quotations/${draft.id}`, payload)
+        : post<SupplierQuotation & WorkItemMutationResult>(`/projects/${projectId}/supplier-quotations`, payload);
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       await invalidate();
+      syncWorkItemMutationTransition(queryClient, result);
       setEditor(null);
       setEditorErrors({});
-      toast.success('Đã lưu báo giá nhà cung cấp');
+      toast.success(`Đã lưu báo giá nhà cung cấp.${workItemAutoStartedNotice(result)}`);
     },
     onError: (error) => toast.error('Không lưu được báo giá', error),
   });
   const submit = useMutation({
-    mutationFn: (quotationId: string) => post(`/supplier-quotations/${quotationId}/submit`, {}),
-    onSuccess: async () => {
+    mutationFn: (quotationId: string) => post<WorkItemMutationResult>(`/supplier-quotations/${quotationId}/submit`, withWorkItemMutationContext({}, workItemId)),
+    onSuccess: async (result) => {
       await invalidate();
-      toast.success('Đã gửi báo giá để đánh giá');
+      syncWorkItemMutationTransition(queryClient, result);
+      toast.success(`Đã gửi báo giá để đánh giá.${workItemAutoStartedNotice(result)}`);
     },
     onError: (error) => toast.error('Không gửi được báo giá', error),
   });
   const qualify = useMutation({
-    mutationFn: (value: NonNullable<typeof qualification>) => post(`/supplier-quotations/${value.quotation.id}/qualify`, {
+    mutationFn: (value: NonNullable<typeof qualification>) => post<WorkItemMutationResult>(`/supplier-quotations/${value.quotation.id}/qualify`, withWorkItemMutationContext({
       technical_status: value.technical_status,
       commercial_status: value.commercial_status,
       comment: value.comment,
-    }),
-    onSuccess: async () => {
+    }, workItemId)),
+    onSuccess: async (result) => {
       await invalidate();
+      syncWorkItemMutationTransition(queryClient, result);
       setQualification(null);
-      toast.success('Đã hoàn tất đánh giá báo giá');
+      toast.success(`Đã hoàn tất đánh giá báo giá.${workItemAutoStartedNotice(result)}`);
     },
     onError: (error) => toast.error('Không đánh giá được báo giá', error),
   });
   const selectQuote = useMutation({
-    mutationFn: (value: NonNullable<typeof selection>) => post(`/supplier-quotation-items/${value.quote.quotation_item_id}/select`, { decision_reason: value.reason }),
-    onSuccess: async () => {
+    mutationFn: (value: NonNullable<typeof selection>) => post<WorkItemMutationResult>(`/supplier-quotation-items/${value.quote.quotation_item_id}/select`, withWorkItemMutationContext({ decision_reason: value.reason }, workItemId)),
+    onSuccess: async (result) => {
       await invalidate();
+      syncWorkItemMutationTransition(queryClient, result);
       setSelection(null);
-      toast.success('Đã chọn báo giá và khóa giá cuối BOQ');
+      toast.success(`Đã chọn báo giá và khóa giá cuối BOQ.${workItemAutoStartedNotice(result)}`);
     },
     onError: (error) => toast.error('Không chọn được báo giá', error),
   });

@@ -31,6 +31,7 @@ import type {
   WorkItem,
 } from '../../lib/types/domain';
 import { statusLabel } from '../../lib/utils/status';
+import { roleSummary } from '../../lib/utils/roles';
 import { workItemDetailPath } from '../work-items/workItemNavigation';
 import { workflowFormStatusLabel } from '../work-items/workItemPresentation';
 import {
@@ -62,6 +63,7 @@ export function ProjectWorkspaceLayout() {
 
   const project = operations.data?.project_summary ?? operations.data?.project;
   const visibleGroups = visibleProjectWorkspaceGroups(hasAnyPermission);
+  const userRoleSummary = roleSummary(user?.roles);
   const activeWorkItemId = showWorkflowSidebar ? activeWorkItemIdFromPath(location.pathname) : '';
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -103,7 +105,7 @@ export function ProjectWorkspaceLayout() {
             <div className="flex shrink-0 items-center gap-3">
               <div className="hidden min-w-0 text-right sm:block">
                 <p className="truncate text-sm font-semibold text-ink">{user?.full_name}</p>
-                <p className="truncate text-xs text-slate-500">{user?.roles?.join(', ')}</p>
+                <p className="truncate text-xs text-slate-500">{userRoleSummary}</p>
               </div>
               <button
                 aria-label="Đăng xuất"

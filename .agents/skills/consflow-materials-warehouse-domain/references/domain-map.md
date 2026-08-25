@@ -58,3 +58,4 @@
 ## Golden Sample
 
 - `GOLDEN-REAL-001` traces procurement acceptance into explicit receive/issue/return movements, six site balances, a submitted material snapshot and six surplus-return histories; final surplus is zero and every balance is `handled`.
+- Posted stock documents opened from a canonical Warehouse Work Item may carry explicit `work_item_context`; work-item-owned material snapshots and surplus handling derive the same start intent from their persisted link. The stock/source rows, movements, balance/audit and Work Item transition share one transaction. Wrong project/action/workspace, future/terminal work or missing permission rolls back the warehouse mutation; auto-start never changes quantities, invents movements or marks surplus handled.

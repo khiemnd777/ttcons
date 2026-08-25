@@ -2940,6 +2940,27 @@ export type WorkItem = ProjectOperationsRecord & {
   assignments?: ProjectOperationsRecord[];
 };
 
+export type MyWorkflowAction = {
+  id: string;
+  action_type: 'advance_run_node' | string;
+  title: string;
+  action_label: string;
+  description: string;
+  project_id: string;
+  project_name: string;
+  project_code: string;
+  pipeline_run_id: string;
+  run_node_id: string;
+  run_node_name: string;
+  run_node_type?: string;
+  run_node_business_code?: string;
+  next_run_node_id?: string;
+  next_run_node_name?: string;
+  next_run_node_type?: string;
+  terminal?: boolean;
+  readiness: 'actionable' | string;
+};
+
 export type WorkItemExecutionTarget = {
   kind: 'domain' | 'capture' | 'evidence' | 'approval' | 'mixed' | 'work_item' | string;
   workspace: 'preparation' | 'planning' | 'boq' | 'contracts' | 'procurement' | 'warehouse' | 'operations' | 'acceptance' | 'handover' | 'project_finance' | 'work_item' | string;

@@ -24,6 +24,7 @@ import {
   uploadAcceptanceDraftEvidence,
   type AcceptanceDraft,
 } from './AcceptanceEditor';
+import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from '../work-items/workItemMutationContext';
 
 type ConclusionResult = 'pass' | 'conditional_pass' | 'fail';
 type SelectedChecklistItem = { item: AcceptanceChecklistItem; index: number } | null;
@@ -138,7 +139,8 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
       setEditorOpen(false);
       setSelectedId(String(record.id));
       await invalidate(String(record.id));
-      toast.success(variables.submit ? 'Đã gửi biên bản nghiệm thu' : 'Đã lưu nháp biên bản nghiệm thu');
+      syncWorkItemMutationTransition(queryClient, record);
+      toast.success(`${variables.submit ? 'Đã gửi biên bản nghiệm thu' : 'Đã lưu nháp biên bản nghiệm thu'}.${workItemAutoStartedNotice(record)}`);
     },
     onError: (error) => toast.error('Không lưu được biên bản nghiệm thu', error),
   });

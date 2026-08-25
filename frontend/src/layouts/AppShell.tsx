@@ -27,6 +27,7 @@ import clsx from 'clsx';
 import { BrandHomeLink } from '../components/BrandLogo';
 import { PoweredBySignature } from '../components/PoweredBySignature';
 import { useAuth } from '../lib/auth/AuthContext';
+import { roleSummary } from '../lib/utils/roles';
 
 type NavItem = {
   to: string;
@@ -79,6 +80,7 @@ export function AppShell() {
   const mobileNavTriggerRef = useRef<HTMLButtonElement>(null);
   const mobileNavCloseRef = useRef<HTMLButtonElement>(null);
   const mobileNavPanelRef = useRef<HTMLElement>(null);
+  const userRoleSummary = roleSummary(user?.roles);
   const visibleNavGroups = navGroups
     .map((group) => ({
       ...group,
@@ -192,7 +194,7 @@ export function AppShell() {
             <AppNavigation groups={visibleNavGroups} className="min-h-0 flex-1 overflow-auto" onNavigate={() => setMobileNavOpen(false)} />
             <div className="border-t border-line px-4 py-3">
               <p className="truncate text-sm font-semibold text-ink">{user?.full_name}</p>
-              <p className="truncate text-xs text-slate-500">{user?.roles?.join(', ')}</p>
+              <p className="truncate text-xs text-slate-500">{userRoleSummary}</p>
               <button
                 type="button"
                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
@@ -250,7 +252,7 @@ export function AppShell() {
                 aria-label="Mở hồ sơ cá nhân"
               >
                 <p className="text-sm font-semibold text-ink">{user?.full_name}</p>
-                <p className="text-xs text-slate-500">{user?.roles?.join(', ')}</p>
+                <p className="text-xs text-slate-500">{userRoleSummary}</p>
               </button>
               <button
                 className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"

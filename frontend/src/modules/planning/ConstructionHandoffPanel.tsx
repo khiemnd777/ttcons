@@ -18,6 +18,12 @@ import {
   constructionHandoffIntentMatches,
   consumeConstructionHandoffNavigationState,
 } from '../work-items/workItemNavigation';
+import {
+  syncWorkItemMutationTransition,
+  withWorkItemMutationContext,
+  workItemAutoStartedNotice,
+  type WorkItemMutationResult,
+} from '../work-items/workItemMutationContext';
 
 type EditableItem = ConstructionHandoffCandidate & {
   local_id: string;
@@ -31,6 +37,7 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
+  const taskId = new URLSearchParams(location.search).get('task')?.trim() ?? '';
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
@@ -72,7 +79,7 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
   }, [canManage, handoff.data, handoffOpenIntent, location.hash, location.pathname, location.search, location.state, navigate, projectId, toast]);
 
   const activate = useMutation({
-    mutationFn: () => post<ConstructionHandoff>(`/projects/${projectId}/construction-handoff/activate`, {
+    mutationFn: () => post<ConstructionHandoff & WorkItemMutationResult>(`/projects/${projectId}/construction-handoff/activate`, withWorkItemMutationContext({
       title: title.trim(),
       notes: notes.trim(),
       source_run_node_id: handoff.data?.source_run_node_id ?? currentNode?.id ?? '',
@@ -89,7 +96,7 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
         evidence_required: true,
         criteria: normalizedCriteria(item),
       })),
-    }),
+    }, taskId)),
     onSuccess: async (result) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['construction-handoff', projectId] }),
@@ -99,9 +106,10 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
         queryClient.invalidateQueries({ queryKey: ['work-item'] }),
       ]);
       setOpen(false);
+      syncWorkItemMutationTransition(queryClient, result);
       toast.success({
         title: result.idempotent_replay ? 'Bàn giao này đã được kích hoạt trước đó' : 'Đã bàn giao kế hoạch sang Thi công',
-        description: `${result.items?.length ?? items.length} kiểm tra đã được tạo trong không gian Thi công.`,
+        description: `${result.items?.length ?? items.length} kiểm tra đã được tạo trong không gian Thi công.${workItemAutoStartedNotice(result)}`,
       });
     },
     onError: (error) => toast.error('Không kích hoạt được bàn giao thi công', error),

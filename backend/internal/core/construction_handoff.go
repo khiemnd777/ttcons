@@ -91,7 +91,7 @@ func (s *Service) ActivateConstructionHandoff(ctx context.Context, projectID str
 		items = append(items, raw)
 	}
 
-	return s.repo.ActivateConstructionHandoff(ctx, projectID, title, strings.TrimSpace(req.Notes), cleanID(req.SourceRunNodeID), cleanID(req.SourceFormInstanceID), req.SourceFormRevisionNo, items, actorID, actorName)
+	return s.repo.ActivateConstructionHandoff(ctx, projectID, title, strings.TrimSpace(req.Notes), cleanID(req.SourceRunNodeID), cleanID(req.SourceFormInstanceID), req.SourceFormRevisionNo, items, req.WorkItemContext, actorID, actorName)
 }
 
 func (r *Repository) ProjectConstructionHandoff(ctx context.Context, projectID string) (Record, error) {
@@ -298,7 +298,7 @@ func constructionHandoffCandidate(formCode, fieldKey string, index int, item Rec
 	}
 }
 
-func (r *Repository) ActivateConstructionHandoff(ctx context.Context, projectID, title, notes, sourceRunNodeID, sourceFormInstanceID string, expectedSourceFormRevision int, items []ConstructionHandoffItemRequest, actorID, actorName string) (Record, error) {
+func (r *Repository) ActivateConstructionHandoff(ctx context.Context, projectID, title, notes, sourceRunNodeID, sourceFormInstanceID string, expectedSourceFormRevision int, items []ConstructionHandoffItemRequest, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -513,10 +513,15 @@ func (r *Repository) ActivateConstructionHandoff(ctx context.Context, projectID,
 	}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, mutationContext, constructionHandoffWorkItemPolicy, "construction_handoff", cleanID(handoff["id"]), actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetConstructionHandoff(ctx, cleanID(handoff["id"]), false)
+	result, err := r.GetConstructionHandoff(ctx, cleanID(handoff["id"]), false)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (r *Repository) GetConstructionHandoff(ctx context.Context, handoffID string, idempotent bool) (Record, error) {

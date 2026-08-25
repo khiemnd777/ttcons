@@ -19,6 +19,7 @@ import type {
   Warehouse,
 } from '../../lib/types/domain';
 import { partnerOptions } from '../core-data/partnerUtils';
+import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
 
 type LineDraft = {
   key: string;
@@ -272,7 +273,8 @@ export function IncomingAcceptancePanel({
       if (!record) return;
       setDraft(draftFromRecord(record));
       invalidate();
-      toast.success('Đã lưu nháp nghiệm thu đầu vào');
+      syncWorkItemMutationTransition(queryClient, record);
+      toast.success(`Đã lưu nháp nghiệm thu đầu vào.${workItemAutoStartedNotice(record)}`);
     },
     onError: (error) => toast.error('Không lưu được nghiệm thu đầu vào', error),
   });
@@ -287,7 +289,8 @@ export function IncomingAcceptancePanel({
       if (!record) return;
       setDraft(defaultDraft());
       invalidate();
-      toast.success('Đã gửi nghiệm thu đầu vào');
+      syncWorkItemMutationTransition(queryClient, record);
+      toast.success(`Đã gửi nghiệm thu đầu vào.${workItemAutoStartedNotice(record)}`);
     },
     onError: (error) => toast.error('Không gửi được nghiệm thu đầu vào', error),
   });

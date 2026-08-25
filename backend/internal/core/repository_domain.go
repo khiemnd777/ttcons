@@ -243,7 +243,7 @@ func (r *Repository) InitialPasswordChangeRequired(ctx context.Context, userID s
 
 func (r *Repository) UserRoles(ctx context.Context, userID string) ([]string, error) {
 	rows, err := r.Query(ctx, `
-		SELECT r.display_name
+		SELECT DISTINCT r.display_name
 		FROM user_roles ur
 		JOIN roles r ON r.id=ur.role_id
 		WHERE ur.user_id=$1
@@ -2943,6 +2943,11 @@ func (r *Repository) SaveSubcontractorReconciliation(ctx context.Context, item R
 	}); err != nil {
 		return err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), subcontractorAcceptanceWorkItemPolicy, "subcontractor_reconciliation", reconciliationID, actorID, actorName)
+	if err != nil {
+		return err
+	}
+	item["work_item_transition"] = transition
 	return tx.Commit()
 }
 
@@ -3254,10 +3259,15 @@ func (r *Repository) SaveAcceptance(ctx context.Context, acceptanceID string, he
 	}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), finalAcceptanceWorkItemPolicy, "acceptance", acceptanceID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetAcceptanceDetail(ctx, acceptanceID)
+	result, err := r.GetAcceptanceDetail(ctx, acceptanceID)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (r *Repository) SubmitAcceptance(ctx context.Context, acceptanceID, actorID, actorName string) (Record, error) {
@@ -3343,10 +3353,15 @@ func (r *Repository) SubmitAcceptance(ctx context.Context, acceptanceID, actorID
 	}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), finalAcceptanceWorkItemPolicy, "acceptance", acceptanceID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetAcceptanceDetail(ctx, acceptanceID)
+	result, err := r.GetAcceptanceDetail(ctx, acceptanceID)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (r *Repository) GetOwnerClientReconciliation(ctx context.Context, workItemID string) (Record, error) {
@@ -3527,6 +3542,11 @@ func (r *Repository) SaveOwnerClientReconciliation(ctx context.Context, item Rec
 	}); err != nil {
 		return err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), finalAcceptanceWorkItemPolicy, "owner_client_reconciliation", reconciliationID, actorID, actorName)
+	if err != nil {
+		return err
+	}
+	item["work_item_transition"] = transition
 	return tx.Commit()
 }
 
@@ -3726,6 +3746,11 @@ func (r *Repository) SaveMaterialSnapshot(ctx context.Context, item Record, head
 	}); err != nil {
 		return err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), warehouseWorkItemPolicy, "material_snapshot", snapshotID, actorID, actorName)
+	if err != nil {
+		return err
+	}
+	item["work_item_transition"] = transition
 	return tx.Commit()
 }
 
@@ -3945,10 +3970,15 @@ func (r *Repository) SaveSurplusHandling(ctx context.Context, item Record, handl
 	}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), warehouseWorkItemPolicy, "site_surplus_handling", handlingID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetSurplusHandling(ctx, handlingID)
+	result, err := r.GetSurplusHandling(ctx, handlingID)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (r *Repository) SubmitSurplusHandling(ctx context.Context, handlingID string, actorID, actorName string) (Record, error) {
@@ -4131,10 +4161,15 @@ func (r *Repository) SubmitSurplusHandling(ctx context.Context, handlingID strin
 	}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), warehouseWorkItemPolicy, "site_surplus_handling", handlingID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetSurplusHandling(ctx, handlingID)
+	result, err := r.GetSurplusHandling(ctx, handlingID)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (r *Repository) ListIncomingAcceptancesForProject(ctx context.Context, projectID string) ([]Record, error) {
@@ -4379,10 +4414,15 @@ func (r *Repository) SaveIncomingAcceptance(ctx context.Context, acceptanceID st
 	}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), incomingAcceptanceWorkItemPolicy, "incoming_acceptance", acceptanceID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetIncomingAcceptance(ctx, acceptanceID)
+	response, err := r.GetIncomingAcceptance(ctx, acceptanceID)
+	return attachWorkItemTransition(response, transition), err
 }
 
 func (r *Repository) SubmitIncomingAcceptance(ctx context.Context, acceptanceID string, result string, actorID, actorName string) (Record, error) {
@@ -4482,10 +4522,15 @@ func (r *Repository) SubmitIncomingAcceptance(ctx context.Context, acceptanceID 
 	}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), incomingAcceptanceWorkItemPolicy, "incoming_acceptance", acceptanceID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetIncomingAcceptance(ctx, acceptanceID)
+	response, err := r.GetIncomingAcceptance(ctx, acceptanceID)
+	return attachWorkItemTransition(response, transition), err
 }
 
 func (r *Repository) HasSubmittedWorkflowFormForWorkItem(ctx context.Context, workItemID string) (bool, error) {
@@ -5512,6 +5557,29 @@ func startWorkflowFormWorkItemTx(ctx context.Context, tx *sql.Tx, instance Recor
 		}
 	}
 
+	formAction := "draft_saved"
+	comment := "Bắt đầu đầu việc khi lưu nháp hồ sơ nghiệp vụ"
+	if submit {
+		formAction = "submitted"
+		comment = "Bắt đầu đầu việc khi chốt hồ sơ nghiệp vụ"
+	}
+	metadata := Record{
+		"action":                    "started",
+		"source":                    "workflow_form_first_write",
+		"workflow_form_action":      formAction,
+		"workflow_form_instance_id": instance["id"],
+		"workflow_form_version_id":  instance["form_version_id"],
+	}
+	return persistWorkItemStartedTx(ctx, tx, item, actorID, actorName, comment, metadata)
+}
+
+func persistWorkItemStartedTx(ctx context.Context, tx *sql.Tx, item Record, actorID, actorName, comment string, metadata Record) error {
+	workItemID := cleanID(item["id"])
+	projectID := cleanID(item["project_id"])
+	fromStatus := fmt.Sprint(item["status"])
+	if workItemID == "" || projectID == "" {
+		return validationError("Đầu việc không hợp lệ", Record{"work_item_id": workItemID, "project_id": projectID})
+	}
 	updated, err := queryTx(ctx, tx, `
 		UPDATE work_items
 		SET status='in_progress',
@@ -5530,22 +5598,11 @@ func startWorkflowFormWorkItemTx(ctx context.Context, tx *sql.Tx, instance Recor
 	if err := applyRunStepStatusTx(ctx, tx, item, "in_progress", actorID); err != nil {
 		return err
 	}
-
-	formAction := "draft_saved"
-	comment := "Bắt đầu đầu việc khi lưu nháp hồ sơ nghiệp vụ"
-	if submit {
-		formAction = "submitted"
-		comment = "Bắt đầu đầu việc khi chốt hồ sơ nghiệp vụ"
+	if metadata == nil {
+		metadata = Record{}
 	}
-	metadata := Record{
-		"action":                    "started",
-		"source":                    "workflow_form_first_write",
-		"workflow_form_action":      formAction,
-		"workflow_form_instance_id": instance["id"],
-		"workflow_form_version_id":  instance["form_version_id"],
-	}
+	metadata["action"] = "started"
 	rawMetadata, _ := json.Marshal(metadata)
-	projectID := cleanID(item["project_id"])
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, from_status, to_status, metadata_json)
 		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'started', $4, $5, 'in_progress', $6::jsonb)
@@ -10841,7 +10898,7 @@ func (r *Repository) automateClientBOQProcurement(ctx context.Context, contextRo
 		return automationBlocked("generate_procurement_from_boq", "BOQ còn dòng chưa duyệt hoặc chưa khóa đơn giá cuối", metadata), nil
 	}
 	if number(summary["ready_without_procurement"]) > 0 {
-		procurement, err := r.GenerateProcurementFromBOQ(ctx, projectID, actorID, actorName)
+		procurement, err := r.GenerateProcurementFromBOQ(ctx, projectID, WorkItemMutationContext{}, actorID, actorName)
 		if err != nil {
 			var statusErr StatusError
 			if errors.As(err, &statusErr) {
@@ -12463,7 +12520,7 @@ func (r *Repository) GetBOQItemDetail(ctx context.Context, itemID string) (Recor
 	`, itemID)
 }
 
-func (r *Repository) BOQProjectAction(ctx context.Context, projectID, action, actorID, actorName string) (Record, error) {
+func (r *Repository) BOQProjectAction(ctx context.Context, projectID, action string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -12540,10 +12597,14 @@ func (r *Repository) BOQProjectAction(ctx context.Context, projectID, action, ac
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "project_boq", projectID, fmt.Sprintf("Chuyển %d dòng BOQ sang %s", count, toStatus), Record{"action": action, "from_statuses": fromStatuses, "to_status": toStatus, "item_count": count}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, mutationContext, boqReleaseWorkItemPolicy, "project_boq", projectID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return Record{"action": action, "from_status": fromStatuses[0], "from_statuses": fromStatuses, "to_status": toStatus, "item_count": count}, nil
+	return attachWorkItemTransition(Record{"action": action, "from_status": fromStatuses[0], "from_statuses": fromStatuses, "to_status": toStatus, "item_count": count}, transition), nil
 }
 
 func (r *Repository) CreateBOQItem(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
@@ -12955,7 +13016,7 @@ func (r *Repository) GetSupplierQuotationDetail(ctx context.Context, quotationID
 	return quotation, nil
 }
 
-func (r *Repository) SaveSupplierQuotation(ctx context.Context, projectID, quotationID string, header Record, items []Record, actorID, actorName string) (Record, error) {
+func (r *Repository) SaveSupplierQuotation(ctx context.Context, projectID, quotationID string, header Record, items []Record, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -13018,13 +13079,18 @@ func (r *Repository) SaveSupplierQuotation(ctx context.Context, projectID, quota
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "supplier_quotation", quotationID, "Lưu báo giá nhà cung cấp", Record{"quotation_code": header["quotation_code"], "item_count": len(items), "supplier_partner_id": header["supplier_partner_id"]}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, mutationContext, supplierQuotationWorkItemPolicy, "supplier_quotation", quotationID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetSupplierQuotationDetail(ctx, quotationID)
+	result, err := r.GetSupplierQuotationDetail(ctx, quotationID)
+	return attachWorkItemTransition(result, transition), err
 }
 
-func (r *Repository) SupplierQuotationAction(ctx context.Context, quotationID, action, technicalStatus, commercialStatus, comment, actorID, actorName string) (Record, error) {
+func (r *Repository) SupplierQuotationAction(ctx context.Context, quotationID, action, technicalStatus, commercialStatus, comment string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -13089,13 +13155,18 @@ func (r *Repository) SupplierQuotationAction(ctx context.Context, quotationID, a
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "supplier_quotation", quotationID, "Cập nhật trạng thái báo giá", Record{"from_status": fromStatus, "to_status": toStatus, "technical_status": technicalStatus, "commercial_status": commercialStatus, "comment": comment}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, mutationContext, supplierQuotationWorkItemPolicy, "supplier_quotation", quotationID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetSupplierQuotationDetail(ctx, quotationID)
+	result, err := r.GetSupplierQuotationDetail(ctx, quotationID)
+	return attachWorkItemTransition(result, transition), err
 }
 
-func (r *Repository) SelectSupplierQuote(ctx context.Context, quotationItemID, reason, actorID, actorName string) (Record, error) {
+func (r *Repository) SelectSupplierQuote(ctx context.Context, quotationItemID, reason string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -13169,10 +13240,15 @@ func (r *Repository) SelectSupplierQuote(ctx context.Context, quotationItemID, r
 	if err := addAuditTx(ctx, tx, cleanID(item["project_id"]), actorID, actorName, "supplier_quote_selected", "boq_item", cleanID(item["boq_item_id"]), "Chọn báo giá và khóa đơn giá cuối BOQ", Record{"quotation_item_id": quotationItemID, "quotation_id": item["quotation_id"], "supplier_partner_id": item["supplier_partner_id"], "unit_price": item["unit_price"], "decision_reason": reason}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(item["project_id"]), mutationContext, supplierSelectionWorkItemPolicy, "supplier_quote_selection", cleanID(item["boq_item_id"]), actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetBOQItemDetail(ctx, cleanID(item["boq_item_id"]))
+	result, err := r.GetBOQItemDetail(ctx, cleanID(item["boq_item_id"]))
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (r *Repository) SupplierQuoteComparison(ctx context.Context, projectID string) ([]Record, error) {
@@ -13200,7 +13276,7 @@ func (r *Repository) SupplierQuoteComparison(ctx context.Context, projectID stri
 	`, projectID)
 }
 
-func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, actorID, actorName string) (Record, error) {
+func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -13331,6 +13407,10 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 			return nil, err
 		}
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, mutationContext, boqProcurementWorkItemPolicy, "procurement_request", requestIDs[0], actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -13345,7 +13425,7 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID, 
 	result := requests[0]
 	result["requests"] = requests
 	result["request_count"] = len(requests)
-	return result, nil
+	return attachWorkItemTransition(result, transition), nil
 }
 
 func (r *Repository) GetProcurementDetail(ctx context.Context, requestID string) (Record, error) {
@@ -13550,10 +13630,15 @@ func (r *Repository) ProcurementAction(ctx context.Context, id, action string, r
 	if err := addAuditTx(ctx, tx, fmt.Sprint(current["project_id"]), actorID, actorName, event, "procurement_request", id, fmt.Sprintf("Cập nhật yêu cầu mua từ %s sang %s", fromStatus, toStatus), metadata); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(current["project_id"]), req.WorkItemContext, inputContractProcurementWorkItemPolicy, "procurement_request", id, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetProcurementDetail(ctx, id)
+	result, err := r.GetProcurementDetail(ctx, id)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func procurementTransitionForAction(action, fromStatus string) (string, string, error) {
@@ -13819,7 +13904,7 @@ func (r *Repository) CreateProjectDocument(ctx context.Context, projectID, targe
 	return rows[0], nil
 }
 
-func (r *Repository) SaveContract(ctx context.Context, contractID string, body Record, actorID, actorName string) (Record, error) {
+func (r *Repository) SaveContract(ctx context.Context, contractID string, body Record, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -13869,13 +13954,18 @@ func (r *Repository) SaveContract(ctx context.Context, contractID string, body R
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "contract", contractID, "Lưu hồ sơ hợp đồng", Record{"contract_code": body["contract_code"], "contract_type": body["contract_type"], "direction": body["direction"]}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, mutationContext, contractWorkItemPolicyFor(body, "contract_saved"), "contract", contractID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetContractDetail(ctx, contractID)
+	result, err := r.GetContractDetail(ctx, contractID)
+	return attachWorkItemTransition(result, transition), err
 }
 
-func (r *Repository) CreateContractVersion(ctx context.Context, contractID string, body Record, actorID, actorName string) (Record, error) {
+func (r *Repository) CreateContractVersion(ctx context.Context, contractID string, body Record, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -13916,10 +14006,15 @@ func (r *Repository) CreateContractVersion(ctx context.Context, contractID strin
 	if err := addAuditTx(ctx, tx, cleanID(contract["project_id"]), actorID, actorName, "contract_version_created", "contract_version", versionID, "Tạo phiên bản hợp đồng", Record{"contract_id": contractID, "version_no": nextVersion, "definition_hash": hex.EncodeToString(hash[:])}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(contract["project_id"]), mutationContext, contractWorkItemPolicyFor(contract, "contract_version_created"), "contract_version", versionID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetContractDetail(ctx, contractID)
+	result, err := r.GetContractDetail(ctx, contractID)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func mustJSON(value any) string {
@@ -13930,14 +14025,14 @@ func mustJSON(value any) string {
 	return string(raw)
 }
 
-func (r *Repository) ContractVersionAction(ctx context.Context, versionID, action, comment, actorID, actorName string) (Record, error) {
+func (r *Repository) ContractVersionAction(ctx context.Context, versionID, action, comment string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 	rows, err := queryTx(ctx, tx, `
-		SELECT cv.*, c.project_id, c.status AS contract_status, c.approval_request_id, c.contract_type
+		SELECT cv.*, c.project_id, c.status AS contract_status, c.approval_request_id, c.contract_type, c.direction
 		FROM contract_versions cv JOIN contracts c ON c.id=cv.contract_id
 		WHERE cv.id=$1 FOR UPDATE OF cv,c
 	`, versionID)
@@ -14007,20 +14102,25 @@ func (r *Repository) ContractVersionAction(ctx context.Context, versionID, actio
 	if err := addAuditTx(ctx, tx, cleanID(version["project_id"]), actorID, actorName, eventType, "contract_version", versionID, fmt.Sprintf("Chuyển version hợp đồng từ %s sang %s", fromStatus, toStatus), Record{"contract_id": version["contract_id"], "version_no": version["version_no"], "comment": comment}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(version["project_id"]), mutationContext, contractWorkItemPolicyFor(version, "contract_version_"+action), "contract_version", versionID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetContractDetail(ctx, cleanID(version["contract_id"]))
+	result, err := r.GetContractDetail(ctx, cleanID(version["contract_id"]))
+	return attachWorkItemTransition(result, transition), err
 }
 
-func (r *Repository) SignContractVersionWithWorkflowSignature(ctx context.Context, versionID, signatureID, comment, actorID, actorName string) (Record, error) {
+func (r *Repository) SignContractVersionWithWorkflowSignature(ctx context.Context, versionID, signatureID, comment string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 	versions, err := queryTx(ctx, tx, `
-		SELECT cv.*,c.project_id,c.status AS contract_status
+		SELECT cv.*,c.project_id,c.status AS contract_status,c.contract_type,c.direction
 		FROM contract_versions cv
 		JOIN contracts c ON c.id=cv.contract_id
 		WHERE cv.id=$1
@@ -14086,13 +14186,18 @@ func (r *Repository) SignContractVersionWithWorkflowSignature(ctx context.Contex
 	}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(version["project_id"]), mutationContext, contractWorkItemPolicyFor(version, "contract_version_signed"), "contract_version", versionID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetContractDetail(ctx, cleanID(version["contract_id"]))
+	result, err := r.GetContractDetail(ctx, cleanID(version["contract_id"]))
+	return attachWorkItemTransition(result, transition), err
 }
 
-func (r *Repository) CreateContractDispatch(ctx context.Context, contractID string, body Record, actorID, actorName string) (Record, error) {
+func (r *Repository) CreateContractDispatch(ctx context.Context, contractID string, body Record, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -14145,10 +14250,15 @@ func (r *Repository) CreateContractDispatch(ctx context.Context, contractID stri
 	}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(contract["project_id"]), mutationContext, contractWorkItemPolicyFor(contract, "contract_paper_dispatched"), "contract_dispatch", dispatchID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetContractDetail(ctx, contractID)
+	result, err := r.GetContractDetail(ctx, contractID)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func validateProjectDocumentTx(ctx context.Context, tx *sql.Tx, documentID, projectID string) error {
@@ -14162,14 +14272,14 @@ func validateProjectDocumentTx(ctx context.Context, tx *sql.Tx, documentID, proj
 	return nil
 }
 
-func (r *Repository) ReceiveContractDispatch(ctx context.Context, dispatchID, scanDocumentID, note, actorID, actorName string) (Record, error) {
+func (r *Repository) ReceiveContractDispatch(ctx context.Context, dispatchID, scanDocumentID, note string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 	rows, err := queryTx(ctx, tx, `
-		SELECT dispatch.*,contract.project_id
+		SELECT dispatch.*,contract.project_id,contract.contract_type,contract.direction
 		FROM contract_dispatches dispatch
 		JOIN contracts contract ON contract.id=dispatch.contract_id
 		WHERE dispatch.id=$1 FOR UPDATE OF dispatch
@@ -14200,13 +14310,18 @@ func (r *Repository) ReceiveContractDispatch(ctx context.Context, dispatchID, sc
 	}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(dispatch["project_id"]), mutationContext, contractWorkItemPolicyFor(dispatch, "contract_signed_scan_received"), "contract_dispatch", dispatchID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetContractDetail(ctx, cleanID(dispatch["contract_id"]))
+	result, err := r.GetContractDetail(ctx, cleanID(dispatch["contract_id"]))
+	return attachWorkItemTransition(result, transition), err
 }
 
-func (r *Repository) ActivateContract(ctx context.Context, contractID, comment, actorID, actorName string) (Record, error) {
+func (r *Repository) ActivateContract(ctx context.Context, contractID, comment string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -14259,10 +14374,15 @@ func (r *Repository) ActivateContract(ctx context.Context, contractID, comment, 
 	if err := addAuditTx(ctx, tx, cleanID(contract["project_id"]), actorID, actorName, "contract_activated", "contract", contractID, "Kích hoạt hợp đồng đã ký", Record{"current_version_id": contract["current_version_id"], "current_amount": contract["version_amount"], "comment": comment}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(contract["project_id"]), mutationContext, contractWorkItemPolicyFor(contract, "contract_activated"), "contract", contractID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetContractDetail(ctx, contractID)
+	result, err := r.GetContractDetail(ctx, contractID)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (r *Repository) CreateContractMilestone(ctx context.Context, contractID string, body Record, actorID, actorName string) (Record, error) {
@@ -15191,10 +15311,14 @@ func (r *Repository) CreateConstructionCheck(ctx context.Context, projectID, wor
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "construction_check_created", "construction_check", cleanID(row["id"]), "Tạo kiểm tra "+title, Record{"work_item_id": workItemID, "source_daily_report_id": sourceDailyReportID, "template_id": templateID, "scheduled_at": scheduledAt, "criteria_count": len(criteria), "context_evidence_count": len(contextEvidenceIDs)}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), operationsWorkItemPolicy, "construction_check", cleanID(row["id"]), actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return row, nil
+	return attachWorkItemTransition(row, transition), nil
 }
 
 func (r *Repository) UpdateConstructionCheck(ctx context.Context, checkID, workItemID, templateID, title, location, scheduledAt string, criteria []ConstructionCheckCriterion, criteriaProvided bool, contextEvidenceIDs []string, contextEvidenceProvided bool, actorID, actorName string) (Record, error) {
@@ -15364,10 +15488,14 @@ func (r *Repository) CreateConstructionAction(ctx context.Context, projectID, wo
 	if err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), operationsWorkItemPolicy, "construction_action", cleanID(action["id"]), actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return action, nil
+	return attachWorkItemTransition(action, transition), nil
 }
 
 func (r *Repository) UpdateConstructionAction(ctx context.Context, actionID, title, description, priority, assignedUserID, dueAt, actorID, actorName string) (Record, error) {
@@ -16873,10 +17001,15 @@ func (r *Repository) CreateStockDocument(ctx context.Context, req StockDocumentR
 	}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, req.ProjectID, req.WorkItemContext, warehouseWorkItemPolicy, "stock_document", documentID, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetStockDocument(ctx, documentID)
+	document, err := r.GetStockDocument(ctx, documentID)
+	return attachWorkItemTransition(document, transition), err
 }
 
 func (r *Repository) StockPositions(ctx context.Context, userID, warehouseID string) ([]Record, error) {
@@ -17102,8 +17235,133 @@ func (r *Repository) ListProjectDailyReports(ctx context.Context, projectID stri
 	`, projectID)
 }
 
-func (r *Repository) CreateDailyReport(ctx context.Context, body Record) (Record, error) {
-	return r.Insert(ctx, "operation_daily_reports", dailyReportColumns(), body)
+func (r *Repository) CreateDailyReport(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	workItemID := cleanID(body["work_item_id"])
+	projectID := cleanID(body["project_id"])
+	rows, err := queryTx(ctx, tx, `
+		SELECT
+			wi.*,
+			COALESCE(pr.engine_version, 1) AS pipeline_engine_version,
+			pr.status AS pipeline_run_status,
+			pr.current_node_id AS pipeline_current_node_id,
+			target_node.status AS run_node_status,
+			target_node.type AS run_node_type,
+			target_node.business_code AS run_node_business_code,
+			rs.business_code AS run_step_business_code
+		FROM work_items wi
+		LEFT JOIN pipeline_runs pr ON pr.id=wi.pipeline_run_id
+		LEFT JOIN pipeline_run_nodes target_node ON target_node.id=wi.run_node_id
+		LEFT JOIN pipeline_run_steps rs ON rs.id=wi.run_step_id
+		WHERE wi.id=$1
+		FOR UPDATE OF wi
+	`, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, validationError("Không tìm thấy hạng mục thi công", Record{"work_item_id": workItemID})
+	}
+	item := rows[0]
+	if cleanID(item["project_id"]) != projectID {
+		return nil, validationError("Hạng mục không thuộc công trình", Record{"work_item_id": workItemID, "project_id": projectID})
+	}
+
+	fromStatus := fmt.Sprint(item["status"])
+	autoStart := statusIn(fromStatus, "pending", "ready", "needs_changes")
+	if !autoStart && !statusIn(fromStatus, "in_progress", "blocked") {
+		return nil, validationError("Trạng thái đầu việc không cho phép tạo báo cáo thi công", Record{"work_item_id": workItemID, "status": fromStatus})
+	}
+	if !workItemHasStarted(item) && myWorkPlannedStartInFuture(item["planned_start_at"], time.Now()) {
+		return nil, validationError("Đầu việc chưa đến thời điểm được phép bắt đầu", Record{
+			"work_item_id":     workItemID,
+			"planned_start_at": item["planned_start_at"],
+		})
+	}
+	if int(number(item["pipeline_engine_version"])) >= 2 && cleanID(item["pipeline_run_id"]) != "" {
+		runtimeRows, runtimeErr := queryTx(ctx, tx, `
+			SELECT pr.current_node_id, pr.status AS run_status, current_node.status AS node_status
+			FROM pipeline_runs pr
+			LEFT JOIN pipeline_run_nodes current_node ON current_node.id=pr.current_node_id
+			WHERE pr.id=$1
+			FOR UPDATE OF pr
+		`, item["pipeline_run_id"])
+		if runtimeErr != nil {
+			return nil, runtimeErr
+		}
+		if len(runtimeRows) == 0 {
+			return nil, validationError("Không tìm thấy pipeline run của đầu việc")
+		}
+		runtime := runtimeRows[0]
+		currentNodeID := cleanID(runtime["current_node_id"])
+		if statusIn(fmt.Sprint(runtime["run_status"]), "completed", "cancelled") ||
+			currentNodeID == "" || currentNodeID != cleanID(item["run_node_id"]) ||
+			!statusIn(fmt.Sprint(runtime["node_status"]), "in_progress", "waiting_approval", "blocked") {
+			return nil, validationError("Đầu việc không còn thuộc Node Thi công đang thực hiện", Record{
+				"work_item_id":    workItemID,
+				"run_node_id":     item["run_node_id"],
+				"current_node_id": currentNodeID,
+			})
+		}
+		if fmt.Sprint(item["run_step_business_code"]) != "construction.item_reporting" &&
+			fmt.Sprint(item["run_node_business_code"]) != "construction_execution" &&
+			fmt.Sprint(item["run_node_type"]) != "construction" {
+			return nil, validationError("Hạng mục không thuộc bước Thi công của quy trình", Record{"work_item_id": workItemID})
+		}
+	}
+
+	report, err := insertRecord(ctx, tx, "operation_daily_reports", dailyReportColumns(), body)
+	if err != nil {
+		return nil, err
+	}
+	transition := Record{
+		"auto_started":    false,
+		"work_item_id":    workItemID,
+		"work_item_title": item["title"],
+		"from_status":     fromStatus,
+		"to_status":       fromStatus,
+	}
+	if autoStart {
+		metadata := Record{
+			"source":          "construction_daily_report_created",
+			"daily_report_id": report["id"],
+		}
+		if err := persistWorkItemStartedTx(ctx, tx, item, actorID, actorName, "Bắt đầu đầu việc khi tạo báo cáo thi công", metadata); err != nil {
+			return nil, err
+		}
+		transition["auto_started"] = true
+		transition["to_status"] = "in_progress"
+	}
+	auditMetadata := Record{
+		"progress_percent":       report["progress_percent"],
+		"work_item_id":           workItemID,
+		"evidence_count":         len(stringSlice(report["photos"])),
+		"work_item_auto_started": autoStart,
+	}
+	if err := addAuditTx(
+		ctx,
+		tx,
+		projectID,
+		actorID,
+		actorName,
+		"daily_report_created",
+		"daily_report",
+		cleanID(report["id"]),
+		fmt.Sprintf("Tạo nhật ký ngày %v", report["report_date"]),
+		auditMetadata,
+	); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	report["work_item_transition"] = transition
+	return report, nil
 }
 
 func (r *Repository) UpdateDailyReport(ctx context.Context, id string, body Record) (Record, error) {
@@ -17263,7 +17521,7 @@ func (r *Repository) CreateHandover(ctx context.Context, body Record) (Record, e
 	return r.Insert(ctx, "handover_records", handoverColumns(), body)
 }
 
-func (r *Repository) CreateHandoverPackage(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+func (r *Repository) CreateHandoverPackage(ctx context.Context, body Record, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -17313,10 +17571,15 @@ func (r *Repository) CreateHandoverPackage(ctx context.Context, body Record, act
 	if err := addAuditTx(ctx, tx, cleanID(handover["project_id"]), actorID, actorName, "handover_created", "handover", cleanID(handover["id"]), "Tạo hồ sơ bàn giao", Record{"handover_code": handover["handover_code"], "final_acceptance_id": handover["final_acceptance_id"], "checklist_items": len(items)}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(handover["project_id"]), mutationContext, handoverWorkItemPolicy, "handover", cleanID(handover["id"]), actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetHandoverDetail(ctx, cleanID(handover["id"]))
+	result, err := r.GetHandoverDetail(ctx, cleanID(handover["id"]))
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (r *Repository) GetHandoverDetail(ctx context.Context, id string) (Record, error) {
@@ -17602,10 +17865,15 @@ func (r *Repository) SubmitHandover(ctx context.Context, id string, req ActionRe
 	if err := addAuditTx(ctx, tx, cleanID(handover["project_id"]), actorID, actorName, "handover_submitted", "handover", id, "Gửi hồ sơ bàn giao để kiểm tra", Record{"comment": comment, "final_acceptance_id": handover["final_acceptance_id"]}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(handover["project_id"]), req.WorkItemContext, handoverWorkItemPolicy, "handover", id, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.GetHandoverDetail(ctx, cleanID(updated[0]["id"]))
+	result, err := r.GetHandoverDetail(ctx, cleanID(updated[0]["id"]))
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (r *Repository) UpdateHandoverChecklistItem(ctx context.Context, id string, body Record, actorID, actorName string) (Record, error) {
@@ -17892,10 +18160,14 @@ func (r *Repository) CompleteHandover(ctx context.Context, id string, req Action
 	if err := addAuditTx(ctx, tx, fmt.Sprint(done["project_id"]), actorID, actorName, "handover_completed", "handover", id, "Hoàn tất bàn giao công trình", metadata); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(done["project_id"]), req.WorkItemContext, handoverWorkItemPolicy, "handover", id, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return done, nil
+	return attachWorkItemTransition(done, transition), nil
 }
 
 func (r *Repository) PayableAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {

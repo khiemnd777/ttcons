@@ -758,15 +758,14 @@ func (s *Service) CreateDailyReport(ctx context.Context, projectID string, req C
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.repo.CreateDailyReport(ctx, body)
+	row, err := s.repo.CreateDailyReport(ctx, body, actorID, actorName)
 	if err != nil {
 		return nil, err
 	}
-	s.repo.AddAuditBestEffort(ctx, cleanID(row["project_id"]), actorID, actorName, "daily_report_created", "daily_report", cleanID(row["id"]), fmt.Sprintf("Tạo nhật ký ngày %s", row["report_date"]), Record{
-		"progress_percent": row["progress_percent"],
-		"work_item_id":     body["work_item_id"],
-		"evidence_count":   len(normalizeConstructionReportEvidenceIDs(req.EvidenceIDs, req.PrimaryEvidenceID)),
-	})
+	transition := recordFromAny(row["work_item_transition"])
+	if boolValue(transition["auto_started"]) {
+		s.publishWorkItemChanged(Record{"id": transition["work_item_id"], "project_id": row["project_id"]}, actorID)
+	}
 	return row, nil
 }
 
@@ -828,15 +827,19 @@ func (s *Service) normalizeConstructionDailyReport(ctx context.Context, projectI
 	if workItemID == "" {
 		return nil, validationError("Báo cáo thi công cần chọn hạng mục đang thực hiện", Record{"work_item_id": "required"})
 	}
-	if _, err := s.requireActiveConstructionWorkItem(ctx, projectID, workItemID); err != nil {
-		return nil, err
-	}
-	canView, err := s.repo.CanViewWorkItem(ctx, workItemID, actorID)
+	workItem, err := s.requireActiveConstructionWorkItem(ctx, projectID, workItemID)
 	if err != nil {
 		return nil, err
 	}
-	if !canView {
-		return nil, forbiddenError("Bạn không có quyền sử dụng công việc liên quan này")
+	canAct, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !canAct {
+		return nil, forbiddenError("Bạn không có quyền thao tác hạng mục thi công này")
+	}
+	if err := s.requireWorkItemPermission(ctx, workItem, actorID); err != nil {
+		return nil, err
 	}
 
 	evidenceIDs := normalizeConstructionReportEvidenceIDs(req.EvidenceIDs, req.PrimaryEvidenceID)
@@ -1602,7 +1605,7 @@ func (s *Service) CreateHandover(ctx context.Context, projectID string, req Hand
 		"company_representative": companyRepresentative, "documents_ready": false,
 		"warehouse_closed": false, "payables_recorded": false, "receivables_recorded": false,
 		"notes": notes, "created_by": actorID,
-	}, actorID, actorName)
+	}, req.WorkItemContext, actorID, actorName)
 }
 
 func (s *Service) ProjectBudget(ctx context.Context, projectID string) ([]Record, error) {
@@ -2347,6 +2350,32 @@ func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, act
 	}, nil
 }
 
+func (s *Service) MyWorkflowActions(ctx context.Context, filter MyWorkflowActionsFilter, actorID string) (Record, error) {
+	filter, err := normalizeMyWorkflowActionsFilter(filter)
+	if err != nil {
+		return nil, err
+	}
+	actions, err := s.repo.MyWorkflowActions(ctx, actorID, filter)
+	if err != nil {
+		return nil, err
+	}
+	filtered := actions
+	if filter.Search != "" {
+		needle := strings.ToLower(filter.Search)
+		filtered = make([]Record, 0, len(actions))
+		for _, action := range actions {
+			haystack := strings.ToLower(strings.Join([]string{
+				fmt.Sprint(action["title"]), fmt.Sprint(action["project_name"]), fmt.Sprint(action["project_code"]),
+				fmt.Sprint(action["run_node_name"]), fmt.Sprint(action["next_run_node_name"]),
+			}, " "))
+			if strings.Contains(haystack, needle) {
+				filtered = append(filtered, action)
+			}
+		}
+	}
+	return Record{"items": filtered, "total": len(filtered), "summary_total": len(actions)}, nil
+}
+
 func (s *Service) MyActivityAttention(ctx context.Context, filter ActivityAttentionFilter, actorID string) ([]Record, error) {
 	filter.Queue = strings.TrimSpace(filter.Queue)
 	if filter.Queue == "" {
@@ -3053,7 +3082,9 @@ func (s *Service) saveSubcontractorReconciliation(ctx context.Context, workItemI
 	if err := s.repo.SaveSubcontractorReconciliation(ctx, item, form, strings.TrimSpace(req.Comment), normalizedItems, summary, submit, actorID, actorName); err != nil {
 		return nil, err
 	}
-	return s.subcontractorReconciliationResponse(ctx, item, form)
+	result, err := s.subcontractorReconciliationResponse(ctx, item, form)
+	transition, _ := item["work_item_transition"].(Record)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (s *Service) subcontractorReconciliationResponse(ctx context.Context, item Record, form Record) (Record, error) {
@@ -3611,7 +3642,9 @@ func (s *Service) saveOwnerClientReconciliation(ctx context.Context, workItemID 
 	if err := s.repo.SaveOwnerClientReconciliation(ctx, item, form, strings.TrimSpace(req.Comment), normalizedItems, summary, submit, actorID, actorName); err != nil {
 		return nil, err
 	}
-	return s.ownerClientReconciliationResponse(ctx, item, form)
+	result, err := s.ownerClientReconciliationResponse(ctx, item, form)
+	transition, _ := item["work_item_transition"].(Record)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (s *Service) ownerClientReconciliationResponse(ctx context.Context, item Record, form Record) (Record, error) {
@@ -3924,7 +3957,9 @@ func (s *Service) saveMaterialSnapshot(ctx context.Context, workItemID string, r
 	if err := s.repo.SaveMaterialSnapshot(ctx, item, header, normalizedItems, summary, submit, actorID, actorName); err != nil {
 		return nil, err
 	}
-	return s.materialSnapshotResponse(ctx, item)
+	result, err := s.materialSnapshotResponse(ctx, item)
+	transition, _ := item["work_item_transition"].(Record)
+	return attachWorkItemTransition(result, transition), err
 }
 
 func (s *Service) materialSnapshotResponse(ctx context.Context, item Record) (Record, error) {
@@ -8615,6 +8650,7 @@ func (s *Service) SubmitRunStep(ctx context.Context, stepID string, req WorkItem
 		_ = s.repo.RunClientWorkflowAutomationForWorkItem(ctx, workItemID, actorID, actorName)
 	}
 	s.publishProjectProgressChanged(cleanID(step["project_id"]))
+	s.publishWorkQueueChanged(cleanID(step["project_id"]))
 	return step, nil
 }
 
@@ -8628,6 +8664,7 @@ func (s *Service) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorName
 		return nil, err
 	}
 	s.publishProjectProgressChanged(cleanID(node["project_id"]))
+	s.publishWorkQueueChanged(cleanID(node["project_id"]))
 	return node, nil
 }
 
@@ -8654,6 +8691,7 @@ func (s *Service) RequestNodeApproval(ctx context.Context, nodeID, actorID, acto
 		return nil, err
 	}
 	s.publishProjectProgressChanged(cleanID(request["project_id"]))
+	s.publishWorkQueueChanged(cleanID(request["project_id"]))
 	return request, nil
 }
 
@@ -8663,6 +8701,7 @@ func (s *Service) BlockRunNode(ctx context.Context, nodeID, reason, actorID, act
 		return nil, err
 	}
 	s.publishProjectProgressChanged(cleanID(node["project_id"]))
+	s.publishWorkQueueChanged(cleanID(node["project_id"]))
 	return node, nil
 }
 
@@ -8701,6 +8740,7 @@ func (s *Service) ApprovalAction(ctx context.Context, id, action, comment, actor
 		return nil, err
 	}
 	s.publishProjectProgressChanged(cleanID(updated["project_id"]))
+	s.publishWorkQueueChanged(cleanID(updated["project_id"]))
 	return updated, nil
 }
 
@@ -8802,12 +8842,12 @@ func (s *Service) GetBOQ(ctx context.Context, itemID string) (Record, error) {
 	return s.repo.GetBOQItemDetail(ctx, itemID)
 }
 
-func (s *Service) BOQProjectAction(ctx context.Context, projectID, action, actorID, actorName string) (Record, error) {
+func (s *Service) BOQProjectAction(ctx context.Context, projectID, action string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	projectID = cleanID(projectID)
 	if projectID == "" {
 		return nil, validationError("project_id không hợp lệ")
 	}
-	return s.repo.BOQProjectAction(ctx, projectID, action, actorID, actorName)
+	return s.repo.BOQProjectAction(ctx, projectID, action, mutationContext, actorID, actorName)
 }
 
 func (s *Service) CreateBOQ(ctx context.Context, projectID string, body Record, actorID, actorName string) (Record, error) {
@@ -8897,11 +8937,11 @@ func (s *Service) SaveSupplierQuotation(ctx context.Context, projectID, quotatio
 	if cleanOptionalText(header["quotation_code"]) == "" {
 		header["quotation_code"] = fmt.Sprintf("BG-%s-%d", projectID[:8], timeNowUnix())
 	}
-	return s.repo.SaveSupplierQuotation(ctx, projectID, cleanID(quotationID), header, items, actorID, actorName)
+	return s.repo.SaveSupplierQuotation(ctx, projectID, cleanID(quotationID), header, items, req.WorkItemContext, actorID, actorName)
 }
 
-func (s *Service) SubmitSupplierQuotation(ctx context.Context, quotationID, actorID, actorName string) (Record, error) {
-	return s.repo.SupplierQuotationAction(ctx, cleanID(quotationID), "submit", "", "", "", actorID, actorName)
+func (s *Service) SubmitSupplierQuotation(ctx context.Context, quotationID string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
+	return s.repo.SupplierQuotationAction(ctx, cleanID(quotationID), "submit", "", "", "", mutationContext, actorID, actorName)
 }
 
 func (s *Service) QualifySupplierQuotation(ctx context.Context, quotationID string, req SupplierQuotationQualificationRequest, actorID, actorName string) (Record, error) {
@@ -8917,7 +8957,7 @@ func (s *Service) QualifySupplierQuotation(ctx context.Context, quotationID stri
 	if comment == "" {
 		return nil, validationError("Đánh giá báo giá cần có nhận xét")
 	}
-	return s.repo.SupplierQuotationAction(ctx, cleanID(quotationID), "qualify", technicalStatus, commercialStatus, comment, actorID, actorName)
+	return s.repo.SupplierQuotationAction(ctx, cleanID(quotationID), "qualify", technicalStatus, commercialStatus, comment, req.WorkItemContext, actorID, actorName)
 }
 
 func (s *Service) SelectSupplierQuote(ctx context.Context, quotationItemID string, req SupplierQuoteSelectionRequest, actorID, actorName string) (Record, error) {
@@ -8928,7 +8968,7 @@ func (s *Service) SelectSupplierQuote(ctx context.Context, quotationItemID strin
 	if len([]rune(reason)) > 2000 {
 		return nil, validationError("Lý do chọn báo giá không được vượt quá 2000 ký tự")
 	}
-	return s.repo.SelectSupplierQuote(ctx, cleanID(quotationItemID), reason, actorID, actorName)
+	return s.repo.SelectSupplierQuote(ctx, cleanID(quotationItemID), reason, req.WorkItemContext, actorID, actorName)
 }
 
 func (s *Service) SupplierQuoteComparison(ctx context.Context, projectID string) ([]Record, error) {
@@ -9107,7 +9147,7 @@ func normalizeBOQItemRequest(projectID string, body Record, create bool) (Record
 	return out, nil
 }
 
-func (s *Service) GenerateProcurementFromBOQ(ctx context.Context, projectID, actorID, actorName string) (Record, error) {
+func (s *Service) GenerateProcurementFromBOQ(ctx context.Context, projectID string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	projectID = cleanID(projectID)
 	canGenerate, err := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"procurement.create", "procurement.approve", "boq.approve"})
 	if err != nil {
@@ -9116,7 +9156,7 @@ func (s *Service) GenerateProcurementFromBOQ(ctx context.Context, projectID, act
 	if !canGenerate {
 		return nil, forbiddenError("Bạn không có quyền sinh yêu cầu mua từ BOQ", Record{"permissions": []string{"procurement.create", "procurement.approve", "boq.approve"}})
 	}
-	return s.repo.GenerateProcurementFromBOQ(ctx, projectID, actorID, actorName)
+	return s.repo.GenerateProcurementFromBOQ(ctx, projectID, mutationContext, actorID, actorName)
 }
 
 func (s *Service) CreateProcurement(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
@@ -9286,7 +9326,7 @@ func (s *Service) SaveContract(ctx context.Context, projectID, contractID string
 		"original_amount": req.OriginalAmount, "advance_percent": req.AdvancePercent, "retention_percent": req.RetentionPercent,
 		"warranty_days": req.WarrantyDays, "signed_date": signedDate, "effective_date": effectiveDate, "expiry_date": expiryDate,
 	}
-	return s.repo.SaveContract(ctx, contractID, body, actorID, actorName)
+	return s.repo.SaveContract(ctx, contractID, body, req.WorkItemContext, actorID, actorName)
 }
 
 func normalizeContractDates(signedDate, effectiveDate, expiryDate string) (string, string, string, error) {
@@ -9320,15 +9360,15 @@ func (s *Service) CreateContractVersion(ctx context.Context, contractID string, 
 		"commercial_terms_json": req.CommercialTerms, "payment_terms_json": req.PaymentTerms,
 		"planned_start_date": startDate, "planned_end_date": endDate, "document_id": cleanID(req.DocumentID), "comment": strings.TrimSpace(req.Comment),
 	}
-	return s.repo.CreateContractVersion(ctx, cleanID(contractID), body, actorID, actorName)
+	return s.repo.CreateContractVersion(ctx, cleanID(contractID), body, req.WorkItemContext, actorID, actorName)
 }
 
-func (s *Service) ContractVersionAction(ctx context.Context, versionID, action, comment, actorID, actorName string) (Record, error) {
+func (s *Service) ContractVersionAction(ctx context.Context, versionID, action, comment string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
 	comment = strings.TrimSpace(comment)
 	if statusIn(action, "approve", "sign") && comment == "" {
 		return nil, validationError("Duyệt/ký phiên bản hợp đồng cần có nhận xét")
 	}
-	return s.repo.ContractVersionAction(ctx, cleanID(versionID), action, comment, actorID, actorName)
+	return s.repo.ContractVersionAction(ctx, cleanID(versionID), action, comment, mutationContext, actorID, actorName)
 }
 
 func (s *Service) SignContractVersion(ctx context.Context, versionID string, req ContractVersionSignRequest, actorID, actorName string) (Record, error) {
@@ -9340,7 +9380,7 @@ func (s *Service) SignContractVersion(ctx context.Context, versionID string, req
 	if signatureID == "" {
 		return nil, validationError("Chữ ký trên App là bắt buộc")
 	}
-	return s.repo.SignContractVersionWithWorkflowSignature(ctx, cleanID(versionID), signatureID, comment, actorID, actorName)
+	return s.repo.SignContractVersionWithWorkflowSignature(ctx, cleanID(versionID), signatureID, comment, req.WorkItemContext, actorID, actorName)
 }
 
 func (s *Service) CreateContractDispatch(ctx context.Context, contractID string, req ContractDispatchRequest, actorID, actorName string) (Record, error) {
@@ -9359,7 +9399,7 @@ func (s *Service) CreateContractDispatch(ctx context.Context, contractID string,
 		"tracking_reference":  strings.TrimSpace(req.TrackingReference),
 		"sent_document_id":    cleanID(req.SentDocumentID),
 		"note":                strings.TrimSpace(req.Note),
-	}, actorID, actorName)
+	}, req.WorkItemContext, actorID, actorName)
 }
 
 func (s *Service) ReceiveContractDispatch(ctx context.Context, dispatchID string, req ContractDispatchReceiveRequest, actorID, actorName string) (Record, error) {
@@ -9367,11 +9407,11 @@ func (s *Service) ReceiveContractDispatch(ctx context.Context, dispatchID string
 	if scanID == "" {
 		return nil, validationError("Bản scan hợp đồng đã ký nhận là bắt buộc")
 	}
-	return s.repo.ReceiveContractDispatch(ctx, cleanID(dispatchID), scanID, strings.TrimSpace(req.Note), actorID, actorName)
+	return s.repo.ReceiveContractDispatch(ctx, cleanID(dispatchID), scanID, strings.TrimSpace(req.Note), req.WorkItemContext, actorID, actorName)
 }
 
-func (s *Service) ActivateContract(ctx context.Context, contractID, comment, actorID, actorName string) (Record, error) {
-	return s.repo.ActivateContract(ctx, cleanID(contractID), strings.TrimSpace(comment), actorID, actorName)
+func (s *Service) ActivateContract(ctx context.Context, contractID, comment string, mutationContext WorkItemMutationContext, actorID, actorName string) (Record, error) {
+	return s.repo.ActivateContract(ctx, cleanID(contractID), strings.TrimSpace(comment), mutationContext, actorID, actorName)
 }
 
 func (s *Service) CreateContractMilestone(ctx context.Context, contractID string, req ContractMilestoneRequest, actorID, actorName string) (Record, error) {

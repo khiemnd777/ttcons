@@ -1,5 +1,117 @@
 # Current States
 
+## Active Plan: Tự động bắt đầu đầu việc khi tạo báo cáo thi công
+
+Status: IMPLEMENTED AND FOCUSED TECHNICALLY VERIFIED; FULL BACKEND SUITE HAS OUT-OF-SCOPE FAILURES; UX NOT ACCEPTED (approved by user on 2026-08-25)
+
+### Will be done
+
+- Make the first direct construction daily-report create atomically start its linked actionable Work Item when the item is `pending`, `ready` or `needs_changes`; preserve `in_progress` and `blocked`, and keep terminal/future/non-current-node rejection fail-closed.
+- Reuse the Work Item lifecycle invariants for `started_at`, linked Run Step status, activity, audit and queue invalidation; require actor action scope instead of view-only scope.
+- Return truthful transition metadata so Operations can show one concise success message and refresh actor-owned My Work caches without issuing a second start request.
+- Preserve report edits, form-backed first-write behavior and historical records; add no schema migration or automatic backfill for existing report-linked `ready` items.
+- Add focused backend/frontend regressions, update durable Construction Operations and Workflow Orchestration mappings, and validate the current dirty working tree without reverting overlapping edits. Browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the review package, status matrix, actor-action permission, atomic backend ownership and no historical backfill with `OK triển khai`.
+- Confirmed the reproduced ordering defect on local PostgreSQL: Work Item `eb96b0af-64aa-46b6-b17c-ab2abcb2de6e` received its report at `2026-08-25 05:24:30 UTC` and transitioned `ready -> in_progress` only at `06:13:45 UTC` after the separate manual start.
+- Confirmed the current implementation split: direct report creation inserts the report and writes best-effort audit without a lifecycle transition, while workflow-form first write already starts its linked Work Item transactionally.
+- Moved direct daily-report creation, Work Item `pending|ready|needs_changes -> in_progress`, linked Run Step synchronization, started activity, Work Item audit and report audit into one PostgreSQL transaction. `in_progress` is an idempotent no-op, `blocked` remains blocked, and terminal/future/non-current Construction work is rejected.
+- Required actor action scope and the Work Item's project permission before report creation. The additive `work_item_transition` response truthfully reports whether the report auto-started its linked item, and `work_item_changed` is published only after commit.
+- Added create-dialog helper copy for startable items, one success message after the atomic mutation, and invalidation for Operations, Work Item and My Work query families without issuing a second frontend `/start` request. Report edit and form-backed first-write paths remain unchanged.
+- Added PostgreSQL-backed regressions for atomic `ready -> in_progress`, Run Step/activity/audit synchronization, idempotent `in_progress`, blocker preservation and action-scope denial. Added frontend source-contract coverage for the helper, response handling, cache invalidation and absence of a second start request.
+- Updated the central module, backend, frontend, root-cause, Construction Operations and Workflow Orchestration mappings. No migration, production data rewrite or historical backfill was added.
+- Current working-tree verification at HEAD `7a37ebf` plus the listed dirty-tree changes passed: both focused PostgreSQL backend regressions; 266/266 frontend tests; TypeScript/Vite production build; 250 KiB gzip bundle budget with 141 chunks; and `git diff --check`.
+- Rebuilt and restarted the local Docker stack through the required `down -> build -> run` sequence. PostgreSQL and both Redis services are healthy, backend `/api/health` and `/api/ready` return success, and the rebuilt Operations frontend route returns HTTP 200.
+- Full backend verification remains non-green for unrelated environment/fixture reasons: the shared local database produced four duplicate finance-code failures plus one stale workflow-template migration expectation; a fresh migration-only database removed those failures but the two sample-data integration tests require seeded reference data, while the current `seed/seed.sql` cannot populate that migrated schema because of an existing missing workflow-form-instance foreign key. The disposable test database was removed after diagnosis.
+
+### Skipped / remaining acceptance
+
+- Full backend `go test ./...` is not green for the out-of-scope fixture/seed failures recorded above; the affected Construction Operations regressions are green.
+- Browser/UAT is not authorized in this turn and remains `NOT UX ACCEPTED`.
+
+## Active Plan: Làm rõ toàn bộ nhóm công việc trên Bàn làm việc
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-25)
+
+### Will be done
+
+- Add an additive `completed` My Work bucket and `summary.completed` count for all completed work inside the selected assignment/visibility scope; retain `done_today` for compatibility.
+- Separate the source-backed `Xem tất cả` control from the quick status filters and expose `Hoàn tất` so users can account for historical rows without assuming every quick bucket is a mutually exclusive partition.
+- Preserve Work Item status, assignments, readiness, permissions, execution targets, workflow transitions and all project data; add no migration or data repair.
+- Add focused backend/frontend regressions, update durable My Work mappings, and validate the current dirty working tree without reverting overlapping user changes. Browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the review package, API behavior and responsive Mockup as Text with `OK triển khai`.
+- Confirmed the root cause against code and local PostgreSQL: `Tất cả` includes completed history, the quick-filter row omitted a full-history filter, and the fourth supervisor row is the completed `Ghi nhận gói khảo sát hiện trạng` from 22/08/2026.
+- Added additive backend `bucket=completed` and `summary.completed` over the existing actor/project/queue scope. The narrower `done_today` contract remains available and no mutation, migration or data repair was added.
+- Reworked the quick-filter header so `Xem tất cả` is a separate source-backed control and added the full-history `Hoàn tất` shortcut. Existing operational shortcuts remain overlapping filters, not a fabricated partition.
+- Added a PostgreSQL-backed history/compatibility regression and focused frontend source-contract coverage. The initial tests failed against the previous contract and now pass after implementation.
+- Updated the central/backend/frontend/root-cause and Workflow Orchestration mappings with the completed-history API and responsive presentation contract.
+- Current working-tree verification at HEAD `7a37ebf` plus the listed dirty-tree changes passed: focused PostgreSQL regression on a newly created disposable database (removed after the run); full backend `go test ./...`; 264/264 frontend tests; TypeScript/Vite production build; 250 KiB gzip budget with 141 chunks; and `git diff --check`.
+- Rebuilt and restarted the local Docker stack through the required `down -> build -> run` sequence. PostgreSQL and both Redis services are healthy, backend health/readiness and the rebuilt `/my-work` frontend route return HTTP 200.
+- Read-only API verification as `supervisor@dev.local` for project `8494484c-4d94-47a0-88ab-29c443506137` now returns `total=4`, `need_action=2`, `upcoming=1`, `completed=1`, `done_today=0`; `bucket=completed` returns only `Ghi nhận gói khảo sát hiện trạng`. The temporary verification session was logged out afterward.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn and remains `NOT UX ACCEPTED`.
+
+## Active Plan: Đưa hành động chuyển giai đoạn vào Bàn làm việc
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-25)
+
+### Will be done
+
+- Add one generic, actor-scoped My Work workflow-action read contract for the current runtime Node when every completion, approval, automation, blocker and transition condition is satisfied.
+- Present that action in the ordinary `Bàn làm việc` queue and `Làm ngay` count with a business-first label such as `Bắt đầu Thi công`, while keeping Node terminology and navigation knowledge out of the primary user flow.
+- Reuse the existing protected Node advance mutation so the backend rechecks authorization and every runtime gate at click time; do not create synthetic Work Items, auto-advance, change historical runs or add a database migration.
+- Preserve the existing `Quy trình` action as a fallback, add desktop/mobile loading/error/pending/success behavior, focused backend/frontend regressions, durable mapping updates and current-tree verification. Browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the generic all-Node scope, business-first labels, one-click action without an extra confirmation dialog, no auto-advance and keeping `Quy trình` as a fallback with `OK, triển khai`.
+- Loaded the central backend/frontend mappings plus Workflow Orchestration, Project Planning, Frontend Workflow, Backend Workflow and Impact Analysis instructions. Confirmed the current split: `/me/work-items` returns Work Items only, while the protected Node advance mutation and its UI affordance exist only in the Pipeline workspace.
+- Confirmed the implementation root cause: completing the final Work Item leaves no actor-visible `Làm ngay` entry for the separate Node transition, so users must remember and navigate to `Quy trình` even when the backend already considers the current Node ready.
+- Added protected actor-scoped `GET /me/workflow-actions` as a read-only projection of generic current-Node advance actions. It checks project scope, Node permission, responsible role, current/run status, Run Steps, Work Items, required Forms, construction handoff, approval, automation, blockers and the actual next-edge condition; it creates no synthetic Work Item and performs no transition.
+- Added the ready action to ordinary My Work `Tất cả` and `Làm ngay` totals/list/desktop inspector with compact mobile CTA, business-first labels, one-click pending/error/success feedback and no confirmation dialog. Advanced Work Item-only filters intentionally hide the action; Pipeline remains the fallback.
+- Kept `POST /pipeline-run-nodes/:id/advance` as the only mutation authority, so click time repeats permission, completion, blocker and route checks and preserves the existing audit. Submit-step, approval, block and advance paths now publish visibility-safe `work_queue_changed` invalidation so Work Items and ready workflow actions refresh together.
+- Added backend normalization/label/stream tests and a PostgreSQL-backed readiness/authorization regression covering ready PM, unauthorized actor, empty responsible roles, blocked Node, incomplete step/item and post-advance removal. Added focused My Work source-contract coverage and updated central/backend/frontend/root-cause/Workflow Orchestration/Project Planning mappings. No migration or historical data rewrite was required.
+- Current working-tree verification at HEAD `7a37ebf` plus the listed changes passed: PostgreSQL-backed workflow-action integration test; full backend `go test ./...`; 264/264 frontend tests; TypeScript/Vite production build; and `git diff --check`.
+- Rebuilt and restarted the local Docker stack through the required `down -> build -> run` sequence. PostgreSQL and both Redis services are healthy, backend health/readiness return HTTP 200, and the rebuilt Admin service is running.
+- Read-only API verification as `pm@dev.local` against project `8494484c-4d94-47a0-88ab-29c443506137` returned exactly one actionable item: `Bắt đầu Thi công` / `Chuyển sang Thi công`, from `Kế hoạch thi công` to `Thi công`. The verification did not call advance or mutate project/runtime data; its temporary curl login sessions were revoked afterward.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn and remains `NOT UX ACCEPTED`.
+
+## Active Plan: Khử trùng lặp subtitle vai trò tài khoản
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-25)
+
+### Will be done
+
+- Keep every global/project-scoped `user_roles` assignment intact while making the current-user role summary return each nonblank display name once.
+- Reuse one frontend role-summary helper in AppShell, Project Workspace, Profile and My Work so stale or legacy payloads cannot render duplicate subtitle labels.
+- Add focused backend/frontend regression coverage, update central/backend/frontend/root-cause/Admin Governance maps and run current-tree backend/frontend validation. No schema migration or data cleanup is planned; browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the diagnosis, implementation outline and Mockup as Text with `OK triển khai`.
+- Confirmed on local PostgreSQL that `pm@dev.local` has 17 valid PM assignments across 17 sample projects but only one distinct role display name; the selected project `DEMO-PLAN-260824024337-8494484C` is one of those scopes.
+- Confirmed the root cause: `Repository.UserRoles` returns one display-name row per assignment without `DISTINCT`, while shared headers and Profile join the raw array directly. My Work already has a local display-only dedupe, and `UserPermissions` already uses `DISTINCT`.
+- Changed `Repository.UserRoles` to return sorted distinct display names. Login, Refresh and `/auth/me` now receive one actor-wide display label per role while every global/project-scoped assignment remains unchanged.
+- Added shared frontend `uniqueRoleNames`/`roleSummary` helpers and applied them to AppShell desktop/mobile account surfaces, Project Workspace, Profile and My Work. Blank labels are removed, surrounding whitespace is normalized and stale/legacy duplicate payloads remain safe to render.
+- Added a PostgreSQL-backed regression proving two project-scoped assignments produce one repository and `Service.Me` display label, plus focused shared-helper and consumer-wiring frontend coverage.
+- Updated central/backend/frontend/root-cause and Admin Governance maps with the current-user role-summary contract. No schema migration, data cleanup or assignment rewrite was required.
+- Current working-tree verification at HEAD `7a37ebf` plus the listed changes passed: focused PostgreSQL-backed backend regression, full backend `go test ./...`, 263/263 frontend tests, TypeScript/Vite production build, 250 KiB gzip budget with 140 chunks and `git diff --check`.
+- Rebuilt and restarted the local Docker stack through the required `down -> build -> run` sequence after the sandbox-only Docker Buildx activity-file denial was rerun with approved Docker access. PostgreSQL and both Redis services are healthy, backend health/readiness return HTTP 200 and the rebuilt Admin route returns HTTP 200.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT is not authorized in this turn and remains `NOT UX ACCEPTED`.
+
 ## Active Plan: Tách Phạm vi khỏi thanh lọc Bàn làm việc
 
 Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-24)

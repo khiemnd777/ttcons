@@ -16,6 +16,7 @@ import type {
   MaterialSnapshotResponse,
   ProjectMaterialBalance,
 } from '../../lib/types/domain';
+import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
 
 type RowDraft = {
   item_index: number;
@@ -193,7 +194,8 @@ export function MaterialSnapshotPanel({
       if (!updated) return;
       resetFromResponse(updated);
       invalidate();
-      toast.success('Đã lưu nháp ghi nhận vật tư');
+      syncWorkItemMutationTransition(queryClient, updated);
+      toast.success(`Đã lưu nháp ghi nhận vật tư.${workItemAutoStartedNotice(updated)}`);
     },
     onError: (error) => toast.error('Không lưu được ghi nhận vật tư', error),
   });
@@ -208,7 +210,8 @@ export function MaterialSnapshotPanel({
       if (!updated) return;
       resetFromResponse(updated);
       invalidate();
-      toast.success('Đã gửi ghi nhận vật tư');
+      syncWorkItemMutationTransition(queryClient, updated);
+      toast.success(`Đã gửi ghi nhận vật tư.${workItemAutoStartedNotice(updated)}`);
     },
     onError: (error) => toast.error('Không gửi được ghi nhận vật tư', error),
   });

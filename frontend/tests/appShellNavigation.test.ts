@@ -27,6 +27,8 @@ test('standard shell exposes the permission-filtered navigation on mobile', asyn
   assert.doesNotMatch(appShell, /to: '\/dashboard', label: 'Điều hành'/);
   assert.match(appShell, /aria-label="Mở hồ sơ cá nhân"/);
   assert.ok((appShell.match(/navigate\('\/profile'\)/g) ?? []).length >= 2, 'desktop and mobile user surfaces must expose Profile');
+  assert.match(appShell, /const userRoleSummary = roleSummary\(user\?\.roles\)/);
+  assert.doesNotMatch(appShell, /user\?\.roles\?\.join\(', '\)/);
 });
 
 test('focus sidebars reuse the approved home brand link', async () => {
@@ -38,4 +40,6 @@ test('focus sidebars reuse the approved home brand link', async () => {
   assert.match(brand, /aria-label="Về trang mặc định"/);
   assert.match(templateSidebar, /<BrandHomeLink/);
   assert.match(projectWorkspace, /<BrandHomeLink/);
+  assert.match(projectWorkspace, /const userRoleSummary = roleSummary\(user\?\.roles\)/);
+  assert.doesNotMatch(projectWorkspace, /user\?\.roles\?\.join\(', '\)/);
 });

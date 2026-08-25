@@ -107,3 +107,4 @@
 ## Golden Sample
 
 - `GOLDEN-REAL-001` is the reconciled review fixture for four AP and five AR obligations, schedules, settled advances, nine terminal payments/receipts, allocations, verified input invoice, issued output invoice and released contract retention. AP/AR remaining balances are zero before handover.
+- Project material-cost and cash-request create/transition mutations accept explicit canonical Work Item context and may atomically start only the matching project-finance close item. This bridge changes no ledger, payment, journal, AP/AR, invoice or tax state beyond the requested source mutation; it does not satisfy financial-close readiness or complete the Work Item. Wrong/future/terminal context rolls the source mutation back, and calls without task context remain unchanged.

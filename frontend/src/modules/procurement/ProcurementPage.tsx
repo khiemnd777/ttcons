@@ -18,6 +18,12 @@ import { enumOptions } from '../../lib/utils/status';
 import { partnerOptions } from '../core-data/partnerUtils';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { workItemDetailPath } from '../work-items/workItemNavigation';
+import {
+  syncWorkItemMutationTransition,
+  withWorkItemMutationContext,
+  workItemAutoStartedNotice,
+  type WorkItemMutationResult,
+} from '../work-items/workItemMutationContext';
 
 type ProcurementRow = Record<string, any>;
 type QueueView = 'attention' | 'delivery' | 'all';
@@ -38,6 +44,7 @@ const procurementStatusLabels: Record<string, string> = {
 export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
   const { id } = useParams();
   const location = useLocation();
+  const taskId = new URLSearchParams(location.search).get('task')?.trim() ?? '';
   const { hasPermission } = useAuth();
   const [projectId, setProjectId] = useState(id ?? '');
   const [view, setView] = useState<QueueView>('attention');
@@ -63,8 +70,8 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
     onError: (error) => toast.error('Không cập nhật được yêu cầu mua', error),
   });
   const action = useMutation({
-    mutationFn: ({ requestId, name }: { requestId: string; name: string }) => post(`/procurement-requests/${requestId}/${name}`, {}),
-    onSuccess: async (_data, variables) => { await invalidate(); toast.success(procurementActionLabels[variables.name] ?? 'Đã cập nhật yêu cầu mua'); },
+    mutationFn: ({ requestId, name }: { requestId: string; name: string }) => post<WorkItemMutationResult>(`/procurement-requests/${requestId}/${name}`, withWorkItemMutationContext({}, taskId)),
+    onSuccess: async (result, variables) => { await invalidate(); syncWorkItemMutationTransition(queryClient, result); toast.success(`${procurementActionLabels[variables.name] ?? 'Đã cập nhật yêu cầu mua'}.${workItemAutoStartedNotice(result)}`); },
     onError: (error) => toast.error('Không cập nhật được yêu cầu mua', error),
   });
   const rows = requests.data ?? [];

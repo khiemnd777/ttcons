@@ -36,6 +36,26 @@ test('linked construction variation uses the shared Vietnamese status label', ()
   assert.equal(`PS-002 · ${statusLabel('in_progress')}`, 'PS-002 · Đang xử lý');
 });
 
+test('construction variation stays contextual and distinguishes unavailable readiness from real alerts', async () => {
+  const page = await readFile(new URL('../src/modules/operations/OperationsPage.tsx', import.meta.url), 'utf8');
+  const panel = await readFile(new URL('../src/modules/operations/ConstructionWorkspacePanel.tsx', import.meta.url), 'utf8');
+  const actions = await readFile(new URL('../src/modules/operations/ConstructionActionDialogs.tsx', import.meta.url), 'utf8');
+  const proposal = await readFile(new URL('../src/modules/operations/ConstructionVariationProposalDialog.tsx', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(page, /ConstructionVariationBand/);
+  assert.match(page, /openVariations\.length > 0 \? <ConstructionVariationStatus/);
+  assert.doesNotMatch(page, /Cần hợp đồng chủ đầu tư đang hiệu lực trước khi lập phát sinh ngoài kế hoạch/);
+  assert.match(panel, /mode === 'actions'[\s\S]*variationContext\?\.available[\s\S]*Đề xuất phát sinh/);
+  assert.match(actions, /variationContextLoading/);
+  assert.match(actions, /variationContextError/);
+  assert.match(actions, /Chưa thể đề xuất — thiếu hợp đồng chủ đầu tư đang hiệu lực/);
+  assert.match(actions, /Báo cáo, kiểm tra và xử lý hiện trường vẫn hoạt động bình thường/);
+  assert.match(proposal, /Đang kiểm tra điều kiện đề xuất/);
+  assert.match(proposal, /Không tải được điều kiện đề xuất/);
+  assert.match(proposal, /Công trình chưa có hợp đồng chủ đầu tư đang hiệu lực/);
+  assert.match(proposal, /Báo cáo, kiểm tra và xử lý hiện trường vẫn hoạt động bình thường/);
+});
+
 test('construction evidence draft preview recreates object URLs inside an effect for StrictMode', async () => {
   const source = await readFile(new URL('../src/modules/_shared/EvidenceCapture.tsx', import.meta.url), 'utf8');
 
@@ -71,6 +91,20 @@ test('construction report exposes protected saved evidence preview and the appro
   assert.match(source, /onRetry=\{viewerRecord \? \(\) => setEvidencePreviewRetryKey/);
   assert.doesNotMatch(source, /import \{ EvidenceViewerDialog \}/);
   assert.doesNotMatch(source, /window\.open\(previewURL/);
+});
+
+test('construction report explains and refreshes the atomic work-item auto start', async () => {
+  const form = await readFile(new URL('../src/modules/operations/ConstructionReportFormDialog.tsx', import.meta.url), 'utf8');
+  const page = await readFile(new URL('../src/modules/operations/OperationsPage.tsx', import.meta.url), 'utf8');
+
+  assert.match(form, /Khi lưu báo cáo, hạng mục sẽ chuyển sang “Đang làm”\./);
+  assert.match(form, /\['pending', 'ready', 'needs_changes'\]\.includes\(selectedWorkItem\.status\)/);
+  assert.match(page, /report\.work_item_transition/);
+  assert.match(page, /auto_started/);
+  assert.match(page, /queryKey: \['work-item'\]/);
+  assert.match(page, /queryKey: \['my-work-items'\]/);
+  assert.match(page, /Đã lưu báo cáo và bắt đầu/);
+  assert.doesNotMatch(page, /\/work-items\/\$\{[^}]+\}\/start/);
 });
 
 test('shared evidence viewer keeps images in-app with loading, retry, decode failure and nested-dialog escape safety', async () => {

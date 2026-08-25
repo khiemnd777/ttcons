@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, RefreshCw, Send } from 'lucide-react';
 import { DataTable } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
@@ -20,11 +20,19 @@ import { HandoverChecklistSourceDialog } from './HandoverChecklistSourceDialog';
 import { HandoverCreateDialog } from './HandoverCreateDialog';
 import { HandoverWorkspace } from './HandoverWorkspace';
 import type { ChecklistItem, FinalAcceptanceOption, HandoverDetail, HandoverRow } from './handoverTypes';
+import {
+  syncWorkItemMutationTransition,
+  withWorkItemMutationContext,
+  workItemAutoStartedNotice,
+  type WorkItemMutationResult,
+} from '../work-items/workItemMutationContext';
 
 type HandoverAction = { type: 'checklist'; item: ChecklistItem } | { type: 'source'; item: ChecklistItem } | { type: 'complete'; record: HandoverDetail } | null;
 
 export function HandoverPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const taskId = searchParams.get('task')?.trim() ?? '';
   const [projectId, setProjectId] = useState(id ?? '');
   const [statusFilter, setStatusFilter] = useState('all');
   const [createOpen, setCreateOpen] = useState(false);
@@ -54,13 +62,13 @@ export function HandoverPage() {
     ]);
   };
   const create = useMutation({
-    mutationFn: (values: Record<string, any>) => post<HandoverDetail>(`/projects/${projectId}/handover`, values),
-    onSuccess: async (row) => { setCreateOpen(false); setSelectedID(row.id); await invalidate(); toast.success('Đã tạo hồ sơ bàn giao'); },
+    mutationFn: (values: Record<string, any>) => post<HandoverDetail & WorkItemMutationResult>(`/projects/${projectId}/handover`, withWorkItemMutationContext(values, taskId)),
+    onSuccess: async (row) => { setCreateOpen(false); setSelectedID(row.id); await invalidate(); syncWorkItemMutationTransition(queryClient, row); toast.success(`Đã tạo hồ sơ bàn giao.${workItemAutoStartedNotice(row)}`); },
     onError: (error) => toast.error('Không tạo được hồ sơ bàn giao', error),
   });
   const transition = useMutation({
-    mutationFn: ({ endpoint, values }: { endpoint: string; values?: Record<string, any> }) => post<HandoverDetail>(endpoint, values ?? {}),
-    onSuccess: async (row) => { if (row.id) setSelectedID(row.id); setAction(null); await invalidate(); toast.success('Đã cập nhật trạng thái bàn giao'); },
+    mutationFn: ({ endpoint, values }: { endpoint: string; values?: Record<string, any> }) => post<HandoverDetail & WorkItemMutationResult>(endpoint, withWorkItemMutationContext(values ?? {}, taskId)),
+    onSuccess: async (row) => { if (row.id) setSelectedID(row.id); setAction(null); await invalidate(); syncWorkItemMutationTransition(queryClient, row); toast.success(`Đã cập nhật trạng thái bàn giao.${workItemAutoStartedNotice(row)}`); },
     onError: (error) => toast.error('Không cập nhật được hồ sơ bàn giao', error),
   });
   const checklist = useMutation({

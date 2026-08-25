@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Clock3,
   MessageSquare,
+  PlayCircle,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -23,9 +24,11 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
-import type { ActivityAttentionItem, ActivityAttentionSummary, ApprovalRequest, WorkItem } from '../../lib/types/domain';
+import { useToast } from '../../components/ToastProvider';
+import type { ActivityAttentionItem, ActivityAttentionSummary, ApprovalRequest, MyWorkflowAction, WorkItem } from '../../lib/types/domain';
 import { ApprovalPanel } from '../../components/ApprovalPanel';
 import { statusLabel } from '../../lib/utils/status';
+import { roleSummary as summarizeRoles } from '../../lib/utils/roles';
 import { ActivityAttachments } from '../work-items/ActivityAttachments';
 import { ActivityReactionBar, ActivityReplyQuote } from '../work-items/ActivityConversationMeta';
 import { WorkItemCard } from '../work-items/WorkItemCard';
@@ -47,8 +50,8 @@ type ModeKey = 'work' | 'approval' | 'attention';
 type WorkScopeKey = 'responsible' | 'mine' | 'department' | 'watching' | 'all';
 type LegacyQueueKey = WorkScopeKey | 'pending_approval';
 type AttentionQueueKey = 'all' | 'mentions' | 'questions' | 'blockers' | 'reminders' | 'unread';
-type SummaryBucket = 'all' | 'need_action' | 'in_progress' | 'overdue' | 'blocked' | 'waiting_decision' | 'upcoming' | 'done_today';
-type WorkQuickBucket = 'all' | 'need_action' | 'in_progress' | 'blocked' | 'upcoming';
+type SummaryBucket = 'all' | 'need_action' | 'in_progress' | 'overdue' | 'blocked' | 'waiting_decision' | 'upcoming' | 'completed' | 'done_today';
+type WorkQuickBucket = 'all' | 'need_action' | 'in_progress' | 'blocked' | 'upcoming' | 'completed';
 
 type FacetOption = string | {
   id?: string;
@@ -75,6 +78,7 @@ type MyWorkSummary = {
   waiting_decision: number;
   waiting_approval: number;
   upcoming: number;
+  completed: number;
   done_today: number;
 };
 type MyWorkPageResponse = {
@@ -84,6 +88,11 @@ type MyWorkPageResponse = {
   total: number;
   has_more: boolean;
   next_cursor?: string;
+};
+type MyWorkflowActionsResponse = {
+  items: MyWorkflowAction[];
+  total: number;
+  summary_total: number;
 };
 
 const scopes: Array<{ key: WorkScopeKey; label: string }> = [
@@ -131,14 +140,15 @@ export function MyWorkPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null);
+  const toast = useToast();
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [searchDraft, setSearchDraft] = useState(searchParams.get('search') ?? '');
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('reconnecting');
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
 
   const requestedMode = validValue<ModeKey>(searchParams.get('mode'), ['work', 'approval', 'attention'], 'work');
   const requestedQueue = validValue<LegacyQueueKey>(searchParams.get('queue'), ['responsible', 'mine', 'department', 'pending_approval', 'watching', 'all'], 'responsible');
-  const requestedBucket = validValue<SummaryBucket>(searchParams.get('bucket'), ['all', 'need_action', 'in_progress', 'overdue', 'blocked', 'waiting_decision', 'upcoming', 'done_today'], 'need_action');
+  const requestedBucket = validValue<SummaryBucket>(searchParams.get('bucket'), ['all', 'need_action', 'in_progress', 'overdue', 'blocked', 'waiting_decision', 'upcoming', 'completed', 'done_today'], 'need_action');
   const legacyApprovalMode = requestedQueue === 'pending_approval' || requestedBucket === 'waiting_decision';
   const mode: ModeKey = requestedMode === 'attention' ? 'attention' : requestedMode === 'approval' || legacyApprovalMode ? 'approval' : 'work';
   const queue: WorkScopeKey = requestedQueue === 'pending_approval' ? 'responsible' : requestedQueue;
@@ -151,7 +161,7 @@ export function MyWorkPage() {
   const priority = searchParams.get('priority') ?? '';
   const search = searchParams.get('search') ?? '';
   const sort = searchParams.get('sort') ?? 'priority';
-  const roleSummary = uniqueRoleNames(user?.roles);
+  const roleSummary = summarizeRoles(user?.roles);
 
   useEffect(() => setSearchDraft(search), [search]);
 
@@ -161,6 +171,15 @@ export function MyWorkPage() {
     initialPageParam: '',
     queryFn: ({ pageParam }) => get<MyWorkPageResponse>(buildWorkPath(filterKey, String(pageParam ?? ''))),
     getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor : undefined,
+    enabled: Boolean(user?.id),
+    retry: false,
+  });
+  const workflowActionsMatchCurrentWorkFilters = (bucket === 'all' || bucket === 'need_action')
+    && !status && !deadline && !workType && !priority;
+  const workflowActionsVisible = mode === 'work' && workflowActionsMatchCurrentWorkFilters;
+  const workflowActions = useQuery({
+    queryKey: ['my-workflow-actions', user?.id, queue, project, search],
+    queryFn: () => get<MyWorkflowActionsResponse>(buildWorkflowActionsPath({ queue, project, search })),
     enabled: Boolean(user?.id),
     retry: false,
   });
@@ -226,9 +245,26 @@ export function MyWorkPage() {
       if (item?.project_id) queryClient.invalidateQueries({ queryKey: ['project-operations', item.project_id] });
     },
   });
+  const advanceWorkflowAction = useMutation({
+    mutationFn: (action: MyWorkflowAction) => post(`/pipeline-run-nodes/${action.run_node_id}/advance`, {}),
+    onSuccess: async (_result, action) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['my-workflow-actions'] }),
+        queryClient.invalidateQueries({ queryKey: ['my-work-items'] }),
+        queryClient.invalidateQueries({ queryKey: ['pipeline-run', action.project_id] }),
+        queryClient.invalidateQueries({ queryKey: ['project-operations', action.project_id] }),
+        queryClient.invalidateQueries({ queryKey: ['project-progress'] }),
+      ]);
+      toast.success(workflowActionSuccessMessage(action));
+    },
+    onError: (error) => toast.error('Không chuyển được giai đoạn', error),
+  });
 
   const firstPage = workItems.data?.pages[0];
   const rows = useMemo(() => dedupeWorkItems(workItems.data?.pages.flatMap((page) => page.items) ?? []), [workItems.data]);
+  const workflowActionRows = useMemo(() => workflowActionsVisible ? workflowActions.data?.items ?? [] : [], [workflowActions.data?.items, workflowActionsVisible]);
+  const workflowActionTotal = workflowActionsMatchCurrentWorkFilters ? workflowActions.data?.total ?? 0 : 0;
+  const workflowActionSummaryTotal = workflowActions.data?.summary_total ?? 0;
   const approvalFirstPage = approvalWorkItems.data?.pages[0];
   const approvalRows = useMemo(() => dedupeWorkItems(approvalWorkItems.data?.pages.flatMap((page) => page.items) ?? []), [approvalWorkItems.data]);
   const summary = firstPage?.summary ?? emptySummary;
@@ -242,23 +278,27 @@ export function MyWorkPage() {
       : activityAttentionSummary.data?.has_more
         ? '120+'
         : activityAttentionSummary.data?.count ?? 0;
-  const workTabCount = workItems.isLoading
+  const workTabCount = workItems.isLoading || (workflowActionsMatchCurrentWorkFilters && workflowActions.isLoading)
     ? '…'
-    : workItems.isError && !firstPage
+    : (workItems.isError && !firstPage) || (workflowActionsMatchCurrentWorkFilters && workflowActions.isError && !workflowActions.data)
       ? '—'
-      : firstPage?.total ?? 0;
+      : (firstPage?.total ?? 0) + workflowActionTotal;
   const approvalTabCount = workItems.isLoading || pendingNodeApprovals.isLoading
     ? '…'
     : (workItems.isError && !firstPage) || (pendingNodeApprovals.isError && !pendingNodeApprovals.data)
       ? '—'
       : summary.waiting_decision + nodeApprovalCount;
   const activeWorkRows = mode === 'approval' ? approvalRows : rows;
-  const selectedItem = activeWorkRows.find((item) => item.id === selectedWorkId) ?? activeWorkRows[0] ?? null;
+  const selectedWorkflowAction = mode === 'work' ? workflowActionRows.find((action) => action.id === selectedEntryId) ?? null : null;
+  const selectedItem = selectedWorkflowAction ? null : activeWorkRows.find((item) => item.id === selectedEntryId) ?? activeWorkRows[0] ?? null;
 
   useEffect(() => {
-    if (!activeWorkRows.length) setSelectedWorkId(null);
-    else if (!selectedWorkId || !activeWorkRows.some((item) => item.id === selectedWorkId)) setSelectedWorkId(activeWorkRows[0].id);
-  }, [activeWorkRows, selectedWorkId]);
+    const entryIds = mode === 'work'
+      ? [...workflowActionRows.map((action) => action.id), ...activeWorkRows.map((item) => item.id)]
+      : activeWorkRows.map((item) => item.id);
+    if (!entryIds.length) setSelectedEntryId(null);
+    else if (!selectedEntryId || !entryIds.includes(selectedEntryId)) setSelectedEntryId(entryIds[0]);
+  }, [activeWorkRows, mode, selectedEntryId, workflowActionRows]);
 
   useEffect(() => {
     if (!user?.id) return undefined;
@@ -268,6 +308,7 @@ export function MyWorkPage() {
         if (message.event === 'attention_changed') queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
         if (message.event === 'work_queue_changed' || message.event === 'work_item_changed') {
           queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
+          queryClient.invalidateQueries({ queryKey: ['my-workflow-actions'] });
         }
       },
     });
@@ -303,6 +344,7 @@ export function MyWorkPage() {
 
   function refreshAll() {
     void workItems.refetch();
+    void workflowActions.refetch();
     void activityAttentionSummary.refetch();
     if (mode === 'attention') void activityAttention.refetch();
     if (mode === 'approval') void approvalWorkItems.refetch();
@@ -314,9 +356,14 @@ export function MyWorkPage() {
   }
 
   const hasFilters = Boolean(bucket !== 'need_action' || queue !== 'responsible' || project || status || deadline || workType || priority || search || sort !== 'priority');
-  const total = firstPage?.total ?? summary.total ?? rows.length;
+  const total = (firstPage?.total ?? summary.total ?? rows.length) + workflowActionTotal;
   const approvalTotal = approvalFirstPage?.total ?? approvalRows.length;
   const scopeLabel = scopes.find((item) => item.key === queue)?.label ?? 'Tôi phụ trách';
+  const actionAwareSummary = {
+    ...summary,
+    total: summary.total + workflowActionSummaryTotal,
+    need_action: summary.need_action + workflowActionSummaryTotal,
+  };
 
   return (
     <>
@@ -327,7 +374,7 @@ export function MyWorkPage() {
           <div className="flex items-center gap-2">
             <LiveStatusBadge status={streamStatus} />
             <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={refreshAll}>
-              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || activityAttentionSummary.isFetching || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
+              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || workflowActions.isFetching || activityAttentionSummary.isFetching || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
               Làm mới
             </button>
           </div>
@@ -347,11 +394,11 @@ export function MyWorkPage() {
 
             <div className="min-w-0">
               <WorkQuickFilters
-                summary={summary}
+                summary={actionAwareSummary}
                 selected={bucket}
                 scopeLabel={scopeLabel}
-                loading={workItems.isLoading}
-                unavailable={workItems.isError && !firstPage}
+                loading={workItems.isLoading || workflowActions.isLoading}
+                unavailable={(workItems.isError && !firstPage) || (workflowActions.isError && !workflowActions.data)}
                 onSelect={selectBucket}
               />
 
@@ -377,22 +424,36 @@ export function MyWorkPage() {
                 <WorkList
                   rows={rows}
                   selectedId={selectedItem?.id}
+                  workflowActions={workflowActionRows}
+                  selectedWorkflowActionId={selectedWorkflowAction?.id}
+                  workflowActionsLoading={workflowActionsVisible && workflowActions.isLoading}
+                  workflowActionsError={workflowActionsVisible ? workflowActions.error : null}
+                  pendingWorkflowActionId={advanceWorkflowAction.isPending ? advanceWorkflowAction.variables?.id : undefined}
                   loading={workItems.isLoading}
                   fetchingMore={workItems.isFetchingNextPage}
                   error={workItems.error}
                   total={total}
                   hasMore={Boolean(workItems.hasNextPage)}
                   filtered={hasFilters}
-                  onSelect={setSelectedWorkId}
+                  onSelect={setSelectedEntryId}
+                  onSelectWorkflowAction={setSelectedEntryId}
+                  onRunWorkflowAction={(action) => advanceWorkflowAction.mutate(action)}
                   onOpen={openWorkItem}
                   onLoadMore={() => void workItems.fetchNextPage()}
                   onReset={resetFilters}
                   onRetry={() => void workItems.refetch()}
+                  onRetryWorkflowActions={() => void workflowActions.refetch()}
                 />
               </div>
             </div>
 
-            <NextWorkPanel item={selectedItem} onOpen={openWorkItem} />
+            <NextQueuePanel
+              item={selectedItem}
+              workflowAction={selectedWorkflowAction}
+              pending={advanceWorkflowAction.isPending && advanceWorkflowAction.variables?.id === selectedWorkflowAction?.id}
+              onOpen={openWorkItem}
+              onRunWorkflowAction={(action) => advanceWorkflowAction.mutate(action)}
+            />
           </div>
         </section>
       ) : mode === 'approval' ? (
@@ -410,7 +471,7 @@ export function MyWorkPage() {
           project={project}
           projects={normalizeFacetOptions(facets.projects, 'Công trình')}
           onProjectChange={(value) => updateParams({ project: value || null })}
-          onSelect={setSelectedWorkId}
+          onSelect={setSelectedEntryId}
           onOpen={openWorkItem}
           onLoadMore={() => void approvalWorkItems.fetchNextPage()}
           onRetryWork={() => void approvalWorkItems.refetch()}
@@ -535,6 +596,21 @@ function buildWorkPath(filters: {
   return `/me/work-items?${params.toString()}`;
 }
 
+function buildWorkflowActionsPath(filters: { queue: WorkScopeKey; project: string; search: string }) {
+  const params = new URLSearchParams({ queue: filters.queue });
+  if (filters.project) params.set('project_id', filters.project);
+  if (filters.search) params.set('search', filters.search);
+  return `/me/workflow-actions?${params.toString()}`;
+}
+
+function workflowActionSuccessMessage(action: MyWorkflowAction) {
+  if (action.terminal) return 'Đã hoàn tất quy trình';
+  const nextType = action.next_run_node_type ?? '';
+  if (['construction_execution', 'construction'].includes(nextType)) return 'Đã bắt đầu giai đoạn Thi công';
+  if (['handover_finance', 'handover'].includes(nextType)) return 'Đã mở giai đoạn Bàn giao';
+  return `Đã chuyển sang ${action.next_run_node_name || 'giai đoạn tiếp theo'}`;
+}
+
 function dedupeWorkItems(rows: WorkItem[]) {
   return Array.from(new Map(rows.map((item) => [item.id, item])).values());
 }
@@ -543,11 +619,7 @@ function validValue<T extends string>(value: string | null, values: readonly T[]
   return value && values.includes(value as T) ? value as T : fallback;
 }
 
-function uniqueRoleNames(roles?: string[]) {
-  return Array.from(new Set((roles ?? []).map((role) => role.trim()).filter(Boolean))).join(', ');
-}
-
-const emptySummary: MyWorkSummary = { total: 0, need_action: 0, in_progress: 0, overdue: 0, blocked: 0, waiting_decision: 0, waiting_approval: 0, upcoming: 0, done_today: 0 };
+const emptySummary: MyWorkSummary = { total: 0, need_action: 0, in_progress: 0, overdue: 0, blocked: 0, waiting_decision: 0, waiting_approval: 0, upcoming: 0, completed: 0, done_today: 0 };
 
 function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable, onSelect }: {
   summary: MyWorkSummary;
@@ -558,15 +630,30 @@ function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable,
   onSelect: (bucket: WorkQuickBucket) => void;
 }) {
   const cards: Array<{ bucket: WorkQuickBucket; label: string; value: number; icon: typeof BriefcaseBusiness; activeClass: string }> = [
-    { bucket: 'all', label: 'Tất cả', value: summary.total, icon: BriefcaseBusiness, activeClass: 'border-blue-300 bg-blue-50 ring-blue-200' },
     { bucket: 'need_action', label: 'Làm ngay', value: summary.need_action, icon: BriefcaseBusiness, activeClass: 'border-blue-300 bg-blue-50 ring-blue-200' },
     { bucket: 'in_progress', label: 'Đang làm', value: summary.in_progress, icon: Clock3, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
     { bucket: 'blocked', label: 'Bị chặn', value: summary.blocked, icon: AlertCircle, activeClass: 'border-rose-300 bg-rose-50 ring-rose-200' },
     { bucket: 'upcoming', label: 'Sắp tới · chỉ xem', value: summary.upcoming, icon: Clock3, activeClass: 'border-slate-300 bg-slate-50 ring-slate-200' },
+    { bucket: 'completed', label: 'Hoàn tất', value: summary.completed, icon: CheckCircle2, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
   ];
+  const allActive = selected === 'all';
   return (
     <section className="mb-3 rounded-lg border border-line bg-white p-3" aria-label="Bộ lọc nhanh công việc" aria-busy={loading}>
-      <h2 className="mb-2 text-sm font-semibold text-ink">Bộ lọc nhanh · {scopeLabel}</h2>
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-sm font-semibold text-ink">Bộ lọc nhanh · {scopeLabel}</h2>
+        <button
+          type="button"
+          aria-pressed={allActive}
+          className={clsx(
+            'inline-flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm transition sm:w-auto sm:min-w-[9rem]',
+            allActive ? 'border-blue-300 bg-blue-50 text-blue-800 ring-1 ring-blue-200' : 'border-line bg-white text-slate-700 hover:border-blue-200 hover:bg-slate-50',
+          )}
+          onClick={() => onSelect('all')}
+        >
+          <span className="font-semibold">Xem tất cả</span>
+          <span className="text-base font-semibold">{loading ? '…' : unavailable ? '—' : summary.total}</span>
+        </button>
+      </div>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {cards.map((card) => {
           const Icon = card.icon;
@@ -676,26 +763,71 @@ function FilterSelect({ value, label, options, onChange }: { value: string; labe
   return <select className="min-w-0 rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700" value={value} onChange={(event) => onChange(event.target.value)}><option value="">{label}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
 }
 
-function WorkList({ rows, selectedId, loading, fetchingMore, error, total, hasMore, filtered, emptyTitle, onSelect, onOpen, onLoadMore, onReset, onRetry }: {
+function WorkList({ rows, selectedId, workflowActions = [], selectedWorkflowActionId, workflowActionsLoading = false, workflowActionsError, pendingWorkflowActionId, loading, fetchingMore, error, total, hasMore, filtered, emptyTitle, onSelect, onSelectWorkflowAction, onRunWorkflowAction, onOpen, onLoadMore, onReset, onRetry, onRetryWorkflowActions }: {
   rows: WorkItem[]; selectedId?: string; loading: boolean; fetchingMore: boolean; error: unknown; total: number; hasMore: boolean; filtered: boolean;
   emptyTitle?: string;
+  workflowActions?: MyWorkflowAction[]; selectedWorkflowActionId?: string; workflowActionsLoading?: boolean; workflowActionsError?: unknown; pendingWorkflowActionId?: string;
   onSelect: (id: string) => void; onOpen: (item: WorkItem) => void; onLoadMore: () => void; onReset: () => void; onRetry: () => void;
+  onSelectWorkflowAction?: (id: string) => void; onRunWorkflowAction?: (action: MyWorkflowAction) => void; onRetryWorkflowActions?: () => void;
 }) {
-  if (loading) return <WorkListSkeleton />;
-  if (error && !rows.length) return <SourceError title="Không tải được danh sách công việc" onRetry={onRetry} />;
-  if (!rows.length) return <EmptyState title={emptyTitle ?? (filtered ? 'Không có công việc khớp bộ lọc' : 'Không có việc cần xử lý trong phạm vi này')} action={filtered ? <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700" onClick={onReset}>Xóa bộ lọc</button> : undefined} />;
+  const hasEntries = workflowActions.length > 0 || rows.length > 0;
+  if ((loading || workflowActionsLoading) && !hasEntries) return <WorkListSkeleton />;
+  if (!hasEntries && error && workflowActionsError) return <div className="space-y-2"><SourceError title="Không tải được danh sách công việc" onRetry={onRetry} /><SourceError title="Không tải được hành động quy trình" onRetry={onRetryWorkflowActions} /></div>;
+  if (!hasEntries && error) return <SourceError title="Không tải được danh sách công việc" onRetry={onRetry} />;
+  if (!hasEntries && workflowActionsError) return <SourceError title="Không tải được hành động quy trình" onRetry={onRetryWorkflowActions} />;
+  if (!hasEntries) return <EmptyState title={emptyTitle ?? (filtered ? 'Không có công việc khớp bộ lọc' : 'Không có việc cần xử lý trong phạm vi này')} action={filtered ? <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700" onClick={onReset}>Xóa bộ lọc</button> : undefined} />;
   return (
     <div className="min-w-0">
-      <div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold text-ink">{total} việc</p></div>
+      <div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold text-ink">{total} mục</p></div>
       {error ? <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Chưa cập nhật được dữ liệu mới; đang giữ danh sách gần nhất.</span><button className="shrink-0 font-semibold text-amber-900 underline underline-offset-2" onClick={onRetry}>Thử lại</button></div> : null}
+      {workflowActionsError ? <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Không tải được hành động chuyển giai đoạn.</span>{onRetryWorkflowActions ? <button className="shrink-0 font-semibold text-amber-900 underline underline-offset-2" onClick={onRetryWorkflowActions}>Thử lại</button> : null}</div> : null}
       <div className="max-h-[720px] overflow-y-auto rounded-lg border border-line bg-white">
+        {workflowActionsLoading ? <WorkflowActionSkeleton /> : null}
+        {workflowActions.map((action) => (
+          <WorkflowActionCard
+            key={action.id}
+            action={action}
+            selected={selectedWorkflowActionId === action.id}
+            pending={pendingWorkflowActionId === action.id}
+            onSelect={() => onSelectWorkflowAction?.(action.id)}
+            onRun={() => onRunWorkflowAction?.(action)}
+          />
+        ))}
         {rows.map((item) => (
           <WorkItemCard key={item.id} item={item} selected={selectedId === item.id} onSelect={() => onSelect(item.id)} onOpen={() => onOpen(item)} />
         ))}
       </div>
-      {hasMore ? <button className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" disabled={fetchingMore} onClick={onLoadMore}>{fetchingMore ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}Tải thêm · Đã hiển thị {rows.length}/{total}</button> : <p className="mt-3 text-center text-xs text-slate-500">Đã hiển thị {rows.length}/{total}</p>}
+      {hasMore ? <button className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" disabled={fetchingMore} onClick={onLoadMore}>{fetchingMore ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}Tải thêm · Đã hiển thị {workflowActions.length + rows.length}/{total}</button> : <p className="mt-3 text-center text-xs text-slate-500">Đã hiển thị {workflowActions.length + rows.length}/{total}</p>}
     </div>
   );
+}
+
+function WorkflowActionCard({ action, selected, pending, onSelect, onRun }: { action: MyWorkflowAction; selected: boolean; pending: boolean; onSelect: () => void; onRun: () => void }) {
+  return (
+    <article className={clsx('border-b border-line last:border-b-0 sm:flex sm:items-stretch', selected ? 'bg-blue-50/70 shadow-[inset_3px_0_0_0_#2563eb]' : 'bg-white hover:bg-slate-50')}>
+      <button type="button" className="min-w-0 flex-1 px-4 py-3 text-left" aria-pressed={selected} onClick={onSelect}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">Cần chốt giai đoạn</span>
+          <span className="text-sm font-semibold text-ink">{action.title}</span>
+        </div>
+        <p className="mt-1 truncate text-xs font-medium text-slate-600" title={`${action.project_code} · ${action.project_name} › ${action.run_node_name}`}>{action.project_code} · {action.project_name} › {action.run_node_name}</p>
+        <p className="mt-1 line-clamp-2 text-xs text-slate-500">Đã đủ điều kiện để tiếp tục quy trình.</p>
+      </button>
+      <button
+        type="button"
+        className="mx-4 mb-3 inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:my-3 sm:ml-0"
+        disabled={pending}
+        onClick={() => { onSelect(); onRun(); }}
+      >
+        {pending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
+        {pending ? 'Đang chuyển…' : action.action_label}
+      </button>
+    </article>
+  );
+}
+
+function WorkflowActionSkeleton() {
+  return <div className="animate-pulse border-b border-line bg-blue-50/40 px-4 py-3"><div className="h-5 w-44 rounded bg-blue-100" /><div className="mt-2 h-3 w-4/5 rounded bg-slate-100" /><div className="mt-2 h-8 w-40 rounded bg-blue-100 sm:ml-auto" /></div>;
 }
 
 function WorkListSkeleton() {
@@ -726,6 +858,25 @@ function NextWorkPanel({ item, onOpen }: { item: WorkItem | null; onOpen: (item:
       {upcoming ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Bước này chưa đến lượt. Có thể xem trước hồ sơ nhưng chưa thể bắt đầu hoặc cập nhật.</p> : item.blocked_reason ? <p className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-700">Điểm chặn: {item.blocked_reason}</p> : <p className="mt-3 text-sm leading-6 text-slate-600">{nextActionCopy(item)}</p>}
       <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onOpen(item)}>{upcoming ? 'Xem trước công việc' : executionTargetActionLabel(item)} <ChevronRight className="h-4 w-4" /></button>
       {item.project_id ? <Link className="mt-2 inline-flex w-full justify-center rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${item.project_id}`}>Mở công trình</Link> : null}
+    </aside>
+  );
+}
+
+function NextQueuePanel({ item, workflowAction, pending, onOpen, onRunWorkflowAction }: { item: WorkItem | null; workflowAction: MyWorkflowAction | null; pending: boolean; onOpen: (item: WorkItem) => void; onRunWorkflowAction: (action: MyWorkflowAction) => void }) {
+  if (!workflowAction) return <NextWorkPanel item={item} onOpen={onOpen} />;
+  return (
+    <aside className="hidden rounded-lg border border-blue-200 bg-white p-4 xl:sticky xl:top-4 xl:block xl:self-start">
+      <span className="rounded-md bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800">Cần chốt giai đoạn</span>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Việc tiếp theo</p>
+      <h3 className="mt-1 text-base font-semibold text-ink">{workflowAction.title}</h3>
+      <p className="mt-2 text-xs font-medium leading-5 text-slate-600">{workflowAction.project_code} · {workflowAction.project_name} › {workflowAction.run_node_name}</p>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{workflowAction.description}</p>
+      <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Các công việc và điều kiện bắt buộc của giai đoạn hiện tại đã hoàn tất.</div>
+      <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={pending} onClick={() => onRunWorkflowAction(workflowAction)}>
+        {pending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
+        {pending ? 'Đang chuyển…' : workflowAction.action_label}
+      </button>
+      <Link className="mt-2 inline-flex w-full justify-center rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${workflowAction.project_id}`}>Mở công trình</Link>
     </aside>
   );
 }

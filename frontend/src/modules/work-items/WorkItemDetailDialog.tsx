@@ -57,7 +57,7 @@ import {
   type WorkItemRequirementNavigationTarget,
 } from './workItemRequirements';
 import { firstFocusableRequirementControl, revealWorkItemRequirementTarget } from './workItemRequirementNavigation';
-import { executionTargetPath } from './workItemExecutionTarget';
+import { executionTargetPath, isDomainExecutionTarget } from './workItemExecutionTarget';
 import { constructionHandoffNavigationState } from './workItemNavigation';
 import type { WorkItemWorkflowNavigation } from './workItemWorkflowNavigation';
 import {
@@ -541,6 +541,9 @@ function permittedActions(item?: WorkItem | null, workflowFormSubmitted?: boolea
   if (!item || ['completed', 'cancelled'].includes(item.status)) return [];
 
   let statusActions = availableActions(item.status);
+  if (isDomainExecutionTarget(item.execution_target) || hasWorkflowFormSummary(item)) {
+    statusActions = statusActions.filter((action) => action !== 'start');
+  }
   const serverActions = asArray<string>(item.available_actions);
   const submitted = workflowFormSubmitted ?? item.workflow_form_status === 'submitted';
   if (submitted) {

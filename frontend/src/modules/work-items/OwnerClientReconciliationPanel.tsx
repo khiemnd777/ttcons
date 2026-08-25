@@ -10,6 +10,7 @@ import { useToast } from '../../components/ToastProvider';
 import { get, post, put } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
 import type { OwnerClientReconciliationItem, OwnerClientReconciliationResponse, ProjectOperationsRecord } from '../../lib/types/domain';
+import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
 
 type RowDraft = {
   item_index: number;
@@ -114,7 +115,8 @@ export function OwnerClientReconciliationPanel({
       if (!updated) return;
       resetFromResponse(updated);
       invalidate();
-      toast.success('Đã lưu nháp đối soát chủ đầu tư');
+      syncWorkItemMutationTransition(queryClient, updated);
+      toast.success(`Đã lưu nháp đối soát chủ đầu tư.${workItemAutoStartedNotice(updated)}`);
     },
     onError: (error) => toast.error('Không lưu được đối soát chủ đầu tư', error),
   });
@@ -129,7 +131,8 @@ export function OwnerClientReconciliationPanel({
       if (!updated) return;
       resetFromResponse(updated);
       invalidate();
-      toast.success('Đã gửi đối soát chủ đầu tư');
+      syncWorkItemMutationTransition(queryClient, updated);
+      toast.success(`Đã gửi đối soát chủ đầu tư.${workItemAutoStartedNotice(updated)}`);
     },
     onError: (error) => toast.error('Không gửi được đối soát chủ đầu tư', error),
   });

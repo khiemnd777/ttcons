@@ -43,6 +43,12 @@ import { currency, dateText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { partnerOptions } from '../core-data/partnerUtils';
+import {
+  syncWorkItemMutationTransition,
+  withWorkItemMutationContext,
+  workItemAutoStartedNotice,
+  type WorkItemMutationResult,
+} from '../work-items/workItemMutationContext';
 import { SignatureCaptureDialog, type SignatureCapturePayload } from '../work-items/SignatureCaptureDialog';
 
 type CreateDialog = 'contract' | 'version' | 'milestone' | 'variation' | null;
@@ -75,6 +81,7 @@ type ContractPermissions = {
 export function ContractsPage() {
   const { id = '' } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const taskId = searchParams.get('task')?.trim() ?? '';
   const { hasAnyPermission, user } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -154,7 +161,7 @@ export function ContractsPage() {
   };
 
   const create = useMutation({
-    mutationFn: ({ path, values }: { path: string; values: Record<string, any> }) => post<Contract>(path, values),
+    mutationFn: ({ path, values }: { path: string; values: Record<string, any> }) => post<Contract & WorkItemMutationResult>(path, withWorkItemMutationContext(values, taskId)),
     onSuccess: async (data, variables) => {
       setSelectedId(data.id);
       setMobileDetailOpen(true);
@@ -162,16 +169,18 @@ export function ContractsPage() {
       if (variables.path.endsWith('/milestones')) setActiveTab('milestones');
       if (variables.path.endsWith('/variations')) setActiveTab('variations');
       await invalidate(data.id);
+      syncWorkItemMutationTransition(queryClient, data);
       setCreateDialog(null);
-      toast.success('Đã lưu hồ sơ hợp đồng');
+      toast.success(`Đã lưu hồ sơ hợp đồng.${workItemAutoStartedNotice(data)}`);
     },
     onError: (error) => toast.error('Không lưu được hồ sơ hợp đồng', error),
   });
   const action = useMutation({
-    mutationFn: ({ endpoint, body }: { endpoint: string; body?: Record<string, any> }) => post<Contract>(endpoint, body ?? {}),
-    onSuccess: async () => {
+    mutationFn: ({ endpoint, body }: { endpoint: string; body?: Record<string, any> }) => post<Contract & WorkItemMutationResult>(endpoint, withWorkItemMutationContext(body ?? {}, taskId)),
+    onSuccess: async (result) => {
       await invalidate();
-      toast.success(actionDialog?.success ?? 'Đã cập nhật hợp đồng');
+      syncWorkItemMutationTransition(queryClient, result);
+      toast.success(`${actionDialog?.success ?? 'Đã cập nhật hợp đồng'}.${workItemAutoStartedNotice(result)}`);
       setActionDialog(null);
     },
     onError: (error) => toast.error('Không thực hiện được thao tác hợp đồng', error),
@@ -192,26 +201,28 @@ export function ContractsPage() {
         .reverse()
         .find((row) => row.purpose === 'approved_by' && row.signer_user_id === user?.id);
       if (!signature) throw new Error('Không tìm thấy chữ ký approved_by vừa tạo để liên kết với phiên bản hợp đồng.');
-      return post<Contract>(`/contract-versions/${target.version.id}/sign`, {
+      return post<Contract & WorkItemMutationResult>(`/contract-versions/${target.version.id}/sign`, withWorkItemMutationContext({
         workflow_form_signature_id: signature.id,
         comment: payload.comment,
-      });
+      }, taskId));
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       await invalidate();
+      syncWorkItemMutationTransition(queryClient, result);
       setVersionSignTarget(null);
       setActiveTab('execution');
-      toast.success('Đã ký phiên bản hợp đồng trên App');
+      toast.success(`Đã ký phiên bản hợp đồng trên App.${workItemAutoStartedNotice(result)}`);
     },
     onError: (error) => toast.error('Không ký được phiên bản hợp đồng', error),
   });
   const dispatch = useMutation({
-    mutationFn: (values: Record<string, any>) => post<Contract>(`/contracts/${selectedId}/dispatches`, values),
-    onSuccess: async () => {
+    mutationFn: (values: Record<string, any>) => post<Contract & WorkItemMutationResult>(`/contracts/${selectedId}/dispatches`, withWorkItemMutationContext(values, taskId)),
+    onSuccess: async (result) => {
       await invalidate();
+      syncWorkItemMutationTransition(queryClient, result);
       setDispatchDialogOpen(false);
       setActiveTab('execution');
-      toast.success('Đã ghi nhận gửi hồ sơ giấy');
+      toast.success(`Đã ghi nhận gửi hồ sơ giấy.${workItemAutoStartedNotice(result)}`);
     },
     onError: (error) => toast.error('Không ghi nhận được việc gửi hồ sơ giấy', error),
   });
@@ -222,16 +233,17 @@ export function ContractsPage() {
       form.append('document_type', 'returned_signed_contract_scan');
       form.append('name', file.name);
       const document = await postForm<Record<string, any>>(`/contract-dispatches/${target.id}/documents/upload`, form);
-      return post<Contract>(`/contract-dispatches/${target.id}/receive`, {
+      return post<Contract & WorkItemMutationResult>(`/contract-dispatches/${target.id}/receive`, withWorkItemMutationContext({
         returned_scan_document_id: document.id,
         note,
-      });
+      }, taskId));
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       await invalidate();
+      syncWorkItemMutationTransition(queryClient, result);
       setDispatchReceiveTarget(null);
       setActiveTab('execution');
-      toast.success('Đã lưu bản scan hợp đồng giấy có chữ ký');
+      toast.success(`Đã lưu bản scan hợp đồng giấy có chữ ký.${workItemAutoStartedNotice(result)}`);
     },
     onError: (error) => toast.error('Không nhận được bản scan hợp đồng giấy', error),
   });

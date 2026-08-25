@@ -15,6 +15,62 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+func TestCurrentUserRolesDeduplicateDisplayNamesAcrossProjectScopes(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	suffix := newID()
+	userID := newID()
+	roleID := newID()
+	firstProjectID := newID()
+	secondProjectID := newID()
+	roleDisplayName := "Scoped PM " + suffix[:8]
+
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1`, userID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id IN ($1,$2)`, firstProjectID, secondProjectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, roleID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, userID)
+	})
+
+	mustExec(t, db, `
+		INSERT INTO users (id,email,password_hash,full_name,status)
+		VALUES ($1,$2,'demo:test','Scoped Role User','active')
+	`, userID, "scoped-role-user-"+suffix[:8]+"@test.local")
+	mustExec(t, db, `
+		INSERT INTO roles (id,name,display_name,system_role)
+		VALUES ($1,$2,$3,false)
+	`, roleID, "scoped_role_"+suffix[:8], roleDisplayName)
+	mustExec(t, db, `
+		INSERT INTO projects (id,name,code,client_name,status) VALUES
+			($1,'Scoped Role Project One',$2,'Client','planning'),
+			($3,'Scoped Role Project Two',$4,'Client','planning')
+	`, firstProjectID, "SR1-"+suffix[:8], secondProjectID, "SR2-"+suffix[:8])
+	mustExec(t, db, `
+		INSERT INTO user_roles (user_id,role_id,project_id) VALUES
+			($1,$2,$3),
+			($1,$2,$4)
+	`, userID, roleID, firstProjectID, secondProjectID)
+
+	roles, err := repo.UserRoles(ctx, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roles) != 1 || roles[0] != roleDisplayName {
+		t.Fatalf("repository roles=%#v, want one %q display name", roles, roleDisplayName)
+	}
+
+	profile, err := service.Me(ctx, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profileRoles, ok := profile["roles"].([]string)
+	if !ok || len(profileRoles) != 1 || profileRoles[0] != roleDisplayName {
+		t.Fatalf("current-user roles=%#v, want one %q display name", profile["roles"], roleDisplayName)
+	}
+}
+
 func TestPartnerCatalogGroupFilters(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

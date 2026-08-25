@@ -86,6 +86,8 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 		itemConditions = append(itemConditions, "can_decide AND status IN ('waiting_review','waiting_approval')")
 	case "upcoming":
 		itemConditions = append(itemConditions, "is_future")
+	case "completed":
+		itemConditions = append(itemConditions, "status='completed'")
 	case "done_today":
 		itemConditions = append(itemConditions, "status='completed' AND completed_at IS NOT NULL AND (completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date=(now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date")
 	}
@@ -126,11 +128,12 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 				COUNT(*) FILTER (WHERE can_decide AND status IN ('waiting_review','waiting_approval')) AS waiting_decision,
 				COUNT(*) FILTER (WHERE %s AND status IN ('waiting_review','waiting_approval')) AS waiting_approval,
 				COUNT(*) FILTER (WHERE %s AND is_future) AS upcoming,
+				COUNT(*) FILTER (WHERE %s AND status='completed') AS completed,
 				COUNT(*) FILTER (WHERE %s AND status='completed' AND completed_at IS NOT NULL AND (completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date=(now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date) AS done_today
 			FROM base_work
 			WHERE %s
 		`, queueCondition, queueCondition, myWorkNeedActionSQL(), queueCondition, queueCondition, queueCondition,
-		queueCondition, queueCondition, queueCondition, projectWhere), projectArgs...)
+		queueCondition, queueCondition, queueCondition, queueCondition, projectWhere), projectArgs...)
 	if err != nil {
 		return myWorkItemsPageData{}, err
 	}

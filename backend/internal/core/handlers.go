@@ -957,6 +957,18 @@ func (h *Handler) MyWorkItems(c *fiber.Ctx) error {
 	return response.OK(c, items)
 }
 
+func (h *Handler) MyWorkflowActions(c *fiber.Ctx) error {
+	actions, err := h.service.MyWorkflowActions(c.Context(), MyWorkflowActionsFilter{
+		Queue:     c.Query("queue"),
+		ProjectID: c.Query("project_id"),
+		Search:    c.Query("search"),
+	}, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, actions)
+}
+
 func (h *Handler) MyActivityAttention(c *fiber.Ctx) error {
 	items, err := h.service.MyActivityAttention(c.Context(), ActivityAttentionFilter{
 		Queue:     c.Query("queue"),
@@ -1837,7 +1849,11 @@ func (h *Handler) SubmitBOQ(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"boq.update"}); err != nil {
 		return err
 	}
-	result, err := h.service.BOQProjectAction(c.Context(), c.Params("id"), "submit", actorID(c), actorName(c))
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	result, err := h.service.BOQProjectAction(c.Context(), c.Params("id"), "submit", req.WorkItemContext, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -1848,7 +1864,11 @@ func (h *Handler) ApproveBOQ(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"boq.approve"}); err != nil {
 		return err
 	}
-	result, err := h.service.BOQProjectAction(c.Context(), c.Params("id"), "approve", actorID(c), actorName(c))
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	result, err := h.service.BOQProjectAction(c.Context(), c.Params("id"), "approve", req.WorkItemContext, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -1859,7 +1879,11 @@ func (h *Handler) GenerateProcurementFromBOQ(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"procurement.create", "procurement.approve", "boq.approve"}); err != nil {
 		return err
 	}
-	req, err := h.service.GenerateProcurementFromBOQ(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	mutationReq, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	req, err := h.service.GenerateProcurementFromBOQ(c.Context(), c.Params("id"), mutationReq.WorkItemContext, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -1926,7 +1950,11 @@ func (h *Handler) SubmitSupplierQuotation(c *fiber.Ctx) error {
 	if err := h.requireRecordProjectPermission(c, "supplier_quotations", c.Params("id"), []string{"procurement.create"}); err != nil {
 		return err
 	}
-	quotation, err := h.service.SubmitSupplierQuotation(c.Context(), c.Params("id"), actorID(c), actorName(c))
+	req, err := actionRequest(c)
+	if err != nil {
+		return err
+	}
+	quotation, err := h.service.SubmitSupplierQuotation(c.Context(), c.Params("id"), req.WorkItemContext, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -2083,7 +2111,7 @@ func (h *Handler) contractVersionAction(c *fiber.Ctx, action string, permissions
 	if err != nil {
 		return err
 	}
-	row, err := h.service.ContractVersionAction(c.Context(), c.Params("id"), action, actionComment(req), actorID(c), actorName(c))
+	row, err := h.service.ContractVersionAction(c.Context(), c.Params("id"), action, actionComment(req), req.WorkItemContext, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
@@ -2098,7 +2126,7 @@ func (h *Handler) ActivateContract(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	row, err := h.service.ActivateContract(c.Context(), c.Params("id"), actionComment(req), actorID(c), actorName(c))
+	row, err := h.service.ActivateContract(c.Context(), c.Params("id"), actionComment(req), req.WorkItemContext, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}

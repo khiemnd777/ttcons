@@ -147,10 +147,14 @@ func (r *Repository) CreateProjectMaterialCost(ctx context.Context, projectID st
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "project_material_cost_created", "project_material_cost", cleanID(row["id"]), "Ghi nhận chi phí mua vật tư công trình", Record{"total_amount": req.TotalAmount, "vendor_name": req.VendorName}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, req.WorkItemContext, projectFinanceWorkItemPolicy, "project_material_cost", cleanID(row["id"]), actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return row, nil
+	return attachWorkItemTransition(row, transition), nil
 }
 
 func validateProjectFinanceSources(ctx context.Context, tx *sql.Tx, projectID, procurementID, acceptanceID, stockDocumentID, documentID string) error {
@@ -206,10 +210,14 @@ func (r *Repository) CreateProjectCashRequest(ctx context.Context, projectID str
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "project_cash_request_created", "project_cash_request", cleanID(row["id"]), "Lập đề nghị thu/chi nội bộ", Record{"request_code": requestCode, "direction": req.Direction, "amount": req.Amount}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, req.WorkItemContext, projectFinanceWorkItemPolicy, "project_cash_request", cleanID(row["id"]), actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return row, nil
+	return attachWorkItemTransition(row, transition), nil
 }
 
 func validateProjectFinanceCashSource(ctx context.Context, tx *sql.Tx, projectID, sourceType, sourceID string) error {
@@ -301,10 +309,14 @@ func (r *Repository) ProjectMaterialCostAction(ctx context.Context, id, action s
 	if err := addAuditTx(ctx, tx, cleanID(current["project_id"]), actorID, actorName, "project_material_cost_"+action, "project_material_cost", id, "Cập nhật hồ sơ chi phí vật tư", Record{"from_status": fromStatus, "to_status": row["status"], "comment": comment, "recognized_cost_amount": row["recognized_cost_amount"]}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(current["project_id"]), req.WorkItemContext, projectFinanceWorkItemPolicy, "project_material_cost", id, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return row, nil
+	return attachWorkItemTransition(row, transition), nil
 }
 
 func (r *Repository) ProjectCashRequestAction(ctx context.Context, id, action string, req ProjectFinanceActionRequest, actorID, actorName string) (Record, error) {
@@ -375,8 +387,12 @@ func (r *Repository) ProjectCashRequestAction(ctx context.Context, id, action st
 	if err := addAuditTx(ctx, tx, cleanID(current["project_id"]), actorID, actorName, "project_cash_request_"+action, "project_cash_request", id, "Cập nhật đề nghị thu/chi nội bộ", Record{"from_status": fromStatus, "to_status": toStatus, "comment": comment}); err != nil {
 		return nil, err
 	}
+	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(current["project_id"]), req.WorkItemContext, projectFinanceWorkItemPolicy, "project_cash_request", id, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return row, nil
+	return attachWorkItemTransition(row, transition), nil
 }

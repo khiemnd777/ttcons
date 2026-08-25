@@ -35,10 +35,233 @@ func TestNormalizeMyWorkItemsFilterAndCursor(t *testing.T) {
 	if _, _, err := normalizeMyWorkItemsFilter(MyWorkItemsFilter{Limit: 101}); err == nil {
 		t.Fatal("expected invalid limit error")
 	}
-	for _, bucket := range []string{"all", "in_progress", "upcoming"} {
+	for _, bucket := range []string{"all", "in_progress", "upcoming", "completed"} {
 		if normalized, _, err := normalizeMyWorkItemsFilter(MyWorkItemsFilter{Bucket: bucket}); err != nil || normalized.Bucket != bucket {
 			t.Fatalf("bucket %q normalized to %#v with error %v", bucket, normalized, err)
 		}
+	}
+}
+
+func TestMyWorkCompletedBucketIncludesFullHistoryAndKeepsDoneToday(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	completedID := newID()
+
+	mustExec(t, db, `
+		INSERT INTO work_items (
+			id,project_id,source_type,source_id,title,work_type,status,role_ids,
+			completed_at,created_by,updated_by
+		) VALUES (
+			$1,$2,'issue',$3,'Completed history','task','completed','["Đội thi công"]'::jsonb,
+			now()-interval '2 days',$4,$4
+		)
+	`, completedID, fixture.projectID, newID(), fixture.workerID)
+
+	allPage, err := service.MyWorkItems(ctx, MyWorkItemsFilter{
+		Queue: "responsible", Bucket: "all", ProjectID: fixture.projectID, Limit: 20,
+	}, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	summary, _ := allPage["summary"].(Record)
+	if number(summary["total"]) != 2 || number(summary["need_action"]) != 1 || number(summary["completed"]) != 1 || number(summary["done_today"]) != 0 {
+		t.Fatalf("completed history summary = %#v, want total=2 need_action=1 completed=1 done_today=0", summary)
+	}
+
+	completedPage, err := service.MyWorkItems(ctx, MyWorkItemsFilter{
+		Queue: "responsible", Bucket: "completed", ProjectID: fixture.projectID, Limit: 20,
+	}, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	completedItems, _ := completedPage["items"].([]Record)
+	if number(completedPage["total"]) != 1 || len(completedItems) != 1 || cleanID(completedItems[0]["id"]) != completedID {
+		t.Fatalf("completed history page = %#v", completedPage)
+	}
+
+	doneTodayPage, err := service.MyWorkItems(ctx, MyWorkItemsFilter{
+		Queue: "responsible", Bucket: "done_today", ProjectID: fixture.projectID, Limit: 20,
+	}, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(doneTodayPage["total"]) != 0 {
+		t.Fatalf("done-today compatibility bucket = %#v, want no old history", doneTodayPage)
+	}
+}
+
+func TestNormalizeMyWorkflowActionsFilter(t *testing.T) {
+	filter, err := normalizeMyWorkflowActionsFilter(MyWorkflowActionsFilter{
+		Queue: " Responsible ", Search: "  Thi công  ",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filter.Queue != "responsible" || filter.Search != "Thi công" {
+		t.Fatalf("normalized workflow action filter = %#v", filter)
+	}
+	if _, err := normalizeMyWorkflowActionsFilter(MyWorkflowActionsFilter{Queue: "invalid"}); err == nil {
+		t.Fatal("expected invalid workflow-action queue error")
+	}
+	if _, err := normalizeMyWorkflowActionsFilter(MyWorkflowActionsFilter{ProjectID: "not-a-uuid"}); err == nil {
+		t.Fatal("expected invalid workflow-action project id error")
+	}
+}
+
+func TestMyWorkflowAdvanceLabelsUseBusinessLanguage(t *testing.T) {
+	tests := []struct {
+		name      string
+		nextName  string
+		nextType  string
+		terminal  bool
+		wantTitle string
+		wantLabel string
+	}{
+		{name: "construction", nextName: "Thi công", nextType: "construction_execution", wantTitle: "Bắt đầu Thi công", wantLabel: "Chuyển sang Thi công"},
+		{name: "handover", nextName: "Kết thúc: Bàn giao", nextType: "handover_finance", wantTitle: "Mở giai đoạn Bàn giao", wantLabel: "Chuyển sang Bàn giao"},
+		{name: "generic", nextName: "Khảo sát", nextType: "survey", wantTitle: "Chuyển sang Khảo sát", wantLabel: "Chuyển sang Khảo sát"},
+		{name: "terminal", terminal: true, wantTitle: "Hoàn tất quy trình", wantLabel: "Hoàn tất quy trình"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			title, label := myWorkflowAdvanceLabels(test.nextName, test.nextType, test.terminal)
+			if title != test.wantTitle || label != test.wantLabel {
+				t.Fatalf("labels = %q / %q, want %q / %q", title, label, test.wantTitle, test.wantLabel)
+			}
+		})
+	}
+}
+
+func TestMyWorkflowActionsExposeOnlyReadyAuthorizedCurrentNode(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	templateID := newID()
+	runID := newID()
+	currentNodeID := newID()
+	nextNodeID := newID()
+	stepID := newID()
+	workItemID := newID()
+	advancePermissionID := ensurePermission(t, db, "pipeline.advance_node", "Chuyển node", "pipeline")
+	operationPermissionID := ensurePermission(t, db, "operation.report", "Tạo daily report", "operation")
+	pmRoleID := ensureRole(t, db, "pm", "PM")
+	mustExec(t, db, `INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2),($1,$3) ON CONFLICT DO NOTHING`, pmRoleID, advancePermissionID, operationPermissionID)
+
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `UPDATE projects SET current_pipeline_run_id=NULL WHERE id=$1`, fixture.projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM pipeline_runs WHERE id=$1`, runID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM pipeline_templates WHERE id=$1`, templateID)
+	})
+	mustExec(t, db, `
+		INSERT INTO pipeline_templates (id,name,status,template_family_id,revision_no,engine_version)
+		VALUES ($1,'My Work transition','published',$1,1,2)
+	`, templateID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_runs (id,project_id,template_id,status,engine_version)
+		VALUES ($1,$2,$3,'in_progress',2)
+	`, runID, fixture.projectID, templateID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (
+			id,run_id,project_id,name,type,business_code,order_index,responsible_role_ids,
+			required_permission,permissions,status,started_at
+		) VALUES
+			($1,$3,$4,'Kế hoạch thi công','planning','planning',1,'["PM"]'::jsonb,'pipeline.advance_node','["pipeline.advance_node"]'::jsonb,'in_progress',now()),
+			($2,$3,$4,'Thi công','construction_execution','construction_execution',2,'["Giám sát"]'::jsonb,'operation.report','["operation.report"]'::jsonb,'pending',NULL)
+	`, currentNodeID, nextNodeID, runID, fixture.projectID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$2 WHERE id=$1`, runID, currentNodeID)
+	mustExec(t, db, `UPDATE projects SET current_pipeline_run_id=$2 WHERE id=$1`, fixture.projectID, runID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_edges (run_id,project_id,from_run_node_id,to_run_node_id,condition_type,label)
+		VALUES ($1,$2,$3,$4,'always','Bắt đầu thi công')
+	`, runID, fixture.projectID, currentNodeID, nextNodeID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_steps (
+			id,run_node_id,project_id,name,step_type,required_role_ids,required_permission,
+			checklist_required,order_index,status,submitted_by,submitted_at
+		) VALUES ($1,$2,$3,'Kích hoạt bàn giao thi công','task','["PM"]'::jsonb,'pipeline.advance_node',false,1,'completed',$4,now())
+	`, stepID, currentNodeID, fixture.projectID, fixture.pmID)
+	mustExec(t, db, `
+		INSERT INTO work_items (
+			id,project_id,pipeline_run_id,run_node_id,run_step_id,source_type,source_id,title,
+			work_type,status,role_ids,completed_at,created_by,updated_by
+		) VALUES ($1,$2,$3,$4,$5,'pipeline_run_step',$5,'Kích hoạt bàn giao thi công','task','completed','["PM"]'::jsonb,now(),$6,$6)
+	`, workItemID, fixture.projectID, runID, currentNodeID, stepID, fixture.pmID)
+
+	page, err := service.MyWorkflowActions(ctx, MyWorkflowActionsFilter{
+		Queue: "responsible", ProjectID: fixture.projectID,
+	}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions, _ := page["items"].([]Record)
+	if len(actions) != 1 || number(page["total"]) != 1 {
+		t.Fatalf("ready PM workflow actions = %#v", page)
+	}
+	if fmt.Sprint(actions[0]["title"]) != "Bắt đầu Thi công" || cleanID(actions[0]["run_node_id"]) != currentNodeID {
+		t.Fatalf("ready workflow action = %#v", actions[0])
+	}
+
+	workerPage, err := service.MyWorkflowActions(ctx, MyWorkflowActionsFilter{
+		Queue: "all", ProjectID: fixture.projectID,
+	}, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(workerPage["total"]) != 0 {
+		t.Fatalf("unauthorized worker workflow actions = %#v", workerPage)
+	}
+
+	mustExec(t, db, `UPDATE pipeline_run_nodes SET responsible_role_ids='[]'::jsonb WHERE id=$1`, currentNodeID)
+	unassignedPage, err := service.MyWorkflowActions(ctx, MyWorkflowActionsFilter{
+		Queue: "responsible", ProjectID: fixture.projectID,
+	}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(unassignedPage["total"]) != 1 {
+		t.Fatalf("authorized unassigned workflow actions = %#v", unassignedPage)
+	}
+	mustExec(t, db, `UPDATE pipeline_run_nodes SET status='blocked',block_reason='Tạm dừng' WHERE id=$1`, currentNodeID)
+	blockedNodePage, err := service.MyWorkflowActions(ctx, MyWorkflowActionsFilter{
+		Queue: "responsible", ProjectID: fixture.projectID,
+	}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(blockedNodePage["total"]) != 0 {
+		t.Fatalf("blocked node workflow actions = %#v", blockedNodePage)
+	}
+	mustExec(t, db, `UPDATE pipeline_run_nodes SET status='in_progress',block_reason=NULL,responsible_role_ids='["PM"]'::jsonb WHERE id=$1`, currentNodeID)
+
+	mustExec(t, db, `UPDATE pipeline_run_steps SET status='pending',submitted_by=NULL,submitted_at=NULL WHERE id=$1`, stepID)
+	mustExec(t, db, `UPDATE work_items SET status='ready',completed_at=NULL WHERE id=$1`, workItemID)
+	blockedPage, err := service.MyWorkflowActions(ctx, MyWorkflowActionsFilter{
+		Queue: "responsible", ProjectID: fixture.projectID,
+	}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(blockedPage["total"]) != 0 {
+		t.Fatalf("incomplete node workflow actions = %#v", blockedPage)
+	}
+
+	mustExec(t, db, `UPDATE pipeline_run_steps SET status='completed',submitted_by=$2,submitted_at=now() WHERE id=$1`, stepID, fixture.pmID)
+	mustExec(t, db, `UPDATE work_items SET status='completed',completed_at=now() WHERE id=$1`, workItemID)
+	if _, err := service.AdvanceRunNode(ctx, currentNodeID, fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	afterAdvance, err := service.MyWorkflowActions(ctx, MyWorkflowActionsFilter{
+		Queue: "responsible", ProjectID: fixture.projectID,
+	}, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(afterAdvance["total"]) != 0 {
+		t.Fatalf("advanced node workflow actions = %#v", afterAdvance)
 	}
 }
 
@@ -249,6 +472,10 @@ func TestMyActivityAttentionStreamMapsWorkItemInvalidation(t *testing.T) {
 	}
 	if output.WorkItemID != "" {
 		t.Fatalf("work queue invalidation leaked unverified item id: %#v", output)
+	}
+	eventName, output = myActivityAttentionStreamEvent(ActivityStreamEvent{Type: "work_queue_changed", ProjectID: "project-1"})
+	if eventName != "work_queue_changed" || output.Type != "work_queue_changed" || output.ProjectID != "project-1" {
+		t.Fatalf("direct work queue invalidation = %q %#v", eventName, output)
 	}
 	eventName, output = myActivityAttentionStreamEvent(ActivityStreamEvent{Type: "activity_changed", ProjectID: "project-1"})
 	if eventName != "attention_changed" || output.Type != "attention_changed" {

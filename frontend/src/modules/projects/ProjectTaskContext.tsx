@@ -12,7 +12,7 @@ import {
   projectTaskDetailIntentMatches,
   safeReturnPath,
 } from '../work-items/workItemNavigation';
-import { executionTargetNeedsEmbeddedWorkItem, executionTargetWorkspaceLabel, workItemMatchesProject } from '../work-items/workItemExecutionTarget';
+import { executionTargetNeedsEmbeddedWorkItem, executionTargetWorkspaceLabel, isDomainExecutionTarget, workItemMatchesProject } from '../work-items/workItemExecutionTarget';
 
 export function ProjectTaskContext({ projectId }: { projectId: string }) {
   const location = useLocation();
@@ -78,6 +78,9 @@ export function ProjectTaskContext({ projectId }: { projectId: string }) {
               <h2 className="mt-2 text-base font-semibold text-ink">{item.title}</h2>
               <p className="mt-1 text-sm text-slate-600">Thực hiện tại <span className="font-semibold text-slate-800">{executionTargetWorkspaceLabel(item)}</span>{item.run_node_name ? ` · Giai đoạn: ${item.run_node_name}` : ''}</p>
               {item.execution_target?.source_message ? <p className="mt-2 text-sm text-slate-700">{item.execution_target.source_message}</p> : null}
+              {isDomainExecutionTarget(item.execution_target) && ['pending', 'ready', 'needs_changes'].includes(item.status) ? (
+                <p className="mt-2 text-sm font-medium text-blue-800">Thao tác nghiệp vụ đầu tiên lưu thành công sẽ tự chuyển đầu việc sang Đang làm. Không cần bấm Bắt đầu riêng.</p>
+              ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {returnTo ? <Link className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={returnTo}><ArrowLeft className="h-4 w-4" />Quay lại</Link> : null}

@@ -10,6 +10,7 @@ import { useToast } from '../../components/ToastProvider';
 import { get, post, put } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
 import type { BOQItem, SubcontractorReconciliationItem, SubcontractorReconciliationResponse } from '../../lib/types/domain';
+import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
 
 type RowDraft = {
   item_index: number;
@@ -119,7 +120,8 @@ export function SubcontractorReconciliationPanel({
       if (!updated) return;
       resetFromResponse(updated);
       invalidate();
-      toast.success('Đã lưu nháp đối soát thầu phụ');
+      syncWorkItemMutationTransition(queryClient, updated);
+      toast.success(`Đã lưu nháp đối soát thầu phụ.${workItemAutoStartedNotice(updated)}`);
     },
     onError: (error) => toast.error('Không lưu được đối soát thầu phụ', error),
   });
@@ -134,7 +136,8 @@ export function SubcontractorReconciliationPanel({
       if (!updated) return;
       resetFromResponse(updated);
       invalidate();
-      toast.success('Đã gửi đối soát thầu phụ');
+      syncWorkItemMutationTransition(queryClient, updated);
+      toast.success(`Đã gửi đối soát thầu phụ.${workItemAutoStartedNotice(updated)}`);
     },
     onError: (error) => toast.error('Không gửi được đối soát thầu phụ', error),
   });

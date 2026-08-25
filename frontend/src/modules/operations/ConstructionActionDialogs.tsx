@@ -1,10 +1,12 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { AlertTriangle, CalendarDays, CheckCircle2, GitPullRequestArrow, Loader2, Pencil, ShieldCheck, Wrench } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import { post, put } from '../../lib/api/client';
-import type { ConstructionActionItem, ConstructionCheck, ConstructionDailyReportSource, ConstructionWorkspace } from '../../lib/types/domain';
+import type { ConstructionActionItem, ConstructionCheck, ConstructionDailyReportSource, ConstructionVariationContext, ConstructionWorkspace } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
@@ -12,6 +14,7 @@ import { ConstructionEvidenceButton } from './ConstructionEvidenceButton';
 import { FieldBlock, SectionTitle, controlClass, errorSummary, requiredErrors, type FormErrors } from './ConstructionFormControls';
 import { createConstructionAction, uploadConstructionEvidence } from './constructionWorkspaceApi';
 import { actionStatusLabel, constructionActionAssigneeLabel, constructionImpactHelperText, dateTimeText, eventLabel, impactLabel, isConstructionActionEditable, optionalISO, toDateTimeInput } from './constructionWorkspaceUtils';
+import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from '../work-items/workItemMutationContext';
 
 export type ActionDialogState =
   | { type: 'create'; sourceReport?: ConstructionDailyReportSource }
@@ -29,14 +32,19 @@ type Props = {
   canResolve: boolean;
   canVerify: boolean;
   canApproveImpact: boolean;
-	  canProposeVariation: boolean;
+  canProposeVariation: boolean;
+  variationContext?: ConstructionVariationContext;
+  variationContextLoading: boolean;
+  variationContextError: boolean;
+  canViewContracts: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
   onEdit: (action: ConstructionActionItem) => void;
   onResolve: (action: ConstructionActionItem) => void;
   onVerify: (action: ConstructionActionItem) => void;
   onApproveImpact: (action: ConstructionActionItem) => Promise<void>;
-	  onProposeVariation: (action: ConstructionActionItem) => void;
+  onRetryVariationContext?: () => void;
+  onProposeVariation: (action: ConstructionActionItem) => void;
   onViewCheck: (check: ConstructionCheck) => void;
   onViewReport?: (reportId: string) => void;
 };
@@ -51,6 +59,7 @@ export function ConstructionActionDialogs(props: Props) {
 
 function ActionFormDialog({ state, projectId, workspace, onClose, onSaved }: Props & { state: { type: 'create'; sourceReport?: ConstructionDailyReportSource } | { type: 'edit'; action: ConstructionActionItem } }) {
   const toast = useToast();
+  const queryClient = useQueryClient();
   const action = state.type === 'edit' ? state.action : undefined;
   const sourceReport = state.type === 'create' ? state.sourceReport : undefined;
   const [values, setValues] = useState({ work_item_id: '', title: '', description: '', assigned_user_id: '', due_at: '', priority: 'normal', impact_scope: 'none' });
@@ -78,12 +87,14 @@ function ActionFormDialog({ state, projectId, workspace, onClose, onSaved }: Pro
     setSaving(true);
     try {
       if (action) {
-        await put(`/construction-actions/${action.id}`, { title: values.title.trim(), description: values.description.trim(), priority: values.priority, assigned_user_id: values.assigned_user_id, due_at: optionalISO(values.due_at) });
-        toast.success('Đã cập nhật việc cần xử lý');
+        const result = await put(`/construction-actions/${action.id}`, { title: values.title.trim(), description: values.description.trim(), priority: values.priority, assigned_user_id: values.assigned_user_id, due_at: optionalISO(values.due_at) });
+        syncWorkItemMutationTransition(queryClient, result);
+        toast.success(`Đã cập nhật việc cần xử lý.${workItemAutoStartedNotice(result)}`);
       } else {
         const evidenceId = uploads.length ? await uploadConstructionEvidence(values.work_item_id, uploads) : sourceEvidenceId;
-        await createConstructionAction(projectId, { work_item_id: values.work_item_id, source_daily_report_id: sourceReport?.id ?? '', title: values.title.trim(), description: values.description.trim(), priority: values.priority as 'normal' | 'urgent', assigned_user_id: values.assigned_user_id, due_at: optionalISO(values.due_at), impact_scope: values.impact_scope as 'none' | 'timeline' | 'budget' | 'design_scope', evidence_id: evidenceId });
-        toast.success('Đã tạo việc cần xử lý');
+        const result = await createConstructionAction(projectId, { work_item_id: values.work_item_id, source_daily_report_id: sourceReport?.id ?? '', title: values.title.trim(), description: values.description.trim(), priority: values.priority as 'normal' | 'urgent', assigned_user_id: values.assigned_user_id, due_at: optionalISO(values.due_at), impact_scope: values.impact_scope as 'none' | 'timeline' | 'budget' | 'design_scope', evidence_id: evidenceId });
+        syncWorkItemMutationTransition(queryClient, result);
+        toast.success(`Đã tạo việc cần xử lý.${workItemAutoStartedNotice(result)}`);
       }
       await onSaved();
     } catch (error) {
@@ -110,11 +121,23 @@ function ActionFormDialog({ state, projectId, workspace, onClose, onSaved }: Pro
   </Dialog>;
 }
 
-function ActionViewDialog({ action, workspace, canEdit, canResolve, canVerify, canApproveImpact, canProposeVariation, onClose, onEdit, onResolve, onVerify, onApproveImpact, onProposeVariation, onViewCheck, onViewReport }: Props & { action: ConstructionActionItem }) {
+function ActionViewDialog({ action, projectId, workspace, canEdit, canResolve, canVerify, canApproveImpact, canProposeVariation, variationContext, variationContextLoading, variationContextError, canViewContracts, onClose, onEdit, onResolve, onVerify, onApproveImpact, onRetryVariationContext, onProposeVariation, onViewCheck, onViewReport }: Props & { action: ConstructionActionItem }) {
   const sourceCheck = workspace.checks.find((item) => item.id === action.source_check_id);
   const editable = canEdit && isConstructionActionEditable(action);
   const needsImpactApproval = Boolean(action.technical_replanning_id && action.impact_status !== 'approved' && canApproveImpact);
-	  const canPropose = canProposeVariation && action.impact_scope !== 'none' && !action.linked_variation_id;
+  const proposalApplicable = canProposeVariation && action.impact_scope !== 'none' && !action.linked_variation_id;
+  const canPropose = proposalApplicable && Boolean(variationContext?.available && variationContext.can_propose) && !variationContextLoading && !variationContextError;
+  const variationStatus = action.linked_variation_id
+    ? `${action.linked_variation_code || 'Đã liên kết'} · ${statusLabel(action.linked_variation_status || 'in_progress')}`
+    : action.impact_scope === 'none'
+      ? 'Không áp dụng'
+      : variationContextLoading
+        ? 'Đang kiểm tra điều kiện đề xuất'
+        : variationContextError
+          ? 'Chưa xác định'
+          : variationContext?.available
+            ? 'Chưa đề xuất'
+            : 'Chưa thể đề xuất — thiếu hợp đồng chủ đầu tư đang hiệu lực';
   const [approving, setApproving] = useState(false);
 
   async function approve() {
@@ -122,7 +145,7 @@ function ActionViewDialog({ action, workspace, canEdit, canResolve, canVerify, c
     try { await onApproveImpact(action); } finally { setApproving(false); }
   }
 
-	  return <Dialog open title={action.title} description={`${actionStatusLabel(action.status)} · ${action.work_item_title || 'Công việc liên quan'}`} size="xl" onClose={onClose} footer={<div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between"><button type="button" className="rounded-md border border-line px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-white" onClick={onClose}>Đóng</button><div className="flex flex-wrap justify-end gap-2">{canPropose ? <button type="button" className="inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100" onClick={() => onProposeVariation(action)}><GitPullRequestArrow className="h-4 w-4" /> Đề xuất phát sinh</button> : null}{needsImpactApproval ? <button type="button" disabled={approving} className="inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60" onClick={approve}>{approving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Xác nhận ảnh hưởng</button> : null}{editable ? <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onEdit(action)}><Pencil className="h-4 w-4" /> Chỉnh sửa</button> : null}{action.status === 'open' && canResolve ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onResolve(action)}><Wrench className="h-4 w-4" /> Gửi khắc phục</button> : null}{action.status === 'waiting_confirmation' && canVerify ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => onVerify(action)}><ShieldCheck className="h-4 w-4" /> Xác nhận</button> : null}</div></div>}>
+  return <Dialog open title={action.title} description={`${actionStatusLabel(action.status)} · ${action.work_item_title || 'Công việc liên quan'}`} size="xl" onClose={onClose} footer={<div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between"><button type="button" className="rounded-md border border-line px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-white" onClick={onClose}>Đóng</button><div className="flex flex-wrap justify-end gap-2">{canPropose ? <button type="button" className="inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100" onClick={() => onProposeVariation(action)}><GitPullRequestArrow className="h-4 w-4" /> Đề xuất phát sinh</button> : null}{needsImpactApproval ? <button type="button" disabled={approving} className="inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60" onClick={approve}>{approving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Xác nhận ảnh hưởng</button> : null}{editable ? <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onEdit(action)}><Pencil className="h-4 w-4" /> Chỉnh sửa</button> : null}{action.status === 'open' && canResolve ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onResolve(action)}><Wrench className="h-4 w-4" /> Gửi khắc phục</button> : null}{action.status === 'waiting_confirmation' && canVerify ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700" onClick={() => onVerify(action)}><ShieldCheck className="h-4 w-4" /> Xác nhận</button> : null}</div></div>}>
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
       <div className="space-y-5">
         <div><SectionTitle>Mô tả hiện trạng</SectionTitle><p className="mt-3 whitespace-pre-wrap rounded-lg border border-line bg-slate-50 p-4 text-sm leading-6 text-slate-700">{action.description || 'Không có mô tả.'}</p></div>
@@ -136,8 +159,9 @@ function ActionViewDialog({ action, workspace, canEdit, canResolve, canVerify, c
         <Detail label="Hạn xử lý" value={dateTimeText(action.due_at)} />
         <Detail label="Mức ưu tiên" value={action.priority === 'urgent' ? 'Gấp' : 'Bình thường'} />
         <Detail label="Ảnh hưởng" value={impactLabel(action.impact_scope)} />
-	        <Detail label="Trạng thái ảnh hưởng" value={action.impact_scope === 'none' ? 'Không áp dụng' : action.impact_status === 'approved' ? 'Đã xác nhận' : 'Chờ xác nhận'} />
-	        <Detail label="Phát sinh thương mại" value={action.linked_variation_id ? `${action.linked_variation_code || 'Đã liên kết'} · ${statusLabel(action.linked_variation_status || 'in_progress')}` : action.impact_scope === 'none' ? 'Không áp dụng' : 'Chưa đề xuất'} />
+        <Detail label="Trạng thái ảnh hưởng" value={action.impact_scope === 'none' ? 'Không áp dụng' : action.impact_status === 'approved' ? 'Đã xác nhận' : 'Chờ xác nhận'} />
+        <Detail label="Phát sinh thương mại" value={variationStatus} />
+        {proposalApplicable ? <VariationReadinessNote projectId={projectId} loading={variationContextLoading} error={variationContextError} available={Boolean(variationContext?.available)} canViewContracts={canViewContracts} onRetry={onRetryVariationContext} /> : null}
         <Detail label="Số lần trả lại" value={String(action.retry_count ?? 0)} />
         <Detail label="Ngày tạo" value={dateTimeText(action.created_at)} />
         {!isConstructionActionEditable(action) && action.status === 'open' ? <p className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-700">Đồng bộ từ hồ sơ kỹ thuật; chỉnh sửa tại nguồn QA/QC.</p> : null}
@@ -148,6 +172,13 @@ function ActionViewDialog({ action, workspace, canEdit, canResolve, canVerify, c
 
 function SourceReportBanner({ report }: { report: ConstructionDailyReportSource }) {
   return <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-white text-blue-600"><CalendarDays className="h-5 w-5" /></span><div><p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Nguồn đã liên kết</p><p className="mt-1 font-semibold text-blue-900">Báo cáo ngày {dateText(report.report_date)}</p><p className="mt-1 text-xs text-blue-700">{report.weather || 'Chưa ghi thời tiết'}{report.evidence.length ? ` · Có ${report.evidence.length} minh chứng có thể tái sử dụng` : ''}</p></div></div>;
+}
+
+function VariationReadinessNote({ projectId, loading, error, available, canViewContracts, onRetry }: { projectId: string; loading: boolean; error: boolean; available: boolean; canViewContracts: boolean; onRetry?: () => void }) {
+  if (available) return null;
+  if (loading) return <p className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600">Đang kiểm tra điều kiện đề xuất…</p>;
+  if (error) return <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600"><p>Không tải được điều kiện đề xuất.</p>{onRetry ? <button type="button" className="mt-1 font-semibold text-blue-700 hover:text-blue-800" onClick={onRetry}>Thử lại</button> : null}</div>;
+  return <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600"><p>Cần PM/Thương mại hoàn tất hợp đồng trước khi gửi đề xuất.</p><p className="mt-1">Báo cáo, kiểm tra và xử lý hiện trường vẫn hoạt động bình thường.</p>{canViewContracts ? <Link className="mt-1 inline-flex font-semibold text-blue-700 hover:text-blue-800" to={`/projects/${projectId}/contracts`}>Mở hợp đồng</Link> : null}</div>;
 }
 
 function ResolutionDialog({ action, onClose, onSaved }: Props & { action: ConstructionActionItem }) {

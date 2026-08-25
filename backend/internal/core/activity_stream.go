@@ -379,6 +379,13 @@ func (s *Service) publishProjectProgressChanged(projectID string) {
 	})
 }
 
+func (s *Service) publishWorkQueueChanged(projectID string) {
+	s.publishActivityEvent(ActivityStreamEvent{
+		Type:      "work_queue_changed",
+		ProjectID: cleanID(projectID),
+	})
+}
+
 func activityEventFromRecord(eventType string, activity Record, actorID string) ActivityStreamEvent {
 	return ActivityStreamEvent{
 		Type:       eventType,
@@ -549,7 +556,7 @@ func activityAttentionEventVisible(event ActivityStreamEvent, visibleProjects ma
 }
 
 func myActivityAttentionStreamEvent(event ActivityStreamEvent) (string, ActivityStreamEvent) {
-	if event.Type == "work_item_changed" {
+	if statusIn(event.Type, "work_item_changed", "work_queue_changed") {
 		return "work_queue_changed", ActivityStreamEvent{
 			Type:      "work_queue_changed",
 			ProjectID: event.ProjectID,

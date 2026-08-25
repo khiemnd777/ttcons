@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, DollarSign, Eye, History, Loader2, Lock, Plus, Send, ShoppingCart, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
@@ -19,6 +19,12 @@ import { SimpleForm } from '../_shared/SimpleForm';
 import { currency } from '../../lib/utils/format';
 import { SupplierQuotationWorkspace } from './SupplierQuotationWorkspace';
 import { useAuth } from '../../lib/auth/AuthContext';
+import {
+  syncWorkItemMutationTransition,
+  withWorkItemMutationContext,
+  workItemAutoStartedNotice,
+  type WorkItemMutationResult,
+} from '../work-items/workItemMutationContext';
 
 type PriceAction = 'expected' | 'norm' | 'final';
 
@@ -33,6 +39,8 @@ type WorkspaceTab = 'estimate' | 'quotes' | 'compare';
 
 export function BOQPage() {
   const { id = '' } = useParams();
+  const [searchParams] = useSearchParams();
+  const taskId = searchParams.get('task')?.trim() ?? '';
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const canGenerateProcurement = hasPermission('procurement.create') || hasPermission('procurement.approve') || hasPermission('boq.approve');
@@ -111,31 +119,34 @@ export function BOQPage() {
   });
 
   const submit = useMutation({
-    mutationFn: () => post(`/projects/${id}/boq/submit`, {}),
-    onSuccess: () => {
+    mutationFn: () => post<WorkItemMutationResult>(`/projects/${id}/boq/submit`, withWorkItemMutationContext({}, taskId)),
+    onSuccess: (result) => {
       invalidate();
-      toast.success('Đã gửi dự toán để duyệt');
+      syncWorkItemMutationTransition(queryClient, result);
+      toast.success(`Đã gửi dự toán để duyệt.${workItemAutoStartedNotice(result)}`);
     },
     onError: (error) => toast.error('Không gửi được dự toán', error),
   });
 
   const approve = useMutation({
-    mutationFn: () => post(`/projects/${id}/boq/approve`, {}),
-    onSuccess: () => {
+    mutationFn: () => post<WorkItemMutationResult>(`/projects/${id}/boq/approve`, withWorkItemMutationContext({}, taskId)),
+    onSuccess: (result) => {
       invalidate();
-      toast.success('Đã duyệt BOQ');
+      syncWorkItemMutationTransition(queryClient, result);
+      toast.success(`Đã duyệt BOQ.${workItemAutoStartedNotice(result)}`);
     },
     onError: (error) => toast.error('Không duyệt được BOQ', error),
   });
 
   const generate = useMutation({
-    mutationFn: () => post<BOQProcurementResult>(`/projects/${id}/boq/generate-procurement`, {}),
+    mutationFn: () => post<BOQProcurementResult & WorkItemMutationResult>(`/projects/${id}/boq/generate-procurement`, withWorkItemMutationContext({}, taskId)),
     onSuccess: (result) => {
       invalidate();
+      syncWorkItemMutationTransition(queryClient, result);
       queryClient.invalidateQueries({ queryKey: ['procurement'] });
       queryClient.invalidateQueries({ queryKey: ['procurement-detail'] });
       setGenerated(result);
-      toast.success('Đã sinh yêu cầu mua sắm');
+      toast.success(`Đã sinh yêu cầu mua sắm.${workItemAutoStartedNotice(result)}`);
     },
     onError: (error) => toast.error('Không sinh được yêu cầu mua sắm', error),
   });
@@ -302,8 +313,8 @@ export function BOQPage() {
         />
       </> : null}
 
-      {activeTab === 'quotes' ? <SupplierQuotationWorkspace projectId={id} boqItems={rows} mode="quotes" /> : null}
-      {activeTab === 'compare' ? <SupplierQuotationWorkspace projectId={id} boqItems={rows} mode="compare" /> : null}
+      {activeTab === 'quotes' ? <SupplierQuotationWorkspace projectId={id} workItemId={taskId} boqItems={rows} mode="quotes" /> : null}
+      {activeTab === 'compare' ? <SupplierQuotationWorkspace projectId={id} workItemId={taskId} boqItems={rows} mode="compare" /> : null}
       {activeTab === 'compare' && canGenerateProcurement ? <div className="mt-4 flex justify-end"><button className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={generate.isPending || priceReadiness.generateDisabled} title={priceReadiness.generateDisabledReason} onClick={() => generate.mutate()}>{generate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}Tạo yêu cầu mua sắm</button></div> : null}
 
       <Dialog open={open} title="Thêm dòng dự toán" description="Trạng thái khởi tạo do hệ thống quản lý." onClose={() => setOpen(false)} size="lg">
