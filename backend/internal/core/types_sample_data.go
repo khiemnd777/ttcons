@@ -1,6 +1,6 @@
 package core
 
-const sampleDataBlueprintVersion = 3
+const sampleDataBlueprintVersion = 4
 
 const sampleDataUserPassword = "Dev240489."
 

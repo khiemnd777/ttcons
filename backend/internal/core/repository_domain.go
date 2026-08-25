@@ -7664,15 +7664,97 @@ func applyRunStepStatusTx(ctx context.Context, tx *sql.Tx, item Record, toStatus
 		stepStatus = "pending"
 	}
 	if toStatus == "completed" {
-		_, err := tx.ExecContext(ctx, `
+		rows, err := queryTx(ctx, tx, `
 			UPDATE pipeline_run_steps
 			SET status='completed', submitted_by=NULLIF($2,'')::uuid, submitted_at=now()
 			WHERE id=$1
+			RETURNING id
 		`, runStepID, actorID)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return fmt.Errorf("linked pipeline run step %s was not found", runStepID)
+		}
+		return ensureRunStepWorkItemCompletionSyncTx(ctx, tx, runStepID)
+	}
+	rows, err := queryTx(ctx, tx, `UPDATE pipeline_run_steps SET status=$2 WHERE id=$1 RETURNING id`, runStepID, stepStatus)
+	if err != nil {
 		return err
 	}
-	_, err := tx.ExecContext(ctx, `UPDATE pipeline_run_steps SET status=$2 WHERE id=$1`, runStepID, stepStatus)
-	return err
+	if len(rows) == 0 {
+		return fmt.Errorf("linked pipeline run step %s was not found", runStepID)
+	}
+	return nil
+}
+
+func ensureRunStepWorkItemCompletionSyncTx(ctx context.Context, tx *sql.Tx, runStepID string) error {
+	runStepID = cleanID(runStepID)
+	if runStepID == "" {
+		return nil
+	}
+	rows, err := queryTx(ctx, tx, `
+		SELECT
+			rs.status AS run_step_status,
+			wi.id AS work_item_id,
+			wi.status AS work_item_status
+		FROM pipeline_run_steps rs
+		LEFT JOIN work_items wi ON wi.run_step_id=rs.id AND wi.status <> 'cancelled'
+		WHERE rs.id=$1
+		LIMIT 1
+	`, runStepID)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return fmt.Errorf("linked pipeline run step %s was not found", runStepID)
+	}
+	pair := rows[0]
+	if cleanID(pair["work_item_id"]) == "" {
+		return nil
+	}
+	runStepCompleted := fmt.Sprint(pair["run_step_status"]) == "completed"
+	workItemCompleted := fmt.Sprint(pair["work_item_status"]) == "completed"
+	if runStepCompleted != workItemCompleted {
+		return fmt.Errorf(
+			"workflow completion state mismatch for run step %s: run_step=%s work_item=%s",
+			runStepID,
+			pair["run_step_status"],
+			pair["work_item_status"],
+		)
+	}
+	return nil
+}
+
+func ensureProjectRunStepWorkItemCompletionSyncTx(ctx context.Context, tx *sql.Tx, projectID string) error {
+	rows, err := queryTx(ctx, tx, `
+		SELECT
+			rs.id AS run_step_id,
+			rs.status AS run_step_status,
+			wi.id AS work_item_id,
+			wi.status AS work_item_status
+		FROM pipeline_run_steps rs
+		JOIN work_items wi ON wi.run_step_id=rs.id AND wi.project_id=rs.project_id
+		WHERE rs.project_id=$1
+		  AND ((rs.status='completed') <> (wi.status='completed'))
+		ORDER BY rs.id
+		LIMIT 1
+	`, projectID)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	pair := rows[0]
+	return fmt.Errorf(
+		"workflow completion state mismatch for project %s, run step %s, work item %s: run_step=%s work_item=%s",
+		projectID,
+		pair["run_step_id"],
+		pair["work_item_id"],
+		pair["run_step_status"],
+		pair["work_item_status"],
+	)
 }
 
 func workItemAuditDescription(activityType string, item Record, comment string) string {
@@ -10099,6 +10181,9 @@ func (r *Repository) SubmitRunStep(ctx context.Context, stepID string, req WorkI
 		`, item["id"], item["project_id"], actorID, comment, item["previous_status"], `{"source":"pipeline_run_step_submit"}`); err != nil {
 			return nil, err
 		}
+	}
+	if err := ensureRunStepWorkItemCompletionSyncTx(ctx, tx, stepID); err != nil {
+		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, cleanID(step["project_id"]), actorID, actorName, "step_completed", "pipeline_run_step", stepID, fmt.Sprintf("Hoàn tất step %s", step["name"]), Record{"step": step["name"]}); err != nil {
 		return nil, err

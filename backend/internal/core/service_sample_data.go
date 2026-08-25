@@ -509,7 +509,7 @@ func buildSampleDataPlan(blueprint sampleDataBlueprint, accounting *sampleDataAc
 				step.Actor = actors[0]
 				step.Completed = selectedOrdinal < completedStepCount
 				if step.Completed {
-					step.Status, step.WorkStatus = "submitted", "completed"
+					step.Status, step.WorkStatus = "completed", "completed"
 					for _, field := range stepDefinition.Fields {
 						step.Answers[strings.TrimSpace(fmt.Sprint(field["field_key"]))] = sampleFormFieldValue(field, plan.ProjectCode, now)
 					}

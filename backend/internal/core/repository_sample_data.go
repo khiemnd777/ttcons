@@ -415,6 +415,9 @@ func (r *Repository) CreateSampleData(ctx context.Context, plan sampleDataPlan) 
 		if err := insertSampleDomainHistoryTx(ctx, tx, plan); err != nil {
 			return nil, fmt.Errorf("insert sample domain history: %w", err)
 		}
+		if err := ensureProjectRunStepWorkItemCompletionSyncTx(ctx, tx, plan.ProjectID); err != nil {
+			return nil, fmt.Errorf("validate sample workflow lifecycle: %w", err)
+		}
 	}
 	result = Record{
 		"project_id": plan.ProjectID, "project_code": plan.ProjectCode, "project_name": plan.ProjectName,

@@ -77,6 +77,7 @@
 - V123 and repository member/RBAC paths enforce two-way identity isolation. Sample users cannot receive global roles, a role other than `sample_role_id`, a role in a real project, or membership/PM ownership in a real project. Real users cannot receive a project role, membership or PM ownership in a sample project. Generic project-member options filter by the selected project's `is_sample`; generated historical sample projects are not retroactively rewritten.
 - `GET /settings/sample-data/options` and `POST /settings/sample-data/projects` are protected capability routes. Production/demo availability is intentional; environment name is not an authorization control.
 - Generation records retain actor, request profile/progress, selected target-environment Pipeline/hash/accounting book, project result and UUID idempotency. A replay is valid only for the same actor, profile, progress and both selected sources. Audit metadata must remain explicitly simulated and must not include secrets.
+- Sample blueprint v4 persists every simulated completed Work Item with its linked Run Step also `completed` and validates all linked terminal pairs before the generation transaction commits. V124 repairs only the earlier generated `is_sample=true`, Work Item completed / Run Step submitted pattern; real projects and every Node/run pointer are explicitly outside migration scope.
 
 ## Cross-Domain Checks
 

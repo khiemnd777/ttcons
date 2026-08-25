@@ -43,6 +43,62 @@ func TestWorkflowTimelineCountsSubmittedAndSkippedSteps(t *testing.T) {
 	}
 }
 
+func TestWorkItemCompletionKeepsLinkedRunStepTerminalStateAtomic(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	runID := newID()
+	nodeID := newID()
+	stepID := newID()
+	mustExec(t, db, `
+		INSERT INTO pipeline_runs (id,project_id,template_id,status,engine_version)
+		VALUES ($1,$2,'40000000-0000-0000-0000-000000000021','in_progress',2)
+	`, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (id,run_id,project_id,name,type,order_index,status,started_at)
+		VALUES ($1,$2,$3,'Node đồng bộ vòng đời','task',1,'in_progress',now())
+	`, nodeID, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_steps (id,run_node_id,project_id,name,order_index,status)
+		VALUES ($1,$2,$3,'Bước đồng bộ vòng đời',1,'pending')
+	`, stepID, nodeID, fixture.projectID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$1 WHERE id=$2`, nodeID, runID)
+	mustExec(t, db, `UPDATE projects SET current_pipeline_run_id=$1 WHERE id=$2`, runID, fixture.projectID)
+	mustExec(t, db, `
+		UPDATE work_items
+		SET pipeline_run_id=$2,run_node_id=$3,run_step_id=$4,status='ready'
+		WHERE id=$1
+	`, fixture.itemID, runID, nodeID, stepID)
+
+	completed, err := service.WorkItemAction(ctx, fixture.itemID, "complete", WorkItemActionRequest{Comment: "Hoàn tất đúng vòng đời"}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(completed["status"]) != "completed" {
+		t.Fatalf("work item status = %v, want completed", completed["status"])
+	}
+	assertCount(t, db, `
+		SELECT COUNT(*)
+		FROM pipeline_run_steps rs
+		JOIN work_items wi ON wi.run_step_id=rs.id
+		WHERE rs.id=$1 AND rs.status='completed' AND wi.status='completed'
+	`, 1, stepID)
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE pipeline_run_steps SET status='submitted' WHERE id=$1`, stepID); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureRunStepWorkItemCompletionSyncTx(ctx, tx, stepID); err == nil || !strings.Contains(err.Error(), "workflow completion state mismatch") {
+		t.Fatalf("completion postcondition error = %v, want fail-closed mismatch", err)
+	}
+}
+
 func TestWorkItemCanStartOutOfSequenceWithoutMovingRunPointer(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

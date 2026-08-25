@@ -78,6 +78,7 @@ func TestCreateCompletedSampleDataProjectIntegration(t *testing.T) {
 		cleanID(result["pipeline_template_id"]) != pipeline.ID || cleanID(result["accounting_book_id"]) != accountingBook.ID {
 		t.Fatalf("unexpected completed sample result: %#v", result)
 	}
+	assertSampleRunStepWorkItemCompletionSync(t, database, projectID)
 	replayed, err := service.CreateSampleDataProject(ctx, SampleDataCreateRequest{
 		Profile: "completed", ProgressPercent: 100, PipelineTemplateID: pipeline.ID,
 		AccountingBookID: accountingBook.ID, IdempotencyKey: idempotencyKey,
@@ -134,6 +135,7 @@ func TestCreatePlanningSampleDataAssignmentsIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	projectID := cleanID(result["id"])
+	assertSampleRunStepWorkItemCompletionSync(t, database, projectID)
 	replayed, err := service.CreateSampleDataProject(ctx, SampleDataCreateRequest{
 		Profile: "planning", ProgressPercent: 65, PipelineTemplateID: pipeline.ID, IdempotencyKey: idempotencyKey,
 	}, actorID, actorName)
@@ -194,6 +196,23 @@ func TestCreatePlanningSampleDataAssignmentsIntegration(t *testing.T) {
 	}
 	if realMembers != 0 || unscopedRoles != 0 || scopedRoles == 0 || realBusinessActors != 0 {
 		t.Fatalf("sample isolation mismatch real_members=%d unscoped_roles=%d scoped_roles=%d real_business_actors=%d", realMembers, unscopedRoles, scopedRoles, realBusinessActors)
+	}
+}
+
+func assertSampleRunStepWorkItemCompletionSync(t *testing.T, database *sql.DB, projectID string) {
+	t.Helper()
+	var mismatched int
+	if err := database.QueryRowContext(context.Background(), `
+		SELECT COUNT(*)
+		FROM pipeline_run_steps rs
+		JOIN work_items wi ON wi.run_step_id=rs.id AND wi.project_id=rs.project_id
+		WHERE rs.project_id=$1
+		  AND ((rs.status='completed') <> (wi.status='completed'))
+	`, projectID).Scan(&mismatched); err != nil {
+		t.Fatal(err)
+	}
+	if mismatched != 0 {
+		t.Fatalf("sample project %s has %d Work Item/Run Step terminal completion mismatches", projectID, mismatched)
 	}
 }
 
@@ -278,6 +297,9 @@ func TestSampleDataPipelineCompatibilityDoesNotDependOnEnvironmentIDsOrRevision(
 		for _, plannedStep := range node.Steps {
 			if plannedStep.Completed {
 				completed++
+				if plannedStep.Status != "completed" || plannedStep.WorkStatus != "completed" {
+					t.Fatalf("completed sample step lifecycle mismatch: run_step=%s work_item=%s step=%s", plannedStep.Status, plannedStep.WorkStatus, plannedStep.Definition.Record["name"])
+				}
 			}
 		}
 	}

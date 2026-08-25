@@ -508,10 +508,32 @@ func TestPlanningConstructionHandoffIsIdempotentAndTracksCheckResolution(t *test
 	if recordListHasCode(afterIssues, "CONSTRUCTION_HANDOFF_REQUIRED") {
 		t.Fatalf("planning completion issues after handoff = %#v, handoff blocker should be cleared", afterIssues)
 	}
-	mustExec(t, db, `UPDATE pipeline_run_nodes SET status='completed',completed_at=now() WHERE id=$1`, planningNodeID)
-	mustExec(t, db, `UPDATE pipeline_run_nodes SET status='in_progress',started_at=now() WHERE id=$1`, constructionNodeID)
-	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$2 WHERE id=$1`, runID, constructionNodeID)
-	mustExec(t, db, `UPDATE work_items SET status='ready' WHERE project_id=$1 AND source_type='construction_handoff_item' AND status='pending'`, fixture.projectID)
+	advancedRun, err := service.AdvanceRunNode(ctx, planningNodeID, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(advancedRun["current_node_id"]) != constructionNodeID {
+		t.Fatalf("current node after handoff advance = %v, want construction node %s", advancedRun["current_node_id"], constructionNodeID)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_run_nodes WHERE id=$1 AND status='completed'`, 1, planningNodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_run_nodes WHERE id=$1 AND status='in_progress'`, 1, constructionNodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1 AND source_type='construction_handoff_item' AND status='ready'`, 2, fixture.projectID)
+	workspace, err := service.ProjectConstructionWorkspace(ctx, fixture.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !boolValue(recordFromAny(workspace["runtime"])["construction_active"]) {
+		t.Fatalf("construction workspace runtime after explicit node advance = %#v, want active", workspace["runtime"])
+	}
+	reportEligible := 0
+	for _, item := range workflowAnswerRecordList(workspace["work_items"]) {
+		if fmt.Sprint(item["source_type"]) == "construction_handoff_item" && boolValue(item["report_eligible"]) {
+			reportEligible++
+		}
+	}
+	if reportEligible != 2 {
+		t.Fatalf("report-eligible handoff work items after explicit node advance = %d, want 2; workspace=%#v", reportEligible, workspace["work_items"])
+	}
 
 	items := workflowAnswerRecordList(first["items"])
 	if len(items) != 2 {
