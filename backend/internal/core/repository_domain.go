@@ -9356,6 +9356,7 @@ func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, i
 			COALESCE(s.user_id::text, '') AS user_id,
 			s.full_name, s.email, s.phone, s.department, s.position,
 			COALESCE(u.is_sample,false) AS is_sample,
+			COALESCE(u.status='active' AND u.deleted_at IS NULL AND s.status='active', false) AS account_active,
 			COALESCE(s.status='deleted', false) AS account_deleted,
 			pm.role_ids, pm.active, pm.notes, pm.created_at, pm.updated_at,
 			(pm.staff_id=p.pm_staff_id) AS is_project_manager,
@@ -9369,6 +9370,16 @@ func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, i
 						SELECT 1 FROM role_permissions rp
 						JOIN permissions p ON p.id=rp.permission_id
 						WHERE rp.role_id=r.id AND p.key='project.view'
+					),
+					'grants_project_member_manage', EXISTS (
+						SELECT 1 FROM role_permissions rp
+						JOIN permissions p ON p.id=rp.permission_id
+						WHERE rp.role_id=r.id AND p.key='project.member.manage'
+					),
+					'grants_pipeline_run', EXISTS (
+						SELECT 1 FROM role_permissions rp
+						JOIN permissions p ON p.id=rp.permission_id
+						WHERE rp.role_id=r.id AND p.key='pipeline.run'
 					)
 				) ORDER BY r.display_name)
 				FROM user_roles ur
@@ -9387,6 +9398,16 @@ func (r *Repository) ListProjectMembers(ctx context.Context, projectID string, i
 						SELECT 1 FROM role_permissions rp
 						JOIN permissions p ON p.id=rp.permission_id
 						WHERE rp.role_id=r.id AND p.key='project.view'
+					),
+					'grants_project_member_manage', EXISTS (
+						SELECT 1 FROM role_permissions rp
+						JOIN permissions p ON p.id=rp.permission_id
+						WHERE rp.role_id=r.id AND p.key='project.member.manage'
+					),
+					'grants_pipeline_run', EXISTS (
+						SELECT 1 FROM role_permissions rp
+						JOIN permissions p ON p.id=rp.permission_id
+						WHERE rp.role_id=r.id AND p.key='pipeline.run'
 					)
 				) ORDER BY r.display_name)
 				FROM user_roles ur
@@ -9417,6 +9438,16 @@ func (r *Repository) ProjectMemberOptions(ctx context.Context, projectID string)
 						SELECT 1 FROM role_permissions rp
 						JOIN permissions p ON p.id=rp.permission_id
 						WHERE rp.role_id=r.id AND p.key='project.view'
+					),
+					'grants_project_member_manage', EXISTS (
+						SELECT 1 FROM role_permissions rp
+						JOIN permissions p ON p.id=rp.permission_id
+						WHERE rp.role_id=r.id AND p.key='project.member.manage'
+					),
+					'grants_pipeline_run', EXISTS (
+						SELECT 1 FROM role_permissions rp
+						JOIN permissions p ON p.id=rp.permission_id
+						WHERE rp.role_id=r.id AND p.key='pipeline.run'
 					)
 				) ORDER BY r.display_name)
 				FROM user_roles ur
@@ -9449,13 +9480,25 @@ func (r *Repository) ProjectMemberOptions(ctx context.Context, projectID string)
 		return nil, err
 	}
 	roles, err := r.Query(ctx, `
-		SELECT r.id::text, r.name, r.display_name, r.description,
+		SELECT r.id::text, r.name, r.display_name, r.description, 'project' AS scope,
 			EXISTS (
 				SELECT 1
 				FROM role_permissions rp
 				JOIN permissions p ON p.id=rp.permission_id
 				WHERE rp.role_id=r.id AND p.key='project.view'
-			) AS grants_project_view
+			) AS grants_project_view,
+			EXISTS (
+				SELECT 1
+				FROM role_permissions rp
+				JOIN permissions p ON p.id=rp.permission_id
+				WHERE rp.role_id=r.id AND p.key='project.member.manage'
+			) AS grants_project_member_manage,
+			EXISTS (
+				SELECT 1
+				FROM role_permissions rp
+				JOIN permissions p ON p.id=rp.permission_id
+				WHERE rp.role_id=r.id AND p.key='pipeline.run'
+			) AS grants_pipeline_run
 		FROM projects target_project
 		JOIN roles r ON true
 		WHERE target_project.id=$1 AND target_project.status <> 'cancelled'
@@ -9525,6 +9568,53 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 		return nil, err
 	}
 	defer tx.Rollback()
+	memberID, err = r.saveProjectMemberTx(ctx, tx, projectID, memberID, req, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.GetProjectMember(ctx, projectID, memberID)
+}
+
+func (r *Repository) SaveProjectMembersBulk(ctx context.Context, projectID string, requests []ProjectMemberMutationRequest, actorID, actorName string) ([]Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	memberIDs := make([]string, 0, len(requests))
+	for _, req := range requests {
+		memberID, err := r.saveProjectMemberTx(ctx, tx, projectID, "", req, actorID, actorName)
+		if err != nil {
+			return nil, err
+		}
+		memberIDs = append(memberIDs, memberID)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	rows, err := r.ListProjectMembers(ctx, projectID, true)
+	if err != nil {
+		return nil, err
+	}
+	memberByID := make(map[string]Record, len(rows))
+	for _, row := range rows {
+		memberByID[cleanID(row["id"])] = row
+	}
+	members := make([]Record, 0, len(memberIDs))
+	for _, memberID := range memberIDs {
+		member, ok := memberByID[memberID]
+		if !ok {
+			return nil, sql.ErrNoRows
+		}
+		members = append(members, member)
+	}
+	return members, nil
+}
+
+func (r *Repository) saveProjectMemberTx(ctx context.Context, tx *sql.Tx, projectID, memberID string, req ProjectMemberMutationRequest, actorID, actorName string) (string, error) {
 
 	projectRows, err := queryTx(ctx, tx, `
 		SELECT id::text, COALESCE(pm_staff_id::text, '') AS pm_staff_id,is_sample
@@ -9533,10 +9623,10 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 		FOR UPDATE
 	`, projectID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if len(projectRows) == 0 {
-		return nil, validationError("Công trình không tồn tại hoặc đã huỷ", Record{"project_id": projectID})
+		return "", validationError("Công trình không tồn tại hoặc đã huỷ", Record{"project_id": projectID})
 	}
 	staffRows, err := queryTx(ctx, tx, `
 		SELECT s.id::text, s.full_name, COALESCE(s.user_id::text, '') AS user_id,
@@ -9554,10 +9644,10 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 		FOR UPDATE OF s
 	`, req.StaffID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if len(staffRows) == 0 || cleanID(staffRows[0]["user_id"]) == "" {
-		return nil, validationError("Nhân sự phải đang hoạt động và có tài khoản đăng nhập", Record{"staff_id": req.StaffID})
+		return "", validationError("Nhân sự phải đang hoạt động và có tài khoản đăng nhập", Record{"staff_id": req.StaffID})
 	}
 	staffName := strings.TrimSpace(fmt.Sprint(staffRows[0]["full_name"]))
 	userID := cleanID(staffRows[0]["user_id"])
@@ -9566,20 +9656,20 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 	sampleRoleID := cleanID(staffRows[0]["sample_role_id"])
 	if projectIsSample != userIsSample {
 		if projectIsSample {
-			return nil, validationError("Tài khoản thật không được gán vào công trình mẫu", Record{"staff_id": req.StaffID})
+			return "", validationError("Tài khoản thật không được gán vào công trình mẫu", Record{"staff_id": req.StaffID})
 		}
-		return nil, validationError("Tài khoản mẫu không được gán vào công trình thật", Record{"staff_id": req.StaffID})
+		return "", validationError("Tài khoản mẫu không được gán vào công trình thật", Record{"staff_id": req.StaffID})
 	}
 	if userIsSample {
 		if len(req.ProjectRoleIDs) != 1 || cleanID(req.ProjectRoleIDs[0]) != sampleRoleID {
-			return nil, validationError("Tài khoản mẫu chỉ được dùng đúng vai trò mẫu của tài khoản", Record{"staff_id": req.StaffID, "sample_role_id": sampleRoleID})
+			return "", validationError("Tài khoản mẫu chỉ được dùng đúng vai trò mẫu của tài khoản", Record{"staff_id": req.StaffID, "sample_role_id": sampleRoleID})
 		}
 		var sampleRoleName string
 		if err := tx.QueryRowContext(ctx, `SELECT display_name FROM roles WHERE id=$1`, sampleRoleID).Scan(&sampleRoleName); err != nil {
-			return nil, err
+			return "", err
 		}
 		if len(req.RoleIDs) != 1 || !strings.EqualFold(strings.TrimSpace(req.RoleIDs[0]), strings.TrimSpace(sampleRoleName)) {
-			return nil, validationError("Vai trò vận hành của tài khoản mẫu phải khớp vai trò hệ thống", Record{"staff_id": req.StaffID, "role": sampleRoleName})
+			return "", validationError("Vai trò vận hành của tài khoản mẫu phải khớp vai trò hệ thống", Record{"staff_id": req.StaffID, "role": sampleRoleName})
 		}
 	}
 	for _, roleLabel := range req.RoleIDs {
@@ -9592,20 +9682,20 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 				  AND lower(btrim(display_name))=lower(btrim($1))
 			)
 		`, roleLabel).Scan(&externalOnly); err != nil {
-			return nil, err
+			return "", err
 		}
 		if externalOnly {
-			return nil, validationError("Vai trò vận hành của đối tác ngoài App không thể gán cho thành viên công trình", Record{"role": roleLabel})
+			return "", validationError("Vai trò vận hành của đối tác ngoài App không thể gán cho thành viên công trình", Record{"role": roleLabel})
 		}
 	}
 
 	for _, roleID := range req.ProjectRoleIDs {
 		var exists int
 		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM roles WHERE id=$1 AND name NOT IN ('admin','director') AND NOT external_only`, roleID).Scan(&exists); err != nil {
-			return nil, err
+			return "", err
 		}
 		if exists == 0 {
-			return nil, validationError("Role phân quyền không tồn tại", Record{"role_id": roleID})
+			return "", validationError("Role phân quyền không tồn tại", Record{"role_id": roleID})
 		}
 	}
 
@@ -9617,17 +9707,17 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 			FOR UPDATE
 		`, memberID, projectID)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		if len(rows) == 0 {
-			return nil, validationError("Thành viên không thuộc công trình", Record{"member_id": memberID})
+			return "", validationError("Thành viên không thuộc công trình", Record{"member_id": memberID})
 		}
 		current = rows[0]
 		if current["active"] != true {
-			return nil, validationError("Thành viên đã ngừng tham gia; hãy dùng luồng thêm để kích hoạt lại", Record{"member_id": memberID})
+			return "", validationError("Thành viên đã ngừng tham gia; hãy dùng luồng thêm để kích hoạt lại", Record{"member_id": memberID})
 		}
 		if cleanID(current["staff_id"]) != req.StaffID {
-			return nil, validationError("Không thể đổi nhân sự của một membership đã tồn tại", Record{"member_id": memberID})
+			return "", validationError("Không thể đổi nhân sự của một membership đã tồn tại", Record{"member_id": memberID})
 		}
 	} else {
 		rows, err := queryTx(ctx, tx, `
@@ -9637,19 +9727,19 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 			FOR UPDATE
 		`, projectID, req.StaffID)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		if len(rows) > 0 {
 			current = rows[0]
 			if current["active"] == true {
-				return nil, validationError("Nhân sự đã là thành viên đang hoạt động của công trình", Record{"staff_id": req.StaffID})
+				return "", validationError("Nhân sự đã là thành viên đang hoạt động của công trình", Record{"staff_id": req.StaffID})
 			}
 			memberID = cleanID(current["id"])
 		}
 	}
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1 AND project_id=$2`, userID, projectID); err != nil {
-		return nil, err
+		return "", err
 	}
 	for _, roleID := range req.ProjectRoleIDs {
 		if _, err := tx.ExecContext(ctx, `
@@ -9657,7 +9747,7 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 			VALUES ($1,$2,$3)
 			ON CONFLICT DO NOTHING
 		`, userID, roleID, projectID); err != nil {
-			return nil, err
+			return "", err
 		}
 	}
 	var canViewProject bool
@@ -9672,10 +9762,10 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 			  AND p.key='project.view'
 		)
 	`, userID, projectID).Scan(&canViewProject); err != nil {
-		return nil, err
+		return "", err
 	}
 	if !canViewProject {
-		return nil, validationError("Role hiện tại không cấp quyền xem công trình; hãy chọn role có project.view", Record{"field": "project_role_ids"})
+		return "", validationError("Role hiện tại không cấp quyền xem công trình; hãy chọn role có project.view", Record{"field": "project_role_ids"})
 	}
 
 	rawRoles, _ := json.Marshal(req.RoleIDs)
@@ -9687,7 +9777,7 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 			VALUES ($1,$2,$3::jsonb,NULLIF($4,''),true,now())
 			RETURNING id::text
 		`, projectID, req.StaffID, string(rawRoles), req.Notes).Scan(&memberID); err != nil {
-			return nil, err
+			return "", err
 		}
 		eventType = "project_member_added"
 		description = fmt.Sprintf("Thêm thành viên %s", staffName)
@@ -9696,7 +9786,7 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 		SET role_ids=$3::jsonb, notes=NULLIF($4,''), active=true, updated_at=now()
 		WHERE id=$1 AND project_id=$2
 	`, memberID, projectID, string(rawRoles), req.Notes); err != nil {
-		return nil, err
+		return "", err
 	} else if current != nil && current["active"] != true {
 		eventType = "project_member_reactivated"
 		description = fmt.Sprintf("Kích hoạt lại thành viên %s", staffName)
@@ -9713,12 +9803,9 @@ func (r *Repository) SaveProjectMember(ctx context.Context, projectID, memberID 
 		metadata["previous_active"] = current["active"]
 	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, eventType, "project_member", memberID, description, metadata); err != nil {
-		return nil, err
+		return "", err
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return r.GetProjectMember(ctx, projectID, memberID)
+	return memberID, nil
 }
 
 func (r *Repository) DeactivateProjectMember(ctx context.Context, projectID, memberID, actorID, actorName string) (Record, error) {

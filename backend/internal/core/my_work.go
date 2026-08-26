@@ -116,6 +116,14 @@ func normalizeMyWorkflowActionsFilter(filter MyWorkflowActionsFilter) (MyWorkflo
 	return filter, nil
 }
 
+func normalizeMyWorkScopeSummaryProjectID(projectID string) (string, error) {
+	projectID = cleanID(projectID)
+	if projectID != "" && !validActivityUUID(projectID) {
+		return "", validationError("project_id không hợp lệ", Record{"project_id": projectID})
+	}
+	return projectID, nil
+}
+
 func validMyWorkToken(value string) bool {
 	if len(value) > 64 {
 		return false

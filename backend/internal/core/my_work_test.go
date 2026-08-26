@@ -108,6 +108,34 @@ func TestNormalizeMyWorkflowActionsFilter(t *testing.T) {
 	if _, err := normalizeMyWorkflowActionsFilter(MyWorkflowActionsFilter{ProjectID: "not-a-uuid"}); err == nil {
 		t.Fatal("expected invalid workflow-action project id error")
 	}
+	projectID := newID()
+	if normalized, err := normalizeMyWorkScopeSummaryProjectID("  " + projectID + "  "); err != nil || normalized != projectID {
+		t.Fatalf("normalized scope-summary project = %q, error = %v", normalized, err)
+	}
+	if _, err := normalizeMyWorkScopeSummaryProjectID("not-a-uuid"); err == nil {
+		t.Fatal("expected invalid scope-summary project id error")
+	}
+}
+
+func TestMyWorkScopeSummaryKeepsIndependentNeedActionSources(t *testing.T) {
+	summary := myWorkScopeSummaryRecord(myWorkScopeCounts{
+		Responsible: 2, Mine: 1, Department: 3, Watching: 4, All: 7,
+	}, 5, 8, 6)
+
+	responsible := recordValue(summary["responsible"])
+	allScope := recordValue(summary["all"])
+	if number(responsible["total"]) != 13 || number(responsible["workflow_actions"]) != 5 || number(responsible["project_startups"]) != 6 {
+		t.Fatalf("responsible scope = %#v, want 2 + 5 + 6", responsible)
+	}
+	if number(allScope["total"]) != 21 || number(allScope["workflow_actions"]) != 8 || number(allScope["project_startups"]) != 6 {
+		t.Fatalf("all scope = %#v, want 7 + 8 + 6", allScope)
+	}
+	for _, scope := range []string{"mine", "department", "watching"} {
+		row := recordValue(summary[scope])
+		if number(row["workflow_actions"]) != 0 || number(row["project_startups"]) != 0 {
+			t.Fatalf("ordinary scope %s leaked non-work-item sources: %#v", scope, row)
+		}
+	}
 }
 
 func TestMyWorkflowAdvanceLabelsUseBusinessLanguage(t *testing.T) {
@@ -203,6 +231,18 @@ func TestMyWorkflowActionsExposeOnlyReadyAuthorizedCurrentNode(t *testing.T) {
 	}
 	if fmt.Sprint(actions[0]["title"]) != "Bắt đầu Thi công" || cleanID(actions[0]["run_node_id"]) != currentNodeID {
 		t.Fatalf("ready workflow action = %#v", actions[0])
+	}
+	if _, leaked := actions[0]["is_responsible"]; leaked {
+		t.Fatalf("workflow action leaked internal responsibility flag: %#v", actions[0])
+	}
+	scopeSummary, err := service.MyWorkScopeSummary(ctx, fixture.pmID, fixture.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responsibleScope := recordValue(scopeSummary["responsible"])
+	allScope := recordValue(scopeSummary["all"])
+	if number(responsibleScope["workflow_actions"]) != 1 || number(allScope["workflow_actions"]) != 1 {
+		t.Fatalf("workflow scope counts = responsible %#v, all %#v", responsibleScope, allScope)
 	}
 
 	workerPage, err := service.MyWorkflowActions(ctx, MyWorkflowActionsFilter{
@@ -518,6 +558,22 @@ func TestMyWorkItemsPageContractPaginationAndDecisionCapability(t *testing.T) {
 	}
 	if _, ok := page["facets"].(Record); !ok {
 		t.Fatalf("facets = %#v", page["facets"])
+	}
+	scopeSummary, err := service.MyWorkScopeSummary(ctx, fixture.workerID, fixture.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, scope := range []string{"responsible", "mine", "department", "watching", "all"} {
+		needActionPage, err := service.MyWorkItems(ctx, MyWorkItemsFilter{
+			Queue: scope, Bucket: "need_action", ProjectID: fixture.projectID, Limit: 100,
+		}, fixture.workerID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		row := recordValue(scopeSummary[scope])
+		if number(row["work_items"]) != number(needActionPage["total"]) {
+			t.Fatalf("scope %s work_items = %v, need-action page total = %v", scope, row["work_items"], needActionPage["total"])
+		}
 	}
 	if _, err := service.WorkItemAction(ctx, fixture.itemID, "request-review", WorkItemActionRequest{}, fixture.workerID, "Worker"); err != nil {
 		t.Fatal(err)

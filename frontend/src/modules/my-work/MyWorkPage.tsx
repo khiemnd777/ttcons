@@ -18,16 +18,15 @@ import {
   X,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { ApiError, get, post, put, type StreamStatus } from '../../lib/api/client';
+import { get, post, type StreamStatus } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
-import { Dialog } from '../../components/Dialog';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
-import type { ActivityAttentionItem, ActivityAttentionSummary, ApprovalRequest, MyWorkflowAction, ProjectMembersResponse, ProjectStartupAction, ProjectStartupActionsResponse, ProjectStartupReadiness, WorkItem, WorkReportListItem, WorkReportSummary } from '../../lib/types/domain';
+import type { ActivityAttentionItem, ActivityAttentionSummary, ApprovalRequest, MyWorkflowAction, ProjectStartupAction, ProjectStartupActionsResponse, WorkItem, WorkReportListItem, WorkReportSummary } from '../../lib/types/domain';
 import { ApprovalPanel } from '../../components/ApprovalPanel';
 import { statusLabel } from '../../lib/utils/status';
 import { roleSummary as summarizeRoles } from '../../lib/utils/roles';
@@ -48,6 +47,7 @@ import {
   workItemWorkflowContext,
   workTypeLabel,
 } from '../work-items/workItemPresentation';
+import { ProjectStartupWizard } from '../projects/ProjectStartupWizard';
 
 type ModeKey = 'work' | 'approval' | 'attention';
 type ApprovalLaneKey = 'work' | 'node' | 'report';
@@ -98,10 +98,16 @@ type MyWorkflowActionsResponse = {
   total: number;
   summary_total: number;
 };
+type MyWorkScopeSummaryRow = {
+  work_items: number;
+  workflow_actions: number;
+  project_startups: number;
+  total: number;
+};
+type MyWorkScopeSummary = Record<WorkScopeKey, MyWorkScopeSummaryRow>;
 
 const scopes: Array<{ key: WorkScopeKey; label: string }> = [
   { key: 'responsible', label: 'Tôi phụ trách' },
-  { key: 'mine', label: 'Giao trực tiếp' },
   { key: 'department', label: 'Phòng ban' },
   { key: 'watching', label: 'Đang theo dõi' },
   { key: 'all', label: 'Tất cả được phép xem' },
@@ -161,7 +167,7 @@ export function MyWorkPage() {
   const requestedBucket = validValue<SummaryBucket>(searchParams.get('bucket'), ['all', 'need_action', 'in_progress', 'overdue', 'blocked', 'waiting_decision', 'upcoming', 'completed', 'done_today'], 'need_action');
   const legacyApprovalMode = requestedQueue === 'pending_approval' || requestedBucket === 'waiting_decision';
   const mode: ModeKey = requestedMode === 'attention' ? 'attention' : requestedMode === 'approval' || legacyApprovalMode ? 'approval' : 'work';
-  const queue: WorkScopeKey = requestedQueue === 'pending_approval' ? 'responsible' : requestedQueue;
+  const queue: WorkScopeKey = (requestedQueue === 'pending_approval' || requestedQueue === 'mine') ? 'responsible' : requestedQueue;
   const attentionQueue = validValue<AttentionQueueKey>(searchParams.get('attention'), ['all', 'mentions', 'questions', 'blockers', 'reminders', 'unread'], 'all');
   const bucket: SummaryBucket = requestedBucket === 'waiting_decision' ? 'all' : requestedBucket;
   const project = searchParams.get('project') ?? '';
@@ -177,6 +183,15 @@ export function MyWorkPage() {
     ? requestedApprovalLaneValue as ApprovalLaneKey
     : null;
   const permittedRequestedApprovalLane = requestedApprovalLane === 'report' && !canReviewWorkReports ? null : requestedApprovalLane;
+
+  useEffect(() => {
+    if (requestedQueue !== 'mine') return;
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('queue');
+      return next;
+    }, { replace: true });
+  }, [requestedQueue, setSearchParams]);
 
   useEffect(() => setSearchDraft(search), [search]);
   useEffect(() => {
@@ -194,6 +209,12 @@ export function MyWorkPage() {
     initialPageParam: '',
     queryFn: ({ pageParam }) => get<MyWorkPageResponse>(buildWorkPath(filterKey, String(pageParam ?? ''))),
     getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor : undefined,
+    enabled: Boolean(user?.id),
+    retry: false,
+  });
+  const scopeSummary = useQuery({
+    queryKey: ['my-work-scope-summary', user?.id, project],
+    queryFn: () => get<MyWorkScopeSummary>(buildWorkScopeSummaryPath(project)),
     enabled: Boolean(user?.id),
     retry: false,
   });
@@ -299,6 +320,7 @@ export function MyWorkPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['my-workflow-actions'] }),
         queryClient.invalidateQueries({ queryKey: ['my-work-items'] }),
+        queryClient.invalidateQueries({ queryKey: ['my-work-scope-summary'] }),
         queryClient.invalidateQueries({ queryKey: ['pipeline-run', action.project_id] }),
         queryClient.invalidateQueries({ queryKey: ['project-operations', action.project_id] }),
         queryClient.invalidateQueries({ queryKey: ['project-progress'] }),
@@ -426,6 +448,7 @@ export function MyWorkPage() {
 
   function refreshAll() {
     void workItems.refetch();
+    void scopeSummary.refetch();
     void workflowActions.refetch();
     void startupActions.refetch();
     void activityAttentionSummary.refetch();
@@ -460,7 +483,7 @@ export function MyWorkPage() {
           <div className="flex items-center gap-2">
             <LiveStatusBadge status={streamStatus} />
             <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={refreshAll}>
-              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || workflowActions.isFetching || startupActions.isFetching || activityAttentionSummary.isFetching || pendingNodeApprovals.isFetching || (canReviewWorkReports && reportReviewSummary.isFetching) || (mode === 'approval' && canReviewWorkReports && reportReviewList.isFetching) || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
+              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || scopeSummary.isFetching || workflowActions.isFetching || startupActions.isFetching || activityAttentionSummary.isFetching || pendingNodeApprovals.isFetching || (canReviewWorkReports && reportReviewSummary.isFetching) || (mode === 'approval' && canReviewWorkReports && reportReviewList.isFetching) || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
               Làm mới
             </button>
           </div>
@@ -476,7 +499,12 @@ export function MyWorkPage() {
       {mode === 'work' ? (
         <section className="mt-4">
           <div className="grid gap-3 xl:grid-cols-[208px_minmax(0,1fr)_320px]">
-            <ScopeRail value={queue} onChange={(value) => updateParams({ queue: value, bucket: 'all' })} />
+            <ScopeRail
+              value={queue}
+              counts={scopeSummary.data}
+              loading={scopeSummary.isLoading}
+              onChange={(value) => updateParams({ queue: value, bucket: 'all' })}
+            />
 
             <div className="min-w-0">
               <WorkQuickFilters
@@ -599,7 +627,8 @@ export function MyWorkPage() {
         />
       )}
 
-      <ProjectStartupDialog
+      <ProjectStartupWizard
+        open={Boolean(startupDialogProjectID)}
         projectId={startupDialogProjectID}
         onClose={() => {
           setStartupDialogProjectID(null);
@@ -608,6 +637,7 @@ export function MyWorkPage() {
         onChanged={() => {
           void startupActions.refetch();
           void workItems.refetch();
+          void scopeSummary.refetch();
           void queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary'] });
         }}
       />
@@ -800,6 +830,12 @@ function buildWorkPath(filters: {
   return `/me/work-items?${params.toString()}`;
 }
 
+function buildWorkScopeSummaryPath(project: string) {
+  return project
+    ? `/me/work-items/scope-summary?project_id=${encodeURIComponent(project)}`
+    : '/me/work-items/scope-summary';
+}
+
 function buildWorkflowActionsPath(filters: { queue: WorkScopeKey; project: string; search: string }) {
   const params = new URLSearchParams({ queue: filters.queue });
   if (filters.project) params.set('project_id', filters.project);
@@ -906,12 +942,37 @@ function ModeTab({ active, label, count, onClick }: { active: boolean; label: st
   );
 }
 
-function ScopeRail({ value, onChange }: { value: WorkScopeKey; onChange: (value: WorkScopeKey) => void }) {
+function ScopeCountChip({ count, active }: { count: number; active: boolean }) {
+  if (count <= 0) return null;
   return (
-    <aside className="min-w-0 rounded-lg border border-line bg-white p-3 xl:sticky xl:top-4 xl:self-start" aria-label="Phạm vi công việc">
+    <span
+      className={clsx(
+        'inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums ring-1 ring-inset',
+        active ? 'bg-blue-600 text-white ring-blue-600' : 'bg-slate-100 text-slate-600 ring-slate-200',
+      )}
+      aria-label={`${count} việc làm ngay`}
+    >
+      {count}
+    </span>
+  );
+}
+
+function ScopeRail({ value, counts, loading, onChange }: {
+  value: WorkScopeKey;
+  counts?: MyWorkScopeSummary;
+  loading: boolean;
+  onChange: (value: WorkScopeKey) => void;
+}) {
+  const countValue = (scope: WorkScopeKey) => counts?.[scope]?.total ?? 0;
+  const activeScope = scopes.find((item) => item.key === value);
+  return (
+    <aside className="min-w-0 rounded-lg border border-line bg-white p-3 xl:sticky xl:top-4 xl:self-start" aria-label="Phạm vi công việc" aria-busy={loading}>
       <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-ink">Phạm vi</h2>
-        <span className="shrink-0 text-xs font-semibold text-blue-700 xl:hidden">{scopes.find((item) => item.key === value)?.label}</span>
+        <span className="flex shrink-0 items-center gap-2 text-xs font-semibold text-blue-700 xl:hidden">
+          {activeScope?.label}
+          <ScopeCountChip count={countValue(value)} active />
+        </span>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible xl:pb-0">
         {scopes.map((item) => {
@@ -930,7 +991,10 @@ function ScopeRail({ value, onChange }: { value: WorkScopeKey; onChange: (value:
               {active ? <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-blue-600" aria-hidden="true" /> : null}
               <span className="flex items-center gap-2 text-sm font-semibold">
                 {active ? <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-600" /> : <span className="h-4 w-4 shrink-0" aria-hidden="true" />}
-                {item.label}
+                <span>{item.label}</span>
+                <span className="ml-auto">
+                  <ScopeCountChip count={countValue(item.key)} active={active} />
+                </span>
               </span>
             </button>
           );
@@ -1150,131 +1214,6 @@ function ProjectStartupNextPanel({ action, onOpen }: { action: ProjectStartupAct
       <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={onOpen}><UserCog className="h-4 w-4" />{upcoming ? 'Xem thiết lập' : 'Tiếp tục thiết lập'}</button>
       <Link className="mt-2 inline-flex w-full justify-center rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${action.project_id}`}>Mở công trình</Link>
     </aside>
-  );
-}
-
-function ProjectStartupDialog({ projectId, onClose, onChanged }: { projectId: string | null; onClose: () => void; onChanged: () => void }) {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const [selectedPMStaffID, setSelectedPMStaffID] = useState('');
-  const readiness = useQuery({
-    queryKey: ['project-startup-readiness', projectId],
-    queryFn: () => get<ProjectStartupReadiness>(`/projects/${projectId}/startup-readiness`),
-    enabled: Boolean(projectId),
-    retry: false,
-  });
-  const members = useQuery({
-    queryKey: ['project-members', projectId],
-    queryFn: () => get<ProjectMembersResponse>(`/projects/${projectId}/members?include_inactive=false`),
-    enabled: Boolean(projectId),
-    retry: false,
-  });
-  useEffect(() => setSelectedPMStaffID(readiness.data?.pm_staff_id ?? ''), [projectId, readiness.data?.pm_staff_id]);
-
-  const setProjectManager = useMutation({
-    mutationFn: (staffId: string) => put(`/projects/${projectId}/project-manager`, { staff_id: staffId }),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['project-startup-readiness', projectId] }),
-        queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] }),
-        queryClient.invalidateQueries({ queryKey: ['project-members', projectId] }),
-      ]);
-      onChanged();
-      toast.success('Đã bàn giao trách nhiệm thiết lập cho PM');
-    },
-    onError: (error) => {
-      if (error instanceof ApiError && error.code === 'VALIDATION_ERROR') {
-        toast.warn({ title: 'Chưa thể chỉ định PM', description: error.message });
-        return;
-      }
-      toast.error('Không chỉ định được PM', error);
-    },
-  });
-  const startPipeline = useMutation({
-    mutationFn: () => post(`/projects/${projectId}/start-pipeline`, { template_id: readiness.data?.template_id }),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['project-startup-readiness', projectId] }),
-        queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] }),
-        queryClient.invalidateQueries({ queryKey: ['my-work-items'] }),
-        queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] }),
-        queryClient.invalidateQueries({ queryKey: ['pipeline-run', projectId] }),
-      ]);
-      onChanged();
-      toast.success('Đã bắt đầu quy trình và giao các công việc đầu tiên');
-      onClose();
-    },
-    onError: (error) => {
-      if (error instanceof ApiError && error.code === 'VALIDATION_ERROR') {
-        toast.warn({ title: 'Chưa thể bắt đầu quy trình', description: error.message });
-        return;
-      }
-      toast.error('Không bắt đầu được quy trình', error);
-    },
-  });
-  const data = readiness.data;
-  const activeMembers = (members.data?.items ?? []).filter((member) => member.active && member.user_id);
-
-  return (
-    <Dialog
-      open={Boolean(projectId)}
-      title={data ? `Thiết lập ${data.project_code} · ${data.project_name}` : 'Thiết lập công trình'}
-      description="Hoàn tất đúng người phụ trách và phạm vi bước đầu trước khi tạo công việc thật."
-      size="lg"
-      onClose={onClose}
-      footer={data ? (
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <Link className="inline-flex justify-center rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${data.project_id}?tab=members`}>Quản lý thành viên công trình</Link>
-          <div className="flex justify-end gap-2">
-            <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>Đóng</button>
-            {data.capabilities.can_start_pipeline ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={startPipeline.isPending} onClick={() => startPipeline.mutate()}>{startPipeline.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}{startPipeline.isPending ? 'Đang khởi động…' : 'Bắt đầu quy trình'}</button> : null}
-          </div>
-        </div>
-      ) : undefined}
-    >
-      {readiness.isLoading ? <LoadingSpinner /> : null}
-      {readiness.isError ? <SourceError title="Không tải được trạng thái khởi tạo công trình" onRetry={() => void readiness.refetch()} /> : null}
-      {data ? (
-        <div className="space-y-4">
-          <section className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-line bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Người chịu trách nhiệm</p><p className="mt-2 font-semibold text-ink">{data.owner_name || 'Chưa xác định'}</p><p className="mt-1 text-xs text-slate-600">{data.pm_user_id ? 'PM công trình' : 'Người tạo công trình (tạm thời)'}</p></div>
-            <div className="rounded-lg border border-line bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mẫu quy trình</p><p className="mt-2 font-semibold text-ink">{data.template_name || 'Chưa có mẫu đã phát hành'}</p><p className="mt-1 text-xs text-slate-600">{data.template_id ? 'Sẵn sàng kiểm tra bước đầu' : 'Cần chọn hoặc phát hành mẫu quy trình'}</p></div>
-          </section>
-
-          {data.capabilities.can_manage_project_manager ? (
-            <section className="rounded-lg border border-line p-4">
-              <h3 className="font-semibold text-ink">1. Chỉ định PM chịu trách nhiệm</h3>
-              <p className="mt-1 text-sm text-slate-600">PM phải là thành viên đang hoạt động và có quyền quản lý thành viên, xem công trình, chạy pipeline.</p>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                <select className="min-w-0 flex-1 rounded-md border border-line bg-white px-3 py-2 text-sm" value={selectedPMStaffID} onChange={(event) => setSelectedPMStaffID(event.target.value)}>
-                  <option value="">Chọn PM từ thành viên hoạt động</option>
-                  {activeMembers.map((member) => <option key={member.id} value={member.staff_id}>{member.full_name} · {(member.role_ids ?? []).join(', ') || 'Chưa có vai trò'}</option>)}
-                </select>
-                <button type="button" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={!selectedPMStaffID || selectedPMStaffID === data.pm_staff_id || setProjectManager.isPending} onClick={() => setProjectManager.mutate(selectedPMStaffID)}>{setProjectManager.isPending ? 'Đang lưu…' : 'Bàn giao cho PM'}</button>
-              </div>
-              {members.isError ? <p className="mt-2 text-sm text-rose-700">Không tải được danh sách thành viên; hãy mở tab Thành viên để kiểm tra.</p> : null}
-            </section>
-          ) : null}
-
-          <section className="rounded-lg border border-line p-4">
-            <h3 className="font-semibold text-ink">2. Người thực hiện bước đầu</h3>
-            <div className="mt-3 space-y-2">
-              {data.first_steps.length ? data.first_steps.map((step) => (
-                <div key={step.id} className={clsx('rounded-md border p-3', step.covered ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50')}>
-                  <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-ink">{step.name}</p><p className="mt-1 text-xs text-slate-600">Vai trò: {step.role_ids.join(', ') || 'Không giới hạn'}{step.required_permission ? ` · Quyền: ${step.required_permission}` : ''}</p></div><span className={clsx('shrink-0 text-xs font-semibold', step.covered ? 'text-emerald-700' : 'text-amber-800')}>{step.covered ? 'Đã có người' : 'Thiếu người'}</span></div>
-                  <p className="mt-2 text-xs text-slate-700">{step.eligible_users.length ? step.eligible_users.map((person) => person.full_name).join(', ') : 'Chưa có thành viên phù hợp.'}</p>
-                </div>
-              )) : <p className="text-sm text-slate-600">Node đầu không có bước tạo công việc.</p>}
-            </div>
-          </section>
-
-          <section className={clsx('rounded-lg border p-4', data.ready_to_start ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50')}>
-            <h3 className={clsx('font-semibold', data.ready_to_start ? 'text-emerald-800' : 'text-amber-900')}>{data.ready_to_start ? 'Đã sẵn sàng bắt đầu' : `Còn ${data.blockers.length} điều kiện cần xử lý`}</h3>
-            {!data.ready_to_start ? <ul className="mt-2 space-y-1 text-sm text-amber-900">{data.blockers.map((blocker, index) => <li key={`${blocker.key}-${blocker.step_id ?? index}`}>• {blocker.label}</li>)}</ul> : <p className="mt-1 text-sm text-emerald-800">Khi bắt đầu, hệ thống mới tạo Work Item thật và thông báo đúng nhóm vai trò.</p>}
-          </section>
-        </div>
-      ) : null}
-    </Dialog>
   );
 }
 

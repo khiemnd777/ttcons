@@ -17,7 +17,7 @@ import {
   Plus,
   Search,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { get, post, put, streamSSE, type StreamStatus } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -28,9 +28,8 @@ import { EmptyState } from '../../components/EmptyState';
 import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { SimpleForm } from '../_shared/SimpleForm';
-import type { Partner, Project, ProjectExplorerPage } from '../../lib/types/domain';
+import type { Project, ProjectExplorerPage } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
-import { partnerOptions } from '../core-data/partnerUtils';
 import { BulkSelectionBar } from '../../components/BulkSelectionBar';
 import { BulkDeleteDialog, type BulkDeletionResult } from '../../components/BulkDeleteDialog';
 import { SelectionCheckbox } from '../../components/SelectionCheckbox';
@@ -50,12 +49,13 @@ import {
 } from './projectExplorerSort';
 import { ProjectImportDialog } from './ProjectImportDialog';
 import { ProjectExportDialog } from './ProjectExportDialog';
+import { ProjectStartupWizard } from './ProjectStartupWizard';
+import { buildProjectFormFields, useProjectFormCatalogs } from './projectFormFields';
 
 const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-[112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
 const PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS = 'lg:grid-cols-[32px_112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
 
 export function ProjectsPage() {
-	const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [search, setSearch] = useState('');
@@ -94,8 +94,7 @@ export function ProjectsPage() {
 		staleTime: 0,
 		refetchInterval: streamStatus === 'connected' ? false : 60_000,
 	});
-  const templates = useQuery({ queryKey: ['pipeline-templates'], queryFn: () => get<Record<string, any>[]>('/pipeline-templates') });
-  const partners = useQuery({ queryKey: ['partners', 'client', 'active'], queryFn: () => get<Partner[]>('/partners?status=active&type=client') });
+  const projectFormCatalogs = useProjectFormCatalogs();
   const createProject = useMutation({
     mutationFn: (values: Record<string, any>) => post<Project>('/projects', values),
     onSuccess: (project) => {
@@ -103,9 +102,7 @@ export function ProjectsPage() {
 		queryClient.invalidateQueries({ queryKey: ['project-explorer'] });
 		queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] });
 		queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary'] });
-      setOpen(false);
-      toast.success({ title: 'Đã tạo công trình', description: 'Tiếp theo: chỉ định PM, kiểm tra người phụ trách bước đầu và bắt đầu quy trình.' });
-      navigate(`/my-work?setup=${project.id}`);
+      toast.success({ title: 'Đã tạo công trình', description: 'Tiếp theo: chọn nhân sự tham gia công trình.' });
     },
     onError: (error) => toast.error('Không tạo được công trình', error),
   });
@@ -120,42 +117,11 @@ export function ProjectsPage() {
     onError: (error) => toast.error('Không cập nhật được công trình', error),
   });
 
-  const projectFields = (record?: Project) => [
-    { name: 'name', label: 'Tên công trình', defaultValue: record?.name ?? 'Công trình mới', required: true },
-    { name: 'code', label: 'Mã công trình', defaultValue: record?.code ?? `PRJ-${Date.now().toString().slice(-5)}`, required: true },
-    {
-      name: 'partner_id',
-      label: 'Chọn chủ đầu tư có sẵn',
-      type: 'select' as const,
-      defaultValue: record?.partner_id ?? '',
-      options: partnerOptions(partners.data ?? [], ['client']),
-      helperText: 'Khi chọn, hệ thống lưu tên chủ đầu tư hiện tại vào công trình.',
-      fullWidth: true,
-    },
-    {
-      name: 'client_name',
-      label: 'Khách hàng / Chủ đầu tư',
-      defaultValue: record?.client_name ?? 'Khách hàng mới',
-      required: true,
-      hiddenWhen: (values: Record<string, any>) => Boolean(values.partner_id),
-      fullWidth: true,
-    },
-    { name: 'address', label: 'Địa chỉ', defaultValue: record?.address ?? '', fullWidth: true },
-    { name: 'planned_start_date', label: 'Ngày bắt đầu dự kiến', type: 'date' as const, defaultValue: record?.planned_start_date?.slice?.(0, 10) ?? '' },
-    { name: 'planned_end_date', label: 'Ngày kết thúc dự kiến', type: 'date' as const, defaultValue: record?.planned_end_date?.slice?.(0, 10) ?? '' },
-    { name: 'estimated_budget', label: 'Ngân sách dự kiến', type: 'currency' as const, defaultValue: record?.estimated_budget ?? 300000000, min: 0 },
-    { name: 'contract_amount', label: 'Giá trị hợp đồng', type: 'currency' as const, defaultValue: record?.contract_amount ?? 450000000, min: 0 },
-    {
-      name: 'pipeline_template_id',
-      label: 'Pipeline template',
-      type: 'select' as const,
-      defaultValue: record?.pipeline_template_id ?? latestPublishedTemplateId(templates.data ?? []),
-      options: (templates.data ?? [])
-        .filter((template) => template.status === 'published')
-        .map((template) => ({ label: `${template.name} · revision ${template.revision_no ?? template.version}`, value: template.id })),
-      fullWidth: true,
-    },
-  ];
+  const projectFields = (record?: Project) => buildProjectFormFields(
+    record,
+    projectFormCatalogs.partners,
+    projectFormCatalogs.templates,
+  );
 
   const visibleFolders = useMemo(
     () => visibleProjectWorkspaceGroups(hasAnyPermission),
@@ -457,13 +423,18 @@ export function ProjectsPage() {
 			onError={(title, error) => toast.error(title, error)}
 		/>
 
-      <FormDrawer open={open} title="Tạo công trình mới" onClose={() => setOpen(false)}>
-        <SimpleForm
-          submitLabel="Tạo công trình"
-          fields={projectFields()}
-          onSubmit={(values) => createProject.mutateAsync(values)}
-        />
-      </FormDrawer>
+      <ProjectStartupWizard
+        open={open}
+        onCreateProject={(values) => createProject.mutateAsync(values)}
+        onUpdateProject={(projectId, values) => updateProject.mutateAsync({ projectId, values })}
+        onClose={() => setOpen(false)}
+        onChanged={() => {
+          void queryClient.invalidateQueries({ queryKey: ['projects'] });
+          void queryClient.invalidateQueries({ queryKey: ['project-explorer'] });
+          void queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] });
+          void queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary'] });
+        }}
+      />
       <FormDrawer open={Boolean(editingProject)} title="Chỉnh sửa công trình" onClose={() => setEditingProject(null)}>
         {editingProject ? (
           <div className="space-y-5">
@@ -547,12 +518,6 @@ function ProjectExplorerPagination({
 			</div>
 		</div>
 	);
-}
-
-function latestPublishedTemplateId(templates: Record<string, any>[]) {
-  return [...templates]
-    .filter((template) => template.status === 'published')
-    .sort((left, right) => Number(right.revision_no ?? right.version ?? 0) - Number(left.revision_no ?? left.version ?? 0))[0]?.id ?? '';
 }
 
 function ProjectEditSummary({ project }: { project: Project }) {

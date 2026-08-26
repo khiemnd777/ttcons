@@ -51,6 +51,7 @@ export function ActorRealtimeProvider({ children }: { children: ReactNode }) {
         if (message.event === 'work_queue_changed' || message.event === 'work_item_changed') {
           void queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary', actorID] });
           void queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
+          void queryClient.invalidateQueries({ queryKey: ['my-work-scope-summary'] });
           void queryClient.invalidateQueries({ queryKey: ['my-workflow-actions'] });
           void queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] });
           void queryClient.invalidateQueries({ queryKey: ['project-startup-readiness'] });

@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const featureFiles = [
   '../src/modules/projects/ProjectsPage.tsx',
+  '../src/modules/projects/projectFormFields.ts',
   '../src/modules/warehouse/WarehousePage.tsx',
   '../src/modules/procurement/ProcurementPage.tsx',
   '../src/modules/rework/ReworkPage.tsx',

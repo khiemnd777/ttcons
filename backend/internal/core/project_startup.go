@@ -87,9 +87,14 @@ func (s *Service) ProjectStartupReadiness(ctx context.Context, projectID, actorI
 	if err != nil {
 		return nil, err
 	}
+	canUpdate, err := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"project.update"})
+	if err != nil {
+		return nil, err
+	}
 	readiness["capabilities"] = Record{
 		"can_manage_project_manager": canManage,
 		"can_start_pipeline":         canStart && boolValue(readiness["ready_to_start"]),
+		"can_update_project":         canUpdate,
 		"is_startup_owner":           cleanID(readiness["owner_user_id"]) == actorID,
 	}
 	return readiness, nil
@@ -206,20 +211,20 @@ func projectStartupReadiness(ctx context.Context, db queryContext, projectID str
 	}
 	templateID := cleanID(project["template_id"])
 	firstSteps := []Record{}
+	roleCoverage := []Record{}
 	blockers := []Record{}
 	if templateID == "" || fmt.Sprint(project["template_status"]) != "published" {
 		blockers = append(blockers, Record{"key": "pipeline_template", "label": "Chọn mẫu quy trình đã phát hành"})
 	} else {
-		steps, err := queryRecords(ctx, db, `
-			WITH first_node AS (
-				SELECT id,responsible_role_ids FROM pipeline_template_nodes
-				WHERE template_id=$1::uuid ORDER BY order_index,created_at,id LIMIT 1
-			)
-			SELECT step.id::text,step.name,step.required_role_ids,step.required_permission,
-				first_node.responsible_role_ids AS node_role_ids,step.order_index
-			FROM first_node
-			JOIN pipeline_template_steps step ON step.node_id=first_node.id
-			ORDER BY step.order_index,step.created_at,step.id
+		templateRows, err := queryRecords(ctx, db, `
+			SELECT node.id::text AS node_id,node.name AS node_name,node.responsible_role_ids AS node_role_ids,
+				COALESCE(step.id::text,'') AS step_id,COALESCE(step.name,'') AS step_name,
+				COALESCE(step.required_role_ids,'[]'::jsonb) AS step_role_ids,
+				COALESCE(step.required_permission,'') AS required_permission
+			FROM pipeline_template_nodes node
+			LEFT JOIN pipeline_template_steps step ON step.node_id=node.id
+			WHERE node.template_id=$1::uuid
+			ORDER BY node.order_index,node.created_at,node.id,step.order_index,step.created_at,step.id
 		`, templateID)
 		if err != nil {
 			return nil, err
@@ -228,8 +233,16 @@ func projectStartupReadiness(ctx context.Context, db queryContext, projectID str
 		if err != nil {
 			return nil, err
 		}
-		for _, step := range steps {
-			roles := stringSlice(step["required_role_ids"])
+		roleCoverage = projectStartupRoleCoverage(templateRows, members)
+		firstNodeID := ""
+		if len(templateRows) > 0 {
+			firstNodeID = cleanID(templateRows[0]["node_id"])
+		}
+		for _, step := range templateRows {
+			if cleanID(step["node_id"]) != firstNodeID || cleanID(step["step_id"]) == "" {
+				continue
+			}
+			roles := stringSlice(step["step_role_ids"])
 			if len(roles) == 0 {
 				roles = stringSlice(step["node_role_ids"])
 			}
@@ -246,11 +259,11 @@ func projectStartupReadiness(ctx context.Context, db queryContext, projectID str
 			}
 			covered := len(eligible) > 0
 			firstSteps = append(firstSteps, Record{
-				"id": step["id"], "name": step["name"], "role_ids": roles, "required_permission": requiredPermission,
+				"id": step["step_id"], "name": step["step_name"], "role_ids": roles, "required_permission": requiredPermission,
 				"eligible_users": eligible, "covered": covered,
 			})
 			if !covered {
-				blockers = append(blockers, Record{"key": "first_step_coverage", "step_id": step["id"], "label": fmt.Sprintf("Phân công người đủ vai trò cho bước %s", step["name"])})
+				blockers = append(blockers, Record{"key": "first_step_coverage", "step_id": step["step_id"], "label": fmt.Sprintf("Phân công người đủ vai trò cho bước %s", step["step_name"])})
 			}
 		}
 	}
@@ -262,8 +275,79 @@ func projectStartupReadiness(ctx context.Context, db queryContext, projectID str
 		"created_by": project["created_by"], "owner_user_id": ownerID, "owner_name": ownerName,
 		"pm_staff_id": project["pm_staff_id"], "pm_user_id": project["pm_user_id"], "pm_name": project["pm_name"],
 		"template_id": templateID, "template_name": project["template_name"], "template_status": project["template_status"],
-		"first_steps": firstSteps, "blockers": blockers, "ready_to_start": len(blockers) == 0,
+		"role_coverage": roleCoverage, "first_steps": firstSteps, "blockers": blockers, "ready_to_start": len(blockers) == 0,
 	}, nil
+}
+
+func projectStartupRoleCoverage(templateRows, members []Record) []Record {
+	type roleUsage struct {
+		label   string
+		nodes   map[string]bool
+		steps   map[string]bool
+		members []Record
+	}
+	orderedKeys := make([]string, 0)
+	usageByKey := map[string]*roleUsage{}
+	addUsage := func(roleLabel, nodeID, stepID string) {
+		roleLabel = strings.TrimSpace(roleLabel)
+		key := normalizeRoleLabel(roleLabel)
+		if key == "" {
+			return
+		}
+		usage := usageByKey[key]
+		if usage == nil {
+			usage = &roleUsage{label: roleLabel, nodes: map[string]bool{}, steps: map[string]bool{}, members: make([]Record, 0)}
+			for _, member := range members {
+				if roleLabelsIntersect(stringSlice(member["role_ids"]), []string{roleLabel}) {
+					usage.members = append(usage.members, Record{
+						"user_id": member["user_id"], "staff_id": member["staff_id"], "full_name": member["full_name"],
+					})
+				}
+			}
+			usageByKey[key] = usage
+			orderedKeys = append(orderedKeys, key)
+		}
+		if nodeID != "" {
+			usage.nodes[nodeID] = true
+		}
+		if stepID != "" {
+			usage.steps[stepID] = true
+		}
+	}
+	seenNodes := map[string]bool{}
+	for _, row := range templateRows {
+		nodeID := cleanID(row["node_id"])
+		nodeRoles := stringSlice(row["node_role_ids"])
+		if nodeID != "" && !seenNodes[nodeID] {
+			for _, roleLabel := range nodeRoles {
+				addUsage(roleLabel, nodeID, "")
+			}
+			seenNodes[nodeID] = true
+		}
+		stepID := cleanID(row["step_id"])
+		if stepID == "" {
+			continue
+		}
+		stepRoles := stringSlice(row["step_role_ids"])
+		if len(stepRoles) == 0 {
+			stepRoles = nodeRoles
+		}
+		for _, roleLabel := range stepRoles {
+			addUsage(roleLabel, nodeID, stepID)
+		}
+	}
+	coverage := make([]Record, 0, len(orderedKeys))
+	for _, key := range orderedKeys {
+		usage := usageByKey[key]
+		coverage = append(coverage, Record{
+			"role_label": usage.label,
+			"node_count": len(usage.nodes),
+			"step_count": len(usage.steps),
+			"members":    usage.members,
+			"covered":    len(usage.members) > 0,
+		})
+	}
+	return coverage
 }
 
 func projectStartupMembers(ctx context.Context, db queryContext, projectID string) ([]Record, error) {

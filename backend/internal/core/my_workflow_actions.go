@@ -37,13 +37,14 @@ func (r *Repository) MyWorkflowActions(ctx context.Context, actorID string, filt
 	}
 	candidates, err := r.Query(ctx, fmt.Sprintf(`
 		SELECT rn.*, p.name AS project_name, p.code AS project_code,
-			pr.engine_version AS pipeline_engine_version
+			pr.engine_version AS pipeline_engine_version,
+			%s AS is_responsible
 		FROM pipeline_runs pr
 		JOIN projects p ON p.id=pr.project_id
 		JOIN pipeline_run_nodes rn ON rn.id=pr.current_node_id AND rn.run_id=pr.id
 		WHERE %s
 		ORDER BY p.name,p.code,rn.order_index,rn.id
-	`, strings.Join(conditions, " AND ")), args...)
+	`, myWorkflowActionResponsibilitySQL("rn", "p", 2, 3), strings.Join(conditions, " AND ")), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,9 @@ func (r *Repository) MyWorkflowActions(ctx context.Context, actorID string, filt
 		if len(transitionBlockers) > 0 || transition == nil {
 			continue
 		}
-		actions = append(actions, myWorkflowAdvanceAction(node, nextNode, transition))
+		action := myWorkflowAdvanceAction(node, nextNode, transition)
+		action["is_responsible"] = boolValue(node["is_responsible"])
+		actions = append(actions, action)
 	}
 	return actions, nil
 }

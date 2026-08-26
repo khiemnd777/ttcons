@@ -27,6 +27,100 @@ func TestNormalizeProjectMemberMutationRequest(t *testing.T) {
 	}
 }
 
+func TestSaveProjectMembersBulkRejectsEmptyOversizedAndDuplicateRequests(t *testing.T) {
+	service := &Service{}
+	projectID := newID()
+	staffID := newID()
+	valid := ProjectMemberMutationRequest{StaffID: staffID, RoleIDs: []string{"PM"}}
+	if _, err := service.SaveProjectMembersBulk(context.Background(), projectID, ProjectMemberBulkMutationRequest{}, "", "Test"); err == nil {
+		t.Fatal("expected empty bulk request to fail")
+	}
+	tooMany := make([]ProjectMemberMutationRequest, 51)
+	if _, err := service.SaveProjectMembersBulk(context.Background(), projectID, ProjectMemberBulkMutationRequest{Members: tooMany}, "", "Test"); err == nil {
+		t.Fatal("expected oversized bulk request to fail")
+	}
+	if _, err := service.SaveProjectMembersBulk(context.Background(), projectID, ProjectMemberBulkMutationRequest{Members: []ProjectMemberMutationRequest{valid, valid}}, "", "Test"); err == nil {
+		t.Fatal("expected duplicate staff in bulk request to fail")
+	}
+}
+
+func TestProjectMemberBulkSaveIsAtomic(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	suffix := strings.ReplaceAll(newID()[:8], "-", "")
+	projectID := newID()
+	roleID := newID()
+	missingRoleID := newID()
+	userIDs := []string{newID(), newID()}
+	staffIDs := []string{newID(), newID()}
+	roleName := "bulk_member_" + suffix
+	roleLabel := "Bulk Member " + suffix
+	viewPermissionID := ensurePermission(t, db, "project.view", "Xem công trình", "project")
+	managePermissionID := ensurePermission(t, db, "project.member.manage", "Quản lý thành viên", "project")
+	runPermissionID := ensurePermission(t, db, "pipeline.run", "Khởi chạy pipeline", "pipeline")
+
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id IN ($1,$2)`, userIDs[0], userIDs[1])
+		_, _ = db.ExecContext(ctx, `DELETE FROM project_members WHERE project_id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE project_id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id IN ($1,$2)`, staffIDs[0], staffIDs[1])
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id IN ($1,$2)`, userIDs[0], userIDs[1])
+		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, roleID)
+	})
+
+	mustExec(t, db, `INSERT INTO roles (id,name,display_name,system_role,external_only) VALUES ($1,$2,$3,false,false)`, roleID, roleName, roleLabel)
+	mustExec(t, db, `INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2),($1,$3),($1,$4)`, roleID, viewPermissionID, managePermissionID, runPermissionID)
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'x','Bulk One','active'),($3,$4,'x','Bulk Two','active')`, userIDs[0], "bulk-one-"+suffix+"@test.local", userIDs[1], "bulk-two-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,status) VALUES ($1,$2,'Bulk One',$3,'active'),($4,$5,'Bulk Two',$6,'active')`, staffIDs[0], userIDs[0], "bulk-one-staff-"+suffix+"@test.local", staffIDs[1], userIDs[1], "bulk-two-staff-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status) VALUES ($1,'Bulk Member Project',$2,'Client','draft')`, projectID, "BMP-"+suffix)
+
+	requests := []ProjectMemberMutationRequest{
+		{StaffID: staffIDs[0], RoleIDs: []string{roleLabel}, ProjectRoleIDs: []string{roleID}},
+		{StaffID: staffIDs[1], RoleIDs: []string{roleLabel}, ProjectRoleIDs: []string{missingRoleID}},
+	}
+	if _, err := repo.SaveProjectMembersBulk(ctx, projectID, requests, "", "Integration Test"); err == nil {
+		t.Fatal("expected invalid second member to fail the bulk transaction")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM project_members WHERE project_id=$1`, 0, projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_roles WHERE project_id=$1`, 0, projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND target_type='project_member'`, 0, projectID)
+
+	requests[1].ProjectRoleIDs = []string{roleID}
+	members, err := repo.SaveProjectMembersBulk(ctx, projectID, requests, "", "Integration Test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(members) != 2 {
+		t.Fatalf("bulk members = %#v", members)
+	}
+	if !boolValue(members[0]["account_active"]) {
+		t.Fatalf("saved member account state = %#v", members[0]["account_active"])
+	}
+	memberRoles := recordsFromAny(members[0]["project_roles"])
+	if len(memberRoles) != 1 || !boolValue(memberRoles[0]["grants_project_view"]) || !boolValue(memberRoles[0]["grants_project_member_manage"]) || !boolValue(memberRoles[0]["grants_pipeline_run"]) {
+		t.Fatalf("saved member did not expose PM eligibility grants: %#v", members[0]["project_roles"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM project_members WHERE project_id=$1 AND active`, 2, projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND target_type='project_member'`, 2, projectID)
+
+	options, err := repo.ProjectMemberOptions(ctx, projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundEligibleRole := false
+	for _, role := range options["access_roles"].([]Record) {
+		if cleanID(role["id"]) != roleID {
+			continue
+		}
+		foundEligibleRole = boolValue(role["grants_project_view"]) && boolValue(role["grants_project_member_manage"]) && boolValue(role["grants_pipeline_run"])
+	}
+	if !foundEligibleRole {
+		t.Fatalf("access role did not expose PM eligibility grants: %#v", options["access_roles"])
+	}
+}
+
 func TestProjectMemberLifecycleAndProjectManagerProtection(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

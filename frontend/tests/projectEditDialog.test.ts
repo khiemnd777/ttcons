@@ -6,6 +6,10 @@ async function projectsPageSource() {
   return readFile(new URL('../src/modules/projects/ProjectsPage.tsx', import.meta.url), 'utf8');
 }
 
+async function projectFormFieldsSource() {
+  return readFile(new URL('../src/modules/projects/projectFormFields.ts', import.meta.url), 'utf8');
+}
+
 test('project explorer keeps one pencil entry point for project review and editing', async () => {
   const projectsPage = await projectsPageSource();
 
@@ -31,10 +35,11 @@ test('project edit dialog preserves read-only detail context above the editable 
 
 test('project edit dialog uses plain-language owner selection wording', async () => {
   const projectsPage = await projectsPageSource();
+  const projectFormFields = await projectFormFieldsSource();
 
-  assert.match(projectsPage, /label: 'Chọn chủ đầu tư có sẵn'/);
+  assert.match(projectFormFields, /label: 'Chọn chủ đầu tư có sẵn'/);
   assert.match(projectsPage, />Chủ đầu tư đã chọn<\/dt>/);
-  assert.match(projectsPage, /helperText: 'Khi chọn, hệ thống lưu tên chủ đầu tư hiện tại vào công trình\.'/);
-  assert.doesNotMatch(projectsPage, /Chủ đầu tư catalog/);
-  assert.doesNotMatch(projectsPage, /backend tự snapshot/);
+  assert.match(projectFormFields, /helperText: 'Khi chọn, hệ thống lưu tên chủ đầu tư hiện tại vào công trình\.'/);
+  assert.doesNotMatch(`${projectsPage}\n${projectFormFields}`, /Chủ đầu tư catalog/);
+  assert.doesNotMatch(`${projectsPage}\n${projectFormFields}`, /backend tự snapshot/);
 });

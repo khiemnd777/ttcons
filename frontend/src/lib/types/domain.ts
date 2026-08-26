@@ -345,6 +345,8 @@ export type ProjectMemberAccessRole = {
   scope: 'global' | 'project';
   description?: string;
   grants_project_view?: boolean;
+  grants_project_member_manage?: boolean;
+  grants_pipeline_run?: boolean;
 };
 
 export type ProjectMember = {
@@ -362,6 +364,7 @@ export type ProjectMember = {
   project_roles: ProjectMemberAccessRole[];
   notes?: string;
   active: boolean;
+  account_active?: boolean;
   account_deleted?: boolean;
   is_project_manager: boolean;
   created_at?: string;
@@ -415,6 +418,14 @@ export type ProjectStartupStep = {
   covered: boolean;
 };
 
+export type ProjectStartupRoleCoverage = {
+  role_label: string;
+  node_count: number;
+  step_count: number;
+  members: ProjectStartupEligibleUser[];
+  covered: boolean;
+};
+
 export type ProjectStartupBlocker = {
   key: 'pipeline_template' | 'project_manager' | 'first_step_coverage' | string;
   label: string;
@@ -454,12 +465,14 @@ export type ProjectStartupReadiness = {
   template_id?: string;
   template_name?: string;
   template_status?: string;
+  role_coverage?: ProjectStartupRoleCoverage[];
   first_steps: ProjectStartupStep[];
   blockers: ProjectStartupBlocker[];
   ready_to_start: boolean;
   capabilities: {
     can_manage_project_manager: boolean;
     can_start_pipeline: boolean;
+    can_update_project: boolean;
     is_startup_owner: boolean;
   };
 };

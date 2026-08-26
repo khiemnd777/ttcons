@@ -20,6 +20,52 @@ type myWorkNavigationCounts struct {
 	WaitingDecision int
 }
 
+type myWorkScopeCounts struct {
+	Responsible int
+	Mine        int
+	Department  int
+	Watching    int
+	All         int
+}
+
+func (r *Repository) MyWorkScopeCounts(ctx context.Context, userID, projectID string) (myWorkScopeCounts, error) {
+	profile, err := r.WorkItemAccessProfile(ctx, userID)
+	if err != nil {
+		return myWorkScopeCounts{}, err
+	}
+	args := append(
+		workItemScopeArgs(profile, false, true),
+		workItemScopeArgs(profile, profile.IsAdmin, false)...,
+	)
+	args = append(args, profile.IsAdmin || profile.IsDirector)
+	conditions := []string{"TRUE"}
+	if projectID != "" {
+		args = append(args, projectID)
+		conditions = append(conditions, fmt.Sprintf("project_id=$%d", len(args)))
+	}
+	needAction := myWorkNeedActionSQL()
+	row, err := r.QueryOne(ctx, myWorkItemsBaseSQL()+fmt.Sprintf(`
+		SELECT
+			COUNT(*) FILTER (WHERE is_responsible AND %[1]s) AS responsible,
+			COUNT(*) FILTER (WHERE is_mine AND %[1]s) AS mine,
+			COUNT(*) FILTER (WHERE is_department AND %[1]s) AS department,
+			COUNT(*) FILTER (WHERE is_watching AND %[1]s) AS watching,
+			COUNT(*) FILTER (WHERE %[1]s) AS all_scope
+		FROM base_work
+		WHERE %s
+	`, needAction, strings.Join(conditions, " AND ")), args...)
+	if err != nil {
+		return myWorkScopeCounts{}, err
+	}
+	return myWorkScopeCounts{
+		Responsible: int(number(row["responsible"])),
+		Mine:        int(number(row["mine"])),
+		Department:  int(number(row["department"])),
+		Watching:    int(number(row["watching"])),
+		All:         int(number(row["all_scope"])),
+	}, nil
+}
+
 func (r *Repository) MyWorkNavigationCounts(ctx context.Context, userID string) (myWorkNavigationCounts, error) {
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
 	if err != nil {

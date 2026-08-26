@@ -379,6 +379,22 @@ func (h *Handler) CreateProjectMember(c *fiber.Ctx) error {
 	return response.Created(c, member)
 }
 
+func (h *Handler) CreateProjectMembersBulk(c *fiber.Ctx) error {
+	projectID := c.Params("id")
+	if err := h.requireProjectPermission(c, projectID, []string{"project.member.manage"}); err != nil {
+		return err
+	}
+	req := ProjectMemberBulkMutationRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu danh sách thành viên không hợp lệ")
+	}
+	result, err := h.service.SaveProjectMembersBulk(c.Context(), projectID, req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, result)
+}
+
 func (h *Handler) UpdateProjectMember(c *fiber.Ctx) error {
 	projectID := c.Params("id")
 	if err := h.requireProjectPermission(c, projectID, []string{"project.member.manage"}); err != nil {
@@ -987,6 +1003,14 @@ func (h *Handler) MyWorkItems(c *fiber.Ctx) error {
 
 func (h *Handler) MyWorkNavigationSummary(c *fiber.Ctx) error {
 	summary, err := h.service.MyWorkNavigationSummary(c.Context(), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, summary)
+}
+
+func (h *Handler) MyWorkScopeSummary(c *fiber.Ctx) error {
+	summary, err := h.service.MyWorkScopeSummary(c.Context(), actorID(c), c.Query("project_id"))
 	if err != nil {
 		return err
 	}

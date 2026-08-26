@@ -140,7 +140,7 @@ func TestProjectStartupHandoverStartsPipelineAndCreatesRealWorkNotifications(t *
 		t.Fatal(err)
 	}
 	roleLabels := []string{"PM"}
-	permissionKeys := []string{"project.view", "project.member.manage", "pipeline.run"}
+	permissionKeys := []string{"project.view", "project.update", "project.member.manage", "pipeline.run"}
 	for _, step := range startupRecordSlice(readiness["first_steps"]) {
 		roleLabels = append(roleLabels, stringSlice(step["role_ids"])...)
 		if permission := strings.TrimSpace(stringValue(step["required_permission"])); permission != "" {
@@ -167,6 +167,23 @@ func TestProjectStartupHandoverStartsPipelineAndCreatesRealWorkNotifications(t *
 	}
 	if !boolValue(readiness["ready_to_start"]) {
 		t.Fatalf("readiness = %#v, want ready", readiness)
+	}
+	roleCoverage := startupRecordSlice(readiness["role_coverage"])
+	if len(roleCoverage) == 0 {
+		t.Fatalf("readiness role_coverage = %#v, want whole-template role projection", readiness["role_coverage"])
+	}
+	coveredRoleCount := 0
+	for _, role := range roleCoverage {
+		if boolValue(role["covered"]) && len(startupRecordSlice(role["members"])) > 0 {
+			coveredRoleCount++
+		}
+	}
+	if coveredRoleCount == 0 {
+		t.Fatalf("readiness role_coverage = %#v, want at least one assigned operational role", roleCoverage)
+	}
+	capabilities := recordFromAny(readiness["capabilities"])
+	if !boolValue(capabilities["can_update_project"]) {
+		t.Fatalf("startup capabilities = %#v, want can_update_project", capabilities)
 	}
 	if _, err := service.StartPipeline(ctx, projectID, templateID, actorID, actorEmail); err != nil {
 		t.Fatal(err)

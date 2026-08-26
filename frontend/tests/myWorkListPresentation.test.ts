@@ -53,16 +53,18 @@ test('My Work tab count follows the currently displayed work query', async () =>
 
 test('My Work defaults to personal responsibility and keeps approval out of ordinary scope', async () => {
   const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const scopeOptions = page.slice(page.indexOf('const scopes'), page.indexOf('const attentionQueues'));
 
   assert.match(page, /type WorkScopeKey = 'responsible' \| 'mine'/);
   assert.match(page, /key: 'responsible', label: 'Tôi phụ trách'/);
   assert.match(page, /key: 'all', label: 'Tất cả được phép xem'/);
-  assert.doesNotMatch(page.slice(page.indexOf('const scopes'), page.indexOf('const attentionQueues')), /pending_approval/);
-  assert.match(page, /requestedQueue === 'pending_approval' \? 'responsible' : requestedQueue/);
+  assert.doesNotMatch(scopeOptions, /key: 'mine'|Giao trực tiếp|pending_approval/);
+  assert.match(page, /\(requestedQueue === 'pending_approval' \|\| requestedQueue === 'mine'\) \? 'responsible' : requestedQueue/);
+  assert.match(page, /if \(requestedQueue !== 'mine'\) return;[\s\S]*next\.delete\('queue'\);[\s\S]*replace: true/);
   assert.match(page, /key === 'queue' && value === 'responsible'/);
   assert.match(page, /updateParams\(\{ queue: 'responsible', bucket: 'need_action'/);
   assert.match(page, /function selectBucket\(nextBucket: WorkQuickBucket\) \{[\s\S]*?bucket: nextBucket/);
-  assert.match(page, /<ScopeRail value=\{queue\}/);
+  assert.match(page, /<ScopeRail\s+value=\{queue\}/);
   assert.doesNotMatch(page, /<FilterSelect value=\{queue\} label="Phạm vi công việc"/);
 });
 
@@ -142,6 +144,23 @@ test('My Work scope rail keeps only concise scope labels', async () => {
   assert.doesNotMatch(page, /Giao trực tiếp, theo vai trò hoặc nhóm phòng ban chưa có người nhận/);
 });
 
+test('My Work scope rail shows only positive need-action counts as chips', async () => {
+  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const realtime = await source('../src/modules/notifications/ActorRealtimeProvider.tsx');
+  const scopeRail = page.slice(page.indexOf('function ScopeCountChip('), page.indexOf('function FilterBar('));
+
+  assert.match(page, /type MyWorkScopeSummary = Record<WorkScopeKey, MyWorkScopeSummaryRow>/);
+  assert.match(page, /queryKey: \['my-work-scope-summary', user\?\.id, project\]/);
+  assert.match(page, /get<MyWorkScopeSummary>\(buildWorkScopeSummaryPath\(project\)\)/);
+  assert.match(page, /<ScopeRail[\s\S]*counts=\{scopeSummary\.data\}[\s\S]*loading=\{scopeSummary\.isLoading\}/);
+  assert.match(scopeRail, /function ScopeCountChip[\s\S]*if \(count <= 0\) return null/);
+  assert.match(scopeRail, /rounded-full[\s\S]*active \? 'bg-blue-600 text-white ring-blue-600' : 'bg-slate-100 text-slate-600 ring-slate-200'/);
+  assert.match(scopeRail, /<ScopeCountChip count=\{countValue\(item\.key\)\} active=\{active\} \/>/);
+  assert.doesNotMatch(scopeRail, /countLabel|\? '…'|\? '—'/);
+  assert.match(scopeRail, /tabular-nums/);
+  assert.match(realtime, /\['my-work-scope-summary'\]/);
+});
+
 test('My Work isolates actor queries and never presents placeholder zeroes as loaded quick-filter values', async () => {
   const page = await source('../src/modules/my-work/MyWorkPage.tsx');
 
@@ -174,6 +193,7 @@ test('My Work surfaces generic ready stage transitions as one-click business act
 test('My Work coordinates project startup without creating placeholder work items', async () => {
   const page = await source('../src/modules/my-work/MyWorkPage.tsx');
   const projects = await source('../src/modules/projects/ProjectsPage.tsx');
+  const wizard = await source('../src/modules/projects/ProjectStartupWizard.tsx');
   const realtime = await source('../src/modules/notifications/ActorRealtimeProvider.tsx');
 
   assert.match(page, /queryKey: \['my-project-startup-actions', user\?\.id, project, search\]/);
@@ -181,11 +201,12 @@ test('My Work coordinates project startup without creating placeholder work item
   assert.match(page, /function ProjectStartupActionCard\(/);
   assert.match(page, /Cần thiết lập công trình/);
   assert.match(page, /Sắp tới · chỉ xem/);
-  assert.match(page, /function ProjectStartupDialog\(/);
-  assert.match(page, /\/projects\/\$\{projectId\}\/startup-readiness/);
-  assert.match(page, /\/projects\/\$\{projectId\}\/project-manager/);
-  assert.match(page, /\/projects\/\$\{projectId\}\/start-pipeline/);
-  assert.match(page, /Khi bắt đầu, hệ thống mới tạo Work Item thật/);
-  assert.match(projects, /navigate\(`\/my-work\?setup=\$\{project\.id\}`\)/);
+  assert.match(page, /<ProjectStartupWizard/);
+  assert.match(projects, /<ProjectStartupWizard/);
+  assert.match(wizard, /\/projects\/\$\{activeProjectID\}\/startup-readiness/);
+  assert.match(wizard, /\/projects\/\$\{activeProjectID\}\/project-manager/);
+  assert.match(wizard, /\/projects\/\$\{activeProjectID\}\/start-pipeline/);
+  assert.match(wizard, /Khi bắt đầu, hệ thống mới tạo Work Item thật/);
+  assert.doesNotMatch(projects, /navigate\(`\/my-work\?setup=/);
   assert.match(realtime, /\['my-project-startup-actions'\]/);
 });

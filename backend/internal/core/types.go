@@ -225,6 +225,10 @@ type ProjectMemberMutationRequest struct {
 	Notes          string   `json:"notes"`
 }
 
+type ProjectMemberBulkMutationRequest struct {
+	Members []ProjectMemberMutationRequest `json:"members"`
+}
+
 type InputInvoiceRequest struct {
 	TaxCodeID            string  `json:"tax_code_id"`
 	ExpenseAccountID     string  `json:"expense_account_id"`

@@ -657,6 +657,34 @@ func (s *Service) SaveProjectMember(ctx context.Context, projectID, memberID str
 	return member, nil
 }
 
+func (s *Service) SaveProjectMembersBulk(ctx context.Context, projectID string, req ProjectMemberBulkMutationRequest, actorID, actorName string) (Record, error) {
+	if len(req.Members) == 0 {
+		return nil, validationError("Chọn ít nhất một nhân sự để thêm vào công trình")
+	}
+	if len(req.Members) > 50 {
+		return nil, validationError("Mỗi lần chỉ có thể thêm tối đa 50 thành viên")
+	}
+	normalized := make([]ProjectMemberMutationRequest, 0, len(req.Members))
+	seenStaff := map[string]bool{}
+	for index, member := range req.Members {
+		item, err := normalizeProjectMemberMutationRequest(projectID, "", member)
+		if err != nil {
+			return nil, validationError("Thành viên trong danh sách không hợp lệ", Record{"index": index, "cause": err.Error()})
+		}
+		if seenStaff[item.StaffID] {
+			return nil, validationError("Danh sách có nhân sự bị trùng", Record{"index": index, "staff_id": item.StaffID})
+		}
+		seenStaff[item.StaffID] = true
+		normalized = append(normalized, item)
+	}
+	members, err := s.repo.SaveProjectMembersBulk(ctx, strings.TrimSpace(projectID), normalized, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishWorkQueueChanged(projectID)
+	return Record{"items": members, "total": len(members)}, nil
+}
+
 func (s *Service) DeactivateProjectMember(ctx context.Context, projectID, memberID, actorID, actorName string) (Record, error) {
 	if _, err := uuid.Parse(strings.TrimSpace(projectID)); err != nil {
 		return nil, validationError("project_id không hợp lệ", Record{"project_id": projectID})
@@ -2454,6 +2482,51 @@ func (s *Service) MyWorkNavigationSummary(ctx context.Context, actorID string) (
 	return myWorkNavigationSummaryRecord(workItemCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount), nil
 }
 
+func (s *Service) MyWorkScopeSummary(ctx context.Context, actorID, projectID string) (Record, error) {
+	projectID, err := normalizeMyWorkScopeSummaryProjectID(projectID)
+	if err != nil {
+		return nil, err
+	}
+	workItemCounts, err := s.repo.MyWorkScopeCounts(ctx, actorID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	workflowActions, err := s.repo.MyWorkflowActions(ctx, actorID, MyWorkflowActionsFilter{
+		Queue: "all", ProjectID: projectID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	workflowResponsible := 0
+	for _, action := range workflowActions {
+		if boolValue(action["is_responsible"]) {
+			workflowResponsible++
+		}
+	}
+	startupActions, err := s.MyProjectStartupActions(ctx, actorID, projectID, "")
+	if err != nil {
+		return nil, err
+	}
+	startupNeedAction := int(number(recordValue(startupActions["summary"])["need_action"]))
+	return myWorkScopeSummaryRecord(workItemCounts, workflowResponsible, len(workflowActions), startupNeedAction), nil
+}
+
+func myWorkScopeSummaryRecord(workItemCounts myWorkScopeCounts, workflowResponsible, workflowAll, startupNeedAction int) Record {
+	row := func(workItems, workflowActions, projectStartups int) Record {
+		return Record{
+			"work_items": workItems, "workflow_actions": workflowActions, "project_startups": projectStartups,
+			"total": workItems + workflowActions + projectStartups,
+		}
+	}
+	return Record{
+		"responsible": row(workItemCounts.Responsible, workflowResponsible, startupNeedAction),
+		"mine":        row(workItemCounts.Mine, 0, 0),
+		"department":  row(workItemCounts.Department, 0, 0),
+		"watching":    row(workItemCounts.Watching, 0, 0),
+		"all":         row(workItemCounts.All, workflowAll, startupNeedAction),
+	}
+}
+
 func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount int) Record {
 	workTotal := workItemCounts.NeedAction + workflowActionCount + startupActionCount
 	approvalTotal := workItemCounts.WaitingDecision + nodeApprovalCount + workReportReviewCount
@@ -2492,6 +2565,9 @@ func (s *Service) MyWorkflowActions(ctx context.Context, filter MyWorkflowAction
 				filtered = append(filtered, action)
 			}
 		}
+	}
+	for _, action := range filtered {
+		delete(action, "is_responsible")
 	}
 	return Record{"items": filtered, "total": len(filtered), "summary_total": len(actions)}, nil
 }
