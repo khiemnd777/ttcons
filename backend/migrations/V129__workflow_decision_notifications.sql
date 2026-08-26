@@ -1,0 +1,72 @@
+INSERT INTO notification_event_types (
+  event_key,domain_key,category_key,category_label,intent,severity,icon_key,tone_key,
+  audience_policy_key,visibility_policy_key,permissions_any,action_route_template,
+  action_label,required_delivery,enabled
+) VALUES
+  ('work_item.review_requested','workflow','work','Công việc','action_required','warning','review','warning',
+   'approval_deciders','project_scope','{}','/my-work?mode=approval&task={{work_item_id}}',
+   'Mở hàng chờ rà soát',true,true),
+  ('workflow.node_approval_requested','workflow','workflow','Quy trình','action_required','warning','approval','warning',
+   'approval_deciders','project_scope','{}','/my-work?mode=approval&approval={{approval_request_id}}',
+   'Mở yêu cầu phê duyệt',true,true),
+  ('workflow.node_approval_progressed','workflow','workflow','Quy trình','awareness','info','approval','primary',
+   'explicit_users','project_scope','{}','/projects/{{project_id}}/planning',
+   'Mở tiến trình',false,true),
+  ('workflow.node_approval_approved','workflow','workflow','Quy trình','outcome','success','check','success',
+   'explicit_users','project_scope','{}','/projects/{{project_id}}/planning',
+   'Mở tiến trình',false,true),
+  ('workflow.node_approval_rejected','workflow','workflow','Quy trình','outcome','critical','x','critical',
+   'explicit_users','project_scope','{}','/projects/{{project_id}}/planning',
+   'Mở tiến trình',false,true),
+  ('workflow.node_approval_changes_requested','workflow','workflow','Quy trình','action_required','warning','alert','warning',
+   'explicit_users','project_scope','{}','/projects/{{project_id}}/planning',
+   'Mở tiến trình',true,true)
+ON CONFLICT (event_key) DO UPDATE SET
+  domain_key=EXCLUDED.domain_key,
+  category_key=EXCLUDED.category_key,
+  category_label=EXCLUDED.category_label,
+  intent=EXCLUDED.intent,
+  severity=EXCLUDED.severity,
+  icon_key=EXCLUDED.icon_key,
+  tone_key=EXCLUDED.tone_key,
+  audience_policy_key=EXCLUDED.audience_policy_key,
+  visibility_policy_key=EXCLUDED.visibility_policy_key,
+  permissions_any=EXCLUDED.permissions_any,
+  action_route_template=EXCLUDED.action_route_template,
+  action_label=EXCLUDED.action_label,
+  required_delivery=EXCLUDED.required_delivery,
+  enabled=EXCLUDED.enabled,
+  updated_at=now();
+
+INSERT INTO notification_templates (
+  event_key,locale,version,title_template,body_template,required_payload_keys,active
+) VALUES
+  ('work_item.review_requested','vi-VN',1,
+   '{{actor_name}} yêu cầu rà soát công việc',
+   'Công việc "{{work_item_title}}" đang chờ anh/chị xử lý.',
+   ARRAY['actor_name','work_item_title','work_item_id','project_id'],true),
+  ('workflow.node_approval_requested','vi-VN',1,
+   '{{actor_name}} yêu cầu phê duyệt bước quy trình',
+   'Bước "{{node_name}}" đang chờ anh/chị xử lý.',
+   ARRAY['actor_name','node_name','node_id','project_id','approval_request_id'],true),
+  ('workflow.node_approval_progressed','vi-VN',1,
+   'Yêu cầu phê duyệt đã có tiến triển',
+   '{{actor_name}} đã phê duyệt bước "{{node_name}}"; yêu cầu vẫn đang chờ đủ quyết định.',
+   ARRAY['actor_name','node_name','node_id','project_id','approval_request_id'],true),
+  ('workflow.node_approval_approved','vi-VN',1,
+   'Bước quy trình đã được phê duyệt',
+   '{{actor_name}} đã hoàn tất phê duyệt bước "{{node_name}}".',
+   ARRAY['actor_name','node_name','node_id','project_id','approval_request_id'],true),
+  ('workflow.node_approval_rejected','vi-VN',1,
+   'Bước quy trình bị từ chối',
+   '{{actor_name}} đã từ chối bước "{{node_name}}".',
+   ARRAY['actor_name','node_name','node_id','project_id','approval_request_id'],true),
+  ('workflow.node_approval_changes_requested','vi-VN',1,
+   'Bước quy trình cần bổ sung',
+   '{{actor_name}} yêu cầu bổ sung cho bước "{{node_name}}".',
+   ARRAY['actor_name','node_name','node_id','project_id','approval_request_id'],true)
+ON CONFLICT (event_key,locale,version) DO UPDATE SET
+  title_template=EXCLUDED.title_template,
+  body_template=EXCLUDED.body_template,
+  required_payload_keys=EXCLUDED.required_payload_keys,
+  active=EXCLUDED.active;

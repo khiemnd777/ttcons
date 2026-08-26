@@ -22,31 +22,12 @@ import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { constructionReportViewModel } from '../operations/constructionReportViewModel';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
-import type { WorkReportSummary } from '../../lib/types/domain';
+import type { WorkReportListItem, WorkReportStatus, WorkReportSummary } from '../../lib/types/domain';
 
-type WorkReportStatus = 'draft' | 'recorded' | 'submitted' | 'needs_changes' | 'acknowledged';
 type WorkReportScope = 'mine' | 'source' | 'review' | 'all';
 type ExportFormat = 'pdf' | 'xlsx' | 'csv';
 
-type WorkReportRow = Record<string, any> & {
-  source_id: string;
-  work_report_id?: string;
-  project_id: string;
-  project_code: string;
-  project_name: string;
-  report_date: string;
-  author_id: string;
-  author_name: string;
-  author_account_deleted?: boolean;
-  recipient_id?: string;
-  recipient_name?: string;
-  recipient_account_deleted?: boolean;
-  status: WorkReportStatus;
-  current_revision_no: number;
-  submitted_at?: string;
-};
-
-type WorkReportDetail = WorkReportRow & {
+type WorkReportDetail = WorkReportListItem & {
   report_delivery_eligible: boolean;
   work_item_title?: string;
   weather?: string;
@@ -120,7 +101,7 @@ export function WorkReportsPage() {
 
   const reports = useQuery({
     queryKey: ['work-reports', scope, filters],
-    queryFn: () => get<WorkReportRow[]>(`/work-reports?${listQueryString}`),
+    queryFn: () => get<WorkReportListItem[]>(`/work-reports?${listQueryString}`),
     retry: false,
   });
 
@@ -192,7 +173,7 @@ export function WorkReportsPage() {
 
   const rows = reports.data ?? [];
 
-  function openReport(row: WorkReportRow) {
+  function openReport(row: WorkReportListItem) {
     if (!row.work_report_id) {
       navigate(`/projects/${row.project_id}/operations?tab=timeline&report=${encodeURIComponent(row.source_id)}`);
       return;
@@ -285,7 +266,7 @@ export function WorkReportsPage() {
           ))}
         </div>
 
-        <DataTable<WorkReportRow>
+        <DataTable<WorkReportListItem>
           rows={rows}
           loading={reports.isLoading}
           error={reports.error}
@@ -515,7 +496,7 @@ function WorkReportDialog({
   );
 }
 
-function WorkReportCard({ row, onOpen }: { row: WorkReportRow; onOpen: () => void }) {
+function WorkReportCard({ row, onOpen }: { row: WorkReportListItem; onOpen: () => void }) {
   return (
     <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">

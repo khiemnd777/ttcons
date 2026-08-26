@@ -1003,6 +1003,19 @@ func (r *Repository) CanDecideApprovalRequest(ctx context.Context, request Recor
 	if requestedBy := cleanID(request["requested_by"]); requesterCannotApprove && requestedBy != "" && requestedBy == userID {
 		return false, nil
 	}
+	if approvalRequestID := cleanID(request["id"]); validActivityUUID(approvalRequestID) {
+		priorApprovals, err := r.Query(ctx, `
+			SELECT COUNT(*) AS total
+			FROM approval_actions
+			WHERE approval_request_id=$1::uuid AND user_id=$2::uuid AND action='approve'
+		`, approvalRequestID, userID)
+		if err != nil {
+			return false, err
+		}
+		if len(priorApprovals) > 0 && number(priorApprovals[0]["total"]) > 0 {
+			return false, nil
+		}
+	}
 	projectID := cleanID(request["project_id"])
 	if projectID != "" {
 		activeProject, err := r.Query(ctx, `SELECT COUNT(*) AS total FROM projects WHERE id=$1 AND status <> 'cancelled'`, projectID)
@@ -7173,10 +7186,12 @@ func (r *Repository) ApplyWorkItemTransition(ctx context.Context, item Record, t
 		return nil, err
 	}
 
-	if _, err := tx.ExecContext(ctx, `
+	var activityID string
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, from_status, to_status, metadata_json)
 		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, $4, $5, $6, $7, $8::jsonb)
-	`, workItemID, projectID, actorID, activityType, comment, fromStatus, toStatus, string(rawMetadata)); err != nil {
+		RETURNING id::text
+	`, workItemID, projectID, actorID, activityType, comment, fromStatus, toStatus, string(rawMetadata)).Scan(&activityID); err != nil {
 		return nil, err
 	}
 	auditDescription := workItemAuditDescription(activityType, item, comment)
@@ -7185,6 +7200,27 @@ func (r *Repository) ApplyWorkItemTransition(ctx context.Context, item Record, t
 	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "work_item_"+activityType, "work_item", workItemID, auditDescription, json.RawMessage(rawMetadata)); err != nil {
 		return nil, err
+	}
+	if activityType == "review_requested" {
+		if _, err := emitNotificationEventTx(ctx, tx, NotificationDomainEvent{
+			Key:            "work_item.review_requested",
+			AggregateType:  "work_item",
+			AggregateID:    workItemID,
+			SourceEventID:  activityID,
+			ProjectID:      projectID,
+			ActorUserID:    actorID,
+			CorrelationKey: "work_item:" + workItemID + ":approval",
+			IdempotencyKey: "work_item_activity:" + activityID + ":notification",
+			Payload: Record{
+				"actor_name":      actorName,
+				"work_item_title": fmt.Sprint(item["title"]),
+				"work_item_id":    workItemID,
+				"project_id":      projectID,
+			},
+			Audience: Record{"work_item_id": workItemID, "exclude_actor": true},
+		}); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -11876,6 +11912,9 @@ func (r *Repository) RequestNodeApproval(ctx context.Context, nodeID, actorID, a
 		} else if affected != 1 {
 			return nil, sql.ErrNoRows
 		}
+		if err := emitPipelineNodeApprovalRequestedTx(ctx, tx, created, node, actorID, actorName, "", 0, false); err != nil {
+			return nil, err
+		}
 		return created, nil
 	}, func(request Record) auditEvent {
 		return auditEvent{
@@ -12505,10 +12544,12 @@ func (r *Repository) ApprovalAction(ctx context.Context, approvalID, action, com
 		return nil, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `
+	var approvalActionID string
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO approval_actions (approval_request_id, user_id, action, comment)
 		VALUES ($1, NULLIF($2,'')::uuid, $3, $4)
-	`, approvalID, actorID, action, comment); err != nil {
+		RETURNING id::text
+	`, approvalID, actorID, action, comment).Scan(&approvalActionID); err != nil {
 		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE approval_requests SET status=$2, resolved_at=now() WHERE id=$1`, approvalID, status); err != nil {
@@ -12516,6 +12557,10 @@ func (r *Repository) ApprovalAction(ctx context.Context, approvalID, action, com
 	}
 	actionLabel := approvalAuditActionLabel(action)
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, event, targetType, targetID, fmt.Sprintf("%s phê duyệt: %s", actionLabel, comment), Record{"approval_request_id": approvalID, "action": action}); err != nil {
+		return nil, err
+	}
+	currentStage := int(number(request["current_stage"]))
+	if err := emitPipelineNodeApprovalActionTx(ctx, tx, request, approvalActionID, action, comment, actorID, actorName, currentStage, currentStage, status); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

@@ -165,6 +165,26 @@ export type WorkReportSummary = {
   total_visible: number;
 };
 
+export type WorkReportStatus = 'draft' | 'recorded' | 'submitted' | 'needs_changes' | 'acknowledged';
+
+export type WorkReportListItem = AnyRecord & {
+  source_id: string;
+  work_report_id?: string;
+  project_id: string;
+  project_code: string;
+  project_name: string;
+  report_date: string;
+  author_id: string;
+  author_name: string;
+  author_account_deleted?: boolean;
+  recipient_id?: string;
+  recipient_name?: string;
+  recipient_account_deleted?: boolean;
+  status: WorkReportStatus;
+  current_revision_no: number;
+  submitted_at?: string;
+};
+
 export type MyWorkNavigationSummary = {
   work_items_need_action: number;
   workflow_actions_ready: number;

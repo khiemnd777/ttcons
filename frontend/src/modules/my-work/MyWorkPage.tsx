@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -25,7 +25,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
-import type { ActivityAttentionItem, ActivityAttentionSummary, ApprovalRequest, MyWorkflowAction, WorkItem } from '../../lib/types/domain';
+import type { ActivityAttentionItem, ActivityAttentionSummary, ApprovalRequest, MyWorkflowAction, WorkItem, WorkReportListItem, WorkReportSummary } from '../../lib/types/domain';
 import { ApprovalPanel } from '../../components/ApprovalPanel';
 import { statusLabel } from '../../lib/utils/status';
 import { roleSummary as summarizeRoles } from '../../lib/utils/roles';
@@ -136,13 +136,14 @@ const sortOptions = [
 ];
 
 export function MyWorkPage() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
   const requestedTask = searchParams.get('task')?.trim() ?? '';
+  const requestedApproval = searchParams.get('approval')?.trim() ?? '';
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(() => requestedTask || null);
   const [searchDraft, setSearchDraft] = useState(searchParams.get('search') ?? '');
 	const streamStatus = useActorRealtimeStatus();
@@ -164,6 +165,7 @@ export function MyWorkPage() {
   const search = searchParams.get('search') ?? '';
   const sort = searchParams.get('sort') ?? 'priority';
   const roleSummary = summarizeRoles(user?.roles);
+  const canReviewWorkReports = hasPermission('work_report.view') && (hasPermission('work_report.review') || hasPermission('work_report.manage'));
 
   useEffect(() => setSearchDraft(search), [search]);
   useEffect(() => {
@@ -215,6 +217,22 @@ export function MyWorkPage() {
       return get<ApprovalRequest[]>(`/approvals/pending?${params.toString()}`);
     },
     enabled: Boolean(user?.id),
+    retry: false,
+  });
+  const reportReviewSummary = useQuery({
+    queryKey: ['work-report-summary', user?.id, 'my-work', project],
+    queryFn: () => get<WorkReportSummary>(`/work-reports/summary${project ? `?project_id=${encodeURIComponent(project)}` : ''}`),
+    enabled: Boolean(user?.id) && canReviewWorkReports,
+    retry: false,
+  });
+  const reportReviewList = useQuery({
+    queryKey: ['work-reports', 'review', user?.id, 'my-work', project],
+    queryFn: () => {
+      const params = new URLSearchParams({ scope: 'review' });
+      if (project) params.set('project_id', project);
+      return get<WorkReportListItem[]>(`/work-reports?${params.toString()}`);
+    },
+    enabled: Boolean(user?.id) && canReviewWorkReports && mode === 'approval',
     retry: false,
   });
 
@@ -273,8 +291,12 @@ export function MyWorkPage() {
   const approvalFirstPage = approvalWorkItems.data?.pages[0];
   const approvalRows = useMemo(() => dedupeWorkItems(approvalWorkItems.data?.pages.flatMap((page) => page.items) ?? []), [approvalWorkItems.data]);
   const summary = firstPage?.summary ?? emptySummary;
-  const nodeApprovalCount = pendingNodeApprovals.data?.filter((request) => request.target_type === 'pipeline_run_node').length ?? 0;
+  const nodeApprovalRows = useMemo(() => (pendingNodeApprovals.data ?? []).filter((request) => request.target_type === 'pipeline_run_node'), [pendingNodeApprovals.data]);
+  const nodeApprovalCount = nodeApprovalRows.length;
+  const reportReviewRows = reportReviewList.data ?? [];
+  const reportReviewCount = canReviewWorkReports ? reportReviewSummary.data?.scopes.review ?? 0 : 0;
   const facets = firstPage?.facets ?? {};
+  const approvalProjectOptions = useMemo(() => mergeApprovalProjectOptions(normalizeFacetOptions(facets.projects, 'Công trình'), nodeApprovalRows, reportReviewRows), [facets.projects, nodeApprovalRows, reportReviewRows]);
   const attentionRows = useMemo(() => asArray<ActivityAttentionItem>(activityAttention.data), [activityAttention.data]);
   const attentionTabCount = activityAttentionSummary.isLoading
     ? '…'
@@ -288,11 +310,11 @@ export function MyWorkPage() {
     : (workItems.isError && !firstPage) || (workflowActionsMatchCurrentWorkFilters && workflowActions.isError && !workflowActions.data)
       ? '—'
       : (firstPage?.total ?? 0) + workflowActionTotal;
-  const approvalTabCount = workItems.isLoading || pendingNodeApprovals.isLoading
+  const approvalTabCount = workItems.isLoading || pendingNodeApprovals.isLoading || (canReviewWorkReports && reportReviewSummary.isLoading)
     ? '…'
-    : (workItems.isError && !firstPage) || (pendingNodeApprovals.isError && !pendingNodeApprovals.data)
+    : (workItems.isError && !firstPage) || (pendingNodeApprovals.isError && !pendingNodeApprovals.data) || (canReviewWorkReports && reportReviewSummary.isError && !reportReviewSummary.data)
       ? '—'
-      : summary.waiting_decision + nodeApprovalCount;
+      : summary.waiting_decision + nodeApprovalCount + reportReviewCount;
   const activeWorkRows = mode === 'approval' ? approvalRows : rows;
   const selectedWorkflowAction = mode === 'work' ? workflowActionRows.find((action) => action.id === selectedEntryId) ?? null : null;
   const selectedItem = selectedWorkflowAction ? null : activeWorkRows.find((item) => item.id === selectedEntryId) ?? activeWorkRows[0] ?? null;
@@ -340,6 +362,8 @@ export function MyWorkPage() {
     if (mode === 'attention') void activityAttention.refetch();
     if (mode === 'approval') void approvalWorkItems.refetch();
     void pendingNodeApprovals.refetch();
+    if (canReviewWorkReports) void reportReviewSummary.refetch();
+    if (mode === 'approval' && canReviewWorkReports) void reportReviewList.refetch();
   }
 
   function openWorkItem(item: WorkItem) {
@@ -365,7 +389,7 @@ export function MyWorkPage() {
           <div className="flex items-center gap-2">
             <LiveStatusBadge status={streamStatus} />
             <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={refreshAll}>
-              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || workflowActions.isFetching || activityAttentionSummary.isFetching || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
+              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || workflowActions.isFetching || activityAttentionSummary.isFetching || pendingNodeApprovals.isFetching || (canReviewWorkReports && reportReviewSummary.isFetching) || (mode === 'approval' && canReviewWorkReports && reportReviewList.isFetching) || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
               Làm mới
             </button>
           </div>
@@ -456,17 +480,25 @@ export function MyWorkPage() {
           workError={approvalWorkItems.error}
           workTotal={approvalTotal}
           workHasMore={Boolean(approvalWorkItems.hasNextPage)}
-          nodeRows={(pendingNodeApprovals.data ?? []).filter((request) => request.target_type === 'pipeline_run_node')}
+          nodeRows={nodeApprovalRows}
           nodeLoading={pendingNodeApprovals.isLoading}
           nodeError={pendingNodeApprovals.error}
+          requestedApprovalId={requestedApproval}
+          reportVisible={canReviewWorkReports}
+          reportRows={reportReviewRows}
+          reportCount={reportReviewCount}
+          reportLoading={reportReviewList.isLoading}
+          reportError={reportReviewList.error}
           project={project}
-          projects={normalizeFacetOptions(facets.projects, 'Công trình')}
+          projects={approvalProjectOptions}
           onProjectChange={(value) => updateParams({ project: value || null })}
           onSelect={setSelectedEntryId}
           onOpen={openWorkItem}
           onLoadMore={() => void approvalWorkItems.fetchNextPage()}
           onRetryWork={() => void approvalWorkItems.refetch()}
           onRetryNodes={() => void pendingNodeApprovals.refetch()}
+          onRetryReports={() => void reportReviewList.refetch()}
+          onOpenReport={(report) => navigate(`/reports?scope=review&report=${report.source_id}`)}
         />
       ) : (
         <ActivityAttentionPanel
@@ -486,7 +518,7 @@ export function MyWorkPage() {
   );
 }
 
-function ApprovalWorkspace({ workRows, selectedItem, workLoading, workFetchingMore, workError, workTotal, workHasMore, nodeRows, nodeLoading, nodeError, project, projects, onProjectChange, onSelect, onOpen, onLoadMore, onRetryWork, onRetryNodes }: {
+function ApprovalWorkspace({ workRows, selectedItem, workLoading, workFetchingMore, workError, workTotal, workHasMore, nodeRows, nodeLoading, nodeError, requestedApprovalId, reportVisible, reportRows, reportCount, reportLoading, reportError, project, projects, onProjectChange, onSelect, onOpen, onLoadMore, onRetryWork, onRetryNodes, onRetryReports, onOpenReport }: {
   workRows: WorkItem[];
   selectedItem: WorkItem | null;
   workLoading: boolean;
@@ -497,6 +529,12 @@ function ApprovalWorkspace({ workRows, selectedItem, workLoading, workFetchingMo
   nodeRows: ApprovalRequest[];
   nodeLoading: boolean;
   nodeError: unknown;
+  requestedApprovalId: string;
+  reportVisible: boolean;
+  reportRows: WorkReportListItem[];
+  reportCount: number;
+  reportLoading: boolean;
+  reportError: unknown;
   project: string;
   projects: Array<{ value: string; label: string }>;
   onProjectChange: (value: string) => void;
@@ -505,8 +543,13 @@ function ApprovalWorkspace({ workRows, selectedItem, workLoading, workFetchingMo
   onLoadMore: () => void;
   onRetryWork: () => void;
   onRetryNodes: () => void;
+  onRetryReports: () => void;
+  onOpenReport: (report: WorkReportListItem) => void;
 }) {
-  const empty = !workLoading && !nodeLoading && !workError && !nodeError && !workRows.length && !nodeRows.length;
+  const reportUnavailable = reportVisible && reportError;
+  const empty = !workLoading && !nodeLoading && (!reportVisible || !reportLoading)
+    && !workError && !nodeError && !reportUnavailable
+    && !workRows.length && !nodeRows.length && (!reportVisible || !reportRows.length);
   return (
     <section className="mt-4" aria-label="Công việc chờ tôi duyệt">
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -538,7 +581,8 @@ function ApprovalWorkspace({ workRows, selectedItem, workLoading, workFetchingMo
                 />
               </section>
 
-              <NodeApprovalLane rows={nodeRows} loading={nodeLoading} error={nodeError} onRetry={onRetryNodes} />
+              <NodeApprovalLane rows={nodeRows} loading={nodeLoading} error={nodeError} requestedApprovalId={requestedApprovalId} onRetry={onRetryNodes} />
+              {reportVisible ? <WorkReportReviewLane rows={reportRows} total={reportCount} loading={reportLoading} error={reportError} onRetry={onRetryReports} onOpen={onOpenReport} /> : null}
             </>
           )}
         </div>
@@ -549,7 +593,13 @@ function ApprovalWorkspace({ workRows, selectedItem, workLoading, workFetchingMo
   );
 }
 
-function NodeApprovalLane({ rows, loading, error, onRetry }: { rows: ApprovalRequest[]; loading: boolean; error: unknown; onRetry: () => void }) {
+function NodeApprovalLane({ rows, loading, error, requestedApprovalId, onRetry }: { rows: ApprovalRequest[]; loading: boolean; error: unknown; requestedApprovalId: string; onRetry: () => void }) {
+  const requestedRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!requestedApprovalId || !requestedRef.current) return;
+    requestedRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    requestedRef.current.focus({ preventScroll: true });
+  }, [requestedApprovalId, rows]);
   return (
     <section className="mt-4 rounded-md border border-amber-200 bg-amber-50/50 p-3" aria-labelledby="node-approval-lane-title">
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -559,9 +609,54 @@ function NodeApprovalLane({ rows, loading, error, onRetry }: { rows: ApprovalReq
         </div>
         <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-amber-800">{rows.length} yêu cầu</span>
       </div>
-      {loading ? <LoadingSpinner /> : error ? <SourceError title="Không tải được yêu cầu phê duyệt giai đoạn" onRetry={onRetry} /> : rows.length ? <div className="space-y-2">{rows.map((request) => <ApprovalPanel key={request.id} request={request} />)}</div> : <p className="rounded-md border border-dashed border-amber-200 bg-white p-4 text-sm text-slate-600">Không có giai đoạn nào đang chờ anh phê duyệt.</p>}
+      {loading ? <LoadingSpinner /> : error ? <SourceError title="Không tải được yêu cầu phê duyệt giai đoạn" onRetry={onRetry} /> : rows.length ? <div className="space-y-2">{rows.map((request) => (
+        <div
+          key={request.id}
+          ref={request.id === requestedApprovalId ? requestedRef : undefined}
+          data-approval-id={request.id}
+          tabIndex={-1}
+          className={clsx('rounded-md outline-none', request.id === requestedApprovalId && 'ring-2 ring-blue-500 ring-offset-2')}
+        >
+          <ApprovalPanel request={request} />
+        </div>
+      ))}</div> : <p className="rounded-md border border-dashed border-amber-200 bg-white p-4 text-sm text-slate-600">Không có giai đoạn nào đang chờ anh phê duyệt.</p>}
     </section>
   );
+}
+
+function WorkReportReviewLane({ rows, total, loading, error, onRetry, onOpen }: { rows: WorkReportListItem[]; total: number; loading: boolean; error: unknown; onRetry: () => void; onOpen: (report: WorkReportListItem) => void }) {
+  const visibleRows = rows.slice(0, 5);
+  return (
+    <section className="mt-4 rounded-md border border-blue-200 bg-blue-50/40 p-3" aria-labelledby="work-report-review-lane-title">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h2 id="work-report-review-lane-title" className="text-sm font-semibold text-ink">Báo cáo chờ xác nhận</h2>
+          <p className="mt-1 text-xs text-slate-600">Báo cáo đã gửi đích danh đến anh/chị và còn ở trạng thái chờ xác nhận.</p>
+        </div>
+        <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-blue-800">{total} báo cáo</span>
+      </div>
+      {loading ? <LoadingSpinner /> : error ? <SourceError title="Không tải được báo cáo chờ xác nhận" onRetry={onRetry} /> : visibleRows.length ? (
+        <div className="space-y-2">
+          {visibleRows.map((report) => (
+            <article key={report.source_id} className="flex flex-col gap-3 rounded-md border border-blue-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink">Báo cáo ngày {workReportDateText(report.report_date)}</p>
+                <p className="mt-1 truncate text-xs font-medium text-slate-600" title={`${report.project_code} · ${report.project_name}`}>{report.project_code} · {report.project_name}</p>
+                <p className="mt-1 text-xs text-slate-500">{identityReferenceText(report.author_name, report.author_account_deleted, 'Người lập')} · Lần {report.current_revision_no}</p>
+              </div>
+              <button type="button" className="shrink-0 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onOpen(report)}>Xem và xác nhận</button>
+            </article>
+          ))}
+          {total > visibleRows.length ? <Link className="inline-flex w-full justify-center rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to="/reports?scope=review">Mở tất cả {total} báo cáo</Link> : null}
+        </div>
+      ) : <p className="rounded-md border border-dashed border-blue-200 bg-white p-4 text-sm text-slate-600">Không có báo cáo nào đang chờ anh/chị xác nhận.</p>}
+    </section>
+  );
+}
+
+function workReportDateText(value: string) {
+  const parts = value.slice(0, 10).split('-');
+  return parts.length === 3 ? parts.reverse().join('/') : value;
 }
 
 function buildWorkPath(filters: {
@@ -748,6 +843,19 @@ function normalizeFacetOptions(values: FacetOption[] | undefined, fallback: stri
     const value = item.value ?? item.id ?? item.project_id ?? '';
     return { value, label: item.label ?? ([item.code ?? item.project_code, item.name ?? item.project_name].filter(Boolean).join(' · ') || fallback) };
   }).filter((item) => item.value);
+}
+
+function mergeApprovalProjectOptions(base: Array<{ value: string; label: string }>, nodeRows: ApprovalRequest[], reportRows: WorkReportListItem[]) {
+  const options = new Map(base.map((option) => [option.value, option]));
+  nodeRows.forEach((request) => {
+    if (!request.project_id || options.has(request.project_id)) return;
+    options.set(request.project_id, { value: request.project_id, label: request.project_name || 'Công trình' });
+  });
+  reportRows.forEach((report) => {
+    if (!report.project_id || options.has(report.project_id)) return;
+    options.set(report.project_id, { value: report.project_id, label: [report.project_code, report.project_name].filter(Boolean).join(' · ') || 'Công trình' });
+  });
+  return Array.from(options.values());
 }
 
 function FilterSelect({ value, label, options, onChange }: { value: string; label: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {

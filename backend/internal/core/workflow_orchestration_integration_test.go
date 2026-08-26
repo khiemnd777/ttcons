@@ -3264,6 +3264,9 @@ func TestWorkItemReviewSelfApprovalForbidden(t *testing.T) {
 	if waiting["status"] != "waiting_review" {
 		t.Fatalf("work item status = %v, want waiting_review", waiting["status"])
 	}
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_item.review_requested' AND source_id=$2 AND resolved_at IS NULL`, 1, fixture.pmID, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_item.review_requested' AND source_id=$2`, 0, fixture.workerID, fixture.itemID)
 
 	_, err = service.WorkItemAction(ctx, fixture.itemID, "approve", WorkItemActionRequest{Comment: "self review"}, fixture.workerID, "Worker")
 	if err == nil {
@@ -3281,8 +3284,181 @@ func TestWorkItemReviewSelfApprovalForbidden(t *testing.T) {
 	if approved["status"] != "completed" {
 		t.Fatalf("work item status = %v, want completed", approved["status"])
 	}
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_item.approved' AND source_id=$2`, 1, fixture.workerID, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_item.review_requested' AND source_id=$2 AND resolved_at IS NOT NULL`, 1, fixture.pmID, fixture.itemID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='review_requested'`, 1, fixture.itemID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='approved'`, 1, fixture.itemID)
+}
+
+func TestPipelineNodeApprovalNotificationLifecycle(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	runID := newID()
+	nodeID := newID()
+
+	mustExec(t, db, `
+		INSERT INTO pipeline_runs (id,project_id,template_id,status,engine_version)
+		VALUES ($1,$2,'40000000-0000-0000-0000-000000000021','in_progress',2)
+	`, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (
+			id,run_id,project_id,name,type,business_code,order_index,responsible_role_ids,
+			approval_policy_json,status,started_at
+		) VALUES (
+			$1,$2,$3,'Chốt nhánh kiểm thử','survey_review','test.node_approval',1,'["PM"]'::jsonb,
+			'{"mode":"any","roles":["PM"],"quorum":1,"requester_cannot_approve":true,"comment_required":true}'::jsonb,
+			'in_progress',now()
+		)
+	`, nodeID, runID, fixture.projectID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$1 WHERE id=$2`, nodeID, runID)
+	mustExec(t, db, `UPDATE projects SET current_pipeline_run_id=$1 WHERE id=$2`, runID, fixture.projectID)
+
+	request, err := service.RequestNodeApproval(ctx, nodeID, fixture.workerID, "Worker", "PM chốt giai đoạn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := cleanID(request["id"])
+	if approvalID == "" || fmt.Sprint(request["status"]) != "pending" {
+		t.Fatalf("node approval request = %#v", request)
+	}
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 1, fixture.pmID, nodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2`, 0, fixture.workerID, nodeID)
+	var actionHref string
+	if err := db.QueryRowContext(ctx, `SELECT action_href FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2`, fixture.pmID, nodeID).Scan(&actionHref); err != nil {
+		t.Fatal(err)
+	}
+	if actionHref != "/my-work?mode=approval&approval="+approvalID {
+		t.Fatalf("node approval action href = %q", actionHref)
+	}
+
+	if _, err := service.ApprovalAction(ctx, approvalID, "approve", "Đồng ý", fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_approved' AND source_id=$2`, 1, fixture.workerID, nodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NOT NULL`, 1, fixture.pmID, nodeID)
+}
+
+func TestPipelineNodeOrderedApprovalNotificationMovesToCurrentStage(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	stageTwoID := addProjectApprovalReviewer(t, db, fixture.projectID, "QA")
+	runID := newID()
+	nodeID := newID()
+
+	mustExec(t, db, `
+		INSERT INTO pipeline_runs (id,project_id,template_id,status,engine_version)
+		VALUES ($1,$2,'40000000-0000-0000-0000-000000000021','in_progress',2)
+	`, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (
+			id,run_id,project_id,name,type,business_code,order_index,responsible_role_ids,
+			approval_policy_json,status,started_at
+		) VALUES (
+			$1,$2,$3,'Duyệt tuần tự','survey_review','test.node_ordered_approval',1,'["PM","QA"]'::jsonb,
+			'{"mode":"ordered","stages":[{"roles":["PM"],"quorum":1},{"roles":["QA"],"quorum":1}],"requester_cannot_approve":true,"comment_required":true}'::jsonb,
+			'in_progress',now()
+		)
+	`, nodeID, runID, fixture.projectID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$1 WHERE id=$2`, nodeID, runID)
+
+	request, err := service.RequestNodeApproval(ctx, nodeID, fixture.workerID, "Worker", "Duyệt tuần tự")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := cleanID(request["id"])
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 1, fixture.pmID, nodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2`, 0, stageTwoID, nodeID)
+
+	if _, err := service.ApprovalAction(ctx, approvalID, "approve", "PM đồng ý", fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 0, fixture.pmID, nodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 1, stageTwoID, nodeID)
+
+	if _, err := service.ApprovalAction(ctx, approvalID, "approve", "QA đồng ý", stageTwoID, "QA"); err != nil {
+		t.Fatal(err)
+	}
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_approved' AND source_id=$2`, 1, fixture.workerID, nodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 0, stageTwoID, nodeID)
+}
+
+func TestPipelineNodeQuorumApprovalResolvesOnlyActingDecider(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	qaID := addProjectApprovalReviewer(t, db, fixture.projectID, "QA")
+	runID := newID()
+	nodeID := newID()
+
+	mustExec(t, db, `
+		INSERT INTO pipeline_runs (id,project_id,template_id,status,engine_version)
+		VALUES ($1,$2,'40000000-0000-0000-0000-000000000021','in_progress',2)
+	`, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (
+			id,run_id,project_id,name,type,business_code,order_index,responsible_role_ids,
+			approval_policy_json,status,started_at
+		) VALUES (
+			$1,$2,$3,'Duyệt đủ quorum','survey_review','test.node_quorum_approval',1,'["PM","QA"]'::jsonb,
+			'{"mode":"quorum","roles":["PM","QA"],"quorum":2,"requester_cannot_approve":true,"comment_required":true}'::jsonb,
+			'in_progress',now()
+		)
+	`, nodeID, runID, fixture.projectID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$1 WHERE id=$2`, nodeID, runID)
+
+	request, err := service.RequestNodeApproval(ctx, nodeID, fixture.workerID, "Worker", "Duyệt đủ quorum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := cleanID(request["id"])
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 1, fixture.pmID, nodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 1, qaID, nodeID)
+
+	if _, err := service.ApprovalAction(ctx, approvalID, "approve", "PM đồng ý", fixture.pmID, "PM"); err != nil {
+		t.Fatal(err)
+	}
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 0, fixture.pmID, nodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 1, qaID, nodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_progressed' AND source_id=$2`, 1, fixture.workerID, nodeID)
+
+	if _, err := service.ApprovalAction(ctx, approvalID, "approve", "QA đồng ý", qaID, "QA"); err != nil {
+		t.Fatal(err)
+	}
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_approved' AND source_id=$2`, 1, fixture.workerID, nodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 0, qaID, nodeID)
+}
+
+func addProjectApprovalReviewer(t *testing.T, db *sql.DB, projectID, roleLabel string) string {
+	t.Helper()
+	suffix := newID()
+	userID := newID()
+	staffID := newID()
+	roleID := ensureRole(t, db, "approval_reviewer_"+suffix[:8], roleLabel)
+	t.Cleanup(func() {
+		_, _ = db.Exec(`DELETE FROM project_members WHERE project_id=$1 AND staff_id=$2`, projectID, staffID)
+		_, _ = db.Exec(`DELETE FROM staff WHERE id=$1`, staffID)
+		_, _ = db.Exec(`DELETE FROM users WHERE id=$1`, userID)
+		_, _ = db.Exec(`DELETE FROM roles WHERE id=$1`, roleID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw',$3,'active')`, userID, "approval-reviewer-"+suffix+"@test.local", roleLabel)
+	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,position,status) VALUES ($1,$2,$3,$4,'Dự án',$3,'active')`, staffID, userID, roleLabel, "approval-reviewer-staff-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,jsonb_build_array($3::text),true)`, projectID, staffID, roleLabel)
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2)`, userID, roleID)
+	return userID
 }
 
 func TestWorkItemGenericApprovalRequestChangeKeepsItemInSync(t *testing.T) {

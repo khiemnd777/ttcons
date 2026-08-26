@@ -332,7 +332,7 @@ func (s *Service) projectNotificationEvent(ctx context.Context, outboxID int64, 
 				$6,$7,$8,$9,$10,$11,
 				$12,$13::uuid,$14::uuid,$15,$16,
 				'open_notification_target',$17::jsonb,$18,$19,$20::text[],
-				$21,$22,NULLIF($23,''),$24 + make_interval(days => $25),$24
+				$21,$22,NULLIF($23,''),$24::timestamptz + make_interval(days => $25::int),$24::timestamptz
 			)
 			ON CONFLICT (recipient_user_id,idempotency_key) DO NOTHING
 			RETURNING id::text
@@ -378,7 +378,7 @@ func (s *Service) projectNotificationEvent(ctx context.Context, outboxID int64, 
 
 func loadNotificationProjection(ctx context.Context, tx *sql.Tx, eventID string) (notificationProjection, error) {
 	projection := notificationProjection{}
-	var payloadRaw, audienceRaw []byte
+	var payloadRaw, audienceRaw, permissionsRaw, requiredPayloadKeysRaw []byte
 	err := tx.QueryRowContext(ctx, `
 		SELECT event.id::text,event.event_key,event.aggregate_type,event.aggregate_id::text,
 			COALESCE(event.source_event_id::text,''),COALESCE(event.project_id::text,''),
@@ -386,9 +386,9 @@ func loadNotificationProjection(ctx context.Context, tx *sql.Tx, eventID string)
 			COALESCE(event.correlation_key,''),event.occurred_at,
 			catalog.category_key,catalog.category_label,catalog.intent,catalog.severity,
 			catalog.icon_key,catalog.tone_key,catalog.audience_policy_key,catalog.visibility_policy_key,
-			catalog.permissions_any,catalog.action_route_template,catalog.action_label,
+			array_to_json(catalog.permissions_any)::text,catalog.action_route_template,catalog.action_label,
 			catalog.required_delivery,catalog.retention_days,
-			template.title_template,template.body_template,template.required_payload_keys
+			template.title_template,template.body_template,array_to_json(template.required_payload_keys)::text
 		FROM notification_events event
 		JOIN notification_event_types catalog ON catalog.event_key=event.event_key AND catalog.enabled
 		JOIN LATERAL (
@@ -404,9 +404,9 @@ func loadNotificationProjection(ctx context.Context, tx *sql.Tx, eventID string)
 		&projection.SourceEventID, &projection.ProjectID, &projection.ActorUserID, &payloadRaw, &audienceRaw,
 		&projection.CorrelationKey, &projection.OccurredAt, &projection.CategoryKey, &projection.CategoryLabel,
 		&projection.Intent, &projection.Severity, &projection.IconKey, &projection.ToneKey,
-		&projection.AudiencePolicyKey, &projection.VisibilityPolicyKey, &projection.PermissionsAny,
+		&projection.AudiencePolicyKey, &projection.VisibilityPolicyKey, &permissionsRaw,
 		&projection.ActionRouteTemplate, &projection.ActionLabel, &projection.RequiredDelivery,
-		&projection.RetentionDays, &projection.TitleTemplate, &projection.BodyTemplate, &projection.RequiredPayloadKeys,
+		&projection.RetentionDays, &projection.TitleTemplate, &projection.BodyTemplate, &requiredPayloadKeysRaw,
 	)
 	if err != nil {
 		return projection, err
@@ -419,12 +419,38 @@ func loadNotificationProjection(ctx context.Context, tx *sql.Tx, eventID string)
 	if err := json.Unmarshal(audienceRaw, &projection.Audience); err != nil {
 		return projection, err
 	}
+	if err := json.Unmarshal(permissionsRaw, &projection.PermissionsAny); err != nil {
+		return projection, err
+	}
+	if err := json.Unmarshal(requiredPayloadKeysRaw, &projection.RequiredPayloadKeys); err != nil {
+		return projection, err
+	}
 	return projection, nil
 }
 
 func (s *Service) resolveNotificationRecipients(ctx context.Context, tx *sql.Tx, projection notificationProjection) ([]string, error) {
 	switch projection.AudiencePolicyKey {
 	case "explicit_users":
+		if boolValue(projection.Audience["require_pending_approval"]) {
+			approvalRequestID := cleanID(projection.Audience["approval_request_id"])
+			if !validActivityUUID(approvalRequestID) {
+				return nil, fmt.Errorf("notification event %s requires a valid pending approval request", projection.EventKey)
+			}
+			requests, err := queryTx(ctx, tx, `
+				SELECT status,current_stage
+				FROM approval_requests
+				WHERE id=$1::uuid AND project_id=NULLIF($2,'')::uuid
+			`, approvalRequestID, projection.ProjectID)
+			if err != nil {
+				return nil, err
+			}
+			if len(requests) == 0 || fmt.Sprint(requests[0]["status"]) != "pending" {
+				return []string{}, nil
+			}
+			if expectedStage, ok := projection.Audience["expected_stage"]; ok && int(number(expectedStage)) != int(number(requests[0]["current_stage"])) {
+				return []string{}, nil
+			}
+		}
 		return filterNotificationRecipients(ctx, tx, projection, notificationAudienceUserIDs(projection.Audience, "user_ids"))
 	case "approval_deciders":
 		return s.resolveApprovalDeciderRecipients(ctx, tx, projection)
@@ -435,22 +461,71 @@ func (s *Service) resolveNotificationRecipients(ctx context.Context, tx *sql.Tx,
 
 func (s *Service) resolveApprovalDeciderRecipients(ctx context.Context, tx *sql.Tx, projection notificationProjection) ([]string, error) {
 	approvalRequestID := cleanID(projection.Audience["approval_request_id"])
-	if !validActivityUUID(approvalRequestID) {
-		return nil, fmt.Errorf("notification event %s requires a valid approval_request_id audience fact", projection.EventKey)
+	workItemID := cleanID(projection.Audience["work_item_id"])
+	if !validActivityUUID(approvalRequestID) && !validActivityUUID(workItemID) {
+		return nil, fmt.Errorf("notification event %s requires a valid approval_request_id or work_item_id audience fact", projection.EventKey)
 	}
-	requests, err := queryTx(ctx, tx, `
-		SELECT * FROM approval_requests
-		WHERE id=$1::uuid AND project_id=NULLIF($2,'')::uuid
-	`, approvalRequestID, projection.ProjectID)
+
+	var canDecide func(string) (bool, error)
+	if validActivityUUID(approvalRequestID) {
+		requests, err := queryTx(ctx, tx, `
+			SELECT * FROM approval_requests
+			WHERE id=$1::uuid AND project_id=NULLIF($2,'')::uuid
+		`, approvalRequestID, projection.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if len(requests) == 0 {
+			return nil, fmt.Errorf("notification approval request %s is not visible in project scope", approvalRequestID)
+		}
+		request := requests[0]
+		if fmt.Sprint(request["status"]) != "pending" {
+			return []string{}, nil
+		}
+		if expectedStage, ok := projection.Audience["expected_stage"]; ok && int(number(expectedStage)) != int(number(request["current_stage"])) {
+			return []string{}, nil
+		}
+		canDecide = func(candidateID string) (bool, error) {
+			return s.repo.CanDecideApprovalRequest(ctx, request, candidateID)
+		}
+	} else {
+		items, err := queryTx(ctx, tx, `
+			SELECT * FROM work_items
+			WHERE id=$1::uuid AND project_id=NULLIF($2,'')::uuid
+		`, workItemID, projection.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if len(items) == 0 {
+			return nil, fmt.Errorf("notification work item %s is not visible in project scope", workItemID)
+		}
+		item := items[0]
+		if !statusIn(fmt.Sprint(item["status"]), "waiting_review", "waiting_approval") {
+			return []string{}, nil
+		}
+		canDecide = func(candidateID string) (bool, error) {
+			return s.repo.CanDecideWorkItem(ctx, item, candidateID)
+		}
+	}
+
+	candidates, err := notificationApprovalCandidates(ctx, tx, projection.ProjectID)
 	if err != nil {
 		return nil, err
 	}
-	if len(requests) == 0 {
-		return nil, fmt.Errorf("notification approval request %s is not visible in project scope", approvalRequestID)
+	deciders := make([]string, 0, len(candidates))
+	for _, candidateID := range candidates {
+		allowed, err := canDecide(candidateID)
+		if err != nil {
+			return nil, err
+		}
+		if allowed {
+			deciders = append(deciders, candidateID)
+		}
 	}
-	if fmt.Sprint(requests[0]["status"]) != "pending" {
-		return []string{}, nil
-	}
+	return filterNotificationRecipients(ctx, tx, projection, deciders)
+}
+
+func notificationApprovalCandidates(ctx context.Context, tx *sql.Tx, projectID string) ([]string, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT DISTINCT account.id::text
 		FROM users account
@@ -471,7 +546,7 @@ func (s *Service) resolveApprovalDeciderRecipients(ctx context.Context, tx *sql.
 			OR EXISTS (
 				SELECT 1 FROM user_roles project_assignment
 				WHERE project_assignment.user_id=account.id
-				  AND (project_assignment.project_id IS NULL OR project_assignment.project_id=NULLIF($1,'')::uuid)
+				  AND project_assignment.project_id=NULLIF($1,'')::uuid
 			)
 			OR EXISTS (
 				SELECT 1 FROM staff person
@@ -480,8 +555,8 @@ func (s *Service) resolveApprovalDeciderRecipients(ctx context.Context, tx *sql.
 				  AND member.project_id=NULLIF($1,'')::uuid
 			)
 		  )
-		ORDER BY account.id
-	`, projection.ProjectID)
+		ORDER BY account.id::text
+	`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -492,13 +567,7 @@ func (s *Service) resolveApprovalDeciderRecipients(ctx context.Context, tx *sql.
 		if err := rows.Scan(&candidateID); err != nil {
 			return nil, err
 		}
-		allowed, err := s.repo.CanDecideApprovalRequest(ctx, requests[0], candidateID)
-		if err != nil {
-			return nil, err
-		}
-		if allowed {
-			candidates = append(candidates, candidateID)
-		}
+		candidates = append(candidates, candidateID)
 		if len(candidates) > 500 {
 			return nil, errors.New("notification approval audience exceeds 500 recipients")
 		}
@@ -506,7 +575,7 @@ func (s *Service) resolveApprovalDeciderRecipients(ctx context.Context, tx *sql.
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	return filterNotificationRecipients(ctx, tx, projection, candidates)
+	return candidates, nil
 }
 
 func filterNotificationRecipients(ctx context.Context, tx *sql.Tx, projection notificationProjection, rawCandidates []string) ([]string, error) {

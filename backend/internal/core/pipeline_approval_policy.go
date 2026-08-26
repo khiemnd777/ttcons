@@ -200,10 +200,12 @@ func (r *Repository) ApplyApprovalPolicyAction(ctx context.Context, request Reco
 	if action == "approve" && len(duplicate) > 0 {
 		return nil, validationError("Người dùng đã phê duyệt yêu cầu này")
 	}
-	if _, err := tx.ExecContext(ctx, `
+	var approvalActionID string
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO approval_actions (approval_request_id, user_id, action, comment, role_label)
 		VALUES ($1, NULLIF($2,'')::uuid, $3, NULLIF($4,''), $5)
-	`, request["id"], actorID, action, comment, roleLabel); err != nil {
+		RETURNING id::text
+	`, request["id"], actorID, action, comment, roleLabel).Scan(&approvalActionID); err != nil {
 		return nil, err
 	}
 
@@ -259,6 +261,9 @@ func (r *Repository) ApplyApprovalPolicyAction(ctx context.Context, request Reco
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "approval_"+strings.ReplaceAll(action, "-", "_"), fmt.Sprint(request["target_type"]), cleanID(request["target_id"]), fmt.Sprintf("%s phê duyệt stage %d", action, currentStage+1), Record{"approval_request_id": request["id"], "action": action, "role_label": roleLabel, "stage": currentStage, "next_stage": nextStage, "status": status}); err != nil {
+		return nil, err
+	}
+	if err := emitPipelineNodeApprovalActionTx(ctx, tx, locked[0], approvalActionID, action, comment, actorID, actorName, currentStage, nextStage, status); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

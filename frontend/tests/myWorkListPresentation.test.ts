@@ -93,6 +93,13 @@ test('My Work separates actor-decidable approvals into a dedicated compatible mo
   assert.match(page, /mode === 'approval'[\s\S]*<ApprovalWorkspace/);
   assert.match(page, /bucket: 'waiting_decision'/);
   assert.match(page, /<NodeApprovalLane/);
+  assert.match(page, /<WorkReportReviewLane/);
+  assert.match(page, /get<WorkReportSummary>\(`\/work-reports\/summary/);
+  assert.match(page, /get<WorkReportListItem\[]>\(`\/work-reports\?/);
+  assert.match(page, /summary\.waiting_decision \+ nodeApprovalCount \+ reportReviewCount/);
+  assert.match(page, /navigate\(`\/reports\?scope=review&report=\$\{report\.source_id\}`\)/);
+  assert.match(page, /searchParams\.get\('approval'\)/);
+  assert.match(page, /data-approval-id=\{request\.id\}/);
   assert.match(page, /Không có yêu cầu nào đang chờ anh duyệt\./);
 });
 
