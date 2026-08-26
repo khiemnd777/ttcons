@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { FileText, Image as ImageIcon, Info, Loader2, RefreshCw, X } from 'lucide-react';
 import { EvidencePdfViewer } from './EvidencePdfViewer';
 import { EvidenceSpreadsheetViewer } from './EvidenceSpreadsheetViewer';
@@ -45,6 +45,7 @@ export function EvidenceViewerDialog({
   onClose,
 }: EvidenceViewerDialogProps) {
   const [decodeFailed, setDecodeFailed] = useState(false);
+  const dialogRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setDecodeFailed(false);
@@ -53,17 +54,38 @@ export function EvidenceViewerDialog({
   useEffect(() => {
     if (!open) return undefined;
     const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      onClose();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if (!focusable.length) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.body.style.overflow = 'hidden';
     document.addEventListener('keydown', onKeyDown, true);
+    window.requestAnimationFrame(() => dialogRef.current?.querySelector<HTMLElement>('[data-viewer-autofocus]')?.focus());
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', onKeyDown, true);
+      window.requestAnimationFrame(() => previousFocus?.isConnected && previousFocus.focus());
     };
   }, [open, onClose]);
 
@@ -73,7 +95,7 @@ export function EvidenceViewerDialog({
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center p-0 sm:p-4">
       <button type="button" className="absolute inset-0 bg-ink/60" aria-label="Đóng trình xem minh chứng" onClick={onClose} />
-      <section role="dialog" aria-modal="true" aria-labelledby="evidence-viewer-title" className="relative flex h-full max-h-none w-full max-w-[min(1180px,calc(100vw-2rem))] flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:rounded-xl sm:border sm:border-line">
+      <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="evidence-viewer-title" className="relative flex h-full max-h-none w-full max-w-[min(1180px,calc(100vw-2rem))] flex-col overflow-hidden bg-white shadow-2xl outline-none sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:rounded-xl sm:border sm:border-line">
         <header className="flex items-start justify-between gap-4 border-b border-line px-4 py-3 sm:px-5 sm:py-4">
           <div className="min-w-0 flex-1">
             <h2 id="evidence-viewer-title" className="text-lg font-semibold text-ink">Xem minh chứng</h2>
@@ -82,9 +104,9 @@ export function EvidenceViewerDialog({
             {description ? <p className="mt-1.5 text-xs leading-5 text-slate-500">{description}</p> : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {['pdf', 'word', 'spreadsheet'].includes(mediaType) ? mediaAction : null}
+            {mediaAction}
             {headerStatus}
-            <button type="button" className="rounded-md p-2 text-slate-500 hover:bg-slate-100" onClick={onClose} aria-label="Đóng"><X className="h-5 w-5" /></button>
+            <button type="button" data-viewer-autofocus className="rounded-md p-2 text-slate-500 hover:bg-slate-100" onClick={onClose} aria-label="Đóng"><X className="h-5 w-5" /></button>
           </div>
         </header>
 
@@ -124,13 +146,15 @@ export function EvidenceViewerDialog({
                 />
               ) : (
                 <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-line bg-slate-50 px-6 py-8 text-center sm:min-h-[22rem]">
+                  {loading ? <span className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-600"><Loader2 className="h-5 w-5 animate-spin" /> Đang tải minh chứng…</span> : null}
                   <span className="grid h-20 w-20 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm">
                     <FileText className="h-10 w-10" />
                   </span>
                   <p className="mt-5 max-w-xl break-words text-base font-semibold leading-6 text-ink">{name}</p>
                   {metadata.length ? <p className="mt-2 text-sm text-slate-500">{metadata.filter(Boolean).join(' · ')}</p> : null}
-                  {documentUnavailableText ? <p className="mt-4 max-w-xl text-sm font-medium leading-6 text-slate-500">{documentUnavailableText}</p> : null}
-                  {mediaAction ? <div className="mt-5">{mediaAction}</div> : !documentUnavailableText ? <p className="mt-4 text-sm font-medium text-slate-500">Chưa có tệp có thể mở.</p> : null}
+                  {!loading && visibleError ? <div className="mt-4 text-center"><p className="text-sm font-semibold text-rose-700">{visibleError}</p>{onRetry ? <button type="button" className="mt-3 inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={onRetry}><RefreshCw className="h-4 w-4" /> Thử lại</button> : null}</div> : null}
+                  {!loading && !visibleError && documentUnavailableText ? <p className="mt-4 max-w-xl text-sm font-medium leading-6 text-slate-500">{documentUnavailableText}</p> : null}
+                  {!loading && !visibleError && mediaAction ? <div className="mt-5">{mediaAction}</div> : !loading && !visibleError && !documentUnavailableText ? <p className="mt-4 text-sm font-medium text-slate-500">Chưa có tệp có thể mở.</p> : null}
                 </div>
               )}
               {caption ? <div className="mt-3 flex items-start gap-2 rounded-md border border-blue-100 bg-blue-50/70 p-3 text-sm leading-6 text-slate-700"><Info className="mt-1 h-4 w-4 shrink-0 text-blue-700" /><p className="whitespace-pre-wrap break-words">{caption}</p></div> : null}

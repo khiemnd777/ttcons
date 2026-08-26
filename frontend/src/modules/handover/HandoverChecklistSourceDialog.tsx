@@ -1,13 +1,11 @@
 import { type ReactNode, useState } from 'react';
-import { ExternalLink, FileText, Info, Loader2, LockKeyhole } from 'lucide-react';
+import { ExternalLink, Eye, FileText, Info, LockKeyhole } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Dialog } from '../../components/Dialog';
 import { StatusBadge } from '../../components/StatusBadge';
-import { useToast } from '../../components/ToastProvider';
-import { downloadBlob } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { currency, dateText } from '../../lib/utils/format';
-import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
+import { EvidenceReferenceViewer } from '../_shared/EvidenceReferenceViewer';
 import {
   automaticSourcePresentation,
   checklistItemCodeLabel,
@@ -31,32 +29,20 @@ type HandoverChecklistSourceDialogProps = {
 
 export function HandoverChecklistSourceDialog({ open, item, detail, canEdit = false, onEdit, onClose }: HandoverChecklistSourceDialogProps) {
   const { hasAnyPermission } = useAuth();
-  const toast = useToast();
-  const [openingEvidenceID, setOpeningEvidenceID] = useState('');
+  const [viewerSource, setViewerSource] = useState<LinkedSourcePresentation | null>(null);
   const mode = item ? checklistSourceMode(item) : null;
   const automaticSource = item && detail && mode === 'automatic' ? automaticSourcePresentation(item, detail) : null;
   const linkedSources = item && mode === 'linked' ? linkedSourcePresentations(item) : [];
   const canOpenAutomaticSource = Boolean(automaticSource && hasAnyPermission(automaticSource.permissions));
 
-  async function openEvidence(source: LinkedSourcePresentation) {
-    setOpeningEvidenceID(source.id);
-    try {
-      await openProtectedBlob(() => downloadBlob(`/evidence/${source.id}/file`));
-    } catch (error) {
-      toast.error('Không mở được tệp minh chứng', error);
-    } finally {
-      setOpeningEvidenceID('');
-    }
-  }
-
   const footer = <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
     <button type="button" className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>Đóng</button>
     {mode === 'linked' && canEdit && onEdit ? <button type="button" className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={onEdit}>Cập nhật liên kết</button> : null}
     {automaticSource && canOpenAutomaticSource ? <Link className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" to={automaticSource.targetPath} onClick={onClose}>{automaticSource.targetLabel}<ExternalLink className="h-4 w-4" /></Link> : null}
-    {linkedSources.map((source) => source.openMode === 'external_document' && source.targetUrl ? <a key={source.id} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" href={source.targetUrl} target="_blank" rel="noreferrer">Mở tài liệu<ExternalLink className="h-4 w-4" /></a> : source.openMode === 'protected_evidence' ? <button key={source.id} type="button" disabled={openingEvidenceID === source.id} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={() => void openEvidence(source)}>{openingEvidenceID === source.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}Mở minh chứng</button> : null)}
+    {linkedSources.map((source) => source.openMode === 'external_document' && source.targetUrl ? <a key={source.id} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" href={source.targetUrl} target="_blank" rel="noreferrer">Mở tài liệu<ExternalLink className="h-4 w-4" /></a> : source.openMode === 'protected_evidence' ? <button key={source.id} type="button" className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setViewerSource(source)}><Eye className="h-4 w-4" />Xem minh chứng</button> : null)}
   </div>;
 
-  return <Dialog
+  return <><Dialog
     open={open}
     title={mode === 'linked' ? 'Nguồn xác minh đã liên kết' : 'Nguồn xác minh tự động'}
     description={item ? item.title : undefined}
@@ -65,7 +51,18 @@ export function HandoverChecklistSourceDialog({ open, item, detail, canEdit = fa
     footer={footer}
   >
     {!item || !detail ? <SourceUnavailable message="Không xác định được mục checklist cần xem nguồn." /> : mode === 'automatic' && automaticSource ? <AutomaticSourceContent item={item} source={automaticSource} canOpenSource={canOpenAutomaticSource} /> : mode === 'linked' && linkedSources.length ? <LinkedSourceContent item={item} sources={linkedSources} /> : <SourceUnavailable message="Mục checklist này chưa có nguồn xác minh có thể hiển thị." />}
-  </Dialog>;
+  </Dialog>
+  <EvidenceReferenceViewer
+    reference={viewerSource ? {
+      id: viewerSource.id,
+      name: viewerSource.name,
+      mimeType: viewerSource.mimeType,
+      metadata: [viewerSource.typeLabel],
+      headerStatus: viewerSource.status ? <StatusBadge status={viewerSource.status} /> : undefined,
+    } : null}
+    onClose={() => setViewerSource(null)}
+  />
+  </>;
 }
 
 function AutomaticSourceContent({ item, source, canOpenSource }: { item: ChecklistItem; source: AutomaticSourcePresentation; canOpenSource: boolean }) {

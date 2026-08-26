@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Circle, ClipboardCheck, FileText, Image as ImageIcon, Link2, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Circle, ClipboardCheck, Eye, FileText, Image as ImageIcon, Link2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
@@ -16,6 +16,7 @@ import {
 } from '../_shared/EvidenceCapture';
 import { AcceptanceEvidencePicker } from './AcceptanceEvidencePicker';
 import { AcceptanceWorkItemPickerDialog } from './AcceptanceWorkItemPickerDialog';
+import { EvidenceReferenceViewer } from '../_shared/EvidenceReferenceViewer';
 
 export type AcceptanceLineDraft = {
   key: string;
@@ -120,6 +121,7 @@ export function AcceptanceEditor({
   const toast = useToast();
   const [selectedKey, setSelectedKey] = useState(draft.checklist[0]?.key ?? '');
   const [evidencePickerOpen, setEvidencePickerOpen] = useState(false);
+  const [viewerRecord, setViewerRecord] = useState<EvidenceRecord | null>(null);
   const [workItemPickerOpen, setWorkItemPickerOpen] = useState(false);
   const [workItemPickerMode, setWorkItemPickerMode] = useState<'capture' | 'change'>('change');
   const pendingCaptureResume = useRef<(() => void) | null>(null);
@@ -313,7 +315,7 @@ export function AcceptanceEditor({
 
                   <label className="flex items-start gap-2 rounded-md border border-line bg-slate-50 px-3 py-2.5 text-sm text-slate-700"><input type="checkbox" className="mt-0.5" checked={selectedLine.photo_required} onChange={(event) => updateLine(selectedLine.key, { photo_required: event.target.checked })} disabled={disabled} /><span><strong className="font-semibold">Bắt buộc có minh chứng</strong><span className="mt-0.5 block text-xs text-slate-500">Tự động bắt buộc khi kết quả là Đạt có điều kiện hoặc Không đạt.</span></span></label>
 
-                  {selectedEvidence.length ? <div className="grid gap-2 sm:grid-cols-2">{selectedEvidence.map((record) => <SelectedEvidenceCard key={String(record.id)} record={record} mismatch={Boolean(draft.work_item_id && record.work_item_id && record.work_item_id !== draft.work_item_id)} disabled={disabled} onRemove={() => removeEvidence(selectedLine, String(record.id), (patch) => updateLine(selectedLine.key, patch))} />)}</div> : null}
+                  {selectedEvidence.length ? <div className="grid gap-2 sm:grid-cols-2">{selectedEvidence.map((record) => <SelectedEvidenceCard key={String(record.id)} record={record} mismatch={Boolean(draft.work_item_id && record.work_item_id && record.work_item_id !== draft.work_item_id)} disabled={disabled} onView={() => setViewerRecord(record)} onRemove={() => removeEvidence(selectedLine, String(record.id), (patch) => updateLine(selectedLine.key, patch))} />)}</div> : null}
                   {selectedLine.photo_url ? <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">Tiêu chí này còn một liên kết ảnh từ dữ liệu cũ. Liên kết sẽ tiếp tục được giữ khi lưu.</div> : null}
 
                   <div className="flex flex-wrap gap-2">
@@ -396,6 +398,17 @@ export function AcceptanceEditor({
         onClear={clearWorkItem}
         onConfirm={selectWorkItem}
       />
+      <EvidenceReferenceViewer
+        reference={viewerRecord ? {
+          id: String(viewerRecord.id),
+          name: viewerRecord.name || viewerRecord.title || String(viewerRecord.id),
+          mimeType: viewerRecord.mime_type,
+          evidenceType: viewerRecord.evidence_type,
+          metadata: viewerRecord.work_item_title ? [viewerRecord.work_item_title] : undefined,
+          headerStatus: <StatusBadge status={viewerRecord.status} />,
+        } : null}
+        onClose={() => setViewerRecord(null)}
+      />
     </div>
   );
 }
@@ -405,9 +418,9 @@ function CriterionListItem({ line, index, active, onClick }: { line: AcceptanceL
   return <button type="button" className={clsx('w-full px-3 py-3 text-left transition', active ? 'bg-white shadow-[inset_3px_0_0_#2563eb]' : 'hover:bg-white/70')} onClick={onClick}><span className="flex items-start gap-3"><span className={clsx('mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold', active ? 'bg-blue-600 text-white' : 'bg-white text-slate-500 ring-1 ring-line')}>{index + 1}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink">{line.title || 'Tiêu chí chưa đặt tên'}</span><span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span>{decisionLabel(line.decision)}</span><span>·</span><span>{line.evidence_ids.length + line.uploads.length} minh chứng</span></span>{issue ? <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-700"><AlertTriangle className="h-3.5 w-3.5" /> {issue}</span> : null}</span></span></button>;
 }
 
-function SelectedEvidenceCard({ record, mismatch, disabled, onRemove }: { record: EvidenceRecord; mismatch: boolean; disabled: boolean; onRemove: () => void }) {
+function SelectedEvidenceCard({ record, mismatch, disabled, onView, onRemove }: { record: EvidenceRecord; mismatch: boolean; disabled: boolean; onView: () => void; onRemove: () => void }) {
   const Icon = record.evidence_type === 'photo' ? ImageIcon : FileText;
-  return <article className={clsx('flex min-w-0 items-start gap-3 rounded-md border p-3', mismatch ? 'border-amber-300 bg-amber-50' : 'border-line bg-white')}><span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-500"><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{record.name || record.title || String(record.id)}</p><p className="mt-1 truncate text-xs text-slate-500">{record.work_item_title || 'Hồ sơ công trình'}</p><div className="mt-2 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} />{mismatch ? <span className="text-xs font-semibold text-amber-800">Khác nguồn công việc</span> : null}</div></div><button type="button" disabled={disabled} className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50" onClick={onRemove} aria-label="Bỏ minh chứng"><X className="h-4 w-4" /></button></article>;
+  return <article className={clsx('flex min-w-0 items-start gap-3 rounded-md border p-3', mismatch ? 'border-amber-300 bg-amber-50' : 'border-line bg-white')}><span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-500"><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{record.name || record.title || String(record.id)}</p><p className="mt-1 truncate text-xs text-slate-500">{record.work_item_title || 'Hồ sơ công trình'}</p><div className="mt-2 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} />{mismatch ? <span className="text-xs font-semibold text-amber-800">Khác nguồn công việc</span> : null}</div></div><div className="flex shrink-0 items-center gap-1"><button type="button" className="rounded-md p-1.5 text-blue-700 hover:bg-blue-50" onClick={onView} aria-label={`Xem ${record.name || record.title || 'minh chứng'}`}><Eye className="h-4 w-4" /></button><button type="button" disabled={disabled} className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50" onClick={onRemove} aria-label="Bỏ minh chứng"><X className="h-4 w-4" /></button></div></article>;
 }
 
 function EditorField({ fieldKey, label, className = '', children }: { fieldKey?: string; label: string; className?: string; children: ReactNode }) {

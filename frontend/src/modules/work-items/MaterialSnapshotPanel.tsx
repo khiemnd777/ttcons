@@ -18,6 +18,7 @@ import type {
 } from '../../lib/types/domain';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
+import { SelectedEvidenceViewButton } from '../_shared/EvidenceReferenceViewer';
 
 type RowDraft = {
   item_index: number;
@@ -580,37 +581,43 @@ function MaterialSnapshotRow({
         <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`before-evidence-${row.item_index}`}>
           Minh chứng trước
         </label>
-        <select
-          id={`before-evidence-${row.item_index}`}
-          className="mt-1 w-full rounded-md border border-line bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
-          value={row.before_evidence_id}
-          onChange={(event) => onChange({ before_evidence_id: event.target.value })}
-          disabled={disabled}
-        >
-          <option value="">Chưa chọn</option>
-          {evidence.map((item) => (
-            <option key={item.id} value={item.id}>
-              {evidenceLabel(item)}
-            </option>
-          ))}
-        </select>
+        <div className="mt-1 flex items-center gap-2">
+          <select
+            id={`before-evidence-${row.item_index}`}
+            className="min-w-0 flex-1 rounded-md border border-line bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+            value={row.before_evidence_id}
+            onChange={(event) => onChange({ before_evidence_id: event.target.value })}
+            disabled={disabled}
+          >
+            <option value="">Chưa chọn</option>
+            {evidence.map((item) => (
+              <option key={item.id} value={item.id}>
+                {evidenceLabel(item)}
+              </option>
+            ))}
+          </select>
+          <SelectedEvidenceViewButton evidenceId={row.before_evidence_id} evidence={evidence} />
+        </div>
         <label className="mt-2 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`after-evidence-${row.item_index}`}>
           Minh chứng sau
         </label>
-        <select
-          id={`after-evidence-${row.item_index}`}
-          className="mt-1 w-full rounded-md border border-line bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
-          value={row.after_evidence_id}
-          onChange={(event) => onChange({ after_evidence_id: event.target.value })}
-          disabled={disabled}
-        >
-          <option value="">Chưa chọn</option>
-          {evidence.map((item) => (
-            <option key={item.id} value={item.id}>
-              {evidenceLabel(item)}
-            </option>
-          ))}
-        </select>
+        <div className="mt-1 flex items-center gap-2">
+          <select
+            id={`after-evidence-${row.item_index}`}
+            className="min-w-0 flex-1 rounded-md border border-line bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+            value={row.after_evidence_id}
+            onChange={(event) => onChange({ after_evidence_id: event.target.value })}
+            disabled={disabled}
+          >
+            <option value="">Chưa chọn</option>
+            {evidence.map((item) => (
+              <option key={item.id} value={item.id}>
+                {evidenceLabel(item)}
+              </option>
+            ))}
+          </select>
+          <SelectedEvidenceViewButton evidenceId={row.after_evidence_id} evidence={evidence} />
+        </div>
         <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
           <input
             className="h-9 w-full rounded-md border border-line px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"

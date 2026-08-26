@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, ClipboardCheck, ExternalLink, Eye, FileText, Loader2, Plus, Search, Send, Wrench } from 'lucide-react';
-import { downloadBlob, get, post, put } from '../../lib/api/client';
+import { CheckCircle2, ClipboardCheck, Eye, FileText, Loader2, Plus, Search, Send, Wrench } from 'lucide-react';
+import { get, post, put } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
-import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
 import { ProjectSelector } from '../_shared/ProjectSelector';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
@@ -27,6 +26,7 @@ import {
 } from './AcceptanceEditor';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from '../work-items/workItemMutationContext';
+import { EvidenceReferenceViewer, type EvidenceFileReference } from '../_shared/EvidenceReferenceViewer';
 
 type ConclusionResult = 'pass' | 'conditional_pass' | 'fail';
 type SelectedChecklistItem = { item: AcceptanceChecklistItem; index: number } | null;
@@ -454,32 +454,32 @@ function acceptanceStatusText(record: AcceptanceRecord) {
 }
 
 function ChecklistItemDialog({ selected, record, onClose }: { selected: SelectedChecklistItem; record: AcceptanceRecord | null; onClose: () => void }) {
-  const toast = useToast();
-  const [openingEvidence, setOpeningEvidence] = useState('');
+  const [viewerReference, setViewerReference] = useState<EvidenceFileReference | null>(null);
   const item = selected?.item;
   const evidenceRecords = checklistEvidenceRecords(item);
   const supplemental = Object.entries(item?.payload_json ?? {}).filter(([key]) => key !== 'evidence_required');
   const evidenceRequired = Boolean(item?.photo_required || item?.payload_json?.evidence_required || item?.decision === 'conditional_pass' || item?.decision === 'fail');
 
-  async function openEvidence(evidence?: EvidenceRecord) {
+  function openEvidence(evidence?: EvidenceRecord) {
     if (!item) return;
     const evidenceId = String(evidence?.id ?? item.evidence_id ?? '');
     if (!evidenceId && item.photo_url) {
-      window.open(item.photo_url, '_blank', 'noopener,noreferrer');
+      setViewerReference({ name: item.evidence_name || 'Ảnh dữ liệu cũ', fileUrl: item.photo_url, evidenceType: 'photo' });
       return;
     }
     if (!evidenceId) return;
-    setOpeningEvidence(evidenceId);
-    try {
-      await openProtectedBlob(() => downloadBlob(`/evidence/${evidenceId}/file`));
-    } catch (error) {
-      toast.error('Không mở được minh chứng', error);
-    } finally {
-      setOpeningEvidence('');
-    }
+    setViewerReference({
+      id: evidenceId,
+      name: evidence?.name || evidence?.title || item.evidence_name || 'Minh chứng nghiệm thu',
+      mimeType: evidence?.mime_type,
+      evidenceType: evidence?.evidence_type,
+      metadata: evidence?.work_item_title ? [evidence.work_item_title] : undefined,
+      headerStatus: evidence?.status ? <StatusBadge status={evidence.status} /> : undefined,
+    });
   }
 
   return (
+    <>
     <Dialog
       open={Boolean(selected)}
       title={selected ? `Chi tiết tiêu chí #${selected.index + 1}` : 'Chi tiết tiêu chí'}
@@ -504,7 +504,7 @@ function ChecklistItemDialog({ selected, record, onClose }: { selected: Selected
 
           <section className="rounded-md border border-line p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Minh chứng · {evidenceRecords.length || (item.photo_url ? 1 : 0)}</p>
-            {evidenceRecords.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{evidenceRecords.map((evidence) => <article key={String(evidence.id)} className="flex min-w-0 items-start gap-3 rounded-md border border-line p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{evidence.name || evidence.title || evidence.id}</p><p className="mt-1 truncate text-xs text-slate-500">{evidence.work_item_title || 'Hồ sơ công trình'}</p><div className="mt-2"><StatusBadge status={evidence.status} /></div></div><button type="button" disabled={Boolean(openingEvidence)} className="inline-flex shrink-0 items-center gap-2 rounded-md border border-line bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-60" onClick={() => openEvidence(evidence)}>{openingEvidence === String(evidence.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />} Xem</button></article>)}</div> : item.photo_url ? <button type="button" className="mt-3 inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => openEvidence()}><ExternalLink className="h-4 w-4" /> Xem ảnh dữ liệu cũ</button> : <p className="mt-2 text-sm text-slate-500">Chưa có minh chứng.</p>}
+            {evidenceRecords.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{evidenceRecords.map((evidence) => <article key={String(evidence.id)} className="flex min-w-0 items-start gap-3 rounded-md border border-line p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{evidence.name || evidence.title || evidence.id}</p><p className="mt-1 truncate text-xs text-slate-500">{evidence.work_item_title || 'Hồ sơ công trình'}</p><div className="mt-2"><StatusBadge status={evidence.status} /></div></div><button type="button" className="inline-flex shrink-0 items-center gap-2 rounded-md border border-line bg-white px-2.5 py-2 text-xs font-semibold text-blue-700 hover:border-blue-200 hover:bg-blue-50" onClick={() => openEvidence(evidence)}><Eye className="h-4 w-4" /> Xem</button></article>)}</div> : item.photo_url ? <button type="button" className="mt-3 inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={() => openEvidence()}><Eye className="h-4 w-4" /> Xem ảnh dữ liệu cũ</button> : <p className="mt-2 text-sm text-slate-500">Chưa có minh chứng.</p>}
           </section>
 
           <DetailField label="Ghi chú tiêu chí" value={item.note || '-'} full />
@@ -517,6 +517,8 @@ function ChecklistItemDialog({ selected, record, onClose }: { selected: Selected
         </div>
       ) : null}
     </Dialog>
+    <EvidenceReferenceViewer reference={viewerReference} onClose={() => setViewerReference(null)} />
+    </>
   );
 }
 

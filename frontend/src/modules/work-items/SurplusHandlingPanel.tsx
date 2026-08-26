@@ -17,6 +17,7 @@ import type {
 } from '../../lib/types/domain';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
+import { SelectedEvidenceViewButton } from '../_shared/EvidenceReferenceViewer';
 
 type Draft = {
   id: string;
@@ -457,22 +458,25 @@ function SurplusRow({
           placeholder="Vị trí lưu / bàn giao"
           aria-invalid={isInvalid('custody_location')}
         />
-        <select
-          name={keyFor('evidence_id')}
-          data-validation-key={keyFor('evidence_id')}
-          data-validation-error={isInvalid('evidence_id') ? 'true' : undefined}
-          className={clsx('h-9 rounded-md border bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', isInvalid('evidence_id') ? 'border-rose-300' : 'border-line')}
-          value={draft.evidence_id}
-          onChange={(event) => onChange({ evidence_id: event.target.value })}
-          disabled={disabled}
-          aria-label="Minh chứng vật tư dư"
-          aria-invalid={isInvalid('evidence_id')}
-        >
-          <option value="">Chọn minh chứng</option>
-          {evidence.map((item) => (
-            <option key={item.id} value={item.id}>{evidenceLabel(item)}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            name={keyFor('evidence_id')}
+            data-validation-key={keyFor('evidence_id')}
+            data-validation-error={isInvalid('evidence_id') ? 'true' : undefined}
+            className={clsx('h-9 min-w-0 flex-1 rounded-md border bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', isInvalid('evidence_id') ? 'border-rose-300' : 'border-line')}
+            value={draft.evidence_id}
+            onChange={(event) => onChange({ evidence_id: event.target.value })}
+            disabled={disabled}
+            aria-label="Minh chứng vật tư dư"
+            aria-invalid={isInvalid('evidence_id')}
+          >
+            <option value="">Chọn minh chứng</option>
+            {evidence.map((item) => (
+              <option key={item.id} value={item.id}>{evidenceLabel(item)}</option>
+            ))}
+          </select>
+          <SelectedEvidenceViewButton evidenceId={draft.evidence_id} evidence={evidence} />
+        </div>
         <input
           className="h-9 rounded-md border border-line px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
           value={draft.comment}

@@ -62,4 +62,6 @@
 
 ## Notification Platform Boundary
 
+- Material before/after snapshot, incoming acceptance and surplus-handling selectors expose a separate `Xem` action for the selected protected evidence. The shared viewer is presentation-only: it does not change the selected evidence ID, submit payload, accepted quantities, site-balance usage, surplus handling state, custody, warehouse movement or stock traceability.
+
 - V126 catalogs stock-document completion, material-snapshot review and surplus assignment candidates disabled. Notification projection must never post a movement, change a balance or mark surplus handled. Future producers must emit only after the same authoritative stock/snapshot/surplus transaction succeeds and resolve current requester/custodian/reviewer scope without duplicating warehouse ledgers.

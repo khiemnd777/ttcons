@@ -90,4 +90,6 @@
 
 ## Notification Platform Boundary
 
+- Construction check context/result fallback cards, corrective-action before/after evidence and `construction_action_events` evidence use the shared ID/name evidence viewer instead of opening protected blobs in a raw tab. The adapter is presentation-only: it still reads `/evidence/:id/file`, never changes `construction_check_evidence`, the legacy primary `evidence_id`, action/event history, status, assignee, issue/rework synchronization or handover blocker semantics.
+
 - Construction daily Work Reports use the enabled generic report events through the shared immutable delivery lifecycle; the mutable Operations source does not invent a second notification contract. Construction check/action/issue/evidence candidates are cataloged disabled in V126. Enabling any of them requires emission inside the authoritative technical transition, evidence/project visibility checks and an audience resolver; a notification must never replace `construction_action_events`, issue/rework history or handover blockers.

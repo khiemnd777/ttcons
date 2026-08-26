@@ -150,6 +150,12 @@ Use this map after `module-keyword-map.md` for React/Vite admin UI, frontend hel
 - For a selected `pending|ready|needs_changes` construction item, the report form explains that saving moves the item to `Đang làm`; it adds no confirmation dialog and issues no client-side `/start` request. The create response's additive `work_item_transition.auto_started` is the only source for the success wording.
 - A real auto-start invalidates report/workspace plus `work-item` and actor-owned `my-work-items` caches. The success toast names the started item; partial linked check/action failure still reports the successful report/start separately and reopens only failed child drafts. `in_progress` and `blocked` saves use the ordinary report success path.
 
+## Evidence Reference Viewer Adoption
+
+- Shared owner: `modules/_shared/EvidenceReferenceViewer.tsx` over `EvidenceViewerDialog.tsx`; focused coverage: `tests/evidenceReferenceViewer.test.ts`.
+- Compact consumers with only an evidence ID/name download the same protected `/evidence/:id/file` only after the user opens the viewer, classify Image/PDF/DOCX/XLSX/document from the response MIME plus filename, expose loading/error/retry, revoke object URLs and keep focus inside the top nested dialog before restoring the trigger on close.
+- Consumers: `modules/operations/ConstructionEvidenceButton.tsx`, `modules/acceptance/AcceptancePage.tsx`, `AcceptanceEditor.tsx`, `modules/handover/HandoverChecklistSourceDialog.tsx`, `modules/work-items/MaterialSnapshotPanel.tsx`, `IncomingAcceptancePanel.tsx`, `SurplusHandlingPanel.tsx`, `SubcontractorReconciliationPanel.tsx`, `OwnerClientReconciliationPanel.tsx`. A separate `Xem` action never changes the selected evidence ID or removes the record. Evidence permission/status/storage/audit and every construction, acceptance, handover, reconciliation and material transition remain unchanged; external documents and non-evidence artifacts retain their separate open contracts.
+
 ## Cross-Module Work Item Mutation Context
 
 - Shared owner: `modules/work-items/workItemMutationContext.ts`; consumers include `BOQPage`, `SupplierQuotationWorkspace`, `ContractsPage`, `ProcurementPage`, `WarehousePage`, `ConstructionHandoffPanel`, `HandoverPage`, `ProjectFinancePage`, acceptance/material/reconciliation Work Item panels and construction check/action dialogs. Coverage: `tests/workItemMutationContext.test.ts`.

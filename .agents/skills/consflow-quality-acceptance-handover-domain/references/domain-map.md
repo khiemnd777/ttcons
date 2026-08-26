@@ -89,4 +89,6 @@
 
 ## Notification Platform Boundary
 
+- Acceptance criterion detail and editor plus protected handover checklist evidence open through the shared evidence viewer, including legacy ID/name-only references. Viewing is read-only and uses the existing protected evidence-file authorization; it never changes checklist evidence association, conclusion, rework creation/history, checklist verification, readiness snapshots, sign-off or handover completion. External handover documents keep their separately validated URL behavior.
+
 - V126 catalogs ITP/RFI/NCR, acceptance/rework and handover notification candidates disabled. A future producer must be atomic with the exact quality transition and link its immutable evidence/activity source; notification resolution may reflect but never perform acceptance, corrective approval, reinspection, checklist verification or handover completion.

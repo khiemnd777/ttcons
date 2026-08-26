@@ -78,4 +78,6 @@
 
 ## Notification Platform Boundary
 
+- Subcontractor and owner/client reconciliation rows expose a separate shared-viewer action for their persisted work-item evidence ID/name. Viewing uses the existing protected evidence-file authorization and never changes confirmed quantity, variance, BOQ/acceptance linkage, client decision, required action, comment, reconciliation status, source attribution or any stock/quality/finance downstream state.
+
 - V126 catalogs BOQ, quotation, procurement, contract and variation notification candidates disabled. No commercial recipient is currently inferred from a role label or sent a notification. Each future enablement must emit from the authoritative approval/selection/milestone transaction, preserve idempotency and reuse the exact decider/source-owner policy without bypassing price lock, procurement generation, signature or contract activation gates.

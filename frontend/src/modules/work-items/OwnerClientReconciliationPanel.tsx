@@ -12,6 +12,7 @@ import { dateText } from '../../lib/utils/format';
 import type { OwnerClientReconciliationItem, OwnerClientReconciliationResponse, ProjectOperationsRecord } from '../../lib/types/domain';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
+import { EvidenceReferenceViewButton } from '../_shared/EvidenceReferenceViewer';
 
 type RowDraft = {
   item_index: number;
@@ -317,7 +318,7 @@ function ReconciliationItemRow({
           {item.severity ? <StatusBadge status={item.severity} /> : null}
           {item.evidence_id ? <StatusBadge status={item.evidence_status ?? 'submitted'} /> : null}
         </div>
-        {item.evidence_name ? <p className="mt-2 truncate text-xs text-slate-500">Minh chứng: {item.evidence_name}</p> : null}
+        {item.evidence_id ? <div className="mt-2 flex items-center gap-2"><p className="min-w-0 flex-1 truncate text-xs text-slate-500">Minh chứng: {item.evidence_name || item.evidence_id}</p><EvidenceReferenceViewButton reference={{ id: item.evidence_id, name: item.evidence_name || 'Minh chứng đối soát', headerStatus: <StatusBadge status={item.evidence_status ?? 'submitted'} /> }} /></div> : null}
         {item.output_ref ? <p className="mt-1 truncate text-xs text-slate-500">Đầu ra: {item.output_ref}</p> : null}
         {item.required_action ? <p className="mt-2 text-xs leading-5 text-slate-600">Yêu cầu: {item.required_action}</p> : null}
       </div>

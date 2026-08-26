@@ -21,6 +21,7 @@ import type {
 import { partnerOptions } from '../core-data/partnerUtils';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
+import { SelectedEvidenceViewButton } from '../_shared/EvidenceReferenceViewer';
 
 type LineDraft = {
   key: string;
@@ -635,12 +636,15 @@ function IncomingLine({
         ))}
       </select>
       <div className="grid gap-1">
-        <select name={keyFor('evidence_id')} data-validation-key={keyFor('evidence_id')} data-validation-error={isInvalid('evidence_id') ? 'true' : undefined} className={clsx(controlClassName, isInvalid('evidence_id') && 'border-rose-300 bg-rose-50')} value={line.evidence_id} onChange={(event) => onChange({ evidence_id: event.target.value })} disabled={disabled} aria-invalid={isInvalid('evidence_id')}>
-          <option value="">Minh chứng</option>
-          {evidence.map((record) => (
-            <option key={record.id} value={record.id}>{evidenceLabel(record)}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select name={keyFor('evidence_id')} data-validation-key={keyFor('evidence_id')} data-validation-error={isInvalid('evidence_id') ? 'true' : undefined} className={clsx(controlClassName, 'min-w-0 flex-1', isInvalid('evidence_id') && 'border-rose-300 bg-rose-50')} value={line.evidence_id} onChange={(event) => onChange({ evidence_id: event.target.value })} disabled={disabled} aria-invalid={isInvalid('evidence_id')}>
+            <option value="">Minh chứng</option>
+            {evidence.map((record) => (
+              <option key={record.id} value={record.id}>{evidenceLabel(record)}</option>
+            ))}
+          </select>
+          <SelectedEvidenceViewButton evidenceId={line.evidence_id} evidence={evidence} />
+        </div>
         <input name={keyFor('defect_note')} data-validation-key={keyFor('defect_note')} data-validation-error={isInvalid('defect_note') ? 'true' : undefined} className={clsx(controlClassName, isInvalid('defect_note') && 'border-rose-300 bg-rose-50')} value={line.defect_note} onChange={(event) => onChange({ defect_note: event.target.value })} disabled={disabled} placeholder="Mô tả lỗi" aria-invalid={isInvalid('defect_note')} />
       </div>
     </div>
