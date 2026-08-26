@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, RefreshCw, Save, Send, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
@@ -17,6 +17,7 @@ import type {
   ProjectMaterialBalance,
 } from '../../lib/types/domain';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 type RowDraft = {
   item_index: number;
@@ -88,6 +89,9 @@ export function MaterialSnapshotPanel({
   const [constructionArea, setConstructionArea] = useState('');
   const [comment, setComment] = useState('');
   const [rows, setRows] = useState<RowDraft[]>([]);
+  const [invalidKey, setInvalidKey] = useState('');
+  const panelRef = useRef<HTMLElement | null>(null);
+  const navigateValidation = useValidationNavigation(panelRef);
 
   const snapshotQuery = useQuery({
     queryKey: ['material-snapshot', workItemId],
@@ -174,6 +178,15 @@ export function MaterialSnapshotPanel({
 
     if (invalid.length) {
       toast.warn({ title: 'Dữ liệu ghi nhận vật tư chưa hợp lệ', description: invalid.slice(0, 6).join(', ') });
+      const key = firstMaterialSnapshotInvalidKey({
+        snapshotDate,
+        rows,
+        requireComplete,
+        materialById,
+        balanceByMaterialId,
+      });
+      setInvalidKey(key ?? '');
+      navigateValidation(key);
       return null;
     }
     return {
@@ -265,7 +278,7 @@ export function MaterialSnapshotPanel({
   if (!snapshotQuery.data?.available || !record) return null;
 
   return (
-    <section>
+    <section ref={panelRef}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-ink">Vật tư trước/sau</h3>
@@ -292,17 +305,19 @@ export function MaterialSnapshotPanel({
         ) : null}
 
         <div className="mt-3 grid gap-3 lg:grid-cols-[180px_1fr]">
-          <div>
+          <div data-validation-key="snapshot_date" data-validation-error={invalidKey === 'snapshot_date' ? 'true' : undefined}>
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="material-snapshot-date">
               Ngày ghi nhận
             </label>
             <input
               id="material-snapshot-date"
+              name="snapshot_date"
               type="date"
-              className="mt-1 h-10 w-full rounded-md border border-line px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+              className={clsx('mt-1 h-10 w-full rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', invalidKey === 'snapshot_date' ? 'border-rose-300 bg-rose-50' : 'border-line')}
               value={snapshotDate}
               onChange={(event) => setSnapshotDate(event.target.value)}
               disabled={locked || actionPending}
+              aria-invalid={invalidKey === 'snapshot_date'}
             />
           </div>
           <div>
@@ -347,7 +362,7 @@ export function MaterialSnapshotPanel({
         </div>
 
         {rows.length ? (
-          <div className="mt-3 divide-y divide-line border-y border-line">
+          <div className="mt-3 divide-y divide-line border-y border-line" data-validation-key="items" data-validation-error={invalidKey === 'items' ? 'true' : undefined}>
             {rows.map((row, index) => (
               <MaterialSnapshotRow
                 key={row.item_index}
@@ -357,8 +372,12 @@ export function MaterialSnapshotPanel({
                 materialById={materialById}
                 balance={balanceByMaterialId.get(row.material_id)}
                 evidence={evidenceOptions}
+                invalidKey={invalidKey}
                 disabled={locked || actionPending}
-                onChange={(patch) => updateRow(row.item_index, patch)}
+                onChange={(patch) => {
+                  updateRow(row.item_index, patch);
+                  setInvalidKey('');
+                }}
                 onRemove={() => removeRow(row.item_index)}
               />
             ))}
@@ -402,6 +421,7 @@ function MaterialSnapshotRow({
   materialById,
   balance,
   evidence,
+  invalidKey,
   disabled,
   onChange,
   onRemove,
@@ -412,6 +432,7 @@ function MaterialSnapshotRow({
   materialById: Map<string, MaterialCatalogItem>;
   balance?: ProjectMaterialBalance;
   evidence: EvidenceRecord[];
+  invalidKey: string;
   disabled: boolean;
   onChange: (patch: Partial<RowDraft>) => void;
   onRemove: () => void;
@@ -420,6 +441,8 @@ function MaterialSnapshotRow({
   const available = balanceAvailable(balance);
   const overAvailable = row.affects_site_balance && used > available + 0.000001;
   const material = materialById.get(row.material_id);
+  const keyFor = (field: string) => `items.${row.item_index}.${field}`;
+  const isInvalid = (field: string) => invalidKey === keyFor(field);
 
   return (
     <div className="grid gap-3 py-3 xl:grid-cols-[44px_1.2fr_1fr_1.2fr]">
@@ -444,7 +467,10 @@ function MaterialSnapshotRow({
         </label>
         <select
           id={`material-${row.item_index}`}
-          className="mt-1 w-full rounded-md border border-line bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+          name={keyFor('material_id')}
+          data-validation-key={keyFor('material_id')}
+          data-validation-error={isInvalid('material_id') ? 'true' : undefined}
+          className={clsx('mt-1 w-full rounded-md border bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', isInvalid('material_id') ? 'border-rose-300' : 'border-line')}
           value={row.material_id}
           onChange={(event) => {
             const selected = materialById.get(event.target.value);
@@ -455,6 +481,7 @@ function MaterialSnapshotRow({
             });
           }}
           disabled={disabled}
+          aria-invalid={isInvalid('material_id')}
         >
           <option value="">Chọn vật tư</option>
           {materials.map((item) => (
@@ -465,11 +492,15 @@ function MaterialSnapshotRow({
         </select>
         {!row.affects_site_balance ? (
           <input
-            className="mt-2 h-9 w-full rounded-md border border-line px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+            name={keyFor('material_name')}
+            data-validation-key={keyFor('material_name')}
+            data-validation-error={isInvalid('material_name') ? 'true' : undefined}
+            className={clsx('mt-2 h-9 w-full rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', isInvalid('material_name') ? 'border-rose-300 bg-rose-50' : 'border-line')}
             value={row.material_name}
             onChange={(event) => onChange({ material_name: event.target.value })}
             disabled={disabled}
             placeholder="Tên vật tư ngoài tồn công trình"
+            aria-invalid={isInvalid('material_name')}
           />
         ) : null}
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -524,20 +555,24 @@ function MaterialSnapshotRow({
 
       <div>
         <div className="grid grid-cols-2 gap-2">
-          <QuantityInput label="Trước" value={row.before_quantity} disabled={disabled} onChange={(value) => onChange({ before_quantity: value })} />
-          <QuantityInput label="Bổ sung" value={row.added_quantity} disabled={disabled} onChange={(value) => onChange({ added_quantity: value })} />
-          <QuantityInput label="Sau" value={row.after_quantity} disabled={disabled} onChange={(value) => onChange({ after_quantity: value })} />
-          <QuantityInput label="Hư hao" value={row.waste_quantity} disabled={disabled} onChange={(value) => onChange({ waste_quantity: value })} />
+          <QuantityInput fieldKey={keyFor('before_quantity')} invalid={isInvalid('before_quantity')} label="Trước" value={row.before_quantity} disabled={disabled} onChange={(value) => onChange({ before_quantity: value })} />
+          <QuantityInput fieldKey={keyFor('added_quantity')} invalid={isInvalid('added_quantity')} label="Bổ sung" value={row.added_quantity} disabled={disabled} onChange={(value) => onChange({ added_quantity: value })} />
+          <QuantityInput fieldKey={keyFor('after_quantity')} invalid={isInvalid('after_quantity')} label="Sau" value={row.after_quantity} disabled={disabled} onChange={(value) => onChange({ after_quantity: value })} />
+          <QuantityInput fieldKey={keyFor('waste_quantity')} invalid={isInvalid('waste_quantity')} label="Hư hao" value={row.waste_quantity} disabled={disabled} onChange={(value) => onChange({ waste_quantity: value })} />
         </div>
         <div className={clsx('mt-2 rounded-md px-3 py-2 text-sm font-semibold', used < 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-700')}>
           KL dùng: {formatQty(Math.max(used, 0))} {row.unit || material?.unit || ''}
         </div>
         <input
-          className="mt-2 h-9 w-full rounded-md border border-line px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+          name={keyFor('unit')}
+          data-validation-key={keyFor('unit')}
+          data-validation-error={isInvalid('unit') ? 'true' : undefined}
+          className={clsx('mt-2 h-9 w-full rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', isInvalid('unit') ? 'border-rose-300 bg-rose-50' : 'border-line')}
           value={row.unit}
           onChange={(event) => onChange({ unit: event.target.value })}
           disabled={disabled}
           placeholder="Đơn vị"
+          aria-invalid={isInvalid('unit')}
         />
       </div>
 
@@ -599,27 +634,33 @@ function MaterialSnapshotRow({
 }
 
 function QuantityInput({
+  fieldKey,
+  invalid,
   label,
   value,
   disabled,
   onChange,
 }: {
+  fieldKey: string;
+  invalid: boolean;
   label: string;
   value: string;
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" data-validation-key={fieldKey} data-validation-error={invalid ? 'true' : undefined}>
       {label}
       <input
         type="number"
+        name={fieldKey}
         min="0"
         step="0.001"
-        className="mt-1 h-9 w-full rounded-md border border-line px-2 text-sm font-normal normal-case tracking-normal outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+        className={clsx('mt-1 h-9 w-full rounded-md border px-2 text-sm font-normal normal-case tracking-normal outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', invalid ? 'border-rose-300 bg-rose-50' : 'border-line')}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
+        aria-invalid={invalid}
       />
     </label>
   );
@@ -647,6 +688,44 @@ function SummaryChip({
       <p className="mt-1 text-lg font-bold leading-none">{value}</p>
     </div>
   );
+}
+
+function firstMaterialSnapshotInvalidKey({
+  snapshotDate,
+  rows,
+  requireComplete,
+  materialById,
+  balanceByMaterialId,
+}: {
+  snapshotDate: string;
+  rows: RowDraft[];
+  requireComplete: boolean;
+  materialById: Map<string, MaterialCatalogItem>;
+  balanceByMaterialId: Map<string, ProjectMaterialBalance>;
+}) {
+  if (requireComplete && !snapshotDate) return 'snapshot_date';
+  if (requireComplete && !rows.length) return 'items';
+  for (const row of rows) {
+    const keyFor = (field: string) => `items.${row.item_index}.${field}`;
+    const material = materialById.get(row.material_id);
+    const materialName = (material?.name ?? row.material_name).trim();
+    const unit = (row.unit || material?.unit || '').trim();
+    const numericFields = [
+      ['before_quantity', numberInput(row.before_quantity)],
+      ['added_quantity', numberInput(row.added_quantity)],
+      ['after_quantity', numberInput(row.after_quantity)],
+      ['waste_quantity', numberInput(row.waste_quantity)],
+    ] as const;
+    if (row.affects_site_balance && !row.material_id) return keyFor('material_id');
+    if (!row.affects_site_balance && !materialName) return keyFor('material_name');
+    if (!unit) return keyFor('unit');
+    const invalidNumber = numericFields.find(([, value]) => value < 0 || !Number.isFinite(value));
+    if (invalidNumber) return keyFor(invalidNumber[0]);
+    if (computedUsed(row) < -0.000001) return keyFor('after_quantity');
+    if (row.affects_site_balance && !balanceByMaterialId.has(row.material_id)) return keyFor('material_id');
+    if (requireComplete && row.affects_site_balance && computedUsed(row) > balanceAvailable(balanceByMaterialId.get(row.material_id)) + 0.000001) return keyFor('after_quantity');
+  }
+  return undefined;
 }
 
 function defaultRowDraft(itemIndex: number): RowDraft {

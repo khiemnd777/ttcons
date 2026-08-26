@@ -3,11 +3,11 @@ import clsx from 'clsx';
 
 export type FormErrors = Record<string, string>;
 
-export function FieldBlock({ label, required, error, helper, className, children }: { label: string; required?: boolean; error?: string; helper?: string; className?: string; children: ReactNode }) {
-  return <label className={clsx('block', className)}>
+export function FieldBlock({ fieldKey, label, required, error, helper, className, children }: { fieldKey?: string; label: string; required?: boolean; error?: string; helper?: string; className?: string; children: ReactNode }) {
+  return <label data-validation-key={fieldKey} data-validation-error={error ? 'true' : undefined} className={clsx('block scroll-mt-24 rounded-md outline-none', className)}>
     <span className="text-sm font-semibold text-slate-700">{label}{required ? <span className="ml-1 text-rose-600">*</span> : null}</span>
     {children}
-    {error ? <span className="mt-1 block text-xs font-medium text-rose-700">{error}</span> : helper ? <span className="mt-1 block text-xs text-slate-500">{helper}</span> : null}
+    {error ? <span role="alert" className="mt-1 block text-xs font-medium text-rose-700">{error}</span> : helper ? <span className="mt-1 block text-xs text-slate-500">{helper}</span> : null}
   </label>;
 }
 

@@ -13,6 +13,7 @@ import { downloadBlob, get, post, postForm } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import type { InputInvoiceRecord, Partner, PayableRecord } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { partnerOptions, vendorPartnerTypes } from '../core-data/partnerUtils';
 
 const maxInvoiceUploadBytes = 10 * 1024 * 1024;
@@ -41,6 +42,8 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [draft, setDraft] = useState<InvoiceDraft>(() => defaultDraft(payable));
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadFormRef = useRef<HTMLFormElement | null>(null);
+  const navigateToValidation = useValidationNavigation(uploadFormRef);
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasAnyPermission } = useAuth();
@@ -101,7 +104,8 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
     event.preventDefault();
     const validation = validateDraft(draft, selectedFile);
     if (validation) {
-      toast.warn({ title: 'Thiếu hoặc sai thông tin hoá đơn', description: validation });
+      toast.warn({ title: 'Thiếu hoặc sai thông tin hoá đơn', description: validation.message });
+      navigateToValidation(validation.key);
       return;
     }
     const formData = new FormData();
@@ -224,11 +228,12 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
       )}
 
       <Dialog open={dialogOpen} title="Upload PDF hoá đơn đầu vào" onClose={() => setDialogOpen(false)} size="lg">
-        <form className="space-y-4" onSubmit={submitUpload}>
-          <label className="block">
+        <form ref={uploadFormRef} className="space-y-4" onSubmit={submitUpload} noValidate>
+          <label data-validation-key="file" className="block scroll-mt-24 rounded-md">
             <span className="text-xs font-semibold text-slate-600">File PDF</span>
             <input
               ref={fileInputRef}
+              name="file"
               type="file"
               accept="application/pdf"
               className="mt-1 block w-full rounded-md border border-line bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
@@ -238,16 +243,16 @@ export function InputInvoicePanel({ payable, onChanged }: InputInvoicePanelProps
           </label>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <TextField label="Số hoá đơn" value={draft.invoice_number} onChange={(value) => updateDraft('invoice_number', value)} required />
+            <TextField fieldKey="invoice_number" label="Số hoá đơn" value={draft.invoice_number} onChange={(value) => updateDraft('invoice_number', value)} required />
             <TextField label="Ký hiệu" value={draft.invoice_symbol} onChange={(value) => updateDraft('invoice_symbol', value)} />
-            <TextField label="Ngày hoá đơn" type="date" value={draft.invoice_date} onChange={(value) => updateDraft('invoice_date', value)} required />
+            <TextField fieldKey="invoice_date" label="Ngày hoá đơn" type="date" value={draft.invoice_date} onChange={(value) => updateDraft('invoice_date', value)} required />
             <SelectField label="Vendor catalog" value={draft.vendor_partner_id} onChange={selectVendorPartner} options={partnerOptions(partners.data ?? [], vendorPartnerTypes)} />
-            {!draft.vendor_partner_id ? <TextField label="Vendor" value={draft.vendor_name} onChange={(value) => updateDraft('vendor_name', value)} required /> : <ReadOnlyField label="Vendor snapshot" value={draft.vendor_name} />}
+            {!draft.vendor_partner_id ? <TextField fieldKey="vendor_name" label="Vendor" value={draft.vendor_name} onChange={(value) => updateDraft('vendor_name', value)} required /> : <ReadOnlyField label="Vendor snapshot" value={draft.vendor_name} />}
             {!draft.vendor_partner_id ? <TextField label="Mã số thuế vendor" value={draft.vendor_tax_code} onChange={(value) => updateDraft('vendor_tax_code', value)} /> : <ReadOnlyField label="MST vendor" value={draft.vendor_tax_code || '-'} />}
             <TextField label="Yêu cầu mua liên kết" value={draft.procurement_request_id} onChange={(value) => updateDraft('procurement_request_id', value)} placeholder="UUID procurement request nếu có" />
-            <TextField label="Trước VAT" type="currency" value={draft.amount_before_vat} onChange={(value) => updateDraft('amount_before_vat', value)} min="0" />
-            <TextField label="VAT" type="currency" value={draft.vat_amount} onChange={(value) => updateDraft('vat_amount', value)} min="0" />
-            <TextField label="Tổng tiền" type="currency" value={draft.total_amount} onChange={(value) => updateDraft('total_amount', value)} min="0" required />
+            <TextField fieldKey="amount_before_vat" label="Trước VAT" type="currency" value={draft.amount_before_vat} onChange={(value) => updateDraft('amount_before_vat', value)} min="0" />
+            <TextField fieldKey="vat_amount" label="VAT" type="currency" value={draft.vat_amount} onChange={(value) => updateDraft('vat_amount', value)} min="0" />
+            <TextField fieldKey="total_amount" label="Tổng tiền" type="currency" value={draft.total_amount} onChange={(value) => updateDraft('total_amount', value)} min="0" required />
           </div>
 
           <label className="block">
@@ -292,20 +297,20 @@ function defaultDraft(payable: PayableRecord): InvoiceDraft {
 }
 
 function validateDraft(draft: InvoiceDraft, selectedFile: File | null) {
-  if (!selectedFile) return 'Chọn file PDF hoá đơn.';
-  if (selectedFile.size > maxInvoiceUploadBytes) return `Dung lượng tối đa ${formatFileSize(maxInvoiceUploadBytes)}.`;
-  if (selectedFile.type && selectedFile.type !== 'application/pdf') return 'File upload phải là PDF.';
-  if (!draft.invoice_number.trim()) return 'Nhập số hoá đơn.';
-  if (!draft.invoice_date) return 'Chọn ngày hoá đơn.';
-  if (!draft.vendor_partner_id && !draft.vendor_name.trim()) return 'Nhập tên vendor trên hoá đơn.';
+  if (!selectedFile) return { key: 'file', message: 'Chọn file PDF hoá đơn.' };
+  if (selectedFile.size > maxInvoiceUploadBytes) return { key: 'file', message: `Dung lượng tối đa ${formatFileSize(maxInvoiceUploadBytes)}.` };
+  if (selectedFile.type && selectedFile.type !== 'application/pdf') return { key: 'file', message: 'File upload phải là PDF.' };
+  if (!draft.invoice_number.trim()) return { key: 'invoice_number', message: 'Nhập số hoá đơn.' };
+  if (!draft.invoice_date) return { key: 'invoice_date', message: 'Chọn ngày hoá đơn.' };
+  if (!draft.vendor_partner_id && !draft.vendor_name.trim()) return { key: 'vendor_name', message: 'Nhập tên vendor trên hoá đơn.' };
   const beforeVAT = Number(draft.amount_before_vat || 0);
   const vat = Number(draft.vat_amount || 0);
   const total = Number(draft.total_amount || 0);
-  if (!Number.isFinite(beforeVAT) || beforeVAT < 0) return 'Số tiền trước VAT không hợp lệ.';
-  if (!Number.isFinite(vat) || vat < 0) return 'VAT không hợp lệ.';
-  if (!Number.isFinite(total) || total <= 0) return 'Tổng tiền phải lớn hơn 0.';
-  if (beforeVAT + vat > 0 && total + 1 < beforeVAT + vat) return 'Tổng tiền nhỏ hơn trước VAT cộng VAT.';
-  return '';
+  if (!Number.isFinite(beforeVAT) || beforeVAT < 0) return { key: 'amount_before_vat', message: 'Số tiền trước VAT không hợp lệ.' };
+  if (!Number.isFinite(vat) || vat < 0) return { key: 'vat_amount', message: 'VAT không hợp lệ.' };
+  if (!Number.isFinite(total) || total <= 0) return { key: 'total_amount', message: 'Tổng tiền phải lớn hơn 0.' };
+  if (beforeVAT + vat > 0 && total + 1 < beforeVAT + vat) return { key: 'total_amount', message: 'Tổng tiền nhỏ hơn trước VAT cộng VAT.' };
+  return null;
 }
 
 function invalidateInvoiceData(queryClient: ReturnType<typeof useQueryClient>, payable: PayableRecord) {
@@ -374,6 +379,7 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
 }
 
 function TextField({
+  fieldKey,
   label,
   value,
   onChange,
@@ -382,6 +388,7 @@ function TextField({
   min,
   placeholder,
 }: {
+  fieldKey?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -391,9 +398,10 @@ function TextField({
   placeholder?: string;
 }) {
   return (
-    <label className="block">
+    <label data-validation-key={fieldKey} className="block scroll-mt-24 rounded-md">
       <span className="text-xs font-semibold text-slate-600">{label}{required ? ' *' : ''}</span>
       {type === 'currency' ? <CurrencyInput
+        name={fieldKey}
         className="mt-1"
         inputClassName="text-sm focus:ring-blue-500"
         value={value}
@@ -401,6 +409,7 @@ function TextField({
         placeholder={placeholder}
         onValueChange={({ numericString }) => onChange(numericString)}
       /> : <input
+        name={fieldKey}
         className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
         type={type}
         value={value}

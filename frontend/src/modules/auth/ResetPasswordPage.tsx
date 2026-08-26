@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -12,6 +12,7 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { PASSWORD_RULE_HELPER, passwordConfirmationMessage, passwordValueSchema } from '../../lib/security/password';
 import { AuthCard } from './AuthCard';
 import { clearRecoveryTokenFragment, recoveryTokenFromFragment } from './recoveryToken';
+import { firstInvalidFieldKey, useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 const schema = z.object({
   new_password: passwordValueSchema(),
@@ -27,6 +28,8 @@ export function ResetPasswordPage() {
   const [completed, setCompleted] = useState(false);
   const toast = useToast();
   const { logout } = useAuth();
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const navigateToValidation = useValidationNavigation(formRef);
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { new_password: '', new_password_confirmation: '' } });
   const resetPassword = useMutation({
     mutationFn: (values: Values) => post<{ password_reset: boolean }>('/auth/password/reset', { token, ...values }),
@@ -53,7 +56,10 @@ export function ResetPasswordPage() {
           <Link className="block w-full rounded-md bg-blue-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-blue-700" to="/login">Đăng nhập</Link>
         </div>
       ) : (
-        <form className="space-y-4" onSubmit={form.handleSubmit((values) => resetPassword.mutate(values))} noValidate>
+        <form ref={formRef} className="space-y-4" onSubmit={form.handleSubmit((values) => resetPassword.mutate(values), (errors) => {
+          toast.warn({ title: 'Vui lòng kiểm tra thông tin', description: 'Mật khẩu mới hoặc phần xác nhận chưa hợp lệ.' });
+          navigateToValidation(firstInvalidFieldKey(errors, ['new_password', 'new_password_confirmation']));
+        })} noValidate>
           <PasswordField label="Mật khẩu mới" error={form.formState.errors.new_password?.message} registration={form.register('new_password')} />
           <PasswordField label="Nhập lại mật khẩu mới" error={form.formState.errors.new_password_confirmation?.message} registration={form.register('new_password_confirmation')} />
           <p className="rounded-md bg-slate-50 px-3 py-2 text-sm leading-5 text-slate-600">{PASSWORD_RULE_HELPER}</p>
@@ -78,18 +84,20 @@ function InvalidLink() {
 }
 
 function PasswordField({ label, error, registration }: { label: string; error?: string; registration: ReturnType<ReturnType<typeof useForm<Values>>['register']> }) {
+  const errorId = `${registration.name}-error`;
   return (
-    <label className="block text-sm font-semibold text-slate-700">
+    <label data-validation-key={registration.name} className="block scroll-mt-24 rounded-md text-sm font-semibold text-slate-700">
       {label} <span className="text-rose-600">*</span>
       <span className="mt-1 block">
         <PasswordInput
           autoComplete="new-password"
           className={`w-full rounded-md border px-3 py-2 text-sm focus-ring ${error ? 'border-rose-400 bg-rose-50' : 'border-line'}`}
           invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
           {...registration}
         />
       </span>
-      {error ? <span className="mt-1 block text-xs font-medium text-rose-600">{error}</span> : null}
+      {error ? <span id={errorId} role="alert" className="mt-1 block text-xs font-medium text-rose-600">{error}</span> : null}
     </label>
   );
 }

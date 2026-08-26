@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -21,6 +21,7 @@ import { dateText } from '../../lib/utils/format';
 import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { constructionReportViewModel } from '../operations/constructionReportViewModel';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 type WorkReportStatus = 'draft' | 'recorded' | 'submitted' | 'needs_changes' | 'acknowledged';
 type WorkReportScope = 'mine' | 'source' | 'review' | 'all';
@@ -89,6 +90,8 @@ export function WorkReportsPage() {
   const [selectedSourceID, setSelectedSourceID] = useState('');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('xlsx');
   const [exporting, setExporting] = useState(false);
+  const filtersRef = useRef<HTMLElement | null>(null);
+  const navigateFilterValidation = useValidationNavigation(filtersRef);
 
   const listQueryString = useMemo(() => {
     const params = new URLSearchParams({ scope });
@@ -116,6 +119,7 @@ export function WorkReportsPage() {
   function applyFilters() {
     if (draftFilters.dateFrom && draftFilters.dateTo && draftFilters.dateFrom > draftFilters.dateTo) {
       toast.warn({ title: 'Khoảng ngày chưa hợp lệ', description: 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.' });
+      navigateFilterValidation('date_to');
       return;
     }
     setFilters({ ...draftFilters, search: draftFilters.search.trim() });
@@ -187,7 +191,7 @@ export function WorkReportsPage() {
         </div>
       </header>
 
-      <section className="rounded-lg border border-line bg-white p-4 shadow-panel" aria-label="Bộ lọc báo cáo">
+      <section ref={filtersRef} className="rounded-lg border border-line bg-white p-4 shadow-panel" aria-label="Bộ lọc báo cáo">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(15rem,1.4fr)_minmax(10rem,1fr)_9rem_9rem_minmax(14rem,1.2fr)_auto] xl:items-end">
           <AsyncProjectPicker
             value={draftFilters.projectId}
@@ -197,8 +201,8 @@ export function WorkReportsPage() {
             emptyLabel="Tất cả công trình được phép xem"
           />
           <FilterSelect label="Trạng thái" value={draftFilters.status} options={statusOptions} onChange={(status) => setDraftFilters((current) => ({ ...current, status }))} />
-          <FilterInput type="date" label="Từ ngày" value={draftFilters.dateFrom} onChange={(dateFrom) => setDraftFilters((current) => ({ ...current, dateFrom }))} />
-          <FilterInput type="date" label="Đến ngày" value={draftFilters.dateTo} onChange={(dateTo) => setDraftFilters((current) => ({ ...current, dateTo }))} />
+          <FilterInput fieldKey="date_from" type="date" label="Từ ngày" value={draftFilters.dateFrom} onChange={(dateFrom) => setDraftFilters((current) => ({ ...current, dateFrom }))} />
+          <FilterInput fieldKey="date_to" type="date" label="Đến ngày" value={draftFilters.dateTo} onChange={(dateTo) => setDraftFilters((current) => ({ ...current, dateTo }))} />
           <FilterInput label="Tìm kiếm" placeholder="Công trình, người lập, nội dung..." value={draftFilters.search} onChange={(search) => setDraftFilters((current) => ({ ...current, search }))} onEnter={applyFilters} />
           <div className="flex gap-2">
             <button type="button" className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={resetFilters}>Đặt lại</button>
@@ -301,18 +305,24 @@ function WorkReportDialog({
   const toast = useToast();
   const [reviewComment, setReviewComment] = useState('');
   const [busyAction, setBusyAction] = useState('');
+  const [reviewCommentInvalid, setReviewCommentInvalid] = useState(false);
+  const detailContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateReviewValidation = useValidationNavigation(detailContentRef);
   const view = useMemo(() => constructionReportViewModel(detail ?? {}), [detail]);
   const mayReview = Boolean(detail && canReview && detail.status === 'submitted' && (canManage || detail.recipient_id === userID));
 
   useEffect(() => {
     if (!open) return;
     setReviewComment('');
+    setReviewCommentInvalid(false);
   }, [detail?.source_id, open]);
 
   async function review(action: 'request-changes' | 'acknowledge') {
     if (!detail?.work_report_id) return;
     if (action === 'request-changes' && !reviewComment.trim()) {
+      setReviewCommentInvalid(true);
       toast.warn({ title: 'Chưa nhập nội dung cần bổ sung', description: 'Nêu rõ phần người lập cần chỉnh sửa trước khi gửi lại.' });
+      navigateReviewValidation('review_comment');
       return;
     }
     setBusyAction(action);
@@ -369,7 +379,7 @@ function WorkReportDialog({
       {loading ? <div className="grid min-h-52 place-items-center"><LoadingSpinner /></div> : error ? (
         <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">Không tải được chi tiết báo cáo. {error instanceof Error ? error.message : ''}</div>
       ) : detail ? (
-        <div className="space-y-5">
+        <div ref={detailContentRef} className="space-y-5">
           <div className="grid gap-3 rounded-lg border border-line bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-5">
             <DetailMetric label="Trạng thái" value={<WorkReportStatusBadge status={detail.status} />} />
             <DetailMetric label="Người lập" value={identityReferenceText(detail.author_name, detail.author_account_deleted)} />
@@ -398,10 +408,10 @@ function WorkReportDialog({
           </div>
 
           {mayReview ? (
-            <section className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
+            <section data-validation-key="review_comment" data-validation-error={reviewCommentInvalid ? 'true' : undefined} className="scroll-mt-24 rounded-lg border border-amber-200 bg-amber-50/50 p-4">
               <h3 className="font-semibold text-ink">Phản hồi cho người lập</h3>
               <p className="mt-1 text-sm text-slate-600">Nhập nội dung bắt buộc nếu yêu cầu bổ sung; có thể để trống khi xác nhận đã xem.</p>
-              <textarea className="mt-3 min-h-24 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-100" maxLength={2000} value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} placeholder="Nội dung phản hồi..." />
+              <textarea name="review_comment" aria-invalid={reviewCommentInvalid} className="mt-3 min-h-24 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-100" maxLength={2000} value={reviewComment} onChange={(event) => { setReviewComment(event.target.value); if (event.target.value.trim()) setReviewCommentInvalid(false); }} placeholder="Nội dung phản hồi..." />
             </section>
           ) : null}
 
@@ -480,8 +490,8 @@ function DetailMetric({ label, value }: { label: string; value: React.ReactNode 
   return <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><div className="mt-1 text-sm font-semibold text-ink">{value}</div></div>;
 }
 
-function FilterInput({ label, value, onChange, type = 'text', placeholder, onEnter }: { label: string; value: string; onChange: (value: string) => void; type?: 'text' | 'date'; placeholder?: string; onEnter?: () => void }) {
-  return <label className="block"><span className="text-xs font-semibold text-slate-600">{label}</span><input type={type} className="mt-1 h-10 w-full rounded-md border border-line bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-100" value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onEnter?.(); }} /></label>;
+function FilterInput({ fieldKey, label, value, onChange, type = 'text', placeholder, onEnter }: { fieldKey?: string; label: string; value: string; onChange: (value: string) => void; type?: 'text' | 'date'; placeholder?: string; onEnter?: () => void }) {
+  return <label data-validation-key={fieldKey} className="block scroll-mt-24 rounded-md"><span className="text-xs font-semibold text-slate-600">{label}</span><input name={fieldKey} type={type} className="mt-1 h-10 w-full rounded-md border border-line bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-100" value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onEnter?.(); }} /></label>;
 }
 
 function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: Array<[string, string]>; onChange: (value: string) => void }) {

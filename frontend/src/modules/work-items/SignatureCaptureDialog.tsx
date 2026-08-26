@@ -1,6 +1,7 @@
 import { PointerEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Eraser, Loader2, PenLine, ShieldCheck, Stamp, Upload } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import type { SealAsset } from '../../lib/types/domain';
 import { SealAssetPreview } from './SealAssetPreview';
 
@@ -77,6 +78,8 @@ export function SignatureCaptureDialog({
   onValidationWarning,
 }: SignatureCaptureDialogProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const dialogContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateValidation = useValidationNavigation(dialogContentRef);
   const signatureAllowed = allowedKinds.includes('signature');
   const sealAllowed = allowedKinds.includes('seal') && Boolean(onApplySeal);
   const enabledKinds = useMemo(
@@ -92,6 +95,7 @@ export function SignatureCaptureDialog({
   const [sealName, setSealName] = useState('');
   const [sealFile, setSealFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState('');
+  const [uploadInvalidKey, setUploadInvalidKey] = useState('');
   const [acknowledgedImmutable, setAcknowledgedImmutable] = useState(false);
   const signedPurposeSet = useMemo(() => new Set(signedPurposes), [signedPurposes]);
   const appliedSealKeySet = useMemo(() => new Set(appliedSealKeys), [appliedSealKeys]);
@@ -122,6 +126,7 @@ export function SignatureCaptureDialog({
     setSealName('');
     setSealFile(null);
     setUploadError('');
+    setUploadInvalidKey('');
     setAcknowledgedImmutable(false);
   }, [defaultPurpose, enabledKinds, open]);
 
@@ -217,10 +222,14 @@ export function SignatureCaptureDialog({
     const message = validateSealUpload(normalizedName, sealFile);
     if (message || !sealFile || !onUploadSeal) {
       setUploadError(message || 'Chưa thể tải con dấu.');
+      const key = !normalizedName ? 'seal_name' : 'seal_file';
+      setUploadInvalidKey(key);
       onValidationWarning?.(message || 'Chưa thể tải con dấu.');
+      navigateValidation(key);
       return;
     }
     setUploadError('');
+    setUploadInvalidKey('');
     try {
       const asset = await onUploadSeal(normalizedName, sealFile);
       setSelectedSealAssetId(asset.id);
@@ -275,7 +284,7 @@ export function SignatureCaptureDialog({
         </div>
       )}
     >
-      <div className="space-y-3">
+      <div ref={dialogContentRef} className="space-y-3">
         <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
           <div className="flex items-start gap-2">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
@@ -357,6 +366,7 @@ export function SignatureCaptureDialog({
             sealName={sealName}
             sealFile={sealFile}
             uploadError={uploadError}
+            uploadInvalidKey={uploadInvalidKey}
             onSelect={(id) => {
               setSelectedSealAssetId(id);
               setAcknowledgedImmutable(false);
@@ -364,10 +374,12 @@ export function SignatureCaptureDialog({
             onNameChange={(name) => {
               setSealName(name);
               setUploadError('');
+              setUploadInvalidKey('');
             }}
             onFileChange={(file) => {
               setSealFile(file);
               setUploadError('');
+              setUploadInvalidKey('');
               if (file && !sealName.trim()) setSealName(file.name.replace(/\.[^.]+$/, ''));
             }}
             onUpload={() => void uploadSeal()}
@@ -426,6 +438,7 @@ function SealSelection({
   sealName,
   sealFile,
   uploadError,
+  uploadInvalidKey,
   onSelect,
   onNameChange,
   onFileChange,
@@ -439,6 +452,7 @@ function SealSelection({
   sealName: string;
   sealFile: File | null;
   uploadError: string;
+  uploadInvalidKey: string;
   onSelect: (id: string) => void;
   onNameChange: (name: string) => void;
   onFileChange: (file: File | null) => void;
@@ -474,13 +488,13 @@ function SealSelection({
         <div className="rounded-md border border-line bg-slate-50 p-3">
           <div className="flex items-center gap-2"><Upload className="h-4 w-4 text-blue-600" /><p className="text-sm font-semibold text-ink">Tải con dấu mới vào tài nguyên dùng chung</p></div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <label>
+            <label data-validation-key="seal_name" data-validation-error={uploadInvalidKey === 'seal_name' ? 'true' : undefined}>
               <span className="text-xs font-semibold text-slate-600">Tên con dấu *</span>
-              <input className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm" value={sealName} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} />
+              <input name="seal_name" className={`mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm ${uploadInvalidKey === 'seal_name' ? 'border-rose-300' : 'border-line'}`} value={sealName} disabled={disabled} aria-invalid={uploadInvalidKey === 'seal_name'} onChange={(event) => onNameChange(event.target.value)} />
             </label>
-            <label>
+            <label data-validation-key="seal_file" data-validation-error={uploadInvalidKey === 'seal_file' ? 'true' : undefined}>
               <span className="text-xs font-semibold text-slate-600">Ảnh PNG/JPG/WebP *</span>
-              <input className="mt-1 block w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-2 file:font-semibold" type="file" accept="image/png,image/jpeg,image/webp" disabled={disabled} onChange={(event) => onFileChange(event.target.files?.[0] ?? null)} />
+              <input name="seal_file" className="mt-1 block w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-2 file:font-semibold" type="file" accept="image/png,image/jpeg,image/webp" disabled={disabled} aria-invalid={uploadInvalidKey === 'seal_file'} onChange={(event) => onFileChange(event.target.files?.[0] ?? null)} />
             </label>
           </div>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">

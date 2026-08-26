@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { Save, X } from 'lucide-react';
 import type { PipelineEdgeConditionDefinition, PipelineNode, PipelineTemplateEdge } from '../../../lib/types/domain';
+import { useValidationNavigation } from '../../../lib/utils/formValidationNavigation';
 
 type EdgeForm = {
   label: string;
@@ -19,8 +21,10 @@ type EdgeInspectorPanelProps = {
   conditionLoadError: boolean;
   edgeForm: EdgeForm;
   conditionInvalid: boolean;
+  labelInvalid: boolean;
   priorityInvalid: boolean;
   configInvalidKeys: string[];
+  validationRequestId: number;
   answerFieldOptions: Array<{ label: string; value: string }>;
   answerValueOptionsByFieldKey: Record<string, Array<{ label: string; value: string }>>;
   savePending: boolean;
@@ -41,8 +45,10 @@ export function EdgeInspectorPanel({
   conditionLoadError,
   edgeForm,
   conditionInvalid,
+  labelInvalid,
   priorityInvalid,
   configInvalidKeys,
+  validationRequestId,
   answerFieldOptions,
   answerValueOptionsByFieldKey,
   savePending,
@@ -51,6 +57,8 @@ export function EdgeInspectorPanel({
   onSave,
   onClose,
 }: EdgeInspectorPanelProps) {
+  const panelRef = useRef<HTMLElement | null>(null);
+  const navigateValidation = useValidationNavigation(panelRef);
   const selectedCondition = conditions.find((condition) => condition.type === edgeForm.condition_type);
   const sourceName = fromNode?.name ?? edge.from_node_id;
   const targetName = toNode?.name ?? edge.to_node_id;
@@ -59,8 +67,23 @@ export function EdgeInspectorPanel({
     conditionOptions.push({ label: edgeForm.condition_type, value: edgeForm.condition_type });
   }
 
+  useEffect(() => {
+    if (!validationRequestId) return;
+    navigateValidation(
+      labelInvalid
+        ? 'label'
+        : conditionInvalid || conditionLoadError
+          ? 'condition_type'
+          : configInvalidKeys[0]
+            ? `condition_config.${configInvalidKeys[0]}`
+            : priorityInvalid
+              ? 'priority'
+              : undefined,
+    );
+  }, [conditionInvalid, conditionLoadError, configInvalidKeys, labelInvalid, navigateValidation, priorityInvalid, validationRequestId]);
+
   return (
-    <aside className="pipeline-details-panel absolute bottom-4 right-4 top-20 z-30 w-[380px] overflow-auto rounded-lg border border-line bg-white p-4 shadow-panel">
+    <aside ref={panelRef} className="pipeline-details-panel absolute bottom-4 right-4 top-20 z-30 w-[380px] overflow-auto rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -83,14 +106,17 @@ export function EdgeInspectorPanel({
 
       <div className="space-y-3">
         <Field
+          fieldKey="label"
           label="Nhãn"
           value={edgeForm.label}
+          invalid={labelInvalid}
           invalidText="Nhãn tối đa 80 ký tự"
           disabled={readOnly}
           onChange={(value) => onChangeField('label', value)}
         />
 
         <Select
+          fieldKey="condition_type"
           label="Điều kiện chuyển tiếp"
           value={edgeForm.condition_type}
           options={conditionOptions}
@@ -106,6 +132,7 @@ export function EdgeInspectorPanel({
               const invalid = configInvalidKeys.includes(configField.key);
               const options = connectorConfigOptions(configField.control, configField.depends_on, edgeForm.condition_config, answerFieldOptions, answerValueOptionsByFieldKey);
               const common = {
+                fieldKey: `condition_config.${configField.key}`,
                 label: configField.label,
                 value,
                 invalid,
@@ -124,6 +151,7 @@ export function EdgeInspectorPanel({
           </div>
         ) : null}
         <Field
+          fieldKey="priority"
           label="Ưu tiên"
           value={edgeForm.priority}
           type="number"
@@ -187,6 +215,7 @@ function connectorConfigOptions(
 }
 
 function Field({
+  fieldKey,
   label,
   value,
   onChange,
@@ -197,6 +226,7 @@ function Field({
   max,
   disabled,
 }: {
+  fieldKey?: string;
   label: string;
   value?: string;
   onChange: (value: string) => void;
@@ -209,15 +239,16 @@ function Field({
 }) {
   const fieldClass = `mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring disabled:bg-slate-100 disabled:text-slate-600 ${invalid ? 'border-rose-300 bg-rose-50' : 'border-line'}`;
   return (
-    <label className="block">
+    <label className="block" data-validation-key={fieldKey} data-validation-error={invalid ? 'true' : undefined}>
       <span className="text-sm font-semibold text-slate-700">{label}</span>
-      <input className={fieldClass} type={type} min={min} max={max} value={value ?? ''} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+      <input name={fieldKey} className={fieldClass} type={type} min={min} max={max} value={value ?? ''} disabled={disabled} aria-invalid={invalid} onChange={(event) => onChange(event.target.value)} />
       {invalid ? <span className="mt-1 block text-xs font-medium text-rose-600">{invalidText}</span> : null}
     </label>
   );
 }
 
 function Select({
+  fieldKey,
   label,
   value,
   options,
@@ -226,6 +257,7 @@ function Select({
   invalid,
   invalidText,
 }: {
+  fieldKey?: string;
   label: string;
   value?: string;
   options: { label: string; value: string }[];
@@ -236,9 +268,9 @@ function Select({
 }) {
   const fieldClass = `mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring disabled:bg-slate-100 ${invalid ? 'border-rose-300 bg-rose-50' : 'border-line'}`;
   return (
-    <label className="block">
+    <label className="block" data-validation-key={fieldKey} data-validation-error={invalid ? 'true' : undefined}>
       <span className="text-sm font-semibold text-slate-700">{label}</span>
-      <select className={fieldClass} value={value ?? ''} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+      <select name={fieldKey} className={fieldClass} value={value ?? ''} disabled={disabled} aria-invalid={invalid} onChange={(event) => onChange(event.target.value)}>
         <option value="">Chọn điều kiện chuyển tiếp</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>

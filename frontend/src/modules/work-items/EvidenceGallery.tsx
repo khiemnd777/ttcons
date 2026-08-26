@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, ExternalLink, Eye, FileText, Image as ImageIcon, Search } from 'lucide-react';
 import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
@@ -9,6 +9,7 @@ import { downloadBlob } from '../../lib/api/client';
 import type { EvidenceRecord } from '../../lib/types/domain';
 import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
 import { isProtectedStorageProvider } from '../../lib/utils/protectedStorage.ts';
+import { revealValidationTarget } from '../../lib/utils/formValidationNavigation';
 import {
   EvidenceRecordViewerDialog,
   evidenceRecordTitle as evidenceTitle,
@@ -66,6 +67,8 @@ export function EvidenceGallery({
   const [reviewComment, setReviewComment] = useState('');
   const [reviewingAction, setReviewingAction] = useState<EvidenceReviewAction | null>(null);
   const [previewRetryKey, setPreviewRetryKey] = useState(0);
+  const [reviewCommentInvalid, setReviewCommentInvalid] = useState(false);
+  const reviewCommentRef = useRef<HTMLTextAreaElement | null>(null);
   const previews = useEvidencePreviewUrls(evidence, previewRetryKey);
   const previewUrls = previews.urls;
   const filterCounts = useMemo(() => evidenceFilterCounts(evidence), [evidence]);
@@ -99,7 +102,9 @@ export function EvidenceGallery({
     if (!selected || !onReview) return;
     const comment = reviewComment.trim();
     if (action === 'reject' && !comment) {
+      setReviewCommentInvalid(true);
       toast.warn({ title: 'Thiếu lý do từ chối', description: 'Nhập lý do để từ chối minh chứng.' });
+      revealValidationTarget(reviewCommentRef.current, reviewCommentRef.current);
       return;
     }
     setReviewingAction(action);
@@ -232,12 +237,15 @@ export function EvidenceGallery({
         canReview={Boolean(onReview) && (selected?.can_review ?? true)}
         reviewingAction={reviewingAction}
         reviewComment={reviewComment}
-        onReviewCommentChange={setReviewComment}
+        reviewCommentInvalid={reviewCommentInvalid}
+        reviewCommentRef={reviewCommentRef}
+        onReviewCommentChange={(value) => { setReviewComment(value); if (value.trim()) setReviewCommentInvalid(false); }}
         onOpenFile={() => selected && void openEvidence(selected)}
         onRetry={() => setPreviewRetryKey((current) => current + 1)}
         onClose={() => {
           setSelected(null);
           setReviewComment('');
+          setReviewCommentInvalid(false);
         }}
         onReview={(action) => void submitReview(action)}
       />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, MessageSquareWarning, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -14,6 +14,7 @@ import {
   approvalRequiresComment,
   type ApprovalDecisionAction,
 } from './approvalPresentation';
+import { useValidationNavigation } from '../lib/utils/formValidationNavigation';
 
 export function ApprovalPanel({ request, onChanged }: { request?: ApprovalRequest; onChanged?: (request: ApprovalRequest) => void }) {
   if (!request) return null;
@@ -53,6 +54,8 @@ export function ApprovalDecisionButton({ request, action, onChanged, compact = f
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState('');
   const [invalid, setInvalid] = useState(false);
+  const dialogContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateValidation = useValidationNavigation(dialogContentRef);
   const queryClient = useQueryClient();
   const toast = useToast();
   const required = approvalRequiresComment(request);
@@ -84,6 +87,7 @@ export function ApprovalDecisionButton({ request, action, onChanged, compact = f
     if (required && !comment.trim()) {
       setInvalid(true);
       toast.warn({ title: 'Thiếu ý kiến phê duyệt', description: 'Vui lòng nhập ý kiến trước khi xác nhận.' });
+      navigateValidation('approval_comment');
       return;
     }
     mutation.mutate();
@@ -102,12 +106,14 @@ export function ApprovalDecisionButton({ request, action, onChanged, compact = f
         onClose={() => !mutation.isPending && setOpen(false)}
         footer={<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700" disabled={mutation.isPending} onClick={() => setOpen(false)}>Hủy</button><button type="button" className={clsx('rounded-md border px-3 py-2 text-sm font-semibold disabled:opacity-60', tone)} disabled={mutation.isPending} onClick={submit}>{mutation.isPending ? 'Đang lưu…' : 'Xác nhận'}</button></div>}
       >
-        <label className="block text-sm font-semibold text-slate-700">
+        <div ref={dialogContentRef}>
+        <label className="block text-sm font-semibold text-slate-700" data-validation-key="approval_comment" data-validation-error={invalid ? 'true' : undefined}>
           Ý kiến{required ? <span className="text-rose-600"> *</span> : null}
-          <textarea className={clsx('mt-2 min-h-28 w-full rounded-md border px-3 py-2 text-sm font-normal outline-none focus:border-blue-400', invalid ? 'border-rose-400 bg-rose-50' : 'border-line')} value={comment} onChange={(event) => { setComment(event.target.value); setInvalid(false); }} placeholder="Nêu rõ kết quả rà soát hoặc nội dung cần chỉnh sửa" />
+          <textarea name="approval_comment" className={clsx('mt-2 min-h-28 w-full rounded-md border px-3 py-2 text-sm font-normal outline-none focus:border-blue-400', invalid ? 'border-rose-400 bg-rose-50' : 'border-line')} value={comment} aria-invalid={invalid} aria-describedby={invalid ? 'approval-comment-error' : undefined} onChange={(event) => { setComment(event.target.value); setInvalid(false); }} placeholder="Nêu rõ kết quả rà soát hoặc nội dung cần chỉnh sửa" />
         </label>
-        {invalid ? <p className="mt-1 text-xs font-semibold text-rose-600">Ý kiến là bắt buộc.</p> : null}
+        {invalid ? <p id="approval-comment-error" role="alert" className="mt-1 text-xs font-semibold text-rose-600">Ý kiến là bắt buộc.</p> : null}
         <p className="mt-3 rounded-md bg-slate-50 p-3 text-xs leading-5 text-slate-600">{approvalDecisionLabel(request)}</p>
+        </div>
       </Dialog>
     </>
   );

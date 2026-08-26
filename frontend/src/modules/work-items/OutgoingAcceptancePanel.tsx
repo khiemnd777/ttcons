@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Loader2, RefreshCw, RotateCcw, Save, Send, X } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
@@ -19,6 +19,7 @@ import {
   acceptanceDraftFromRecord,
   acceptanceDraftPayload,
   createAcceptanceDraft,
+  firstAcceptanceDraftInvalidKey,
   uploadAcceptanceDraftEvidence,
   type AcceptanceDraft,
   type AcceptancePayload,
@@ -39,6 +40,8 @@ export function OutgoingAcceptancePanel({
   const queryClient = useQueryClient();
   const toast = useToast();
   const [draft, setDraft] = useState<AcceptanceDraft>(() => createAcceptanceDraft({ workItemId }));
+  const [validationRequest, setValidationRequest] = useState<{ id: number; key: string } | null>(null);
+  const validationSequence = useRef(0);
 
   const acceptanceQuery = useQuery({
     queryKey: ['outgoing-acceptance', workItemId],
@@ -92,6 +95,11 @@ export function OutgoingAcceptancePanel({
     if (!projectId) invalid.unshift('Công trình');
     if (invalid.length) {
       toast.warn({ title: 'Dữ liệu nghiệm thu đầu ra chưa hợp lệ', description: invalid.slice(0, 8).join(', ') });
+      const key = firstAcceptanceDraftInvalidKey(sourceDraft, requireComplete);
+      if (key) {
+        validationSequence.current += 1;
+        setValidationRequest({ id: validationSequence.current, key });
+      }
       return null;
     }
     return payload;
@@ -204,6 +212,7 @@ export function OutgoingAcceptancePanel({
           pdfExports={pdfExports}
           fixedWorkItem
           disabled={actionPending}
+          validationRequest={validationRequest}
           onChange={setDraft}
         />
         <div className="flex flex-wrap justify-end gap-2">

@@ -14,6 +14,7 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import type { AnyRecord, EvidenceRecord, SealAsset, WorkflowFormDetail, WorkflowFormField, WorkflowFormPDFConfirmationPreference, WorkflowFormPDFExport, WorkflowFormSealApplication, WorkflowFormSignature } from '../../lib/types/domain';
 import { dateText, percent } from '../../lib/utils/format';
 import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
+import { firstInvalidFieldKey, useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { enumLabel } from '../../lib/utils/status';
 import { SignatureCaptureDialog, type SignatureStroke, type WorkflowSealApplicationPayload } from './SignatureCaptureDialog';
 import type { WorkItemRequirementNavigationRequest } from './workItemRequirements';
@@ -123,6 +124,7 @@ export function WorkflowFormPanel({
   const [optionalFieldsOpen, setOptionalFieldsOpen] = useState(false);
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const panelRef = useRef<HTMLElement | null>(null);
+  const navigateToValidation = useValidationNavigation(panelRef);
   const actionCenterRef = useRef<HTMLDivElement | null>(null);
   const fieldsSectionRef = useRef<HTMLElement | null>(null);
   const lastHandledNavigationRef = useRef<number | null>(null);
@@ -305,6 +307,14 @@ export function WorkflowFormPanel({
       title: 'Dữ liệu hồ sơ chưa hợp lệ',
       description: [...new Set(Object.values(fieldErrors))].slice(0, 4).join('; '),
     });
+    const firstKey = firstInvalidFieldKey(fieldErrors, activeFields.map((field) => field.field_key));
+    navigateToValidation({
+      key: firstKey,
+      prepare: () => {
+        setFieldsOpen(true);
+        if (optionalFields.some((field) => field.field_key === firstKey)) setOptionalFieldsOpen(true);
+      },
+    });
   }
 
   const saveDraft = useMutation({
@@ -460,6 +470,14 @@ export function WorkflowFormPanel({
     const issues = [...new Set(Object.values(nextErrors))];
     if (issues.length) {
       toast.warn({ title: 'Dữ liệu hồ sơ chưa hợp lệ', description: issues.slice(0, 4).join('; ') });
+      const firstKey = firstInvalidFieldKey(nextErrors, activeFields.map((field) => field.field_key));
+      navigateToValidation({
+        key: firstKey,
+        prepare: () => {
+          setFieldsOpen(true);
+          if (optionalFields.some((field) => field.field_key === firstKey)) setOptionalFieldsOpen(true);
+        },
+      });
       return false;
     }
     return true;
@@ -2162,6 +2180,7 @@ function WorkflowFieldControl({
   return (
     <div
       data-workflow-field-key={field.field_key}
+      data-validation-key={field.field_key}
       tabIndex={-1}
       className="min-w-0 scroll-mt-24 rounded-md outline-none"
     >

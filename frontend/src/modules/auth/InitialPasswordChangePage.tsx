@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,7 @@ import { put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { PASSWORD_RULE_HELPER, passwordConfirmationMessage, passwordValueSchema } from '../../lib/security/password';
 import { AuthCard } from './AuthCard';
+import { firstInvalidFieldKey, useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 const schema = z.object({
   current_password: z.string().min(1, 'Nhập mật khẩu ban đầu'),
@@ -30,6 +31,8 @@ export function InitialPasswordChangePage() {
   const navigate = useNavigate();
   const toast = useToast();
   const [serverError, setServerError] = useState('');
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const navigateToValidation = useValidationNavigation(formRef);
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { current_password: '', new_password: '', new_password_confirmation: '' },
@@ -38,6 +41,7 @@ export function InitialPasswordChangePage() {
   return (
     <AuthCard title="Đổi mật khẩu ban đầu" description="Tài khoản đã được kích hoạt. Anh/chị cần đặt mật khẩu riêng trước khi sử dụng hệ thống.">
       <form
+        ref={formRef}
         className="space-y-4"
         noValidate
         onSubmit={form.handleSubmit(async (values) => {
@@ -50,6 +54,9 @@ export function InitialPasswordChangePage() {
           } catch (error) {
             setServerError(error instanceof Error ? error.message : 'Không đổi được mật khẩu');
           }
+        }, (errors) => {
+          toast.warn({ title: 'Vui lòng kiểm tra thông tin', description: 'Có trường mật khẩu chưa hợp lệ.' });
+          navigateToValidation(firstInvalidFieldKey(errors, ['current_password', 'new_password', 'new_password_confirmation']));
         })}
       >
         <PasswordField label="Mật khẩu ban đầu" name="current_password" autoComplete="current-password" form={form} />
@@ -73,18 +80,20 @@ function PasswordField({ label, name, autoComplete, helper, form }: {
   form: ReturnType<typeof useForm<FormValues>>;
 }) {
   const error = form.formState.errors[name]?.message;
+  const errorId = `${name}-error`;
   return (
-    <label className="block">
+    <label data-validation-key={name} className="block scroll-mt-24 rounded-md">
       <span className="text-sm font-semibold text-slate-700">{label}</span>
       <span className="mt-1 block">
         <PasswordInput
           autoComplete={autoComplete}
           className={`w-full rounded-md border px-3 py-2 text-sm focus-ring ${error ? 'border-rose-400 bg-rose-50' : 'border-line'}`}
           invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
           {...form.register(name)}
         />
       </span>
-      {error ? <span className="mt-1 block text-xs font-medium text-rose-600">{error}</span> : null}
+      {error ? <span id={errorId} role="alert" className="mt-1 block text-xs font-medium text-rose-600">{error}</span> : null}
       {!error && helper ? <span className="mt-1 block text-xs leading-5 text-slate-500">{helper}</span> : null}
     </label>
   );

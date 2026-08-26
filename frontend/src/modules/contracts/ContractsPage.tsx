@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -41,6 +41,7 @@ import type {
 } from '../../lib/types/domain';
 import { currency, dateText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { partnerOptions } from '../core-data/partnerUtils';
 import {
@@ -1312,17 +1313,23 @@ function ReceiveContractScanDialog({ target, submitting, onClose, onSubmit }: {
   const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState('');
+  const [fileError, setFileError] = useState(false);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const navigateValidation = useValidationNavigation(contentRef);
 
   useEffect(() => {
     if (!target) {
       setFile(null);
       setNote('');
+      setFileError(false);
     }
   }, [target]);
 
   async function submit() {
     if (!file) {
+      setFileError(true);
       toast.warn('Vui lòng chọn bản scan PDF hoặc ảnh hợp đồng giấy đã ký.');
+      navigateValidation('signed_scan');
       return;
     }
     await onSubmit(file, note);
@@ -1344,16 +1351,28 @@ function ReceiveContractScanDialog({ target, submitting, onClose, onSubmit }: {
         </div>
       )}
     >
-      <div className="space-y-3">
-        <label className="block rounded-md border border-dashed border-line bg-slate-50 p-4">
+      <div ref={contentRef} className="space-y-3">
+        <label
+          className={clsx('block rounded-md border border-dashed bg-slate-50 p-4', fileError ? 'border-rose-300' : 'border-line')}
+          data-validation-key="signed_scan"
+          data-validation-error={fileError ? 'true' : undefined}
+        >
           <span className="text-sm font-semibold text-ink">Tệp PDF/ảnh có chữ ký hai bên</span>
           <input
+            name="signed_scan"
             className="mt-2 block w-full text-sm text-slate-600"
             type="file"
             accept="application/pdf,image/png,image/jpeg,image/webp"
             disabled={submitting}
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            aria-invalid={fileError}
+            aria-describedby={fileError ? 'signed-scan-error' : undefined}
+            onChange={(event) => {
+              const nextFile = event.target.files?.[0] ?? null;
+              setFile(nextFile);
+              if (nextFile) setFileError(false);
+            }}
           />
+          {fileError ? <p id="signed-scan-error" role="alert" className="mt-2 text-xs font-medium text-rose-700">Vui lòng chọn tệp PDF hoặc ảnh hợp đồng đã ký.</p> : null}
         </label>
         <label className="block">
           <span className="text-xs font-semibold text-slate-600">Ghi chú tiếp nhận</span>

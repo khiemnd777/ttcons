@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, RefreshCw, Save, Send, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
@@ -20,6 +20,7 @@ import type {
 } from '../../lib/types/domain';
 import { partnerOptions } from '../core-data/partnerUtils';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 type LineDraft = {
   key: string;
@@ -123,6 +124,9 @@ export function IncomingAcceptancePanel({
   const queryClient = useQueryClient();
   const toast = useToast();
   const [draft, setDraft] = useState<Draft>(() => defaultDraft());
+  const [invalidKey, setInvalidKey] = useState('');
+  const panelRef = useRef<HTMLElement | null>(null);
+  const navigateValidation = useValidationNavigation(panelRef);
 
   const acceptanceQuery = useQuery({
     queryKey: ['incoming-acceptances', workItemId],
@@ -239,6 +243,9 @@ export function IncomingAcceptancePanel({
 
     if (invalid.length) {
       toast.warn({ title: 'Dữ liệu nghiệm thu đầu vào chưa hợp lệ', description: invalid.slice(0, 8).join(', ') });
+      const key = firstIncomingInvalidKey(draft, requireComplete, materials, procurementItems);
+      setInvalidKey(key ?? '');
+      navigateValidation(key);
       return null;
     }
     return {
@@ -331,7 +338,7 @@ export function IncomingAcceptancePanel({
   if (!acceptanceQuery.data?.available) return null;
 
   return (
-    <section>
+    <section ref={panelRef}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-ink">Nghiệm thu đầu vào</h3>
@@ -380,9 +387,9 @@ export function IncomingAcceptancePanel({
               ))}
             </select>
           </label>
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" data-validation-key="received_at" data-validation-error={invalidKey === 'received_at' ? 'true' : undefined}>
             Ngày nhận
-            <input className={controlClassName} type="date" value={draft.received_at} onChange={(event) => updateDraft({ received_at: event.target.value })} disabled={actionPending} />
+            <input name="received_at" className={controlClassName} type="date" value={draft.received_at} onChange={(event) => { updateDraft({ received_at: event.target.value }); if (event.target.value) setInvalidKey(''); }} disabled={actionPending} aria-invalid={invalidKey === 'received_at'} />
           </label>
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Nhà cung cấp catalog
@@ -427,7 +434,7 @@ export function IncomingAcceptancePanel({
           </label>
         </div>
 
-        <div className="overflow-x-auto border-y border-line">
+        <div className="overflow-x-auto border-y border-line" data-validation-key="items" data-validation-error={invalidKey === 'items' ? 'true' : undefined}>
           <div className="min-w-[1180px] divide-y divide-line">
             {draft.items.map((line, index) => (
               <IncomingLine
@@ -437,6 +444,7 @@ export function IncomingAcceptancePanel({
                 materials={materials}
                 procurementItems={procurementItems.filter((item) => !draft.procurement_request_id || item.request_id === draft.procurement_request_id)}
                 evidence={evidenceOptions}
+                invalidKey={invalidKey}
                 disabled={actionPending}
                 onChange={(patch) => updateLine(line.key, patch)}
                 onRemove={() => removeLine(line.key)}
@@ -516,6 +524,7 @@ function IncomingLine({
   materials,
   procurementItems,
   evidence,
+  invalidKey,
   disabled,
   onChange,
   onRemove,
@@ -525,6 +534,7 @@ function IncomingLine({
   materials: MaterialCatalogItem[];
   procurementItems: ProcurementRequestItemOption[];
   evidence: EvidenceRecord[];
+  invalidKey: string;
   disabled: boolean;
   onChange: (patch: Partial<LineDraft>) => void;
   onRemove: () => void;
@@ -533,6 +543,8 @@ function IncomingLine({
   const accepted = numberInput(line.accepted_quantity);
   const rejected = numberInput(line.rejected_quantity);
   const over = Number.isFinite(delivered) && accepted + rejected > delivered + 0.000001;
+  const keyFor = (field: string) => `line.${line.key}.${field}`;
+  const isInvalid = (field: string) => invalidKey === keyFor(field);
 
   function selectMaterial(materialID: string) {
     const material = materials.find((item) => item.id === materialID);
@@ -565,7 +577,7 @@ function IncomingLine({
         <Trash2 className="h-4 w-4" />
       </button>
       <div className="pt-2 text-xs font-semibold text-slate-500">{index + 1}</div>
-      <select className={controlClassName} value={line.material_id} onChange={(event) => selectMaterial(event.target.value)} disabled={disabled}>
+      <select name={keyFor('material_name')} data-validation-key={keyFor('material_name')} data-validation-error={isInvalid('material_name') ? 'true' : undefined} className={clsx(controlClassName, isInvalid('material_name') && 'border-rose-300 bg-rose-50')} aria-invalid={isInvalid('material_name')} value={line.material_id} onChange={(event) => selectMaterial(event.target.value)} disabled={disabled}>
         <option value="">Chọn vật tư</option>
         {materials.map((material) => (
           <option key={material.id} value={material.id}>{materialLabel(material)}</option>
@@ -578,6 +590,9 @@ function IncomingLine({
         ))}
       </select>
       <input
+        name={keyFor('delivered_quantity')}
+        data-validation-key={keyFor('delivered_quantity')}
+        data-validation-error={isInvalid('delivered_quantity') ? 'true' : undefined}
         className={clsx(controlClassName, over && 'border-rose-300 bg-rose-50')}
         type="number"
         min="0"
@@ -586,6 +601,7 @@ function IncomingLine({
         onChange={(event) => onChange({ delivered_quantity: event.target.value })}
         disabled={disabled}
         aria-label="Số lượng giao"
+        aria-invalid={isInvalid('delivered_quantity') || over}
       />
       <input
         className={clsx(controlClassName, over && 'border-rose-300 bg-rose-50')}
@@ -607,25 +623,25 @@ function IncomingLine({
         disabled={disabled}
         aria-label="Số lượng từ chối"
       />
-      <input className={controlClassName} value={line.unit} onChange={(event) => onChange({ unit: event.target.value })} disabled={disabled} aria-label="Đơn vị" />
+      <input name={keyFor('unit')} data-validation-key={keyFor('unit')} data-validation-error={isInvalid('unit') ? 'true' : undefined} className={clsx(controlClassName, isInvalid('unit') && 'border-rose-300 bg-rose-50')} value={line.unit} onChange={(event) => onChange({ unit: event.target.value })} disabled={disabled} aria-label="Đơn vị" aria-invalid={isInvalid('unit')} />
       <select className={controlClassName} value={line.condition} onChange={(event) => onChange({ condition: event.target.value })} disabled={disabled}>
         {conditionOptions.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}
       </select>
-      <select className={controlClassName} value={line.decision} onChange={(event) => onChange({ decision: event.target.value })} disabled={disabled}>
+      <select name={keyFor('decision')} data-validation-key={keyFor('decision')} data-validation-error={isInvalid('decision') ? 'true' : undefined} className={clsx(controlClassName, isInvalid('decision') && 'border-rose-300 bg-rose-50')} value={line.decision} onChange={(event) => onChange({ decision: event.target.value })} disabled={disabled} aria-invalid={isInvalid('decision')}>
         {decisionOptions.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}
       </select>
       <div className="grid gap-1">
-        <select className={controlClassName} value={line.evidence_id} onChange={(event) => onChange({ evidence_id: event.target.value })} disabled={disabled}>
+        <select name={keyFor('evidence_id')} data-validation-key={keyFor('evidence_id')} data-validation-error={isInvalid('evidence_id') ? 'true' : undefined} className={clsx(controlClassName, isInvalid('evidence_id') && 'border-rose-300 bg-rose-50')} value={line.evidence_id} onChange={(event) => onChange({ evidence_id: event.target.value })} disabled={disabled} aria-invalid={isInvalid('evidence_id')}>
           <option value="">Minh chứng</option>
           {evidence.map((record) => (
             <option key={record.id} value={record.id}>{evidenceLabel(record)}</option>
           ))}
         </select>
-        <input className={controlClassName} value={line.defect_note} onChange={(event) => onChange({ defect_note: event.target.value })} disabled={disabled} placeholder="Mô tả lỗi" />
+        <input name={keyFor('defect_note')} data-validation-key={keyFor('defect_note')} data-validation-error={isInvalid('defect_note') ? 'true' : undefined} className={clsx(controlClassName, isInvalid('defect_note') && 'border-rose-300 bg-rose-50')} value={line.defect_note} onChange={(event) => onChange({ defect_note: event.target.value })} disabled={disabled} placeholder="Mô tả lỗi" aria-invalid={isInvalid('defect_note')} />
       </div>
     </div>
   );
@@ -658,6 +674,39 @@ function PartnerSelect({
       {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
   );
+}
+
+function firstIncomingInvalidKey(
+  draft: Draft,
+  requireComplete: boolean,
+  materials: MaterialCatalogItem[],
+  procurementItems: ProcurementRequestItemOption[],
+) {
+  if (requireComplete && !draft.received_at) return 'received_at';
+  const lines = draft.items.filter(hasLineInput);
+  if (requireComplete && !lines.length) return 'items';
+  const materialByID = new Map(materials.map((item) => [String(item.id), item]));
+  const procurementItemByID = new Map(procurementItems.map((item) => [String(item.id), item]));
+  for (const line of lines) {
+    const material = materialByID.get(line.material_id);
+    const procurementItem = procurementItemByID.get(line.procurement_request_item_id);
+    const materialName = (material?.name ?? line.material_name ?? procurementItem?.material_name ?? '').trim();
+    const unit = (line.unit || material?.unit || procurementItem?.unit || '').trim();
+    const delivered = numberInput(line.delivered_quantity);
+    const accepted = numberInput(line.accepted_quantity);
+    const rejected = numberInput(line.rejected_quantity);
+    const keyFor = (field: string) => `line.${line.key}.${field}`;
+    if (!materialName) return keyFor('material_name');
+    if (!unit) return keyFor('unit');
+    if (requireComplete && (!Number.isFinite(delivered) || delivered <= 0)) return keyFor('delivered_quantity');
+    if (!Number.isFinite(delivered) || delivered < 0 || !Number.isFinite(accepted) || accepted < 0 || !Number.isFinite(rejected) || rejected < 0) return keyFor('delivered_quantity');
+    if (accepted + rejected > delivered + 0.000001) return keyFor('delivered_quantity');
+    if (requireComplete && line.decision === 'pending') return keyFor('decision');
+    const evidenceRequired = line.decision !== 'accepted' || line.condition !== 'usable' || rejected > 0;
+    if (requireComplete && evidenceRequired && !line.evidence_id) return keyFor('evidence_id');
+    if (requireComplete && evidenceRequired && !line.defect_note.trim()) return keyFor('defect_note');
+  }
+  return undefined;
 }
 
 function defaultDraft(): Draft {

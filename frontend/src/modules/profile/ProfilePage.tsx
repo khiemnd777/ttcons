@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type FieldErrors, type UseFormRegisterReturn } from 'react-hook-form';
@@ -14,6 +14,7 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { PASSWORD_RULE_HELPER, passwordConfirmationMessage, passwordValueSchema } from '../../lib/security/password';
 import type { User } from '../../lib/types/domain';
 import { uniqueRoleNames } from '../../lib/utils/roles';
+import { firstInvalidFieldKey, useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 type ProfileFormValues = {
   full_name: string;
@@ -91,6 +92,14 @@ export function ProfilePage() {
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [removeRecoveryOpen, setRemoveRecoveryOpen] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+  const profileFormRef = useRef<HTMLFormElement | null>(null);
+  const passwordFormRef = useRef<HTMLFormElement | null>(null);
+  const recoveryFormRef = useRef<HTMLFormElement | null>(null);
+  const removeRecoveryFormRef = useRef<HTMLFormElement | null>(null);
+  const navigateProfileValidation = useValidationNavigation(profileFormRef);
+  const navigatePasswordValidation = useValidationNavigation(passwordFormRef);
+  const navigateRecoveryValidation = useValidationNavigation(recoveryFormRef);
+  const navigateRemoveRecoveryValidation = useValidationNavigation(removeRecoveryFormRef);
   const currentEmail = user?.email ?? '';
   const currentProfileSchema = useMemo(() => profileSchema(currentEmail), [currentEmail]);
 
@@ -324,15 +333,18 @@ export function ProfilePage() {
           </div>
         )}
       >
-        <form id="profile-form" className="space-y-4" onSubmit={profileForm.handleSubmit((values) => updateProfile.mutate(values), (errors) => warnInvalidFields(toast.warn, errors, profileFieldLabels))} noValidate>
-          <FormField label="Họ và tên" required error={profileForm.formState.errors.full_name?.message}>
-            <input autoComplete="name" className={inputClass(Boolean(profileForm.formState.errors.full_name))} {...profileForm.register('full_name')} />
+        <form ref={profileFormRef} id="profile-form" className="space-y-4" onSubmit={profileForm.handleSubmit((values) => updateProfile.mutate(values), (errors) => {
+          warnInvalidFields(toast.warn, errors, profileFieldLabels);
+          navigateProfileValidation(firstInvalidFieldKey(errors as Record<string, unknown>, Object.keys(profileFieldLabels)));
+        })} noValidate>
+          <FormField fieldKey="full_name" label="Họ và tên" required error={profileForm.formState.errors.full_name?.message} errorId="profile-full-name-error">
+            <input autoComplete="name" aria-invalid={Boolean(profileForm.formState.errors.full_name)} aria-describedby={profileForm.formState.errors.full_name ? 'profile-full-name-error' : undefined} className={inputClass(Boolean(profileForm.formState.errors.full_name))} {...profileForm.register('full_name')} />
           </FormField>
-          <FormField label="Email đăng nhập" required error={profileForm.formState.errors.email?.message}>
-            <input type="email" autoComplete="email" className={inputClass(Boolean(profileForm.formState.errors.email))} {...profileForm.register('email')} />
+          <FormField fieldKey="email" label="Email đăng nhập" required error={profileForm.formState.errors.email?.message} errorId="profile-email-error">
+            <input type="email" autoComplete="email" aria-invalid={Boolean(profileForm.formState.errors.email)} aria-describedby={profileForm.formState.errors.email ? 'profile-email-error' : undefined} className={inputClass(Boolean(profileForm.formState.errors.email))} {...profileForm.register('email')} />
           </FormField>
-          <FormField label="Số điện thoại" error={profileForm.formState.errors.phone?.message}>
-            <input type="tel" autoComplete="tel" placeholder="Ví dụ: 0901234567" className={inputClass(Boolean(profileForm.formState.errors.phone))} {...profileForm.register('phone')} />
+          <FormField fieldKey="phone" label="Số điện thoại" error={profileForm.formState.errors.phone?.message} errorId="profile-phone-error">
+            <input type="tel" autoComplete="tel" placeholder="Ví dụ: 0901234567" aria-invalid={Boolean(profileForm.formState.errors.phone)} aria-describedby={profileForm.formState.errors.phone ? 'profile-phone-error' : undefined} className={inputClass(Boolean(profileForm.formState.errors.phone))} {...profileForm.register('phone')} />
           </FormField>
           {emailChanged ? (
             <PasswordField
@@ -364,7 +376,10 @@ export function ProfilePage() {
           </div>
         )}
       >
-        <form id="password-form" className="space-y-4" onSubmit={passwordForm.handleSubmit((values) => changePassword.mutate(values), (errors) => warnInvalidFields(toast.warn, errors, passwordFieldLabels))} noValidate>
+        <form ref={passwordFormRef} id="password-form" className="space-y-4" onSubmit={passwordForm.handleSubmit((values) => changePassword.mutate(values), (errors) => {
+          warnInvalidFields(toast.warn, errors, passwordFieldLabels);
+          navigatePasswordValidation(firstInvalidFieldKey(errors as Record<string, unknown>, Object.keys(passwordFieldLabels)));
+        })} noValidate>
           <PasswordField
             id="current-password"
             label="Mật khẩu hiện tại"
@@ -411,9 +426,12 @@ export function ProfilePage() {
           </div>
         )}
       >
-        <form id="recovery-email-form" className="space-y-4" onSubmit={recoveryForm.handleSubmit((values) => updateRecoveryEmail.mutate(values), (errors) => warnInvalidFields(toast.warn, errors, recoveryEmailFieldLabels))} noValidate>
-          <FormField label="Email khôi phục mới" required error={recoveryForm.formState.errors.recovery_email?.message}>
-            <input type="email" autoComplete="email" placeholder="vidu@email.com" className={inputClass(Boolean(recoveryForm.formState.errors.recovery_email))} {...recoveryForm.register('recovery_email')} />
+        <form ref={recoveryFormRef} id="recovery-email-form" className="space-y-4" onSubmit={recoveryForm.handleSubmit((values) => updateRecoveryEmail.mutate(values), (errors) => {
+          warnInvalidFields(toast.warn, errors, recoveryEmailFieldLabels);
+          navigateRecoveryValidation(firstInvalidFieldKey(errors as Record<string, unknown>, Object.keys(recoveryEmailFieldLabels)));
+        })} noValidate>
+          <FormField fieldKey="recovery_email" label="Email khôi phục mới" required error={recoveryForm.formState.errors.recovery_email?.message} errorId="recovery-email-error">
+            <input type="email" autoComplete="email" placeholder="vidu@email.com" aria-invalid={Boolean(recoveryForm.formState.errors.recovery_email)} aria-describedby={recoveryForm.formState.errors.recovery_email ? 'recovery-email-error' : undefined} className={inputClass(Boolean(recoveryForm.formState.errors.recovery_email))} {...recoveryForm.register('recovery_email')} />
           </FormField>
           <PasswordField
             id="recovery-current-password"
@@ -441,7 +459,10 @@ export function ProfilePage() {
           </div>
         )}
       >
-        <form id="remove-recovery-email-form" className="space-y-4" onSubmit={removeRecoveryForm.handleSubmit((values) => removeRecoveryEmail.mutate(values), (errors) => warnInvalidFields(toast.warn, errors, removeRecoveryEmailFieldLabels))} noValidate>
+        <form ref={removeRecoveryFormRef} id="remove-recovery-email-form" className="space-y-4" onSubmit={removeRecoveryForm.handleSubmit((values) => removeRecoveryEmail.mutate(values), (errors) => {
+          warnInvalidFields(toast.warn, errors, removeRecoveryEmailFieldLabels);
+          navigateRemoveRecoveryValidation(firstInvalidFieldKey(errors as Record<string, unknown>, Object.keys(removeRecoveryEmailFieldLabels)));
+        })} noValidate>
           <PasswordField
             id="remove-recovery-current-password"
             label="Mật khẩu hiện tại"
@@ -467,12 +488,12 @@ function ProfileValue({ icon: Icon, label, value }: { icon: typeof UserRound; la
   );
 }
 
-function FormField({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: React.ReactNode }) {
+function FormField({ fieldKey, label, required, error, errorId, children }: { fieldKey: string; label: string; required?: boolean; error?: string; errorId?: string; children: React.ReactNode }) {
   return (
-    <label className="block text-sm font-medium text-slate-700">
+    <label data-validation-key={fieldKey} className="block scroll-mt-24 rounded-md text-sm font-medium text-slate-700">
       <span>{label}{required ? <span className="text-rose-600"> *</span> : null}</span>
       <span className="mt-1 block">{children}</span>
-      {error ? <span className="mt-1 block text-xs font-medium text-rose-600">{error}</span> : null}
+      {error ? <span id={errorId} role="alert" className="mt-1 block text-xs font-medium text-rose-600">{error}</span> : null}
     </label>
   );
 }
@@ -488,7 +509,7 @@ function PasswordField({ id, label, required, autoComplete, visible, onToggle, r
   error?: string;
 }) {
   return (
-    <FormField label={label} required={required} error={error}>
+    <FormField fieldKey={registration.name} label={label} required={required} error={error} errorId={`${id}-error`}>
       <span className="block">
         <PasswordInput
           id={id}
@@ -497,6 +518,7 @@ function PasswordField({ id, label, required, autoComplete, visible, onToggle, r
           visible={visible}
           onVisibilityChange={onToggle}
           invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-error` : undefined}
           {...registration}
         />
       </span>

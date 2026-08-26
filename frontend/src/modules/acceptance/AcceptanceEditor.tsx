@@ -7,6 +7,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { postForm } from '../../lib/api/client';
 import type { AcceptanceChecklistItem, AcceptanceRecord, EvidenceRecord, WorkflowFormPDFExport, WorkItem } from '../../lib/types/domain';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import {
   EvidenceCapture,
   evidenceUploadFormData,
@@ -98,6 +99,7 @@ export function AcceptanceEditor({
   workItemsLoading = false,
   workItemsError = false,
   disabled = false,
+  validationRequest,
   onReloadWorkItems,
   onChange,
 }: {
@@ -111,6 +113,7 @@ export function AcceptanceEditor({
   workItemsLoading?: boolean;
   workItemsError?: boolean;
   disabled?: boolean;
+  validationRequest?: { id: number; key: string } | null;
   onReloadWorkItems?: () => void;
   onChange: (draft: AcceptanceDraft) => void;
 }) {
@@ -120,6 +123,9 @@ export function AcceptanceEditor({
   const [workItemPickerOpen, setWorkItemPickerOpen] = useState(false);
   const [workItemPickerMode, setWorkItemPickerMode] = useState<'capture' | 'change'>('change');
   const pendingCaptureResume = useRef<(() => void) | null>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const supplementalDetailsRef = useRef<HTMLDetailsElement | null>(null);
+  const navigateToValidation = useValidationNavigation(editorRef);
   const evidenceCatalog = useMemo(() => new Map(evidence.map((record) => [String(record.id), record])), [evidence]);
   const selectedWorkItem = useMemo(() => workItems.find((item) => item.id === draft.work_item_id), [draft.work_item_id, workItems]);
   const evidenceWorkItemIDs = useMemo(() => new Set(
@@ -133,6 +139,20 @@ export function AcceptanceEditor({
     if (draft.checklist.some((line) => line.key === selectedKey)) return;
     setSelectedKey(draft.checklist[0]?.key ?? '');
   }, [draft.checklist, selectedKey]);
+
+  useEffect(() => {
+    if (!validationRequest?.key) return;
+    const line = draft.checklist.find((candidate) => validationRequest.key.startsWith(`${candidate.key}.`));
+    navigateToValidation({
+      key: validationRequest.key,
+      prepare: () => {
+        if (line) setSelectedKey(line.key);
+        if (['signature_status', 'document_status'].includes(validationRequest.key) && supplementalDetailsRef.current) {
+          supplementalDetailsRef.current.open = true;
+        }
+      },
+    });
+  }, [validationRequest?.id, navigateToValidation]);
 
   const selectedLine = draft.checklist.find((line) => line.key === selectedKey) ?? draft.checklist[0];
   const updateDraft = (patch: Partial<AcceptanceDraft>) => onChange({ ...draft, ...patch });
@@ -183,8 +203,8 @@ export function AcceptanceEditor({
   }
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-lg border border-line bg-white p-4">
+    <div ref={editorRef} className="space-y-4">
+      <section data-validation-key="work_item_id" className="scroll-mt-24 rounded-lg border border-line bg-white p-4">
         <div className="mb-4 flex items-start gap-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700"><FileText className="h-4 w-4" /></span>
           <div><h3 className="text-sm font-semibold text-ink">Thông tin biên bản</h3><p className="mt-1 text-xs leading-5 text-slate-500">Xác định phạm vi nghiệm thu trước khi lập các tiêu chí kiểm tra.</p></div>
@@ -206,11 +226,11 @@ export function AcceptanceEditor({
               {typeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </EditorField>
-          <EditorField label="Ngày nghiệm thu">
-            <input className={controlClassName} type="date" value={draft.acceptance_date} onChange={(event) => updateDraft({ acceptance_date: event.target.value })} disabled={disabled} />
+          <EditorField fieldKey="acceptance_date" label="Ngày nghiệm thu">
+            <input name="acceptance_date" className={controlClassName} type="date" value={draft.acceptance_date} onChange={(event) => updateDraft({ acceptance_date: event.target.value })} disabled={disabled} />
           </EditorField>
-          <EditorField label="Tiêu đề" className="md:col-span-2">
-            <input className={controlClassName} value={draft.title} onChange={(event) => updateDraft({ title: event.target.value })} disabled={disabled} />
+          <EditorField fieldKey="title" label="Tiêu đề" className="md:col-span-2">
+            <input name="title" className={controlClassName} value={draft.title} onChange={(event) => updateDraft({ title: event.target.value })} disabled={disabled} />
           </EditorField>
           <EditorField label="Khu vực / vị trí" className="md:col-span-2">
             <input className={controlClassName} value={draft.location} onChange={(event) => updateDraft({ location: event.target.value })} disabled={disabled} placeholder="Ví dụ: Khu B · tầng 3" />
@@ -236,7 +256,7 @@ export function AcceptanceEditor({
           <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60" disabled={disabled} onClick={addLine}><Plus className="h-4 w-4" /> Thêm tiêu chí</button>
         </div>
 
-        {!draft.checklist.length ? <div className="p-5"><EmptyState title="Chưa có tiêu chí nghiệm thu" /><p className="mt-2 text-center text-sm text-slate-500">Thêm tiêu chí đầu tiên để bắt đầu lập checklist.</p><div className="mt-3 flex justify-center"><button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={addLine}><Plus className="h-4 w-4" /> Thêm tiêu chí đầu tiên</button></div></div> : (
+        {!draft.checklist.length ? <div data-validation-key="checklist" tabIndex={-1} className="scroll-mt-24 p-5 outline-none"><EmptyState title="Chưa có tiêu chí nghiệm thu" /><p className="mt-2 text-center text-sm text-slate-500">Thêm tiêu chí đầu tiên để bắt đầu lập checklist.</p><div className="mt-3 flex justify-center"><button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={addLine}><Plus className="h-4 w-4" /> Thêm tiêu chí đầu tiên</button></div></div> : (
           <div className="grid min-h-[520px] lg:grid-cols-[310px_minmax(0,1fr)]">
             <aside className="border-b border-line bg-slate-50/70 lg:border-b-0 lg:border-r">
               <div className="border-b border-line px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Danh sách · {draft.checklist.length}</div>
@@ -253,15 +273,15 @@ export function AcceptanceEditor({
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
-                  <EditorField label="Hạng mục / tiêu chí">
-                    <input className={controlClassName} value={selectedLine.title} onChange={(event) => updateLine(selectedLine.key, { title: event.target.value })} disabled={disabled} placeholder="Ví dụ: Cao độ trần khu B" />
+                  <EditorField fieldKey={`${selectedLine.key}.title`} label="Hạng mục / tiêu chí">
+                    <input name={`${selectedLine.key}.title`} className={controlClassName} value={selectedLine.title} onChange={(event) => updateLine(selectedLine.key, { title: event.target.value })} disabled={disabled} placeholder="Ví dụ: Cao độ trần khu B" />
                   </EditorField>
                   <EditorField label="Mô tả / tiêu chuẩn chấp nhận">
                     <input className={controlClassName} value={selectedLine.description} onChange={(event) => updateLine(selectedLine.key, { description: event.target.value })} disabled={disabled} placeholder="Điều kiện để kết luận đạt" />
                   </EditorField>
                 </div>
 
-                <fieldset>
+                <fieldset data-validation-key={`${selectedLine.key}.decision`} className="scroll-mt-24 rounded-md">
                   <legend className="text-xs font-semibold uppercase tracking-wide text-slate-500">Kết quả kiểm tra</legend>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {decisionOptions.map((option) => {
@@ -276,8 +296,8 @@ export function AcceptanceEditor({
                     <EditorField label="Mức độ">
                       <select className={controlClassName} value={selectedLine.severity} onChange={(event) => updateLine(selectedLine.key, { severity: event.target.value })} disabled={disabled}>{severityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
                     </EditorField>
-                    <EditorField label="Yêu cầu xử lý">
-                      <input className={controlClassName} value={selectedLine.required_action} onChange={(event) => updateLine(selectedLine.key, { required_action: event.target.value })} disabled={disabled} placeholder="Nêu rõ phần việc cần hoàn tất hoặc khắc phục" />
+                    <EditorField fieldKey={`${selectedLine.key}.required_action`} label="Yêu cầu xử lý">
+                      <input name={`${selectedLine.key}.required_action`} className={controlClassName} value={selectedLine.required_action} onChange={(event) => updateLine(selectedLine.key, { required_action: event.target.value })} disabled={disabled} placeholder="Nêu rõ phần việc cần hoàn tất hoặc khắc phục" />
                     </EditorField>
                     <EditorField label="Hạn xử lý">
                       <input className={controlClassName} type="date" value={selectedLine.due_date} onChange={(event) => updateLine(selectedLine.key, { due_date: event.target.value })} disabled={disabled} />
@@ -285,7 +305,7 @@ export function AcceptanceEditor({
                   </div>
                 ) : null}
 
-                <section className="space-y-3 rounded-lg border border-line p-4">
+                <section data-validation-key={`${selectedLine.key}.evidence`} className="scroll-mt-24 space-y-3 rounded-lg border border-line p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div><h5 className="flex items-center gap-2 text-sm font-semibold text-ink"><ImageIcon className="h-4 w-4 text-blue-600" /> Hình ảnh / minh chứng</h5><p className="mt-1 text-xs leading-5 text-slate-500">Chụp ảnh, chọn tệp mới hoặc dùng hồ sơ đã có trong công trình.</p></div>
                     <span className={clsx('w-fit rounded-md px-2 py-1 text-xs font-semibold', selectedEvidenceCount >= 10 ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600')}>{selectedEvidenceCount}/10</span>
@@ -321,14 +341,14 @@ export function AcceptanceEditor({
         )}
       </section>
 
-      <details className="rounded-lg border border-line bg-white" open={Boolean(draft.form_instance_id || draft.pdf_export_id || draft.notes)}>
+      <details ref={supplementalDetailsRef} className="rounded-lg border border-line bg-white" open={Boolean(draft.form_instance_id || draft.pdf_export_id || draft.notes)}>
         <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-ink">Hồ sơ, chữ ký và ghi chú</summary>
         <div className="grid gap-3 border-t border-line p-4 md:grid-cols-2 xl:grid-cols-4">
-          <EditorField label="Chữ ký">
-            <select className={controlClassName} value={draft.signature_status} onChange={(event) => updateDraft({ signature_status: event.target.value })} disabled={disabled}>{signatureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+          <EditorField fieldKey="signature_status" label="Chữ ký">
+            <select name="signature_status" className={controlClassName} value={draft.signature_status} onChange={(event) => updateDraft({ signature_status: event.target.value })} disabled={disabled}>{signatureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
           </EditorField>
-          <EditorField label="Tài liệu / PDF">
-            <select className={controlClassName} value={draft.document_status} onChange={(event) => updateDraft({ document_status: event.target.value })} disabled={disabled}>{documentOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+          <EditorField fieldKey="document_status" label="Tài liệu / PDF">
+            <select name="document_status" className={controlClassName} value={draft.document_status} onChange={(event) => updateDraft({ document_status: event.target.value })} disabled={disabled}>{documentOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
           </EditorField>
           {formInstance?.id || draft.form_instance_id ? (
             <EditorField label="Hồ sơ nghiệp vụ" className="md:col-span-2">
@@ -390,8 +410,30 @@ function SelectedEvidenceCard({ record, mismatch, disabled, onRemove }: { record
   return <article className={clsx('flex min-w-0 items-start gap-3 rounded-md border p-3', mismatch ? 'border-amber-300 bg-amber-50' : 'border-line bg-white')}><span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-500"><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink">{record.name || record.title || String(record.id)}</p><p className="mt-1 truncate text-xs text-slate-500">{record.work_item_title || 'Hồ sơ công trình'}</p><div className="mt-2 flex flex-wrap items-center gap-2"><StatusBadge status={record.status} />{mismatch ? <span className="text-xs font-semibold text-amber-800">Khác nguồn công việc</span> : null}</div></div><button type="button" disabled={disabled} className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50" onClick={onRemove} aria-label="Bỏ minh chứng"><X className="h-4 w-4" /></button></article>;
 }
 
-function EditorField({ label, className = '', children }: { label: string; className?: string; children: ReactNode }) {
-  return <label className={clsx('block text-xs font-semibold uppercase tracking-wide text-slate-500', className)}>{label}{children}</label>;
+function EditorField({ fieldKey, label, className = '', children }: { fieldKey?: string; label: string; className?: string; children: ReactNode }) {
+  return <label data-validation-key={fieldKey} className={clsx('block scroll-mt-24 rounded-md text-xs font-semibold uppercase tracking-wide text-slate-500', className)}>{label}{children}</label>;
+}
+
+export function firstAcceptanceDraftInvalidKey(draft: AcceptanceDraft, requireComplete: boolean) {
+  if (!draft.title.trim()) return 'title';
+  if (requireComplete && !draft.acceptance_date) return 'acceptance_date';
+  if (requireComplete && draft.signature_status === 'pending') return 'signature_status';
+  if (requireComplete && draft.document_status === 'pending') return 'document_status';
+  if (!draft.work_item_id && draft.checklist.some((line) => line.uploads.length > 0)) return 'work_item_id';
+  const lines = draft.checklist.filter(hasLineInput);
+  if (requireComplete && lines.length === 0) return 'checklist';
+  for (const line of lines) {
+    const evidenceIDs = uniqueStrings([line.evidence_id, ...line.evidence_ids]);
+    const evidenceCount = evidenceIDs.length + line.uploads.length;
+    if (!line.title.trim()) return `${line.key}.title`;
+    if (requireComplete && line.decision === 'pending') return `${line.key}.decision`;
+    if (evidenceCount > 10) return `${line.key}.evidence`;
+    if (draft.work_item_id && line.evidence_records.some((record) => record.work_item_id && record.work_item_id !== draft.work_item_id)) return `${line.key}.evidence`;
+    const evidenceRequired = line.photo_required || line.decision === 'conditional_pass' || line.decision === 'fail';
+    if (requireComplete && evidenceRequired && evidenceCount === 0 && !line.photo_url.trim()) return `${line.key}.evidence`;
+    if (requireComplete && (line.decision === 'conditional_pass' || line.decision === 'fail') && !line.required_action.trim()) return `${line.key}.required_action`;
+  }
+  return undefined;
 }
 
 export function createAcceptanceDraft({ workItemId = '', formInstanceId = '', pdfExportId = '', hasSignature = false }: { workItemId?: string; formInstanceId?: string; pdfExportId?: string; hasSignature?: boolean } = {}): AcceptanceDraft {

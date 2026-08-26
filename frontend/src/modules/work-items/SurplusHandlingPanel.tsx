@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, RefreshCw, Save, Send } from 'lucide-react';
 import clsx from 'clsx';
@@ -16,6 +16,7 @@ import type {
   Warehouse,
 } from '../../lib/types/domain';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 type Draft = {
   id: string;
@@ -66,6 +67,9 @@ export function SurplusHandlingPanel({
   const queryClient = useQueryClient();
   const toast = useToast();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [invalidKey, setInvalidKey] = useState('');
+  const panelRef = useRef<HTMLElement | null>(null);
+  const navigateValidation = useValidationNavigation(panelRef);
 
   const handlingQuery = useQuery({
     queryKey: ['surplus-handlings', workItemId],
@@ -133,6 +137,20 @@ export function SurplusHandlingPanel({
     if (requireComplete && !draft.evidence_id) invalid.push('Minh chứng');
     if (invalid.length) {
       toast.warn({ title: 'Dữ liệu xử lý vật tư dư chưa hợp lệ', description: invalid.join(', ') });
+      const prefix = `balance.${balance.id}`;
+      const key = !Number.isFinite(quantity) || quantity <= 0 || quantity > surplus + 0.000001
+        ? `${prefix}.quantity`
+        : !unit
+          ? `${prefix}.unit`
+          : !draft.warehouse_id
+            ? `${prefix}.warehouse_id`
+            : requireComplete && !draft.custody_location.trim()
+              ? `${prefix}.custody_location`
+              : requireComplete && !draft.evidence_id
+                ? `${prefix}.evidence_id`
+                : '';
+      setInvalidKey(key);
+      navigateValidation(key);
       return null;
     }
     return {
@@ -218,7 +236,7 @@ export function SurplusHandlingPanel({
   if (!handlingQuery.data?.available) return null;
 
   return (
-    <section>
+    <section ref={panelRef}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-ink">Lưu kho vật tư tồn</h3>
@@ -242,8 +260,12 @@ export function SurplusHandlingPanel({
                   warehouses={warehouses}
                   evidence={evidenceOptions}
                   handlingOptions={handlingOptions}
+                  invalidKey={invalidKey}
                   disabled={actionPending}
-                  onChange={(patch) => updateDraft(String(balance.id), patch)}
+                  onChange={(patch) => {
+                    updateDraft(String(balance.id), patch);
+                    setInvalidKey('');
+                  }}
                   onSave={() => saveDraft.mutate({ balance, draft })}
                   onSubmit={() => submitDraft.mutate({ balance, draft })}
                   saving={saveDraft.isPending}
@@ -291,6 +313,7 @@ function SurplusRow({
   warehouses,
   evidence,
   handlingOptions,
+  invalidKey,
   disabled,
   onChange,
   onSave,
@@ -303,6 +326,7 @@ function SurplusRow({
   warehouses: Warehouse[];
   evidence: EvidenceRecord[];
   handlingOptions: typeof allHandlingOptions;
+  invalidKey: string;
   disabled: boolean;
   onChange: (patch: Partial<Draft>) => void;
   onSave: () => void;
@@ -313,6 +337,8 @@ function SurplusRow({
   const surplus = Number(balance.surplus_quantity ?? 0);
   const quantity = numberInput(draft.quantity);
   const over = quantity > surplus + 0.000001;
+  const keyFor = (field: string) => `balance.${balance.id}.${field}`;
+  const isInvalid = (field: string) => invalidKey === keyFor(field);
 
   return (
     <div className="grid gap-3 py-3 xl:grid-cols-[auto_1fr_1fr_1.2fr]">
@@ -347,7 +373,7 @@ function SurplusRow({
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" data-validation-key={keyFor('quantity')} data-validation-error={isInvalid('quantity') ? 'true' : undefined}>
           Xử lý
           <select
             className="mt-1 h-9 w-full rounded-md border border-line bg-white px-2 text-sm font-normal normal-case tracking-normal outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
@@ -368,20 +394,24 @@ function SurplusRow({
             step="0.001"
             className={clsx(
               'mt-1 h-9 w-full rounded-md border px-2 text-sm font-normal normal-case tracking-normal outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50',
-              over ? 'border-rose-300 bg-rose-50' : 'border-line',
+              over || isInvalid('quantity') ? 'border-rose-300 bg-rose-50' : 'border-line',
             )}
+            name={keyFor('quantity')}
             value={draft.quantity}
             onChange={(event) => onChange({ quantity: event.target.value })}
             disabled={disabled}
+            aria-invalid={over || isInvalid('quantity')}
           />
         </label>
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" data-validation-key={keyFor('unit')} data-validation-error={isInvalid('unit') ? 'true' : undefined}>
           Đơn vị
           <input
-            className="mt-1 h-9 w-full rounded-md border border-line px-2 text-sm font-normal normal-case tracking-normal outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+            name={keyFor('unit')}
+            className={clsx('mt-1 h-9 w-full rounded-md border px-2 text-sm font-normal normal-case tracking-normal outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', isInvalid('unit') ? 'border-rose-300 bg-rose-50' : 'border-line')}
             value={draft.unit}
             onChange={(event) => onChange({ unit: event.target.value })}
             disabled={disabled}
+            aria-invalid={isInvalid('unit')}
           />
         </label>
         <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -401,11 +431,15 @@ function SurplusRow({
 
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1">
         <select
-          className="h-9 rounded-md border border-line bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+          name={keyFor('warehouse_id')}
+          data-validation-key={keyFor('warehouse_id')}
+          data-validation-error={isInvalid('warehouse_id') ? 'true' : undefined}
+          className={clsx('h-9 rounded-md border bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', isInvalid('warehouse_id') ? 'border-rose-300' : 'border-line')}
           value={draft.warehouse_id}
           onChange={(event) => onChange({ warehouse_id: event.target.value })}
           disabled={disabled}
           aria-label="Kho trung chuyển"
+          aria-invalid={isInvalid('warehouse_id')}
         >
           <option value="">Chọn kho</option>
           {warehouses.map((warehouse) => (
@@ -413,18 +447,26 @@ function SurplusRow({
           ))}
         </select>
         <input
-          className="h-9 rounded-md border border-line px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+          name={keyFor('custody_location')}
+          data-validation-key={keyFor('custody_location')}
+          data-validation-error={isInvalid('custody_location') ? 'true' : undefined}
+          className={clsx('h-9 rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', isInvalid('custody_location') ? 'border-rose-300 bg-rose-50' : 'border-line')}
           value={draft.custody_location}
           onChange={(event) => onChange({ custody_location: event.target.value })}
           disabled={disabled}
           placeholder="Vị trí lưu / bàn giao"
+          aria-invalid={isInvalid('custody_location')}
         />
         <select
-          className="h-9 rounded-md border border-line bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+          name={keyFor('evidence_id')}
+          data-validation-key={keyFor('evidence_id')}
+          data-validation-error={isInvalid('evidence_id') ? 'true' : undefined}
+          className={clsx('h-9 rounded-md border bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', isInvalid('evidence_id') ? 'border-rose-300' : 'border-line')}
           value={draft.evidence_id}
           onChange={(event) => onChange({ evidence_id: event.target.value })}
           disabled={disabled}
           aria-label="Minh chứng vật tư dư"
+          aria-invalid={isInvalid('evidence_id')}
         >
           <option value="">Chọn minh chứng</option>
           {evidence.map((item) => (

@@ -21,9 +21,11 @@ import {
   acceptanceDraftFromRecord,
   acceptanceDraftPayload,
   createAcceptanceDraft,
+  firstAcceptanceDraftInvalidKey,
   uploadAcceptanceDraftEvidence,
   type AcceptanceDraft,
 } from './AcceptanceEditor';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from '../work-items/workItemMutationContext';
 
 type ConclusionResult = 'pass' | 'conditional_pass' | 'fail';
@@ -50,6 +52,10 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
   const [conclusionResult, setConclusionResult] = useState<ConclusionResult>('pass');
   const [conclusionComment, setConclusionComment] = useState('');
   const [selectedChecklistItem, setSelectedChecklistItem] = useState<SelectedChecklistItem>(null);
+  const [editorValidationRequest, setEditorValidationRequest] = useState<{ id: number; key: string } | null>(null);
+  const [conclusionInvalid, setConclusionInvalid] = useState(false);
+  const conclusionContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateConclusionValidation = useValidationNavigation(conclusionContentRef);
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasAnyPermission } = useAuth();
@@ -124,6 +130,8 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
       const { invalid } = initial;
       if (invalid.length) {
         toast.warn({ title: 'Biên bản nghiệm thu chưa hợp lệ', description: invalid.slice(0, 8).join(', ') });
+        const key = firstAcceptanceDraftInvalidKey(draft, submit);
+        if (key) setEditorValidationRequest((current) => ({ id: (current?.id ?? 0) + 1, key }));
         return null;
       }
       const readyDraft = await uploadAcceptanceDraftEvidence(draft, setDraft);
@@ -149,7 +157,9 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
     mutationFn: async () => {
       if (!selectedId) return null;
       if (!conclusionComment.trim()) {
+        setConclusionInvalid(true);
         toast.warn({ title: 'Thiếu kết luận', description: 'Nhập nhận xét kết luận nghiệm thu.' });
+        navigateConclusionValidation('conclusion_comment');
         return null;
       }
       const action = conclusionResult === 'conditional_pass' ? 'conditional-pass' : conclusionResult;
@@ -176,18 +186,21 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
 
   function openNewEditor() {
     setDraft(createAcceptanceDraft({ workItemId: taskWorkItem?.id }));
+    setEditorValidationRequest(null);
     setEditorOpen(true);
   }
 
   function openEditEditor() {
     if (!selected || selected.status !== 'draft') return;
     setDraft(acceptanceDraftFromRecord(selected));
+    setEditorValidationRequest(null);
     setEditorOpen(true);
   }
 
   function openConclusion() {
     if (!selected) return;
     setConclusionResult(canApprove ? 'pass' : 'fail');
+    setConclusionInvalid(false);
     setConclusionComment('');
     setConclusionOpen(true);
   }
@@ -281,6 +294,7 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
           workItemsLoading={operations.isLoading}
           workItemsError={Boolean(operations.error)}
           disabled={save.isPending}
+          validationRequest={editorValidationRequest}
           onReloadWorkItems={() => { void operations.refetch(); }}
           onChange={setDraft}
         />
@@ -298,15 +312,15 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
           <button disabled={conclude.isPending} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={() => conclude.mutate()}>{conclude.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Xác nhận kết luận</button>
         </div>}
       >
-        <div className="space-y-3">
+        <div ref={conclusionContentRef} className="space-y-3">
           {resultOptions.filter((option) => option.value === 'fail' ? canReject : canApprove).map((option) => (
             <label key={option.value} className={`flex cursor-pointer gap-3 rounded-md border p-3 ${conclusionResult === option.value ? 'border-blue-300 bg-blue-50' : 'border-line bg-white'}`}>
               <input type="radio" name="acceptance-result" className="mt-1" checked={conclusionResult === option.value} onChange={() => setConclusionResult(option.value)} />
               <span><span className="block text-sm font-semibold text-ink">{option.label}</span><span className="mt-1 block text-xs leading-5 text-slate-600">{option.description}</span></span>
             </label>
           ))}
-          <label className="block text-sm font-semibold text-slate-700">Nhận xét kết luận *
-            <textarea className="mt-1 min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" value={conclusionComment} onChange={(event) => setConclusionComment(event.target.value)} placeholder="Ghi rõ căn cứ kết luận và phần việc cần theo dõi nếu có" />
+          <label data-validation-key="conclusion_comment" data-validation-error={conclusionInvalid ? 'true' : undefined} className="block scroll-mt-24 rounded-md text-sm font-semibold text-slate-700">Nhận xét kết luận *
+            <textarea name="conclusion_comment" aria-invalid={conclusionInvalid} className="mt-1 min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" value={conclusionComment} onChange={(event) => { setConclusionComment(event.target.value); if (event.target.value.trim()) setConclusionInvalid(false); }} placeholder="Ghi rõ căn cứ kết luận và phần việc cần theo dõi nếu có" />
           </label>
         </div>
       </Dialog>

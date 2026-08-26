@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Ref } from 'react';
 import { CheckCircle2, ChevronRight, ExternalLink, Loader2, XCircle } from 'lucide-react';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
@@ -39,6 +39,8 @@ type EvidenceRecordViewerDialogProps = {
   canReview?: boolean;
   reviewingAction?: EvidenceReviewAction | null;
   reviewComment?: string;
+  reviewCommentInvalid?: boolean;
+  reviewCommentRef?: Ref<HTMLTextAreaElement>;
   onReviewCommentChange?: (value: string) => void;
   onOpenFile?: () => void;
   onRetry?: () => void;
@@ -55,6 +57,8 @@ export function EvidenceRecordViewerDialog({
   canReview = false,
   reviewingAction = null,
   reviewComment = '',
+  reviewCommentInvalid = false,
+  reviewCommentRef,
   onReviewCommentChange,
   onOpenFile,
   onRetry,
@@ -197,10 +201,12 @@ export function EvidenceRecordViewerDialog({
           </details>
 
           {reviewable ? (
-            <label className="block rounded-md border border-amber-200 bg-amber-50 p-3">
+            <label data-validation-key="review_comment" data-validation-error={reviewCommentInvalid ? 'true' : undefined} className="block scroll-mt-24 rounded-md border border-amber-200 bg-amber-50 p-3">
               <span className="block text-sm font-semibold text-amber-900">Rà soát minh chứng</span>
               <span className="mt-1 block text-xs leading-5 text-amber-800">Nhập lý do khi từ chối; ghi chú là tùy chọn khi chấp nhận.</span>
               <textarea
+                ref={reviewCommentRef}
+                aria-invalid={reviewCommentInvalid}
                 className="mt-2 w-full rounded-md border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200"
                 rows={3}
                 value={reviewComment}

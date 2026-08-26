@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CheckCircle2, ClipboardCheck, Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ import type {
   ConstructionHandoffItem,
   ConstructionHandoffWorkspace,
 } from '../../lib/types/domain';
+import { firstInvalidFieldKey, useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import {
   constructionHandoffIntentMatches,
   consumeConstructionHandoffNavigationState,
@@ -45,6 +46,8 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<EditableItem[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const dialogContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateToValidation = useValidationNavigation(dialogContentRef);
 
   const handoff = useQuery({
     queryKey: ['construction-handoff', projectId],
@@ -146,6 +149,11 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
     setErrors(next);
     if (Object.keys(next).length) {
       toast.warn({ title: 'Chưa đủ thông tin bàn giao', description: 'Kiểm tra tên đợt, nội dung và tiêu chí đạt của từng hạng mục.' });
+      navigateToValidation(firstInvalidFieldKey(next, [
+        'title',
+        'items',
+        ...items.flatMap((item) => [`${item.local_id}.title`, `${item.local_id}.criteria`]),
+      ]));
       return;
     }
     activate.mutate();
@@ -236,12 +244,12 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
           </div>
         )}
       >
-        <div className="space-y-5">
+        <div ref={dialogContentRef} className="space-y-5">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <label className="block">
+            <label data-validation-key="title" className="block scroll-mt-24 rounded-md">
               <span className="text-sm font-semibold text-slate-700">Tên đợt bàn giao <span className="text-rose-600">*</span></span>
-              <input disabled={readOnly} className={controlClass(Boolean(errors.title), readOnly)} value={title} onChange={(event) => { setTitle(event.target.value); setErrors((current) => ({ ...current, title: '' })); }} autoFocus={!readOnly} />
-              {errors.title ? <span className="mt-1 block text-xs text-rose-600">{errors.title}</span> : null}
+              <input name="title" aria-invalid={Boolean(errors.title)} disabled={readOnly} className={controlClass(Boolean(errors.title), readOnly)} value={title} onChange={(event) => { setTitle(event.target.value); setErrors((current) => ({ ...current, title: '' })); }} autoFocus={!readOnly} />
+              {errors.title ? <span role="alert" className="mt-1 block text-xs text-rose-600">{errors.title}</span> : null}
             </label>
             <label className="block">
               <span className="text-sm font-semibold text-slate-700">Lưu ý bàn giao</span>
@@ -257,7 +265,7 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
             {!readOnly ? <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={() => setItems((current) => [...current, emptyItem(current)])}><Plus className="h-4 w-4" /> Thêm hạng mục</button> : null}
           </div>
 
-          {errors.items ? <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errors.items}</p> : null}
+          {errors.items ? <p data-validation-key="items" tabIndex={-1} role="alert" className="scroll-mt-24 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 outline-none">{errors.items}</p> : null}
           <div className="space-y-3">
             {items.map((item, index) => (
               <article key={item.local_id} className="rounded-lg border border-line bg-slate-50/60 p-4">
@@ -269,12 +277,12 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
                   {!readOnly ? <button className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setItems((current) => current.filter((row) => row.local_id !== item.local_id))} aria-label={`Xóa hạng mục ${index + 1}`}><Trash2 className="h-4 w-4" /></button> : null}
                 </div>
                 <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
-                  <Field label="Nội dung kiểm tra" required error={errors[`${item.local_id}.title`]} className="xl:col-span-2">
-                    <input disabled={readOnly} className={controlClass(Boolean(errors[`${item.local_id}.title`]), readOnly)} value={item.title} onChange={(event) => updateItem(setItems, item.local_id, { title: event.target.value })} />
+                  <Field fieldKey={`${item.local_id}.title`} label="Nội dung kiểm tra" required error={errors[`${item.local_id}.title`]} className="xl:col-span-2">
+                    <input name={`${item.local_id}.title`} aria-invalid={Boolean(errors[`${item.local_id}.title`])} disabled={readOnly} className={controlClass(Boolean(errors[`${item.local_id}.title`]), readOnly)} value={item.title} onChange={(event) => { updateItem(setItems, item.local_id, { title: event.target.value }); setErrors((current) => ({ ...current, [`${item.local_id}.title`]: '' })); }} />
                   </Field>
                   <Field label="Vị trí"><input disabled={readOnly} className={controlClass(false, readOnly)} value={item.location ?? ''} onChange={(event) => updateItem(setItems, item.local_id, { location: event.target.value })} placeholder="Khu vực / tầng" /></Field>
                   <Field label="Thời điểm dự kiến"><input disabled={readOnly} type="datetime-local" className={controlClass(false, readOnly)} value={toDateTimeInput(item.scheduled_at)} onChange={(event) => updateItem(setItems, item.local_id, { scheduled_at: event.target.value })} /></Field>
-                  <Field label="Tiêu chí đạt" required error={errors[`${item.local_id}.criteria`]} className="xl:col-span-2"><textarea disabled={readOnly} rows={2} className={controlClass(Boolean(errors[`${item.local_id}.criteria`]), readOnly)} value={criterionText(item)} onChange={(event) => updateCriterion(setItems, item.local_id, event.target.value)} /></Field>
+                  <Field fieldKey={`${item.local_id}.criteria`} label="Tiêu chí đạt" required error={errors[`${item.local_id}.criteria`]} className="xl:col-span-2"><textarea name={`${item.local_id}.criteria`} aria-invalid={Boolean(errors[`${item.local_id}.criteria`])} disabled={readOnly} rows={2} className={controlClass(Boolean(errors[`${item.local_id}.criteria`]), readOnly)} value={criterionText(item)} onChange={(event) => { updateCriterion(setItems, item.local_id, event.target.value); setErrors((current) => ({ ...current, [`${item.local_id}.criteria`]: '' })); }} /></Field>
                   <Field label="Vai trò giám sát"><select disabled={readOnly} className={controlClass(false, readOnly)} value={item.responsible_role || 'QA/QC'} onChange={(event) => updateItem(setItems, item.local_id, { responsible_role: event.target.value })}>{!['QA/QC', 'Giám sát', 'PM'].includes(item.responsible_role) && item.responsible_role ? <option value={item.responsible_role}>{item.responsible_role}</option> : null}<option value="QA/QC">QA/QC</option><option value="Giám sát">Giám sát</option><option value="PM">PM</option></select></Field>
                   <Field label="Người giám sát"><select disabled={readOnly} className={controlClass(false, readOnly)} value={item.assigned_user_id ?? ''} onChange={(event) => updateItem(setItems, item.local_id, { assigned_user_id: event.target.value })}><option value="">Theo vai trò</option>{item.assigned_user_id && !(handoff.data?.participants ?? []).some((participant) => participant.id === item.assigned_user_id) ? <option value={item.assigned_user_id}>{identityReferenceText(item.assigned_user_name, item.assigned_user_account_deleted, 'Tài khoản không còn hoạt động')}{item.assigned_user_account_deleted ? ' · Cần phân công lại' : ''}</option> : null}{handoff.data?.participants?.map((participant) => <option key={participant.id} value={participant.id}>{participant.full_name}</option>)}</select></Field>
                 </div>
@@ -299,8 +307,8 @@ function Metric({ label, value, tone }: { label: string; value: number; tone: st
   return <div className="bg-white px-4 py-3"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className={`mt-1 text-xl font-black ${tone}`}>{value}</p></div>;
 }
 
-function Field({ label, required, error, className = '', children }: { label: string; required?: boolean; error?: string; className?: string; children: ReactNode }) {
-  return <label className={`block ${className}`}><span className="text-xs font-semibold text-slate-600">{label}{required ? <span className="text-rose-600"> *</span> : null}</span><div className="mt-1">{children}</div>{error ? <span className="mt-1 block text-xs text-rose-600">{error}</span> : null}</label>;
+function Field({ fieldKey, label, required, error, className = '', children }: { fieldKey?: string; label: string; required?: boolean; error?: string; className?: string; children: ReactNode }) {
+  return <label data-validation-key={fieldKey} className={`block scroll-mt-24 rounded-md ${className}`}><span className="text-xs font-semibold text-slate-600">{label}{required ? <span className="text-rose-600"> *</span> : null}</span><div className="mt-1">{children}</div>{error ? <span role="alert" className="mt-1 block text-xs text-rose-600">{error}</span> : null}</label>;
 }
 
 function controlClass(error = false, disabled = false) {

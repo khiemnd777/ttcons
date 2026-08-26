@@ -1,10 +1,11 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronUp, Loader2, MessageSquarePlus, Plus, Send, X } from 'lucide-react';
 import clsx from 'clsx';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import type { ActivityAttachmentPayload, ActivityMentionPayload, ActivityPayload, WorkItemActivity } from '../../lib/types/domain';
 import { enumLabel, statusLabel } from '../../lib/utils/status';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { compactDateTime } from './workItemPresentation';
 
 type ComposerMode = 'project' | 'work_item';
@@ -126,6 +127,8 @@ export function ActivityComposer({
   const [mentions, setMentions] = useState<ActivityMentionPayload[]>([]);
   const [attachments, setAttachments] = useState<ActivityAttachmentPayload[]>([]);
   const [touched, setTouched] = useState(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const navigateToValidation = useValidationNavigation(formRef);
 
   const activityOptions = useMemo(() => {
     if (mode === 'work_item') return [...baseActivityOptions, ...workItemOnlyOptions];
@@ -160,6 +163,7 @@ export function ActivityComposer({
     const id = mentionId.trim();
     if (!id) {
       toast.warn({ title: 'Thiếu người được nhắc', description: mentionType === 'role' ? 'Nhập nhãn vai trò cần nhắc.' : 'Nhập ID cần nhắc.' });
+      navigateToValidation('mention');
       return;
     }
     const next = { type: mentionType, id, label: mentionLabel.trim() || undefined };
@@ -175,6 +179,7 @@ export function ActivityComposer({
     const id = referenceId.trim();
     if (!id) {
       toast.warn({ title: 'Thiếu tệp đính kèm', description: 'Cần chọn hoặc nhập ID minh chứng/tài liệu.' });
+      navigateToValidation('reference');
       return;
     }
     const selected = attachmentOptions.find((option) => option.type === referenceType && option.id === id);
@@ -198,6 +203,15 @@ export function ActivityComposer({
     ].filter(Boolean);
     if (missing.length) {
       toast.warn({ title: 'Thiếu thông tin hoạt động', description: `Cần nhập: ${missing.join(', ')}` });
+      navigateToValidation(
+        !comment.trim()
+          ? 'comment'
+          : needsDueAt && !dueAt
+            ? 'due_at'
+            : needsReference && !attachments.length
+              ? 'reference'
+              : 'target_id',
+      );
       return;
     }
 
@@ -250,7 +264,7 @@ export function ActivityComposer({
 
   if (variant === 'chat') {
     return (
-      <form className="space-y-2" onSubmit={submit}>
+      <form ref={formRef} className="space-y-2" onSubmit={submit} noValidate>
         {editing && editItem ? (
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left">
             <div className="min-w-0 flex-1">
@@ -291,7 +305,7 @@ export function ActivityComposer({
                   </select>
                 </label>
                 {targetScope !== 'project' ? (
-                  <label className="block">
+                  <label data-validation-key="target_id" data-validation-error={missingTarget ? 'true' : undefined} className="block scroll-mt-24 rounded-md">
                     <span className="sr-only">Đối tượng được gắn</span>
                     <select
                       className={clsx(
@@ -299,6 +313,7 @@ export function ActivityComposer({
                         missingTarget ? 'border-amber-300 bg-amber-50' : 'border-line',
                       )}
                       value={targetId}
+                      aria-invalid={missingTarget}
                       onChange={(event) => setTargetId(event.target.value)}
                     >
                       <option value="">Chọn đối tượng</option>
@@ -309,7 +324,7 @@ export function ActivityComposer({
               </>
             ) : null}
             {showsDueAt ? (
-              <label className="block">
+              <label data-validation-key="due_at" data-validation-error={missingDueAt ? 'true' : undefined} className="block scroll-mt-24 rounded-md">
                 <span className="sr-only">{activityType === 'reminder' ? 'Ngày nhắc' : 'Hạn điểm chặn'}</span>
                 <input
                   className={clsx(
@@ -317,6 +332,7 @@ export function ActivityComposer({
                     missingDueAt ? 'border-amber-300 bg-amber-50' : 'border-line',
                   )}
                   type="date"
+                  aria-invalid={missingDueAt}
                   value={dueAt}
                   onChange={(event) => setDueAt(event.target.value)}
                   title={activityType === 'reminder' ? 'Ngày nhắc' : 'Hạn điểm chặn'}
@@ -340,7 +356,7 @@ export function ActivityComposer({
         ) : null}
 
         {needsReference ? (
-          <div className={clsx('grid gap-2 rounded-md border bg-slate-50 p-2 sm:grid-cols-[120px_minmax(0,1fr)_auto]', missingReference ? 'border-amber-300' : 'border-line')}>
+          <div data-validation-key="reference" data-validation-error={missingReference ? 'true' : undefined} className={clsx('scroll-mt-24 grid gap-2 rounded-md border bg-slate-50 p-2 sm:grid-cols-[120px_minmax(0,1fr)_auto]', missingReference ? 'border-amber-300' : 'border-line')}>
             <select
               className="rounded-md border border-line bg-white px-2.5 py-2 text-xs font-semibold text-slate-600"
               value={referenceType}
@@ -389,10 +405,11 @@ export function ActivityComposer({
           </div>
         ) : null}
 
-        <div className={clsx('rounded-xl border bg-white shadow-sm focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100', missingComment ? 'border-amber-300' : 'border-line')}>
+        <div data-validation-key="comment" data-validation-error={missingComment ? 'true' : undefined} className={clsx('scroll-mt-24 rounded-xl border bg-white shadow-sm focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100', missingComment ? 'border-amber-300' : 'border-line')}>
           <textarea
             className="max-h-40 min-h-16 w-full resize-y rounded-t-xl bg-transparent px-3 py-2.5 text-sm leading-6 outline-none"
             value={comment}
+            aria-invalid={missingComment}
             onBlur={() => setTouched(true)}
             onChange={(event) => setComment(event.target.value)}
             placeholder={editing ? 'Nhập nội dung chỉnh sửa...' : replying ? `Trả lời ${identityReferenceText(replyTo?.actor_name, replyTo?.actor_account_deleted, 'thành viên công trình')}...` : 'Nhắn vào thảo luận công trình...'}
@@ -408,7 +425,7 @@ export function ActivityComposer({
             )}
             {!editing ? <details className="relative">
               <summary className="cursor-pointer list-none rounded-md px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">@ Nhắc đến</summary>
-              <div className="absolute bottom-9 left-0 z-20 w-72 space-y-2 rounded-lg border border-line bg-white p-2 shadow-lg">
+              <div data-validation-key="mention" className="absolute bottom-9 left-0 z-20 w-72 scroll-mt-24 space-y-2 rounded-lg border border-line bg-white p-2 shadow-lg">
                 <select className="w-full rounded-md border border-line px-2 py-2 text-xs" value={mentionType} onChange={(event) => { setMentionType(event.target.value as MentionType); setMentionId(''); setMentionLabel(''); }}>
                   {mentionTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
@@ -456,7 +473,7 @@ export function ActivityComposer({
 	}
 
   return (
-    <form className="rounded-lg border border-blue-100 bg-blue-50/30 p-3 shadow-sm" onSubmit={submit}>
+    <form ref={formRef} className="rounded-lg border border-blue-100 bg-blue-50/30 p-3 shadow-sm" onSubmit={submit} noValidate>
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-ink">Tạo trao đổi</p>
@@ -512,7 +529,7 @@ export function ActivityComposer({
             </select>
           </label>
           {targetScope !== 'project' ? (
-            <label className="block">
+            <label data-validation-key="target_id" data-validation-error={missingTarget ? 'true' : undefined} className="block scroll-mt-24 rounded-md">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Đích</span>
               {visibleTargetOptions.length ? (
                 <select
@@ -521,6 +538,7 @@ export function ActivityComposer({
                     missingTarget ? 'border-amber-300 bg-amber-50' : 'border-line',
                   )}
                   value={targetId}
+                  aria-invalid={missingTarget}
                   onChange={(event) => setTargetId(event.target.value)}
                 >
                   <option value="">Chọn đối tượng</option>
@@ -533,11 +551,14 @@ export function ActivityComposer({
       ) : null}
 
       <textarea
+        data-validation-key="comment"
+        data-validation-error={missingComment ? 'true' : undefined}
         className={clsx(
           'mt-2 min-h-20 w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500',
           missingComment ? 'border-amber-300 bg-amber-50' : 'border-line',
         )}
         value={comment}
+        aria-invalid={missingComment}
         onBlur={() => setTouched(true)}
         onChange={(event) => setComment(event.target.value)}
         placeholder="Nhập nội dung hoạt động"
@@ -546,7 +567,7 @@ export function ActivityComposer({
       {showsDueAt || activityType === 'decision' || needsReference ? (
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {showsDueAt ? (
-            <label className="block">
+            <label data-validation-key="due_at" data-validation-error={missingDueAt ? 'true' : undefined} className="block scroll-mt-24 rounded-md">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{activityType === 'reminder' ? 'Ngày nhắc' : 'Hạn điểm chặn'}</span>
               <input
                 className={clsx(
@@ -554,6 +575,7 @@ export function ActivityComposer({
                   missingDueAt ? 'border-amber-300 bg-amber-50' : 'border-line',
                 )}
                 type="date"
+                aria-invalid={missingDueAt}
                 value={dueAt}
                 onChange={(event) => setDueAt(event.target.value)}
               />
@@ -573,7 +595,7 @@ export function ActivityComposer({
             </label>
           ) : null}
           {needsReference ? (
-            <div className={clsx('rounded-md border bg-white p-2 sm:col-span-2', missingReference ? 'border-amber-300 bg-amber-50' : 'border-line')}>
+            <div data-validation-key="reference" data-validation-error={missingReference ? 'true' : undefined} className={clsx('scroll-mt-24 rounded-md border bg-white p-2 sm:col-span-2', missingReference ? 'border-amber-300 bg-amber-50' : 'border-line')}>
               <div className="grid gap-2 sm:grid-cols-[140px_minmax(0,1fr)_auto]">
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Tệp đính kèm</span>
@@ -641,7 +663,7 @@ export function ActivityComposer({
         </div>
       ) : null}
 
-      <div className="mt-2 rounded-md border border-line bg-white p-2">
+      <div data-validation-key="mention" className="mt-2 scroll-mt-24 rounded-md border border-line bg-white p-2">
         <div className="grid gap-2 sm:grid-cols-[140px_minmax(0,1fr)_auto]">
           <label className="block">
             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Nhắc đến</span>

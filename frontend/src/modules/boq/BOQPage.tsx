@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, DollarSign, Eye, History, Loader2, Lock, Plus, Send, ShoppingCart, ThumbsUp } from 'lucide-react';
@@ -17,6 +17,7 @@ import { Dialog } from '../../components/Dialog';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { currency } from '../../lib/utils/format';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { SupplierQuotationWorkspace } from './SupplierQuotationWorkspace';
 import { useAuth } from '../../lib/auth/AuthContext';
 import {
@@ -52,6 +53,8 @@ export function BOQPage() {
   const [generated, setGenerated] = useState<BOQProcurementResult | null>(null);
   const [priceDialog, setPriceDialog] = useState<BOQItem | null>(null);
   const [priceForm, setPriceForm] = useState<PriceFormState>({ expected: '', norm: '', final: '', comment: '' });
+  const [priceValidationRequest, setPriceValidationRequest] = useState<{ key: string; requestId: number } | null>(null);
+  const priceValidationSequence = useRef(0);
   const queryClient = useQueryClient();
   const toast = useToast();
   const boq = useQuery({ queryKey: ['boq', id], queryFn: () => get<BOQItem[]>(`/projects/${id}/boq`), enabled: Boolean(id) });
@@ -87,6 +90,7 @@ export function BOQPage() {
   useEffect(() => {
     if (!priceDialog) {
       setPriceForm({ expected: '', norm: '', final: '', comment: '' });
+      setPriceValidationRequest(null);
       return;
     }
     setPriceForm({
@@ -221,10 +225,14 @@ export function BOQPage() {
     const unitPrice = Number(raw);
     if (!Number.isFinite(unitPrice) || unitPrice < 0 || (action !== 'expected' && unitPrice <= 0)) {
       toast.warn({ title: 'Đơn giá không hợp lệ', description: action === 'expected' ? 'Đơn giá dự kiến phải lớn hơn hoặc bằng 0.' : 'Giá khóa phải lớn hơn 0.' });
+      priceValidationSequence.current += 1;
+      setPriceValidationRequest({ key: action, requestId: priceValidationSequence.current });
       return;
     }
     if (action === 'final' && !priceForm.comment.trim()) {
       toast.warn({ title: 'Thiếu lý do miễn báo giá', description: 'Khóa giá cuối thủ công chỉ dùng khi có lý do miễn so sánh báo giá.' });
+      priceValidationSequence.current += 1;
+      setPriceValidationRequest({ key: 'comment', requestId: priceValidationSequence.current });
       return;
     }
     const payload = { itemId: priceDialog.id, unitPrice, comment: priceForm.comment };
@@ -349,8 +357,12 @@ export function BOQPage() {
       <UnitPriceLifecycleDialog
         item={priceDialog}
         form={priceForm}
+        validationRequest={priceValidationRequest}
         pending={pendingPriceAction}
-        onChange={setPriceForm}
+        onChange={(nextForm) => {
+          setPriceForm(nextForm);
+          setPriceValidationRequest(null);
+        }}
         onClose={() => setPriceDialog(null)}
         onSubmit={submitPriceAction}
         canUpdate={hasPermission('boq.update')}
@@ -527,6 +539,7 @@ function PriceStatusChip({ item }: { item: BOQItem }) {
 function UnitPriceLifecycleDialog({
   item,
   form,
+  validationRequest,
   pending,
   onChange,
   onClose,
@@ -536,6 +549,7 @@ function UnitPriceLifecycleDialog({
 }: {
   item: BOQItem | null;
   form: PriceFormState;
+  validationRequest: { key: string; requestId: number } | null;
   pending: boolean;
   onChange: (form: PriceFormState) => void;
   onClose: () => void;
@@ -543,6 +557,13 @@ function UnitPriceLifecycleDialog({
   canUpdate: boolean;
   canApprove: boolean;
 }) {
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const navigateValidation = useValidationNavigation(contentRef);
+
+  useEffect(() => {
+    if (item && validationRequest) navigateValidation(validationRequest.key);
+  }, [item, navigateValidation, validationRequest]);
+
   if (!item) return null;
   const setField = (field: keyof PriceFormState, value: string) => onChange({ ...form, [field]: value });
   const nextAction = unitPriceNextAction(item);
@@ -560,6 +581,7 @@ function UnitPriceLifecycleDialog({
         </div>
       }
     >
+      <div ref={contentRef}>
       <div className={clsx('mb-4 rounded-md border p-3', item.final_price_locked ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50')}>
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
@@ -572,6 +594,8 @@ function UnitPriceLifecycleDialog({
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-3">
           <PriceStagePanel
+            validationKey="expected"
+            invalid={validationRequest?.key === 'expected'}
             title="Đơn giá dự kiến"
             description="Giá QS dự kiến, chỉ sửa trước khi khóa định mức hoặc giá cuối."
             value={form.expected}
@@ -581,6 +605,8 @@ function UnitPriceLifecycleDialog({
             onSubmit={() => onSubmit('expected')}
           />
           <PriceStagePanel
+            validationKey="norm"
+            invalid={validationRequest?.key === 'norm'}
             title="Đơn giá định mức"
             description="Chốt định mức nội bộ. Sau khi khóa, đơn giá dự kiến không còn được sửa."
             value={form.norm}
@@ -590,6 +616,8 @@ function UnitPriceLifecycleDialog({
             onSubmit={() => onSubmit('norm')}
           />
           {item.status === 'approved' ? <PriceStagePanel
+            validationKey="final"
+            invalid={validationRequest?.key === 'final'}
             title="Đơn giá cuối"
             description="Ưu tiên chọn tại bảng so sánh báo giá. Khóa thủ công cần ghi rõ lý do miễn báo giá."
             value={form.final}
@@ -598,15 +626,17 @@ function UnitPriceLifecycleDialog({
             onValueChange={(value) => setField('final', value)}
             onSubmit={() => onSubmit('final')}
           /> : null}
-          <label className="block">
+          <label className="block" data-validation-key="comment" data-validation-error={validationRequest?.key === 'comment' ? 'true' : undefined}>
             <span className="text-sm font-semibold text-slate-700">Ghi chú</span>
             <textarea
               className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
               rows={3}
+              name="comment"
               value={form.comment}
               disabled={pending}
               onChange={(event) => setField('comment', event.target.value)}
               placeholder="Ghi chú lý do cập nhật hoặc khóa giá"
+              aria-invalid={validationRequest?.key === 'comment'}
             />
           </label>
         </div>
@@ -626,11 +656,14 @@ function UnitPriceLifecycleDialog({
           )}
         </div>
       </div>
+      </div>
     </Dialog>
   );
 }
 
 function PriceStagePanel({
+  validationKey,
+  invalid,
   title,
   description,
   value,
@@ -639,6 +672,8 @@ function PriceStagePanel({
   onValueChange,
   onSubmit,
 }: {
+  validationKey: PriceAction;
+  invalid: boolean;
   title: string;
   description: string;
   value: string;
@@ -648,7 +683,7 @@ function PriceStagePanel({
   onSubmit: () => void;
 }) {
   return (
-    <div className="rounded-md border border-line bg-white p-3">
+    <div className="rounded-md border border-line bg-white p-3" data-validation-key={validationKey} data-validation-error={invalid ? 'true' : undefined}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink">{title}</h3>
@@ -665,11 +700,13 @@ function PriceStagePanel({
         </button>
       </div>
       <CurrencyInput
+        name={validationKey}
         className="mt-3"
         inputClassName="text-sm"
         min={0}
         value={value}
         disabled={disabled}
+        invalid={invalid}
         onValueChange={({ numericString }) => onValueChange(numericString)}
       />
     </div>

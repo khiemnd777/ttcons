@@ -9,6 +9,7 @@ import {
   evidenceSupportedFileHint,
   type EvidenceFileKind,
 } from './evidenceFileTypes';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 export const constructionEvidenceMaxBytes = 10 * 1024 * 1024;
 
@@ -39,6 +40,8 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fallbackCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const captureRef = useRef<HTMLDivElement | null>(null);
+  const navigateValidation = useValidationNavigation(captureRef);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [localPreview, setLocalPreview] = useState<{ draft: ConstructionEvidenceUploadDraft; previewURL: string } | null>(null);
 
@@ -48,10 +51,12 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
       const classification = classifyEvidenceFile(file);
       if (!classification) {
         toast.warn({ title: 'Tệp không được hỗ trợ', description: `${file.name}: chỉ nhận ${evidenceSupportedFileHint}.` });
+        navigateValidation('evidence_files');
         return;
       }
       if (file.size <= 0 || file.size > constructionEvidenceMaxBytes) {
         toast.warn({ title: 'Dung lượng tệp không hợp lệ', description: `${file.name}: tối đa ${formatEvidenceFileSize(constructionEvidenceMaxBytes)}.` });
+        navigateValidation('evidence_files');
         return;
       }
       valid.push({ id: newDraftID(), file, evidenceType: classification.evidenceType, fileKind: classification.kind, name: file.name, caption: '' });
@@ -59,6 +64,7 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
     const available = maxFiles === undefined ? valid.length : Math.max(0, maxFiles - drafts.length);
     if (valid.length > available) {
       toast.warn({ title: 'Đã đạt giới hạn minh chứng', description: `Mỗi nhóm được đính kèm tối đa ${maxFiles} ảnh hoặc tệp.` });
+      navigateValidation('evidence_files');
     }
     if (available > 0) onChange([...drafts, ...valid.slice(0, available)]);
   }
@@ -76,7 +82,7 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disab
   }
 
   return (
-    <div className="rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4">
+    <div ref={captureRef} className="rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4" data-validation-key="evidence_files">
       <input ref={fileInputRef} type="file" multiple accept={evidenceFileAccept} className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
       <input ref={fallbackCameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -6,6 +6,8 @@ import { Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 import { z } from 'zod';
 import { post } from '../../lib/api/client';
+import { useToast } from '../../components/ToastProvider';
+import { firstInvalidFieldKey, useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { AuthCard } from './AuthCard';
 
 const schema = z.object({ email: z.string().trim().email('Email đăng nhập không hợp lệ') });
@@ -13,6 +15,9 @@ type Values = z.infer<typeof schema>;
 
 export function ForgotPasswordPage() {
   const [submitted, setSubmitted] = useState(false);
+  const toast = useToast();
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const navigateToValidation = useValidationNavigation(formRef);
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { email: '' } });
   const requestReset = useMutation({
     mutationFn: (values: Values) => post<{ accepted: boolean; message: string }>('/auth/password/forgot', { email: values.email.trim().toLowerCase() }),
@@ -31,11 +36,14 @@ export function ForgotPasswordPage() {
           </button>
         </div>
       ) : (
-        <form className="space-y-4" onSubmit={form.handleSubmit((values) => requestReset.mutate(values))} noValidate>
-          <label className="block text-sm font-semibold text-slate-700">
+        <form ref={formRef} className="space-y-4" onSubmit={form.handleSubmit((values) => requestReset.mutate(values), (errors) => {
+          toast.warn({ title: 'Vui lòng kiểm tra thông tin', description: 'Email đăng nhập chưa hợp lệ.' });
+          navigateToValidation(firstInvalidFieldKey(errors, ['email']));
+        })} noValidate>
+          <label data-validation-key="email" className="block scroll-mt-24 rounded-md text-sm font-semibold text-slate-700">
             Email đăng nhập <span className="text-rose-600">*</span>
-            <input type="email" autoComplete="username" className={`mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring ${form.formState.errors.email ? 'border-rose-400 bg-rose-50' : 'border-line'}`} {...form.register('email')} />
-            {form.formState.errors.email ? <span className="mt-1 block text-xs font-medium text-rose-600">{form.formState.errors.email.message}</span> : null}
+            <input type="email" autoComplete="username" aria-invalid={Boolean(form.formState.errors.email)} aria-describedby={form.formState.errors.email ? 'forgot-email-error' : undefined} className={`mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring ${form.formState.errors.email ? 'border-rose-400 bg-rose-50' : 'border-line'}`} {...form.register('email')} />
+            {form.formState.errors.email ? <span id="forgot-email-error" role="alert" className="mt-1 block text-xs font-medium text-rose-600">{form.formState.errors.email.message}</span> : null}
           </label>
           <button disabled={requestReset.isPending} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
             <Mail className="h-4 w-4" />

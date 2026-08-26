@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Plus, Search, ShieldCheck, Upload } from 'lucide-react';
@@ -24,6 +24,7 @@ import type { StaffImportResult } from './staffImportTypes';
 import { StaffDeleteDialog, type StaffDeletionResult } from './StaffDeleteDialog';
 import { BulkSelectionBar } from '../../components/BulkSelectionBar';
 import { SampleDataBadge } from '../../components/SampleDataBadge';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 type StaffRole = {
   id: string;
@@ -472,6 +473,8 @@ function StaffRoleDialog({
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'selected'>('all');
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const dialogContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateValidation = useValidationNavigation(dialogContentRef);
   const assignableRoleIDs = useMemo(() => new Set(roles.map((role) => role.id)), [roles]);
 
   useEffect(() => {
@@ -523,6 +526,7 @@ function StaffRoleDialog({
       if (missingProject && missingRoles) onWarn('Chọn công trình và ít nhất một vai trò trước khi lưu');
       else if (missingProject) onWarn('Chọn công trình trước khi lưu vai trò theo công trình');
       else onWarn('Chọn ít nhất một vai trò cho nhân sự');
+      navigateValidation(missingProject ? 'project_id' : 'role_ids');
       return;
     }
     void onSave(Array.from(selected), scope === 'project' ? projectID : '');
@@ -547,7 +551,7 @@ function StaffRoleDialog({
         </div>
       }
     >
-      <div className="space-y-5">
+      <div ref={dialogContentRef} className="space-y-5">
         <fieldset>
           <legend className="text-sm font-semibold text-slate-700">Phạm vi áp dụng</legend>
           <div className="mt-2 grid grid-cols-2 rounded-md border border-line bg-slate-50 p-1">
@@ -570,10 +574,11 @@ function StaffRoleDialog({
           {scope === 'global' ? (
             <p className="mt-2 text-xs leading-5 text-slate-500">Vai trò có hiệu lực toàn hệ thống; quyền vào từng công trình vẫn phụ thuộc phạm vi được cấp.</p>
           ) : (
-            <div className="mt-3">
+            <div className="mt-3" data-validation-key="project_id" data-validation-error={projectMissing ? 'true' : undefined}>
               <label className="block">
                 <span className="text-sm font-semibold text-slate-700">Công trình <span className="text-rose-600">*</span></span>
                 <select
+                  name="project_id"
                   className={`mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring disabled:bg-slate-100 disabled:text-slate-500 ${projectMissing ? 'border-rose-400 bg-rose-50' : 'border-line'}`}
                   value={projectID}
                   onChange={(event) => setProjectID(event.target.value)}
@@ -634,7 +639,7 @@ function StaffRoleDialog({
             </div>
           </div>
 
-          <div className={`mt-3 overflow-hidden rounded-lg border ${rolesMissing ? 'border-rose-400 ring-1 ring-rose-100' : 'border-line'}`}>
+          <div className={`mt-3 overflow-hidden rounded-lg border ${rolesMissing ? 'border-rose-400 ring-1 ring-rose-100' : 'border-line'}`} data-validation-key="role_ids" data-validation-error={rolesMissing ? 'true' : undefined}>
             <div className="max-h-[42vh] overflow-auto">
               <table className="min-w-full border-separate border-spacing-0">
                 <thead className="sticky top-0 z-10 bg-slate-50">

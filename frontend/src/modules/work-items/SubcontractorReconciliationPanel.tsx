@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, RefreshCw, Save, Send } from 'lucide-react';
 import clsx from 'clsx';
@@ -11,6 +11,7 @@ import { get, post, put } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
 import type { BOQItem, SubcontractorReconciliationItem, SubcontractorReconciliationResponse } from '../../lib/types/domain';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 type RowDraft = {
   item_index: number;
@@ -52,6 +53,9 @@ export function SubcontractorReconciliationPanel({
   const toast = useToast();
   const [comment, setComment] = useState('');
   const [rows, setRows] = useState<RowDraft[]>([]);
+  const [invalidKey, setInvalidKey] = useState('');
+  const panelRef = useRef<HTMLElement | null>(null);
+  const navigateValidation = useValidationNavigation(panelRef);
 
   const reconciliation = useQuery({
     queryKey: ['subcontractor-reconciliation', workItemId],
@@ -105,6 +109,15 @@ export function SubcontractorReconciliationPanel({
     });
     if (invalid.length) {
       toast.warn({ title: 'Dữ liệu đối soát chưa hợp lệ', description: invalid.join(', ') });
+      const invalidRow = sourceRows.find((row) => {
+        const confirmedText = row.confirmed_quantity.trim();
+        const confirmedQuantity = confirmedText === '' ? null : Number(confirmedText);
+        return (confirmedQuantity !== null && (!Number.isFinite(confirmedQuantity) || confirmedQuantity < 0))
+          || (row.decision === 'adjust_quantity' && confirmedQuantity === null);
+      });
+      const key = invalidRow ? `items.${invalidRow.item_index}.confirmed_quantity` : '';
+      setInvalidKey(key);
+      navigateValidation(key);
       return null;
     }
     return { comment: comment.trim(), items: payloadRows };
@@ -192,7 +205,7 @@ export function SubcontractorReconciliationPanel({
   if (!record) return null;
 
   return (
-    <section>
+    <section ref={panelRef}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-ink">Đối soát thầu phụ</h3>
@@ -240,8 +253,12 @@ export function SubcontractorReconciliationPanel({
                 item={item}
                 draft={rowsByIndex.get(item.item_index) ?? rowDraftFromItem(item)}
                 boqItems={boqItems}
+                invalid={invalidKey === `items.${item.item_index}.confirmed_quantity`}
                 disabled={locked || pending}
-                onChange={(patch) => updateRow(item.item_index, patch)}
+                onChange={(patch) => {
+                  updateRow(item.item_index, patch);
+                  if (patch.confirmed_quantity !== undefined) setInvalidKey('');
+                }}
               />
             ))}
           </div>
@@ -282,12 +299,14 @@ function ReconciliationItemRow({
   item,
   draft,
   boqItems,
+  invalid,
   disabled,
   onChange,
 }: {
   item: SubcontractorReconciliationItem;
   draft: RowDraft;
   boqItems: BOQItem[];
+  invalid: boolean;
   disabled: boolean;
   onChange: (patch: Partial<RowDraft>) => void;
 }) {
@@ -337,16 +356,18 @@ function ReconciliationItemRow({
 
       <div className="grid grid-cols-3 gap-2 lg:block lg:space-y-2">
         <QuantityMetric label="Yêu cầu" value={item.claimed_quantity} unit={item.unit} />
-        <label className="block">
+        <label className="block" data-validation-key={`items.${item.item_index}.confirmed_quantity`} data-validation-error={invalid ? 'true' : undefined}>
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Xác nhận</span>
           <input
-            className="mt-1 h-9 w-full rounded-md border border-line px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+            className={clsx('mt-1 h-9 w-full rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', invalid ? 'border-rose-300 bg-rose-50' : 'border-line')}
+            name={`items.${item.item_index}.confirmed_quantity`}
             type="number"
             min="0"
             step="0.001"
             value={draft.confirmed_quantity}
             onChange={(event) => onChange({ confirmed_quantity: event.target.value })}
             disabled={disabled}
+            aria-invalid={invalid}
           />
         </label>
         <QuantityMetric label="Chênh" value={variance} unit={item.unit} signed />

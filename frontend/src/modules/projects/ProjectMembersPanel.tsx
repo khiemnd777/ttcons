@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -24,6 +24,7 @@ import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { RowActions } from '../../components/RowActions';
 import { useToast } from '../../components/ToastProvider';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 
 type MemberDialog =
@@ -355,6 +356,8 @@ function ProjectMemberFormDialog({ open, member, data, saving, onClose, onSave, 
   const [projectRoleIDs, setProjectRoleIDs] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const dialogContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateValidation = useValidationNavigation(dialogContentRef);
 
   useEffect(() => {
     if (!open) return;
@@ -396,6 +399,7 @@ function ProjectMemberFormDialog({ open, member, data, saving, onClose, onSave, 
     if (!accessReady) problems.push('chọn role có quyền project.view hoặc dùng nhân sự đã có role toàn hệ thống phù hợp');
     if (problems.length) {
       onWarn(`Cần ${problems.join('; ')}.`);
+      navigateValidation(!staffID ? 'staff_id' : !roleIDs.length ? 'role_ids' : 'project_role_ids');
       return;
     }
     void onSave({ staff_id: staffID, role_ids: roleIDs, project_role_ids: projectRoleIDs, notes });
@@ -415,9 +419,9 @@ function ProjectMemberFormDialog({ open, member, data, saving, onClose, onSave, 
         </div>
       )}
     >
-      <div className="space-y-5">
-        <Field label="Nhân sự" required invalid={submitted && !staffID}>
-          <select className={fieldClass(submitted && !staffID)} value={staffID} disabled={Boolean(member)} onChange={(event) => selectStaff(event.target.value)}>
+      <div ref={dialogContentRef} className="space-y-5">
+        <Field fieldKey="staff_id" label="Nhân sự" required invalid={submitted && !staffID}>
+          <select name="staff_id" className={fieldClass(submitted && !staffID)} value={staffID} disabled={Boolean(member)} aria-invalid={submitted && !staffID} onChange={(event) => selectStaff(event.target.value)}>
             <option value="">Chọn nhân sự đang hoạt động</option>
             {staffOptions.map((option) => (
               <option key={option.id} value={option.id} disabled={Boolean(option.member_active && option.id !== member?.staff_id)}>
@@ -427,13 +431,13 @@ function ProjectMemberFormDialog({ open, member, data, saving, onClose, onSave, 
           </select>
         </Field>
 
-        <Field label="Vai trò vận hành tại công trình" required invalid={submitted && !roleIDs.length}>
+        <Field fieldKey="role_ids" label="Vai trò vận hành tại công trình" required invalid={submitted && !roleIDs.length}>
           <div className={clsx('grid gap-2 rounded-md border p-3 sm:grid-cols-2 lg:grid-cols-3', submitted && !roleIDs.length ? 'border-rose-300 bg-rose-50/40' : 'border-line')}>
             {roleLabels.map((label) => <CheckOption key={label} label={label} checked={roleIDs.includes(label)} onChange={() => setRoleIDs(toggleValue(roleIDs, label))} />)}
           </div>
         </Field>
 
-        <Field label="Role phân quyền riêng trong công trình" invalid={submitted && !accessReady}>
+        <Field fieldKey="project_role_ids" label="Role phân quyền riêng trong công trình" invalid={submitted && !accessReady}>
           <div className={clsx('grid gap-2 rounded-md border p-3 sm:grid-cols-2', submitted && !accessReady ? 'border-rose-300 bg-rose-50/40' : 'border-line')}>
             {accessRoles.map((accessRole) => <CheckOption key={accessRole.id} label={accessRole.display_name} description={accessRole.description} checked={projectRoleIDs.includes(accessRole.id)} onChange={() => setProjectRoleIDs(toggleValue(projectRoleIDs, accessRole.id))} />)}
           </div>
@@ -453,8 +457,8 @@ function ProjectMemberFormDialog({ open, member, data, saving, onClose, onSave, 
   );
 }
 
-function Field({ label, required, invalid, children }: { label: string; required?: boolean; invalid?: boolean; children: React.ReactNode }) {
-  return <div><p className={clsx('mb-2 text-sm font-semibold', invalid ? 'text-rose-700' : 'text-slate-700')}>{label}{required ? <span className="ml-1 text-rose-600">*</span> : null}</p>{children}</div>;
+function Field({ fieldKey, label, required, invalid, children }: { fieldKey?: string; label: string; required?: boolean; invalid?: boolean; children: React.ReactNode }) {
+  return <div data-validation-key={fieldKey} data-validation-error={invalid ? 'true' : undefined}><p className={clsx('mb-2 text-sm font-semibold', invalid ? 'text-rose-700' : 'text-slate-700')}>{label}{required ? <span className="ml-1 text-rose-600">*</span> : null}</p>{children}</div>;
 }
 
 function CheckOption({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: () => void }) {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -19,6 +19,7 @@ import { autoLayoutPosition, nextNodePosition } from './components/diagram/diagr
 import type { DiagramEditingMode, NodePosition } from './components/diagram/diagramTypes';
 import { WorkflowDefinitionImportDialog } from '../workflow-definitions/WorkflowDefinitionImportDialog';
 import { WorkflowDefinitionExportDialog } from '../workflow-definitions/WorkflowDefinitionExportDialog';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import {
   buildCreateEdgePayload,
   buildUpdateEdgeLayoutPayload,
@@ -83,11 +84,15 @@ export function PipelineBuilderPage() {
   const [stepDialog, setStepDialog] = useState<{ mode: 'add' | 'edit' | 'view'; step?: Record<string, any> } | null>(null);
   const [stepForm, setStepForm] = useState<StepForm>({ business_code: '', name: '', step_type: 'task', required_role_ids: ['PM'], form_required: true, form_version_id: '' });
   const [stepSubmitAttempted, setStepSubmitAttempted] = useState(false);
+  const [stepValidationRequestId, setStepValidationRequestId] = useState(0);
   const [nodeForm, setNodeForm] = useState<Record<string, any>>({});
   const [edgeForm, setEdgeForm] = useState<EdgeForm>({ label: '', condition_type: 'always', priority: '100', condition_config: {} });
   const [edgeSubmitAttempted, setEdgeSubmitAttempted] = useState(false);
+  const [edgeValidationRequestId, setEdgeValidationRequestId] = useState(0);
   const [definitionImportOpen, setDefinitionImportOpen] = useState(false);
   const [definitionExportOpen, setDefinitionExportOpen] = useState(false);
+  const renameDialogContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateRenameValidation = useValidationNavigation(renameDialogContentRef);
 
   const templates = useQuery({ queryKey: ['pipeline-templates'], queryFn: () => get<PipelineTemplate[]>('/pipeline-templates') });
   const template = useQuery({
@@ -753,6 +758,7 @@ export function PipelineBuilderPage() {
         title: 'Thiếu thông tin checklist',
         description: invalidFields.join(', '),
       });
+      setStepValidationRequestId((current) => current + 1);
       return;
     }
     if (stepDialog?.mode === 'edit') {
@@ -779,6 +785,7 @@ export function PipelineBuilderPage() {
         title: 'Thiếu hoặc sai cấu hình connector',
         description: invalidLabels.join(', '),
       });
+      setEdgeValidationRequestId((current) => current + 1);
       return;
     }
 
@@ -851,6 +858,7 @@ export function PipelineBuilderPage() {
         title: 'Thiếu tên template',
         description: 'Vui lòng nhập tên template',
       });
+      navigateRenameValidation('template_name');
       return;
     }
     updateTemplateName.mutate();
@@ -986,7 +994,11 @@ export function PipelineBuilderPage() {
               stepNameInvalid={stepSubmitAttempted && !stepForm.name.trim()}
               stepCodeInvalid={stepSubmitAttempted && Number(template.data?.engine_version ?? 1) >= 3 && !validBusinessCode(stepForm.business_code)}
               stepRolesInvalid={stepSubmitAttempted && !normalizeRoleIds(stepForm.required_role_ids).length}
-              stepFormInvalid={stepSubmitAttempted && stepForm.form_required && !stepForm.form_version_id}
+              stepFormInvalid={stepSubmitAttempted && (
+                (stepForm.form_required && !stepForm.form_version_id)
+                || Boolean(stepForm.form_version_id && workflowFormVersionIds.size > 0 && !workflowFormVersionIds.has(stepForm.form_version_id))
+              )}
+              stepValidationRequestId={stepValidationRequestId}
               savePending={saveNode.isPending}
               addStepPending={addStep.isPending}
               updateStepPending={updateStep.isPending}
@@ -1037,8 +1049,10 @@ export function PipelineBuilderPage() {
               conditionLoadError={edgeConditions.isError}
               edgeForm={edgeForm}
               conditionInvalid={edgeSubmitAttempted && (!edgeForm.condition_type || !edgeConditionTypes.has(edgeForm.condition_type))}
+              labelInvalid={edgeSubmitAttempted && edgeForm.label.trim().length > 80}
               priorityInvalid={edgeSubmitAttempted && !validEdgePriority(edgeForm.priority)}
               configInvalidKeys={edgeSubmitAttempted ? invalidEdgeConfigKeys : []}
+              validationRequestId={edgeValidationRequestId}
               answerFieldOptions={answerFieldOptions}
               answerValueOptionsByFieldKey={answerValueOptionsByFieldKey}
               savePending={saveEdgeSettings.isPending}
@@ -1129,11 +1143,13 @@ export function PipelineBuilderPage() {
           </div>
         }
       >
+        <div ref={renameDialogContentRef} data-validation-key="template_name" data-validation-error={templateNameSubmitAttempted && !templateNameForm.trim() ? 'true' : undefined}>
         <label className="block text-sm font-semibold text-ink" htmlFor="template-name">
           Tên template *
         </label>
         <input
           id="template-name"
+          name="template_name"
           className={clsx(
             'mt-2 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100',
             templateNameSubmitAttempted && !templateNameForm.trim() ? 'border-rose-300 bg-rose-50' : 'border-line',
@@ -1141,10 +1157,13 @@ export function PipelineBuilderPage() {
           value={templateNameForm}
           onChange={(event) => setTemplateNameForm(event.target.value)}
           autoFocus
+          aria-invalid={templateNameSubmitAttempted && !templateNameForm.trim()}
+          aria-describedby={templateNameSubmitAttempted && !templateNameForm.trim() ? 'template-name-error' : undefined}
         />
         {templateNameSubmitAttempted && !templateNameForm.trim() ? (
-          <p className="mt-2 text-sm font-medium text-rose-700">Vui lòng nhập tên template.</p>
+          <p id="template-name-error" role="alert" className="mt-2 text-sm font-medium text-rose-700">Vui lòng nhập tên template.</p>
         ) : null}
+        </div>
       </Dialog>
 
       <Dialog

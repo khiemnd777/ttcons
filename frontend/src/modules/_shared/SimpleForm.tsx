@@ -1,9 +1,10 @@
-import { FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { FormEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { ChevronDown, X } from 'lucide-react';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { PasswordInput } from '../../components/PasswordInput';
 import { useToast } from '../../components/ToastProvider';
+import { firstInvalidFieldKey, useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 type FieldType = 'text' | 'email' | 'password' | 'number' | 'currency' | 'date' | 'textarea' | 'select' | 'multi-select' | 'checkbox';
 type FieldOption = { label: string; value: string };
@@ -86,6 +87,9 @@ export function SimpleForm({
   onCancel?: () => void;
 }) {
   const toast = useToast();
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const formId = useId().replace(/:/g, '');
+  const navigateToValidation = useValidationNavigation(formRef);
   const initialValues = useMemo(() => Object.fromEntries(fields.map((field) => [field.name, fieldInitialValue(field)])), [fields]);
   const [values, setValues] = useState<Record<string, any>>(initialValues);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -143,6 +147,8 @@ export function SimpleForm({
       <div className={clsx('grid gap-4', layout === 'two-column' ? 'md:grid-cols-2' : 'grid-cols-1')}>
         {sectionFields.map((field) => {
           const error = errors[field.name];
+          const inputId = `${formId}-${field.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+          const errorId = `${inputId}-error`;
           const disabled = saving || Boolean(field.disabledWhen?.(values));
           const controlClassName = clsx(
             'w-full rounded-md border px-3 py-2 text-sm focus-ring',
@@ -151,20 +157,29 @@ export function SimpleForm({
           );
 
           return (
-            <label key={field.name} className={clsx('block', layout === 'two-column' && (field.fullWidth || field.type === 'textarea') && 'md:col-span-2')}>
+            <label
+              key={field.name}
+              data-validation-key={field.name}
+              className={clsx('block scroll-mt-24 rounded-md outline-none', layout === 'two-column' && (field.fullWidth || field.type === 'textarea') && 'md:col-span-2')}
+            >
               <span className="text-sm font-semibold text-slate-700">{field.label}</span>
               {field.required ? <span className="ml-1 text-rose-600">*</span> : null}
               {field.type === 'textarea' ? (
                 <textarea
+                  id={inputId}
+                  name={field.name}
                   className={clsx(controlClassName, 'mt-1 min-h-24')}
                   placeholder={field.placeholder}
                   value={values[field.name] ?? ''}
                   onChange={(event) => setFieldValue(field, event.target.value)}
                   aria-invalid={Boolean(error)}
+                  aria-describedby={error ? errorId : undefined}
                   disabled={disabled}
                 />
               ) : field.type === 'currency' ? (
                 <CurrencyInput
+                  id={inputId}
+                  name={field.name}
                   className="mt-1"
                   inputClassName="text-sm focus-ring"
                   value={values[field.name] ?? ''}
@@ -175,15 +190,19 @@ export function SimpleForm({
                   max={field.max}
                   placeholder={field.placeholder}
                   invalid={Boolean(error)}
+                  aria-describedby={error ? errorId : undefined}
                   disabled={disabled}
                   onValueChange={({ numericString }) => setFieldValue(field, numericString)}
                 />
               ) : field.type === 'select' ? (
                 <select
+                  id={inputId}
+                  name={field.name}
                   className={clsx(controlClassName, 'mt-1')}
                   value={values[field.name] ?? ''}
                   onChange={(event) => setFieldValue(field, event.target.value)}
                   aria-invalid={Boolean(error)}
+                  aria-describedby={error ? errorId : undefined}
                   disabled={disabled}
                 >
                   <option value="">{field.placeholder ?? 'Chọn'}</option>
@@ -195,6 +214,9 @@ export function SimpleForm({
                 </select>
               ) : field.type === 'multi-select' ? (
                 <MultiSelectControl
+                  inputId={inputId}
+                  name={field.name}
+                  describedBy={error ? errorId : undefined}
                   value={Array.isArray(values[field.name]) ? values[field.name] : []}
                   options={field.options ?? []}
                   placeholder={field.placeholder ?? 'Gõ để tìm'}
@@ -205,11 +227,14 @@ export function SimpleForm({
               ) : field.type === 'checkbox' ? (
                 <span className="mt-2 flex items-center gap-2">
                   <input
+                    id={inputId}
+                    name={field.name}
                     type="checkbox"
                     className={clsx('h-4 w-4 rounded', error ? 'border-rose-300 bg-rose-50' : 'border-line', disabled && 'cursor-not-allowed opacity-60')}
                     checked={Boolean(values[field.name])}
                     onChange={(event) => setFieldValue(field, event.target.checked)}
                     aria-invalid={Boolean(error)}
+                    aria-describedby={error ? errorId : undefined}
                     disabled={disabled}
                   />
                   {field.helperText ? <span className="text-xs text-slate-500">{field.helperText}</span> : null}
@@ -217,12 +242,15 @@ export function SimpleForm({
               ) : field.type === 'password' ? (
                 <span className="mt-1 block">
                   <PasswordInput
+                    id={inputId}
+                    name={field.name}
                     autoComplete="new-password"
                     className={controlClassName}
                     placeholder={field.placeholder}
                     value={values[field.name] ?? ''}
                     onChange={(event) => setFieldValue(field, event.target.value)}
                     invalid={Boolean(error)}
+                    aria-describedby={error ? errorId : undefined}
                     disabled={disabled}
                     onSuggest={field.suggestValue ? () => setFieldValue(field, field.suggestValue?.() ?? '') : undefined}
                     suggestLabel={field.suggestLabel}
@@ -230,17 +258,20 @@ export function SimpleForm({
                 </span>
               ) : (
                 <input
+                  id={inputId}
+                  name={field.name}
                   type={field.type ?? 'text'}
                   className={clsx(controlClassName, 'mt-1')}
                   placeholder={field.placeholder}
                   value={values[field.name] ?? ''}
                   onChange={(event) => setFieldValue(field, event.target.value)}
                   aria-invalid={Boolean(error)}
+                  aria-describedby={error ? errorId : undefined}
                   disabled={disabled}
                 />
               )}
               {field.type !== 'checkbox' && field.helperText ? <p className="mt-1 text-xs text-slate-500">{field.helperText}</p> : null}
-              {error ? <p className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}
+              {error ? <p id={errorId} role="alert" className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}
             </label>
           );
         })}
@@ -258,6 +289,7 @@ export function SimpleForm({
         title: 'Kiểm tra dữ liệu',
         description: `Thiếu hoặc sai: ${labels.join(', ')}`,
       });
+      navigateToValidation(firstInvalidFieldKey(nextErrors, visibleFields.map((field) => field.name)));
       return;
     }
     setSaving(true);
@@ -273,7 +305,7 @@ export function SimpleForm({
   }
 
   return (
-    <form className="space-y-4" noValidate onSubmit={handleSubmit}>
+    <form ref={formRef} className="space-y-4" noValidate onSubmit={handleSubmit}>
       <div className={clsx(renderAside && 'grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]')}>
         <div className="space-y-4">
           {sections?.length ? sections.map((section) => {
@@ -318,6 +350,9 @@ export function SimpleForm({
 }
 
 function MultiSelectControl({
+  inputId,
+  name,
+  describedBy,
   value,
   options,
   placeholder,
@@ -325,6 +360,9 @@ function MultiSelectControl({
   invalid,
   onChange,
 }: {
+  inputId: string;
+  name: string;
+  describedBy?: string;
   value: string[];
   options: FieldOption[];
   placeholder: string;
@@ -377,6 +415,10 @@ function MultiSelectControl({
       >
         <div className="flex overflow-hidden rounded-md border border-line bg-white focus-within:ring-2 focus-within:ring-blue-100">
           <input
+            id={inputId}
+            name={name}
+            aria-invalid={invalid || undefined}
+            aria-describedby={describedBy}
             className="min-w-0 flex-1 px-3 py-2 text-sm outline-none disabled:bg-slate-100"
             value={query}
             disabled={disabled || availableOptions.length === 0}

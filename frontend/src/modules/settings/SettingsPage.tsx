@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, Database, KeyRound, Loader2, LockKeyhole, Plus, RefreshCw, RotateCcw, Save, Settings2, Stamp, Upload } from 'lucide-react';
 import { DataTable } from '../../components/DataTable';
@@ -12,6 +12,7 @@ import { get, post, postForm, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import type { SealAsset } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
+import { firstInvalidFieldKey, useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { SealAssetPreview } from '../work-items/SealAssetPreview';
 import { SampleDataPanel } from './SampleDataPanel';
 import { SettingsBackupPanel } from './SettingsBackupPanel';
@@ -52,6 +53,8 @@ export function SettingsPage() {
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<{ name?: string; file?: string }>({});
+  const uploadContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateUploadValidation = useValidationNavigation(uploadContentRef);
 
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => get<SettingsResponse>('/settings'), retry: false });
   const seals = useQuery({
@@ -94,6 +97,7 @@ export function SettingsPage() {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       toast.warn({ title: 'Chưa thể tải con dấu', description: Object.values(nextErrors).join(' ') });
+      navigateUploadValidation(firstInvalidFieldKey(nextErrors, ['name', 'file']));
       return;
     }
     upload.mutate();
@@ -121,9 +125,9 @@ export function SettingsPage() {
           <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={upload.isPending} onClick={validateAndUpload}>{upload.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}Tải và lưu</button>
         </div>
       )}>
-        <div className="space-y-4">
-          <label className="block"><span className="text-sm font-semibold text-slate-700">Tên con dấu *</span><input className={`mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 ${errors.name ? 'border-rose-300 bg-rose-50 focus:ring-rose-100' : 'border-line focus:ring-blue-100'}`} value={name} maxLength={160} disabled={upload.isPending} onChange={(event) => { setName(event.target.value); setErrors((current) => ({ ...current, name: undefined })); }} placeholder="Ví dụ: Dấu tròn Công ty TTCons" />{errors.name ? <p className="mt-1 text-xs font-medium text-rose-600">{errors.name}</p> : null}</label>
-          <label className="block"><span className="text-sm font-semibold text-slate-700">Ảnh con dấu *</span><input className={`mt-1 block w-full rounded-md border p-2 text-sm ${errors.file ? 'border-rose-300 bg-rose-50' : 'border-line bg-white'}`} type="file" accept="image/png,image/jpeg,image/webp" disabled={upload.isPending} onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); if (next && !name.trim()) setName(next.name.replace(/\.[^.]+$/, '')); setErrors((current) => ({ ...current, file: undefined })); }} />{errors.file ? <p className="mt-1 text-xs font-medium text-rose-600">{errors.file}</p> : <p className="mt-1 text-xs text-slate-500">Không hỗ trợ SVG. Nên dùng ảnh nền trong suốt, cắt sát viền con dấu.</p>}</label>
+        <div ref={uploadContentRef} className="space-y-4">
+          <label data-validation-key="name" className="block scroll-mt-24 rounded-md"><span className="text-sm font-semibold text-slate-700">Tên con dấu *</span><input name="name" aria-invalid={Boolean(errors.name)} className={`mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 ${errors.name ? 'border-rose-300 bg-rose-50 focus:ring-rose-100' : 'border-line focus:ring-blue-100'}`} value={name} maxLength={160} disabled={upload.isPending} onChange={(event) => { setName(event.target.value); setErrors((current) => ({ ...current, name: undefined })); }} placeholder="Ví dụ: Dấu tròn Công ty TTCons" />{errors.name ? <p role="alert" className="mt-1 text-xs font-medium text-rose-600">{errors.name}</p> : null}</label>
+          <label data-validation-key="file" className="block scroll-mt-24 rounded-md"><span className="text-sm font-semibold text-slate-700">Ảnh con dấu *</span><input name="file" aria-invalid={Boolean(errors.file)} className={`mt-1 block w-full rounded-md border p-2 text-sm ${errors.file ? 'border-rose-300 bg-rose-50' : 'border-line bg-white'}`} type="file" accept="image/png,image/jpeg,image/webp" disabled={upload.isPending} onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); if (next && !name.trim()) setName(next.name.replace(/\.[^.]+$/, '')); setErrors((current) => ({ ...current, file: undefined })); }} />{errors.file ? <p role="alert" className="mt-1 text-xs font-medium text-rose-600">{errors.file}</p> : <p className="mt-1 text-xs text-slate-500">Không hỗ trợ SVG. Nên dùng ảnh nền trong suốt, cắt sát viền con dấu.</p>}</label>
         </div>
       </Dialog>
       <Dialog open={Boolean(archiveCandidate)} title="Ngừng sử dụng con dấu?" description="Con dấu sẽ không còn xuất hiện trong danh sách chọn mới; các hồ sơ đã đóng dấu vẫn giữ nguyên." size="sm" onClose={() => { if (!archiveSeal.isPending) setArchiveCandidate(null); }} footer={(
@@ -164,6 +168,8 @@ function SystemSettingsPanel({ data, loading, error, onRetry }: { data?: Setting
   const [clearSecrets, setClearSecrets] = useState<Record<string, boolean>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showCore, setShowCore] = useState(false);
+  const settingsPanelRef = useRef<HTMLElement | null>(null);
+  const navigateSettingsValidation = useValidationNavigation(settingsPanelRef);
 
   useEffect(() => {
     if (!data) return;
@@ -199,6 +205,14 @@ function SystemSettingsPanel({ data, loading, error, onRetry }: { data?: Setting
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       toast.warn({ title: 'Chưa thể lưu thiết lập', description: `${Object.keys(nextErrors).length} trường chưa hợp lệ.` });
+      const firstKey = firstInvalidFieldKey(nextErrors, data?.settings.map((setting) => setting.key) ?? []);
+      navigateSettingsValidation({
+        key: firstKey,
+        prepare: () => {
+          const invalidSetting = data?.settings.find((setting) => setting.key === firstKey);
+          if (invalidSetting) setCategory(invalidSetting.category);
+        },
+      });
       return;
     }
     save.mutate();
@@ -210,7 +224,7 @@ function SystemSettingsPanel({ data, loading, error, onRetry }: { data?: Setting
   const canUpdate = data.capabilities.can_update;
   const visibleSettings = data.settings.filter((setting) => setting.category === category);
   return (
-    <section className="space-y-4">
+    <section ref={settingsPanelRef} className="space-y-4">
       <SettingsBackupPanel canRestore={canUpdate} />
       {!canUpdate ? <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><LockKeyhole className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-semibold">Chế độ chỉ xem</p><p className="mt-1 text-blue-800">Admin có thể xem toàn bộ thiết lập. Chỉ vai trò Nhà phát triển được phép chỉnh sửa và lưu.</p></div></div> : null}
       {data.restart_required_count > 0 ? <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><span className="font-semibold">{data.restart_required_count} thiết lập đang chờ khởi động lại backend.</span> Giá trị đã được lưu và sẽ có hiệu lực ở lần khởi động tiếp theo.</div> : null}
@@ -237,7 +251,7 @@ function SystemSettingsPanel({ data, loading, error, onRetry }: { data?: Setting
 function SettingField({ setting, value, clearSecret, disabled, error, onChange, onClearSecret }: { setting: SystemSetting; value: unknown; clearSecret: boolean; disabled: boolean; error?: string; onChange: (value: unknown) => void; onClearSecret: () => void }) {
   const inputClass = `mt-2 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 disabled:bg-slate-50 disabled:text-slate-500 ${error ? 'border-rose-300 bg-rose-50 focus:ring-rose-100' : 'border-line focus:ring-blue-100'}`;
   return (
-    <article className="rounded-lg border border-line bg-white p-4">
+    <article data-validation-key={setting.key} data-validation-error={error ? 'true' : undefined} className="scroll-mt-24 rounded-lg border border-line bg-white p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-semibold text-ink">{setting.label}</h3>{setting.restart_pending ? <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Chờ restart</span> : setting.requires_restart ? <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">Cần restart</span> : <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Hiệu lực ngay</span>}</div><p className="mt-1 text-sm text-slate-600">{setting.description}</p><code className="mt-1 block text-[11px] text-slate-400">{setting.key}</code></div><span className="shrink-0 text-xs text-slate-400">v{setting.version}</span></div>
       {setting.value_type === 'boolean' ? <label className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" className="h-4 w-4 rounded border-line text-blue-600" checked={Boolean(value)} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />{value ? 'Đang bật' : 'Đang tắt'}</label> : null}
       {setting.value_type === 'enum' ? <select className={inputClass} value={String(value ?? '')} disabled={disabled} onChange={(event) => onChange(event.target.value)}>{setting.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : null}
@@ -245,7 +259,7 @@ function SettingField({ setting, value, clearSecret, disabled, error, onChange, 
       {setting.value_type === 'integer' || setting.value_type === 'number' ? <div className="relative"><input type="number" step={setting.value_type === 'integer' ? 1 : 'any'} min={setting.min ?? undefined} max={setting.max ?? undefined} className={inputClass} value={String(value ?? '')} disabled={disabled} onChange={(event) => onChange(event.target.value)} />{setting.unit ? <span className="pointer-events-none absolute bottom-2 right-3 text-xs font-semibold text-slate-400">{setting.unit}</span> : null}</div> : null}
       {setting.value_type === 'duration' || setting.value_type === 'string' ? <input className={inputClass} value={String(value ?? '')} disabled={disabled} onChange={(event) => onChange(event.target.value)} placeholder={setting.value_type === 'duration' ? 'Ví dụ: 15s, 5m, 24h' : undefined} /> : null}
       {setting.value_type === 'secret' ? <div className="mt-2 space-y-2"><input type="password" className={inputClass.replace('mt-2 ', '')} value={String(value ?? '')} disabled={disabled} onChange={(event) => onChange(event.target.value)} placeholder={setting.configured ? 'Để trống để giữ nguyên secret hiện tại' : 'Nhập secret mới'} autoComplete="new-password" /><div className="flex flex-wrap items-center justify-between gap-2 text-xs"><span className={clearSecret ? 'font-semibold text-rose-700' : 'text-slate-500'}>{clearSecret ? 'Secret sẽ bị xóa khi lưu.' : setting.configured ? 'Đã có secret; giá trị hiện tại không được trả về trình duyệt.' : 'Chưa cấu hình secret.'}</span>{setting.configured && !disabled ? <button className="font-semibold text-rose-700 hover:text-rose-800" onClick={onClearSecret}>Xóa secret khi lưu</button> : null}</div></div> : null}
-      {error ? <p className="mt-2 text-xs font-semibold text-rose-600">{error}</p> : null}
+      {error ? <p role="alert" className="mt-2 text-xs font-semibold text-rose-600">{error}</p> : null}
       <p className="mt-3 text-[11px] text-slate-400">Nguồn: {sourceLabel(setting.source)}{setting.updated_by ? ` · Cập nhật bởi ${setting.updated_by}` : ''}{setting.updated_at ? ` · ${dateText(setting.updated_at)}` : ''}</p>
     </article>
   );

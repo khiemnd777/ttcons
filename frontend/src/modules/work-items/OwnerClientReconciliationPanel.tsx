@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, RefreshCw, Save, Send } from 'lucide-react';
 import clsx from 'clsx';
@@ -11,6 +11,7 @@ import { get, post, put } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
 import type { OwnerClientReconciliationItem, OwnerClientReconciliationResponse, ProjectOperationsRecord } from '../../lib/types/domain';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 type RowDraft = {
   item_index: number;
@@ -49,6 +50,9 @@ export function OwnerClientReconciliationPanel({
   const toast = useToast();
   const [comment, setComment] = useState('');
   const [rows, setRows] = useState<RowDraft[]>([]);
+  const [invalidKey, setInvalidKey] = useState('');
+  const panelRef = useRef<HTMLElement | null>(null);
+  const navigateValidation = useValidationNavigation(panelRef);
 
   const reconciliation = useQuery({
     queryKey: ['owner-client-reconciliation', workItemId],
@@ -100,6 +104,10 @@ export function OwnerClientReconciliationPanel({
     });
     if (invalid.length) {
       toast.warn({ title: 'Dữ liệu đối soát chưa hợp lệ', description: invalid.join(', ') });
+      const invalidRow = sourceRows.find((row) => ['accepted', 'conditional_acceptance'].includes(row.decision) && !row.acceptance_id);
+      const key = invalidRow ? `items.${invalidRow.item_index}.acceptance_id` : '';
+      setInvalidKey(key);
+      navigateValidation(key);
       return null;
     }
     return { comment: comment.trim(), items: payloadRows };
@@ -187,7 +195,7 @@ export function OwnerClientReconciliationPanel({
   if (!record) return null;
 
   return (
-    <section>
+    <section ref={panelRef}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-ink">Đối soát chủ đầu tư</h3>
@@ -237,8 +245,12 @@ export function OwnerClientReconciliationPanel({
                 draft={rowsByIndex.get(item.item_index) ?? rowDraftFromItem(item)}
                 acceptances={acceptances}
                 acceptanceById={acceptanceById}
+                invalid={invalidKey === `items.${item.item_index}.acceptance_id`}
                 disabled={locked || pending}
-                onChange={(patch) => updateRow(item.item_index, patch)}
+                onChange={(patch) => {
+                  updateRow(item.item_index, patch);
+                  if (patch.acceptance_id) setInvalidKey('');
+                }}
               />
             ))}
           </div>
@@ -280,6 +292,7 @@ function ReconciliationItemRow({
   draft,
   acceptances,
   acceptanceById,
+  invalid,
   disabled,
   onChange,
 }: {
@@ -287,6 +300,7 @@ function ReconciliationItemRow({
   draft: RowDraft;
   acceptances: ProjectOperationsRecord[];
   acceptanceById: Map<string, ProjectOperationsRecord>;
+  invalid: boolean;
   disabled: boolean;
   onChange: (patch: Partial<RowDraft>) => void;
 }) {
@@ -308,16 +322,18 @@ function ReconciliationItemRow({
         {item.required_action ? <p className="mt-2 text-xs leading-5 text-slate-600">Yêu cầu: {item.required_action}</p> : null}
       </div>
 
-      <div>
+      <div data-validation-key={`items.${item.item_index}.acceptance_id`} data-validation-error={invalid ? 'true' : undefined}>
         <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`acceptance-${item.item_index}`}>
           Nghiệm thu nội bộ
         </label>
         <select
           id={`acceptance-${item.item_index}`}
-          className="mt-1 w-full rounded-md border border-line bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+          name={`items.${item.item_index}.acceptance_id`}
+          className={clsx('mt-1 w-full rounded-md border bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50', invalid ? 'border-rose-300' : 'border-line')}
           value={draft.acceptance_id}
           onChange={(event) => onChange({ acceptance_id: event.target.value })}
           disabled={disabled}
+          aria-invalid={invalid}
         >
           <option value="">Chưa liên kết nghiệm thu</option>
           {draft.acceptance_id && !selectedExists ? (

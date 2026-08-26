@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CalendarDays, CheckCircle2, Loader2, Pencil, PlayCircle, Plus, Trash2 } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
@@ -14,6 +14,7 @@ import { checkStatusLabel, constructionActionAssigneeLabel, dateTimeText, option
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { EvidenceGallery } from '../work-items/EvidenceGallery';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from '../work-items/workItemMutationContext';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 export type CheckDialogState =
   | { type: 'template' }
@@ -52,6 +53,8 @@ function TemplateDialog({ projectId, onClose, onSaved }: Props) {
   const [values, setValues] = useState({ name: '', description: '', criteria: '' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
+  const formRef = useRef<HTMLDivElement | null>(null);
+  const navigateToValidation = useValidationNavigation(formRef);
 
   async function save() {
     const next = requiredErrors(values, [{ name: 'name', label: 'Tên mẫu' }, { name: 'criteria', label: 'Tiêu chí' }]);
@@ -60,6 +63,7 @@ function TemplateDialog({ projectId, onClose, onSaved }: Props) {
     setErrors(next);
     if (Object.keys(next).length) {
       toast.warn({ title: 'Chưa đủ thông tin', description: errorSummary(next) });
+      navigateToValidation({});
       return;
     }
     setSaving(true);
@@ -75,7 +79,7 @@ function TemplateDialog({ projectId, onClose, onSaved }: Props) {
   }
 
   return <Dialog open title="Tạo mẫu kiểm tra" description="Mỗi dòng là một điều đội hiện trường cần nhìn và xác nhận." size="lg" onClose={onClose} footer={<FormFooter saving={saving} submitLabel="Tạo mẫu" onClose={onClose} onSave={save} />}>
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div ref={formRef} className="grid gap-4 sm:grid-cols-2">
       <FieldBlock label="Tên mẫu" required error={errors.name}><input className={controlClass(errors.name)} value={values.name} onChange={(event) => change(setValues, setErrors, 'name', event.target.value)} autoFocus /></FieldBlock>
       <FieldBlock label="Mô tả ngắn"><input className={controlClass()} value={values.description} onChange={(event) => change(setValues, setErrors, 'description', event.target.value)} /></FieldBlock>
       <FieldBlock className="sm:col-span-2" label="Các tiêu chí" required error={errors.criteria} helper="Mỗi dòng tương ứng một tiêu chí; hệ thống sẽ lưu kèm yêu cầu minh chứng."><textarea rows={8} className={controlClass(errors.criteria)} value={values.criteria} onChange={(event) => change(setValues, setErrors, 'criteria', event.target.value)} placeholder={'Cao độ và độ phẳng — Sai số không quá 3mm\nBề mặt hoàn thiện — Không cong vênh, nứt hoặc hở mối nối'} /></FieldBlock>
@@ -95,6 +99,8 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
   const [uploads, setUploads] = useState<ConstructionEvidenceUploadDraft[]>([]);
   const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
+	const formRef = useRef<HTMLDivElement | null>(null);
+	const navigateToValidation = useValidationNavigation(formRef);
 	  const availableWorkItems = workspace.work_items.filter((item) => item.report_eligible || item.id === check?.work_item_id || item.id === sourceReport?.work_item_id);
 
   useEffect(() => {
@@ -145,6 +151,7 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
     setErrors(next);
     if (Object.keys(next).length) {
       toast.warn({ title: 'Chưa đủ thông tin', description: errorSummary(next) });
+      navigateToValidation({});
       return;
     }
     setSaving(true);
@@ -173,7 +180,7 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
   }
 
   return <Dialog open title={check ? 'Chỉnh sửa kiểm tra' : 'Tạo kiểm tra'} description={check ? 'Chỉ kiểm tra đang chờ và được tạo tại màn hình này mới có thể chỉnh sửa.' : sourceReport ? 'Kiểm tra này sẽ được truy vết trực tiếp về báo cáo hiện trường nguồn.' : 'Đặt nội dung, công việc và thời điểm để đội hiện trường có thể thực hiện ngay.'} size="xl" onClose={onClose} footer={<FormFooter saving={saving} submitLabel={check ? 'Lưu thay đổi' : 'Tạo kiểm tra'} onClose={onClose} onSave={save} />}>
-    <div className="space-y-5">
+    <div ref={formRef} className="space-y-5">
       {sourceReport ? <SourceReportBanner report={sourceReport} /> : null}
       <div><SectionTitle>Thông tin kiểm tra</SectionTitle><div className="mt-3 grid gap-4 sm:grid-cols-2">
 	        <FieldBlock label="Công việc liên quan" required error={errors.work_item_id} helper={sourceReport?.work_item_id ? 'Được khóa theo báo cáo nguồn.' : 'Chỉ hiển thị hạng mục thuộc Node Thi công đang hoạt động.'}><select disabled={Boolean(sourceReport?.work_item_id)} className={controlClass(errors.work_item_id, Boolean(sourceReport?.work_item_id))} value={values.work_item_id} onChange={(event) => changeWorkItem(event.target.value)}><option value="">Chọn công việc</option>{availableWorkItems.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></FieldBlock>
@@ -231,6 +238,8 @@ function CompleteCheckDialog({ check, workspace, onClose, onSaved }: Props & { c
   const [errors, setErrors] = useState<FormErrors>({});
   const [uploads, setUploads] = useState<ConstructionEvidenceUploadDraft[]>([]);
   const [saving, setSaving] = useState(false);
+  const formRef = useRef<HTMLDivElement | null>(null);
+  const navigateToValidation = useValidationNavigation(formRef);
   const failed = values.result === 'fail';
 
   useEffect(() => {
@@ -245,6 +254,7 @@ function CompleteCheckDialog({ check, workspace, onClose, onSaved }: Props & { c
     setErrors(next);
     if (Object.keys(next).length) {
       toast.warn({ title: 'Chưa đủ thông tin', description: errorSummary(next) });
+      navigateToValidation({});
       return;
     }
     setSaving(true);
@@ -261,7 +271,7 @@ function CompleteCheckDialog({ check, workspace, onClose, onSaved }: Props & { c
   }
 
   return <Dialog open title="Ghi kết quả kiểm tra" description={`${check.title} · ${check.work_item_title || 'Công việc liên quan'}`} size="xl" onClose={onClose} footer={<FormFooter saving={saving} submitLabel="Lưu kết quả" onClose={onClose} onSave={save} />}>
-    <div className="space-y-5">
+    <div ref={formRef} className="space-y-5">
       <ResultChoice value={values.result} onChange={(result) => change(setValues, setErrors, 'result', result)} />
       <FieldBlock label="Ghi chú kết quả"><textarea rows={3} className={controlClass()} value={values.note} onChange={(event) => change(setValues, setErrors, 'note', event.target.value)} placeholder="Mô tả quan sát hoặc điểm cần lưu ý" /></FieldBlock>
       {failed ? <div><SectionTitle>Việc cần xử lý được tạo tự động</SectionTitle><div className="mt-3 grid gap-4 sm:grid-cols-2">

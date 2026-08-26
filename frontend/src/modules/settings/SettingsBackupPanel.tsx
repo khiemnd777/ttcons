@@ -1,9 +1,10 @@
-import { DragEvent, useState } from 'react';
+import { DragEvent, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Download, FileJson, Loader2, RotateCcw, Upload } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, postForm } from '../../lib/api/client';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 const maxBackupFileSize = 256 * 1024;
 
@@ -54,6 +55,8 @@ export function SettingsBackupPanel({ canRestore }: { canRestore: boolean }) {
   const [restored, setRestored] = useState<RestoreResult | null>(null);
   const [dragging, setDragging] = useState(false);
   const [inputKey, setInputKey] = useState(0);
+  const uploadContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateToValidation = useValidationNavigation(uploadContentRef);
 
   const download = useMutation({
     mutationFn: () => downloadBlob('/settings/backup'),
@@ -136,12 +139,14 @@ export function SettingsBackupPanel({ canRestore }: { canRestore: boolean }) {
     if (!file) {
       setFileError('Vui lòng chọn tệp JSON bản sao cấu hình.');
       toast.warn({ title: 'Chưa thể kiểm tra bản sao', description: 'Vui lòng chọn tệp JSON bản sao cấu hình.' });
+      navigateToValidation('file');
       return;
     }
     const nextError = validateBackupFile(file);
     setFileError(nextError);
     if (nextError) {
       toast.warn({ title: 'Chưa thể kiểm tra bản sao', description: nextError });
+      navigateToValidation('file');
       return;
     }
     checkBackup.mutate(file);
@@ -186,12 +191,12 @@ export function SettingsBackupPanel({ canRestore }: { canRestore: boolean }) {
 
       <Dialog open={open} title={restored ? 'Khôi phục cấu hình thành công' : preview ? 'Xác nhận khôi phục cấu hình' : 'Khôi phục thiết lập hệ thống'} description={preview || restored ? undefined : 'Tệp được kiểm tra và so sánh trước; chưa có dữ liệu nào bị ghi ở bước này.'} size={preview ? 'xl' : 'lg'} onClose={closeDialog} footer={footer}>
         {restored ? <RestoreSuccess result={restored} /> : preview ? <BackupPreviewContent file={file} preview={preview} operationError={operationError} /> : (
-          <div className="space-y-4">
-            <div className={`rounded-lg border-2 border-dashed p-6 text-center transition ${dragging ? 'border-blue-400 bg-blue-50' : fileError ? 'border-rose-300 bg-rose-50' : 'border-slate-300 bg-slate-50'}`} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={handleDrop}>
+          <div ref={uploadContentRef} className="space-y-4">
+            <div data-validation-key="file" data-validation-error={fileError ? 'true' : undefined} className={`scroll-mt-24 rounded-lg border-2 border-dashed p-6 text-center transition ${dragging ? 'border-blue-400 bg-blue-50' : fileError ? 'border-rose-300 bg-rose-50' : 'border-slate-300 bg-slate-50'}`} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={handleDrop}>
               <FileJson className="mx-auto h-9 w-9 text-slate-400" />
               <p className="mt-3 text-sm font-semibold text-ink">Kéo thả file JSON vào đây</p>
               <p className="mt-1 text-xs text-slate-500">Chỉ nhận JSON · tối đa 256 KB</p>
-              <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"><Upload className="h-4 w-4" />Chọn file<input key={inputKey} className="sr-only" type="file" accept=".json,application/json" disabled={busy} onChange={(event) => selectFile(event.target.files?.[0] ?? null)} /></label>
+              <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"><Upload className="h-4 w-4" />Chọn file<input key={inputKey} name="file" aria-invalid={Boolean(fileError)} className="sr-only" type="file" accept=".json,application/json" disabled={busy} onChange={(event) => selectFile(event.target.files?.[0] ?? null)} /></label>
             </div>
             {file ? <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-white px-3 py-2"><div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{file.name}</p><p className="text-xs text-slate-500">{formatBytes(file.size)}</p></div><button type="button" className="text-xs font-semibold text-blue-700" disabled={busy} onClick={resetSelection}>Chọn lại</button></div> : null}
             {fileError ? <InlineError message={fileError} /> : null}

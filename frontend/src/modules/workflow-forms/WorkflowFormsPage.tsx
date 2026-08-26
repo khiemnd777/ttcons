@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBlocker } from 'react-router-dom';
 import {
@@ -34,6 +34,7 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { WorkflowDefinitionImportDialog } from '../workflow-definitions/WorkflowDefinitionImportDialog';
 import { WorkflowDefinitionExportDialog } from '../workflow-definitions/WorkflowDefinitionExportDialog';
 import { resolveCurrencyFractionDigits } from '../../lib/utils/currencyInput';
+import { firstInvalidFieldKey, useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import type {
   AnyRecord,
   WorkflowFormField,
@@ -792,6 +793,21 @@ function DraftFieldEditor({
   onPublish: () => void;
 }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(fields.length ? 0 : null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const navigateToValidation = useValidationNavigation(editorRef);
+  const errorKeys = Object.keys(errors);
+
+  useEffect(() => {
+    const firstKey = firstInvalidFieldKey(errors, errorKeys);
+    if (!firstKey) return;
+    const index = Number(firstKey.split('.')[0]);
+    navigateToValidation({
+      key: firstKey,
+      prepare: () => {
+        if (Number.isInteger(index)) setExpandedIndex(index);
+      },
+    });
+  }, [errorKeys.join('|'), navigateToValidation]);
 
   function updateField(index: number, patch: Partial<DraftField>) {
     onChange(fields.map((field, currentIndex) => (currentIndex === index ? { ...field, ...patch } : field)));
@@ -824,7 +840,7 @@ function DraftFieldEditor({
   }
 
   return (
-    <div className={clsx(saving && 'pointer-events-none opacity-70')} aria-busy={saving}>
+    <div ref={editorRef} className={clsx(saving && 'pointer-events-none opacity-70')} aria-busy={saving}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-slate-600">Chỉ bản nháp mới có thể chỉnh sửa.</p>
         <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50" onClick={addField}>
@@ -854,8 +870,8 @@ function DraftFieldEditor({
               {expandedIndex === index ? (
                 <div className="border-t border-line bg-slate-50 p-3 md:p-4">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
-                    <FieldInput label="Tên trường *" value={field.label} error={errors[`${index}.label`]} onChange={(value) => updateField(index, { label: value })} />
-                    <FieldInput label="Khóa kỹ thuật *" value={field.field_key} error={errors[`${index}.field_key`]} onChange={(value) => updateField(index, { field_key: value })} />
+                    <FieldInput fieldKey={`${index}.label`} label="Tên trường *" value={field.label} error={errors[`${index}.label`]} onChange={(value) => updateField(index, { label: value })} />
+                    <FieldInput fieldKey={`${index}.field_key`} label="Khóa kỹ thuật *" value={field.field_key} error={errors[`${index}.field_key`]} onChange={(value) => updateField(index, { field_key: value })} />
                     <label className="block">
                       <span className="text-xs font-semibold text-slate-600">Kiểu dữ liệu *</span>
                       <select className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm" value={field.field_type} onChange={(event) => updateFieldType(index, event.target.value)}>
@@ -867,6 +883,7 @@ function DraftFieldEditor({
                     <CurrencyFieldConfiguration
                       validationText={field.validationText}
                       error={errors[`${index}.validation_json`]}
+                      fieldKey={`${index}.validation_json`}
                       onChange={(validationText) => updateField(index, { validationText })}
                     />
                   ) : null}
@@ -877,14 +894,14 @@ function DraftFieldEditor({
                       Trường bắt buộc
                     </label>
                   </div>
-                  <details className="mt-3 rounded-md border border-line bg-white">
+                  <details open={Boolean(errors[`${index}.options_json`] || errors[`${index}.validation_json`] || errors[`${index}.visibility_json`]) || undefined} className="mt-3 rounded-md border border-line bg-white">
                     <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700">
                       <Settings2 className="h-4 w-4 text-slate-500" /> Cấu hình nâng cao
                     </summary>
                     <div className="grid gap-3 border-t border-line p-3 lg:grid-cols-3">
-                      <JsonTextarea label="Lựa chọn (JSON)" value={field.optionsText} error={errors[`${index}.options_json`]} onChange={(value) => updateField(index, { optionsText: value })} />
-                      <JsonTextarea label="Điều kiện kiểm tra (JSON)" value={field.validationText} error={errors[`${index}.validation_json`]} onChange={(value) => updateField(index, { validationText: value })} />
-                      <JsonTextarea label="Điều kiện hiển thị (JSON)" value={field.visibilityText} error={errors[`${index}.visibility_json`]} onChange={(value) => updateField(index, { visibilityText: value })} />
+                      <JsonTextarea fieldKey={`${index}.options_json`} label="Lựa chọn (JSON)" value={field.optionsText} error={errors[`${index}.options_json`]} onChange={(value) => updateField(index, { optionsText: value })} />
+                      <JsonTextarea fieldKey={`${index}.validation_json`} label="Điều kiện kiểm tra (JSON)" value={field.validationText} error={errors[`${index}.validation_json`]} onChange={(value) => updateField(index, { validationText: value })} />
+                      <JsonTextarea fieldKey={`${index}.visibility_json`} label="Điều kiện hiển thị (JSON)" value={field.visibilityText} error={errors[`${index}.visibility_json`]} onChange={(value) => updateField(index, { visibilityText: value })} />
                     </div>
                   </details>
                 </div>
@@ -892,7 +909,7 @@ function DraftFieldEditor({
             </div>
           ))}
         </div>
-      ) : <EmptyState title="Bản nháp chưa có trường dữ liệu." action={<button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={addField}>Thêm trường đầu tiên</button>} />}
+      ) : <div data-validation-key="form" tabIndex={-1} className="scroll-mt-24 rounded-md outline-none"><EmptyState title="Bản nháp chưa có trường dữ liệu." action={<button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={addField}>Thêm trường đầu tiên</button>} /></div>}
       <div className="sticky bottom-0 mt-4 flex flex-wrap justify-end gap-2 border-t border-line bg-white/95 pt-3 backdrop-blur">
         <button className="inline-flex items-center gap-2 rounded-md border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60" disabled={saving} onClick={onPublish}>
           <UploadCloud className="h-4 w-4" />
@@ -907,7 +924,7 @@ function DraftFieldEditor({
   );
 }
 
-function CurrencyFieldConfiguration({ validationText, error, onChange }: { validationText: string; error?: string; onChange: (value: string) => void }) {
+function CurrencyFieldConfiguration({ fieldKey, validationText, error, onChange }: { fieldKey: string; validationText: string; error?: string; onChange: (value: string) => void }) {
   const validation = parseJSONObject(validationText) ?? {};
   const currencyCode = String(validation.currency_code ?? 'VND').toUpperCase();
   const isVND = currencyCode === 'VND';
@@ -924,7 +941,7 @@ function CurrencyFieldConfiguration({ validationText, error, onChange }: { valid
     onChange(stableJSONString(next));
   }
   return (
-    <section className="mt-3 rounded-md border border-blue-200 bg-blue-50/60 p-3" aria-label="Cấu hình trường tiền tệ">
+    <section data-validation-key={fieldKey} data-validation-error={error ? 'true' : undefined} className="mt-3 scroll-mt-24 rounded-md border border-blue-200 bg-blue-50/60 p-3" aria-label="Cấu hình trường tiền tệ">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <FieldInput label="Mã tiền tệ" value={currencyCode} onChange={updateCurrencyCode} />
         <FieldInput label={isVND ? 'Số lẻ tối đa · VND = 0' : 'Số lẻ tối đa'} type="number" value={String(isVND ? 0 : validation.maximum_fraction_digits ?? resolveCurrencyFractionDigits(currencyCode))} disabled={isVND} onChange={(value) => update('maximum_fraction_digits', value === '' ? undefined : Number(value))} />
@@ -1022,6 +1039,9 @@ function TemplateDialog({
   onSubmit: () => void;
 }) {
   const missing = templateMissingFields(form, mode === 'create');
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const navigateToValidation = useValidationNavigation(contentRef);
+  const missingKey = missing.includes('Mã biểu mẫu') ? 'code' : missing.includes('Tên biểu mẫu') ? 'name' : missing.includes('Loại biểu mẫu') ? 'form_type' : undefined;
   return (
     <Dialog
       open={Boolean(mode)}
@@ -1031,16 +1051,16 @@ function TemplateDialog({
       footer={
         <div className="flex justify-end gap-2">
           <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>Hủy</button>
-          <button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={submitting} onClick={onSubmit}>
+          <button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={submitting} onClick={() => { onSubmit(); navigateToValidation(missingKey); }}>
             {mode === 'create' ? 'Tạo biểu mẫu' : 'Lưu thông tin'}
           </button>
         </div>
       }
     >
-      <div className="grid gap-3 md:grid-cols-2">
-        <FieldInput label="Mã biểu mẫu *" value={form.code} disabled={mode === 'edit'} error={submitAttempted && missing.includes('Mã biểu mẫu') ? 'Bắt buộc' : ''} onChange={(value) => onChange({ ...form, code: value })} />
-        <FieldInput label="Tên biểu mẫu *" value={form.name} error={submitAttempted && missing.includes('Tên biểu mẫu') ? 'Bắt buộc' : ''} onChange={(value) => onChange({ ...form, name: value })} />
-        <label className="block">
+      <div ref={contentRef} className="grid gap-3 md:grid-cols-2">
+        <FieldInput fieldKey="code" label="Mã biểu mẫu *" value={form.code} disabled={mode === 'edit'} error={submitAttempted && missing.includes('Mã biểu mẫu') ? 'Bắt buộc' : ''} onChange={(value) => onChange({ ...form, code: value })} />
+        <FieldInput fieldKey="name" label="Tên biểu mẫu *" value={form.name} error={submitAttempted && missing.includes('Tên biểu mẫu') ? 'Bắt buộc' : ''} onChange={(value) => onChange({ ...form, name: value })} />
+        <label data-validation-key="form_type" className="block scroll-mt-24 rounded-md">
           <span className="text-xs font-semibold text-slate-600">Loại biểu mẫu *</span>
           <select className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm disabled:bg-slate-100" value={form.form_type} disabled={mode === 'edit'} onChange={(event) => onChange({ ...form, form_type: event.target.value })}>
             {formTypeOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -1150,12 +1170,14 @@ function ErrorPanel({ title, onRetry }: { title: string; onRetry: () => void }) 
   );
 }
 
-function FieldInput({ label, value, type = 'text', error, disabled, onChange }: { label: string; value: string; type?: string; error?: string; disabled?: boolean; onChange: (value: string) => void }) {
+function FieldInput({ fieldKey, label, value, type = 'text', error, disabled, onChange }: { fieldKey?: string; label: string; value: string; type?: string; error?: string; disabled?: boolean; onChange: (value: string) => void }) {
   return (
-    <label className="block">
+    <label data-validation-key={fieldKey} data-validation-error={error ? 'true' : undefined} className="block scroll-mt-24 rounded-md">
       <span className="text-xs font-semibold text-slate-600">{label}</span>
       <input
         type={type}
+        name={fieldKey}
+        aria-invalid={Boolean(error)}
         className={clsx('mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100', error ? 'border-rose-300 bg-rose-50' : 'border-line bg-white')}
         value={value}
         disabled={disabled}
@@ -1166,11 +1188,13 @@ function FieldInput({ label, value, type = 'text', error, disabled, onChange }: 
   );
 }
 
-function JsonTextarea({ label, value, error, onChange }: { label: string; value: string; error?: string; onChange: (value: string) => void }) {
+function JsonTextarea({ fieldKey, label, value, error, onChange }: { fieldKey: string; label: string; value: string; error?: string; onChange: (value: string) => void }) {
   return (
-    <label className="block">
+    <label data-validation-key={fieldKey} data-validation-error={error ? 'true' : undefined} className="block scroll-mt-24 rounded-md">
       <span className="text-xs font-semibold text-slate-600">{label}</span>
       <textarea
+        name={fieldKey}
+        aria-invalid={Boolean(error)}
         className={clsx('mt-1 min-h-20 w-full rounded-md border px-3 py-2 font-mono text-xs outline-none focus:ring-2 focus:ring-blue-500', error ? 'border-rose-300 bg-rose-50' : 'border-line bg-white')}
         value={value}
         onChange={(event) => onChange(event.target.value)}

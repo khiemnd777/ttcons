@@ -28,6 +28,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { get, post } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { statusLabel } from '../../lib/utils/status';
 import { useToast } from '../../components/ToastProvider';
 import type { ActivityPayload, EvidenceRecord, ProjectActivityOptions, WorkflowFormDetail, WorkItem, WorkItemActivity, WorkItemStartRequirement } from '../../lib/types/domain';
@@ -135,6 +136,10 @@ export function WorkItemDetailWorkspace({
   const selectedWorkId = workItemId ?? item?.id ?? '';
   const navigationSequence = useRef(0);
   const workflowFormActionRef = useRef<WorkflowFormActionHandle | null>(null);
+  const amendmentDialogContentRef = useRef<HTMLDivElement | null>(null);
+  const earlyStartDialogContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateAmendmentValidation = useValidationNavigation(amendmentDialogContentRef);
+  const navigateEarlyStartValidation = useValidationNavigation(earlyStartDialogContentRef);
   const [navigationRequest, setNavigationRequest] = useState<WorkItemRequirementNavigationRequest | null>(null);
   const [workflowFormActionState, setWorkflowFormActionState] = useState<WorkflowFormActionState | null>(null);
   const [amendmentDialogOpen, setAmendmentDialogOpen] = useState(false);
@@ -241,6 +246,7 @@ export function WorkItemDetailWorkspace({
     if (!reason) {
       setStartReasonAttempted(true);
       toast.warn({ title: 'Cần nhập lý do bắt đầu sớm', description: 'Lý do được lưu cùng lịch sử và audit của đầu việc.' });
+      navigateEarlyStartValidation('start_reason');
       return;
     }
     workAction.mutate({
@@ -440,6 +446,7 @@ export function WorkItemDetailWorkspace({
                 if (!reason) {
                   setAmendmentReasonAttempted(true);
                   toast.warn({ title: 'Thiếu lý do chỉnh sửa', description: 'Nhập lý do để lịch sử thay đổi có đủ bối cảnh.' });
+                  navigateAmendmentValidation('amendment_reason');
                   return;
                 }
                 workflowFormActionRef.current?.beginAmendment(reason);
@@ -453,7 +460,12 @@ export function WorkItemDetailWorkspace({
           </div>
         )}
       >
-        <label className="block text-sm font-semibold text-slate-700">
+        <div ref={amendmentDialogContentRef}>
+        <label
+          className="block text-sm font-semibold text-slate-700"
+          data-validation-key="amendment_reason"
+          data-validation-error={amendmentReasonAttempted && !amendmentReason.trim() ? 'true' : undefined}
+        >
           Lý do chỉnh sửa <span className="text-rose-600">*</span>
           <textarea
             className={clsx(
@@ -461,15 +473,19 @@ export function WorkItemDetailWorkspace({
               amendmentReasonAttempted && !amendmentReason.trim() ? 'border-rose-400' : 'border-line',
             )}
             value={amendmentReason}
+            name="amendment_reason"
             maxLength={1000}
             onChange={(event) => {
               setAmendmentReason(event.target.value);
               if (event.target.value.trim()) setAmendmentReasonAttempted(false);
             }}
             placeholder="Ví dụ: Bổ sung phạm vi theo biên bản khảo sát ngày 17-08"
+            aria-invalid={amendmentReasonAttempted && !amendmentReason.trim()}
+            aria-describedby={amendmentReasonAttempted && !amendmentReason.trim() ? 'amendment-reason-error' : undefined}
           />
         </label>
-        {amendmentReasonAttempted && !amendmentReason.trim() ? <p className="mt-1 text-xs font-medium text-rose-600">Lý do chỉnh sửa là bắt buộc.</p> : null}
+        {amendmentReasonAttempted && !amendmentReason.trim() ? <p id="amendment-reason-error" role="alert" className="mt-1 text-xs font-medium text-rose-600">Lý do chỉnh sửa là bắt buộc.</p> : null}
+        </div>
       </Dialog>
       <Dialog
         open={startConfirmationOpen}
@@ -503,15 +519,17 @@ export function WorkItemDetailWorkspace({
           </div>
         )}
       >
-        <EarlyStartConfirmationContent
-          requirements={detailItem?.start_readiness?.requirements ?? []}
-          reason={startReason}
-          reasonInvalid={startReasonAttempted && !startReason.trim()}
-          onReasonChange={(value) => {
-            setStartReason(value);
-            if (value.trim()) setStartReasonAttempted(false);
-          }}
-        />
+        <div ref={earlyStartDialogContentRef}>
+          <EarlyStartConfirmationContent
+            requirements={detailItem?.start_readiness?.requirements ?? []}
+            reason={startReason}
+            reasonInvalid={startReasonAttempted && !startReason.trim()}
+            onReasonChange={(value) => {
+              setStartReason(value);
+              if (value.trim()) setStartReasonAttempted(false);
+            }}
+          />
+        </div>
       </Dialog>
     </>
   );
@@ -682,18 +700,22 @@ function EarlyStartConfirmationContent({
       <label className="block text-sm font-semibold text-ink" htmlFor="early-start-reason">
         Lý do bắt đầu sớm <span className="text-rose-600">*</span>
       </label>
-      <textarea
-        id="early-start-reason"
-        className={clsx(
-          'min-h-24 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500',
-          reasonInvalid ? 'border-rose-300 bg-rose-50' : 'border-line bg-white',
-        )}
-        value={reason}
-        onChange={(event) => onReasonChange(event.target.value)}
-        placeholder="Ví dụ: cần triển khai song song để kịp tiến độ công trình"
-        aria-invalid={reasonInvalid}
-      />
-      {reasonInvalid ? <p className="text-xs font-medium text-rose-700">Vui lòng nhập lý do để lưu cùng lịch sử audit.</p> : null}
+      <div data-validation-key="start_reason" data-validation-error={reasonInvalid ? 'true' : undefined}>
+        <textarea
+          id="early-start-reason"
+          name="start_reason"
+          className={clsx(
+            'min-h-24 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500',
+            reasonInvalid ? 'border-rose-300 bg-rose-50' : 'border-line bg-white',
+          )}
+          value={reason}
+          onChange={(event) => onReasonChange(event.target.value)}
+          placeholder="Ví dụ: cần triển khai song song để kịp tiến độ công trình"
+          aria-invalid={reasonInvalid}
+          aria-describedby={reasonInvalid ? 'early-start-reason-error' : undefined}
+        />
+        {reasonInvalid ? <p id="early-start-reason-error" role="alert" className="mt-1 text-xs font-medium text-rose-700">Vui lòng nhập lý do để lưu cùng lịch sử audit.</p> : null}
+      </div>
     </div>
   );
 }
@@ -995,10 +1017,12 @@ function WorkItemActionPanel({
     : nextAction;
   const panelRef = useRef<HTMLElement | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
+  const navigateActionValidation = useValidationNavigation(panelRef);
 
   useEffect(() => {
-    if (pendingAction && actionRequiresReason(pendingAction)) setNoteOpen(true);
-  }, [pendingAction]);
+    if (!pendingAction || !actionRequiresReason(pendingAction) || actionText.trim()) return;
+    navigateActionValidation({ key: 'action_reason', prepare: () => setNoteOpen(true) });
+  }, [actionText, navigateActionValidation, pendingAction]);
 
   useEffect(() => {
     const shouldRevealActionPanel = navigationRequest?.target.kind === 'action_panel'
@@ -1075,15 +1099,22 @@ function WorkItemActionPanel({
             {noteOpen ? 'Ẩn ghi chú' : actionText.trim() ? 'Sửa ghi chú' : 'Thêm ghi chú / lý do'}
           </button>
           {noteOpen ? (
-          <textarea
-            className={clsx(
-              'min-h-20 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500',
-              pendingAction && actionRequiresReason(pendingAction) && !actionText.trim() ? 'border-amber-300 bg-amber-50' : 'border-line bg-white',
-            )}
-            value={actionText}
-            onChange={(event) => onActionTextChange(event.target.value)}
-            placeholder="Ghi chú / lý do cho thao tác"
-          />
+          <div
+            data-validation-key="action_reason"
+            data-validation-error={pendingAction && actionRequiresReason(pendingAction) && !actionText.trim() ? 'true' : undefined}
+          >
+            <textarea
+              name="action_reason"
+              className={clsx(
+                'min-h-20 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500',
+                pendingAction && actionRequiresReason(pendingAction) && !actionText.trim() ? 'border-amber-300 bg-amber-50' : 'border-line bg-white',
+              )}
+              value={actionText}
+              onChange={(event) => onActionTextChange(event.target.value)}
+              placeholder="Ghi chú / lý do cho thao tác"
+              aria-invalid={Boolean(pendingAction && actionRequiresReason(pendingAction) && !actionText.trim())}
+            />
+          </div>
           ) : null}
 
           {secondaryActions.length ? (

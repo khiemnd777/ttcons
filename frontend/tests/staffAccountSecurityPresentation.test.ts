@@ -38,7 +38,7 @@ test('staff edit dialog exposes permission-gated direct account security fields'
   assert.match(simpleForm, /'email' \| 'password'/);
   assert.match(simpleForm, /<PasswordInput/);
   assert.match(passwordInput, /aria-label=\{passwordVisible \? 'Ẩn mật khẩu' : 'Hiện mật khẩu'\}/);
-  assert.match(simpleForm, /<form className="space-y-4" noValidate onSubmit=\{handleSubmit\}>/);
+  assert.match(simpleForm, /<form ref=\{formRef\} className="space-y-4" noValidate onSubmit=\{handleSubmit\}>/);
 });
 
 test('staff creation requires account-security authority and creates one password plus recovery email', async () => {

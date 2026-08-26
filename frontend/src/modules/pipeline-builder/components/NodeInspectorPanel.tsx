@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import clsx from 'clsx';
 import { ChevronDown, GripVertical, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { Dialog } from '../../../components/Dialog';
@@ -6,6 +6,7 @@ import { EnumChip } from '../../../components/EnumChip';
 import type { PipelineNode, WorkflowFormCatalogItem } from '../../../lib/types/domain';
 import { pipelineActorRoleOptions } from '../../../lib/utils/roles';
 import { enumOptions, nodeTypeValues } from '../../../lib/utils/status';
+import { useValidationNavigation } from '../../../lib/utils/formValidationNavigation';
 
 const stepTypes = ['task', 'checklist', 'approval', 'document_upload', 'photo_upload', 'budget_check', 'material_check', 'daily_report', 'meeting_minutes', 'acceptance_check', 'handover_check', 'accounting_check'];
 
@@ -35,6 +36,7 @@ type NodeInspectorPanelProps = {
   stepCodeInvalid: boolean;
   stepRolesInvalid: boolean;
   stepFormInvalid: boolean;
+  stepValidationRequestId: number;
   savePending: boolean;
   addStepPending: boolean;
   updateStepPending: boolean;
@@ -69,6 +71,7 @@ export function NodeInspectorPanel({
   stepCodeInvalid,
   stepRolesInvalid,
   stepFormInvalid,
+  stepValidationRequestId,
   savePending,
   addStepPending,
   updateStepPending,
@@ -92,6 +95,8 @@ export function NodeInspectorPanel({
   const stepSavePending = addStepPending || updateStepPending;
   const stepActionPending = readOnly || stepSavePending || deleteStepPending || reorderStepPending;
   const stepDialogReadOnly = readOnly || stepDialogMode === 'view';
+  const stepDialogContentRef = useRef<HTMLDivElement | null>(null);
+  const navigateStepValidation = useValidationNavigation(stepDialogContentRef);
   const [draggedStepId, setDraggedStepId] = useState('');
   const [dropTargetStepId, setDropTargetStepId] = useState('');
   const [dropPosition, setDropPosition] = useState<StepDropPosition>('before');
@@ -115,6 +120,20 @@ export function NodeInspectorPanel({
     if (next.mode === 'none') onChangeField('approval_policy_json', { mode: 'none' });
     else onChangeField('approval_policy_json', next);
   };
+
+  useEffect(() => {
+    if (!stepValidationRequestId || !stepDialogMode) return;
+    const key = stepCodeInvalid
+      ? 'business_code'
+      : stepNameInvalid
+        ? 'name'
+        : stepRolesInvalid
+          ? 'required_role_ids'
+          : stepFormInvalid
+            ? 'form_version_id'
+            : undefined;
+    navigateStepValidation(key);
+  }, [navigateStepValidation, stepCodeInvalid, stepDialogMode, stepFormInvalid, stepNameInvalid, stepRolesInvalid, stepValidationRequestId]);
 
   const resetStepDragState = () => {
     setDraggedStepId('');
@@ -420,16 +439,17 @@ export function NodeInspectorPanel({
           )
         }
       >
-        <div className="space-y-4">
+        <div ref={stepDialogContentRef} className="space-y-4">
           {stepDialogReadOnly ? (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
               Revision đã phát hành là bất biến. Nội dung bên dưới chỉ để xem.
             </div>
           ) : null}
-          <Field label="Business code" value={stepForm.business_code} onChange={(value) => onChangeStepField('business_code', value)} invalid={stepCodeInvalid} invalidText="Business code phải ổn định, dạng lowercase.segment" disabled={stepDialogReadOnly} />
-          <Field label="Tên" value={stepForm.name} onChange={(value) => onChangeStepField('name', value)} invalid={stepNameInvalid} disabled={stepDialogReadOnly} />
+          <Field fieldKey="business_code" label="Business code" value={stepForm.business_code} onChange={(value) => onChangeStepField('business_code', value)} invalid={stepCodeInvalid} invalidText="Business code phải ổn định, dạng lowercase.segment" disabled={stepDialogReadOnly} />
+          <Field fieldKey="name" label="Tên" value={stepForm.name} onChange={(value) => onChangeStepField('name', value)} invalid={stepNameInvalid} disabled={stepDialogReadOnly} />
           <Select label="Loại" value={stepForm.step_type} options={enumOptions('step_type', stepTypes)} onChange={(value) => onChangeStepField('step_type', value)} disabled={stepDialogReadOnly} />
           <MultiSelect
+            fieldKey="required_role_ids"
             label="Role phụ trách"
             value={stepForm.required_role_ids}
             options={pipelineActorRoleOptions}
@@ -447,6 +467,7 @@ export function NodeInspectorPanel({
             onChange={(value) => onChangeStepField('required_role_ids', value)}
           />
           <WorkflowFormSelect
+            fieldKey="form_version_id"
             value={stepForm.form_version_id}
             required={stepForm.form_required}
             invalid={stepFormInvalid}
@@ -472,15 +493,15 @@ function isRecord(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function Field({ label, value, onChange, textarea, invalid, invalidText, disabled = false }: { label: string; value?: string; onChange: (value: string) => void; textarea?: boolean; invalid?: boolean; invalidText?: string; disabled?: boolean }) {
+function Field({ fieldKey, label, value, onChange, textarea, invalid, invalidText, disabled = false }: { fieldKey?: string; label: string; value?: string; onChange: (value: string) => void; textarea?: boolean; invalid?: boolean; invalidText?: string; disabled?: boolean }) {
   const fieldClass = `mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600 ${invalid ? 'border-rose-300 bg-rose-50' : 'border-line'}`;
   return (
-    <label className="block">
+    <label className="block" data-validation-key={fieldKey} data-validation-error={invalid ? 'true' : undefined}>
       <span className="text-sm font-semibold text-slate-700">{label}</span>
       {textarea ? (
-        <textarea className={`${fieldClass} min-h-20`} value={value ?? ''} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+        <textarea name={fieldKey} className={`${fieldClass} min-h-20`} value={value ?? ''} disabled={disabled} aria-invalid={invalid} onChange={(event) => onChange(event.target.value)} />
       ) : (
-        <input className={fieldClass} value={value ?? ''} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+        <input name={fieldKey} className={fieldClass} value={value ?? ''} disabled={disabled} aria-invalid={invalid} onChange={(event) => onChange(event.target.value)} />
       )}
       {invalid ? <span className="mt-1 block text-xs font-medium text-rose-600">{invalidText ?? 'Tên checklist là bắt buộc'}</span> : null}
     </label>
@@ -536,6 +557,7 @@ function PermissionSelect({
 }
 
 function WorkflowFormSelect({
+  fieldKey,
   value,
   required,
   invalid,
@@ -547,6 +569,7 @@ function WorkflowFormSelect({
   onRequiredChange,
   onChange,
 }: {
+  fieldKey?: string;
   value: string;
   required: boolean;
   invalid: boolean;
@@ -561,7 +584,7 @@ function WorkflowFormSelect({
   const inputDisabled = disabled || loading || error || !forms.length;
   const requiredFields = requiredFieldLabels(selectedForm);
   return (
-    <section className="rounded-md border border-line bg-slate-50 p-3">
+    <section className="rounded-md border border-line bg-slate-50 p-3" data-validation-key={fieldKey} data-validation-error={invalid ? 'true' : undefined}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-ink">Workflow Form</h3>
@@ -574,11 +597,13 @@ function WorkflowFormSelect({
       <label className="mt-3 block">
         <span className="text-xs font-semibold text-slate-600">Form template/version</span>
         <select
+          name={fieldKey}
           className={clsx(
             'mt-1 w-full rounded-md border px-3 py-2 text-sm focus-ring disabled:bg-slate-100',
             invalid ? 'border-rose-300 bg-rose-50' : 'border-line bg-white',
           )}
           value={value ?? ''}
+          aria-invalid={invalid}
           disabled={inputDisabled}
           onChange={(event) => onChange(event.target.value)}
         >
@@ -621,6 +646,7 @@ function requiredFieldLabels(form?: WorkflowFormCatalogItem) {
 }
 
 function MultiSelect({
+  fieldKey,
   label,
   value,
   options,
@@ -638,6 +664,7 @@ function MultiSelect({
   dropdownMode = 'overlay',
   onChange,
 }: {
+  fieldKey?: string;
   label: string;
   value: string[];
   options: SelectOption[];
@@ -675,7 +702,7 @@ function MultiSelect({
   };
 
   return (
-    <div className="block">
+    <div className="block" data-validation-key={fieldKey} data-validation-error={invalid ? 'true' : undefined}>
       <span className="text-sm font-semibold text-slate-700">{label}</span>
       <div className={clsx('mt-1 rounded-md border px-2 py-2', invalid ? 'border-rose-300 bg-rose-50' : 'border-line')}>
         <div className="flex min-h-8 flex-wrap gap-1">
@@ -699,8 +726,10 @@ function MultiSelect({
         >
           <div className="flex overflow-hidden rounded-md border border-line bg-white focus-within:ring-2 focus-within:ring-blue-100">
             <input
+              name={fieldKey}
               className="min-w-0 flex-1 px-3 py-2 text-sm outline-none disabled:bg-slate-100"
               value={query}
+              aria-invalid={invalid}
               disabled={!canSearch}
               placeholder={loading ? loadingPlaceholder : availableOptions.length ? searchPlaceholder : fullPlaceholder}
               onFocus={() => {

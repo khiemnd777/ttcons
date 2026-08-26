@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import { useToast } from '../../components/ToastProvider';
 import { post, postFormWithProgress } from '../../lib/api/client';
 import type { EvidenceRecord } from '../../lib/types/domain';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import {
   classifyEvidenceFile,
   evidenceFileAccept,
@@ -67,6 +68,7 @@ export function EvidencePanel({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRefs = useRef(new Map<string, HTMLInputElement>());
   const lastHandledNavigationRef = useRef<number | null>(null);
+  const navigateUploadValidation = useValidationNavigation(uploadFormRef);
   const stats = useMemo(() => evidenceStats(evidence), [evidence]);
   const selectedRows = useMemo(() => uploadRows.filter((row) => row.file), [uploadRows]);
   const overallProgress = useMemo(() => evidenceUploadOverallProgress(selectedRows.map((row) => ({
@@ -133,6 +135,7 @@ export function EvidencePanel({
       input.value = '';
       updateUploadRow(rowId, (row) => ({ ...row, file: null, classification: null, name: '', fileIssue: issue, progress: 0, status: 'queued', error: '' }));
       toast.warn({ title: 'Tệp không được hỗ trợ', description: `${file.name}: ${issue}` });
+      navigateUploadValidation(rowId);
       return;
     }
     if (file.size <= 0 || file.size > maxEvidenceUploadBytes) {
@@ -142,6 +145,7 @@ export function EvidencePanel({
       input.value = '';
       updateUploadRow(rowId, (row) => ({ ...row, file: null, classification: null, name: '', fileIssue: issue, progress: 0, status: 'queued', error: '' }));
       toast.warn({ title: 'Dung lượng tệp không hợp lệ', description: `${file.name}: ${issue}` });
+      navigateUploadValidation(rowId);
       return;
     }
 
@@ -185,6 +189,7 @@ export function EvidencePanel({
     const rows = uploadRows.filter((row) => (!included || included.has(row.id)) && isUploadableRow(row));
     if (!rows.length) {
       toast.warn({ title: 'Chưa có tệp chờ tải', description: `Chọn tối đa ${evidenceUploadBatchLimit} tệp thuộc nhóm ${evidenceSupportedFileHint}.` });
+      navigateUploadValidation(uploadRows[0]?.id);
       return;
     }
 
@@ -234,6 +239,7 @@ export function EvidencePanel({
       const failedRows = current.filter((row) => failedRowIds.has(row.id));
       return failedRows.length ? failedRows : [createEvidenceUploadRow()];
     });
+    navigateUploadValidation(failedRowIds.values().next().value);
     if (successCount) {
       toast.warn({
         title: `Đã tải xong ${successCount} tệp · ${failureCount} tệp lỗi`,
@@ -297,6 +303,7 @@ export function EvidencePanel({
             event.preventDefault();
             void uploadEvidenceRows();
           }}
+          noValidate
         >
           <div className="hidden gap-2 px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:grid xl:grid-cols-[2rem_minmax(14rem,1.4fr)_7rem_minmax(9rem,1fr)_minmax(9rem,1fr)_10rem]">
             <span>#</span>
@@ -312,7 +319,7 @@ export function EvidencePanel({
               const rowBusy = row.status === 'uploading' || row.status === 'processing';
               const photoMismatch = requirementEvidenceType === 'photo' && row.classification?.evidenceType === 'document';
               return (
-                <article key={row.id} className={clsx('rounded-md border bg-white p-2', row.status === 'error' ? 'border-rose-300' : row.status === 'success' ? 'border-emerald-300' : 'border-line')}>
+                <article data-validation-key={row.id} data-validation-error={row.fileIssue || row.status === 'error' ? 'true' : undefined} key={row.id} className={clsx('scroll-mt-24 rounded-md border bg-white p-2', row.status === 'error' ? 'border-rose-300' : row.status === 'success' ? 'border-emerald-300' : 'border-line')}>
                   <div className="grid gap-2 xl:grid-cols-[2rem_minmax(14rem,1.4fr)_7rem_minmax(9rem,1fr)_minmax(9rem,1fr)_10rem] xl:items-start">
                     <span className="hidden pt-2 text-center text-sm font-semibold text-slate-500 xl:block">{index + 1}</span>
                     <label className="min-w-0">
@@ -324,6 +331,8 @@ export function EvidencePanel({
                           if (index === 0) fileInputRef.current = node;
                         }}
                         type="file"
+                        name={row.id}
+                        aria-invalid={Boolean(row.fileIssue || row.status === 'error')}
                         accept={evidenceFileAccept}
                         disabled={batchUploading}
                         className={clsx('block w-full rounded-md border bg-white px-2 py-1.5 text-sm file:mr-2 file:rounded-md file:border-0 file:bg-blue-50 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 disabled:bg-slate-100', row.fileIssue ? 'border-rose-400' : 'border-line', index === 0 && 'mt-1 xl:mt-0')}

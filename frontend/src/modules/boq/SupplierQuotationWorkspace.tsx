@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ClipboardCheck, Eye, FilePlus2, Loader2, Pencil, Send } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
@@ -10,6 +10,7 @@ import type { BOQItem, Partner, SupplierQuoteComparison, SupplierQuotation } fro
 import { partnerOptions } from '../core-data/partnerUtils';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { dateText } from '../../lib/utils/format';
+import { firstInvalidFieldKey, useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import {
   syncWorkItemMutationTransition,
   withWorkItemMutationContext,
@@ -281,14 +282,24 @@ export function SupplierQuotationWorkspace({ projectId, workItemId, boqItems, mo
 }
 
 function QuotationEditor({ draft, errors, supplierOptions, pending, onChange, onClose, onSave }: { draft: QuotationDraft | null; errors: QuotationErrors; supplierOptions: Array<{ label: string; value: string }>; pending: boolean; onChange: (value: QuotationDraft | null) => void; onClose: () => void; onSave: () => void }) {
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const navigateValidation = useValidationNavigation(contentRef);
+  const editorOpen = Boolean(draft);
+
+  useEffect(() => {
+    if (!editorOpen) return;
+    navigateValidation(firstInvalidFieldKey(errors, ['quotation_code', 'supplier_partner_id', 'quotation_date', 'items']));
+  }, [editorOpen, errors, navigateValidation]);
+
   if (!draft) return null;
   const set = <K extends keyof QuotationDraft>(key: K, value: QuotationDraft[K]) => onChange({ ...draft, [key]: value });
   const updateItem = (index: number, patch: Partial<QuotationItemDraft>) => set('items', draft.items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
   return <Dialog open title={draft.id ? 'Chỉnh sửa báo giá' : 'Tạo báo giá nhà cung cấp'} description="Lưu nháp trước khi gửi đánh giá. Sau khi gửi, nội dung báo giá không thể sửa." onClose={onClose} size="workspace" footer={<div className="flex justify-end gap-2"><button className="rounded-md border border-line px-3 py-2 text-sm font-semibold" onClick={onClose}>Đóng</button><button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={pending} onClick={onSave}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Lưu nháp</button></div>}>
+    <div ref={contentRef}>
     <div className="grid gap-3 md:grid-cols-4">
-      <Field label="Mã báo giá" value={draft.quotation_code} error={errors.quotation_code} onChange={(value) => set('quotation_code', value)} required />
-      <SelectField label="Nhà cung cấp" value={draft.supplier_partner_id} error={errors.supplier_partner_id} onChange={(value) => set('supplier_partner_id', value)} options={supplierOptions} required />
-      <Field label="Ngày báo giá" type="date" value={draft.quotation_date} error={errors.quotation_date} onChange={(value) => set('quotation_date', value)} required />
+      <Field fieldKey="quotation_code" label="Mã báo giá" value={draft.quotation_code} error={errors.quotation_code} onChange={(value) => set('quotation_code', value)} required />
+      <SelectField fieldKey="supplier_partner_id" label="Nhà cung cấp" value={draft.supplier_partner_id} error={errors.supplier_partner_id} onChange={(value) => set('supplier_partner_id', value)} options={supplierOptions} required />
+      <Field fieldKey="quotation_date" label="Ngày báo giá" type="date" value={draft.quotation_date} error={errors.quotation_date} onChange={(value) => set('quotation_date', value)} required />
       <Field label="Hiệu lực đến" type="date" value={draft.valid_until} onChange={(value) => set('valid_until', value)} />
       <Field label="Tiền tệ" value={draft.currency} onChange={(value) => set('currency', value.toUpperCase())} required />
       <Field label="Công nợ (ngày)" type="number" value={draft.payment_terms_days} onChange={(value) => set('payment_terms_days', value)} />
@@ -297,14 +308,14 @@ function QuotationEditor({ draft, errors, supplierOptions, pending, onChange, on
       <Field label="Bảo hành" value={draft.warranty_terms} onChange={(value) => set('warranty_terms', value)} />
       <label className="md:col-span-3"><span className="text-sm font-semibold text-slate-700">Ghi chú</span><textarea className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm" rows={2} value={draft.notes} onChange={(event) => set('notes', event.target.value)} /></label>
     </div>
-    <div className="mt-5 overflow-x-auto rounded-md border border-line">
-      {errors.items ? <p className="border-b border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{errors.items}</p> : null}
+    <div className="mt-5 overflow-x-auto rounded-md border border-line" data-validation-key="items" data-validation-error={errors.items ? 'true' : undefined}>
+      {errors.items ? <p role="alert" className="border-b border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{errors.items}</p> : null}
       <table className="min-w-[1100px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-2 py-2">Chọn</th><th className="px-2 py-2">Dòng BOQ</th><th className="px-2 py-2">Khối lượng</th><th className="px-2 py-2">Đơn giá</th><th className="px-2 py-2">Chiết khấu</th><th className="px-2 py-2">Thuế GTGT %</th><th className="px-2 py-2">Thời gian cung ứng</th><th className="px-2 py-2">Đáp ứng</th><th className="px-2 py-2">Sai khác</th></tr></thead>
         <tbody className="divide-y divide-line">{draft.items.map((item, index) => <tr key={item.boq_item_id} className={!item.enabled ? 'opacity-50' : ''}>
           <td className="px-2 py-2"><input type="checkbox" checked={item.enabled} onChange={(event) => updateItem(index, { enabled: event.target.checked })} /></td>
           <td className="px-2 py-2"><div className="font-semibold">{item.description}</div><div className="text-xs text-slate-500">{item.unit}</div></td>
-          <td className="px-2 py-2"><MiniInput type="number" value={item.quantity} error={errors[`item_${index}_quantity`]} disabled={!item.enabled} onChange={(value) => updateItem(index, { quantity: value })} /></td>
-          <td className="px-2 py-2"><CurrencyMiniInput currencyCode={draft.currency} value={item.unit_price} error={errors[`item_${index}_unit_price`]} disabled={!item.enabled} onChange={(value) => updateItem(index, { unit_price: value })} /></td>
+          <td className="px-2 py-2"><MiniInput fieldKey={`item_${index}_quantity`} type="number" value={item.quantity} error={errors[`item_${index}_quantity`]} disabled={!item.enabled} onChange={(value) => updateItem(index, { quantity: value })} /></td>
+          <td className="px-2 py-2"><CurrencyMiniInput fieldKey={`item_${index}_unit_price`} currencyCode={draft.currency} value={item.unit_price} error={errors[`item_${index}_unit_price`]} disabled={!item.enabled} onChange={(value) => updateItem(index, { unit_price: value })} /></td>
           <td className="px-2 py-2"><CurrencyMiniInput currencyCode={draft.currency} value={item.discount_amount} disabled={!item.enabled} onChange={(value) => updateItem(index, { discount_amount: value })} /></td>
           <td className="px-2 py-2"><MiniInput type="number" value={item.tax_rate} disabled={!item.enabled} onChange={(value) => updateItem(index, { tax_rate: value })} /></td>
           <td className="px-2 py-2"><MiniInput type="number" value={item.lead_time_days} disabled={!item.enabled} onChange={(value) => updateItem(index, { lead_time_days: value })} /></td>
@@ -312,6 +323,7 @@ function QuotationEditor({ draft, errors, supplierOptions, pending, onChange, on
           <td className="px-2 py-2"><MiniInput value={item.deviation_note} disabled={!item.enabled} onChange={(value) => updateItem(index, { deviation_note: value })} /></td>
         </tr>)}</tbody>
       </table>
+    </div>
     </div>
   </Dialog>;
 }
@@ -325,10 +337,19 @@ function QualificationDialog({ value, pending, onChange, onClose, onSubmit }: { 
 }
 
 function SelectionDialog({ value, error, pending, onChange, onClose, onSubmit }: { value: SelectionState | null; error: boolean; pending: boolean; onChange: (value: SelectionState | null) => void; onClose: () => void; onSubmit: () => void }) {
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const navigateValidation = useValidationNavigation(contentRef);
+
+  useEffect(() => {
+    if (value && error) navigateValidation('selection_reason');
+  }, [error, navigateValidation, value]);
+
   if (!value) return null;
   return <Dialog open title="Xác nhận chọn báo giá" description={`${value.row.work_item_name} · ${value.quote.supplier_name}`} onClose={onClose} footer={<div className="flex justify-end gap-2"><button className="rounded-md border border-line px-3 py-2 text-sm font-semibold" onClick={onClose}>Đóng</button><button className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={pending} onClick={onSubmit}>Chọn & khóa giá cuối</button></div>}>
+    <div ref={contentRef}>
     <div className="grid gap-3 rounded-md border border-line bg-slate-50 p-3 sm:grid-cols-3"><Summary label="Giá định mức" value={<CurrencyText value={value.row.norm_unit_price ?? value.row.expected_unit_price} />} /><Summary label="Giá được chọn" value={<CurrencyText value={value.quote.unit_price} />} /><Summary label="Thời gian cung ứng" value={`${value.quote.lead_time_days} ngày`} /></div>
-    <label className="mt-3 block"><span className="text-sm font-semibold text-slate-700">Căn cứ quyết định *</span><textarea className={`mt-1 w-full rounded-md border px-3 py-2 text-sm ${error ? 'border-rose-300 bg-rose-50' : 'border-line'}`} aria-invalid={error} rows={4} value={value.reason} onChange={(event) => onChange({ ...value, reason: event.target.value })} placeholder="Nêu căn cứ giá, kỹ thuật, tiến độ, điều khoản thanh toán..." />{error ? <p className="mt-1 text-xs font-medium text-rose-700">Căn cứ quyết định là bắt buộc.</p> : null}</label>
+    <label className="mt-3 block" data-validation-key="selection_reason" data-validation-error={error ? 'true' : undefined}><span className="text-sm font-semibold text-slate-700">Căn cứ quyết định *</span><textarea name="selection_reason" className={`mt-1 w-full rounded-md border px-3 py-2 text-sm ${error ? 'border-rose-300 bg-rose-50' : 'border-line'}`} aria-invalid={error} aria-describedby={error ? 'selection-reason-error' : undefined} rows={4} value={value.reason} onChange={(event) => onChange({ ...value, reason: event.target.value })} placeholder="Nêu căn cứ giá, kỹ thuật, tiến độ, điều khoản thanh toán..." />{error ? <p id="selection-reason-error" role="alert" className="mt-1 text-xs font-medium text-rose-700">Căn cứ quyết định là bắt buộc.</p> : null}</label>
+    </div>
   </Dialog>;
 }
 
@@ -383,7 +404,7 @@ function Summary({ label, value }: { label: string; value: React.ReactNode }) { 
 function LoadingText() { return <div className="flex items-center gap-2 rounded-md border border-dashed border-line p-4 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Đang tải dữ liệu...</div>; }
 function EmptyText({ text }: { text: string }) { return <div className="rounded-md border border-dashed border-line p-4 text-sm text-slate-500">{text}</div>; }
 function ErrorText({ onRetry }: { onRetry: () => void }) { return <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"><span>Không tải được dữ liệu báo giá.</span><button className="font-semibold underline" onClick={onRetry}>Thử lại</button></div>; }
-function Field({ label, value, onChange, type = 'text', required = false, error }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean; error?: string }) { return <label><span className="text-sm font-semibold text-slate-700">{label}{required ? ' *' : ''}</span><input className={`mt-1 w-full rounded-md border px-3 py-2 text-sm ${error ? 'border-rose-300 bg-rose-50' : 'border-line'}`} aria-invalid={Boolean(error)} type={type} value={value} onChange={(event) => onChange(event.target.value)} />{error ? <p className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}</label>; }
-function SelectField({ label, value, onChange, options, required = false, error }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ label: string; value: string }>; required?: boolean; error?: string }) { return <label><span className="text-sm font-semibold text-slate-700">{label}{required ? ' *' : ''}</span><select className={`mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm ${error ? 'border-rose-300 bg-rose-50' : 'border-line'}`} aria-invalid={Boolean(error)} value={value} onChange={(event) => onChange(event.target.value)}><option value="">-- Chọn --</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{error ? <p className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}</label>; }
-function MiniInput({ value, onChange, type = 'text', disabled = false, error }: { value: string; onChange: (value: string) => void; type?: string; disabled?: boolean; error?: string }) { return <div><input className={`w-28 rounded-md border px-2 py-1.5 text-sm disabled:bg-slate-100 ${error ? 'border-rose-300 bg-rose-50' : 'border-line'}`} aria-invalid={Boolean(error)} type={type} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />{error ? <p className="mt-1 w-28 text-xs font-medium text-rose-700">{error}</p> : null}</div>; }
-function CurrencyMiniInput({ value, currencyCode, onChange, disabled = false, error }: { value: string; currencyCode: string; onChange: (value: string) => void; disabled?: boolean; error?: string }) { return <div><CurrencyInput className="w-36" inputClassName="px-2 py-1.5 text-sm" currencyCode={currencyCode} value={value} disabled={disabled} invalid={Boolean(error)} onValueChange={({ numericString }) => onChange(numericString)} />{error ? <p className="mt-1 w-36 text-xs font-medium text-rose-700">{error}</p> : null}</div>; }
+function Field({ fieldKey, label, value, onChange, type = 'text', required = false, error }: { fieldKey?: string; label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean; error?: string }) { return <label data-validation-key={fieldKey} data-validation-error={error ? 'true' : undefined}><span className="text-sm font-semibold text-slate-700">{label}{required ? ' *' : ''}</span><input name={fieldKey} className={`mt-1 w-full rounded-md border px-3 py-2 text-sm ${error ? 'border-rose-300 bg-rose-50' : 'border-line'}`} aria-invalid={Boolean(error)} type={type} value={value} onChange={(event) => onChange(event.target.value)} />{error ? <p role="alert" className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}</label>; }
+function SelectField({ fieldKey, label, value, onChange, options, required = false, error }: { fieldKey?: string; label: string; value: string; onChange: (value: string) => void; options: Array<{ label: string; value: string }>; required?: boolean; error?: string }) { return <label data-validation-key={fieldKey} data-validation-error={error ? 'true' : undefined}><span className="text-sm font-semibold text-slate-700">{label}{required ? ' *' : ''}</span><select name={fieldKey} className={`mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm ${error ? 'border-rose-300 bg-rose-50' : 'border-line'}`} aria-invalid={Boolean(error)} value={value} onChange={(event) => onChange(event.target.value)}><option value="">-- Chọn --</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{error ? <p role="alert" className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}</label>; }
+function MiniInput({ fieldKey, value, onChange, type = 'text', disabled = false, error }: { fieldKey?: string; value: string; onChange: (value: string) => void; type?: string; disabled?: boolean; error?: string }) { return <div data-validation-key={fieldKey} data-validation-error={error ? 'true' : undefined}><input name={fieldKey} className={`w-28 rounded-md border px-2 py-1.5 text-sm disabled:bg-slate-100 ${error ? 'border-rose-300 bg-rose-50' : 'border-line'}`} aria-invalid={Boolean(error)} type={type} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />{error ? <p role="alert" className="mt-1 w-28 text-xs font-medium text-rose-700">{error}</p> : null}</div>; }
+function CurrencyMiniInput({ fieldKey, value, currencyCode, onChange, disabled = false, error }: { fieldKey?: string; value: string; currencyCode: string; onChange: (value: string) => void; disabled?: boolean; error?: string }) { return <div data-validation-key={fieldKey} data-validation-error={error ? 'true' : undefined}><CurrencyInput className="w-36" inputClassName="px-2 py-1.5 text-sm" currencyCode={currencyCode} value={value} disabled={disabled} invalid={Boolean(error)} onValueChange={({ numericString }) => onChange(numericString)} />{error ? <p role="alert" className="mt-1 w-36 text-xs font-medium text-rose-700">{error}</p> : null}</div>; }

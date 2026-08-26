@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Camera, ClipboardCheck, Eye, FileText, Image as ImageIcon, Loader2, Package, Plus, RefreshCw, Send, Trash2, Users, Wrench } from 'lucide-react';
 import clsx from 'clsx';
@@ -24,6 +24,7 @@ import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } fro
 import { ConstructionReportLinkedComposer, createReportLinkedDraft, reportLinkedSubmitLabel, validateReportLinkedDrafts, type ReportLinkedDraft } from './ConstructionReportLinkedComposer';
 import { constructionReportEditModel } from './constructionReportViewModel';
 import { useWorkReportRecipients } from './useWorkReportRecipients';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 type CrewDraft = { crew_name: string; worker_count: string; work_hours: string; note: string };
 type MaterialDraft = { material_name: string; quantity: string; unit: string; note: string };
@@ -95,6 +96,8 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   const [evidenceViewer, setEvidenceViewer] = useState<ReportEvidenceViewer | null>(null);
   const [recipientId, setRecipientId] = useState('');
   const [deliveryComment, setDeliveryComment] = useState('');
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const navigateToValidation = useValidationNavigation(formRef);
 
   useEffect(() => {
     if (!open) return;
@@ -244,6 +247,9 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
       setErrors(nextErrors);
       const linkedSummary = linkedErrors.length ? `${linkedErrors.length} kiểm tra/việc xử lý chưa đủ thông tin` : '';
       toast.warn({ title: 'Kiểm tra báo cáo', description: `Thiếu hoặc sai: ${[...Object.values(nextErrors), linkedSummary].filter(Boolean).join(', ')}` });
+      navigateToValidation({ prepare: () => {
+        if (nextErrors.done_items) setWorkGroup('done');
+      } });
       return;
     }
     const payload: ConstructionDailyReportCreatePayload = {
@@ -332,7 +338,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
           </div>
         )}
       >
-      <form id="construction-report-form" className="space-y-5" onSubmit={handleSubmit}>
+      <form ref={formRef} id="construction-report-form" className="space-y-5" noValidate onSubmit={handleSubmit}>
         <section className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Field label="Ngày báo cáo" required error={errors.report_date}>
@@ -358,7 +364,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
 
         <div className={clsx('grid gap-5', mode === 'create' && (canCreateCheck || canCreateAction) && 'xl:grid-cols-[minmax(0,1fr)_22rem]')}>
           <div className="space-y-5">
-            <section>
+            <section data-validation-error={errors.done_items ? 'true' : undefined} className="scroll-mt-24 rounded-md">
 	              <SectionTitle title="Công việc trong ngày" description="Ghi các hạng mục đã làm, đang làm và kế hoạch tiếp theo trong ngày." />
               <div className="mt-3 flex gap-1 overflow-x-auto rounded-lg border border-line bg-slate-50 p-1">
                 {([
@@ -379,7 +385,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
               <BlockerEditor rows={blockers} drafts={linkedDrafts} canCreateCheck={mode === 'create' && canCreateCheck} canCreateAction={mode === 'create' && canCreateAction} disabled={!workspace} onChange={setBlockerContent} onRelation={setBlockerRelation} onRemove={removeBlocker} onAdd={() => setBlockers((current) => [...current, emptyBlocker()])} />
             </section>
 
-            <section>
+            <section data-validation-error={errors.evidence_ids ? 'true' : undefined} className="scroll-mt-24 rounded-md">
 	              <SectionTitle title={`Minh chứng · ${selectedEvidenceIds.length + uploads.length}`} description="Bắt buộc ít nhất một ảnh hiện trường; kiểm tra và việc xử lý sẽ dùng lại minh chứng này." />
               <div className="mt-3 space-y-3">
 	                {!workItemId ? <InfoState title="Chưa chọn hạng mục thi công" description="Chọn hạng mục đang thực hiện trước khi chụp hoặc tải ảnh hiện trường." /> : null}
@@ -403,7 +409,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
           {mode === 'create' && (canCreateCheck || canCreateAction) ? <ConstructionReportLinkedComposer mode="batch" drafts={linkedDrafts} onChange={setLinkedDrafts} workspace={workspace} sourceWorkItemId={workItemId} reportEvidence={selectedEvidence} reportEvidencePending={uploads.length > 0} primaryEvidenceId={primaryEvidenceId} canCreateCheck={canCreateCheck} canCreateAction={canCreateAction} showValidation={showLinkedErrors} /> : null}
         </div>
         {mayDeliver ? (
-          <section className={clsx('rounded-lg border bg-blue-50/50 p-4', errors.delivery_recipient_id ? 'border-rose-300' : 'border-blue-200')} aria-labelledby="construction-report-delivery-heading">
+          <section data-validation-error={errors.delivery_recipient_id ? 'true' : undefined} className={clsx('scroll-mt-24 rounded-lg border bg-blue-50/50 p-4', errors.delivery_recipient_id ? 'border-rose-300' : 'border-blue-200')} aria-labelledby="construction-report-delivery-heading">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
               <div>
                 <h3 id="construction-report-delivery-heading" className="font-semibold text-ink">Gửi báo cáo</h3>
@@ -579,11 +585,11 @@ function MaterialEditor({ rows, onChange, error }: { rows: MaterialDraft[]; onCh
 }
 
 function ResourceEditorFrame({ icon, title, count, error, onAdd, children }: { icon: ReactNode; title: string; count: number; error?: string; onAdd: () => void; children: ReactNode }) {
-  return <article className={clsx('rounded-lg border border-line bg-white p-4', error && 'border-rose-300')}><div className="flex items-center justify-between gap-3"><h4 className="flex items-center gap-2 text-sm font-semibold text-ink"><span className="text-blue-600">{icon}</span>{title}</h4><span className="text-xs font-semibold text-slate-500">{count} dòng</span></div><div className="mt-3">{children}</div>{error ? <p className="mt-2 text-xs font-medium text-rose-700">{error}</p> : null}<button type="button" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700" onClick={onAdd}><Plus className="h-3.5 w-3.5" /> Thêm dòng</button></article>;
+  return <article data-validation-error={error ? 'true' : undefined} className={clsx('scroll-mt-24 rounded-lg border border-line bg-white p-4', error && 'border-rose-300')}><div className="flex items-center justify-between gap-3"><h4 className="flex items-center gap-2 text-sm font-semibold text-ink"><span className="text-blue-600">{icon}</span>{title}</h4><span className="text-xs font-semibold text-slate-500">{count} dòng</span></div><div className="mt-3">{children}</div>{error ? <p role="alert" className="mt-2 text-xs font-medium text-rose-700">{error}</p> : null}<button type="button" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700" onClick={onAdd}><Plus className="h-3.5 w-3.5" /> Thêm dòng</button></article>;
 }
 
 function Field({ label, required = false, error, helper, children }: { label: string; required?: boolean; error?: string; helper?: string; children: ReactNode }) {
-  return <label className="block"><span className="text-sm font-semibold text-slate-700">{label}{required ? <span className="ml-1 text-rose-600">*</span> : null}</span>{children}{helper ? <p className="mt-1 text-xs text-slate-500">{helper}</p> : null}{error ? <p className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}</label>;
+  return <label data-validation-error={error ? 'true' : undefined} className="block scroll-mt-24 rounded-md"><span className="text-sm font-semibold text-slate-700">{label}{required ? <span className="ml-1 text-rose-600">*</span> : null}</span>{children}{helper ? <p className="mt-1 text-xs text-slate-500">{helper}</p> : null}{error ? <p role="alert" className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}</label>;
 }
 
 function SectionTitle({ title, description }: { title: string; description: string }) {

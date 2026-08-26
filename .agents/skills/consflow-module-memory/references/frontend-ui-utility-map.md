@@ -12,6 +12,12 @@ Use this map after `module-keyword-map.md` for React/Vite admin UI, frontend hel
 6. For work-item execution surfaces, inspect `frontend/src/modules/work-items` and `frontend/src/modules/projects/ProjectWorkspaceLayout.tsx` before changing layout, navigation, primary panels, evidence, forms, activity, or workflow sidebar behavior.
 7. Update this map when adding, renaming, moving, deleting, or changing UI surfaces, helper contracts, API usage patterns, or shared presentation behavior.
 
+## Shared Interaction Contracts
+
+| Keywords / behavior | Owner files | Durable contract |
+|---|---|---|
+| required field, invalid field, validation toast, scroll to error, focus first error, reveal accordion/tab/category | `lib/utils/formValidationNavigation.ts`; primary shared consumer `modules/_shared/SimpleForm.tsx`; Workflow Form consumer `modules/work-items/WorkflowFormPanel.tsx`; custom consumers under auth/profile, acceptance, BOQ/contracts, Operations, Pipeline Builder, Settings, Staff/Project Members and Work Item domain panels; focused coverage `tests/formValidationNavigation.test.ts` | Every client-side validation failure that maps to an editable control exposes a stable `data-validation-key` (or Workflow legacy key/name) inside the owning form/dialog/panel root. The first invalid key follows the form's visible business order; controlled tabs, accordions, details or categories open before two animation-frame lookup. The target center-scrolls smoothly, focuses its first visible enabled control and receives a transient rose ring; `prefers-reduced-motion` uses immediate scrolling. Lookup never searches outside the scoped owner, so nested dialogs and responsive duplicate controls remain isolated and the visible duplicate wins. Existing inline errors and warning summaries remain. API/network/RBAC/workflow-state failures without a concrete field keep their existing toast/banner and do not scroll. |
+
 ## Frontend Route Map
 
 | Route/surface | Page owner | Shared dependencies | Backend owner |

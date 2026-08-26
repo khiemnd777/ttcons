@@ -1,9 +1,11 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, Loader2, Plus, Trash2, Wrench } from 'lucide-react';
 import clsx from 'clsx';
 import type { ConstructionWorkspace, EvidenceRecord } from '../../lib/types/domain';
 import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
 import { FieldBlock, controlClass, type FormErrors } from './ConstructionFormControls';
+import { useToast } from '../../components/ToastProvider';
+import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 export type ReportLinkedDraft = {
   id: string;
@@ -92,10 +94,13 @@ export function reportLinkedSubmitLabel(drafts: ReportLinkedDraft[]) {
 }
 
 export function ConstructionReportLinkedComposer({ mode, drafts, onChange, workspace, sourceWorkItemId = '', reportEvidence = [], reportEvidencePending = false, primaryEvidenceId = '', canCreateCheck, canCreateAction, blockers = [], showValidation = false, notice, onSubmitDraft }: Props) {
+  const toast = useToast();
   const [attempted, setAttempted] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({});
   const hasReportEvidence = reportEvidence.length > 0 || reportEvidencePending;
+  const composerRef = useRef<HTMLElement | null>(null);
+  const navigateToValidation = useValidationNavigation(composerRef);
 
   function add(kind: ReportLinkedDraft['kind'], title = '', sourceBlockerKey?: string) {
     onChange((current) => [...current, createReportLinkedDraft(kind, { title, workItemId: sourceWorkItemId, sourceBlockerKey, sourceLabel: title })]);
@@ -113,7 +118,12 @@ export function ConstructionReportLinkedComposer({ mode, drafts, onChange, works
   async function submit(draft: ReportLinkedDraft) {
     setAttempted((current) => ({ ...current, [draft.id]: true }));
     const errors = validateReportLinkedDraft(draft, sourceWorkItemId, hasReportEvidence);
-    if (Object.keys(errors).length || !onSubmitDraft) return;
+    if (Object.keys(errors).length) {
+      toast.warn({ title: 'Chưa đủ thông tin', description: Object.values(errors).join(', ') });
+      navigateToValidation({});
+      return;
+    }
+    if (!onSubmitDraft) return;
     setSaving((current) => ({ ...current, [draft.id]: true }));
     setSubmitErrors((current) => ({ ...current, [draft.id]: '' }));
     try {
@@ -127,7 +137,7 @@ export function ConstructionReportLinkedComposer({ mode, drafts, onChange, works
   }
 
   const canAdd = Boolean(workspace);
-  return <aside className={clsx('rounded-lg border border-line bg-slate-50/70 p-4', mode === 'batch' && 'xl:sticky xl:top-4 xl:self-start')}>
+  return <aside ref={composerRef} className={clsx('rounded-lg border border-line bg-slate-50/70 p-4', mode === 'batch' && 'xl:sticky xl:top-4 xl:self-start')}>
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between xl:flex-col">
       <div>
         <h3 className="font-semibold text-ink">Kiểm tra & xử lý</h3>
@@ -153,7 +163,7 @@ export function ConstructionReportLinkedComposer({ mode, drafts, onChange, works
       {drafts.map((draft, index) => {
         const errors = showValidation || attempted[draft.id] ? validateReportLinkedDraft(draft, sourceWorkItemId, hasReportEvidence) : {};
         const selectedEvidenceId = draft.evidence_id || primaryEvidenceId || reportEvidence[0]?.id || '';
-        return <article key={draft.id} className={clsx('rounded-lg border bg-white p-3', draft.kind === 'check' ? 'border-blue-200' : 'border-amber-200', Object.keys(errors).length && 'ring-1 ring-rose-200')}>
+        return <article key={draft.id} data-validation-error={Object.keys(errors).length ? 'true' : undefined} className={clsx('scroll-mt-24 rounded-lg border bg-white p-3', draft.kind === 'check' ? 'border-blue-200' : 'border-amber-200', Object.keys(errors).length && 'ring-1 ring-rose-200')}>
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-2"><span className={clsx('grid h-7 w-7 shrink-0 place-items-center rounded-md', draft.kind === 'check' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700')}>{draft.kind === 'check' ? <ClipboardCheck className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}</span><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{draft.kind === 'check' ? `Kiểm tra ${index + 1}` : `Việc xử lý ${index + 1}`}</p>{draft.source_label ? <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-500">Từ blocker: {draft.source_label}</p> : null}</div></div>
             <button type="button" disabled={saving[draft.id]} className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50" onClick={() => remove(draft.id)} aria-label="Xóa mục liên kết"><Trash2 className="h-4 w-4" /></button>
