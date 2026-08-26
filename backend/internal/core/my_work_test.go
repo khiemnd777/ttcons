@@ -606,7 +606,7 @@ func TestMyWorkNavigationSummaryTotalsOnlyWorkAndApprovalLanes(t *testing.T) {
 	summary := myWorkNavigationSummaryRecord(myWorkNavigationCounts{
 		NeedAction:      2,
 		WaitingDecision: 3,
-	}, 4, 5, 6)
+	}, 4, 0, 5, 6)
 
 	if number(summary["work_total"]) != 6 || number(summary["approval_total"]) != 14 || number(summary["total"]) != 20 {
 		t.Fatalf("my work navigation totals = %#v, want work 6 + approvals 14 = 20", summary)

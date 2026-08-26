@@ -7,13 +7,13 @@
 - Frontend routes: `frontend/src/app/router.tsx`
 - Frontend modules: `frontend/src/modules/pipeline-builder`, `frontend/src/modules/planning`, `frontend/src/modules/workflow-forms`, `frontend/src/modules/workflow-definitions`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
 - Shared frontend contracts: `frontend/src/lib/api/client.ts`, `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
-- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`, `V70`, `V71`, `V83`-`V87`, Workflow Definition governance `V118`, sensitive grant role-rename hardening `V119`, and XLSX/JSON import provenance `V120`
+- Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`, `V70`, `V71`, `V83`-`V87`, Workflow Definition governance `V118`, sensitive grant role-rename hardening `V119`, XLSX/JSON import provenance `V120`, and project-startup/work-assignment coordination `V130`
 
 ## Routes
 
 - Template builder: `/pipeline-templates`, `GET /pipeline-templates/:id/pdf`, `/pipeline-nodes`, `/pipeline-steps`, `/pipeline-edges`, `/pipeline-edge-conditions`
 - Workflow Definition XLSX/JSON: `GET /workflow-definitions/imports/template?scope&format`, `POST /workflow-definitions/imports/preview|execute`, `GET /workflow-definitions/export?format`
-- Runtime: read-only global snapshot `/projects/progress-board` and invalidation stream `/projects/progress-board/stream`; project execution `/projects/:id/start-pipeline`, `/projects/:id/pipeline-run`, `/pipeline-run-nodes/:id/*`, `/pipeline-run-steps/:id/submit`
+- Runtime: read-only global snapshot `/projects/progress-board` and invalidation stream `/projects/progress-board/stream`; startup projection `/projects/:id/startup-readiness`, `/me/project-startup-actions`; project execution `/projects/:id/start-pipeline`, `/projects/:id/pipeline-run`, `/pipeline-run-nodes/:id/*`, `/pipeline-run-steps/:id/submit`
 - Work items: `/work-items/:id`, `/work-items/:id/start|complete|block|resolve-blocker|request-review|request-approval|approve|reject|request-change`
 - Activity/evidence: `/work-items/:id/activity`, `/projects/:id/activity|activity/options|activity/read-all`, `/projects/:id/evidence`, `/activities/:id/read|resolve|reactions|message|withdraw`, `/work-items/:id/evidence`, `/evidence/:id/file|accept|reject`
 - Workflow forms: `/workflow-form-templates`, `/workflow-form-template-library`, `/workflow-form-versions/:id/publish|archive`, `/workflow-form-instances/:id/draft|submit|sign|pdf-confirmation-preference|pdf-exports`

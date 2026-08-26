@@ -150,7 +150,7 @@ test('My Work isolates actor queries and never presents placeholder zeroes as lo
   assert.match(page, /queryKey: \['approvals', 'pending', 'decidable', user\?\.id, project\]/);
   assert.match(page, /queryKey: \['activity-attention', 'summary', user\?\.id, project\]/);
   assert.match(page, /queryKey: \['activity-attention', 'list', user\?\.id, project\]/);
-  assert.match(page, /<WorkQuickFilters[\s\S]*loading=\{workItems\.isLoading \|\| workflowActions\.isLoading\}[\s\S]*unavailable=\{\(workItems\.isError && !firstPage\)/);
+  assert.match(page, /<WorkQuickFilters[\s\S]*loading=\{workItems\.isLoading \|\| workflowActions\.isLoading \|\| startupActions\.isLoading\}[\s\S]*unavailable=\{\(workItems\.isError && !firstPage\)/);
   assert.match(page, /\{loading \? '…' : unavailable \? '—' : card\.value\}/);
 });
 
@@ -169,4 +169,23 @@ test('My Work surfaces generic ready stage transitions as one-click business act
   assert.match(page, /function NextQueuePanel\(/);
   assert.match(page, /pending \? 'Đang chuyển…' : action\.action_label/);
   assert.doesNotMatch(page, /Xác nhận chuyển giai đoạn/);
+});
+
+test('My Work coordinates project startup without creating placeholder work items', async () => {
+  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const projects = await source('../src/modules/projects/ProjectsPage.tsx');
+  const realtime = await source('../src/modules/notifications/ActorRealtimeProvider.tsx');
+
+  assert.match(page, /queryKey: \['my-project-startup-actions', user\?\.id, project, search\]/);
+  assert.match(page, /searchParams\.get\('setup'\)/);
+  assert.match(page, /function ProjectStartupActionCard\(/);
+  assert.match(page, /Cần thiết lập công trình/);
+  assert.match(page, /Sắp tới · chỉ xem/);
+  assert.match(page, /function ProjectStartupDialog\(/);
+  assert.match(page, /\/projects\/\$\{projectId\}\/startup-readiness/);
+  assert.match(page, /\/projects\/\$\{projectId\}\/project-manager/);
+  assert.match(page, /\/projects\/\$\{projectId\}\/start-pipeline/);
+  assert.match(page, /Khi bắt đầu, hệ thống mới tạo Work Item thật/);
+  assert.match(projects, /navigate\(`\/my-work\?setup=\$\{project\.id\}`\)/);
+  assert.match(realtime, /\['my-project-startup-actions'\]/);
 });

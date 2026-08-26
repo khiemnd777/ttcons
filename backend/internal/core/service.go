@@ -574,7 +574,7 @@ func (s *Service) UpdatePartner(ctx context.Context, id string, body Record, act
 	return row, nil
 }
 
-func (s *Service) CreateProject(ctx context.Context, body Record) (Record, error) {
+func (s *Service) CreateProject(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
 	if body["code"] == nil || body["code"] == "" {
 		body["code"] = fmt.Sprintf("PRJ-%d", time.Now().Unix())
 	}
@@ -587,16 +587,20 @@ func (s *Service) CreateProject(ctx context.Context, body Record) (Record, error
 	if err := s.applyPartnerSnapshot(ctx, body, "partner_id", "client_name", "", []string{"client"}); err != nil {
 		return nil, err
 	}
-	project, err := s.repo.Insert(ctx, "projects", projectColumns(), body)
+	project, err := s.repo.CreateProjectWithStartup(ctx, body, actorID, actorName)
 	if err != nil {
 		return nil, err
 	}
 	s.publishProjectProgressChanged("")
+	s.publishWorkQueueChanged(cleanID(project["id"]))
 	return project, nil
 }
 
 func (s *Service) UpdateProject(ctx context.Context, id string, body Record) (Record, error) {
 	delete(body, "workflow_entry_mode")
+	// PM changes must use the dedicated audited handover endpoint.
+	delete(body, "pm_staff_id")
+	delete(body, "created_by")
 	if err := s.applyPartnerSnapshot(ctx, body, "partner_id", "client_name", "", []string{"client"}); err != nil {
 		return nil, err
 	}
@@ -645,7 +649,12 @@ func (s *Service) SaveProjectMember(ctx context.Context, projectID, memberID str
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.SaveProjectMember(ctx, projectID, memberID, normalized, actorID, actorName)
+	member, err := s.repo.SaveProjectMember(ctx, projectID, memberID, normalized, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishWorkQueueChanged(projectID)
+	return member, nil
 }
 
 func (s *Service) DeactivateProjectMember(ctx context.Context, projectID, memberID, actorID, actorName string) (Record, error) {
@@ -655,7 +664,12 @@ func (s *Service) DeactivateProjectMember(ctx context.Context, projectID, member
 	if _, err := uuid.Parse(strings.TrimSpace(memberID)); err != nil {
 		return nil, validationError("member_id không hợp lệ", Record{"member_id": memberID})
 	}
-	return s.repo.DeactivateProjectMember(ctx, strings.TrimSpace(projectID), strings.TrimSpace(memberID), actorID, actorName)
+	member, err := s.repo.DeactivateProjectMember(ctx, strings.TrimSpace(projectID), strings.TrimSpace(memberID), actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	s.publishWorkQueueChanged(projectID)
+	return member, nil
 }
 
 func normalizeProjectMemberMutationRequest(projectID, memberID string, req ProjectMemberMutationRequest) (ProjectMemberMutationRequest, error) {
@@ -2338,6 +2352,7 @@ func (s *Service) StartPipeline(ctx context.Context, projectID, templateID, acto
 		return nil, err
 	}
 	s.publishProjectProgressChanged(cleanID(projectID))
+	s.publishWorkQueueChanged(cleanID(projectID))
 	return run, nil
 }
 
@@ -2402,6 +2417,11 @@ func (s *Service) MyWorkNavigationSummary(ctx context.Context, actorID string) (
 		return nil, err
 	}
 	workflowActionCount := len(workflowActions)
+	startupActions, err := s.MyProjectStartupActions(ctx, actorID, "", "")
+	if err != nil {
+		return nil, err
+	}
+	startupActionCount := int(number(recordValue(startupActions["summary"])["need_action"]))
 
 	permissions, err := s.repo.UserPermissions(ctx, actorID)
 	if err != nil {
@@ -2431,15 +2451,16 @@ func (s *Service) MyWorkNavigationSummary(ctx context.Context, actorID string) (
 		workReportReviewCount = workReportSummary.Scopes["review"]
 	}
 
-	return myWorkNavigationSummaryRecord(workItemCounts, workflowActionCount, nodeApprovalCount, workReportReviewCount), nil
+	return myWorkNavigationSummaryRecord(workItemCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount), nil
 }
 
-func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workflowActionCount, nodeApprovalCount, workReportReviewCount int) Record {
-	workTotal := workItemCounts.NeedAction + workflowActionCount
+func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount int) Record {
+	workTotal := workItemCounts.NeedAction + workflowActionCount + startupActionCount
 	approvalTotal := workItemCounts.WaitingDecision + nodeApprovalCount + workReportReviewCount
 	return Record{
 		"work_items_need_action":      workItemCounts.NeedAction,
 		"workflow_actions_ready":      workflowActionCount,
+		"project_startups_pending":    startupActionCount,
 		"work_total":                  workTotal,
 		"work_items_waiting_decision": workItemCounts.WaitingDecision,
 		"node_approvals_pending":      nodeApprovalCount,

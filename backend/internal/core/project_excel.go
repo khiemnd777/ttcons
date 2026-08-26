@@ -168,6 +168,7 @@ func (s *Service) ExecuteProjectExcelImport(ctx context.Context, actorID, actorN
 		return nil, err
 	}
 	s.publishProjectProgressChanged("")
+	s.publishWorkQueueChanged("")
 	return result, nil
 }
 
@@ -732,11 +733,11 @@ func (r *Repository) ExecuteProjectExcelImport(ctx context.Context, actorID, act
 		if err := tx.QueryRowContext(ctx, `
 			INSERT INTO projects (
 				name,code,partner_id,client_name,address,planned_start_date,planned_end_date,
-				estimated_budget,contract_amount,status,pipeline_template_id,progress_percent
+				estimated_budget,contract_amount,status,pipeline_template_id,progress_percent,created_by
 			)
-			VALUES ($1,$2,NULLIF($3,'')::uuid,$4,NULLIF($5,''),NULLIF($6,'')::date,NULLIF($7,'')::date,$8,0,'draft',$9,0)
+			VALUES ($1,$2,NULLIF($3,'')::uuid,$4,NULLIF($5,''),NULLIF($6,'')::date,NULLIF($7,'')::date,$8,0,'draft',$9,0,NULLIF($10,'')::uuid)
 			RETURNING id::text
-		`, row.ProjectName, row.ProjectCode, row.PartnerID, row.ClientName, row.Address, row.PlannedStartDate, row.PlannedEndDate, row.EstimatedBudgetVND, row.PipelineID).Scan(&projectID); err != nil {
+		`, row.ProjectName, row.ProjectCode, row.PartnerID, row.ClientName, row.Address, row.PlannedStartDate, row.PlannedEndDate, row.EstimatedBudgetVND, row.PipelineID, actorID).Scan(&projectID); err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 				return nil, conflictError("Mã công trình đã được sử dụng trong lúc import", Record{"row_number": row.RowNumber, "field": "project_code"})
@@ -775,6 +776,14 @@ func (r *Repository) ExecuteProjectExcelImport(ctx context.Context, actorID, act
 	}
 	if err := addAuditTx(ctx, tx, "", actorID, actorName, "project_data_import_completed", "project_excel_import", importID, "Hoàn tất import công trình từ gói dữ liệu", Record{
 		"source_filename": strings.TrimSpace(sourceFilename), "source_format": sourceFormat, "row_count": len(rows), "created_count": len(rows), "pipeline_started_count": 0,
+	}); err != nil {
+		return nil, err
+	}
+	if _, err := emitNotificationEventTx(ctx, tx, NotificationDomainEvent{
+		Key: "project.setup_batch_required", AggregateType: "project_excel_import", AggregateID: importID, ActorUserID: actorID,
+		Payload:  Record{"project_count": len(rows), "import_id": importID},
+		Audience: Record{"user_ids": []string{actorID}}, CorrelationKey: "project_setup_batch:" + importID,
+		IdempotencyKey: "project_setup_batch:" + importID,
 	}); err != nil {
 		return nil, err
 	}

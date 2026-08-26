@@ -641,6 +641,9 @@ func (r *Repository) CanAccessProjectPermission(ctx context.Context, userID, pro
 		return false, nil
 	}
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
@@ -694,6 +697,7 @@ func projectAccessSQL(projectAlias string, start int) string {
 	staffID := fmt.Sprintf("NULLIF($%d,'')::uuid", start+2)
 	return fmt.Sprintf(`(
 		%s
+		OR %s.created_by=%s
 		OR EXISTS (
 			SELECT 1
 			FROM project_members pm
@@ -707,7 +711,7 @@ func projectAccessSQL(projectAlias string, start int) string {
 			WHERE ur.user_id=%s
 			  AND ur.project_id=%s.id
 		)
-	)`, bypass, projectAlias, staffID, userID, projectAlias)
+	)`, bypass, projectAlias, userID, projectAlias, staffID, userID, projectAlias)
 }
 
 func (r *Repository) RunNodePermissionGate(ctx context.Context, userID, nodeID string) (bool, []string, error) {
@@ -814,6 +818,8 @@ func (r *Repository) CanViewProjectOperations(ctx context.Context, projectID, us
 		WHERE p.id=$1
 		  AND p.status <> 'cancelled'
 		  AND (
+			p.created_by=$3
+			OR
 			(NULLIF($2,'')::uuid IS NOT NULL AND EXISTS (
 				SELECT 1
 				FROM project_members pm
@@ -909,6 +915,30 @@ func (r *Repository) CanViewWorkItem(ctx context.Context, workItemID, userID str
 
 func (r *Repository) CanActOnWorkItem(ctx context.Context, workItemID, userID string) (bool, error) {
 	return r.canAccessWorkItem(ctx, workItemID, userID, false, false)
+}
+
+// IsWorkItemResponsible deliberately excludes the global admin override used by
+// interactive authorization. Notification fan-out must target the operational
+// assignment pool, not every administrator who is allowed to intervene.
+func (r *Repository) IsWorkItemResponsible(ctx context.Context, workItemID, userID string) (bool, error) {
+	profile, err := r.WorkItemAccessProfile(ctx, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	args := append([]any{workItemID}, workItemScopeArgs(profile, false, false)...)
+	rows, err := r.Query(ctx, fmt.Sprintf(`
+		SELECT COUNT(*) AS total
+		FROM work_items wi
+		JOIN projects project ON project.id=wi.project_id AND project.status <> 'cancelled'
+		WHERE wi.id=$1 AND wi.status <> 'cancelled' AND (%s)
+	`, workItemScopeSQL("wi", 2)), args...)
+	if err != nil {
+		return false, err
+	}
+	return len(rows) > 0 && number(rows[0]["total"]) > 0, nil
 }
 
 func (r *Repository) CanDecideWorkItem(ctx context.Context, item Record, userID string) (bool, error) {
@@ -1091,6 +1121,8 @@ func (r *Repository) UserHasProjectScope(ctx context.Context, userID, projectID 
 		FROM projects p
 		WHERE p.id=$1 AND p.status <> 'cancelled'
 		  AND (
+			p.created_by=$2
+			OR
 			EXISTS (
 				SELECT 1
 				FROM staff s
@@ -10022,7 +10054,11 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 	}
 	defer tx.Rollback()
 
-	projectRows, err := queryTx(ctx, tx, `SELECT id FROM projects WHERE id=$1 AND status <> 'cancelled' FOR UPDATE`, projectID)
+	projectRows, err := queryTx(ctx, tx, `
+		SELECT id::text,code,name,COALESCE(created_by::text,'') AS created_by,is_sample,
+			COALESCE(pm_staff_id::text,'') AS pm_staff_id
+		FROM projects WHERE id=$1 AND status <> 'cancelled' FOR UPDATE
+	`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -10072,6 +10108,22 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 			"status":      templateRows[0]["status"],
 		})
 	}
+	if cleanID(projectRows[0]["created_by"]) != "" && !boolValue(projectRows[0]["is_sample"]) {
+		readiness, readinessErr := projectStartupReadiness(ctx, tx, projectID)
+		if readinessErr != nil {
+			return nil, readinessErr
+		}
+		if cleanID(readiness["template_id"]) != templateID {
+			return nil, validationError("Mẫu quy trình được chọn không khớp cấu hình khởi tạo đã kiểm tra", Record{
+				"expected_template_id": readiness["template_id"], "template_id": templateID,
+			})
+		}
+		if !boolValue(readiness["ready_to_start"]) {
+			return nil, validationError("Chưa thể bắt đầu quy trình vì thiết lập công trình chưa hoàn tất", Record{
+				"blockers": readiness["blockers"], "readiness": readiness,
+			})
+		}
+	}
 	if err := validateLegacyProjectEntryPrerequisites(ctx, tx, projectID, templateID); err != nil {
 		return nil, err
 	}
@@ -10105,6 +10157,7 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 	}
 
 	currentNodeID := ""
+	readyWorkItems := make([]Record, 0)
 	runNodeIDByTemplateNodeID := map[string]string{}
 	for index, node := range nodes {
 		runNodeID := newID()
@@ -10173,6 +10226,9 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 				VALUES ($1,$2,$3,$4,$5,'pipeline_run_step',$5,$6,$7,$8,$9,'normal',$10::jsonb,$11::jsonb,NULLIF($12,'')::uuid,NULLIF($12,'')::uuid)
 			`, workItemID, projectID, runID, runNodeID, runStepID, step["name"], step["description"], workItemType(step["step_type"]), workItemStatus, string(rawWorkItemRoles), string(rawEvidenceRequirement), actorID); err != nil {
 				return nil, err
+			}
+			if workItemStatus == "ready" {
+				readyWorkItems = append(readyWorkItems, Record{"id": workItemID, "title": step["name"]})
 			}
 			for _, roleLabel := range stringSlice(roleLabels) {
 				if _, err := tx.ExecContext(ctx, `
@@ -10244,6 +10300,33 @@ func (r *Repository) StartPipeline(ctx context.Context, projectID, templateID, a
 	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "node_started", "pipeline_run", runID, "Tạo Pipeline Run và mở node đầu tiên", Record{}); err != nil {
 		return nil, err
+	}
+	if cleanID(projectRows[0]["created_by"]) != "" && !boolValue(projectRows[0]["is_sample"]) {
+		recipients := []string{cleanID(projectRows[0]["created_by"])}
+		if pmUserRows, pmErr := queryTx(ctx, tx, `
+			SELECT account.id::text AS user_id
+			FROM projects project
+			JOIN staff person ON person.id=project.pm_staff_id
+			JOIN users account ON account.id=person.user_id
+			WHERE project.id=$1::uuid
+		`, projectID); pmErr != nil {
+			return nil, pmErr
+		} else if len(pmUserRows) > 0 && cleanID(pmUserRows[0]["user_id"]) != "" && cleanID(pmUserRows[0]["user_id"]) != recipients[0] {
+			recipients = append(recipients, cleanID(pmUserRows[0]["user_id"]))
+		}
+		if _, err := emitNotificationEventTx(ctx, tx, NotificationDomainEvent{
+			Key: "project.setup_completed", AggregateType: "project", AggregateID: projectID, ProjectID: projectID, ActorUserID: actorID,
+			Payload:  Record{"actor_name": actorName, "project_id": projectID, "project_code": projectRows[0]["code"], "project_name": projectRows[0]["name"]},
+			Audience: Record{"user_ids": recipients, "resolve_thread_for_all": true}, CorrelationKey: projectStartupThreadPrefix + projectID,
+			IdempotencyKey: "project_setup:" + projectID + ":completed",
+		}); err != nil {
+			return nil, err
+		}
+	}
+	for _, item := range readyWorkItems {
+		if _, err := emitNotificationEventTx(ctx, tx, workItemAssignedNotificationEvent(item, projectRows[0], actorID, actorName, "start")); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -12006,8 +12089,20 @@ func (r *Repository) AdvanceRunNode(ctx context.Context, nodeID, actorID, actorN
 		if _, err := tx.ExecContext(ctx, `UPDATE pipeline_run_nodes SET status='in_progress', started_at=COALESCE(started_at, now()) WHERE id=$1`, nextID); err != nil {
 			return nil, err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE work_items SET status='ready', updated_at=now() WHERE run_node_id=$1 AND status='pending'`, nextID); err != nil {
+		readyItems, err := queryTx(ctx, tx, `UPDATE work_items SET status='ready', updated_at=now() WHERE run_node_id=$1 AND status='pending' RETURNING id::text,title`, nextID)
+		if err != nil {
 			return nil, err
+		}
+		projectRows, err := queryTx(ctx, tx, `SELECT id::text,code,name FROM projects WHERE id=$1::uuid`, node["project_id"])
+		if err != nil {
+			return nil, err
+		}
+		if len(projectRows) > 0 {
+			for _, item := range readyItems {
+				if _, err := emitNotificationEventTx(ctx, tx, workItemAssignedNotificationEvent(item, projectRows[0], actorID, actorName, "advance-"+nextID)); err != nil {
+					return nil, err
+				}
+			}
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE pipeline_runs SET current_node_id=$1 WHERE id=$2`, nextID, node["run_id"]); err != nil {
 			return nil, err

@@ -5,13 +5,13 @@
 - Frontend modules: `frontend/src/modules/projects`, `frontend/src/modules/planning` including `ConstructionHandoffPanel.tsx`, `frontend/src/modules/planning-daily-reports`, `frontend/src/modules/meeting-minutes`, `frontend/src/modules/planning-checklists`
 - Shared work item UI: `frontend/src/modules/work-items`
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `project_progress.go`, `types.go`; Project data-package owners `handlers_project_excel.go`, `project_excel.go`, `data_package.go`, `xlsx_workbook.go`
+- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `project_startup.go`, `project_progress.go`, `types.go`; Project data-package owners `handlers_project_excel.go`, `project_excel.go`, `data_package.go`, `xlsx_workbook.go`
 - Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
 
 ## Routes
 
 - Projects: legacy `/projects`, paginated `/projects/explorer`, invalidation `/projects/explorer/stream`, controlled `POST /projects/deletions/preview|execute`; XLSX/JSON data packages through `GET /projects/imports/readiness|template?format`, `POST /projects/imports/preview|execute`, `GET /projects/export?format`; rolling-compatible full `/projects/progress-board`, bounded `/projects/progress-board/summary`, `/projects/progress-board/stages/:stageKey`, invalidation `/projects/progress-board/stream`; dynamic `/projects/:id`, `/projects/:id/operations`, `/projects/:id/evidence`
-- Project members: `/projects/:id/members`, `/projects/:id/members/:memberId`
+- Project members/startup: `/projects/:id/members`, `/projects/:id/members/:memberId`, `/projects/:id/startup-readiness`, `/projects/:id/project-manager`, `/me/project-startup-actions`
 - Planning backend: `/projects/:id/start-pipeline`, `/projects/:id/pipeline-run`, `/projects/:id/work-items`, `/projects/:id/construction-handoff`, `/projects/:id/construction-handoff/activate`; frontend business routes: `/projects/:id/preparation`, `/projects/:id/planning`, `/projects/:id/pipeline`
 - Planning reports: `/planning/daily-reports`, `/planning/meeting-minutes`, `/planning/checklists`
 - Activity: `/projects/:id/activity`, `/projects/:id/activity/options`, `/projects/:id/activity/read-all`, `/projects/:id/activity/stream`, `/activities/:id/read|resolve|reactions|message|withdraw`, `/me/activity-attention`, `/me/activity-attention/summary`
@@ -19,7 +19,7 @@
 
 ## Tables And Migrations
 
-- `projects`, `project_members`, `audit_logs`, V116 `bulk_deletion_batches`, V117 `project_excel_imports`, V120 additive `source_format`
+- `projects` including V130 `created_by`, `project_members`, `audit_logs`, V116 `bulk_deletion_batches`, V117 `project_excel_imports`, V120 additive `source_format`; V130 also registers project-startup/work-assignment notification contracts
 - Commercial project master: `contracts`, signed `contract_versions`; `projects.contract_amount` is not the version history.
 - Runtime planning: `pipeline_runs`, `pipeline_run_nodes`, `pipeline_run_steps`, `work_items`, `construction_handoffs`, `construction_handoff_items`
 - Form-backed planning: `workflow_form_instances`, `workflow_form_answers`, `workflow_form_events`
@@ -29,6 +29,7 @@
 ## Invariants
 
 - Planning reports are project-scoped and permission-filtered.
+- A newly created/imported real project with non-null `projects.created_by` has a server-derived startup projection until its first Pipeline Run exists. Creator is the temporary owner; an active linked PM member becomes owner after the audited dedicated handover. `/my-work` shows owner action and eligible first-step preview without creating fake Work Items. Pipeline start for this cohort fails closed unless the effective template is published, PM is active and each first-node step has at least one active member matching operational role labels and required permission. Sample and legacy null-creator projects keep their historical compatibility. Successful start resolves the setup thread, creates runtime Work Items and emits exact-role assignment notifications.
 - Project XLSX/JSON import is a project-master setup action, not runtime orchestration. Readiness/template/preview/execute require a ready published Pipeline catalog plus published active Workflow Form versions containing Fields. XLSX and `consflow.project-package` JSON v1 adapt to the same exact nine-field canonical request, capped at 100 rows/5 MB; authoritative preview rejects duplicate/existing project codes and stale Pipeline/partner references and HMAC-binds format/version. Execute revalidates and atomically writes only draft `projects` with selected `pipeline_template_id`, zero contract/progress, per-project/batch audit and same-actor idempotent batch metadata including `source_format`. It never starts Pipeline or creates runtime nodes/steps, work items, form instances/answers, members or domain records. Export uses current scoped non-cancelled filter/sort or max-100 selection, remains available when reference data is incomplete and records selected/runtime reference state in the XLSX workbook or nested JSON snapshot; money in JSON uses exact decimal strings.
 - Workflow Definition XLSX/JSON can bootstrap Form/Fields and Pipeline definitions when the system has no published catalog, but import always produces drafts. Those drafts deliberately do not satisfy Project import readiness; an authorized reviewer must separately publish valid Form versions and Pipeline revisions before Project template download/import becomes available. Workflow Definition export stays independent of the Project readiness blocker.
 - The operational project report counts open issues and pending approvals in independent correlated subqueries per accessible non-cancelled project; it must not join both one-to-many sources before counting. Optional `project_id` and CSV export retain the same scope.

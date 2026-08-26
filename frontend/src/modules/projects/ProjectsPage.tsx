@@ -17,7 +17,7 @@ import {
   Plus,
   Search,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { get, post, put, streamSSE, type StreamStatus } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -55,6 +55,7 @@ const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-[112px_minmax(0,1.6fr)
 const PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS = 'lg:grid-cols-[32px_112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
 
 export function ProjectsPage() {
+	const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [search, setSearch] = useState('');
@@ -97,11 +98,14 @@ export function ProjectsPage() {
   const partners = useQuery({ queryKey: ['partners', 'client', 'active'], queryFn: () => get<Partner[]>('/partners?status=active&type=client') });
   const createProject = useMutation({
     mutationFn: (values: Record<string, any>) => post<Project>('/projects', values),
-    onSuccess: () => {
+    onSuccess: (project) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
 		queryClient.invalidateQueries({ queryKey: ['project-explorer'] });
+		queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] });
+		queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary'] });
       setOpen(false);
-      toast.success('Đã tạo công trình');
+      toast.success({ title: 'Đã tạo công trình', description: 'Tiếp theo: chỉ định PM, kiểm tra người phụ trách bước đầu và bắt đầu quy trình.' });
+      navigate(`/my-work?setup=${project.id}`);
     },
     onError: (error) => toast.error('Không tạo được công trình', error),
   });
@@ -430,8 +434,10 @@ export function ProjectsPage() {
 				await Promise.all([
 					queryClient.invalidateQueries({ queryKey: ['projects'] }),
 					queryClient.invalidateQueries({ queryKey: ['project-explorer'] }),
+					queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] }),
+					queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary'] }),
 				]);
-				toast.success({ title: `Đã tạo ${result.created_count} công trình`, description: 'Các công trình ở trạng thái Nháp; Pipeline chưa được khởi chạy.' });
+				toast.success({ title: `Đã tạo ${result.created_count} công trình`, description: 'Mở Bàn làm việc để hoàn tất PM, nhân sự bước đầu và khởi chạy quy trình.' });
 			}}
 			onError={(title, error) => toast.error(title, error)}
 		/>

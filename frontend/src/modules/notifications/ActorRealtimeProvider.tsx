@@ -52,6 +52,8 @@ export function ActorRealtimeProvider({ children }: { children: ReactNode }) {
           void queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary', actorID] });
           void queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
           void queryClient.invalidateQueries({ queryKey: ['my-workflow-actions'] });
+          void queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] });
+          void queryClient.invalidateQueries({ queryKey: ['project-startup-readiness'] });
         }
         if (message.event === 'attention_changed') {
           void queryClient.invalidateQueries({ queryKey: ['activity-attention'] });

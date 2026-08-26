@@ -454,9 +454,44 @@ func (s *Service) resolveNotificationRecipients(ctx context.Context, tx *sql.Tx,
 		return filterNotificationRecipients(ctx, tx, projection, notificationAudienceUserIDs(projection.Audience, "user_ids"))
 	case "approval_deciders":
 		return s.resolveApprovalDeciderRecipients(ctx, tx, projection)
+	case "work_item_responsible":
+		return s.resolveWorkItemResponsibleRecipients(ctx, tx, projection)
 	default:
 		return nil, fmt.Errorf("notification audience policy %q is not implemented for enabled event %q", projection.AudiencePolicyKey, projection.EventKey)
 	}
+}
+
+func (s *Service) resolveWorkItemResponsibleRecipients(ctx context.Context, tx *sql.Tx, projection notificationProjection) ([]string, error) {
+	workItemID := cleanID(projection.Audience["work_item_id"])
+	if workItemID == "" {
+		workItemID = projection.AggregateID
+	}
+	items, err := queryTx(ctx, tx, `
+		SELECT id::text,status,project_id::text
+		FROM work_items
+		WHERE id=$1::uuid AND project_id=NULLIF($2,'')::uuid
+	`, workItemID, projection.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 || !statusIn(fmt.Sprint(items[0]["status"]), "ready", "in_progress", "needs_changes", "blocked") {
+		return []string{}, nil
+	}
+	candidates, err := notificationApprovalCandidates(ctx, tx, projection.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	responsible := make([]string, 0, len(candidates))
+	for _, candidateID := range candidates {
+		allowed, err := s.repo.IsWorkItemResponsible(ctx, workItemID, candidateID)
+		if err != nil {
+			return nil, err
+		}
+		if allowed {
+			responsible = append(responsible, candidateID)
+		}
+	}
+	return filterNotificationRecipients(ctx, tx, projection, responsible)
 }
 
 func (s *Service) resolveApprovalDeciderRecipients(ctx context.Context, tx *sql.Tx, projection notificationProjection) ([]string, error) {
@@ -624,6 +659,10 @@ func filterNotificationRecipients(ctx context.Context, tx *sql.Tx, projection no
 			OR EXISTS (
 				SELECT 1 FROM user_roles project_assignment
 				WHERE project_assignment.user_id=account.id AND project_assignment.project_id=NULLIF($1,'')::uuid
+			)
+			OR EXISTS (
+				SELECT 1 FROM projects owned_project
+				WHERE owned_project.id=NULLIF($1,'')::uuid AND owned_project.created_by=account.id
 			)
 			OR EXISTS (
 				SELECT 1 FROM staff person

@@ -229,6 +229,7 @@ export type WorkReportDetail = WorkReportListItem & {
 export type MyWorkNavigationSummary = {
   work_items_need_action: number;
   workflow_actions_ready: number;
+  project_startups_pending: number;
   work_total: number;
   work_items_waiting_decision: number;
   node_approvals_pending: number;
@@ -396,6 +397,70 @@ export type ProjectMembersResponse = {
   capabilities: {
     can_manage: boolean;
     can_view_inactive: boolean;
+  };
+};
+
+export type ProjectStartupEligibleUser = {
+  user_id: string;
+  staff_id: string;
+  full_name: string;
+};
+
+export type ProjectStartupStep = {
+  id: string;
+  name: string;
+  role_ids: string[];
+  required_permission?: string;
+  eligible_users: ProjectStartupEligibleUser[];
+  covered: boolean;
+};
+
+export type ProjectStartupBlocker = {
+  key: 'pipeline_template' | 'project_manager' | 'first_step_coverage' | string;
+  label: string;
+  step_id?: string;
+};
+
+export type ProjectStartupAction = {
+  id: string;
+  action_kind: 'setup_required' | 'upcoming';
+  project_id: string;
+  project_code: string;
+  project_name: string;
+  owner_user_id: string;
+  owner_name: string;
+  ready_to_start: boolean;
+  blockers: ProjectStartupBlocker[];
+  first_steps: ProjectStartupStep[];
+  created_at?: string;
+};
+
+export type ProjectStartupActionsResponse = {
+  items: ProjectStartupAction[];
+  total: number;
+  summary: { need_action: number; upcoming: number; total: number };
+};
+
+export type ProjectStartupReadiness = {
+  project_id: string;
+  project_code: string;
+  project_name: string;
+  created_by: string;
+  owner_user_id: string;
+  owner_name: string;
+  pm_staff_id?: string;
+  pm_user_id?: string;
+  pm_name?: string;
+  template_id?: string;
+  template_name?: string;
+  template_status?: string;
+  first_steps: ProjectStartupStep[];
+  blockers: ProjectStartupBlocker[];
+  ready_to_start: boolean;
+  capabilities: {
+    can_manage_project_manager: boolean;
+    can_start_pipeline: boolean;
+    is_startup_owner: boolean;
   };
 };
 

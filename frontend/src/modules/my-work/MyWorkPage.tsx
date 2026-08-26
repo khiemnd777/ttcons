@@ -14,18 +14,20 @@ import {
   RefreshCw,
   Search,
   SlidersHorizontal,
+  UserCog,
   X,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { get, post, type StreamStatus } from '../../lib/api/client';
+import { ApiError, get, post, put, type StreamStatus } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
+import { Dialog } from '../../components/Dialog';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
-import type { ActivityAttentionItem, ActivityAttentionSummary, ApprovalRequest, MyWorkflowAction, WorkItem, WorkReportListItem, WorkReportSummary } from '../../lib/types/domain';
+import type { ActivityAttentionItem, ActivityAttentionSummary, ApprovalRequest, MyWorkflowAction, ProjectMembersResponse, ProjectStartupAction, ProjectStartupActionsResponse, ProjectStartupReadiness, WorkItem, WorkReportListItem, WorkReportSummary } from '../../lib/types/domain';
 import { ApprovalPanel } from '../../components/ApprovalPanel';
 import { statusLabel } from '../../lib/utils/status';
 import { roleSummary as summarizeRoles } from '../../lib/utils/roles';
@@ -144,9 +146,11 @@ export function MyWorkPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const requestedTask = searchParams.get('task')?.trim() ?? '';
+  const requestedSetup = searchParams.get('setup')?.trim() ?? '';
   const requestedApproval = searchParams.get('approval')?.trim() ?? '';
   const requestedApprovalLaneValue = searchParams.get('approval_type');
-  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(() => requestedTask || null);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(() => requestedTask || (requestedSetup ? `project-startup:${requestedSetup}` : null));
+  const [startupDialogProjectID, setStartupDialogProjectID] = useState<string | null>(() => requestedSetup || null);
   const [autoApprovalLane, setAutoApprovalLane] = useState<ApprovalLaneKey | null>(null);
   const [searchDraft, setSearchDraft] = useState(searchParams.get('search') ?? '');
 	const streamStatus = useActorRealtimeStatus();
@@ -178,6 +182,11 @@ export function MyWorkPage() {
   useEffect(() => {
     if (requestedTask) setSelectedEntryId(requestedTask);
   }, [requestedTask]);
+  useEffect(() => {
+    if (!requestedSetup) return;
+    setSelectedEntryId(`project-startup:${requestedSetup}`);
+    setStartupDialogProjectID(requestedSetup);
+  }, [requestedSetup]);
 
   const filterKey = useMemo(() => ({ queue, bucket, project, status, deadline, workType, priority, search, sort }), [bucket, deadline, priority, project, queue, search, sort, status, workType]);
   const workItems = useInfiniteQuery({
@@ -194,6 +203,15 @@ export function MyWorkPage() {
   const workflowActions = useQuery({
     queryKey: ['my-workflow-actions', user?.id, queue, project, search],
     queryFn: () => get<MyWorkflowActionsResponse>(buildWorkflowActionsPath({ queue, project, search })),
+    enabled: Boolean(user?.id),
+    retry: false,
+  });
+  const startupActionsMatchCurrentWorkFilters = (bucket === 'all' || bucket === 'need_action' || bucket === 'upcoming')
+    && (queue === 'responsible' || queue === 'all')
+    && !status && !deadline && !workType && !priority;
+  const startupActions = useQuery({
+    queryKey: ['my-project-startup-actions', user?.id, project, search],
+    queryFn: () => get<ProjectStartupActionsResponse>(buildProjectStartupActionsPath({ project, search })),
     enabled: Boolean(user?.id),
     retry: false,
   });
@@ -295,6 +313,18 @@ export function MyWorkPage() {
   const workflowActionRows = useMemo(() => workflowActionsVisible ? workflowActions.data?.items ?? [] : [], [workflowActions.data?.items, workflowActionsVisible]);
   const workflowActionTotal = workflowActionsMatchCurrentWorkFilters ? workflowActions.data?.total ?? 0 : 0;
   const workflowActionSummaryTotal = workflowActions.data?.summary_total ?? 0;
+  const startupActionRows = useMemo(() => {
+    if (!startupActionsMatchCurrentWorkFilters) return [];
+    const items = startupActions.data?.items ?? [];
+    if (bucket === 'need_action') return items.filter((item) => item.action_kind === 'setup_required');
+    if (bucket === 'upcoming') return items.filter((item) => item.action_kind === 'upcoming');
+    return items;
+  }, [bucket, startupActions.data?.items, startupActionsMatchCurrentWorkFilters]);
+  const startupActionTotal = startupActionRows.length;
+  const startupSummary = startupActions.data?.summary ?? { need_action: 0, upcoming: 0, total: 0 };
+  const visibleStartupSummary = startupActionsMatchCurrentWorkFilters
+    ? startupSummary
+    : { need_action: 0, upcoming: 0, total: 0 };
   const approvalFirstPage = approvalWorkItems.data?.pages[0];
   const approvalRows = useMemo(() => dedupeWorkItems(approvalWorkItems.data?.pages.flatMap((page) => page.items) ?? []), [approvalWorkItems.data]);
   const summary = firstPage?.summary ?? emptySummary;
@@ -312,11 +342,11 @@ export function MyWorkPage() {
       : activityAttentionSummary.data?.has_more
         ? '120+'
         : activityAttentionSummary.data?.count ?? 0;
-  const workTabCount = workItems.isLoading || (workflowActionsMatchCurrentWorkFilters && workflowActions.isLoading)
+  const workTabCount = workItems.isLoading || (workflowActionsMatchCurrentWorkFilters && workflowActions.isLoading) || (startupActionsMatchCurrentWorkFilters && startupActions.isLoading)
     ? '…'
-    : (workItems.isError && !firstPage) || (workflowActionsMatchCurrentWorkFilters && workflowActions.isError && !workflowActions.data)
+    : (workItems.isError && !firstPage) || (workflowActionsMatchCurrentWorkFilters && workflowActions.isError && !workflowActions.data) || (startupActionsMatchCurrentWorkFilters && startupActions.isError && !startupActions.data)
       ? '—'
-      : (firstPage?.total ?? 0) + workflowActionTotal;
+      : (firstPage?.total ?? 0) + workflowActionTotal + startupActionTotal;
   const approvalTabCount = workItems.isLoading || pendingNodeApprovals.isLoading || (canReviewWorkReports && reportReviewSummary.isLoading)
     ? '…'
     : (workItems.isError && !firstPage) || (pendingNodeApprovals.isError && !pendingNodeApprovals.data) || (canReviewWorkReports && reportReviewSummary.isError && !reportReviewSummary.data)
@@ -344,16 +374,17 @@ export function MyWorkPage() {
     ? 'node'
     : permittedRequestedApprovalLane ?? autoApprovalLane;
   const activeWorkRows = mode === 'approval' ? approvalRows : rows;
-  const selectedWorkflowAction = mode === 'work' ? workflowActionRows.find((action) => action.id === selectedEntryId) ?? null : null;
-  const selectedItem = selectedWorkflowAction ? null : activeWorkRows.find((item) => item.id === selectedEntryId) ?? activeWorkRows[0] ?? null;
+  const selectedStartupAction = mode === 'work' ? startupActionRows.find((action) => action.id === selectedEntryId) ?? null : null;
+  const selectedWorkflowAction = mode === 'work' && !selectedStartupAction ? workflowActionRows.find((action) => action.id === selectedEntryId) ?? null : null;
+  const selectedItem = selectedStartupAction || selectedWorkflowAction ? null : activeWorkRows.find((item) => item.id === selectedEntryId) ?? activeWorkRows[0] ?? null;
 
   useEffect(() => {
     const entryIds = mode === 'work'
-      ? [...workflowActionRows.map((action) => action.id), ...activeWorkRows.map((item) => item.id)]
+      ? [...startupActionRows.map((action) => action.id), ...workflowActionRows.map((action) => action.id), ...activeWorkRows.map((item) => item.id)]
       : activeWorkRows.map((item) => item.id);
     if (!entryIds.length) setSelectedEntryId(null);
     else if (!selectedEntryId || !entryIds.includes(selectedEntryId)) setSelectedEntryId(entryIds[0]);
-  }, [activeWorkRows, mode, selectedEntryId, workflowActionRows]);
+  }, [activeWorkRows, mode, selectedEntryId, startupActionRows, workflowActionRows]);
 
   useEffect(() => {
     if (mode !== 'approval' || requestedApproval || permittedRequestedApprovalLane || autoApprovalLane || !approvalSourcesSettled) return;
@@ -396,6 +427,7 @@ export function MyWorkPage() {
   function refreshAll() {
     void workItems.refetch();
     void workflowActions.refetch();
+    void startupActions.refetch();
     void activityAttentionSummary.refetch();
     if (mode === 'attention') void activityAttention.refetch();
     if (mode === 'approval') void approvalWorkItems.refetch();
@@ -409,13 +441,14 @@ export function MyWorkPage() {
   }
 
   const hasFilters = Boolean(bucket !== 'need_action' || queue !== 'responsible' || project || status || deadline || workType || priority || search || sort !== 'priority');
-  const total = (firstPage?.total ?? summary.total ?? rows.length) + workflowActionTotal;
+  const total = (firstPage?.total ?? summary.total ?? rows.length) + workflowActionTotal + startupActionTotal;
   const approvalTotal = approvalFirstPage?.total ?? approvalRows.length;
   const scopeLabel = scopes.find((item) => item.key === queue)?.label ?? 'Tôi phụ trách';
   const actionAwareSummary = {
     ...summary,
-    total: summary.total + workflowActionSummaryTotal,
-    need_action: summary.need_action + workflowActionSummaryTotal,
+    total: summary.total + workflowActionSummaryTotal + visibleStartupSummary.total,
+    need_action: summary.need_action + workflowActionSummaryTotal + visibleStartupSummary.need_action,
+    upcoming: summary.upcoming + visibleStartupSummary.upcoming,
   };
 
   return (
@@ -427,7 +460,7 @@ export function MyWorkPage() {
           <div className="flex items-center gap-2">
             <LiveStatusBadge status={streamStatus} />
             <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={refreshAll}>
-              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || workflowActions.isFetching || activityAttentionSummary.isFetching || pendingNodeApprovals.isFetching || (canReviewWorkReports && reportReviewSummary.isFetching) || (mode === 'approval' && canReviewWorkReports && reportReviewList.isFetching) || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
+              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || workflowActions.isFetching || startupActions.isFetching || activityAttentionSummary.isFetching || pendingNodeApprovals.isFetching || (canReviewWorkReports && reportReviewSummary.isFetching) || (mode === 'approval' && canReviewWorkReports && reportReviewList.isFetching) || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
               Làm mới
             </button>
           </div>
@@ -450,8 +483,8 @@ export function MyWorkPage() {
                 summary={actionAwareSummary}
                 selected={bucket}
                 scopeLabel={scopeLabel}
-                loading={workItems.isLoading || workflowActions.isLoading}
-                unavailable={(workItems.isError && !firstPage) || (workflowActions.isError && !workflowActions.data)}
+                loading={workItems.isLoading || workflowActions.isLoading || startupActions.isLoading}
+                unavailable={(workItems.isError && !firstPage) || (workflowActions.isError && !workflowActions.data) || (startupActions.isError && !startupActions.data)}
                 onSelect={selectBucket}
               />
 
@@ -478,6 +511,10 @@ export function MyWorkPage() {
                   rows={rows}
                   selectedId={selectedItem?.id}
                   workflowActions={workflowActionRows}
+                  startupActions={startupActionRows}
+                  selectedStartupActionId={selectedStartupAction?.id}
+                  startupActionsLoading={startupActionsMatchCurrentWorkFilters && startupActions.isLoading}
+                  startupActionsError={startupActionsMatchCurrentWorkFilters ? startupActions.error : null}
                   selectedWorkflowActionId={selectedWorkflowAction?.id}
                   workflowActionsLoading={workflowActionsVisible && workflowActions.isLoading}
                   workflowActionsError={workflowActionsVisible ? workflowActions.error : null}
@@ -490,12 +527,15 @@ export function MyWorkPage() {
                   filtered={hasFilters}
                   onSelect={setSelectedEntryId}
                   onSelectWorkflowAction={setSelectedEntryId}
+                  onSelectStartupAction={setSelectedEntryId}
+                  onOpenStartupAction={(action) => setStartupDialogProjectID(action.project_id)}
                   onRunWorkflowAction={(action) => advanceWorkflowAction.mutate(action)}
                   onOpen={openWorkItem}
                   onLoadMore={() => void workItems.fetchNextPage()}
                   onReset={resetFilters}
                   onRetry={() => void workItems.refetch()}
                   onRetryWorkflowActions={() => void workflowActions.refetch()}
+                  onRetryStartupActions={() => void startupActions.refetch()}
                 />
               </div>
             </div>
@@ -503,9 +543,11 @@ export function MyWorkPage() {
             <NextQueuePanel
               item={selectedItem}
               workflowAction={selectedWorkflowAction}
+              startupAction={selectedStartupAction}
               pending={advanceWorkflowAction.isPending && advanceWorkflowAction.variables?.id === selectedWorkflowAction?.id}
               onOpen={openWorkItem}
               onRunWorkflowAction={(action) => advanceWorkflowAction.mutate(action)}
+              onOpenStartupAction={(action) => setStartupDialogProjectID(action.project_id)}
             />
           </div>
         </section>
@@ -556,6 +598,19 @@ export function MyWorkPage() {
           onMarkRead={(activityId) => markAttentionRead.mutate(activityId)}
         />
       )}
+
+      <ProjectStartupDialog
+        projectId={startupDialogProjectID}
+        onClose={() => {
+          setStartupDialogProjectID(null);
+          if (searchParams.get('setup')) updateParams({ setup: null });
+        }}
+        onChanged={() => {
+          void startupActions.refetch();
+          void workItems.refetch();
+          void queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary'] });
+        }}
+      />
 
     </>
   );
@@ -752,6 +807,14 @@ function buildWorkflowActionsPath(filters: { queue: WorkScopeKey; project: strin
   return `/me/workflow-actions?${params.toString()}`;
 }
 
+function buildProjectStartupActionsPath(filters: { project: string; search: string }) {
+  const params = new URLSearchParams();
+  if (filters.project) params.set('project_id', filters.project);
+  if (filters.search) params.set('search', filters.search);
+  const query = params.toString();
+  return `/me/project-startup-actions${query ? `?${query}` : ''}`;
+}
+
 function workflowActionSuccessMessage(action: MyWorkflowAction) {
   if (action.terminal) return 'Đã hoàn tất quy trình';
   const nextType = action.next_run_node_type ?? '';
@@ -932,25 +995,31 @@ function FilterSelect({ value, label, options, onChange }: { value: string; labe
   return <select className="min-w-0 rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700" value={value} onChange={(event) => onChange(event.target.value)}><option value="">{label}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
 }
 
-function WorkList({ rows, selectedId, workflowActions = [], selectedWorkflowActionId, workflowActionsLoading = false, workflowActionsError, pendingWorkflowActionId, loading, fetchingMore, error, total, hasMore, filtered, emptyTitle, onSelect, onSelectWorkflowAction, onRunWorkflowAction, onOpen, onLoadMore, onReset, onRetry, onRetryWorkflowActions }: {
+function WorkList({ rows, selectedId, startupActions = [], selectedStartupActionId, startupActionsLoading = false, startupActionsError, workflowActions = [], selectedWorkflowActionId, workflowActionsLoading = false, workflowActionsError, pendingWorkflowActionId, loading, fetchingMore, error, total, hasMore, filtered, emptyTitle, onSelect, onSelectStartupAction, onOpenStartupAction, onSelectWorkflowAction, onRunWorkflowAction, onOpen, onLoadMore, onReset, onRetry, onRetryStartupActions, onRetryWorkflowActions }: {
   rows: WorkItem[]; selectedId?: string; loading: boolean; fetchingMore: boolean; error: unknown; total: number; hasMore: boolean; filtered: boolean;
   emptyTitle?: string;
   workflowActions?: MyWorkflowAction[]; selectedWorkflowActionId?: string; workflowActionsLoading?: boolean; workflowActionsError?: unknown; pendingWorkflowActionId?: string;
+  startupActions?: ProjectStartupAction[]; selectedStartupActionId?: string; startupActionsLoading?: boolean; startupActionsError?: unknown;
   onSelect: (id: string) => void; onOpen: (item: WorkItem) => void; onLoadMore: () => void; onReset: () => void; onRetry: () => void;
   onSelectWorkflowAction?: (id: string) => void; onRunWorkflowAction?: (action: MyWorkflowAction) => void; onRetryWorkflowActions?: () => void;
+  onSelectStartupAction?: (id: string) => void; onOpenStartupAction?: (action: ProjectStartupAction) => void; onRetryStartupActions?: () => void;
 }) {
-  const hasEntries = workflowActions.length > 0 || rows.length > 0;
-  if ((loading || workflowActionsLoading) && !hasEntries) return <WorkListSkeleton />;
+  const hasEntries = startupActions.length > 0 || workflowActions.length > 0 || rows.length > 0;
+  if ((loading || workflowActionsLoading || startupActionsLoading) && !hasEntries) return <WorkListSkeleton />;
   if (!hasEntries && error && workflowActionsError) return <div className="space-y-2"><SourceError title="Không tải được danh sách công việc" onRetry={onRetry} /><SourceError title="Không tải được hành động quy trình" onRetry={onRetryWorkflowActions} /></div>;
   if (!hasEntries && error) return <SourceError title="Không tải được danh sách công việc" onRetry={onRetry} />;
   if (!hasEntries && workflowActionsError) return <SourceError title="Không tải được hành động quy trình" onRetry={onRetryWorkflowActions} />;
+  if (!hasEntries && startupActionsError) return <SourceError title="Không tải được điều phối khởi tạo công trình" onRetry={onRetryStartupActions} />;
   if (!hasEntries) return <EmptyState title={emptyTitle ?? (filtered ? 'Không có công việc khớp bộ lọc' : 'Không có việc cần xử lý trong phạm vi này')} action={filtered ? <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700" onClick={onReset}>Xóa bộ lọc</button> : undefined} />;
   return (
     <div className="min-w-0">
       <div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold text-ink">{total} mục</p></div>
       {error ? <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Chưa cập nhật được dữ liệu mới; đang giữ danh sách gần nhất.</span><button className="shrink-0 font-semibold text-amber-900 underline underline-offset-2" onClick={onRetry}>Thử lại</button></div> : null}
       {workflowActionsError ? <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Không tải được hành động chuyển giai đoạn.</span>{onRetryWorkflowActions ? <button className="shrink-0 font-semibold text-amber-900 underline underline-offset-2" onClick={onRetryWorkflowActions}>Thử lại</button> : null}</div> : null}
+      {startupActionsError ? <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Không tải được điều phối khởi tạo công trình.</span>{onRetryStartupActions ? <button className="shrink-0 font-semibold text-amber-900 underline underline-offset-2" onClick={onRetryStartupActions}>Thử lại</button> : null}</div> : null}
       <div className="max-h-[720px] overflow-y-auto rounded-lg border border-line bg-white">
+        {startupActionsLoading ? <WorkflowActionSkeleton /> : null}
+        {startupActions.map((action) => <ProjectStartupActionCard key={action.id} action={action} selected={selectedStartupActionId === action.id} onSelect={() => onSelectStartupAction?.(action.id)} onOpen={() => onOpenStartupAction?.(action)} />)}
         {workflowActionsLoading ? <WorkflowActionSkeleton /> : null}
         {workflowActions.map((action) => (
           <WorkflowActionCard
@@ -966,8 +1035,27 @@ function WorkList({ rows, selectedId, workflowActions = [], selectedWorkflowActi
           <WorkItemCard key={item.id} item={item} selected={selectedId === item.id} onSelect={() => onSelect(item.id)} onOpen={() => onOpen(item)} />
         ))}
       </div>
-      {hasMore ? <button className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" disabled={fetchingMore} onClick={onLoadMore}>{fetchingMore ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}Tải thêm · Đã hiển thị {workflowActions.length + rows.length}/{total}</button> : <p className="mt-3 text-center text-xs text-slate-500">Đã hiển thị {workflowActions.length + rows.length}/{total}</p>}
+      {hasMore ? <button className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" disabled={fetchingMore} onClick={onLoadMore}>{fetchingMore ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}Tải thêm · Đã hiển thị {startupActions.length + workflowActions.length + rows.length}/{total}</button> : <p className="mt-3 text-center text-xs text-slate-500">Đã hiển thị {startupActions.length + workflowActions.length + rows.length}/{total}</p>}
     </div>
+  );
+}
+
+function ProjectStartupActionCard({ action, selected, onSelect, onOpen }: { action: ProjectStartupAction; selected: boolean; onSelect: () => void; onOpen: () => void }) {
+  const upcoming = action.action_kind === 'upcoming';
+  return (
+    <article className={clsx('border-b border-line last:border-b-0 sm:flex sm:items-stretch', selected ? 'bg-amber-50/70 shadow-[inset_3px_0_0_0_#d97706]' : 'bg-white hover:bg-slate-50')}>
+      <button type="button" className="min-w-0 flex-1 px-4 py-3 text-left" aria-pressed={selected} onClick={onSelect}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={clsx('rounded-md px-2 py-0.5 text-xs font-semibold', upcoming ? 'bg-slate-100 text-slate-700' : 'bg-amber-100 text-amber-800')}>{upcoming ? 'Sắp tới · chỉ xem' : 'Cần thiết lập công trình'}</span>
+          <span className="text-sm font-semibold text-ink">{action.project_code} · {action.project_name}</span>
+        </div>
+        <p className="mt-1 text-xs font-medium text-slate-600">Phụ trách: {action.owner_name || 'Chưa xác định'}</p>
+        <p className="mt-1 line-clamp-2 text-xs text-slate-500">{upcoming ? 'Anh/chị thuộc nhóm vai trò của bước đầu; theo dõi trước khi quy trình bắt đầu.' : action.ready_to_start ? 'Đã đủ điều kiện để bắt đầu quy trình.' : `Còn ${action.blockers.length} điều kiện cần hoàn tất.`}</p>
+      </button>
+      <button type="button" className={clsx('mx-4 mb-3 inline-flex shrink-0 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold sm:my-3 sm:ml-0', upcoming ? 'border border-line bg-white text-blue-700 hover:bg-blue-50' : 'bg-blue-600 text-white hover:bg-blue-700')} onClick={() => { onSelect(); onOpen(); }}>
+        <UserCog className="h-4 w-4" />{upcoming ? 'Xem thiết lập' : 'Tiếp tục thiết lập'}
+      </button>
+    </article>
   );
 }
 
@@ -1031,7 +1119,8 @@ function NextWorkPanel({ item, onOpen }: { item: WorkItem | null; onOpen: (item:
   );
 }
 
-function NextQueuePanel({ item, workflowAction, pending, onOpen, onRunWorkflowAction }: { item: WorkItem | null; workflowAction: MyWorkflowAction | null; pending: boolean; onOpen: (item: WorkItem) => void; onRunWorkflowAction: (action: MyWorkflowAction) => void }) {
+function NextQueuePanel({ item, workflowAction, startupAction, pending, onOpen, onRunWorkflowAction, onOpenStartupAction }: { item: WorkItem | null; workflowAction: MyWorkflowAction | null; startupAction: ProjectStartupAction | null; pending: boolean; onOpen: (item: WorkItem) => void; onRunWorkflowAction: (action: MyWorkflowAction) => void; onOpenStartupAction: (action: ProjectStartupAction) => void }) {
+  if (startupAction) return <ProjectStartupNextPanel action={startupAction} onOpen={() => onOpenStartupAction(startupAction)} />;
   if (!workflowAction) return <NextWorkPanel item={item} onOpen={onOpen} />;
   return (
     <aside className="hidden rounded-lg border border-blue-200 bg-white p-4 xl:sticky xl:top-4 xl:block xl:self-start">
@@ -1047,6 +1136,145 @@ function NextQueuePanel({ item, workflowAction, pending, onOpen, onRunWorkflowAc
       </button>
       <Link className="mt-2 inline-flex w-full justify-center rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${workflowAction.project_id}`}>Mở công trình</Link>
     </aside>
+  );
+}
+
+function ProjectStartupNextPanel({ action, onOpen }: { action: ProjectStartupAction; onOpen: () => void }) {
+  const upcoming = action.action_kind === 'upcoming';
+  return (
+    <aside className="hidden rounded-lg border border-amber-200 bg-white p-4 xl:sticky xl:top-4 xl:block xl:self-start">
+      <span className={clsx('rounded-md px-2 py-1 text-xs font-semibold', upcoming ? 'bg-slate-100 text-slate-700' : 'bg-amber-100 text-amber-800')}>{upcoming ? 'Sắp tới · chỉ xem' : 'Cần thiết lập'}</span>
+      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Việc tiếp theo</p>
+      <h3 className="mt-1 text-base font-semibold text-ink">{action.project_code} · {action.project_name}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{upcoming ? `Người phụ trách thiết lập hiện tại: ${action.owner_name || 'Chưa xác định'}.` : action.ready_to_start ? 'Thiết lập đã đầy đủ; hãy kiểm tra lần cuối và bắt đầu quy trình.' : `Hoàn tất ${action.blockers.length} điều kiện còn thiếu trước khi bắt đầu quy trình.`}</p>
+      <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={onOpen}><UserCog className="h-4 w-4" />{upcoming ? 'Xem thiết lập' : 'Tiếp tục thiết lập'}</button>
+      <Link className="mt-2 inline-flex w-full justify-center rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${action.project_id}`}>Mở công trình</Link>
+    </aside>
+  );
+}
+
+function ProjectStartupDialog({ projectId, onClose, onChanged }: { projectId: string | null; onClose: () => void; onChanged: () => void }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [selectedPMStaffID, setSelectedPMStaffID] = useState('');
+  const readiness = useQuery({
+    queryKey: ['project-startup-readiness', projectId],
+    queryFn: () => get<ProjectStartupReadiness>(`/projects/${projectId}/startup-readiness`),
+    enabled: Boolean(projectId),
+    retry: false,
+  });
+  const members = useQuery({
+    queryKey: ['project-members', projectId],
+    queryFn: () => get<ProjectMembersResponse>(`/projects/${projectId}/members?include_inactive=false`),
+    enabled: Boolean(projectId),
+    retry: false,
+  });
+  useEffect(() => setSelectedPMStaffID(readiness.data?.pm_staff_id ?? ''), [projectId, readiness.data?.pm_staff_id]);
+
+  const setProjectManager = useMutation({
+    mutationFn: (staffId: string) => put(`/projects/${projectId}/project-manager`, { staff_id: staffId }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['project-startup-readiness', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] }),
+        queryClient.invalidateQueries({ queryKey: ['project-members', projectId] }),
+      ]);
+      onChanged();
+      toast.success('Đã bàn giao trách nhiệm thiết lập cho PM');
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.code === 'VALIDATION_ERROR') {
+        toast.warn({ title: 'Chưa thể chỉ định PM', description: error.message });
+        return;
+      }
+      toast.error('Không chỉ định được PM', error);
+    },
+  });
+  const startPipeline = useMutation({
+    mutationFn: () => post(`/projects/${projectId}/start-pipeline`, { template_id: readiness.data?.template_id }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['project-startup-readiness', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] }),
+        queryClient.invalidateQueries({ queryKey: ['my-work-items'] }),
+        queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['pipeline-run', projectId] }),
+      ]);
+      onChanged();
+      toast.success('Đã bắt đầu quy trình và giao các công việc đầu tiên');
+      onClose();
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.code === 'VALIDATION_ERROR') {
+        toast.warn({ title: 'Chưa thể bắt đầu quy trình', description: error.message });
+        return;
+      }
+      toast.error('Không bắt đầu được quy trình', error);
+    },
+  });
+  const data = readiness.data;
+  const activeMembers = (members.data?.items ?? []).filter((member) => member.active && member.user_id);
+
+  return (
+    <Dialog
+      open={Boolean(projectId)}
+      title={data ? `Thiết lập ${data.project_code} · ${data.project_name}` : 'Thiết lập công trình'}
+      description="Hoàn tất đúng người phụ trách và phạm vi bước đầu trước khi tạo công việc thật."
+      size="lg"
+      onClose={onClose}
+      footer={data ? (
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Link className="inline-flex justify-center rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${data.project_id}?tab=members`}>Quản lý thành viên công trình</Link>
+          <div className="flex justify-end gap-2">
+            <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>Đóng</button>
+            {data.capabilities.can_start_pipeline ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={startPipeline.isPending} onClick={() => startPipeline.mutate()}>{startPipeline.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}{startPipeline.isPending ? 'Đang khởi động…' : 'Bắt đầu quy trình'}</button> : null}
+          </div>
+        </div>
+      ) : undefined}
+    >
+      {readiness.isLoading ? <LoadingSpinner /> : null}
+      {readiness.isError ? <SourceError title="Không tải được trạng thái khởi tạo công trình" onRetry={() => void readiness.refetch()} /> : null}
+      {data ? (
+        <div className="space-y-4">
+          <section className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-line bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Người chịu trách nhiệm</p><p className="mt-2 font-semibold text-ink">{data.owner_name || 'Chưa xác định'}</p><p className="mt-1 text-xs text-slate-600">{data.pm_user_id ? 'PM công trình' : 'Người tạo công trình (tạm thời)'}</p></div>
+            <div className="rounded-lg border border-line bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mẫu quy trình</p><p className="mt-2 font-semibold text-ink">{data.template_name || 'Chưa có mẫu đã phát hành'}</p><p className="mt-1 text-xs text-slate-600">{data.template_id ? 'Sẵn sàng kiểm tra bước đầu' : 'Cần chọn hoặc phát hành mẫu quy trình'}</p></div>
+          </section>
+
+          {data.capabilities.can_manage_project_manager ? (
+            <section className="rounded-lg border border-line p-4">
+              <h3 className="font-semibold text-ink">1. Chỉ định PM chịu trách nhiệm</h3>
+              <p className="mt-1 text-sm text-slate-600">PM phải là thành viên đang hoạt động và có quyền quản lý thành viên, xem công trình, chạy pipeline.</p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <select className="min-w-0 flex-1 rounded-md border border-line bg-white px-3 py-2 text-sm" value={selectedPMStaffID} onChange={(event) => setSelectedPMStaffID(event.target.value)}>
+                  <option value="">Chọn PM từ thành viên hoạt động</option>
+                  {activeMembers.map((member) => <option key={member.id} value={member.staff_id}>{member.full_name} · {(member.role_ids ?? []).join(', ') || 'Chưa có vai trò'}</option>)}
+                </select>
+                <button type="button" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={!selectedPMStaffID || selectedPMStaffID === data.pm_staff_id || setProjectManager.isPending} onClick={() => setProjectManager.mutate(selectedPMStaffID)}>{setProjectManager.isPending ? 'Đang lưu…' : 'Bàn giao cho PM'}</button>
+              </div>
+              {members.isError ? <p className="mt-2 text-sm text-rose-700">Không tải được danh sách thành viên; hãy mở tab Thành viên để kiểm tra.</p> : null}
+            </section>
+          ) : null}
+
+          <section className="rounded-lg border border-line p-4">
+            <h3 className="font-semibold text-ink">2. Người thực hiện bước đầu</h3>
+            <div className="mt-3 space-y-2">
+              {data.first_steps.length ? data.first_steps.map((step) => (
+                <div key={step.id} className={clsx('rounded-md border p-3', step.covered ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50')}>
+                  <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-ink">{step.name}</p><p className="mt-1 text-xs text-slate-600">Vai trò: {step.role_ids.join(', ') || 'Không giới hạn'}{step.required_permission ? ` · Quyền: ${step.required_permission}` : ''}</p></div><span className={clsx('shrink-0 text-xs font-semibold', step.covered ? 'text-emerald-700' : 'text-amber-800')}>{step.covered ? 'Đã có người' : 'Thiếu người'}</span></div>
+                  <p className="mt-2 text-xs text-slate-700">{step.eligible_users.length ? step.eligible_users.map((person) => person.full_name).join(', ') : 'Chưa có thành viên phù hợp.'}</p>
+                </div>
+              )) : <p className="text-sm text-slate-600">Node đầu không có bước tạo công việc.</p>}
+            </div>
+          </section>
+
+          <section className={clsx('rounded-lg border p-4', data.ready_to_start ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50')}>
+            <h3 className={clsx('font-semibold', data.ready_to_start ? 'text-emerald-800' : 'text-amber-900')}>{data.ready_to_start ? 'Đã sẵn sàng bắt đầu' : `Còn ${data.blockers.length} điều kiện cần xử lý`}</h3>
+            {!data.ready_to_start ? <ul className="mt-2 space-y-1 text-sm text-amber-900">{data.blockers.map((blocker, index) => <li key={`${blocker.key}-${blocker.step_id ?? index}`}>• {blocker.label}</li>)}</ul> : <p className="mt-1 text-sm text-emerald-800">Khi bắt đầu, hệ thống mới tạo Work Item thật và thông báo đúng nhóm vai trò.</p>}
+          </section>
+        </div>
+      ) : null}
+    </Dialog>
   );
 }
 

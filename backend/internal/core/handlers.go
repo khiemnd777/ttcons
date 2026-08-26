@@ -256,11 +256,39 @@ func (h *Handler) CreateProject(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	project, err := h.service.CreateProject(c.Context(), body)
+	project, err := h.service.CreateProject(c.Context(), body, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
 	return response.Created(c, project)
+}
+
+func (h *Handler) ProjectStartupReadiness(c *fiber.Ctx) error {
+	readiness, err := h.service.ProjectStartupReadiness(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, readiness)
+}
+
+func (h *Handler) MyProjectStartupActions(c *fiber.Ctx) error {
+	page, err := h.service.MyProjectStartupActions(c.Context(), actorID(c), c.Query("project_id"), c.Query("search"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, page)
+}
+
+func (h *Handler) SetProjectManager(c *fiber.Ctx) error {
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	project, err := h.service.SetProjectManager(c.Context(), c.Params("id"), cleanID(body["staff_id"]), actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, project)
 }
 
 func (h *Handler) GetProject(c *fiber.Ctx) error {

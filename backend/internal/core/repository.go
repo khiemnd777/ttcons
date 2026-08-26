@@ -342,7 +342,7 @@ func newID() string {
 }
 
 func projectColumns() []ColumnSpec {
-	return []ColumnSpec{col("name"), col("code"), col("partner_id"), col("client_name"), col("address"), col("planned_start_date"), col("planned_end_date"), col("estimated_budget"), col("contract_amount"), col("status"), col("pipeline_template_id"), col("pm_staff_id"), col("progress_percent"), col("workflow_entry_mode")}
+	return []ColumnSpec{col("name"), col("code"), col("partner_id"), col("client_name"), col("address"), col("planned_start_date"), col("planned_end_date"), col("estimated_budget"), col("contract_amount"), col("status"), col("pipeline_template_id"), col("pm_staff_id"), col("progress_percent"), col("workflow_entry_mode"), col("created_by")}
 }
 
 func partnerColumns() []ColumnSpec {
