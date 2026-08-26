@@ -121,6 +121,100 @@ func (r *Repository) WorkReports(ctx context.Context, actorID string, filter Wor
 	`, statusExpression, strings.Join(conditions, " AND ")), args...)
 }
 
+func (r *Repository) WorkReportSummary(ctx context.Context, actorID string, filter WorkReportFilter) (WorkReportSummary, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, actorID, "project", 1)
+	if err != nil {
+		return WorkReportSummary{}, err
+	}
+	args := append([]any{}, scopeArgs...)
+	addArg := func(value any) string {
+		args = append(args, value)
+		return fmt.Sprintf("$%d", len(args))
+	}
+	permissionActor := addArg(actorID)
+	filterConditions := []string{"TRUE"}
+	if filter.ProjectID != "" {
+		filterConditions = append(filterConditions, "base.project_id="+addArg(filter.ProjectID)+"::uuid")
+	}
+	if filter.Status != "" {
+		filterConditions = append(filterConditions, "base.status="+addArg(filter.Status))
+	}
+	if filter.DateFrom != "" {
+		filterConditions = append(filterConditions, "base.report_date >= "+addArg(filter.DateFrom)+"::date")
+	}
+	if filter.DateTo != "" {
+		filterConditions = append(filterConditions, "base.report_date <= "+addArg(filter.DateTo)+"::date")
+	}
+	if filter.Search != "" {
+		filterConditions = append(filterConditions, "base.search_text LIKE "+addArg("%"+strings.ToLower(filter.Search)+"%"))
+	}
+	row, err := r.QueryOne(ctx, fmt.Sprintf(`
+		WITH base AS (
+			SELECT source.id,source.project_id,source.report_date,source.reported_by,
+				report.id AS work_report_id,report.recipient_id,report.status AS formal_status,
+				COALESCE(report.status,CASE WHEN source.report_delivery_eligible THEN 'draft' ELSE 'recorded' END) AS status,
+				source.report_delivery_eligible,
+				lower(concat_ws(' ',project.code,project.name,author.full_name,recipient.full_name,source.weather,source.work_summary,source.issues_summary)) AS search_text,
+				EXISTS (
+					SELECT 1 FROM user_roles assignment
+					JOIN role_permissions link ON link.role_id=assignment.role_id
+					JOIN permissions permission ON permission.id=link.permission_id
+					WHERE assignment.user_id=%s::uuid
+					  AND (assignment.project_id IS NULL OR assignment.project_id=project.id)
+					  AND permission.key='work_report.view'
+				) AS can_view,
+				EXISTS (
+					SELECT 1 FROM user_roles assignment
+					JOIN role_permissions link ON link.role_id=assignment.role_id
+					JOIN permissions permission ON permission.id=link.permission_id
+					WHERE assignment.user_id=%s::uuid
+					  AND (assignment.project_id IS NULL OR assignment.project_id=project.id)
+					  AND permission.key IN ('work_report.review','work_report.manage')
+				) AS can_review,
+				EXISTS (
+					SELECT 1 FROM user_roles assignment
+					JOIN role_permissions link ON link.role_id=assignment.role_id
+					JOIN permissions permission ON permission.id=link.permission_id
+					WHERE assignment.user_id=%s::uuid
+					  AND (assignment.project_id IS NULL OR assignment.project_id=project.id)
+					  AND permission.key='work_report.manage'
+				) AS can_manage
+			FROM operation_daily_reports source
+			JOIN projects project ON project.id=source.project_id
+			LEFT JOIN users author ON author.id=source.reported_by
+			LEFT JOIN work_reports report ON report.source_kind='operation_daily_report' AND report.source_id=source.id
+			LEFT JOIN users recipient ON recipient.id=report.recipient_id
+			WHERE project.status <> 'cancelled' AND %s
+		), filtered AS (
+			SELECT base.*,
+				(can_view AND reported_by=%s::uuid AND work_report_id IS NOT NULL) AS mine_scope,
+				(can_view AND reported_by=%s::uuid AND report_delivery_eligible AND work_report_id IS NULL) AS source_scope,
+				(can_review AND recipient_id=%s::uuid AND formal_status='submitted') AS review_scope,
+				(can_manage AND work_report_id IS NOT NULL) AS all_scope
+			FROM base
+			WHERE %s
+		)
+		SELECT
+			COUNT(*) FILTER (WHERE mine_scope) AS mine,
+			COUNT(*) FILTER (WHERE source_scope) AS source,
+			COUNT(*) FILTER (WHERE review_scope) AS review,
+			COUNT(*) FILTER (WHERE all_scope) AS all_scope,
+			COUNT(*) FILTER (WHERE mine_scope OR source_scope OR review_scope OR all_scope) AS total_visible
+		FROM filtered
+	`, permissionActor, permissionActor, permissionActor, scopeSQL,
+		permissionActor, permissionActor, permissionActor, strings.Join(filterConditions, " AND ")), args...)
+	if err != nil {
+		return WorkReportSummary{}, err
+	}
+	return WorkReportSummary{
+		Scopes: map[string]int{
+			"mine": int(number(row["mine"])), "source": int(number(row["source"])),
+			"review": int(number(row["review"])), "all": int(number(row["all_scope"])),
+		},
+		TotalVisible: int(number(row["total_visible"])),
+	}, nil
+}
+
 func (r *Repository) WorkReportSource(ctx context.Context, sourceID string) (Record, error) {
 	row, err := r.QueryOne(ctx, `
 		SELECT source.*,source.id::text AS source_id,source.project_id::text AS project_id,
@@ -378,24 +472,53 @@ func (r *Repository) submitWorkReportTx(ctx context.Context, tx *sql.Tx, sourceI
 	`, reportID, revisionNo, rawSnapshot, hash, actorID, strings.TrimSpace(comment)); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `
+	var eventID string
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO work_report_events (report_id,revision_no,event_type,actor_id,comment,metadata_json)
 		VALUES ($1,$2,$3,$4::uuid,NULLIF($5,''),$6::jsonb)
-	`, reportID, revisionNo, eventType, actorID, strings.TrimSpace(comment), `{"recipient_id":"`+recipientID+`"}`); err != nil {
+		RETURNING id::text
+	`, reportID, revisionNo, eventType, actorID, strings.TrimSpace(comment), `{"recipient_id":"`+recipientID+`"}`).Scan(&eventID); err != nil {
+		return nil, err
+	}
+	reportDateLabel := workReportDisplayDate(dateOnly(source["report_date"]))
+	audience := Record{"user_ids": []string{recipientID}, "exclude_actor": true}
+	if eventType == "resubmitted" {
+		audience["resolve_user_ids"] = []string{actorID}
+	}
+	notificationEventID, err := emitNotificationEventTx(ctx, tx, NotificationDomainEvent{
+		Key:           "work_report." + eventType,
+		AggregateType: "operation_daily_report",
+		AggregateID:   sourceID,
+		SourceEventID: eventID,
+		ProjectID:     cleanID(source["project_id"]),
+		ActorUserID:   actorID,
+		Payload: Record{
+			"source_id": sourceID, "work_report_id": reportID, "project_id": cleanID(source["project_id"]),
+			"actor_name": actorName, "report_date": reportDateLabel, "project_name": fmt.Sprint(source["project_name"]),
+		},
+		Audience:       audience,
+		CorrelationKey: "work_report:" + reportID,
+		IdempotencyKey: "work_report_event:" + eventID,
+	})
+	if err != nil {
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, cleanID(source["project_id"]), actorID, actorName, "work_report_"+eventType, "work_report", reportID, "Gửi báo cáo thi công", Record{"source_id": sourceID, "revision_no": revisionNo, "recipient_id": recipientID}); err != nil {
 		return nil, err
 	}
 	return Record{
-		"mode":           "submit",
-		"submitted":      true,
-		"status":         "submitted",
-		"work_report_id": reportID,
-		"revision_no":    revisionNo,
-		"recipient_id":   recipientID,
-		"recipient_name": recipientName,
-		"event_type":     eventType,
+		"mode":                  "submit",
+		"submitted":             true,
+		"status":                "submitted",
+		"work_report_id":        reportID,
+		"revision_no":           revisionNo,
+		"recipient_id":          recipientID,
+		"recipient_name":        recipientName,
+		"event_type":            eventType,
+		"source_event_id":       eventID,
+		"notification_event_id": notificationEventID,
+		"project_id":            cleanID(source["project_id"]),
+		"author_id":             actorID,
 	}, nil
 }
 
@@ -430,10 +553,31 @@ func (r *Repository) ReviewWorkReport(ctx context.Context, reportID, action, com
 		return nil, err
 	}
 	eventType := map[string]string{"request-changes": "needs_changes", "acknowledge": "acknowledged"}[action]
-	if _, err := tx.ExecContext(ctx, `
+	var eventID string
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO work_report_events (report_id,revision_no,event_type,actor_id,comment)
 		VALUES ($1,$2,$3,$4::uuid,NULLIF($5,''))
-	`, reportID, report["current_revision_no"], eventType, actorID, strings.TrimSpace(comment)); err != nil {
+		RETURNING id::text
+	`, reportID, report["current_revision_no"], eventType, actorID, strings.TrimSpace(comment)).Scan(&eventID); err != nil {
+		return nil, err
+	}
+	if _, err := emitNotificationEventTx(ctx, tx, NotificationDomainEvent{
+		Key:           "work_report." + eventType,
+		AggregateType: "operation_daily_report",
+		AggregateID:   cleanID(report["source_id"]),
+		SourceEventID: eventID,
+		ProjectID:     cleanID(report["project_id"]),
+		ActorUserID:   actorID,
+		Payload: Record{
+			"source_id": cleanID(report["source_id"]), "work_report_id": reportID,
+			"project_id": cleanID(report["project_id"]), "actor_name": actorName,
+		},
+		Audience: Record{
+			"user_ids": []string{cleanID(report["author_id"])}, "resolve_user_ids": []string{actorID}, "exclude_actor": true,
+		},
+		CorrelationKey: "work_report:" + reportID,
+		IdempotencyKey: "work_report_event:" + eventID,
+	}); err != nil {
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, cleanID(report["project_id"]), actorID, actorName, "work_report_"+eventType, "work_report", reportID, map[string]string{"request-changes": "Yêu cầu bổ sung báo cáo", "acknowledge": "Xác nhận đã xem báo cáo"}[action], Record{"revision_no": report["current_revision_no"], "comment": strings.TrimSpace(comment)}); err != nil {

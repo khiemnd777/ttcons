@@ -44,6 +44,7 @@ const AuditPage = lazy(() => import('../modules/audit/AuditPage').then(({ AuditP
 const EventLogsPage = lazy(() => import('../modules/event-logs/EventLogsPage').then(({ EventLogsPage }) => ({ default: EventLogsPage })));
 const ReportsPage = lazy(() => import('../modules/reports/ReportsPage').then(({ ReportsPage }) => ({ default: ReportsPage })));
 const WorkReportsPage = lazy(() => import('../modules/work-reports/WorkReportsPage').then(({ WorkReportsPage }) => ({ default: WorkReportsPage })));
+const NotificationsPage = lazy(() => import('../modules/notifications/NotificationsPage').then(({ NotificationsPage }) => ({ default: NotificationsPage })));
 const SettingsPage = lazy(() => import('../modules/settings/SettingsPage').then(({ SettingsPage }) => ({ default: SettingsPage })));
 
 function RequireAuth() {
@@ -101,6 +102,7 @@ export const router = createBrowserRouter([
       { path: '/progress', element: guarded(<ProjectProgressPage />, ['project.view']) },
       { path: '/my-work', element: guarded(<MyWorkPage />) },
       { path: '/profile', element: guarded(<ProfilePage />) },
+      { path: '/notifications', element: guarded(<NotificationsPage />) },
       { path: '/work-items/:id', element: guarded(<WorkItemDetailPage />) },
       { path: '/projects', element: guarded(<ProjectsPage />, ['project.view']) },
       {

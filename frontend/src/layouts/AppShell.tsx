@@ -28,6 +28,8 @@ import { BrandHomeLink } from '../components/BrandLogo';
 import { PoweredBySignature } from '../components/PoweredBySignature';
 import { useAuth } from '../lib/auth/AuthContext';
 import { roleSummary } from '../lib/utils/roles';
+import { NotificationPanel } from '../modules/notifications/NotificationPanel';
+import { useShellIndicators } from '../modules/notifications/useShellIndicators';
 
 type NavItem = {
   to: string;
@@ -37,6 +39,7 @@ type NavItem = {
 };
 
 type NavGroup = { title: string; items: NavItem[] };
+type NavBadge = { value: number | '…' | '—'; error?: boolean };
 
 const navGroups: NavGroup[] = [
   {
@@ -81,6 +84,12 @@ export function AppShell() {
   const mobileNavCloseRef = useRef<HTMLButtonElement>(null);
   const mobileNavPanelRef = useRef<HTMLElement>(null);
   const userRoleSummary = roleSummary(user?.roles);
+  const projectFocusMode = /^\/projects\/[^/]+/.test(location.pathname);
+  const indicators = useShellIndicators(!location.pathname.startsWith('/pipeline-builder') && !projectFocusMode);
+  const navigationBadges: Record<string, NavBadge> = {
+    '/my-work': indicatorBadge(indicators.myWork.data?.total, indicators.myWork.isLoading, indicators.myWork.isError),
+    '/reports': indicatorBadge(indicators.workReports.data?.total_visible, indicators.workReports.isLoading, indicators.workReports.isError),
+  };
   const visibleNavGroups = navGroups
     .map((group) => ({
       ...group,
@@ -136,8 +145,6 @@ export function AppShell() {
     if (returnFocus) window.requestAnimationFrame(() => mobileNavTriggerRef.current?.focus());
   };
 
-  const projectFocusMode = /^\/projects\/[^/]+/.test(location.pathname);
-
   if (location.pathname.startsWith('/pipeline-builder') || projectFocusMode) {
     return (
       <div className="min-h-screen bg-surface">
@@ -153,7 +160,7 @@ export function AppShell() {
           <div className="h-16 border-b border-line">
             <BrandHomeLink />
           </div>
-          <AppNavigation groups={visibleNavGroups} className="flex-1 overflow-auto" />
+          <AppNavigation groups={visibleNavGroups} badges={navigationBadges} className="flex-1 overflow-auto" />
           <div className="border-t border-line px-4 py-3">
             <PoweredBySignature />
           </div>
@@ -191,7 +198,7 @@ export function AppShell() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <AppNavigation groups={visibleNavGroups} className="min-h-0 flex-1 overflow-auto" onNavigate={() => setMobileNavOpen(false)} />
+            <AppNavigation groups={visibleNavGroups} badges={navigationBadges} className="min-h-0 flex-1 overflow-auto" onNavigate={() => setMobileNavOpen(false)} />
             <div className="border-t border-line px-4 py-3">
               <p className="truncate text-sm font-semibold text-ink">{user?.full_name}</p>
               <p className="truncate text-xs text-slate-500">{userRoleSummary}</p>
@@ -245,6 +252,7 @@ export function AppShell() {
               <p className="hidden text-sm font-medium text-ink sm:block">Bắt đầu từ việc ưu tiên, luôn rõ Dự án › Node › Bước</p>
             </div>
             <div className="flex items-center gap-3">
+              <NotificationPanel summary={indicators.notifications.data} />
               <button
                 type="button"
                 className="hidden rounded-md px-2 py-1 text-right hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:block"
@@ -279,10 +287,12 @@ export function AppShell() {
 
 function AppNavigation({
   groups,
+  badges,
   className,
   onNavigate,
 }: {
   groups: NavGroup[];
+  badges: Record<string, NavBadge>;
   className?: string;
   onNavigate?: () => void;
 }) {
@@ -305,7 +315,12 @@ function AppNavigation({
                 }
               >
                 <item.icon className="h-4 w-4" />
-                {item.label}
+                <span className="min-w-0 flex-1">{item.label}</span>
+                {badges[item.to] ? (
+                  <span className={clsx('min-w-6 rounded-full px-1.5 text-center text-xs font-semibold leading-5', badges[item.to].error ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-700')} aria-label={`${item.label}: ${badges[item.to].value}`}>
+                    {compactNavigationCount(badges[item.to].value)}
+                  </span>
+                ) : null}
               </NavLink>
             ))}
           </div>
@@ -313,4 +328,14 @@ function AppNavigation({
       ))}
     </nav>
   );
+}
+
+function indicatorBadge(value: number | undefined, loading: boolean, error: boolean): NavBadge {
+  if (loading) return { value: '…' };
+  if (error) return { value: '—', error: true };
+  return { value: value ?? 0 };
+}
+
+function compactNavigationCount(value: NavBadge['value']) {
+  return typeof value === 'number' && value > 999 ? '999+' : value;
 }

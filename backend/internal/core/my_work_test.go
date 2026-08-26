@@ -519,7 +519,6 @@ func TestMyWorkItemsPageContractPaginationAndDecisionCapability(t *testing.T) {
 	if _, ok := page["facets"].(Record); !ok {
 		t.Fatalf("facets = %#v", page["facets"])
 	}
-
 	if _, err := service.WorkItemAction(ctx, fixture.itemID, "request-review", WorkItemActionRequest{}, fixture.workerID, "Worker"); err != nil {
 		t.Fatal(err)
 	}
@@ -589,6 +588,25 @@ func TestMyWorkItemsPageContractPaginationAndDecisionCapability(t *testing.T) {
 	}
 	if number(requesterPage["total"]) != 0 {
 		t.Fatalf("requester pending approval total = %v, want 0", requesterPage["total"])
+	}
+	navigationSummary, err := service.MyWorkNavigationSummary(ctx, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workItemsNeedAction := int(number(navigationSummary["work_items_need_action"]))
+	workflowActionsReady := int(number(navigationSummary["workflow_actions_ready"]))
+	if workItemsNeedAction < 1 || int(number(navigationSummary["total"])) != workItemsNeedAction+workflowActionsReady {
+		t.Fatalf("my work navigation summary = %#v", navigationSummary)
+	}
+}
+
+func TestMyWorkNavigationNeedActionExcludesDecisionLane(t *testing.T) {
+	query := myWorkNavigationNeedActionSQL()
+	if !strings.Contains(query, "status NOT IN ('waiting_review','waiting_approval','completed','cancelled')") {
+		t.Fatalf("navigation predicate = %q", query)
+	}
+	if strings.Contains(query, "can_decide") {
+		t.Fatalf("navigation predicate leaked the separate decision lane: %q", query)
 	}
 }
 

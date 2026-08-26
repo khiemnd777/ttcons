@@ -90,6 +90,10 @@ test('work report workspace is a delivery register while source drafts stay in c
   assert.match(page, /format: ExportFormat/);
   assert.match(page, /\/operations\?tab=timeline&report=\$\{encodeURIComponent\(row\.source_id\)\}/);
   assert.match(page, /Mở tại Thi công/);
+  assert.match(page, /get<WorkReportSummary>\(`\/work-reports\/summary/);
+  assert.match(page, /scopeCount\(reportSummary\.data, item\.key/);
+  assert.match(page, /searchParams\.get\('report'\)/);
+  assert.match(page, /searchParams\.get\('scope'\)/);
   assert.doesNotMatch(page, /Gửi báo cáo cho người quản lý/);
   assert.doesNotMatch(page, /\/work-reports\/daily-reports\/\$\{detail\.source_id\}\/submit/);
 });

@@ -110,3 +110,14 @@ func TestActivityAttentionEventUsesConnectionProjectSnapshot(t *testing.T) {
 		t.Fatal("non-project invalidation was rejected")
 	}
 }
+
+func TestPersonalInvalidationOnlyReachesItsRecipient(t *testing.T) {
+	visibleProjects := map[string]struct{}{}
+	event := ActivityStreamEvent{Type: "notification_changed", ProjectID: "project-outside-operations", RecipientID: "user-1"}
+	if !activityAttentionEventVisibleForActor(event, "user-1", visibleProjects) {
+		t.Fatal("targeted recipient invalidation was rejected by the operations project snapshot")
+	}
+	if activityAttentionEventVisibleForActor(event, "user-2", map[string]struct{}{"project-outside-operations": {}}) {
+		t.Fatal("targeted invalidation leaked to another actor")
+	}
+}

@@ -770,6 +770,7 @@ func (s *Service) CreateDailyReport(ctx context.Context, projectID string, req C
 	if boolValue(transition["auto_started"]) {
 		s.publishWorkItemChanged(Record{"id": transition["work_item_id"], "project_id": row["project_id"]}, actorID)
 	}
+	s.publishDailyReportDeliveryChanged(row, actorID)
 	return row, nil
 }
 
@@ -965,7 +966,15 @@ func (s *Service) UpdateDailyReport(ctx context.Context, reportID string, req Co
 	if err != nil {
 		return nil, err
 	}
+	s.publishDailyReportDeliveryChanged(row, actorID)
 	return row, nil
+}
+
+func (s *Service) publishDailyReportDeliveryChanged(row Record, actorID string) {
+	projectID := cleanID(row["project_id"])
+	transition := recordFromAny(row["delivery_transition"])
+	recipientID := cleanID(transition["recipient_id"])
+	s.publishWorkReportChanged(projectID, actorID, recipientID)
 }
 
 func (s *Service) normalizeConstructionReportDelivery(ctx context.Context, projectID string, req WorkReportDeliveryRequest, actorID string) (WorkReportDeliveryRequest, error) {
@@ -2380,6 +2389,23 @@ func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, act
 		"total":       page.Total,
 		"has_more":    page.HasMore,
 		"next_cursor": page.NextCursor,
+	}, nil
+}
+
+func (s *Service) MyWorkNavigationSummary(ctx context.Context, actorID string) (Record, error) {
+	workItemCount, err := s.repo.MyWorkNavigationCount(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	workflowActions, err := s.repo.MyWorkflowActions(ctx, actorID, MyWorkflowActionsFilter{Queue: "responsible"})
+	if err != nil {
+		return nil, err
+	}
+	workflowActionCount := len(workflowActions)
+	return Record{
+		"work_items_need_action": workItemCount,
+		"workflow_actions_ready": workflowActionCount,
+		"total":                  workItemCount + workflowActionCount,
 	}, nil
 }
 

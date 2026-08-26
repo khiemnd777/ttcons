@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './lib/auth/AuthContext';
 import { router } from './app/router';
 import { ToastProvider } from './components/ToastProvider';
+import { ActorRealtimeProvider } from './modules/notifications/ActorRealtimeProvider';
 import { shouldRetryQuery } from './lib/api/backpressure';
 import './index.css';
 
@@ -21,9 +22,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ToastProvider>
-          <RouterProvider router={router} />
-        </ToastProvider>
+        <ActorRealtimeProvider>
+          <ToastProvider>
+            <RouterProvider router={router} />
+          </ToastProvider>
+        </ActorRealtimeProvider>
       </AuthProvider>
     </QueryClientProvider>
   </React.StrictMode>,

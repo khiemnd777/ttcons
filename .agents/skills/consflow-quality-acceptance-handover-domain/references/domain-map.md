@@ -86,3 +86,7 @@
 - Rev8 combines subcontractor checklist plus quantity dossier into one immutable work-package form and combines owner reconciliation plus final acceptance into one composite source checklist. Canonical reconciliation, acceptance result, evidence and rework tables remain authoritative and are not replaced by the combined form.
 - Rework budget impact is monetary and uses semantic `currency`/shared `CurrencyInput`; timeline impact, acceptance quantities and checklist counts remain ordinary numeric fields.
 - Work-item-owned incoming/final acceptance, subcontractor reconciliation, owner/client reconciliation and handover source mutations now reuse the atomic first-mutation lifecycle bridge. Their persisted Work Item link or explicit handover task context must match project/action/current Node and actor scope. Auto-start only changes the Work Item/Run Step lifecycle after the canonical record succeeds; it never supplies acceptance evidence, changes a conclusion, closes rework, verifies checklist items or completes physical handover.
+
+## Notification Platform Boundary
+
+- V126 catalogs ITP/RFI/NCR, acceptance/rework and handover notification candidates disabled. A future producer must be atomic with the exact quality transition and link its immutable evidence/activity source; notification resolution may reflect but never perform acceptance, corrective approval, reinspection, checklist verification or handover completion.

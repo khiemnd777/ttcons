@@ -1,5 +1,37 @@
 # Current States
 
+## Active Plan: Notification cá nhân và bộ đếm điều hướng
+
+Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-26)
+
+### Will be done
+
+- Add actor-owned persistent notifications with unread/read lifecycle, cursor paging, summary, idempotency and current project/report visibility checks. Initial types are work-report submitted, resubmitted, needs changes and acknowledged.
+- Create each work-report notification in the same PostgreSQL transaction as its immutable report event and audit; publish only targeted invalidation after commit so Redis/SSE failure cannot lose persisted notifications.
+- Add a source-backed Work Report summary with permission-aware per-scope counts and one distinct unfiltered navigation total; never sum overlapping tabs or count rendered rows.
+- Add a lightweight My Work navigation summary for `responsible + need_action` plus ready workflow-stage actions; exclude history, upcoming, attention and the separate approval lane.
+- Add the AppShell notification bell/panel, unread badge, Reports/My Work navigation badges, responsive states and notification deep links to the canonical Reports or Operations owner.
+- Add backend/frontend regressions, update central/backend/frontend/root-cause plus Reporting/Admin/Workflow mappings, and verify the current working tree. Browser/UAT remains skipped unless separately authorized.
+
+### Done
+
+- User approved the review package, count semantics, four initial notification types and Mockup as Text with `OK triển khai`.
+- Confirmed current owners: V106 Work Report lifecycle, `repository_work_reports.go`, actor-scoped My Work summaries, AppShell navigation, Work Reports tabs and the invalidation-only activity SSE hub.
+- Confirmed notifications must remain a recipient projection, not a replacement for immutable Work Report events, audit, Work Item readiness, approval state or activity-attention read state.
+- Added V125 `user_notifications` with recipient/type/source-event idempotency, unread/read lifecycle and indexes. Report submit/resubmit/review now writes the typed recipient notification in the same transaction as the immutable report event and audit; a failed insert fails the source transition closed.
+- Added actor/project/permission-scoped notification list, unread summary, mark-one and mark-all APIs. The list uses an opaque `(created_at,id)` cursor; current report visibility is rechecked, and mutations never change source report state.
+- Added post-commit recipient-targeted `notification_changed` and `work_report_changed` invalidation on the existing SSE hub. Targeted events reach only the exact actor and contain invalidation metadata rather than notification content; persisted PostgreSQL pages remain authoritative through Redis/SSE loss.
+- Added `/work-reports/summary` with applied-filter per-scope counts plus a distinct visible-source union, and `/me/work-items/navigation-summary` with responsible actionable work plus ready responsible workflow-stage actions. Attention, future/history and the separate decision/approval lane are excluded from the My Work badge.
+- Added the responsive notification bell/panel to the standard and project-workspace headers with unread badge, all/unread filters, loading/error/empty/pagination states, read-one/read-all feedback, four typed presentations and safe deep links. AppShell disables its stream under project focus so the two layouts do not open duplicate SSE connections.
+- Added Reports/My Work navigation badges to the shared desktop/mobile navigation, per-tab Reports counts under applied filters, URL-backed `scope`/`report` deep links and summary invalidation from Operations/review mutations.
+- Added PostgreSQL lifecycle regressions for four notification types, recipient ownership, unread/read-all, idempotent event cardinality and report summary semantics; added My Work navigation/SSE targeting tests and frontend source contracts for the bell, counts, deep links and both shell placements.
+- Updated central/backend/frontend/root-cause mappings plus Reporting Analytics, Admin Governance and Workflow Orchestration domain maps.
+- Current working-tree verification at HEAD `f1d1f3a` plus the listed dirty-tree changes passed: migration checksum check for 125 migrations; V125 applied successfully to the local Consflow PostgreSQL database; focused report-notification PostgreSQL integration tests; full backend `go test ./...`; 274/274 frontend tests; TypeScript/Vite production build; 250 KiB gzip bundle budget with 137 chunks; and `git diff --check`.
+
+### Skipped / remaining acceptance
+
+- Browser/UAT was not authorized in this turn and remains `NOT UX ACCEPTED`.
+
 ## Active Plan: Gửi báo cáo cho người quản lý ngay tại Thi công
 
 Status: IMPLEMENTED AND TECHNICALLY VERIFIED; UX NOT ACCEPTED (approved by user on 2026-08-25)

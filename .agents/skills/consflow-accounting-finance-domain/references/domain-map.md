@@ -108,3 +108,7 @@
 
 - `GOLDEN-REAL-001` is the reconciled review fixture for four AP and five AR obligations, schedules, settled advances, nine terminal payments/receipts, allocations, verified input invoice, issued output invoice and released contract retention. AP/AR remaining balances are zero before handover.
 - Project material-cost and cash-request create/transition mutations accept explicit canonical Work Item context and may atomically start only the matching project-finance close item. This bridge changes no ledger, payment, journal, AP/AR, invoice or tax state beyond the requested source mutation; it does not satisfy financial-close readiness or complete the Work Item. Wrong/future/terminal context rolls the source mutation back, and calls without task context remain unchanged.
+
+## Notification Platform Boundary
+
+- V126 catalogs budget approval, due AP/AR, invoice rejection, payment reversal, cash request and tax-period candidates disabled. No scheduler or finance delivery adapter is active in this implementation. Future enablement must use canonical finance dates/status/currency and project/accounting scope, emit from an authoritative transition or idempotent scheduler occurrence, and never post/reverse a journal, settle an obligation or imply payment merely because a notification was read.

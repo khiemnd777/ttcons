@@ -7068,13 +7068,35 @@ func (r *Repository) RequestWorkItemApproval(ctx context.Context, item Record, r
 	if err := applyRunStepStatusTx(ctx, tx, item, "waiting_approval", actorID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `
+	var activityID string
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, from_status, to_status, metadata_json)
 		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, 'approval_requested', $4, $5, 'waiting_approval', $6::jsonb)
-	`, workItemID, projectID, actorID, comment, fromStatus, string(rawMetadata)); err != nil {
+		RETURNING id::text
+	`, workItemID, projectID, actorID, comment, fromStatus, string(rawMetadata)).Scan(&activityID); err != nil {
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "work_item_approval_requested", "work_item", workItemID, workItemAuditDescription("approval_requested", item, comment), json.RawMessage(rawMetadata)); err != nil {
+		return nil, err
+	}
+	if _, err := emitNotificationEventTx(ctx, tx, NotificationDomainEvent{
+		Key:            "work_item.approval_requested",
+		AggregateType:  "work_item",
+		AggregateID:    workItemID,
+		SourceEventID:  activityID,
+		ProjectID:      projectID,
+		ActorUserID:    actorID,
+		CorrelationKey: "work_item:" + workItemID + ":approval",
+		IdempotencyKey: "work_item_activity:" + activityID + ":notification",
+		Payload: Record{
+			"actor_name":          actorName,
+			"work_item_title":     fmt.Sprint(item["title"]),
+			"work_item_id":        workItemID,
+			"project_id":          projectID,
+			"approval_request_id": approvalID,
+		},
+		Audience: Record{"approval_request_id": approvalID, "exclude_actor": true},
+	}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -7189,7 +7211,16 @@ func (r *Repository) ApplyWorkItemDecision(ctx context.Context, item Record, act
 	defer tx.Rollback()
 
 	approvalID := cleanID(item["approval_request_id"])
+	requestedBy := ""
 	if approvalID != "" {
+		if err := tx.QueryRowContext(ctx, `
+			SELECT COALESCE(requested_by::text,'')
+			FROM approval_requests
+			WHERE id=$1::uuid AND project_id=$2::uuid
+			FOR UPDATE
+		`, approvalID, projectID).Scan(&requestedBy); err != nil {
+			return nil, err
+		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO approval_actions (approval_request_id, user_id, action, comment)
 			VALUES ($1, NULLIF($2,'')::uuid, $3, $4)
@@ -7213,6 +7244,18 @@ func (r *Repository) ApplyWorkItemDecision(ctx context.Context, item Record, act
 			return nil, err
 		}
 	}
+	if requestedBy == "" {
+		err := tx.QueryRowContext(ctx, `
+			SELECT COALESCE(actor_id::text,'')
+			FROM work_item_activities
+			WHERE work_item_id=$1::uuid AND activity_type IN ('approval_requested','review_requested')
+			ORDER BY created_at DESC,id DESC
+			LIMIT 1
+		`, workItemID).Scan(&requestedBy)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+	}
 
 	updated, err := queryTx(ctx, tx, `
 		UPDATE work_items
@@ -7233,14 +7276,51 @@ func (r *Repository) ApplyWorkItemDecision(ctx context.Context, item Record, act
 	if err := applyRunStepStatusTx(ctx, tx, item, toStatus, actorID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `
+	var activityID string
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO work_item_activities (work_item_id, project_id, scope_type, scope_id, actor_id, activity_type, comment, from_status, to_status, metadata_json)
 		VALUES ($1, $2, 'work_item', $1, NULLIF($3,'')::uuid, $4, $5, $6, $7, $8::jsonb)
-	`, workItemID, projectID, actorID, activityType, comment, fromStatus, toStatus, string(rawMetadata)); err != nil {
+		RETURNING id::text
+	`, workItemID, projectID, actorID, activityType, comment, fromStatus, toStatus, string(rawMetadata)).Scan(&activityID); err != nil {
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "work_item_"+activityType, "work_item", workItemID, workItemAuditDescription(activityType, item, comment), json.RawMessage(rawMetadata)); err != nil {
 		return nil, err
+	}
+	eventKey := ""
+	switch action {
+	case "approve":
+		eventKey = "work_item.approved"
+	case "reject":
+		eventKey = "work_item.rejected"
+	case "request-change":
+		eventKey = "work_item.changes_requested"
+	}
+	if eventKey != "" && requestedBy != "" {
+		if _, err := emitNotificationEventTx(ctx, tx, NotificationDomainEvent{
+			Key:            eventKey,
+			AggregateType:  "work_item",
+			AggregateID:    workItemID,
+			SourceEventID:  activityID,
+			ProjectID:      projectID,
+			ActorUserID:    actorID,
+			CorrelationKey: "work_item:" + workItemID + ":approval",
+			IdempotencyKey: "work_item_activity:" + activityID + ":notification",
+			Payload: Record{
+				"actor_name":      actorName,
+				"work_item_title": fmt.Sprint(item["title"]),
+				"work_item_id":    workItemID,
+				"project_id":      projectID,
+				"comment":         comment,
+			},
+			Audience: Record{
+				"user_ids":               []string{requestedBy},
+				"exclude_actor":          true,
+				"resolve_thread_for_all": true,
+			},
+		}); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -7323,7 +7403,7 @@ func (r *Repository) AddWorkItemActivity(ctx context.Context, item Record, req W
 	if len(rows) == 0 {
 		return nil, sql.ErrNoRows
 	}
-	if err := r.insertActivityAttentionTx(ctx, tx, rows[0], req, actorID); err != nil {
+	if err := r.insertActivityAttentionTx(ctx, tx, rows[0], req, actorID, actorName); err != nil {
 		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE work_items SET updated_by=NULLIF($2,'')::uuid, updated_at=now() WHERE id=$1`, workItemID, actorID); err != nil {
@@ -7364,7 +7444,7 @@ func (r *Repository) AddProjectActivity(ctx context.Context, projectID string, r
 	if len(rows) == 0 {
 		return nil, sql.ErrNoRows
 	}
-	if err := r.insertActivityAttentionTx(ctx, tx, rows[0], req, actorID); err != nil {
+	if err := r.insertActivityAttentionTx(ctx, tx, rows[0], req, actorID, actorName); err != nil {
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "project_activity_"+req.ActivityType, req.ScopeType, req.ScopeID, projectActivityDescription(req.ActivityType, req.Comment), json.RawMessage(rawAuditMetadata)); err != nil {
@@ -7511,7 +7591,7 @@ func (r *Repository) WithdrawActivityMessage(ctx context.Context, activity Recor
 	return updatedRows[0], nil
 }
 
-func (r *Repository) insertActivityAttentionTx(ctx context.Context, tx *sql.Tx, activity Record, req WorkItemActivityRequest, actorID string) error {
+func (r *Repository) insertActivityAttentionTx(ctx context.Context, tx *sql.Tx, activity Record, req WorkItemActivityRequest, actorID, actorName string) error {
 	activityID := cleanID(activity["id"])
 	projectID := cleanID(activity["project_id"])
 	if activityID == "" || projectID == "" || len(req.Mentions) == 0 {
@@ -7579,6 +7659,43 @@ func (r *Repository) insertActivityAttentionTx(ctx context.Context, tx *sql.Tx, 
 		WHERE activity_id=$1
 		ON CONFLICT DO NOTHING
 	`, activityID, actorID)
+	if err != nil {
+		return err
+	}
+	recipientRows, err := queryTx(ctx, tx, `
+		SELECT DISTINCT recipient_user_id::text AS user_id
+		FROM activity_mentions
+		WHERE activity_id=$1::uuid AND recipient_user_id IS NOT NULL
+		ORDER BY recipient_user_id::text
+	`, activityID)
+	if err != nil {
+		return err
+	}
+	recipientIDs := make([]string, 0, len(recipientRows))
+	for _, row := range recipientRows {
+		if recipientID := cleanID(row["user_id"]); recipientID != "" && recipientID != actorID {
+			recipientIDs = append(recipientIDs, recipientID)
+		}
+	}
+	if len(recipientIDs) == 0 {
+		return nil
+	}
+	_, err = emitNotificationEventTx(ctx, tx, NotificationDomainEvent{
+		Key:           "activity.mentioned",
+		AggregateType: "activity",
+		AggregateID:   activityID,
+		SourceEventID: activityID,
+		ProjectID:     projectID,
+		ActorUserID:   actorID,
+		Payload: Record{
+			"activity_id": activityID,
+			"project_id":  projectID,
+			"actor_name":  actorName,
+		},
+		Audience:       Record{"user_ids": recipientIDs, "exclude_actor": true},
+		CorrelationKey: "activity:" + activityID,
+		IdempotencyKey: "activity_mentioned:" + activityID,
+	})
 	return err
 }
 
@@ -14909,7 +15026,7 @@ func (r *Repository) recordContractVariationEventTx(ctx context.Context, tx *sql
 	for _, role := range nextRoles {
 		mentions = append(mentions, ActivityMentionRequest{Type: "role", ID: role, Label: role})
 	}
-	return r.insertActivityAttentionTx(ctx, tx, activityRows[0], WorkItemActivityRequest{Mentions: mentions}, actorID)
+	return r.insertActivityAttentionTx(ctx, tx, activityRows[0], WorkItemActivityRequest{Mentions: mentions}, actorID, actorName)
 }
 
 func projectIDForContractTx(ctx context.Context, tx *sql.Tx, contractID string) (string, error) {

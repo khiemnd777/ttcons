@@ -3199,6 +3199,23 @@ func TestWorkItemApprovalRequiresDecisionScope(t *testing.T) {
 	if approvalID == "" {
 		t.Fatal("expected approval_request_id")
 	}
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_item.approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 1, fixture.pmID, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_item.approval_requested' AND source_id=$2`, 0, fixture.workerID, fixture.itemID)
+	var approvalNotificationID string
+	if err := db.QueryRowContext(ctx, `SELECT id::text FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_item.approval_requested' AND source_id=$2`, fixture.pmID, fixture.itemID).Scan(&approvalNotificationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.MarkUserNotificationRead(ctx, approvalNotificationID, fixture.pmID); err != nil {
+		t.Fatal(err)
+	}
+	pmSummary, err := service.UserNotificationSummary(ctx, fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pmSummary.UnreadTotal != 0 || pmSummary.ActionRequired != 1 {
+		t.Fatalf("notification summary after read = %#v, want unread=0 action_required=1", pmSummary)
+	}
 
 	_, err = service.ApprovalAction(ctx, approvalID, "approve", "self approve", fixture.workerID, "Worker")
 	if err == nil {
@@ -3223,6 +3240,9 @@ func TestWorkItemApprovalRequiresDecisionScope(t *testing.T) {
 	if approved["status"] != "completed" {
 		t.Fatalf("work item status = %v, want completed", approved["status"])
 	}
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_item.approved' AND source_id=$2`, 1, fixture.workerID, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_item.approval_requested' AND source_id=$2 AND resolved_at IS NOT NULL`, 1, fixture.pmID, fixture.itemID)
 	assertCount(t, db, `SELECT COUNT(*) FROM approval_requests WHERE id=$1 AND status='approved'`, 1, approvalID)
 	assertCount(t, db, `SELECT COUNT(*) FROM approval_actions WHERE approval_request_id=$1 AND action='approve'`, 1, approvalID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='approval_requested'`, 1, fixture.itemID)

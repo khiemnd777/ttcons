@@ -15,6 +15,35 @@ type myWorkItemsPageData struct {
 	NextCursor string
 }
 
+func (r *Repository) MyWorkNavigationCount(ctx context.Context, userID string) (int, error) {
+	profile, err := r.WorkItemAccessProfile(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	args := append(
+		workItemScopeArgs(profile, false, true),
+		workItemScopeArgs(profile, profile.IsAdmin, false)...,
+	)
+	args = append(args, profile.IsAdmin || profile.IsDirector)
+	row, err := r.QueryOne(ctx, myWorkItemsBaseSQL()+fmt.Sprintf(`
+		SELECT COUNT(*) AS total
+		FROM base_work
+		WHERE is_responsible AND %s
+	`, myWorkNavigationNeedActionSQL()), args...)
+	if err != nil {
+		return 0, err
+	}
+	return int(number(row["total"])), nil
+}
+
+func myWorkNavigationNeedActionSQL() string {
+	return `(
+		status NOT IN ('waiting_review','waiting_approval','completed','cancelled')
+		AND can_act
+		AND NOT is_future
+	)`
+}
+
 func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter MyWorkItemsFilter, offset int) (myWorkItemsPageData, error) {
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
 	if err != nil {

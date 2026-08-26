@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2,
   Download,
@@ -22,6 +22,7 @@ import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { constructionReportViewModel } from '../operations/constructionReportViewModel';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
+import type { WorkReportSummary } from '../../lib/types/domain';
 
 type WorkReportStatus = 'draft' | 'recorded' | 'submitted' | 'needs_changes' | 'acknowledged';
 type WorkReportScope = 'mine' | 'source' | 'review' | 'all';
@@ -71,6 +72,7 @@ const statusOptions: Array<[string, string]> = [
 export function WorkReportsPage() {
   const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const toast = useToast();
   const canReview = hasPermission('work_report.review') || hasPermission('work_report.manage');
@@ -84,7 +86,10 @@ export function WorkReportsPage() {
     ...(canReview ? [{ key: 'review' as const, label: 'Chờ tôi xem' }] : []),
     ...(canManage ? [{ key: 'all' as const, label: 'Tất cả được phép xem' }] : []),
   ], [canManage, canOpenSource, canReview]);
-  const [scope, setScope] = useState<WorkReportScope>('mine');
+  const [scope, setScope] = useState<WorkReportScope>(() => {
+    const requested = normalizeScope(searchParams.get('scope'));
+    return requested && availableScopes.some((item) => item.key === requested) ? requested : availableScopes[0]?.key ?? 'mine';
+  });
   const [draftFilters, setDraftFilters] = useState({ projectId: '', status: '', dateFrom: '', dateTo: '', search: '' });
   const [filters, setFilters] = useState(draftFilters);
   const [selectedSourceID, setSelectedSourceID] = useState('');
@@ -103,9 +108,25 @@ export function WorkReportsPage() {
     return params.toString();
   }, [filters, scope]);
 
+  const summaryQueryString = useMemo(() => {
+    const params = new URLSearchParams();
+    if (filters.projectId) params.set('project_id', filters.projectId);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    if (filters.search) params.set('search', filters.search.trim());
+    return params.toString();
+  }, [filters]);
+
   const reports = useQuery({
     queryKey: ['work-reports', scope, filters],
     queryFn: () => get<WorkReportRow[]>(`/work-reports?${listQueryString}`),
+    retry: false,
+  });
+
+  const reportSummary = useQuery({
+    queryKey: ['work-report-summary', user?.id, 'page', filters],
+    queryFn: () => get<WorkReportSummary>(`/work-reports/summary${summaryQueryString ? `?${summaryQueryString}` : ''}`),
     retry: false,
   });
 
@@ -115,6 +136,17 @@ export function WorkReportsPage() {
     enabled: Boolean(selectedSourceID),
     retry: false,
   });
+
+  useEffect(() => {
+    const requestedScope = normalizeScope(searchParams.get('scope'));
+    if (requestedScope && availableScopes.some((item) => item.key === requestedScope) && requestedScope !== scope) {
+      setScope(requestedScope);
+    } else if (!availableScopes.some((item) => item.key === scope)) {
+      setScope(availableScopes[0]?.key ?? 'mine');
+    }
+    const requestedReport = searchParams.get('report') ?? '';
+    if (requestedReport !== selectedSourceID) setSelectedSourceID(requestedReport);
+  }, [availableScopes, scope, searchParams, selectedSourceID]);
 
   function applyFilters() {
     if (draftFilters.dateFrom && draftFilters.dateTo && draftFilters.dateFrom > draftFilters.dateTo) {
@@ -135,6 +167,12 @@ export function WorkReportsPage() {
     setScope(nextScope);
     setFilters((current) => ({ ...current, status: nextScope === 'source' ? 'draft' : current.status === 'draft' ? '' : current.status }));
     setDraftFilters((current) => ({ ...current, status: nextScope === 'source' ? 'draft' : current.status === 'draft' ? '' : current.status }));
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set('scope', nextScope);
+      next.delete('report');
+      return next;
+    }, { replace: true });
   }
 
   async function exportRegister() {
@@ -160,6 +198,21 @@ export function WorkReportsPage() {
       return;
     }
     setSelectedSourceID(row.source_id);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set('scope', scope);
+      next.set('report', row.source_id);
+      return next;
+    }, { replace: true });
+  }
+
+  function closeReport() {
+    setSelectedSourceID('');
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('report');
+      return next;
+    }, { replace: true });
   }
 
   return (
@@ -225,6 +278,9 @@ export function WorkReportsPage() {
               onClick={() => changeScope(item.key)}
             >
               {item.label}
+              <span className="ml-1 text-xs text-slate-400" aria-label={`${item.label}: ${scopeCount(reportSummary.data, item.key, reportSummary.isLoading, reportSummary.isError)}`}>
+                ({scopeCount(reportSummary.data, item.key, reportSummary.isLoading, reportSummary.isError)})
+              </span>
             </button>
           ))}
         </div>
@@ -268,9 +324,10 @@ export function WorkReportsPage() {
           await Promise.all([
             detail.refetch(),
             queryClient.invalidateQueries({ queryKey: ['work-reports'] }),
+            queryClient.invalidateQueries({ queryKey: ['work-report-summary'] }),
           ]);
         }}
-        onClose={() => setSelectedSourceID('')}
+        onClose={closeReport}
       />
     </div>
   );
@@ -523,4 +580,14 @@ function dateTimeText(value: unknown) {
   if (!value) return '—';
   const date = new Date(String(value));
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('vi-VN');
+}
+
+function normalizeScope(value: string | null): WorkReportScope | null {
+  return value === 'mine' || value === 'source' || value === 'review' || value === 'all' ? value : null;
+}
+
+function scopeCount(summary: WorkReportSummary | undefined, scope: WorkReportScope, loading: boolean, error: boolean) {
+  if (loading) return '…';
+  if (error) return '—';
+  return summary?.scopes?.[scope] ?? 0;
 }

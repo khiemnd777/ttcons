@@ -86,6 +86,17 @@ func (h *Handler) WorkReports(c *fiber.Ctx) error {
 	return response.OK(c, rows)
 }
 
+func (h *Handler) WorkReportSummary(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"work_report.view"}); err != nil {
+		return err
+	}
+	summary, err := h.service.WorkReportSummary(c.Context(), workReportFilter(c), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, summary)
+}
+
 func (h *Handler) WorkReportProjects(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"work_report.view"}); err != nil {
 		return err

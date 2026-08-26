@@ -21,14 +21,15 @@ import (
 )
 
 type ActivityStreamEvent struct {
-	Type       string `json:"type"`
-	ProjectID  string `json:"project_id,omitempty"`
-	WorkItemID string `json:"work_item_id,omitempty"`
-	ActivityID string `json:"activity_id,omitempty"`
-	ScopeType  string `json:"scope_type,omitempty"`
-	ScopeID    string `json:"scope_id,omitempty"`
-	ActorID    string `json:"actor_id,omitempty"`
-	At         string `json:"at"`
+	Type        string `json:"type"`
+	ProjectID   string `json:"project_id,omitempty"`
+	WorkItemID  string `json:"work_item_id,omitempty"`
+	ActivityID  string `json:"activity_id,omitempty"`
+	ScopeType   string `json:"scope_type,omitempty"`
+	ScopeID     string `json:"scope_id,omitempty"`
+	ActorID     string `json:"actor_id,omitempty"`
+	RecipientID string `json:"recipient_id,omitempty"`
+	At          string `json:"at"`
 }
 
 type ActivityStreamHub struct {
@@ -386,6 +387,30 @@ func (s *Service) publishWorkQueueChanged(projectID string) {
 	})
 }
 
+func (s *Service) publishPersonalInvalidation(eventType, recipientID, projectID string) {
+	recipientID = cleanID(recipientID)
+	if recipientID == "" {
+		return
+	}
+	s.publishActivityEvent(ActivityStreamEvent{
+		Type:        eventType,
+		ProjectID:   cleanID(projectID),
+		RecipientID: recipientID,
+	})
+}
+
+func (s *Service) publishWorkReportChanged(projectID string, actorIDs ...string) {
+	seen := map[string]bool{}
+	for _, actorID := range actorIDs {
+		actorID = cleanID(actorID)
+		if actorID == "" || seen[actorID] {
+			continue
+		}
+		seen[actorID] = true
+		s.publishPersonalInvalidation("work_report_changed", actorID, projectID)
+	}
+}
+
 func activityEventFromRecord(eventType string, activity Record, actorID string) ActivityStreamEvent {
 	return ActivityStreamEvent{
 		Type:       eventType,
@@ -538,13 +563,20 @@ func (h *Handler) MyActivityAttentionStream(c *fiber.Ctx) error {
 		return err
 	}
 	h.writeActivityStream(c, release, func(event ActivityStreamEvent) (string, ActivityStreamEvent, bool) {
-		if !activityAttentionEventVisible(event, visibleProjects) {
+		if !activityAttentionEventVisibleForActor(event, userID, visibleProjects) {
 			return "", ActivityStreamEvent{}, false
 		}
 		eventName, output := myActivityAttentionStreamEvent(event)
 		return eventName, output, true
 	})
 	return nil
+}
+
+func activityAttentionEventVisibleForActor(event ActivityStreamEvent, actorID string, visibleProjects map[string]struct{}) bool {
+	if event.RecipientID != "" {
+		return event.RecipientID == actorID
+	}
+	return activityAttentionEventVisible(event, visibleProjects)
 }
 
 func activityAttentionEventVisible(event ActivityStreamEvent, visibleProjects map[string]struct{}) bool {
@@ -556,6 +588,14 @@ func activityAttentionEventVisible(event ActivityStreamEvent, visibleProjects ma
 }
 
 func myActivityAttentionStreamEvent(event ActivityStreamEvent) (string, ActivityStreamEvent) {
+	if statusIn(event.Type, "notification_changed", "work_report_changed") {
+		return event.Type, ActivityStreamEvent{
+			Type:        event.Type,
+			ProjectID:   event.ProjectID,
+			RecipientID: event.RecipientID,
+			At:          time.Now().UTC().Format(time.RFC3339),
+		}
+	}
 	if statusIn(event.Type, "work_item_changed", "work_queue_changed") {
 		return "work_queue_changed", ActivityStreamEvent{
 			Type:      "work_queue_changed",

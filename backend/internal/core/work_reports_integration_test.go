@@ -63,6 +63,7 @@ func TestConstructionReportCreateAndSubmitIsAtomicAndRecommendsProjectPM(t *test
 	if !boolValue(recordFromAny(created["work_item_transition"])["auto_started"]) {
 		t.Fatalf("work item transition = %#v, want atomic auto start", created["work_item_transition"])
 	}
+	mustDispatchNotifications(t, service)
 	delivery := recordFromAny(created["delivery_transition"])
 	if !boolValue(delivery["submitted"]) || delivery["status"] != "submitted" || cleanID(delivery["recipient_id"]) != fixture.pmID || int(number(delivery["revision_no"])) != 1 {
 		t.Fatalf("delivery transition = %#v, want submitted revision 1", delivery)
@@ -70,6 +71,7 @@ func TestConstructionReportCreateAndSubmitIsAtomicAndRecommendsProjectPM(t *test
 	assertCount(t, db, `SELECT COUNT(*) FROM work_reports WHERE source_id=$1 AND status='submitted' AND recipient_id=$2`, 1, created["id"], fixture.pmID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_report_revisions revision JOIN work_reports report ON report.id=revision.report_id WHERE report.source_id=$1 AND revision.revision_no=1`, 1, created["id"])
 	assertCount(t, db, `SELECT COUNT(*) FROM work_report_events event JOIN work_reports report ON report.id=event.report_id WHERE report.source_id=$1 AND event.event_type='submitted'`, 1, created["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_report.submitted' AND source_id=$2`, 1, fixture.pmID, created["id"])
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND target_id=$2 AND event_type='daily_report_created'`, 1, fixture.projectID, created["id"])
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='work_report_submitted'`, 1, fixture.projectID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='in_progress'`, 1, fixture.itemID)
@@ -78,6 +80,8 @@ func TestConstructionReportCreateAndSubmitIsAtomicAndRecommendsProjectPM(t *test
 	if _, err := service.ReviewWorkReport(ctx, reportID, "request-changes", WorkReportReviewRequest{Comment: "Bổ sung ghi chú hiện trường"}, fixture.pmID, "PM"); err != nil {
 		t.Fatal(err)
 	}
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_report.needs_changes' AND source_id=$2`, 1, fixture.workerID, created["id"])
 	req.DoneItems = []ConstructionDailyReportWorkItemRequest{{Title: "Hoàn thiện khu A và vệ sinh cuối ca"}}
 	req.FieldNotes = "Đã bổ sung theo phản hồi"
 	updated, err := service.UpdateDailyReport(ctx, cleanID(created["id"]), req, fixture.workerID, "Worker")
@@ -88,8 +92,10 @@ func TestConstructionReportCreateAndSubmitIsAtomicAndRecommendsProjectPM(t *test
 	if !boolValue(resubmission["submitted"]) || int(number(resubmission["revision_no"])) != 2 || resubmission["event_type"] != "resubmitted" {
 		t.Fatalf("resubmission transition = %#v, want atomic revision 2", resubmission)
 	}
+	mustDispatchNotifications(t, service)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_report_revisions WHERE report_id=$1`, 2, reportID)
 	assertCount(t, db, `SELECT COUNT(*) FROM work_report_events WHERE report_id=$1 AND event_type='resubmitted'`, 1, reportID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_report.resubmitted' AND source_id=$2`, 1, fixture.pmID, created["id"])
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='in_progress'`, 1, fixture.itemID)
 }
 
@@ -141,6 +147,13 @@ func TestWorkReportLifecycleKeepsImmutableSubmittedRevisions(t *testing.T) {
 	if len(formalBeforeSubmit) != 0 || len(sourceDrafts) != 1 || fmt.Sprint(sourceDrafts[0]["status"]) != "draft" {
 		t.Fatalf("report register split before submit = formal %#v source %#v", formalBeforeSubmit, sourceDrafts)
 	}
+	beforeSummary, err := service.WorkReportSummary(ctx, WorkReportFilter{}, author.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if beforeSummary.Scopes["source"] != 1 || beforeSummary.TotalVisible != 1 {
+		t.Fatalf("summary before submit = %#v, want one distinct source draft", beforeSummary)
+	}
 	if _, err := service.SubmitWorkReport(ctx, sourceID, WorkReportSubmitRequest{RecipientID: author.userID}, author.userID, "Scoped User"); err == nil {
 		t.Fatal("saved-source quick submit must reject the author as recipient")
 	}
@@ -174,6 +187,17 @@ func TestWorkReportLifecycleKeepsImmutableSubmittedRevisions(t *testing.T) {
 	}
 	if len(formalAfterSubmit) != 1 || len(sourceAfterSubmit) != 0 {
 		t.Fatalf("report register split after submit = formal %#v source %#v", formalAfterSubmit, sourceAfterSubmit)
+	}
+	authorSummary, err := service.WorkReportSummary(ctx, WorkReportFilter{}, author.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviewerSummary, err := service.WorkReportSummary(ctx, WorkReportFilter{}, reviewerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if authorSummary.Scopes["mine"] != 1 || authorSummary.TotalVisible != 1 || reviewerSummary.Scopes["review"] != 1 || reviewerSummary.TotalVisible != 1 {
+		t.Fatalf("summaries after submit = author %#v reviewer %#v", authorSummary, reviewerSummary)
 	}
 
 	if _, err := service.UpdateDailyReport(ctx, sourceID, ConstructionDailyReportCreateRequest{}, author.userID, "Scoped User"); err == nil {
@@ -236,6 +260,75 @@ func TestWorkReportLifecycleKeepsImmutableSubmittedRevisions(t *testing.T) {
 	if fmt.Sprint(acknowledged["status"]) != "acknowledged" {
 		t.Fatalf("acknowledged status = %#v", acknowledged["status"])
 	}
+	mustDispatchNotifications(t, service)
+
+	reviewerNotifications, err := service.UserNotifications(ctx, NotificationFilter{Limit: 20}, reviewerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorNotifications, err := service.UserNotifications(ctx, NotificationFilter{Limit: 20}, author.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reviewerNotifications.Items) != 2 || len(authorNotifications.Items) != 2 {
+		t.Fatalf("notification lifecycle = reviewer %#v author %#v, want two each", reviewerNotifications.Items, authorNotifications.Items)
+	}
+	reviewerUnread, err := service.UserNotificationSummary(ctx, reviewerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reviewerUnread.UnreadTotal != 2 || reviewerUnread.ByCategory["reports"] != 2 || reviewerUnread.ActionRequired != 0 {
+		t.Fatalf("reviewer unread summary = %#v", reviewerUnread)
+	}
+	if _, err := service.MarkUserNotificationRead(ctx, cleanID(reviewerNotifications.Items[0]["id"]), reviewerID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.MarkUserNotificationRead(ctx, cleanID(reviewerNotifications.Items[0]["id"]), author.userID); err == nil {
+		t.Fatal("another actor must not mark a notification as read")
+	}
+	if _, err := service.MarkAllUserNotificationsRead(ctx, reviewerID); err != nil {
+		t.Fatal(err)
+	}
+	reviewerUnread, err = service.UserNotificationSummary(ctx, reviewerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reviewerUnread.UnreadTotal != 0 {
+		t.Fatalf("reviewer unread after mark-all = %#v", reviewerUnread)
+	}
+	mustExec(t, db, `
+		INSERT INTO user_notifications (
+			recipient_user_id,actor_user_id,project_id,notification_type,source_kind,source_id,source_event_id,
+			title_snapshot,message_snapshot,action_key,action_payload_json,idempotency_key,created_at
+		)
+		SELECT $1::uuid,$2::uuid,$3::uuid,'work_report_submitted','operation_daily_report',$4::uuid,gen_random_uuid(),
+			'Kiểm thử phân trang','Thông báo kiểm thử','open_work_report_review','{}'::jsonb,
+			'pagination-test-' || $5 || '-' || sequence,
+			TIMESTAMPTZ '2026-08-26 03:00:00+00' + sequence * INTERVAL '1 microsecond'
+		FROM generate_series(1,25) sequence
+	`, reviewerID, author.userID, author.projectID, sourceID, suffix)
+	firstNotificationPage, err := service.UserNotifications(ctx, NotificationFilter{State: "unread", Limit: 20}, reviewerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondNotificationPage, err := service.UserNotifications(ctx, NotificationFilter{State: "unread", Limit: 20, Cursor: firstNotificationPage.NextCursor}, reviewerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(firstNotificationPage.Items) != 20 || !firstNotificationPage.HasMore || firstNotificationPage.NextCursor == "" || len(secondNotificationPage.Items) != 5 || secondNotificationPage.HasMore {
+		t.Fatalf("notification pagination = first %#v second %#v", firstNotificationPage, secondNotificationPage)
+	}
+	seenNotificationIDs := map[string]bool{}
+	for _, notification := range append(firstNotificationPage.Items, secondNotificationPage.Items...) {
+		notificationID := cleanID(notification["id"])
+		if notificationID == "" || seenNotificationIDs[notificationID] {
+			t.Fatalf("notification cursor duplicated or lost identity: %#v", notification)
+		}
+		seenNotificationIDs[notificationID] = true
+	}
+	if len(seenNotificationIDs) != 25 {
+		t.Fatalf("notification cursor returned %d unique rows, want 25", len(seenNotificationIDs))
+	}
 
 	pdf, err := service.ExportWorkReportPDF(ctx, reportID, 1, reviewerID, "Người quản lý")
 	if err != nil {
@@ -250,6 +343,13 @@ func TestWorkReportLifecycleKeepsImmutableSubmittedRevisions(t *testing.T) {
 	}
 	if _, err := db.ExecContext(ctx, `DELETE FROM work_report_events WHERE report_id=$1`, reportID); err == nil {
 		t.Fatal("event history delete must be rejected by the database")
+	}
+}
+
+func mustDispatchNotifications(t *testing.T, service *Service) {
+	t.Helper()
+	if err := service.dispatchNotificationEvents(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 }
 

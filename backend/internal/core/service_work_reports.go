@@ -172,6 +172,23 @@ func (s *Service) WorkReports(ctx context.Context, filter WorkReportFilter, acto
 	return s.repo.WorkReports(ctx, actorID, normalized)
 }
 
+func (s *Service) WorkReportSummary(ctx context.Context, filter WorkReportFilter, actorID string) (WorkReportSummary, error) {
+	normalized, err := normalizeWorkReportFilter(filter)
+	if err != nil {
+		return WorkReportSummary{}, err
+	}
+	if normalized.ProjectID != "" {
+		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, normalized.ProjectID, []string{"work_report.view"})
+		if err != nil {
+			return WorkReportSummary{}, err
+		}
+		if !allowed {
+			return WorkReportSummary{}, forbiddenError("Bạn không có quyền xem báo cáo của công trình này", Record{"permissions": []string{"work_report.view"}})
+		}
+	}
+	return s.repo.WorkReportSummary(ctx, actorID, normalized)
+}
+
 func normalizeWorkReportFilter(filter WorkReportFilter) (WorkReportFilter, error) {
 	filter.Scope = strings.TrimSpace(filter.Scope)
 	if filter.Scope == "" {
@@ -303,7 +320,13 @@ func (s *Service) SubmitWorkReport(ctx context.Context, sourceID string, req Wor
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền gửi báo cáo này")
 	}
-	return s.repo.SubmitWorkReport(ctx, sourceID, req.RecipientID, req.Comment, actorID, actorName)
+	row, err := s.repo.SubmitWorkReport(ctx, sourceID, req.RecipientID, req.Comment, actorID, actorName)
+	if err != nil {
+		return nil, err
+	}
+	projectID := cleanID(source["project_id"])
+	s.publishWorkReportChanged(projectID, actorID, req.RecipientID)
+	return row, nil
 }
 
 func (s *Service) ReviewWorkReport(ctx context.Context, reportID, action string, req WorkReportReviewRequest, actorID, actorName string) (Record, error) {
@@ -333,7 +356,14 @@ func (s *Service) ReviewWorkReport(ctx context.Context, reportID, action string,
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.ReviewWorkReport(ctx, reportID, action, req.Comment, actorID, actorName, canManage)
+	row, err := s.repo.ReviewWorkReport(ctx, reportID, action, req.Comment, actorID, actorName, canManage)
+	if err != nil {
+		return nil, err
+	}
+	projectID := cleanID(header["project_id"])
+	authorID := cleanID(header["author_id"])
+	s.publishWorkReportChanged(projectID, authorID, cleanID(header["recipient_id"]))
+	return row, nil
 }
 
 func (s *Service) ExportWorkReports(ctx context.Context, filter WorkReportFilter, format, actorID, actorName string) (tabularExportResult, error) {

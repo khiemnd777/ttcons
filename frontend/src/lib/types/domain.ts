@@ -91,6 +91,86 @@ export type User = {
   pending_recovery_email_masked?: string;
 };
 
+export type UserNotification = AnyRecord & {
+  id: string;
+  event_key: string;
+  notification_type: string;
+  category_key: string;
+  category_label: string;
+  intent: 'action_required' | 'awareness' | 'outcome' | 'security';
+  severity: 'info' | 'success' | 'warning' | 'critical';
+  icon_key: string;
+  tone_key: string;
+  source_kind: string;
+  source_id: string;
+  source_event_id: string;
+  project_id: string;
+  project_code: string;
+  project_name: string;
+  actor_user_id?: string;
+  actor_name?: string;
+  actor_account_deleted?: boolean;
+  title_snapshot: string;
+  message_snapshot: string;
+  action_key: string;
+  action_payload_json?: AnyRecord;
+  action_href?: string | null;
+  action_label: string;
+  read_at?: string | null;
+  seen_at?: string | null;
+  archived_at?: string | null;
+  resolved_at?: string | null;
+  created_at: string;
+};
+
+export type NotificationPage = {
+  items: UserNotification[];
+  has_more: boolean;
+  next_cursor?: string;
+};
+
+export type NotificationSummary = {
+  unread_total: number;
+  action_required: number;
+  by_category: Record<string, number>;
+  actor_revision: number;
+};
+
+export type NotificationCatalogItem = {
+  event_key: string;
+  domain_key: string;
+  category_key: string;
+  category_label: string;
+  intent: UserNotification['intent'];
+  severity: UserNotification['severity'];
+  icon_key: string;
+  tone_key: string;
+  enabled: boolean;
+  required_delivery: boolean;
+  permissions_any: string[];
+};
+
+export type NotificationPreference = {
+  category_key: string;
+  event_key: string;
+  in_app_enabled: boolean;
+  email_enabled: boolean;
+  push_enabled: boolean;
+  digest_mode: 'immediate' | 'daily' | 'weekly' | 'off';
+  quiet_hours_json: AnyRecord;
+};
+
+export type WorkReportSummary = {
+  scopes: Partial<Record<'mine' | 'source' | 'review' | 'all', number>>;
+  total_visible: number;
+};
+
+export type MyWorkNavigationSummary = {
+  work_items_need_action: number;
+  workflow_actions_ready: number;
+  total: number;
+};
+
 export type Project = AnyRecord & {
   id: string;
   name: string;

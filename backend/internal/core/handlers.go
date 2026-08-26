@@ -957,6 +957,14 @@ func (h *Handler) MyWorkItems(c *fiber.Ctx) error {
 	return response.OK(c, items)
 }
 
+func (h *Handler) MyWorkNavigationSummary(c *fiber.Ctx) error {
+	summary, err := h.service.MyWorkNavigationSummary(c.Context(), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, summary)
+}
+
 func (h *Handler) MyWorkflowActions(c *fiber.Ctx) error {
 	actions, err := h.service.MyWorkflowActions(c.Context(), MyWorkflowActionsFilter{
 		Queue:     c.Query("queue"),

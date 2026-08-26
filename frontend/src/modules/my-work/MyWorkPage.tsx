@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { get, post, streamSSE, type StreamStatus } from '../../lib/api/client';
+import { get, post, type StreamStatus } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -34,6 +34,7 @@ import { ActivityReactionBar, ActivityReplyQuote } from '../work-items/ActivityC
 import { WorkItemCard } from '../work-items/WorkItemCard';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
 import { executionTargetActionLabel, executionTargetPath, executionTargetWorkspaceLabel } from '../work-items/workItemExecutionTarget';
+import { useActorRealtimeStatus } from '../notifications/ActorRealtimeProvider';
 import {
   asArray,
   activityLabel,
@@ -141,9 +142,10 @@ export function MyWorkPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
-  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const requestedTask = searchParams.get('task')?.trim() ?? '';
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(() => requestedTask || null);
   const [searchDraft, setSearchDraft] = useState(searchParams.get('search') ?? '');
-  const [streamStatus, setStreamStatus] = useState<StreamStatus>('reconnecting');
+	const streamStatus = useActorRealtimeStatus();
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
 
   const requestedMode = validValue<ModeKey>(searchParams.get('mode'), ['work', 'approval', 'attention'], 'work');
@@ -164,6 +166,9 @@ export function MyWorkPage() {
   const roleSummary = summarizeRoles(user?.roles);
 
   useEffect(() => setSearchDraft(search), [search]);
+  useEffect(() => {
+    if (requestedTask) setSelectedEntryId(requestedTask);
+  }, [requestedTask]);
 
   const filterKey = useMemo(() => ({ queue, bucket, project, status, deadline, workType, priority, search, sort }), [bucket, deadline, priority, project, queue, search, sort, status, workType]);
   const workItems = useInfiniteQuery({
@@ -299,20 +304,6 @@ export function MyWorkPage() {
     if (!entryIds.length) setSelectedEntryId(null);
     else if (!selectedEntryId || !entryIds.includes(selectedEntryId)) setSelectedEntryId(entryIds[0]);
   }, [activeWorkRows, mode, selectedEntryId, workflowActionRows]);
-
-  useEffect(() => {
-    if (!user?.id) return undefined;
-    return streamSSE('/me/activity-attention/stream', {
-      onStatus: setStreamStatus,
-      onEvent: (message) => {
-        if (message.event === 'attention_changed') queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
-        if (message.event === 'work_queue_changed' || message.event === 'work_item_changed') {
-          queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
-          queryClient.invalidateQueries({ queryKey: ['my-workflow-actions'] });
-        }
-      },
-    });
-  }, [queryClient, user?.id]);
 
   function updateParams(changes: Record<string, string | null>) {
     setSearchParams((current) => {

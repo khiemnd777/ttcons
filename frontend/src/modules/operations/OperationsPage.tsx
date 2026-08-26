@@ -102,6 +102,7 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
     queryClient.invalidateQueries({ queryKey: ['work-item'] });
     queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
     queryClient.invalidateQueries({ queryKey: ['work-reports'] });
+    queryClient.invalidateQueries({ queryKey: ['work-report-summary'] });
     queryClient.invalidateQueries({ queryKey: ['work-report-detail'] });
   };
   const createReport = useMutation({

@@ -29,6 +29,10 @@ test('standard shell exposes the permission-filtered navigation on mobile', asyn
   assert.ok((appShell.match(/navigate\('\/profile'\)/g) ?? []).length >= 2, 'desktop and mobile user surfaces must expose Profile');
   assert.match(appShell, /const userRoleSummary = roleSummary\(user\?\.roles\)/);
   assert.doesNotMatch(appShell, /user\?\.roles\?\.join\(', '\)/);
+  assert.match(appShell, /<NotificationPanel summary=\{indicators\.notifications\.data\}/);
+  assert.match(appShell, /'\/my-work': indicatorBadge\(indicators\.myWork\.data\?\.total/);
+  assert.match(appShell, /'\/reports': indicatorBadge\(indicators\.workReports\.data\?\.total_visible/);
+  assert.match(appShell, /badges=\{navigationBadges\}/);
 });
 
 test('focus sidebars reuse the approved home brand link', async () => {
@@ -41,5 +45,6 @@ test('focus sidebars reuse the approved home brand link', async () => {
   assert.match(templateSidebar, /<BrandHomeLink/);
   assert.match(projectWorkspace, /<BrandHomeLink/);
   assert.match(projectWorkspace, /const userRoleSummary = roleSummary\(user\?\.roles\)/);
+  assert.match(projectWorkspace, /<NotificationPanel summary=\{indicators\.notifications\.data\}/);
   assert.doesNotMatch(projectWorkspace, /user\?\.roles\?\.join\(', '\)/);
 });

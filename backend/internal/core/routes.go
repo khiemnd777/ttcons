@@ -42,6 +42,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 		MaxValueBytes:    cfg.ProjectExplorerCacheMaxBytes,
 	}, cacheObserver)
 	stopProjectExplorerDispatcher := service.StartProjectExplorerInvalidationDispatcher(context.Background())
+	stopNotificationDispatcher := service.StartNotificationDispatcher(context.Background())
 	h := NewHandler(service)
 	h.ConfigureReadiness(cfg.ReadinessTimeout, db.PingContext)
 
@@ -153,10 +154,20 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Post("/projects/:id/activity", h.AddProjectActivity)
 	protected.Post("/projects/:id/activity/read-all", h.MarkProjectActivityRead)
 	protected.Get("/me/work-items", h.MyWorkItems)
+	protected.Get("/me/work-items/navigation-summary", h.MyWorkNavigationSummary)
 	protected.Get("/me/workflow-actions", h.MyWorkflowActions)
 	protected.Get("/me/activity-attention/stream", h.MyActivityAttentionStream)
 	protected.Get("/me/activity-attention/summary", h.MyActivityAttentionSummary)
 	protected.Get("/me/activity-attention", h.MyActivityAttention)
+	protected.Get("/me/notifications", h.UserNotifications)
+	protected.Get("/me/notifications/summary", h.UserNotificationSummary)
+	protected.Get("/me/notifications/catalog", h.NotificationCatalog)
+	protected.Get("/me/notifications/projects", h.NotificationProjects)
+	protected.Get("/me/notifications/preferences", h.NotificationPreferences)
+	protected.Put("/me/notifications/preferences", h.SaveNotificationPreference)
+	protected.Put("/me/notifications/:id/read", h.MarkUserNotificationRead)
+	protected.Put("/me/notifications/:id/archive", h.ArchiveUserNotification)
+	protected.Post("/me/notifications/read-all", h.MarkAllUserNotificationsRead)
 	protected.Get("/work-items/:id", h.GetWorkItem)
 	protected.Get("/work-items/:id/form", h.GetWorkItemForm)
 	protected.Post("/work-items/:id/start", h.StartWorkItem)
@@ -477,6 +488,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Get("/statistics/staff", h.StaffStatistic)
 	protected.Get("/statistics/staff/export", h.StaffStatisticExport)
 	protected.Get("/work-reports", h.WorkReports)
+	protected.Get("/work-reports/summary", h.WorkReportSummary)
 	protected.Get("/work-reports/export", h.ExportWorkReports)
 	protected.Get("/work-reports/projects", h.WorkReportProjects)
 	protected.Get("/work-reports/recipients", h.WorkReportRecipients)
@@ -515,6 +527,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	var closeOnce sync.Once
 	return func() {
 		closeOnce.Do(func() {
+			stopNotificationDispatcher()
 			stopProjectExplorerDispatcher()
 			service.CloseActivityStreaming()
 		})
