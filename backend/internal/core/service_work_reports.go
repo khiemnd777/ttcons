@@ -265,9 +265,75 @@ func (s *Service) WorkReportDetail(ctx context.Context, sourceID, actorID string
 	if err != nil {
 		return nil, err
 	}
+	reportProjectID := cleanID(detail["project_id"])
+	for _, revision := range revisions {
+		snapshot := recordFromAny(revision["snapshot_json"])
+		evidenceIDs := workReportSnapshotEvidenceIDs(snapshot)
+		evidenceRecords, evidenceErr := s.repo.WorkReportEvidenceRecords(
+			ctx,
+			reportProjectID,
+			cleanID(snapshot["work_item_id"]),
+			evidenceIDs,
+		)
+		if evidenceErr != nil {
+			return nil, evidenceErr
+		}
+		revision["evidence_ids"] = evidenceIDs
+		revision["evidence_records"] = evidenceRecords
+	}
 	detail["revisions"] = revisions
 	detail["events"] = events
 	return detail, nil
+}
+
+func (s *Service) WorkReportEvidenceFile(ctx context.Context, reportID string, revisionNo int, evidenceID, actorID string) (EvidenceFileResult, error) {
+	reportID = cleanID(reportID)
+	evidenceID = cleanID(evidenceID)
+	if !validActivityUUID(reportID) || revisionNo < 1 || !validActivityUUID(evidenceID) {
+		return EvidenceFileResult{}, validationError("Minh chứng bản báo cáo không hợp lệ", Record{"report_id": reportID, "revision_no": revisionNo, "evidence_id": evidenceID})
+	}
+	header, err := s.repo.WorkReportHeader(ctx, reportID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return EvidenceFileResult{}, validationError("Không tìm thấy báo cáo", Record{"report_id": reportID})
+	}
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, cleanID(header["project_id"]), []string{"work_report.view"})
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	if !allowed {
+		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem minh chứng báo cáo này")
+	}
+	canManage, err := s.repo.UserHasAnyProjectPermission(ctx, actorID, cleanID(header["project_id"]), []string{"work_report.manage"})
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	if !canManage && actorID != cleanID(header["author_id"]) && actorID != cleanID(header["recipient_id"]) {
+		return EvidenceFileResult{}, forbiddenError("Báo cáo này không thuộc phạm vi cá nhân của bạn")
+	}
+	revision, err := s.repo.WorkReportRevision(ctx, reportID, revisionNo)
+	if errors.Is(err, sql.ErrNoRows) {
+		return EvidenceFileResult{}, validationError("Không tìm thấy lần gửi báo cáo", Record{"revision_no": revisionNo})
+	}
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	snapshot := recordFromAny(revision["snapshot_json"])
+	evidenceIDs := workReportSnapshotEvidenceIDs(snapshot)
+	if !workReportContains(evidenceIDs, evidenceID) {
+		return EvidenceFileResult{}, forbiddenError("Minh chứng không thuộc lần gửi báo cáo này")
+	}
+	evidenceRecords, err := s.repo.WorkReportEvidenceRecords(ctx, cleanID(header["project_id"]), cleanID(snapshot["work_item_id"]), []string{evidenceID})
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	if len(evidenceRecords) != 1 {
+		return EvidenceFileResult{}, validationError("Không tìm thấy minh chứng trong bản báo cáo", Record{"evidence_id": evidenceID})
+	}
+	evidence := evidenceRecords[0]
+	return s.storedFileResult(ctx, evidence, "storage_provider", "storage_key", "mime_type", evidenceDownloadName(evidence))
 }
 
 func (s *Service) WorkReportRecipients(ctx context.Context, projectID, actorID string) ([]Record, error) {
@@ -451,4 +517,25 @@ func workReportContains(values []string, wanted string) bool {
 		}
 	}
 	return false
+}
+
+func workReportSnapshotEvidenceIDs(snapshot Record) []string {
+	values := []string{cleanID(snapshot["primary_evidence_id"])}
+	values = append(values, stringSlice(snapshot["photos"])...)
+	structured := recordFromAny(snapshot["structured_json"])
+	values = append(values, cleanID(structured["site_photo_evidence_id"]))
+	for _, item := range workflowAnswerRecordList(structured["completed_items"]) {
+		values = append(values, cleanID(item["evidence_id"]))
+	}
+	normalized := make([]string, 0, len(values))
+	seen := map[string]bool{}
+	for _, value := range values {
+		value = cleanID(value)
+		if value == "" || seen[value] || !validActivityUUID(value) {
+			continue
+		}
+		seen[value] = true
+		normalized = append(normalized, value)
+	}
+	return normalized
 }

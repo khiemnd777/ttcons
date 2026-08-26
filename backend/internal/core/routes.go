@@ -494,6 +494,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Get("/work-reports/recipients", h.WorkReportRecipients)
 	protected.Get("/work-reports/daily-reports/:id", h.WorkReportDetail)
 	protected.Post("/work-reports/daily-reports/:id/submit", h.SubmitWorkReport)
+	protected.Get("/work-reports/:id/revisions/:revision/evidence/:evidenceId/file", h.GetWorkReportEvidenceFile)
 	protected.Post("/work-reports/:id/:action", h.ReviewWorkReport)
 	protected.Get("/work-reports/:id/pdf", h.ExportWorkReportPDF)
 	protected.Get("/reports/dashboard", h.Dashboard)

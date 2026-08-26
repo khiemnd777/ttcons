@@ -66,7 +66,7 @@ test('shared evidence viewer renders protected PDFs in-app with lifecycle-safe b
   assert.match(pdfViewer, /Đang tải PDF/);
   assert.match(pdfViewer, /Trình duyệt không thể hiển thị tệp PDF này/);
   assert.match(pdfViewer, /Hồ sơ chưa có tệp PDF để đọc/);
-  assert.match(recordViewer, /downloadBlob\(`\/evidence\/\$\{recordId\}\/file`\)/);
+  assert.match(recordViewer, /downloadBlob\(protectedFilePath \|\| `\/evidence\/\$\{recordId\}\/file`\)/);
   assert.match(recordViewer, /URL\.createObjectURL\(normalizedBlob\)/);
   assert.match(recordViewer, /URL\.revokeObjectURL\(objectUrl\)/);
   assert.match(recordViewer, /mediaType=\{inlineMediaType \?\?/);

@@ -190,6 +190,21 @@ func (h *Handler) ExportWorkReportPDF(c *fiber.Ctx) error {
 	return sendExport(c, result)
 }
 
+func (h *Handler) GetWorkReportEvidenceFile(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"work_report.view"}); err != nil {
+		return err
+	}
+	revisionNo, err := strconv.Atoi(strings.TrimSpace(c.Params("revision")))
+	if err != nil || revisionNo < 1 {
+		return validationError("revision không hợp lệ", Record{"revision": c.Params("revision")})
+	}
+	file, err := h.service.WorkReportEvidenceFile(c.Context(), c.Params("id"), revisionNo, c.Params("evidenceId"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return sendProtectedFile(c, file, "minh-chung-bao-cao")
+}
+
 func workReportFilter(c *fiber.Ctx) WorkReportFilter {
 	return WorkReportFilter{
 		Scope:     c.Query("scope", "mine"),

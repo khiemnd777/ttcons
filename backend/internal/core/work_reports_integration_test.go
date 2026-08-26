@@ -3,8 +3,11 @@ package core
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 func TestConstructionReportCreateAndSubmitIsAtomicAndRecommendsProjectPM(t *testing.T) {
@@ -15,6 +18,7 @@ func TestConstructionReportCreateAndSubmitIsAtomicAndRecommendsProjectPM(t *test
 
 	submitPermissionID := ensurePermission(t, db, "work_report.submit", "Gửi báo cáo", "work_report")
 	reviewPermissionID := ensurePermission(t, db, "work_report.review", "Xem xét báo cáo", "work_report")
+	viewPermissionID := ensurePermission(t, db, "work_report.view", "Xem báo cáo", "work_report")
 	var workerRoleID, pmRoleID, pmStaffID string
 	if err := db.QueryRowContext(ctx, `SELECT role_id::text FROM user_roles WHERE user_id=$1 LIMIT 1`, fixture.workerID).Scan(&workerRoleID); err != nil {
 		t.Fatal(err)
@@ -25,7 +29,7 @@ func TestConstructionReportCreateAndSubmitIsAtomicAndRecommendsProjectPM(t *test
 	if err := db.QueryRowContext(ctx, `SELECT id::text FROM staff WHERE user_id=$1 AND status <> 'deleted'`, fixture.pmID).Scan(&pmStaffID); err != nil {
 		t.Fatal(err)
 	}
-	mustExec(t, db, `INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2),($3,$4) ON CONFLICT DO NOTHING`, workerRoleID, submitPermissionID, pmRoleID, reviewPermissionID)
+	mustExec(t, db, `INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2),($3,$4),($3,$5) ON CONFLICT DO NOTHING`, workerRoleID, submitPermissionID, pmRoleID, reviewPermissionID, viewPermissionID)
 	mustExec(t, db, `UPDATE projects SET pm_staff_id=$2 WHERE id=$1`, fixture.projectID, pmStaffID)
 
 	recipients, err := service.WorkReportRecipients(ctx, fixture.projectID, fixture.workerID)
@@ -77,6 +81,32 @@ func TestConstructionReportCreateAndSubmitIsAtomicAndRecommendsProjectPM(t *test
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='in_progress'`, 1, fixture.itemID)
 
 	reportID := cleanID(delivery["work_report_id"])
+	detail, err := service.WorkReportDetail(ctx, cleanID(created["id"]), fixture.pmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revisions, _ := detail["revisions"].([]Record)
+	if len(revisions) != 1 {
+		t.Fatalf("detail revisions = %#v, want one submitted revision", detail["revisions"])
+	}
+	revisionEvidence, _ := revisions[0]["evidence_records"].([]Record)
+	if len(revisionEvidence) != 1 || cleanID(revisionEvidence[0]["id"]) != cleanID(evidence["id"]) {
+		t.Fatalf("revision evidence = %#v, want submitted evidence %s", revisions[0]["evidence_records"], cleanID(evidence["id"]))
+	}
+	unlinkedEvidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
+		EvidenceType: "photo", Name: "Ảnh thêm sau khi gửi", FileURL: "https://example.com/unlinked.jpg", Visibility: "project",
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.WorkReportEvidenceFile(ctx, reportID, 1, cleanID(unlinkedEvidence["id"]), fixture.pmID); err == nil {
+		t.Fatal("report evidence endpoint must reject an evidence record outside the immutable revision snapshot")
+	} else {
+		var forbidden StatusError
+		if !errors.As(err, &forbidden) || forbidden.Status != fiber.StatusForbidden {
+			t.Fatalf("unlinked report evidence error = %T %v, want forbidden", err, err)
+		}
+	}
 	if _, err := service.ReviewWorkReport(ctx, reportID, "request-changes", WorkReportReviewRequest{Comment: "Bổ sung ghi chú hiện trường"}, fixture.pmID, "PM"); err != nil {
 		t.Fatal(err)
 	}
@@ -97,6 +127,30 @@ func TestConstructionReportCreateAndSubmitIsAtomicAndRecommendsProjectPM(t *test
 	assertCount(t, db, `SELECT COUNT(*) FROM work_report_events WHERE report_id=$1 AND event_type='resubmitted'`, 1, reportID)
 	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='work_report.resubmitted' AND source_id=$2`, 1, fixture.pmID, created["id"])
 	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='in_progress'`, 1, fixture.itemID)
+}
+
+func TestWorkReportSnapshotEvidenceIDsAreOrderedAndUnique(t *testing.T) {
+	primary := "10000000-0000-4000-8000-000000000001"
+	photo := "10000000-0000-4000-8000-000000000002"
+	sitePhoto := "10000000-0000-4000-8000-000000000003"
+	completed := "10000000-0000-4000-8000-000000000004"
+	snapshot := Record{
+		"primary_evidence_id": primary,
+		"photos":              []any{photo, primary, "not-a-uuid"},
+		"structured_json": Record{
+			"site_photo_evidence_id": sitePhoto,
+			"completed_items": []any{
+				map[string]any{"evidence_id": completed},
+				map[string]any{"evidence_id": photo},
+			},
+		},
+	}
+
+	got := workReportSnapshotEvidenceIDs(snapshot)
+	want := []string{primary, photo, sitePhoto, completed}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("workReportSnapshotEvidenceIDs() = %#v, want %#v", got, want)
+	}
 }
 
 func TestWorkReportLifecycleKeepsImmutableSubmittedRevisions(t *testing.T) {
@@ -198,6 +252,16 @@ func TestWorkReportLifecycleKeepsImmutableSubmittedRevisions(t *testing.T) {
 	}
 	if authorSummary.Scopes["mine"] != 1 || authorSummary.TotalVisible != 1 || reviewerSummary.Scopes["review"] != 1 || reviewerSummary.TotalVisible != 1 {
 		t.Fatalf("summaries after submit = author %#v reviewer %#v", authorSummary, reviewerSummary)
+	}
+	reviewerNavigationSummary, err := service.MyWorkNavigationSummary(ctx, reviewerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(reviewerNavigationSummary["work_total"]) != 0 ||
+		number(reviewerNavigationSummary["work_reports_review_pending"]) != 1 ||
+		number(reviewerNavigationSummary["approval_total"]) != 1 ||
+		number(reviewerNavigationSummary["total"]) != 1 {
+		t.Fatalf("reviewer navigation summary = %#v, want 0 work + 1 report approval", reviewerNavigationSummary)
 	}
 
 	if _, err := service.UpdateDailyReport(ctx, sourceID, ConstructionDailyReportCreateRequest{}, author.userID, "Scoped User"); err == nil {

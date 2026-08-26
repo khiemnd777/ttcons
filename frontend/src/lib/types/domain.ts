@@ -185,9 +185,55 @@ export type WorkReportListItem = AnyRecord & {
   submitted_at?: string;
 };
 
+export type WorkReportRevision = AnyRecord & {
+  id: string;
+  revision_no: number;
+  snapshot_json: AnyRecord;
+  snapshot_sha256: string;
+  submitted_by?: string;
+  submitted_by_name?: string;
+  submitted_by_account_deleted?: boolean;
+  submitted_at: string;
+  comment?: string;
+  evidence_ids: string[];
+  evidence_records: EvidenceRecord[];
+};
+
+export type WorkReportEvent = AnyRecord & {
+  id: string;
+  event_type: string;
+  revision_no: number;
+  actor_id?: string;
+  actor_name?: string;
+  actor_account_deleted?: boolean;
+  comment?: string;
+  created_at: string;
+};
+
+export type WorkReportDetail = WorkReportListItem & {
+  report_delivery_eligible: boolean;
+  work_item_id?: string;
+  work_item_title?: string;
+  weather?: string;
+  progress_percent?: number;
+  structured_json?: AnyRecord;
+  work_summary?: string;
+  manpower_summary?: string;
+  material_usage_summary?: string;
+  issues_summary?: string;
+  review_comment?: string;
+  revisions: WorkReportRevision[];
+  events: WorkReportEvent[];
+};
+
 export type MyWorkNavigationSummary = {
   work_items_need_action: number;
   workflow_actions_ready: number;
+  work_total: number;
+  work_items_waiting_decision: number;
+  node_approvals_pending: number;
+  work_reports_review_pending: number;
+  approval_total: number;
   total: number;
 };
 

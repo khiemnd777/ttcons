@@ -8,6 +8,7 @@ async function source(path: string) {
 
 test('standard shell exposes the permission-filtered navigation on mobile', async () => {
   const appShell = await source('../src/layouts/AppShell.tsx');
+  const domainTypes = await source('../src/lib/types/domain.ts');
 
   assert.match(appShell, /const \[mobileNavOpen, setMobileNavOpen\] = useState\(false\)/);
   assert.match(appShell, /aria-controls="mobile-navigation"/);
@@ -33,6 +34,11 @@ test('standard shell exposes the permission-filtered navigation on mobile', asyn
   assert.match(appShell, /'\/my-work': indicatorBadge\(indicators\.myWork\.data\?\.total/);
   assert.match(appShell, /'\/reports': indicatorBadge\(indicators\.workReports\.data\?\.total_visible/);
   assert.match(appShell, /badges=\{navigationBadges\}/);
+  const myWorkNavigationType = domainTypes.slice(domainTypes.indexOf('export type MyWorkNavigationSummary'), domainTypes.indexOf('export type Project'));
+  assert.match(myWorkNavigationType, /work_total: number/);
+  assert.match(myWorkNavigationType, /approval_total: number/);
+  assert.match(myWorkNavigationType, /work_reports_review_pending: number/);
+  assert.doesNotMatch(myWorkNavigationType, /attention/);
 });
 
 test('focus sidebars reuse the approved home brand link', async () => {

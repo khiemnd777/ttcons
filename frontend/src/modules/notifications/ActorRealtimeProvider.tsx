@@ -46,6 +46,7 @@ export function ActorRealtimeProvider({ children }: { children: ReactNode }) {
           void queryClient.invalidateQueries({ queryKey: ['work-report-summary'] });
           void queryClient.invalidateQueries({ queryKey: ['work-reports'] });
           void queryClient.invalidateQueries({ queryKey: ['work-report-detail'] });
+          void queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary', actorID] });
         }
         if (message.event === 'work_queue_changed' || message.event === 'work_item_changed') {
           void queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary', actorID] });

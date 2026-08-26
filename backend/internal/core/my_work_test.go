@@ -595,8 +595,24 @@ func TestMyWorkItemsPageContractPaginationAndDecisionCapability(t *testing.T) {
 	}
 	workItemsNeedAction := int(number(navigationSummary["work_items_need_action"]))
 	workflowActionsReady := int(number(navigationSummary["workflow_actions_ready"]))
-	if workItemsNeedAction < 1 || int(number(navigationSummary["total"])) != workItemsNeedAction+workflowActionsReady {
+	workTotal := int(number(navigationSummary["work_total"]))
+	approvalTotal := int(number(navigationSummary["approval_total"]))
+	if workItemsNeedAction < 1 || workTotal != workItemsNeedAction+workflowActionsReady || int(number(navigationSummary["total"])) != workTotal+approvalTotal {
 		t.Fatalf("my work navigation summary = %#v", navigationSummary)
+	}
+}
+
+func TestMyWorkNavigationSummaryTotalsOnlyWorkAndApprovalLanes(t *testing.T) {
+	summary := myWorkNavigationSummaryRecord(myWorkNavigationCounts{
+		NeedAction:      2,
+		WaitingDecision: 3,
+	}, 4, 5, 6)
+
+	if number(summary["work_total"]) != 6 || number(summary["approval_total"]) != 14 || number(summary["total"]) != 20 {
+		t.Fatalf("my work navigation totals = %#v, want work 6 + approvals 14 = 20", summary)
+	}
+	if _, leakedAttention := summary["attention_total"]; leakedAttention {
+		t.Fatalf("my work navigation summary must exclude attention: %#v", summary)
 	}
 }
 

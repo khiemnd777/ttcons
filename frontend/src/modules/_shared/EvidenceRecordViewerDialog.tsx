@@ -35,6 +35,8 @@ type EvidenceRecordViewerDialogProps = {
   previewUrl?: string;
   previewLoading?: boolean;
   previewError?: string;
+  protectedFilePath?: string;
+  protectedAccessDescription?: string;
   showWorkItem?: boolean;
   canReview?: boolean;
   reviewingAction?: EvidenceReviewAction | null;
@@ -53,6 +55,8 @@ export function EvidenceRecordViewerDialog({
   previewUrl,
   previewLoading = false,
   previewError,
+  protectedFilePath,
+  protectedAccessDescription,
   showWorkItem = false,
   canReview = false,
   reviewingAction = null,
@@ -66,7 +70,7 @@ export function EvidenceRecordViewerDialog({
   onReview,
 }: EvidenceRecordViewerDialogProps) {
   const inlineMediaType = record ? inlineEvidenceMediaType(record) : undefined;
-  const protectedPreview = useProtectedEvidencePreview(record, inlineMediaType);
+  const protectedPreview = useProtectedEvidencePreview(record, inlineMediaType, protectedFilePath);
   if (!record) return null;
   const reviewable = canReview
     && Boolean(onReview)
@@ -126,7 +130,7 @@ export function EvidenceRecordViewerDialog({
       footer={(
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-slate-500">
-            {protectedFile ? 'Tệp được bảo vệ được mở qua API có kiểm tra quyền đầu việc.' : 'Thông tin minh chứng được hiển thị theo quyền truy cập hiện tại.'}
+            {protectedFile ? (protectedAccessDescription ?? 'Tệp được bảo vệ được mở qua API có kiểm tra quyền đầu việc.') : 'Thông tin minh chứng được hiển thị theo quyền truy cập hiện tại.'}
           </p>
           <div className="flex flex-wrap justify-end gap-2">
             <CloseButton onClose={onClose} />
@@ -313,7 +317,7 @@ export function formatEvidenceFileSize(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: 'pdf' | 'word' | 'spreadsheet') {
+function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: 'pdf' | 'word' | 'spreadsheet', protectedFilePath?: string) {
   const [retryKey, setRetryKey] = useState(0);
   const [state, setState] = useState<{
     recordId?: string;
@@ -340,7 +344,7 @@ function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: 
 
     async function loadEvidenceFile() {
       try {
-        const blob = await downloadBlob(`/evidence/${recordId}/file`);
+        const blob = await downloadBlob(protectedFilePath || `/evidence/${recordId}/file`);
         if (cancelled) return;
         const normalizedBlob = normalizeEvidenceBlob(blob, mediaType);
         objectUrl = URL.createObjectURL(normalizedBlob);
@@ -358,7 +362,7 @@ function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: 
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [mediaType, recordId, retryKey, storageKey, updatedAt]);
+  }, [mediaType, protectedFilePath, recordId, retryKey, storageKey, updatedAt]);
 
   const currentState = state.recordId === recordId && state.mediaType === mediaType ? state : { loading: Boolean(recordId) };
   return {

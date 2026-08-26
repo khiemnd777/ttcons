@@ -71,6 +71,9 @@ test('statistics use one global project scope and report-specific responsive car
 
 test('work report workspace is a delivery register while source drafts stay in construction', async () => {
   const page = await source('../src/modules/work-reports/WorkReportsPage.tsx');
+  const reviewDialog = await source('../src/modules/work-reports/WorkReportReviewDialog.tsx');
+  const evidenceGallery = await source('../src/modules/work-items/EvidenceGallery.tsx');
+  const evidenceViewer = await source('../src/modules/_shared/EvidenceRecordViewerDialog.tsx');
   const router = await source('../src/app/router.tsx');
   const shell = await source('../src/layouts/AppShell.tsx');
 
@@ -83,9 +86,23 @@ test('work report workspace is a delivery register while source drafts stay in c
   assert.match(page, /canOpenSource \? \[\{ key: 'source' as const, label: 'Nháp tại nguồn' \}\] : \[\]/);
   assert.match(page, /Chờ tôi xem/);
   assert.match(page, /hasPermission\('work_report\.create'\).*hasPermission\('operation\.report'\).*hasPermission\('operation\.view'\)/);
-  assert.match(page, /Yêu cầu bổ sung/);
-  assert.match(page, /Xác nhận đã xem/);
-  assert.match(page, /PDF bản này/);
+  assert.match(page, /<WorkReportReviewDialog/);
+  assert.doesNotMatch(page, /function WorkReportDialog/);
+  assert.match(reviewDialog, /Nội dung &amp; minh chứng/);
+  assert.match(reviewDialog, /Lịch sử &amp; phản hồi/);
+  assert.match(reviewDialog, /Các lần gửi/);
+  assert.match(reviewDialog, /xl:grid-cols-\[minmax\(0,1fr\)_22rem\]/);
+  assert.match(reviewDialog, /xl:sticky xl:top-0/);
+  assert.match(reviewDialog, /Yêu cầu bổ sung/);
+  assert.match(reviewDialog, /Xác nhận đã xem/);
+  assert.match(reviewDialog, /không phải nghiệm thu chất lượng/);
+  assert.match(reviewDialog, /PDF bản này/);
+  assert.match(reviewDialog, /variant="review"/);
+  assert.match(reviewDialog, /initialVisibleCount=\{5\}/);
+  assert.match(reviewDialog, /\/work-reports\/\$\{detail\.work_report_id\}\/revisions\/\$\{selectedRevision\.revision_no\}\/evidence\/\$\{record\.id\}\/file/);
+  assert.match(evidenceGallery, /variant\?: 'cards' \| 'list' \| 'review'/);
+  assert.match(evidenceGallery, /protectedFilePath=\{selected \? resolveEvidenceFilePath/);
+  assert.match(evidenceViewer, /protectedAccessDescription/);
   assert.match(page, /endpoint="\/work-reports\/projects"/);
   assert.match(page, /format: ExportFormat/);
   assert.match(page, /\/operations\?tab=timeline&report=\$\{encodeURIComponent\(row\.source_id\)\}/);

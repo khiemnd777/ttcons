@@ -35,6 +35,7 @@ test('notification platform uses server-owned presentation, safe routes, and one
   assert.match(realtime, /streamSSE\('\/me\/activity-attention\/stream'/);
   assert.match(realtime, /status !== 'connected'/);
   assert.match(realtime, /message\.event === 'notification_changed'/);
+  assert.match(realtime, /message\.event === 'work_report_changed'[\s\S]*?\['my-work-navigation-summary', actorID\]/);
   assert.doesNotMatch(myWork, /streamSSE\('\/me\/activity-attention\/stream'/);
 
   assert.match(page, /\/me\/notifications\/catalog/);

@@ -15,10 +15,15 @@ type myWorkItemsPageData struct {
 	NextCursor string
 }
 
-func (r *Repository) MyWorkNavigationCount(ctx context.Context, userID string) (int, error) {
+type myWorkNavigationCounts struct {
+	NeedAction      int
+	WaitingDecision int
+}
+
+func (r *Repository) MyWorkNavigationCounts(ctx context.Context, userID string) (myWorkNavigationCounts, error) {
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
 	if err != nil {
-		return 0, err
+		return myWorkNavigationCounts{}, err
 	}
 	args := append(
 		workItemScopeArgs(profile, false, true),
@@ -26,14 +31,18 @@ func (r *Repository) MyWorkNavigationCount(ctx context.Context, userID string) (
 	)
 	args = append(args, profile.IsAdmin || profile.IsDirector)
 	row, err := r.QueryOne(ctx, myWorkItemsBaseSQL()+fmt.Sprintf(`
-		SELECT COUNT(*) AS total
+		SELECT
+			COUNT(*) FILTER (WHERE is_responsible AND %s) AS need_action,
+			COUNT(*) FILTER (WHERE can_decide AND status IN ('waiting_review','waiting_approval')) AS waiting_decision
 		FROM base_work
-		WHERE is_responsible AND %s
 	`, myWorkNavigationNeedActionSQL()), args...)
 	if err != nil {
-		return 0, err
+		return myWorkNavigationCounts{}, err
 	}
-	return int(number(row["total"])), nil
+	return myWorkNavigationCounts{
+		NeedAction:      int(number(row["need_action"])),
+		WaitingDecision: int(number(row["waiting_decision"])),
+	}, nil
 }
 
 func myWorkNavigationNeedActionSQL() string {

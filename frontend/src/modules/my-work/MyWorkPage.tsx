@@ -48,6 +48,7 @@ import {
 } from '../work-items/workItemPresentation';
 
 type ModeKey = 'work' | 'approval' | 'attention';
+type ApprovalLaneKey = 'work' | 'node' | 'report';
 type WorkScopeKey = 'responsible' | 'mine' | 'department' | 'watching' | 'all';
 type LegacyQueueKey = WorkScopeKey | 'pending_approval';
 type AttentionQueueKey = 'all' | 'mentions' | 'questions' | 'blockers' | 'reminders' | 'unread';
@@ -144,7 +145,9 @@ export function MyWorkPage() {
   const toast = useToast();
   const requestedTask = searchParams.get('task')?.trim() ?? '';
   const requestedApproval = searchParams.get('approval')?.trim() ?? '';
+  const requestedApprovalLaneValue = searchParams.get('approval_type');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(() => requestedTask || null);
+  const [autoApprovalLane, setAutoApprovalLane] = useState<ApprovalLaneKey | null>(null);
   const [searchDraft, setSearchDraft] = useState(searchParams.get('search') ?? '');
 	const streamStatus = useActorRealtimeStatus();
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
@@ -166,6 +169,10 @@ export function MyWorkPage() {
   const sort = searchParams.get('sort') ?? 'priority';
   const roleSummary = summarizeRoles(user?.roles);
   const canReviewWorkReports = hasPermission('work_report.view') && (hasPermission('work_report.review') || hasPermission('work_report.manage'));
+  const requestedApprovalLane = requestedApprovalLaneValue && ['work', 'node', 'report'].includes(requestedApprovalLaneValue)
+    ? requestedApprovalLaneValue as ApprovalLaneKey
+    : null;
+  const permittedRequestedApprovalLane = requestedApprovalLane === 'report' && !canReviewWorkReports ? null : requestedApprovalLane;
 
   useEffect(() => setSearchDraft(search), [search]);
   useEffect(() => {
@@ -315,6 +322,27 @@ export function MyWorkPage() {
     : (workItems.isError && !firstPage) || (pendingNodeApprovals.isError && !pendingNodeApprovals.data) || (canReviewWorkReports && reportReviewSummary.isError && !reportReviewSummary.data)
       ? '—'
       : summary.waiting_decision + nodeApprovalCount + reportReviewCount;
+  const approvalWorkLaneCount = approvalWorkItems.isLoading
+    ? '…'
+    : approvalWorkItems.isError && !approvalFirstPage
+      ? '—'
+      : approvalFirstPage?.total ?? approvalRows.length;
+  const nodeApprovalLaneCount = pendingNodeApprovals.isLoading
+    ? '…'
+    : pendingNodeApprovals.isError && !pendingNodeApprovals.data
+      ? '—'
+      : nodeApprovalCount;
+  const reportReviewLaneCount = reportReviewSummary.isLoading
+    ? '…'
+    : reportReviewSummary.isError && !reportReviewSummary.data
+      ? '—'
+      : reportReviewCount;
+  const approvalSourcesSettled = !approvalWorkItems.isLoading
+    && !pendingNodeApprovals.isLoading
+    && (!canReviewWorkReports || !reportReviewSummary.isLoading);
+  const approvalLane = requestedApproval
+    ? 'node'
+    : permittedRequestedApprovalLane ?? autoApprovalLane;
   const activeWorkRows = mode === 'approval' ? approvalRows : rows;
   const selectedWorkflowAction = mode === 'work' ? workflowActionRows.find((action) => action.id === selectedEntryId) ?? null : null;
   const selectedItem = selectedWorkflowAction ? null : activeWorkRows.find((item) => item.id === selectedEntryId) ?? activeWorkRows[0] ?? null;
@@ -326,6 +354,16 @@ export function MyWorkPage() {
     if (!entryIds.length) setSelectedEntryId(null);
     else if (!selectedEntryId || !entryIds.includes(selectedEntryId)) setSelectedEntryId(entryIds[0]);
   }, [activeWorkRows, mode, selectedEntryId, workflowActionRows]);
+
+  useEffect(() => {
+    if (mode !== 'approval' || requestedApproval || permittedRequestedApprovalLane || autoApprovalLane || !approvalSourcesSettled) return;
+    setAutoApprovalLane(firstPopulatedApprovalLane(
+      approvalFirstPage?.total ?? approvalRows.length,
+      nodeApprovalCount,
+      reportReviewCount,
+      canReviewWorkReports,
+    ));
+  }, [approvalFirstPage?.total, approvalRows.length, approvalSourcesSettled, autoApprovalLane, canReviewWorkReports, mode, nodeApprovalCount, permittedRequestedApprovalLane, reportReviewCount, requestedApproval]);
 
   function updateParams(changes: Record<string, string | null>) {
     setSearchParams((current) => {
@@ -473,6 +511,10 @@ export function MyWorkPage() {
         </section>
       ) : mode === 'approval' ? (
         <ApprovalWorkspace
+          activeLane={approvalLane}
+          workCount={approvalWorkLaneCount}
+          nodeCount={nodeApprovalLaneCount}
+          reportTabCount={reportReviewLaneCount}
           workRows={approvalRows}
           selectedItem={selectedItem}
           workLoading={approvalWorkItems.isLoading}
@@ -492,6 +534,7 @@ export function MyWorkPage() {
           project={project}
           projects={approvalProjectOptions}
           onProjectChange={(value) => updateParams({ project: value || null })}
+          onLaneChange={(value) => updateParams({ approval_type: value, approval: value === 'node' ? requestedApproval || null : null })}
           onSelect={setSelectedEntryId}
           onOpen={openWorkItem}
           onLoadMore={() => void approvalWorkItems.fetchNextPage()}
@@ -518,7 +561,11 @@ export function MyWorkPage() {
   );
 }
 
-function ApprovalWorkspace({ workRows, selectedItem, workLoading, workFetchingMore, workError, workTotal, workHasMore, nodeRows, nodeLoading, nodeError, requestedApprovalId, reportVisible, reportRows, reportCount, reportLoading, reportError, project, projects, onProjectChange, onSelect, onOpen, onLoadMore, onRetryWork, onRetryNodes, onRetryReports, onOpenReport }: {
+function ApprovalWorkspace({ activeLane, workCount, nodeCount, reportTabCount, workRows, selectedItem, workLoading, workFetchingMore, workError, workTotal, workHasMore, nodeRows, nodeLoading, nodeError, requestedApprovalId, reportVisible, reportRows, reportCount, reportLoading, reportError, project, projects, onProjectChange, onLaneChange, onSelect, onOpen, onLoadMore, onRetryWork, onRetryNodes, onRetryReports, onOpenReport }: {
+  activeLane: ApprovalLaneKey | null;
+  workCount: number | string;
+  nodeCount: number | string;
+  reportTabCount: number | string;
   workRows: WorkItem[];
   selectedItem: WorkItem | null;
   workLoading: boolean;
@@ -538,6 +585,7 @@ function ApprovalWorkspace({ workRows, selectedItem, workLoading, workFetchingMo
   project: string;
   projects: Array<{ value: string; label: string }>;
   onProjectChange: (value: string) => void;
+  onLaneChange: (value: ApprovalLaneKey) => void;
   onSelect: (id: string) => void;
   onOpen: (item: WorkItem) => void;
   onLoadMore: () => void;
@@ -546,50 +594,77 @@ function ApprovalWorkspace({ workRows, selectedItem, workLoading, workFetchingMo
   onRetryReports: () => void;
   onOpenReport: (report: WorkReportListItem) => void;
 }) {
-  const reportUnavailable = reportVisible && reportError;
-  const empty = !workLoading && !nodeLoading && (!reportVisible || !reportLoading)
-    && !workError && !nodeError && !reportUnavailable
-    && !workRows.length && !nodeRows.length && (!reportVisible || !reportRows.length);
   return (
     <section className="mt-4" aria-label="Công việc chờ tôi duyệt">
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0">
-          <div className="flex flex-col gap-3 rounded-lg border border-line bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-sm font-semibold text-ink">Chờ tôi duyệt</h2>
-            <FilterSelect value={project} label="Tất cả công trình" options={projects} onChange={onProjectChange} />
-          </div>
-
-          {empty ? <div className="mt-4"><EmptyState title="Không có yêu cầu nào đang chờ anh duyệt." /></div> : (
-            <>
-              <section className="mt-4" aria-labelledby="work-approval-lane-title">
-                <h2 id="work-approval-lane-title" className="mb-2 text-sm font-semibold text-ink">Phê duyệt công việc</h2>
-                <WorkList
-                  rows={workRows}
-                  selectedId={selectedItem?.id}
-                  loading={workLoading}
-                  fetchingMore={workFetchingMore}
-                  error={workError}
-                  total={workTotal}
-                  hasMore={workHasMore}
-                  filtered={Boolean(project)}
-                  emptyTitle="Không có công việc nào đang chờ anh duyệt."
-                  onSelect={onSelect}
-                  onOpen={onOpen}
-                  onLoadMore={onLoadMore}
-                  onReset={() => onProjectChange('')}
-                  onRetry={onRetryWork}
-                />
-              </section>
-
-              <NodeApprovalLane rows={nodeRows} loading={nodeLoading} error={nodeError} requestedApprovalId={requestedApprovalId} onRetry={onRetryNodes} />
-              {reportVisible ? <WorkReportReviewLane rows={reportRows} total={reportCount} loading={reportLoading} error={reportError} onRetry={onRetryReports} onOpen={onOpenReport} /> : null}
-            </>
-          )}
-        </div>
-
-        <NextWorkPanel item={selectedItem} onOpen={onOpen} />
+      <div className="flex flex-col gap-3 rounded-lg border border-line bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-sm font-semibold text-ink">Chờ tôi duyệt</h2>
+        <FilterSelect value={project} label="Tất cả công trình" options={projects} onChange={onProjectChange} />
       </div>
+
+      <div className="mt-3 flex gap-1 overflow-x-auto border-b border-line" role="tablist" aria-label="Nhóm yêu cầu chờ duyệt">
+        <ApprovalLaneTab lane="work" active={activeLane === 'work'} label="Phê duyệt công việc" count={workCount} onSelect={onLaneChange} />
+        <ApprovalLaneTab lane="node" active={activeLane === 'node'} label="Phê duyệt giai đoạn quy trình" count={nodeCount} onSelect={onLaneChange} />
+        {reportVisible ? <ApprovalLaneTab lane="report" active={activeLane === 'report'} label="Báo cáo chờ xác nhận" count={reportTabCount} onSelect={onLaneChange} /> : null}
+      </div>
+
+      {!activeLane ? <div className="mt-3 rounded-lg border border-line bg-white p-8" aria-label="Đang tải nhóm yêu cầu chờ duyệt"><LoadingSpinner /></div> : null}
+
+      {activeLane === 'work' ? (
+        <div id="approval-lane-panel-work" role="tabpanel" aria-labelledby="approval-lane-tab-work" className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0">
+            <WorkList
+              rows={workRows}
+              selectedId={selectedItem?.id}
+              loading={workLoading}
+              fetchingMore={workFetchingMore}
+              error={workError}
+              total={workTotal}
+              hasMore={workHasMore}
+              filtered={Boolean(project)}
+              emptyTitle="Không có công việc nào đang chờ anh duyệt."
+              onSelect={onSelect}
+              onOpen={onOpen}
+              onLoadMore={onLoadMore}
+              onReset={() => onProjectChange('')}
+              onRetry={onRetryWork}
+            />
+          </div>
+          <NextWorkPanel item={selectedItem} onOpen={onOpen} />
+        </div>
+      ) : null}
+
+      {activeLane === 'node' ? (
+        <div id="approval-lane-panel-node" role="tabpanel" aria-labelledby="approval-lane-tab-node" className="mt-3">
+          <NodeApprovalLane rows={nodeRows} loading={nodeLoading} error={nodeError} requestedApprovalId={requestedApprovalId} onRetry={onRetryNodes} />
+        </div>
+      ) : null}
+
+      {reportVisible && activeLane === 'report' ? (
+        <div id="approval-lane-panel-report" role="tabpanel" aria-labelledby="approval-lane-tab-report" className="mt-3">
+          <WorkReportReviewLane rows={reportRows} total={reportCount} loading={reportLoading} error={reportError} onRetry={onRetryReports} onOpen={onOpenReport} />
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+function ApprovalLaneTab({ lane, active, label, count, onSelect }: { lane: ApprovalLaneKey; active: boolean; label: string; count: number | string; onSelect: (lane: ApprovalLaneKey) => void }) {
+  return (
+    <button
+      id={`approval-lane-tab-${lane}`}
+      type="button"
+      role="tab"
+      aria-selected={active}
+      aria-controls={`approval-lane-panel-${lane}`}
+      className={clsx(
+        'inline-flex min-w-fit items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition',
+        active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800',
+      )}
+      onClick={() => onSelect(lane)}
+    >
+      {label}
+      <span className={clsx('rounded-md px-2 py-0.5 text-xs', active ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600')}>{count}</span>
+    </button>
   );
 }
 
@@ -601,14 +676,8 @@ function NodeApprovalLane({ rows, loading, error, requestedApprovalId, onRetry }
     requestedRef.current.focus({ preventScroll: true });
   }, [requestedApprovalId, rows]);
   return (
-    <section className="mt-4 rounded-md border border-amber-200 bg-amber-50/50 p-3" aria-labelledby="node-approval-lane-title">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <h2 id="node-approval-lane-title" className="text-sm font-semibold text-ink">Phê duyệt giai đoạn quy trình</h2>
-          <p className="mt-1 text-xs text-slate-600">Quyết định ở cấp node; không tạo đầu việc giả trong danh sách công việc.</p>
-        </div>
-        <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-amber-800">{rows.length} yêu cầu</span>
-      </div>
+    <section className="rounded-md border border-amber-200 bg-amber-50/50 p-3" aria-label="Phê duyệt giai đoạn quy trình">
+      <p className="mb-3 text-xs text-slate-600">Quyết định ở cấp node; không tạo đầu việc giả trong danh sách công việc.</p>
       {loading ? <LoadingSpinner /> : error ? <SourceError title="Không tải được yêu cầu phê duyệt giai đoạn" onRetry={onRetry} /> : rows.length ? <div className="space-y-2">{rows.map((request) => (
         <div
           key={request.id}
@@ -627,14 +696,8 @@ function NodeApprovalLane({ rows, loading, error, requestedApprovalId, onRetry }
 function WorkReportReviewLane({ rows, total, loading, error, onRetry, onOpen }: { rows: WorkReportListItem[]; total: number; loading: boolean; error: unknown; onRetry: () => void; onOpen: (report: WorkReportListItem) => void }) {
   const visibleRows = rows.slice(0, 5);
   return (
-    <section className="mt-4 rounded-md border border-blue-200 bg-blue-50/40 p-3" aria-labelledby="work-report-review-lane-title">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <h2 id="work-report-review-lane-title" className="text-sm font-semibold text-ink">Báo cáo chờ xác nhận</h2>
-          <p className="mt-1 text-xs text-slate-600">Báo cáo đã gửi đích danh đến anh/chị và còn ở trạng thái chờ xác nhận.</p>
-        </div>
-        <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-blue-800">{total} báo cáo</span>
-      </div>
+    <section className="rounded-md border border-blue-200 bg-blue-50/40 p-3" aria-label="Báo cáo chờ xác nhận">
+      <p className="mb-3 text-xs text-slate-600">Báo cáo đã gửi đích danh đến anh/chị và còn ở trạng thái chờ xác nhận.</p>
       {loading ? <LoadingSpinner /> : error ? <SourceError title="Không tải được báo cáo chờ xác nhận" onRetry={onRetry} /> : visibleRows.length ? (
         <div className="space-y-2">
           {visibleRows.map((report) => (
@@ -703,6 +766,13 @@ function dedupeWorkItems(rows: WorkItem[]) {
 
 function validValue<T extends string>(value: string | null, values: readonly T[], fallback: T): T {
   return value && values.includes(value as T) ? value as T : fallback;
+}
+
+function firstPopulatedApprovalLane(workCount: number, nodeCount: number, reportCount: number, reportVisible: boolean): ApprovalLaneKey {
+  if (workCount > 0) return 'work';
+  if (nodeCount > 0) return 'node';
+  if (reportVisible && reportCount > 0) return 'report';
+  return 'work';
 }
 
 const emptySummary: MyWorkSummary = { total: 0, need_action: 0, in_progress: 0, overdue: 0, blocked: 0, waiting_decision: 0, waiting_approval: 0, upcoming: 0, completed: 0, done_today: 0 };

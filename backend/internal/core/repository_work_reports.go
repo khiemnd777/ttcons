@@ -352,6 +352,33 @@ func (r *Repository) WorkReportRevision(ctx context.Context, reportID string, re
 	`, reportID, revisionNo)
 }
 
+func (r *Repository) WorkReportEvidenceRecords(ctx context.Context, projectID, workItemID string, evidenceIDs []string) ([]Record, error) {
+	if len(evidenceIDs) == 0 {
+		return []Record{}, nil
+	}
+	rawEvidenceIDs, err := json.Marshal(evidenceIDs)
+	if err != nil {
+		return nil, err
+	}
+	return r.Query(ctx, `
+		SELECT evidence.*,work_item.title AS work_item_title,work_item.status AS work_item_status,
+			run_node.name AS run_node_name,
+			submitter.full_name AS submitted_by_name,COALESCE(submitter.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
+			reviewer.full_name AS reviewed_by_name,COALESCE(reviewer.deleted_at IS NOT NULL,false) AS reviewed_by_account_deleted,
+			document.name AS document_name
+		FROM jsonb_array_elements_text($1::jsonb) WITH ORDINALITY requested(evidence_id,sort_order)
+		JOIN evidence_records evidence ON evidence.id=requested.evidence_id::uuid
+		JOIN work_items work_item ON work_item.id=evidence.work_item_id AND work_item.project_id=evidence.project_id
+		LEFT JOIN pipeline_run_nodes run_node ON run_node.id=work_item.run_node_id
+		LEFT JOIN users submitter ON submitter.id=evidence.submitted_by
+		LEFT JOIN users reviewer ON reviewer.id=evidence.reviewed_by
+		LEFT JOIN documents document ON document.id=evidence.document_id
+		WHERE evidence.project_id=$2::uuid
+		  AND (NULLIF($3,'')::uuid IS NULL OR evidence.work_item_id=NULLIF($3,'')::uuid)
+		ORDER BY requested.sort_order
+	`, string(rawEvidenceIDs), projectID, workItemID)
+}
+
 func (r *Repository) SubmitWorkReport(ctx context.Context, sourceID, recipientID, comment, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

@@ -100,7 +100,25 @@ test('My Work separates actor-decidable approvals into a dedicated compatible mo
   assert.match(page, /navigate\(`\/reports\?scope=review&report=\$\{report\.source_id\}`\)/);
   assert.match(page, /searchParams\.get\('approval'\)/);
   assert.match(page, /data-approval-id=\{request\.id\}/);
-  assert.match(page, /Không có yêu cầu nào đang chờ anh duyệt\./);
+});
+
+test('My Work splits approval sources into URL-backed responsive tabs', async () => {
+  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const workspace = page.slice(page.indexOf('function ApprovalWorkspace('), page.indexOf('function NodeApprovalLane('));
+
+  assert.match(page, /type ApprovalLaneKey = 'work' \| 'node' \| 'report'/);
+  assert.match(page, /searchParams\.get\('approval_type'\)/);
+  assert.match(page, /requestedApproval\s*\? 'node'/);
+  assert.match(page, /function firstPopulatedApprovalLane[\s\S]*workCount > 0[\s\S]*nodeCount > 0[\s\S]*reportVisible && reportCount > 0/);
+  assert.match(page, /updateParams\(\{ approval_type: value, approval: value === 'node' \? requestedApproval \|\| null : null \}\)/);
+  assert.match(workspace, /role="tablist" aria-label="Nhóm yêu cầu chờ duyệt"/);
+  assert.match(workspace, /lane="work"[\s\S]*label="Phê duyệt công việc"[\s\S]*count=\{workCount\}/);
+  assert.match(workspace, /lane="node"[\s\S]*label="Phê duyệt giai đoạn quy trình"[\s\S]*count=\{nodeCount\}/);
+  assert.match(workspace, /reportVisible \? <ApprovalLaneTab lane="report"[\s\S]*label="Báo cáo chờ xác nhận"/);
+  assert.match(workspace, /activeLane === 'work'[\s\S]*<WorkList[\s\S]*<NextWorkPanel/);
+  assert.match(workspace, /activeLane === 'node'[\s\S]*<NodeApprovalLane/);
+  assert.match(workspace, /reportVisible && activeLane === 'report'[\s\S]*<WorkReportReviewLane/);
+  assert.match(workspace, /overflow-x-auto border-b border-line/);
 });
 
 test('My Work separates scope, list, and selected-work actions responsively', async () => {

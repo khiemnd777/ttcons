@@ -37,8 +37,11 @@ type EvidenceGalleryProps = {
   emptyTitle?: string;
   showWorkItem?: boolean;
   showControls?: boolean;
-  variant?: 'cards' | 'list';
+  variant?: 'cards' | 'list' | 'review';
   listContext?: 'default' | 'project';
+  initialVisibleCount?: number;
+  filePath?: (record: EvidenceRecord) => string;
+  protectedAccessDescription?: string;
   onReview?: (record: EvidenceRecord, action: EvidenceReviewAction, comment: string) => Promise<void>;
 };
 
@@ -58,6 +61,9 @@ export function EvidenceGallery({
   showControls = true,
   variant = 'cards',
   listContext = 'default',
+  initialVisibleCount = 0,
+  filePath,
+  protectedAccessDescription,
   onReview,
 }: EvidenceGalleryProps) {
   const toast = useToast();
@@ -68,14 +74,22 @@ export function EvidenceGallery({
   const [reviewingAction, setReviewingAction] = useState<EvidenceReviewAction | null>(null);
   const [previewRetryKey, setPreviewRetryKey] = useState(0);
   const [reviewCommentInvalid, setReviewCommentInvalid] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const reviewCommentRef = useRef<HTMLTextAreaElement | null>(null);
-  const previews = useEvidencePreviewUrls(evidence, previewRetryKey);
-  const previewUrls = previews.urls;
   const filterCounts = useMemo(() => evidenceFilterCounts(evidence), [evidence]);
   const rows = useMemo(
     () => showControls ? filterEvidence(evidence, activeFilter, query) : evidence,
     [activeFilter, evidence, query, showControls],
   );
+  const visibleRows = initialVisibleCount > 0 && !showAll ? rows.slice(0, initialVisibleCount) : rows;
+  const hiddenCount = rows.length - visibleRows.length;
+  const previews = useEvidencePreviewUrls(visibleRows, previewRetryKey, filePath);
+  const previewUrls = previews.urls;
+
+  useEffect(() => {
+    setShowAll(false);
+    setSelected(null);
+  }, [evidence]);
 
   async function openEvidence(record: EvidenceRecord) {
     const previewUrl = previewUrls[record.id];
@@ -85,7 +99,7 @@ export function EvidenceGallery({
     }
     if (isProtectedStorageProvider(record.storage_provider) && record.storage_key) {
       try {
-        await openProtectedBlob(() => downloadBlob(`/evidence/${record.id}/file`));
+        await openProtectedBlob(() => downloadBlob(resolveEvidenceFilePath(record, filePath)));
       } catch (error) {
         toast.error('Không mở được tệp minh chứng', error);
       }
@@ -170,7 +184,7 @@ export function EvidenceGallery({
         </div>
       </div> : null}
 
-      {rows.length && variant === 'list' ? (
+      {visibleRows.length && variant === 'list' ? (
         <div className="overflow-hidden rounded-md border border-line bg-white">
           {listContext === 'project' ? (
             <div className={clsx('hidden gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:grid', PROJECT_EVIDENCE_LIST_GRID_CLASS)}>
@@ -192,7 +206,7 @@ export function EvidenceGallery({
             </div>
           )}
           <div className="divide-y divide-line">
-            {rows.map((record) => (
+            {visibleRows.map((record) => (
               <EvidenceListRow
                 key={record.id}
                 record={record}
@@ -208,14 +222,15 @@ export function EvidenceGallery({
             ))}
           </div>
         </div>
-      ) : rows.length ? (
-        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-          {rows.map((record) => (
+      ) : visibleRows.length ? (
+        <div className={clsx('grid gap-3 sm:grid-cols-2', variant === 'review' ? '2xl:grid-cols-2' : '2xl:grid-cols-3')}>
+          {visibleRows.map((record, index) => (
             <EvidenceCard
               key={record.id}
               record={record}
               previewUrl={previewUrls[record.id]}
               showWorkItem={showWorkItem}
+              featured={variant === 'review' && index === 0}
               onOpen={() => canPreviewEvidenceInApp(record) ? setSelected(record) : void openEvidence(record)}
               onSelect={() => {
                 setSelected(record);
@@ -228,11 +243,23 @@ export function EvidenceGallery({
         <EmptyState title={evidence.length ? 'Không có minh chứng phù hợp bộ lọc' : emptyTitle} />
       )}
 
+      {hiddenCount > 0 ? (
+        <button
+          type="button"
+          className="w-full rounded-md border border-dashed border-blue-200 bg-blue-50/50 px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+          onClick={() => setShowAll(true)}
+        >
+          Xem tất cả {rows.length} minh chứng
+        </button>
+      ) : null}
+
       <EvidenceRecordViewerDialog
         record={selected}
         previewUrl={selected ? previewUrls[selected.id] || (!selected.storage_key ? selected.file_url : undefined) : undefined}
         previewLoading={selected ? previews.loadingIds.has(selected.id) : false}
         previewError={selected && previews.errorIds.has(selected.id) ? 'Không tải được ảnh minh chứng.' : undefined}
+        protectedFilePath={selected ? resolveEvidenceFilePath(selected, filePath) : undefined}
+        protectedAccessDescription={protectedAccessDescription}
         showWorkItem={showWorkItem}
         canReview={Boolean(onReview) && (selected?.can_review ?? true)}
         reviewingAction={reviewingAction}
@@ -376,20 +403,22 @@ function EvidenceCard({
   record,
   previewUrl,
   showWorkItem,
+  featured,
   onOpen,
   onSelect,
 }: {
   record: EvidenceRecord;
   previewUrl?: string;
   showWorkItem: boolean;
+  featured?: boolean;
   onOpen: () => void;
   onSelect: () => void;
 }) {
   const title = evidenceTitle(record);
   return (
-    <article className="min-w-0 rounded-md border border-line bg-white p-3">
+    <article className={clsx('min-w-0 rounded-md border border-line bg-white p-3', featured && 'sm:col-span-2')}>
       <button type="button" className="block w-full text-left" onClick={onSelect}>
-        <div className="aspect-[4/3] overflow-hidden rounded-md border border-line bg-slate-100">
+        <div className={clsx('overflow-hidden rounded-md border border-line bg-slate-100', featured ? 'aspect-video' : 'aspect-[4/3]')}>
           {previewUrl ? (
             <img className="h-full w-full object-cover" src={previewUrl} alt={title} />
           ) : (
@@ -470,15 +499,15 @@ function filterEvidence(evidence: EvidenceRecord[], filter: EvidenceFilter, quer
   });
 }
 
-export function useEvidencePreviewUrls(evidence: EvidenceRecord[], retryKey = 0) {
+export function useEvidencePreviewUrls(evidence: EvidenceRecord[], retryKey = 0, filePath?: (record: EvidenceRecord) => string) {
   const [state, setState] = useState<{
     urls: Record<string, string>;
     loadingIds: Set<string>;
     errorIds: Set<string>;
   }>({ urls: {}, loadingIds: new Set(), errorIds: new Set() });
   const signature = useMemo(
-    () => evidence.map((record) => `${record.id}:${record.storage_key ?? ''}:${record.updated_at ?? ''}:${record.mime_type ?? ''}`).join('|'),
-    [evidence],
+    () => evidence.map((record) => `${record.id}:${record.storage_key ?? ''}:${record.updated_at ?? ''}:${record.mime_type ?? ''}:${resolveEvidenceFilePath(record, filePath)}`).join('|'),
+    [evidence, filePath],
   );
 
   useEffect(() => {
@@ -490,7 +519,7 @@ export function useEvidencePreviewUrls(evidence: EvidenceRecord[], retryKey = 0)
     async function loadPreviews() {
       const entries = await Promise.all(imageRecords.map(async (record) => {
         try {
-          const blob = await downloadBlob(`/evidence/${record.id}/file`);
+          const blob = await downloadBlob(resolveEvidenceFilePath(record, filePath));
           const objectUrl = URL.createObjectURL(blob);
           objectUrls.push(objectUrl);
           return { id: record.id, objectUrl };
@@ -517,6 +546,10 @@ export function useEvidencePreviewUrls(evidence: EvidenceRecord[], retryKey = 0)
   }, [retryKey, signature]);
 
   return state;
+}
+
+function resolveEvidenceFilePath(record: EvidenceRecord, filePath?: (record: EvidenceRecord) => string) {
+  return filePath?.(record) || `/evidence/${record.id}/file`;
 }
 
 function isDocumentEvidence(record: EvidenceRecord) {

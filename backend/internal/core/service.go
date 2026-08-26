@@ -2393,7 +2393,7 @@ func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, act
 }
 
 func (s *Service) MyWorkNavigationSummary(ctx context.Context, actorID string) (Record, error) {
-	workItemCount, err := s.repo.MyWorkNavigationCount(ctx, actorID)
+	workItemCounts, err := s.repo.MyWorkNavigationCounts(ctx, actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -2402,11 +2402,51 @@ func (s *Service) MyWorkNavigationSummary(ctx context.Context, actorID string) (
 		return nil, err
 	}
 	workflowActionCount := len(workflowActions)
+
+	permissions, err := s.repo.UserPermissions(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	nodeApprovalCount := 0
+	if hasAnyString(permissions, []string{"project.view", "operation.view", "procurement.view", "accounting.view", "report.view"}) {
+		pendingApprovals, err := s.PendingApprovals(ctx, PendingApprovalFilter{DecidableOnly: true}, actorID)
+		if err != nil {
+			return nil, err
+		}
+		for _, approval := range pendingApprovals {
+			if fmt.Sprint(approval["target_type"]) == "pipeline_run_node" {
+				nodeApprovalCount++
+			}
+		}
+	}
+
+	workReportReviewCount := 0
+	canViewWorkReports := hasAnyString(permissions, []string{"work_report.view"})
+	canReviewWorkReports := hasAnyString(permissions, []string{"work_report.review", "work_report.manage"})
+	if canViewWorkReports && canReviewWorkReports {
+		workReportSummary, err := s.WorkReportSummary(ctx, WorkReportFilter{Scope: "review"}, actorID)
+		if err != nil {
+			return nil, err
+		}
+		workReportReviewCount = workReportSummary.Scopes["review"]
+	}
+
+	return myWorkNavigationSummaryRecord(workItemCounts, workflowActionCount, nodeApprovalCount, workReportReviewCount), nil
+}
+
+func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workflowActionCount, nodeApprovalCount, workReportReviewCount int) Record {
+	workTotal := workItemCounts.NeedAction + workflowActionCount
+	approvalTotal := workItemCounts.WaitingDecision + nodeApprovalCount + workReportReviewCount
 	return Record{
-		"work_items_need_action": workItemCount,
-		"workflow_actions_ready": workflowActionCount,
-		"total":                  workItemCount + workflowActionCount,
-	}, nil
+		"work_items_need_action":      workItemCounts.NeedAction,
+		"workflow_actions_ready":      workflowActionCount,
+		"work_total":                  workTotal,
+		"work_items_waiting_decision": workItemCounts.WaitingDecision,
+		"node_approvals_pending":      nodeApprovalCount,
+		"work_reports_review_pending": workReportReviewCount,
+		"approval_total":              approvalTotal,
+		"total":                       workTotal + approvalTotal,
+	}
 }
 
 func (s *Service) MyWorkflowActions(ctx context.Context, filter MyWorkflowActionsFilter, actorID string) (Record, error) {

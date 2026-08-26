@@ -2,44 +2,26 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  CheckCircle2,
   Download,
   Eye,
   FilePlus2,
-  MessageSquareWarning,
   RefreshCw,
   Search,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { DataTable } from '../../components/DataTable';
-import { Dialog } from '../../components/Dialog';
-import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useToast } from '../../components/ToastProvider';
-import { downloadBlob, get, post } from '../../lib/api/client';
+import { downloadBlob, get } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { dateText } from '../../lib/utils/format';
 import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
-import { constructionReportViewModel } from '../operations/constructionReportViewModel';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
-import type { WorkReportListItem, WorkReportStatus, WorkReportSummary } from '../../lib/types/domain';
+import type { WorkReportDetail, WorkReportListItem, WorkReportSummary } from '../../lib/types/domain';
+import { WorkReportReviewDialog, WorkReportStatusBadge } from './WorkReportReviewDialog';
 
 type WorkReportScope = 'mine' | 'source' | 'review' | 'all';
 type ExportFormat = 'pdf' | 'xlsx' | 'csv';
-
-type WorkReportDetail = WorkReportListItem & {
-  report_delivery_eligible: boolean;
-  work_item_title?: string;
-  weather?: string;
-  progress_percent?: number;
-  structured_json?: Record<string, unknown>;
-  work_summary?: string;
-  manpower_summary?: string;
-  material_usage_summary?: string;
-  issues_summary?: string;
-  revisions?: Array<Record<string, any>>;
-  events?: Array<Record<string, any>>;
-};
 
 const statusOptions: Array<[string, string]> = [
   ['', 'Tất cả trạng thái'],
@@ -291,7 +273,7 @@ export function WorkReportsPage() {
         />
       </section>
 
-      <WorkReportDialog
+      <WorkReportReviewDialog
         open={Boolean(selectedSourceID)}
         detail={detail.data ?? null}
         loading={detail.isLoading}
@@ -314,188 +296,6 @@ export function WorkReportsPage() {
   );
 }
 
-function WorkReportDialog({
-  open,
-  detail,
-  loading,
-  error,
-  userID,
-  canReview,
-  canManage,
-  canOpenSource,
-  canExport,
-  onRefresh,
-  onClose,
-}: {
-  open: boolean;
-  detail: WorkReportDetail | null;
-  loading: boolean;
-  error: unknown;
-  userID: string;
-  canReview: boolean;
-  canManage: boolean;
-  canOpenSource: boolean;
-  canExport: boolean;
-  onRefresh: () => Promise<void>;
-  onClose: () => void;
-}) {
-  const navigate = useNavigate();
-  const toast = useToast();
-  const [reviewComment, setReviewComment] = useState('');
-  const [busyAction, setBusyAction] = useState('');
-  const [reviewCommentInvalid, setReviewCommentInvalid] = useState(false);
-  const detailContentRef = useRef<HTMLDivElement | null>(null);
-  const navigateReviewValidation = useValidationNavigation(detailContentRef);
-  const view = useMemo(() => constructionReportViewModel(detail ?? {}), [detail]);
-  const mayReview = Boolean(detail && canReview && detail.status === 'submitted' && (canManage || detail.recipient_id === userID));
-
-  useEffect(() => {
-    if (!open) return;
-    setReviewComment('');
-    setReviewCommentInvalid(false);
-  }, [detail?.source_id, open]);
-
-  async function review(action: 'request-changes' | 'acknowledge') {
-    if (!detail?.work_report_id) return;
-    if (action === 'request-changes' && !reviewComment.trim()) {
-      setReviewCommentInvalid(true);
-      toast.warn({ title: 'Chưa nhập nội dung cần bổ sung', description: 'Nêu rõ phần người lập cần chỉnh sửa trước khi gửi lại.' });
-      navigateReviewValidation('review_comment');
-      return;
-    }
-    setBusyAction(action);
-    try {
-      await post(`/work-reports/${detail.work_report_id}/${action}`, { comment: reviewComment.trim() });
-      await onRefresh();
-      toast.success(action === 'acknowledge' ? 'Đã xác nhận xem báo cáo' : 'Đã gửi yêu cầu bổ sung');
-    } catch (requestError) {
-      toast.error(action === 'acknowledge' ? 'Không xác nhận được báo cáo' : 'Không gửi được yêu cầu bổ sung', requestError);
-    } finally {
-      setBusyAction('');
-    }
-  }
-
-  async function exportRevision(reportID: string, revisionNo: number) {
-    setBusyAction(`pdf-${revisionNo}`);
-    try {
-      const blob = await downloadBlob(`/work-reports/${reportID}/pdf?revision=${revisionNo}`);
-      saveBlob(blob, `bao-cao-thi-cong-${detail?.report_date ?? 'khong-ro-ngay'}-lan-${revisionNo}.pdf`);
-      toast.success(`Đã xuất PDF lần gửi ${revisionNo}`);
-    } catch (requestError) {
-      toast.error('Không xuất được PDF báo cáo', requestError);
-    } finally {
-      setBusyAction('');
-    }
-  }
-
-  return (
-    <Dialog
-      open={open}
-      title={detail ? `Báo cáo thi công ngày ${dateText(detail.report_date)}` : 'Chi tiết báo cáo'}
-      description={detail ? `${detail.project_code} · ${detail.project_name}` : undefined}
-      size="report"
-      onClose={onClose}
-      footer={detail ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {canOpenSource ? <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={() => navigate(`/projects/${detail.project_id}/operations?tab=timeline&report=${encodeURIComponent(detail.source_id)}`)}>Mở nguồn tại Thi công</button> : <span />}
-          <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>Đóng</button>
-            {mayReview ? (
-              <>
-                <button type="button" className="inline-flex items-center gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-60" disabled={Boolean(busyAction)} onClick={() => void review('request-changes')}>
-                  {busyAction === 'request-changes' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <MessageSquareWarning className="h-4 w-4" />} Yêu cầu bổ sung
-                </button>
-                <button type="button" className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60" disabled={Boolean(busyAction)} onClick={() => void review('acknowledge')}>
-                  {busyAction === 'acknowledge' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Xác nhận đã xem
-                </button>
-              </>
-            ) : null}
-          </div>
-        </div>
-      ) : undefined}
-    >
-      {loading ? <div className="grid min-h-52 place-items-center"><LoadingSpinner /></div> : error ? (
-        <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">Không tải được chi tiết báo cáo. {error instanceof Error ? error.message : ''}</div>
-      ) : detail ? (
-        <div ref={detailContentRef} className="space-y-5">
-          <div className="grid gap-3 rounded-lg border border-line bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-5">
-            <DetailMetric label="Trạng thái" value={<WorkReportStatusBadge status={detail.status} />} />
-            <DetailMetric label="Người lập" value={identityReferenceText(detail.author_name, detail.author_account_deleted)} />
-            <DetailMetric label="Gửi đến" value={detail.recipient_name ? identityReferenceText(detail.recipient_name, detail.recipient_account_deleted) : 'Chưa gửi'} />
-            <DetailMetric label="Tiến độ ghi nhận" value={`${Number(detail.progress_percent ?? 0)}%`} />
-            <DetailMetric label="Lần gửi hiện tại" value={Number(detail.current_revision_no) > 0 ? `Lần ${detail.current_revision_no}` : 'Chưa gửi'} />
-          </div>
-
-          {detail.status === 'recorded' ? (
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Đây là nhật ký được tạo trước khi có vòng đời gửi–phản hồi. Hệ thống giữ lại để tra cứu và không giả lập trạng thái đã gửi.</div>
-          ) : null}
-          {detail.status === 'needs_changes' && detail.review_comment ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><strong>Nội dung cần bổ sung:</strong> {detail.review_comment}</div>
-          ) : null}
-
-          <div className="grid gap-4 lg:grid-cols-4">
-            <ReportSection title="Đã làm" items={view.done} empty="Chưa ghi hạng mục hoàn tất" tone="emerald" />
-            <ReportSection title="Đang làm" items={view.current} empty="Không có hạng mục đang thực hiện" tone="blue" />
-            <ReportSection title="Sẽ làm" items={view.next} empty="Chưa ghi kế hoạch tiếp theo" tone="slate" />
-            <ReportSection title="Vấn đề / trở ngại" items={view.timelineProblems} empty="Không có vấn đề" tone="rose" />
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ReportSection title="Nhân lực" items={view.crew} empty={detail.manpower_summary || 'Chưa ghi nhân lực'} tone="slate" />
-            <ReportSection title="Vật tư sử dụng" items={view.materials} empty={detail.material_usage_summary || 'Chưa ghi vật tư'} tone="slate" />
-          </div>
-
-          {mayReview ? (
-            <section data-validation-key="review_comment" data-validation-error={reviewCommentInvalid ? 'true' : undefined} className="scroll-mt-24 rounded-lg border border-amber-200 bg-amber-50/50 p-4">
-              <h3 className="font-semibold text-ink">Phản hồi cho người lập</h3>
-              <p className="mt-1 text-sm text-slate-600">Nhập nội dung bắt buộc nếu yêu cầu bổ sung; có thể để trống khi xác nhận đã xem.</p>
-              <textarea name="review_comment" aria-invalid={reviewCommentInvalid} className="mt-3 min-h-24 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-100" maxLength={2000} value={reviewComment} onChange={(event) => { setReviewComment(event.target.value); if (event.target.value.trim()) setReviewCommentInvalid(false); }} placeholder="Nội dung phản hồi..." />
-            </section>
-          ) : null}
-
-          <section>
-            <h3 className="font-semibold text-ink">Lịch sử gửi và phản hồi</h3>
-            {!detail.events?.length ? <p className="mt-2 rounded-md border border-dashed border-line p-4 text-sm text-slate-500">Báo cáo chưa được gửi.</p> : (
-              <div className="mt-3 space-y-2">
-                {detail.events.map((event) => (
-                  <article key={event.id} className="rounded-md border border-line p-3 text-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-semibold text-ink">{eventLabel(String(event.event_type))} · Lần {event.revision_no}</p>
-                      <time className="text-xs text-slate-500">{dateTimeText(event.created_at)}</time>
-                    </div>
-                    <p className="mt-1 text-slate-600">{identityReferenceText(event.actor_name, event.actor_account_deleted, 'Không rõ người thực hiện')}{event.comment ? ` — ${event.comment}` : ''}</p>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {detail.revisions?.length ? (
-            <section>
-              <h3 className="font-semibold text-ink">Các bản đã gửi</h3>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {detail.revisions.map((revision) => (
-                  <article key={revision.id} className="rounded-md border border-line p-3">
-                    <p className="font-semibold text-ink">Lần {revision.revision_no}</p>
-                    <p className="mt-1 text-xs text-slate-500">{dateTimeText(revision.submitted_at)} · {identityReferenceText(revision.submitted_by_name || detail.author_name, revision.submitted_by_account_deleted ?? detail.author_account_deleted)}</p>
-                    {revision.comment ? <p className="mt-2 text-sm text-slate-600">{revision.comment}</p> : null}
-                    <p className="mt-2 truncate font-mono text-[10px] text-slate-400" title={revision.snapshot_sha256}>SHA-256 {revision.snapshot_sha256}</p>
-                    {canExport && detail.work_report_id ? (
-                      <button type="button" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-900 disabled:opacity-60" disabled={Boolean(busyAction)} onClick={() => void exportRevision(detail.work_report_id!, Number(revision.revision_no))}>
-                        {busyAction === `pdf-${revision.revision_no}` ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} PDF bản này
-                      </button>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </div>
-      ) : null}
-    </Dialog>
-  );
-}
-
 function WorkReportCard({ row, onOpen }: { row: WorkReportListItem; onOpen: () => void }) {
   return (
     <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
@@ -507,25 +307,6 @@ function WorkReportCard({ row, onOpen }: { row: WorkReportListItem; onOpen: () =
       <button type="button" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-blue-700" onClick={onOpen}><Eye className="h-4 w-4" /> {row.work_report_id ? 'Xem chi tiết' : 'Mở tại Thi công'}</button>
     </article>
   );
-}
-
-function WorkReportStatusBadge({ status }: { status: WorkReportStatus }) {
-  const style = {
-    draft: 'bg-slate-100 text-slate-700', recorded: 'bg-slate-100 text-slate-500', submitted: 'bg-blue-50 text-blue-700', needs_changes: 'bg-amber-50 text-amber-700', acknowledged: 'bg-emerald-50 text-emerald-700',
-  }[status];
-  const label = {
-    draft: 'Nháp tại nguồn', recorded: 'Nhật ký lịch sử', submitted: 'Chờ xác nhận', needs_changes: 'Yêu cầu bổ sung', acknowledged: 'Đã xác nhận',
-  }[status];
-  return <span className={clsx('inline-flex rounded-md px-2 py-1 text-xs font-semibold', style)}>{label}</span>;
-}
-
-function ReportSection({ title, items, empty, tone }: { title: string; items: string[]; empty: string; tone: 'emerald' | 'blue' | 'slate' | 'rose' }) {
-  const border = { emerald: 'border-emerald-200', blue: 'border-blue-200', slate: 'border-slate-200', rose: 'border-rose-200' }[tone];
-  return <section className={clsx('rounded-lg border bg-white p-4', border)}><h3 className="text-sm font-semibold text-ink">{title}</h3>{items.length ? <ul className="mt-2 space-y-1.5 text-sm text-slate-700">{items.map((item, index) => <li key={`${item}-${index}`} className="flex gap-2"><span aria-hidden="true">•</span><span>{item}</span></li>)}</ul> : <p className="mt-2 text-sm text-slate-500">{empty}</p>}</section>;
-}
-
-function DetailMetric({ label, value }: { label: string; value: React.ReactNode }) {
-  return <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><div className="mt-1 text-sm font-semibold text-ink">{value}</div></div>;
 }
 
 function FilterInput({ fieldKey, label, value, onChange, type = 'text', placeholder, onEnter }: { fieldKey?: string; label: string; value: string; onChange: (value: string) => void; type?: 'text' | 'date'; placeholder?: string; onEnter?: () => void }) {
@@ -551,16 +332,6 @@ function saveBlob(blob: Blob, filename: string) {
 
 function exportLabel(format: ExportFormat) {
   return format === 'xlsx' ? 'Excel' : format.toUpperCase();
-}
-
-function eventLabel(eventType: string) {
-  return { submitted: 'Đã gửi báo cáo', resubmitted: 'Đã gửi lại', needs_changes: 'Yêu cầu bổ sung', acknowledged: 'Đã xác nhận xem' }[eventType] ?? eventType;
-}
-
-function dateTimeText(value: unknown) {
-  if (!value) return '—';
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('vi-VN');
 }
 
 function normalizeScope(value: string | null): WorkReportScope | null {
