@@ -1135,6 +1135,20 @@ type StockDocumentRequest struct {
 	ReferenceID       string                     `json:"reference_id"`
 	DocumentDate      string                     `json:"document_date"`
 	Note              string                     `json:"note"`
+	CorrectionReason  string                     `json:"correction_reason"`
 	Items             []StockDocumentItemRequest `json:"items"`
 	WorkItemContext   WorkItemMutationContext    `json:"work_item_context"`
+}
+
+type StockAdjustmentRequest struct {
+	WarehouseID    string  `json:"warehouse_id"`
+	MaterialID     string  `json:"material_id"`
+	TargetQuantity float64 `json:"target_quantity"`
+	DocumentDate   string  `json:"document_date"`
+	Reason         string  `json:"reason"`
+}
+
+type SiteMaterialUsageAdjustmentRequest struct {
+	TargetUsedQuantity float64 `json:"target_used_quantity"`
+	Reason             string  `json:"reason"`
 }

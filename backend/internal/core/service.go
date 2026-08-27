@@ -775,11 +775,47 @@ func projectMemberSummary(items []Record) Record {
 	}
 }
 
-func (s *Service) CreateMaterial(ctx context.Context, body Record) (Record, error) {
+func (s *Service) CreateMaterial(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
+	if err := normalizeMaterialBody(body, true); err != nil {
+		return nil, err
+	}
 	if err := s.applyPartnerSnapshot(ctx, body, "default_supplier_partner_id", "default_supplier", "", []string{"supplier", "service_provider", "other"}); err != nil {
 		return nil, err
 	}
-	return s.repo.Insert(ctx, "materials", materialColumns(), body)
+	return s.repo.CreateMaterial(ctx, body, actorID, actorName)
+}
+
+func (s *Service) UpdateMaterial(ctx context.Context, materialID string, body Record, actorID, actorName string) (Record, error) {
+	if err := normalizeMaterialBody(body, false); err != nil {
+		return nil, err
+	}
+	if err := s.applyPartnerSnapshot(ctx, body, "default_supplier_partner_id", "default_supplier", "", []string{"supplier", "service_provider", "other"}); err != nil {
+		return nil, err
+	}
+	return s.repo.UpdateMaterial(ctx, cleanID(materialID), body, actorID, actorName)
+}
+
+func normalizeMaterialBody(body Record, creating bool) error {
+	if body == nil {
+		return validationError("Dữ liệu vật tư không hợp lệ")
+	}
+	for _, key := range []string{"code", "name", "unit", "category", "default_supplier"} {
+		if value, exists := body[key]; exists {
+			body[key] = cleanOptionalText(value)
+		}
+	}
+	for _, key := range []string{"code", "name", "unit", "category"} {
+		if cleanOptionalText(body[key]) == "" {
+			return validationError("Thông tin vật tư bắt buộc còn thiếu", Record{"field": key})
+		}
+	}
+	if creating {
+		body["active"] = true
+	} else {
+		delete(body, "active")
+	}
+	delete(body, "standard_price")
+	return nil
 }
 
 func (s *Service) CreateWarehouse(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
@@ -9873,6 +9909,18 @@ func (s *Service) CreateStockMovement(ctx context.Context, req StockActionReques
 
 func (s *Service) CreateStockDocument(ctx context.Context, req StockDocumentRequest, actorID, actorName string) (Record, error) {
 	return s.repo.CreateStockDocument(ctx, req, actorID, actorName)
+}
+
+func (s *Service) UpdateStockDocument(ctx context.Context, documentID string, req StockDocumentRequest, actorID, actorName string) (Record, error) {
+	return s.repo.UpdateStockDocument(ctx, cleanID(documentID), req, actorID, actorName)
+}
+
+func (s *Service) CreateStockAdjustment(ctx context.Context, req StockAdjustmentRequest, actorID, actorName string) (Record, error) {
+	return s.repo.CreateStockAdjustment(ctx, req, actorID, actorName)
+}
+
+func (s *Service) AdjustSiteMaterialUsage(ctx context.Context, projectID, materialID string, req SiteMaterialUsageAdjustmentRequest, actorID, actorName string) (Record, error) {
+	return s.repo.AdjustSiteMaterialUsage(ctx, cleanID(projectID), cleanID(materialID), req, actorID, actorName)
 }
 
 func (s *Service) ProjectAcceptances(ctx context.Context, projectID, actorID string) ([]Record, error) {

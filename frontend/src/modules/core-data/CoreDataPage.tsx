@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
 import { DataTable, type DataTableRowKey } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
 import { PageHeader } from '../../components/PageHeader';
@@ -16,11 +17,9 @@ import { BulkSelectionBar } from '../../components/BulkSelectionBar';
 import { BulkDeleteDialog, type BulkDeletionResult } from '../../components/BulkDeleteDialog';
 
 type PartnerDialog = { mode: 'view' | 'edit'; record: Partner } | { mode: 'create'; record?: undefined } | null;
-type PartnerCatalogGroup = 'all' | 'input' | 'output';
+type PartnerCatalogGroup = 'input' | 'output';
 
 const partnerCatalogConfig: Record<PartnerCatalogGroup, {
-  title: string;
-  description: string;
   actionLabel: string;
   createDialogTitle: string;
   defaultType: 'client' | 'supplier';
@@ -28,19 +27,7 @@ const partnerCatalogConfig: Record<PartnerCatalogGroup, {
   metricValue: string;
   empty: string;
 }> = {
-  all: {
-    title: 'Đối tác',
-    description: 'Một danh mục dùng chung cho khách hàng, nhà cung cấp, thầu phụ và đơn vị dịch vụ.',
-    actionLabel: 'Thêm đối tác',
-    createDialogTitle: 'Tạo đối tác',
-    defaultType: 'supplier',
-    metricLabel: 'Loại lọc',
-    metricValue: 'Tất cả đối tác',
-    empty: 'Chưa có đối tác',
-  },
   input: {
-    title: 'Danh mục đầu vào',
-    description: 'Quản lý Khách hàng / CĐT.',
     actionLabel: 'Thêm đầu vào',
     createDialogTitle: 'Tạo đối tác đầu vào',
     defaultType: 'client',
@@ -49,8 +36,6 @@ const partnerCatalogConfig: Record<PartnerCatalogGroup, {
     empty: 'Chưa có đối tác đầu vào',
   },
   output: {
-    title: 'Danh mục đầu ra',
-    description: 'Quản lý nhà cung cấp, thầu phụ và các đơn vị thực hiện.',
     actionLabel: 'Thêm đầu ra',
     createDialogTitle: 'Tạo đối tác đầu ra',
     defaultType: 'supplier',
@@ -59,6 +44,11 @@ const partnerCatalogConfig: Record<PartnerCatalogGroup, {
     empty: 'Chưa có đối tác đầu ra',
   },
 };
+
+const partnerCatalogTabs: Array<{ group: PartnerCatalogGroup; label: string; to: string }> = [
+  { group: 'input', label: 'Đầu vào', to: '/core-data/input' },
+  { group: 'output', label: 'Đầu ra', to: '/core-data/output' },
+];
 
 export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
   const [status, setStatus] = useState<'active' | 'inactive' | 'all'>('active');
@@ -73,7 +63,7 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
   const config = partnerCatalogConfig[group];
   const partners = useQuery({
     queryKey: ['partners', group, status, type],
-    queryFn: () => get<Partner[]>(`/partners?status=${encodeURIComponent(status)}${group === 'all' ? '' : `&group=${group}`}${type ? `&type=${encodeURIComponent(type)}` : ''}`),
+    queryFn: () => get<Partner[]>(`/partners?status=${encodeURIComponent(status)}&group=${group}${type ? `&type=${encodeURIComponent(type)}` : ''}`),
   });
 
   const createPartner = useMutation({
@@ -103,8 +93,8 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
   return (
     <>
       <PageHeader
-        title={config.title}
-        description={config.description}
+        title="Đối tác"
+        description="Quản lý khách hàng, nhà cung cấp, thầu phụ và đơn vị dịch vụ theo nhóm nghiệp vụ."
         actions={
           <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setDialog({ mode: 'create' })}>
             <Plus className="h-4 w-4" />
@@ -112,6 +102,23 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
           </button>
         }
       />
+
+      <nav aria-label="Phân nhóm đối tác" className="mb-4 grid grid-cols-2 border-b border-line sm:flex">
+        {partnerCatalogTabs.map((tab) => (
+          <NavLink
+            key={tab.group}
+            to={tab.to}
+            end
+            className={({ isActive }) => `-mb-px inline-flex min-h-11 items-center justify-center border-b-2 px-5 py-2 text-sm font-semibold transition-colors ${
+              isActive
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'
+            }`}
+          >
+            {tab.label}
+          </NavLink>
+        ))}
+      </nav>
 
       {canDelete ? <BulkSelectionBar count={selectedKeys.size} itemLabel="đối tác" actionLabel="Xóa đối tác đã chọn" onClear={() => setSelectedKeys(new Set())} onDelete={() => setDeleteOpen(true)} /> : null}
 
@@ -121,12 +128,12 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
           <Metric label="Active" value={String(activeCount)} />
           <Metric label={config.metricLabel} value={type ? partnerTypeLabel(type) : config.metricValue} />
         </div>
-        {group !== 'input' ? (
+        {group === 'output' ? (
           <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
             Loại
             <select className={filterClassName} value={type} onChange={(event) => { setType(event.target.value); setSelectedKeys(new Set()); }}>
-              <option value="">{group === 'all' ? 'Tất cả loại đối tác' : 'Tất cả đầu ra'}</option>
-              {(group === 'all' ? partnerTypeOptions : outputPartnerTypeOptions).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              <option value="">Tất cả đầu ra</option>
+              {outputPartnerTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
         ) : null}
@@ -150,7 +157,7 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
         pageSize={10}
         defaultSort={{ key: 'name', direction: 'asc' }}
         getRowKey={(row) => row.id}
-        selection={canDelete ? { selectedKeys, onSelectedKeysChange: setSelectedKeys, ariaLabel: 'Chọn tất cả đối tác trên trang hiện tại' } : undefined}
+        selection={canDelete ? { selectedKeys, onSelectedKeysChange: setSelectedKeys, ariaLabel: `Chọn tất cả đối tác ${group === 'input' ? 'Đầu vào' : 'Đầu ra'} trên trang hiện tại` } : undefined}
         columns={[
           { key: 'partner_code', header: 'Mã', sortable: true },
           {

@@ -2782,13 +2782,11 @@ func (h *Handler) ListMaterials(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"warehouse.view", "procurement.view"}); err != nil {
 		return err
 	}
-	return h.list(c, `
-		SELECT m.*, p.name AS default_supplier_partner_name, p.tax_code AS default_supplier_tax_code
-		FROM materials m
-		LEFT JOIN partners p ON p.id=m.default_supplier_partner_id
-		WHERE m.active
-		ORDER BY m.category, m.name
-	`)
+	rows, err := h.service.repo.ListActiveMaterials(c.Context())
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
 }
 func (h *Handler) CreateMaterial(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"warehouse.adjust"}); err != nil {
@@ -2798,11 +2796,25 @@ func (h *Handler) CreateMaterial(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	row, err := h.service.CreateMaterial(c.Context(), body)
+	row, err := h.service.CreateMaterial(c.Context(), body, actorID(c), actorName(c))
 	if err != nil {
 		return err
 	}
 	return response.Created(c, row)
+}
+func (h *Handler) UpdateMaterial(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"warehouse.adjust"}); err != nil {
+		return err
+	}
+	body, err := bodyMap(c)
+	if err != nil {
+		return err
+	}
+	row, err := h.service.UpdateMaterial(c.Context(), c.Params("id"), body, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, row)
 }
 func (h *Handler) ListWarehouses(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"warehouse.view"}); err != nil {
@@ -2836,8 +2848,8 @@ func (h *Handler) Stock(c *fiber.Ctx) error {
 	rows, err := h.service.repo.Query(c.Context(), fmt.Sprintf(`
 		SELECT m.id AS material_id, m.code, m.name, m.unit, m.category,
 			COALESCE(SUM(CASE
-				WHEN sm.movement_type IN ('receive','return_to_warehouse') THEN sm.quantity
-				WHEN sm.movement_type IN ('issue','loss') THEN -sm.quantity
+				WHEN sm.movement_type IN ('receive','return_to_warehouse','adjustment_in') THEN sm.quantity
+				WHEN sm.movement_type IN ('issue','loss','adjustment_out') THEN -sm.quantity
 				WHEN sm.movement_type='transfer' AND sm.target_warehouse_id IS NULL THEN -sm.quantity
 				ELSE 0
 			END),0) AS stock_quantity
@@ -2915,13 +2927,7 @@ func (h *Handler) CreateStockDocument(c *fiber.Ctx) error {
 	if err := json.Unmarshal(c.Body(), &req); err != nil {
 		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu phiếu kho không hợp lệ")
 	}
-	permissions := map[string][]string{
-		"receive":                 {"warehouse.receive"},
-		"issue":                   {"warehouse.issue"},
-		"transfer":                {"warehouse.transfer"},
-		"return_to_warehouse":     {"warehouse.surplus_handle"},
-		"return_to_subcontractor": {"warehouse.surplus_handle"},
-	}[strings.TrimSpace(req.MovementType)]
+	permissions := stockDocumentPermissions(strings.TrimSpace(req.MovementType))
 	if len(permissions) == 0 {
 		return validationError("Loại phiếu kho không hợp lệ")
 	}
@@ -2946,6 +2952,84 @@ func (h *Handler) CreateStockDocument(c *fiber.Ctx) error {
 		return err
 	}
 	return response.Created(c, document)
+}
+
+func (h *Handler) UpdateStockDocument(c *fiber.Ctx) error {
+	var req StockDocumentRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu chỉnh sửa phiếu kho không hợp lệ")
+	}
+	current, err := h.service.repo.GetStockDocument(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	currentPermissions := stockDocumentPermissions(strings.TrimSpace(fmt.Sprint(current["movement_type"])))
+	requestedPermissions := stockDocumentPermissions(strings.TrimSpace(req.MovementType))
+	if len(currentPermissions) == 0 || len(requestedPermissions) == 0 {
+		return validationError("Loại phiếu kho không hợp lệ")
+	}
+	currentProjectID := cleanID(current["project_id"])
+	requestedProjectID := cleanID(req.ProjectID)
+	if currentProjectID != "" {
+		if err := h.requireProjectPermission(c, currentProjectID, []string{"warehouse.adjust"}); err != nil {
+			return err
+		}
+		if err := h.requireProjectPermission(c, currentProjectID, currentPermissions); err != nil {
+			return err
+		}
+	} else {
+		if err := h.requirePermission(c, []string{"warehouse.adjust"}); err != nil {
+			return err
+		}
+		if err := h.requirePermission(c, currentPermissions); err != nil {
+			return err
+		}
+	}
+	if requestedProjectID != "" {
+		if err := h.requireProjectPermission(c, requestedProjectID, []string{"warehouse.adjust"}); err != nil {
+			return err
+		}
+		if err := h.requireProjectPermission(c, requestedProjectID, requestedPermissions); err != nil {
+			return err
+		}
+	} else {
+		if err := h.requirePermission(c, []string{"warehouse.adjust"}); err != nil {
+			return err
+		}
+		if err := h.requirePermission(c, requestedPermissions); err != nil {
+			return err
+		}
+	}
+	document, err := h.service.UpdateStockDocument(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, document)
+}
+
+func (h *Handler) CreateStockAdjustment(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"warehouse.adjust"}); err != nil {
+		return err
+	}
+	var req StockAdjustmentRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu điều chỉnh tồn kho không hợp lệ")
+	}
+	document, err := h.service.CreateStockAdjustment(c.Context(), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, document)
+}
+
+func stockDocumentPermissions(movementType string) []string {
+	return map[string][]string{
+		"receive":                 {"warehouse.receive"},
+		"issue":                   {"warehouse.issue"},
+		"transfer":                {"warehouse.transfer"},
+		"return_to_warehouse":     {"warehouse.surplus_handle"},
+		"return_to_subcontractor": {"warehouse.surplus_handle"},
+	}[movementType]
 }
 
 func (h *Handler) StockReceive(c *fiber.Ctx) error  { return h.stockAction(c, "receive") }
@@ -2994,6 +3078,22 @@ func (h *Handler) MaterialBalances(c *fiber.Ctx) error {
 		return err
 	}
 	return response.OK(c, rows)
+}
+
+func (h *Handler) AdjustSiteMaterialUsage(c *fiber.Ctx) error {
+	projectID := c.Params("id")
+	if err := h.requireProjectPermission(c, projectID, []string{"warehouse.adjust"}); err != nil {
+		return err
+	}
+	var req SiteMaterialUsageAdjustmentRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu điều chỉnh sử dụng vật tư không hợp lệ")
+	}
+	balance, err := h.service.AdjustSiteMaterialUsage(c.Context(), projectID, c.Params("materialId"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, balance)
 }
 
 func (h *Handler) WarehouseReceiptOptions(c *fiber.Ctx) error {

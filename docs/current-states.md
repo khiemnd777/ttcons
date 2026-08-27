@@ -1,5 +1,43 @@
 # Current States
 
+## Global Warehouse navigation — 2026-08-27
+
+### Will be done
+
+- Add one permission-filtered global `Kho vật tư` navigation item at `/warehouse`, immediately below `Đối tác` in the standard App shell.
+- Keep the existing project-scoped `Kho vật tư` business-tree entry and preserve the current global/project filter semantics of all four Warehouse tabs.
+- Add focused navigation coverage for label, route, `warehouse.view` RBAC and ordering after `Đối tác`.
+- Update the central module, frontend UI/utility and Materials Warehouse domain maps, then verify focused/full frontend tests and the production build without browser/UAT.
+
+### Done
+
+- Review package and Mockup as Text approved by the user.
+- Added the permission-filtered global `Kho vật tư` item at `/warehouse`, immediately below `Đối tác` and before `Nhân sự` in the shared desktop/mobile App navigation.
+- Preserved the existing project-scoped Warehouse business-tree entry and made no route, API, database, stock-ledger or Warehouse-tab behavior change.
+- Added focused source-contract coverage for the route, label, `warehouse.view` permission and exact navigation order.
+- Updated the central module, frontend UI/utility and Materials Warehouse domain maps with the global/project navigation and tab-scope contract.
+- Focused App-shell navigation tests passed 2/2; the full frontend suite passed 287/287; the production TypeScript/Vite build passed on the resulting frontend source, with only the existing Vite chunk-size warning.
+- Status: `TECHNICALLY VERIFIED`; `NOT UX ACCEPTED` because browser/UAT was not requested and did not run.
+
+## Partner catalog tabs — 2026-08-27
+
+### Will be done
+
+- Keep one global `Đối tác` navigation item while presenting `Đầu vào` and `Đầu ra` as route-backed tabs inside the shared partner workspace.
+- Restore `/core-data/input` and `/core-data/output` to their existing server-backed partner groups, with `/core-data` defaulting to Input.
+- Preserve partner multi-type membership, global soft deletion, permissions, API/storage compatibility and downstream snapshots.
+- Update focused frontend coverage and the central/frontend/admin mapping references, then verify frontend tests and production build without browser/UAT.
+
+### Done
+
+- Review package and Mockup as Text approved by the user.
+- Kept one global `Đối tác` navigation item and added responsive route-backed `Đầu vào`/`Đầu ra` tabs inside `CoreDataPage`.
+- Restored `/core-data/input` and `/core-data/output` to `group=input|output`; `/core-data` now defaults to Input.
+- Removed the frontend-only `all` catalog mode while preserving multi-type membership, output exact-type filtering, global soft deletion, permissions and downstream snapshot behavior.
+- Updated focused partner presentation coverage plus the central module, frontend UI/utility and Admin Governance maps.
+- Focused navigation/partner tests passed 4/4; the full frontend suite passed 287/287; the production TypeScript/Vite build passed on the resulting frontend source.
+- Status: `TECHNICALLY VERIFIED`; `NOT UX ACCEPTED` because browser/UAT was not requested and did not run.
+
 ## Release v2026-08-27.1
 
 ### Will be done

@@ -586,3 +586,195 @@ func TestIncomingAcceptanceSubmitDoesNotCreateStockMovement(t *testing.T) {
 	}, fixture.workerID, "Worker")
 	assertValidationError(t, err)
 }
+
+func TestMaterialEditingLocksCodeAndUnitAfterOperationalUsage(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	actorID := newID()
+	warehouseID := newID()
+	materialID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE actor_id=$1`, actorID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_movements WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM materials WHERE id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM warehouses WHERE id=$1`, warehouseID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Material Editor','active')`, actorID, "material-editor-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO warehouses (id,name,location,type,active) VALUES ($1,'Material Edit Warehouse','Test','central',true)`, warehouseID)
+	mustExec(t, db, `INSERT INTO materials (id,code,name,unit,category,active) VALUES ($1,$2,'Editable Material','m','Test',true)`, materialID, "EDIT-"+materialID[:8])
+
+	updated, err := service.UpdateMaterial(ctx, materialID, Record{
+		"code": "EDITED-" + materialID[:8], "name": "Editable Material v2", "unit": "kg", "category": "Updated",
+		"default_supplier_partner_id": nil, "default_supplier": "",
+	}, actorID, "Material Editor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated["code"] != "EDITED-"+materialID[:8] || updated["unit"] != "kg" || updated["identity_locked"] != false {
+		t.Fatalf("unlocked material update = %#v, want updated code/unit and identity_locked=false", updated)
+	}
+
+	if _, err := repo.CreateStockMovement(ctx, StockActionRequest{
+		WarehouseID: warehouseID, MaterialID: materialID, MovementType: "receive", Quantity: 2, Unit: "kg", Reason: "lock material identity",
+	}, actorID, "Material Editor"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.UpdateMaterial(ctx, materialID, Record{
+		"code": "FORBIDDEN-" + materialID[:8], "name": "Editable Material v3", "unit": "m", "category": "Updated",
+		"default_supplier_partner_id": nil, "default_supplier": "",
+	}, actorID, "Material Editor")
+	assertValidationError(t, err)
+
+	updated, err = service.UpdateMaterial(ctx, materialID, Record{
+		"code": "EDITED-" + materialID[:8], "name": "Editable Material renamed", "unit": "kg", "category": "Final",
+		"default_supplier_partner_id": nil, "default_supplier": "Local supplier",
+	}, actorID, "Material Editor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated["name"] != "Editable Material renamed" || updated["identity_locked"] != true {
+		t.Fatalf("locked material mutable fields = %#v, want renamed material and identity_locked=true", updated)
+	}
+}
+
+func TestWarehouseAndSiteAdjustmentsPreserveDerivedBalances(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	actorID := newID()
+	projectID := newID()
+	warehouseID := newID()
+	materialID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE actor_id=$1`, actorID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM site_material_adjustments WHERE project_id=$1 OR material_id=$2`, projectID, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_movements WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_documents WHERE id IN (SELECT document_id FROM stock_document_items WHERE material_id=$1)`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM site_material_balances WHERE project_id=$1 OR material_id=$2`, projectID, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM materials WHERE id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM warehouses WHERE id=$1`, warehouseID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Warehouse Adjuster','active')`, actorID, "warehouse-adjuster-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status) VALUES ($1,'Adjustment Project',$2,'Client','active')`, projectID, "ADJ-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO warehouses (id,name,location,type,active) VALUES ($1,'Adjustment Warehouse','Test','central',true)`, warehouseID)
+	mustExec(t, db, `INSERT INTO materials (id,code,name,unit,category,active) VALUES ($1,$2,'Adjustment Material','m','Test',true)`, materialID, "ADJM-"+materialID[:8])
+
+	if _, err := repo.CreateStockAdjustment(ctx, StockAdjustmentRequest{
+		WarehouseID: warehouseID, MaterialID: materialID, TargetQuantity: 10, DocumentDate: "2026-08-27", Reason: "Opening physical count",
+	}, actorID, "Warehouse Adjuster"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.CreateStockAdjustment(ctx, StockAdjustmentRequest{
+		WarehouseID: warehouseID, MaterialID: materialID, TargetQuantity: 6, DocumentDate: "2026-08-27", Reason: "Recounted physical stock",
+	}, actorID, "Warehouse Adjuster"); err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	available, err := warehouseMaterialAvailableTx(ctx, tx, warehouseID, materialID)
+	_ = tx.Rollback()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if available != 6 {
+		t.Fatalf("warehouse available = %.3f, want 6 after two audited adjustments", available)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_documents WHERE movement_type IN ('adjustment_in','adjustment_out') AND id IN (SELECT document_id FROM stock_document_items WHERE material_id=$1)`, 2, materialID)
+
+	if _, err := repo.CreateStockMovement(ctx, StockActionRequest{
+		ProjectID: projectID, WarehouseID: warehouseID, MaterialID: materialID, MovementType: "issue", Quantity: 5, Unit: "m", Reason: "issue for usage adjustment",
+	}, actorID, "Warehouse Adjuster"); err != nil {
+		t.Fatal(err)
+	}
+	adjusted, err := repo.AdjustSiteMaterialUsage(ctx, projectID, materialID, SiteMaterialUsageAdjustmentRequest{
+		TargetUsedQuantity: 3, Reason: "Verified installed quantity",
+	}, actorID, "Warehouse Adjuster")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(adjusted["issued_quantity"]) != 5 || number(adjusted["used_quantity"]) != 3 || number(adjusted["surplus_quantity"]) != 2 {
+		t.Fatalf("adjusted site balance = %#v, want issued/used/surplus 5/3/2", adjusted)
+	}
+	_, err = repo.AdjustSiteMaterialUsage(ctx, projectID, materialID, SiteMaterialUsageAdjustmentRequest{
+		TargetUsedQuantity: 6, Reason: "must not exceed issued quantity",
+	}, actorID, "Warehouse Adjuster")
+	assertValidationError(t, err)
+	assertCount(t, db, `SELECT COUNT(*) FROM site_material_adjustments WHERE project_id=$1 AND material_id=$2 AND adjustment_type='usage_increase'`, 1, projectID, materialID)
+}
+
+func TestStockDocumentMetadataEditAndQuantityCorrectionKeepHistory(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	actorID := newID()
+	warehouseID := newID()
+	materialID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE actor_id=$1`, actorID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_movements WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_documents WHERE id IN (SELECT document_id FROM stock_document_items WHERE material_id=$1)`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM materials WHERE id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM warehouses WHERE id=$1`, warehouseID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Document Corrector','active')`, actorID, "document-corrector-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO warehouses (id,name,location,type,active) VALUES ($1,'Correction Warehouse','Test','central',true)`, warehouseID)
+	mustExec(t, db, `INSERT INTO materials (id,code,name,unit,category,active) VALUES ($1,$2,'Correction Material','m','Test',true)`, materialID, "CORR-"+materialID[:8])
+
+	created, err := repo.CreateStockDocument(ctx, StockDocumentRequest{
+		MovementType: "receive", TargetWarehouseID: warehouseID, DocumentDate: "2026-08-26", Note: "Original note",
+		Items: []StockDocumentItemRequest{{MaterialID: materialID, Quantity: 10, Unit: "m", Reason: "Original receipt"}},
+	}, actorID, "Document Corrector")
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalID := cleanID(created["id"])
+
+	metadataEdited, err := repo.UpdateStockDocument(ctx, originalID, StockDocumentRequest{
+		MovementType: "receive", TargetWarehouseID: warehouseID, DocumentDate: "2026-08-27", Note: "Metadata corrected",
+		Items: []StockDocumentItemRequest{{MaterialID: materialID, Quantity: 10, Unit: "m", Reason: "Original receipt"}},
+	}, actorID, "Document Corrector")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleanID(metadataEdited["id"]) != originalID || metadataEdited["note"] != "Metadata corrected" {
+		t.Fatalf("metadata edit = %#v, want same document id and updated note", metadataEdited)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1`, 1, materialID)
+
+	replacement, err := repo.UpdateStockDocument(ctx, originalID, StockDocumentRequest{
+		MovementType: "receive", TargetWarehouseID: warehouseID, DocumentDate: "2026-08-27", Note: "Quantity corrected",
+		CorrectionReason: "Actual received quantity was 7", Items: []StockDocumentItemRequest{{MaterialID: materialID, Quantity: 7, Unit: "m", Reason: "Corrected receipt"}},
+	}, actorID, "Document Corrector")
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacementID := cleanID(replacement["id"])
+	if replacementID == originalID || cleanID(replacement["correction_of_document_id"]) != originalID {
+		t.Fatalf("replacement = %#v, want a new document linked to original", replacement)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_documents WHERE id=$1 AND status='corrected' AND corrected_by_document_id=$2`, 1, originalID, replacementID)
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_documents WHERE id=$1 AND status='posted' AND correction_of_document_id=$2`, 1, replacementID, originalID)
+	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1`, 3, materialID)
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	available, err := warehouseMaterialAvailableTx(ctx, tx, warehouseID, materialID)
+	_ = tx.Rollback()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if available != 7 {
+		t.Fatalf("warehouse available = %.3f, want 7 after correction chain", available)
+	}
+}

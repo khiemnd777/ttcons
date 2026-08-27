@@ -2851,6 +2851,11 @@ export type StockDocument = ProjectOperationsRecord & {
   document_date: string;
   note?: string;
   status: string;
+  correction_of_document_id?: string;
+  corrected_by_document_id?: string;
+  corrected_document_id?: string;
+  correction_reason?: string;
+  corrected_at?: string;
   item_count?: number;
   total_quantity?: number;
   created_by_name?: string;

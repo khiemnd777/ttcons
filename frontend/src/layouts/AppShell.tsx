@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   UserRound,
   Users,
+  Warehouse,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -64,6 +65,7 @@ const navGroups: NavGroup[] = [
     title: 'Quản trị',
     items: [
       { to: '/core-data', label: 'Đối tác', icon: ArrowDownToLine, permissions: ['catalog.view'] },
+      { to: '/warehouse', label: 'Kho vật tư', icon: Warehouse, permissions: ['warehouse.view'] },
       { to: '/staff', label: 'Nhân sự', icon: Users, permissions: ['staff.view'] },
       { to: '/roles', label: 'Vai trò', icon: ShieldCheck, permissions: ['role.view'] },
       { to: '/audit', label: 'Audit nghiệp vụ', icon: FileClock, permissions: ['audit.view'] },

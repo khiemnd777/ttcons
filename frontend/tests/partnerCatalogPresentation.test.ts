@@ -6,7 +6,7 @@ async function source(path: string) {
   return readFile(new URL(path, import.meta.url), 'utf8');
 }
 
-test('partner catalog is one role-filtered business directory', async () => {
+test('partner catalog keeps one navigation entry with input and output tabs', async () => {
   const appShell = await source('../src/layouts/AppShell.tsx');
   const page = await source('../src/modules/core-data/CoreDataPage.tsx');
   const router = await source('../src/app/router.tsx');
@@ -15,17 +15,19 @@ test('partner catalog is one role-filtered business directory', async () => {
   assert.match(appShell, /to: '\/core-data', label: 'Đối tác'.*permissions: \['catalog\.view'\]/);
   assert.doesNotMatch(appShell, /to: '\/core-data\/(?:input|output)', label: '(?:Đầu vào|Đầu ra)'/);
   assert.doesNotMatch(appShell, /label: 'Dữ liệu lõi'/);
-  assert.match(router, /path: '\/core-data'.*<CoreDataPage key="partners" group="all" \/>/);
-  assert.match(router, /path: '\/core-data\/input'.*<Navigate to="\/core-data" replace \/>/);
-  assert.match(router, /path: '\/core-data\/output'.*<Navigate to="\/core-data" replace \/>/);
-  assert.match(page, /title: 'Đối tác'/);
-  assert.match(page, /actionLabel: 'Thêm đối tác'/);
-  assert.match(page, /title: 'Danh mục đầu vào'/);
-  assert.match(page, /title: 'Danh mục đầu ra'/);
+  assert.match(router, /path: '\/core-data'.*<Navigate to="\/core-data\/input" replace \/>/);
+  assert.match(router, /path: '\/core-data\/input'.*<CoreDataPage key="partner-input" group="input" \/>/);
+  assert.match(router, /path: '\/core-data\/output'.*<CoreDataPage key="partner-output" group="output" \/>/);
+  assert.match(page, /title="Đối tác"/);
+  assert.match(page, /aria-label="Phân nhóm đối tác"/);
+  assert.match(page, /label: 'Đầu vào', to: '\/core-data\/input'/);
+  assert.match(page, /label: 'Đầu ra', to: '\/core-data\/output'/);
   assert.match(page, /actionLabel: 'Thêm đầu vào'/);
   assert.match(page, /actionLabel: 'Thêm đầu ra'/);
-  assert.match(page, /group === 'all' \? '' : `&group=\$\{group\}`/);
-  assert.match(page, /group === 'all' \? partnerTypeOptions : outputPartnerTypeOptions/);
+  assert.match(page, /get<Partner\[]>\(`\/partners\?status=.*&group=\$\{group\}/);
+  assert.match(page, /group === 'output'/);
+  assert.match(page, /outputPartnerTypeOptions\.map/);
+  assert.doesNotMatch(page, /group="all"|group === 'all'/);
   assert.match(partnerUtils, /outputPartnerTypeOptions = partnerTypeOptions\.filter\(\(option\) => option\.value !== 'client'\)/);
   assert.match(partnerUtils, /vendorPartnerTypes = outputPartnerTypeOptions\.map/);
 });

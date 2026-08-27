@@ -3,6 +3,7 @@
 ## Owners
 
 - Frontend modules: `frontend/src/modules/warehouse`, `frontend/src/modules/work-items`
+- Navigation: global `frontend/src/layouts/AppShell.tsx`, project-scoped `frontend/src/modules/projects/projectWorkspaceNavigation.ts`
 - Work item panels: `MaterialSnapshotPanel.tsx`, `SurplusHandlingPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
 - Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`
@@ -10,20 +11,20 @@
 
 ## Routes
 
-- Catalog and stock: `/materials`, `/warehouses`, `/stock`, `/stock/positions`, `/stock/movements`
-- Multi-line stock documents: `/stock/documents`, `/stock/documents/:id`
+- Catalog and stock: `GET|POST /materials`, `PUT /materials/:id`, `/warehouses`, `/stock`, `/stock/positions`, `/stock/movements`
+- Multi-line stock documents: `GET|POST /stock/documents`, `GET|PUT /stock/documents/:id`; audited physical-count corrections: `POST /stock/adjustments`
 - Stock actions: `/stock/receive`, `/stock/issue`, `/stock/transfer`, `/stock/return-to-warehouse`, `/stock/return-to-subcontractor`
-- Site balances and receipt sources: `/projects/:id/material-balances`, `/projects/:id/warehouse-receipt-options`
+- Site balances and receipt sources: `/projects/:id/material-balances`, `POST /projects/:id/material-balances/:materialId/adjustments`, `/projects/:id/warehouse-receipt-options`
 - Work item material snapshots: `/work-items/:id/material-snapshot`
 - Surplus handling: `/work-items/:id/surplus-handlings`, `/surplus-handlings/:id`, `/surplus-handlings/:id/submit`
 
 ## Tables And Migrations
 
-- `materials`, `warehouses`, `stock_documents`, `stock_document_items`, `stock_movements`, `site_material_balances`
+- `materials`, `warehouses`, `stock_documents`, `stock_document_items`, `stock_movements`, `site_material_balances`, `site_material_adjustments`
 - `material_before_after_snapshots`, `material_before_after_snapshot_items`
 - `site_surplus_handlings`
 - Related evidence: `evidence_records`, `documents`
-- Relevant migrations: `V1`, `V6`, `V23`, `V24`, `V33`, `V61`
+- Relevant migrations: `V1`, `V6`, `V23`, `V24`, `V33`, `V61`, `V132`
 
 ## Invariants
 
@@ -31,9 +32,14 @@
 - Every stock operation keeps source, target, actor, quantity, material, and project traceability.
 - Soft-deleting the creator/submitting account never changes or deletes a stock document, stock movement, site balance or material snapshot. Dynamic stock-document creator and material-snapshot submitter names keep their original fields plus companion deletion flags for the shared deleted-account label; active warehouse/member selectors continue to exclude deleted identities.
 - Posted stock documents are multi-line and atomic. Transfer documents require distinct active source/target warehouses, lock both balances in stable order and count the same quantity out of the source and into the target.
+- Posted document metadata (date/note) may be updated in place with audit. Any project/type/warehouse/source/item/quantity change requires a correction reason, atomically reverses the old movements, posts one replacement document, links both documents and keeps the old document as `corrected`; adjustment documents themselves are append-only.
+- Physical stock correction never overwrites a balance. `POST /stock/adjustments` serializes the warehouse/material pair and posts `adjustment_in` or `adjustment_out` from the current ledger quantity to the non-negative target. Stock positions, receipt caps, warehouse reports and ledgers include those movement types with the same sign semantics.
+- Material name/category/supplier metadata remains editable. Material code and unit are editable only before any operational reference exists; after stock/document/site/BOQ/procurement/quotation/acceptance/snapshot/surplus usage, both are server-locked. Every new stock line must use the active material master's exact unit.
+- Site `issued_quantity` remains movement-derived. A usage correction may set only a non-negative `used_quantity` no greater than issued, recalculates surplus/status and appends `site_material_adjustments` plus audit; stock-document reversal corrections append separate issued correction rows and fail closed if the final issued quantity would be below used.
 - Submitted incoming acceptance is only a selectable receipt source. A linked receipt cannot exceed `accepted_quantity - previously linked receive movements`; acceptance never posts stock by itself.
 - Procurement accepted-vs-stocked progress also recognizes historical explicit receive movements linked to the originating `boq_item`; this compatibility source is capped at accepted quantity and blocks duplicate acceptance-linked receipts.
 - The stock workspace has four explicit sources of truth: warehouse positions, posted documents/ledger, project site/surplus balance and active material catalog.
+- The standard App shell exposes `/warehouse` under `warehouse.view`, immediately below `Đối tác`; the project business tree keeps `/projects/:id/warehouse`. Global navigation does not make project site/surplus data global: `Tại công trình & dư` still requires a selected project, and posted documents apply the project filter when one is selected.
 - Material creation presents `default_supplier_partner_id` as `Nhà cung cấp tham khảo` because a selected quotation supplier still takes precedence; `default_supplier` is the conditional `Tên nhà cung cấp khác` fallback. The naming is presentation-only and does not change supplier validation, snapshots or procurement grouping.
 - Material `standard_price` remains schema/API compatibility for historical integrations but is absent from the primary Warehouse create form and material table. Warehouse owns quantity, custody and movement traceability; users do not re-declare accounting valuation here.
 - Material snapshot submit applies site balance usage but does not create warehouse movement by itself.

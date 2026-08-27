@@ -352,8 +352,8 @@ func (r *Repository) report(ctx context.Context, kind, userID, projectID, requir
 		return r.Query(ctx, fmt.Sprintf(`
 			WITH stock_totals AS (
 				SELECT sm.material_id, COALESCE(SUM(CASE
-					WHEN sm.movement_type IN ('receive','return_to_warehouse') THEN sm.quantity
-					WHEN sm.movement_type IN ('issue','loss') THEN -sm.quantity
+					WHEN sm.movement_type IN ('receive','return_to_warehouse','adjustment_in') THEN sm.quantity
+					WHEN sm.movement_type IN ('issue','loss','adjustment_out') THEN -sm.quantity
 					WHEN sm.movement_type='transfer' AND sm.target_warehouse_id IS NULL THEN -sm.quantity
 					ELSE 0
 				END),0) AS stock_quantity
