@@ -15,7 +15,15 @@
 - Release/deploy review package approved by the user.
 - Confirmed the pre-release source payload baseline at `0681148769f6624319d7d5e07188c9023e030a85`: clean local `main`, exact match with remote `origin/main`, two commits ahead of `v2026-08-27.1`, and no GitHub Actions run for this SHA because ordinary `main` pushes do not trigger workflows.
 - Confirmed the existing production baseline before release: `/gateway-health` returned HTTP 204, `/api/ready` returned HTTP 200 and the frontend root returned HTTP 200 with valid TLS.
-- Status: `TARGET`; validation, tag creation and deployment are still pending.
+- Added and pushed the release-tracking commit, producing final release revision `e19ed813f15ae66061de181184c037ba5cdf888d`; local `main` and remote `origin/main` matched that revision at tag creation, and the annotated release tag remains pinned to it.
+- Local CI-equivalent validation passed on the final release revision: backend format, all 132 migration checks, serial `go test -p 1 ./...` on fresh PostgreSQL 16/Redis 7, release-tag tests, production operator tooling, 289/289 frontend tests, frontend production build, 250 KiB gzip bundle budget, production Caddy image validation and whitespace checks.
+- The first local `npm ci` attempt was blocked by root-owned files in the global npm cache; the same locked dependency install and all frontend gates passed with a dedicated temporary cache. npm reported four non-gating dependency audit findings: one moderate and three high.
+- `make production-check` passed before release; the temporary PostgreSQL/Redis validation containers were stopped and automatically removed afterward.
+- Created and pushed annotated tag `v2026-08-27.2` from final revision `e19ed813f15ae66061de181184c037ba5cdf888d`.
+- GitHub Actions run `33046528516` completed successfully: tag/ancestry validation, the reusable validation job, digest-pinned backend/admin GHCR image builds, the fail-closed VPS deployment and public HTTPS verification all passed. GitHub emitted non-blocking Node 20 deprecation annotations for third-party actions running under Node 24.
+- Production migration reported `applied=1 skipped=131` and applied V132 `warehouse corrections`; Admin bootstrap returned `already_exists`, the new backend was healthy, the new Admin Caddy container started and the release script recorded `deployed release v2026-08-27.2`.
+- Independent post-deploy checks passed: HTTP redirected to HTTPS with 308; `/gateway-health` returned 204; `/api/ready` returned 200 with database `ok`; `/`, `/warehouse` and `/core-data/input` returned 200 over valid TLS.
+- Status: `TECHNICALLY VERIFIED`; `NOT UX ACCEPTED` because browser/UAT was explicitly out of scope.
 
 ## Global Warehouse navigation — 2026-08-27
 
