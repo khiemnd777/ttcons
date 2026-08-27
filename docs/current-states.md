@@ -1,5 +1,22 @@
 # Current States
 
+## Release v2026-08-27.2
+
+### Will be done
+
+- Release the approved Warehouse corrections/material editing, global Warehouse navigation and Partner catalog tab changes from the current clean `main` branch.
+- Run the full CI-equivalent validation on the final release revision: backend format, all migration checksum checks, serial backend tests on fresh PostgreSQL 16/Redis 7, release/operator tooling tests, frontend tests/build/bundle budget, production Caddy image validation and whitespace checks.
+- Run the production configuration preflight before creating the immutable annotated tag `v2026-08-27.2`.
+- Monitor the tag-triggered GitHub Actions workflow through validation, digest-pinned GHCR image builds, fail-closed VPS migration/bootstrap/deployment and public HTTPS verification.
+- Run independent post-deploy gateway, readiness and frontend checks; keep browser/UAT explicitly out of scope.
+
+### Done
+
+- Release/deploy review package approved by the user.
+- Confirmed the pre-release source payload baseline at `0681148769f6624319d7d5e07188c9023e030a85`: clean local `main`, exact match with remote `origin/main`, two commits ahead of `v2026-08-27.1`, and no GitHub Actions run for this SHA because ordinary `main` pushes do not trigger workflows.
+- Confirmed the existing production baseline before release: `/gateway-health` returned HTTP 204, `/api/ready` returned HTTP 200 and the frontend root returned HTTP 200 with valid TLS.
+- Status: `TARGET`; validation, tag creation and deployment are still pending.
+
 ## Global Warehouse navigation — 2026-08-27
 
 ### Will be done
