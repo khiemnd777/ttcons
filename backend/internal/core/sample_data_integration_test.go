@@ -21,12 +21,7 @@ func TestCreateCompletedSampleDataProjectIntegration(t *testing.T) {
 	service := NewService(repo, "sample-data-test-secret")
 	service.ConfigureUploads(t.TempDir(), defaultMaxUploadBytes)
 
-	var actorID, actorName string
-	if err := database.QueryRowContext(ctx, `
-		SELECT id::text,full_name FROM users WHERE email='developer@consflow.local' AND status='active'
-	`).Scan(&actorID, &actorName); err != nil {
-		t.Fatal(err)
-	}
+	actorID, actorName := setupSampleDataDeveloperActor(t, database)
 	pipeline, accountingBook := sampleDataIntegrationSources(t, ctx, service, actorID, actorName, true)
 	reprovisioned, err := service.CreateSampleDataUsers(ctx, SampleDataUserCreateRequest{PipelineTemplateID: pipeline.ID}, actorID, actorName)
 	if err != nil {
@@ -111,12 +106,7 @@ func TestCreatePlanningSampleDataAssignmentsIntegration(t *testing.T) {
 	service := NewService(repo, "sample-data-test-secret")
 	service.ConfigureUploads(t.TempDir(), defaultMaxUploadBytes)
 
-	var actorID, actorName string
-	if err := database.QueryRowContext(ctx, `
-		SELECT id::text,full_name FROM users WHERE email='developer@consflow.local' AND status='active'
-	`).Scan(&actorID, &actorName); err != nil {
-		t.Fatal(err)
-	}
+	actorID, actorName := setupSampleDataDeveloperActor(t, database)
 	pipeline, _ := sampleDataIntegrationSources(t, ctx, service, actorID, actorName, false)
 	blueprint, err := repo.LoadSampleDataBlueprint(ctx, pipeline.ID)
 	if err != nil {
@@ -364,6 +354,26 @@ func sampleDataIntegrationSources(t *testing.T, ctx context.Context, service *Se
 		t.Fatalf("test environment has no compatible accounting book: %#v", options.AccountingBooks)
 	}
 	return selectedPipeline, selectedBook
+}
+
+func setupSampleDataDeveloperActor(t *testing.T, database *sql.DB) (string, string) {
+	t.Helper()
+	ctx := context.Background()
+	actorID := newID()
+	actorName := "Sample Data Test Developer"
+	roleID := ensureRole(t, database, "developer", "Nhà phát triển hệ thống")
+	permissionID := ensurePermission(t, database, "sample_data.create", "Tạo dữ liệu công trình mẫu", "settings")
+	mustExec(t, database, `INSERT INTO role_permissions (role_id,permission_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, roleID, permissionID)
+	mustExec(t, database, `
+		INSERT INTO users (id,email,password_hash,full_name,status)
+		VALUES ($1,$2,'demo:pw',$3,'active')
+	`, actorID, "sample-data-developer-"+actorID+"@test.local", actorName)
+	mustExec(t, database, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2)`, actorID, roleID)
+	t.Cleanup(func() {
+		_, _ = database.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1`, actorID)
+		_, _ = database.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	return actorID, actorName
 }
 
 func cancelSampleDataIntegration(t *testing.T, database *sql.DB, idempotencyKey string) {

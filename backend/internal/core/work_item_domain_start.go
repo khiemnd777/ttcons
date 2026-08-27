@@ -233,7 +233,9 @@ func (r *Repository) startWorkItemForDomainMutationTx(
 			target_node.status AS run_node_status,
 			target_node.type AS run_node_type,
 			target_node.business_code AS run_node_business_code,
-			rs.business_code AS run_step_business_code
+			rs.business_code AS run_step_business_code,
+			rs.surface_kind,
+			rs.domain_action_key
 		FROM work_items wi
 		LEFT JOIN pipeline_runs pr ON pr.id=wi.pipeline_run_id
 		LEFT JOIN pipeline_run_nodes current_node ON current_node.id=pr.current_node_id

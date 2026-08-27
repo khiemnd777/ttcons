@@ -422,6 +422,7 @@ func TestConstructionWorkspaceLinksDailyReportThroughChecksActionsAndResolution(
 	ctx := context.Background()
 	service := NewService(NewRepository(db), "test-secret")
 	fixture := setupWorkItemFlowFixture(t, db, false)
+	bindWorkItemDomainExecutionContext(t, db, fixture, "construction", "construction_execution", "generic", "")
 
 	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{
 		EvidenceType: "photo",
@@ -671,7 +672,8 @@ func TestPlanningConstructionHandoffIsIdempotentAndTracksCheckResolution(t *test
 	}, fixture.workerID, "Worker"); err != nil {
 		t.Fatal(err)
 	}
-	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='ready'`, 1, workIDs[0])
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='in_progress' AND started_at IS NOT NULL`, 1, workIDs[0])
+	assertCount(t, db, `SELECT COUNT(*) FROM work_item_activities WHERE work_item_id=$1 AND activity_type='started'`, 1, workIDs[0])
 
 	if _, err = service.CompleteConstructionCheck(ctx, checkIDs[0], ConstructionCheckCompleteRequest{
 		Result: "pass", Note: "Đạt", EvidenceIDs: []string{evidenceIDs[0]},

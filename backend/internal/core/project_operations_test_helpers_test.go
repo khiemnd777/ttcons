@@ -243,6 +243,37 @@ func setupWorkItemFlowFixture(t *testing.T, db *sql.DB, documentRequired bool) w
 	return workItemFlowFixture{projectID: projectID, workerID: workerID, pmID: pmID, itemID: itemID}
 }
 
+func bindWorkItemDomainExecutionContext(t *testing.T, db *sql.DB, fixture workItemFlowFixture, nodeType, nodeBusinessCode, surfaceKind, actionKey string) {
+	t.Helper()
+	runID := newID()
+	nodeID := newID()
+	stepID := newID()
+	mustExec(t, db, `
+		INSERT INTO pipeline_runs (id,project_id,template_id,status,engine_version)
+		VALUES ($1,$2,'40000000-0000-0000-0000-000000000021','in_progress',2)
+	`, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (
+			id,run_id,project_id,name,type,business_code,order_index,responsible_role_ids,status,started_at
+		) VALUES ($1,$2,$3,'Domain mutation test node',$4,NULLIF($5,''),1,'["Đội thi công"]'::jsonb,'in_progress',now())
+	`, nodeID, runID, fixture.projectID, nodeType, nodeBusinessCode)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$2 WHERE id=$1`, runID, nodeID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_steps (
+			id,run_node_id,project_id,name,step_type,required_role_ids,required_permission,
+			checklist_required,order_index,status,surface_kind,domain_action_key,business_code
+		) VALUES (
+			$1,$2,$3,'Domain mutation test step','task','["Đội thi công"]'::jsonb,'operation.report',
+			false,1,'ready',NULLIF($4,''),NULLIF($5,''),$6
+		)
+	`, stepID, nodeID, fixture.projectID, surfaceKind, actionKey, "test."+stepID)
+	mustExec(t, db, `
+		UPDATE work_items
+		SET pipeline_run_id=$2,run_node_id=$3,run_step_id=$4
+		WHERE id=$1
+	`, fixture.itemID, runID, nodeID, stepID)
+}
+
 type clientOfficialWorkflowFixture struct {
 	projectID    string
 	actorID      string

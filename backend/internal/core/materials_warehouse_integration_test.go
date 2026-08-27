@@ -124,6 +124,7 @@ func TestMaterialBeforeAfterSnapshotAppliesSiteBalanceWithoutStockMovement(t *te
 	repo := NewRepository(db)
 	service := NewService(repo, "test-secret")
 	fixture := setupWorkItemFlowFixture(t, db, false)
+	bindWorkItemDomainExecutionContext(t, db, fixture, "warehouse", "warehouse_material_snapshot", "material_snapshot", "warehouse.material_snapshot")
 
 	warehouseID := newID()
 	materialID := newID()
@@ -261,6 +262,7 @@ func TestSiteSurplusHandlingCreatesStockMovementAndPartialStatus(t *testing.T) {
 	repo := NewRepository(db)
 	service := NewService(repo, "test-secret")
 	fixture := setupWorkItemFlowFixture(t, db, false)
+	bindWorkItemDomainExecutionContext(t, db, fixture, "warehouse", "warehouse_surplus_handling", "surplus_handling", "warehouse.surplus_handle")
 
 	suffix := newID()
 	surplusPermissionID := ensurePermission(t, db, "warehouse.surplus_handle", "Xử lý vật tư dư", "warehouse")
@@ -497,6 +499,7 @@ func TestIncomingAcceptanceSubmitDoesNotCreateStockMovement(t *testing.T) {
 	repo := NewRepository(db)
 	service := NewService(repo, "test-secret")
 	fixture := setupWorkItemFlowFixture(t, db, false)
+	bindWorkItemDomainExecutionContext(t, db, fixture, "acceptance", "incoming_acceptance", "incoming_acceptance", "acceptance.incoming_material")
 
 	warehouseID := newID()
 	materialID := newID()

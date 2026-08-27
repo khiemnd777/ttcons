@@ -389,6 +389,7 @@ func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
 	repo := NewRepository(db)
 	service := NewService(repo, "test-secret")
 	fixture := setupWorkItemFlowFixture(t, db, false)
+	bindWorkItemDomainExecutionContext(t, db, fixture, "acceptance", "outgoing_acceptance", "outgoing_acceptance", "source.final_acceptance_ready")
 
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM handover_records WHERE project_id=$1`, fixture.projectID)

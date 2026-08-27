@@ -706,6 +706,7 @@ func TestConstructionVariationProposalStartsAtQSAndTracesAction(t *testing.T) {
 	ctx := context.Background()
 	service := NewService(NewRepository(db), "test-secret")
 	fixture := setupWorkItemFlowFixture(t, db, false)
+	bindWorkItemDomainExecutionContext(t, db, fixture, "construction", "construction_execution", "generic", "")
 	contractID := newID()
 	mustExec(t, db, `
 		INSERT INTO contracts (
@@ -932,6 +933,7 @@ func TestSubcontractorChecklistReconciliationPersistsAuditAndValidatesReferences
 	repo := NewRepository(db)
 	service := NewService(repo, "test-secret")
 	fixture := setupWorkItemFlowFixture(t, db, false)
+	bindWorkItemDomainExecutionContext(t, db, fixture, "acceptance", "subcontractor_acceptance", "subcontractor_reconciliation", "subcontractor.reconcile_checklist")
 
 	boqItem, err := service.CreateBOQ(ctx, fixture.projectID, Record{
 		"category":            "Trần",
@@ -1227,6 +1229,7 @@ func TestOwnerClientChecklistReconciliationPersistsAuditAndValidatesAcceptance(t
 	repo := NewRepository(db)
 	service := NewService(repo, "test-secret")
 	fixture := setupWorkItemFlowFixture(t, db, false)
+	bindWorkItemDomainExecutionContext(t, db, fixture, "acceptance", "final_acceptance", "owner_client_reconciliation", "owner.reconcile_acceptance")
 
 	acceptanceID := newID()
 	mustExec(t, db, `
