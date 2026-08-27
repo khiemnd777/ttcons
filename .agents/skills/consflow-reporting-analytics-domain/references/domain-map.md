@@ -2,7 +2,7 @@
 
 ## Owners
 
-- Ordinary project-finance report: `frontend/src/modules/project-finance/ProjectFinancePage.tsx` with shared `AsyncProjectPicker.tsx`/`ProjectScopeActions.tsx`; backend `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, with project-option paging shared internally through report handler/service/repository helpers.
+- Accounting Handoff has no ordinary finance report. Its source queue lives in `frontend/src/modules/project-finance/AccountingHandoffPage.tsx` and backend `accounting_handoff.go`; the old project-finance management report remains visible only when the compatibility workspace returns `mode=legacy`.
 - Frontend modules: `frontend/src/modules/dashboard`, compatibility-named statistics implementation under `frontend/src/modules/reports`, authored reports under `frontend/src/modules/work-reports`, `frontend/src/modules/accounting/AccountingBooksPanel.tsx`, `frontend/src/modules/accounting/CashflowPanel.tsx`
 - Statistics workspace/panels: `ReportsPage.tsx` exports `StatisticsPage`, `reportRegistry.ts`, `ReportFilters.tsx`, `OperationalReportPanel.tsx`; authored work-report register/detail: `WorkReportsPage.tsx`; legacy professional panels remain `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`, `CashflowPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
@@ -11,7 +11,7 @@
 
 ## Routes
 
-- Project-management finance: `/project-finance/projects?search&cursor&limit&selected_id`, `/projects/:id/project-finance` and `/projects/:id/project-finance/export`.
+- Accounting Handoff: `/project-finance/projects?search&cursor&limit&selected_id` and compatibility workspace `/projects/:id/project-finance`; legacy-only project-finance export remains available to pinned old projects.
 - Dashboard: `/reports/dashboard?period_type&year&period_no` and `/reports/dashboard/projects?search&status&sort&direction&cursor&limit`
 - Statistics options: `/statistics/options?search&cursor&limit&selected_id` returns only non-cancelled projects inside actor scope as `{projects:{items,has_more,next_cursor,selected}}`; limit defaults to 20 and is capped at 50.
 - Statistics aggregates: `/statistics/projects`, `/statistics/warehouse`, `/statistics/procurement`, `/statistics/staff`; each accepts optional `project_id`, search/sort/direction and has `/export?format=pdf|xlsx|csv`. Professional accounting has no `/statistics/accounting` route.
@@ -34,10 +34,10 @@
 
 - `/statistics` exposes project, procurement, warehouse and staff aggregates only. Legacy accounting/cashflow/tax/profit APIs stay available for Dashboard/admin/history support but their panels are not registered in Statistics.
 - `/reports` means an authored work-report register: a worker sends a source-backed report to an eligible manager, the recipient either requests changes with a required comment or acknowledges it, and every send/resend produces an immutable revision snapshot plus append-only event. Recipient detail resolves report content and evidence from the same selected revision; acknowledgement remains receipt/read confirmation, never quality acceptance, quantity confirmation or Work Item completion. The initial adapter is `operation_daily_reports`; this does not create a second construction-content editor.
-- Project-management finance reporting lives under `Tài chính công trình`: eligible main-client milestone revenue, confirmed material-purchase cost and provisional profit. The UI/API must carry the incomplete-cost-scope warning and redact management monetary totals without `project_finance.report_view`.
-- Project-finance CSV serializes the same material-cost rows returned by the workspace; it must not query legacy AP/AR/payment/invoice/ledger tables as a substitute.
-- Global Project Finance keeps draft and applied project scope separate: only the explicit Apply action writes `project`, while Reset removes it and returns to the no-project state. Workspace data, create/action context and CSV always use the applied project ID; the project-scoped route remains fixed to its route ID.
-- Statistics and Finance share asynchronous picker/page presentation and internal request/cursor mechanics, not permission routes. Statistics reads `/statistics/options`; Finance reads `/project-finance/projects`, which additionally filters every list and selected lookup by `project_finance.view`. Neither surface eagerly loads all projects.
+- Accounting Handoff deliberately exposes no cost/revenue/profit/VAT/cashflow calculation or export. Summary values are dossier counts, and any source amount is read-only reference context. MISA remains authoritative for accounting reports.
+- Legacy mode alone retains the former project-finance CSV/report semantics and permission redaction; it must not query legacy AP/AR/payment/invoice/ledger tables as a substitute for its material-cost source.
+- Global Accounting Handoff keeps draft and applied project scope separate: only Apply writes `project`, while Reset removes it and returns to the no-project state. Workspace data and actions always use the applied project ID; the project-scoped route remains fixed to its route ID.
+- Statistics and Accounting Handoff share asynchronous picker/page presentation and internal request/cursor mechanics, not permission routes. Statistics reads `/statistics/options`; Accounting Handoff reads `/project-finance/projects`, which filters by `accounting_handoff.view` while retaining `project_finance.view` for legacy compatibility. Neither surface eagerly loads all projects.
 - Statistics uses `statistics.view` for list/options and `statistics.export` for export; work reports use distinct `work_report.view|create|submit|review|export|manage`. `report.view` remains the Dashboard/legacy compatibility permission and is not repurposed as authored-report access.
 - Frontend `/statistics` and `/statistics/:reportKey` expose only definitions allowed by `statistics.view`; the base/invalid/unavailable key redirects to the first visible statistic. Exactly one panel is lazy-mounted. `/reports` is guarded by `work_report.view`; author, recipient and project-scoped manager checks are repeated server-side per record.
 - `/statistics/options`, list results and exports use the same actor project scope. `project_id` and option `selected_id` are UUID-validated before repository access. Search and controlled sort/direction are included in the export query and validated against format-specific columns.

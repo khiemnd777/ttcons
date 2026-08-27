@@ -2,8 +2,8 @@
 
 ## Owners
 
-- Ordinary project-finance UI: `frontend/src/modules/project-finance/ProjectFinancePage.tsx`, shared `frontend/src/modules/_shared/AsyncProjectPicker.tsx` and `ProjectScopeActions.tsx`, routed at `/accounting` and `/projects/:id/accounting`
-- Ordinary project-finance backend: `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, `types_project_finance.go`; project-option parsing/paging/search helpers live in `handlers_reports.go`, `service_reports.go` and `repository_reports.go`
+- Ordinary Accounting Handoff UI: `frontend/src/modules/project-finance/AccountingHandoffPage.tsx`, compatibility wrapper/legacy UI in `ProjectFinancePage.tsx`, shared `frontend/src/modules/_shared/AsyncProjectPicker.tsx` and `ProjectScopeActions.tsx`, routed at `/accounting` and `/projects/:id/accounting`
+- Accounting Handoff backend: `accounting_handoff.go`, `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, `types_project_finance.go`; project-option parsing/paging/search helpers live in `handlers_reports.go`, `service_reports.go` and `repository_reports.go`
 - Frontend modules: `frontend/src/modules/accounting` (`AccountingPage.tsx`, `AccountingBooksPanel.tsx`, `ManualJournalDialog.tsx`, `TaxWorkspace.tsx`, `AccountingCreateDialog.tsx`, `AccountingDetailDialog.tsx`, `CashflowPanel.tsx`), `frontend/src/modules/debt`, `frontend/src/modules/contracts`, `frontend/src/modules/reports`, and the permission-gated cashflow projection in `frontend/src/modules/dashboard/DashboardSummaryPanels.tsx`
 - Debt panels: `InputInvoicePanel.tsx`, `OutputInvoicePanel.tsx`, `InputPaymentPlanPanel.tsx`, `OutputBillingPlanPanel.tsx`, `PayableReconciliationPanel.tsx`, `ReceivableReconciliationPanel.tsx`
 - Report panels: `CashflowPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`
@@ -13,7 +13,7 @@
 
 ## Routes
 
-- Ordinary project finance: `/project-finance/projects?search&cursor&limit&selected_id`, `/projects/:id/project-finance`, `/projects/:id/project-finance/options`, `/projects/:id/project-finance/export`, create material-cost/cash-request routes and record action routes. The global project-options route requires `project_finance.view` and applies both actor project scope and per-project permission to list/search/cursor/selected resolution.
+- Ordinary Accounting Handoff: `/project-finance/projects?search&cursor&limit&selected_id`, compatibility workspace `/projects/:id/project-finance`, `POST /projects/:id/accounting-handoffs`, and `POST /accounting-handoffs/:id/:action`. The global project-options route accepts `accounting_handoff.view` while retaining `project_finance.view` for pinned legacy projects, and applies actor project scope plus per-project permission to list/search/cursor/selected resolution. Legacy options/export/material-cost/cash-request routes remain backend-compatible only.
 - The routes below are legacy professional-accounting support. They remain backend-compatible but are not ordinary Accounting/Reports navigation for non-admin roles.
 - Budgets/payments: `/projects/:id/budget`, `/budgets/:id/approve`, `/payments`, `/payments/:id/approve|reverse`
 - Ledger: `/accounting/accounts`, `/accounting/periods`, `/accounting/journal-entries`, `/projects/:id/accounting/journal-entries`, `/accounting/journal-entries/:id/reverse`
@@ -27,7 +27,8 @@
 
 ## Tables And Migrations
 
-- Ordinary management records: `project_material_costs`, `project_cash_requests`; migration `V83`.
+- Ordinary handoff records: `accounting_handoffs`; migration `V131`. Source records remain `procurement_requests` and `contract_milestones`.
+- Legacy management records: `project_material_costs`, `project_cash_requests`; migration `V83`.
 - `accounting_budgets`, `payables`, `receivables`, `payments`, `advance_requests`, `payment_allocations`, `receipt_allocations`
 - `accounting_books`, `accounting_accounts`, `accounting_periods`, `journal_entries`, `journal_entry_lines`, `accounting_posting_rules`
 - `budget_movements`, `payment_reversals`, `accounting_backfill_issues`
@@ -36,19 +37,20 @@
 - `payable_payment_schedules`, `receivable_payment_schedules`, `client_advance_receipts`
 - `contracts`, `contract_versions`, `contract_milestones`, `contract_variations`, `contract_retentions`, `contract_retention_releases`
 - Related documents: `documents`, `evidence_records`, `partners`
-- Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`, `V70`, `V71`, `V73`-`V83`; existing V90 project search/order indexes support the Finance picker without a new migration.
+- Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`, `V70`, `V71`, `V73`-`V83`, `V131`; V90 project search/order indexes support the shared project picker.
 
 ## Invariants
 
-- Tài chính công trình remains the canonical management-finance workspace. Work-item `execution_target` links may preserve existing source tabs and add presentation-only `?task=` context; they do not create a parallel payable/receivable/cash ledger, grant financial permission, post a journal or mark an external payment processed.
-- Product boundary: Consflow ordinary users manage workflow and project-management finance only. MISA owns professional bookkeeping/tax outside Consflow; there is no MISA integration or synchronization.
+- `Bàn giao kế toán` is the canonical ordinary workspace. Work-item `execution_target` links may add presentation-only `?task=` context; they do not create a parallel payable/receivable/cash ledger, grant permission, post a journal, record payment or change a source record.
+- Product boundary: Consflow ordinary users prepare and hand off source dossiers only. MISA is the system of record for bookkeeping, tax, payment and authoritative accounting values; this feature has no MISA synchronization. Any displayed source amount is explicitly reference-only.
 - Global `/accounting` uses a draft searchable project choice and applies it only through the `project` query parameter after explicit confirmation. It must not eagerly load `/projects` or auto-select the first project; Reset removes the applied project and returns to the no-project empty state. Workspace reads, creates, actions and CSV use only the applied ID. `/projects/:id/accounting` remains fixed to the route project and never renders the global selector.
-- Finance project choices come from `/project-finance/projects`, not `/reports/options`. Search is server-side by code/name with bounded cursor pages; list rows and direct `selected_id` resolution apply identical actor-scope, non-cancelled and `project_finance.view` checks, so an unauthorized selected project returns `selected: null` without leaking its name.
-- Only `project_material_costs.status='confirmed'` contributes to management cost. Draft/submitted/needs-changes records remain visible blockers but do not alter provisional profit.
-- Provisional management profit is eligible main-client milestone revenue minus confirmed material-purchase cost. It must always disclose that labor, subcontractor, equipment, overhead, management cost and tax are excluded.
-- A project material cost must link at least one same-project procurement, incoming-acceptance, stock-document or document source. Cash-request generic source IDs are type-whitelisted and same-project validated.
-- `project_cash_requests` is an internal request/handoff workflow. `processed` means Accounting handled the dossier in the external professional system; it is not proof of cash movement, double-entry posting, invoice issuance or tax filing in Consflow.
-- Management report totals and CSV require `project_finance.report_view`; workspace responses redact management monetary totals without it. Operational transitions are actor-audited atomically and `needs_changes` requires a reason.
+- Project choices come from `/project-finance/projects`, not `/reports/options`. Search is server-side by code/name with bounded cursor pages; list rows and direct `selected_id` resolution apply identical actor-scope, non-cancelled and Accounting Handoff-or-legacy permission checks, so an unauthorized selected project returns `selected: null` without leaking its name.
+- New payable-direction candidates are same-project procurement requests at `approved|ordered|partially_received|received`; handoff readiness additionally requires an ordered-or-later status, supplier and PO number. New receivable-direction candidates are main-client contract milestones at `active|eligible|obligation_opened|paid`; acceptance-required milestones fail closed until the linked approved acceptance result is pass or conditional pass.
+- Procurement acceptance counts, stock receipt counts and milestone acceptance are readiness evidence on the canonical source candidate. They do not create extra handoff rows or accounting values.
+- `accounting_handoffs` has one row per project/source. First handoff persists an immutable source snapshot and enters `handed_off`; Accounting may `acknowledged` or `returned`, with return reason required; only `returned` may be handed off again, refreshing the snapshot while preserving audit history. Optional external reference stores the MISA/dossier reference only.
+- New workspace summary is a count projection only. It must not calculate cost, revenue, profit, VAT, budget consumption, cashflow, payable/receivable balance or export management finance.
+- A true-empty Accounting Handoff workspace explains the two canonical source paths and exposes only permission-aware navigation to the same project's Procurement and Contracts pages. Filter/search-empty remains distinct. The empty state never creates a manual accounting dossier, bypasses source readiness, or adds a dependency on an Accounting Work Item.
+- Active Rev9 uses Accounting Handoff mode. Active Rev8 and projects with live `project_material_costs` or `project_cash_requests` stay in legacy mode, preserving old records, status actions, reports and permissions without migrating their meaning.
 - Legacy accounting, Debt and finance-report backends remain immutable/history-compatible and admin-only by ordinary RBAC. Do not derive new management material cost or cash-request completion from legacy AP/AR/payment/invoice/ledger tables.
 - AP/AR records reconcile to invoices, payments/receipts, advances, settlements, and source documents.
 - Every posted journal has at least two lines and equal debit/credit totals. The deferred balance trigger and open-period trigger enforce this at transaction commit; posted headers/lines are immutable and are corrected only through a linked reversal journal.
@@ -86,7 +88,7 @@
 - A milestone can open AP/AR only after the contract is active and the milestone is eligible; acceptance-required milestones must reference an approved pass/conditional-pass acceptance.
 - Retention held at milestone obligation time is reconciled through append-only release rows; each release creates a traceable AP/AR source record and cannot exceed outstanding retention.
 - The contract workspace presents milestone obligations as Vietnamese payable/receivable labels without exposing raw obligation identifiers; eligibility, obligation creation and retention release still use the existing permission and server transition gates.
-- Handover readiness requires zero unconfirmed project material costs and zero cash requests outside `processed|cancelled` for Rev7 and older runtimes. Rev8 alone moves those two facts to the final `source.project_finance_close_ready` work-package gate, after physical handover; it never auto-confirms, cancels, posts or reconciles a finance record. Older `ap_reconciliation` and `ar_reconciliation` checklist codes remain compatibility aliases and never force-close legacy financial records.
+- Rev9 final closure `source.accounting_handoff_close_ready` requires physical handover plus every current source candidate `acknowledged`; no-candidate is ready once physical handover is complete. It never auto-acknowledges, posts, pays, taxes or reconciles a source. Rev8 preserves `source.project_finance_close_ready`; Rev7 and older preserve their combined legacy handover rule. Older checklist codes remain compatibility aliases only.
 
 ## Developer Sample Data
 
@@ -99,10 +101,10 @@
 - Pair with commercial/procurement when payables, vendor invoices, advances, payment schedules, or procurement-linked source documents change.
 - Pair with quality/acceptance/handover when receivables, output invoices, client billing, or handover readiness depends on acceptance state.
 - Pair with admin/governance when partner catalog, tax codes, permissions, or audit semantics affect financial records.
-- Every editable monetary value in accounting, project finance, AP/AR, invoices, schedules, advances, settlements, taxes and journal debit/credit uses shared `CurrencyInput` or semantic `currency`; native/generic number fields remain reserved for non-money numerics. Preserve explicit currency, negative adjustment rules, decimal precision and the existing numeric API payload.
+- Every editable monetary value in legacy accounting, legacy project finance, AP/AR, invoices, schedules, advances, settlements, taxes and journal debit/credit uses shared `CurrencyInput` or semantic `currency`; native/generic number fields remain reserved for non-money numerics. Accounting Handoff exposes no editable monetary field; source amounts are read-only reference context.
 - V102's lean workflow forms do not post or reconcile invoices. `client_output_invoice_issue` and `client_input_invoice_closure` V2 require only an operational invoice status by default; number and semantic VND currency amount become visible and required only for `issued` or `received`. Canonical invoice/AR/AP routes, files, transitions, journals, tax and reconciliation remain separate and authoritative.
 - Rev7 removes duplicated invoice number/amount/status, payment period/amount, received/paid amount and closure-check capture from workflow forms. `source.*`, `receivable.issue_invoice`, `payable.verify_input_invoice`, finance scaffold and handover gates read canonical AP/AR, verified/issued invoice, allocation and readiness records and fail closed before work-item completion; they never post accounting entries from form answers.
-- Rev8 removes AP/AR/invoice/collection steps from the technical critical path. Ordinary `project_material_costs` and `project_cash_requests` remain the only project-finance closure facts; the 21-step template neither recreates legacy debt scaffolds nor treats workflow-form answers as financial postings.
+- Rev8 removes AP/AR/invoice/collection steps from the technical critical path and retains `project_material_costs`/`project_cash_requests` as legacy closure facts. Rev9 keeps the same 21-work-package topology but replaces only the final close gate with source-backed Accounting Handoff; neither revision treats workflow-form answers as financial postings.
 
 ## Golden Sample
 

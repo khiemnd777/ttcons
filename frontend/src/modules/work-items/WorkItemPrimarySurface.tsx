@@ -318,8 +318,8 @@ function configuredPrimarySurface(item: WorkItem): WorkItemPrimarySurfaceDefinit
     },
     finance: {
       kind: 'finance',
-      title: 'Tài chính công trình',
-      description: 'Ghi nhận chi phí mua vật tư, lập và theo dõi hồ sơ đề nghị thu/chi nội bộ trước khi bàn giao Kế toán xử lý trên hệ thống chuyên môn.',
+      title: 'Bàn giao kế toán',
+      description: 'Kiểm tra readiness của hồ sơ nghiệp vụ và theo dõi bàn giao/tiếp nhận với Kế toán; nghiệp vụ kế toán tiếp tục xử lý trên MISA.',
     },
     handover: {
       kind: 'handover',

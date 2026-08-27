@@ -1,6 +1,6 @@
 TRUNCATE TABLE
   audit_logs,
-  project_cash_requests, project_material_costs,
+  accounting_handoffs, project_cash_requests, project_material_costs,
   activity_mentions, activity_read_states,
   receipt_allocations, client_advance_receipts, receivable_payment_schedules,
   payment_allocations, payable_payment_schedules,
@@ -54,7 +54,7 @@ INSERT INTO roles (id, name, display_name, description, system_role) VALUES
 ('20000000-0000-0000-0000-000000000002','director','Giám đốc','Duyệt ngân sách và quyết định vượt hạn mức',true),
 ('20000000-0000-0000-0000-000000000003','pm','PM','Quản lý công trình và pipeline',true),
 ('20000000-0000-0000-0000-000000000004','qs','QS','Bóc tách khối lượng, BOQ và kiểm soát chi phí',true),
-('20000000-0000-0000-0000-000000000005','accounting','Kế toán','Ghi nhận chi phí vật tư và theo dõi hồ sơ thu/chi công trình',true),
+('20000000-0000-0000-0000-000000000005','accounting','Kế toán','Tiếp nhận hồ sơ công trình và xử lý nghiệp vụ kế toán trên MISA',true),
 ('20000000-0000-0000-0000-000000000006','procurement','Mua hàng','Phụ trách yêu cầu mua và nhà cung cấp',true),
 ('20000000-0000-0000-0000-000000000007','warehouse','Thủ kho','Nhập xuất tồn và vật tư dư',true),
 ('20000000-0000-0000-0000-000000000008','supervisor','Giám sát','Báo cáo thi công và hiện trường',true),
@@ -89,6 +89,7 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('accounting.view','Xem kế toán','accounting'),('accounting.budget_view','Xem ngân sách','accounting'),('accounting.budget_approve','Duyệt ngân sách','accounting'),('accounting.payable_view','Xem phải trả','accounting'),('accounting.payable_approve','Duyệt phải trả','accounting'),('accounting.receivable_view','Xem phải thu','accounting'),('accounting.receivable_approve','Duyệt phải thu','accounting'),('accounting.payment_create','Tạo thanh toán','accounting'),('accounting.payment_approve','Duyệt thanh toán','accounting'),
 ('accounting.journal_view','Xem sổ kế toán','accounting'),('accounting.journal_post','Ghi sổ chứng từ kế toán','accounting'),('accounting.journal_reverse','Lập bút toán đảo','accounting'),('accounting.period_close','Khóa kỳ kế toán','accounting'),('accounting.period_reopen','Mở lại kỳ kế toán','accounting'),('accounting.tax_view','Xem sổ thuế','accounting'),('accounting.tax_manage','Quản lý thuế','accounting'),
 ('project_finance.view','Xem tài chính công trình','project_finance'),('project_finance.cost_create','Ghi nhận chi phí vật tư','project_finance'),('project_finance.cost_review','Xác nhận chi phí vật tư','project_finance'),('project_finance.request_create','Lập đề nghị thu/chi','project_finance'),('project_finance.request_approve','Duyệt đề nghị thu/chi','project_finance'),('project_finance.process','Xác nhận bàn giao kế toán','project_finance'),('project_finance.report_view','Xem báo cáo quản trị công trình','project_finance'),
+('accounting_handoff.view','Xem bàn giao kế toán','accounting_handoff'),('accounting_handoff.submit','Bàn giao hồ sơ kế toán','accounting_handoff'),('accounting_handoff.acknowledge','Xác nhận hồ sơ kế toán','accounting_handoff'),
 ('contract.view','Xem hợp đồng','contract'),('contract.create','Tạo và sửa hợp đồng','contract'),('contract.review','Review hợp đồng','contract'),('contract.approve','Duyệt hợp đồng','contract'),('contract.sign','Ký và kích hoạt hợp đồng','contract'),('contract.milestone_manage','Quản lý milestone hợp đồng','contract'),('contract.retention_release','Giải phóng giữ lại','contract'),
 ('contract.dispatch','Gửi hồ sơ hợp đồng giấy','contract'),('contract.scan_manage','Quản lý bản scan hợp đồng','contract'),('contract.variation.propose','Đề xuất phát sinh thi công','contract'),('contract.variation_qs_review','QS rà soát phát sinh','contract'),('contract.variation_purchase','Mua hàng xử lý phát sinh','contract'),
 ('catalog.view','Xem dữ liệu lõi','catalog'),('catalog.manage','Quản lý dữ liệu lõi','catalog'),
@@ -128,6 +129,20 @@ JOIN permissions permission ON
     'work_report.view','work_report.create','work_report.submit','work_report.review',
     'work_report.export','work_report.manage'
   ))
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id,permission_id)
+SELECT role.id,permission.id
+FROM roles role
+JOIN permissions permission ON
+  (role.name IN ('admin','developer') AND permission.key LIKE 'accounting_handoff.%') OR
+  (role.name='accounting' AND permission.key IN (
+    'accounting_handoff.view','accounting_handoff.submit','accounting_handoff.acknowledge'
+  )) OR
+  (role.name IN ('pm','procurement') AND permission.key IN (
+    'accounting_handoff.view','accounting_handoff.submit'
+  )) OR
+  (role.name IN ('director','qs') AND permission.key='accounting_handoff.view')
 ON CONFLICT DO NOTHING;
 
 DELETE FROM role_permissions role_permission

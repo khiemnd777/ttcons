@@ -26,6 +26,7 @@ import {
   workItemAutoStartedNotice,
   type WorkItemMutationResult,
 } from '../work-items/workItemMutationContext';
+import { AccountingHandoffPage } from './AccountingHandoffPage';
 
 type FinanceTab = 'overview' | 'tasks' | 'costs' | 'requests' | 'report';
 type FinanceRow = Record<string, any>;
@@ -39,6 +40,20 @@ const tabs: Array<{ value: FinanceTab; label: string }> = [
 ];
 
 export function ProjectFinancePage({ global = false }: { global?: boolean }) {
+  const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const projectId = id ?? (global ? searchParams.get('project') ?? '' : '');
+  const mode = useQuery({
+    queryKey: ['project-finance', projectId],
+    queryFn: () => get<ProjectFinanceWorkspace>(`/projects/${projectId}/project-finance`),
+    enabled: Boolean(projectId),
+  });
+  if (projectId && mode.isLoading) return <div className="rounded-lg border border-line bg-white p-8 text-sm text-slate-600">Đang tải hồ sơ bàn giao kế toán...</div>;
+  if (mode.data?.mode === 'legacy') return <LegacyProjectFinancePage global={global} />;
+  return <AccountingHandoffPage global={global} />;
+}
+
+function LegacyProjectFinancePage({ global = false }: { global?: boolean }) {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab') as FinanceTab | null;

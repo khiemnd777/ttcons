@@ -13,8 +13,6 @@ import { Dialog } from '../../components/Dialog';
 import { StatCard } from '../../components/StatCard';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { ProjectSelector } from '../_shared/ProjectSelector';
-import { EnumChip } from '../../components/EnumChip';
-import { enumOptions } from '../../lib/utils/status';
 import { partnerOptions } from '../core-data/partnerUtils';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { workItemDetailPath } from '../work-items/workItemNavigation';
@@ -51,7 +49,6 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
-  const [budgetFilter, setBudgetFilter] = useState('all');
   const [viewId, setViewId] = useState('');
   const [editRecord, setEditRecord] = useState<ProcurementRow | null>(null);
   const queryClient = useQueryClient();
@@ -80,13 +77,12 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
     const matchesQuery = !query.trim() || text.includes(query.trim().toLocaleLowerCase('vi-VN'));
     const matchesStatus = statusFilter === 'all' || row.status === statusFilter;
     const matchesSupplier = supplierFilter === 'all' || row.supplier_partner_id === supplierFilter;
-    const matchesBudget = budgetFilter === 'all' || row.budget_status === budgetFilter;
     const awaitingStock = numeric(row.accepted_quantity) > numeric(row.stock_received_quantity) + 0.000001;
     const matchesView = view === 'all'
       || (view === 'delivery' && ['ordered', 'partially_received', 'received'].includes(row.status))
       || (view === 'attention' && (!['received'].includes(row.status) || awaitingStock));
-    return matchesQuery && matchesStatus && matchesSupplier && matchesBudget && matchesView;
-  }), [budgetFilter, query, rows, statusFilter, supplierFilter, view]);
+    return matchesQuery && matchesStatus && matchesSupplier && matchesView;
+  }), [query, rows, statusFilter, supplierFilter, view]);
   const supplierOptions = partnerOptions(partners.data ?? [], ['supplier', 'service_provider', 'other']);
   const waitingApproval = rows.filter((row) => ['waiting_approval', 'submitted'].includes(row.status)).length;
   const waitingOrder = rows.filter((row) => row.status === 'approved').length;
@@ -95,8 +91,6 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
 
   const fields = (record: ProcurementRow) => [
     { name: 'title', label: 'Tiêu đề', defaultValue: record.title ?? '', required: true },
-    { name: 'total_estimated_amount', label: 'Giá trị dự kiến', type: 'currency' as const, defaultValue: record.total_estimated_amount ?? 0, min: 0 },
-    { name: 'budget_status', label: 'Ngân sách', type: 'select' as const, defaultValue: record.budget_status ?? 'within_budget', required: true, options: enumOptions('budget_status', ['within_budget', 'budget_exceeded']) },
     { name: 'supplier_partner_id', label: 'Nhà cung cấp', type: 'select' as const, defaultValue: record.supplier_partner_id ?? '', options: supplierOptions, helperText: 'Yêu cầu sinh từ BOQ đã được tách theo nhà cung cấp được chọn.' },
     { name: 'order_reference', label: 'Số đơn đặt hàng / PO', defaultValue: record.order_reference ?? '', helperText: 'Bắt buộc trước khi ghi nhận đã đặt hàng.' },
     { name: 'expected_delivery_date', label: 'Ngày giao dự kiến', type: 'date' as const, defaultValue: record.expected_delivery_date?.slice?.(0, 10) ?? '', helperText: 'Bắt buộc trước khi ghi nhận đã đặt hàng.' },
@@ -124,11 +118,10 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
         <ViewButton active={view === 'delivery'} onClick={() => setView('delivery')}>Đang giao & nghiệm thu</ViewButton>
         <ViewButton active={view === 'all'} onClick={() => setView('all')}>Tất cả</ViewButton>
       </div>
-      <div className="grid gap-2 pt-3 md:grid-cols-[minmax(220px,1fr)_180px_180px_170px]">
+      <div className="grid gap-2 pt-3 md:grid-cols-[minmax(220px,1fr)_180px_180px]">
         <label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className="w-full rounded-md border border-line py-2 pl-9 pr-3 text-sm" placeholder="Tìm mã, yêu cầu, nhà cung cấp..." value={query} onChange={(event) => setQuery(event.target.value)} /></label>
         <select className="rounded-md border border-line bg-white px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tất cả trạng thái</option>{Object.entries(procurementStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <select className="rounded-md border border-line bg-white px-3 py-2 text-sm" value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}><option value="all">Tất cả nhà cung cấp</option>{supplierOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-        <select className="rounded-md border border-line bg-white px-3 py-2 text-sm" value={budgetFilter} onChange={(event) => setBudgetFilter(event.target.value)}><option value="all">Tất cả ngân sách</option><option value="within_budget">Trong ngân sách</option><option value="budget_exceeded">Vượt ngân sách</option></select>
       </div>
     </div>
 
@@ -136,7 +129,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
       <DataTable rows={filteredRows} loading={requests.isLoading} error={requests.error} onRetry={() => requests.refetch()} pageSize={10} defaultSort={{ key: 'created_at', direction: 'desc' }} columns={[
         { key: 'request', header: 'Yêu cầu / Nhà cung cấp', sortable: true, filterValue: (row) => [row.request_code, row.title, row.supplier_name], render: (row) => <button className="text-left" onClick={() => setViewId(row.id)}><span className="font-semibold text-blue-700 hover:underline">{row.request_code}</span><div className="font-semibold text-ink">{row.title}</div><div className="text-xs text-slate-500">{row.supplier_name || 'Chưa gán'} · {row.item_count ?? 0} dòng</div></button> },
         { key: 'progress', header: 'Tiến trình', render: (row) => <ProcurementProgress row={row} /> },
-        { key: 'total_estimated_amount', header: 'Giá trị', align: 'right', sortable: true, sortValue: (row) => numeric(row.total_estimated_amount), render: (row) => <div><CurrencyText value={row.total_estimated_amount} /><div className="mt-1"><EnumChip group="budget_status" value={row.budget_status} /></div></div> },
+        { key: 'total_estimated_amount', header: 'Giá trị từ dòng mua', align: 'right', sortable: true, sortValue: (row) => numeric(row.total_estimated_amount), render: (row) => <div><CurrencyText value={row.total_estimated_amount} /><div className="text-xs text-slate-400">Tự tổng hợp</div></div> },
         { key: 'delivery', header: 'Giao dự kiến', sortable: true, sortValue: (row) => row.expected_delivery_date, render: (row) => <div className={isOverdue(row) ? 'font-semibold text-rose-700' : ''}>{formatDate(row.expected_delivery_date)}{isOverdue(row) ? <div className="mt-1 flex items-center gap-1 text-xs"><AlertTriangle className="h-3.5 w-3.5" />Trễ giao</div> : null}</div> },
         { key: 'next', header: 'Việc tiếp theo', action: true, align: 'right', render: (row) => <NextAction row={row} projectId={row.project_id ?? projectId} locationPath={`${location.pathname}${location.search}`} hasPermission={hasPermission} onView={() => setViewId(row.id)} onEdit={() => setEditRecord(row)} onAction={(name) => action.mutate({ requestId: row.id, name })} /> },
       ]} empty="Không có yêu cầu trong hàng đợi này" />
@@ -149,7 +142,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
       {detail.isLoading ? <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Đang tải chi tiết...</div> : detail.error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">Không tải được chi tiết yêu cầu mua.</div> : detail.data ? <ProcurementDetail record={detail.data} /> : null}
     </Dialog>
     <Dialog open={Boolean(editRecord)} title="Thông tin thương mại & đặt hàng" description={editRecord ? `${editRecord.request_code} · ${editRecord.title}` : undefined} onClose={() => setEditRecord(null)} size="lg">
-      {editRecord ? <SimpleForm submitLabel="Lưu thông tin" fields={fields(editRecord)} onSubmit={(values) => update.mutateAsync({ requestId: editRecord.id, values: { ...values, project_id: editRecord.project_id, request_code: editRecord.request_code, status: editRecord.status, supplier_partner_id: values.supplier_partner_id || null } })} /> : null}
+      {editRecord ? <SimpleForm submitLabel="Lưu thông tin" fields={fields(editRecord)} onSubmit={(values) => update.mutateAsync({ requestId: editRecord.id, values: { ...values, project_id: editRecord.project_id, request_code: editRecord.request_code, status: editRecord.status, total_estimated_amount: editRecord.total_estimated_amount, budget_status: editRecord.budget_status, supplier_partner_id: values.supplier_partner_id || null } })} /> : null}
     </Dialog>
   </>;
 }

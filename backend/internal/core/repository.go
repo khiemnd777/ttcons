@@ -330,7 +330,7 @@ func safeTable(table string) string {
 		"receipt_allocations", "partners", "accounting_books", "accounting_accounts", "accounting_periods",
 		"journal_entries", "journal_entry_lines", "accounting_posting_rules", "budget_movements", "tax_codes",
 		"tax_periods", "invoice_tax_lines", "tax_adjustments", "accounting_backfill_issues",
-		"project_material_costs", "project_cash_requests":
+		"project_material_costs", "project_cash_requests", "accounting_handoffs":
 		return table
 	default:
 		return ""

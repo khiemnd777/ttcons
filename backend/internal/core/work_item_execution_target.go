@@ -35,7 +35,7 @@ var executionWorkspacePresentations = map[string]executionWorkspacePresentation{
 	executionWorkspaceOperations:     {Path: "operations", ActionLabel: "Mở thi công"},
 	executionWorkspaceAcceptance:     {Path: "acceptance", ActionLabel: "Mở nghiệm thu"},
 	executionWorkspaceHandover:       {Path: "handover", ActionLabel: "Mở bàn giao"},
-	executionWorkspaceProjectFinance: {Path: "accounting", ActionLabel: "Mở tài chính công trình"},
+	executionWorkspaceProjectFinance: {Path: "accounting", ActionLabel: "Mở bàn giao kế toán"},
 	executionWorkspaceWorkItem:       {Path: "", ActionLabel: "Mở hồ sơ công việc"},
 }
 
@@ -67,6 +67,7 @@ var executionWorkspaceByActionPrefix = []struct {
 	{Prefix: "receivable.", Workspace: executionWorkspaceProjectFinance},
 	{Prefix: "finance.", Workspace: executionWorkspaceProjectFinance},
 	{Prefix: "source.project_finance", Workspace: executionWorkspaceProjectFinance},
+	{Prefix: "source.accounting_handoff", Workspace: executionWorkspaceProjectFinance},
 	{Prefix: "source.handover", Workspace: executionWorkspaceHandover},
 	{Prefix: "handover.", Workspace: executionWorkspaceHandover},
 }
@@ -81,6 +82,9 @@ func workItemExecutionTarget(item Record, businessSource Record) Record {
 	completionMode := executionCompletionMode(kind)
 	presentation := executionWorkspacePresentations[workspace]
 	actionLabel := presentation.ActionLabel
+	if workspace == executionWorkspaceProjectFinance && !strings.HasPrefix(actionKey, "source.accounting_handoff") {
+		actionLabel = "Mở tài chính công trình"
+	}
 	switch kind {
 	case "approval":
 		actionLabel = "Mở phê duyệt"

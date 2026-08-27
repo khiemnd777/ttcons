@@ -137,7 +137,6 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
       { name: 'category', label: 'Nhóm', defaultValue: 'Phụ kiện', required: true },
       { name: 'default_supplier_partner_id', label: 'Nhà cung cấp tham khảo', type: 'select', placeholder: 'Chọn từ Danh mục đối tác', helperText: 'Dùng làm nguồn cung ban đầu; có thể thay đổi khi lấy báo giá.', options: partnerOptions(partners.data ?? [], ['supplier', 'service_provider', 'other']) },
       { name: 'default_supplier', label: 'Tên nhà cung cấp khác', placeholder: 'Nhập tên nhà cung cấp', helperText: 'Chỉ nhập khi nhà cung cấp chưa có trong Danh mục đối tác.', hiddenWhen: (values: RecordRow) => Boolean(values.default_supplier_partner_id) },
-      { name: 'standard_price', label: 'Giá chuẩn', type: 'currency', defaultValue: 0, min: 0 },
     ]} onSubmit={(values) => createMaterial.mutateAsync(values)} />
 
     <StockDocumentDialog open={openDocument} projectId={projectId} receiptId={receiptParam} materials={materials.data ?? []} warehouses={warehouses.data ?? []} receiptOptions={receiptOptions.data ?? []} hasPermission={hasPermission} pending={createDocument.isPending} onClose={() => setOpenDocument(false)} onSubmit={(values) => createDocument.mutateAsync(values)} />
@@ -182,7 +181,7 @@ function SiteTab({ rows, loading, error, onRetry, projectId }: { rows: RecordRow
 ]} empty={projectId ? 'Chưa có vật tư tại công trình' : 'Chọn công trình để xem tồn tại site'} />; }
 
 function MaterialsTab({ rows, loading, error, onRetry, onCreate }: { rows: RecordRow[]; loading: boolean; error: unknown; onRetry: () => void; onCreate?: () => void }) { return <DataTable rows={rows} loading={loading} error={error} onRetry={onRetry} pageSize={15} defaultSort={{ key: 'name' }} columns={[
-  { key: 'code', header: 'Mã', sortable: true }, { key: 'name', header: 'Vật tư', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.name}</span> }, { key: 'category', header: 'Nhóm', sortable: true }, { key: 'unit', header: 'ĐVT' }, { key: 'default_supplier_partner_name', header: 'Nhà cung cấp tham khảo' }, { key: 'standard_price', header: 'Giá chuẩn', align: 'right', sortable: true, render: (row) => numeric(row.standard_price).toLocaleString('vi-VN') },
+  { key: 'code', header: 'Mã', sortable: true }, { key: 'name', header: 'Vật tư', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.name}</span> }, { key: 'category', header: 'Nhóm', sortable: true }, { key: 'unit', header: 'ĐVT' }, { key: 'default_supplier_partner_name', header: 'Nhà cung cấp tham khảo' },
 ]} empty="Chưa có vật tư hoạt động" emptyAction={onCreate ? <button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={onCreate}>Thêm vật tư</button> : undefined} />; }
 
 type DraftLine = { key: string; material_id: string; quantity: number; unit: string; reason: string; source_line_type?: string; source_line_id?: string; max_quantity?: number };

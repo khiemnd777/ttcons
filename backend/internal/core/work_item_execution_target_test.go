@@ -156,6 +156,18 @@ func TestWorkItemExecutionTargetUsesCanonicalBusinessWorkspace(t *testing.T) {
 			completion: "domain_gate",
 			action:     "Mở tài chính công trình",
 		},
+		{
+			name: "Rev9 accounting handoff opens lean workspace",
+			item: Record{
+				"id": "work-13", "project_id": "project-1", "domain_action_key": "source.accounting_handoff_close_ready",
+			},
+			source:     Record{"route": "/projects/project-1/accounting", "ready": false, "status": "blocked"},
+			kind:       "domain",
+			workspace:  executionWorkspaceProjectFinance,
+			route:      "/projects/project-1/accounting?task=work-13",
+			completion: "domain_gate",
+			action:     "Mở bàn giao kế toán",
+		},
 	}
 
 	for _, tt := range tests {

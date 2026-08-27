@@ -198,3 +198,96 @@ func TestProjectFinanceRejectsSourceFromAnotherProject(t *testing.T) {
 	}, fixture.userID, "Finance Actor")
 	assertValidationError(t, err)
 }
+
+func TestAccountingHandoffUsesSourceReadinessAndAuditedLifecycle(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	fixture := setupProjectScopeFixture(t, db, []string{
+		"accounting_handoff.view", "accounting_handoff.submit", "accounting_handoff.acknowledge",
+	})
+	service := NewService(NewRepository(db), "test-secret")
+	partnerID := newID()
+	procurementID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM partners WHERE id=$1`, partnerID)
+	})
+	mustExec(t, db, `
+		INSERT INTO partners (id,partner_code,name,partner_types,active)
+		VALUES ($1,$2,'Nhà cung cấp bàn giao','["supplier"]'::jsonb,true)
+	`, partnerID, "AH-"+partnerID[:8])
+	mustExec(t, db, `
+		INSERT INTO procurement_requests (
+			id,project_id,request_code,title,requested_by,status,total_estimated_amount,
+			supplier_partner_id,supplier_name,order_reference
+		) VALUES ($1,$2,$3,'Mua vật tư bàn giao',$4,'ordered',2500000,$5,'Nhà cung cấp bàn giao','PO-001')
+	`, procurementID, fixture.projectID, "AH-PR-"+procurementID[:8], fixture.userID, partnerID)
+
+	workspace, err := service.ProjectFinanceWorkspace(ctx, fixture.projectID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if workspace["mode"] != "handoff" {
+		t.Fatalf("workspace mode = %v, want handoff", workspace["mode"])
+	}
+	items := workspace["items"].([]Record)
+	if len(items) != 1 || items[0]["status"] != "ready" || cleanID(items[0]["source_id"]) != procurementID {
+		t.Fatalf("handoff candidates = %#v", items)
+	}
+
+	created, err := service.CreateAccountingHandoff(ctx, fixture.projectID, AccountingHandoffRequest{
+		SourceType: "procurement_request", SourceID: procurementID, Note: "Đủ PO",
+	}, fixture.userID, "Handoff Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handoffID := cleanID(created["id"])
+	if created["status"] != "handed_off" {
+		t.Fatalf("created handoff = %#v", created)
+	}
+	readiness, err := service.repo.AccountingHandoffCloseReadiness(ctx, fixture.projectID)
+	if err != nil || boolValue(readiness["ready"]) || int(number(readiness["pending_handoffs"])) != 1 {
+		t.Fatalf("pending close readiness = %#v, err=%v", readiness, err)
+	}
+	_, err = service.AccountingHandoffAction(ctx, handoffID, "return", AccountingHandoffActionRequest{}, fixture.userID, "Accounting Actor")
+	assertValidationError(t, err)
+	returned, err := service.AccountingHandoffAction(ctx, handoffID, "return", AccountingHandoffActionRequest{ReturnReason: "Thiếu biên bản giao nhận"}, fixture.userID, "Accounting Actor")
+	if err != nil || returned["status"] != "returned" {
+		t.Fatalf("returned handoff = %#v, err=%v", returned, err)
+	}
+	resent, err := service.AccountingHandoffAction(ctx, handoffID, "handoff", AccountingHandoffActionRequest{Note: "Đã bổ sung"}, fixture.userID, "Handoff Actor")
+	if err != nil || resent["status"] != "handed_off" || resent["return_reason"] != nil {
+		t.Fatalf("resent handoff = %#v, err=%v", resent, err)
+	}
+	acknowledged, err := service.AccountingHandoffAction(ctx, handoffID, "acknowledge", AccountingHandoffActionRequest{ExternalReference: "MISA-001"}, fixture.userID, "Accounting Actor")
+	if err != nil || acknowledged["status"] != "acknowledged" || acknowledged["external_reference"] != "MISA-001" {
+		t.Fatalf("acknowledged handoff = %#v, err=%v", acknowledged, err)
+	}
+	handoverID := newID()
+	mustExec(t, db, `
+		INSERT INTO handover_records (id,project_id,handover_code,status,completed_at,created_by)
+		VALUES ($1,$2,$3,'handed_over',now(),$4)
+	`, handoverID, fixture.projectID, "AH-HO-"+handoverID[:8], fixture.userID)
+	readiness, err = service.repo.AccountingHandoffCloseReadiness(ctx, fixture.projectID)
+	if err != nil || !boolValue(readiness["ready"]) || int(number(readiness["acknowledged_count"])) != 1 {
+		t.Fatalf("acknowledged close readiness = %#v, err=%v", readiness, err)
+	}
+	if _, err := service.CreateAccountingHandoff(ctx, fixture.projectID, AccountingHandoffRequest{SourceType: "procurement_request", SourceID: procurementID}, fixture.userID, "Handoff Actor"); err == nil {
+		t.Fatal("duplicate source handoff was accepted")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND target_type='accounting_handoff' AND target_id=$2`, 4, fixture.projectID, handoffID)
+}
+
+func TestAccountingHandoffRejectsProcurementBeforeOrderReadiness(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	fixture := setupProjectScopeFixture(t, db, []string{"accounting_handoff.submit"})
+	procurementID := newID()
+	mustExec(t, db, `
+		INSERT INTO procurement_requests (id,project_id,request_code,title,requested_by,status,total_estimated_amount)
+		VALUES ($1,$2,$3,'Yêu cầu chưa đặt',$4,'approved',100)
+	`, procurementID, fixture.projectID, "AH-WAIT-"+procurementID[:8], fixture.userID)
+	_, err := NewService(NewRepository(db), "test-secret").CreateAccountingHandoff(ctx, fixture.projectID, AccountingHandoffRequest{
+		SourceType: "procurement_request", SourceID: procurementID,
+	}, fixture.userID, "Handoff Actor")
+	assertValidationError(t, err)
+}

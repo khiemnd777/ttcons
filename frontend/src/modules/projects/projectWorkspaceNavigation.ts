@@ -62,13 +62,13 @@ export const PROJECT_WORKSPACE_GROUPS: ProjectWorkspaceGroup[] = [
   },
   {
     key: 'finance',
-    label: 'Bàn giao & Tài chính',
-    description: 'Bàn giao, chi phí vật tư, đề nghị thu/chi và số liệu quản trị',
+    label: 'Bàn giao & Kế toán',
+    description: 'Bàn giao công trình và hồ sơ nghiệp vụ cho Kế toán',
     to: 'handover',
-    permissions: ['handover.view', 'project_finance.view'],
+    permissions: ['handover.view', 'accounting_handoff.view', 'project_finance.view'],
     children: [
       { label: 'Bàn giao', to: 'handover', permissions: ['handover.view'] },
-      { label: 'Tài chính công trình', to: 'accounting', permissions: ['project_finance.view'] },
+      { label: 'Bàn giao kế toán', to: 'accounting', permissions: ['accounting_handoff.view', 'project_finance.view'] },
     ],
   },
   {

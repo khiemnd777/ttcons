@@ -25,6 +25,8 @@ test('standard shell exposes the permission-filtered navigation on mobile', asyn
   assert.ok(dashboardIndex < myWorkIndex, 'Dashboard must appear before Bàn làm việc');
   assert.match(appShell, /to: '\/audit', label: 'Audit nghiệp vụ'.*permissions: \['audit\.view'\]/);
   assert.match(appShell, /to: '\/event-logs', label: 'Nhật ký sự kiện'.*permissions: \['event_log\.view'\]/);
+  assert.match(appShell, /to: '\/accounting', label: 'Bàn giao kế toán'.*accounting_handoff\.view/);
+  assert.match(appShell, /to: '\/core-data', label: 'Đối tác'.*permissions: \['catalog\.view'\]/);
   assert.doesNotMatch(appShell, /to: '\/dashboard', label: 'Điều hành'/);
   assert.match(appShell, /aria-label="Mở hồ sơ cá nhân"/);
   assert.ok((appShell.match(/navigate\('\/profile'\)/g) ?? []).length >= 2, 'desktop and mobile user surfaces must expose Profile');

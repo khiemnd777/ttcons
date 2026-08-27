@@ -10,7 +10,7 @@ const workspaceLabels: Record<string, string> = {
   operations: 'Thi công',
   acceptance: 'Nghiệm thu',
   handover: 'Bàn giao',
-  project_finance: 'Tài chính công trình',
+  project_finance: 'Bàn giao kế toán',
   work_item: 'Hồ sơ công việc',
 };
 

@@ -53,7 +53,7 @@ const progressStages: ProgressStage[] = [
   { key: 'planning', label: 'Kế hoạch', headerClassName: 'bg-cyan-50 text-cyan-800' },
   { key: 'construction', label: 'Thi công', headerClassName: 'bg-emerald-50 text-emerald-800' },
   { key: 'acceptance', label: 'Nghiệm thu', headerClassName: 'bg-amber-50 text-amber-800' },
-  { key: 'handover_finance', label: 'Bàn giao & Tài chính', headerClassName: 'bg-orange-50 text-orange-800' },
+  { key: 'handover_finance', label: 'Bàn giao & Kế toán', headerClassName: 'bg-orange-50 text-orange-800' },
   { key: 'completed', label: 'Hoàn tất', headerClassName: 'bg-teal-50 text-teal-800' },
   { key: 'other', label: 'Khác', headerClassName: 'bg-slate-100 text-slate-700' },
 ];

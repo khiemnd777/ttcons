@@ -15,7 +15,7 @@ func TestSafeTableAllowsContractsForProjectRecordPermission(t *testing.T) {
 }
 
 func TestSafeTableAllowsSimplifiedConstructionRecords(t *testing.T) {
-	for _, table := range []string{"construction_checks", "construction_action_items"} {
+	for _, table := range []string{"construction_checks", "construction_action_items", "accounting_handoffs"} {
 		if got := safeTable(table); got != table {
 			t.Fatalf("safeTable(%s) = %q, want %s", table, got, table)
 		}

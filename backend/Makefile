@@ -45,6 +45,7 @@ seed: check-local-env
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < migrations/V103__operational_official_workflow_rev7.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < migrations/V104__rev7_returned_scan_source_gate.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < migrations/V105__lean_official_workflow_rev8.sql; \
+		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < migrations/V131__accounting_handoff_workspace.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/golden_project.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/golden_project_domains.sql; \
 		$(BACKEND_COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)" < seed/golden_project_closure.sql; \
@@ -69,6 +70,7 @@ seed: check-local-env
 			-f migrations/V103__operational_official_workflow_rev7.sql \
 			-f migrations/V104__rev7_returned_scan_source_gate.sql \
 			-f migrations/V105__lean_official_workflow_rev8.sql \
+			-f migrations/V131__accounting_handoff_workspace.sql \
 			-f seed/golden_project.sql \
 			-f seed/golden_project_domains.sql \
 			-f seed/golden_project_closure.sql \

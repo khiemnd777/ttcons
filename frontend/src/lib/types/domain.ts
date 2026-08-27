@@ -3368,11 +3368,51 @@ export type ProjectCashRequest = AnyRecord & {
 };
 
 export type ProjectFinanceWorkspace = {
+  mode?: 'legacy';
   can_view_report: boolean;
   summary: ProjectFinanceSummary;
   tasks: AnyRecord[];
   material_costs: ProjectMaterialCost[];
   cash_requests: ProjectCashRequest[];
+};
+
+export type AccountingHandoffRequirement = {
+  key: string;
+  label: string;
+  met: boolean;
+  guidance: string;
+};
+
+export type AccountingHandoffItem = AnyRecord & {
+  source_id: string;
+  source_type: 'procurement_request' | 'contract_milestone';
+  direction: 'payable' | 'receivable';
+  source_code: string;
+  source_title: string;
+  counterparty_name: string;
+  reference_amount: number;
+  currency: string;
+  source_route: string;
+  readiness: 'needs_attention' | 'ready';
+  requirements: AccountingHandoffRequirement[];
+  handoff_id?: string | null;
+  handoff_status?: 'handed_off' | 'acknowledged' | 'returned' | 'cancelled' | null;
+  status: 'needs_attention' | 'ready' | 'handed_off' | 'acknowledged' | 'returned';
+  note?: string;
+  return_reason?: string;
+  external_reference?: string;
+};
+
+export type AccountingHandoffWorkspace = {
+  mode: 'handoff';
+  summary: {
+    needs_attention_count: number;
+    ready_count: number;
+    handed_off_count: number;
+    acknowledged_count: number;
+    returned_count: number;
+  };
+  items: AccountingHandoffItem[];
 };
 
 export type ProjectFinanceOptions = {

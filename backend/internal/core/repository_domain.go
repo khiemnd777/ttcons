@@ -11094,6 +11094,23 @@ func (r *Repository) automateClientOperationalSourceGate(ctx context.Context, co
 			workflowSourceReadinessCheck("cash_requests", "Đề nghị thu/chi đã xử lý", cashReady, "Mọi đề nghị thu/chi phải được xử lý hoặc hủy.", fmt.Sprintf("/projects/%s/accounting?tab=tasks", projectID)),
 		}
 		targetType, targetID = "handover", cleanID(row["target_id"])
+	case "source.accounting_handoff_close_ready":
+		metadata["label"] = "Bàn giao hồ sơ kế toán"
+		metadata["route"] = fmt.Sprintf("/projects/%s/accounting", projectID)
+		readiness, readinessErr := r.AccountingHandoffCloseReadiness(ctx, projectID)
+		if readinessErr != nil {
+			return workflowAutomationOutcome{}, readinessErr
+		}
+		handoverReady := boolValue(readiness["physical_handover"])
+		handoffsReady := number(readiness["pending_handoffs"]) == 0
+		ready = handoverReady && handoffsReady
+		reason = "Bàn giao vật lý hoặc hồ sơ kế toán còn điều kiện chưa kết thúc"
+		metadata["checks"] = []Record{
+			workflowSourceReadinessCheck("physical_handover", "Bàn giao vật lý đã hoàn tất", handoverReady, "Hoàn tất bàn giao vật lý trước khi đóng công trình.", fmt.Sprintf("/projects/%s/handover", projectID)),
+			workflowSourceReadinessCheck("accounting_handoffs", "Hồ sơ kế toán đã được tiếp nhận", handoffsReady, "Bàn giao và để Kế toán xác nhận mọi hồ sơ mua sắm/mốc thu đủ điều kiện.", fmt.Sprintf("/projects/%s/accounting", projectID)),
+		}
+		row = readiness
+		targetType, targetID = "handover", cleanID(readiness["target_id"])
 	default:
 		return workflowAutomationOutcome{}, nil
 	}

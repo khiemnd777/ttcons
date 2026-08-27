@@ -195,7 +195,7 @@ func (r *Repository) ReportProjectOptions(ctx context.Context, userID string, re
 }
 
 func (r *Repository) ProjectFinanceProjectOptions(ctx context.Context, userID string, req ReportOptionsRequest, cursor *reportProjectOptionsCursor) ([]Record, Record, error) {
-	return r.projectOptions(ctx, userID, req, cursor, "project_finance.view")
+	return r.projectOptions(ctx, userID, req, cursor, "accounting_handoff.view")
 }
 
 func (r *Repository) projectOptions(ctx context.Context, userID string, req ReportOptionsRequest, cursor *reportProjectOptionsCursor, requiredPermission string) ([]Record, Record, error) {
@@ -214,8 +214,8 @@ func (r *Repository) projectOptions(ctx context.Context, userID string, req Repo
 			JOIN permissions permission ON permission.id=rp.permission_id
 			WHERE ur.user_id=NULLIF($%d, '')::uuid
 			  AND (ur.project_id IS NULL OR ur.project_id=p.id)
-			  AND permission.key=$%d
-		)`, len(args)-1, len(args)))
+			  AND (permission.key=$%d OR ($%d='accounting_handoff.view' AND permission.key='project_finance.view'))
+		)`, len(args)-1, len(args), len(args)))
 	}
 	if req.Search != "" {
 		args = append(args, "%"+req.Search+"%")
@@ -254,8 +254,8 @@ func (r *Repository) projectOptions(ctx context.Context, userID string, req Repo
 				JOIN permissions permission ON permission.id=rp.permission_id
 				WHERE ur.user_id=NULLIF($%d, '')::uuid
 				  AND (ur.project_id IS NULL OR ur.project_id=p.id)
-				  AND permission.key=$%d
-			)`, len(selectedArgs)-1, len(selectedArgs)))
+				  AND (permission.key=$%d OR ($%d='accounting_handoff.view' AND permission.key='project_finance.view'))
+			)`, len(selectedArgs)-1, len(selectedArgs), len(selectedArgs)))
 		}
 		selectedArgs = append(selectedArgs, req.SelectedID)
 		selected, err = r.QueryOne(ctx, fmt.Sprintf(`

@@ -1,0 +1,265 @@
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowRight, CheckCircle2, ExternalLink, RotateCcw, Send, Undo2 } from 'lucide-react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import clsx from 'clsx';
+import { CurrencyText } from '../../components/CurrencyText';
+import { DataTable, type Column } from '../../components/DataTable';
+import { Dialog } from '../../components/Dialog';
+import { EmptyState } from '../../components/EmptyState';
+import { ProjectBackLink } from '../../components/ProjectBackLink';
+import { StatusBadge } from '../../components/StatusBadge';
+import { useToast } from '../../components/ToastProvider';
+import { get, post } from '../../lib/api/client';
+import { useAuth } from '../../lib/auth/AuthContext';
+import type { AccountingHandoffItem, AccountingHandoffWorkspace } from '../../lib/types/domain';
+import { dateText } from '../../lib/utils/format';
+import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
+import { ProjectScopeActions } from '../_shared/ProjectScopeActions';
+import {
+  syncWorkItemMutationTransition,
+  withWorkItemMutationContext,
+  workItemAutoStartedNotice,
+  type WorkItemMutationResult,
+} from '../work-items/workItemMutationContext';
+
+type HandoffFilter = 'all' | 'needs_attention' | 'ready' | 'handed_off' | 'acknowledged' | 'returned';
+type HandoffAction = 'handoff' | 'acknowledge' | 'return';
+type HandoffDialog = { action: HandoffAction; item: AccountingHandoffItem } | null;
+
+const filterLabels: Array<{ value: HandoffFilter; label: string; countKey?: keyof AccountingHandoffWorkspace['summary'] }> = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'needs_attention', label: 'Cần bổ sung', countKey: 'needs_attention_count' },
+  { value: 'ready', label: 'Sẵn sàng', countKey: 'ready_count' },
+  { value: 'handed_off', label: 'Đã bàn giao', countKey: 'handed_off_count' },
+  { value: 'acknowledged', label: 'Đã tiếp nhận', countKey: 'acknowledged_count' },
+  { value: 'returned', label: 'Bị trả lại', countKey: 'returned_count' },
+];
+
+export function AccountingHandoffPage({ global = false }: { global?: boolean }) {
+  const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedProjectId = searchParams.get('project') ?? '';
+  const taskId = searchParams.get('task')?.trim() ?? '';
+  const [draftProjectId, setDraftProjectId] = useState(requestedProjectId);
+  const [filter, setFilter] = useState<HandoffFilter>('all');
+  const [dialog, setDialog] = useState<HandoffDialog>(null);
+  const { hasAnyPermission } = useAuth();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const projectId = id ?? (global ? requestedProjectId : '');
+  const workspace = useQuery({
+    queryKey: ['project-finance', projectId],
+    queryFn: () => get<AccountingHandoffWorkspace>(`/projects/${projectId}/project-finance`),
+    enabled: Boolean(projectId),
+  });
+  const canSubmit = hasAnyPermission(['accounting_handoff.submit']);
+  const canAcknowledge = hasAnyPermission(['accounting_handoff.acknowledge']);
+  const canViewProcurement = hasAnyPermission(['procurement.view']);
+  const canViewContracts = hasAnyPermission(['contract.view']);
+  const data = workspace.data;
+  const rows = useMemo(() => (data?.items ?? []).filter((item) => filter === 'all' || item.status === filter), [data?.items, filter]);
+
+  useEffect(() => {
+    if (global) setDraftProjectId(requestedProjectId);
+  }, [global, requestedProjectId]);
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['project-finance', projectId] });
+  const mutation = useMutation({
+    mutationFn: ({ action, item, note, returnReason, externalReference }: { action: HandoffAction; item: AccountingHandoffItem; note: string; returnReason: string; externalReference: string }) => {
+      const body = withWorkItemMutationContext({ note, return_reason: returnReason, external_reference: externalReference }, taskId);
+      if (action === 'handoff' && !item.handoff_id) {
+        return post<WorkItemMutationResult>(`/projects/${projectId}/accounting-handoffs`, withWorkItemMutationContext({ source_type: item.source_type, source_id: item.source_id, note, external_reference: externalReference }, taskId));
+      }
+      return post<WorkItemMutationResult>(`/accounting-handoffs/${item.handoff_id}/${action}`, body);
+    },
+    onSuccess: async (result, variables) => {
+      await refresh();
+      syncWorkItemMutationTransition(queryClient, result);
+      setDialog(null);
+      const message = variables.action === 'acknowledge'
+        ? 'Đã xác nhận tiếp nhận hồ sơ'
+        : variables.action === 'return'
+          ? 'Đã trả hồ sơ để bổ sung'
+          : 'Đã bàn giao hồ sơ cho Kế toán';
+      toast.success(`${message}.${workItemAutoStartedNotice(result)}`);
+    },
+    onError: (error) => toast.error('Không cập nhật được bàn giao kế toán', error),
+  });
+
+  function applyProjectScope() {
+    if (!draftProjectId) return;
+    const params = new URLSearchParams(searchParams);
+    params.set('project', draftProjectId);
+    params.delete('tab');
+    setSearchParams(params, { replace: true });
+    setFilter('all');
+    setDialog(null);
+  }
+
+  function resetProjectScope() {
+    const params = new URLSearchParams(searchParams);
+    params.delete('project');
+    params.delete('tab');
+    setSearchParams(params, { replace: true });
+    setDraftProjectId('');
+    setFilter('all');
+    setDialog(null);
+  }
+
+  const columns: Column<AccountingHandoffItem>[] = [
+    {
+      key: 'source',
+      header: 'Hồ sơ nguồn',
+      filterValue: (row) => [row.source_code, row.source_title, row.counterparty_name],
+      render: (row) => <div><Link className="font-semibold text-blue-700 hover:underline" to={row.source_route}>{row.source_code}</Link><div className="font-semibold text-ink">{row.source_title}</div><div className="text-xs text-slate-500">{row.counterparty_name || 'Chưa xác định đối tác'}</div></div>,
+    },
+    {
+      key: 'direction',
+      header: 'Nhóm hồ sơ',
+      render: (row) => <div><span className="font-semibold text-slate-700">{row.direction === 'payable' ? 'Hồ sơ mua' : 'Hồ sơ thu'}</span><div className="text-xs text-slate-500">{row.source_type === 'procurement_request' ? 'Yêu cầu mua' : 'Mốc hợp đồng'}</div></div>,
+    },
+    {
+      key: 'reference_amount',
+      header: 'Giá trị tham chiếu',
+      align: 'right',
+      sortable: true,
+      sortValue: (row) => Number(row.reference_amount ?? 0),
+      render: (row) => <div><CurrencyText value={row.reference_amount} /><div className="text-xs text-slate-400">{row.currency} · từ hồ sơ nguồn</div></div>,
+    },
+    {
+      key: 'readiness',
+      header: 'Điều kiện nguồn',
+      render: (row) => <Requirements item={row} />,
+    },
+    {
+      key: 'status',
+      header: 'Bàn giao',
+      sortable: true,
+      render: (row) => <div><StatusBadge status={row.status} />{row.return_reason ? <div className="mt-1 max-w-52 text-xs text-rose-700">{row.return_reason}</div> : null}{row.acknowledged_at ? <div className="mt-1 text-xs text-slate-500">{dateText(row.acknowledged_at)}</div> : null}</div>,
+    },
+    {
+      key: 'actions',
+      header: 'Thao tác',
+      action: true,
+      align: 'right',
+      render: (row) => <RowActions item={row} canSubmit={canSubmit} canAcknowledge={canAcknowledge} onOpen={setDialog} />,
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {id ? <ProjectBackLink /> : null}
+      <header className="border-b border-line pb-5">
+        <div className={clsx('grid gap-4', global && 'xl:grid-cols-[minmax(0,1fr)_36rem] xl:items-end xl:gap-8')}>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Hồ sơ bàn giao kế toán</h1>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Theo dõi hồ sơ nghiệp vụ từ Mua sắm và Hợp đồng đến lúc Kế toán tiếp nhận. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA.</p>
+          </div>
+          {global ? <section className="min-w-0 border-t border-line pt-4 xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình bàn giao kế toán">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <AsyncProjectPicker value={draftProjectId} onChange={setDraftProjectId} endpoint="/project-finance/projects" queryKey="accounting-handoff-project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} />
+              <ProjectScopeActions applying={workspace.isFetching} applyDisabled={!draftProjectId || draftProjectId === projectId} resetDisabled={workspace.isFetching || (!draftProjectId && !projectId)} onApply={applyProjectScope} onReset={resetProjectScope} />
+            </div>
+          </section> : null}
+        </div>
+      </header>
+
+      {!projectId ? <EmptyState title="Chọn công trình để xem hồ sơ bàn giao kế toán." /> : <>
+        <div className="flex flex-wrap gap-2" aria-label="Lọc trạng thái bàn giao">
+          {filterLabels.map((item) => <button key={item.value} className={clsx('rounded-md border px-3 py-2 text-sm font-semibold', filter === item.value ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-line bg-white text-slate-600 hover:bg-slate-50')} onClick={() => setFilter(item.value)}>{item.label}{item.countKey ? <span className="ml-2 rounded-full bg-white px-1.5 py-0.5 text-xs ring-1 ring-inset ring-slate-200">{data?.summary[item.countKey] ?? 0}</span> : null}</button>)}
+        </div>
+        <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          Consflow chỉ kiểm tra hồ sơ nguồn và ghi nhận bàn giao/tiếp nhận. Giá trị hiển thị là tham chiếu từ hồ sơ nghiệp vụ, không phải số liệu kế toán.
+        </div>
+        <DataTable
+          rows={rows}
+          columns={columns}
+          loading={workspace.isLoading}
+          error={workspace.error}
+          onRetry={() => void workspace.refetch()}
+          searchPlaceholder="Tìm mã hồ sơ, nội dung, đối tác..."
+          pageSize={15}
+          empty={data?.items.length ? 'Không có hồ sơ phù hợp với bộ lọc hoặc tìm kiếm.' : 'Chưa có hồ sơ nguồn để bàn giao'}
+          emptyAction={data?.items.length === 0 ? (
+            <AccountingHandoffEmptyActions
+              projectId={projectId}
+              canViewProcurement={canViewProcurement}
+              canViewContracts={canViewContracts}
+            />
+          ) : undefined}
+        />
+      </>}
+
+      <HandoffActionDialog dialog={dialog} pending={mutation.isPending} onClose={() => setDialog(null)} onSubmit={(values) => dialog ? mutation.mutate({ action: dialog.action, item: dialog.item, ...values }) : undefined} />
+    </div>
+  );
+}
+
+function AccountingHandoffEmptyActions({ projectId, canViewProcurement, canViewContracts }: { projectId: string; canViewProcurement: boolean; canViewContracts: boolean }) {
+  const hasSourceNavigation = canViewProcurement || canViewContracts;
+  const linkClass = 'inline-flex w-full items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 sm:w-auto';
+  return (
+    <section className="w-full max-w-2xl text-left" aria-label="Hướng dẫn tạo hồ sơ nguồn bàn giao kế toán">
+      <p className="text-sm leading-6 text-slate-600">Hồ sơ sẽ tự xuất hiện tại đây sau khi nghiệp vụ nguồn đạt điều kiện tối thiểu:</p>
+      <ul className="mt-2 space-y-1 text-sm leading-6 text-slate-600">
+        <li>• Yêu cầu mua đã được duyệt hoặc đặt hàng tại Mua sắm.</li>
+        <li>• Mốc hợp đồng chủ đầu tư đã được kích hoạt hoặc đủ điều kiện thu.</li>
+      </ul>
+      {hasSourceNavigation ? (
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
+          {canViewProcurement ? <Link className={linkClass} to={`/projects/${projectId}/procurement`}><ExternalLink className="h-4 w-4" />Mở Mua sắm</Link> : null}
+          {canViewContracts ? <Link className={linkClass} to={`/projects/${projectId}/contracts`}><ExternalLink className="h-4 w-4" />Mở Hợp đồng</Link> : null}
+        </div>
+      ) : (
+        <p className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-center text-xs text-slate-500">Tài khoản hiện tại chưa có quyền mở Mua sắm hoặc Hợp đồng.</p>
+      )}
+      <p className="mt-3 text-center text-xs text-slate-500">Không cần tạo hồ sơ kế toán thủ công trên Consflow.</p>
+    </section>
+  );
+}
+
+function Requirements({ item }: { item: AccountingHandoffItem }) {
+  const unmet = item.requirements?.filter((requirement) => !requirement.met) ?? [];
+  if (!unmet.length) return <div><StatusBadge status="ready" /><div className="mt-1 text-xs text-slate-500">{item.acceptance_count ?? 0} nghiệm thu · {item.stock_document_count ?? 0} phiếu kho</div></div>;
+  return <div><StatusBadge status="needs_attention" /><ul className="mt-1 space-y-0.5 text-xs text-amber-800">{unmet.map((requirement) => <li key={requirement.key}>• {requirement.label}</li>)}</ul></div>;
+}
+
+function RowActions({ item, canSubmit, canAcknowledge, onOpen }: { item: AccountingHandoffItem; canSubmit: boolean; canAcknowledge: boolean; onOpen: (dialog: HandoffDialog) => void }) {
+  const buttonClass = 'inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-semibold';
+  if (item.status === 'ready' && canSubmit) return <button className={`${buttonClass} bg-blue-600 text-white hover:bg-blue-700`} onClick={() => onOpen({ action: 'handoff', item })}><Send className="h-3.5 w-3.5" />Bàn giao</button>;
+  if (item.status === 'handed_off' && canAcknowledge) return <div className="flex justify-end gap-1"><button className={`${buttonClass} bg-emerald-600 text-white hover:bg-emerald-700`} onClick={() => onOpen({ action: 'acknowledge', item })}><CheckCircle2 className="h-3.5 w-3.5" />Tiếp nhận</button><button className={`${buttonClass} border border-line bg-white text-slate-700 hover:bg-slate-50`} onClick={() => onOpen({ action: 'return', item })}><Undo2 className="h-3.5 w-3.5" />Trả lại</button></div>;
+  if (item.status === 'returned' && canSubmit) return <button className={`${buttonClass} bg-blue-600 text-white hover:bg-blue-700`} onClick={() => onOpen({ action: 'handoff', item })}><RotateCcw className="h-3.5 w-3.5" />Bàn giao lại</button>;
+  return <Link className={`${buttonClass} border border-line bg-white text-slate-700 hover:bg-slate-50`} to={item.source_route}><ExternalLink className="h-3.5 w-3.5" />Mở nguồn</Link>;
+}
+
+function HandoffActionDialog({ dialog, pending, onClose, onSubmit }: { dialog: HandoffDialog; pending: boolean; onClose: () => void; onSubmit: (values: { note: string; returnReason: string; externalReference: string }) => void }) {
+  const [note, setNote] = useState('');
+  const [returnReason, setReturnReason] = useState('');
+  const [externalReference, setExternalReference] = useState('');
+  const [warning, setWarning] = useState('');
+  useEffect(() => {
+    setNote(dialog?.item.note ?? '');
+    setReturnReason('');
+    setExternalReference(dialog?.item.external_reference ?? '');
+    setWarning('');
+  }, [dialog]);
+  const title = dialog?.action === 'acknowledge' ? 'Xác nhận tiếp nhận hồ sơ' : dialog?.action === 'return' ? 'Trả hồ sơ để bổ sung' : dialog?.item.handoff_id ? 'Bàn giao lại hồ sơ' : 'Bàn giao hồ sơ cho Kế toán';
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (dialog?.action === 'return' && !returnReason.trim()) {
+      setWarning('Cần ghi rõ nội dung hồ sơ phải bổ sung.');
+      return;
+    }
+    onSubmit({ note: note.trim(), returnReason: returnReason.trim(), externalReference: externalReference.trim() });
+  }
+  return <Dialog open={Boolean(dialog)} title={title} description={dialog ? `${dialog.item.source_code} · ${dialog.item.source_title}` : undefined} onClose={onClose} size="md">
+    <form className="space-y-4" onSubmit={submit}>
+      {dialog?.action === 'return' ? <label className="block text-sm font-semibold text-slate-700">Nội dung cần bổ sung <span className="text-rose-600">*</span><textarea className="mt-1 min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm" value={returnReason} onChange={(event) => setReturnReason(event.target.value)} /></label> : null}
+      {dialog?.action !== 'return' ? <label className="block text-sm font-semibold text-slate-700">Mã tham chiếu MISA (không bắt buộc)<input className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm" value={externalReference} onChange={(event) => setExternalReference(event.target.value)} placeholder="Ví dụ: MISA-CT-001" /></label> : null}
+      <label className="block text-sm font-semibold text-slate-700">Ghi chú<textarea className="mt-1 min-h-20 w-full rounded-md border border-line px-3 py-2 text-sm" value={note} onChange={(event) => setNote(event.target.value)} /></label>
+      {warning ? <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{warning}</p> : null}
+      <div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700" onClick={onClose}>Hủy</button><button type="submit" disabled={pending} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"><ArrowRight className="h-4 w-4" />{pending ? 'Đang xử lý...' : 'Xác nhận'}</button></div>
+    </form>
+  </Dialog>;
+}

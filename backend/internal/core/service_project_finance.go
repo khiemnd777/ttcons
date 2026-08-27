@@ -8,6 +8,13 @@ import (
 )
 
 func (s *Service) ProjectFinanceWorkspace(ctx context.Context, projectID string, includeManagementReport bool) (Record, error) {
+	mode, err := s.repo.ProjectFinanceMode(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if mode == "handoff" {
+		return s.AccountingHandoffWorkspace(ctx, projectID)
+	}
 	summary, err := s.repo.ProjectFinanceSummary(ctx, projectID)
 	if err != nil {
 		return nil, err
@@ -29,7 +36,7 @@ func (s *Service) ProjectFinanceWorkspace(ctx context.Context, projectID string,
 			summary[field] = nil
 		}
 	}
-	return Record{"summary": summary, "tasks": tasks, "material_costs": costs, "cash_requests": requests, "can_view_report": includeManagementReport}, nil
+	return Record{"mode": "legacy", "summary": summary, "tasks": tasks, "material_costs": costs, "cash_requests": requests, "can_view_report": includeManagementReport}, nil
 }
 
 func (s *Service) ProjectFinanceOptions(ctx context.Context, projectID string) (Record, error) {

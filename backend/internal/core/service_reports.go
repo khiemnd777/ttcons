@@ -298,7 +298,7 @@ func (s *Service) ReportOptions(ctx context.Context, req ReportOptionsRequest, a
 }
 
 func (s *Service) ProjectFinanceProjects(ctx context.Context, req ReportOptionsRequest, actorID string) (ReportOptionsResponse, error) {
-	return s.projectOptions(ctx, req, actorID, "project_finance.view")
+	return s.projectOptions(ctx, req, actorID, "accounting_handoff.view")
 }
 
 func (s *Service) projectOptions(ctx context.Context, req ReportOptionsRequest, actorID, requiredPermission string) (ReportOptionsResponse, error) {

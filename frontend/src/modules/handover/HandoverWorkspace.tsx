@@ -114,7 +114,7 @@ function nextAction(status: string, blockerCount: number, actions: { onSubmit: (
 
 function blockerTarget(projectId: string, blocker: string) {
   const value = blocker.toLocaleLowerCase('vi');
-  if (value.includes('chi phí vật tư') || value.includes('đề nghị thu') || value.includes('đề nghị chi') || value.includes('công nợ') || value.includes('phiếu chi') || value.includes('phiếu thu')) return { group: 'Tài chính', path: `/projects/${projectId}/accounting?tab=tasks`, label: 'Mở Tài chính công trình' };
+  if (value.includes('chi phí vật tư') || value.includes('đề nghị thu') || value.includes('đề nghị chi') || value.includes('công nợ') || value.includes('phiếu chi') || value.includes('phiếu thu')) return { group: 'Kế toán', path: `/projects/${projectId}/accounting`, label: 'Mở Bàn giao kế toán' };
   if (value.includes('vật tư') || value.includes('kho')) return { group: 'Kho và vật tư', path: `/projects/${projectId}/warehouse`, label: 'Mở Kho vật tư' };
   if (value.includes('nghiệm thu')) return { group: 'Chất lượng', path: `/projects/${projectId}/acceptance`, label: 'Mở Nghiệm thu' };
   if (value.includes('lỗi') || value.includes('ncr') || value.includes('rework') || value.includes('công trường')) return { group: 'Thi công và chất lượng', path: `/projects/${projectId}/operations`, label: 'Mở Thi công' };

@@ -35,6 +35,7 @@
 - Procurement accepted-vs-stocked progress also recognizes historical explicit receive movements linked to the originating `boq_item`; this compatibility source is capped at accepted quantity and blocks duplicate acceptance-linked receipts.
 - The stock workspace has four explicit sources of truth: warehouse positions, posted documents/ledger, project site/surplus balance and active material catalog.
 - Material creation presents `default_supplier_partner_id` as `Nhà cung cấp tham khảo` because a selected quotation supplier still takes precedence; `default_supplier` is the conditional `Tên nhà cung cấp khác` fallback. The naming is presentation-only and does not change supplier validation, snapshots or procurement grouping.
+- Material `standard_price` remains schema/API compatibility for historical integrations but is absent from the primary Warehouse create form and material table. Warehouse owns quantity, custody and movement traceability; users do not re-declare accounting valuation here.
 - Material snapshot submit applies site balance usage but does not create warehouse movement by itself.
 - Surplus handling can be partial and must keep remaining/handled state consistent.
 - Returning only part of the available site material leaves `surplus_status='partial'` when a positive surplus remains; it becomes `handled` only when no surplus remains. Stock SQL binds quantities explicitly as numeric to avoid PostgreSQL parameter type ambiguity.
@@ -50,10 +51,10 @@
 
 - Pair with procurement when receive/order flows create stock movements or material obligations.
 - Procurement `receive` now reconciles submitted incoming-acceptance quantities into `partially_received`/`received`; it does not create `stock_movements`. Warehouse receipt remains an explicit stock action with its own balance ledger and audit.
-- Submitted incoming acceptance and posted stock documents can be selected as same-project source evidence for `project_material_costs`. This reference is read-only: material-cost creation/confirmation never posts, reverses or changes warehouse movements/balances.
+- Submitted incoming acceptance and posted stock documents remain canonical readiness/quantity evidence attached to their Procurement source. They do not create separate Accounting Handoff rows; handoff transitions never post, reverse or change warehouse movements/balances. Rev8/legacy projects may still select them as old `project_material_costs` evidence.
 - Pair with construction operations when site usage, before/after snapshots, or surplus handling changes work item state.
 - Pair with quality/acceptance/handover when incoming acceptance, outgoing acceptance, or handover blockers depend on material state.
-- Material `standard_price` is a monetary input and uses semantic `currency`/shared `CurrencyInput`; stock, acceptance, snapshot and surplus quantities remain numeric quantity fields and must not be converted to currency.
+- Stock, acceptance, snapshot and surplus quantities remain numeric quantity fields. The ordinary Warehouse UI has no editable monetary field; if a compatibility maintenance surface ever edits `standard_price`, it must still use semantic `currency`/shared `CurrencyInput`.
 
 ## Golden Sample
 

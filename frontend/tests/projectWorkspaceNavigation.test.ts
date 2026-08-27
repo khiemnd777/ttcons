@@ -22,7 +22,7 @@ test('project explorer groups open their canonical first workspace for an admin'
     'project.view', 'pipeline.view', 'planning.view', 'boq.view',
     'contract.view', 'procurement.view', 'warehouse.view',
     'operation.view', 'quality.view', 'acceptance.view', 'rework.view',
-    'handover.view', 'project_finance.view',
+    'handover.view', 'accounting_handoff.view', 'project_finance.view',
     'audit.view',
   ];
 
@@ -32,6 +32,17 @@ test('project explorer groups open their canonical first workspace for an admin'
     materials: '/projects/project-1/boq',
     quality: '/projects/project-1/operations',
     finance: '/projects/project-1/handover',
+    governance: '/projects/project-1?tab=members',
+  });
+});
+
+test('project explorer exposes the lean accounting handoff permission without legacy finance rights', () => {
+  assert.deepEqual(routeMap([
+    'project.view', 'accounting_handoff.view', 'audit.view',
+  ]), {
+    overview: '/projects/project-1',
+    planning: '/projects/project-1/preparation',
+    finance: '/projects/project-1/accounting',
     governance: '/projects/project-1?tab=members',
   });
 });
