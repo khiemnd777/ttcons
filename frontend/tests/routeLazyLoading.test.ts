@@ -12,7 +12,7 @@ test('authenticated pages stay lazy and below the permission boundary', async ()
   assert.doesNotMatch(source, /lazy\(\(\) => import\('\.\.\/modules\/auth\/LoginPage'\)/);
   assert.match(
     guardedFunction,
-    /<RequirePermission permissions=\{permissions\}>[\s\S]*<RouteModuleBoundary focus=\{focus\}>\{element\}<\/RouteModuleBoundary>[\s\S]*<\/RequirePermission>/,
+    /<RequirePermission permissions=\{permissions\} excludePermissions=\{excludePermissions\}>[\s\S]*<RouteModuleBoundary focus=\{focus\}>\{element\}<\/RouteModuleBoundary>[\s\S]*<\/RequirePermission>/,
   );
 });
 

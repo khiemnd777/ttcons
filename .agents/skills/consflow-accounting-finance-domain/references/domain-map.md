@@ -2,7 +2,8 @@
 
 ## Owners
 
-- Ordinary Accounting Handoff UI: `frontend/src/modules/project-finance/AccountingHandoffPage.tsx`, compatibility wrapper/legacy UI in `ProjectFinancePage.tsx`, shared `frontend/src/modules/_shared/AsyncProjectPicker.tsx` and `ProjectScopeActions.tsx`, routed at `/accounting` and `/projects/:id/accounting`
+- Ordinary Accounting Handoff UI: `frontend/src/modules/project-finance/AccountingHandoffPage.tsx`, shared `AccountingHandoffActionDialog.tsx`, compatibility wrapper/legacy UI in `ProjectFinancePage.tsx`, shared project picker/actions, routed at `/accounting` and `/projects/:id/accounting`
+- Accounting company work UI: `frontend/src/modules/my-work/AccountingWorkLane.tsx`, hosted by `MyWorkPage.tsx`; company observer presentation in `AppShell.tsx`, `app/router.tsx`, `ProjectWorkspaceLayout.tsx` and `projectWorkspaceNavigation.ts`
 - Accounting Handoff backend: `accounting_handoff.go`, `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, `types_project_finance.go`; project-option parsing/paging/search helpers live in `handlers_reports.go`, `service_reports.go` and `repository_reports.go`
 - Frontend modules: `frontend/src/modules/accounting` (`AccountingPage.tsx`, `AccountingBooksPanel.tsx`, `ManualJournalDialog.tsx`, `TaxWorkspace.tsx`, `AccountingCreateDialog.tsx`, `AccountingDetailDialog.tsx`, `CashflowPanel.tsx`), `frontend/src/modules/debt`, `frontend/src/modules/contracts`, `frontend/src/modules/reports`, and the permission-gated cashflow projection in `frontend/src/modules/dashboard/DashboardSummaryPanels.tsx`
 - Debt panels: `InputInvoicePanel.tsx`, `OutputInvoicePanel.tsx`, `InputPaymentPlanPanel.tsx`, `OutputBillingPlanPanel.tsx`, `PayableReconciliationPanel.tsx`, `ReceivableReconciliationPanel.tsx`
@@ -27,7 +28,7 @@
 
 ## Tables And Migrations
 
-- Ordinary handoff records: `accounting_handoffs`; migration `V131`. Source records remain `procurement_requests` and `contract_milestones`.
+- Ordinary handoff records: `accounting_handoffs`; migration `V131`. V133 adds the `project.reconciliation.view` observer marker and additive Accounting read grants. Source records remain `procurement_requests` and `contract_milestones`.
 - Legacy management records: `project_material_costs`, `project_cash_requests`; migration `V83`.
 - `accounting_budgets`, `payables`, `receivables`, `payments`, `advance_requests`, `payment_allocations`, `receipt_allocations`
 - `accounting_books`, `accounting_accounts`, `accounting_periods`, `journal_entries`, `journal_entry_lines`, `accounting_posting_rules`
@@ -40,6 +41,12 @@
 - Relevant migrations: `V1`, `V27`-`V36`, `V48`, `V54`-`V56`, `V70`, `V71`, `V73`-`V83`, `V131`; V90 project search/order indexes support the shared project picker.
 
 ## Invariants
+
+- A global `project.reconciliation.view` grant means Accounting may reconcile non-cancelled company projects, Dashboard finance and source workflow records without membership. It is an observation marker, not Admin/Director identity and not a wildcard permission.
+- Company scope is allowed only for the enumerated read permissions and Accounting-owned action keys. Procurement/contract/PM/Admin approvals and mutations remain membership-scoped even if a historical role grant contains their key. Project activity creation also remains membership-scoped.
+- `GET /me/accounting-handoffs` is the focused Accounting lane: pending `handed_off` records are actionable, while `returned` and `acknowledged` are follow-up/history views. It must not fill ordinary personal Work Item queues with every observed project task.
+- Accounting acknowledge/return from My Work uses the existing canonical transition, required return reason, optional MISA reference, audit and actor/timestamp behavior; it never creates a second finance state machine.
+- Accounting observer navigation excludes Pipeline/Form configuration, Staff, Role/Permission, Audit/Event Logs and Settings. Global and project Audit APIs also reject the reconciliation marker through `requirePermissionExcluding`; the other hidden surfaces retain their existing backend capability gates. No historical role grant is removed.
 
 - `Bàn giao kế toán` is the canonical ordinary workspace. Work-item `execution_target` links may add presentation-only `?task=` context; they do not create a parallel payable/receivable/cash ledger, grant permission, post a journal, record payment or change a source record.
 - Product boundary: Consflow ordinary users prepare and hand off source dossiers only. MISA is the system of record for bookkeeping, tax, payment and authoritative accounting values; this feature has no MISA synchronization. Any displayed source amount is explicitly reference-only.

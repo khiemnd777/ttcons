@@ -2471,6 +2471,21 @@ func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, act
 	}, nil
 }
 
+func (s *Service) MyAccountingWork(ctx context.Context, filter MyAccountingWorkFilter, actorID string) (Record, error) {
+	filter, offset, err := normalizeMyAccountingWorkFilter(filter)
+	if err != nil {
+		return nil, err
+	}
+	allowed, err := s.repo.UserHasAnyPermission(ctx, actorID, []string{"accounting_handoff.view", "project_finance.view"})
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền xem công việc Kế toán")
+	}
+	return s.repo.MyAccountingWork(ctx, actorID, filter, offset)
+}
+
 func (s *Service) MyWorkNavigationSummary(ctx context.Context, actorID string) (Record, error) {
 	workItemCounts, err := s.repo.MyWorkNavigationCounts(ctx, actorID)
 	if err != nil {
@@ -2515,7 +2530,16 @@ func (s *Service) MyWorkNavigationSummary(ctx context.Context, actorID string) (
 		workReportReviewCount = workReportSummary.Scopes["review"]
 	}
 
-	return myWorkNavigationSummaryRecord(workItemCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount), nil
+	accountingHandoffCount := 0
+	if hasAnyString(permissions, []string{"accounting_handoff.view"}) && hasAnyString(permissions, []string{"accounting_handoff.acknowledge"}) {
+		accountingPage, err := s.MyAccountingWork(ctx, MyAccountingWorkFilter{Status: "handed_off", Limit: 1}, actorID)
+		if err != nil {
+			return nil, err
+		}
+		accountingHandoffCount = int(number(accountingPage["total"]))
+	}
+
+	return myWorkNavigationSummaryRecord(workItemCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount, accountingHandoffCount), nil
 }
 
 func (s *Service) MyWorkScopeSummary(ctx context.Context, actorID, projectID string) (Record, error) {
@@ -2563,7 +2587,7 @@ func myWorkScopeSummaryRecord(workItemCounts myWorkScopeCounts, workflowResponsi
 	}
 }
 
-func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount int) Record {
+func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount, accountingHandoffCount int) Record {
 	workTotal := workItemCounts.NeedAction + workflowActionCount + startupActionCount
 	approvalTotal := workItemCounts.WaitingDecision + nodeApprovalCount + workReportReviewCount
 	return Record{
@@ -2575,7 +2599,9 @@ func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workfl
 		"node_approvals_pending":      nodeApprovalCount,
 		"work_reports_review_pending": workReportReviewCount,
 		"approval_total":              approvalTotal,
-		"total":                       workTotal + approvalTotal,
+		"accounting_handoffs_pending": accountingHandoffCount,
+		"accounting_total":            accountingHandoffCount,
+		"total":                       workTotal + approvalTotal + accountingHandoffCount,
 	}
 }
 
@@ -7364,6 +7390,13 @@ func (s *Service) AddProjectActivity(ctx context.Context, projectID string, req 
 	}
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền thêm hoạt động cho công trình này")
+	}
+	canMutate, err := s.repo.CanMutateProjectActivity(ctx, actorID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if !canMutate {
+		return nil, forbiddenError("Chế độ đối soát Kế toán chỉ được xem hoạt động của công trình")
 	}
 	if strings.TrimSpace(req.ParentActivityID) != "" {
 		req.ActivityType = "comment"

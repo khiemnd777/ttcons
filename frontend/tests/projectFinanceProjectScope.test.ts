@@ -24,6 +24,7 @@ test('global accounting handoff uses a draft/applied asynchronous project scope'
 
 test('new accounting handoff is source-backed and contains no duplicate accounting capture', async () => {
   const financePage = await source('../src/modules/project-finance/AccountingHandoffPage.tsx');
+  const actionDialog = await source('../src/modules/project-finance/AccountingHandoffActionDialog.tsx');
   const compatibilityWrapper = await source('../src/modules/project-finance/ProjectFinancePage.tsx');
 
   assert.match(financePage, /Hồ sơ bàn giao kế toán/);
@@ -31,7 +32,8 @@ test('new accounting handoff is source-backed and contains no duplicate accounti
   assert.match(financePage, /source_type: item\.source_type, source_id: item\.source_id/);
   assert.match(financePage, /\/projects\/\$\{projectId\}\/accounting-handoffs/);
   assert.match(financePage, /\/accounting-handoffs\/\$\{item\.handoff_id\}\/\$\{action\}/);
-  assert.match(financePage, /'handoff' \| 'acknowledge' \| 'return'/);
+  assert.match(actionDialog, /'handoff' \| 'acknowledge' \| 'return'/);
+  assert.match(financePage, /<AccountingHandoffActionDialog/);
   assert.doesNotMatch(financePage, /Ghi nhận chi phí vật tư|Lập đề nghị thu\/chi|Báo cáo quản trị|provisional_profit|amount_before_vat|vat_amount/);
   assert.match(compatibilityWrapper, /mode\.data\?\.mode === 'legacy'/);
   assert.match(financePage, /\{id \? <ProjectBackLink \/> : null\}/);

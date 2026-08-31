@@ -159,6 +159,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Get("/me/work-items", h.MyWorkItems)
 	protected.Get("/me/work-items/scope-summary", h.MyWorkScopeSummary)
 	protected.Get("/me/work-items/navigation-summary", h.MyWorkNavigationSummary)
+	protected.Get("/me/accounting-handoffs", h.MyAccountingWork)
 	protected.Get("/me/project-startup-actions", h.MyProjectStartupActions)
 	protected.Get("/me/workflow-actions", h.MyWorkflowActions)
 	protected.Get("/me/activity-attention/stream", h.MyActivityAttentionStream)

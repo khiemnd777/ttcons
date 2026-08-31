@@ -507,19 +507,29 @@ func (r *Repository) ReplaceUserRoles(ctx context.Context, userID string, roleID
 }
 
 type workItemAccessProfile struct {
-	UserID     string
-	StaffID    string
-	Department string
-	RoleLabels []string
-	IsAdmin    bool
-	IsDirector bool
-	IsManager  bool
+	UserID                  string
+	StaffID                 string
+	Department              string
+	RoleLabels              []string
+	IsAdmin                 bool
+	IsDirector              bool
+	IsManager               bool
+	CanReconcileAllProjects bool
 }
 
 func (r *Repository) WorkItemAccessProfile(ctx context.Context, userID string) (workItemAccessProfile, error) {
 	profile := workItemAccessProfile{UserID: userID}
 	staffRows, err := r.Query(ctx, `
-		SELECT COALESCE(s.id::text, '') AS staff_id, COALESCE(s.department, '') AS department
+		SELECT COALESCE(s.id::text, '') AS staff_id, COALESCE(s.department, '') AS department,
+			EXISTS (
+				SELECT 1
+				FROM user_roles reconciliation_role
+				JOIN role_permissions reconciliation_grant ON reconciliation_grant.role_id=reconciliation_role.role_id
+				JOIN permissions reconciliation_permission ON reconciliation_permission.id=reconciliation_grant.permission_id
+				WHERE reconciliation_role.user_id=u.id
+				  AND reconciliation_role.project_id IS NULL
+				  AND reconciliation_permission.key='project.reconciliation.view'
+			) AS can_reconcile_all_projects
 		FROM users u
 		LEFT JOIN staff s ON s.user_id=u.id AND s.status='active'
 		WHERE u.id=$1
@@ -532,6 +542,7 @@ func (r *Repository) WorkItemAccessProfile(ctx context.Context, userID string) (
 	}
 	profile.StaffID = fmt.Sprint(staffRows[0]["staff_id"])
 	profile.Department = fmt.Sprint(staffRows[0]["department"])
+	profile.CanReconcileAllProjects = boolValue(staffRows[0]["can_reconcile_all_projects"])
 
 	roleRows, err := r.Query(ctx, `
 		SELECT DISTINCT r.id::text AS id, r.name, r.display_name, COALESCE(ur.project_id::text, '') AS project_id
@@ -571,6 +582,59 @@ func (r *Repository) WorkItemAccessProfile(ctx context.Context, userID string) (
 }
 
 var projectOperationsViewPermissions = []string{"operation.view", "project.view", "pipeline.view"}
+
+var projectReconciliationReadPermissions = map[string]bool{
+	"project.reconciliation.view": true,
+	"project.view":                true,
+	"pipeline.view":               true,
+	"planning.view":               true,
+	"boq.view":                    true,
+	"procurement.view":            true,
+	"contract.view":               true,
+	"warehouse.view":              true,
+	"operation.view":              true,
+	"quality.view":                true,
+	"acceptance.view":             true,
+	"rework.view":                 true,
+	"replanning.view":             true,
+	"handover.view":               true,
+	"accounting_handoff.view":     true,
+	"project_finance.view":        true,
+	"project_finance.report_view": true,
+	"report.view":                 true,
+	"statistics.view":             true,
+}
+
+var projectReconciliationGlobalActionPermissions = map[string]bool{
+	"accounting_handoff.acknowledge": true,
+	"project_finance.cost_create":    true,
+	"project_finance.cost_review":    true,
+	"project_finance.request_create": true,
+	"project_finance.process":        true,
+}
+
+func reconciliationCompanyScopeAllowed(profile workItemAccessProfile, granted, required []string) bool {
+	if !profile.CanReconcileAllProjects {
+		return false
+	}
+	grantedSet := make(map[string]bool, len(granted))
+	for _, permission := range granted {
+		grantedSet[permission] = true
+	}
+	for _, permission := range required {
+		if !grantedSet[permission] {
+			continue
+		}
+		if projectReconciliationReadPermissions[permission] || projectReconciliationGlobalActionPermissions[permission] {
+			return true
+		}
+	}
+	return false
+}
+
+func profileCanObserveAllProjectWork(profile workItemAccessProfile) bool {
+	return profile.IsManager || profile.CanReconcileAllProjects
+}
 
 func (r *Repository) UserHasAnyPermission(ctx context.Context, userID string, required []string) (bool, error) {
 	if len(required) == 0 {
@@ -668,6 +732,20 @@ func (r *Repository) CanAccessProjectPermission(ctx context.Context, userID, pro
 	if profile.IsAdmin || profile.IsDirector {
 		return true, nil
 	}
+	if reconciliationCompanyScopeAllowed(profile, permissions, required) {
+		return true, nil
+	}
+	return r.UserHasProjectScope(ctx, userID, projectID)
+}
+
+func (r *Repository) CanMutateProjectActivity(ctx context.Context, userID, projectID string) (bool, error) {
+	profile, err := r.WorkItemAccessProfile(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	if !profile.CanReconcileAllProjects || profile.IsAdmin || profile.IsDirector {
+		return true, nil
+	}
 	return r.UserHasProjectScope(ctx, userID, projectID)
 }
 
@@ -688,7 +766,7 @@ func (r *Repository) ProjectAccessFilter(ctx context.Context, userID, projectAli
 	if err != nil {
 		return "", nil, err
 	}
-	return projectAccessSQL(projectAlias, start), []any{profile.IsAdmin || profile.IsDirector, profile.UserID, profile.StaffID}, nil
+	return projectAccessSQL(projectAlias, start), []any{profile.IsAdmin || profile.IsDirector || profile.CanReconcileAllProjects, profile.UserID, profile.StaffID}, nil
 }
 
 func projectAccessSQL(projectAlias string, start int) string {
@@ -799,7 +877,7 @@ func (r *Repository) CanViewProjectOperations(ctx context.Context, projectID, us
 	if len(activeProject) == 0 || number(activeProject[0]["total"]) == 0 {
 		return false, nil
 	}
-	if profile.IsAdmin {
+	if profile.IsAdmin || profile.CanReconcileAllProjects {
 		return true, nil
 	}
 	permissions, err := r.UserProjectPermissions(ctx, userID, projectID)
@@ -880,7 +958,7 @@ func (r *Repository) ProjectOperationsVisibleProjectIDs(ctx context.Context, use
 				)
 			)
 		  )
-	`, profile.IsAdmin, profile.IsDirector, profile.UserID, profile.StaffID)
+	`, profile.IsAdmin || profile.CanReconcileAllProjects, profile.IsDirector, profile.UserID, profile.StaffID)
 	if err != nil {
 		return nil, err
 	}
@@ -1240,7 +1318,7 @@ func (r *Repository) canAccessWorkItem(ctx context.Context, workItemID, userID s
 	if err != nil {
 		return false, err
 	}
-	managerOverride := profile.IsManager
+	managerOverride := profileCanObserveAllProjectWork(profile)
 	if !includeWatchers {
 		managerOverride = profile.IsAdmin
 	}
@@ -1276,7 +1354,7 @@ func (r *Repository) listProjectWorkItems(ctx context.Context, projectID, userID
 	if err != nil {
 		return nil, err
 	}
-	args := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	args := append([]any{projectID}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
 	statusCondition := "wi.status <> 'cancelled'"
 	if includeCancelled {
 		statusCondition = "TRUE"
@@ -1341,7 +1419,7 @@ func (r *Repository) ListProjectWorkflowSidebarWorkItems(ctx context.Context, pr
 	if err != nil {
 		return nil, err
 	}
-	args := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	args := append([]any{projectID}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT
 			wi.id,
@@ -8080,7 +8158,7 @@ func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID st
 		return nil, err
 	}
 	domainCounts := Record{}
-	if profile.IsManager {
+	if profileCanObserveAllProjectWork(profile) {
 		domainCounts, err = r.ProjectOperationsDomainCounts(ctx, projectID)
 		if err != nil {
 			return nil, err
@@ -8090,7 +8168,7 @@ func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID st
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	if run != nil && !profile.IsManager {
+	if run != nil && !profileCanObserveAllProjectWork(profile) {
 		run = scopePipelineRunToWorkItems(run, workItems)
 	}
 	visibility := projectOperationsVisibility(profile, permissions)
@@ -8138,7 +8216,7 @@ func (r *Repository) ProjectOperationsWorkflowSidebar(ctx context.Context, proje
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	if run != nil && !profile.IsManager {
+	if run != nil && !profileCanObserveAllProjectWork(profile) {
 		run = scopePipelineRunToWorkItems(run, workItems)
 	}
 	visibility := projectOperationsVisibility(profile, permissions)
@@ -8165,7 +8243,7 @@ func (r *Repository) ProjectPipelineRun(ctx context.Context, projectID, userID s
 	if err != nil {
 		return nil, err
 	}
-	if profile.IsManager {
+	if profileCanObserveAllProjectWork(profile) {
 		return run, nil
 	}
 	workItems, err := r.ListProjectWorkItems(ctx, projectID, userID)
@@ -8331,7 +8409,7 @@ func (r *Repository) MarkProjectActivityRead(ctx context.Context, projectID, use
 }
 
 func (r *Repository) ProjectActivitySummary(ctx context.Context, projectID string, profile workItemAccessProfile) (Record, error) {
-	args := append([]any{projectID, profile.UserID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	args := append([]any{projectID, profile.UserID}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
 	visibilitySQL := "TRUE"
 	if profileIsClient(profile) && !profile.IsManager {
 		visibilitySQL = "wia.visibility='client'"
@@ -8392,7 +8470,7 @@ func (r *Repository) ProjectActivityOptions(ctx context.Context, projectID strin
 	if err != nil {
 		return nil, err
 	}
-	workArgs := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	workArgs := append([]any{projectID}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
 	workTargets, err := r.Query(ctx, fmt.Sprintf(`
 		SELECT 'work_item' AS scope_type, wi.id AS scope_id,
 			COALESCE(NULLIF(wi.title, ''), wi.id::text) AS label,
@@ -8435,7 +8513,7 @@ func (r *Repository) ProjectActivityOptions(ctx context.Context, projectID strin
 	if profileIsClient(profile) && !profile.IsManager {
 		evidenceVisibility = "er.visibility='client'"
 	}
-	attachmentArgs := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	attachmentArgs := append([]any{projectID}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
 	attachments, err := r.Query(ctx, fmt.Sprintf(`
 		SELECT 'evidence' AS type, er.id, COALESCE(NULLIF(er.name,''), NULLIF(er.title,''), er.id::text) AS label,
 			er.status, er.visibility, er.work_item_id
@@ -8471,7 +8549,7 @@ func (r *Repository) ProjectActivityOptions(ctx context.Context, projectID strin
 }
 
 func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string, profile workItemAccessProfile, filter ProjectActivityFilter) ([]Record, error) {
-	args := append([]any{projectID, profile.UserID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	args := append([]any{projectID, profile.UserID}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
 	visibilitySQL := "TRUE"
 	if profileIsClient(profile) && !profile.IsManager {
 		visibilitySQL = "wia.visibility='client'"
@@ -8631,7 +8709,7 @@ func profileIsClient(profile workItemAccessProfile) bool {
 }
 
 func (r *Repository) ProjectOperationsApprovals(ctx context.Context, projectID string, profile workItemAccessProfile) ([]Record, error) {
-	if profile.IsManager {
+	if profileCanObserveAllProjectWork(profile) {
 		return r.Query(ctx, `
 			SELECT ar.*, u.full_name AS requested_by_name,
 				COALESCE(u.deleted_at IS NOT NULL,false) AS requested_by_account_deleted
@@ -8664,7 +8742,7 @@ func (r *Repository) ProjectOperationsApprovals(ctx context.Context, projectID s
 }
 
 func (r *Repository) ProjectOperationsEvidence(ctx context.Context, projectID string, profile workItemAccessProfile) ([]Record, error) {
-	args := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	args := append([]any{projectID}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT er.*, wi.title AS work_item_title,u.full_name AS submitted_by_name,
 			COALESCE(u.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,d.name AS document_name
@@ -8683,7 +8761,7 @@ func (r *Repository) ProjectOperationsEvidence(ctx context.Context, projectID st
 }
 
 func projectEvidenceWhere(projectID string, profile workItemAccessProfile, filter ProjectEvidenceFilter, includeCursor bool) ([]string, []any) {
-	args := append([]any{projectID}, workItemScopeArgs(profile, profile.IsManager, true)...)
+	args := append([]any{projectID}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
 	conditions := []string{
 		"er.project_id=$1",
 		"wi.status <> 'cancelled'",
@@ -8850,6 +8928,9 @@ func (r *Repository) ProjectEvidenceOptions(ctx context.Context, projectID strin
 }
 
 func (r *Repository) ProjectOperationsAudit(ctx context.Context, projectID string, profile workItemAccessProfile) ([]Record, error) {
+	if profile.CanReconcileAllProjects && !profile.IsManager {
+		return []Record{}, nil
+	}
 	if profile.IsManager {
 		return r.Query(ctx, `
 			SELECT al.*
@@ -8954,17 +9035,22 @@ func projectOperationsVisibility(profile workItemAccessProfile, permissions []st
 		scope = "admin"
 	} else if profile.IsDirector {
 		scope = "director"
+	} else if profile.CanReconcileAllProjects {
+		scope = "accounting_reconciliation"
 	} else if profile.Department != "" {
 		scope = "project_member"
 	}
 	hiddenSections := []string{}
-	if !profile.IsManager {
+	canObserveAll := profileCanObserveAllProjectWork(profile)
+	if !canObserveAll {
 		hiddenSections = append(hiddenSections, "domain_counts", "project_audit", "unscoped_pipeline_steps")
+	} else if profile.CanReconcileAllProjects && !profile.IsManager {
+		hiddenSections = append(hiddenSections, "project_audit")
 	}
 	return Record{
 		"scope":                scope,
-		"scoped":               !profile.IsManager,
-		"can_view_all_project": profile.IsManager,
+		"scoped":               !canObserveAll,
+		"can_view_all_project": canObserveAll,
 		"department":           profile.Department,
 		"permissions":          permissions,
 		"role_labels":          profile.RoleLabels,

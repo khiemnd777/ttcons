@@ -26,7 +26,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
-import type { ActivityAttentionItem, ActivityAttentionSummary, ApprovalRequest, MyWorkflowAction, ProjectStartupAction, ProjectStartupActionsResponse, WorkItem, WorkReportListItem, WorkReportSummary } from '../../lib/types/domain';
+import type { AccountingWorkPage, AccountingWorkStatus, ActivityAttentionItem, ActivityAttentionSummary, ApprovalRequest, MyWorkflowAction, ProjectStartupAction, ProjectStartupActionsResponse, WorkItem, WorkReportListItem, WorkReportSummary } from '../../lib/types/domain';
 import { ApprovalPanel } from '../../components/ApprovalPanel';
 import { statusLabel } from '../../lib/utils/status';
 import { roleSummary as summarizeRoles } from '../../lib/utils/roles';
@@ -48,8 +48,9 @@ import {
   workTypeLabel,
 } from '../work-items/workItemPresentation';
 import { ProjectStartupWizard } from '../projects/ProjectStartupWizard';
+import { AccountingWorkLane } from './AccountingWorkLane';
 
-type ModeKey = 'work' | 'approval' | 'attention';
+type ModeKey = 'work' | 'approval' | 'accounting' | 'attention';
 type ApprovalLaneKey = 'work' | 'node' | 'report';
 type WorkScopeKey = 'responsible' | 'mine' | 'department' | 'watching' | 'all';
 type LegacyQueueKey = WorkScopeKey | 'pending_approval';
@@ -162,11 +163,19 @@ export function MyWorkPage() {
 	const streamStatus = useActorRealtimeStatus();
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
 
-  const requestedMode = validValue<ModeKey>(searchParams.get('mode'), ['work', 'approval', 'attention'], 'work');
+  const canViewAccountingWork = hasPermission('accounting_handoff.view') && hasPermission('accounting_handoff.acknowledge');
+  const canAcknowledgeAccounting = hasPermission('accounting_handoff.acknowledge');
+  const requestedMode = validValue<ModeKey>(searchParams.get('mode'), ['work', 'approval', 'accounting', 'attention'], 'work');
   const requestedQueue = validValue<LegacyQueueKey>(searchParams.get('queue'), ['responsible', 'mine', 'department', 'pending_approval', 'watching', 'all'], 'responsible');
   const requestedBucket = validValue<SummaryBucket>(searchParams.get('bucket'), ['all', 'need_action', 'in_progress', 'overdue', 'blocked', 'waiting_decision', 'upcoming', 'completed', 'done_today'], 'need_action');
   const legacyApprovalMode = requestedQueue === 'pending_approval' || requestedBucket === 'waiting_decision';
-  const mode: ModeKey = requestedMode === 'attention' ? 'attention' : requestedMode === 'approval' || legacyApprovalMode ? 'approval' : 'work';
+  const mode: ModeKey = requestedMode === 'accounting'
+    ? canViewAccountingWork ? 'accounting' : 'work'
+    : requestedMode === 'attention'
+      ? 'attention'
+      : requestedMode === 'approval' || legacyApprovalMode
+        ? 'approval'
+        : 'work';
   const queue: WorkScopeKey = (requestedQueue === 'pending_approval' || requestedQueue === 'mine') ? 'responsible' : requestedQueue;
   const attentionQueue = validValue<AttentionQueueKey>(searchParams.get('attention'), ['all', 'mentions', 'questions', 'blockers', 'reminders', 'unread'], 'all');
   const bucket: SummaryBucket = requestedBucket === 'waiting_decision' ? 'all' : requestedBucket;
@@ -176,6 +185,7 @@ export function MyWorkPage() {
   const workType = searchParams.get('type') ?? '';
   const priority = searchParams.get('priority') ?? '';
   const search = searchParams.get('search') ?? '';
+  const accountingStatus = validValue<AccountingWorkStatus>(searchParams.get('accounting_status'), ['handed_off', 'returned', 'acknowledged', 'all'], 'handed_off');
   const sort = searchParams.get('sort') ?? 'priority';
   const roleSummary = summarizeRoles(user?.roles);
   const canReviewWorkReports = hasPermission('work_report.view') && (hasPermission('work_report.review') || hasPermission('work_report.manage'));
@@ -234,6 +244,15 @@ export function MyWorkPage() {
     queryKey: ['my-project-startup-actions', user?.id, project, search],
     queryFn: () => get<ProjectStartupActionsResponse>(buildProjectStartupActionsPath({ project, search })),
     enabled: Boolean(user?.id),
+    retry: false,
+  });
+  const accountingFilterKey = useMemo(() => ({ project, status: accountingStatus, search }), [accountingStatus, project, search]);
+  const accountingWork = useInfiniteQuery({
+    queryKey: ['my-accounting-work', user?.id, accountingFilterKey],
+    initialPageParam: '',
+    queryFn: ({ pageParam }) => get<AccountingWorkPage>(buildAccountingWorkPath(accountingFilterKey, String(pageParam ?? ''))),
+    getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor : undefined,
+    enabled: Boolean(user?.id) && canViewAccountingWork,
     retry: false,
   });
   const approvalFilterKey = useMemo(() => ({
@@ -357,6 +376,8 @@ export function MyWorkPage() {
   const facets = firstPage?.facets ?? {};
   const approvalProjectOptions = useMemo(() => mergeApprovalProjectOptions(normalizeFacetOptions(facets.projects, 'Công trình'), nodeApprovalRows, reportReviewRows), [facets.projects, nodeApprovalRows, reportReviewRows]);
   const attentionRows = useMemo(() => asArray<ActivityAttentionItem>(activityAttention.data), [activityAttention.data]);
+  const accountingFirstPage = accountingWork.data?.pages[0];
+  const accountingRows = useMemo(() => accountingWork.data?.pages.flatMap((page) => page.items) ?? [], [accountingWork.data]);
   const attentionTabCount = activityAttentionSummary.isLoading
     ? '…'
     : activityAttentionSummary.isError
@@ -374,6 +395,11 @@ export function MyWorkPage() {
     : (workItems.isError && !firstPage) || (pendingNodeApprovals.isError && !pendingNodeApprovals.data) || (canReviewWorkReports && reportReviewSummary.isError && !reportReviewSummary.data)
       ? '—'
       : summary.waiting_decision + nodeApprovalCount + reportReviewCount;
+  const accountingTabCount = accountingWork.isLoading
+    ? '…'
+    : accountingWork.isError && !accountingFirstPage
+      ? '—'
+      : accountingFirstPage?.summary.handed_off_count ?? 0;
   const approvalWorkLaneCount = approvalWorkItems.isLoading
     ? '…'
     : approvalWorkItems.isError && !approvalFirstPage
@@ -457,6 +483,7 @@ export function MyWorkPage() {
     void pendingNodeApprovals.refetch();
     if (canReviewWorkReports) void reportReviewSummary.refetch();
     if (mode === 'approval' && canReviewWorkReports) void reportReviewList.refetch();
+    if (canViewAccountingWork) void accountingWork.refetch();
   }
 
   function openWorkItem(item: WorkItem) {
@@ -483,7 +510,7 @@ export function MyWorkPage() {
           <div className="flex items-center gap-2">
             <LiveStatusBadge status={streamStatus} />
             <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={refreshAll}>
-              <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || scopeSummary.isFetching || workflowActions.isFetching || startupActions.isFetching || activityAttentionSummary.isFetching || pendingNodeApprovals.isFetching || (canReviewWorkReports && reportReviewSummary.isFetching) || (mode === 'approval' && canReviewWorkReports && reportReviewList.isFetching) || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
+            <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || scopeSummary.isFetching || workflowActions.isFetching || startupActions.isFetching || activityAttentionSummary.isFetching || pendingNodeApprovals.isFetching || (canViewAccountingWork && accountingWork.isFetching) || (canReviewWorkReports && reportReviewSummary.isFetching) || (mode === 'approval' && canReviewWorkReports && reportReviewList.isFetching) || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
               Làm mới
             </button>
           </div>
@@ -493,6 +520,7 @@ export function MyWorkPage() {
       <div className="mt-4 flex gap-1 overflow-x-auto border-b border-line">
         <ModeTab active={mode === 'work'} label="Công việc" count={workTabCount} onClick={() => updateParams({ mode: 'work', queue, bucket })} />
         <ModeTab active={mode === 'approval'} label="Chờ tôi duyệt" count={approvalTabCount} onClick={() => updateParams({ mode: 'approval', queue, bucket })} />
+        {canViewAccountingWork ? <ModeTab active={mode === 'accounting'} label="Nghiệp vụ Kế toán" count={accountingTabCount} onClick={() => updateParams({ mode: 'accounting' })} /> : null}
         <ModeTab active={mode === 'attention'} label="Trao đổi cần phản hồi" count={attentionTabCount} onClick={() => updateParams({ mode: 'attention' })} />
       </div>
 
@@ -612,6 +640,23 @@ export function MyWorkPage() {
           onRetryNodes={() => void pendingNodeApprovals.refetch()}
           onRetryReports={() => void reportReviewList.refetch()}
           onOpenReport={(report) => navigate(`/reports?scope=review&report=${report.source_id}`)}
+        />
+      ) : mode === 'accounting' ? (
+        <AccountingWorkLane
+          rows={accountingRows}
+          summary={accountingFirstPage?.summary}
+          total={accountingFirstPage?.total ?? accountingRows.length}
+          loading={accountingWork.isLoading}
+          fetchingMore={accountingWork.isFetchingNextPage}
+          error={accountingWork.error}
+          hasMore={Boolean(accountingWork.hasNextPage)}
+          project={project}
+          status={accountingStatus}
+          search={search}
+          canAcknowledge={canAcknowledgeAccounting}
+          onFilterChange={(changes) => updateParams(changes)}
+          onLoadMore={() => void accountingWork.fetchNextPage()}
+          onRetry={() => void accountingWork.refetch()}
         />
       ) : (
         <ActivityAttentionPanel
@@ -805,6 +850,14 @@ function WorkReportReviewLane({ rows, total, loading, error, onRetry, onOpen }: 
 function workReportDateText(value: string) {
   const parts = value.slice(0, 10).split('-');
   return parts.length === 3 ? parts.reverse().join('/') : value;
+}
+
+function buildAccountingWorkPath(filters: { project: string; status: AccountingWorkStatus; search: string }, cursor: string) {
+  const params = new URLSearchParams({ status: filters.status, limit: '30' });
+  if (filters.project) params.set('project_id', filters.project);
+  if (filters.search) params.set('search', filters.search);
+  if (cursor) params.set('cursor', cursor);
+  return `/me/accounting-handoffs?${params.toString()}`;
 }
 
 function buildWorkPath(filters: {

@@ -1,5 +1,12 @@
 # Reporting Analytics Domain Map
 
+## Accounting Reconciliation Dashboard Scope (V133)
+
+- Dashboard finance visibility accepts `project.reconciliation.view` in addition to the existing finance permissions; portfolio project scope comes from the same all-company `ProjectAccessFilter` used by source lists.
+- The money projection remains the canonical approved `payments` ledger with the existing period/direction/date semantics. The observer marker changes authorization scope only; it does not introduce MISA sync or alternate totals.
+- `report.view` is still required for Dashboard access and does not disclose finance by itself. The Accounting migration grants both `report.view` and the reconciliation marker additively.
+- Technical/legacy accounting reports remain outside ordinary Accounting navigation; source reconciliation uses Dashboard, Statistics and project business workspaces.
+
 ## Owners
 
 - Accounting Handoff has no ordinary finance report. Its source queue lives in `frontend/src/modules/project-finance/AccountingHandoffPage.tsx` and backend `accounting_handoff.go`; the old project-finance management report remains visible only when the compatibility workspace returns `mode=legacy`.

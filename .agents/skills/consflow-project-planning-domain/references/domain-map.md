@@ -1,5 +1,13 @@
 # Project Planning Domain Map
 
+## Accounting Company Observation (V133)
+
+- `ProjectAccessFilter` treats a global `project.reconciliation.view` actor as an all-company reader for non-cancelled projects and project-backed source lists.
+- Individual project reads still require a granted permission from the reconciliation read allowlist; the marker alone is not a wildcard module grant.
+- Accounting observers can inspect Project overview, membership/file context, planning/runtime/source modules and progress needed for financial reconciliation. Audit is excluded from their project tree and full-operations response.
+- Creating project activity remains membership-scoped through `CanMutateProjectActivity`; viewing all project activity does not authorize comments or workflow mutations.
+- `ProjectWorkspaceLayout.tsx` displays the explicit all-company/read-only Accounting banner so “thấy hết quy trình” is not mistaken for PM/Admin operating authority.
+
 ## Owners
 
 - Frontend modules: `frontend/src/modules/projects`, `frontend/src/modules/planning` including `ConstructionHandoffPanel.tsx`, `frontend/src/modules/planning-daily-reports`, `frontend/src/modules/meeting-minutes`, `frontend/src/modules/planning-checklists`

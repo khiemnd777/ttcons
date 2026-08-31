@@ -1009,6 +1009,23 @@ func (h *Handler) MyWorkNavigationSummary(c *fiber.Ctx) error {
 	return response.OK(c, summary)
 }
 
+func (h *Handler) MyAccountingWork(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"accounting_handoff.view", "project_finance.view"}); err != nil {
+		return err
+	}
+	page, err := h.service.MyAccountingWork(c.Context(), MyAccountingWorkFilter{
+		ProjectID: c.Query("project_id"),
+		Status:    c.Query("status"),
+		Search:    c.Query("search"),
+		Cursor:    c.Query("cursor"),
+		Limit:     c.QueryInt("limit", 0),
+	}, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, page)
+}
+
 func (h *Handler) MyWorkScopeSummary(c *fiber.Ctx) error {
 	summary, err := h.service.MyWorkScopeSummary(c.Context(), actorID(c), c.Query("project_id"))
 	if err != nil {
@@ -4780,7 +4797,7 @@ func (h *Handler) AssignUserRoles(c *fiber.Ctx) error {
 }
 
 func (h *Handler) AuditLogs(c *fiber.Ctx) error {
-	if err := h.requirePermission(c, []string{"audit.view"}); err != nil {
+	if err := h.requirePermissionExcluding(c, []string{"audit.view"}, []string{"project.reconciliation.view"}); err != nil {
 		return err
 	}
 	page, err := h.service.AuditLogs(c.Context(), "", actorID(c), auditLogFilterFromQuery(c))
@@ -4790,6 +4807,9 @@ func (h *Handler) AuditLogs(c *fiber.Ctx) error {
 	return response.OK(c, page)
 }
 func (h *Handler) ProjectAuditLogs(c *fiber.Ctx) error {
+	if err := h.requirePermissionExcluding(c, []string{"audit.view"}, []string{"project.reconciliation.view"}); err != nil {
+		return err
+	}
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"audit.view"}); err != nil {
 		return err
 	}
@@ -4962,6 +4982,20 @@ func (h *Handler) requirePermission(c *fiber.Ctx, permissions []string) error {
 		return nil
 	}
 	return forbiddenError("Bạn không có quyền thao tác module này", Record{"permissions": permissions})
+}
+
+func (h *Handler) requirePermissionExcluding(c *fiber.Ctx, permissions, excludedPermissions []string) error {
+	if err := h.requirePermission(c, permissions); err != nil {
+		return err
+	}
+	excluded, err := h.service.repo.UserHasAnyPermission(c.Context(), actorID(c), excludedPermissions)
+	if err != nil {
+		return err
+	}
+	if excluded {
+		return forbiddenError("Chức năng này nằm ngoài phạm vi đối soát Kế toán", Record{"excluded_permissions": excludedPermissions})
+	}
+	return nil
 }
 
 func (h *Handler) requireProjectPermission(c *fiber.Ctx, projectID string, permissions []string) error {

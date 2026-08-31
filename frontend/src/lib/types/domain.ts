@@ -235,6 +235,8 @@ export type MyWorkNavigationSummary = {
   node_approvals_pending: number;
   work_reports_review_pending: number;
   approval_total: number;
+  accounting_handoffs_pending: number;
+  accounting_total: number;
   total: number;
 };
 
@@ -3418,6 +3420,48 @@ export type AccountingHandoffWorkspace = {
     returned_count: number;
   };
   items: AccountingHandoffItem[];
+};
+
+export type AccountingWorkStatus = 'handed_off' | 'returned' | 'acknowledged' | 'all';
+
+export type AccountingWorkItem = AnyRecord & {
+  id: string;
+  handoff_id: string;
+  project_id: string;
+  project_code: string;
+  project_name: string;
+  source_id: string;
+  source_type: 'procurement_request' | 'contract_milestone';
+  direction: 'payable' | 'receivable';
+  source_code: string;
+  source_title: string;
+  counterparty_name: string;
+  reference_amount: number;
+  currency: string;
+  source_route: string;
+  status: Exclude<AccountingWorkStatus, 'all'>;
+  note?: string;
+  return_reason?: string;
+  external_reference?: string;
+  handed_off_at?: string;
+  acknowledged_at?: string;
+  returned_at?: string;
+  handed_off_by_name?: string;
+  acknowledged_by_name?: string;
+  returned_by_name?: string;
+};
+
+export type AccountingWorkPage = {
+  items: AccountingWorkItem[];
+  summary: {
+    handed_off_count: number;
+    returned_count: number;
+    acknowledged_count: number;
+    total: number;
+  };
+  total: number;
+  has_more: boolean;
+  next_cursor?: string;
 };
 
 export type ProjectFinanceOptions = {

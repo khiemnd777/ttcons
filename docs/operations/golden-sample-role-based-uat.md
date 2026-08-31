@@ -99,7 +99,7 @@ Ký hiệu: `P` hành động positive-path; `D` quyết định/duyệt bằng 
 | Admin `admin@consflow.local` | P | R | R | R | R | R | R | R | R | R |
 | PM `pm@consflow.local` | P/N | P/D | P/D | P/D | R | P/D | P/D | R/D | R | P/D |
 | QS `qs@consflow.local` | P/N | P | P | P | P | P | P | P | P/R | R |
-| Kế toán `accounting@consflow.local` | P/N | N | N | R | P | P/D | N | R | P/D | P/D |
+| Kế toán `accounting@consflow.local` | P/R/N | R/N | R/N | R | P/R | P/D/R | R/N | R | P/D/R | P/D/R |
 | Thủ kho `warehouse@consflow.local` | P/N | N | N | R | P | N | P | P/R | N | P |
 | Giám sát `supervisor@consflow.local` | P/N | P | R | N | R | N | P | P | N | P |
 | Giám đốc `director@consflow.local` | P/N | D | D | D | D | D | D | D | D | D |
@@ -112,6 +112,14 @@ Ký hiệu: `P` hành động positive-path; `D` quyết định/duyệt bằng 
 | Pháp lý `legal@consflow.local` | P/N | N | N | R | N | P/D | N | N | R | R |
 
 Golden Live có actor/project member chuyên biệt cho `Thiết kế`, `Sale` và `Pháp lý`. Các step yêu cầu một trong ba vai trò này phải dùng đúng actor tương ứng; nếu account hoặc membership bị thiếu, ghi `BLOCKED-COVERAGE` và không dùng Admin để biến coverage thiếu thành `PASS`. `client@consflow.local` không nằm trong ma trận App: đây là fixture `inactive` dùng để xác nhận đăng nhập bị từ chối; hồ sơ/evidence nghiệp vụ mới là bằng chứng xác nhận của chủ đầu tư.
+
+Riêng actor Kế toán phải có thêm bộ evidence đối soát toàn công ty:
+
+1. Nhìn thấy Dashboard finance và ít nhất hai công trình không cùng membership trực tiếp, đồng thời mở được dữ liệu nguồn BOQ, hợp đồng, mua sắm, kho, thi công và bàn giao của từng công trình.
+2. `Bàn làm việc › Nghiệp vụ Kế toán` hiển thị hồ sơ `handed_off` toàn công ty; tiếp nhận và trả bổ sung chạy đúng transition, return reason, actor/time và audit.
+3. Một write thuộc nghiệp vụ Kế toán được phân quyền phải thành công ngoài membership; một write PM/procurement/contract/project activity phải trả `403` và không tạo side effect.
+4. Menu và direct route của Pipeline Builder, Workflow Forms, Staff, Role/Permission, Audit/Event Logs và Settings không khả dụng trong chế độ đối soát; gọi trực tiếp API Audit toàn cục/công trình phải trả `403`; các menu nghiệp vụ công trình còn lại vẫn hiển thị.
+5. Đối chiếu rằng quyền cũ không bị thu hồi: mọi positive path Kế toán đã có trong ma trận trước V133 vẫn chạy trong membership dự án.
 
 Rev3 có fixture riêng `GOLDEN-REV3-BOQ-001` (project 023) và actor `Bộ phận HĐ` là `contract@consflow.local`. Khi kiểm thử Rev3, actor này phải nhìn thấy work item hợp đồng được giao nhưng không được dùng để thay QS/Kế toán/Pháp lý/Mua hàng/PM/Giám đốc ở các quyết định cần tách vai trò. Project 022 và ma trận 14 vai trò App phía trên không được rebound sang Rev3.
 

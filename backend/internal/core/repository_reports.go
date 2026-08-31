@@ -1447,7 +1447,7 @@ func reportFinancePermissionSQL(projectAlias string, userIDPlaceholder int) stri
 		JOIN permissions finance_permission ON finance_permission.id=finance_role_permission.permission_id
 		WHERE finance_role.user_id=NULLIF($%d, '')::uuid
 		  AND (finance_role.project_id IS NULL OR finance_role.project_id=%s.id)
-		  AND finance_permission.key IN ('report.finance.view','accounting.view')
+		  AND finance_permission.key IN ('report.finance.view','accounting.view','project.reconciliation.view')
 	)`, userIDPlaceholder, projectAlias)
 }
 

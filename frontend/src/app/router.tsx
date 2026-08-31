@@ -63,9 +63,10 @@ function RequireInitialPasswordChange() {
   return <RouteModuleBoundary focus><InitialPasswordChangePage /></RouteModuleBoundary>;
 }
 
-function RequirePermission({ permissions, children }: { permissions?: string[]; children: ReactNode }) {
+function RequirePermission({ permissions, excludePermissions, children }: { permissions?: string[]; excludePermissions?: string[]; children: ReactNode }) {
   const { hasAnyPermission } = useAuth();
   if (!hasAnyPermission(permissions)) return <PermissionDenied permissions={permissions} />;
+  if (excludePermissions?.length && hasAnyPermission(excludePermissions)) return <PermissionDenied />;
   return <>{children}</>;
 }
 
@@ -80,9 +81,9 @@ function LegacyStatisticsRedirect() {
   return <Navigate to={`${target}${location.search}`} replace />;
 }
 
-function guarded(element: ReactNode, permissions?: string[], focus = false) {
+function guarded(element: ReactNode, permissions?: string[], focus = false, excludePermissions?: string[]) {
   return (
-    <RequirePermission permissions={permissions}>
+    <RequirePermission permissions={permissions} excludePermissions={excludePermissions}>
       <RouteModuleBoundary focus={focus}>{element}</RouteModuleBoundary>
     </RequirePermission>
   );
@@ -124,12 +125,12 @@ export const router = createBrowserRouter([
           { path: 'rework', element: guarded(<Navigate to="../operations?tab=actions" replace />, ['rework.view']) },
           { path: 'handover', element: guarded(<HandoverPage />, ['handover.view']) },
           { path: 'accounting', element: guarded(<ProjectFinancePage />, ['accounting_handoff.view', 'project_finance.view']) },
-          { path: 'audit', element: guarded(<AuditPage scoped />, ['audit.view']) },
+          { path: 'audit', element: guarded(<AuditPage scoped />, ['audit.view'], false, ['project.reconciliation.view']) },
         ],
       },
-      { path: '/pipeline-builder', element: guarded(<PipelineBuilderPage />, ['pipeline.view'], true) },
-      { path: '/pipeline-builder/:id', element: guarded(<PipelineBuilderPage />, ['pipeline.view'], true) },
-      { path: '/workflow-forms', element: guarded(<WorkflowFormsPage />, ['pipeline.view']) },
+      { path: '/pipeline-builder', element: guarded(<PipelineBuilderPage />, ['pipeline.view'], true, ['project.reconciliation.view']) },
+      { path: '/pipeline-builder/:id', element: guarded(<PipelineBuilderPage />, ['pipeline.view'], true, ['project.reconciliation.view']) },
+      { path: '/workflow-forms', element: guarded(<WorkflowFormsPage />, ['pipeline.view'], false, ['project.reconciliation.view']) },
       { path: '/planning/daily-reports', element: guarded(<PlanningDailyReportsPage />, ['planning.view', 'pipeline.view']) },
       { path: '/planning/meeting-minutes', element: guarded(<MeetingMinutesPage />, ['planning.view', 'pipeline.view']) },
       { path: '/planning/checklists', element: guarded(<PlanningChecklistsPage />, ['planning.view', 'pipeline.view']) },
@@ -145,16 +146,16 @@ export const router = createBrowserRouter([
       { path: '/core-data', element: guarded(<Navigate to="/core-data/input" replace />, ['catalog.view']) },
       { path: '/core-data/input', element: guarded(<CoreDataPage key="partner-input" group="input" />, ['catalog.view']) },
       { path: '/core-data/output', element: guarded(<CoreDataPage key="partner-output" group="output" />, ['catalog.view']) },
-      { path: '/staff', element: guarded(<StaffPage />, ['staff.view']) },
-      { path: '/roles', element: guarded(<RolesPage />, ['role.view']) },
-      { path: '/permissions', element: guarded(<PermissionsPage />, ['permission.view']) },
-      { path: '/audit', element: guarded(<AuditPage />, ['audit.view']) },
-      { path: '/event-logs', element: guarded(<EventLogsPage />, ['event_log.view']) },
+      { path: '/staff', element: guarded(<StaffPage />, ['staff.view'], false, ['project.reconciliation.view']) },
+      { path: '/roles', element: guarded(<RolesPage />, ['role.view'], false, ['project.reconciliation.view']) },
+      { path: '/permissions', element: guarded(<PermissionsPage />, ['permission.view'], false, ['project.reconciliation.view']) },
+      { path: '/audit', element: guarded(<AuditPage />, ['audit.view'], false, ['project.reconciliation.view']) },
+      { path: '/event-logs', element: guarded(<EventLogsPage />, ['event_log.view'], false, ['project.reconciliation.view']) },
       { path: '/reports', element: guarded(<WorkReportsPage />, ['work_report.view']) },
       { path: '/reports/:reportKey', element: guarded(<LegacyStatisticsRedirect />, ['statistics.view']) },
       { path: '/statistics', element: guarded(<ReportsPage />, ['statistics.view']) },
       { path: '/statistics/:reportKey', element: guarded(<ReportsPage />, ['statistics.view']) },
-      { path: '/settings', element: guarded(<SettingsPage />, ['settings.view']) },
+      { path: '/settings', element: guarded(<SettingsPage />, ['settings.view'], false, ['project.reconciliation.view']) },
     ],
   },
 ]);

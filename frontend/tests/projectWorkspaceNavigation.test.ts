@@ -60,3 +60,21 @@ test('project explorer groups fall back to the first child the user may view', (
     governance: '/projects/project-1?tab=members',
   });
 });
+
+test('accounting reconciliation observer sees the business tree but not project audit', () => {
+  const groups = visibleProjectWorkspaceGroups(permissionCheck([
+    'project.reconciliation.view', 'project.view', 'pipeline.view', 'planning.view',
+    'boq.view', 'contract.view', 'procurement.view', 'warehouse.view',
+    'operation.view', 'quality.view', 'acceptance.view', 'rework.view',
+    'handover.view', 'accounting_handoff.view', 'project_finance.view', 'audit.view',
+  ]));
+  const children = groups.flatMap((group) => group.children.map((child) => child.label));
+
+  assert.ok(groups.some((group) => group.key === 'planning'));
+  assert.ok(groups.some((group) => group.key === 'materials'));
+  assert.ok(groups.some((group) => group.key === 'quality'));
+  assert.ok(groups.some((group) => group.key === 'finance'));
+  assert.ok(children.includes('Thành viên'));
+  assert.ok(children.includes('Hồ sơ'));
+  assert.ok(!children.includes('Nhật ký'));
+});

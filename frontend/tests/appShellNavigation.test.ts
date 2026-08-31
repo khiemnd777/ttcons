@@ -47,7 +47,23 @@ test('standard shell exposes the permission-filtered navigation on mobile', asyn
   assert.match(myWorkNavigationType, /work_total: number/);
   assert.match(myWorkNavigationType, /approval_total: number/);
   assert.match(myWorkNavigationType, /work_reports_review_pending: number/);
+  assert.match(myWorkNavigationType, /accounting_handoffs_pending: number/);
+  assert.match(myWorkNavigationType, /accounting_total: number/);
   assert.doesNotMatch(myWorkNavigationType, /attention/);
+});
+
+test('accounting reconciliation mode excludes technical and administration navigation', async () => {
+  const appShell = await source('../src/layouts/AppShell.tsx');
+  const router = await source('../src/app/router.tsx');
+
+  assert.match(appShell, /type NavItem = \{[\s\S]*excludePermissions\?: string\[\]/);
+  for (const path of ['/pipeline-builder', '/workflow-forms', '/staff', '/roles', '/audit', '/event-logs', '/settings']) {
+    const escapedPath = path.replace('/', '\\/');
+    assert.match(appShell, new RegExp(`to: '${escapedPath}'[^\\n]*excludePermissions: \\['project\\.reconciliation\\.view'\\]`));
+  }
+  assert.match(appShell, /hasAnyPermission\(item\.permissions\)[\s\S]*item\.excludePermissions/);
+  assert.match(router, /excludePermissions\?\.length && hasAnyPermission\(excludePermissions\)/);
+  assert.match(router, /path: 'audit'.*project\.reconciliation\.view/);
 });
 
 test('focus sidebars reuse the approved home brand link', async () => {

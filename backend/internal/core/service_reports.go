@@ -16,7 +16,7 @@ func (s *Service) Dashboard(ctx context.Context, req DashboardPeriodRequest, act
 	if err != nil {
 		return DashboardReportResponse{}, err
 	}
-	financeVisible, err := s.repo.UserHasAnyPermission(ctx, actorID, []string{"report.finance.view", "accounting.view"})
+	financeVisible, err := s.repo.UserHasAnyPermission(ctx, actorID, []string{"report.finance.view", "accounting.view", "project.reconciliation.view"})
 	if err != nil {
 		return DashboardReportResponse{}, err
 	}
@@ -51,7 +51,7 @@ func (s *Service) DashboardProjects(ctx context.Context, req DashboardProjectsRe
 		return DashboardProjectsPage{}, err
 	}
 	req.DashboardPeriodRequest = period
-	financeVisible, err := s.repo.UserHasAnyPermission(ctx, actorID, []string{"report.finance.view", "accounting.view"})
+	financeVisible, err := s.repo.UserHasAnyPermission(ctx, actorID, []string{"report.finance.view", "accounting.view", "project.reconciliation.view"})
 	if err != nil {
 		return DashboardProjectsPage{}, err
 	}

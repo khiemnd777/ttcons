@@ -662,10 +662,10 @@ func TestMyWorkNavigationSummaryTotalsOnlyWorkAndApprovalLanes(t *testing.T) {
 	summary := myWorkNavigationSummaryRecord(myWorkNavigationCounts{
 		NeedAction:      2,
 		WaitingDecision: 3,
-	}, 4, 0, 5, 6)
+	}, 4, 0, 5, 6, 7)
 
-	if number(summary["work_total"]) != 6 || number(summary["approval_total"]) != 14 || number(summary["total"]) != 20 {
-		t.Fatalf("my work navigation totals = %#v, want work 6 + approvals 14 = 20", summary)
+	if number(summary["work_total"]) != 6 || number(summary["approval_total"]) != 14 || number(summary["accounting_total"]) != 7 || number(summary["total"]) != 27 {
+		t.Fatalf("my work navigation totals = %#v, want work 6 + approvals 14 + accounting 7 = 27", summary)
 	}
 	if _, leakedAttention := summary["attention_total"]; leakedAttention {
 		t.Fatalf("my work navigation summary must exclude attention: %#v", summary)

@@ -291,3 +291,92 @@ func TestAccountingHandoffRejectsProcurementBeforeOrderReadiness(t *testing.T) {
 	}, fixture.userID, "Handoff Actor")
 	assertValidationError(t, err)
 }
+
+func TestAccountingReconciliationObserverSeesCompanyScopeButKeepsActionBoundaries(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	fixture := setupProjectScopeFixture(t, db, []string{
+		"project.reconciliation.view",
+		"project.view",
+		"operation.view",
+		"project_finance.view",
+		"accounting_handoff.view",
+		"accounting_handoff.acknowledge",
+		"audit.view",
+		"procurement.approve",
+		"project.update",
+	})
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+
+	canViewOther, err := repo.CanAccessProjectPermission(ctx, fixture.userID, fixture.otherProjectID, []string{"project.view"})
+	if err != nil || !canViewOther {
+		t.Fatalf("observer project read access = %v, err=%v", canViewOther, err)
+	}
+	canAcknowledgeOther, err := repo.CanAccessProjectPermission(ctx, fixture.userID, fixture.otherProjectID, []string{"accounting_handoff.acknowledge"})
+	if err != nil || !canAcknowledgeOther {
+		t.Fatalf("observer Accounting action access = %v, err=%v", canAcknowledgeOther, err)
+	}
+	for permission, label := range map[string]string{
+		"project.update":      "project mutation",
+		"procurement.approve": "procurement approval",
+	} {
+		allowed, permissionErr := repo.CanAccessProjectPermission(ctx, fixture.userID, fixture.otherProjectID, []string{permission})
+		if permissionErr != nil {
+			t.Fatal(permissionErr)
+		}
+		if allowed {
+			t.Fatalf("observer unexpectedly received %s outside project membership", label)
+		}
+	}
+	handler := NewHandler(service)
+	app := batch4TestApp(fixture.userID, func(app *fiber.App, h *Handler) {
+		app.Get("/audit-logs", h.AuditLogs)
+		app.Get("/projects/:id/audit-logs", h.ProjectAuditLogs)
+	}, handler)
+	for _, path := range []string{"/audit-logs", "/projects/" + fixture.projectID + "/audit-logs"} {
+		response, requestErr := app.Test(httptest.NewRequest(http.MethodGet, path, nil))
+		if requestErr != nil {
+			t.Fatal(requestErr)
+		}
+		_ = response.Body.Close()
+		if response.StatusCode != http.StatusForbidden {
+			t.Fatalf("Accounting reconciliation Audit status for %s = %d, want %d", path, response.StatusCode, http.StatusForbidden)
+		}
+	}
+	canPostActivity, err := repo.CanMutateProjectActivity(ctx, fixture.userID, fixture.otherProjectID)
+	if err != nil || canPostActivity {
+		t.Fatalf("observer activity mutation outside membership = %v, err=%v", canPostActivity, err)
+	}
+	canPostMemberActivity, err := repo.CanMutateProjectActivity(ctx, fixture.userID, fixture.projectID)
+	if err != nil || !canPostMemberActivity {
+		t.Fatalf("observer activity mutation inside membership = %v, err=%v", canPostMemberActivity, err)
+	}
+
+	handoffID := newID()
+	sourceID := newID()
+	mustExec(t, db, `
+		INSERT INTO accounting_handoffs (
+			id,project_id,direction,source_type,source_id,source_snapshot_json,status,handed_off_by
+		) VALUES (
+			$1,$2,'payable','procurement_request',$3,
+			jsonb_build_object(
+				'source_code',$4,'source_title','Hồ sơ đối soát ngoài phạm vi thành viên',
+				'counterparty_name','Nhà cung cấp kiểm thử','reference_amount',2500000,'currency','VND'
+			),
+			'handed_off',$5
+		)
+	`, handoffID, fixture.otherProjectID, sourceID, "REC-"+sourceID[:8], fixture.userID)
+
+	page, err := service.MyAccountingWork(ctx, MyAccountingWorkFilter{Status: "handed_off", Limit: 20}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, ok := page["items"].([]Record)
+	if !ok || len(items) != 1 || cleanID(items[0]["project_id"]) != fixture.otherProjectID || cleanID(items[0]["handoff_id"]) != handoffID {
+		t.Fatalf("company Accounting queue = %#v", page)
+	}
+	if int(number(page["total"])) != 1 || int(number(recordValue(page["summary"])["handed_off_count"])) != 1 {
+		t.Fatalf("company Accounting queue summary = %#v", page)
+	}
+}

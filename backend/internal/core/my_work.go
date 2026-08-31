@@ -37,6 +37,10 @@ var myWorkPriorities = map[string]bool{
 	"": true, "low": true, "normal": true, "high": true, "urgent": true,
 }
 
+var myAccountingWorkStatuses = map[string]bool{
+	"handed_off": true, "returned": true, "acknowledged": true, "all": true,
+}
+
 func normalizeMyWorkItemsFilter(filter MyWorkItemsFilter) (MyWorkItemsFilter, int, error) {
 	filter.Queue = strings.ToLower(strings.TrimSpace(filter.Queue))
 	if filter.Queue == "" {
@@ -114,6 +118,39 @@ func normalizeMyWorkflowActionsFilter(filter MyWorkflowActionsFilter) (MyWorkflo
 		return filter, validationError("Từ khóa tìm kiếm không được vượt quá 200 ký tự", nil)
 	}
 	return filter, nil
+}
+
+func normalizeMyAccountingWorkFilter(filter MyAccountingWorkFilter) (MyAccountingWorkFilter, int, error) {
+	filter.ProjectID = cleanID(filter.ProjectID)
+	if filter.ProjectID != "" && !validActivityUUID(filter.ProjectID) {
+		return filter, 0, validationError("project_id không hợp lệ", Record{"project_id": filter.ProjectID})
+	}
+	filter.Status = strings.ToLower(strings.TrimSpace(filter.Status))
+	if filter.Status == "" {
+		filter.Status = "handed_off"
+	}
+	if !myAccountingWorkStatuses[filter.Status] {
+		return filter, 0, validationError("Trạng thái hồ sơ Kế toán không hợp lệ", Record{"status": filter.Status})
+	}
+	filter.Search = strings.TrimSpace(filter.Search)
+	if len([]rune(filter.Search)) > 200 {
+		return filter, 0, validationError("Từ khóa tìm kiếm không được vượt quá 200 ký tự")
+	}
+	if filter.Limit == 0 {
+		filter.Limit = 40
+	}
+	if filter.Limit < 1 || filter.Limit > 100 {
+		return filter, 0, validationError("limit phải nằm trong khoảng 1 đến 100", Record{"limit": filter.Limit})
+	}
+	offset := 0
+	if strings.TrimSpace(filter.Cursor) != "" {
+		parsed, err := parseMyWorkItemsCursor(strings.TrimSpace(filter.Cursor))
+		if err != nil {
+			return filter, 0, validationError("cursor không hợp lệ", Record{"cursor": filter.Cursor})
+		}
+		offset = parsed
+	}
+	return filter, offset, nil
 }
 
 func normalizeMyWorkScopeSummaryProjectID(projectID string) (string, error) {

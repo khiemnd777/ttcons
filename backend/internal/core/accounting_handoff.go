@@ -172,6 +172,123 @@ func (s *Service) AccountingHandoffWorkspace(ctx context.Context, projectID stri
 	}, nil
 }
 
+func (r *Repository) MyAccountingWork(ctx context.Context, actorID string, filter MyAccountingWorkFilter, offset int) (Record, error) {
+	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, actorID, "project", 1)
+	if err != nil {
+		return nil, err
+	}
+	baseArgs := append([]any{}, scopeArgs...)
+	baseConditions := []string{"project.status <> 'cancelled'", "handoff.status <> 'cancelled'", scopeSQL}
+	if filter.ProjectID != "" {
+		baseArgs = append(baseArgs, filter.ProjectID)
+		baseConditions = append(baseConditions, fmt.Sprintf("handoff.project_id=$%d::uuid", len(baseArgs)))
+	}
+	if filter.Search != "" {
+		baseArgs = append(baseArgs, "%"+filter.Search+"%")
+		placeholder := len(baseArgs)
+		baseConditions = append(baseConditions, fmt.Sprintf(`concat_ws(' ',
+			project.code, project.name,
+			COALESCE(handoff.source_snapshot_json->>'source_code',''),
+			COALESCE(handoff.source_snapshot_json->>'source_title',''),
+			COALESCE(handoff.source_snapshot_json->>'counterparty_name',''),
+			COALESCE(handoff.external_reference,'')
+		) ILIKE $%d`, placeholder))
+	}
+	baseWhere := strings.Join(baseConditions, " AND ")
+	summary, err := r.QueryOne(ctx, fmt.Sprintf(`
+		SELECT
+			COUNT(*) FILTER (WHERE handoff.status='handed_off') AS handed_off_count,
+			COUNT(*) FILTER (WHERE handoff.status='returned') AS returned_count,
+			COUNT(*) FILTER (WHERE handoff.status='acknowledged') AS acknowledged_count,
+			COUNT(*) AS total
+		FROM accounting_handoffs handoff
+		JOIN projects project ON project.id=handoff.project_id
+		WHERE %s
+	`, baseWhere), baseArgs...)
+	if err != nil {
+		return nil, err
+	}
+	itemArgs := append([]any{}, baseArgs...)
+	itemConditions := append([]string{}, baseConditions...)
+	if filter.Status != "all" {
+		itemArgs = append(itemArgs, filter.Status)
+		itemConditions = append(itemConditions, fmt.Sprintf("handoff.status=$%d", len(itemArgs)))
+	}
+	itemWhere := strings.Join(itemConditions, " AND ")
+	totalRow, err := r.QueryOne(ctx, fmt.Sprintf(`
+		SELECT COUNT(*) AS total
+		FROM accounting_handoffs handoff
+		JOIN projects project ON project.id=handoff.project_id
+		WHERE %s
+	`, itemWhere), itemArgs...)
+	if err != nil {
+		return nil, err
+	}
+	total := int(number(totalRow["total"]))
+	pageArgs := append([]any{}, itemArgs...)
+	pageArgs = append(pageArgs, filter.Limit, offset)
+	items, err := r.Query(ctx, fmt.Sprintf(`
+		SELECT
+			handoff.id AS handoff_id,
+			handoff.id,
+			handoff.project_id,
+			project.code AS project_code,
+			project.name AS project_name,
+			handoff.direction,
+			handoff.source_type,
+			handoff.source_id,
+			COALESCE(handoff.source_snapshot_json->>'source_code','') AS source_code,
+			COALESCE(handoff.source_snapshot_json->>'source_title','') AS source_title,
+			COALESCE(handoff.source_snapshot_json->>'counterparty_name','') AS counterparty_name,
+			NULLIF(handoff.source_snapshot_json->>'reference_amount','')::numeric AS reference_amount,
+			COALESCE(NULLIF(handoff.source_snapshot_json->>'currency',''),'VND') AS currency,
+			COALESCE(handoff.source_snapshot_json->>'source_status','') AS source_status,
+			CASE handoff.source_type
+				WHEN 'procurement_request' THEN '/projects/' || handoff.project_id || '/procurement'
+				WHEN 'contract_milestone' THEN '/projects/' || handoff.project_id || '/contracts'
+				ELSE '/projects/' || handoff.project_id
+			END AS source_route,
+			handoff.status,
+			handoff.note,
+			handoff.external_reference,
+			handoff.return_reason,
+			handoff.handed_off_at,
+			handoff.acknowledged_at,
+			handoff.returned_at,
+			handoff.updated_at,
+			handed_off.full_name AS handed_off_by_name,
+			acknowledged.full_name AS acknowledged_by_name,
+			returned.full_name AS returned_by_name
+		FROM accounting_handoffs handoff
+		JOIN projects project ON project.id=handoff.project_id
+		LEFT JOIN users handed_off ON handed_off.id=handoff.handed_off_by
+		LEFT JOIN users acknowledged ON acknowledged.id=handoff.acknowledged_by
+		LEFT JOIN users returned ON returned.id=handoff.returned_by
+		WHERE %s
+		ORDER BY
+			CASE handoff.status WHEN 'handed_off' THEN 1 WHEN 'returned' THEN 2 WHEN 'acknowledged' THEN 3 ELSE 4 END,
+			handoff.updated_at DESC,
+			handoff.id DESC
+		LIMIT $%d OFFSET $%d
+	`, itemWhere, len(pageArgs)-1, len(pageArgs)), pageArgs...)
+	if err != nil {
+		return nil, err
+	}
+	nextOffset := offset + len(items)
+	hasMore := nextOffset < total
+	nextCursor := ""
+	if hasMore {
+		nextCursor = encodeMyWorkItemsCursor(nextOffset)
+	}
+	return Record{
+		"items":       items,
+		"summary":     summary,
+		"total":       total,
+		"has_more":    hasMore,
+		"next_cursor": nextCursor,
+	}, nil
+}
+
 func (s *Service) CreateAccountingHandoff(ctx context.Context, projectID string, req AccountingHandoffRequest, actorID, actorName string) (Record, error) {
 	req.SourceType = strings.TrimSpace(req.SourceType)
 	req.SourceID = strings.TrimSpace(req.SourceID)

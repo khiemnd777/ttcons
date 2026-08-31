@@ -1,5 +1,48 @@
 # Current States
 
+## Global Docker CLI PATH for zsh — 2026-08-31
+
+### Will be done
+
+- Add a user-global zsh startup file so `/usr/local/bin/docker` is available from login, non-login, interactive and non-interactive zsh sessions in every repository.
+- Keep the existing `.zprofile` and `.zshrc` unchanged and avoid changing Docker Desktop, Compose or Consflow source/configuration.
+- Verify Docker resolution from a minimal inherited PATH, then verify Docker Client/Server and the Consflow Make dry-run.
+
+### Done
+
+- Review package approved by the user.
+- Confirmed the ChatGPT/Codex parent process was launched by macOS with `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, while Docker CLI is installed at `/usr/local/bin/docker`.
+- Confirmed sourcing `.zprofile` repairs only the current shell because the affected integrated terminal starts a non-login zsh session.
+- Created `/Users/khiemnguyen/.zshenv` with a zsh-native unique PATH entry for `/usr/local/bin`; existing `.zprofile` and `.zshrc` timestamps remain unchanged.
+- Verified syntax plus clean-environment non-interactive, interactive non-login and login zsh sessions; every mode resolved Docker to `/usr/local/bin/docker` from an initial system-only PATH.
+- Verified Docker Client/Server `29.7.2`, `docker compose --env-file .env config --quiet`, and the Consflow `make -n down` expansion from the same clean GUI-style PATH.
+- Status: `TECHNICALLY VERIFIED`; no container restart, migration, backend/frontend build or browser/UAT was needed for this user-level shell configuration fix.
+
+## Accounting company-wide reconciliation visibility — 2026-08-31
+
+### Will be done
+
+- Add a dedicated company-wide accounting reconciliation observation capability without weakening existing mutation permissions or project/work-item action gates.
+- Let Accounting inspect every non-cancelled project, its runtime workflow, source records and Dashboard financial aggregates across the company while keeping Staff, Roles, Settings, Audit/Event Logs and technical Workflow Definition authoring out of the Accounting navigation.
+- Add a focused Accounting lane to `Bàn làm việc` for actionable Accounting Handoff dossiers; do not mix company-wide read-only workflow records into the personal action queue.
+- Preserve every existing Accounting permission and Accounting Handoff transition; this change is additive only.
+- Add focused backend/frontend/migration regression coverage, update role-based UAT and mandatory module/domain maps, then run backend formatting/tests and the frontend production build without browser/UAT.
+
+### Done
+
+- Client review package and Mockup as Text approved.
+- Confirmed company-wide visibility scope, business-menu boundary, Dashboard/source-data requirement, Accounting workbench priority and additive-only permission policy.
+- Added V133 and seed parity for the Accounting company reconciliation observer plus the missing business read grants.
+- Split all-company observation from mutation authority in project/work-item access; retained company scope only for explicit Accounting-owned actions.
+- Added the company-scoped Accounting Handoff queue and navigation summary count for `Bàn làm việc`.
+- Added `Nghiệp vụ Kế toán` with project/search/status filters, source links and direct acknowledge/return using the shared dialog.
+- Added the Accounting observer banner and excluded Pipeline/Form configuration, Staff, Role/Permission, Audit/Event Logs and Settings from navigation/direct routes; global/project Audit APIs also reject the observer marker without deleting the historical role grant.
+- Dashboard finance visibility now recognizes the reconciliation marker while retaining the canonical approved-payment source.
+- Added backend/frontend regression contracts and updated module/domain maps plus role-based UAT coverage.
+- Final current-working-tree checks passed: `go test ./...`, 292/292 frontend tests, TypeScript no-emit check, Vite production build, all 133 migration manifests/checksums, eight Golden PDF fixtures and `git diff --check`.
+- PostgreSQL-backed `TestAccountingReconciliationObserverSeesCompanyScopeButKeepsActionBoundaries` compiles and is registered, but the explicit run was skipped because `CONSFLOW_TEST_DATABASE_URL` is absent; Docker is not running and local PostgreSQL is not reachable. V133 has therefore not been applied or runtime-smoke-tested in this session.
+- Status: `IMPLEMENTED`; source/build/static migration gates are `TECHNICALLY VERIFIED`. Database-backed integration remains `BLOCKED` by the unavailable test database, and the UI is `NOT UX ACCEPTED` because browser/UAT was not requested and did not run.
+
 ## Release v2026-08-27.2
 
 ### Will be done

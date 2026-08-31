@@ -2,6 +2,7 @@ export type ProjectWorkspaceChild = {
   label: string;
   to: string;
   permissions?: string[];
+  excludePermissions?: string[];
 };
 
 export type ProjectWorkspaceGroup = {
@@ -11,6 +12,7 @@ export type ProjectWorkspaceGroup = {
   description: string;
   to: string;
   permissions?: string[];
+  excludePermissions?: string[];
   children: ProjectWorkspaceChild[];
 };
 
@@ -74,13 +76,13 @@ export const PROJECT_WORKSPACE_GROUPS: ProjectWorkspaceGroup[] = [
   {
     key: 'governance',
     label: 'Quản trị công trình',
-    description: 'Thành viên, hồ sơ, audit',
+    description: 'Thành viên và hồ sơ công trình',
     to: '',
     permissions: ['project.view', 'audit.view'],
     children: [
       { label: 'Thành viên', to: '?tab=members', permissions: ['project.view'] },
       { label: 'Hồ sơ', to: '?tab=files', permissions: ['project.view'] },
-      { label: 'Nhật ký', to: 'audit', permissions: ['audit.view'] },
+      { label: 'Nhật ký', to: 'audit', permissions: ['audit.view'], excludePermissions: ['project.reconciliation.view'] },
     ],
   },
 ];
@@ -91,9 +93,17 @@ export function visibleProjectWorkspaceGroups(
   return PROJECT_WORKSPACE_GROUPS
     .map((group) => ({
       ...group,
-      children: group.children.filter((child) => hasAnyPermission(child.permissions)),
+      children: group.children.filter((child) => isWorkspaceEntryVisible(child, hasAnyPermission)),
     }))
-    .filter((group) => hasAnyPermission(group.permissions) || group.children.length > 0);
+    .filter((group) => isWorkspaceEntryVisible(group, hasAnyPermission) || group.children.length > 0);
+}
+
+function isWorkspaceEntryVisible(
+  entry: { permissions?: string[]; excludePermissions?: string[] },
+  hasAnyPermission: (permissions?: string[]) => boolean,
+) {
+  return hasAnyPermission(entry.permissions)
+    && !(entry.excludePermissions?.length && hasAnyPermission(entry.excludePermissions));
 }
 
 export function projectWorkspacePath(projectId: string, target: string) {

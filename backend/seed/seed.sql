@@ -74,7 +74,7 @@ SET external_only=(name='client');
 
 INSERT INTO permissions (id, key, name, module)
 SELECT gen_random_uuid(), key, name, module FROM (VALUES
-('project.view','Xem công trình','project'),('project.create','Tạo công trình','project'),('project.update','Cập nhật công trình','project'),('project.delete','Xóa công trình','project'),('project.member.manage','Quản lý thành viên công trình','project'),('project.import','Import công trình','project'),('project.export','Xuất công trình','project'),
+('project.view','Xem công trình','project'),('project.create','Tạo công trình','project'),('project.update','Cập nhật công trình','project'),('project.delete','Xóa công trình','project'),('project.member.manage','Quản lý thành viên công trình','project'),('project.import','Import công trình','project'),('project.export','Xuất công trình','project'),('project.reconciliation.view','Đối soát tài chính toàn công ty','project'),
 ('pipeline.view','Xem pipeline','pipeline'),('pipeline.create','Tạo pipeline','pipeline'),('pipeline.edit','Sửa pipeline','pipeline'),('pipeline.publish','Publish pipeline','pipeline'),('pipeline.run','Chạy pipeline','pipeline'),('pipeline.advance_node','Chuyển node','pipeline'),
 ('workflow_definition.import','Import định nghĩa workflow','pipeline'),('workflow_definition.export','Xuất định nghĩa workflow','pipeline'),
 ('planning.view','Xem planning','planning'),('planning.edit','Cập nhật kế hoạch','planning'),
@@ -82,6 +82,7 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('procurement.view','Xem mua sắm','procurement'),('procurement.create','Tạo yêu cầu mua','procurement'),('procurement.approve','Duyệt mua','procurement'),('procurement.order','Đặt hàng','procurement'),('procurement.receive','Nhận hàng','procurement'),
 ('warehouse.view','Xem kho','warehouse'),('warehouse.receive','Nhập kho','warehouse'),('warehouse.issue','Xuất kho','warehouse'),('warehouse.transfer','Điều chuyển','warehouse'),('warehouse.adjust','Điều chỉnh kho','warehouse'),('warehouse.surplus_handle','Xử lý vật tư dư','warehouse'),
 ('operation.view','Xem thi công','operation'),('operation.report','Tạo daily report','operation'),('operation.issue_create','Tạo issue','operation'),('operation.issue_update','Sửa issue','operation'),
+('quality.view','Xem chất lượng','quality'),
 ('acceptance.view','Xem nghiệm thu','acceptance'),('acceptance.create','Tạo nghiệm thu','acceptance'),('acceptance.approve','Duyệt nghiệm thu','acceptance'),('acceptance.reject','Reject nghiệm thu','acceptance'),
 ('rework.view','Xem rework','rework'),('rework.create','Tạo rework','rework'),('rework.approve','Duyệt rework','rework'),
 ('replanning.view','Xem replanning','replanning'),('replanning.create','Tạo replanning','replanning'),('replanning.approve','Duyệt replanning','replanning'),
@@ -111,7 +112,8 @@ WHERE key='staff.account_security.manage';
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
-WHERE r.name = 'developer' OR (r.name = 'admin' AND p.key NOT IN ('settings.update','staff.import','sample_data.create'))
+WHERE (r.name = 'developer' AND p.key <> 'project.reconciliation.view')
+   OR (r.name = 'admin' AND p.key NOT IN ('settings.update','staff.import','sample_data.create','project.reconciliation.view'))
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id,permission_id)
@@ -217,9 +219,9 @@ JOIN permissions p ON (
     'project.view','pipeline.view','boq.view','boq.create','boq.update','boq.approve','procurement.view','accounting.budget_view','catalog.view','report.view'
   ))
   OR (r.name='accounting' AND p.key IN (
-    'project.view','pipeline.view','boq.view',
+    'project.reconciliation.view','project.view','pipeline.view','planning.view','boq.view',
     'procurement.view','procurement.approve',
-    'handover.view',
+    'warehouse.view','operation.view','quality.view','acceptance.view','rework.view','replanning.view','handover.view',
     'accounting.view','accounting.budget_view','accounting.budget_approve',
     'accounting.payable_view','accounting.payable_approve',
     'accounting.receivable_view','accounting.receivable_approve',

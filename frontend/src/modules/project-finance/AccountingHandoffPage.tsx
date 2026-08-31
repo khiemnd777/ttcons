@@ -1,11 +1,10 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, CheckCircle2, ExternalLink, RotateCcw, Send, Undo2 } from 'lucide-react';
+import { CheckCircle2, ExternalLink, RotateCcw, Send, Undo2 } from 'lucide-react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { CurrencyText } from '../../components/CurrencyText';
 import { DataTable, type Column } from '../../components/DataTable';
-import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -22,10 +21,13 @@ import {
   workItemAutoStartedNotice,
   type WorkItemMutationResult,
 } from '../work-items/workItemMutationContext';
+import {
+  AccountingHandoffActionDialog,
+  type AccountingHandoffAction,
+  type AccountingHandoffDialog,
+} from './AccountingHandoffActionDialog';
 
 type HandoffFilter = 'all' | 'needs_attention' | 'ready' | 'handed_off' | 'acknowledged' | 'returned';
-type HandoffAction = 'handoff' | 'acknowledge' | 'return';
-type HandoffDialog = { action: HandoffAction; item: AccountingHandoffItem } | null;
 
 const filterLabels: Array<{ value: HandoffFilter; label: string; countKey?: keyof AccountingHandoffWorkspace['summary'] }> = [
   { value: 'all', label: 'Tất cả' },
@@ -43,7 +45,7 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
   const taskId = searchParams.get('task')?.trim() ?? '';
   const [draftProjectId, setDraftProjectId] = useState(requestedProjectId);
   const [filter, setFilter] = useState<HandoffFilter>('all');
-  const [dialog, setDialog] = useState<HandoffDialog>(null);
+  const [dialog, setDialog] = useState<AccountingHandoffDialog<AccountingHandoffItem>>(null);
   const { hasAnyPermission } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -66,7 +68,7 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['project-finance', projectId] });
   const mutation = useMutation({
-    mutationFn: ({ action, item, note, returnReason, externalReference }: { action: HandoffAction; item: AccountingHandoffItem; note: string; returnReason: string; externalReference: string }) => {
+    mutationFn: ({ action, item, note, returnReason, externalReference }: { action: AccountingHandoffAction; item: AccountingHandoffItem; note: string; returnReason: string; externalReference: string }) => {
       const body = withWorkItemMutationContext({ note, return_reason: returnReason, external_reference: externalReference }, taskId);
       if (action === 'handoff' && !item.handoff_id) {
         return post<WorkItemMutationResult>(`/projects/${projectId}/accounting-handoffs`, withWorkItemMutationContext({ source_type: item.source_type, source_id: item.source_id, note, external_reference: externalReference }, taskId));
@@ -191,7 +193,7 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
         />
       </>}
 
-      <HandoffActionDialog dialog={dialog} pending={mutation.isPending} onClose={() => setDialog(null)} onSubmit={(values) => dialog ? mutation.mutate({ action: dialog.action, item: dialog.item, ...values }) : undefined} />
+      <AccountingHandoffActionDialog dialog={dialog} pending={mutation.isPending} onClose={() => setDialog(null)} onSubmit={(values) => dialog ? mutation.mutate({ action: dialog.action, item: dialog.item, ...values }) : undefined} />
     </div>
   );
 }
@@ -225,41 +227,10 @@ function Requirements({ item }: { item: AccountingHandoffItem }) {
   return <div><StatusBadge status="needs_attention" /><ul className="mt-1 space-y-0.5 text-xs text-amber-800">{unmet.map((requirement) => <li key={requirement.key}>• {requirement.label}</li>)}</ul></div>;
 }
 
-function RowActions({ item, canSubmit, canAcknowledge, onOpen }: { item: AccountingHandoffItem; canSubmit: boolean; canAcknowledge: boolean; onOpen: (dialog: HandoffDialog) => void }) {
+function RowActions({ item, canSubmit, canAcknowledge, onOpen }: { item: AccountingHandoffItem; canSubmit: boolean; canAcknowledge: boolean; onOpen: (dialog: AccountingHandoffDialog<AccountingHandoffItem>) => void }) {
   const buttonClass = 'inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-semibold';
   if (item.status === 'ready' && canSubmit) return <button className={`${buttonClass} bg-blue-600 text-white hover:bg-blue-700`} onClick={() => onOpen({ action: 'handoff', item })}><Send className="h-3.5 w-3.5" />Bàn giao</button>;
   if (item.status === 'handed_off' && canAcknowledge) return <div className="flex justify-end gap-1"><button className={`${buttonClass} bg-emerald-600 text-white hover:bg-emerald-700`} onClick={() => onOpen({ action: 'acknowledge', item })}><CheckCircle2 className="h-3.5 w-3.5" />Tiếp nhận</button><button className={`${buttonClass} border border-line bg-white text-slate-700 hover:bg-slate-50`} onClick={() => onOpen({ action: 'return', item })}><Undo2 className="h-3.5 w-3.5" />Trả lại</button></div>;
   if (item.status === 'returned' && canSubmit) return <button className={`${buttonClass} bg-blue-600 text-white hover:bg-blue-700`} onClick={() => onOpen({ action: 'handoff', item })}><RotateCcw className="h-3.5 w-3.5" />Bàn giao lại</button>;
   return <Link className={`${buttonClass} border border-line bg-white text-slate-700 hover:bg-slate-50`} to={item.source_route}><ExternalLink className="h-3.5 w-3.5" />Mở nguồn</Link>;
-}
-
-function HandoffActionDialog({ dialog, pending, onClose, onSubmit }: { dialog: HandoffDialog; pending: boolean; onClose: () => void; onSubmit: (values: { note: string; returnReason: string; externalReference: string }) => void }) {
-  const [note, setNote] = useState('');
-  const [returnReason, setReturnReason] = useState('');
-  const [externalReference, setExternalReference] = useState('');
-  const [warning, setWarning] = useState('');
-  useEffect(() => {
-    setNote(dialog?.item.note ?? '');
-    setReturnReason('');
-    setExternalReference(dialog?.item.external_reference ?? '');
-    setWarning('');
-  }, [dialog]);
-  const title = dialog?.action === 'acknowledge' ? 'Xác nhận tiếp nhận hồ sơ' : dialog?.action === 'return' ? 'Trả hồ sơ để bổ sung' : dialog?.item.handoff_id ? 'Bàn giao lại hồ sơ' : 'Bàn giao hồ sơ cho Kế toán';
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (dialog?.action === 'return' && !returnReason.trim()) {
-      setWarning('Cần ghi rõ nội dung hồ sơ phải bổ sung.');
-      return;
-    }
-    onSubmit({ note: note.trim(), returnReason: returnReason.trim(), externalReference: externalReference.trim() });
-  }
-  return <Dialog open={Boolean(dialog)} title={title} description={dialog ? `${dialog.item.source_code} · ${dialog.item.source_title}` : undefined} onClose={onClose} size="md">
-    <form className="space-y-4" onSubmit={submit}>
-      {dialog?.action === 'return' ? <label className="block text-sm font-semibold text-slate-700">Nội dung cần bổ sung <span className="text-rose-600">*</span><textarea className="mt-1 min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm" value={returnReason} onChange={(event) => setReturnReason(event.target.value)} /></label> : null}
-      {dialog?.action !== 'return' ? <label className="block text-sm font-semibold text-slate-700">Mã tham chiếu MISA (không bắt buộc)<input className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm" value={externalReference} onChange={(event) => setExternalReference(event.target.value)} placeholder="Ví dụ: MISA-CT-001" /></label> : null}
-      <label className="block text-sm font-semibold text-slate-700">Ghi chú<textarea className="mt-1 min-h-20 w-full rounded-md border border-line px-3 py-2 text-sm" value={note} onChange={(event) => setNote(event.target.value)} /></label>
-      {warning ? <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{warning}</p> : null}
-      <div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700" onClick={onClose}>Hủy</button><button type="submit" disabled={pending} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"><ArrowRight className="h-4 w-4" />{pending ? 'Đang xử lý...' : 'Xác nhận'}</button></div>
-    </form>
-  </Dialog>;
 }

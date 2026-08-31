@@ -376,6 +376,14 @@ type MyWorkflowActionsFilter struct {
 	Search    string
 }
 
+type MyAccountingWorkFilter struct {
+	ProjectID string
+	Status    string
+	Search    string
+	Cursor    string
+	Limit     int
+}
+
 type PendingApprovalFilter struct {
 	ProjectID     string
 	DecidableOnly bool

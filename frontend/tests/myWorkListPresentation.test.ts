@@ -89,7 +89,7 @@ test('My Work presents source-backed quick filters inside the selected work scop
 test('My Work separates actor-decidable approvals into a dedicated compatible mode', async () => {
   const page = await source('../src/modules/my-work/MyWorkPage.tsx');
 
-  assert.match(page, /type ModeKey = 'work' \| 'approval' \| 'attention'/);
+  assert.match(page, /type ModeKey = 'work' \| 'approval' \| 'accounting' \| 'attention'/);
   assert.match(page, /legacyApprovalMode = requestedQueue === 'pending_approval' \|\| requestedBucket === 'waiting_decision'/);
   assert.match(page, /label="Chờ tôi duyệt" count=\{approvalTabCount\}/);
   assert.match(page, /mode === 'approval'[\s\S]*<ApprovalWorkspace/);
@@ -209,4 +209,22 @@ test('My Work coordinates project startup without creating placeholder work item
   assert.match(wizard, /Khi bắt đầu, hệ thống mới tạo Work Item thật/);
   assert.doesNotMatch(projects, /navigate\(`\/my-work\?setup=/);
   assert.match(realtime, /\['my-project-startup-actions'\]/);
+});
+
+test('My Work exposes a focused Accounting lane with direct handoff actions', async () => {
+  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const lane = await source('../src/modules/my-work/AccountingWorkLane.tsx');
+  const dialog = await source('../src/modules/project-finance/AccountingHandoffActionDialog.tsx');
+
+  assert.match(page, /type ModeKey = 'work' \| 'approval' \| 'accounting' \| 'attention'/);
+  assert.match(page, /hasPermission\('accounting_handoff\.view'\) && hasPermission\('accounting_handoff\.acknowledge'\)/);
+  assert.match(page, /label="Nghiệp vụ Kế toán" count=\{accountingTabCount\}/);
+  assert.match(page, /get<AccountingWorkPage>\(buildAccountingWorkPath/);
+  assert.match(page, /<AccountingWorkLane/);
+  assert.match(lane, /Ưu tiên tiếp nhận hồ sơ kế toán toàn công ty/);
+  assert.match(lane, /post\(`\/accounting-handoffs\/\$\{item\.handoff_id\}\/\$\{action\}`/);
+  assert.match(lane, />Tiếp nhận/);
+  assert.match(lane, />Trả lại/);
+  assert.match(lane, />Mở nguồn/);
+  assert.match(dialog, /Mã tham chiếu MISA/);
 });

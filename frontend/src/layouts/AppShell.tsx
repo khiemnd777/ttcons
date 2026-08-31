@@ -36,6 +36,7 @@ type NavItem = {
   label: string;
   icon: LucideIcon;
   permissions?: string[];
+  excludePermissions?: string[];
 };
 
 type NavGroup = { title: string; items: NavItem[] };
@@ -57,8 +58,8 @@ const navGroups: NavGroup[] = [
   {
     title: 'Workflow',
     items: [
-      { to: '/pipeline-builder', label: 'Trình thiết kế quy trình', icon: GitBranch, permissions: ['pipeline.view'] },
-      { to: '/workflow-forms', label: 'Biểu mẫu quy trình', icon: ClipboardList, permissions: ['pipeline.view'] },
+      { to: '/pipeline-builder', label: 'Trình thiết kế quy trình', icon: GitBranch, permissions: ['pipeline.view'], excludePermissions: ['project.reconciliation.view'] },
+      { to: '/workflow-forms', label: 'Biểu mẫu quy trình', icon: ClipboardList, permissions: ['pipeline.view'], excludePermissions: ['project.reconciliation.view'] },
     ],
   },
   {
@@ -66,11 +67,11 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/core-data', label: 'Đối tác', icon: ArrowDownToLine, permissions: ['catalog.view'] },
       { to: '/warehouse', label: 'Kho vật tư', icon: Warehouse, permissions: ['warehouse.view'] },
-      { to: '/staff', label: 'Nhân sự', icon: Users, permissions: ['staff.view'] },
-      { to: '/roles', label: 'Vai trò', icon: ShieldCheck, permissions: ['role.view'] },
-      { to: '/audit', label: 'Audit nghiệp vụ', icon: FileClock, permissions: ['audit.view'] },
-      { to: '/event-logs', label: 'Nhật ký sự kiện', icon: Bug, permissions: ['event_log.view'] },
-      { to: '/settings', label: 'Cấu hình', icon: Settings, permissions: ['settings.view'] },
+      { to: '/staff', label: 'Nhân sự', icon: Users, permissions: ['staff.view'], excludePermissions: ['project.reconciliation.view'] },
+      { to: '/roles', label: 'Vai trò', icon: ShieldCheck, permissions: ['role.view'], excludePermissions: ['project.reconciliation.view'] },
+      { to: '/audit', label: 'Audit nghiệp vụ', icon: FileClock, permissions: ['audit.view'], excludePermissions: ['project.reconciliation.view'] },
+      { to: '/event-logs', label: 'Nhật ký sự kiện', icon: Bug, permissions: ['event_log.view'], excludePermissions: ['project.reconciliation.view'] },
+      { to: '/settings', label: 'Cấu hình', icon: Settings, permissions: ['settings.view'], excludePermissions: ['project.reconciliation.view'] },
     ],
   },
 ];
@@ -93,7 +94,7 @@ export function AppShell() {
   const visibleNavGroups = navGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => hasAnyPermission(item.permissions)),
+      items: group.items.filter((item) => hasAnyPermission(item.permissions) && !(item.excludePermissions?.length && hasAnyPermission(item.excludePermissions))),
     }))
     .filter((group) => group.items.length > 0);
 

@@ -65,6 +65,7 @@ export function ProjectWorkspaceLayout() {
 
   const project = operations.data?.project_summary ?? operations.data?.project;
   const visibleGroups = visibleProjectWorkspaceGroups(hasAnyPermission);
+  const isAccountingObserver = hasAnyPermission(['project.reconciliation.view']);
   const userRoleSummary = roleSummary(user?.roles);
   const indicators = useShellIndicators();
   const activeWorkItemId = showWorkflowSidebar ? activeWorkItemIdFromPath(location.pathname) : '';
@@ -166,6 +167,12 @@ export function ProjectWorkspaceLayout() {
 
         <div className="flex min-w-0 flex-col">
           <main className="flex-1 px-4 py-5 md:px-6">
+            {isAccountingObserver ? (
+              <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
+                <p className="font-semibold">Chế độ đối soát Kế toán · dữ liệu toàn công ty</p>
+                <p className="mt-1 leading-6 text-blue-900">Anh/chị được xem dữ liệu nguồn xuyên suốt công trình. Ngoài nghiệp vụ Kế toán được phân quyền, các bước khác chỉ được xem.</p>
+              </div>
+            ) : null}
             <ProjectTaskContext projectId={id} />
             <Outlet />
           </main>

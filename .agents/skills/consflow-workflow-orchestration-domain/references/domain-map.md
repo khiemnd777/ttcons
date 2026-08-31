@@ -1,5 +1,12 @@
 # Workflow Orchestration Domain Map
 
+## Accounting Observer Runtime Rule (V133)
+
+- `project.reconciliation.view` permits Accounting to inspect company project runs, Work Items, forms/evidence/activity and source workspaces for reconciliation.
+- Read access uses `profileCanObserveAllProjectWork`; action access deliberately does not. `CanActOnWorkItem` retains the Admin-only override, so observation never becomes start/complete/review/approve authority.
+- The ordinary actor-owned `Công việc` and `Chờ tôi duyệt` lanes remain assignment/decision scoped. Company dossiers live in the separate `Nghiệp vụ Kế toán` lane backed by `GET /me/accounting-handoffs`; do not flood personal work queues with observed Work Items.
+- Project full-operations output identifies `visibility_scope=accounting_reconciliation`, marks the response unscoped and omits project Audit for this presentation mode.
+
 ## Owners
 
 - Backend routes: `backend/internal/core/routes.go`
