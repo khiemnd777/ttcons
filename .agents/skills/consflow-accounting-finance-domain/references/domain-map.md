@@ -4,13 +4,13 @@
 
 - Ordinary Accounting Handoff UI: `frontend/src/modules/project-finance/AccountingHandoffPage.tsx`, shared `AccountingHandoffActionDialog.tsx`, compatibility wrapper/legacy UI in `ProjectFinancePage.tsx`, shared project picker/actions, routed at `/accounting` and `/projects/:id/accounting`
 - Accounting company work UI: `frontend/src/modules/my-work/AccountingWorkLane.tsx`, hosted by `MyWorkPage.tsx`; company observer presentation in `AppShell.tsx`, `app/router.tsx`, `ProjectWorkspaceLayout.tsx` and `projectWorkspaceNavigation.ts`
-- Accounting Handoff backend: `accounting_handoff.go`, `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, `types_project_finance.go`; project-option parsing/paging/search helpers live in `handlers_reports.go`, `service_reports.go` and `repository_reports.go`
+- Accounting Handoff backend: `accounting_handoff.go`, `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, `types_project_finance.go`; project-option parsing/paging/search helpers live in `handlers_reports.go`, `service_reports.go` and `repository_reports.go` dashboard/options plus `repository_reports_{cashflow,tax,profit}.go` query owners
 - Frontend modules: `frontend/src/modules/accounting` (`AccountingPage.tsx`, `AccountingBooksPanel.tsx`, `ManualJournalDialog.tsx`, `TaxWorkspace.tsx`, `AccountingCreateDialog.tsx`, `AccountingDetailDialog.tsx`, `CashflowPanel.tsx`), `frontend/src/modules/debt`, `frontend/src/modules/contracts`, `frontend/src/modules/reports`, and the permission-gated cashflow projection in `frontend/src/modules/dashboard/DashboardSummaryPanels.tsx`
 - Debt panels: `InputInvoicePanel.tsx`, `OutputInvoicePanel.tsx`, `InputPaymentPlanPanel.tsx`, `OutputBillingPlanPanel.tsx`, `PayableReconciliationPanel.tsx`, `ReceivableReconciliationPanel.tsx`
 - Report panels: `CashflowPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`
-- Backend routes: `backend/internal/core/routes.go`
-- Backend logic: source finance methods in `handlers.go`, `service.go`, `repository_domain.go`, `types.go`; ledger owners `handlers_accounting.go`, `types_accounting.go`, `accounting_core.go`, `accounting_dimensions.go`, `accounting_posting.go`, `accounting_payment_reversal.go`, `accounting_tax.go`, `accounting_reports.go`
-- Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
+- Backend routes: `backend/internal/core/routes.go` bootstrap plus bounded `backend/internal/core/routes_*.go` registrars
+- Backend logic: source finance methods in `handlers.go` foundation plus bounded `handlers_*.go` owners, `service_finance_common.go`, `service_finance_invoices.go`, `service_debt_payables.go`, `service_debt_receivables.go`, `service_reconciliations.go`, `service_storage.go`, `repository_domain.go` foundation plus bounded `repository_*.go` owners, `types.go` foundation plus bounded `types_*.go` contracts; ledger owners `handlers_accounting.go`, `types_accounting.go`, `accounting_core.go`, `accounting_dimensions.go`, `accounting_posting.go`, `accounting_payment_reversal.go`, `accounting_tax.go`, `accounting_reports.go`
+- Contracts: `frontend/src/lib/types/domain.ts` compatibility barrel plus bounded `frontend/src/lib/types/domain/*.ts` contracts, `frontend/src/lib/utils/status.ts`
 
 ## Routes
 
@@ -42,7 +42,7 @@
 
 ## Invariants
 
-- A global `project.reconciliation.view` grant means Accounting may reconcile non-cancelled company projects, Dashboard finance and source workflow records without membership. It is an observation marker, not Admin/Director identity and not a wildcard permission.
+- A global `project.reconciliation.view` grant means Accounting may reconcile non-cancelled company projects, Dashboard finance and source workflow records without membership. It is an Accounting-only observation marker, intentionally absent from Admin/Developer because those system roles already have their own scope semantics; it is not Admin/Director identity and not a wildcard permission.
 - Company scope is allowed only for the enumerated read permissions and Accounting-owned action keys. Procurement/contract/PM/Admin approvals and mutations remain membership-scoped even if a historical role grant contains their key. Project activity creation also remains membership-scoped.
 - `GET /me/accounting-handoffs` is the focused Accounting lane: pending `handed_off` records are actionable, while `returned` and `acknowledged` are follow-up/history views. It must not fill ordinary personal Work Item queues with every observed project task.
 - Accounting acknowledge/return from My Work uses the existing canonical transition, required return reason, optional MISA reference, audit and actor/timestamp behavior; it never creates a second finance state machine.

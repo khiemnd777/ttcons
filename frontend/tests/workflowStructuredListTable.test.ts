@@ -3,7 +3,11 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 async function workflowFormPanelSource() {
-  return readFile(new URL('../src/modules/work-items/WorkflowFormPanel.tsx', import.meta.url), 'utf8');
+  const [panel, structuredList] = await Promise.all([
+    readFile(new URL('../src/modules/work-items/WorkflowFormPanel.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/modules/work-items/WorkflowFormStructuredList.tsx', import.meta.url), 'utf8'),
+  ]);
+  return `${panel}\n${structuredList}`;
 }
 
 async function globalStylesSource() {

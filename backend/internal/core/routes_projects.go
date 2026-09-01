@@ -1,0 +1,36 @@
+package core
+
+import "github.com/gofiber/fiber/v2"
+
+func registerProjectsRoutes(protected fiber.Router, h *Handler) {
+	protected.Get("/projects", h.ListProjects)
+	protected.Get("/projects/explorer", h.ProjectExplorer)
+	protected.Get("/projects/explorer/stream", h.ProjectExplorerStream)
+	protected.Get("/projects/imports/readiness", h.ProjectExcelReadiness)
+	protected.Get("/projects/imports/template", h.ProjectExcelTemplate)
+	protected.Post("/projects/imports/preview", h.PreviewProjectExcelImport)
+	protected.Post("/projects/imports/execute", h.ExecuteProjectExcelImport)
+	protected.Get("/projects/export", h.ExportProjectsExcel)
+	protected.Post("/projects", h.CreateProject)
+	protected.Get("/projects/progress-board", h.ProjectProgressBoard)
+	protected.Get("/projects/progress-board/summary", h.ProjectProgressBoardSummary)
+	protected.Get("/projects/progress-board/stages/:stageKey", h.ProjectProgressBoardStage)
+	protected.Get("/projects/progress-board/stream", h.ProjectProgressBoardStream)
+	protected.Post("/projects/deletions/preview", h.PreviewProjectDeletion)
+	protected.Post("/projects/deletions/execute", h.ExecuteProjectDeletion)
+	protected.Get("/projects/:id", h.GetProject)
+	protected.Put("/projects/:id", h.UpdateProject)
+	protected.Get("/projects/:id/startup-readiness", h.ProjectStartupReadiness)
+	protected.Put("/projects/:id/project-manager", h.SetProjectManager)
+	protected.Delete("/projects/:id", h.DeleteProject)
+	protected.Get("/projects/:id/members", h.ProjectMembers)
+	protected.Post("/projects/:id/members", h.CreateProjectMember)
+	protected.Post("/projects/:id/members/bulk", h.CreateProjectMembersBulk)
+	protected.Put("/projects/:id/members/:memberId", h.UpdateProjectMember)
+	protected.Delete("/projects/:id/members/:memberId", h.DeactivateProjectMember)
+	protected.Get("/partners", h.ListPartners)
+	protected.Post("/partners", h.CreatePartner)
+	protected.Post("/partners/deletions/preview", h.PreviewPartnerDeletion)
+	protected.Post("/partners/deletions/execute", h.ExecutePartnerDeletion)
+	protected.Put("/partners/:id", h.UpdatePartner)
+}

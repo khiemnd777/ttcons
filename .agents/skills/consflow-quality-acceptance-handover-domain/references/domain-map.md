@@ -4,9 +4,9 @@
 
 - Frontend modules: `frontend/src/modules/quality`, `frontend/src/modules/acceptance`, `frontend/src/modules/rework`, `frontend/src/modules/handover` (`HandoverPage.tsx`, `HandoverCreateDialog.tsx`, `HandoverWorkspace.tsx`, `handoverTypes.ts`), `frontend/src/modules/work-items`
 - Work item panels: `IncomingAcceptancePanel.tsx`, `OutgoingAcceptancePanel.tsx`, `EvidencePanel.tsx`, `WorkflowFormPanel.tsx`
-- Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`
-- Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
+- Backend routes: `backend/internal/core/routes.go` bootstrap plus bounded `backend/internal/core/routes_*.go` registrars
+- Backend logic: `backend/internal/core/handlers.go` foundation plus bounded `backend/internal/core/handlers_*.go` owners, `service_quality.go`, `service_acceptance_incoming.go`, `service_acceptance_outgoing.go`, `service_handover.go`, `service_workflow_forms.go`, `service_storage.go`, `repository_domain.go` foundation plus bounded `repository_*.go` owners, `types.go` foundation plus bounded `types_*.go` contracts
+- Contracts: `frontend/src/lib/types/domain.ts` compatibility barrel plus bounded `frontend/src/lib/types/domain/*.ts` contracts, `frontend/src/lib/utils/status.ts`
 
 ## Routes
 

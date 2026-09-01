@@ -5,9 +5,9 @@
 - Frontend modules: `frontend/src/modules/warehouse`, `frontend/src/modules/work-items`
 - Navigation: global `frontend/src/layouts/AppShell.tsx`, project-scoped `frontend/src/modules/projects/projectWorkspaceNavigation.ts`
 - Work item panels: `MaterialSnapshotPanel.tsx`, `SurplusHandlingPanel.tsx`
-- Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`
-- Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
+- Backend routes: `backend/internal/core/routes.go` bootstrap plus bounded `backend/internal/core/routes_*.go` registrars
+- Backend logic: `backend/internal/core/handlers.go` foundation plus bounded `backend/internal/core/handlers_*.go` owners, `service_materials_warehouse.go`, `service_evidence.go`, `repository_domain.go` foundation plus bounded `repository_*.go` owners, `types.go` foundation plus bounded `types_*.go` contracts
+- Contracts: `frontend/src/lib/types/domain.ts` compatibility barrel plus bounded `frontend/src/lib/types/domain/*.ts` contracts, `frontend/src/lib/utils/status.ts`
 
 ## Routes
 

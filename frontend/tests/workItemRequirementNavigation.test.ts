@@ -6,8 +6,16 @@ async function source(path: string) {
   return readFile(new URL(path, import.meta.url), 'utf8');
 }
 
+async function workItemDetailSource() {
+  const [page, domain] = await Promise.all([
+    source('../src/modules/work-items/WorkItemDetailDialog.tsx'),
+    source('../src/modules/work-items/workItemDetailDomain.ts'),
+  ]);
+  return `${page}\n${domain}`;
+}
+
 test('completion requirement rows expose keyboard actions and explicit instructions', async () => {
-  const detail = await source('../src/modules/work-items/WorkItemDetailDialog.tsx');
+  const detail = await workItemDetailSource();
 
   assert.match(detail, /<button[\s\S]*onClick=\{\(\) => onNavigate\(navigationTarget\)\}/);
   assert.match(detail, /row\.kind === 'permission' \? 'Khi không thể thao tác:' : 'Cách xử lý:'/);
@@ -30,7 +38,7 @@ test('evidence requirement navigation opens and focuses the matching uploader', 
 });
 
 test('completion errors dispatch the backend-owned missing requirement target', async () => {
-  const detail = await source('../src/modules/work-items/WorkItemDetailDialog.tsx');
+  const detail = await workItemDetailSource();
 
   assert.match(
     detail,

@@ -361,7 +361,7 @@ func TestAccountingReconciliationObserverSeesCompanyScopeButKeepsActionBoundarie
 		) VALUES (
 			$1,$2,'payable','procurement_request',$3,
 			jsonb_build_object(
-				'source_code',$4,'source_title','Hồ sơ đối soát ngoài phạm vi thành viên',
+				'source_code',$4::text,'source_title','Hồ sơ đối soát ngoài phạm vi thành viên',
 				'counterparty_name','Nhà cung cấp kiểm thử','reference_amount',2500000,'currency','VND'
 			),
 			'handed_off',$5

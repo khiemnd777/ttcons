@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { domainTypesSource } from './domainTypesSource.ts';
 
 const source = (path: string) => readFile(new URL(path, import.meta.url), 'utf8');
 
@@ -20,7 +21,7 @@ test('manual project creation uses the three-step startup wizard', async () => {
 
 test('completed startup steps navigate backward and resumed setup reloads editable project data', async () => {
   const wizard = await source('../src/modules/projects/ProjectStartupWizard.tsx');
-  const domain = await source('../src/lib/types/domain.ts');
+  const domain = await domainTypesSource();
 
   assert.match(wizard, /queryKey: \['project', activeProjectID\]/);
   assert.match(wizard, /get<Project>\(`\/projects\/\$\{activeProjectID\}`\)/);
@@ -59,7 +60,7 @@ test('wizard requires valid access and a PM-eligible member before setup', async
 
 test('setup shows the full saved team and whole-template operational role coverage', async () => {
   const wizard = await source('../src/modules/projects/ProjectStartupWizard.tsx');
-  const domain = await source('../src/lib/types/domain.ts');
+  const domain = await domainTypesSource();
 
   assert.match(wizard, /teamMembers=\{savedActiveMembers\}/);
   assert.match(wizard, /Đội ngũ công trình/);

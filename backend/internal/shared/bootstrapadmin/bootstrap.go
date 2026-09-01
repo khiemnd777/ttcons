@@ -226,11 +226,11 @@ func activeAdminRoleID(ctx context.Context, tx *sql.Tx) (string, error) {
 	if err := tx.QueryRowContext(ctx, `
 		SELECT
 			COUNT(*) FILTER (
-				WHERE permission.key NOT IN ('settings.update','staff.import','sample_data.create')
+				WHERE permission.key NOT IN ('settings.update','staff.import','sample_data.create','project.reconciliation.view')
 				  AND assignment.permission_id IS NULL
 			),
 			COUNT(*) FILTER (
-				WHERE permission.key IN ('settings.update','staff.import','sample_data.create')
+				WHERE permission.key IN ('settings.update','staff.import','sample_data.create','project.reconciliation.view')
 				  AND assignment.permission_id IS NOT NULL
 			)
 		FROM permissions permission

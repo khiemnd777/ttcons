@@ -9,11 +9,11 @@
 
 ## Owners
 
-- Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`; Workflow Definition data-package owners `handlers_workflow_definition_excel.go`, `workflow_definition_excel.go`, `data_package.go`, `xlsx_workbook.go`
+- Backend routes: `backend/internal/core/routes.go` bootstrap plus bounded `backend/internal/core/routes_*.go` registrars
+- Backend logic: `backend/internal/core/handlers.go` foundation plus bounded `backend/internal/core/handlers_*.go` owners, `service_workflow_definitions.go`, `service_pipeline_runtime.go`, `service_work_items.go`, `service_workflow_forms.go`, `service_workflow_form_validation.go`, `service_evidence.go`, `service_activity.go`, `service_storage.go`, `service_helpers.go`, `repository_domain.go` foundation plus bounded `repository_*.go` owners, `types.go` foundation plus bounded `types_*.go` contracts; Workflow Definition data-package owners `handlers_workflow_definition_excel.go`, `workflow_definition_excel.go` contracts plus `workflow_definition_excel_{service,validation,repository,export}.go` owners, `data_package.go`, `xlsx_workbook.go`
 - Frontend routes: `frontend/src/app/router.tsx`
 - Frontend modules: `frontend/src/modules/pipeline-builder`, `frontend/src/modules/planning`, `frontend/src/modules/workflow-forms`, `frontend/src/modules/workflow-definitions`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
-- Shared frontend contracts: `frontend/src/lib/api/client.ts`, `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
+- Shared frontend contracts: `frontend/src/lib/api/client.ts`, `frontend/src/lib/types/domain.ts` compatibility barrel plus bounded `frontend/src/lib/types/domain/*.ts` contracts, `frontend/src/lib/utils/status.ts`
 - Migrations: `V1`-`V16`, `V40`, `V43`-`V46`, `V50`, `V52`, `V53`, `V55`-`V57`, `V66`, `V68`, `V69`, `V70`, `V71`, `V83`-`V87`, Workflow Definition governance `V118`, sensitive grant role-rename hardening `V119`, XLSX/JSON import provenance `V120`, and project-startup/work-assignment coordination `V130`
 
 ## Routes

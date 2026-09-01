@@ -1,0 +1,32 @@
+package core
+
+import "github.com/gofiber/fiber/v2"
+
+func registerMaterialsRoutes(protected fiber.Router, h *Handler) {
+	protected.Get("/materials", h.ListMaterials)
+	protected.Post("/materials", h.CreateMaterial)
+	protected.Put("/materials/:id", h.UpdateMaterial)
+	protected.Get("/warehouses", h.ListWarehouses)
+	protected.Post("/warehouses", h.CreateWarehouse)
+	protected.Get("/stock", h.Stock)
+	protected.Get("/stock/positions", h.StockPositions)
+	protected.Get("/stock/movements", h.StockMovements)
+	protected.Get("/stock/documents", h.StockDocuments)
+	protected.Post("/stock/documents", h.CreateStockDocument)
+	protected.Get("/stock/documents/:id", h.GetStockDocument)
+	protected.Put("/stock/documents/:id", h.UpdateStockDocument)
+	protected.Post("/stock/adjustments", h.CreateStockAdjustment)
+	protected.Post("/stock/receive", h.StockReceive)
+	protected.Post("/stock/issue", h.StockIssue)
+	protected.Post("/stock/transfer", h.StockTransfer)
+	protected.Post("/stock/return-to-warehouse", h.StockReturnWarehouse)
+	protected.Post("/stock/return-to-subcontractor", h.StockReturnSubcontractor)
+	protected.Get("/projects/:id/material-balances", h.MaterialBalances)
+	protected.Post("/projects/:id/material-balances/:materialId/adjustments", h.AdjustSiteMaterialUsage)
+	protected.Get("/projects/:id/warehouse-receipt-options", h.WarehouseReceiptOptions)
+	protected.Get("/projects/:id/incoming-acceptances", h.ProjectIncomingAcceptances)
+	protected.Post("/projects/:id/incoming-acceptances", h.CreateIncomingAcceptance)
+	protected.Get("/incoming-acceptances/:id", h.GetIncomingAcceptance)
+	protected.Put("/incoming-acceptances/:id", h.UpdateIncomingAcceptance)
+	protected.Post("/incoming-acceptances/:id/submit", h.SubmitIncomingAcceptance)
+}
