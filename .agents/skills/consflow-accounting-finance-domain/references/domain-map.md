@@ -4,13 +4,13 @@
 
 - Ordinary Accounting Handoff UI: `frontend/src/modules/project-finance/AccountingHandoffPage.tsx`, shared `AccountingHandoffActionDialog.tsx`, compatibility wrapper/legacy UI in `ProjectFinancePage.tsx`, shared project picker/actions, routed at `/accounting` and `/projects/:id/accounting`
 - Accounting company work UI: `frontend/src/modules/my-work/AccountingWorkLane.tsx`, hosted by `MyWorkPage.tsx`; company observer presentation in `AppShell.tsx`, `app/router.tsx`, `ProjectWorkspaceLayout.tsx` and `projectWorkspaceNavigation.ts`
-- Accounting Handoff backend: `accounting_handoff.go`, `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, `types_project_finance.go`; project-option parsing/paging/search helpers live in `handlers_reports.go`, `service_reports.go` and `repository_reports.go`
+- Accounting Handoff backend: `accounting_handoff.go`, `handlers_project_finance.go`, `service_project_finance.go`, `repository_project_finance.go`, `types_project_finance.go`; project-option parsing/paging/search helpers live in `handlers_reports.go`, `service_reports.go` and `repository_reports.go` dashboard/options plus `repository_reports_{cashflow,tax,profit}.go` query owners
 - Frontend modules: `frontend/src/modules/accounting` (`AccountingPage.tsx`, `AccountingBooksPanel.tsx`, `ManualJournalDialog.tsx`, `TaxWorkspace.tsx`, `AccountingCreateDialog.tsx`, `AccountingDetailDialog.tsx`, `CashflowPanel.tsx`), `frontend/src/modules/debt`, `frontend/src/modules/contracts`, `frontend/src/modules/reports`, and the permission-gated cashflow projection in `frontend/src/modules/dashboard/DashboardSummaryPanels.tsx`
 - Debt panels: `InputInvoicePanel.tsx`, `OutputInvoicePanel.tsx`, `InputPaymentPlanPanel.tsx`, `OutputBillingPlanPanel.tsx`, `PayableReconciliationPanel.tsx`, `ReceivableReconciliationPanel.tsx`
 - Report panels: `CashflowPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`
-- Backend routes: `backend/internal/core/routes.go`
-- Backend logic: source finance methods in `handlers.go`, `service_finance_common.go`, `service_finance_invoices.go`, `service_debt_payables.go`, `service_debt_receivables.go`, `service_reconciliations.go`, `service_storage.go`, `repository_domain.go`, `types.go`; ledger owners `handlers_accounting.go`, `types_accounting.go`, `accounting_core.go`, `accounting_dimensions.go`, `accounting_posting.go`, `accounting_payment_reversal.go`, `accounting_tax.go`, `accounting_reports.go`
-- Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
+- Backend routes: `backend/internal/core/routes.go` bootstrap plus bounded `backend/internal/core/routes_*.go` registrars
+- Backend logic: source finance methods in `handlers.go` foundation plus bounded `handlers_*.go` owners, `service_finance_common.go`, `service_finance_invoices.go`, `service_debt_payables.go`, `service_debt_receivables.go`, `service_reconciliations.go`, `service_storage.go`, `repository_domain.go` foundation plus bounded `repository_*.go` owners, `types.go` foundation plus bounded `types_*.go` contracts; ledger owners `handlers_accounting.go`, `types_accounting.go`, `accounting_core.go`, `accounting_dimensions.go`, `accounting_posting.go`, `accounting_payment_reversal.go`, `accounting_tax.go`, `accounting_reports.go`
+- Contracts: `frontend/src/lib/types/domain.ts` compatibility barrel plus bounded `frontend/src/lib/types/domain/*.ts` contracts, `frontend/src/lib/utils/status.ts`
 
 ## Routes
 

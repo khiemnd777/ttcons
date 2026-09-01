@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { domainTypesSource } from './domainTypesSource.ts';
 
 async function source(path: string) {
   return readFile(new URL(path, import.meta.url), 'utf8');
@@ -33,7 +34,7 @@ test('early start uses an explicit audited confirmation instead of unlocking all
 });
 
 test('work-item domain contract keeps start readiness separate from completion requirements', async () => {
-  const domain = await source('../src/lib/types/domain.ts');
+  const domain = await domainTypesSource();
 
   assert.match(domain, /start_readiness\?: WorkItemStartReadiness/);
   assert.match(domain, /export type WorkItemStartReadiness/);

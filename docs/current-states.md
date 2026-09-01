@@ -1,5 +1,36 @@
 # Current States
 
+## Backend/frontend overloaded-file code split — 2026-09-01
+
+### Will be done
+
+- Work on branch `split-overloaded-files`, created from revision `4bcedc7`, and keep the refactor behavior-preserving: no API, schema, migration, route path, status, permission, SQL semantics or UI behavior changes.
+- Split `handlers.go`, `types.go` and the frontend domain type registry first; keep Go receivers/signatures and a TypeScript compatibility barrel so existing consumers remain source-compatible.
+- Split `routes.go` by bounded route groups without changing registration order, middleware nesting, concurrency classification or handler binding.
+- Split `repository_domain.go` one bounded context at a time while preserving method bodies, transaction boundaries, SQL text, audit/activity/outbox writes and soft-delete filters.
+- Split the largest React containers through pure helpers, hooks and focused components while preserving query keys, invalidation families, URL state, action readiness and rendered behavior.
+- Split Workflow Definition Excel, Project Excel and report owners last because their hashing, idempotency, transaction and export-parity contracts are higher risk.
+- Update the central, backend, frontend and affected domain maps for every moved owner; add no database migration.
+- Verify baseline and final declaration/route parity, Go formatting/tests, frontend tests/build, Pipeline Builder checks, Docker restart/startup migrations and local health/readiness. Browser/UAT remains out of scope unless explicitly requested.
+
+### Done
+
+- User approved the review package and the proposed safe split order.
+- Created branch `split-overloaded-files` from clean revision `4bcedc7`; the initially proposed slash name could not be created inside the sandbox, so the approved no-`codex` fallback name is used.
+- Corrected the accidental earlier push of `4bcedc7` to `main`: first anchored that commit at `origin/split-overloaded-files`, then moved `origin/main` back to `cbbdfb6` with an exact `--force-with-lease` and aligned local `main` to the same revision using a ref-only branch update. No checkout/reset ran; the existing unstaged split worktree was preserved byte-for-byte across the ref correction.
+- Re-ran the pre-commit integrity review after restoring `main`: local/remote `main` remained at `cbbdfb6`, local/remote `split-overloaded-files` remained at `4bcedc7`, and `main` was the direct ancestor. Exact Go AST parity passed for all 484 service, 407 handler, 133 shared-type, 482 domain-repository, 55 Workflow Definition, 36 Project package and 32 report declarations; all 458 routes retained their original order/hash; the frontend retained all 215 public domain-type exports with the same checksum and no duplicate name. Current `go test -count=1 ./...`, `go vet ./...`, server build, 292/292 frontend tests, TypeScript/Vite production build, Pipeline Builder regression check, 250 KiB bundle budget and `git diff --check` all passed.
+- Loaded the mandatory central/backend/frontend mapping and cross-domain impact guardrails; confirmed this is a physical ownership refactor with no intended product behavior or contract change.
+- Split the core handler, route, shared-type and domain-repository monoliths into bounded files in the same `core` package. Route parity is 458 registrations in the original order; AST parity confirms 407 handler, 133 type and 482 domain-repository declarations are unchanged.
+- Kept `routes.go`, `handlers.go`, `types.go` and `repository_domain.go` as compatibility/foundation entry points. No receiver, signature, SQL body, transaction, audit/activity/outbox write, route path, middleware nesting, status, permission or response contract was intentionally changed.
+- Split the frontend domain registry behind the existing `lib/types/domain.ts` barrel and updated source-contract tests to load the bounded modules in the original declaration order.
+- Extracted pure domain/presentation owners from Pipeline Builder, Workflow Form structured lists, Work Item detail, My Work, Contracts, Workflow Forms administration and Activity Thread while leaving queries, mutations, URL state and invalidation in their existing page/container owners.
+- Split Workflow Definition and Project XLSX/JSON processing into contract, service, validation, repository and export files; split report SQL into Dashboard/options, cashflow, tax and profit owners. AST parity confirms 55 Workflow Definition, 36 Project package and 32 report declarations are unchanged.
+- Updated the central/backend/frontend/root-cause maps and all affected business-domain maps with the new physical owners. No migration or seed change is required because persistence and business behavior are unchanged.
+- Final completed-working-tree verification passed: route parity (458 registrations, original order/hash); AST parity for handlers (407), shared types (133), domain repository (482), Workflow Definition package (55), Project package (36) and reports (32); `gofmt -d`; uncached `go test -count=1 ./...`; `go vet ./...`; server build; 292/292 frontend tests; TypeScript/Vite production build (1,896 modules); and `git diff --check`.
+- `make restart` completed the required `down -> build -> run` pipeline after rerunning outside the sandbox for Docker Buildx metadata access. Startup reported storage ready and migrations `applied=0 skipped=133`; PostgreSQL, Redis, Redis cache, backend and admin remained running with restart count 0. PostgreSQL/Redis health checks were healthy and backend `/api/health`, `/api/ready` plus admin root returned HTTP 200; no panic/fatal/error log was observed after startup.
+- `CONSFLOW_TEST_DATABASE_URL` is absent, so isolated destructive/database-backed and Golden tests did not run; the core JSON test stream reported 155 skip events and zero fail events. The Docker smoke proves compatibility with the existing local database/migration state, not isolated-database acceptance.
+- Status: `TECHNICALLY VERIFIED` for move parity, compile/tests/build, Docker image build, startup migration compatibility and local health/readiness. `NOT UX ACCEPTED` because browser/UAT was not requested and did not run.
+
 ## Backend core service code split — 2026-09-01
 
 ### Will be done

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { domainTypesSource } from './domainTypesSource.ts';
 
 async function source(path: string) {
   return readFile(new URL(path, import.meta.url), 'utf8');
@@ -33,7 +34,7 @@ test('project explorer exposes equivalent desktop and mobile sort controls', asy
 
 test('project explorer keeps selection before actions and creation date after progress', async () => {
   const projectsPage = await source('../src/modules/projects/ProjectsPage.tsx');
-  const domainTypes = await source('../src/lib/types/domain.ts');
+  const domainTypes = await domainTypesSource();
 
   assert.match(projectsPage, /selectable \? <SelectionCheckbox[^>]+> : null\}\s*<span><span className="sr-only">Thao tác<\/span><\/span>\s*<ProjectExplorerSortHeader label="Cây công trình"/);
   assert.match(projectsPage, /<span>Tiến độ<\/span>\s*<ProjectExplorerSortHeader label="Ngày tạo" sortKey="created_at"[^/]+\/>/);

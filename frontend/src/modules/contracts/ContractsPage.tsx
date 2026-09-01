@@ -51,17 +51,42 @@ import {
   type WorkItemMutationResult,
 } from '../work-items/workItemMutationContext';
 import { SignatureCaptureDialog, type SignatureCapturePayload } from '../work-items/SignatureCaptureDialog';
+import {
+  PriorityBadge,
+  SignedCurrency,
+  acceptanceLabel,
+  amountBasisOptions,
+  contractStatusLabel,
+  contractTypeLabel,
+  contractTypeOptions,
+  currencyLabel,
+  directionLabel,
+  directionOptions,
+  dispatchMethodLabel,
+  dispatchMethodOptions,
+  milestoneEligibleAction,
+  milestoneObligationAction,
+  milestoneTypeLabel,
+  milestoneTypeOptions,
+  obligationLabel,
+  readinessCount,
+  signedDays,
+  variationApproveAction,
+  variationIncorporateAction,
+  variationPriorityOptions,
+  variationProcurementAction,
+  variationPurchaseAction,
+  variationQSAction,
+  variationSubmitAction,
+  variationTypeOptions,
+  versionApproveAction,
+  versionSubmitAction,
+  type ActionDialog,
+} from './contractsPresentation';
 
 type CreateDialog = 'contract' | 'version' | 'milestone' | 'variation' | null;
 type DetailTab = 'execution' | 'versions' | 'milestones' | 'variations' | 'retentions';
 type DirectionFilter = 'all' | 'receivable' | 'payable';
-type ActionDialog = {
-  title: string;
-  description: string;
-  endpoint: string;
-  success: string;
-  commentRequired?: boolean;
-} | null;
 type RetentionDialog = { id: string; outstanding: number; milestone: string } | null;
 type VersionSignTarget = { version: ContractVersion; form: ContractSigningForm } | null;
 type DispatchReceiveTarget = ContractDispatch | null;
@@ -1434,169 +1459,3 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
     </div>
   );
 }
-
-function SignedCurrency({ value }: { value: number }) {
-  const numericValue = Number(value ?? 0);
-  return <span className={numericValue > 0 ? 'text-emerald-700' : numericValue < 0 ? 'text-rose-700' : undefined}>{numericValue > 0 ? '+' : ''}{currency(numericValue)}</span>;
-}
-
-function versionSubmitAction(row: ContractVersion): NonNullable<ActionDialog> {
-  return { title: 'Gửi rà soát phiên bản', description: row.version_label, endpoint: `/contract-versions/${row.id}/submit`, success: 'Đã gửi rà soát phiên bản' };
-}
-
-function versionApproveAction(row: ContractVersion): NonNullable<ActionDialog> {
-  return { title: 'Duyệt phiên bản hợp đồng', description: row.version_label, endpoint: `/contract-versions/${row.id}/approve`, success: 'Đã duyệt phiên bản', commentRequired: true };
-}
-
-function milestoneEligibleAction(row: ContractMilestone): NonNullable<ActionDialog> {
-  return { title: 'Xác nhận mốc đủ điều kiện', description: row.milestone_name, endpoint: `/contract-milestones/${row.id}/eligible`, success: 'Đã xác nhận mốc đủ điều kiện' };
-}
-
-function milestoneObligationAction(row: ContractMilestone): NonNullable<ActionDialog> {
-  return { title: 'Mở công nợ từ mốc thanh toán', description: `${row.milestone_name} · sau giữ lại ${currency(row.net_amount)}`, endpoint: `/contract-milestones/${row.id}/open-obligation`, success: 'Đã mở công nợ từ mốc thanh toán' };
-}
-
-function variationSubmitAction(row: ContractVariation): NonNullable<ActionDialog> {
-  return { title: 'Gửi QS rà soát phát sinh', description: row.title, endpoint: `/contract-variations/${row.id}/submit`, success: 'Đã gửi phát sinh cho QS' };
-}
-
-function variationQSAction(row: ContractVariation): NonNullable<ActionDialog> {
-  return { title: 'QS rà soát phát sinh', description: row.title, endpoint: `/contract-variations/${row.id}/qs-review`, success: 'QS đã xác nhận và chuyển Mua hàng', commentRequired: true };
-}
-
-function variationPurchaseAction(row: ContractVariation): NonNullable<ActionDialog> {
-  return { title: 'Mua hàng xác nhận đã lấy giá', description: row.title, endpoint: `/contract-variations/${row.id}/purchase`, success: 'Đã chuyển phát sinh sang PM/Giám đốc duyệt', commentRequired: true };
-}
-
-function variationApproveAction(row: ContractVariation): NonNullable<ActionDialog> {
-  return { title: 'Duyệt phụ lục', description: row.title, endpoint: `/contract-variations/${row.id}/approve`, success: 'Đã duyệt phụ lục', commentRequired: true };
-}
-
-function variationIncorporateAction(row: ContractVariation): NonNullable<ActionDialog> {
-  return {
-    title: 'Tạo phiên bản điều chỉnh từ phụ lục',
-    description: 'Tạo phiên bản nháp mới; vẫn phải rà soát, duyệt và ký.',
-    endpoint: `/contract-variations/${row.id}/incorporate`,
-    success: 'Đã tạo phiên bản điều chỉnh từ phụ lục',
-  };
-}
-
-function variationProcurementAction(row: ContractVariation): NonNullable<ActionDialog> {
-  return {
-    title: 'Tạo yêu cầu mua từ phát sinh',
-    description: 'Yêu cầu mua nháp được tạo sau khi phát sinh đã qua đủ QS, Mua hàng và phê duyệt.',
-    endpoint: `/contract-variations/${row.id}/generate-procurement`,
-    success: 'Đã tạo yêu cầu mua từ phát sinh',
-  };
-}
-
-function readinessCount(contract: Contract) {
-  const readiness = contract.execution_readiness;
-  if (!readiness) return 0;
-  const executionReady = readiness.contract_active
-    && readiness.app_signed
-    && readiness.paper_dispatched
-    && readiness.returned_scan_received;
-  return [readiness.app_signed, readiness.paper_dispatched, readiness.returned_scan_received, executionReady].filter(Boolean).length;
-}
-
-function PriorityBadge({ priority }: { priority?: string }) {
-  const urgent = priority === 'urgent';
-  return (
-    <span className={clsx(
-      'inline-flex rounded-md px-2 py-1 text-xs font-semibold ring-1 ring-inset',
-      urgent ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-slate-100 text-slate-700 ring-slate-200',
-    )}>
-      {urgent ? 'Gấp' : 'Không gấp'}
-    </span>
-  );
-}
-
-function dispatchMethodLabel(method?: string) {
-  return dispatchMethodOptions.find((option) => option.value === method)?.label ?? method ?? 'Chưa xác định';
-}
-
-function acceptanceLabel(row: ContractMilestone) {
-  if (!row.acceptance_required) return 'Không yêu cầu';
-  return row.acceptance_id ? 'Có nghiệm thu liên kết' : 'Thiếu hồ sơ nghiệm thu';
-}
-
-function obligationLabel(row: ContractMilestone) {
-  if (!row.obligation_id) return null;
-  return `${directionLabel(row.obligation_type)} · Đã mở công nợ`;
-}
-
-function contractStatusLabel(status?: string) {
-  if (status === 'active') return 'Đang hiệu lực';
-  if (status === 'terminated') return 'Đã chấm dứt';
-  return statusLabel(status);
-}
-
-function contractTypeLabel(type?: string) {
-  return contractTypeOptions.find((option) => option.value === type)?.label ?? 'Loại hợp đồng khác';
-}
-
-function directionLabel(direction?: string) {
-  if (direction === 'receivable') return 'Phải thu';
-  if (direction === 'payable') return 'Phải trả';
-  return 'Chưa xác định';
-}
-
-function currencyLabel(value?: string) {
-  return value === 'VND' ? 'Việt Nam đồng' : value || 'Chưa xác định tiền tệ';
-}
-
-function milestoneTypeLabel(type?: string) {
-  return milestoneTypeOptions.find((option) => option.value === type)?.label ?? 'Loại mốc khác';
-}
-
-function signedDays(value: number) {
-  const days = Number(value ?? 0);
-  return `${days > 0 ? '+' : ''}${days} ngày`;
-}
-
-const contractTypeOptions = [
-  { value: 'main_client', label: 'Hợp đồng chủ đầu tư' },
-  { value: 'subcontractor', label: 'Hợp đồng thầu phụ' },
-  { value: 'supplier', label: 'Hợp đồng nhà cung cấp' },
-  { value: 'service', label: 'Hợp đồng dịch vụ' },
-  { value: 'other', label: 'Hợp đồng khác' },
-];
-
-const directionOptions = [
-  { value: 'receivable', label: 'Phải thu · Đầu ra' },
-  { value: 'payable', label: 'Phải trả · Đầu vào' },
-];
-
-const milestoneTypeOptions = [
-  { value: 'advance', label: 'Tạm ứng' },
-  { value: 'progress', label: 'Thanh toán tiến độ' },
-  { value: 'final', label: 'Quyết toán' },
-  { value: 'retention_release', label: 'Giải phóng khoản giữ lại' },
-  { value: 'other', label: 'Loại khác' },
-];
-
-const amountBasisOptions = [
-  { value: 'percentage', label: 'Tỷ lệ hợp đồng' },
-  { value: 'fixed', label: 'Giá trị cố định' },
-  { value: 'quantity_certificate', label: 'Chứng nhận khối lượng' },
-];
-
-const variationTypeOptions = [
-  { value: 'scope', label: 'Phạm vi' },
-  { value: 'price', label: 'Giá trị' },
-  { value: 'time', label: 'Tiến độ' },
-  { value: 'mixed', label: 'Kết hợp' },
-];
-
-const variationPriorityOptions = [
-  { value: 'normal', label: 'Không gấp' },
-  { value: 'urgent', label: 'Gấp' },
-];
-
-const dispatchMethodOptions = [
-  { value: 'direct', label: 'Bàn giao trực tiếp' },
-  { value: 'courier', label: 'Chuyển phát' },
-  { value: 'postal', label: 'Bưu điện' },
-  { value: 'other', label: 'Khác' },
-];

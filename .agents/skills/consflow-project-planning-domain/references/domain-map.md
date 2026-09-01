@@ -12,9 +12,9 @@
 
 - Frontend modules: `frontend/src/modules/projects`, `frontend/src/modules/planning` including `ConstructionHandoffPanel.tsx`, `frontend/src/modules/planning-daily-reports`, `frontend/src/modules/meeting-minutes`, `frontend/src/modules/planning-checklists`
 - Shared work item UI: `frontend/src/modules/work-items`
-- Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service_projects.go`, `service_project_documents.go`, `service_my_work.go`, `service_activity.go`, `service_pipeline_runtime.go`, `repository_domain.go`, `project_startup.go`, `project_progress.go`, `types.go`; Project data-package owners `handlers_project_excel.go`, `project_excel.go`, `data_package.go`, `xlsx_workbook.go`
-- Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
+- Backend routes: `backend/internal/core/routes.go` bootstrap plus bounded `backend/internal/core/routes_*.go` registrars
+- Backend logic: `backend/internal/core/handlers.go` foundation plus bounded `backend/internal/core/handlers_*.go` owners, `service_projects.go`, `service_project_documents.go`, `service_my_work.go`, `service_activity.go`, `service_pipeline_runtime.go`, `repository_domain.go` foundation plus bounded `repository_*.go` owners, `project_startup.go`, `project_progress.go`, `types.go` foundation plus bounded `types_*.go` contracts; Project data-package owners `handlers_project_excel.go`, `project_excel.go` contracts plus `project_excel_{service,validation,repository,export}.go` owners, `data_package.go`, `xlsx_workbook.go`
+- Contracts: `frontend/src/lib/types/domain.ts` compatibility barrel plus bounded `frontend/src/lib/types/domain/*.ts` contracts, `frontend/src/lib/utils/status.ts`
 
 ## Routes
 

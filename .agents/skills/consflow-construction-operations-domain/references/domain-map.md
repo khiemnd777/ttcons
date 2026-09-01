@@ -4,9 +4,9 @@
 
 - Frontend modules: `frontend/src/modules/operations`, shared `frontend/src/modules/_shared/EvidenceCapture.tsx`, `frontend/src/modules/quality`, `frontend/src/modules/acceptance`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
 - Work item panels: `WorkflowFormPanel.tsx`, `EvidencePanel.tsx`, `EvidenceGallery.tsx`, `ActivityThread.tsx`, `ActivityComposer.tsx`
-- Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service_construction.go`, `service_work_items.go`, `service_evidence.go`, `service_activity.go`, `repository_domain.go`, `construction_handoff.go`, `types.go`
-- Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
+- Backend routes: `backend/internal/core/routes.go` bootstrap plus bounded `backend/internal/core/routes_*.go` registrars
+- Backend logic: `backend/internal/core/handlers.go` foundation plus bounded `backend/internal/core/handlers_*.go` owners, `service_construction.go`, `service_work_items.go`, `service_evidence.go`, `service_activity.go`, `repository_domain.go` foundation plus bounded `repository_*.go` owners, `construction_handoff.go`, `types.go` foundation plus bounded `types_*.go` contracts
+- Contracts: `frontend/src/lib/types/domain.ts` compatibility barrel plus bounded `frontend/src/lib/types/domain/*.ts` contracts, `frontend/src/lib/utils/status.ts`
 
 ## Routes
 

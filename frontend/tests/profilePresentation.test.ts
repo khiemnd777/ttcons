@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { domainTypesSource } from './domainTypesSource.ts';
 
 async function source(path: string) {
   return readFile(new URL(path, import.meta.url), 'utf8');
@@ -45,7 +46,7 @@ test('profile page keeps personal and password edits in shared dialogs', async (
 
 test('auth context can refresh the user summary after a non-sensitive profile update', async () => {
   const auth = await source('../src/lib/auth/AuthContext.tsx');
-  const types = await source('../src/lib/types/domain.ts');
+  const types = await domainTypesSource();
 
   assert.match(auth, /refreshUser: \(\) => Promise<User>/);
   assert.match(auth, /async refreshUser\(\)/);

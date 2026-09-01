@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { domainTypesSource } from './domainTypesSource.ts';
 
 async function source(path: string) {
   return readFile(new URL(path, import.meta.url), 'utf8');
@@ -36,7 +37,7 @@ test('recovery tokens use URL fragments and are removed from browser history', a
 
 test('profile presents only masked recovery email state and requires current password for mutations', async () => {
   const profile = await source('../src/modules/profile/ProfilePage.tsx');
-  const types = await source('../src/lib/types/domain.ts');
+  const types = await domainTypesSource();
 
   assert.match(profile, /Email khôi phục/);
   assert.match(profile, /put<[^>]+>\('\/auth\/recovery-email'/);

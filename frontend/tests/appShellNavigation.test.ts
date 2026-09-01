@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { domainTypesSource } from './domainTypesSource.ts';
 
 async function source(path: string) {
   return readFile(new URL(path, import.meta.url), 'utf8');
@@ -8,7 +9,7 @@ async function source(path: string) {
 
 test('standard shell exposes the permission-filtered navigation on mobile', async () => {
   const appShell = await source('../src/layouts/AppShell.tsx');
-  const domainTypes = await source('../src/lib/types/domain.ts');
+  const domainTypes = await domainTypesSource();
 
   assert.match(appShell, /const \[mobileNavOpen, setMobileNavOpen\] = useState\(false\)/);
   assert.match(appShell, /aria-controls="mobile-navigation"/);

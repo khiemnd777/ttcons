@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { domainTypesSource } from './domainTypesSource.ts';
 
 async function source(path: string) {
   return readFile(new URL(path, import.meta.url), 'utf8');
@@ -40,7 +41,7 @@ test('Import preview and execute never render a plaintext password', async () =>
 test('Imported accounts are routed to the standalone initial password change screen', async () => {
   const router = await source('../src/app/router.tsx');
   const page = await source('../src/modules/auth/InitialPasswordChangePage.tsx');
-  const types = await source('../src/lib/types/domain.ts');
+  const types = await domainTypesSource();
   assert.match(types, /must_change_password\?: boolean/);
   assert.match(router, /user\.must_change_password.*change-initial-password/);
   assert.match(router, /path: '\/change-initial-password'/);

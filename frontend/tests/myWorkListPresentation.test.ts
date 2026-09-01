@@ -1,14 +1,23 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { domainTypesSource } from './domainTypesSource.ts';
 
 async function source(path: string) {
   return readFile(new URL(path, import.meta.url), 'utf8');
 }
 
+async function myWorkPageSource() {
+  const [page, domain] = await Promise.all([
+    source('../src/modules/my-work/MyWorkPage.tsx'),
+    source('../src/modules/my-work/myWorkDomain.ts'),
+  ]);
+  return `${page}\n${domain}`;
+}
+
 test('My Work renders compact semantic rows without nested interactive controls', async () => {
   const card = await source('../src/modules/work-items/WorkItemCard.tsx');
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
 
   assert.match(card, /aria-pressed=\{selected\}/);
   assert.match(card, /onClick=\{onSelect \?\? onOpen\}/);
@@ -23,7 +32,7 @@ test('My Work renders compact semantic rows without nested interactive controls'
 });
 
 test('My Work keeps detail copy in the desktop inspector and deduplicates header roles', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
 
   assert.match(page, /import \{ roleSummary as summarizeRoles \} from '\.\.\/\.\.\/lib\/utils\/roles'/);
   assert.match(page, /const roleSummary = summarizeRoles\(user\?\.roles\)/);
@@ -35,7 +44,7 @@ test('My Work keeps detail copy in the desktop inspector and deduplicates header
 });
 
 test('My Work provides compact loading and stale-data states', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
 
   assert.match(page, /function WorkListSkeleton\(\)/);
   assert.match(page, /Đang tải danh sách công việc/);
@@ -44,7 +53,7 @@ test('My Work provides compact loading and stale-data states', async () => {
 });
 
 test('My Work tab count follows the currently displayed work query', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
 
   assert.match(page, /const workTabCount = workItems\.isLoading[\s\S]*workItems\.isError && !firstPage[\s\S]*\(firstPage\?\.total \?\? 0\) \+ workflowActionTotal/);
   assert.match(page, /label="Công việc" count=\{workTabCount\}/);
@@ -52,7 +61,7 @@ test('My Work tab count follows the currently displayed work query', async () =>
 });
 
 test('My Work defaults to personal responsibility and keeps approval out of ordinary scope', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
   const scopeOptions = page.slice(page.indexOf('const scopes'), page.indexOf('const attentionQueues'));
 
   assert.match(page, /type WorkScopeKey = 'responsible' \| 'mine'/);
@@ -69,7 +78,7 @@ test('My Work defaults to personal responsibility and keeps approval out of ordi
 });
 
 test('My Work presents source-backed quick filters inside the selected work scope', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
   const workMode = page.slice(page.indexOf("{mode === 'work' ? ("), page.indexOf(") : mode === 'approval' ? ("));
   const quickFilters = page.slice(page.indexOf('function WorkQuickFilters('), page.indexOf('function ModeTab('));
 
@@ -87,7 +96,7 @@ test('My Work presents source-backed quick filters inside the selected work scop
 });
 
 test('My Work separates actor-decidable approvals into a dedicated compatible mode', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
 
   assert.match(page, /type ModeKey = 'work' \| 'approval' \| 'accounting' \| 'attention'/);
   assert.match(page, /legacyApprovalMode = requestedQueue === 'pending_approval' \|\| requestedBucket === 'waiting_decision'/);
@@ -105,7 +114,7 @@ test('My Work separates actor-decidable approvals into a dedicated compatible mo
 });
 
 test('My Work splits approval sources into URL-backed responsive tabs', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
   const workspace = page.slice(page.indexOf('function ApprovalWorkspace('), page.indexOf('function NodeApprovalLane('));
 
   assert.match(page, /type ApprovalLaneKey = 'work' \| 'node' \| 'report'/);
@@ -124,7 +133,7 @@ test('My Work splits approval sources into URL-backed responsive tabs', async ()
 });
 
 test('My Work separates scope, list, and selected-work actions responsively', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
 
   assert.match(page, /xl:grid-cols-\[208px_minmax\(0,1fr\)_320px\]/);
   assert.match(page, /function ScopeRail\(/);
@@ -135,7 +144,7 @@ test('My Work separates scope, list, and selected-work actions responsively', as
 });
 
 test('My Work scope rail keeps only concise scope labels', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
   const scopeRail = page.slice(page.indexOf('function ScopeRail('), page.indexOf('function FilterBar('));
 
   assert.match(page, /const scopes: Array<\{ key: WorkScopeKey; label: string \}>/);
@@ -145,7 +154,7 @@ test('My Work scope rail keeps only concise scope labels', async () => {
 });
 
 test('My Work scope rail shows only positive need-action counts as chips', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
   const realtime = await source('../src/modules/notifications/ActorRealtimeProvider.tsx');
   const scopeRail = page.slice(page.indexOf('function ScopeCountChip('), page.indexOf('function FilterBar('));
 
@@ -162,7 +171,7 @@ test('My Work scope rail shows only positive need-action counts as chips', async
 });
 
 test('My Work isolates actor queries and never presents placeholder zeroes as loaded quick-filter values', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
 
   assert.match(page, /queryKey: \['my-work-items', user\?\.id, filterKey\]/);
   assert.match(page, /queryKey: \['my-workflow-actions', user\?\.id, queue, project, search\]/);
@@ -174,8 +183,8 @@ test('My Work isolates actor queries and never presents placeholder zeroes as lo
 });
 
 test('My Work surfaces generic ready stage transitions as one-click business actions', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
-  const domain = await source('../src/lib/types/domain.ts');
+  const page = await myWorkPageSource();
+  const domain = await domainTypesSource();
   const workList = page.slice(page.indexOf('function WorkList('), page.indexOf('function WorkListSkeleton('));
 
   assert.match(domain, /export type MyWorkflowAction =/);
@@ -191,7 +200,7 @@ test('My Work surfaces generic ready stage transitions as one-click business act
 });
 
 test('My Work coordinates project startup without creating placeholder work items', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
   const projects = await source('../src/modules/projects/ProjectsPage.tsx');
   const wizard = await source('../src/modules/projects/ProjectStartupWizard.tsx');
   const realtime = await source('../src/modules/notifications/ActorRealtimeProvider.tsx');
@@ -212,7 +221,7 @@ test('My Work coordinates project startup without creating placeholder work item
 });
 
 test('My Work exposes a focused Accounting lane with direct handoff actions', async () => {
-  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const page = await myWorkPageSource();
   const lane = await source('../src/modules/my-work/AccountingWorkLane.tsx');
   const dialog = await source('../src/modules/project-finance/AccountingHandoffActionDialog.tsx');
 

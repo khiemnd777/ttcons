@@ -42,7 +42,11 @@ test('official module workspaces share the context bridge and domain items do no
   }
 
   const taskContext = await readFile(new URL('../src/modules/projects/ProjectTaskContext.tsx', import.meta.url), 'utf8');
-  const detail = await readFile(new URL('../src/modules/work-items/WorkItemDetailDialog.tsx', import.meta.url), 'utf8');
+  const [detailPage, detailDomain] = await Promise.all([
+    readFile(new URL('../src/modules/work-items/WorkItemDetailDialog.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/modules/work-items/workItemDetailDomain.ts', import.meta.url), 'utf8'),
+  ]);
+  const detail = `${detailPage}\n${detailDomain}`;
   assert.match(taskContext, /Thao tác nghiệp vụ đầu tiên lưu thành công sẽ tự chuyển đầu việc sang Đang làm/);
   assert.match(detail, /isDomainExecutionTarget\(item\.execution_target\)[\s\S]*action !== 'start'/);
 });
