@@ -2,7 +2,7 @@
 
 ## Accounting Reconciliation Observer Boundary (V133)
 
-- Permission marker: `project.reconciliation.view`, granted additively to the system `accounting` role by `backend/migrations/V133__accounting_company_reconciliation_visibility.sql` and mirrored in `backend/seed/seed.sql`.
+- Permission marker: `project.reconciliation.view`, granted additively only to the system `accounting` role by `backend/migrations/V133__accounting_company_reconciliation_visibility.sql` and mirrored in `backend/seed/seed.sql`. Production RBAC validation and Admin bootstrap treat it as an explicit Accounting-only exception rather than requiring or allowing it on Admin/Developer.
 - Backend owner: `WorkItemAccessProfile`, `reconciliationCompanyScopeAllowed`, `CanAccessProjectPermission`, `ProjectAccessFilter` and `CanMutateProjectActivity` in `backend/internal/core/repository_domain.go` foundation plus bounded `backend/internal/core/repository_*.go` owners.
 - The marker applies only from a global role assignment and grants all-company observation for an explicit read allowlist. It never sets `IsAdmin`, `IsDirector` or the Work Item decision override.
 - Only exact Accounting-owned action keys receive company scope. Project/admin/procurement/contract approvals and project activity mutations continue to require membership or their existing manager rules.

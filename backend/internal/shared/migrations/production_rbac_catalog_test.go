@@ -25,7 +25,7 @@ func TestProductionRBACCatalogSupportsFreshDatabaseWithoutSeed(t *testing.T) {
 	assertRBACCount(t, ctx, database, `
 		SELECT COUNT(*)
 		FROM permissions permission
-		WHERE permission.key NOT IN ('settings.update','staff.import','sample_data.create')
+		WHERE permission.key NOT IN ('settings.update','staff.import','sample_data.create','project.reconciliation.view')
 		  AND NOT EXISTS (
 			SELECT 1 FROM role_permissions assignment
 			JOIN roles role ON role.id=assignment.role_id AND role.name='admin'
@@ -35,11 +35,27 @@ func TestProductionRBACCatalogSupportsFreshDatabaseWithoutSeed(t *testing.T) {
 	assertRBACCount(t, ctx, database, `
 		SELECT COUNT(*)
 		FROM permissions permission
-		WHERE NOT EXISTS (
+		WHERE permission.key <> 'project.reconciliation.view'
+		  AND NOT EXISTS (
 			SELECT 1 FROM role_permissions assignment
 			JOIN roles role ON role.id=assignment.role_id AND role.name='developer'
 			WHERE assignment.permission_id=permission.id
-		)
+		  )
+	`, 0)
+	assertRBACCount(t, ctx, database, `
+		SELECT COUNT(*)
+		FROM role_permissions assignment
+		JOIN roles role ON role.id=assignment.role_id
+		JOIN permissions permission ON permission.id=assignment.permission_id
+		WHERE permission.key='project.reconciliation.view'
+	`, 1)
+	assertRBACCount(t, ctx, database, `
+		SELECT COUNT(*)
+		FROM role_permissions assignment
+		JOIN roles role ON role.id=assignment.role_id
+		JOIN permissions permission ON permission.id=assignment.permission_id
+		WHERE permission.key='project.reconciliation.view'
+		  AND role.name <> 'accounting'
 	`, 0)
 	assertRBACCount(t, ctx, database, `
 		SELECT COUNT(*)

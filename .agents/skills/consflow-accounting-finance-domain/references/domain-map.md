@@ -42,7 +42,7 @@
 
 ## Invariants
 
-- A global `project.reconciliation.view` grant means Accounting may reconcile non-cancelled company projects, Dashboard finance and source workflow records without membership. It is an observation marker, not Admin/Director identity and not a wildcard permission.
+- A global `project.reconciliation.view` grant means Accounting may reconcile non-cancelled company projects, Dashboard finance and source workflow records without membership. It is an Accounting-only observation marker, intentionally absent from Admin/Developer because those system roles already have their own scope semantics; it is not Admin/Director identity and not a wildcard permission.
 - Company scope is allowed only for the enumerated read permissions and Accounting-owned action keys. Procurement/contract/PM/Admin approvals and mutations remain membership-scoped even if a historical role grant contains their key. Project activity creation also remains membership-scoped.
 - `GET /me/accounting-handoffs` is the focused Accounting lane: pending `handed_off` records are actionable, while `returned` and `acknowledged` are follow-up/history views. It must not fill ordinary personal Work Item queues with every observed project task.
 - Accounting acknowledge/return from My Work uses the existing canonical transition, required return reason, optional MISA reference, audit and actor/timestamp behavior; it never creates a second finance state machine.
