@@ -13,7 +13,7 @@
 - Frontend modules: `frontend/src/modules/projects`, `frontend/src/modules/planning` including `ConstructionHandoffPanel.tsx`, `frontend/src/modules/planning-daily-reports`, `frontend/src/modules/meeting-minutes`, `frontend/src/modules/planning-checklists`
 - Shared work item UI: `frontend/src/modules/work-items`
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `project_startup.go`, `project_progress.go`, `types.go`; Project data-package owners `handlers_project_excel.go`, `project_excel.go`, `data_package.go`, `xlsx_workbook.go`
+- Backend logic: `backend/internal/core/handlers.go`, `service_projects.go`, `service_project_documents.go`, `service_my_work.go`, `service_activity.go`, `service_pipeline_runtime.go`, `repository_domain.go`, `project_startup.go`, `project_progress.go`, `types.go`; Project data-package owners `handlers_project_excel.go`, `project_excel.go`, `data_package.go`, `xlsx_workbook.go`
 - Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
 
 ## Routes

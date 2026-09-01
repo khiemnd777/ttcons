@@ -1,5 +1,28 @@
 # Current States
 
+## Backend core service code split — 2026-09-01
+
+### Will be done
+
+- Split `backend/internal/core/service.go` by bounded context while keeping every declaration in `package core` and preserving the existing `Service` type, method signatures, route/handler contracts, repository call order, transaction boundaries, status values and error behavior.
+- Keep this action move-only: do not introduce subpackages, new service abstractions, API/schema/migration/frontend changes or unrelated refactors.
+- Move low-coupling administration/project/catalog/audit groups first, domain ledgers second, and workflow/work-item/form/activity/storage orchestration last, with formatting and test checkpoints between phases.
+- Update the central module map, backend function map and affected domain maps so service owner paths remain durable and accurate.
+- Verify declaration parity, backend formatting/build/tests and DB-backed integration/Golden validation when an isolated PostgreSQL test environment is available.
+
+### Done
+
+- Review package approved by the user with explicit confirmation to implement.
+- Baseline source revision is `cbbdfb6` with a clean working tree; `backend/internal/core/service.go` contains 12,060 lines and 469 function declarations.
+- Baseline `go test ./...` passed on Go 1.25.0 for the current working tree.
+- Split the original 484 top-level declarations into 28 bounded owner files in the existing `core` package. `service.go` is now 180 lines and retains only `Service`, `NewService`, shared limits, and runtime/upload/storage/auth/recovery configuration.
+- Kept cross-package helpers `cleanOptionalText`, `anySlice`, and `statusIn` in `service_helpers.go`; no new service type, subpackage, route, handler contract, repository call, schema, migration, frontend behavior, or runtime initialization hook was introduced.
+- Compared the split against `HEAD:backend/internal/core/service.go`: all 484 declarations were found exactly once and their declaration text was unchanged. The moved package variables are literal lookup maps and there are no moved `init` functions, so file-order initialization introduces no new dependency.
+- Updated the central module map, backend function map, root-cause triage map, and all eight affected business-domain maps with the new service ownership paths.
+- Current uncached `go test -count=1 ./...` passed on Go 1.25.0; `go vet ./...`, `go build -o /private/tmp/consflow-server ./cmd/server`, and `git diff --check` also passed. The core suite reports the same 155 skipped tests as baseline and zero failed test events.
+- A later approved `make restart` completed the required `down -> build -> run` pipeline against this working tree. After about 40 seconds, `admin`, `backend`, PostgreSQL, Redis and Redis cache remained running with restart count 0; PostgreSQL/Redis services were healthy, backend `/api/health` and `/api/ready` returned HTTP 200, and admin returned HTTP 200. Backend startup reported storage ready and migrations `applied=0 skipped=133` with no startup panic/fatal/error observed.
+- Status: `TECHNICALLY VERIFIED` for declaration parity, formatting, compile, non-gated backend tests, Docker image build, startup migration compatibility and local HTTP health/readiness. Destructive DB-backed integration/Golden suites were not run against the existing local data volume, and browser/UAT was not requested.
+
 ## Global Docker CLI PATH for zsh — 2026-08-31
 
 ### Will be done

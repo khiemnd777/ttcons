@@ -9,7 +9,7 @@
 - Debt panels: `InputInvoicePanel.tsx`, `OutputInvoicePanel.tsx`, `InputPaymentPlanPanel.tsx`, `OutputBillingPlanPanel.tsx`, `PayableReconciliationPanel.tsx`, `ReceivableReconciliationPanel.tsx`
 - Report panels: `CashflowPanel.tsx`, `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: source finance methods in `handlers.go`, `service.go`, `repository_domain.go`, `types.go`; ledger owners `handlers_accounting.go`, `types_accounting.go`, `accounting_core.go`, `accounting_dimensions.go`, `accounting_posting.go`, `accounting_payment_reversal.go`, `accounting_tax.go`, `accounting_reports.go`
+- Backend logic: source finance methods in `handlers.go`, `service_finance_common.go`, `service_finance_invoices.go`, `service_debt_payables.go`, `service_debt_receivables.go`, `service_reconciliations.go`, `service_storage.go`, `repository_domain.go`, `types.go`; ledger owners `handlers_accounting.go`, `types_accounting.go`, `accounting_core.go`, `accounting_dimensions.go`, `accounting_posting.go`, `accounting_payment_reversal.go`, `accounting_tax.go`, `accounting_reports.go`
 - Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
 
 ## Routes

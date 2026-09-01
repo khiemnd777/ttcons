@@ -6,7 +6,7 @@
 - Navigation: global `frontend/src/layouts/AppShell.tsx`, project-scoped `frontend/src/modules/projects/projectWorkspaceNavigation.ts`
 - Work item panels: `MaterialSnapshotPanel.tsx`, `SurplusHandlingPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`
+- Backend logic: `backend/internal/core/handlers.go`, `service_materials_warehouse.go`, `service_evidence.go`, `repository_domain.go`, `types.go`
 - Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
 
 ## Routes

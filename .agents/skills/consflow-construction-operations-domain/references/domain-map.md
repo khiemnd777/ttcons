@@ -5,7 +5,7 @@
 - Frontend modules: `frontend/src/modules/operations`, shared `frontend/src/modules/_shared/EvidenceCapture.tsx`, `frontend/src/modules/quality`, `frontend/src/modules/acceptance`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`
 - Work item panels: `WorkflowFormPanel.tsx`, `EvidencePanel.tsx`, `EvidenceGallery.tsx`, `ActivityThread.tsx`, `ActivityComposer.tsx`
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `construction_handoff.go`, `types.go`
+- Backend logic: `backend/internal/core/handlers.go`, `service_construction.go`, `service_work_items.go`, `service_evidence.go`, `service_activity.go`, `repository_domain.go`, `construction_handoff.go`, `types.go`
 - Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
 
 ## Routes

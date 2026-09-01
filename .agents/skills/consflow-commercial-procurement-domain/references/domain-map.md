@@ -5,7 +5,7 @@
 - Frontend modules: `frontend/src/modules/boq`, `frontend/src/modules/procurement`, `frontend/src/modules/contracts`, `frontend/src/modules/work-items`
 - Reconciliation panels: `SubcontractorReconciliationPanel.tsx`, `OwnerClientReconciliationPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`
+- Backend logic: `backend/internal/core/handlers.go`, `service_commercial_procurement.go`, `service_reconciliations.go`, `service_partners.go`, `repository_domain.go`, `types.go`
 - Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
 
 ## Routes

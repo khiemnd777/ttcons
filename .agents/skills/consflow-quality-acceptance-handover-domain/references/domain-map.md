@@ -5,7 +5,7 @@
 - Frontend modules: `frontend/src/modules/quality`, `frontend/src/modules/acceptance`, `frontend/src/modules/rework`, `frontend/src/modules/handover` (`HandoverPage.tsx`, `HandoverCreateDialog.tsx`, `HandoverWorkspace.tsx`, `handoverTypes.ts`), `frontend/src/modules/work-items`
 - Work item panels: `IncomingAcceptancePanel.tsx`, `OutgoingAcceptancePanel.tsx`, `EvidencePanel.tsx`, `WorkflowFormPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go`
-- Backend logic: `backend/internal/core/handlers.go`, `service.go`, `repository_domain.go`, `types.go`
+- Backend logic: `backend/internal/core/handlers.go`, `service_quality.go`, `service_acceptance_incoming.go`, `service_acceptance_outgoing.go`, `service_handover.go`, `service_workflow_forms.go`, `service_storage.go`, `repository_domain.go`, `types.go`
 - Contracts: `frontend/src/lib/types/domain.ts`, `frontend/src/lib/utils/status.ts`
 
 ## Routes
