@@ -28,13 +28,15 @@ test('standard shell exposes the permission-filtered navigation on mobile', asyn
   assert.match(appShell, /to: '\/event-logs', label: 'Nhật ký sự kiện'.*permissions: \['event_log\.view'\]/);
   assert.match(appShell, /to: '\/accounting', label: 'Bàn giao kế toán'.*accounting_handoff\.view/);
   assert.match(appShell, /to: '\/core-data', label: 'Đối tác'.*permissions: \['catalog\.view'\]/);
+  assert.match(appShell, /to: '\/warehouse\?tab=materials', label: 'Vật tư'.*permissions: \['material\.view'\].*excludePermissions: \['warehouse\.view'\]/);
   assert.match(appShell, /to: '\/warehouse', label: 'Kho vật tư'.*permissions: \['warehouse\.view'\]/);
   const partnerIndex = appShell.indexOf("{ to: '/core-data', label: 'Đối tác'");
+  const materialIndex = appShell.indexOf("{ to: '/warehouse?tab=materials', label: 'Vật tư'");
   const warehouseIndex = appShell.indexOf("{ to: '/warehouse', label: 'Kho vật tư'");
   const staffIndex = appShell.indexOf("{ to: '/staff', label: 'Nhân sự'");
-  assert.ok(partnerIndex >= 0 && warehouseIndex >= 0 && staffIndex >= 0, 'Đối tác, Kho vật tư and Nhân sự must all be registered');
-  assert.ok(partnerIndex < warehouseIndex && warehouseIndex < staffIndex, 'Kho vật tư must appear immediately after Đối tác');
-  assert.match(appShell, /to: '\/core-data', label: 'Đối tác'[^\n]*\n\s*\{ to: '\/warehouse', label: 'Kho vật tư'/);
+  assert.ok(partnerIndex >= 0 && materialIndex >= 0 && warehouseIndex >= 0 && staffIndex >= 0, 'Đối tác, Vật tư, Kho vật tư and Nhân sự must all be registered');
+  assert.ok(partnerIndex < materialIndex && materialIndex < warehouseIndex && warehouseIndex < staffIndex, 'Material-only navigation must sit between Đối tác and Kho vật tư');
+  assert.match(appShell, /to: '\/core-data', label: 'Đối tác'[^\n]*\n\s*\{ to: '\/warehouse\?tab=materials', label: 'Vật tư'[^\n]*\n\s*\{ to: '\/warehouse', label: 'Kho vật tư'/);
   assert.doesNotMatch(appShell, /to: '\/dashboard', label: 'Điều hành'/);
   assert.match(appShell, /aria-label="Mở hồ sơ cá nhân"/);
   assert.ok((appShell.match(/navigate\('\/profile'\)/g) ?? []).length >= 2, 'desktop and mobile user surfaces must expose Profile');

@@ -1946,7 +1946,7 @@ func TestOfficialWorkflowRevisionTwoWordingAndRoles(t *testing.T) {
 		displayName string
 		permissions []string
 	}{
-		{"design", "Thiết kế", []string{"project.view", "pipeline.view", "planning.view", "planning.edit", "operation.view", "operation.report"}},
+		{"design", "Thiết kế", []string{"project.view", "pipeline.view", "planning.view", "planning.edit", "material.view", "operation.view", "operation.report"}},
 		{"sales", "Sale", []string{"project.view", "pipeline.view", "planning.view", "planning.edit", "boq.view", "boq.update", "boq.approve", "contract.view", "contract.review"}},
 		{"legal", "Pháp lý", []string{"project.view", "pipeline.view", "contract.view", "contract.review"}},
 	}

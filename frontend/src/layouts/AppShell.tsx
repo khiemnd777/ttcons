@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  PackageCheck,
   Settings,
   ShieldCheck,
   UserRound,
@@ -66,6 +67,7 @@ const navGroups: NavGroup[] = [
     title: 'Quản trị',
     items: [
       { to: '/core-data', label: 'Đối tác', icon: ArrowDownToLine, permissions: ['catalog.view'] },
+      { to: '/warehouse?tab=materials', label: 'Vật tư', icon: PackageCheck, permissions: ['material.view'], excludePermissions: ['warehouse.view'] },
       { to: '/warehouse', label: 'Kho vật tư', icon: Warehouse, permissions: ['warehouse.view'] },
       { to: '/staff', label: 'Nhân sự', icon: Users, permissions: ['staff.view'], excludePermissions: ['project.reconciliation.view'] },
       { to: '/roles', label: 'Vai trò', icon: ShieldCheck, permissions: ['role.view'], excludePermissions: ['project.reconciliation.view'] },

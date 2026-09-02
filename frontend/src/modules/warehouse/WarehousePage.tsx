@@ -33,8 +33,9 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const initialParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const taskId = initialParams.get('task')?.trim() ?? '';
   const { hasPermission } = useAuth();
+  const canViewWarehouse = hasPermission('warehouse.view');
   const [projectId, setProjectId] = useState(id ?? '');
-  const [tab, setTab] = useState<WarehouseTab>(() => validTab(initialParams.get('tab')));
+  const [tab, setTab] = useState<WarehouseTab>(() => canViewWarehouse ? validTab(initialParams.get('tab')) : 'materials');
   const [query, setQuery] = useState('');
   const [warehouseFilter, setWarehouseFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -49,15 +50,15 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const materials = useQuery({ queryKey: ['materials'], queryFn: () => get<RecordRow[]>('/materials') });
-  const warehouses = useQuery({ queryKey: ['warehouses'], queryFn: () => get<RecordRow[]>('/warehouses') });
-  const partners = useQuery({ queryKey: ['partners', 'supplier', 'active'], queryFn: () => get<Partner[]>('/partners?status=active') });
-  const positions = useQuery({ queryKey: ['stock-positions'], queryFn: () => get<StockPosition[]>('/stock/positions') });
+  const warehouses = useQuery({ queryKey: ['warehouses'], queryFn: () => get<RecordRow[]>('/warehouses'), enabled: canViewWarehouse });
+  const partners = useQuery({ queryKey: ['partners', 'supplier', 'active'], queryFn: () => get<Partner[]>('/partners?status=active'), enabled: canViewWarehouse });
+  const positions = useQuery({ queryKey: ['stock-positions'], queryFn: () => get<StockPosition[]>('/stock/positions'), enabled: canViewWarehouse });
   const documentsPath = projectId ? `/stock/documents?project_id=${encodeURIComponent(projectId)}` : '/stock/documents';
-  const documents = useQuery({ queryKey: ['stock-documents', projectId], queryFn: () => get<StockDocument[]>(documentsPath) });
-  const documentDetail = useQuery({ queryKey: ['stock-document', documentId], queryFn: () => get<StockDocument>(`/stock/documents/${documentId}`), enabled: Boolean(documentId) });
-  const editingDocumentDetail = useQuery({ queryKey: ['stock-document', editingDocumentId], queryFn: () => get<StockDocument>(`/stock/documents/${editingDocumentId}`), enabled: Boolean(editingDocumentId) });
-  const balances = useQuery({ queryKey: ['material-balances', projectId], queryFn: () => get<RecordRow[]>(`/projects/${projectId}/material-balances`), enabled: Boolean(projectId) });
-  const receiptOptions = useQuery({ queryKey: ['warehouse-receipt-options', projectId], queryFn: () => get<WarehouseReceiptOption[]>(`/projects/${projectId}/warehouse-receipt-options`), enabled: Boolean(projectId) });
+  const documents = useQuery({ queryKey: ['stock-documents', projectId], queryFn: () => get<StockDocument[]>(documentsPath), enabled: canViewWarehouse });
+  const documentDetail = useQuery({ queryKey: ['stock-document', documentId], queryFn: () => get<StockDocument>(`/stock/documents/${documentId}`), enabled: canViewWarehouse && Boolean(documentId) });
+  const editingDocumentDetail = useQuery({ queryKey: ['stock-document', editingDocumentId], queryFn: () => get<StockDocument>(`/stock/documents/${editingDocumentId}`), enabled: canViewWarehouse && Boolean(editingDocumentId) });
+  const balances = useQuery({ queryKey: ['material-balances', projectId], queryFn: () => get<RecordRow[]>(`/projects/${projectId}/material-balances`), enabled: canViewWarehouse && Boolean(projectId) });
+  const receiptOptions = useQuery({ queryKey: ['warehouse-receipt-options', projectId], queryFn: () => get<WarehouseReceiptOption[]>(`/projects/${projectId}/warehouse-receipt-options`), enabled: canViewWarehouse && Boolean(projectId) });
   const createMaterial = useMutation({
     mutationFn: (values: RecordRow) => post('/materials', values),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['materials'] }); setOpenMaterial(false); setEditingMaterial(null); toast.success('Đã thêm vật tư'); },
@@ -105,8 +106,13 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   });
 
   useEffect(() => {
+    if (!canViewWarehouse) {
+      setTab('materials');
+      setOpenDocument(false);
+      return;
+    }
     if (initialParams.get('receipt')) { setTab('documents'); setOpenDocument(true); }
-  }, [initialParams]);
+  }, [canViewWarehouse, initialParams]);
 
   const positionRows = useMemo(() => (positions.data ?? []).filter((row) => {
     const searchText = `${row.code} ${row.name} ${row.category ?? ''} ${row.warehouse_name}`.toLocaleLowerCase('vi-VN');
@@ -124,6 +130,23 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const pendingSurplus = (balances.data ?? []).filter((row) => ['pending', 'partial'].includes(row.surplus_status) && numeric(row.surplus_quantity) > 0).length;
   const receiptParam = initialParams.get('receipt') ?? '';
   const canCreateAnyDocument = ['warehouse.receive', 'warehouse.issue', 'warehouse.transfer', 'warehouse.surplus_handle'].some(hasPermission);
+
+  if (!canViewWarehouse) {
+    return <>
+      <PageHeader
+        title="Vật tư"
+        description="Tra cứu danh mục vật tư phục vụ thiết kế. Số liệu tồn kho và nghiệp vụ kho không nằm trong phạm vi truy cập."
+        actions={scoped ? <ProjectBackLink projectId={projectId} /> : undefined}
+      />
+      <div className="mb-4 rounded-lg border border-line bg-white p-3 shadow-panel">
+        <label className="relative block max-w-2xl">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input className="w-full rounded-md border border-line py-2 pl-9 pr-3 text-sm" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm theo mã, tên hoặc nhóm vật tư..." />
+        </label>
+      </div>
+      <MaterialsTab rows={materialRows} loading={materials.isLoading} error={materials.error} onRetry={() => materials.refetch()} />
+    </>;
+  }
 
   return <>
     <PageHeader

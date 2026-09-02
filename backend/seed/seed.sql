@@ -80,7 +80,7 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('planning.view','Xem planning','planning'),('planning.edit','Cập nhật kế hoạch','planning'),
 ('boq.view','Xem BOQ','boq'),('boq.create','Tạo BOQ','boq'),('boq.update','Sửa BOQ','boq'),('boq.approve','Duyệt BOQ','boq'),
 ('procurement.view','Xem mua sắm','procurement'),('procurement.create','Tạo yêu cầu mua','procurement'),('procurement.approve','Duyệt mua','procurement'),('procurement.order','Đặt hàng','procurement'),('procurement.receive','Nhận hàng','procurement'),
-('warehouse.view','Xem kho','warehouse'),('warehouse.receive','Nhập kho','warehouse'),('warehouse.issue','Xuất kho','warehouse'),('warehouse.transfer','Điều chuyển','warehouse'),('warehouse.adjust','Điều chỉnh kho','warehouse'),('warehouse.surplus_handle','Xử lý vật tư dư','warehouse'),
+('material.view','Xem danh mục vật tư','warehouse'),('warehouse.view','Xem kho','warehouse'),('warehouse.receive','Nhập kho','warehouse'),('warehouse.issue','Xuất kho','warehouse'),('warehouse.transfer','Điều chuyển','warehouse'),('warehouse.adjust','Điều chỉnh kho','warehouse'),('warehouse.surplus_handle','Xử lý vật tư dư','warehouse'),
 ('operation.view','Xem thi công','operation'),('operation.report','Tạo daily report','operation'),('operation.issue_create','Tạo issue','operation'),('operation.issue_update','Sửa issue','operation'),
 ('quality.view','Xem chất lượng','quality'),
 ('acceptance.view','Xem nghiệm thu','acceptance'),('acceptance.create','Tạo nghiệm thu','acceptance'),('acceptance.approve','Duyệt nghiệm thu','acceptance'),('acceptance.reject','Reject nghiệm thu','acceptance'),
@@ -258,7 +258,7 @@ JOIN permissions p ON (
     'project.view','pipeline.view','operation.view','acceptance.view','handover.view','report.view'
   ))
   OR (r.name='design' AND p.key IN (
-    'project.view','pipeline.view','planning.view','planning.edit','operation.view','operation.report'
+    'project.view','pipeline.view','planning.view','planning.edit','material.view','operation.view','operation.report'
   ))
   OR (r.name='sales' AND p.key IN (
     'project.view','pipeline.view','planning.view','planning.edit','boq.view','boq.update','boq.approve','contract.view','contract.review'

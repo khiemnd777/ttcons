@@ -72,3 +72,9 @@
 - Material before/after snapshot, incoming acceptance and surplus-handling selectors expose a separate `Xem` action for the selected protected evidence. The shared viewer is presentation-only: it does not change the selected evidence ID, submit payload, accepted quantities, site-balance usage, surplus handling state, custody, warehouse movement or stock traceability.
 
 - V126 catalogs stock-document completion, material-snapshot review and surplus assignment candidates disabled. Notification projection must never post a movement, change a balance or mark surplus handled. Future producers must emit only after the same authoritative stock/snapshot/surplus transaction succeeds and resolve current requester/custodian/reviewer scope without duplicating warehouse ledgers.
+
+## Design Material Catalog Boundary
+
+- V134 separates active material-master observation into `material.view`. The Design role receives this permission but not `warehouse.view`; `GET /materials` accepts `material.view|warehouse.view|procurement.view`, while every warehouse, stock, site-balance, partner and mutation endpoint keeps its existing gate.
+- The standard shell exposes a Design-only `Vật tư` entry at `/warehouse?tab=materials`. `WarehousePage` detects the absence of `warehouse.view`, enables only the `/materials` query and renders only material search/table. It must not fetch or reveal warehouses, stock positions, stock documents, site balances, receipt options, suppliers or inventory statistics. Existing warehouse actors keep the four-tab `Kho vật tư` workspace unchanged.
+- Material visibility is reference data for design choices only. It does not reserve stock, select a supplier, create BOQ/Procurement, change price, post a movement or expose quantities.

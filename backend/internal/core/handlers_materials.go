@@ -9,7 +9,7 @@ import (
 )
 
 func (h *Handler) ListMaterials(c *fiber.Ctx) error {
-	if err := h.requirePermission(c, []string{"warehouse.view", "procurement.view"}); err != nil {
+	if err := h.requirePermission(c, []string{"material.view", "warehouse.view", "procurement.view"}); err != nil {
 		return err
 	}
 	rows, err := h.service.repo.ListActiveMaterials(c.Context())

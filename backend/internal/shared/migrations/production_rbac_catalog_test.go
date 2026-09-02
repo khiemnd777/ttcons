@@ -90,6 +90,20 @@ func TestProductionRBACCatalogSupportsFreshDatabaseWithoutSeed(t *testing.T) {
 		FROM role_permissions assignment
 		JOIN roles role ON role.id=assignment.role_id
 		JOIN permissions permission ON permission.id=assignment.permission_id
+		WHERE permission.key='material.view' AND role.name='design'
+	`, 1)
+	assertRBACCount(t, ctx, database, `
+		SELECT COUNT(*)
+		FROM role_permissions assignment
+		JOIN roles role ON role.id=assignment.role_id
+		JOIN permissions permission ON permission.id=assignment.permission_id
+		WHERE role.name='design' AND permission.key LIKE 'warehouse.%'
+	`, 0)
+	assertRBACCount(t, ctx, database, `
+		SELECT COUNT(*)
+		FROM role_permissions assignment
+		JOIN roles role ON role.id=assignment.role_id
+		JOIN permissions permission ON permission.id=assignment.permission_id
 		WHERE permission.key='staff.delete' AND role.name IN ('admin','developer')
 	`, 2)
 	assertRBACCount(t, ctx, database, `

@@ -12,6 +12,7 @@ import { get } from '../../lib/api/client';
 import type { ProjectOperationsResponse, WorkItem } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { WorkItemDetailWorkspace } from '../work-items/WorkItemDetailDialog';
+import { DesignReleasePanel } from '../work-items/DesignReleasePanel';
 import { executionTargetActionLabel } from '../work-items/workItemExecutionTarget';
 import { safeReturnPath } from '../work-items/workItemNavigation';
 import { buildWorkItemWorkflowNavigation } from '../work-items/workItemWorkflowNavigation';
@@ -141,6 +142,10 @@ export function PreparationPage() {
         description="Hồ sơ tiếp nhận, khảo sát và thiết kế cần chuẩn bị."
         actions={<Link className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50" to={`/projects/${id}/pipeline`}>Quy trình</Link>}
       />
+
+      <div className="mt-4">
+        <DesignReleasePanel projectId={id} workItems={allPreparationItems} />
+      </div>
 
       <section className="mt-4 overflow-hidden rounded-lg border border-line bg-white shadow-panel" aria-label="Danh sách hồ sơ chuẩn bị">
         <div className="border-b border-line p-3 sm:p-4">

@@ -960,6 +960,34 @@ func (r *Repository) automateClientOperationalSourceGate(ctx context.Context, co
 	case "source.design_documents_ready":
 		metadata["label"] = "Hồ sơ thiết kế phát hành"
 		metadata["route"] = fmt.Sprintf("/projects/%s", projectID)
+		releaseState, releaseErr := r.QueryOne(ctx, `
+			SELECT
+				(SELECT COUNT(*) FROM design_releases WHERE project_id=$1) AS total_releases,
+				COALESCE((SELECT id::text FROM design_releases WHERE project_id=$1 AND status='released' LIMIT 1), '') AS current_release_id,
+				COALESCE((SELECT revision_label FROM design_releases WHERE project_id=$1 AND status='released' LIMIT 1), '') AS revision_label,
+				COALESCE((SELECT design_release_id::text FROM design_release_handoffs WHERE project_id=$1 ORDER BY handed_off_at DESC,id DESC LIMIT 1), '') AS handed_off_release_id,
+				COALESCE((SELECT id::text FROM design_release_handoffs WHERE project_id=$1 ORDER BY handed_off_at DESC,id DESC LIMIT 1), '') AS handoff_id
+		`, projectID)
+		if releaseErr != nil {
+			err = releaseErr
+			break
+		}
+		if number(releaseState["total_releases"]) > 0 {
+			currentReleaseID := cleanID(releaseState["current_release_id"])
+			handedOffReleaseID := cleanID(releaseState["handed_off_release_id"])
+			ready = currentReleaseID != "" && currentReleaseID == handedOffReleaseID
+			reason = "Revision thiết kế hiện hành chưa được PM bàn giao cho QS"
+			if currentReleaseID == "" {
+				reason = "Chưa có revision hồ sơ thiết kế đã phát hành"
+			}
+			targetType, targetID = "design_release", currentReleaseID
+			metadata["revision_label"] = cleanOptionalText(releaseState["revision_label"])
+			metadata["handoff_id"] = cleanID(releaseState["handoff_id"])
+			metadata["handoff_required"] = true
+			break
+		}
+		// Historical runtime compatibility: projects created before design package
+		// revisions keep their accepted/submitted evidence gate unchanged.
 		row, err = r.QueryOne(ctx, `
 			SELECT COUNT(*) AS total,MAX(er.id::text) AS target_id
 			FROM evidence_records er

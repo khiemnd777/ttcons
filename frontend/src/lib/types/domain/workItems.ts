@@ -168,6 +168,65 @@ export type WorkItem = ProjectOperationsRecord & {
   assignments?: ProjectOperationsRecord[];
 };
 
+export type DesignReleaseFile = {
+  id: string;
+  name: string;
+  document_type: 'layout' | 'render_3d' | 'construction_drawing' | 'other' | string;
+  mime_type?: string;
+  file_size?: number;
+  revision_no?: number;
+  release_status?: string;
+  uploaded_by?: string;
+  uploaded_by_name?: string;
+  created_at?: string;
+};
+
+export type DesignRelease = {
+  id: string;
+  project_id: string;
+  work_item_id?: string;
+  revision_no: number;
+  revision_label: string;
+  status: 'draft' | 'released' | 'superseded' | string;
+  change_reason: string;
+  notes?: string;
+  created_by?: string;
+  created_by_name?: string;
+  released_by?: string;
+  released_by_name?: string;
+  released_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  files: DesignReleaseFile[];
+};
+
+export type DesignReleaseHandoff = {
+  id: string;
+  project_id: string;
+  design_release_id: string;
+  work_item_id?: string;
+  comment?: string;
+  handed_off_by?: string;
+  handed_off_by_name?: string;
+  handed_off_at?: string;
+  revision_no: number;
+  revision_label: string;
+  release_status: string;
+};
+
+export type DesignReleaseWorkspace = {
+  project_id: string;
+  releases: DesignRelease[];
+  current_release?: DesignRelease | null;
+  draft_release?: DesignRelease | null;
+  latest_handoff?: DesignReleaseHandoff | null;
+  requires_rehandoff: boolean;
+  capabilities: {
+    can_manage: boolean;
+    can_handoff: boolean;
+  };
+};
+
 export type MyWorkflowAction = {
   id: string;
   action_type: 'advance_run_node' | string;
