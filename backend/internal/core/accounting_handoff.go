@@ -227,43 +227,7 @@ func (r *Repository) MyAccountingWork(ctx context.Context, actorID string, filte
 	total := int(number(totalRow["total"]))
 	pageArgs := append([]any{}, itemArgs...)
 	pageArgs = append(pageArgs, filter.Limit, offset)
-	items, err := r.Query(ctx, fmt.Sprintf(`
-		SELECT
-			handoff.id AS handoff_id,
-			handoff.id,
-			handoff.project_id,
-			project.code AS project_code,
-			project.name AS project_name,
-			handoff.direction,
-			handoff.source_type,
-			handoff.source_id,
-			COALESCE(handoff.source_snapshot_json->>'source_code','') AS source_code,
-			COALESCE(handoff.source_snapshot_json->>'source_title','') AS source_title,
-			COALESCE(handoff.source_snapshot_json->>'counterparty_name','') AS counterparty_name,
-			NULLIF(handoff.source_snapshot_json->>'reference_amount','')::numeric AS reference_amount,
-			COALESCE(NULLIF(handoff.source_snapshot_json->>'currency',''),'VND') AS currency,
-			COALESCE(handoff.source_snapshot_json->>'source_status','') AS source_status,
-			CASE handoff.source_type
-				WHEN 'procurement_request' THEN '/projects/' || handoff.project_id || '/procurement'
-				WHEN 'contract_milestone' THEN '/projects/' || handoff.project_id || '/contracts'
-				ELSE '/projects/' || handoff.project_id
-			END AS source_route,
-			handoff.status,
-			handoff.note,
-			handoff.external_reference,
-			handoff.return_reason,
-			handoff.handed_off_at,
-			handoff.acknowledged_at,
-			handoff.returned_at,
-			handoff.updated_at,
-			handed_off.full_name AS handed_off_by_name,
-			acknowledged.full_name AS acknowledged_by_name,
-			returned.full_name AS returned_by_name
-		FROM accounting_handoffs handoff
-		JOIN projects project ON project.id=handoff.project_id
-		LEFT JOIN users handed_off ON handed_off.id=handoff.handed_off_by
-		LEFT JOIN users acknowledged ON acknowledged.id=handoff.acknowledged_by
-		LEFT JOIN users returned ON returned.id=handoff.returned_by
+	items, err := r.Query(ctx, accountingWorkSelectSQL()+fmt.Sprintf(`
 		WHERE %s
 		ORDER BY
 			CASE handoff.status WHEN 'handed_off' THEN 1 WHEN 'returned' THEN 2 WHEN 'acknowledged' THEN 3 ELSE 4 END,

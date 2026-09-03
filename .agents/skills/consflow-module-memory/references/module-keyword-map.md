@@ -2,6 +2,14 @@
 
 Use this as the mandatory central routing cache. It is not a replacement for reading code. If a mapping conflicts with code, trust code and update this file when the correction is durable.
 
+## Unified Accounting Work Queue
+
+- Default `Ưu tiên xử lý` (`sort=priority`) puts accounting_handoff before every other Công việc entry. Server `myWorkQueueOrderSQL` applies source precedence before pagination; frontend `orderedWorkListEntries` shares row/selection ordering and puts separately loaded startup/workflow actions after handoffs. Explicit due_asc/newest and legacy WorkItem ordering remain unchanged.
+- Keywords: “Công việc”, “Nghiệp vụ kế toán”, mixed queue, hồ sơ kế toán trong công việc, không đếm trùng. Owners: `MyWorkPage.tsx`, `AccountingWorkCard.tsx`, `myWorkDomain.ts`, shared `project-finance/accountingWorkActions.ts`; backend `my_work_queue.go`, `my_work_repository.go`, `service_my_work.go`, `handlers_work_items.go`, `routes_workflow.go`.
+- `GET /me/work-queue` is an additive typed read model (`entries: {kind,item}[]`) for Work Items and canonical Accounting handoffs; `/me/work-items` stays WorkItem-only. Accounting appears only with both view+acknowledge permissions and only in responsible/all scopes; observed company Work Items do not acquire responsibility.
+- Keep the `Nghiệp vụ Kế toán` tab and `/me/accounting-handoffs` specialized view. Both use the same canonical actions. `work_total` includes pending accounting; `accounting_total` is its breakdown, never added again to navigation `total`.
+- Accounting observer global `/accounting` menu is hidden; the route and `/projects/:id/accounting` register remain available. First searches: `MyWorkQueue|myWorkQueueSQL|accountingWorkSelectSQL|useAccountingWorkActions|WorkQueueEntry` in the owners above. See matching backend/frontend and accounting/workflow domain maps.
+
 ## Durable Memory Sources
 
 - Durable repo rules: `AGENTS.md`.

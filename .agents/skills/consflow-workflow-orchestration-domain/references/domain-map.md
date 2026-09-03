@@ -4,7 +4,7 @@
 
 - `project.reconciliation.view` permits Accounting to inspect company project runs, Work Items, forms/evidence/activity and source workspaces for reconciliation.
 - Read access uses `profileCanObserveAllProjectWork`; action access deliberately does not. `CanActOnWorkItem` retains the Admin-only override, so observation never becomes start/complete/review/approve authority.
-- The ordinary actor-owned `Công việc` and `Chờ tôi duyệt` lanes remain assignment/decision scoped. Company dossiers live in the separate `Nghiệp vụ Kế toán` lane backed by `GET /me/accounting-handoffs`; do not flood personal work queues with observed Work Items.
+- The WorkItem portion of `Công việc` and `Chờ tôi duyệt` remains assignment/decision scoped. `GET /me/work-queue` adds typed canonical accounting dossiers to responsible/all scopes for view+acknowledge actors; no observed company WorkItem becomes a personal assignment. The specialized `Nghiệp vụ Kế toán` tab and `GET /me/accounting-handoffs` remain views of the same handoffs. Accounting acknowledge is not WorkItem completion; accounting_total is a breakdown of work_total, not another addend.
 - Project full-operations output identifies `visibility_scope=accounting_reconciliation`, marks the response unscoped and omits project Audit for this presentation mode.
 
 ## Owners

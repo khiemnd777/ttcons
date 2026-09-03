@@ -53,7 +53,7 @@ const navGroups: NavGroup[] = [
       { to: '/projects', label: 'Công trình', icon: Building2, permissions: ['project.view'] },
       { to: '/reports', label: 'Báo cáo', icon: FileText, permissions: ['work_report.view'] },
       { to: '/statistics', label: 'Thống kê', icon: BarChart3, permissions: ['statistics.view'] },
-      { to: '/accounting', label: 'Bàn giao kế toán', icon: Calculator, permissions: ['accounting_handoff.view', 'project_finance.view'] },
+      { to: '/accounting', label: 'Bàn giao kế toán', icon: Calculator, permissions: ['accounting_handoff.view', 'project_finance.view'], excludePermissions: ['project.reconciliation.view'] },
     ],
   },
   {

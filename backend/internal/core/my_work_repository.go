@@ -8,6 +8,7 @@ import (
 
 type myWorkItemsPageData struct {
 	Items      []Record
+	Entries    []Record
 	Summary    Record
 	Facets     Record
 	Total      int
@@ -109,9 +110,27 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 		workItemScopeArgs(profile, profile.IsAdmin, false)...,
 	)
 	baseArgs = append(baseArgs, profile.IsAdmin || profile.IsDirector)
+	baseSQL := myWorkItemsBaseSQL()
+	if filter.Unified {
+		baseSQL, baseArgs, err = r.myWorkQueueSQL(ctx, userID, filter.IncludeAccounting, baseArgs)
+		if err != nil {
+			return myWorkItemsPageData{}, err
+		}
+	}
+	querySQL := func(query string) string {
+		if filter.Unified {
+			query = strings.ReplaceAll(query, "FROM base_work", "FROM queue_work")
+			query = strings.ReplaceAll(query, "status='completed'", "status IN ('completed','acknowledged')")
+		}
+		return baseSQL + query
+	}
 
 	projectConditions := []string{"TRUE"}
 	projectArgs := append([]any{}, baseArgs...)
+	if filter.Unified && filter.EntryKind != "" {
+		projectArgs = append(projectArgs, filter.EntryKind)
+		projectConditions = append(projectConditions, fmt.Sprintf("entry_kind=$%d", len(projectArgs)))
+	}
 	if filter.ProjectID != "" {
 		projectArgs = append(projectArgs, filter.ProjectID)
 		projectConditions = append(projectConditions, fmt.Sprintf("project_id=$%d", len(projectArgs)))
@@ -120,6 +139,9 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 
 	itemConditions := append([]string{}, projectConditions...)
 	itemArgs := append([]any{}, projectArgs...)
+	if filter.Unified && (filter.Deadline != "" || filter.WorkType != "" || filter.Priority != "") {
+		itemConditions = append(itemConditions, "entry_kind='work_item'")
+	}
 	appendValue := func(condition string, value any) {
 		itemArgs = append(itemArgs, value)
 		itemConditions = append(itemConditions, fmt.Sprintf(condition, len(itemArgs)))
@@ -156,6 +178,8 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 		)`, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder))
 	}
 	switch filter.Bucket {
+	case "waiting_supplement":
+		itemConditions = append(itemConditions, "status='returned'")
 	case "all":
 		// Keep the complete actor-scoped queue.
 	case "need_action":
@@ -183,8 +207,13 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	baseSQL := myWorkItemsBaseSQL()
-	totalRow, err := queryOneRecord(ctx, tx, baseSQL+fmt.Sprintf(` SELECT COUNT(*) AS total FROM base_work WHERE %s`, itemWhere), itemArgs...)
+	if filter.Unified {
+		// The mixed page, total and facets must see the same handoff state.
+		if _, err := tx.ExecContext(ctx, "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"); err != nil {
+			return myWorkItemsPageData{}, err
+		}
+	}
+	totalRow, err := queryOneRecord(ctx, tx, querySQL(fmt.Sprintf(` SELECT COUNT(*) AS total FROM base_work WHERE %s`, itemWhere)), itemArgs...)
 	if err != nil {
 		return myWorkItemsPageData{}, err
 	}
@@ -192,23 +221,28 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 
 	pageArgs := append([]any{}, itemArgs...)
 	pageArgs = append(pageArgs, filter.Limit, offset)
-	items, err := queryRecords(ctx, tx, baseSQL+fmt.Sprintf(`
+	orderSQL := myWorkItemsOrderSQL(filter.Sort)
+	if filter.Unified {
+		orderSQL = myWorkQueueOrderSQL(filter.Sort)
+	}
+	items, err := queryRecords(ctx, tx, querySQL(fmt.Sprintf(`
 		SELECT * FROM base_work
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
-	`, itemWhere, myWorkItemsOrderSQL(filter.Sort), len(pageArgs)-1, len(pageArgs)), pageArgs...)
+	`, itemWhere, orderSQL, len(pageArgs)-1, len(pageArgs))), pageArgs...)
 	if err != nil {
 		return myWorkItemsPageData{}, err
 	}
 
-	summary, err := queryOneRecord(ctx, tx, baseSQL+fmt.Sprintf(`
+	summary, err := queryOneRecord(ctx, tx, querySQL(fmt.Sprintf(`
 			SELECT
 				COUNT(*) FILTER (WHERE %s) AS total,
 				COUNT(*) FILTER (WHERE %s AND %s) AS need_action,
 				COUNT(*) FILTER (WHERE %s AND status='in_progress') AS in_progress,
 				COUNT(*) FILTER (WHERE %s AND status NOT IN ('completed','cancelled') AND due_at < now()) AS overdue,
 				COUNT(*) FILTER (WHERE %s AND status='blocked') AS blocked,
+				COUNT(*) FILTER (WHERE %s AND status='returned') AS waiting_supplement,
 				COUNT(*) FILTER (WHERE can_decide AND status IN ('waiting_review','waiting_approval')) AS waiting_decision,
 				COUNT(*) FILTER (WHERE %s AND status IN ('waiting_review','waiting_approval')) AS waiting_approval,
 				COUNT(*) FILTER (WHERE %s AND is_future) AS upcoming,
@@ -216,13 +250,13 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 				COUNT(*) FILTER (WHERE %s AND status='completed' AND completed_at IS NOT NULL AND (completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date=(now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date) AS done_today
 			FROM base_work
 			WHERE %s
-		`, queueCondition, queueCondition, myWorkNeedActionSQL(), queueCondition, queueCondition, queueCondition,
-		queueCondition, queueCondition, queueCondition, queueCondition, projectWhere), projectArgs...)
+		`, queueCondition, queueCondition, myWorkNeedActionSQL(), queueCondition, queueCondition, queueCondition, queueCondition,
+		queueCondition, queueCondition, queueCondition, queueCondition, projectWhere)), projectArgs...)
 	if err != nil {
 		return myWorkItemsPageData{}, err
 	}
 
-	facets, err := queryOneRecord(ctx, tx, baseSQL+fmt.Sprintf(`
+	facets, err := queryOneRecord(ctx, tx, querySQL(fmt.Sprintf(`
 		SELECT
 			COALESCE((SELECT jsonb_agg(row_value ORDER BY label) FROM (
 				SELECT project_name AS label, jsonb_build_object(
@@ -247,7 +281,7 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 					jsonb_build_object('value', priority, 'count', COUNT(*)) AS row_value
 				FROM base_work WHERE %s GROUP BY priority
 			) priority_rows), '[]'::jsonb) AS priorities
-	`, projectWhere, projectWhere, projectWhere, projectWhere), projectArgs...)
+	`, projectWhere, projectWhere, projectWhere, projectWhere)), projectArgs...)
 	if err != nil {
 		return myWorkItemsPageData{}, err
 	}
@@ -261,8 +295,21 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 	if err := tx.Commit(); err != nil {
 		return myWorkItemsPageData{}, err
 	}
+	entries := make([]Record, 0, len(items))
+	if filter.Unified {
+		workItems := make([]Record, 0, len(items))
+		for _, row := range items {
+			payload := recordValue(row["payload"])
+			kind := fmt.Sprint(row["entry_kind"])
+			entries = append(entries, Record{"kind": kind, "item": payload})
+			if kind == "work_item" {
+				workItems = append(workItems, payload)
+			}
+		}
+		items = workItems
+	}
 	return myWorkItemsPageData{
-		Items: items, Summary: summary, Facets: facets, Total: total, HasMore: hasMore, NextCursor: nextCursor,
+		Items: items, Entries: entries, Summary: summary, Facets: facets, Total: total, HasMore: hasMore, NextCursor: nextCursor,
 	}, nil
 }
 

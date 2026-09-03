@@ -2,6 +2,14 @@
 
 Use this map after `module-keyword-map.md` for React/Vite admin UI, frontend helpers, API usage, status labels, domain types, and presentation behavior.
 
+## Unified Work + Retained Accounting View
+
+- `modules/my-work/MyWorkPage.tsx` reads `/me/work-queue` for Công việc; `myWorkDomain.ts` owns typed `WorkQueueEntry`, `WorkListEntry`, kind-aware keys/dedupe, `buildWorkQueuePath` and `orderedWorkListEntries`. Default priority sorts accounting handoffs first, then separately loaded startup/ready-node actions, then WorkItems; preserve relative order within each source. Explicit due_asc/newest retain server order with existing action prefixes. The same helper drives default selection and rendering; initial selection waits for work-page loading and never replaces a valid existing selection. Accounting-only kind filter still hides startup/ready-node actions; approval WorkList does not enable accounting precedence.
+- `AccountingWorkCard.tsx` owns source-backed row, desktop inspector and shared mobile Dialog content: original status, source code/title/project/counterparty/currency/reference amount, actor dates and shared team responsibility; never assignee/deadline/evidence placeholders. Accounting state buckets: handed_off → Làm ngay, returned → Chờ bổ sung, acknowledged → Đã xử lý; no workflow transition implied.
+- Retain `AccountingWorkLane.tsx` at `?mode=accounting`. Both queue views use `project-finance/accountingWorkActions.ts` and `AccountingHandoffActionDialog.tsx`. All handoff workspace mutations invalidate both queries, scope/navigation summaries and project workspace. Dialog highlights required return reason and uses dismissible warning toast; MISA reference remains optional.
+- Accounting-capable actors see kind filter and company-accessible AsyncProjectPicker. Advanced deadline/work type/priority filters are WorkItem-only. Quick summaries are project/kind/scope-based, not search/advanced-filter totals; list total follows all filters. Approval count comes from an independent legacy WorkItem query, unaffected by kind filter.
+- `AppShell.tsx` hides global `/accounting` only for `project.reconciliation.view`; no route or project register is deleted. Tests: `myWorkQueue.test.ts`, `myWorkListPresentation.test.ts`, project navigation and scope tests.
+
 ## Mandatory Frontend Workflow
 
 1. Start in `frontend/src/app/router.tsx` for route, permission guard, and page ownership.

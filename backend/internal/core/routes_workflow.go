@@ -53,6 +53,7 @@ func registerWorkflowRoutes(protected fiber.Router, h *Handler) {
 	protected.Post("/projects/:id/activity", h.AddProjectActivity)
 	protected.Post("/projects/:id/activity/read-all", h.MarkProjectActivityRead)
 	protected.Get("/me/work-items", h.MyWorkItems)
+	protected.Get("/me/work-queue", h.MyWorkQueue)
 	protected.Get("/me/work-items/scope-summary", h.MyWorkScopeSummary)
 	protected.Get("/me/work-items/navigation-summary", h.MyWorkNavigationSummary)
 	protected.Get("/me/accounting-handoffs", h.MyAccountingWork)

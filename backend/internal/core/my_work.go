@@ -42,6 +42,10 @@ var myAccountingWorkStatuses = map[string]bool{
 }
 
 func normalizeMyWorkItemsFilter(filter MyWorkItemsFilter) (MyWorkItemsFilter, int, error) {
+	filter.EntryKind = strings.ToLower(strings.TrimSpace(filter.EntryKind))
+	if filter.EntryKind != "" && filter.EntryKind != "work_item" && filter.EntryKind != "accounting_handoff" {
+		return filter, 0, validationError("Loại hồ sơ không hợp lệ", nil)
+	}
 	filter.Queue = strings.ToLower(strings.TrimSpace(filter.Queue))
 	if filter.Queue == "" {
 		filter.Queue = "responsible"
@@ -54,7 +58,7 @@ func normalizeMyWorkItemsFilter(filter MyWorkItemsFilter) (MyWorkItemsFilter, in
 		return filter, 0, validationError("project_id không hợp lệ", Record{"project_id": filter.ProjectID})
 	}
 	filter.Status = strings.ToLower(strings.TrimSpace(filter.Status))
-	if !myWorkStatuses[filter.Status] {
+	if !myWorkStatuses[filter.Status] && !(filter.Unified && filter.Status != "all" && myAccountingWorkStatuses[filter.Status]) {
 		return filter, 0, validationError("Trạng thái công việc không hợp lệ", Record{"status": filter.Status})
 	}
 	filter.Deadline = strings.ToLower(strings.TrimSpace(filter.Deadline))
@@ -81,7 +85,7 @@ func normalizeMyWorkItemsFilter(filter MyWorkItemsFilter) (MyWorkItemsFilter, in
 		return filter, 0, validationError("Cách sắp xếp công việc không hợp lệ", Record{"sort": filter.Sort})
 	}
 	filter.Bucket = strings.ToLower(strings.TrimSpace(filter.Bucket))
-	if !myWorkBuckets[filter.Bucket] {
+	if !myWorkBuckets[filter.Bucket] && !(filter.Unified && filter.Bucket == "waiting_supplement") {
 		return filter, 0, validationError("Nhóm công việc không hợp lệ", Record{"bucket": filter.Bucket})
 	}
 	if filter.Limit == 0 {

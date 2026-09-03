@@ -28,7 +28,7 @@ test('My Work renders compact semantic rows without nested interactive controls'
   assert.match(card, /Điểm chặn: \{item\.blocked_reason\}/);
   assert.doesNotMatch(card, /item\.description && !compact/);
   assert.doesNotMatch(page, /role="button" tabIndex=\{0\}/);
-  assert.match(page, /<WorkItemCard key=\{item\.id\} item=\{item\} selected=\{selectedId === item\.id\}/);
+  assert.match(page, /<WorkItemCard key=\{key\} item=\{entry\.item\} selected=\{selectedId === entry\.item\.id\}/);
 });
 
 test('My Work keeps detail copy in the desktop inspector and deduplicates header roles', async () => {
@@ -73,7 +73,7 @@ test('My Work defaults to personal responsibility and keeps approval out of ordi
   assert.match(page, /key === 'queue' && value === 'responsible'/);
   assert.match(page, /updateParams\(\{ queue: 'responsible', bucket: 'need_action'/);
   assert.match(page, /function selectBucket\(nextBucket: WorkQuickBucket\) \{[\s\S]*?bucket: nextBucket/);
-  assert.match(page, /<ScopeRail\s+value=\{queue\}/);
+  assert.match(page, /<ScopeRail\s+accounting=\{canViewAccountingWork\}\s+value=\{queue\}/);
   assert.doesNotMatch(page, /<FilterSelect value=\{queue\} label="Phạm vi công việc"/);
 });
 
@@ -91,7 +91,7 @@ test('My Work presents source-backed quick filters inside the selected work scop
   assert.match(quickFilters, /summary\.total/);
   assert.doesNotMatch(quickFilters.slice(quickFilters.indexOf('const cards'), quickFilters.indexOf('return (')), /bucket: 'all'/);
   assert.match(quickFilters, /bucket: 'upcoming', label: 'Sắp tới · chỉ xem'/);
-  assert.match(quickFilters, /bucket: 'completed', label: 'Hoàn tất', value: summary\.completed/);
+  assert.match(quickFilters, /bucket: 'completed', label: accounting \? 'Đã xử lý' : 'Hoàn tất', value: summary\.completed/);
   assert.doesNotMatch(quickFilters, /waiting_decision|Chờ tôi duyệt/);
 });
 
@@ -107,7 +107,7 @@ test('My Work separates actor-decidable approvals into a dedicated compatible mo
   assert.match(page, /<WorkReportReviewLane/);
   assert.match(page, /get<WorkReportSummary>\(`\/work-reports\/summary/);
   assert.match(page, /get<WorkReportListItem\[]>\(`\/work-reports\?/);
-  assert.match(page, /summary\.waiting_decision \+ nodeApprovalCount \+ reportReviewCount/);
+  assert.match(page, /\(approvalFirstPage\?\.total \?\? 0\) \+ nodeApprovalCount \+ reportReviewCount/);
   assert.match(page, /navigate\(`\/reports\?scope=review&report=\$\{report\.source_id\}`\)/);
   assert.match(page, /searchParams\.get\('approval'\)/);
   assert.match(page, /data-approval-id=\{request\.id\}/);
@@ -173,7 +173,7 @@ test('My Work scope rail shows only positive need-action counts as chips', async
 test('My Work isolates actor queries and never presents placeholder zeroes as loaded quick-filter values', async () => {
   const page = await myWorkPageSource();
 
-  assert.match(page, /queryKey: \['my-work-items', user\?\.id, filterKey\]/);
+  assert.match(page, /queryKey: \['my-work-items', user\?\.id, 'unified', filterKey\]/);
   assert.match(page, /queryKey: \['my-workflow-actions', user\?\.id, queue, project, search\]/);
   assert.match(page, /queryKey: \['approvals', 'pending', 'decidable', user\?\.id, project\]/);
   assert.match(page, /queryKey: \['activity-attention', 'summary', user\?\.id, project\]/);
@@ -191,7 +191,8 @@ test('My Work surfaces generic ready stage transitions as one-click business act
   assert.match(page, /return `\/me\/workflow-actions\?\$\{params\.toString\(\)\}`/);
   assert.match(page, /post\(`\/pipeline-run-nodes\/\$\{action\.run_node_id\}\/advance`, \{\}\)/);
   assert.match(page, /summary\.need_action \+ workflowActionSummaryTotal/);
-  assert.match(workList, /workflowActions\.map[\s\S]*<WorkflowActionCard[\s\S]*rows\.map/);
+  assert.match(workList, /orderedWorkListEntries\(visibleEntries, startupActions, workflowActions, prioritizeAccounting\)/);
+  assert.match(workList, /orderedEntries\.map[\s\S]*entry\.kind === 'workflow_action'[\s\S]*<WorkflowActionCard/);
   assert.match(page, /Cần chốt giai đoạn/);
   assert.match(page, /Đã đủ điều kiện để tiếp tục quy trình\./);
   assert.match(page, /function NextQueuePanel\(/);
@@ -223,6 +224,7 @@ test('My Work coordinates project startup without creating placeholder work item
 test('My Work exposes a focused Accounting lane with direct handoff actions', async () => {
   const page = await myWorkPageSource();
   const lane = await source('../src/modules/my-work/AccountingWorkLane.tsx');
+  const actions = await source('../src/modules/project-finance/accountingWorkActions.ts');
   const dialog = await source('../src/modules/project-finance/AccountingHandoffActionDialog.tsx');
 
   assert.match(page, /type ModeKey = 'work' \| 'approval' \| 'accounting' \| 'attention'/);
@@ -231,7 +233,8 @@ test('My Work exposes a focused Accounting lane with direct handoff actions', as
   assert.match(page, /get<AccountingWorkPage>\(buildAccountingWorkPath/);
   assert.match(page, /<AccountingWorkLane/);
   assert.match(lane, /Ưu tiên tiếp nhận hồ sơ kế toán toàn công ty/);
-  assert.match(lane, /post\(`\/accounting-handoffs\/\$\{item\.handoff_id\}\/\$\{action\}`/);
+  assert.match(actions, /post\(`\/accounting-handoffs\/\$\{item\.handoff_id\}\/\$\{action\}`/);
+  assert.match(lane, /useAccountingWorkActions\(\)/);
   assert.match(lane, />Tiếp nhận/);
   assert.match(lane, />Trả lại/);
   assert.match(lane, />Mở nguồn/);

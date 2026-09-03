@@ -1,5 +1,4 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ExternalLink, RefreshCw, Search, Undo2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
@@ -7,15 +6,13 @@ import { CurrencyText } from '../../components/CurrencyText';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
-import { useToast } from '../../components/ToastProvider';
-import { post } from '../../lib/api/client';
 import type { AccountingWorkItem, AccountingWorkPage, AccountingWorkStatus } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import {
   AccountingHandoffActionDialog,
-  type AccountingHandoffDialog,
 } from '../project-finance/AccountingHandoffActionDialog';
+import { useAccountingWorkActions } from '../project-finance/accountingWorkActions';
 
 const statusTabs: Array<{
   value: AccountingWorkStatus;
@@ -60,36 +57,9 @@ export function AccountingWorkLane({
   onRetry: () => void;
 }) {
   const [searchDraft, setSearchDraft] = useState(search);
-  const [dialog, setDialog] = useState<AccountingHandoffDialog<AccountingWorkItem>>(null);
-  const queryClient = useQueryClient();
-  const toast = useToast();
+  const { dialog, setDialog, mutation } = useAccountingWorkActions();
 
   useEffect(() => setSearchDraft(search), [search]);
-
-  const mutation = useMutation({
-    mutationFn: ({ action, item, note, returnReason, externalReference }: {
-      action: 'acknowledge' | 'return';
-      item: AccountingWorkItem;
-      note: string;
-      returnReason: string;
-      externalReference: string;
-    }) => post(`/accounting-handoffs/${item.handoff_id}/${action}`, {
-      note,
-      return_reason: returnReason,
-      external_reference: externalReference,
-    }),
-    onSuccess: async (_result, variables) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['my-accounting-work'] }),
-        queryClient.invalidateQueries({ queryKey: ['project-finance'] }),
-        queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary'] }),
-        queryClient.invalidateQueries({ queryKey: ['project-operations', variables.item.project_id] }),
-      ]);
-      setDialog(null);
-      toast.success(variables.action === 'acknowledge' ? 'Đã xác nhận tiếp nhận hồ sơ.' : 'Đã trả hồ sơ để bộ phận nguồn bổ sung.');
-    },
-    onError: (mutationError) => toast.error('Không cập nhật được hồ sơ kế toán', mutationError),
-  });
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();

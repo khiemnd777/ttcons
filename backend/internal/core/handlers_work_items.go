@@ -19,6 +19,14 @@ func (h *Handler) ProjectWorkItems(c *fiber.Ctx) error {
 }
 
 func (h *Handler) MyWorkItems(c *fiber.Ctx) error {
+	return h.myWorkPage(c, false)
+}
+
+func (h *Handler) MyWorkQueue(c *fiber.Ctx) error {
+	return h.myWorkPage(c, true)
+}
+
+func (h *Handler) myWorkPage(c *fiber.Ctx, unified bool) error {
 	limit := 0
 	if rawLimit := strings.TrimSpace(c.Query("limit")); rawLimit != "" {
 		parsed, err := strconv.Atoi(rawLimit)
@@ -28,6 +36,8 @@ func (h *Handler) MyWorkItems(c *fiber.Ctx) error {
 		limit = parsed
 	}
 	items, err := h.service.MyWorkItems(c.Context(), MyWorkItemsFilter{
+		Unified:   unified,
+		EntryKind: c.Query("entry_kind"),
 		Queue:     c.Query("queue"),
 		ProjectID: c.Query("project_id"),
 		Status:    c.Query("status"),

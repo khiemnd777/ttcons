@@ -1,9 +1,42 @@
-import type { AccountingWorkStatus, MyWorkflowAction, WorkItem } from '../../lib/types/domain';
+import type { AccountingWorkItem, AccountingWorkStatus, MyWorkflowAction, ProjectStartupAction, WorkItem } from '../../lib/types/domain';
 import { workItemIsUpcoming } from '../work-items/workItemPresentation';
 
 export type ApprovalLaneKey = 'work' | 'node' | 'report';
 export type WorkScopeKey = 'responsible' | 'mine' | 'department' | 'watching' | 'all';
-export type SummaryBucket = 'all' | 'need_action' | 'in_progress' | 'overdue' | 'blocked' | 'waiting_decision' | 'upcoming' | 'completed' | 'done_today';
+export type SummaryBucket = 'all' | 'need_action' | 'in_progress' | 'overdue' | 'blocked' | 'waiting_decision' | 'upcoming' | 'completed' | 'done_today' | 'waiting_supplement';
+export type WorkQueueEntry = { kind: 'work_item'; item: WorkItem } | { kind: 'accounting_handoff'; item: AccountingWorkItem };
+export type WorkQueueKind = '' | WorkQueueEntry['kind'];
+export type WorkListEntry = WorkQueueEntry
+  | { kind: 'project_startup'; item: ProjectStartupAction }
+  | { kind: 'workflow_action'; item: MyWorkflowAction };
+
+export function workQueueEntryKey(entry: WorkListEntry) {
+  return entry.kind === 'accounting_handoff' ? `accounting:${entry.item.handoff_id}` : entry.item.id;
+}
+
+// Use the same order for rows and default selection. Server-side source ordering
+// is authoritative across pages; this only places separately loaded actions.
+export function orderedWorkListEntries(entries: WorkQueueEntry[], startups: ProjectStartupAction[], actions: MyWorkflowAction[], prioritizeAccounting: boolean): WorkListEntry[] {
+  const actionEntries: WorkListEntry[] = [
+    ...startups.map((item): WorkListEntry => ({ kind: 'project_startup', item })),
+    ...actions.map((item): WorkListEntry => ({ kind: 'workflow_action', item })),
+  ];
+  if (!prioritizeAccounting) return [...actionEntries, ...entries];
+  return [
+    ...entries.filter((entry) => entry.kind === 'accounting_handoff'),
+    ...actionEntries,
+    ...entries.filter((entry) => entry.kind !== 'accounting_handoff'),
+  ];
+}
+
+export function dedupeWorkQueue(entries: WorkQueueEntry[]) {
+  return Array.from(new Map(entries.map((entry) => [workQueueEntryKey(entry), entry])).values());
+}
+
+export function buildWorkQueuePath(filters: Parameters<typeof buildWorkPath>[0] & { entryKind: WorkQueueKind }, cursor: string) {
+  const path = buildWorkPath(filters, cursor).replace('/me/work-items?', '/me/work-queue?');
+  return filters.entryKind ? `${path}&entry_kind=${filters.entryKind}` : path;
+}
 
 export function workReportDateText(value: string) {
   const parts = value.slice(0, 10).split('-');

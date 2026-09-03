@@ -10,6 +10,8 @@
 
 ## Owners
 
+- Accounting observers use Bàn làm việc as the daily entry: global `/accounting` menu has `excludePermissions: ['project.reconciliation.view']`; the route and `/projects/:id/accounting` register stay authorized and available. The retained accounting tab and typed Công việc queue share canonical handoffs. This is navigation-only and does not alter role grants or mutation authorization.
+
 - Frontend modules: `frontend/src/modules/auth`, `frontend/src/modules/profile`, `frontend/src/modules/staff`, `frontend/src/modules/rbac`, `frontend/src/modules/core-data`, `frontend/src/modules/audit`, `frontend/src/modules/event-logs`, `frontend/src/modules/settings`; XLSX/JSON data-package action visibility in `frontend/src/modules/projects/ProjectsPage.tsx`, `frontend/src/modules/pipeline-builder`, `frontend/src/modules/workflow-forms` and shared `frontend/src/modules/workflow-definitions`
 - Frontend auth/navigation: `frontend/src/lib/auth/AuthContext.tsx`, `frontend/src/lib/utils/roles.ts`, `frontend/src/app/router.tsx`, `frontend/src/layouts/AppShell.tsx`, `frontend/src/modules/projects/ProjectWorkspaceLayout.tsx`, `frontend/src/modules/profile/ProfilePage.tsx`
 - Backend routes: `backend/internal/core/routes.go` bootstrap plus bounded `backend/internal/core/routes_*.go` registrars

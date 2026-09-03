@@ -31,6 +31,15 @@ func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, act
 	if err != nil {
 		return nil, err
 	}
+	// A company-wide observer does not acquire company-wide workflow responsibility.
+	filter.IncludeAccounting = false
+	if filter.Unified {
+		permissions, err := s.repo.UserPermissions(ctx, actorID)
+		if err != nil {
+			return nil, err
+		}
+		filter.IncludeAccounting = canReceiveAccountingWork(permissions)
+	}
 	page, err := s.repo.MyWorkItemsPage(ctx, actorID, filter, offset)
 	if err != nil {
 		return nil, err
@@ -51,14 +60,22 @@ func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, act
 			delete(item, internalKey)
 		}
 	}
-	return Record{
+	result := Record{
 		"items":       page.Items,
 		"summary":     page.Summary,
 		"facets":      page.Facets,
 		"total":       page.Total,
 		"has_more":    page.HasMore,
 		"next_cursor": page.NextCursor,
-	}, nil
+	}
+	if filter.Unified {
+		result["entries"] = page.Entries
+	}
+	return result, nil
+}
+
+func canReceiveAccountingWork(permissions []string) bool {
+	return hasAnyString(permissions, []string{"accounting_handoff.view"}) && hasAnyString(permissions, []string{"accounting_handoff.acknowledge"})
 }
 
 func (s *Service) MyAccountingWork(ctx context.Context, filter MyAccountingWorkFilter, actorID string) (Record, error) {
@@ -158,7 +175,23 @@ func (s *Service) MyWorkScopeSummary(ctx context.Context, actorID, projectID str
 		return nil, err
 	}
 	startupNeedAction := int(number(recordValue(startupActions["summary"])["need_action"]))
-	return myWorkScopeSummaryRecord(workItemCounts, workflowResponsible, len(workflowActions), startupNeedAction), nil
+	result := myWorkScopeSummaryRecord(workItemCounts, workflowResponsible, len(workflowActions), startupNeedAction)
+	permissions, err := s.repo.UserPermissions(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if canReceiveAccountingWork(permissions) {
+		page, err := s.MyAccountingWork(ctx, MyAccountingWorkFilter{ProjectID: projectID, Status: "handed_off", Limit: 1}, actorID)
+		if err != nil {
+			return nil, err
+		}
+		for _, scope := range []string{"responsible", "all"} {
+			row := recordValue(result[scope])
+			row["accounting_handoffs"] = page["total"]
+			row["total"] = number(row["total"]) + number(page["total"])
+		}
+	}
+	return result, nil
 }
 
 func myWorkScopeSummaryRecord(workItemCounts myWorkScopeCounts, workflowResponsible, workflowAll, startupNeedAction int) Record {
@@ -178,7 +211,7 @@ func myWorkScopeSummaryRecord(workItemCounts myWorkScopeCounts, workflowResponsi
 }
 
 func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount, accountingHandoffCount int) Record {
-	workTotal := workItemCounts.NeedAction + workflowActionCount + startupActionCount
+	workTotal := workItemCounts.NeedAction + workflowActionCount + startupActionCount + accountingHandoffCount
 	approvalTotal := workItemCounts.WaitingDecision + nodeApprovalCount + workReportReviewCount
 	return Record{
 		"work_items_need_action":      workItemCounts.NeedAction,
@@ -191,7 +224,8 @@ func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workfl
 		"approval_total":              approvalTotal,
 		"accounting_handoffs_pending": accountingHandoffCount,
 		"accounting_total":            accountingHandoffCount,
-		"total":                       workTotal + approvalTotal + accountingHandoffCount,
+		// accounting_total is a breakdown of work_total, not an additional lane.
+		"total": workTotal + approvalTotal,
 	}
 }
 

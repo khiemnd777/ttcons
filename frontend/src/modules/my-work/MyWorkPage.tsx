@@ -49,10 +49,22 @@ import {
 } from '../work-items/workItemPresentation';
 import { ProjectStartupWizard } from '../projects/ProjectStartupWizard';
 import { AccountingWorkLane } from './AccountingWorkLane';
+import { Dialog } from '../../components/Dialog';
+import { AccountingWorkCard, AccountingWorkDetails } from './AccountingWorkCard';
+import { AccountingHandoffActionDialog } from '../project-finance/AccountingHandoffActionDialog';
+import { useAccountingWorkActions } from '../project-finance/accountingWorkActions';
+import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
+import type { AccountingWorkItem } from '../../lib/types/domain';
 import {
   buildAccountingWorkPath,
   buildProjectStartupActionsPath,
   buildWorkPath,
+  buildWorkQueuePath,
+  dedupeWorkQueue,
+  workQueueEntryKey,
+  orderedWorkListEntries,
+  type WorkQueueEntry,
+  type WorkQueueKind,
   buildWorkScopeSummaryPath,
   buildWorkflowActionsPath,
   dedupeWorkItems,
@@ -69,7 +81,7 @@ import {
 type ModeKey = 'work' | 'approval' | 'accounting' | 'attention';
 type LegacyQueueKey = WorkScopeKey | 'pending_approval';
 type AttentionQueueKey = 'all' | 'mentions' | 'questions' | 'blockers' | 'reminders' | 'unread';
-type WorkQuickBucket = 'all' | 'need_action' | 'in_progress' | 'blocked' | 'upcoming' | 'completed';
+type WorkQuickBucket = 'all' | 'need_action' | 'in_progress' | 'blocked' | 'upcoming' | 'completed' | 'waiting_supplement';
 
 type FacetOption = string | {
   id?: string;
@@ -98,9 +110,11 @@ type MyWorkSummary = {
   upcoming: number;
   completed: number;
   done_today: number;
+  waiting_supplement?: number;
 };
 type MyWorkPageResponse = {
   items: WorkItem[];
+  entries?: WorkQueueEntry[];
   summary: MyWorkSummary;
   facets: MyWorkFacets;
   total: number;
@@ -175,12 +189,14 @@ export function MyWorkPage() {
   const [searchDraft, setSearchDraft] = useState(searchParams.get('search') ?? '');
 	const streamStatus = useActorRealtimeStatus();
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const [accountingDetailsOpen, setAccountingDetailsOpen] = useState(false);
+  const accountingActions = useAccountingWorkActions();
 
   const canViewAccountingWork = hasPermission('accounting_handoff.view') && hasPermission('accounting_handoff.acknowledge');
   const canAcknowledgeAccounting = hasPermission('accounting_handoff.acknowledge');
   const requestedMode = validValue<ModeKey>(searchParams.get('mode'), ['work', 'approval', 'accounting', 'attention'], 'work');
   const requestedQueue = validValue<LegacyQueueKey>(searchParams.get('queue'), ['responsible', 'mine', 'department', 'pending_approval', 'watching', 'all'], 'responsible');
-  const requestedBucket = validValue<SummaryBucket>(searchParams.get('bucket'), ['all', 'need_action', 'in_progress', 'overdue', 'blocked', 'waiting_decision', 'upcoming', 'completed', 'done_today'], 'need_action');
+  const requestedBucket = validValue<SummaryBucket>(searchParams.get('bucket'), ['all', 'need_action', 'in_progress', 'overdue', 'blocked', 'waiting_decision', 'upcoming', 'completed', 'done_today', 'waiting_supplement'], 'need_action');
   const legacyApprovalMode = requestedQueue === 'pending_approval' || requestedBucket === 'waiting_decision';
   const mode: ModeKey = requestedMode === 'accounting'
     ? canViewAccountingWork ? 'accounting' : 'work'
@@ -196,6 +212,7 @@ export function MyWorkPage() {
   const status = searchParams.get('status') ?? '';
   const deadline = searchParams.get('deadline') ?? '';
   const workType = searchParams.get('type') ?? '';
+  const entryKind = validValue<WorkQueueKind>(searchParams.get('entry_kind'), ['', 'work_item', 'accounting_handoff'], '');
   const priority = searchParams.get('priority') ?? '';
   const search = searchParams.get('search') ?? '';
   const accountingStatus = validValue<AccountingWorkStatus>(searchParams.get('accounting_status'), ['handed_off', 'returned', 'acknowledged', 'all'], 'handed_off');
@@ -226,11 +243,11 @@ export function MyWorkPage() {
     setStartupDialogProjectID(requestedSetup);
   }, [requestedSetup]);
 
-  const filterKey = useMemo(() => ({ queue, bucket, project, status, deadline, workType, priority, search, sort }), [bucket, deadline, priority, project, queue, search, sort, status, workType]);
+  const filterKey = useMemo(() => ({ queue, bucket, project, status, deadline, workType, priority, search, sort, entryKind }), [bucket, deadline, priority, project, queue, search, sort, status, workType, entryKind]);
   const workItems = useInfiniteQuery({
-    queryKey: ['my-work-items', user?.id, filterKey],
+    queryKey: ['my-work-items', user?.id, 'unified', filterKey],
     initialPageParam: '',
-    queryFn: ({ pageParam }) => get<MyWorkPageResponse>(buildWorkPath(filterKey, String(pageParam ?? ''))),
+    queryFn: ({ pageParam }) => get<MyWorkPageResponse>(buildWorkQueuePath(filterKey, String(pageParam ?? ''))),
     getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor : undefined,
     enabled: Boolean(user?.id),
     retry: false,
@@ -242,6 +259,7 @@ export function MyWorkPage() {
     retry: false,
   });
   const workflowActionsMatchCurrentWorkFilters = (bucket === 'all' || bucket === 'need_action')
+    && entryKind !== 'accounting_handoff'
     && !status && !deadline && !workType && !priority;
   const workflowActionsVisible = mode === 'work' && workflowActionsMatchCurrentWorkFilters;
   const workflowActions = useQuery({
@@ -251,6 +269,7 @@ export function MyWorkPage() {
     retry: false,
   });
   const startupActionsMatchCurrentWorkFilters = (bucket === 'all' || bucket === 'need_action' || bucket === 'upcoming')
+    && entryKind !== 'accounting_handoff'
     && (queue === 'responsible' || queue === 'all')
     && !status && !deadline && !workType && !priority;
   const startupActions = useQuery({
@@ -284,7 +303,7 @@ export function MyWorkPage() {
     initialPageParam: '',
     queryFn: ({ pageParam }) => get<MyWorkPageResponse>(buildWorkPath(approvalFilterKey, String(pageParam ?? ''))),
     getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor : undefined,
-    enabled: Boolean(user?.id) && mode === 'approval',
+    enabled: Boolean(user?.id),
     retry: false,
   });
   const pendingNodeApprovals = useQuery({
@@ -363,10 +382,11 @@ export function MyWorkPage() {
   });
 
   const firstPage = workItems.data?.pages[0];
+  const queueEntries = useMemo(() => dedupeWorkQueue(workItems.data?.pages.flatMap((page) => page.entries ?? []) ?? []), [workItems.data]);
   const rows = useMemo(() => dedupeWorkItems(workItems.data?.pages.flatMap((page) => page.items) ?? []), [workItems.data]);
   const workflowActionRows = useMemo(() => workflowActionsVisible ? workflowActions.data?.items ?? [] : [], [workflowActions.data?.items, workflowActionsVisible]);
   const workflowActionTotal = workflowActionsMatchCurrentWorkFilters ? workflowActions.data?.total ?? 0 : 0;
-  const workflowActionSummaryTotal = workflowActions.data?.summary_total ?? 0;
+  const workflowActionSummaryTotal = entryKind === 'accounting_handoff' ? 0 : workflowActions.data?.summary_total ?? 0;
   const startupActionRows = useMemo(() => {
     if (!startupActionsMatchCurrentWorkFilters) return [];
     const items = startupActions.data?.items ?? [];
@@ -403,11 +423,11 @@ export function MyWorkPage() {
     : (workItems.isError && !firstPage) || (workflowActionsMatchCurrentWorkFilters && workflowActions.isError && !workflowActions.data) || (startupActionsMatchCurrentWorkFilters && startupActions.isError && !startupActions.data)
       ? '—'
       : (firstPage?.total ?? 0) + workflowActionTotal + startupActionTotal;
-  const approvalTabCount = workItems.isLoading || pendingNodeApprovals.isLoading || (canReviewWorkReports && reportReviewSummary.isLoading)
+  const approvalTabCount = approvalWorkItems.isLoading || pendingNodeApprovals.isLoading || (canReviewWorkReports && reportReviewSummary.isLoading)
     ? '…'
-    : (workItems.isError && !firstPage) || (pendingNodeApprovals.isError && !pendingNodeApprovals.data) || (canReviewWorkReports && reportReviewSummary.isError && !reportReviewSummary.data)
+    : (approvalWorkItems.isError && !approvalFirstPage) || (pendingNodeApprovals.isError && !pendingNodeApprovals.data) || (canReviewWorkReports && reportReviewSummary.isError && !reportReviewSummary.data)
       ? '—'
-      : summary.waiting_decision + nodeApprovalCount + reportReviewCount;
+      : (approvalFirstPage?.total ?? 0) + nodeApprovalCount + reportReviewCount;
   const accountingTabCount = accountingWork.isLoading
     ? '…'
     : accountingWork.isError && !accountingFirstPage
@@ -437,15 +457,20 @@ export function MyWorkPage() {
   const activeWorkRows = mode === 'approval' ? approvalRows : rows;
   const selectedStartupAction = mode === 'work' ? startupActionRows.find((action) => action.id === selectedEntryId) ?? null : null;
   const selectedWorkflowAction = mode === 'work' && !selectedStartupAction ? workflowActionRows.find((action) => action.id === selectedEntryId) ?? null : null;
-  const selectedItem = selectedStartupAction || selectedWorkflowAction ? null : activeWorkRows.find((item) => item.id === selectedEntryId) ?? activeWorkRows[0] ?? null;
+  const selectedAccountingEntry = mode === 'work' ? queueEntries.find((entry) => entry.kind === 'accounting_handoff' && workQueueEntryKey(entry) === selectedEntryId) : undefined;
+  const selectedAccounting = selectedAccountingEntry?.kind === 'accounting_handoff' ? selectedAccountingEntry.item : null;
+  const selectedItem = selectedStartupAction || selectedWorkflowAction || selectedAccounting ? null : activeWorkRows.find((item) => item.id === selectedEntryId) ?? activeWorkRows[0] ?? null;
+  const orderedEntries = useMemo(() => orderedWorkListEntries(queueEntries, startupActionRows, workflowActionRows, sort === 'priority'), [queueEntries, startupActionRows, workflowActionRows, sort]);
 
   useEffect(() => {
+    // Do not let an earlier startup/action response preselect a non-accounting row.
+    if (mode === 'work' && workItems.isLoading) return;
     const entryIds = mode === 'work'
-      ? [...startupActionRows.map((action) => action.id), ...workflowActionRows.map((action) => action.id), ...activeWorkRows.map((item) => item.id)]
+      ? orderedEntries.map(workQueueEntryKey)
       : activeWorkRows.map((item) => item.id);
     if (!entryIds.length) setSelectedEntryId(null);
     else if (!selectedEntryId || !entryIds.includes(selectedEntryId)) setSelectedEntryId(entryIds[0]);
-  }, [activeWorkRows, mode, selectedEntryId, startupActionRows, workflowActionRows]);
+  }, [activeWorkRows, mode, selectedEntryId, orderedEntries, workItems.isLoading]);
 
   useEffect(() => {
     if (mode !== 'approval' || requestedApproval || permittedRequestedApprovalLane || autoApprovalLane || !approvalSourcesSettled) return;
@@ -470,7 +495,7 @@ export function MyWorkPage() {
 
   function resetFilters() {
     setSearchDraft('');
-    updateParams({ queue: 'responsible', bucket: 'need_action', project: null, status: null, deadline: null, type: null, priority: null, search: null, sort: 'priority' });
+    updateParams({ queue: 'responsible', bucket: 'need_action', project: null, status: null, deadline: null, type: null, entry_kind: null, priority: null, search: null, sort: 'priority' });
   }
 
   function selectBucket(nextBucket: WorkQuickBucket) {
@@ -503,10 +528,15 @@ export function MyWorkPage() {
     navigate(executionTargetPath(item, currentReturnTo(location)));
   }
 
-  const hasFilters = Boolean(bucket !== 'need_action' || queue !== 'responsible' || project || status || deadline || workType || priority || search || sort !== 'priority');
+  function openAccountingAction(item: AccountingWorkItem, action: 'acknowledge' | 'return') {
+    setAccountingDetailsOpen(false);
+    accountingActions.setDialog({ item, action });
+  }
+
+  const hasFilters = Boolean(bucket !== 'need_action' || queue !== 'responsible' || project || status || deadline || workType || entryKind || priority || search || sort !== 'priority');
   const total = (firstPage?.total ?? summary.total ?? rows.length) + workflowActionTotal + startupActionTotal;
   const approvalTotal = approvalFirstPage?.total ?? approvalRows.length;
-  const scopeLabel = scopes.find((item) => item.key === queue)?.label ?? 'Tôi phụ trách';
+  const scopeLabel = queue === 'responsible' && canViewAccountingWork ? 'Tôi / nhóm phụ trách' : scopes.find((item) => item.key === queue)?.label ?? 'Tôi phụ trách';
   const actionAwareSummary = {
     ...summary,
     total: summary.total + workflowActionSummaryTotal + visibleStartupSummary.total,
@@ -541,14 +571,17 @@ export function MyWorkPage() {
         <section className="mt-4">
           <div className="grid gap-3 xl:grid-cols-[208px_minmax(0,1fr)_320px]">
             <ScopeRail
+              accounting={canViewAccountingWork}
               value={queue}
               counts={scopeSummary.data}
               loading={scopeSummary.isLoading}
+              unavailable={scopeSummary.isError && !scopeSummary.data}
               onChange={(value) => updateParams({ queue: value, bucket: 'all' })}
             />
 
             <div className="min-w-0">
               <WorkQuickFilters
+                accounting={canViewAccountingWork && entryKind !== 'work_item'}
                 summary={actionAwareSummary}
                 selected={bucket}
                 scopeLabel={scopeLabel}
@@ -558,6 +591,8 @@ export function MyWorkPage() {
               />
 
               <FilterBar
+                accounting={canViewAccountingWork}
+                entryKind={entryKind}
                 searchDraft={searchDraft}
                 project={project}
                 status={status}
@@ -570,13 +605,23 @@ export function MyWorkPage() {
                 advancedOpen={advancedFiltersOpen}
                 onSearchDraft={setSearchDraft}
                 onSearch={() => updateParams({ search: searchDraft.trim() || null, bucket: 'all' })}
-                onChange={(key, value) => updateParams({ [key]: value || null, bucket: 'all' })}
+                onChange={(key, value) => updateParams(key === 'entry_kind'
+                  ? { entry_kind: value || null, status: null, deadline: null, type: null, priority: null, bucket: 'all' }
+                  : { [key]: value || null, bucket: 'all' })}
                 onReset={resetFilters}
                 onToggleAdvanced={() => setAdvancedFiltersOpen((open) => !open)}
               />
 
               <div className="mt-3">
                 <WorkList
+                  entries={queueEntries}
+                  prioritizeAccounting={sort === 'priority'}
+                  selectedAccountingId={selectedAccounting?.handoff_id}
+                  onSelectAccounting={(item) => {
+                    setSelectedEntryId(`accounting:${item.handoff_id}`);
+                    if (!window.matchMedia('(min-width: 1280px)').matches) setAccountingDetailsOpen(true);
+                  }}
+                  onAcknowledgeAccounting={canAcknowledgeAccounting ? (item) => openAccountingAction(item, 'acknowledge') : undefined}
                   rows={rows}
                   selectedId={selectedItem?.id}
                   workflowActions={workflowActionRows}
@@ -609,7 +654,9 @@ export function MyWorkPage() {
               </div>
             </div>
 
-            <NextQueuePanel
+            {selectedAccounting ? <aside className="hidden self-start rounded-lg border border-line bg-white p-4 xl:block">
+              <AccountingWorkDetails item={selectedAccounting} canAcknowledge={canAcknowledgeAccounting} onAction={(action) => openAccountingAction(selectedAccounting, action)} />
+            </aside> : <NextQueuePanel
               item={selectedItem}
               workflowAction={selectedWorkflowAction}
               startupAction={selectedStartupAction}
@@ -617,7 +664,7 @@ export function MyWorkPage() {
               onOpen={openWorkItem}
               onRunWorkflowAction={(action) => advanceWorkflowAction.mutate(action)}
               onOpenStartupAction={(action) => setStartupDialogProjectID(action.project_id)}
-            />
+            />}
           </div>
         </section>
       ) : mode === 'approval' ? (
@@ -684,6 +731,19 @@ export function MyWorkPage() {
           onMarkRead={(activityId) => markAttentionRead.mutate(activityId)}
         />
       )}
+
+      <Dialog open={mode === 'work' && accountingDetailsOpen && Boolean(selectedAccounting)} title="Hồ sơ kế toán" onClose={() => setAccountingDetailsOpen(false)} size="md">
+        {selectedAccounting ? <AccountingWorkDetails item={selectedAccounting} canAcknowledge={canAcknowledgeAccounting} onAction={(action) => openAccountingAction(selectedAccounting, action)} /> : null}
+      </Dialog>
+      <AccountingHandoffActionDialog
+        dialog={accountingActions.dialog}
+        pending={accountingActions.mutation.isPending}
+        onClose={() => { if (!accountingActions.mutation.isPending) accountingActions.setDialog(null); }}
+        onSubmit={(values) => {
+          const target = accountingActions.dialog;
+          if (target && target.action !== 'handoff') accountingActions.mutation.mutate({ action: target.action, item: target.item, ...values });
+        }}
+      />
 
       <ProjectStartupWizard
         open={Boolean(startupDialogProjectID)}
@@ -862,7 +922,8 @@ function WorkReportReviewLane({ rows, total, loading, error, onRetry, onOpen }: 
 
 const emptySummary: MyWorkSummary = { total: 0, need_action: 0, in_progress: 0, overdue: 0, blocked: 0, waiting_decision: 0, waiting_approval: 0, upcoming: 0, completed: 0, done_today: 0 };
 
-function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable, onSelect }: {
+function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable, onSelect, accounting = false }: {
+  accounting?: boolean;
   summary: MyWorkSummary;
   selected: SummaryBucket;
   scopeLabel: string;
@@ -875,8 +936,9 @@ function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable,
     { bucket: 'in_progress', label: 'Đang làm', value: summary.in_progress, icon: Clock3, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
     { bucket: 'blocked', label: 'Bị chặn', value: summary.blocked, icon: AlertCircle, activeClass: 'border-rose-300 bg-rose-50 ring-rose-200' },
     { bucket: 'upcoming', label: 'Sắp tới · chỉ xem', value: summary.upcoming, icon: Clock3, activeClass: 'border-slate-300 bg-slate-50 ring-slate-200' },
-    { bucket: 'completed', label: 'Hoàn tất', value: summary.completed, icon: CheckCircle2, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
+    { bucket: 'completed', label: accounting ? 'Đã xử lý' : 'Hoàn tất', value: summary.completed, icon: CheckCircle2, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
   ];
+  if (accounting) cards.splice(1, 0, { bucket: 'waiting_supplement', label: 'Chờ bổ sung', value: summary.waiting_supplement ?? 0, icon: Clock3, activeClass: 'border-amber-300 bg-amber-50 ring-amber-200' });
   const allActive = selected === 'all';
   return (
     <section className="mb-3 rounded-lg border border-line bg-white p-3" aria-label="Bộ lọc nhanh công việc" aria-busy={loading}>
@@ -943,7 +1005,9 @@ function ScopeCountChip({ count, active }: { count: number; active: boolean }) {
   );
 }
 
-function ScopeRail({ value, counts, loading, onChange }: {
+function ScopeRail({ value, counts, loading, onChange, accounting = false, unavailable = false }: {
+  accounting?: boolean;
+  unavailable?: boolean;
   value: WorkScopeKey;
   counts?: MyWorkScopeSummary;
   loading: boolean;
@@ -953,10 +1017,11 @@ function ScopeRail({ value, counts, loading, onChange }: {
   const activeScope = scopes.find((item) => item.key === value);
   return (
     <aside className="min-w-0 rounded-lg border border-line bg-white p-3 xl:sticky xl:top-4 xl:self-start" aria-label="Phạm vi công việc" aria-busy={loading}>
+      {unavailable ? <p className="mb-2 text-xs text-amber-700">Số lượng chưa khả dụng. Bấm Làm mới để thử lại.</p> : null}
       <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-ink">Phạm vi</h2>
         <span className="flex shrink-0 items-center gap-2 text-xs font-semibold text-blue-700 xl:hidden">
-          {activeScope?.label}
+          {accounting && value === 'responsible' ? 'Tôi / nhóm phụ trách' : activeScope?.label}
           <ScopeCountChip count={countValue(value)} active />
         </span>
       </div>
@@ -977,7 +1042,7 @@ function ScopeRail({ value, counts, loading, onChange }: {
               {active ? <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-blue-600" aria-hidden="true" /> : null}
               <span className="flex items-center gap-2 text-sm font-semibold">
                 {active ? <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-600" /> : <span className="h-4 w-4 shrink-0" aria-hidden="true" />}
-                <span>{item.label}</span>
+                <span>{accounting && item.key === 'responsible' ? 'Tôi / nhóm phụ trách' : item.label}</span>
                 <span className="ml-auto">
                   <ScopeCountChip count={countValue(item.key)} active={active} />
                 </span>
@@ -990,7 +1055,8 @@ function ScopeRail({ value, counts, loading, onChange }: {
   );
 }
 
-function FilterBar({ searchDraft, project, status, deadline, workType, priority, sort, facets, hasFilters, advancedOpen, onSearchDraft, onSearch, onChange, onReset, onToggleAdvanced }: {
+function FilterBar({ searchDraft, project, status, deadline, workType, priority, sort, facets, hasFilters, advancedOpen, onSearchDraft, onSearch, onChange, onReset, onToggleAdvanced, accounting = false, entryKind = '' }: {
+  accounting?: boolean; entryKind?: WorkQueueKind;
   searchDraft: string; project: string; status: string; deadline: string; workType: string; priority: string; sort: string; facets: MyWorkFacets; hasFilters: boolean; advancedOpen: boolean;
   onSearchDraft: (value: string) => void; onSearch: () => void; onChange: (key: string, value: string) => void; onReset: () => void; onToggleAdvanced: () => void;
 }) {
@@ -1006,14 +1072,17 @@ function FilterBar({ searchDraft, project, status, deadline, workType, priority,
           <div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input className="w-full rounded-l-md border border-line py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400" value={searchDraft} onChange={(event) => onSearchDraft(event.target.value)} placeholder="Tên việc, công trình..." /></div>
           <button className="rounded-r-md border border-l-0 border-line px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50" type="submit">Tìm</button>
         </form>
-        <FilterSelect value={project} label="Tất cả công trình" options={projects} onChange={(value) => onChange('project', value)} />
+        {accounting ? <AsyncProjectPicker value={project} onChange={(value) => onChange('project', value)} endpoint="/project-finance/projects" queryKey="my-accounting-work-project-options" emptyLabel="Tất cả công trình" /> : <FilterSelect value={project} label="Tất cả công trình" options={projects} onChange={(value) => onChange('project', value)} />}
         <button className={clsx('inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold', advancedOpen ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-line text-slate-700 hover:bg-slate-50')} onClick={onToggleAdvanced}><SlidersHorizontal className="h-4 w-4" />Bộ lọc thêm</button>
       </div>
+      {accounting ? <FilterSelect value={entryKind} label="Tất cả loại hồ sơ" options={[{ value: 'work_item', label: 'Công việc quy trình' }, { value: 'accounting_handoff', label: 'Hồ sơ kế toán' }]} onChange={(value) => onChange('entry_kind', value)} /> : null}
       {advancedOpen ? <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-5">
         <FilterSelect value={status} label="Tất cả trạng thái" options={statuses.length ? statuses.map((item) => ({ ...item, label: statusLabel(item.value) })) : statusOptions} onChange={(value) => onChange('status', value)} />
+        {entryKind !== 'accounting_handoff' ? <>
         <FilterSelect value={deadline} label="Tất cả hạn việc" options={deadlineOptions} onChange={(value) => onChange('deadline', value)} />
         <FilterSelect value={workType} label="Tất cả loại việc" options={workTypes.map((item) => ({ ...item, label: workTypeLabel(item.value) }))} onChange={(value) => onChange('type', value)} />
         <FilterSelect value={priority} label="Tất cả ưu tiên" options={priorities.map((item) => ({ ...item, label: priorityLabel(item.value) }))} onChange={(value) => onChange('priority', value)} />
+        </> : null}
         <FilterSelect value={sort} label="Sắp xếp" options={sortOptions} onChange={(value) => onChange('sort', value)} />
       </div> : null}
     </div>
@@ -1045,7 +1114,10 @@ function FilterSelect({ value, label, options, onChange }: { value: string; labe
   return <select className="min-w-0 rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700" value={value} onChange={(event) => onChange(event.target.value)}><option value="">{label}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
 }
 
-function WorkList({ rows, selectedId, startupActions = [], selectedStartupActionId, startupActionsLoading = false, startupActionsError, workflowActions = [], selectedWorkflowActionId, workflowActionsLoading = false, workflowActionsError, pendingWorkflowActionId, loading, fetchingMore, error, total, hasMore, filtered, emptyTitle, onSelect, onSelectStartupAction, onOpenStartupAction, onSelectWorkflowAction, onRunWorkflowAction, onOpen, onLoadMore, onReset, onRetry, onRetryStartupActions, onRetryWorkflowActions }: {
+function WorkList({ rows, entries, prioritizeAccounting = false, selectedAccountingId, onSelectAccounting, onAcknowledgeAccounting, selectedId, startupActions = [], selectedStartupActionId, startupActionsLoading = false, startupActionsError, workflowActions = [], selectedWorkflowActionId, workflowActionsLoading = false, workflowActionsError, pendingWorkflowActionId, loading, fetchingMore, error, total, hasMore, filtered, emptyTitle, onSelect, onSelectStartupAction, onOpenStartupAction, onSelectWorkflowAction, onRunWorkflowAction, onOpen, onLoadMore, onReset, onRetry, onRetryStartupActions, onRetryWorkflowActions }: {
+  entries?: WorkQueueEntry[]; selectedAccountingId?: string;
+  prioritizeAccounting?: boolean;
+  onSelectAccounting?: (item: AccountingWorkItem) => void; onAcknowledgeAccounting?: (item: AccountingWorkItem) => void;
   rows: WorkItem[]; selectedId?: string; loading: boolean; fetchingMore: boolean; error: unknown; total: number; hasMore: boolean; filtered: boolean;
   emptyTitle?: string;
   workflowActions?: MyWorkflowAction[]; selectedWorkflowActionId?: string; workflowActionsLoading?: boolean; workflowActionsError?: unknown; pendingWorkflowActionId?: string;
@@ -1054,7 +1126,10 @@ function WorkList({ rows, selectedId, startupActions = [], selectedStartupAction
   onSelectWorkflowAction?: (id: string) => void; onRunWorkflowAction?: (action: MyWorkflowAction) => void; onRetryWorkflowActions?: () => void;
   onSelectStartupAction?: (id: string) => void; onOpenStartupAction?: (action: ProjectStartupAction) => void; onRetryStartupActions?: () => void;
 }) {
-  const hasEntries = startupActions.length > 0 || workflowActions.length > 0 || rows.length > 0;
+  const visibleEntries: WorkQueueEntry[] = entries ?? rows.map((item) => ({ kind: 'work_item', item }));
+  const orderedEntries = orderedWorkListEntries(visibleEntries, startupActions, workflowActions, prioritizeAccounting);
+  const displayedCount = orderedEntries.length;
+  const hasEntries = displayedCount > 0;
   if ((loading || workflowActionsLoading || startupActionsLoading) && !hasEntries) return <WorkListSkeleton />;
   if (!hasEntries && error && workflowActionsError) return <div className="space-y-2"><SourceError title="Không tải được danh sách công việc" onRetry={onRetry} /><SourceError title="Không tải được hành động quy trình" onRetry={onRetryWorkflowActions} /></div>;
   if (!hasEntries && error) return <SourceError title="Không tải được danh sách công việc" onRetry={onRetry} />;
@@ -1068,24 +1143,17 @@ function WorkList({ rows, selectedId, startupActions = [], selectedStartupAction
       {workflowActionsError ? <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Không tải được hành động chuyển giai đoạn.</span>{onRetryWorkflowActions ? <button className="shrink-0 font-semibold text-amber-900 underline underline-offset-2" onClick={onRetryWorkflowActions}>Thử lại</button> : null}</div> : null}
       {startupActionsError ? <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Không tải được điều phối khởi tạo công trình.</span>{onRetryStartupActions ? <button className="shrink-0 font-semibold text-amber-900 underline underline-offset-2" onClick={onRetryStartupActions}>Thử lại</button> : null}</div> : null}
       <div className="max-h-[720px] overflow-y-auto rounded-lg border border-line bg-white">
+        {orderedEntries.map((entry) => {
+          const key = workQueueEntryKey(entry);
+          if (entry.kind === 'project_startup') return <ProjectStartupActionCard key={key} action={entry.item} selected={selectedStartupActionId === entry.item.id} onSelect={() => onSelectStartupAction?.(entry.item.id)} onOpen={() => onOpenStartupAction?.(entry.item)} />;
+          if (entry.kind === 'workflow_action') return <WorkflowActionCard key={key} action={entry.item} selected={selectedWorkflowActionId === entry.item.id} pending={pendingWorkflowActionId === entry.item.id} onSelect={() => onSelectWorkflowAction?.(entry.item.id)} onRun={() => onRunWorkflowAction?.(entry.item)} />;
+          if (entry.kind === 'accounting_handoff') return <AccountingWorkCard key={key} item={entry.item} selected={selectedAccountingId === entry.item.handoff_id} onSelect={() => onSelectAccounting?.(entry.item)} onAcknowledge={entry.item.status === 'handed_off' && onAcknowledgeAccounting ? () => onAcknowledgeAccounting(entry.item) : undefined} />;
+          return <WorkItemCard key={key} item={entry.item} selected={selectedId === entry.item.id} onSelect={() => onSelect(entry.item.id)} onOpen={() => onOpen(entry.item)} />;
+        })}
         {startupActionsLoading ? <WorkflowActionSkeleton /> : null}
-        {startupActions.map((action) => <ProjectStartupActionCard key={action.id} action={action} selected={selectedStartupActionId === action.id} onSelect={() => onSelectStartupAction?.(action.id)} onOpen={() => onOpenStartupAction?.(action)} />)}
         {workflowActionsLoading ? <WorkflowActionSkeleton /> : null}
-        {workflowActions.map((action) => (
-          <WorkflowActionCard
-            key={action.id}
-            action={action}
-            selected={selectedWorkflowActionId === action.id}
-            pending={pendingWorkflowActionId === action.id}
-            onSelect={() => onSelectWorkflowAction?.(action.id)}
-            onRun={() => onRunWorkflowAction?.(action)}
-          />
-        ))}
-        {rows.map((item) => (
-          <WorkItemCard key={item.id} item={item} selected={selectedId === item.id} onSelect={() => onSelect(item.id)} onOpen={() => onOpen(item)} />
-        ))}
       </div>
-      {hasMore ? <button className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" disabled={fetchingMore} onClick={onLoadMore}>{fetchingMore ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}Tải thêm · Đã hiển thị {startupActions.length + workflowActions.length + rows.length}/{total}</button> : <p className="mt-3 text-center text-xs text-slate-500">Đã hiển thị {startupActions.length + workflowActions.length + rows.length}/{total}</p>}
+      {hasMore ? <button className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" disabled={fetchingMore} onClick={onLoadMore}>{fetchingMore ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}Tải thêm · Đã hiển thị {displayedCount}/{total}</button> : <p className="mt-3 text-center text-xs text-slate-500">Đã hiển thị {displayedCount}/{total}</p>}
     </div>
   );
 }

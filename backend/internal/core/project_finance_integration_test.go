@@ -241,6 +241,18 @@ func TestAccountingHandoffUsesSourceReadinessAndAuditedLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	handoffID := cleanID(created["id"])
+	assertQueue := func(bucket string) {
+		t.Helper()
+		page, err := service.MyWorkItems(ctx, MyWorkItemsFilter{Unified: true, ProjectID: fixture.projectID, EntryKind: "accounting_handoff", Bucket: bucket}, fixture.userID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries := page["entries"].([]Record)
+		if len(entries) != 1 || cleanID(recordValue(entries[0]["item"])["handoff_id"]) != handoffID {
+			t.Fatalf("canonical queue after transition: %#v", page)
+		}
+	}
+	assertQueue("need_action")
 	if created["status"] != "handed_off" {
 		t.Fatalf("created handoff = %#v", created)
 	}
@@ -254,14 +266,17 @@ func TestAccountingHandoffUsesSourceReadinessAndAuditedLifecycle(t *testing.T) {
 	if err != nil || returned["status"] != "returned" {
 		t.Fatalf("returned handoff = %#v, err=%v", returned, err)
 	}
+	assertQueue("waiting_supplement")
 	resent, err := service.AccountingHandoffAction(ctx, handoffID, "handoff", AccountingHandoffActionRequest{Note: "Đã bổ sung"}, fixture.userID, "Handoff Actor")
 	if err != nil || resent["status"] != "handed_off" || resent["return_reason"] != nil {
 		t.Fatalf("resent handoff = %#v, err=%v", resent, err)
 	}
+	assertQueue("need_action")
 	acknowledged, err := service.AccountingHandoffAction(ctx, handoffID, "acknowledge", AccountingHandoffActionRequest{ExternalReference: "MISA-001"}, fixture.userID, "Accounting Actor")
 	if err != nil || acknowledged["status"] != "acknowledged" || acknowledged["external_reference"] != "MISA-001" {
 		t.Fatalf("acknowledged handoff = %#v, err=%v", acknowledged, err)
 	}
+	assertQueue("completed")
 	handoverID := newID()
 	mustExec(t, db, `
 		INSERT INTO handover_records (id,project_id,handover_code,status,completed_at,created_by)

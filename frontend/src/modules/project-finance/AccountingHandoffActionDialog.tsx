@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
+import { useToast } from '../../components/ToastProvider';
 
 export type AccountingHandoffAction = 'handoff' | 'acknowledge' | 'return';
 
@@ -32,6 +33,7 @@ export function AccountingHandoffActionDialog<T extends AccountingHandoffActionT
   const [returnReason, setReturnReason] = useState('');
   const [externalReference, setExternalReference] = useState('');
   const [warning, setWarning] = useState('');
+  const toast = useToast();
 
   useEffect(() => {
     setNote(dialog?.item.note ?? '');
@@ -50,8 +52,10 @@ export function AccountingHandoffActionDialog<T extends AccountingHandoffActionT
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (pending) return;
     if (dialog?.action === 'return' && !returnReason.trim()) {
       setWarning('Cần ghi rõ nội dung hồ sơ phải bổ sung.');
+      toast.warn('Cần ghi rõ nội dung hồ sơ phải bổ sung.');
       return;
     }
     onSubmit({
@@ -74,9 +78,10 @@ export function AccountingHandoffActionDialog<T extends AccountingHandoffActionT
           <label className="block text-sm font-semibold text-slate-700">
             Nội dung cần bổ sung <span className="text-rose-600">*</span>
             <textarea
-              className="mt-1 min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm"
+              className={`mt-1 min-h-24 w-full rounded-md border px-3 py-2 text-sm ${warning ? 'border-rose-500' : 'border-line'}`}
+              aria-invalid={Boolean(warning)}
               value={returnReason}
-              onChange={(event) => setReturnReason(event.target.value)}
+              onChange={(event) => { setReturnReason(event.target.value); setWarning(''); }}
             />
           </label>
         ) : null}

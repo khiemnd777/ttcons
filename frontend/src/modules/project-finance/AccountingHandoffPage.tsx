@@ -26,6 +26,7 @@ import {
   type AccountingHandoffAction,
   type AccountingHandoffDialog,
 } from './AccountingHandoffActionDialog';
+import { invalidateAccountingWork } from './accountingWorkActions';
 
 type HandoffFilter = 'all' | 'needs_attention' | 'ready' | 'handed_off' | 'acknowledged' | 'returned';
 
@@ -76,7 +77,7 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
       return post<WorkItemMutationResult>(`/accounting-handoffs/${item.handoff_id}/${action}`, body);
     },
     onSuccess: async (result, variables) => {
-      await refresh();
+      await invalidateAccountingWork(queryClient, projectId);
       syncWorkItemMutationTransition(queryClient, result);
       setDialog(null);
       const message = variables.action === 'acknowledge'
