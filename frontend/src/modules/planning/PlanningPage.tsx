@@ -14,7 +14,7 @@ import { ProjectBackLink } from '../../components/ProjectBackLink';
 import type { ProjectOperationsResponse, ProjectOperationsTimelineNode, WorkItem } from '../../lib/types/domain';
 import { enumLabel, statusLabel } from '../../lib/utils/status';
 import { ProjectWorkflowWorkspace } from '../projects/ProjectDetailPage';
-import { currentReturnTo, currentWorkspaceReturnTo, projectTaskDetailNavigationState } from '../work-items/workItemNavigation';
+import { currentWorkspaceReturnTo, projectPipelinePath, projectTaskDetailNavigationState } from '../work-items/workItemNavigation';
 import { executionTargetNeedsEmbeddedWorkItem, executionTargetPath } from '../work-items/workItemExecutionTarget';
 import {
   asArray,
@@ -34,7 +34,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
   const location = useLocation();
   const queryClient = useQueryClient();
   const toast = useToast();
-  const [selectedNodeId, setSelectedNodeId] = useState('');
+  const selectedNodeId = new URLSearchParams(location.search).get('stage') ?? '';
   const [blockReason, setBlockReason] = useState('');
   const [blockNodeId, setBlockNodeId] = useState('');
   const [recreateOpen, setRecreateOpen] = useState(false);
@@ -238,9 +238,9 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
           selectedNodeId={selectedNodeId}
           hasPipeline={Boolean(run.data)}
           startPending={start.isPending}
-          onSelectNode={setSelectedNodeId}
+          onSelectNode={(nodeId) => navigate(projectPipelinePath(id, nodeId, location), { state: location.state })}
           onStartPipeline={() => start.mutate()}
-          onOpenWork={(item) => navigate(executionTargetPath(item, currentReturnTo(location)))}
+          onOpenWork={(item) => navigate(executionTargetPath(item, projectPipelinePath(id, item.run_node_id, location)))}
           renderStageContext={(timelineNode) => {
             const runNode = nodes.find((node: Record<string, any>) => String(node.id) === timelineNode.id);
             const approval = approvals.data?.find((request) => request.target_type === 'pipeline_run_node' && request.target_id === timelineNode.id);

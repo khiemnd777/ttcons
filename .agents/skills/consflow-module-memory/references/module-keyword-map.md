@@ -2,6 +2,12 @@
 
 Use this as the mandatory central routing cache. It is not a replacement for reading code. If a mapping conflicts with code, trust code and update this file when the correction is durable.
 
+## Pipeline Stage Return Navigation
+
+- Keywords: `Tiến độ`, `Quy trình`, quay lại sai giai đoạn, Tài chính quay về Thi công, stage selection lost, Pipeline reload/Back/Forward. Owners: `frontend/src/modules/work-items/workItemNavigation.ts`, `frontend/src/modules/planning/PreparationPage.tsx`, `PlanningPage.tsx`, `frontend/src/modules/projects/ProjectTaskContext.tsx`; shared selection fallback remains in `ProjectDetailPage.tsx`.
+- `/projects/:id/pipeline?stage=<run_node_id>` identifies the viewed runtime stage. Planning derives its selection from the current URL and writes stage clicks to history. `projectPipelinePath` builds stage-aware links and cleans stale `task`/`returnTo` while preserving unrelated query/hash; `projectPipelineReturnTo` upgrades only same-project Pipeline returns from the known work-item stage. Preparation's `Quy trình`/`Tiến độ`, domain task context and Pipeline work links share these helpers. Missing or stale stage IDs fall back within the loaded timeline. Viewing a stage never changes the runtime node, execution summary, permissions or work filters.
+- First searches: `projectPipelinePath|projectPipelineReturnTo|selectedNodeId|currentTimelineNode|progressPath`; focused regression: `frontend/tests/pipelineStageNavigation.test.ts`. See frontend and root-cause detail maps plus the Workflow Orchestration domain map.
+
 ## Personal Signature Cards, Detail And Visual
 
 - Keywords: `Chữ ký cá nhân`, `Chi tiết chữ ký`, `Dấu ký`, `Phóng to`, signature thumbnail, signature audit. Owners: `frontend/src/modules/work-items/WorkflowFormPanel.tsx`, `WorkflowSignatureRecord.tsx`, `WorkflowSignatureDetailDialog.tsx`, `WorkflowSignatureVisual.tsx`, `workflowConfirmationPresentation.ts`; shared `frontend/src/lib/utils/protectedImagePreview.ts` and opt-in focus management in `frontend/src/components/Dialog.tsx`.

@@ -19,6 +19,38 @@ export function currentWorkspaceReturnTo(location: LocationLike) {
   return `${location.pathname}${query ? `?${query}` : ''}${location.hash ?? ''}`;
 }
 
+export function projectPipelinePath(
+  projectId: string,
+  stageId?: string | null,
+  location?: Pick<LocationLike, 'search' | 'hash'>,
+) {
+  const params = new URLSearchParams(location?.search ?? '');
+  params.delete('task');
+  params.delete('returnTo');
+  const stage = String(stageId ?? '').trim();
+  if (stage) params.set('stage', stage);
+  else params.delete('stage');
+  const query = params.toString();
+  return `/projects/${encodeURIComponent(projectId)}/pipeline${query ? `?${query}` : ''}${location?.hash ?? ''}`;
+}
+
+export function projectPipelineReturnTo(value: string | null | undefined, projectId: string, stageId?: string | null) {
+  const returnTo = safeReturnPath(value);
+  if (!returnTo || !String(stageId ?? '').trim()) return returnTo;
+
+  const hashIndex = returnTo.indexOf('#');
+  const hash = hashIndex < 0 ? '' : returnTo.slice(hashIndex);
+  const pathAndQuery = hashIndex < 0 ? returnTo : returnTo.slice(0, hashIndex);
+  const queryIndex = pathAndQuery.indexOf('?');
+  const pathname = queryIndex < 0 ? pathAndQuery : pathAndQuery.slice(0, queryIndex);
+  if (pathname !== projectPipelinePath(projectId)) return returnTo;
+
+  return projectPipelinePath(projectId, stageId, {
+    search: queryIndex < 0 ? '' : pathAndQuery.slice(queryIndex),
+    hash,
+  });
+}
+
 export function projectTaskDetailNavigationState(workItemId: string, currentState?: unknown) {
   const nextState = { ...navigationStateRecord(currentState) };
   const cleanWorkItemId = String(workItemId ?? '').trim();

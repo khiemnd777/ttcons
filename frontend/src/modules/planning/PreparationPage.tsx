@@ -14,7 +14,7 @@ import { dateText } from '../../lib/utils/format';
 import { WorkItemDetailWorkspace } from '../work-items/WorkItemDetailDialog';
 import { DesignReleasePanel } from '../work-items/DesignReleasePanel';
 import { executionTargetActionLabel } from '../work-items/workItemExecutionTarget';
-import { safeReturnPath } from '../work-items/workItemNavigation';
+import { projectPipelinePath, projectPipelineReturnTo } from '../work-items/workItemNavigation';
 import { buildWorkItemWorkflowNavigation } from '../work-items/workItemWorkflowNavigation';
 import { groupPreparationItems, type PreparationStageGroup } from './preparationGrouping';
 import {
@@ -38,7 +38,6 @@ export function PreparationPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<PreparationFilter>('need_action');
   const taskId = searchParams.get('task') ?? '';
-  const returnTo = safeReturnPath(searchParams.get('returnTo'));
   const operations = useQuery({
     queryKey: ['project-operations', id, 'full'],
     queryFn: () => get<ProjectOperationsResponse>(`/projects/${id}/operations`),
@@ -65,14 +64,16 @@ export function PreparationPage() {
       ].some((value) => String(value ?? '').toLocaleLowerCase('vi').includes(needle)));
   }, [allPreparationItems, filter, search]);
   const selectedItem = allPreparationItems.find((item) => item.id === taskId);
+  const returnTo = projectPipelineReturnTo(searchParams.get('returnTo'), id, selectedItem?.run_node_id);
+  const pipelinePath = projectPipelinePath(id, selectedItem?.run_node_id);
   const workflowNavigation = useMemo(() => {
     const context = buildWorkItemWorkflowNavigation(operations.data?.work_items ?? [], taskId);
     return context ? {
       ...context,
       returnTo: returnTo || `/projects/${id}/preparation`,
-      progressPath: `/projects/${id}/pipeline`,
+      progressPath: pipelinePath,
     } : undefined;
-  }, [id, operations.data?.work_items, returnTo, taskId]);
+  }, [id, operations.data?.work_items, pipelinePath, returnTo, taskId]);
   const invalidTask = Boolean(taskId && !operations.isLoading && !operations.error && !selectedItem);
 
   useEffect(() => {
@@ -106,7 +107,7 @@ export function PreparationPage() {
             <ArrowLeft className="h-4 w-4" />
             {returnTo ? 'Quay lại' : 'Danh sách hồ sơ'}
           </button>
-          <Link className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50" to={`/projects/${id}/pipeline`}>
+          <Link className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50" to={pipelinePath}>
             Quy trình
           </Link>
         </div>
@@ -140,7 +141,7 @@ export function PreparationPage() {
       <PageHeader
         title="Hồ sơ chuẩn bị"
         description="Hồ sơ tiếp nhận, khảo sát và thiết kế cần chuẩn bị."
-        actions={<Link className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50" to={`/projects/${id}/pipeline`}>Quy trình</Link>}
+        actions={<Link className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50" to={pipelinePath}>Quy trình</Link>}
       />
 
       <div className="mt-4">

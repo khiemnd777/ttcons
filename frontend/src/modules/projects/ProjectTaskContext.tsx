@@ -9,8 +9,9 @@ import type { WorkItem } from '../../lib/types/domain';
 import { WorkItemDetailDialog } from '../work-items/WorkItemDetailDialog';
 import {
   consumeProjectTaskDetailNavigationState,
+  projectPipelinePath,
+  projectPipelineReturnTo,
   projectTaskDetailIntentMatches,
-  safeReturnPath,
 } from '../work-items/workItemNavigation';
 import { executionTargetNeedsEmbeddedWorkItem, executionTargetWorkspaceLabel, isDomainExecutionTarget, workItemMatchesProject } from '../work-items/workItemExecutionTarget';
 
@@ -20,7 +21,6 @@ export function ProjectTaskContext({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const params = new URLSearchParams(location.search);
   const taskId = params.get('task') ?? '';
-  const returnTo = safeReturnPath(params.get('returnTo'));
   const contextEnabled = Boolean(taskId) && !location.pathname.endsWith('/preparation') && !location.pathname.includes('/work-items/');
   const [detailOpen, setDetailOpen] = useState(false);
   const detailOpenIntent = projectTaskDetailIntentMatches(location.state, taskId);
@@ -50,6 +50,7 @@ export function ProjectTaskContext({ projectId }: { projectId: string }) {
   }
 
   const item = task.data;
+  const returnTo = projectPipelineReturnTo(params.get('returnTo'), projectId, item?.run_node_id);
   const contextMismatch = Boolean(item && !workItemMatchesProject(item, projectId));
   return (
     <section className="mb-4 rounded-lg border border-blue-200 bg-blue-50/70 px-4 py-3 shadow-panel" aria-label="Công việc đang thực hiện">
@@ -84,7 +85,7 @@ export function ProjectTaskContext({ projectId }: { projectId: string }) {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {returnTo ? <Link className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={returnTo}><ArrowLeft className="h-4 w-4" />Quay lại</Link> : null}
-              <Link className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${projectId}/pipeline`}><GitBranch className="h-4 w-4" />Tiến độ</Link>
+              <Link className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" to={projectPipelinePath(projectId, item.run_node_id)}><GitBranch className="h-4 w-4" />Tiến độ</Link>
               {executionTargetNeedsEmbeddedWorkItem(item.execution_target) || item.status !== 'completed' ? (
                 <button className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setDetailOpen(true)}>
                   Kiểm tra điều kiện & chốt bước <ExternalLink className="h-4 w-4" />
