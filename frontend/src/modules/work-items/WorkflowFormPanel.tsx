@@ -17,6 +17,9 @@ import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
 import { firstInvalidFieldKey, useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { enumLabel } from '../../lib/utils/status';
 import { SignatureCaptureDialog, type SignatureStroke, type WorkflowSealApplicationPayload } from './SignatureCaptureDialog';
+import { WorkflowSignatureDetailDialog, type WorkflowSignatureViewMode } from './WorkflowSignatureDetailDialog';
+import { WorkflowSignatureRecord } from './WorkflowSignatureRecord';
+import { confirmationRolesText, fileSizeText, signaturePurposeLabel } from './workflowConfirmationPresentation';
 import type { WorkItemRequirementNavigationRequest } from './workItemRequirements';
 import { firstFocusableRequirementControl, revealWorkItemRequirementTarget } from './workItemRequirementNavigation';
 import { compactDateTime, isGenericWorkflowFormTemplate, workflowFormEventLabel, workflowFormStatusLabel, workflowFormTypeLabel } from './workItemPresentation';
@@ -123,7 +126,7 @@ export function WorkflowFormPanel({
   const [values, setValues] = useState<AnyRecord>({});
   const [errors, setErrors] = useState<FormErrors>({});
   const [confirmationDialogOpen, setConfirmationDialogOpen] = useState(false);
-  const [signatureDetail, setSignatureDetail] = useState<WorkflowFormSignature | null>(null);
+  const [signatureViewer, setSignatureViewer] = useState<{ signature: WorkflowFormSignature; mode: WorkflowSignatureViewMode; actorId?: string } | null>(null);
   const [sealApplicationDetail, setSealApplicationDetail] = useState<WorkflowFormSealApplication | null>(null);
   const [pdfDeleteCandidate, setPDFDeleteCandidate] = useState<WorkflowFormPDFExport | null>(null);
   const [amending, setAmending] = useState(false);
@@ -131,6 +134,7 @@ export function WorkflowFormPanel({
   const [fieldsOpen, setFieldsOpen] = useState(true);
   const [optionalFieldsOpen, setOptionalFieldsOpen] = useState(false);
   const [documentsOpen, setDocumentsOpen] = useState(false);
+  useEffect(() => { setSignatureViewer(null); }, [workItemId, user?.id]);
   const panelRef = useRef<HTMLElement | null>(null);
   const navigateToValidation = useValidationNavigation(panelRef);
   const actionCenterRef = useRef<HTMLDivElement | null>(null);
@@ -813,8 +817,8 @@ export function WorkflowFormPanel({
                     if (!readOnly) savePDFConfirmationPreference.mutate(payload);
                   }}
                   onOpenConfirmation={() => { if (!readOnly) setConfirmationDialogOpen(true); }}
-                  onViewSignatureDetail={(signature) => setSignatureDetail(signature)}
-                  onOpenSignatureVisual={(signature) => void openWorkflowBlob(`/workflow-form-signatures/${signature.id}/visual`, 'Không mở được chữ ký')}
+                  onViewSignatureDetail={(signature) => setSignatureViewer({ signature, mode: 'detail', actorId: user?.id })}
+                  onOpenSignatureVisual={(signature) => setSignatureViewer({ signature, mode: 'visual', actorId: user?.id })}
                   onViewSealDetail={(application) => setSealApplicationDetail(application)}
                   onOpenSealVisual={(application) => void openWorkflowBlob(`/workflow-form-seal-applications/${application.id}/visual`, 'Không mở được ảnh con dấu')}
                 />
@@ -834,8 +838,8 @@ export function WorkflowFormPanel({
                 <WorkflowHistoricalConfirmations
                   signatures={historicalSignatures}
                   sealApplications={historicalSealApplications}
-                  onViewSignatureDetail={(signature) => setSignatureDetail(signature)}
-                  onOpenSignatureVisual={(signature) => void openWorkflowBlob(`/workflow-form-signatures/${signature.id}/visual`, 'Không mở được chữ ký')}
+                  onViewSignatureDetail={(signature) => setSignatureViewer({ signature, mode: 'detail', actorId: user?.id })}
+                  onOpenSignatureVisual={(signature) => setSignatureViewer({ signature, mode: 'visual', actorId: user?.id })}
                   onViewSealDetail={(application) => setSealApplicationDetail(application)}
                   onOpenSealVisual={(application) => void openWorkflowBlob(`/workflow-form-seal-applications/${application.id}/visual`, 'Không mở được ảnh con dấu')}
                 />
@@ -863,11 +867,16 @@ export function WorkflowFormPanel({
         onUploadSeal={(name, file) => uploadSeal.mutateAsync({ name, file })}
         onValidationWarning={(message) => toast.warn({ title: 'Chưa thể tải con dấu', description: message })}
       />
-      <SignatureDetailDialog
-        signature={signatureDetail}
-        onClose={() => setSignatureDetail(null)}
-        onOpenVisual={(signature) => void openWorkflowBlob(`/workflow-form-signatures/${signature.id}/visual`, 'Không mở được chữ ký')}
-      />
+      {signatureViewer && signatureViewer.signature.work_item_id === workItemId && signatureViewer.actorId === user?.id ? (
+        <WorkflowSignatureDetailDialog
+          key={`${signatureViewer.signature.id}:${signatureViewer.mode}`}
+          signature={allSignatures.find((signature) => signature.id === signatureViewer.signature.id) ?? signatureViewer.signature}
+          initialMode={signatureViewer.mode}
+          formTitle={businessFormTitle}
+          currentRevision={currentRevision}
+          onClose={() => setSignatureViewer(null)}
+        />
+      ) : null}
       <SealApplicationDetailDialog
         application={sealApplicationDetail}
         onClose={() => setSealApplicationDetail(null)}
@@ -1660,9 +1669,9 @@ function WorkflowConfirmationPanel({
                 </div>
                 <div className={clsx('grid gap-3 p-3', group.signatures.length && group.sealApplications.length && 'lg:grid-cols-2')}>
                   {group.signatures.length ? (
-                    <div className={clsx('space-y-2 rounded-md border border-line bg-slate-50 p-2', !group.includeSignatures && 'opacity-60')}>
+                    <div className="min-w-0 space-y-2 [container-type:inline-size]">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600"><PenLine className="h-3.5 w-3.5" />Chữ ký cá nhân</p>
+                        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600"><PenLine className="h-3.5 w-3.5" />Chữ ký cá nhân · {group.signatures.length}</p>
                         {group.hasBothKinds ? (
                           <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
                             <input
@@ -1681,19 +1690,14 @@ function WorkflowConfirmationPanel({
                         ) : null}
                       </div>
                       {group.signatures.map((signature) => (
-                        <ConfirmationRecord
+                        <WorkflowSignatureRecord
                           key={signature.id}
-                          title={signature.signer_name}
-                          statusLabel="Đã ký"
-                          meta={`Phiên bản ${signature.form_revision_no} · ${compactDateTime(signature.signed_at)}`}
-                          audit={`Vai trò: ${signatureRolesText(signature)} · mã nội dung ${shortHash(signature.payload_hash)}`}
-                          checksum={signature.visual_checksum_sha256 ? `chữ ký sha256:${signature.visual_checksum_sha256.slice(0, 12)}` : undefined}
-                          comment={signature.comment}
-                          visualLabel="Mở chữ ký"
+                          signature={signature}
                           onViewDetail={() => onViewSignatureDetail(signature)}
-                          onOpenVisual={signature.visual_storage_key ? () => onOpenSignatureVisual(signature) : undefined}
+                          onOpenVisual={() => onOpenSignatureVisual(signature)}
                         />
                       ))}
+                      <p className="text-xs text-slate-500">{group.includeSignatures ? 'Được đưa vào PDF mới.' : 'Không đưa vào PDF mới.'}</p>
                     </div>
                   ) : null}
                   {group.sealApplications.length ? (
@@ -1738,7 +1742,7 @@ function WorkflowConfirmationPanel({
             );
           })}
         </div>
-      ) : <ConfirmationEmpty text={submitted ? 'Chưa có chữ ký cá nhân hoặc con dấu công ty.' : 'Chốt hồ sơ trước khi thêm xác nhận.'} />}
+      ) : <div className="space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Chữ ký cá nhân · 0</p><ConfirmationEmpty text={submitted ? 'Chưa có chữ ký cá nhân.' : 'Chốt hồ sơ trước khi thêm xác nhận.'} /></div>}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs text-slate-500">
           {!submitted
@@ -1838,7 +1842,7 @@ function WorkflowHistoricalConfirmations({
             </div>
             <div className="flex shrink-0 gap-2">
               <button type="button" className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100" onClick={() => onViewSignatureDetail(signature)}>Chi tiết</button>
-              {signature.visual_storage_key ? <button type="button" className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50" onClick={() => onOpenSignatureVisual(signature)}>Mở chữ ký</button> : null}
+              {signature.visual_storage_key ? <button type="button" className="rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50" onClick={() => onOpenSignatureVisual(signature)}>Xem dấu ký</button> : null}
             </div>
           </div>
         ))}
@@ -1856,74 +1860,6 @@ function WorkflowHistoricalConfirmations({
         ))}
       </div>
     </details>
-  );
-}
-
-function SignatureDetailDialog({
-  signature,
-  onClose,
-  onOpenVisual,
-}: {
-  signature: WorkflowFormSignature | null;
-  onClose: () => void;
-  onOpenVisual: (signature: WorkflowFormSignature) => void;
-}) {
-  if (!signature) return null;
-  return (
-    <Dialog
-      open={Boolean(signature)}
-      title="Chi tiết chữ ký"
-      description="Người thao tác, mục đích, phiên bản và mã kiểm tra được ghi lại cùng bản ghi chữ ký."
-      size="lg"
-      onClose={onClose}
-      footer={
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-slate-500">Mã nội dung dùng để đối chiếu nội dung hồ sơ tại thời điểm ký.</p>
-          <div className="flex flex-wrap justify-end gap-2">
-            {signature.visual_storage_key ? (
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
-                onClick={() => onOpenVisual(signature)}
-              >
-                <ExternalLink className="h-4 w-4" />
-                Mở dấu ký
-              </button>
-            ) : null}
-            <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>
-              Đóng
-            </button>
-          </div>
-        </div>
-      }
-    >
-      <div className="space-y-4">
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
-          <p className="text-sm font-semibold text-emerald-900">Bản ghi chữ ký không thể chỉnh sửa</p>
-          <p className="mt-1 text-xs leading-5 text-emerald-800">
-            Chữ ký này được lưu chỉ thêm mới theo hồ sơ, người ký, mục đích và phiên bản. Nếu cần thay đổi nội dung, cần tạo phiên bản/hồ sơ mới thay vì sửa bản ghi ký.
-          </p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <SignatureDetailField label="Người ký" value={signature.signer_name || '-'} />
-          <SignatureDetailField label="ID người ký" value={signature.signer_user_id || '-'} mono />
-          <SignatureDetailField label="Mục đích" value={signaturePurposeLabel(signature.purpose)} />
-          <SignatureDetailField label="Thời điểm ký" value={compactDateTime(signature.signed_at)} />
-          <SignatureDetailField label="Phiên bản hồ sơ" value={`Phiên bản ${signature.form_revision_no}`} />
-          <SignatureDetailField label="Vai trò lúc ký" value={signatureRolesText(signature)} />
-          <SignatureDetailField label="Tệp dấu ký" value={signatureVisualText(signature)} />
-          <SignatureDetailField label="Nơi lưu dấu ký" value={signature.visual_storage_provider || '-'} />
-        </div>
-        <SignatureHashBlock label="Mã nội dung" value={signature.payload_hash} />
-        <SignatureHashBlock label="Checksum dấu ký sha256" value={signature.visual_checksum_sha256} />
-        {signature.comment ? (
-          <div className="rounded-md border border-line bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ghi chú</p>
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{signature.comment}</p>
-          </div>
-        ) : null}
-      </div>
-    </Dialog>
   );
 }
 
@@ -2109,53 +2045,6 @@ function workflowPDFExportConfirmationSummary(record: WorkflowFormPDFExport) {
   const sealCount = Number(selection.seal_application_count ?? 0);
   if (!Number.isFinite(signatureCount) || !Number.isFinite(sealCount)) return '';
   return `Đã xuất: ${signatureCount} chữ ký · ${sealCount} con dấu`;
-}
-
-function signatureRolesText(signature: WorkflowFormSignature) {
-  return confirmationRolesText(signature.signer_roles_json);
-}
-
-function confirmationRolesText(roles: WorkflowFormSignature['signer_roles_json'] | WorkflowFormSealApplication['applied_by_roles_json']) {
-  if (!Array.isArray(roles) || !roles.length) return '-';
-  return roles
-    .map((role) => {
-      if (typeof role === 'string') return role;
-      if (!role || typeof role !== 'object') return '';
-      const label = role.display_name ?? role.role_name ?? role.name ?? role.code ?? role.id;
-      return label ? String(label) : JSON.stringify(role);
-    })
-    .filter(Boolean)
-    .join(', ') || '-';
-}
-
-function signatureVisualText(signature: WorkflowFormSignature) {
-  return [
-    signature.visual_mime_type,
-    signature.visual_file_size ? fileSizeText(signature.visual_file_size) : undefined,
-    signature.visual_storage_key ? 'tệp được bảo vệ' : undefined,
-  ].filter(Boolean).join(' · ') || '-';
-}
-
-function fileSizeText(value: number) {
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function signaturePurposeLabel(purpose?: string) {
-  switch (purpose) {
-    case 'prepared_by':
-      return 'Người lập';
-    case 'reviewed_by':
-      return 'Người rà soát';
-    case 'approved_by':
-      return 'Người phê duyệt';
-    case 'received_by':
-      return 'Người nhận';
-    case 'internal_ack':
-    default:
-      return 'Xác nhận nội bộ';
-  }
 }
 
 function WorkflowFieldControl({

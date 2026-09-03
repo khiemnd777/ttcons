@@ -2,6 +2,13 @@
 
 Use this as the mandatory central routing cache. It is not a replacement for reading code. If a mapping conflicts with code, trust code and update this file when the correction is durable.
 
+## Personal Signature Cards, Detail And Visual
+
+- Keywords: `Chữ ký cá nhân`, `Chi tiết chữ ký`, `Dấu ký`, `Phóng to`, signature thumbnail, signature audit. Owners: `frontend/src/modules/work-items/WorkflowFormPanel.tsx`, `WorkflowSignatureRecord.tsx`, `WorkflowSignatureDetailDialog.tsx`, `WorkflowSignatureVisual.tsx`, `workflowConfirmationPresentation.ts`; shared `frontend/src/lib/utils/protectedImagePreview.ts` and opt-in focus management in `frontend/src/components/Dialog.tsx`.
+- Personal signatures show a protected image thumbnail, captured signer/roles, full timestamp and revision; hash/storage details live under collapsed `Thông tin đối chiếu` with full-value copy. Detail and enlargement are two modes in one shared Dialog; full view offers zoom and fit. Historical actions open the same viewer and retain a previous-revision label. The snapshot signer name remains authoritative even when it is an email.
+- Image reads use the existing authenticated `/workflow-form-signatures/:id/visual` endpoint only while the signature surface is mounted. Preview state is scoped to actor/record/attempt; late responses are ignored and object URLs are released on close/change. Missing image, permission denial, transport/decode failure and retry states never erase signature metadata or imply a new verification result.
+- This is presentation-only: seal catalog/applications, immutable signatures, PDF selection/history and work-item gates keep their existing contracts. First searches: `WorkflowSignatureRecord|WorkflowSignatureDetailDialog|useWorkflowSignaturePreview|startProtectedImagePreview|manageFocus`. Detail contract and tests are in the frontend map; no new backend route or migration.
+
 ## Unified Accounting Work Queue
 
 - Default `Ưu tiên xử lý` (`sort=priority`) puts accounting_handoff before every other Công việc entry. Server `myWorkQueueOrderSQL` applies source precedence before pagination; frontend `orderedWorkListEntries` shares row/selection ordering and puts separately loaded startup/workflow actions after handoffs. Explicit due_asc/newest and legacy WorkItem ordering remain unchanged.

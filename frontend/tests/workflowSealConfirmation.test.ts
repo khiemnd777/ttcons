@@ -9,6 +9,7 @@ async function source(path: string) {
 test('workflow confirmation UI separates personal signatures from company seals', async () => {
   const dialog = await source('../src/modules/work-items/SignatureCaptureDialog.tsx');
   const panel = await source('../src/modules/work-items/WorkflowFormPanel.tsx');
+  const signatureRecord = await source('../src/modules/work-items/WorkflowSignatureRecord.tsx');
   const presentation = await source('../src/modules/work-items/workItemPresentation.ts');
 
   assert.match(dialog, /title="Thêm xác nhận hồ sơ"/);
@@ -23,7 +24,8 @@ test('workflow confirmation UI separates personal signatures from company seals'
   assert.match(panel, /buildConfirmationPurposeGroups/);
   assert.match(panel, /\/pdf-confirmation-preference/);
   assert.match(panel, /Hiển thị trong PDF/);
-  assert.match(panel, /statusLabel="Đã ký"/);
+  assert.match(panel, /<WorkflowSignatureRecord/);
+  assert.match(signatureRecord, /Đã ký/);
   assert.match(panel, /statusLabel="Đã đóng dấu"/);
   assert.match(panel, /Cần ít nhất một loại xác nhận/);
   assert.match(panel, /post<WorkflowFormDetail>\(`\/workflow-form-instances\/\$\{instance\?\.id\}\/pdf-exports`, \{\}\)/);
