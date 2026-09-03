@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ArrowDownToLine,
   BarChart3,
   BriefcaseBusiness,
   Building2,
@@ -11,6 +10,7 @@ import {
   FileClock,
   FileText,
   GitBranch,
+  Handshake,
   Kanban,
   LayoutDashboard,
   LogOut,
@@ -66,7 +66,7 @@ const navGroups: NavGroup[] = [
   {
     title: 'Quản trị',
     items: [
-      { to: '/core-data', label: 'Đối tác', icon: ArrowDownToLine, permissions: ['catalog.view'] },
+      { to: '/core-data', label: 'Đối tác', icon: Handshake, permissions: ['catalog.view'] },
       { to: '/warehouse?tab=materials', label: 'Vật tư', icon: PackageCheck, permissions: ['material.view'], excludePermissions: ['warehouse.view'] },
       { to: '/warehouse', label: 'Kho vật tư', icon: Warehouse, permissions: ['warehouse.view'] },
       { to: '/staff', label: 'Nhân sự', icon: Users, permissions: ['staff.view'], excludePermissions: ['project.reconciliation.view'] },
