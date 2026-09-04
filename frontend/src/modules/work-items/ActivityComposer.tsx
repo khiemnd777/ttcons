@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronUp, Loader2, MessageSquarePlus, Plus, Send, X } from 'lucide-react';
+import { AtSign, ChevronUp, Link2, Loader2, MessageSquarePlus, Plus, Send, Users, X } from 'lucide-react';
 import clsx from 'clsx';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
@@ -87,6 +87,7 @@ export function ActivityComposer({
   mentionOptions = [],
   defaultExpanded = false,
   variant = 'card',
+  density = 'comfortable',
   replyTo,
   editItem,
   onCancelReply,
@@ -102,6 +103,7 @@ export function ActivityComposer({
   mentionOptions?: ActivityMentionOption[];
   defaultExpanded?: boolean;
   variant?: 'card' | 'chat';
+  density?: 'comfortable' | 'compact';
   replyTo?: WorkItemActivity | null;
   editItem?: WorkItemActivity | null;
   onCancelReply?: () => void;
@@ -128,6 +130,7 @@ export function ActivityComposer({
   const [attachments, setAttachments] = useState<ActivityAttachmentPayload[]>([]);
   const [touched, setTouched] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
   const navigateToValidation = useValidationNavigation(formRef);
 
   const activityOptions = useMemo(() => {
@@ -152,12 +155,25 @@ export function ActivityComposer({
   const availableTargetScopeOptions = targetScopeOptions.filter((option) => option.value === 'project' || targetOptions.some((target) => target.scope_type === option.value));
   const visibleAttachmentOptions = attachmentOptions.filter((option) => option.type === referenceType);
   const visibleMentionOptions = mentionOptions.filter((option) => option.type === mentionType);
+  const selectedTargetOption = targetOptions.find((option) => option.scope_type === targetScope && option.scope_id === targetId);
+  const targetSummary = targetScope === 'project'
+    ? enumLabel('scope_type', 'project')
+    : selectedTargetOption?.label ?? targetScopeOptions.find((option) => option.value === targetScope)?.label ?? 'Chọn đối tượng';
 
   useEffect(() => {
     if (!editItem) return;
     setComment(editItem.comment ?? '');
     setTouched(false);
   }, [editItem?.id]);
+
+  useEffect(() => {
+    if (variant !== 'chat' || density !== 'compact' || !commentInputRef.current) return;
+    const input = commentInputRef.current;
+    input.style.height = 'auto';
+    const nextHeight = Math.min(Math.max(input.scrollHeight, 44), 112);
+    input.style.height = `${nextHeight}px`;
+    input.style.overflowY = input.scrollHeight > 112 ? 'auto' : 'hidden';
+  }, [comment, density, variant]);
 
   function addMention() {
     const id = mentionId.trim();
@@ -260,6 +276,199 @@ export function ActivityComposer({
     setAttachments([]);
     setTouched(false);
     if (variant === 'card') setExpanded(false);
+  }
+
+  if (variant === 'chat' && density === 'compact') {
+    return (
+      <form ref={formRef} className="space-y-1.5" onSubmit={submit} noValidate>
+        {editing && editItem ? (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-left">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-amber-800">Đang chỉnh sửa · {compactDateTime(editItem.created_at)}</p>
+              <p className="truncate text-[11px] text-slate-500">Phạm vi và đối tượng không đổi</p>
+            </div>
+            <button type="button" className="rounded-md p-1 text-slate-500 hover:bg-white" onClick={onCancelEdit} aria-label="Hủy chỉnh sửa"><X className="h-3.5 w-3.5" /></button>
+          </div>
+        ) : null}
+        {replying && replyTo ? (
+          <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-left">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-blue-800">Trả lời {identityReferenceText(replyTo.actor_name, replyTo.actor_account_deleted, 'thành viên công trình')}</p>
+              <p className="line-clamp-1 text-[11px] text-slate-600">{replyTo.comment || activityLabelForReply(replyTo.activity_type)}</p>
+            </div>
+            <button type="button" className="rounded-md p-1 text-slate-500 hover:bg-white" onClick={onCancelReply} aria-label="Hủy trả lời"><X className="h-3.5 w-3.5" /></button>
+          </div>
+        ) : null}
+
+        <div
+          data-validation-key="comment"
+          data-validation-error={missingComment ? 'true' : undefined}
+          className={clsx(
+            'rounded-xl border bg-white shadow-sm focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100',
+            missingComment ? 'border-amber-300' : 'border-line',
+          )}
+        >
+          {!lockedContext && allowTarget ? (
+            <div className="flex min-h-8 items-center border-b border-line px-2">
+              <details
+                data-validation-key={targetScope !== 'project' ? 'target_id' : undefined}
+                data-validation-error={missingTarget ? 'true' : undefined}
+                className="group relative min-w-0"
+              >
+                <summary className={clsx(
+                  'flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold hover:bg-slate-50',
+                  missingTarget ? 'text-amber-700' : 'text-slate-500',
+                )}>
+                  <Link2 className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">Gắn vào: {targetSummary}</span>
+                  <span aria-hidden="true" className="text-[9px] text-slate-400">▼</span>
+                </summary>
+                <div className="absolute bottom-full left-0 z-30 mb-1 w-[min(20rem,calc(100vw-2rem))] space-y-2 rounded-lg border border-line bg-white p-2 shadow-xl">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Gắn vào</p>
+                  <select
+                    className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-xs font-semibold text-slate-600"
+                    value={targetScope}
+                    onChange={(event) => {
+                      setTargetScope(event.target.value);
+                      setTargetId('');
+                    }}
+                  >
+                    {availableTargetScopeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                  {targetScope !== 'project' ? (
+                    visibleTargetOptions.length ? (
+                      <select
+                        className={clsx(
+                          'w-full rounded-md border bg-white px-2.5 py-2 text-xs font-semibold text-slate-600',
+                          missingTarget ? 'border-amber-300 bg-amber-50' : 'border-line',
+                        )}
+                        value={targetId}
+                        aria-invalid={missingTarget}
+                        onChange={(event) => setTargetId(event.target.value)}
+                      >
+                        <option value="">Chọn đối tượng</option>
+                        {visibleTargetOptions.map((option) => <option key={`${option.scope_type}:${option.scope_id}`} value={option.scope_id}>{option.label}</option>)}
+                      </select>
+                    ) : <p className="rounded-md border border-dashed border-line bg-slate-50 px-2.5 py-2 text-xs text-slate-500">Chưa có đối tượng phù hợp</p>
+                  ) : null}
+                </div>
+              </details>
+            </div>
+          ) : null}
+
+          {!lockedContext && (showsDueAt || effectiveActivityType === 'decision' || needsReference) ? (
+            <div className="grid gap-1.5 border-b border-line bg-slate-50 p-1.5 sm:grid-cols-2">
+              {showsDueAt ? (
+                <label data-validation-key="due_at" data-validation-error={missingDueAt ? 'true' : undefined} className="block rounded-md">
+                  <span className="sr-only">{activityType === 'reminder' ? 'Ngày nhắc' : 'Hạn điểm chặn'}</span>
+                  <input
+                    className={clsx('h-8 w-full rounded-md border bg-white px-2 text-xs text-slate-600', missingDueAt ? 'border-amber-300 bg-amber-50' : 'border-line')}
+                    type="date"
+                    aria-invalid={missingDueAt}
+                    value={dueAt}
+                    onChange={(event) => setDueAt(event.target.value)}
+                    title={activityType === 'reminder' ? 'Ngày nhắc' : 'Hạn điểm chặn'}
+                  />
+                </label>
+              ) : null}
+              {effectiveActivityType === 'blocker' || effectiveActivityType === 'decision' ? (
+                <label className="block">
+                  <span className="sr-only">Người phụ trách</span>
+                  <select className="h-8 w-full rounded-md border border-line bg-white px-2 text-xs text-slate-600" value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>
+                    <option value="">Phụ trách: Chưa chỉ định</option>
+                    {mentionOptions.filter((option) => option.type === 'staff').map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                  </select>
+                </label>
+              ) : null}
+              {needsReference ? (
+                <div data-validation-key="reference" data-validation-error={missingReference ? 'true' : undefined} className={clsx('grid gap-1.5 rounded-md sm:col-span-2 sm:grid-cols-[100px_minmax(0,1fr)_32px]', missingReference && 'ring-1 ring-amber-300')}>
+                  <select className="h-8 rounded-md border border-line bg-white px-2 text-xs text-slate-600" value={referenceType} onChange={(event) => { setReferenceType(event.target.value as AttachmentType); setReferenceId(''); setReferenceLabel(''); }} aria-label="Loại tệp đính kèm">
+                    {attachmentTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                  <select className="h-8 min-w-0 rounded-md border border-line bg-white px-2 text-xs text-slate-600" value={referenceId} onChange={(event) => { const selected = visibleAttachmentOptions.find((option) => option.id === event.target.value); setReferenceId(event.target.value); setReferenceLabel(selected?.label ?? ''); }} aria-label="Chọn tệp đính kèm">
+                    <option value="">Chọn tệp đính kèm</option>
+                    {visibleAttachmentOptions.map((option) => <option key={`${option.type}:${option.id}`} value={option.id}>{option.label}</option>)}
+                  </select>
+                  <button type="button" className="inline-flex h-8 items-center justify-center rounded-md border border-line bg-white text-slate-600 hover:bg-slate-100" onClick={addAttachment} aria-label="Thêm tệp đính kèm"><Plus className="h-3.5 w-3.5" /></button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {!editing && (mentions.length || attachments.length) ? (
+            <div className="flex flex-wrap gap-1 border-b border-line px-2 py-1.5">
+              {mentions.map((mention) => (
+                <span key={`${mention.type}:${mention.id}`} className="inline-flex max-w-full items-center gap-1 rounded-md bg-blue-50 px-1.5 py-1 text-[11px] font-semibold text-blue-700">
+                  <span className="truncate">@{mention.label || mention.id}</span>
+                  <button type="button" className="rounded p-0.5 hover:bg-blue-100" onClick={() => setMentions((current) => current.filter((item) => !(item.type === mention.type && item.id === mention.id)))} aria-label="Gỡ người được nhắc"><X className="h-3 w-3" /></button>
+                </span>
+              ))}
+              {attachments.map((attachment) => (
+                <span key={`${attachment.type}:${attachment.id}`} className="inline-flex max-w-full items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-1 text-[11px] font-semibold text-emerald-700">
+                  <span className="truncate">{attachment.label || attachment.id}</span>
+                  <button type="button" className="rounded p-0.5 hover:bg-emerald-100" onClick={() => setAttachments((current) => current.filter((item) => !(item.type === attachment.type && item.id === attachment.id)))} aria-label="Gỡ tệp đính kèm"><X className="h-3 w-3" /></button>
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <textarea
+            ref={commentInputRef}
+            className="block min-h-11 max-h-28 w-full resize-none bg-transparent px-3 py-2 text-sm leading-5 outline-none"
+            value={comment}
+            aria-invalid={missingComment}
+            onBlur={() => setTouched(true)}
+            onChange={(event) => setComment(event.target.value)}
+            placeholder={editing ? 'Nhập nội dung chỉnh sửa...' : replying ? `Trả lời ${identityReferenceText(replyTo?.actor_name, replyTo?.actor_account_deleted, 'thành viên công trình')}...` : 'Nhắn vào thảo luận công trình...'}
+          />
+
+          <div className="flex h-10 min-w-0 items-center gap-1 border-t border-line px-1.5">
+            {editing ? <span className="shrink-0 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">✎ Chỉnh sửa</span> : replying ? <span className="shrink-0 rounded-md bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">↩ Phản hồi</span> : (
+              <label className="min-w-0 shrink">
+                <span className="sr-only">Loại trao đổi</span>
+                <select className="h-7 max-w-28 rounded-md border-0 bg-slate-100 px-1.5 text-[11px] font-semibold text-slate-600 sm:max-w-36" value={activityType} onChange={(event) => setActivityType(event.target.value as ActivityType)}>
+                  {activityOptions.map((option) => <option key={option.value} value={option.value}>＋ {option.label}</option>)}
+                </select>
+              </label>
+            )}
+            {!editing ? (
+              <details className="relative shrink-0">
+                <summary className="flex h-7 cursor-pointer list-none items-center gap-1 rounded-md px-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100" aria-label="Nhắc đến thành viên hoặc vai trò">
+                  <AtSign className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Nhắc{mentions.length ? ` ${mentions.length}` : ''}</span>
+                </summary>
+                <div data-validation-key="mention" className="absolute bottom-9 left-0 z-30 w-[min(18rem,calc(100vw-2rem))] space-y-2 rounded-lg border border-line bg-white p-2 shadow-xl">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Nhắc đến</p>
+                  <select className="w-full rounded-md border border-line px-2 py-2 text-xs" value={mentionType} onChange={(event) => { setMentionType(event.target.value as MentionType); setMentionId(''); setMentionLabel(''); }}>
+                    {mentionTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                  <div className="flex gap-1.5">
+                    <select className="min-w-0 flex-1 rounded-md border border-line px-2 py-2 text-xs" value={mentionId} onChange={(event) => { const selected = visibleMentionOptions.find((option) => option.id === event.target.value); setMentionId(event.target.value); setMentionLabel(selected?.label ?? ''); }}>
+                      <option value="">Chọn người hoặc vai trò</option>
+                      {visibleMentionOptions.map((option) => <option key={`${option.type}:${option.id}`} value={option.id}>{option.label}{option.description ? ` · ${option.description}` : ''}</option>)}
+                    </select>
+                    <button type="button" className="inline-flex w-8 items-center justify-center rounded-md border border-line text-slate-600 hover:bg-slate-50" onClick={addMention} aria-label="Thêm người được nhắc"><Plus className="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+              </details>
+            ) : null}
+            {editing ? <span className="min-w-0 flex-1 truncate rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">Phạm vi không đổi</span> : replying ? <span className="min-w-0 flex-1 truncate rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600" title="Phạm vi xem được kế thừa từ tin gốc">{visibilityOptions.find((option) => option.value === replyTo?.visibility)?.label ?? replyTo?.visibility}</span> : (
+              <label className="relative min-w-0 flex-1">
+                <span className="sr-only">Ai có thể xem</span>
+                <Users className="pointer-events-none absolute left-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+                <select className="h-7 w-full min-w-0 rounded-md border-0 bg-slate-100 pl-6 pr-1 text-[11px] font-semibold text-slate-600" value={visibility} onChange={(event) => setVisibility(event.target.value as Visibility)}>
+                  {visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+            )}
+            {editing && !editCommentChanged ? <span className="sr-only">Chưa có thay đổi</span> : null}
+            <button className={clsx('ml-auto inline-flex h-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60', editing ? 'gap-1.5 px-3 text-xs font-semibold' : 'w-8')} type="submit" disabled={submitting || (editing && !editCommentChanged)} aria-label={editing ? 'Lưu chỉnh sửa' : 'Gửi trao đổi'}>
+              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : editing ? 'Lưu' : <Send className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        </div>
+      </form>
+    );
   }
 
   if (variant === 'chat') {

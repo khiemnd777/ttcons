@@ -101,6 +101,27 @@ func (h *Handler) MyWorkflowActions(c *fiber.Ctx) error {
 	return response.OK(c, actions)
 }
 
+func (h *Handler) MyProjectDiscussions(c *fiber.Ctx) error {
+	limit := 0
+	if rawLimit := strings.TrimSpace(c.Query("limit")); rawLimit != "" {
+		parsed, err := strconv.Atoi(rawLimit)
+		if err != nil {
+			return validationError("limit không hợp lệ", Record{"limit": rawLimit})
+		}
+		limit = parsed
+	}
+	page, err := h.service.MyProjectDiscussions(c.Context(), ProjectDiscussionFilter{
+		ProjectID: c.Query("project_id"),
+		Search:    c.Query("search"),
+		Cursor:    c.Query("cursor"),
+		Limit:     limit,
+	}, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, page)
+}
+
 func (h *Handler) MyActivityAttention(c *fiber.Ctx) error {
 	items, err := h.service.MyActivityAttention(c.Context(), ActivityAttentionFilter{
 		Queue:     c.Query("queue"),
@@ -193,6 +214,18 @@ func (h *Handler) AddProjectActivity(c *fiber.Ctx) error {
 
 func (h *Handler) MarkProjectActivityRead(c *fiber.Ctx) error {
 	result, err := h.service.MarkProjectActivityRead(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result)
+}
+
+func (h *Handler) MarkProjectDiscussionReadThrough(c *fiber.Ctx) error {
+	req := ProjectDiscussionReadRequest{}
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đánh dấu đã đọc không hợp lệ")
+	}
+	result, err := h.service.MarkProjectDiscussionReadThrough(c.Context(), c.Params("id"), req, actorID(c))
 	if err != nil {
 		return err
 	}

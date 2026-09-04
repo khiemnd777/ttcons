@@ -922,6 +922,7 @@ func (r *Repository) ProjectOperationsVisibleProjectIDs(ctx context.Context, use
 				)
 				AND (
 					$2::boolean
+					OR p.created_by=$3
 					OR EXISTS (
 						SELECT 1
 						FROM project_members pm

@@ -132,6 +132,17 @@ type ProjectActivityFilter struct {
 	Limit           int
 }
 
+type ProjectDiscussionFilter struct {
+	ProjectID string
+	Search    string
+	Cursor    string
+	Limit     int
+}
+
+type ProjectDiscussionReadRequest struct {
+	ActivityID string `json:"activity_id"`
+}
+
 type ProjectEvidenceFilter struct {
 	EvidenceType    string
 	Status          string

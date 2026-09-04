@@ -274,13 +274,14 @@ func TestActivityMentionsUnreadAndRoleScope(t *testing.T) {
 	reporterRoleID := ensureRole(t, db, "batch3_reporter_"+suffix[:8], "Batch3 Reporter")
 	pmRoleID := ensureRole(t, db, "batch3_pm_"+suffix[:8], "Batch3 PM")
 	operationViewID := ensurePermission(t, db, "operation.view", "Xem thi công", "operation")
+	reconciliationViewID := ensurePermission(t, db, "project.reconciliation.view", "Xem đối soát công trình", "project")
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id IN ($1,$2,$3)`, actorStaffID, pmStaffID, outsideStaffID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id IN ($1,$2,$3)`, actorUserID, pmUserID, outsideUserID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id IN ($1,$2)`, reporterRoleID, pmRoleID)
 	})
-	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$3),($2,$3) ON CONFLICT DO NOTHING`, reporterRoleID, pmRoleID, operationViewID)
+	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$3),($2,$3),($2,$4) ON CONFLICT DO NOTHING`, reporterRoleID, pmRoleID, operationViewID, reconciliationViewID)
 	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Mention Actor','active'),($3,$4,'demo:pw','Mention PM','active'),($5,$6,'demo:pw','Outside PM','active')`,
 		actorUserID, "mention-actor-"+suffix+"@test.local", pmUserID, "mention-pm-"+suffix+"@test.local", outsideUserID, "mention-outside-"+suffix+"@test.local")
 	mustExec(t, db, `INSERT INTO staff (id, user_id, full_name, email, department, position, status) VALUES ($1,$2,'Mention Actor',$3,'Site','Reporter','active'),($4,$5,'Mention PM',$6,'Site','PM','active'),($7,$8,'Outside PM',$9,'Site','PM','active')`,
@@ -352,6 +353,55 @@ func TestActivityMentionsUnreadAndRoleScope(t *testing.T) {
 	if number(summary["questions"]) != 1 || number(summary["unread"]) != 1 {
 		t.Fatalf("activity summary = %#v", summary)
 	}
+	if number(summary["discussion_unread"]) != 1 {
+		t.Fatalf("discussion unread summary = %#v, want 1", summary)
+	}
+	discussionPage, err := service.MyProjectDiscussions(ctx, ProjectDiscussionFilter{ProjectID: projectID}, pmUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	discussionItems, _ := discussionPage["items"].([]Record)
+	if len(discussionItems) != 1 || number(discussionPage["unread_total"]) != 1 || number(discussionItems[0]["unread_count"]) != 1 {
+		t.Fatalf("project discussion page before read = %#v", discussionPage)
+	}
+	if canPost, ok := discussionItems[0]["can_post"].(bool); !ok || !canPost {
+		t.Fatalf("project member can_post = %#v, want boolean true", discussionItems[0]["can_post"])
+	}
+	observerDiscussionPage, err := service.MyProjectDiscussions(ctx, ProjectDiscussionFilter{ProjectID: projectID}, outsideUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observerDiscussionItems, _ := observerDiscussionPage["items"].([]Record)
+	if len(observerDiscussionItems) != 1 {
+		t.Fatalf("company observer discussion page = %#v", observerDiscussionPage)
+	}
+	if canPost, ok := observerDiscussionItems[0]["can_post"].(bool); !ok || canPost {
+		t.Fatalf("company observer can_post = %#v, want boolean false", observerDiscussionItems[0]["can_post"])
+	}
+	if _, err := service.MarkProjectDiscussionReadThrough(ctx, projectID, ProjectDiscussionReadRequest{ActivityID: activityID}, pmUserID); err != nil {
+		t.Fatal(err)
+	}
+	discussionPage, err = service.MyProjectDiscussions(ctx, ProjectDiscussionFilter{ProjectID: projectID}, pmUserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	discussionItems, _ = discussionPage["items"].([]Record)
+	if len(discussionItems) != 1 || number(discussionPage["unread_total"]) != 0 || number(discussionItems[0]["unread_count"]) != 0 {
+		t.Fatalf("project discussion page after read = %#v", discussionPage)
+	}
+	laterActivityID := newID()
+	mustExec(t, db, `
+		INSERT INTO work_item_activities (id,project_id,scope_type,scope_id,actor_id,activity_type,comment,visibility,metadata_json,created_at)
+		SELECT $1,$2,'project',$2,$3,'comment','Trao đổi mới hơn','project','{}'::jsonb,created_at + INTERVAL '1 second'
+		FROM work_item_activities WHERE id=$4
+	`, laterActivityID, projectID, actorUserID, activityID)
+	if _, err := service.MarkProjectDiscussionReadThrough(ctx, projectID, ProjectDiscussionReadRequest{ActivityID: laterActivityID}, pmUserID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.MarkProjectDiscussionReadThrough(ctx, projectID, ProjectDiscussionReadRequest{ActivityID: activityID}, pmUserID); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM project_discussion_read_cursors WHERE project_id=$1 AND user_id=$2 AND last_read_activity_id=$3`, 1, projectID, pmUserID, laterActivityID)
 	options, err := service.ProjectActivityOptions(ctx, projectID, actorUserID)
 	if err != nil {
 		t.Fatal(err)

@@ -67,6 +67,7 @@ const emptySummary: ProjectActivitySummary = {
   system: 0,
   decisions: 0,
   unread: 0,
+  discussion_unread: 0,
   mentioned: 0,
   questions: 0,
   blockers: 0,

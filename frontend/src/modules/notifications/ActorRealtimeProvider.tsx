@@ -58,6 +58,8 @@ export function ActorRealtimeProvider({ children }: { children: ReactNode }) {
         }
         if (message.event === 'attention_changed') {
           void queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
+          void queryClient.invalidateQueries({ queryKey: ['project-discussions'] });
+          void queryClient.invalidateQueries({ queryKey: ['utility-project-activity'] });
         }
       },
     });

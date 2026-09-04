@@ -31,6 +31,7 @@ import { useAuth } from '../lib/auth/AuthContext';
 import { roleSummary } from '../lib/utils/roles';
 import { NotificationPanel } from '../modules/notifications/NotificationPanel';
 import { useShellIndicators } from '../modules/notifications/useShellIndicators';
+import { UtilityDock } from '../modules/utilities/UtilityDock';
 
 type NavItem = {
   to: string;
@@ -152,6 +153,7 @@ export function AppShell() {
     return (
       <div className="min-h-screen bg-surface">
         <Outlet />
+        <UtilityDock key="global-utility-dock" />
       </div>
     );
   }
@@ -284,6 +286,7 @@ export function AppShell() {
           <PoweredBySignature />
         </footer>
       </div>
+      <UtilityDock key="global-utility-dock" />
     </div>
   );
 }

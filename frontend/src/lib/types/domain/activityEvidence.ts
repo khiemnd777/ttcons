@@ -20,6 +20,7 @@ export type WorkItemActivity = ProjectOperationsRecord & {
   mentioned_me?: boolean;
   read_at?: string;
   is_unread?: boolean;
+  is_discussion_unread?: boolean;
   queue_types?: string[];
   attachments?: ActivityAttachmentSummary[];
   parent_activity_id?: string;
@@ -92,11 +93,32 @@ export type ProjectActivitySummary = {
   system: number;
   decisions: number;
   unread: number;
+  discussion_unread: number;
   mentioned: number;
   questions: number;
   blockers: number;
   reminders: number;
   attention: number;
+};
+
+export type ProjectDiscussionProject = {
+  project_id: string;
+  project_code: string;
+  project_name: string;
+  unread_count: number;
+  latest_activity_id?: string;
+  latest_activity_at?: string;
+  latest_comment?: string;
+  latest_actor_name?: string;
+  can_post: boolean;
+};
+
+export type ProjectDiscussionPage = {
+  items: ProjectDiscussionProject[];
+  unread_total: number;
+  total: number;
+  has_more: boolean;
+  next_cursor?: string;
 };
 
 export type ProjectActivityFeed = {

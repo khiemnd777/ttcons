@@ -1317,6 +1317,15 @@ func (r *Repository) ProjectActivitySummary(ctx context.Context, projectID strin
 		visibilitySQL = "wia.visibility='client'"
 	}
 	unread := "(wia.withdrawn_at IS NULL AND ars.user_id IS NOT NULL AND ars.read_at IS NULL)"
+	discussionUnread := fmt.Sprintf(`(
+		wia.withdrawn_at IS NULL
+		AND wia.activity_type IN (%s)
+		AND wia.actor_id IS DISTINCT FROM $2::uuid
+		AND (
+			discussion_cursor.last_read_created_at IS NULL
+			OR (wia.created_at, wia.id) > (discussion_cursor.last_read_created_at, COALESCE(discussion_cursor.last_read_activity_id, '00000000-0000-0000-0000-000000000000'::uuid))
+		)
+	)`, projectDiscussionActivityTypesSQL)
 	mentioned := "(wia.withdrawn_at IS NULL AND COALESCE(mention_state.mentioned_me, false))"
 	openQuestion := "(wia.activity_type='question' AND COALESCE(wia.metadata_json->>'answered_at', wia.metadata_json->>'resolved_at', wia.metadata_json->>'closed_at', '')='')"
 	openBlocker := "(wia.activity_type='blocker' AND COALESCE(wia.metadata_json->>'resolved_at', wia.metadata_json->>'closed_at', '')='')"
@@ -1328,6 +1337,7 @@ func (r *Repository) ProjectActivitySummary(ctx context.Context, projectID strin
 			COUNT(*) FILTER (WHERE wia.activity_type NOT IN ('comment','status','blocker','question','decision','reminder','file_note')) AS system,
 			COUNT(*) FILTER (WHERE wia.activity_type='decision') AS decisions,
 			COUNT(*) FILTER (WHERE %s) AS unread,
+			COUNT(*) FILTER (WHERE %s) AS discussion_unread,
 			COUNT(*) FILTER (WHERE %s) AS mentioned,
 			COUNT(*) FILTER (WHERE %s) AS questions,
 			COUNT(*) FILTER (WHERE %s) AS blockers,
@@ -1336,6 +1346,7 @@ func (r *Repository) ProjectActivitySummary(ctx context.Context, projectID strin
 		FROM work_item_activities wia
 		LEFT JOIN work_items wi ON wi.id=wia.work_item_id
 		LEFT JOIN activity_read_states ars ON ars.activity_id=wia.id AND ars.user_id=$2
+		LEFT JOIN project_discussion_read_cursors discussion_cursor ON discussion_cursor.project_id=wia.project_id AND discussion_cursor.user_id=$2
 		LEFT JOIN LATERAL (
 			SELECT bool_or(am.recipient_user_id=$2) AS mentioned_me
 			FROM activity_mentions am
@@ -1345,7 +1356,7 @@ func (r *Repository) ProjectActivitySummary(ctx context.Context, projectID strin
 		  AND (wi.id IS NULL OR wi.status <> 'cancelled')
 		  AND (%s)
 		  AND (wia.scope_type <> 'work_item' OR (wi.id IS NOT NULL AND (%s)))
-	`, unread, mentioned, openQuestion, openBlocker, dueReminder, unread, openQuestion, openBlocker, dueReminder, visibilitySQL, workItemScopeSQL("wi", 3)), args...)
+	`, unread, discussionUnread, mentioned, openQuestion, openBlocker, dueReminder, unread, openQuestion, openBlocker, dueReminder, visibilitySQL, workItemScopeSQL("wi", 3)), args...)
 }
 
 func (r *Repository) ProjectActivityOptions(ctx context.Context, projectID string, profile workItemAccessProfile) (Record, error) {
@@ -1549,6 +1560,15 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 			%s,
 			ars.read_at,
 				(wia.withdrawn_at IS NULL AND ars.user_id IS NOT NULL AND ars.read_at IS NULL) AS is_unread,
+				(
+					wia.withdrawn_at IS NULL
+					AND wia.activity_type IN (%s)
+					AND wia.actor_id IS DISTINCT FROM $2::uuid
+					AND (
+						discussion_cursor.last_read_created_at IS NULL
+						OR (wia.created_at, wia.id) > (discussion_cursor.last_read_created_at, COALESCE(discussion_cursor.last_read_activity_id, '00000000-0000-0000-0000-000000000000'::uuid))
+					)
+				) AS is_discussion_unread,
 			COALESCE(
 				CASE
 					WHEN wia.scope_type='project' THEN p.code || ' · ' || p.name
@@ -1573,6 +1593,7 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 		%s
 		%s
 		LEFT JOIN activity_read_states ars ON ars.activity_id=wia.id AND ars.user_id=$2
+		LEFT JOIN project_discussion_read_cursors discussion_cursor ON discussion_cursor.project_id=wia.project_id AND discussion_cursor.user_id=$2
 		LEFT JOIN LATERAL (
 			SELECT
 				jsonb_agg(jsonb_build_object(
@@ -1597,7 +1618,7 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 		WHERE %s
 		ORDER BY wia.created_at DESC, wia.id DESC
 		LIMIT $%d
-		`, activityAttachmentSelectSQL(), activityConversationSelectSQL("$2"), activityAttachmentJoinSQL(), activityConversationJoinSQL("$2"), strings.Join(conditions, " AND "), limitPlaceholder), args...)
+		`, activityAttachmentSelectSQL(), activityConversationSelectSQL("$2"), projectDiscussionActivityTypesSQL, activityAttachmentJoinSQL(), activityConversationJoinSQL("$2"), strings.Join(conditions, " AND "), limitPlaceholder), args...)
 }
 
 func profileIsClient(profile workItemAccessProfile) bool {
