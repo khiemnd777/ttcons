@@ -78,6 +78,39 @@ const attachmentTypeOptions: Array<{ value: AttachmentType; label: string }> = [
   { value: 'document', label: enumLabel('attachment_type', 'document') },
 ];
 
+function useDismissableDisclosure() {
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !detailsRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      setOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  return {
+    detailsRef,
+    open,
+    toggle: () => setOpen((current) => !current),
+  };
+}
+
 export function ActivityComposer({
   mode,
   submitting,
@@ -131,6 +164,8 @@ export function ActivityComposer({
   const [touched, setTouched] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const targetDisclosure = useDismissableDisclosure();
+  const mentionDisclosure = useDismissableDisclosure();
   const navigateToValidation = useValidationNavigation(formRef);
 
   const activityOptions = useMemo(() => {
@@ -311,14 +346,23 @@ export function ActivityComposer({
           {!lockedContext && allowTarget ? (
             <div className="flex min-h-8 items-center border-b border-line px-2">
               <details
+                ref={targetDisclosure.detailsRef}
+                open={targetDisclosure.open}
                 data-validation-key={targetScope !== 'project' ? 'target_id' : undefined}
                 data-validation-error={missingTarget ? 'true' : undefined}
                 className="group relative min-w-0"
               >
-                <summary className={clsx(
-                  'flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold hover:bg-slate-50',
-                  missingTarget ? 'text-amber-700' : 'text-slate-500',
-                )}>
+                <summary
+                  className={clsx(
+                    'flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-semibold hover:bg-slate-50',
+                    missingTarget ? 'text-amber-700' : 'text-slate-500',
+                  )}
+                  aria-expanded={targetDisclosure.open}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    targetDisclosure.toggle();
+                  }}
+                >
                   <Link2 className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">Gắn vào: {targetSummary}</span>
                   <span aria-hidden="true" className="text-[9px] text-slate-400">▼</span>
@@ -432,8 +476,16 @@ export function ActivityComposer({
               </label>
             )}
             {!editing ? (
-              <details className="relative shrink-0">
-                <summary className="flex h-7 cursor-pointer list-none items-center gap-1 rounded-md px-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100" aria-label="Nhắc đến thành viên hoặc vai trò">
+              <details ref={mentionDisclosure.detailsRef} open={mentionDisclosure.open} className="relative shrink-0">
+                <summary
+                  className="flex h-7 cursor-pointer list-none items-center gap-1 rounded-md px-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
+                  aria-label="Nhắc đến thành viên hoặc vai trò"
+                  aria-expanded={mentionDisclosure.open}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    mentionDisclosure.toggle();
+                  }}
+                >
                   <AtSign className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Nhắc{mentions.length ? ` ${mentions.length}` : ''}</span>
                 </summary>

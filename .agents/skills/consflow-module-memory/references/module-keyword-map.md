@@ -23,6 +23,11 @@ Use this as the mandatory central routing cache. It is not a replacement for rea
 - Keep the `Nghiệp vụ Kế toán` tab and `/me/accounting-handoffs` specialized view. Both use the same canonical actions. `work_total` includes pending accounting; `accounting_total` is its breakdown, never added again to navigation `total`.
 - Accounting observer global `/accounting` menu is hidden; the route and `/projects/:id/accounting` register remain available. First searches: `MyWorkQueue|myWorkQueueSQL|accountingWorkSelectSQL|useAccountingWorkActions|WorkQueueEntry` in the owners above. See matching backend/frontend and accounting/workflow domain maps.
 
+## Utility Dock Compact Composer Dismissal
+
+- Keywords: `Gắn vào`, `Nhắc`, popup không đóng, click bên ngoài, Escape thu nhỏ Dock. Owner: `frontend/src/modules/work-items/ActivityComposer.tsx`; focused regression: `frontend/tests/utilityDock.test.ts`.
+- Compact Activity Composer controls both floating disclosures with per-instance state and refs. A document `pointerdown` listener exists only while the disclosure is open, closes it only for an outside target, and preserves draft plus current target/mention selection. `Escape` closes the disclosure and stops propagation before the global Utility Dock handler, so it does not also minimize a conversation. Multiple mounted project composers remain isolated. First searches: `useDismissableDisclosure|targetDisclosure|mentionDisclosure|handlePointerDown|stopPropagation`.
+
 ## Durable Memory Sources
 
 - Durable repo rules: `AGENTS.md`.

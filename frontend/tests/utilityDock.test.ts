@@ -95,6 +95,13 @@ test('Utility Dock keeps discussion unread separate and reuses canonical work so
   assert.match(composer, /Math\.min\(Math\.max\(input\.scrollHeight, 44\), 112\)/);
   assert.match(composer, /Gắn vào: \{targetSummary\}/);
   assert.match(composer, /Nhắc đến thành viên hoặc vai trò/);
+  assert.match(composer, /function useDismissableDisclosure\(\)/);
+  assert.match(composer, /const targetDisclosure = useDismissableDisclosure\(\)/);
+  assert.match(composer, /const mentionDisclosure = useDismissableDisclosure\(\)/);
+  assert.match(composer, /ref=\{targetDisclosure\.detailsRef\}\s+open=\{targetDisclosure\.open\}/);
+  assert.match(composer, /ref=\{mentionDisclosure\.detailsRef\}\s+open=\{mentionDisclosure\.open\}/);
+  assert.match(composer, /document\.addEventListener\('pointerdown', handlePointerDown\)/);
+  assert.match(composer, /event\.key !== 'Escape'[\s\S]*event\.stopPropagation\(\)[\s\S]*setOpen\(false\)/);
   assert.match(dock, /workSummary\.data\?\.work_total/);
   assert.match(dock, /\/me\/work-queue\?queue=responsible&bucket=need_action&sort=priority&limit=6/);
   assert.match(dock, /orderedWorkListEntries/);
