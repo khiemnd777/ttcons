@@ -11,21 +11,23 @@ type WorkItemActionRequest struct {
 }
 
 type MyWorkItemsFilter struct {
-	// Unified is set by the queue handler; IncludeAccounting is resolved by the service.
-	Unified           bool
-	IncludeAccounting bool
-	EntryKind         string
-	Queue             string
-	ProjectID         string
-	Status            string
-	Deadline          string
-	WorkType          string
-	Priority          string
-	Search            string
-	Sort              string
-	Bucket            string
-	Cursor            string
-	Limit             int
+	// Unified is set by the queue handler. Accounting visibility and responsibility
+	// are resolved by the service and are never trusted from HTTP input.
+	Unified               bool
+	IncludeAccounting     bool
+	AccountingResponsible bool
+	EntryKind             string
+	Queue                 string
+	ProjectID             string
+	Status                string
+	Deadline              string
+	WorkType              string
+	Priority              string
+	Search                string
+	Sort                  string
+	Bucket                string
+	Cursor                string
+	Limit                 int
 }
 
 type MyWorkflowActionsFilter struct {

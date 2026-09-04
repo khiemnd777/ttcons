@@ -63,6 +63,7 @@ import {
   dedupeWorkQueue,
   workQueueEntryKey,
   orderedWorkListEntries,
+  projectStartupVisibility,
   type WorkQueueEntry,
   type WorkQueueKind,
   buildWorkScopeSummaryPath,
@@ -81,7 +82,7 @@ import {
 type ModeKey = 'work' | 'approval' | 'accounting' | 'attention';
 type LegacyQueueKey = WorkScopeKey | 'pending_approval';
 type AttentionQueueKey = 'all' | 'mentions' | 'questions' | 'blockers' | 'reminders' | 'unread';
-type WorkQuickBucket = 'all' | 'need_action' | 'in_progress' | 'blocked' | 'upcoming' | 'completed' | 'waiting_supplement';
+type WorkQuickBucket = 'all' | 'need_action' | 'in_progress' | 'blocked' | 'upcoming' | 'completed';
 
 type FacetOption = string | {
   id?: string;
@@ -198,16 +199,19 @@ export function MyWorkPage() {
   const requestedQueue = validValue<LegacyQueueKey>(searchParams.get('queue'), ['responsible', 'mine', 'department', 'pending_approval', 'watching', 'all'], 'responsible');
   const requestedBucket = validValue<SummaryBucket>(searchParams.get('bucket'), ['all', 'need_action', 'in_progress', 'overdue', 'blocked', 'waiting_decision', 'upcoming', 'completed', 'done_today', 'waiting_supplement'], 'need_action');
   const legacyApprovalMode = requestedQueue === 'pending_approval' || requestedBucket === 'waiting_decision';
+  const legacyReturnedAccountingMode = requestedMode === 'work' && requestedBucket === 'waiting_supplement' && canViewAccountingWork;
   const mode: ModeKey = requestedMode === 'accounting'
     ? canViewAccountingWork ? 'accounting' : 'work'
     : requestedMode === 'attention'
       ? 'attention'
-      : requestedMode === 'approval' || legacyApprovalMode
-        ? 'approval'
-        : 'work';
+      : legacyReturnedAccountingMode
+        ? 'accounting'
+        : requestedMode === 'approval' || legacyApprovalMode
+          ? 'approval'
+          : 'work';
   const queue: WorkScopeKey = (requestedQueue === 'pending_approval' || requestedQueue === 'mine') ? 'responsible' : requestedQueue;
   const attentionQueue = validValue<AttentionQueueKey>(searchParams.get('attention'), ['all', 'mentions', 'questions', 'blockers', 'reminders', 'unread'], 'all');
-  const bucket: SummaryBucket = requestedBucket === 'waiting_decision' ? 'all' : requestedBucket;
+  const bucket: SummaryBucket = requestedBucket === 'waiting_decision' || requestedBucket === 'waiting_supplement' ? 'need_action' : requestedBucket;
   const project = searchParams.get('project') ?? '';
   const status = searchParams.get('status') ?? '';
   const deadline = searchParams.get('deadline') ?? '';
@@ -215,7 +219,7 @@ export function MyWorkPage() {
   const entryKind = validValue<WorkQueueKind>(searchParams.get('entry_kind'), ['', 'work_item', 'accounting_handoff'], '');
   const priority = searchParams.get('priority') ?? '';
   const search = searchParams.get('search') ?? '';
-  const accountingStatus = validValue<AccountingWorkStatus>(searchParams.get('accounting_status'), ['handed_off', 'returned', 'acknowledged', 'all'], 'handed_off');
+  const accountingStatus = validValue<AccountingWorkStatus>(searchParams.get('accounting_status'), ['handed_off', 'returned', 'acknowledged', 'all'], legacyReturnedAccountingMode ? 'returned' : 'handed_off');
   const sort = searchParams.get('sort') ?? 'priority';
   const roleSummary = summarizeRoles(user?.roles);
   const canReviewWorkReports = hasPermission('work_report.view') && (hasPermission('work_report.review') || hasPermission('work_report.manage'));
@@ -232,6 +236,25 @@ export function MyWorkPage() {
       return next;
     }, { replace: true });
   }, [requestedQueue, setSearchParams]);
+
+  useEffect(() => {
+    if (requestedMode !== 'work' || requestedBucket !== 'waiting_supplement') return;
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('bucket');
+      next.delete('queue');
+      next.delete('entry_kind');
+      next.delete('status');
+      if (canViewAccountingWork) {
+        next.set('mode', 'accounting');
+        next.set('accounting_status', 'returned');
+      } else {
+        next.delete('mode');
+        next.delete('accounting_status');
+      }
+      return next;
+    }, { replace: true });
+  }, [canViewAccountingWork, requestedBucket, requestedMode, setSearchParams]);
 
   useEffect(() => setSearchDraft(search), [search]);
   useEffect(() => {
@@ -268,10 +291,8 @@ export function MyWorkPage() {
     enabled: Boolean(user?.id),
     retry: false,
   });
-  const startupActionsMatchCurrentWorkFilters = (bucket === 'all' || bucket === 'need_action' || bucket === 'upcoming')
-    && entryKind !== 'accounting_handoff'
-    && (queue === 'responsible' || queue === 'all')
-    && !status && !deadline && !workType && !priority;
+  const startupVisibility = projectStartupVisibility({ bucket, queue, entryKind, status, deadline, workType, priority });
+  const startupActionsMatchCurrentWorkFilters = startupVisibility.rowsVisible;
   const startupActions = useQuery({
     queryKey: ['my-project-startup-actions', user?.id, project, search],
     queryFn: () => get<ProjectStartupActionsResponse>(buildProjectStartupActionsPath({ project, search })),
@@ -396,7 +417,7 @@ export function MyWorkPage() {
   }, [bucket, startupActions.data?.items, startupActionsMatchCurrentWorkFilters]);
   const startupActionTotal = startupActionRows.length;
   const startupSummary = startupActions.data?.summary ?? { need_action: 0, upcoming: 0, total: 0 };
-  const visibleStartupSummary = startupActionsMatchCurrentWorkFilters
+  const visibleStartupSummary = startupVisibility.contributesToSummary
     ? startupSummary
     : { need_action: 0, upcoming: 0, total: 0 };
   const approvalFirstPage = approvalWorkItems.data?.pages[0];
@@ -418,11 +439,11 @@ export function MyWorkPage() {
       : activityAttentionSummary.data?.has_more
         ? '120+'
         : activityAttentionSummary.data?.count ?? 0;
-  const workTabCount = workItems.isLoading || (workflowActionsMatchCurrentWorkFilters && workflowActions.isLoading) || (startupActionsMatchCurrentWorkFilters && startupActions.isLoading)
+  const workTabCount = scopeSummary.isLoading
     ? '…'
-    : (workItems.isError && !firstPage) || (workflowActionsMatchCurrentWorkFilters && workflowActions.isError && !workflowActions.data) || (startupActionsMatchCurrentWorkFilters && startupActions.isError && !startupActions.data)
+    : scopeSummary.isError && !scopeSummary.data
       ? '—'
-      : (firstPage?.total ?? 0) + workflowActionTotal + startupActionTotal;
+      : scopeSummary.data?.[queue]?.total ?? 0;
   const approvalTabCount = approvalWorkItems.isLoading || pendingNodeApprovals.isLoading || (canReviewWorkReports && reportReviewSummary.isLoading)
     ? '…'
     : (approvalWorkItems.isError && !approvalFirstPage) || (pendingNodeApprovals.isError && !pendingNodeApprovals.data) || (canReviewWorkReports && reportReviewSummary.isError && !reportReviewSummary.data)
@@ -536,7 +557,7 @@ export function MyWorkPage() {
   const hasFilters = Boolean(bucket !== 'need_action' || queue !== 'responsible' || project || status || deadline || workType || entryKind || priority || search || sort !== 'priority');
   const total = (firstPage?.total ?? summary.total ?? rows.length) + workflowActionTotal + startupActionTotal;
   const approvalTotal = approvalFirstPage?.total ?? approvalRows.length;
-  const scopeLabel = queue === 'responsible' && canViewAccountingWork ? 'Tôi / nhóm phụ trách' : scopes.find((item) => item.key === queue)?.label ?? 'Tôi phụ trách';
+  const scopeLabel = scopes.find((item) => item.key === queue)?.label ?? 'Tôi phụ trách';
   const actionAwareSummary = {
     ...summary,
     total: summary.total + workflowActionSummaryTotal + visibleStartupSummary.total,
@@ -571,7 +592,6 @@ export function MyWorkPage() {
         <section className="mt-4">
           <div className="grid gap-3 xl:grid-cols-[208px_minmax(0,1fr)_320px]">
             <ScopeRail
-              accounting={canViewAccountingWork}
               value={queue}
               counts={scopeSummary.data}
               loading={scopeSummary.isLoading}
@@ -581,7 +601,6 @@ export function MyWorkPage() {
 
             <div className="min-w-0">
               <WorkQuickFilters
-                accounting={canViewAccountingWork && entryKind !== 'work_item'}
                 summary={actionAwareSummary}
                 selected={bucket}
                 scopeLabel={scopeLabel}
@@ -922,8 +941,7 @@ function WorkReportReviewLane({ rows, total, loading, error, onRetry, onOpen }: 
 
 const emptySummary: MyWorkSummary = { total: 0, need_action: 0, in_progress: 0, overdue: 0, blocked: 0, waiting_decision: 0, waiting_approval: 0, upcoming: 0, completed: 0, done_today: 0 };
 
-function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable, onSelect, accounting = false }: {
-  accounting?: boolean;
+function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable, onSelect }: {
   summary: MyWorkSummary;
   selected: SummaryBucket;
   scopeLabel: string;
@@ -936,9 +954,8 @@ function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable,
     { bucket: 'in_progress', label: 'Đang làm', value: summary.in_progress, icon: Clock3, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
     { bucket: 'blocked', label: 'Bị chặn', value: summary.blocked, icon: AlertCircle, activeClass: 'border-rose-300 bg-rose-50 ring-rose-200' },
     { bucket: 'upcoming', label: 'Sắp tới · chỉ xem', value: summary.upcoming, icon: Clock3, activeClass: 'border-slate-300 bg-slate-50 ring-slate-200' },
-    { bucket: 'completed', label: accounting ? 'Đã xử lý' : 'Hoàn tất', value: summary.completed, icon: CheckCircle2, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
+    { bucket: 'completed', label: 'Hoàn tất', value: summary.completed, icon: CheckCircle2, activeClass: 'border-emerald-300 bg-emerald-50 ring-emerald-200' },
   ];
-  if (accounting) cards.splice(1, 0, { bucket: 'waiting_supplement', label: 'Chờ bổ sung', value: summary.waiting_supplement ?? 0, icon: Clock3, activeClass: 'border-amber-300 bg-amber-50 ring-amber-200' });
   const allActive = selected === 'all';
   return (
     <section className="mb-3 rounded-lg border border-line bg-white p-3" aria-label="Bộ lọc nhanh công việc" aria-busy={loading}>
@@ -1005,8 +1022,7 @@ function ScopeCountChip({ count, active }: { count: number; active: boolean }) {
   );
 }
 
-function ScopeRail({ value, counts, loading, onChange, accounting = false, unavailable = false }: {
-  accounting?: boolean;
+function ScopeRail({ value, counts, loading, onChange, unavailable = false }: {
   unavailable?: boolean;
   value: WorkScopeKey;
   counts?: MyWorkScopeSummary;
@@ -1014,14 +1030,13 @@ function ScopeRail({ value, counts, loading, onChange, accounting = false, unava
   onChange: (value: WorkScopeKey) => void;
 }) {
   const countValue = (scope: WorkScopeKey) => counts?.[scope]?.total ?? 0;
-  const activeScope = scopes.find((item) => item.key === value);
   return (
     <aside className="min-w-0 rounded-lg border border-line bg-white p-3 xl:sticky xl:top-4 xl:self-start" aria-label="Phạm vi công việc" aria-busy={loading}>
       {unavailable ? <p className="mb-2 text-xs text-amber-700">Số lượng chưa khả dụng. Bấm Làm mới để thử lại.</p> : null}
       <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-ink">Phạm vi</h2>
         <span className="flex shrink-0 items-center gap-2 text-xs font-semibold text-blue-700 xl:hidden">
-          {accounting && value === 'responsible' ? 'Tôi / nhóm phụ trách' : activeScope?.label}
+          {scopes.find((item) => item.key === value)?.label}
           <ScopeCountChip count={countValue(value)} active />
         </span>
       </div>
@@ -1042,7 +1057,7 @@ function ScopeRail({ value, counts, loading, onChange, accounting = false, unava
               {active ? <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-blue-600" aria-hidden="true" /> : null}
               <span className="flex items-center gap-2 text-sm font-semibold">
                 {active ? <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-600" /> : <span className="h-4 w-4 shrink-0" aria-hidden="true" />}
-                <span>{accounting && item.key === 'responsible' ? 'Tôi / nhóm phụ trách' : item.label}</span>
+                <span>{item.label}</span>
                 <span className="ml-auto">
                   <ScopeCountChip count={countValue(item.key)} active={active} />
                 </span>

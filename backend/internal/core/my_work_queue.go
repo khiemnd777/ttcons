@@ -43,7 +43,7 @@ func accountingWorkSelectSQL() string {
 
 // Only index columns are normalized. Payloads remain their original domain type;
 // accounting records never become work_items and never acquire synthetic deadlines.
-func (r *Repository) myWorkQueueSQL(ctx context.Context, actorID string, includeAccounting bool, args []any) (string, []any, error) {
+func (r *Repository) myWorkQueueSQL(ctx context.Context, actorID string, includeAccounting, accountingResponsible bool, args []any) (string, []any, error) {
 	scope := "FALSE"
 	if includeAccounting {
 		var scopeArgs []any
@@ -54,6 +54,8 @@ func (r *Repository) myWorkQueueSQL(ctx context.Context, actorID string, include
 		}
 		args = append(args, scopeArgs...)
 	}
+	args = append(args, accountingResponsible)
+	accountingResponsiblePlaceholder := len(args)
 	return myWorkItemsBaseSQL() + fmt.Sprintf(`,
 		accounting_work AS (%s WHERE project.status <> 'cancelled'
 			AND handoff.status IN ('handed_off','returned','acknowledged') AND (%s)),
@@ -70,7 +72,8 @@ func (r *Repository) myWorkQueueSQL(ctx context.Context, actorID string, include
 				concat_ws(' ',source_code,counterparty_name,external_reference),
 				NULL::text, NULL::text, NULL::text, status, NULL::text, NULL::text,
 				NULL::timestamptz, handed_off_at, acknowledged_at,
-				status='handed_off', false, false, true, false, false, false
+				status='handed_off', false, false,
+				($%d::boolean AND status='handed_off'), false, false, false
 			FROM accounting_work a
-		)`, accountingWorkSelectSQL(), scope), args, nil
+		)`, accountingWorkSelectSQL(), scope, accountingResponsiblePlaceholder), args, nil
 }

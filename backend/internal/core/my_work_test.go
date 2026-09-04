@@ -659,16 +659,23 @@ func TestMyWorkItemsPageContractPaginationAndDecisionCapability(t *testing.T) {
 }
 
 func TestMyWorkNavigationSummaryTotalsOnlyWorkAndApprovalLanes(t *testing.T) {
-	summary := myWorkNavigationSummaryRecord(myWorkNavigationCounts{
+	observerSummary := myWorkNavigationSummaryRecord(myWorkNavigationCounts{
 		NeedAction:      2,
 		WaitingDecision: 3,
-	}, 4, 0, 5, 6, 7)
+	}, 4, 0, 5, 6, 7, 0)
 
-	if number(summary["work_total"]) != 13 || number(summary["approval_total"]) != 14 || number(summary["accounting_total"]) != 7 || number(summary["total"]) != 27 {
-		t.Fatalf("my work navigation totals = %#v, want work 13 (including accounting 7) + approvals 14 = 27", summary)
+	if number(observerSummary["work_total"]) != 6 || number(observerSummary["approval_total"]) != 14 || number(observerSummary["accounting_total"]) != 7 || number(observerSummary["total"]) != 20 {
+		t.Fatalf("observer navigation totals = %#v, want personal work 6 + approvals 14 = 20 with accounting visible only as a breakdown", observerSummary)
 	}
-	if _, leakedAttention := summary["attention_total"]; leakedAttention {
-		t.Fatalf("my work navigation summary must exclude attention: %#v", summary)
+	accountingSummary := myWorkNavigationSummaryRecord(myWorkNavigationCounts{
+		NeedAction:      2,
+		WaitingDecision: 3,
+	}, 4, 0, 5, 6, 7, 7)
+	if number(accountingSummary["work_total"]) != 13 || number(accountingSummary["approval_total"]) != 14 || number(accountingSummary["total"]) != 27 {
+		t.Fatalf("Accounting navigation totals = %#v, want responsible work 13 + approvals 14 = 27", accountingSummary)
+	}
+	if _, leakedAttention := observerSummary["attention_total"]; leakedAttention {
+		t.Fatalf("my work navigation summary must exclude attention: %#v", observerSummary)
 	}
 }
 

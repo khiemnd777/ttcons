@@ -52,12 +52,12 @@ test('My Work provides compact loading and stale-data states', async () => {
   assert.match(page, />Thử lại<\/button>/);
 });
 
-test('My Work tab count follows the currently displayed work query', async () => {
+test('My Work tab count follows the selected scope summary instead of the selected bucket', async () => {
   const page = await myWorkPageSource();
 
-  assert.match(page, /const workTabCount = workItems\.isLoading[\s\S]*workItems\.isError && !firstPage[\s\S]*\(firstPage\?\.total \?\? 0\) \+ workflowActionTotal/);
+  assert.match(page, /const workTabCount = scopeSummary\.isLoading[\s\S]*scopeSummary\.isError && !scopeSummary\.data[\s\S]*scopeSummary\.data\?\.\[queue\]\?\.total \?\? 0/);
   assert.match(page, /label="Công việc" count=\{workTabCount\}/);
-  assert.doesNotMatch(page, /label="Công việc" count=\{summary\.total\}/);
+  assert.doesNotMatch(page, /const workTabCount = workItems\.isLoading|\(firstPage\?\.total \?\? 0\) \+ workflowActionTotal/);
 });
 
 test('My Work defaults to personal responsibility and keeps approval out of ordinary scope', async () => {
@@ -73,7 +73,8 @@ test('My Work defaults to personal responsibility and keeps approval out of ordi
   assert.match(page, /key === 'queue' && value === 'responsible'/);
   assert.match(page, /updateParams\(\{ queue: 'responsible', bucket: 'need_action'/);
   assert.match(page, /function selectBucket\(nextBucket: WorkQuickBucket\) \{[\s\S]*?bucket: nextBucket/);
-  assert.match(page, /<ScopeRail\s+accounting=\{canViewAccountingWork\}\s+value=\{queue\}/);
+  assert.match(page, /<ScopeRail\s+value=\{queue\}/);
+  assert.doesNotMatch(page, /Tôi \/ nhóm phụ trách/);
   assert.doesNotMatch(page, /<FilterSelect value=\{queue\} label="Phạm vi công việc"/);
 });
 
@@ -91,8 +92,16 @@ test('My Work presents source-backed quick filters inside the selected work scop
   assert.match(quickFilters, /summary\.total/);
   assert.doesNotMatch(quickFilters.slice(quickFilters.indexOf('const cards'), quickFilters.indexOf('return (')), /bucket: 'all'/);
   assert.match(quickFilters, /bucket: 'upcoming', label: 'Sắp tới · chỉ xem'/);
-  assert.match(quickFilters, /bucket: 'completed', label: accounting \? 'Đã xử lý' : 'Hoàn tất', value: summary\.completed/);
-  assert.doesNotMatch(quickFilters, /waiting_decision|Chờ tôi duyệt/);
+  assert.match(quickFilters, /bucket: 'completed', label: 'Hoàn tất', value: summary\.completed/);
+  assert.doesNotMatch(quickFilters, /waiting_decision|waiting_supplement|Chờ tôi duyệt|Chờ bổ sung|Đã xử lý/);
+});
+
+test('My Work routes the removed accounting-specific quick bucket to the dedicated Accounting lane', async () => {
+  const page = await myWorkPageSource();
+
+  assert.match(page, /legacyReturnedAccountingMode = requestedMode === 'work' && requestedBucket === 'waiting_supplement' && canViewAccountingWork/);
+  assert.match(page, /requestedBucket === 'waiting_decision' \|\| requestedBucket === 'waiting_supplement' \? 'need_action' : requestedBucket/);
+  assert.match(page, /if \(requestedMode !== 'work' \|\| requestedBucket !== 'waiting_supplement'\) return;[\s\S]*next\.delete\('bucket'\);[\s\S]*next\.set\('mode', 'accounting'\);[\s\S]*next\.set\('accounting_status', 'returned'\);[\s\S]*replace: true/);
 });
 
 test('My Work separates actor-decidable approvals into a dedicated compatible mode', async () => {

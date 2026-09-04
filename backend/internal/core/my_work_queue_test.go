@@ -38,7 +38,7 @@ func TestMyWorkQueuePrioritizesAccountingBeforePagination(t *testing.T) {
 		'2026-01-01'::timestamptz + n*interval '1 day' FROM generate_series(1,3) n`, f.projectID, f.userID)
 	read := func(sortKind, cursor string, limit int, kind string) Record {
 		t.Helper()
-		page, err := s.MyWorkItems(ctx, MyWorkItemsFilter{Unified: true, ProjectID: f.projectID, Bucket: "all", Sort: sortKind, Cursor: cursor, Limit: limit, EntryKind: kind}, f.userID)
+		page, err := s.MyWorkItems(ctx, MyWorkItemsFilter{Unified: true, ProjectID: f.projectID, Queue: "all", Bucket: "all", Sort: sortKind, Cursor: cursor, Limit: limit, EntryKind: kind}, f.userID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -135,6 +135,9 @@ func TestMyWorkQueueMixedPaginationScopeAndCanonicalActions(t *testing.T) {
 	pageFor := func(filter MyWorkItemsFilter) Record {
 		t.Helper()
 		filter.Unified = true
+		if filter.Queue == "" {
+			filter.Queue = "all"
+		}
 		if filter.ProjectID == "" {
 			filter.ProjectID = f.projectID
 		}
@@ -197,7 +200,7 @@ func TestMyWorkQueueMixedPaginationScopeAndCanonicalActions(t *testing.T) {
 		{MyWorkItemsFilter{EntryKind: "accounting_handoff", Queue: "mine"}, 0},
 		{MyWorkItemsFilter{EntryKind: "accounting_handoff", Queue: "department"}, 0},
 		{MyWorkItemsFilter{EntryKind: "accounting_handoff", Queue: "watching"}, 0},
-		{MyWorkItemsFilter{ProjectID: f.otherProjectID, Queue: "responsible", Bucket: "need_action"}, 1},
+		{MyWorkItemsFilter{ProjectID: f.otherProjectID, Queue: "responsible", Bucket: "need_action"}, 0},
 	} {
 		page := pageFor(tc.filter)
 		if int(number(page["total"])) != tc.total {
@@ -208,6 +211,68 @@ func TestMyWorkQueueMixedPaginationScopeAndCanonicalActions(t *testing.T) {
 	if number(summary["need_action"]) != 2 || number(summary["waiting_supplement"]) != 1 || number(summary["completed"]) != 1 {
 		t.Fatalf("summary: %#v", summary)
 	}
+
+	adminRoleID := ensureRole(t, db, "admin", "Quản trị")
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, f.userID, adminRoleID)
+	isAccounting, err := s.repo.UserHasGlobalRole(ctx, f.userID, accountingRoleName)
+	if err != nil || isAccounting {
+		t.Fatalf("Admin incorrectly classified as Accounting: assigned=%v err=%v", isAccounting, err)
+	}
+	adminResponsiblePage := pageFor(MyWorkItemsFilter{Queue: "responsible", Bucket: "need_action", EntryKind: "accounting_handoff"})
+	if number(adminResponsiblePage["total"]) != 0 {
+		t.Fatalf("Admin accounting responsibility leaked from permissions: %#v", adminResponsiblePage)
+	}
+	adminScopeSummary, err := s.MyWorkScopeSummary(ctx, f.userID, f.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(recordValue(adminScopeSummary["responsible"])["total"]) != 1 || number(recordValue(adminScopeSummary["all"])["total"]) != 2 {
+		t.Fatalf("Admin scope summary = %#v, want responsible work only and accounting visible in all", adminScopeSummary)
+	}
+	adminNavigation, err := s.MyWorkNavigationSummary(ctx, f.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminBaseWork := number(adminNavigation["work_items_need_action"]) + number(adminNavigation["workflow_actions_ready"]) + number(adminNavigation["project_startups_pending"])
+	if number(adminNavigation["accounting_total"]) < 1 || number(adminNavigation["work_total"]) != adminBaseWork {
+		t.Fatalf("Admin navigation = %#v, want visible Accounting breakdown excluded from personal work", adminNavigation)
+	}
+
+	accountingRoleID := ensureRole(t, db, "accounting", "Kế toán")
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id,project_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, f.userID, accountingRoleID, f.projectID)
+	isAccounting, err = s.repo.UserHasGlobalRole(ctx, f.userID, accountingRoleName)
+	if err != nil || isAccounting {
+		t.Fatalf("project-scoped Accounting role incorrectly became company responsibility: assigned=%v err=%v", isAccounting, err)
+	}
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, f.userID, accountingRoleID)
+	isAccounting, err = s.repo.UserHasGlobalRole(ctx, f.userID, accountingRoleName)
+	if err != nil || !isAccounting {
+		t.Fatalf("Accounting role was not recognized: assigned=%v err=%v", isAccounting, err)
+	}
+	accountingResponsiblePage := pageFor(MyWorkItemsFilter{Queue: "responsible", Bucket: "need_action", EntryKind: "accounting_handoff"})
+	if number(accountingResponsiblePage["total"]) != 1 {
+		t.Fatalf("Accounting handoff missing from Accounting responsibility: %#v", accountingResponsiblePage)
+	}
+	accountingResponsibleHistory := pageFor(MyWorkItemsFilter{Queue: "responsible", Bucket: "all", EntryKind: "accounting_handoff"})
+	if number(accountingResponsibleHistory["total"]) != 1 {
+		t.Fatalf("returned/acknowledged accounting history leaked into current responsibility: %#v", accountingResponsibleHistory)
+	}
+	accountingScopeSummary, err := s.MyWorkScopeSummary(ctx, f.userID, f.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(recordValue(accountingScopeSummary["responsible"])["total"]) != 2 || number(recordValue(accountingScopeSummary["all"])["total"]) != 2 {
+		t.Fatalf("Accounting scope summary = %#v, want handoff in responsible and all", accountingScopeSummary)
+	}
+	accountingNavigation, err := s.MyWorkNavigationSummary(ctx, f.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accountingBaseWork := number(accountingNavigation["work_items_need_action"]) + number(accountingNavigation["workflow_actions_ready"]) + number(accountingNavigation["project_startups_pending"])
+	if number(accountingNavigation["accounting_total"]) < 1 || number(accountingNavigation["work_total"]) != accountingBaseWork+number(accountingNavigation["accounting_total"]) {
+		t.Fatalf("Accounting navigation = %#v, want visible Accounting breakdown included in personal work", accountingNavigation)
+	}
+
 	legacy, err := s.MyWorkItems(ctx, MyWorkItemsFilter{ProjectID: f.projectID}, f.userID)
 	if err != nil || number(legacy["total"]) != 1 {
 		t.Fatalf("legacy: %#v %v", legacy, err)
@@ -217,7 +282,7 @@ func TestMyWorkQueueMixedPaginationScopeAndCanonicalActions(t *testing.T) {
 	}
 
 	unprivileged := setupProjectScopeFixture(t, db, []string{"project.view", "accounting_handoff.view"})
-	deniedPage, err := s.MyWorkItems(ctx, MyWorkItemsFilter{Unified: true, IncludeAccounting: true, EntryKind: "accounting_handoff"}, unprivileged.userID)
+	deniedPage, err := s.MyWorkItems(ctx, MyWorkItemsFilter{Unified: true, IncludeAccounting: true, AccountingResponsible: true, EntryKind: "accounting_handoff"}, unprivileged.userID)
 	if err != nil || number(deniedPage["total"]) != 0 {
 		t.Fatalf("permission bypass: %#v %v", deniedPage, err)
 	}

@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const accountingRoleName = "accounting"
+
 func (s *Service) ProjectWorkItems(ctx context.Context, projectID, actorID string) ([]Record, error) {
 	allowed, err := s.repo.CanViewProjectOperations(ctx, projectID, actorID)
 	if err != nil {
@@ -31,14 +33,22 @@ func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, act
 	if err != nil {
 		return nil, err
 	}
-	// A company-wide observer does not acquire company-wide workflow responsibility.
+	// Authorization to observe/act on accounting handoffs does not make the actor
+	// responsible for Accounting's inbox.
 	filter.IncludeAccounting = false
+	filter.AccountingResponsible = false
 	if filter.Unified {
 		permissions, err := s.repo.UserPermissions(ctx, actorID)
 		if err != nil {
 			return nil, err
 		}
-		filter.IncludeAccounting = canReceiveAccountingWork(permissions)
+		filter.IncludeAccounting = canAccessAccountingWorkQueue(permissions)
+		if filter.IncludeAccounting {
+			filter.AccountingResponsible, err = s.repo.UserHasGlobalRole(ctx, actorID, accountingRoleName)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 	page, err := s.repo.MyWorkItemsPage(ctx, actorID, filter, offset)
 	if err != nil {
@@ -74,7 +84,7 @@ func (s *Service) MyWorkItems(ctx context.Context, filter MyWorkItemsFilter, act
 	return result, nil
 }
 
-func canReceiveAccountingWork(permissions []string) bool {
+func canAccessAccountingWorkQueue(permissions []string) bool {
 	return hasAnyString(permissions, []string{"accounting_handoff.view"}) && hasAnyString(permissions, []string{"accounting_handoff.acknowledge"})
 }
 
@@ -137,16 +147,24 @@ func (s *Service) MyWorkNavigationSummary(ctx context.Context, actorID string) (
 		workReportReviewCount = workReportSummary.Scopes["review"]
 	}
 
-	accountingHandoffCount := 0
-	if hasAnyString(permissions, []string{"accounting_handoff.view"}) && hasAnyString(permissions, []string{"accounting_handoff.acknowledge"}) {
+	accountingVisibleCount := 0
+	accountingResponsibleCount := 0
+	if canAccessAccountingWorkQueue(permissions) {
 		accountingPage, err := s.MyAccountingWork(ctx, MyAccountingWorkFilter{Status: "handed_off", Limit: 1}, actorID)
 		if err != nil {
 			return nil, err
 		}
-		accountingHandoffCount = int(number(accountingPage["total"]))
+		accountingVisibleCount = int(number(accountingPage["total"]))
+		isAccounting, err := s.repo.UserHasGlobalRole(ctx, actorID, accountingRoleName)
+		if err != nil {
+			return nil, err
+		}
+		if isAccounting {
+			accountingResponsibleCount = accountingVisibleCount
+		}
 	}
 
-	return myWorkNavigationSummaryRecord(workItemCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount, accountingHandoffCount), nil
+	return myWorkNavigationSummaryRecord(workItemCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount, accountingVisibleCount, accountingResponsibleCount), nil
 }
 
 func (s *Service) MyWorkScopeSummary(ctx context.Context, actorID, projectID string) (Record, error) {
@@ -180,15 +198,23 @@ func (s *Service) MyWorkScopeSummary(ctx context.Context, actorID, projectID str
 	if err != nil {
 		return nil, err
 	}
-	if canReceiveAccountingWork(permissions) {
+	if canAccessAccountingWorkQueue(permissions) {
 		page, err := s.MyAccountingWork(ctx, MyAccountingWorkFilter{ProjectID: projectID, Status: "handed_off", Limit: 1}, actorID)
 		if err != nil {
 			return nil, err
 		}
-		for _, scope := range []string{"responsible", "all"} {
-			row := recordValue(result[scope])
-			row["accounting_handoffs"] = page["total"]
-			row["total"] = number(row["total"]) + number(page["total"])
+		allRow := recordValue(result["all"])
+		allRow["accounting_handoffs"] = page["total"]
+		allRow["total"] = number(allRow["total"]) + number(page["total"])
+
+		isAccounting, err := s.repo.UserHasGlobalRole(ctx, actorID, accountingRoleName)
+		if err != nil {
+			return nil, err
+		}
+		if isAccounting {
+			responsibleRow := recordValue(result["responsible"])
+			responsibleRow["accounting_handoffs"] = page["total"]
+			responsibleRow["total"] = number(responsibleRow["total"]) + number(page["total"])
 		}
 	}
 	return result, nil
@@ -210,8 +236,8 @@ func myWorkScopeSummaryRecord(workItemCounts myWorkScopeCounts, workflowResponsi
 	}
 }
 
-func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount, accountingHandoffCount int) Record {
-	workTotal := workItemCounts.NeedAction + workflowActionCount + startupActionCount + accountingHandoffCount
+func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workflowActionCount, startupActionCount, nodeApprovalCount, workReportReviewCount, accountingVisibleCount, accountingResponsibleCount int) Record {
+	workTotal := workItemCounts.NeedAction + workflowActionCount + startupActionCount + accountingResponsibleCount
 	approvalTotal := workItemCounts.WaitingDecision + nodeApprovalCount + workReportReviewCount
 	return Record{
 		"work_items_need_action":      workItemCounts.NeedAction,
@@ -222,9 +248,10 @@ func myWorkNavigationSummaryRecord(workItemCounts myWorkNavigationCounts, workfl
 		"node_approvals_pending":      nodeApprovalCount,
 		"work_reports_review_pending": workReportReviewCount,
 		"approval_total":              approvalTotal,
-		"accounting_handoffs_pending": accountingHandoffCount,
-		"accounting_total":            accountingHandoffCount,
-		// accounting_total is a breakdown of work_total, not an additional lane.
+		"accounting_handoffs_pending": accountingVisibleCount,
+		"accounting_total":            accountingVisibleCount,
+		// Accounting visibility remains available as a breakdown; only an Accounting
+		// actor's responsible count contributes to the personal work total.
 		"total": workTotal + approvalTotal,
 	}
 }

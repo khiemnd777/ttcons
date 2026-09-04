@@ -51,6 +51,31 @@ test('mixed queue query preserves source filters and server cursor, legacy path 
   assert.ok(buildWorkPath(filters, '').startsWith('/me/work-items?'));
 });
 
+test('project startup keeps quick counts stable while a sibling bucket filters the list', async () => {
+  const { projectStartupVisibility } = await queueHelpers();
+  const common = { queue: 'responsible', entryKind: '', status: '', deadline: '', workType: '', priority: '' };
+
+  assert.deepEqual(projectStartupVisibility({ ...common, bucket: 'need_action' }), {
+    contributesToSummary: true,
+    rowsVisible: true,
+  });
+  assert.deepEqual(projectStartupVisibility({ ...common, bucket: 'waiting_supplement' }), {
+    contributesToSummary: true,
+    rowsVisible: false,
+  });
+
+  const baseSummary = { total: 4, need_action: 1 };
+  const startupSummary = { total: 2, need_action: 2 };
+  const waitingSupplementVisibility = projectStartupVisibility({ ...common, bucket: 'waiting_supplement' });
+  assert.equal(baseSummary.total + (waitingSupplementVisibility.contributesToSummary ? startupSummary.total : 0), 6);
+  assert.equal(baseSummary.need_action + (waitingSupplementVisibility.contributesToSummary ? startupSummary.need_action : 0), 3);
+
+  assert.deepEqual(projectStartupVisibility({ ...common, bucket: 'waiting_supplement', entryKind: 'accounting_handoff' }), {
+    contributesToSummary: false,
+    rowsVisible: false,
+  });
+});
+
 test('same UUID in distinct source types remains two entries, duplicate pages do not duplicate a handoff', async () => {
   const { dedupeWorkQueue, workQueueEntryKey } = await queueHelpers();
   const work = { kind: 'work_item', item: { id: 'same' } };

@@ -10,6 +10,29 @@ export type WorkListEntry = WorkQueueEntry
   | { kind: 'project_startup'; item: ProjectStartupAction }
   | { kind: 'workflow_action'; item: MyWorkflowAction };
 
+type ProjectStartupVisibilityFilters = {
+  bucket: SummaryBucket;
+  queue: WorkScopeKey;
+  entryKind: WorkQueueKind;
+  status: string;
+  deadline: string;
+  workType: string;
+  priority: string;
+};
+
+export function projectStartupVisibility(filters: ProjectStartupVisibilityFilters) {
+  const contributesToSummary = filters.entryKind !== 'accounting_handoff'
+    && (filters.queue === 'responsible' || filters.queue === 'all')
+    && !filters.status
+    && !filters.deadline
+    && !filters.workType
+    && !filters.priority;
+  const rowsVisible = contributesToSummary
+    && (filters.bucket === 'all' || filters.bucket === 'need_action' || filters.bucket === 'upcoming');
+
+  return { contributesToSummary, rowsVisible };
+}
+
 export function workQueueEntryKey(entry: WorkListEntry) {
   return entry.kind === 'accounting_handoff' ? `accounting:${entry.item.handoff_id}` : entry.item.id;
 }

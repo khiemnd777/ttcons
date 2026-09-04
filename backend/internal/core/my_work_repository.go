@@ -112,7 +112,7 @@ func (r *Repository) MyWorkItemsPage(ctx context.Context, userID string, filter 
 	baseArgs = append(baseArgs, profile.IsAdmin || profile.IsDirector)
 	baseSQL := myWorkItemsBaseSQL()
 	if filter.Unified {
-		baseSQL, baseArgs, err = r.myWorkQueueSQL(ctx, userID, filter.IncludeAccounting, baseArgs)
+		baseSQL, baseArgs, err = r.myWorkQueueSQL(ctx, userID, filter.IncludeAccounting, filter.AccountingResponsible, baseArgs)
 		if err != nil {
 			return myWorkItemsPageData{}, err
 		}

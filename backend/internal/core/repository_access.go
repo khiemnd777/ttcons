@@ -239,6 +239,21 @@ func (r *Repository) UserRoles(ctx context.Context, userID string) ([]string, er
 	return roles, nil
 }
 
+func (r *Repository) UserHasGlobalRole(ctx context.Context, userID, roleName string) (bool, error) {
+	var assigned bool
+	err := r.db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM user_roles ur
+			JOIN roles r ON r.id=ur.role_id
+			WHERE ur.user_id=$1
+			  AND ur.project_id IS NULL
+			  AND r.name=$2
+		)
+	`, userID, roleName).Scan(&assigned)
+	return assigned, err
+}
+
 func (r *Repository) UserPermissions(ctx context.Context, userID string) ([]string, error) {
 	rows, err := r.Query(ctx, `
 		SELECT DISTINCT p.key
