@@ -1,5 +1,9 @@
 # Quality Acceptance Handover Domain Map
 
+## Discussion Quality Source Topics
+
+- Shared `ActivityTopicDetails.tsx` reads exact Acceptance/Handover detail APIs and the project-scoped Rework list, then verifies source ID/project and non-cancelled/non-deleted state. The dialog displays allowlisted record fields and Acceptance/Handover checklist contents through shared `RecordDetailFields`; it never submits, concludes, verifies, creates rework or completes handover. First searches: `ActivityTopicDetails|activityTopicRecord|activityTopicPath`. Existing domain workspaces remain the action owners.
+
 ## Owners
 
 - Frontend modules: `frontend/src/modules/quality`, `frontend/src/modules/acceptance`, `frontend/src/modules/rework`, `frontend/src/modules/handover` (`HandoverPage.tsx`, `HandoverCreateDialog.tsx`, `HandoverWorkspace.tsx`, `handoverTypes.ts`), `frontend/src/modules/work-items`

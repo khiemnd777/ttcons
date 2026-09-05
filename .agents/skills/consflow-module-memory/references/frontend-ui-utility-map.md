@@ -1,5 +1,12 @@
 # Consflow Frontend UI And Utility Map
 
+## Project Discussion Record Topics
+
+- `ActivityTopic.tsx` shares the record card and actor/project-bound provider across `ActivityThread` and each Dock conversation. Its type/title/open button appears above content and in both composer densities (including inherited reply/edit targets). General project context has no card; unsupported/malformed historical references show an inert unavailable notice. `activityVisibilityLabel` omits only default project metadata and retains internal/client scope. Existing explicit Work Item execution links stay available.
+- `ActivityTopicDetails.tsx` fetches only on open, with actor/project/scope/id query keys, zero retained query cache, fresh reads and local loading/retry/403/404/unavailable states. `activityTopicDomain.ts` owns exact endpoints and ID/project/status validation. Project list reads serve legacy stock movement/rework/AP/AR; payments has no project filter and uses exact client selection from its authorized list. Source titles never resolve IDs. `RecordDetailFields` extracts the existing shared field body without changing `RecordDetailDialog` callers.
+- BOQ reuses exported `BOQDetail` with no mutation/navigation callbacks and four tabs; the ordinary page still supplies its price-management action. Procurement reuses exported `ProcurementDetail`; remaining types show allowlisted source fields/checklists. Dialog is portaled above Dock with focus trap/restoration and captured Escape, keeping conversation/draft mounted. No API write or browser acceptance is implied by opening.
+- First searches: `ActivityTopicCard|ActivityTopicProvider|activityTopicRecord|activityVisibilityLabel`; tests `activityTopic.test.ts`, `activityTopicRendering.test.ts` (Node/React server rendering with auth/details boundary stubs, no browser).
+
 ## Notification Recipient Wording
 
 - `modules/notifications/notificationPresentation.tsx::notificationDisplayText` presents stored `Anh/chị`/`anh/chị` as `Bạn`/`bạn`. Shared `NotificationItem` applies it to title and message in the bell, full inbox and project-update dialog, covering old and new snapshots without rewriting stored data. `NotificationPanel` and `NotificationsPage` use `Bạn` in their unread empty state. This is display wording only; API payloads, notification templates, delivery, counts, read/archive/resolution and routes retain their existing contracts.

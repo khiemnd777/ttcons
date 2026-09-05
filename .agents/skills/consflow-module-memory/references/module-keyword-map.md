@@ -1,5 +1,12 @@
 # Consflow Module Keyword Map
 
+## Project Discussion Record Topics
+
+- Keywords: `Gắn vào`, topic/chủ đề, `Sơn nội thất`, hồ sơ không có liên kết, bỏ `Thành viên công trình`. Owners: `modules/work-items/{ActivityTopic,ActivityTopicDetails,ActivityComposer,ActivityThread}.tsx`, `activityTopicDomain.ts`, `modules/utilities/UtilityDock.tsx`; reused `BOQPage::BOQDetail`, `ProcurementPage::ProcurementDetail`, `components/RecordDetailDialog::RecordDetailFields`.
+- Non-project targets render as a bordered type/title/open button above message content and in selected composer context, shared by full/card discussion and Dock. One actor/project-bound provider opens a focus-managed, body-portaled dialog above Dock; closing retains mounted conversation/draft. General project context and default project visibility metadata are omitted; historical internal/client visibility and explicit Work Item execution links remain.
+- `activityTopicDomain` maps all ten source types to existing authenticated reads and verifies exact source ID + project + non-cancelled/non-deleted state before display. Work Item/BOQ/Procurement/Acceptance/Handover use detail APIs; stock movements, rework and AP/AR use authorized project lists, and legacy payments uses its existing authorized list (no server project filter). Never confuse movement IDs with stock document IDs. Unknown/malformed links stay readable but inert. No migration, workflow, audit, notification or read-cursor mutation.
+- First searches: `ActivityTopicProvider|ActivityTopicCard|activityTopicPath|activityTopicRecord|activityVisibilityLabel`. Tests: `activityTopic.test.ts`, `activityTopicRendering.test.ts` (server render only). Load frontend, triage, Project Planning and the target source domain maps.
+
 ## My Work Search And Filter Alignment
 
 - Scope wording: `Tất cả` replaces `Tất cả được phép xem` on `/my-work`; `MyWorkPage.tsx` owns the shared `scopes` label for the scope rail and `Bộ lọc nhanh · Tất cả` heading. First searches: `const scopes|scopeLabel|ScopeRail`. The `queue=all` key and permission-scoped data contract are unchanged.

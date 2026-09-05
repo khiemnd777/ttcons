@@ -1,5 +1,10 @@
 # Project Planning Domain Map
 
+## Discussion Topic Navigation
+
+- Mục đích chính: recognize the exact source under discussion and inspect it without losing the conversation. `ActivityTopic`/`ActivityTopicDetails`/`activityTopicDomain` share a type/title/open card and an actor/project-bound, focus-managed dialog in full activity, Dock and both composer densities. Project-wide messages omit repeated project context and `Thành viên công trình`; internal/client history remains distinguished. Existing Work Item execution links remain separate.
+- Topic reads resolve persisted scope_type/scope_id and validate exact source/project/status. Opening/closing does not change activity visibility, reply inheritance, mentions, read cursors, source records or workflow status. Source detail access may be denied even when an activity is visible. Legacy list-only source endpoints are filtered to the exact record; unknown/broken links remain inert and readable. First searches: `ActivityTopicCard|activityTopicRecord|activityTopicPath`; focused tests `activityTopic.test.ts` and Node server-render `activityTopicRendering.test.ts`.
+
 ## Dashboard Project Activity Observation
 
 - Frontend absolute dates use shared `format.ts`: full `dd-mm-yyyy`, `HH:mm` and `HH:mm dd-mm-yyyy`. Dashboard shows full day headers plus minute-only row times in a four-column desktop/stacked mobile layout. Shared project/chat day grouping uses the same Vietnam calendar as its labels; only chat retains relative Today/Yesterday labels. This presentation grouping never changes persisted event timestamps, cursor boundaries or read state.

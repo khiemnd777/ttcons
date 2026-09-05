@@ -1,5 +1,9 @@
 # Accounting Finance Domain Map
 
+## Discussion Legacy Finance Topics
+
+- `ActivityTopicDetails.tsx` opens legacy payable/receivable/payment references read-only via existing authorized lists. AP/AR use project_id filters; legacy `/payments` has no project filter, so `activityTopicRecord` must select the exact ID and project from the authorized response. No ID/title substitution, payment action, accounting posting, handoff transition or widened observer permission. Missing access produces a local unavailable state. First searches: `activityTopicPath|activityTopicRecord|ActivityTopicDetails`.
+
 ## Owners
 
 - Ordinary Accounting Handoff UI: `frontend/src/modules/project-finance/AccountingHandoffPage.tsx`, shared `AccountingHandoffActionDialog.tsx`, compatibility wrapper/legacy UI in `ProjectFinancePage.tsx`, shared project picker/actions, routed at `/accounting` and `/projects/:id/accounting`

@@ -8,6 +8,8 @@ import { enumLabel, statusLabel } from '../../lib/utils/status';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { compactDateTime } from './workItemPresentation';
 import { ActivityChatInput } from './ActivityChatInput';
+import { ActivityTopicCard } from './ActivityTopic';
+import { activityVisibilityLabel } from './activityTopicDomain';
 import type { ActivityMentionOption } from './activityChatInputDomain';
 import { chatMentionPayload } from './activityChatInputDomain';
 export type { ActivityMentionOption } from './activityChatInputDomain';
@@ -197,6 +199,7 @@ export function ActivityComposer({
   const targetSummary = targetScope === 'project'
     ? enumLabel('scope_type', 'project')
     : selectedTargetOption?.label ?? targetScopeOptions.find((option) => option.value === targetScope)?.label ?? 'Chọn đối tượng';
+  const topicPreview = <ActivityTopicCard source={editing ? editItem! : replying ? replyTo! : selectedTargetOption ?? {}} />;
 
   useEffect(() => {
     if (!editItem) return;
@@ -478,6 +481,7 @@ export function ActivityComposer({
             </div>
           ) : null}
 
+          <div className="px-2">{topicPreview}</div>
           {chatInput}
         </div>
       </form>
@@ -491,9 +495,7 @@ export function ActivityComposer({
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left">
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-amber-800">Đang chỉnh sửa tin nhắn · {compactDateTime(editItem.created_at)}</p>
-              <p className="mt-0.5 truncate text-[11px] text-slate-500">
-                {enumLabel('scope_type', editItem.scope_type ?? 'project')} · {visibilityOptions.find((option) => option.value === editItem.visibility)?.label ?? editItem.visibility}
-              </p>
+              {activityVisibilityLabel(editItem.visibility) ? <p className="mt-0.5 text-[11px] text-slate-500">{activityVisibilityLabel(editItem.visibility)}</p> : null}
             </div>
             <button type="button" className="rounded-md p-1 text-slate-500 hover:bg-white" onClick={onCancelEdit} aria-label="Hủy chỉnh sửa"><X className="h-4 w-4" /></button>
           </div>
@@ -503,7 +505,7 @@ export function ActivityComposer({
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-blue-800">Đang trả lời {identityReferenceText(replyTo.actor_name, replyTo.actor_account_deleted, 'thành viên công trình')}</p>
               <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">{replyTo.comment || activityLabelForReply(replyTo.activity_type)}</p>
-              <p className="mt-0.5 truncate text-[11px] text-slate-500">{replyTo.target_label ?? 'Công trình'} · {visibilityOptions.find((option) => option.value === replyTo.visibility)?.label ?? replyTo.visibility}</p>
+              {activityVisibilityLabel(replyTo.visibility) ? <p className="mt-0.5 text-[11px] text-slate-500">{activityVisibilityLabel(replyTo.visibility)}</p> : null}
             </div>
             <button type="button" className="rounded-md p-1 text-slate-500 hover:bg-white" onClick={onCancelReply} aria-label="Hủy trả lời"><X className="h-4 w-4" /></button>
           </div>
@@ -622,6 +624,7 @@ export function ActivityComposer({
         ) : null}
 
         <div data-validation-key="comment" data-validation-error={missingComment ? 'true' : undefined} className={clsx('scroll-mt-24 rounded-xl border bg-white shadow-sm focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100', missingComment ? 'border-amber-300' : 'border-line')}>
+          <div className="px-2">{topicPreview}</div>
           {chatInput}
         </div>
       </form>

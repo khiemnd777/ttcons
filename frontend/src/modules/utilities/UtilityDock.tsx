@@ -41,6 +41,8 @@ import { statusLabel } from '../../lib/utils/status';
 import { orderedWorkListEntries, type WorkListEntry, type WorkQueueEntry } from '../my-work/myWorkDomain';
 import { ActivityAttachments } from '../work-items/ActivityAttachments';
 import { ActivityComposer, type ActivityAttachmentOption, type ActivityMentionOption, type ActivityTargetOption } from '../work-items/ActivityComposer';
+import { ActivityTopicCard, ActivityTopicProvider } from '../work-items/ActivityTopic';
+import { activityVisibilityLabel } from '../work-items/activityTopicDomain';
 import { ActivityReplyQuote } from '../work-items/ActivityConversationMeta';
 import { actorInitials, chatBubbleTone } from '../work-items/activityThreadDomain';
 import { executionTargetPath } from '../work-items/workItemExecutionTarget';
@@ -689,6 +691,10 @@ function ProjectPicker({ actorID, projects, openProjectIDs, pickerSearch, onPick
 }
 
 function ProjectConversation({ project }: { project: ProjectDiscussionProject }) {
+  return <ActivityTopicProvider projectId={project.project_id}><ProjectConversationContent project={project} /></ActivityTopicProvider>;
+}
+
+function ProjectConversationContent({ project }: { project: ProjectDiscussionProject }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -759,7 +765,9 @@ function ProjectConversation({ project }: { project: ProjectDiscussionProject })
                     <div className={clsx('rounded-xl border px-3 py-2 text-left text-sm shadow-sm', chatBubbleTone(item.activity_type, own))}>
                       <ActivityReplyQuote replyTo={item.reply_to} />
                       <p className={clsx('mb-1 text-[10px] font-semibold uppercase tracking-wide', own ? 'text-blue-100' : 'text-slate-400')}>{activityLabel(item.activity_type)}</p>
+                      {!item.withdrawn_at ? <ActivityTopicCard source={item} /> : null}
                       <p className="whitespace-pre-wrap break-words leading-5">{item.withdrawn_at ? 'Tin nhắn đã được thu hồi' : item.comment || 'Không có nội dung'}</p>
+                      {activityVisibilityLabel(item.visibility) ? <p className={clsx('mt-1 text-[11px]', own ? 'text-blue-100' : 'text-slate-500')}>{activityVisibilityLabel(item.visibility)}</p> : null}
                       <ActivityAttachments attachments={item.attachments} compact />
                     </div>
                     {!item.withdrawn_at && project.can_post ? <button type="button" className="mt-1 inline-flex items-center gap-1 px-1 text-[11px] font-semibold text-slate-500 hover:text-blue-700" onClick={() => setReplyTo(item)}><Reply className="h-3 w-3" /> Trả lời</button> : null}

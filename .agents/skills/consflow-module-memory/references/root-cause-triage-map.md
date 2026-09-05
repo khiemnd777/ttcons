@@ -1,5 +1,11 @@
 # Consflow Root-Cause Triage Map
 
+## Discussion Topic Is Plain Text Or Opens The Wrong Record
+
+- Route `Gắn vào`, `Sơn nội thất`, missing topic link and redundant `Thành viên công trình` to `ActivityTopic.tsx`, `ActivityTopicDetails.tsx`, `activityTopicDomain.ts`, `ActivityThread.tsx`, `ActivityComposer.tsx` and `UtilityDock.tsx`. Load central/frontend/Project Planning plus the source domain map. First searches: `ActivityTopicCard|activityTopicPath|activityTopicRecord|activityVisibilityLabel`.
+- Prior root cause: `ChatMessage` put target_label in a small metadata span and only linked work_item_id; Dock omitted the target. Shared cards now open an actor/project-bound dialog. Check exact scope/id/project and the target endpoint before diagnosing authorization as missing data; movement and stock-document IDs are different. Never choose a record by title or use work_item_id in place of a non-work-item target.
+- Opening must retain the mounted composer/feed and never submit, mark read or mutate source state. Historical project visibility is omitted only in presentation. Test resolver rejection of wrong IDs/projects/cancelled/deleted rows, inert broken links, loading/error/retry and normal/blue/compact card semantics; Node server rendering is not browser/UAT acceptance.
+
 ## Bare Mention Badge And All-Member Delivery
 
 - Symptom: a lone `@` appears below a sent message. Owners: `ActivityThread.tsx::ChatMessage`, `repository_work_item_activity.go::ProjectActivityThread`. First search: `mentions.map|mention.label|recipient_staff_id`. The old renderer expected `id/label`, while the API projects `type/key/user_id/staff_id`; a source-backed React render reproduced `<span>@</span>`. Chat now omits this redundant row, retaining inline content, `@tôi` and stored attention recipients.

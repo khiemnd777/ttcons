@@ -39,6 +39,8 @@ import type {
 } from '../../lib/types/domain';
 import { activityLabel, compactDateTime, scopeTypeLabel, workflowFormActivityComment } from './workItemPresentation';
 import { ActivityAttachments } from './ActivityAttachments';
+import { ActivityTopicCard, ActivityTopicProvider } from './ActivityTopic';
+import { activityVisibilityLabel } from './activityTopicDomain';
 import { ActivityReactionBar, ActivityReplyQuote } from './ActivityConversationMeta';
 import {
   ActivityComposer,
@@ -112,7 +114,11 @@ const visibilityLabels: Record<string, string> = {
   client: 'Chủ đầu tư',
 };
 
-export function ActivityThread({
+export function ActivityThread(props: Parameters<typeof ActivityThreadContent>[0]) {
+  return <ActivityTopicProvider projectId={props.projectId}><ActivityThreadContent {...props} /></ActivityTopicProvider>;
+}
+
+function ActivityThreadContent({
   projectId,
   targetOptions,
   attachmentOptions = [],
@@ -907,15 +913,15 @@ function ChatMessage({
               </div>
             ) : null}
           </div>
+          {!withdrawn ? <ActivityTopicCard source={item} /> : null}
           {withdrawn ? <p className="text-sm italic leading-6">Tin nhắn đã được thu hồi</p> : comment ? <p className={clsx('whitespace-pre-wrap break-words text-sm leading-6', item.activity_type === 'comment' ? '' : 'mt-1.5')}>{comment}</p> : null}
           {!withdrawn && metadata.due_at ? <p className="mt-2 text-xs font-semibold">Hạn: {compactDateTime(metadata.due_at)}</p> : null}
           {!withdrawn ? <ActivityAttachments attachments={item.attachments} /> : null}
-          <div className={clsx('mt-2 flex flex-wrap items-center gap-2 border-t pt-2 text-[11px]', ownBlueBubble ? 'border-white/20' : 'border-black/5')}>
-            <span className={ownBlueBubble ? 'text-blue-100' : 'text-slate-500'}>{visibilityLabels[item.visibility ?? 'project'] ?? item.visibility}</span>
-            <span className={clsx('truncate', ownBlueBubble ? 'text-blue-100' : 'text-slate-500')}>{item.target_label ?? item.work_item_title ?? scopeTypeLabel(item.scope_type ?? 'project')}</span>
+          {activityVisibilityLabel(item.visibility) || compact || (item.edited_at && !withdrawn) ? <div className={clsx('mt-2 flex flex-wrap items-center gap-2 text-[11px]', ownBlueBubble ? 'text-blue-100' : 'text-slate-500')}>
+            {activityVisibilityLabel(item.visibility) ? <span>{activityVisibilityLabel(item.visibility)}</span> : null}
             {compact ? <span className={ownBlueBubble ? 'text-blue-100' : 'text-slate-400'}>{compactDateTime(item.created_at)}</span> : null}
             {item.edited_at && !withdrawn ? <span className={ownBlueBubble ? 'text-blue-100' : 'text-slate-400'}>đã chỉnh sửa</span> : null}
-          </div>
+          </div> : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {!withdrawn ? <button type="button" className="inline-flex items-center gap-1 rounded-md bg-white/80 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-white" onClick={onReply}>
               <Reply className="h-3 w-3" />
@@ -1006,13 +1012,12 @@ function ActivityCard({
           </div>
           <p className="mt-1.5 truncate text-xs text-slate-500">
             <span className="font-semibold text-slate-700">{identityReferenceText(item.actor_name, item.actor_account_deleted, 'Hệ thống')}</span>
-            {' · '}{item.target_label ?? item.work_item_title ?? scopeTypeLabel(item.scope_type ?? 'project')}
             {' · '}{compactDateTime(item.created_at)}
             {item.edited_at && !withdrawn ? ' · đã chỉnh sửa' : ''}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <span className="hidden rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 sm:inline">{visibilityLabels[item.visibility ?? 'project'] ?? item.visibility}</span>
+          {activityVisibilityLabel(item.visibility) ? <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{activityVisibilityLabel(item.visibility)}</span> : null}
           {item.is_unread ? (
             <button type="button" className="rounded-md border border-blue-200 bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50" disabled={marking} onClick={onMarkRead}>
               {marking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Đã đọc'}
@@ -1020,6 +1025,7 @@ function ActivityCard({
           ) : null}
         </div>
       </div>
+      {!withdrawn ? <ActivityTopicCard source={item} /> : null}
       {!withdrawn ? <ActivityReplyQuote replyTo={item.reply_to} /> : null}
       {withdrawn ? <p className="mt-2 text-sm italic text-slate-500">Tin nhắn đã được thu hồi</p> : comment ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{comment}</p> : null}
       {!withdrawn ? <ActivityAttachments attachments={item.attachments} /> : null}

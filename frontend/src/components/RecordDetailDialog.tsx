@@ -31,16 +31,18 @@ export function RecordDetailDialog<T extends Record<string, any>>({
 }) {
   return (
     <Dialog open={open && Boolean(record)} title={title} onClose={onClose} size="lg">
-      {record ? (
-        <dl className="grid gap-3 md:grid-cols-2">
-          {fields.filter((field) => !field.hidden?.(record)).map((field) => (
-            <div key={field.key} className="rounded-md border border-line bg-slate-50 px-3 py-2">
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{field.label}</dt>
-              <dd className="mt-1 break-words text-sm text-ink">{field.render ? field.render(record) : formatValue(record[field.key])}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
+      {record ? <RecordDetailFields record={record} fields={fields} /> : null}
     </Dialog>
   );
+}
+
+export function RecordDetailFields<T extends Record<string, any>>({ record, fields }: { record: T; fields: DetailField<T>[] }) {
+  return <dl className="grid gap-3 md:grid-cols-2">
+    {fields.filter((field) => !field.hidden?.(record)).map((field) => (
+      <div key={field.key} className="rounded-md border border-line bg-slate-50 px-3 py-2">
+        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{field.label}</dt>
+        <dd className="mt-1 break-words text-sm text-ink">{field.render ? field.render(record) : formatValue(record[field.key])}</dd>
+      </div>
+    ))}
+  </dl>;
 }
