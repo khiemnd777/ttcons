@@ -1,5 +1,11 @@
 # Project Planning Domain Map
 
+## Per-Project Update Awareness
+
+- The Projects explorer shows actor-specific unread notification, discussion and system activity indicators under each project name and a latest-visible-update preview. Summary scope is bounded to the current page through `/projects/updates-summary`; counts are independent because notification and mention-derived discussion sources can overlap.
+- V136 starts system unread awareness at migration activation, using a dedicated per-user/project monotonic cursor. Older system history remains viewable. Existing V135 discussion cursors and notification read/archive semantics remain separate; no read action resolves workflow, attention or source decisions. Only recorded activity is projected; no invented transitions from `updated_at`, no new producer catalog and no changed project/runtime state.
+- The shared dialog exposes paginated group/unread/transition filters and explicit read actions. Read-through cannot run while unseen older pages or hidden transition types remain. Latest/count queries retain current project/Work Item permissions and cancelled/withdrawn exclusions. No actor-specific values enter shared Explorer Redis rows.
+
 ## Accounting Company Observation (V133)
 
 - `ProjectAccessFilter` treats a global `project.reconciliation.view` actor as an all-company reader for non-cancelled projects and project-backed source lists.

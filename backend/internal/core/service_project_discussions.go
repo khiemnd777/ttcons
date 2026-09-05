@@ -90,6 +90,10 @@ func (s *Service) MyProjectDiscussions(ctx context.Context, filter ProjectDiscus
 }
 
 func (s *Service) MarkProjectDiscussionReadThrough(ctx context.Context, projectID string, req ProjectDiscussionReadRequest, actorID string) (Record, error) {
+	return s.markProjectActivityReadThrough(ctx, projectID, req, actorID, false)
+}
+
+func (s *Service) markProjectActivityReadThrough(ctx context.Context, projectID string, req ProjectDiscussionReadRequest, actorID string, system bool) (Record, error) {
 	projectID = cleanID(projectID)
 	if !validActivityUUID(projectID) {
 		return nil, validationError("Mã công trình không hợp lệ", Record{"project_id": projectID})
@@ -124,10 +128,11 @@ func (s *Service) MarkProjectDiscussionReadThrough(ctx context.Context, projectI
 		return nil, validationError("Hoạt động không thuộc công trình đã chọn", Record{"activity_id": activityID})
 	}
 	activityType := strings.TrimSpace(fmt.Sprint(activity["activity_type"]))
-	if !statusIn(activityType, "comment", "status", "blocker", "question", "decision", "reminder", "file_note") || activity["withdrawn_at"] != nil {
-		return nil, validationError("Hoạt động không thuộc luồng trao đổi hoặc đã được thu hồi", Record{"activity_id": activityID})
+	isDiscussion := statusIn(activityType, "comment", "status", "blocker", "question", "decision", "reminder", "file_note")
+	if isDiscussion == system || activity["withdrawn_at"] != nil {
+		return nil, validationError("Hoạt động không thuộc nhóm đã chọn hoặc đã được thu hồi", Record{"activity_id": activityID})
 	}
-	result, err := s.repo.MarkProjectDiscussionReadThrough(ctx, projectID, actorID, activityID)
+	result, err := s.repo.markProjectActivityReadThrough(ctx, projectID, actorID, activityID, system)
 	if err != nil {
 		return nil, err
 	}

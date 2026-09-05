@@ -173,16 +173,17 @@ func (h *Handler) ProjectEvidence(c *fiber.Ctx) error {
 
 func (h *Handler) ProjectActivity(c *fiber.Ctx) error {
 	page, err := h.service.ProjectActivityPage(c.Context(), c.Params("id"), ProjectActivityFilter{
-		ScopeType:    c.Query("scope_type"),
-		ScopeID:      c.Query("scope_id"),
-		ActivityType: c.Query("activity_type"),
-		ActorID:      c.Query("actor_id"),
-		Visibility:   c.Query("visibility"),
-		Kind:         c.Query("kind"),
-		Attention:    c.Query("attention"),
-		Search:       c.Query("search"),
-		Cursor:       c.Query("cursor"),
-		Limit:        c.QueryInt("limit", 30),
+		TransitionsOnly: c.QueryBool("transitions_only", false),
+		ScopeType:       c.Query("scope_type"),
+		ScopeID:         c.Query("scope_id"),
+		ActivityType:    c.Query("activity_type"),
+		ActorID:         c.Query("actor_id"),
+		Visibility:      c.Query("visibility"),
+		Kind:            c.Query("kind"),
+		Attention:       c.Query("attention"),
+		Search:          c.Query("search"),
+		Cursor:          c.Query("cursor"),
+		Limit:           c.QueryInt("limit", 30),
 	}, actorID(c))
 	if err != nil {
 		return err

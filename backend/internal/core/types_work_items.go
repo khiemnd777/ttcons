@@ -120,6 +120,7 @@ type ActivityAttachmentRequest struct {
 }
 
 type ProjectActivityFilter struct {
+	TransitionsOnly bool
 	ScopeType       string
 	ScopeID         string
 	ActivityType    string
@@ -135,10 +136,12 @@ type ProjectActivityFilter struct {
 }
 
 type ProjectDiscussionFilter struct {
-	ProjectID string
-	Search    string
-	Cursor    string
-	Limit     int
+	// Internal bounded batch used by the project explorer updates summary.
+	ProjectIDs []string
+	ProjectID  string
+	Search     string
+	Cursor     string
+	Limit      int
 }
 
 type ProjectDiscussionReadRequest struct {

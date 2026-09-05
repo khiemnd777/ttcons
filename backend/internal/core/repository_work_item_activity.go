@@ -1473,6 +1473,9 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 		fmt.Sprintf("(%s)", visibilitySQL),
 		fmt.Sprintf("(wia.scope_type <> 'work_item' OR (wi.id IS NOT NULL AND (%s)))", workItemScopeSQL("wi", 3)),
 	}
+	if filter.TransitionsOnly {
+		conditions = append(conditions, "NULLIF(wia.from_status,'') IS NOT NULL AND NULLIF(wia.to_status,'') IS NOT NULL AND wia.from_status <> wia.to_status")
+	}
 	if filter.ScopeType != "" {
 		args = append(args, filter.ScopeType)
 		conditions = append(conditions, fmt.Sprintf("wia.scope_type=$%d", len(args)))
@@ -1507,6 +1510,10 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 	openBlocker := "(wia.activity_type='blocker' AND COALESCE(wia.metadata_json->>'resolved_at', wia.metadata_json->>'closed_at', '')='')"
 	dueReminder := "(wia.activity_type='reminder' AND COALESCE(wia.metadata_json->>'completed_at', wia.metadata_json->>'done_at', wia.metadata_json->>'closed_at', '')='' AND COALESCE(wia.metadata_json->>'due_at', '') ~ '^\\d{4}-\\d{2}-\\d{2}' AND left(wia.metadata_json->>'due_at', 10)::date <= current_date + INTERVAL '7 days')"
 	switch filter.Attention {
+	case "discussion_unread":
+		conditions = append(conditions, projectDiscussionUnreadSQL("$2"))
+	case "system_unread":
+		conditions = append(conditions, projectSystemUnreadSQL("$2"))
 	case "mentions":
 		conditions = append(conditions, mentioned)
 	case "questions":
@@ -1560,15 +1567,8 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 			%s,
 			ars.read_at,
 				(wia.withdrawn_at IS NULL AND ars.user_id IS NOT NULL AND ars.read_at IS NULL) AS is_unread,
-				(
-					wia.withdrawn_at IS NULL
-					AND wia.activity_type IN (%s)
-					AND wia.actor_id IS DISTINCT FROM $2::uuid
-					AND (
-						discussion_cursor.last_read_created_at IS NULL
-						OR (wia.created_at, wia.id) > (discussion_cursor.last_read_created_at, COALESCE(discussion_cursor.last_read_activity_id, '00000000-0000-0000-0000-000000000000'::uuid))
-					)
-				) AS is_discussion_unread,
+			%s AS is_discussion_unread,
+			%s AS is_system_unread,
 			COALESCE(
 				CASE
 					WHEN wia.scope_type='project' THEN p.code || ' · ' || p.name
@@ -1594,6 +1594,8 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 		%s
 		LEFT JOIN activity_read_states ars ON ars.activity_id=wia.id AND ars.user_id=$2
 		LEFT JOIN project_discussion_read_cursors discussion_cursor ON discussion_cursor.project_id=wia.project_id AND discussion_cursor.user_id=$2
+		LEFT JOIN project_system_activity_read_cursors system_cursor ON system_cursor.project_id=wia.project_id AND system_cursor.user_id=$2
+		CROSS JOIN project_activity_tracking_start tracking
 		LEFT JOIN LATERAL (
 			SELECT
 				jsonb_agg(jsonb_build_object(
@@ -1618,7 +1620,7 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 		WHERE %s
 		ORDER BY wia.created_at DESC, wia.id DESC
 		LIMIT $%d
-		`, activityAttachmentSelectSQL(), activityConversationSelectSQL("$2"), projectDiscussionActivityTypesSQL, activityAttachmentJoinSQL(), activityConversationJoinSQL("$2"), strings.Join(conditions, " AND "), limitPlaceholder), args...)
+		`, activityAttachmentSelectSQL(), activityConversationSelectSQL("$2"), projectDiscussionUnreadSQL("$2"), projectSystemUnreadSQL("$2"), activityAttachmentJoinSQL(), activityConversationJoinSQL("$2"), strings.Join(conditions, " AND "), limitPlaceholder), args...)
 }
 
 func profileIsClient(profile workItemAccessProfile) bool {

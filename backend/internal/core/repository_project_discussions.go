@@ -59,6 +59,10 @@ func (r *Repository) MyProjectDiscussions(ctx context.Context, profile workItemA
 		args = append(args, filter.ProjectID)
 		projectConditions = append(projectConditions, fmt.Sprintf("p.id=$%d::uuid", len(args)))
 	}
+	if len(filter.ProjectIDs) > 0 {
+		args = append(args, filter.ProjectIDs)
+		projectConditions = append(projectConditions, fmt.Sprintf("p.id=ANY($%d::uuid[])", len(args)))
+	}
 	if filter.Search != "" {
 		args = append(args, "%"+filter.Search+"%")
 		searchPlaceholder := len(args)
@@ -166,16 +170,26 @@ func (r *Repository) MyProjectDiscussions(ctx context.Context, profile workItemA
 }
 
 func (r *Repository) MarkProjectDiscussionReadThrough(ctx context.Context, projectID, userID, activityID string) (Record, error) {
+	return r.markProjectActivityReadThrough(ctx, projectID, userID, activityID, false)
+}
+
+func (r *Repository) markProjectActivityReadThrough(ctx context.Context, projectID, userID, activityID string, system bool) (Record, error) {
+	table := "project_discussion_read_cursors"
+	kind := "activity_type IN (" + projectDiscussionActivityTypesSQL + ")"
+	if system {
+		table = "project_system_activity_read_cursors"
+		kind = "activity_type NOT IN (" + projectDiscussionActivityTypesSQL + ")"
+	}
 	row, err := r.QueryOne(ctx, fmt.Sprintf(`
 		WITH candidate AS (
 			SELECT id, project_id, created_at
 			FROM work_item_activities
 			WHERE id=$3::uuid
 			  AND project_id=$1::uuid
-			  AND activity_type IN (%s)
+			  AND %[1]s
 			  AND withdrawn_at IS NULL
 		), upserted AS (
-			INSERT INTO project_discussion_read_cursors (
+			INSERT INTO %[2]s (
 				project_id, user_id, last_read_activity_id, last_read_created_at, updated_at
 			)
 			SELECT project_id, $2::uuid, id, created_at, now()
@@ -185,17 +199,17 @@ func (r *Repository) MarkProjectDiscussionReadThrough(ctx context.Context, proje
 				last_read_created_at=EXCLUDED.last_read_created_at,
 				updated_at=now()
 			WHERE (EXCLUDED.last_read_created_at, EXCLUDED.last_read_activity_id) >
-				(project_discussion_read_cursors.last_read_created_at, COALESCE(project_discussion_read_cursors.last_read_activity_id, '00000000-0000-0000-0000-000000000000'::uuid))
+				(%[2]s.last_read_created_at, COALESCE(%[2]s.last_read_activity_id, '00000000-0000-0000-0000-000000000000'::uuid))
 			RETURNING *
 		)
 		SELECT * FROM upserted
 		UNION ALL
 		SELECT cursor.*
-		FROM project_discussion_read_cursors cursor
+		FROM %[2]s cursor
 		WHERE cursor.project_id=$1::uuid AND cursor.user_id=$2::uuid
 		  AND NOT EXISTS (SELECT 1 FROM upserted)
 		LIMIT 1
-	`, projectDiscussionActivityTypesSQL), projectID, userID, activityID)
+	`, kind, table), projectID, userID, activityID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, validationError("Hoạt động trao đổi không tồn tại hoặc đã được thu hồi", Record{"activity_id": activityID})

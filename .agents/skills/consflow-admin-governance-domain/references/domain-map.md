@@ -114,6 +114,8 @@
 
 ## Notification Platform Boundary
 
+- Project row updates consume existing actor-owned notification visibility/read policies through a bounded current-page summary; V136 adds only a separate system-activity read cursor and rollout baseline. No new permission, recipient policy, notification producer or workflow decision is introduced. Unread counts must never be stored in the shared Explorer project-row cache. Read-through authorizes exact project/activity/kind and advances monotonically without changing mention attention or notification resolution.
+
 - V126 registers governance/security catalog candidates (`project.member_*`, `project.role_changed`, `project.pm_changed`, `account.role_*`, account lifecycle) disabled. They must not be enabled until their authoritative admin transaction emits an idempotent event with an explicit recipient and a reviewed route; notification delivery may never replace session revocation, audit or permission synchronization.
 - V130 enables the reviewed project-startup events and `work_item.assigned`. Single create and PM handover emit inside the authoritative audit transaction; batch import emits one importer summary rather than one notification per project. Dynamic visibility hides resolved/non-actionable startup and work-item notifications. `work_item_responsible` uses operational assignment scope without the global Admin intervention override, so permission to intervene never becomes a broadcast audience. Notification read/archive remains independent from resolving the startup source projection.
 

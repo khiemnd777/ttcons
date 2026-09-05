@@ -28,7 +28,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { SimpleForm } from '../_shared/SimpleForm';
-import type { Project, ProjectExplorerPage } from '../../lib/types/domain';
+import type { Project, ProjectExplorerPage, ProjectUpdateKind, ProjectUpdateSummary } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { BulkSelectionBar } from '../../components/BulkSelectionBar';
 import { BulkDeleteDialog, type BulkDeletionResult } from '../../components/BulkDeleteDialog';
@@ -51,6 +51,9 @@ import { ProjectImportDialog } from './ProjectImportDialog';
 import { ProjectExportDialog } from './ProjectExportDialog';
 import { ProjectStartupWizard } from './ProjectStartupWizard';
 import { buildProjectFormFields, useProjectFormCatalogs } from './projectFormFields';
+import { useProjectUpdates } from './useProjectUpdates';
+import { ProjectUpdateIndicators } from './ProjectUpdateIndicators';
+import { ProjectUpdatesDialog } from './ProjectUpdatesDialog';
 
 const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-[112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
 const PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS = 'lg:grid-cols-[32px_112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
@@ -58,6 +61,7 @@ const PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS = 'lg:grid-cols-[32px_112px
 export function ProjectsPage() {
   const [open, setOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [updatesSelection, setUpdatesSelection] = useState<{ project: Project; kind: ProjectUpdateKind } | null>(null);
   const [search, setSearch] = useState('');
 	const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -129,6 +133,8 @@ export function ProjectsPage() {
   );
   const statusOptions = projects.data?.options.statuses ?? [];
 	const filteredProjects = projects.data?.items ?? [];
+  const updates = useProjectUpdates(filteredProjects.map((project) => project.id));
+  const updatesByProject = new Map(updates.data?.items.map((item) => [item.project_id, item]) ?? []);
 	const selectedVisibleCount = filteredProjects.filter((project) => selectedProjectIds.has(project.id)).length;
 	const allVisibleSelected = Boolean(filteredProjects.length && selectedVisibleCount === filteredProjects.length);
 	const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
@@ -155,6 +161,8 @@ export function ProjectsPage() {
 				if (invalidateTimer !== undefined) window.clearTimeout(invalidateTimer);
 				invalidateTimer = window.setTimeout(() => {
 					void queryClient.invalidateQueries({ queryKey: ['project-explorer'] });
+					void queryClient.invalidateQueries({ queryKey: ['project-updates'] });
+					void queryClient.invalidateQueries({ queryKey: ['project-update-feed'] });
 				}, 300);
 			},
 		});
@@ -349,6 +357,11 @@ export function ProjectsPage() {
 					onSelectedChange={() => toggleSelectedProject(project.id)}
                     onToggle={() => toggleProject(project.id)}
                     onEdit={() => setEditingProject(project)}
+                    updates={updatesByProject.get(project.id)}
+                    updatesLoading={updates.isLoading}
+                    updatesError={updates.isError}
+                    onRetryUpdates={() => void updates.refetch()}
+                    onOpenUpdates={(kind) => setUpdatesSelection({ project, kind })}
                   />
                   {expanded ? (
                     <ProjectExpandedWorkspace project={project} folders={visibleFolders} />
@@ -423,6 +436,13 @@ export function ProjectsPage() {
 			onError={(title, error) => toast.error(title, error)}
 		/>
 
+      {updatesSelection ? <ProjectUpdatesDialog
+        key={`${updatesSelection.project.id}:${updatesSelection.kind}`}
+        project={updatesSelection.project}
+        initialKind={updatesSelection.kind}
+        summary={updatesByProject.get(updatesSelection.project.id)}
+        onClose={() => setUpdatesSelection(null)}
+      /> : null}
       <ProjectStartupWizard
         open={open}
         onCreateProject={(values) => createProject.mutateAsync(values)}
@@ -747,6 +767,11 @@ function ProjectExplorerRow({
   onSelectedChange,
   onToggle,
   onEdit,
+  updates,
+  updatesLoading,
+  updatesError,
+  onRetryUpdates,
+  onOpenUpdates,
 }: {
   project: Project;
   expanded: boolean;
@@ -755,6 +780,11 @@ function ProjectExplorerRow({
   onSelectedChange: () => void;
   onToggle: () => void;
   onEdit: () => void;
+  updates?: ProjectUpdateSummary;
+  updatesLoading: boolean;
+  updatesError: boolean;
+  onRetryUpdates: () => void;
+  onOpenUpdates: (kind: ProjectUpdateKind) => void;
 }) {
   const gridClass = selectable ? PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS : PROJECT_EXPLORER_DESKTOP_GRID_CLASS;
   return (
@@ -797,6 +827,7 @@ function ProjectExplorerRow({
           <p className="mt-1 truncate text-xs text-slate-500">
             {project.client_name || project.partner_name || 'Chưa có chủ đầu tư'}
           </p>
+          <ProjectUpdateIndicators summary={updates} loading={updatesLoading} error={updatesError} onRetry={onRetryUpdates} onOpen={onOpenUpdates} />
         </div>
       </div>
 

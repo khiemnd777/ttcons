@@ -1,5 +1,11 @@
 # Consflow Backend Function Map
 
+## Project Update Summary And System Read-Through
+
+- `project_updates.go` owns validated max-100 ID batches, handler/service aggregation and bounded activity/notification metrics. Protected `GET /projects/updates-summary` requires `project.view`; actor/project/Work Item scope is reused from `MyProjectDiscussions`, and notification metrics reuse `notificationVisibility` including archive, expiry and source-actionable policies. Response has separate `notification_unread`, `discussion_unread`, `system_unread` and latest visible update. Never merge actor-specific fields into Explorer row cache.
+- V136 adds `project_activity_tracking_start` singleton rollout baseline and `project_system_activity_read_cursors`. Protected `POST /projects/:id/activity/system-read-through` reuses the project/activity authorization and exact project/kind validation of discussion read-through. Both cursors advance only by `(created_at,id)` and never change mention read states, notifications, workflow or activity history. System unread excludes own, withdrawn, inaccessible and cancelled-work-item events, and ignores pre-rollout history.
+- `ProjectActivityThread` adds `is_system_unread`, `attention=discussion_unread|system_unread` and `transitions_only`; existing mention `attention=unread` is unchanged. Transition filtering requires real unequal nonblank before/after fields. `project_updates_test.go` covers scoped counts, expiry/archive/permission exclusions, cursor ordering, pagination, independent readers and a bounded 100-project batch.
+
 Use this map after `module-keyword-map.md` for backend/API/schema/function work. This is a routing cache for fast ownership discovery, not a substitute for reading code.
 
 ## Mandatory Backend Workflow

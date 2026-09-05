@@ -1,5 +1,11 @@
 # Consflow Frontend UI And Utility Map
 
+## Project Row Update Indicators
+
+- `/projects` owns one `useProjectUpdates` actor/current-page query (max 100 IDs), with `ProjectUpdateIndicators` below the project/client name. Independent notification/discussion/system badges cap at `99+`, latest text uses status labels and relative time, and zero/loading/error/missing-scope states are explicit. Existing row actions, checkbox, grid, expansion and pagination remain intact.
+- `ProjectUpdatesDialog` uses shared `Dialog` focus management, `NotificationItem`, activity reply/attachment and status presentation. Group, unread and transition filters are server-backed; feeds paginate and links open canonical notification targets or guarded project Work Item detail. Reading notifications submits exact displayed IDs. Discussion/system read-through is disabled while older pages or a hidden transition subset remain, so the cursor cannot consume unseen content. Failed feed refresh hides cached records; mark-read never resolves source actions.
+- `ActorRealtimeProvider` and Explorer invalidation debounce the `project-updates` and `project-update-feed` families, reconcile on reconnect and retain 60-second polling for disconnect/expiry. `projectUpdates.ts` owns stable batch keys, count formatting and the read-boundary guard; focused tests are `frontend/tests/projectUpdates.test.ts`.
+
 Use this map after `module-keyword-map.md` for React/Vite admin UI, frontend helpers, API usage, status labels, domain types, and presentation behavior.
 
 ## Global Utility Dock

@@ -30,13 +30,23 @@ export function ActorRealtimeProvider({ children }: { children: ReactNode }) {
         queryClient.invalidateQueries({ queryKey: ['notification-projects', actorID] }),
       ]);
     };
-    return streamSSE('/me/activity-attention/stream', {
+    let updatesTimer: number | undefined;
+    const invalidateProjectUpdates = () => {
+      if (updatesTimer !== undefined) window.clearTimeout(updatesTimer);
+      updatesTimer = window.setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: ['project-updates', actorID] });
+        void queryClient.invalidateQueries({ queryKey: ['project-update-feed', actorID] });
+      }, 300);
+    };
+    const stop = streamSSE('/me/activity-attention/stream', {
       onStatus: (status) => {
         setStatus(status);
         if (status !== 'connected') return;
+        invalidateProjectUpdates();
         void reconcileNotifications();
       },
       onEvent: (message) => {
+        if (['notification_changed', 'work_report_changed', 'work_queue_changed', 'work_item_changed', 'attention_changed'].includes(message.event)) invalidateProjectUpdates();
         if (message.event === 'notification_changed') {
           void queryClient.invalidateQueries({ queryKey: ['notification-summary', actorID] });
           void queryClient.invalidateQueries({ queryKey: ['notifications', actorID] });
@@ -63,6 +73,10 @@ export function ActorRealtimeProvider({ children }: { children: ReactNode }) {
         }
       },
     });
+    return () => {
+      stop();
+      if (updatesTimer !== undefined) window.clearTimeout(updatesTimer);
+    };
   }, [actorID, queryClient, user?.must_change_password]);
 
   return <ActorRealtimeStatusContext.Provider value={status}>{children}</ActorRealtimeStatusContext.Provider>;

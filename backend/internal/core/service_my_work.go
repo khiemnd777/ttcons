@@ -652,7 +652,7 @@ func normalizeProjectActivityFilter(filter ProjectActivityFilter) (ProjectActivi
 	if filter.Attention == "all" {
 		filter.Attention = ""
 	}
-	if filter.Attention != "" && !activityAttentionQueues[filter.Attention] {
+	if filter.Attention != "" && !activityAttentionQueues[filter.Attention] && !statusIn(filter.Attention, "discussion_unread", "system_unread") {
 		return filter, validationError("Hàng đợi chú ý không hợp lệ", Record{"attention": filter.Attention})
 	}
 	filter.Search = strings.TrimSpace(filter.Search)

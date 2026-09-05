@@ -21,6 +21,7 @@ export type WorkItemActivity = ProjectOperationsRecord & {
   read_at?: string;
   is_unread?: boolean;
   is_discussion_unread?: boolean;
+  is_system_unread?: boolean;
   queue_types?: string[];
   attachments?: ActivityAttachmentSummary[];
   parent_activity_id?: string;
@@ -120,6 +121,21 @@ export type ProjectDiscussionPage = {
   has_more: boolean;
   next_cursor?: string;
 };
+
+export type ProjectUpdateKind = 'notification' | 'discussion' | 'system';
+export type ProjectUpdateLatest = Pick<WorkItemActivity, 'comment' | 'actor_name' | 'from_status' | 'to_status' | 'target_label'> & {
+  kind: ProjectUpdateKind;
+  created_at: string;
+  activity_type?: string;
+};
+export type ProjectUpdateSummary = {
+  project_id: string;
+  notification_unread: number;
+  discussion_unread: number;
+  system_unread: number;
+  latest: ProjectUpdateLatest | null;
+};
+export type ProjectUpdatesPage = { items: ProjectUpdateSummary[] };
 
 export type ProjectActivityFeed = {
   items: WorkItemActivity[];

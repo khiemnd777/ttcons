@@ -1,5 +1,11 @@
 # Consflow Module Keyword Map
 
+## Project Row Updates
+
+- Keywords: Projects/Dự án/Công trình thông báo, hoạt động mới, trao đổi chưa đọc, chuyển trạng thái trên bảng. Owners: `frontend/src/modules/projects/ProjectsPage.tsx`, `ProjectUpdateIndicators.tsx`, `ProjectUpdatesDialog.tsx`, `useProjectUpdates.ts`, `projectUpdates.ts`; backend `project_updates.go`, shared `repository_project_discussions.go`, `service_project_discussions.go`, `repository_work_item_activity.go`; V136.
+- `/projects/updates-summary?project_ids=` returns independent actor-scoped notification/discussion/system unread counts and the latest visible update for at most 100 current-page projects. No combined count and no personal fields in shared Explorer Redis rows. The dialog reuses notification/activity feeds and explicit read actions; opening the table or a row never reads anything. System read-through uses its own monotonic cursor and rollout baseline; historical events before V136 remain readable but are not new. Message mentions, source workflow decisions and notification resolution remain independent.
+- First searches: `ProjectUpdatesSummary|projectSystemUnreadSQL|projectActivityReadBoundary|project-updates|system-read-through`. Load backend/frontend detail maps and Project Planning domain. Realtime invalidation plus 60-second reconciliation keeps current-page indicators fresh; never broaden event producers by inferring transitions from project timestamps.
+
 Use this as the mandatory central routing cache. It is not a replacement for reading code. If a mapping conflicts with code, trust code and update this file when the correction is durable.
 
 ## Pipeline Stage Return Navigation
