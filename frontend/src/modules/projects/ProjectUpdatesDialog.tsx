@@ -6,17 +6,17 @@ import { useToast } from '../../components/ToastProvider';
 import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 import { get, post, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
-import type { NotificationPage, Project, ProjectActivityFeed, ProjectUpdateKind, ProjectUpdateSummary, UserNotification, WorkItemActivity } from '../../lib/types/domain';
+import type { NotificationPage, ProjectActivityFeed, ProjectUpdateKind, ProjectUpdateSummary, UserNotification, WorkItemActivity } from '../../lib/types/domain';
 import { statusLabel } from '../../lib/utils/status';
 import { NotificationItem } from '../notifications/NotificationItem';
 import { safeNotificationHref } from '../notifications/notificationPresentation';
 import { ActivityAttachments } from '../work-items/ActivityAttachments';
 import { ActivityReplyQuote } from '../work-items/ActivityConversationMeta';
 import { activityLabel, compactDateTime, workflowFormActivityComment } from '../work-items/workItemPresentation';
-import { projectActivityReadBoundary, projectUpdateCount, projectUpdateGroups } from './projectUpdates';
+import { projectActivityReadBoundary, projectUpdateCount, projectUpdateGroups, type ProjectUpdateIdentity } from './projectUpdates';
 
 export function ProjectUpdatesDialog({ project, initialKind, summary, onClose }: {
-  project: Project;
+  project: ProjectUpdateIdentity;
   initialKind: ProjectUpdateKind;
   summary?: ProjectUpdateSummary;
   onClose: () => void;

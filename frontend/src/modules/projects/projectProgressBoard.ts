@@ -31,3 +31,8 @@ export function mergeProjectProgressPages(pages: ProjectProgressStagePage[] | un
   }
   return Array.from(unique.values());
 }
+
+export function projectProgressUpdateIDs(items: ProjectProgressItem[], virtualItems: readonly { index: number }[], nearViewport: boolean) {
+  if (!nearViewport) return [];
+  return [...new Set(virtualItems.flatMap(({ index }) => items[index] ? [items[index].id] : []))];
+}

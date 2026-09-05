@@ -5,8 +5,9 @@ import {
   mergeProjectProgressPages,
   projectProgressFilterQuery,
   projectProgressStageQuery,
+  projectProgressUpdateIDs,
 } from '../src/modules/projects/projectProgressBoard.ts';
-import type { ProjectProgressStagePage } from '../src/lib/types/domain.ts';
+import type { ProjectProgressItem, ProjectProgressStagePage } from '../src/lib/types/domain.ts';
 
 async function source(path: string) {
   return readFile(new URL(path, import.meta.url), 'utf8');
@@ -37,6 +38,15 @@ test('project progress page merging de-duplicates moving rows across cursor page
     mergeProjectProgressPages(pages).map((item) => [item.id, item.name]),
     [['project-1', 'A'], ['project-2', 'B updated'], ['project-3', 'C']],
   );
+});
+
+test('deeply paged boards request updates only for the virtual window in near columns', () => {
+  const items = Array.from({ length: 250 }, (_, index) => ({ id: `project-${index}` })) as ProjectProgressItem[];
+  const window = [{ index: 202 }, { index: 203 }, { index: 204 }, { index: 203 }, { index: 300 }];
+  assert.deepEqual(projectProgressUpdateIDs(items, window, true), ['project-202', 'project-203', 'project-204']);
+  assert.deepEqual(projectProgressUpdateIDs(items, window, false), []);
+  assert.deepEqual(projectProgressUpdateIDs(items, [], true), []);
+  assert.deepEqual(projectProgressUpdateIDs([], window, true), []);
 });
 
 test('project progress UI uses actor-scoped infinite queries, lazy columns, virtualization, and safe SSE refresh', async () => {

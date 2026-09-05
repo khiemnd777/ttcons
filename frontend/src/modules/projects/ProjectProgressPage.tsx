@@ -30,6 +30,8 @@ import type {
   ProjectProgressStageKey,
   ProjectProgressStagePage,
   ProjectProgressSummaryResponse,
+  ProjectUpdateKind,
+  ProjectUpdateSummary,
 } from '../../lib/types/domain';
 import { dateText, dateTimeText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
@@ -37,7 +39,15 @@ import {
   mergeProjectProgressPages,
   projectProgressFilterQuery,
   projectProgressStageQuery,
+  projectProgressUpdateIDs,
 } from './projectProgressBoard';
+import { ProjectUpdateIndicators } from './ProjectUpdateIndicators';
+import { ProjectUpdatesDialog } from './ProjectUpdatesDialog';
+import { useProjectUpdates } from './useProjectUpdates';
+import type { ProjectUpdateIdentity } from './projectUpdates';
+
+type OpenProjectUpdates = (project: ProjectUpdateIdentity, kind: ProjectUpdateKind, summary?: ProjectUpdateSummary) => void;
+type ProgressUpdatesSelection = { actorID: string; project: ProjectUpdateIdentity; kind: ProjectUpdateKind; summary?: ProjectUpdateSummary };
 
 type ProgressStage = {
   key: ProjectProgressStageKey;
@@ -68,6 +78,8 @@ export function ProjectProgressPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [mobileStage, setMobileStage] = useState<ProjectProgressStageKey>('not_started');
   const [hasPendingUpdates, setHasPendingUpdates] = useState(false);
+  const [updatesSelection, setUpdatesSelection] = useState<ProgressUpdatesSelection | null>(null);
+  const desktop = useDesktopProgressBoard();
   const desktopBoardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,6 +93,9 @@ export function ProjectProgressPage() {
     status: statusFilter,
   }), [debouncedSearch, pmFilter, statusFilter]);
   const actorQueryKey = user?.id ?? 'anonymous';
+  const selectedUpdates = updatesSelection?.actorID === actorQueryKey ? updatesSelection : null;
+  // The open dialog must survive virtual-card unmounts and refresh after reads.
+  const selectedSummary = useProjectUpdates(selectedUpdates ? [selectedUpdates.project.id] : []);
   const summaryQueryKey = useMemo(
     () => ['project-progress-board-summary', actorQueryKey, filterQuery] as const,
     [actorQueryKey, filterQuery],
@@ -108,6 +123,10 @@ export function ProjectProgressPage() {
   }, [actorQueryKey, filterQuery]);
 
   useEffect(() => {
+    setUpdatesSelection(null);
+  }, [actorQueryKey]);
+
+  useEffect(() => {
     if (!user?.id) return undefined;
     let invalidateTimer: number | undefined;
     const stop = streamSSE('/projects/progress-board/stream', {
@@ -117,6 +136,7 @@ export function ProjectProgressPage() {
         if (invalidateTimer !== undefined) window.clearTimeout(invalidateTimer);
         invalidateTimer = window.setTimeout(() => {
           const context = activeQueryContext.current;
+          void queryClient.invalidateQueries({ queryKey: ['project-updates', user.id] });
           const hasDeepPages = queryClient
             .getQueriesData<InfiniteData<ProjectProgressStagePage>>({ queryKey: context.stageRoot })
             .some(([, data]) => (data?.pages.length ?? 0) > 1);
@@ -140,8 +160,13 @@ export function ProjectProgressPage() {
     await Promise.all([
       queryClient.resetQueries({ queryKey: stageQueryRoot }),
       queryClient.invalidateQueries({ queryKey: summaryQueryKey, exact: true }),
+      queryClient.invalidateQueries({ queryKey: ['project-updates', actorQueryKey] }),
     ]);
   }
+
+  const openUpdates: OpenProjectUpdates = (project, kind, summary) => {
+    setUpdatesSelection({ actorID: actorQueryKey, project: { id: project.id, code: project.code, name: project.name }, kind, summary });
+  };
 
   const stageCounts = summaryQuery.data?.stage_counts;
   const filteredTotal = Math.max(0, Number(summaryQuery.data?.filtered_total ?? 0));
@@ -243,31 +268,33 @@ export function ProjectProgressPage() {
 
       {summaryQuery.data && filteredTotal > 0 ? (
         <>
-          <div className="mb-3 lg:hidden">
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Giai đoạn</label>
-            <select
-              value={mobileStage}
-              onChange={(event) => setMobileStage(event.target.value as ProjectProgressStageKey)}
-              className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring"
-            >
-              {progressStages.map((stage) => (
-                <option key={stage.key} value={stage.key}>{stage.label} · {stageCounts?.[stage.key] ?? 0}</option>
-              ))}
-            </select>
-          </div>
-          <div className="lg:hidden">
-            <ProgressColumn
-              key={selectedMobileStage.key}
-              stage={selectedMobileStage}
-              total={stageCounts?.[selectedMobileStage.key] ?? 0}
-              actorID={actorQueryKey}
-              filterQuery={filterQuery}
-              queryKeyRoot={stageQueryRoot}
-              streamStatus={streamStatus}
-              forceActive
-            />
-          </div>
-          <div ref={desktopBoardRef} className="hidden overflow-x-auto pb-3 lg:block">
+          {!desktop ? (
+            <>
+              <div className="mb-3">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Giai đoạn</label>
+                <select
+                  value={mobileStage}
+                  onChange={(event) => setMobileStage(event.target.value as ProjectProgressStageKey)}
+                  className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring"
+                >
+                  {progressStages.map((stage) => (
+                    <option key={stage.key} value={stage.key}>{stage.label} · {stageCounts?.[stage.key] ?? 0}</option>
+                  ))}
+                </select>
+              </div>
+              <ProgressColumn
+                key={selectedMobileStage.key}
+                stage={selectedMobileStage}
+                total={stageCounts?.[selectedMobileStage.key] ?? 0}
+                actorID={actorQueryKey}
+                filterQuery={filterQuery}
+                queryKeyRoot={stageQueryRoot}
+                streamStatus={streamStatus}
+                onOpenUpdates={openUpdates}
+                forceActive
+              />
+            </>
+          ) : <div ref={desktopBoardRef} className="overflow-x-auto pb-3">
             <div className="grid auto-cols-[286px] grid-flow-col items-start gap-3">
               {progressStages.map((stage) => (
                 <ProgressColumn
@@ -278,13 +305,23 @@ export function ProjectProgressPage() {
                   filterQuery={filterQuery}
                   queryKeyRoot={stageQueryRoot}
                   streamStatus={streamStatus}
+                  onOpenUpdates={openUpdates}
                   horizontalRootRef={desktopBoardRef}
                 />
               ))}
             </div>
-          </div>
+          </div>}
         </>
       ) : null}
+      {selectedUpdates ? <ProjectUpdatesDialog
+        key={`${actorQueryKey}:${selectedUpdates.project.id}:${selectedUpdates.kind}`}
+        project={selectedUpdates.project}
+        initialKind={selectedUpdates.kind}
+        summary={selectedSummary.isError ? undefined : selectedSummary.data
+          ? selectedSummary.data.items.find((item) => item.project_id === selectedUpdates.project.id)
+          : selectedUpdates.summary}
+        onClose={() => setUpdatesSelection(null)}
+      /> : null}
     </>
   );
 }
@@ -296,6 +333,7 @@ function ProgressColumn({
   filterQuery,
   queryKeyRoot,
   streamStatus,
+  onOpenUpdates,
   horizontalRootRef,
   forceActive = false,
 }: {
@@ -305,12 +343,13 @@ function ProgressColumn({
   filterQuery: string;
   queryKeyRoot: readonly unknown[];
   streamStatus: StreamStatus;
+  onOpenUpdates: OpenProjectUpdates;
   horizontalRootRef?: RefObject<HTMLDivElement>;
   forceActive?: boolean;
 }) {
   const columnRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const active = useNearHorizontalViewport(columnRef, horizontalRootRef, forceActive);
+  const { active, nearViewport } = useNearHorizontalViewport(columnRef, horizontalRootRef, forceActive);
   const query = useInfiniteQuery({
     queryKey: [...queryKeyRoot, stage.key],
     initialPageParam: '',
@@ -330,10 +369,13 @@ function ProgressColumn({
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => listRef.current,
-    estimateSize: () => 238,
+    estimateSize: () => 330,
     getItemKey: (index) => items[index]?.id ?? index,
     overscan: 3,
   });
+  const virtualItems = virtualizer.getVirtualItems();
+  const updates = useProjectUpdates(projectProgressUpdateIDs(items, virtualItems, nearViewport && total > 0));
+  const updatesByProject = new Map(updates.data?.items.map((item) => [item.project_id, item]));
 
   return (
     <section ref={columnRef} className="overflow-hidden rounded-lg border border-line bg-slate-50/70">
@@ -371,7 +413,7 @@ function ProgressColumn({
               className="max-h-[calc(100vh-350px)] min-h-[160px] overflow-y-auto p-2"
             >
               <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
-                {virtualizer.getVirtualItems().map((virtualItem) => {
+                {virtualItems.map((virtualItem) => {
                   const item = items[virtualItem.index];
                   return (
                     <div
@@ -381,7 +423,13 @@ function ProgressColumn({
                       className="absolute left-0 top-0 w-full pb-2"
                       style={{ transform: `translateY(${virtualItem.start}px)` }}
                     >
-                      <ProgressCard item={item} />
+                      <ProgressCard item={item}
+                        updates={updatesByProject.get(item.id)}
+                        updatesLoading={updates.isPending}
+                        updatesError={updates.isError}
+                        onRetryUpdates={() => void updates.refetch()}
+                        onOpenUpdates={(kind) => onOpenUpdates(item, kind, updatesByProject.get(item.id))}
+                      />
                     </div>
                   );
                 })}
@@ -416,22 +464,24 @@ function useNearHorizontalViewport(
   forceActive: boolean,
 ) {
   const [active, setActive] = useState(forceActive);
+  const [nearViewport, setNearViewport] = useState(forceActive);
   useEffect(() => {
     if (forceActive) {
       setActive(true);
+      setNearViewport(true);
       return undefined;
     }
     const column = columnRef.current;
     const root = rootRef?.current;
     if (!column || !root || typeof IntersectionObserver === 'undefined') {
       setActive(true);
+      setNearViewport(true);
       return undefined;
     }
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setActive(true);
-        observer.disconnect();
-      }
+      const near = entries.some((entry) => entry.isIntersecting);
+      setNearViewport(near);
+      if (near) setActive(true);
     }, {
       root,
       rootMargin: '0px 600px 0px 600px',
@@ -440,7 +490,21 @@ function useNearHorizontalViewport(
     observer.observe(column);
     return () => observer.disconnect();
   }, [columnRef, forceActive, rootRef]);
-  return active;
+  return { active, nearViewport };
+}
+
+// Mount only the current layout so hidden mobile/desktop columns cannot request
+// updates or hold duplicate query observers. Match Tailwind's lg breakpoint.
+function useDesktopProgressBoard() {
+  const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const update = () => setDesktop(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  return desktop;
 }
 
 function ProgressColumnDeferred() {
@@ -495,7 +559,14 @@ function LiveStatus({ status, generatedAt }: { status: StreamStatus; generatedAt
   );
 }
 
-function ProgressCard({ item }: { item: ProjectProgressItem }) {
+function ProgressCard({ item, updates, updatesLoading, updatesError, onRetryUpdates, onOpenUpdates }: {
+  item: ProjectProgressItem;
+  updates?: ProjectUpdateSummary;
+  updatesLoading: boolean;
+  updatesError: boolean;
+  onRetryUpdates: () => void;
+  onOpenUpdates: (kind: ProjectUpdateKind) => void;
+}) {
   const progress = Math.min(100, Math.max(0, Number(item.progress_percent ?? 0)));
   const openIssues = nonNegativeNumber(item.open_issues);
   const pendingApprovals = nonNegativeNumber(item.pending_approvals);
@@ -504,20 +575,20 @@ function ProgressCard({ item }: { item: ProjectProgressItem }) {
   const blocked = item.project_status === 'blocked' || item.current_node_status === 'blocked' || blockedItems > 0;
 
   return (
-    <Link
-      to={`/projects/${item.id}`}
-      className="group block rounded-md border border-line bg-white p-3 shadow-sm transition hover:border-blue-300 hover:shadow-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-      aria-label={`Mở công trình ${item.code} · ${item.name}`}
-    >
+    <article className="rounded-md border border-line bg-white p-3 shadow-sm transition hover:border-blue-300 hover:shadow-panel">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">{item.code}</p>
-          <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-ink group-hover:text-blue-700">{item.name}</h3>
+          <h3 className="mt-1 text-sm font-semibold leading-5 text-ink">
+            <Link to={`/projects/${item.id}`} className="line-clamp-2 hover:text-blue-700 focus-ring" aria-label={`Mở công trình ${item.code} · ${item.name}`}>{item.name}</Link>
+          </h3>
         </div>
         <StatusBadge status={item.project_status} className="shrink-0 px-1.5 py-0.5 text-[10px]" />
       </div>
 
       {item.client_name ? <p className="mt-1.5 truncate text-xs text-slate-500">{item.client_name}</p> : null}
+      <ProjectUpdateIndicators summary={updates} loading={updatesLoading} error={updatesError}
+        onRetry={onRetryUpdates} onOpen={onOpenUpdates} wrapLatest />
       <div className="mt-3 flex items-center gap-2 text-xs text-slate-600">
         <UserRound className="h-3.5 w-3.5 shrink-0" />
         <IdentityReferenceLabel name={item.pm_name} deleted={item.pm_account_deleted} liveOwnership fallback="Chưa phân công" className="truncate" />
@@ -548,7 +619,7 @@ function ProgressCard({ item }: { item: ProjectProgressItem }) {
       ) : progress >= 100 ? (
         <div className="mt-3"><AttentionBadge tone="emerald" icon={<CheckCircle2 className="h-3 w-3" />} label="Đã hoàn tất" /></div>
       ) : null}
-    </Link>
+    </article>
   );
 }
 
