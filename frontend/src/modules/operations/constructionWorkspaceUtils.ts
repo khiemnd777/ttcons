@@ -1,12 +1,11 @@
 import type { ConstructionActionItem, ConstructionCheck, ConstructionWorkspace } from '../../lib/types/domain';
 import { identityReferenceText } from '../../components/identityReference.ts';
+import { dateTimeText as formatDateTime } from '../../lib/utils/format.ts';
 
 export const constructionImpactHelperText = 'Chỉ phân loại ảnh hưởng kỹ thuật. Muốn mở luồng thương mại, dùng “Đề xuất phát sinh”.';
 
 export function dateTimeText(value?: string) {
-  if (!value) return 'Chưa đặt';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+  return formatDateTime(value, 'Chưa đặt');
 }
 
 export function toDateTimeInput(value?: string) {

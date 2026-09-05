@@ -4,6 +4,7 @@ import { AlertTriangle, ChevronDown, FilePlus2, FileText, History, Send, Upload,
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { dateTimeText } from '../../lib/utils/format';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, get, post, postForm, put } from '../../lib/api/client';
 import type { DesignRelease, DesignReleaseFile, DesignReleaseWorkspace, WorkItem } from '../../lib/types/domain';
@@ -375,11 +376,4 @@ function fileSizeText(value?: number) {
   if (!bytes) return 'Không rõ dung lượng';
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function dateTimeText(value?: string) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }

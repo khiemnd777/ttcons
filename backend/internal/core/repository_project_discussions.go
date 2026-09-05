@@ -10,14 +10,7 @@ import (
 const projectDiscussionActivityTypesSQL = "'comment','status','blocker','question','decision','reminder','file_note'"
 
 func (r *Repository) MyProjectDiscussions(ctx context.Context, profile workItemAccessProfile, filter ProjectDiscussionFilter, offset int) ([]Record, int, int, error) {
-	args := []any{
-		profile.IsAdmin || profile.CanReconcileAllProjects,
-		profile.IsDirector,
-		profile.UserID,
-		profile.StaffID,
-	}
-	bypassPlaceholder := 1
-	directorPlaceholder := 2
+	args := projectOperationsScopeArgs(profile)
 	actorPlaceholder := 3
 	staffPlaceholder := 4
 	args = append(args, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
@@ -26,35 +19,7 @@ func (r *Repository) MyProjectDiscussions(ctx context.Context, profile workItemA
 	canReconcilePlaceholder := len(args) - 1
 	adminOrDirectorPlaceholder := len(args)
 
-	projectConditions := []string{
-		"p.status <> 'cancelled'",
-		fmt.Sprintf(`(
-			$%d::boolean
-			OR (
-				EXISTS (
-					SELECT 1
-					FROM user_roles access_role
-					JOIN role_permissions access_grant ON access_grant.role_id=access_role.role_id
-					JOIN permissions access_permission ON access_permission.id=access_grant.permission_id
-					WHERE access_role.user_id=$%d::uuid
-					  AND (access_role.project_id IS NULL OR access_role.project_id=p.id)
-					  AND access_permission.key IN ('operation.view','project.view','pipeline.view')
-				)
-				AND (
-					$%d::boolean
-					OR p.created_by=$%d::uuid
-					OR EXISTS (
-						SELECT 1 FROM project_members access_member
-						WHERE access_member.project_id=p.id AND access_member.staff_id=NULLIF($%d,'')::uuid AND access_member.active
-					)
-					OR EXISTS (
-						SELECT 1 FROM user_roles project_role
-						WHERE project_role.project_id=p.id AND project_role.user_id=$%d::uuid
-					)
-				)
-			)
-		)`, bypassPlaceholder, actorPlaceholder, directorPlaceholder, actorPlaceholder, staffPlaceholder, actorPlaceholder),
-	}
+	projectConditions := []string{projectOperationsScopeSQL("p", 1)}
 	if filter.ProjectID != "" {
 		args = append(args, filter.ProjectID)
 		projectConditions = append(projectConditions, fmt.Sprintf("p.id=$%d::uuid", len(args)))

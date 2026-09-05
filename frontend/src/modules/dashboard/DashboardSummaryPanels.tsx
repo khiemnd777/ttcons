@@ -3,6 +3,7 @@ import { AlertCircle, AlertTriangle, Building2, CheckCircle2, CircleDollarSign, 
 import { CurrencyText } from '../../components/CurrencyText';
 import { StatusBadge } from '../../components/StatusBadge';
 import { statusLabel } from '../../lib/utils/status';
+import { dateText as dateLabel } from '../../lib/utils/format';
 import type { DashboardCashflowSeries, DashboardData, DashboardProjectSnapshot } from './dashboardTypes';
 
 export function ProjectSnapshotPanel({ snapshot }: { snapshot: DashboardProjectSnapshot }) {
@@ -163,7 +164,7 @@ function CashflowBars({ series }: { series: DashboardCashflowSeries[] }) {
     <div className="mt-4 max-h-[26rem] space-y-3 overflow-y-auto pr-1">
       {series.map((item) => (
         <div key={item.period_start} className="grid grid-cols-[5.5rem_minmax(0,1fr)_6.5rem] items-center gap-3 text-xs">
-          <span className="font-medium text-slate-500">{compactDateLabel(item.period_start)}</span>
+          <span className="font-medium tabular-nums text-slate-500">{dateLabel(item.period_start)}</span>
           <div className="space-y-1.5">
             <div className="h-2 overflow-hidden rounded-full bg-emerald-50"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.max(1, (Math.abs(item.inflow_amount) / maxAmount) * 100)}%` }} /></div>
             <div className="h-2 overflow-hidden rounded-full bg-rose-50"><div className="h-full rounded-full bg-rose-500" style={{ width: `${Math.max(1, (Math.abs(item.outflow_amount) / maxAmount) * 100)}%` }} /></div>
@@ -240,14 +241,4 @@ function integerText(value: number) {
 
 function decimalText(value: number) {
   return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(value);
-}
-
-function dateLabel(value: string) {
-  const [year, month, day] = value.slice(0, 10).split('-');
-  return `${day}/${month}/${year}`;
-}
-
-function compactDateLabel(value: string) {
-  const [year, month, day] = value.slice(0, 10).split('-');
-  return day === '01' ? `${month}/${year}` : `${day}/${month}`;
 }

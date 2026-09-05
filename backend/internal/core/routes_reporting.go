@@ -24,6 +24,7 @@ func registerReportingRoutes(protected fiber.Router, h *Handler) {
 	protected.Get("/work-reports/:id/pdf", h.ExportWorkReportPDF)
 	protected.Get("/reports/dashboard", h.Dashboard)
 	protected.Get("/reports/dashboard/projects", h.DashboardProjects)
+	protected.Get("/reports/dashboard/activities", h.DashboardActivities)
 	protected.Get("/reports/options", h.ReportOptions)
 	protected.Get("/reports/cashflow", h.CashflowReport)
 	protected.Get("/reports/cashflow/export", h.CashflowReportCSV)

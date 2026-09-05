@@ -1,5 +1,6 @@
 import { lazy, type ReactNode, Suspense, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { dateText } from '../../lib/utils/format';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Check, ClipboardCheck, Plus, RotateCcw } from 'lucide-react';
 import { CurrencyText } from '../../components/CurrencyText';
@@ -262,7 +263,7 @@ function AccountingTasks({ rows, issues, loading, issuesLoading, error, issuesEr
     { key: 'source_code', header: 'Số chứng từ', render: (row) => <span className="font-semibold text-ink">{row.source_code || '-'}</span> },
     { key: 'source_type', header: 'Nguồn', render: (row) => sourceTypeLabel(row.source_type) },
     { key: 'description', header: 'Nội dung cần đối chiếu' },
-    { key: 'created_at', header: 'Ngày ghi nhận', render: (row) => row.created_at ? new Date(row.created_at).toLocaleDateString('vi-VN') : '-' },
+    { key: 'created_at', header: 'Ngày ghi nhận', render: (row) => dateText(row.created_at) },
     { key: 'action', header: 'Thao tác', render: (row) => canResolve ? <button type="button" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700" onClick={() => onResolve(row)}><ClipboardCheck className="h-4 w-4" />Đối chiếu</button> : null },
   ]} empty="Không còn chứng từ lịch sử cần đối chiếu" /></ListSection></div>;
 }

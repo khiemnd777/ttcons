@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Download, FileJson, Loader2, RotateCcw, Up
 import { Dialog } from '../../components/Dialog';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, postForm } from '../../lib/api/client';
+import { dateTimeText } from '../../lib/utils/format';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 
 const maxBackupFileSize = 256 * 1024;
@@ -253,7 +254,6 @@ function settingsBackupFilename(now: Date) {
 }
 
 function formatBytes(value: number) { return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`; }
-function dateTimeText(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString('vi-VN'); }
 function errorMessage(error: unknown) { return error instanceof Error ? error.message : 'Không thực hiện được thao tác.'; }
 function displayBackupValue(value: unknown) {
   if (typeof value === 'boolean') return value ? 'Bật' : 'Tắt';

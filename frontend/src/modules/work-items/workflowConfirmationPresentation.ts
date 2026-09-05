@@ -1,4 +1,5 @@
 import type { WorkflowFormSealApplication, WorkflowFormSignature } from '../../lib/types/domain';
+import { dateTimeText } from '../../lib/utils/format.ts';
 
 export function confirmationRolesText(roles: WorkflowFormSignature['signer_roles_json'] | WorkflowFormSealApplication['applied_by_roles_json']) {
   if (!Array.isArray(roles) || !roles.length) return '-';
@@ -31,11 +32,7 @@ export function signaturePurposeLabel(purpose?: string) {
 }
 
 export function signatureDateTime(value: string) {
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('vi-VN', {
-    hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric',
-  }).format(date);
+  return dateTimeText(value, '—');
 }
 
 export function signatureIsHistorical(signature: WorkflowFormSignature, currentRevision: number) {

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Clock3, List, RefreshCw, Search, X } from 'lucide-react';
 import clsx from 'clsx';
 import { get } from '../../lib/api/client';
+import { dateTimeText as auditDateTime } from '../../lib/utils/format';
 import { PageHeader } from '../../components/PageHeader';
 import { Timeline } from '../../components/Timeline';
 import { DataTable } from '../../components/DataTable';
@@ -287,13 +288,6 @@ function auditDateRange(preset: DatePreset, customFrom: string, customTo: string
 
 function localDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function auditDateTime(value: unknown) {
-  if (!value) return '-';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
 }
 
 function shortID(value: string) {

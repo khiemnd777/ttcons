@@ -911,7 +911,7 @@ function ChatMessage({
               {mentions.map((mention, index) => <span key={`${mention.id ?? mention.label}:${index}`} className="rounded bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold text-blue-700">@{mention.label || mention.id}</span>)}
             </div>
           ) : null}
-          {!withdrawn && metadata.due_at ? <p className="mt-2 text-xs font-semibold">Hạn: {String(metadata.due_at)}</p> : null}
+          {!withdrawn && metadata.due_at ? <p className="mt-2 text-xs font-semibold">Hạn: {compactDateTime(metadata.due_at)}</p> : null}
           {!withdrawn ? <ActivityAttachments attachments={item.attachments} /> : null}
           <div className={clsx('mt-2 flex flex-wrap items-center gap-2 border-t pt-2 text-[11px]', ownBlueBubble ? 'border-white/20' : 'border-black/5')}>
             <span className={ownBlueBubble ? 'text-blue-100' : 'text-slate-500'}>{visibilityLabels[item.visibility ?? 'project'] ?? item.visibility}</span>

@@ -59,6 +59,24 @@ func dashboardPeriodRequest(c *fiber.Ctx) (DashboardPeriodRequest, error) {
 	}, nil
 }
 
+func (h *Handler) DashboardActivities(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"report.view"}); err != nil {
+		return err
+	}
+	limit, err := optionalQueryInt(c, "limit")
+	if err != nil {
+		return err
+	}
+	page, err := h.service.DashboardActivities(c.Context(), DashboardActivitiesRequest{
+		Range: c.Query("range"), Search: c.Query("search"), ActivityType: c.Query("activity_type"),
+		Cursor: c.Query("cursor"), Limit: limit,
+	}, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, page)
+}
+
 func dashboardProjectsRequest(c *fiber.Ctx) (DashboardProjectsRequest, error) {
 	period, err := dashboardPeriodRequest(c)
 	if err != nil {

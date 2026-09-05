@@ -578,6 +578,30 @@ func (r *Repository) WorkItemAccessProfile(ctx context.Context, userID string) (
 
 var projectOperationsViewPermissions = []string{"operation.view", "project.view", "pipeline.view"}
 
+// Bulk equivalent of CanViewProjectOperations, shared by cross-project activity reads.
+// The alias and parameter offset are repository-owned, never request input.
+func projectOperationsScopeSQL(alias string, start int) string {
+	return fmt.Sprintf(`(%[1]s.status <> 'cancelled' AND (
+		$%[2]d::boolean OR (
+			EXISTS (SELECT 1 FROM user_roles access_role
+				JOIN role_permissions access_grant ON access_grant.role_id=access_role.role_id
+				JOIN permissions access_permission ON access_permission.id=access_grant.permission_id
+				WHERE access_role.user_id=$%[4]d::uuid
+				AND (access_role.project_id IS NULL OR access_role.project_id=%[1]s.id)
+				AND access_permission.key IN ('operation.view','project.view','pipeline.view'))
+			AND ($%[3]d::boolean OR %[1]s.created_by=$%[4]d::uuid
+				OR EXISTS (SELECT 1 FROM project_members access_member
+					WHERE access_member.project_id=%[1]s.id
+					AND access_member.staff_id=NULLIF($%[5]d,'')::uuid AND access_member.active)
+				OR EXISTS (SELECT 1 FROM user_roles project_role
+					WHERE project_role.project_id=%[1]s.id AND project_role.user_id=$%[4]d::uuid))
+		)))`, alias, start, start+1, start+2, start+3)
+}
+
+func projectOperationsScopeArgs(profile workItemAccessProfile) []any {
+	return []any{profile.IsAdmin || profile.CanReconcileAllProjects, profile.IsDirector, profile.UserID, profile.StaffID}
+}
+
 var projectReconciliationReadPermissions = map[string]bool{
 	"project.reconciliation.view": true,
 	"project.view":                true,

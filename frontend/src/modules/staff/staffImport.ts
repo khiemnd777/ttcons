@@ -47,7 +47,8 @@ export async function downloadStaffImportTemplate(format: 'xlsx' | 'csv', roles:
     downloadBlob(new Blob([`\uFEFF${STAFF_IMPORT_HEADERS.join(',')}\r\n`], { type: 'text/csv;charset=utf-8' }), 'mau-import-tai-khoan-nhan-su.csv');
     return;
   }
-  const xlsx = await import('xlsx');
+  const { default: xlsxMini } = await import('xlsx/dist/xlsx.mini.min.js');
+  const xlsx = xlsxMini as unknown as typeof import('xlsx');
   const workbook = xlsx.utils.book_new();
   const accounts = xlsx.utils.aoa_to_sheet([Array.from(STAFF_IMPORT_HEADERS)]);
   accounts['!cols'] = [{ wch: 28 }, { wch: 32 }, { wch: 18 }, { wch: 32 }, { wch: 18 }, { wch: 22 }, { wch: 22 }, { wch: 20 }];

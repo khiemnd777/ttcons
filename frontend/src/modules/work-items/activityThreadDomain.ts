@@ -1,5 +1,6 @@
 import type { InfiniteData } from '@tanstack/react-query';
 import type { ActivityReactionSummary, ProjectActivityFeed, WorkItemActivity } from '../../lib/types/domain';
+import { dateText } from '../../lib/utils/format.ts';
 
 export function sameChatAuthor(previous: WorkItemActivity | undefined, current: WorkItemActivity) {
   if (!previous || previous.actor_id !== current.actor_id || !previous.actor_id) return false;
@@ -50,7 +51,7 @@ export function groupActivitiesByDay(items: WorkItemActivity[]) {
   const groups: Array<{ key: string; label: string; items: WorkItemActivity[] }> = [];
   items.forEach((item) => {
     const date = item.created_at ? new Date(item.created_at) : null;
-    const key = date && !Number.isNaN(date.getTime()) ? date.toISOString().slice(0, 10) : 'unknown';
+    const key = dateText(date, 'unknown');
     let group = groups.find((candidate) => candidate.key === key);
     if (!group) {
       group = { key, label: activityDayLabel(date), items: [] };
@@ -64,12 +65,11 @@ export function groupActivitiesByDay(items: WorkItemActivity[]) {
 export function activityDayLabel(date: Date | null) {
   if (!date || Number.isNaN(date.getTime())) return 'Không rõ ngày';
   const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-  const key = date.toISOString().slice(0, 10);
-  if (key === today.toISOString().slice(0, 10)) return 'Hôm nay';
-  if (key === yesterday.toISOString().slice(0, 10)) return 'Hôm qua';
-  return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  const key = dateText(date);
+  if (key === dateText(today)) return 'Hôm nay';
+  if (key === dateText(yesterday)) return 'Hôm qua';
+  return key;
 }
 
 export function updateActivityReactionFeed(

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { get, post } from '../../lib/api/client';
+import { dateText } from '../../lib/utils/format';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -115,7 +116,7 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
         {canViewReworks ? <ListSection title="Bảng sửa lỗi">
           <DataTable rows={filteredReworks} loading={reworks.isLoading} error={reworks.error} onRetry={() => reworks.refetch()} searchPlaceholder="Tìm yêu cầu sửa lỗi, mô tả, hạn xử lý..." pageSize={10} defaultSort={{ key: 'due_date', direction: 'asc' }} columns={[
             { key: 'title', header: 'Sửa lỗi', sortable: true, filterValue: (row) => [row.title, row.description], render: (row) => <span className="font-semibold text-ink">{row.title}</span> },
-            { key: 'due_date', header: 'Hạn xử lý', sortable: true },
+            { key: 'due_date', header: 'Hạn xử lý', sortable: true, render: (row) => dateText(row.due_date) },
             { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
             { key: 'action', header: 'Thao tác', render: (row) => <RowActions onView={() => setDialog({ type: 'rework', record: row })}>{canApproveRework ? <button disabled={row.status === 'done'} className="text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400" onClick={() => action.mutate({ path: `reworks/${row.id}`, actionName: 'complete' })}>Hoàn tất</button> : null}</RowActions> },
           ]} empty={projectId ? 'Không có yêu cầu sửa lỗi trong bộ lọc này' : 'Chọn công trình để xem yêu cầu sửa lỗi'} emptyAction={projectId && canCreateRework ? (
@@ -174,7 +175,7 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
         fields={[
           { key: 'title', label: 'Sửa lỗi' },
           { key: 'description', label: 'Mô tả' },
-          { key: 'due_date', label: 'Hạn xử lý' },
+            { key: 'due_date', label: 'Hạn xử lý', render: (row) => dateText(row.due_date) },
           { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
         ]}
       />

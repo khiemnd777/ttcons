@@ -1,5 +1,39 @@
 package core
 
+type DashboardActivitiesRequest struct {
+	Range        string
+	Search       string
+	ActivityType string
+	Cursor       string
+	Limit        int
+}
+
+// Deliberately omit arbitrary source metadata, attachment URLs and read-state fields.
+type DashboardActivityItem struct {
+	ID                  string `json:"id"`
+	ProjectID           string `json:"project_id"`
+	ProjectCode         string `json:"project_code"`
+	ProjectName         string `json:"project_name"`
+	WorkItemID          string `json:"work_item_id"`
+	TargetLabel         string `json:"target_label"`
+	ActorName           string `json:"actor_name"`
+	ActorAccountDeleted bool   `json:"actor_account_deleted"`
+	ActivityType        string `json:"activity_type"`
+	Comment             string `json:"comment"`
+	FromStatus          string `json:"from_status"`
+	ToStatus            string `json:"to_status"`
+	CreatedAt           string `json:"created_at"`
+	FormVersionID       string `json:"form_version_id,omitempty"`
+}
+
+type DashboardActivitiesPage struct {
+	Items           []DashboardActivityItem `json:"items"`
+	HasMore         bool                    `json:"has_more"`
+	NextCursor      string                  `json:"next_cursor"`
+	CanViewActivity bool                    `json:"can_view_activity"`
+	AsOf            string                  `json:"as_of"`
+}
+
 type DashboardPeriodRequest struct {
 	PeriodType string
 	Year       int

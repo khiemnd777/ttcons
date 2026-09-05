@@ -31,7 +31,7 @@ import type {
   ProjectProgressStagePage,
   ProjectProgressSummaryResponse,
 } from '../../lib/types/domain';
-import { dateText } from '../../lib/utils/format';
+import { dateText, dateTimeText } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import {
   mergeProjectProgressPages,
@@ -481,7 +481,7 @@ function LiveStatus({ status, generatedAt }: { status: StreamStatus; generatedAt
       : 'Mất kết nối · cập nhật định kỳ';
   return (
     <span
-      title={generatedAt ? `Dữ liệu lúc ${new Date(generatedAt).toLocaleString('vi-VN')}` : undefined}
+      title={generatedAt ? `Dữ liệu lúc ${dateTimeText(generatedAt)}` : undefined}
       className={clsx(
         'inline-flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-semibold',
         status === 'connected' && 'bg-emerald-50 text-emerald-700',

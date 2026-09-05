@@ -1,3 +1,4 @@
+import { dateText } from '../../lib/utils/format';
 import {
   Bell,
   CalendarClock,
@@ -86,5 +87,5 @@ export function notificationRelativeTime(value: string) {
   if (seconds < 3600) return `${Math.floor(seconds / 60)} phút`;
   if (seconds < 86_400) return `${Math.floor(seconds / 3600)} giờ`;
   if (seconds < 604_800) return `${Math.floor(seconds / 86_400)} ngày`;
-  return new Date(value).toLocaleDateString('vi-VN');
+  return dateText(value);
 }

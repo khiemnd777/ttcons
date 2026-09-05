@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { dateTimeText as formatDateTime } from '../../lib/utils/format';
 import {
   AlertTriangle,
   CalendarDays,
@@ -483,9 +484,7 @@ function sourceKindLabel(sourceKind: ReturnType<typeof constructionReportViewMod
 }
 
 function dateTimeText(value: unknown) {
-  if (!value) return '—';
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('vi-VN');
+  return formatDateTime(value, '—');
 }
 
 function saveBlob(blob: Blob, filename: string) {

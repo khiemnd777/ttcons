@@ -1,5 +1,12 @@
 # Project Planning Domain Map
 
+## Dashboard Project Activity Observation
+
+- Frontend absolute dates use shared `format.ts`: full `dd-mm-yyyy`, `HH:mm` and `HH:mm dd-mm-yyyy`. Dashboard shows full day headers plus minute-only row times in a four-column desktop/stacked mobile layout. Shared project/chat day grouping uses the same Vietnam calendar as its labels; only chat retains relative Today/Yesterday labels. This presentation grouping never changes persisted event timestamps, cursor boundaries or read state.
+- Dashboard aggregates recorded system activity across currently visible projects via `/reports/dashboard/activities`; it does not create another discussion or action queue. Owners: Reporting's `service_dashboard_activity.go`/`repository_dashboard_activity.go`, frontend `DashboardActivityPanel.tsx`/`dashboardActivity.ts`.
+- Bulk visibility is shared through `projectOperationsScopeSQL/Args`, also consumed by `MyProjectDiscussions`; creator/member/project-role, Director, Admin and Accounting observer semantics remain unchanged. Dashboard additionally enforces Work Item visibility for every non-null linked item regardless of activity target scope, plus matching project and non-cancelled item state. Client-only visibility and withdrawn/cancelled exclusions remain enforced.
+- The feed defaults to seven local calendar days, uses actor/filter-bound snapshot keyset cursors and exposes only display fields. Opening Dashboard or its read-only shared detail dialog never changes discussion/system cursors, notification state, attention or workflow. Only existing system producers contribute; history is not fabricated from project timestamps.
+
 ## Per-Project Update Awareness
 
 - The Projects explorer shows actor-specific unread notification, discussion and system activity indicators under each project name and a latest-visible-update preview. Summary scope is bounded to the current page through `/projects/updates-summary`; counts are independent because notification and mention-derived discussion sources can overlap.

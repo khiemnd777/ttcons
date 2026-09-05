@@ -1,5 +1,6 @@
 import type { WorkItem } from '../../lib/types/domain';
 import { enumLabel, statusLabel } from '../../lib/utils/status';
+export { dateTimeText as compactDateTime } from '../../lib/utils/format.ts';
 export { workItemIsUpcoming, workItemWorkflowContext } from './workItemContext';
 
 export type WorkItemActionKey =
@@ -81,18 +82,6 @@ export function asArray<T>(value: unknown): T[] {
 export function numberValue(value: unknown) {
   const number = Number(value ?? 0);
   return Number.isFinite(number) ? number : 0;
-}
-
-export function compactDateTime(value: unknown) {
-  if (!value) return '-';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
 }
 
 export function departmentLabel(value?: string) {

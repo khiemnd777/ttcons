@@ -16,7 +16,7 @@ import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { Dialog } from '../../components/Dialog';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { SimpleForm } from '../_shared/SimpleForm';
-import { currency } from '../../lib/utils/format';
+import { currency, dateTimeText as compactDateTime } from '../../lib/utils/format';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { SupplierQuotationWorkspace } from './SupplierQuotationWorkspace';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -879,17 +879,4 @@ function priceInputValue(value: unknown) {
   const numeric = Number(value ?? 0);
   if (!Number.isFinite(numeric)) return '0';
   return String(numeric);
-}
-
-function compactDateTime(value?: string) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
 }

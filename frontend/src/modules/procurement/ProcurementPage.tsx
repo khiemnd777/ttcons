@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, ClipboardList, Clock3, Eye, Loader2, PackageCheck, Pencil, Search, Send, Truck } from 'lucide-react';
 import { get, post, put } from '../../lib/api/client';
+import { dateText } from '../../lib/utils/format';
 import type { Partner } from '../../lib/types/domain';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
@@ -180,5 +181,5 @@ function ProcurementDetail({ record }: { record: ProcurementRow }) {
 function Metric({ label, value }: { label: string; value: React.ReactNode }) { return <div><div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div><div className="mt-1 font-semibold text-ink">{value}</div></div>; }
 function numeric(value: unknown) { return Number(value ?? 0); }
 function formatQuantity(value: unknown) { return numeric(value).toLocaleString('vi-VN', { maximumFractionDigits: 3 }); }
-function formatDate(value: unknown) { const text = String(value ?? '').slice(0, 10); if (!text) return 'Chưa chốt'; const date = new Date(`${text}T00:00:00`); return Number.isNaN(date.getTime()) ? text : date.toLocaleDateString('vi-VN'); }
+function formatDate(value: unknown) { return dateText(String(value ?? '').slice(0, 10), 'Chưa chốt'); }
 function isOverdue(row: ProcurementRow) { const date = String(row.expected_delivery_date ?? '').slice(0, 10); return Boolean(date && date < new Date().toISOString().slice(0, 10) && !['received', 'cancelled'].includes(row.status)); }

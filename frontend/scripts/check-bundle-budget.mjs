@@ -4,34 +4,42 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 export const DEFAULT_GZIP_LIMIT_BYTES = 250 * 1024;
+export const DEFAULT_RAW_LIMIT_BYTES = 500 * 1000;
 export const DEFAULT_MINIMUM_CHUNK_COUNT = 20;
 
 export function evaluateBundleBudget({
   assets,
   entryFile,
   limitBytes = DEFAULT_GZIP_LIMIT_BYTES,
+  rawLimitBytes = DEFAULT_RAW_LIMIT_BYTES,
   minimumChunkCount = DEFAULT_MINIMUM_CHUNK_COUNT,
 }) {
   const results = [...assets]
     .sort((left, right) => left.file.localeCompare(right.file))
     .map((asset) => ({
       ...asset,
+      rawBytes: Buffer.byteLength(asset.contents),
       gzipBytes: gzipSync(asset.contents, { level: 9 }).byteLength,
       isEntry: asset.file === entryFile,
     }));
 
   return {
     limitBytes,
+    rawLimitBytes,
     minimumChunkCount,
     results,
     entryFound: results.some((asset) => asset.isEntry),
     chunkCount: results.filter((asset) => !asset.isEntry).length,
-    violations: results.filter((asset) => asset.gzipBytes > limitBytes),
+    violations: results.filter((asset) => asset.rawBytes > rawLimitBytes || asset.gzipBytes > limitBytes),
   };
 }
 
 function formatKiB(bytes) {
   return `${(bytes / 1024).toFixed(1)} KiB`;
+}
+
+function formatKB(bytes) {
+  return `${(bytes / 1000).toFixed(2)} kB`;
 }
 
 async function collectJavaScriptAssets(distDirectory) {
@@ -63,15 +71,20 @@ async function main() {
   if (assets.length === 0) throw new Error('Không tìm thấy JavaScript asset trong dist/assets.');
 
   const report = evaluateBundleBudget({ assets, entryFile });
-  console.log(`Bundle gzip budget: ${formatKiB(report.limitBytes)} cho entry và từng JavaScript chunk.`);
+  console.log(`Bundle budget cho entry và từng JavaScript chunk: raw ${formatKB(report.rawLimitBytes)}, gzip ${formatKiB(report.limitBytes)}.`);
   console.log(`Code-splitting gate: ${report.chunkCount} chunks (tối thiểu ${report.minimumChunkCount}).`);
   for (const result of report.results) {
-    console.log(`${result.isEntry ? 'entry' : 'chunk'}\t${formatKiB(result.gzipBytes)}\t${result.file}`);
+    console.log(`${result.isEntry ? 'entry' : 'chunk'}\traw ${formatKB(result.rawBytes)}\tgzip ${formatKiB(result.gzipBytes)}\t${result.file}`);
   }
 
   if (report.violations.length > 0) {
-    const details = report.violations.map((asset) => `${asset.file} (${formatKiB(asset.gzipBytes)})`).join(', ');
-    throw new Error(`Vượt bundle budget ${formatKiB(report.limitBytes)}: ${details}`);
+    const details = report.violations.map((asset) => {
+      const exceeded = [];
+      if (asset.rawBytes > report.rawLimitBytes) exceeded.push(`raw ${asset.rawBytes} > ${report.rawLimitBytes} bytes`);
+      if (asset.gzipBytes > report.limitBytes) exceeded.push(`gzip ${asset.gzipBytes} > ${report.limitBytes} bytes`);
+      return `${asset.file} (${exceeded.join('; ')})`;
+    }).join(', ');
+    throw new Error(`Vượt bundle budget: ${details}`);
   }
 
   if (!report.entryFound) {

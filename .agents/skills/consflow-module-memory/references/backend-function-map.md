@@ -1,5 +1,12 @@
 # Consflow Backend Function Map
 
+## Dashboard Cross-Project Activity
+
+- Protected `GET /reports/dashboard/activities` requires `report.view`; `handlers_reports.go` parses query input, `service_dashboard_activity.go` validates range/type/search/limit and actor-bound snapshot cursors, `repository_dashboard_activity.go` reads `work_item_activities`, projects, work items and users. Typed request/page/item contracts live in `types_reports.go`.
+- Ranges: `today|7d|30d|90d|all`, default `7d`; 20/default and 50/max rows plus one lookahead. UTC timestamps retain microseconds and sort descending by `(created_at,id)`. A cursor binds actor, normalized filters, limit and the initial `as_of`; window start uses Asia/Ho_Chi_Minh. Payment periods are not part of this query.
+- `projectOperationsScopeSQL/Args` in `repository_access.go` is the shared bulk equivalent of `CanViewProjectOperations`, now reused by `MyProjectDiscussions`. Every linked work item must pass current `workItemScopeSQL`, project consistency and non-cancelled checks even when the activity target scope differs. Client visibility, withdrawn and system/discussion classification remain authoritative. Permission absence returns an empty typed page with `can_view_activity=false`; a permitted actor without matching projects/activity receives a true empty result.
+- Query materializes authorized projects once, then selects the bounded activity page in a shared read-only transaction with transaction-local JIT disabled and no per-project request loop. The projection excludes raw metadata, attachment objects and unread cursors, retaining only `form_version_id` for existing business wording. No producers, workflow/read-state writes or migrations. `dashboard_activity_test.go` covers scope, pagination, filter/time contracts, read independence, HTTP gates and a 100-project/10,000-event EXPLAIN scenario.
+
 ## Project Update Summary And System Read-Through
 
 - `project_updates.go` owns validated max-100 ID batches, handler/service aggregation and bounded activity/notification metrics. Protected `GET /projects/updates-summary` requires `project.view`; actor/project/Work Item scope is reused from `MyProjectDiscussions`, and notification metrics reuse `notificationVisibility` including archive, expiry and source-actionable policies. Response has separate `notification_unread`, `discussion_unread`, `system_unread` and latest visible update. Never merge actor-specific fields into Explorer row cache.

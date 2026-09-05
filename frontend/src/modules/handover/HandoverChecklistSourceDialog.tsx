@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Dialog } from '../../components/Dialog';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useAuth } from '../../lib/auth/AuthContext';
-import { currency, dateText } from '../../lib/utils/format';
+import { currency, dateText, dateTimeText } from '../../lib/utils/format';
 import { EvidenceReferenceViewer } from '../_shared/EvidenceReferenceViewer';
 import {
   automaticSourcePresentation,
@@ -185,13 +185,6 @@ function acceptanceStatusLabel(value?: string) {
 
 function acceptanceResultLabel(value?: string) {
   return ({ pass: 'Đạt', conditional_pass: 'Đạt có điều kiện', fail: 'Không đạt' } as Record<string, string>)[value ?? ''] ?? value ?? '-';
-}
-
-function dateTimeText(value?: string) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return dateText(value);
-  return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
 function fileSizeText(value: number) {

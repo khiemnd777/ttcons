@@ -1,6 +1,7 @@
 import { EnumChip } from './EnumChip';
 import { EmptyState } from './EmptyState';
 import { IdentityReferenceLabel } from './IdentityReferenceLabel';
+import { dateTimeText as timelineDateTime } from '../lib/utils/format';
 
 export function Timeline({ events, onSelect }: { events: Record<string, any>[]; onSelect?: (event: Record<string, any>) => void }) {
   if (!events.length) return <EmptyState title="Chưa có sự kiện audit" />;
@@ -28,17 +29,4 @@ export function Timeline({ events, onSelect }: { events: Record<string, any>[]; 
       </div>
     </div>
   );
-}
-
-function timelineDateTime(value: unknown) {
-  if (!value) return '-';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date);
 }

@@ -3,6 +3,7 @@ import { useLocation, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, Boxes, ClipboardList, PackageCheck, Plus, Search, Trash2, Warehouse as WarehouseIcon } from 'lucide-react';
 import { get, post, put } from '../../lib/api/client';
+import { dateText } from '../../lib/utils/format';
 import type { Partner, StockDocument, StockDocumentItem, StockPosition, WarehouseReceiptOption } from '../../lib/types/domain';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
@@ -412,7 +413,7 @@ function groupReceiptOptions(rows: WarehouseReceiptOption[]) { const groups = ne
 function validTab(value: string | null): WarehouseTab { return value === 'documents' || value === 'site' || value === 'materials' ? value : 'stock'; }
 function numeric(value: unknown) { return Number(value ?? 0); }
 function formatQuantity(value: unknown) { return numeric(value).toLocaleString('vi-VN', { maximumFractionDigits: 3 }); }
-function formatDate(value: unknown) { const text = String(value ?? '').slice(0, 10); if (!text) return '—'; const date = new Date(`${text}T00:00:00`); return Number.isNaN(date.getTime()) ? text : date.toLocaleDateString('vi-VN'); }
+function formatDate(value: unknown) { return dateText(String(value ?? '').slice(0, 10), '—'); }
 function movementLabel(value: string) { return ({ receive: 'Nhập kho', issue: 'Xuất công trình', transfer: 'Điều chuyển', return_to_warehouse: 'Lưu kho vật tư dư', return_to_subcontractor: 'Trả nhà cung cấp / thầu phụ', adjustment_in: 'Điều chỉnh tăng', adjustment_out: 'Điều chỉnh giảm' } as Record<string, string>)[value] ?? value; }
 function warehouseDirection(row: StockDocument) { if (row.movement_type === 'transfer') return `${row.source_warehouse_name || 'Kho nguồn'} → ${row.target_warehouse_name || 'Kho đích'}`; if (['receive', 'return_to_warehouse', 'adjustment_in'].includes(row.movement_type)) return row.target_warehouse_name || 'Kho nhận'; return row.source_warehouse_name || 'Kho xuất'; }
 function sourceLabel(value: string) { return ({ incoming_acceptance: 'Nghiệm thu đầu vào', stock_document_correction: 'Điều chỉnh phiếu kho' } as Record<string, string>)[value] ?? value; }

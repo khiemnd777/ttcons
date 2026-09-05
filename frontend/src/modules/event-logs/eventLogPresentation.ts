@@ -1,3 +1,5 @@
+export { dateTimeText as eventLogDateTime } from '../../lib/utils/format.ts';
+
 export type EventLogCategory = 'unexpected_5xx' | 'panic' | 'controlled_503';
 export type EventLogDatePreset = '7' | '30' | '90' | 'custom';
 
@@ -23,15 +25,6 @@ export function eventLogDateRange(preset: EventLogDatePreset, customFrom: string
   const from = new Date(to);
   from.setDate(from.getDate() - Number(preset) + 1);
   return { from: localDate(from), to: localDate(to) };
-}
-
-export function eventLogDateTime(value: unknown) {
-  if (!value) return '-';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat('vi-VN', {
-    hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric',
-  }).format(date);
 }
 
 export function shortEventLogID(value: string) {

@@ -1,5 +1,30 @@
 export type DashboardPeriodType = 'month' | 'quarter' | 'year';
 
+export type DashboardActivity = {
+  id: string;
+  project_id: string;
+  project_code: string;
+  project_name: string;
+  work_item_id: string;
+  target_label: string;
+  actor_name: string;
+  actor_account_deleted: boolean;
+  activity_type: string;
+  comment: string;
+  from_status: string;
+  to_status: string;
+  created_at: string;
+  form_version_id?: string;
+};
+
+export type DashboardActivitiesPage = {
+  items: DashboardActivity[];
+  has_more: boolean;
+  next_cursor: string;
+  can_view_activity: boolean;
+  as_of: string;
+};
+
 export type DashboardPeriod = {
   periodType: DashboardPeriodType;
   year: number;
