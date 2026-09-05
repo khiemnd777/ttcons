@@ -1,5 +1,12 @@
 # Consflow Module Keyword Map
 
+## My Work Search And Filter Alignment
+
+- Scope wording: `Tất cả` replaces `Tất cả được phép xem` on `/my-work`; `MyWorkPage.tsx` owns the shared `scopes` label for the scope rail and `Bộ lọc nhanh · Tất cả` heading. First searches: `const scopes|scopeLabel|ScopeRail`. The `queue=all` key and permission-scoped data contract are unchanged.
+- Keywords: `Tìm công việc`, lệch field/nút, canh hàng, search button height, `Bộ lọc thêm`, loại hồ sơ. Owners: `frontend/src/modules/my-work/MyWorkPage.tsx` (`FilterBar`, opt-in labelled `FilterSelect`) and `myWorkFilters.css`; project-picker dependency remains `modules/_shared/AsyncProjectPicker.tsx`.
+- The search panel has a full-width labelled keyword row with a separate blue `Tìm` button, followed by labelled project/optional record-kind controls and the advanced-filter toggle. All panel controls are 40px tall with 12px column gaps. A named container query follows the panel's available width rather than the viewport: below 36rem primary filters stack; advanced filters use two columns from 28rem and full-width sorting. The dropdown stays above result rows via the panel's local stacking level.
+- First searches: `my-work-filter|function FilterBar|fieldLabel|AsyncProjectPicker`. Load frontend and root-cause detail maps. Search submit, immediate filter changes, URL/query contracts, accounting visibility and project-picker loading/error/unavailable states retain their existing semantics; this is presentation-only with no API/schema changes.
+
 ## Shared Date And Time Display
 
 - Keywords: format date, ngày giờ, `dd-mm-yyyy`, `HH:mm`, thời gian có giây, ngày lệch múi giờ. Owner: `frontend/src/lib/utils/format.ts`; tests: `frontend/tests/dateFormatting.test.ts` and `dashboardActivity.test.ts`.

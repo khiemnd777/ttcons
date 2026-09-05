@@ -66,7 +66,7 @@ test('My Work defaults to personal responsibility and keeps approval out of ordi
 
   assert.match(page, /type WorkScopeKey = 'responsible' \| 'mine'/);
   assert.match(page, /key: 'responsible', label: 'Tôi phụ trách'/);
-  assert.match(page, /key: 'all', label: 'Tất cả được phép xem'/);
+  assert.match(page, /key: 'all', label: 'Tất cả'/);
   assert.doesNotMatch(scopeOptions, /key: 'mine'|Giao trực tiếp|pending_approval/);
   assert.match(page, /\(requestedQueue === 'pending_approval' \|\| requestedQueue === 'mine'\) \? 'responsible' : requestedQueue/);
   assert.match(page, /if \(requestedQueue !== 'mine'\) return;[\s\S]*next\.delete\('queue'\);[\s\S]*replace: true/);

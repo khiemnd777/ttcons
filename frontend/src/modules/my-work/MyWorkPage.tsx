@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import clsx from 'clsx';
+import './myWorkFilters.css';
 import { get, post, type StreamStatus } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { EmptyState } from '../../components/EmptyState';
@@ -139,7 +140,7 @@ const scopes: Array<{ key: WorkScopeKey; label: string }> = [
   { key: 'responsible', label: 'Tôi phụ trách' },
   { key: 'department', label: 'Phòng ban' },
   { key: 'watching', label: 'Đang theo dõi' },
-  { key: 'all', label: 'Tất cả được phép xem' },
+  { key: 'all', label: 'Tất cả' },
 ];
 
 const attentionQueues: Array<{ key: AttentionQueueKey; label: string; icon: typeof MessageSquare }> = [
@@ -1075,31 +1076,59 @@ function FilterBar({ searchDraft, project, status, deadline, workType, priority,
   searchDraft: string; project: string; status: string; deadline: string; workType: string; priority: string; sort: string; facets: MyWorkFacets; hasFilters: boolean; advancedOpen: boolean;
   onSearchDraft: (value: string) => void; onSearch: () => void; onChange: (key: string, value: string) => void; onReset: () => void; onToggleAdvanced: () => void;
 }) {
+  const searchId = useId();
+  const advancedId = useId();
   const projects = normalizeFacetOptions(facets.projects, 'Công trình');
   const statuses = normalizeFacetOptions(facets.statuses, 'Trạng thái');
   const workTypes = normalizeFacetOptions(facets.work_types, 'Loại việc');
   const priorities = normalizeFacetOptions(facets.priorities, 'Ưu tiên');
   return (
-    <div className="space-y-3 rounded-lg border border-line bg-white p-3">
-      <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-blue-700" /><h2 className="text-sm font-semibold text-ink">Tìm công việc</h2></div>{hasFilters ? <button className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-blue-700" onClick={onReset}><X className="h-3.5 w-3.5" />Về mặc định</button> : null}</div>
-      <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-[minmax(14rem,1fr)_minmax(12rem,18rem)_auto]">
-        <form className="flex min-w-0 md:col-span-2 2xl:col-span-1" onSubmit={(event) => { event.preventDefault(); onSearch(); }}>
-          <div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input className="w-full rounded-l-md border border-line py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400" value={searchDraft} onChange={(event) => onSearchDraft(event.target.value)} placeholder="Tên việc, công trình..." /></div>
-          <button className="rounded-r-md border border-l-0 border-line px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50" type="submit">Tìm</button>
-        </form>
-        {accounting ? <AsyncProjectPicker value={project} onChange={(value) => onChange('project', value)} endpoint="/project-finance/projects" queryKey="my-accounting-work-project-options" emptyLabel="Tất cả công trình" /> : <FilterSelect value={project} label="Tất cả công trình" options={projects} onChange={(value) => onChange('project', value)} />}
-        <button className={clsx('inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold', advancedOpen ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-line text-slate-700 hover:bg-slate-50')} onClick={onToggleAdvanced}><SlidersHorizontal className="h-4 w-4" />Bộ lọc thêm</button>
+    <div className="my-work-filters relative z-10 space-y-4 rounded-lg border border-line bg-white p-4 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-blue-700" /><h2 className="text-sm font-semibold text-ink">Tìm công việc</h2></div>
+        {hasFilters ? <button type="button" className="focus-ring inline-flex items-center gap-1 rounded text-xs font-semibold text-slate-600 hover:text-blue-700" onClick={onReset}>Về mặc định<X className="h-3.5 w-3.5" /></button> : null}
       </div>
-      {accounting ? <FilterSelect value={entryKind} label="Tất cả loại hồ sơ" options={[{ value: 'work_item', label: 'Công việc quy trình' }, { value: 'accounting_handoff', label: 'Hồ sơ kế toán' }]} onChange={(value) => onChange('entry_kind', value)} /> : null}
-      {advancedOpen ? <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-5">
-        <FilterSelect value={status} label="Tất cả trạng thái" options={statuses.length ? statuses.map((item) => ({ ...item, label: statusLabel(item.value) })) : statusOptions} onChange={(value) => onChange('status', value)} />
-        {entryKind !== 'accounting_handoff' ? <>
-        <FilterSelect value={deadline} label="Tất cả hạn việc" options={deadlineOptions} onChange={(value) => onChange('deadline', value)} />
-        <FilterSelect value={workType} label="Tất cả loại việc" options={workTypes.map((item) => ({ ...item, label: workTypeLabel(item.value) }))} onChange={(value) => onChange('type', value)} />
-        <FilterSelect value={priority} label="Tất cả ưu tiên" options={priorities.map((item) => ({ ...item, label: priorityLabel(item.value) }))} onChange={(value) => onChange('priority', value)} />
-        </> : null}
-        <FilterSelect value={sort} label="Sắp xếp" options={sortOptions} onChange={(value) => onChange('sort', value)} />
-      </div> : null}
+
+      <form className="min-w-0 space-y-1" onSubmit={(event) => { event.preventDefault(); onSearch(); }}>
+        <label htmlFor={searchId} className="block text-xs font-semibold leading-4 text-slate-600">Từ khóa</label>
+        <div className="flex items-center gap-3">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input id={searchId} className="block h-10 w-full rounded-md border border-line bg-white pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" value={searchDraft} onChange={(event) => onSearchDraft(event.target.value)} placeholder="Tên việc, công trình..." />
+          </div>
+          <button className="focus-ring inline-flex h-10 w-[88px] shrink-0 items-center justify-center rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700" type="submit">Tìm</button>
+        </div>
+      </form>
+
+      <div className={clsx('my-work-filter-fields grid items-start gap-3', accounting && 'my-work-filter-fields--accounting')}>
+        {accounting ? (
+          <div className="min-w-0 leading-4">
+            <AsyncProjectPicker value={project} onChange={(value) => onChange('project', value)} endpoint="/project-finance/projects" queryKey="my-accounting-work-project-options" emptyLabel="Tất cả công trình" />
+          </div>
+        ) : <FilterSelect fieldLabel="Công trình" value={project} label="Tất cả công trình" options={projects} onChange={(value) => onChange('project', value)} />}
+        {accounting ? <FilterSelect fieldLabel="Loại hồ sơ" value={entryKind} label="Tất cả loại hồ sơ" options={[{ value: 'work_item', label: 'Công việc quy trình' }, { value: 'accounting_handoff', label: 'Hồ sơ kế toán' }]} onChange={(value) => onChange('entry_kind', value)} /> : null}
+        <button
+          type="button"
+          aria-expanded={advancedOpen}
+          aria-controls={advancedId}
+          className={clsx('my-work-filter-toggle focus-ring inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-md border px-3 text-sm font-semibold', advancedOpen ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-blue-300 text-blue-700 hover:bg-blue-50')}
+          onClick={onToggleAdvanced}
+        ><SlidersHorizontal className="h-4 w-4 shrink-0" />Bộ lọc thêm</button>
+      </div>
+
+      {advancedOpen ? (
+        <div id={advancedId} className="my-work-filter-advanced grid gap-3 border-t border-line pt-4">
+          <FilterSelect fieldLabel="Trạng thái" value={status} label="Tất cả trạng thái" options={statuses.length ? statuses.map((item) => ({ ...item, label: statusLabel(item.value) })) : statusOptions} onChange={(value) => onChange('status', value)} />
+          {entryKind !== 'accounting_handoff' ? <>
+            <FilterSelect fieldLabel="Hạn việc" value={deadline} label="Tất cả hạn việc" options={deadlineOptions} onChange={(value) => onChange('deadline', value)} />
+            <FilterSelect fieldLabel="Loại việc" value={workType} label="Tất cả loại việc" options={workTypes.map((item) => ({ ...item, label: workTypeLabel(item.value) }))} onChange={(value) => onChange('type', value)} />
+            <FilterSelect fieldLabel="Ưu tiên" value={priority} label="Tất cả ưu tiên" options={priorities.map((item) => ({ ...item, label: priorityLabel(item.value) }))} onChange={(value) => onChange('priority', value)} />
+          </> : null}
+          <div className="col-span-full min-w-0">
+            <FilterSelect fieldLabel="Sắp xếp" value={sort} label="Sắp xếp" options={sortOptions} onChange={(value) => onChange('sort', value)} />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1125,8 +1154,14 @@ function mergeApprovalProjectOptions(base: Array<{ value: string; label: string 
   return Array.from(options.values());
 }
 
-function FilterSelect({ value, label, options, onChange }: { value: string; label: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
-  return <select className="min-w-0 rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-slate-700" value={value} onChange={(event) => onChange(event.target.value)}><option value="">{label}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
+function FilterSelect({ value, label, fieldLabel, options, onChange }: { value: string; label: string; fieldLabel?: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
+  const control = <select className={clsx('min-w-0 rounded-md border border-line bg-white px-3 text-sm font-medium text-slate-700', fieldLabel ? 'block h-10 w-full outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100' : 'py-2')} value={value} onChange={(event) => onChange(event.target.value)}><option value="">{label}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
+  return fieldLabel ? (
+    <label className="block min-w-0">
+      <span className="mb-1 block text-xs font-semibold leading-4 text-slate-600">{fieldLabel}</span>
+      {control}
+    </label>
+  ) : control;
 }
 
 function WorkList({ rows, entries, prioritizeAccounting = false, selectedAccountingId, onSelectAccounting, onAcknowledgeAccounting, selectedId, startupActions = [], selectedStartupActionId, startupActionsLoading = false, startupActionsError, workflowActions = [], selectedWorkflowActionId, workflowActionsLoading = false, workflowActionsError, pendingWorkflowActionId, loading, fetchingMore, error, total, hasMore, filtered, emptyTitle, onSelect, onSelectStartupAction, onOpenStartupAction, onSelectWorkflowAction, onRunWorkflowAction, onOpen, onLoadMore, onReset, onRetry, onRetryStartupActions, onRetryWorkflowActions }: {

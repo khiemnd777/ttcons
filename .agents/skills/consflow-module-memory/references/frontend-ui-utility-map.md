@@ -1,5 +1,13 @@
 # Consflow Frontend UI And Utility Map
 
+## My Work Search Panel
+
+- `MyWorkPage.tsx` shares `scopes` between `ScopeRail` and the quick-filter `scopeLabel`; key `all` displays `Tất cả` in both places. This wording change preserves the existing queue/filter/authorization semantics; `tests/myWorkListPresentation.test.ts` checks the label.
+- Owners: `modules/my-work/MyWorkPage.tsx` (`FilterBar`, local `FilterSelect`) and `myWorkFilters.css`. `Tìm công việc` separates its labelled keyword/search action into a full-width row, then groups project, permission-dependent record kind and `Bộ lọc thêm` into one responsive filter row. Controls use `h-10` (40px), `gap-3` (12px) and visible labels with a 16px line plus 4px gap; search submits through the existing form/Enter handler. The disclosure exposes `aria-expanded`/`aria-controls` and instance-specific IDs.
+- `my-work-filters` is a named inline-size container. Primary filters stack below 36rem available content width; wider panels use project + toggle, or project + kind + toggle. The toggle reserves the same 20px label offset only in the horizontal layout. Advanced filters use two columns from 28rem, with sorting across the full row. Every field retains `min-w-0`, and the panel sits above results so the existing project dropdown can overlap them.
+- `FilterSelect.fieldLabel` opts into the 40px full-width labelled wrapper; its unlabelled approval-workspace caller retains the previous rendering. The async project picker is reused unchanged inside a local `leading-4` wrapper so its label aligns with native selectors; its loading, empty, unavailable and retry states remain intact, and helper text below it does not stretch sibling controls. Read-only My Work presentation/queue tests and frontend build remain the technical checks; they do not establish browser visual acceptance.
+- First searches: `my-work-filter|function FilterBar|fieldLabel|AsyncProjectPicker`. Update the central and triage maps when these sizing, ownership or responsive rules change. No backend/query/permission changes belong to this presentation surface.
+
 ## Shared Absolute Date And Time Formatting
 
 - `lib/utils/format.ts` owns `dateText(value,fallback)`, `timeText(value,fallback)` and `dateTimeText(value,fallback)`: `dd-mm-yyyy`, `HH:mm`, `HH:mm dd-mm-yyyy`. It accepts Date objects, epoch milliseconds and validated ISO date/date-time strings; `timeText` also accepts `HH:mm[:ss[.fraction]]`. Missing/invalid input returns the selected fallback (`-` by default), including invalid leap days and clocks. A date-only value returns only a date even through `dateTimeText`; `timeText` does not invent midnight for it.

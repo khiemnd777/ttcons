@@ -1,0 +1,30 @@
+.my-work-filters {
+  container-name: my-work-filters;
+  container-type: inline-size;
+}
+
+.my-work-filter-fields,
+.my-work-filter-advanced {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container my-work-filters (min-width: 28rem) {
+  .my-work-filter-advanced {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container my-work-filters (min-width: 36rem) {
+  .my-work-filter-fields {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .my-work-filter-fields--accounting {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) auto;
+  }
+
+  .my-work-filter-toggle {
+    /* Reserve the same 16px label line and 4px gap as the adjacent fields. */
+    margin-top: 1.25rem;
+  }
+}

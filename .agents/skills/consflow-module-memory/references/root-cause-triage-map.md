@@ -1,5 +1,11 @@
 # Consflow Root-Cause Triage Map
 
+## My Work Search Controls Misaligned
+
+- Symptom: `Tìm công việc` keyword input sits above the project dropdown, `Tìm`/`Bộ lọc thêm` stretch taller than inputs, or record kind appears detached. Load central/frontend maps and inspect `modules/my-work/MyWorkPage.tsx`, `myWorkFilters.css`, and shared `modules/_shared/AsyncProjectPicker.tsx`. First search: `my-work-filter|function FilterBar|fieldLabel|AsyncProjectPicker|h-10`.
+- Compare the supplied screenshot against the label box and control box separately. The previous viewport-based grid mixed an unlabelled form with the async picker's label plus control; default grid/flex stretch enlarged buttons without enlarging the keyword input. Record kind was a separate element outside the grid. Do not fix this by changing filter/query semantics or the shared picker's dimensions across other pages.
+- Current contract: full-width keyword/search row; separately labelled primary filters; 40px controls; 16px label plus 4px gap; 12px column spacing; named container queries based on actual panel width. The async picker inherits a local 16px line height; the horizontal toggle reserves 20px above its control while `items-start` leaves helper errors below the field. Verify both accounting-capable and ordinary actors, narrow desktop list columns, long project names, expanded filters and picker unavailable/error states. Build/source tests cannot prove rendered alignment; browser checks still require the user's request in that turn.
+
 Use this map after `module-keyword-map.md` for bugs, regressions, slow flows, stale UI, failed status transitions, data mismatches, permission failures, upload/download issues, and report discrepancies.
 
 ## Mandatory Triage Flow
