@@ -505,7 +505,10 @@ export function ActivityThread({
                   targetOptions={mergedTargets}
                   attachmentOptions={mergedAttachments}
                   mentionOptions={mentionOptions}
-                  submitting={addActivity.isPending}
+                  mentionOptionsLoading={options.isLoading}
+                  mentionOptionsError={options.isError}
+                  onRetryMentionOptions={() => void options.refetch()}
+                  submitting={addActivity.isPending || updateMessage.isPending}
                   onSubmit={(payload) => addActivity.mutateAsync(payload).then(() => undefined)}
                 />
               </div>
@@ -867,7 +870,6 @@ function ChatMessage({
   const withdrawn = Boolean(item.withdrawn_at);
   const ownBlueBubble = own && !['blocker', 'question', 'decision', 'reminder'].includes(item.activity_type) && !withdrawn;
   const metadata = item.metadata_json ?? {};
-  const mentions = (item.mentions ?? []) as Array<{ id?: string; label?: string }>;
   return (
     <article className={clsx('flex items-end gap-2', own ? 'justify-end' : 'justify-start', compact ? 'pt-0' : 'pt-2')}>
       {!own ? (
@@ -906,11 +908,6 @@ function ChatMessage({
             ) : null}
           </div>
           {withdrawn ? <p className="text-sm italic leading-6">Tin nhắn đã được thu hồi</p> : comment ? <p className={clsx('whitespace-pre-wrap break-words text-sm leading-6', item.activity_type === 'comment' ? '' : 'mt-1.5')}>{comment}</p> : null}
-          {!withdrawn && mentions.length ? (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {mentions.map((mention, index) => <span key={`${mention.id ?? mention.label}:${index}`} className="rounded bg-white/70 px-1.5 py-0.5 text-[11px] font-semibold text-blue-700">@{mention.label || mention.id}</span>)}
-            </div>
-          ) : null}
           {!withdrawn && metadata.due_at ? <p className="mt-2 text-xs font-semibold">Hạn: {compactDateTime(metadata.due_at)}</p> : null}
           {!withdrawn ? <ActivityAttachments attachments={item.attachments} /> : null}
           <div className={clsx('mt-2 flex flex-wrap items-center gap-2 border-t pt-2 text-[11px]', ownBlueBubble ? 'border-white/20' : 'border-black/5')}>

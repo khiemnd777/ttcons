@@ -1,7 +1,7 @@
 import { Archive, CircleCheck } from 'lucide-react';
 import clsx from 'clsx';
 import type { UserNotification } from '../../lib/types/domain';
-import { notificationPresentation, notificationRelativeTime } from './notificationPresentation';
+import { notificationDisplayText, notificationPresentation, notificationRelativeTime } from './notificationPresentation';
 
 export function NotificationItem({
   notification,
@@ -25,10 +25,10 @@ export function NotificationItem({
       </span>
       <button type="button" className="min-w-0 flex-1 text-left disabled:opacity-60" disabled={busy} onClick={onOpen}>
         <span className="flex items-start gap-2">
-          <strong className="min-w-0 flex-1 text-sm text-ink">{notification.title_snapshot}</strong>
+          <strong className="min-w-0 flex-1 text-sm text-ink">{notificationDisplayText(notification.title_snapshot)}</strong>
           {!notification.read_at ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-600" aria-label="Chưa đọc" /> : null}
         </span>
-        <span className="mt-1 block text-sm leading-5 text-slate-600">{notification.message_snapshot}</span>
+        <span className="mt-1 block text-sm leading-5 text-slate-600">{notificationDisplayText(notification.message_snapshot)}</span>
         <span className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-slate-400">
           <span className="truncate">{[notification.project_code, presentation.label].filter(Boolean).join(' · ')}</span>
           <time dateTime={notification.created_at}>{notificationRelativeTime(notification.created_at)}</time>

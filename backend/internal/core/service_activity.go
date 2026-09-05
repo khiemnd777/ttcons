@@ -647,13 +647,18 @@ func normalizeActivityMentions(input []ActivityMentionRequest) ([]ActivityMentio
 		if mentionType == "" && mentionID == "" {
 			continue
 		}
-		if mentionType != "user" && mentionType != "staff" && mentionType != "role" {
+		if mentionType == "all" {
+			if !strings.EqualFold(mentionID, "all") {
+				return nil, validationError("Nhắc toàn bộ thành viên cần mã all", Record{"mention_type": mentionType})
+			}
+			mentionID, label = "all", "all"
+		} else if mentionType != "user" && mentionType != "staff" && mentionType != "role" {
 			return nil, validationError("Loại nhắc đến không hợp lệ", Record{"mention_type": mention.Type})
 		}
 		if mentionID == "" {
 			return nil, validationError("Nhắc đến cần ID hoặc nhãn vai trò", Record{"mention_type": mentionType})
 		}
-		if mentionType != "role" && !validActivityUUID(mentionID) {
+		if mentionType != "role" && mentionType != "all" && !validActivityUUID(mentionID) {
 			return nil, validationError("Người dùng/nhân sự được nhắc đến không hợp lệ", Record{"mention_type": mentionType, "id": mentionID})
 		}
 		key := mentionType + ":" + strings.ToLower(mentionID)

@@ -55,7 +55,7 @@ export type ActivityReactionSummary = {
 };
 
 export type ActivityMentionPayload = {
-  type: 'user' | 'staff' | 'role';
+  type: 'user' | 'staff' | 'role' | 'all';
   id: string;
   label?: string;
 };

@@ -134,7 +134,7 @@ export function NotificationPanel({ summary }: { summary?: NotificationSummary }
             ) : rows.length ? rows.map((notification) => (
               <NotificationItem key={notification.id} compact notification={notification} busy={(markRead.isPending && markRead.variables === notification.id) || (archive.isPending && archive.variables === notification.id)} onOpen={() => void openNotification(notification)} onArchive={() => archive.mutate(notification.id)} />
             )) : (
-              <div className="p-8 text-center text-sm text-slate-500"><Bell className="mx-auto mb-2 h-6 w-6 text-slate-300" />{state === 'unread' ? 'Anh/chị đã đọc tất cả thông báo.' : state === 'action_required' ? 'Không có thông báo cần xử lý.' : 'Chưa có thông báo nào.'}</div>
+              <div className="p-8 text-center text-sm text-slate-500"><Bell className="mx-auto mb-2 h-6 w-6 text-slate-300" />{state === 'unread' ? 'Bạn đã đọc tất cả thông báo.' : state === 'action_required' ? 'Không có thông báo cần xử lý.' : 'Chưa có thông báo nào.'}</div>
             )}
             {notifications.hasNextPage ? <div className="border-t border-line p-3 text-center"><button type="button" className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 disabled:opacity-50" disabled={notifications.isFetchingNextPage} onClick={() => void notifications.fetchNextPage()}>{notifications.isFetchingNextPage ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}Tải thêm</button></div> : null}
           </div>

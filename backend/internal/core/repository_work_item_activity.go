@@ -647,6 +647,24 @@ func (r *Repository) insertActivityAttentionTx(ctx context.Context, tx *sql.Tx, 
 	}
 	for _, mention := range req.Mentions {
 		switch mention.Type {
+		case "all":
+			// Resolve the audience from live project membership in the same transaction as the activity.
+			// Persist ordinary staff recipients; no new database mention_type or historical rewrite.
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO activity_mentions (activity_id, project_id, mention_type, mention_key, recipient_user_id, recipient_staff_id)
+				SELECT DISTINCT $1::uuid, $2::uuid, 'staff', s.id::text, u.id, s.id
+				FROM project_members pm
+				JOIN staff s ON s.id=pm.staff_id AND s.status='active'
+				JOIN users u ON u.id=s.user_id AND u.status='active' AND u.deleted_at IS NULL
+				WHERE pm.project_id=$2::uuid AND pm.active
+				  AND NOT EXISTS (
+					SELECT 1 FROM user_roles ur JOIN roles role ON role.id=ur.role_id
+					WHERE ur.user_id=u.id AND role.external_only
+				  )
+				ON CONFLICT DO NOTHING
+			`, activityID, projectID); err != nil {
+				return err
+			}
 		case "user":
 			if _, err := tx.ExecContext(ctx, `
 				INSERT INTO activity_mentions (activity_id, project_id, mention_type, mention_key, recipient_user_id, recipient_staff_id)
@@ -727,6 +745,9 @@ func (r *Repository) insertActivityAttentionTx(ctx context.Context, tx *sql.Tx, 
 	}
 	if len(recipientIDs) == 0 {
 		return nil
+	}
+	if len(recipientIDs) > 500 {
+		return validationError("Một trao đổi chỉ được nhắc tối đa 500 người nhận. Vui lòng thu hẹp danh sách thành viên được nhắc.", Record{"field": "mentions", "recipient_count": len(recipientIDs)})
 	}
 	_, err = emitNotificationEventTx(ctx, tx, NotificationDomainEvent{
 		Key:           "activity.mentioned",

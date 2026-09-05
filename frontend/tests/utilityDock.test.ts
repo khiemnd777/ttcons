@@ -78,10 +78,11 @@ test('discussion picker is separate, preserves mobile switching and supports exp
 });
 
 test('Utility Dock keeps discussion unread separate and reuses canonical work sources', async () => {
-  const [dock, realtime, composer] = await Promise.all([
+  const [dock, realtime, composer, chatInput] = await Promise.all([
     source('../src/modules/utilities/UtilityDock.tsx'),
     source('../src/modules/notifications/ActorRealtimeProvider.tsx'),
     source('../src/modules/work-items/ActivityComposer.tsx'),
+    source('../src/modules/work-items/ActivityChatInput.tsx'),
   ]);
 
   assert.match(dock, /\/me\/project-discussions\?limit=50/);
@@ -92,14 +93,15 @@ test('Utility Dock keeps discussion unread separate and reuses canonical work so
   assert.match(dock, /variant="chat"\s+density="compact"/);
   assert.match(composer, /density\?: 'comfortable' \| 'compact'/);
   assert.match(composer, /variant === 'chat' && density === 'compact'/);
-  assert.match(composer, /Math\.min\(Math\.max\(input\.scrollHeight, 44\), 112\)/);
+  assert.match(chatInput, /Math\.min\(Math\.max\(input.current.scrollHeight, 44\), 112\)/);
   assert.match(composer, /Gắn vào: \{targetSummary\}/);
-  assert.match(composer, /Nhắc đến thành viên hoặc vai trò/);
+  assert.match(chatInput, /Nhắc đến thành viên/);
   assert.match(composer, /function useDismissableDisclosure\(\)/);
   assert.match(composer, /const targetDisclosure = useDismissableDisclosure\(\)/);
-  assert.match(composer, /const mentionDisclosure = useDismissableDisclosure\(\)/);
   assert.match(composer, /ref=\{targetDisclosure\.detailsRef\}\s+open=\{targetDisclosure\.open\}/);
-  assert.match(composer, /ref=\{mentionDisclosure\.detailsRef\}\s+open=\{mentionDisclosure\.open\}/);
+  assert.match(chatInput, /document.addEventListener\('pointerdown', outside\)/);
+  assert.match(chatInput, /!root.current\?\.contains\(event.target\)\) setQuery\(null\)/);
+  assert.match(chatInput, /action === 'dismiss'[\s\S]*event.stopPropagation\(\); setQuery\(null\)/);
   assert.match(composer, /document\.addEventListener\('pointerdown', handlePointerDown\)/);
   assert.match(composer, /event\.key !== 'Escape'[\s\S]*event\.stopPropagation\(\)[\s\S]*setOpen\(false\)/);
   assert.match(dock, /workSummary\.data\?\.work_total/);

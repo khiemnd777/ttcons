@@ -79,6 +79,10 @@ export function compactNotificationCount(value: number) {
   return value > 99 ? '99+' : String(value);
 }
 
+export function notificationDisplayText(value: string) {
+  return value.replace(/Anh\/chị/g, 'Bạn').replace(/anh\/chị/g, 'bạn');
+}
+
 export function notificationRelativeTime(value: string) {
   const createdAt = new Date(value).getTime();
   if (!Number.isFinite(createdAt)) return value;

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { AtSign, ChevronUp, Link2, Loader2, MessageSquarePlus, Plus, Send, Users, X } from 'lucide-react';
+import { ChevronUp, Link2, Loader2, MessageSquarePlus, Plus, Send, X } from 'lucide-react';
 import clsx from 'clsx';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
@@ -7,6 +7,10 @@ import type { ActivityAttachmentPayload, ActivityMentionPayload, ActivityPayload
 import { enumLabel, statusLabel } from '../../lib/utils/status';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { compactDateTime } from './workItemPresentation';
+import { ActivityChatInput } from './ActivityChatInput';
+import type { ActivityMentionOption } from './activityChatInputDomain';
+import { chatMentionPayload } from './activityChatInputDomain';
+export type { ActivityMentionOption } from './activityChatInputDomain';
 
 type ComposerMode = 'project' | 'work_item';
 type ActivityType = ActivityPayload['activity_type'];
@@ -27,13 +31,6 @@ export type ActivityAttachmentOption = {
   label: string;
   status?: string;
   visibility?: string;
-};
-
-export type ActivityMentionOption = {
-  type: 'staff' | 'role';
-  id: string;
-  label: string;
-  description?: string;
 };
 
 const baseActivityOptions: Array<{ value: ActivityType; label: string }> = [
@@ -118,6 +115,9 @@ export function ActivityComposer({
   targetOptions = [],
   attachmentOptions = [],
   mentionOptions = [],
+  mentionOptionsLoading = false,
+  mentionOptionsError = false,
+  onRetryMentionOptions,
   defaultExpanded = false,
   variant = 'card',
   density = 'comfortable',
@@ -134,6 +134,9 @@ export function ActivityComposer({
   targetOptions?: ActivityTargetOption[];
   attachmentOptions?: ActivityAttachmentOption[];
   mentionOptions?: ActivityMentionOption[];
+  mentionOptionsLoading?: boolean;
+  mentionOptionsError?: boolean;
+  onRetryMentionOptions?: () => void;
   defaultExpanded?: boolean;
   variant?: 'card' | 'chat';
   density?: 'comfortable' | 'compact';
@@ -163,9 +166,9 @@ export function ActivityComposer({
   const [attachments, setAttachments] = useState<ActivityAttachmentPayload[]>([]);
   const [touched, setTouched] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
-  const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
   const targetDisclosure = useDismissableDisclosure();
-  const mentionDisclosure = useDismissableDisclosure();
+  const submissionInFlight = useRef(false);
+  const [sending, setSending] = useState(false);
   const navigateToValidation = useValidationNavigation(formRef);
 
   const activityOptions = useMemo(() => {
@@ -198,17 +201,9 @@ export function ActivityComposer({
   useEffect(() => {
     if (!editItem) return;
     setComment(editItem.comment ?? '');
+    setMentions([]);
     setTouched(false);
   }, [editItem?.id]);
-
-  useEffect(() => {
-    if (variant !== 'chat' || density !== 'compact' || !commentInputRef.current) return;
-    const input = commentInputRef.current;
-    input.style.height = 'auto';
-    const nextHeight = Math.min(Math.max(input.scrollHeight, 44), 112);
-    input.style.height = `${nextHeight}px`;
-    input.style.overflowY = input.scrollHeight > 112 ? 'auto' : 'hidden';
-  }, [comment, density, variant]);
 
   function addMention() {
     const id = mentionId.trim();
@@ -245,6 +240,7 @@ export function ActivityComposer({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting || submissionInFlight.current) return;
     setTouched(true);
     const missing = [
       !comment.trim() ? 'nội dung' : '',
@@ -266,13 +262,19 @@ export function ActivityComposer({
       return;
     }
 
-    if (editing && !editCommentChanged) return;
+    if (editing && (!editCommentChanged || !onSubmitEdit)) return;
+
+    submissionInFlight.current = true;
+    setSending(true);
 
     if (editing && onSubmitEdit) {
       try {
         await onSubmitEdit(comment.trim());
       } catch {
         return;
+      } finally {
+        submissionInFlight.current = false;
+        setSending(false);
       }
       setComment('');
       setTouched(false);
@@ -288,17 +290,20 @@ export function ActivityComposer({
       await onSubmit({
         activity_type: effectiveActivityType,
         comment: comment.trim(),
-        visibility: replying ? (replyTo?.visibility as Visibility ?? 'project') : visibility,
+        visibility: replying ? (replyTo?.visibility as Visibility ?? 'project') : variant === 'chat' ? 'project' : visibility,
         scope_type: replying ? replyTo?.scope_type : allowTarget ? targetScope : undefined,
         scope_id: replying ? replyTo?.scope_id : allowTarget && targetScope !== 'project' ? targetId.trim() : undefined,
         work_item_id: replying ? replyTo?.work_item_id : selectedTarget?.work_item_id,
         parent_activity_id: replying ? replyTo?.id : undefined,
-        mentions,
+        mentions: variant === 'chat' ? chatMentionPayload(comment, mentions) : mentions,
         attachments: replying ? [] : attachments,
         metadata: replying ? {} : metadata,
       });
     } catch {
       return;
+    } finally {
+      submissionInFlight.current = false;
+      setSending(false);
     }
     setComment('');
     setDueAt('');
@@ -312,6 +317,29 @@ export function ActivityComposer({
     setTouched(false);
     if (variant === 'card') setExpanded(false);
   }
+
+  const chatInput = (
+    <ActivityChatInput
+      key={editing ? `edit:${editItem?.id}` : 'compose'}
+      value={comment}
+      onChange={(value, selectedMentions) => { setComment(value); if (!editing) setMentions(selectedMentions); }}
+      options={mentionOptions}
+      optionsLoading={mentionOptionsLoading}
+      optionsError={mentionOptionsError}
+      onRetryOptions={onRetryMentionOptions}
+      activityType={activityType}
+      activityOptions={activityOptions}
+      onActivityTypeChange={setActivityType}
+      compact={density === 'compact'}
+      editing={editing}
+      replying={replying}
+      editUnchanged={Boolean(editing && !editCommentChanged)}
+      busy={Boolean(submitting || sending)}
+      invalid={missingComment}
+      onBlur={() => setTouched(true)}
+      placeholder={editing ? 'Nhập nội dung chỉnh sửa...' : replying ? `Trả lời ${identityReferenceText(replyTo?.actor_name, replyTo?.actor_account_deleted, 'thành viên công trình')}...` : 'Nhắn vào thảo luận công trình...'}
+    />
+  );
 
   if (variant === 'chat' && density === 'compact') {
     return (
@@ -439,14 +467,8 @@ export function ActivityComposer({
             </div>
           ) : null}
 
-          {!editing && (mentions.length || attachments.length) ? (
+          {!editing && attachments.length > 0 ? (
             <div className="flex flex-wrap gap-1 border-b border-line px-2 py-1.5">
-              {mentions.map((mention) => (
-                <span key={`${mention.type}:${mention.id}`} className="inline-flex max-w-full items-center gap-1 rounded-md bg-blue-50 px-1.5 py-1 text-[11px] font-semibold text-blue-700">
-                  <span className="truncate">@{mention.label || mention.id}</span>
-                  <button type="button" className="rounded p-0.5 hover:bg-blue-100" onClick={() => setMentions((current) => current.filter((item) => !(item.type === mention.type && item.id === mention.id)))} aria-label="Gỡ người được nhắc"><X className="h-3 w-3" /></button>
-                </span>
-              ))}
               {attachments.map((attachment) => (
                 <span key={`${attachment.type}:${attachment.id}`} className="inline-flex max-w-full items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-1 text-[11px] font-semibold text-emerald-700">
                   <span className="truncate">{attachment.label || attachment.id}</span>
@@ -456,68 +478,7 @@ export function ActivityComposer({
             </div>
           ) : null}
 
-          <textarea
-            ref={commentInputRef}
-            className="block min-h-11 max-h-28 w-full resize-none bg-transparent px-3 py-2 text-sm leading-5 outline-none"
-            value={comment}
-            aria-invalid={missingComment}
-            onBlur={() => setTouched(true)}
-            onChange={(event) => setComment(event.target.value)}
-            placeholder={editing ? 'Nhập nội dung chỉnh sửa...' : replying ? `Trả lời ${identityReferenceText(replyTo?.actor_name, replyTo?.actor_account_deleted, 'thành viên công trình')}...` : 'Nhắn vào thảo luận công trình...'}
-          />
-
-          <div className="flex h-10 min-w-0 items-center gap-1 border-t border-line px-1.5">
-            {editing ? <span className="shrink-0 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">✎ Chỉnh sửa</span> : replying ? <span className="shrink-0 rounded-md bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">↩ Phản hồi</span> : (
-              <label className="min-w-0 shrink">
-                <span className="sr-only">Loại trao đổi</span>
-                <select className="h-7 max-w-28 rounded-md border-0 bg-slate-100 px-1.5 text-[11px] font-semibold text-slate-600 sm:max-w-36" value={activityType} onChange={(event) => setActivityType(event.target.value as ActivityType)}>
-                  {activityOptions.map((option) => <option key={option.value} value={option.value}>＋ {option.label}</option>)}
-                </select>
-              </label>
-            )}
-            {!editing ? (
-              <details ref={mentionDisclosure.detailsRef} open={mentionDisclosure.open} className="relative shrink-0">
-                <summary
-                  className="flex h-7 cursor-pointer list-none items-center gap-1 rounded-md px-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
-                  aria-label="Nhắc đến thành viên hoặc vai trò"
-                  aria-expanded={mentionDisclosure.open}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    mentionDisclosure.toggle();
-                  }}
-                >
-                  <AtSign className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Nhắc{mentions.length ? ` ${mentions.length}` : ''}</span>
-                </summary>
-                <div data-validation-key="mention" className="absolute bottom-9 left-0 z-30 w-[min(18rem,calc(100vw-2rem))] space-y-2 rounded-lg border border-line bg-white p-2 shadow-xl">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Nhắc đến</p>
-                  <select className="w-full rounded-md border border-line px-2 py-2 text-xs" value={mentionType} onChange={(event) => { setMentionType(event.target.value as MentionType); setMentionId(''); setMentionLabel(''); }}>
-                    {mentionTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                  </select>
-                  <div className="flex gap-1.5">
-                    <select className="min-w-0 flex-1 rounded-md border border-line px-2 py-2 text-xs" value={mentionId} onChange={(event) => { const selected = visibleMentionOptions.find((option) => option.id === event.target.value); setMentionId(event.target.value); setMentionLabel(selected?.label ?? ''); }}>
-                      <option value="">Chọn người hoặc vai trò</option>
-                      {visibleMentionOptions.map((option) => <option key={`${option.type}:${option.id}`} value={option.id}>{option.label}{option.description ? ` · ${option.description}` : ''}</option>)}
-                    </select>
-                    <button type="button" className="inline-flex w-8 items-center justify-center rounded-md border border-line text-slate-600 hover:bg-slate-50" onClick={addMention} aria-label="Thêm người được nhắc"><Plus className="h-3.5 w-3.5" /></button>
-                  </div>
-                </div>
-              </details>
-            ) : null}
-            {editing ? <span className="min-w-0 flex-1 truncate rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">Phạm vi không đổi</span> : replying ? <span className="min-w-0 flex-1 truncate rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600" title="Phạm vi xem được kế thừa từ tin gốc">{visibilityOptions.find((option) => option.value === replyTo?.visibility)?.label ?? replyTo?.visibility}</span> : (
-              <label className="relative min-w-0 flex-1">
-                <span className="sr-only">Ai có thể xem</span>
-                <Users className="pointer-events-none absolute left-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
-                <select className="h-7 w-full min-w-0 rounded-md border-0 bg-slate-100 pl-6 pr-1 text-[11px] font-semibold text-slate-600" value={visibility} onChange={(event) => setVisibility(event.target.value as Visibility)}>
-                  {visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
-            )}
-            {editing && !editCommentChanged ? <span className="sr-only">Chưa có thay đổi</span> : null}
-            <button className={clsx('ml-auto inline-flex h-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60', editing ? 'gap-1.5 px-3 text-xs font-semibold' : 'w-8')} type="submit" disabled={submitting || (editing && !editCommentChanged)} aria-label={editing ? 'Lưu chỉnh sửa' : 'Gửi trao đổi'}>
-              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : editing ? 'Lưu' : <Send className="h-3.5 w-3.5" />}
-            </button>
-          </div>
+          {chatInput}
         </div>
       </form>
     );
@@ -649,14 +610,8 @@ export function ActivityComposer({
           </div>
         ) : null}
 
-        {!editing && (mentions.length || attachments.length) ? (
+        {!editing && attachments.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
-            {mentions.map((mention) => (
-              <span key={`${mention.type}:${mention.id}`} className="inline-flex max-w-full items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
-                <span className="truncate">@{mention.label || mention.id}</span>
-                <button type="button" className="rounded p-0.5 hover:bg-blue-100" onClick={() => setMentions((current) => current.filter((item) => !(item.type === mention.type && item.id === mention.id)))} aria-label="Gỡ người được nhắc"><X className="h-3 w-3" /></button>
-              </span>
-            ))}
             {attachments.map((attachment) => (
               <span key={`${attachment.type}:${attachment.id}`} className="inline-flex max-w-full items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
                 <span className="truncate">{attachment.label || attachment.id}</span>
@@ -667,51 +622,7 @@ export function ActivityComposer({
         ) : null}
 
         <div data-validation-key="comment" data-validation-error={missingComment ? 'true' : undefined} className={clsx('scroll-mt-24 rounded-xl border bg-white shadow-sm focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100', missingComment ? 'border-amber-300' : 'border-line')}>
-          <textarea
-            className="max-h-40 min-h-16 w-full resize-y rounded-t-xl bg-transparent px-3 py-2.5 text-sm leading-6 outline-none"
-            value={comment}
-            aria-invalid={missingComment}
-            onBlur={() => setTouched(true)}
-            onChange={(event) => setComment(event.target.value)}
-            placeholder={editing ? 'Nhập nội dung chỉnh sửa...' : replying ? `Trả lời ${identityReferenceText(replyTo?.actor_name, replyTo?.actor_account_deleted, 'thành viên công trình')}...` : 'Nhắn vào thảo luận công trình...'}
-          />
-          <div className="flex flex-wrap items-center gap-1.5 border-t border-line px-2 py-2">
-            {editing ? <span className="rounded-md bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-700">✎ Chỉnh sửa</span> : replying ? <span className="rounded-md bg-blue-50 px-2 py-1.5 text-xs font-semibold text-blue-700">↩ Phản hồi</span> : (
-              <label className="min-w-0">
-                <span className="sr-only">Loại trao đổi</span>
-                <select className="max-w-36 rounded-md border-0 bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-600" value={activityType} onChange={(event) => setActivityType(event.target.value as ActivityType)}>
-                  {activityOptions.map((option) => <option key={option.value} value={option.value}>＋ {option.label}</option>)}
-                </select>
-              </label>
-            )}
-            {!editing ? <details className="relative">
-              <summary className="cursor-pointer list-none rounded-md px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">@ Nhắc đến</summary>
-              <div data-validation-key="mention" className="absolute bottom-9 left-0 z-20 w-72 scroll-mt-24 space-y-2 rounded-lg border border-line bg-white p-2 shadow-lg">
-                <select className="w-full rounded-md border border-line px-2 py-2 text-xs" value={mentionType} onChange={(event) => { setMentionType(event.target.value as MentionType); setMentionId(''); setMentionLabel(''); }}>
-                  {mentionTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-                <div className="flex gap-1.5">
-                  <select className="min-w-0 flex-1 rounded-md border border-line px-2 py-2 text-xs" value={mentionId} onChange={(event) => { const selected = visibleMentionOptions.find((option) => option.id === event.target.value); setMentionId(event.target.value); setMentionLabel(selected?.label ?? ''); }}>
-                    <option value="">Chọn người hoặc vai trò</option>
-                    {visibleMentionOptions.map((option) => <option key={`${option.type}:${option.id}`} value={option.id}>{option.label}</option>)}
-                  </select>
-                  <button type="button" className="rounded-md border border-line px-2 text-slate-600 hover:bg-slate-50" onClick={addMention} aria-label="Thêm người được nhắc"><Plus className="h-4 w-4" /></button>
-                </div>
-              </div>
-            </details> : null}
-            {editing ? <span className="max-w-44 truncate rounded-md bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-600">Phạm vi không đổi</span> : replying ? <span className="max-w-44 truncate rounded-md bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-600" title="Phạm vi xem được kế thừa từ tin gốc">{visibilityOptions.find((option) => option.value === replyTo?.visibility)?.label ?? replyTo?.visibility}</span> : (
-              <label className="min-w-0">
-                <span className="sr-only">Ai có thể xem</span>
-                <select className="max-w-44 rounded-md border-0 bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-600" value={visibility} onChange={(event) => setVisibility(event.target.value as Visibility)}>
-                  {visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
-            )}
-            {editing && !editCommentChanged ? <span className="text-xs font-medium text-slate-400">Chưa có thay đổi</span> : null}
-            <button className={clsx('ml-auto inline-flex h-9 items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60', editing ? 'gap-1.5 px-3 text-xs font-semibold' : 'w-9')} type="submit" disabled={submitting || (editing && !editCommentChanged)} aria-label={editing ? 'Lưu chỉnh sửa' : 'Gửi trao đổi'}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : editing ? 'Lưu chỉnh sửa' : <Send className="h-4 w-4" />}
-            </button>
-          </div>
+          {chatInput}
         </div>
       </form>
     );

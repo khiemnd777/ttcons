@@ -780,6 +780,9 @@ function ProjectConversation({ project }: { project: ProjectDiscussionProject })
             targetOptions={targets}
             attachmentOptions={attachments}
             mentionOptions={mentions}
+            mentionOptionsLoading={options.isLoading}
+            mentionOptionsError={options.isError}
+            onRetryMentionOptions={() => void options.refetch()}
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
             submitting={addActivity.isPending}

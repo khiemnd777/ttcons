@@ -1,5 +1,12 @@
 # Consflow Backend Function Map
 
+## Project Activity All-Member Mentions
+
+- `service_activity.go::normalizeActivityMentions` accepts the additive `{type:"all",id:"all"}` request marker, canonicalizes casing and deduplicates it; arbitrary IDs are rejected. Existing project/work-item activity endpoints and actor authorization remain in place. First searches: `normalizeActivityMentions|insertActivityAttentionTx|ActivityMentionRequest`.
+- `repository_work_item_activity.go::insertActivityAttentionTx` resolves `all` inside the activity transaction from active `project_members`, active staff and active non-deleted users without external-only roles. It stores ordinary `mention_type='staff'` rows, so no schema/migration or historical rewrite is needed. The frontend does not supply the all-member audience.
+- Read states deduplicate by user; the actor starts read and receives no notification. Distinct non-actor recipients feed the existing `activity.mentioned` outbox and idempotent projector, which still rechecks current scope and preferences. More than 500 notification recipients returns validation error and rolls back activity, mention/read rows and outbox together. Replies inherit parent scope/visibility, resolve current members anew and retain parent-author auto-mention. Content-only edits do not create new mentions or notifications.
+- `activity_all_mentions_test.go` covers normalized casing, membership/account/staff/external exclusions, duplicate explicit recipients, actor exclusion, repeated dispatcher delivery, reactivated membership, inherited reply visibility, edit independence, cross-project denial and the 500/501 recipient transaction boundary. Read `consflow-project-planning-domain` and notification boundary invariants before changing this resolver.
+
 ## Dashboard Cross-Project Activity
 
 - Protected `GET /reports/dashboard/activities` requires `report.view`; `handlers_reports.go` parses query input, `service_dashboard_activity.go` validates range/type/search/limit and actor-bound snapshot cursors, `repository_dashboard_activity.go` reads `work_item_activities`, projects, work items and users. Typed request/page/item contracts live in `types_reports.go`.
