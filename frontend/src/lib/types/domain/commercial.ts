@@ -62,6 +62,7 @@ export type BOQItem = ProjectOperationsRecord & {
   selected_quotation_item_id?: string;
   selected_quotation_code?: string;
   selected_supplier_partner_id?: string;
+  selected_quotation_id?: string;
   selected_supplier_name?: string;
   quoted_unit_price?: number;
   price_waiver_reason?: string;

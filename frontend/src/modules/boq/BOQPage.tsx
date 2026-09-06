@@ -10,6 +10,8 @@ import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { CurrencyText } from '../../components/CurrencyText';
 import { RecordSummary, RecordSection, RecordMetrics, RecordMetric, RecordEmpty } from '../../components/RecordDetailLayout';
+import { RecordLink } from '../_shared/RecordLinks';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { useToast } from '../../components/ToastProvider';
 import { RowActions } from '../../components/RowActions';
@@ -49,6 +51,8 @@ export function BOQPage() {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('estimate');
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<{ mode: 'view' | 'edit'; record: BOQItem } | null>(null);
+  const sourceLink = useRecordDeepLink({ kind: 'boq_item', projectId: id, onOpen: record => { setActiveTab('estimate'); setDetailTab('overview'); setDialog({ mode: 'view', record }); } });
+  useEffect(() => { if (searchParams.get('record_type') === 'supplier_quotation') setActiveTab('quotes'); }, [searchParams]);
   const [detailTab, setDetailTab] = useState<'overview' | 'prices' | 'quotes' | 'procurement'>('overview');
   const [reviseDialog, setReviseDialog] = useState<BOQItem | null>(null);
   const [generated, setGenerated] = useState<BOQProcurementResult | null>(null);
@@ -336,7 +340,8 @@ export function BOQPage() {
         />
       </Dialog>
 
-      <Dialog open={dialog?.mode === 'view'} title="Chi tiết dòng dự toán" onClose={() => setDialog(null)} size="xl">
+      {sourceLink.feedback}
+      <Dialog manageFocus open={dialog?.mode === 'view'} title="Chi tiết dòng dự toán" onClose={() => { setDialog(null); if (sourceLink.active) sourceLink.dismiss(); }} size="xl">
         {detail.isLoading ? <LoadingState /> : detail.error ? <ErrorState onRetry={() => detail.refetch()} /> : detail.data ? <BOQDetail item={detail.data} tab={detailTab} onTabChange={setDetailTab} onOpenPrices={() => setPriceDialog(detail.data)} projectId={id} canViewProcurement={hasPermission('procurement.view')} /> : null}
       </Dialog>
 
@@ -409,16 +414,15 @@ export function BOQDetail({ item, tab, onTabChange, onOpenPrices, projectId, can
     </div> : null}
     {tab === 'quotes' ? <div className="space-y-6">
       <RecordSection title="Báo giá được chọn"><RecordMetrics>
-        <RecordMetric label="Mã báo giá">{item.selected_quotation_code || 'Chưa chọn'}</RecordMetric>
-        <RecordMetric label="Nhà cung cấp">{item.selected_supplier_name || 'Chưa chọn'}</RecordMetric>
+        <RecordMetric label="Mã báo giá"><RecordLink target={item.selected_quotation_id ? { kind: 'supplier_quotation', id: item.selected_quotation_id, projectId } : null}>{item.selected_quotation_code || 'Chưa chọn'}</RecordLink></RecordMetric>
+        <RecordMetric label="Nhà cung cấp"><RecordLink target={item.selected_supplier_partner_id ? { kind: 'partner', id: item.selected_supplier_partner_id, partnerGroup: 'output' } : null}>{item.selected_supplier_name || 'Chưa chọn'}</RecordLink></RecordMetric>
         <RecordMetric label="Đơn giá báo giá">{item.quoted_unit_price != null ? <CurrencyText value={item.quoted_unit_price} /> : '—'}</RecordMetric>
       </RecordMetrics></RecordSection>
       <RecordSection title="Căn cứ miễn báo giá"><p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">{item.price_waiver_reason || 'Không có căn cứ miễn báo giá.'}</p></RecordSection>
     </div> : null}
     {tab === 'procurement' ? <RecordSection title="Yêu cầu mua sắm liên quan">
       {item.procurement_request_id || item.has_active_procurement || Number(item.active_procurement_count ?? 0) > 0 ? <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-        <div><p className="mb-2 font-semibold text-emerald-900">Đã liên kết yêu cầu mua {item.procurement_request_code || item.procurement_request_id || ''}</p><StatusBadge status={item.procurement_request_status || 'draft'} /></div>
-        {canViewProcurement ? <Link className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:underline" to={`/projects/${projectId}/procurement`}><Eye className="h-4 w-4" />Mở mua sắm</Link> : null}
+        <div><p className="mb-2 font-semibold text-emerald-900">Đã liên kết yêu cầu mua <RecordLink target={canViewProcurement && item.procurement_request_id ? { kind: 'procurement_request', id: item.procurement_request_id, projectId } : null}>{item.procurement_request_code || item.procurement_request_id || ''}</RecordLink></p><StatusBadge status={item.procurement_request_status || 'draft'} /></div>
       </div> : <RecordEmpty>Dòng này chưa được liên kết với yêu cầu mua sắm đang hoạt động.</RecordEmpty>}
     </RecordSection> : null}
   </div>;

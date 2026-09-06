@@ -7,6 +7,7 @@ import { Dialog } from '../../components/Dialog';
 import { PageHeader } from '../../components/PageHeader';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RecordSummary } from '../../components/RecordDetailLayout';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { RowActions } from '../../components/RowActions';
 import { useToast } from '../../components/ToastProvider';
 import { get, post, put } from '../../lib/api/client';
@@ -55,6 +56,7 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
   const [status, setStatus] = useState<'active' | 'inactive' | 'all'>('active');
   const [type, setType] = useState('');
   const [dialog, setDialog] = useState<PartnerDialog>(null);
+  const sourceLink = useRecordDeepLink({ kind: 'partner', onOpen: record => setDialog({ mode: 'view', record }) });
   const [selectedKeys, setSelectedKeys] = useState<Set<DataTableRowKey>>(new Set());
   const [deleteOpen, setDeleteOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -202,6 +204,7 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
         onError={(title, error) => toast.error(title, error)}
       />
 
+      {sourceLink.feedback}
       <RecordDetailDialog
         open={dialog?.mode === 'view'}
         title="Chi tiết đối tác"
@@ -211,7 +214,7 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
           { title: 'Thông tin giao dịch', keys: ['tax_code', 'payment_terms_days'] },
         ]}
         record={dialog?.mode === 'view' ? dialog.record : null}
-        onClose={() => setDialog(null)}
+        onClose={() => { setDialog(null); if (sourceLink.active) sourceLink.dismiss(); }}
         fields={[
           { key: 'partner_code', label: 'Mã' },
           { key: 'name', label: 'Tên' },

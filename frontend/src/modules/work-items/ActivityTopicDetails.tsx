@@ -11,10 +11,15 @@ import { RecordSummary, RecordSection, RecordEmpty } from '../../components/Reco
 import { dateText, dateTimeText } from '../../lib/utils/format';
 import { enumLabel } from '../../lib/utils/status';
 import { activityTopicPath, activityTopicRecord, ActivityTopicUnavailable, type ActivityTopic, type ActivityTopicScope } from './activityTopicDomain';
+import { RecordLink, RelatedRecords } from '../_shared/RecordLinks';
+import { HandoverChecklistSourceDialog } from '../handover/HandoverChecklistSourceDialog';
+import { checklistSourceMode } from '../handover/handoverSourcePresentation';
+import type { ChecklistItem, HandoverDetail } from '../handover/handoverTypes';
 
-export default function ActivityTopicDetails({ topic }: { topic: ActivityTopic }) {
-  const { user } = useAuth();
+export default function ActivityTopicDetails({ topic, showSource = true, onClose }: { topic: ActivityTopic; showSource?: boolean; onClose?: () => void }) {
+  const { user, hasPermission } = useAuth();
   const [tab, setTab] = useState<'overview' | 'prices' | 'quotes' | 'procurement'>('overview');
+  const [handoverSource, setHandoverSource] = useState<ChecklistItem | null>(null);
   const detail = useQuery({
     queryKey: ['activity-topic-detail', user?.id, topic.projectId, topic.scope, topic.id],
     queryFn: async () => {
@@ -40,15 +45,21 @@ export default function ActivityTopicDetails({ topic }: { topic: ActivityTopic }
   }
   if (!detail.data) return <Unavailable message="Không tìm thấy hồ sơ." />;
   const { record, boq: BOQDetail, procurement: ProcurementDetail } = detail.data;
-  if (BOQDetail) return <BOQDetail item={record as BOQItem} tab={tab} onTabChange={setTab} projectId={topic.projectId} canViewProcurement={false} />;
-  if (ProcurementDetail) return <ProcurementDetail record={record} />;
-  return <div className="space-y-6">
+  const content = BOQDetail ? <BOQDetail item={record as BOQItem} tab={tab} onTabChange={setTab} projectId={topic.projectId} canViewProcurement={hasPermission('procurement.view')} />
+    : ProcurementDetail ? <ProcurementDetail record={record} /> : <div className="space-y-6">
     <TopicRecordSummary topic={topic} record={record} />
     {(topicSections[topic.scope] ?? []).map(section => <RecordSection key={section.title} title={section.title}>
       <RecordDetailFields record={record} fields={(topicFields[topic.scope] ?? []).filter(field => section.keys.includes(field.key))} />
     </RecordSection>)}
     {topic.scope === 'acceptance' ? <Checklist rows={record.checklist} fields={acceptanceFields} /> : null}
-    {topic.scope === 'handover' ? <Checklist rows={record.checklist_items} fields={handoverFields} /> : null}
+    {topic.scope === 'handover' ? <><Checklist rows={record.checklist_items} fields={handoverFields} onViewSource={setHandoverSource} /><HandoverChecklistSourceDialog open={Boolean(handoverSource)} item={handoverSource} detail={record as HandoverDetail} onClose={() => setHandoverSource(null)} /></> : null}
+    <RelatedRecords kind={topic.scope} record={record} />
+  </div>;
+  return <div className="space-y-6">{content}
+    {showSource ? <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 pt-4">
+      {onClose ? <button type="button" className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold" onClick={onClose}>Đóng</button> : null}
+      <RecordLink primary target={{ kind: topic.scope, id: topic.id, projectId: topic.projectId }}>Mở hồ sơ gốc</RecordLink>
+    </div> : null}
   </div>;
 }
 
@@ -90,7 +101,7 @@ const topicSections: Partial<Record<ActivityTopicScope, { title: string; keys: s
   payment: [{ title: 'Thông tin phiếu', keys: ['payment_type', 'payment_method', 'paid_at', 'created_at'] }],
 };
 
-function TopicRecordSummary({ topic, record }: { topic: ActivityTopic; record: Record<string, any> }) {
+export function TopicRecordSummary({ topic, record }: { topic: ActivityTopic; record: Record<string, any> }) {
   const amountKey = topic.scope === 'payable' || topic.scope === 'receivable' ? 'remaining_amount' : topic.scope === 'payment' ? 'amount' : '';
   const amountLabel = topic.scope === 'payable' ? 'Còn phải trả' : topic.scope === 'receivable' ? 'Còn phải thu' : 'Số tiền';
   const code = record.acceptance_code || record.movement_code || record.payable_code || record.receivable_code || record.payment_code;
@@ -98,16 +109,17 @@ function TopicRecordSummary({ topic, record }: { topic: ActivityTopic; record: R
   return <RecordSummary eyebrow={code} title={movement ? record.material_name || topic.label : record.title || topic.label}
     subtitle={movement ? enumLabel('movement_type', record.movement_type) : undefined}
     status={record.status || (topic.scope === 'acceptance' && record.result) ? <div className="flex flex-wrap gap-2">{record.status ? <StatusBadge status={record.status} /> : null}{topic.scope === 'acceptance' && record.result ? <StatusBadge status={record.result} /> : null}</div> : undefined}
-    value={movement ? `${record.quantity ?? '—'} ${record.unit ?? ''}` : amountKey ? record[amountKey] == null ? '—' : <CurrencyText value={record[amountKey]} /> : undefined}
+    value={movement ? `${record.quantity == null ? '—' : Number(record.quantity).toLocaleString('vi-VN', { maximumFractionDigits: 3 })} ${record.unit ?? ''}` : amountKey ? record[amountKey] == null ? '—' : <CurrencyText value={record[amountKey]} /> : undefined}
     valueLabel={movement ? 'Số lượng luân chuyển' : amountLabel} />;
 }
 
-function Checklist({ rows, fields }: { rows: unknown; fields: Field[] }) {
+function Checklist({ rows, fields, onViewSource }: { rows: unknown; fields: Field[]; onViewSource?: (row: ChecklistItem) => void }) {
   const items = Array.isArray(rows) ? rows.filter(row => row && typeof row === 'object') : [];
   return <RecordSection title="Checklist hồ sơ" aside={`${items.length} mục`}>
     {items.length ? <div className="divide-y divide-slate-200">{items.map((row, index) => <details key={row.id ?? index} open={index === 0} className="group py-3">
       <summary className="cursor-pointer text-sm font-semibold text-slate-800"><span className="ml-1 mr-3 text-slate-400">{String(index + 1).padStart(2, '0')}</span>{row.title || 'Nội dung checklist'}<span className="ml-3 inline-flex">{row.decision || row.status ? <StatusBadge status={row.decision || row.status} /> : null}</span></summary>
       <div className="pl-6 pt-2"><RecordDetailFields record={row} fields={fields.filter(field => !['title', 'decision', 'status'].includes(field.key))} /></div>
+      {onViewSource && ['automatic', 'linked'].includes(checklistSourceMode(row)) ? <button type="button" className="ml-6 mt-3 text-sm font-semibold text-blue-700 underline underline-offset-4" onClick={() => onViewSource(row)}>Xem hồ sơ nguồn</button> : null}
     </details>)}</div> : <RecordEmpty>Chưa có mục checklist.</RecordEmpty>}
   </RecordSection>;
 }

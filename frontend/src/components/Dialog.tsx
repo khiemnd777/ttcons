@@ -42,6 +42,9 @@ export function Dialog({
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     let focusFrame = 0;
     const onKeyDown = (event: KeyboardEvent) => {
+      // A nested source/evidence dialog owns keyboard input while it is open.
+      const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+      if (dialogs[dialogs.length - 1] !== dialogRef.current) return;
       if (event.key === 'Escape') {
         if (manageFocus) {
           event.preventDefault();
@@ -67,7 +70,10 @@ export function Dialog({
     };
     document.body.style.overflow = 'hidden';
     document.addEventListener('keydown', onKeyDown, manageFocus);
-    if (manageFocus) focusFrame = window.requestAnimationFrame(() => dialogRef.current?.querySelector<HTMLElement>('[data-dialog-close]')?.focus());
+    if (manageFocus) focusFrame = window.requestAnimationFrame(() => {
+      const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+      if (dialogs[dialogs.length - 1] === dialogRef.current) dialogRef.current?.querySelector<HTMLElement>('[data-dialog-close]')?.focus();
+    });
     return () => {
       window.cancelAnimationFrame(focusFrame);
       document.body.style.overflow = previousOverflow;

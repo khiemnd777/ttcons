@@ -26,6 +26,8 @@ export function RecordDetailDialog<T extends Record<string, any>>({
   onClose,
   summary,
   sections,
+  related,
+  footer,
 }: {
   open: boolean;
   title: string;
@@ -34,15 +36,18 @@ export function RecordDetailDialog<T extends Record<string, any>>({
   onClose: () => void;
   summary?: (record: T) => ReactNode;
   sections?: { title: string; keys: string[]; collapsed?: boolean }[];
+  related?: ReactNode;
+  footer?: ReactNode;
 }) {
   return (
-    <Dialog open={open && Boolean(record)} title={title} onClose={onClose} size="lg">
+    <Dialog manageFocus open={open && Boolean(record)} title={title} onClose={onClose} size="lg" footer={footer}>
       {record ? <div className="space-y-6">
         {summary ? summary(record) : <RecordSummary title={title} />}
         {sections ? sections.map(section => section.collapsed
           ? <details key={section.title} className="rounded-lg border border-slate-200 px-4 py-3"><summary className="cursor-pointer text-sm font-semibold text-slate-600">{section.title}</summary><RecordDetailFields record={record} fields={fields.filter(field => section.keys.includes(field.key))} /></details>
           : <RecordSection key={section.title} title={section.title}><RecordDetailFields record={record} fields={fields.filter(field => section.keys.includes(field.key))} /></RecordSection>)
           : <RecordDetailFields record={record} fields={fields} />}
+        {related}
       </div> : null}
     </Dialog>
   );

@@ -17,6 +17,7 @@ import { ProjectSelector } from '../_shared/ProjectSelector';
 import { dateText, percent } from '../../lib/utils/format';
 import type { PlanningDailyReportItem } from '../../lib/types/domain';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
+import { RecordLink } from '../_shared/RecordLinks';
 import { compactDateTime, numberValue } from '../work-items/workItemPresentation';
 
 type Filters = {
@@ -278,10 +279,10 @@ function MetricCard({ icon, label, value, sub }: { icon: ReactNode; label: strin
 function PlanningDailyReportDetailDialog({ report, onClose, onOpenWorkItem }: {
   report: PlanningDailyReportItem | null; onClose: () => void; onOpenWorkItem: (report: PlanningDailyReportItem) => void;
 }) {
-  return <Dialog open={Boolean(report)} title="Chi tiết báo cáo ngày kế hoạch" size="xl" onClose={onClose}
+  return <Dialog manageFocus open={Boolean(report)} title="Chi tiết báo cáo ngày kế hoạch" size="xl" onClose={onClose}
     footer={report ? <div className="flex flex-wrap justify-end gap-2">
       <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose} type="button">Đóng</button>
-      <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500" disabled={!report.work_item_id} onClick={() => onOpenWorkItem(report)} type="button"><ExternalLink className="h-4 w-4" />Mở đầu việc/biểu mẫu</button>
+      {report.work_item_id ? <RecordLink primary target={{ kind: 'work_item', id: report.work_item_id, projectId: report.project_id }}>Mở đầu việc/biểu mẫu</RecordLink> : <span className="text-sm text-slate-500">Chưa có đầu việc nguồn</span>}
     </div> : null}>
     {report ? <div className="space-y-6">
       <RecordSummary eyebrow={report.project_name} title={report.title || 'Báo cáo ngày kế hoạch'} subtitle={dateText(report.report_date)} status={<StatusBadge status={report.status} />} value={report.progress_percent == null ? '—' : percent(report.progress_percent)} valueLabel="Tiến độ báo cáo" />

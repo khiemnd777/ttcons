@@ -17,6 +17,7 @@ import { ProjectSelector } from '../_shared/ProjectSelector';
 import { dateText } from '../../lib/utils/format';
 import type { MeetingMinutesItem } from '../../lib/types/domain';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
+import { RecordLink } from '../_shared/RecordLinks';
 import { compactDateTime, numberValue } from '../work-items/workItemPresentation';
 
 type Filters = {
@@ -273,10 +274,10 @@ function MetricCard({ icon, label, value, sub }: { icon: ReactNode; label: strin
 function MeetingMinutesDetailDialog({ meeting, onClose, onOpenWorkItem }: {
   meeting: MeetingMinutesItem | null; onClose: () => void; onOpenWorkItem: (meeting: MeetingMinutesItem) => void;
 }) {
-  return <Dialog open={Boolean(meeting)} title="Chi tiết biên bản họp" size="xl" onClose={onClose}
+  return <Dialog manageFocus open={Boolean(meeting)} title="Chi tiết biên bản họp" size="xl" onClose={onClose}
     footer={meeting ? <div className="flex flex-wrap justify-end gap-2">
       <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose} type="button">Đóng</button>
-      <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500" disabled={!meeting.work_item_id} onClick={() => onOpenWorkItem(meeting)} type="button"><ExternalLink className="h-4 w-4" />Mở đầu việc/biểu mẫu</button>
+      {meeting.work_item_id ? <RecordLink primary target={{ kind: 'work_item', id: meeting.work_item_id, projectId: meeting.project_id }}>Mở đầu việc/biểu mẫu</RecordLink> : <span className="text-sm text-slate-500">Chưa có đầu việc nguồn</span>}
     </div> : null}>
     {meeting ? <div className="space-y-6">
       <RecordSummary eyebrow={meeting.project_name} title={meetingTitle(meeting)} subtitle={dateText(meeting.meeting_date)} status={<StatusBadge status={meeting.status} />} />

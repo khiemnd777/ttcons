@@ -4,6 +4,8 @@ import { CheckCircle2, ClipboardCheck, Eye, FilePlus2, Loader2, Pencil, Send } f
 import { Dialog } from '../../components/Dialog';
 import { CurrencyText } from '../../components/CurrencyText';
 import { RecordSummary, RecordSection, RecordMetrics, RecordMetric, RecordTable } from '../../components/RecordDetailLayout';
+import { RecordLink, RelatedRecords } from '../_shared/RecordLinks';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { useToast } from '../../components/ToastProvider';
 import { get, post, put } from '../../lib/api/client';
@@ -77,6 +79,7 @@ export function SupplierQuotationWorkspace({ projectId, workItemId, boqItems, mo
   const [editorErrors, setEditorErrors] = useState<QuotationErrors>({});
   const [selectionReasonError, setSelectionReasonError] = useState(false);
   const [viewQuotation, setViewQuotation] = useState<SupplierQuotation | null>(null);
+  const sourceLink = useRecordDeepLink({ kind: 'supplier_quotation', projectId, onOpen: setViewQuotation });
 
   const quotations = useQuery({
     queryKey: ['supplier-quotations', projectId],
@@ -277,7 +280,8 @@ export function SupplierQuotationWorkspace({ projectId, workItemId, boqItems, mo
         }
         selectQuote.mutate(selection);
       }} />
-      <QuotationDetailDialog quotation={viewQuotation} onClose={() => setViewQuotation(null)} />
+      {sourceLink.feedback}
+      <QuotationDetailDialog quotation={viewQuotation} onClose={() => { setViewQuotation(null); if (sourceLink.active) sourceLink.dismiss(); }} />
     </section>
   );
 }
@@ -355,7 +359,7 @@ function SelectionDialog({ value, error, pending, onChange, onClose, onSubmit }:
 }
 
 function QuotationDetailDialog({ quotation, onClose }: { quotation: SupplierQuotation | null; onClose: () => void }) {
-  return <Dialog open={Boolean(quotation)} title="Chi tiết báo giá" onClose={onClose} size="xl">
+  return <Dialog manageFocus open={Boolean(quotation)} title="Chi tiết báo giá" onClose={onClose} size="xl">
     {quotation ? <div className="space-y-6">
       <RecordSummary eyebrow={quotation.quotation_code} title={quotation.supplier_name || 'Báo giá nhà cung cấp'} status={<QuotationStatus status={quotation.status} />} value={<CurrencyText value={quotation.total_amount ?? 0} />} valueLabel="Tổng giá trị báo giá" />
       <RecordSection title="Hiệu lực & cung ứng"><RecordMetrics>
@@ -369,7 +373,7 @@ function QuotationDetailDialog({ quotation, onClose }: { quotation: SupplierQuot
       </RecordMetrics></RecordSection>
       <RecordSection title="Các dòng báo giá" aside={`${quotation.items?.length ?? 0} dòng`}>
         <RecordTable rows={quotation.items ?? []} rowKey={(item, index) => String(item.id ?? index)} empty="Báo giá chưa có dòng hàng." columns={[
-          { key: 'item', label: 'Dòng dự toán', render: item => <div className="break-words font-semibold text-slate-900">{item.work_item_name || item.description}</div> },
+          { key: 'item', label: 'Dòng dự toán', render: item => <RecordLink target={item.boq_item_id ? { kind: 'boq_item', id: item.boq_item_id, projectId: quotation.project_id } : null}>{item.work_item_name || item.description}</RecordLink> },
           { key: 'quantity', label: 'Khối lượng', align: 'right', render: item => <span className="whitespace-nowrap">{Number(item.quantity).toLocaleString('vi-VN')} {item.unit}</span> },
           { key: 'price', label: 'Đơn giá', align: 'right', render: item => <CurrencyText value={item.unit_price} /> },
           { key: 'total', label: 'Thành tiền', align: 'right', render: item => <strong className="text-slate-900"><CurrencyText value={item.total_amount} /></strong> },
@@ -377,6 +381,7 @@ function QuotationDetailDialog({ quotation, onClose }: { quotation: SupplierQuot
         ]} />
       </RecordSection>
       {quotation.notes ? <RecordSection title="Ghi chú"><p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">{quotation.notes}</p></RecordSection> : null}
+      <RelatedRecords kind="supplier_quotation" record={quotation} />
     </div> : null}
   </Dialog>;
 }

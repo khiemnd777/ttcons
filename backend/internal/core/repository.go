@@ -317,7 +317,7 @@ func safeTable(table string) string {
 	switch table {
 	case "projects", "pipeline_templates", "pipeline_template_nodes", "pipeline_template_edges", "pipeline_template_steps",
 		"pipeline_runs", "pipeline_run_nodes", "pipeline_run_edges", "pipeline_run_steps", "approval_requests", "approval_actions",
-		"boq_items", "procurement_requests", "procurement_request_items", "contracts", "warehouses", "materials", "stock_movements",
+		"boq_items", "supplier_quotations", "procurement_requests", "procurement_request_items", "contracts", "warehouses", "materials", "stock_movements",
 		"site_material_balances", "operation_daily_reports", "issues", "acceptance_records", "acceptance_checklist_items",
 		"construction_check_templates", "construction_checks", "construction_action_items", "construction_action_events",
 		"rework_requests", "replanning_requests", "handover_records", "accounting_budgets", "payables", "receivables",

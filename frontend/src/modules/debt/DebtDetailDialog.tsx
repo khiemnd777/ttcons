@@ -12,6 +12,7 @@ import { OutputInvoicePanel } from './OutputInvoicePanel';
 import { PayableReconciliationPanel } from './PayableReconciliationPanel';
 import { ReceivableReconciliationPanel } from './ReceivableReconciliationPanel';
 import { agingBadgeClass, debtAgingLabel } from './payableDebtUtils';
+import { RelatedRecords } from '../_shared/RecordLinks';
 
 export type DebtDetailTab = 'overview' | 'invoices' | 'plan' | 'payments' | 'reconciliation';
 export type DebtDetail = { type: 'payable'; record: PayableRecord } | { type: 'receivable'; record: ReceivableRecord };
@@ -45,7 +46,7 @@ export function DebtDetailDialog({
   const primary = primaryAction(detail, canApprove, onApprove, onTab);
 
   return (
-    <Dialog open title={`${code} · ${payable ? 'Phải trả' : 'Phải thu'}`} onClose={onClose} size="workspace">
+    <Dialog manageFocus open title={`${code} · ${payable ? 'Phải trả' : 'Phải thu'}`} onClose={onClose} size="workspace">
       <div className="-mx-5 -mt-5 border-b border-line bg-slate-50 px-5 py-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
@@ -75,6 +76,7 @@ export function DebtDetailDialog({
       </div>
 
       {payable ? <PayableDetail tab={tab} record={record as PayableRecord} onChanged={onChanged} /> : <ReceivableDetail tab={tab} record={record as ReceivableRecord} onChanged={onChanged} />}
+      {tab === 'overview' ? <div className="mt-6"><RelatedRecords kind={detail.type} record={record} /></div> : null}
     </Dialog>
   );
 }

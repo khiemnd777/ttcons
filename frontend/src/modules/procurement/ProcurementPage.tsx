@@ -41,6 +41,9 @@ const procurementStatusLabels: Record<string, string> = {
   changes_requested: 'Cần chỉnh sửa',
 };
 
+import { RecordLink, RelatedRecords } from '../_shared/RecordLinks';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
+
 export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
   const { id } = useParams();
   const location = useLocation();
@@ -52,6 +55,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [viewId, setViewId] = useState('');
+  const sourceLink = useRecordDeepLink({ kind: 'procurement_request', projectId: scoped ? id : undefined, onOpen: record => { setProjectId(record.project_id); setViewId(record.id); } });
   const [editRecord, setEditRecord] = useState<ProcurementRow | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -99,6 +103,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
   ];
 
   return <>
+    {sourceLink.feedback}
     <PageHeader
       title="Mua sắm vật tư"
       description="Theo dõi từ yêu cầu mua, đặt hàng, nghiệm thu đầu vào đến phiếu nhập kho."
@@ -140,7 +145,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
       {requests.isLoading ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-slate-500">Đang tải dữ liệu...</div> : filteredRows.map((row) => <div key={row.id} className="rounded-lg border border-line bg-white p-4 shadow-panel"><div className="flex items-start justify-between gap-3"><div><button className="font-semibold text-blue-700" onClick={() => setViewId(row.id)}>{row.request_code}</button><p className="font-semibold text-ink">{row.title}</p><p className="text-xs text-slate-500">{row.supplier_name || 'Chưa gán'}</p></div><ProcurementStatus status={row.status} /></div><div className="my-3"><ProcurementProgress row={row} compact /></div><div className="flex items-end justify-between gap-3"><div className="text-sm"><CurrencyText value={row.total_estimated_amount} /><div className="text-xs text-slate-500">Giao {formatDate(row.expected_delivery_date)}</div></div><NextAction row={row} projectId={row.project_id ?? projectId} locationPath={`${location.pathname}${location.search}`} hasPermission={hasPermission} onView={() => setViewId(row.id)} onEdit={() => setEditRecord(row)} onAction={(name) => action.mutate({ requestId: row.id, name })} /></div></div>)}
     </div>
 
-    <Dialog open={Boolean(viewId)} title="Chi tiết yêu cầu mua" onClose={() => setViewId('')} size="xl">
+    <Dialog manageFocus open={Boolean(viewId)} title="Chi tiết yêu cầu mua" onClose={() => { setViewId(''); if (sourceLink.active) sourceLink.dismiss(); }} size="xl">
       {detail.isLoading ? <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Đang tải chi tiết...</div> : detail.error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">Không tải được chi tiết yêu cầu mua.</div> : detail.data ? <ProcurementDetail record={detail.data} /> : null}
     </Dialog>
     <Dialog open={Boolean(editRecord)} title="Thông tin thương mại & đặt hàng" description={editRecord ? `${editRecord.request_code} · ${editRecord.title}` : undefined} onClose={() => setEditRecord(null)} size="lg">
@@ -179,7 +184,7 @@ export function ProcurementDetail({ record }: { record: ProcurementRow }) {
   return <div className="space-y-6">
     <RecordSummary eyebrow={record.request_code} title={record.title || 'Yêu cầu mua'} status={<ProcurementStatus status={record.status} />} value={record.total_estimated_amount == null ? '—' : <CurrencyText value={record.total_estimated_amount} />} valueLabel="Giá trị yêu cầu" icon={<ShoppingCart className="h-5 w-5" />} />
     <RecordSection title="Thông tin đặt hàng"><RecordMetrics>
-      <RecordMetric label="Nhà cung cấp">{record.supplier_name || 'Chưa gán'}</RecordMetric>
+      <RecordMetric label="Nhà cung cấp"><RecordLink target={record.supplier_partner_id ? { kind: 'partner', id: record.supplier_partner_id, partnerGroup: 'output' } : null}>{record.supplier_name || 'Chưa gán'}</RecordLink></RecordMetric>
       <RecordMetric label="PO / Đơn hàng">{record.order_reference || 'Chưa lập'}</RecordMetric>
       <RecordMetric label="Giao dự kiến">{formatDate(record.expected_delivery_date)}</RecordMetric>
     </RecordMetrics></RecordSection>
@@ -187,9 +192,10 @@ export function ProcurementDetail({ record }: { record: ProcurementRow }) {
       <RecordTable<ProcurementRow> rows={items} rowKey={(item, index) => String(item.id ?? index)} empty="Yêu cầu chưa có dòng hàng; chưa đủ điều kiện gửi duyệt." columns={[
         { key: 'material', label: 'Vật tư / căn cứ giá', render: item => <div className="min-w-0 space-y-2">
           <div className="break-words font-semibold text-slate-900">{item.material_name || item.work_item_name}</div>
+          {item.boq_item_id ? <div className="text-xs"><RecordLink target={{ kind: 'boq_item', id: item.boq_item_id, projectId: record.project_id }}>Dòng BOQ nguồn</RecordLink></div> : null}
           {item.supplier_name ? <p className="text-xs text-slate-500">{item.supplier_name}</p> : null}
           <DeliveryStatus status={item.delivery_status} />
-          {item.quotation_code ? <div className="text-xs leading-5 text-slate-600"><span className="font-medium">Báo giá {item.quotation_code}</span>{item.valid_until ? <div>Hiệu lực đến {formatDate(item.valid_until)}</div> : null}</div>
+          {item.quotation_code ? <div className="text-xs leading-5 text-slate-600"><RecordLink target={item.quotation_id ? { kind: 'supplier_quotation', id: item.quotation_id, projectId: record.project_id } : null}>Báo giá {item.quotation_code}</RecordLink>{item.valid_until ? <div>Hiệu lực đến {formatDate(item.valid_until)}</div> : null}</div>
             : <details className="max-w-prose text-xs leading-5 text-amber-800"><summary className="cursor-pointer font-medium">Căn cứ miễn báo giá</summary><p className="mt-1 whitespace-pre-wrap break-words">{item.price_waiver_reason || 'Chưa có căn cứ'}</p></details>}
         </div> },
         { key: 'requested', label: 'Yêu cầu', align: 'right', render: item => <span className="whitespace-nowrap">{formatQuantity(item.quantity_requested)} {item.unit}</span> },
@@ -198,6 +204,7 @@ export function ProcurementDetail({ record }: { record: ProcurementRow }) {
         { key: 'awaiting', label: 'Chờ nhập kho', align: 'right', render: item => <span className="whitespace-nowrap font-semibold text-blue-800">{formatQuantity(item.awaiting_stock_quantity)} {item.unit}</span> },
       ]} />
     </RecordSection>
+    <RelatedRecords kind="procurement_request" record={{ ...record, supplier_partner_id: undefined }} />
   </div>;
 }
 

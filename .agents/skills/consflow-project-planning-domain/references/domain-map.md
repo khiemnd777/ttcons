@@ -1,5 +1,10 @@
 # Project Planning Domain Map
 
+## Exact Record Source Navigation
+
+- All discussion source types now offer authorized `Mở hồ sơ gốc` new-tab links after successful source validation. The original discussion and draft stay mounted. Planning daily report, meeting minutes and planning checklist detail footers reuse shared RecordLink to their persisted Work Item/form route; missing Work Item IDs have an explicit unavailable-source label. Existing list-row navigation callbacks remain. No source-open operation starts work, submits a form or changes read cursors.
+- Shared owners: `modules/_shared/{recordNavigation,RecordLinks,useRecordDeepLink,RecordSourcePage}`. First searches: `recordPath|relatedRecordTargets|useRecordDeepLink`; see frontend/backend detail maps and `recordNavigation.test.ts` for the navigation contract.
+
 ## Read-Only Record Detail Hierarchy
 
 - `ActivityTopicDetails.tsx` groups the existing Work Item preview into identity/status, owner/deadlines and work/stage context. Source queries, actor/project checks and mounted discussion state remain unchanged; `ActivityTopic.tsx` omits repeated header descriptions and preserves the BOQ acronym.

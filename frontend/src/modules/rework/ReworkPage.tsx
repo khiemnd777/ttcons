@@ -11,6 +11,8 @@ import { CurrencyText } from '../../components/CurrencyText';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
 import { RecordSummary } from '../../components/RecordDetailLayout';
+import { RelatedRecords } from '../_shared/RecordLinks';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { RowActions } from '../../components/RowActions';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { FilterBar, type FilterOption } from '../../components/FilterBar';
@@ -33,6 +35,8 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
   const [replanningStatus, setReplanningStatus] = useState('all');
   const [open, setOpen] = useState<'rework' | 'replanning' | null>(null);
   const [dialog, setDialog] = useState<{ type: 'rework' | 'replanning'; record: Record<string, any> } | null>(null);
+  const reworkLink = useRecordDeepLink({ kind: 'rework', projectId: projectIdOverride ?? routeId, onOpen: record => { setProjectId(record.project_id); setDialog({ type: 'rework', record }); } });
+  const replanningLink = useRecordDeepLink({ kind: 'replanning', projectId: projectIdOverride ?? routeId, onOpen: record => { setProjectId(record.project_id); setDialog({ type: 'replanning', record }); } });
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasAnyPermission } = useAuth();
@@ -168,13 +172,16 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
         ]}
         onSubmit={(values) => createReplanning.mutateAsync(values)}
       />
+      {reworkLink.feedback}
+      {replanningLink.feedback}
       <RecordDetailDialog
         open={dialog?.type === 'rework'}
         title="Chi tiết sửa lỗi"
         summary={row => <RecordSummary title={row.title} status={<StatusBadge status={row.status} />} subtitle={`Hạn xử lý: ${dateText(row.due_date)}`} />}
         sections={[{ title: 'Nội dung cần xử lý', keys: ['description'] }]}
         record={dialog?.record ?? null}
-        onClose={() => setDialog(null)}
+        related={dialog?.type === 'rework' ? <RelatedRecords kind="rework" record={dialog.record} /> : null}
+        onClose={() => { setDialog(null); if (reworkLink.active) reworkLink.dismiss(); }}
         fields={[
           { key: 'title', label: 'Sửa lỗi' },
           { key: 'description', label: 'Mô tả', wide: true },
@@ -188,7 +195,8 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
         summary={row => <RecordSummary title="Yêu cầu lập kế hoạch lại" subtitle={<EnumChip group="impact_scope" value={row.impact_scope} />} status={<StatusBadge status={row.status} />} value={<CurrencyText value={row.budget_impact} />} valueLabel="Ảnh hưởng ngân sách" />}
         sections={[{ title: 'Nguyên nhân', keys: ['reason'] }, { title: 'Ảnh hưởng tiến độ', keys: ['timeline_impact'] }]}
         record={dialog?.record ?? null}
-        onClose={() => setDialog(null)}
+        related={dialog?.type === 'replanning' ? <RelatedRecords kind="replanning" record={dialog.record} /> : null}
+        onClose={() => { setDialog(null); if (replanningLink.active) replanningLink.dismiss(); }}
         fields={[
           { key: 'reason', label: 'Lý do', wide: true },
           { key: 'impact_scope', label: 'Phạm vi ảnh hưởng', render: (row) => <EnumChip group="impact_scope" value={row.impact_scope} /> },

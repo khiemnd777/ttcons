@@ -12,6 +12,8 @@ import { useToast } from '../../components/ToastProvider';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { Dialog } from '../../components/Dialog';
 import { RecordSummary, RecordSection, RecordMetrics, RecordMetric, RecordTable } from '../../components/RecordDetailLayout';
+import { RelatedRecords } from '../_shared/RecordLinks';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { StatCard } from '../../components/StatCard';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { RecordFormDialog } from '../_shared/RecordFormDialog';
@@ -46,6 +48,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const [editingMaterial, setEditingMaterial] = useState<RecordRow | null>(null);
   const [openDocument, setOpenDocument] = useState(false);
   const [documentId, setDocumentId] = useState('');
+  const sourceLink = useRecordDeepLink({ kind: 'stock_document', projectId: scoped ? id : undefined, onOpen: record => { setProjectId(record.project_id ?? ''); setTab('documents'); setDocumentId(record.id); } });
   const [editingDocumentId, setEditingDocumentId] = useState('');
   const [stockAdjustment, setStockAdjustment] = useState<StockPosition | null>(null);
   const [siteUsageAdjustment, setSiteUsageAdjustment] = useState<RecordRow | null>(null);
@@ -199,7 +202,8 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
     <StockDocumentDialog open={Boolean(editingDocumentId)} mode="edit" projectId={editingDocumentDetail.data?.project_id ?? projectId} receiptId="" record={editingDocumentDetail.data} loading={editingDocumentDetail.isLoading} error={editingDocumentDetail.error} materials={materials.data ?? []} warehouses={warehouses.data ?? []} receiptOptions={receiptOptions.data ?? []} hasPermission={hasPermission} pending={updateDocument.isPending} onClose={() => setEditingDocumentId('')} onSubmit={(values) => updateDocument.mutateAsync({ id: editingDocumentId, values })} />
     <StockAdjustmentDialog record={stockAdjustment} pending={adjustStock.isPending} onClose={() => setStockAdjustment(null)} onSubmit={(values) => adjustStock.mutateAsync(values)} />
     <SiteUsageAdjustmentDialog record={siteUsageAdjustment} pending={adjustSiteUsage.isPending} onClose={() => setSiteUsageAdjustment(null)} onSubmit={(values) => siteUsageAdjustment ? adjustSiteUsage.mutateAsync({ materialId: siteUsageAdjustment.material_id, values }) : Promise.resolve()} />
-    <Dialog open={Boolean(documentId)} title="Chi tiết phiếu kho" onClose={() => setDocumentId('')} size="xl">
+    {sourceLink.feedback}
+    <Dialog manageFocus open={Boolean(documentId)} title="Chi tiết phiếu kho" onClose={() => { setDocumentId(''); if (sourceLink.active) sourceLink.dismiss(); }} size="xl">
       {documentDetail.isLoading ? <p className="py-6 text-sm text-slate-500">Đang tải phiếu kho...</p> : documentDetail.error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Không tải được phiếu kho.</p> : documentDetail.data ? <StockDocumentDetail record={documentDetail.data} /> : null}
     </Dialog>
   </>;
@@ -423,6 +427,7 @@ function StockDocumentDetail({ record }: { record: StockDocument }) {
       ]} />
     </RecordSection>
     {record.note ? <RecordSection title="Ghi chú phiếu"><p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">{record.note}</p></RecordSection> : null}
+    <RelatedRecords kind="stock_document" record={record} />
   </div>;
 }
 

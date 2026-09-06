@@ -1,5 +1,12 @@
 # Consflow Module Keyword Map
 
+## Exact Record Source Links
+
+- Keywords: mở hồ sơ gốc, hồ sơ liên quan, tất cả dạng chi tiết, source link, deep link. Owners: `modules/_shared/{recordNavigation.ts,RecordLinks.tsx,useRecordDeepLink.tsx,RecordSourcePage.tsx}`, canonical source pages and `ActivityTopicDetails`. First searches: `recordPath|recordRead|selectSourceRecord|relatedRecordTargets|useRecordDeepLink`.
+- All 19 detail kinds from the redesign are covered by typed source destinations: ten discussion sources, quotation, stock document, partner, replanning, planning daily report/meeting/checklist, role and audit. Planning summaries reuse the exact Work Item/form source; canonical detail dialogs avoid self-opening buttons. Record links are ordinary new-tab anchors, preserve the original discussion/draft and never carry `task` auto-start or `receipt` creation intents.
+- `?record=<UUID>&record_type=<kind>&project_id=<UUID>` opens the exact authorized source independently of list filters/paging. Acceptance/Handover/Contracts suspend first-row selection while a source request is active. Legacy rework/replanning use `/rework`, never the project route redirect to construction actions. `/source-records/:kind/:recordId` is restricted to read-only stock movement, legacy payment, incoming acceptance and issue sources. IDs are never inferred from names/codes; incoming acceptance, acceptance record, stock movement and stock document remain distinct.
+- Backend additive reads: BOQ `selected_quotation_id`, procurement line `quotation_id`, audit `record_id` filter before pagination with UUID validation and existing actor/project scope. No migration or business mutation. Tests: `recordNavigation.test.ts`, `recordDetailPresentation.test.ts`, audit and supplier-quotation integration tests. Pair frontend/backend maps and the six source domain maps.
+
 ## Record Detail Presentation
 
 - Keywords: giao diện sơ sài, dialog demo, detail redesign, phân cấp hồ sơ, `Chi tiết dòng BOQ`, chi tiết yêu cầu mua. Shared owners: `components/RecordDetailLayout.tsx`, `recordDetail.css`, `RecordDetailDialog.tsx`; primary consumers: `BOQPage::BOQDetail`, `ProcurementPage::ProcurementDetail`, `ActivityTopicDetails.tsx`. First searches: `RecordSummary|RecordSection|RecordTable|topicSections|RecordDetailFields`.

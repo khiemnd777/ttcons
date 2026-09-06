@@ -262,6 +262,9 @@ func TestWithAuditTransactionPersistsTargetUUID(t *testing.T) {
 }
 
 func TestNormalizeAuditLogFilter(t *testing.T) {
+	if _, err := normalizeAuditLogFilter(AuditLogFilter{RecordID: "not-an-event"}); err == nil {
+		t.Fatal("expected invalid exact event id to fail")
+	}
 	filter, err := normalizeAuditLogFilter(AuditLogFilter{
 		ProjectID:  "30000000-0000-0000-0000-000000000022",
 		EventType:  " Node_Started ",
@@ -318,5 +321,13 @@ func TestAuditLogPageFiltersAndPagination(t *testing.T) {
 	items, ok := page["items"].([]Record)
 	if !ok || len(items) != 1 || items[0]["event_type"] != "node_started" {
 		t.Fatalf("audit page items = %#v", page["items"])
+	}
+	exact, err := NewService(NewRepository(db), "test-secret").AuditLogs(ctx, projectID, "", AuditLogFilter{RecordID: cleanID(items[0]["id"])})
+	if err != nil || number(exact["total"]) != 1 {
+		t.Fatalf("exact audit filter: %v, %#v", err, exact)
+	}
+	missing, err := NewService(NewRepository(db), "test-secret").AuditLogs(ctx, projectID, "", AuditLogFilter{RecordID: newID()})
+	if err != nil || number(missing["total"]) != 0 {
+		t.Fatalf("missing audit id must not fall back: %v, %#v", err, missing)
 	}
 }

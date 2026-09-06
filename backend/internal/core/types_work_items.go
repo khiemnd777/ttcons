@@ -165,6 +165,7 @@ type ProjectEvidenceFilter struct {
 }
 
 type AuditLogFilter struct {
+	RecordID   string
 	ProjectID  string
 	EventType  string
 	TargetType string

@@ -1,5 +1,11 @@
 # Quality Acceptance Handover Domain Map
 
+## Exact Record Source Navigation
+
+- Handover exact links reveal/focus the existing workspace after the matching detail has loaded, once per requested ID, with space for the sticky header; selection or immediate scrolling before layout settles leaves the source below the fold. Shared Dialog ignores covered modals during focus and keyboard handling; nested source/evidence dialogs retain their existing handlers. Nested-modal browser interaction remains a separate verification case.
+- Acceptance and Handover canonical workspaces resolve exact record IDs independently of lists and suspend first-row fallback for requested sources. Rework/Replanning exact links use `/rework` with kind and project ID, not the project redirect to construction actions; the route admits the existing replanning.view capability while each read retains its own guard. Handover preview checklists reuse the existing source/evidence dialog; automatic source links open new tabs. Final acceptance and stored rework source relations are typed links; issue and incoming-acceptance source fallback viewers are read-only. No readiness, conclusion, approval or stock action occurs on navigation.
+- Shared owners: `modules/_shared/{recordNavigation,RecordLinks,useRecordDeepLink,RecordSourcePage}`. First searches: `recordPath|relatedRecordTargets|useRecordDeepLink`; see frontend/backend detail maps and `recordNavigation.test.ts` for the navigation contract.
+
 ## Discussion Quality Source Topics
 
 - Quality discussion previews use a record summary followed by named source/date/party/note sections. Acceptance/Handover checklist rows are numbered disclosures with the first expanded; status/decision stays in each summary and all prior allowlisted fields remain readable. Rework/Replanning standalone details share purpose-specific summaries and grouped reasons/impact. This changes only read-only presentation; primary Acceptance/Handover workspaces and all quality transitions are untouched.

@@ -17,6 +17,7 @@ import { ProjectSelector } from '../_shared/ProjectSelector';
 import { dateText } from '../../lib/utils/format';
 import type { PlanningChecklistItem } from '../../lib/types/domain';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
+import { RecordLink } from '../_shared/RecordLinks';
 import { compactDateTime, numberValue } from '../work-items/workItemPresentation';
 
 type Filters = {
@@ -311,10 +312,10 @@ function MetricCard({ icon, label, value, sub }: { icon: ReactNode; label: strin
 function PlanningChecklistDetailDialog({ checklist, onClose, onOpenWorkItem }: {
   checklist: PlanningChecklistItem | null; onClose: () => void; onOpenWorkItem: (checklist: PlanningChecklistItem) => void;
 }) {
-  return <Dialog open={Boolean(checklist)} title="Chi tiết checklist kế hoạch" size="xl" onClose={onClose}
+  return <Dialog manageFocus open={Boolean(checklist)} title="Chi tiết checklist kế hoạch" size="xl" onClose={onClose}
     footer={checklist ? <div className="flex flex-wrap justify-end gap-2">
       <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose} type="button">Đóng</button>
-      <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500" disabled={!checklist.work_item_id} onClick={() => onOpenWorkItem(checklist)} type="button"><ExternalLink className="h-4 w-4" />Mở đầu việc/biểu mẫu</button>
+      {checklist.work_item_id ? <RecordLink primary target={{ kind: 'work_item', id: checklist.work_item_id, projectId: checklist.project_id }}>Mở đầu việc/biểu mẫu</RecordLink> : <span className="text-sm text-slate-500">Chưa có đầu việc nguồn</span>}
     </div> : null}>
     {checklist ? <div className="space-y-6">
       <RecordSummary eyebrow={checklist.project_name} title={checklistTitle(checklist)} subtitle={planningScopeLabel(checklist.planning_scope)} status={<StatusBadge status={checklist.status} />} value={numberValue(checklist.needs_action_count)} valueLabel="Mục cần xử lý" />

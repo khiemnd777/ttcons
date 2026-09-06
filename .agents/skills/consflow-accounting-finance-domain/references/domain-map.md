@@ -1,5 +1,10 @@
 # Accounting Finance Domain Map
 
+## Exact Record Source Navigation
+
+- AP/AR topic previews and Debt detail now expose typed related-source links; `/debt/payables|receivables?record=&record_type=&project_id=` open the exact authorized obligation independently of queue filters. Legacy payment topics open a narrow read-only `/source-records/payment/:id` viewer using the existing authorized payment list and exact ID/project checks. Never point legacy payments at `/accounting` (ProjectFinancePage), or mount AccountingPage/mutation controls. Source-type/ID pairs and actual partner IDs are the only link inputs.
+- Shared owners: `modules/_shared/{recordNavigation,RecordLinks,useRecordDeepLink,RecordSourcePage}`. First searches: `recordPath|relatedRecordTargets|useRecordDeepLink`; see frontend/backend detail maps and `recordNavigation.test.ts` for the navigation contract.
+
 ## Legacy Discussion Detail Presentation
 
 - `ActivityTopicDetails.tsx` groups legacy Payable/Receivable previews into counterpart/deadline and source-value sections, emphasizing the existing remaining balance. Payment preview emphasizes its existing amount and preserves method/type/dates/status. These use shared `RecordSummary`/`RecordDetailFields`; they neither calculate new balances nor add menus, routes, posting/payment actions or Accounting Handoff behavior. Existing exact record/project checks remain authoritative. First searches: `TopicRecordSummary|topicSections|remaining_amount`.

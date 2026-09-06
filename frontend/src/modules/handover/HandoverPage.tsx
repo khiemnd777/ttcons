@@ -19,6 +19,7 @@ import { SimpleForm } from '../_shared/SimpleForm';
 import { HandoverChecklistSourceDialog } from './HandoverChecklistSourceDialog';
 import { HandoverCreateDialog } from './HandoverCreateDialog';
 import { HandoverWorkspace } from './HandoverWorkspace';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import type { ChecklistItem, FinalAcceptanceOption, HandoverDetail, HandoverRow } from './handoverTypes';
 import {
   syncWorkItemMutationTransition,
@@ -37,8 +38,10 @@ export function HandoverPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedID, setSelectedID] = useState('');
+  const sourceLink = useRecordDeepLink({ kind: 'handover', projectId: id, onOpen: record => { setProjectId(record.project_id); setSelectedID(record.id); } });
   const [action, setAction] = useState<HandoverAction>(null);
   const workspaceRef = useRef<HTMLElement>(null);
+  const revealedSource = useRef('');
   const queryClient = useQueryClient();
   const toast = useToast();
   const { hasAnyPermission } = useAuth();
@@ -51,10 +54,21 @@ export function HandoverPage() {
   const options = useQuery({ queryKey: ['handover-options', projectId], queryFn: () => get<{ final_acceptances: FinalAcceptanceOption[] }>(`/projects/${projectId}/handover/options`), enabled: Boolean(projectId) });
   const rows = handovers.data ?? [];
   useEffect(() => {
+    if (sourceLink.active) return;
     if (!rows.length) { setSelectedID(''); return; }
     if (!selectedID || !rows.some((row) => row.id === selectedID)) setSelectedID(rows[0].id);
-  }, [rows, selectedID]);
+  }, [rows, selectedID, sourceLink.active]);
   const detail = useQuery({ queryKey: ['handover-detail', selectedID], queryFn: () => get<HandoverDetail>(`/handover/${selectedID}`), enabled: Boolean(selectedID) });
+  useEffect(() => {
+    if (!sourceLink.active) { revealedSource.current = ''; return; }
+    if (!detail.data || detail.isFetching || detail.data.id !== sourceLink.data?.id || revealedSource.current === detail.data.id) return;
+    const frame = window.requestAnimationFrame(() => {
+      workspaceRef.current?.scrollIntoView({ block: 'start' });
+      workspaceRef.current?.focus({ preventScroll: true });
+      revealedSource.current = detail.data.id;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [sourceLink.active, sourceLink.data?.id, detail.data, detail.isFetching]);
   const invalidate = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['handover', projectId] }),
@@ -101,6 +115,7 @@ export function HandoverPage() {
   };
 
   return <>
+    {sourceLink.feedback}
     <PageHeader
       title="Bàn giao"
       description="Hoàn tất hồ sơ bàn giao bằng readiness thật; mỗi điểm chặn dẫn về đúng module nguồn để xử lý."
@@ -123,7 +138,7 @@ export function HandoverPage() {
 
     {rows.length > 1 ? <label className="mb-4 block max-w-xl"><span className="text-xs font-semibold uppercase text-slate-500">Hồ sơ đang xem</span><select className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm" value={selectedID} onChange={(event) => openHandoverDetail(event.target.value)}>{rows.map((row) => <option key={row.id} value={row.id}>{row.handover_code} · {handoverStatusLabel(row.status)}</option>)}</select></label> : null}
 
-    <section ref={workspaceRef} tabIndex={-1} aria-label="Chi tiết hồ sơ bàn giao" className="mb-6 scroll-mt-4 focus:outline-none">
+    <section ref={workspaceRef} tabIndex={-1} aria-label="Chi tiết hồ sơ bàn giao" className="mb-6 scroll-mt-20 focus:outline-none">
       {handovers.isLoading || detail.isLoading ? <Loading /> : handovers.error || detail.error ? <ErrorState onRetry={() => { void handovers.refetch(); void detail.refetch(); }} /> : detail.data ? <HandoverWorkspace
         detail={detail.data}
         canVerify={canVerify}

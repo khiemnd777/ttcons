@@ -1,5 +1,13 @@
 # Consflow Root-Cause Triage Map
 
+## Record Source UAT
+
+- Supplier quotation list renders but detail returns HTTP 500: trace `GetSupplierQuotation` → `requireRecordProjectPermission` → `RecordProjectID` → `safeTable`. A missing `supplier_quotations` allowlist entry was confirmed by a failing focused test; exact allowlisting restores the existing guarded read. Check this before changing SQL or permissions.
+- Supplier quotation detail shows zero while its item totals are nonzero: check `GetSupplierQuotationDetail` returns the same aggregate fields as listing (`item_count`, `amount_before_tax`, `total_amount`) before changing number formatting or financial rows.
+- Source dialog keyboard reaches background navigation: check `Dialog.manageFocus` at the canonical dialog as well as the activity preview. Only the topmost modal may process Tab/Escape or initial focus; test trigger restoration and nested evidence/source dialogs.
+- Stock movement shows `800.000 m` for 800: `ActivityTopicDetails::TopicRecordSummary` must format the API numeric string. Handover source below the fold: wait for the matching detail query to finish, then reveal/focus the workspace once per requested ID; scrolling on selection happens before layout settles.
+- Opening many source tabs redirects to login after `/auth/me` HTTP 429: local UAT confirmed `AuthContext.tsx` bootstrap catch clears the token on every error, including throttling. This remains unresolved in the record-link scope. Trace auth bootstrap, refresh error classification and route guards; preserve server rate limits and session authority. Do not treat a transient request rejection as proof of expired credentials.
+
 ## Discussion Topic Is Plain Text Or Opens The Wrong Record
 
 - Route `Gắn vào`, `Sơn nội thất`, missing topic link and redundant `Thành viên công trình` to `ActivityTopic.tsx`, `ActivityTopicDetails.tsx`, `activityTopicDomain.ts`, `ActivityThread.tsx`, `ActivityComposer.tsx` and `UtilityDock.tsx`. Load central/frontend/Project Planning plus the source domain map. First searches: `ActivityTopicCard|activityTopicPath|activityTopicRecord|activityVisibilityLabel`.

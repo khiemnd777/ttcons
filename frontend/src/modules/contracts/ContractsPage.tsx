@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -112,6 +113,7 @@ export function ContractsPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState('');
+  const sourceLink = useRecordDeepLink({ kind: 'contract', projectId: id, onOpen: record => { setSelectedId(record.id); setMobileDetailOpen(true); } });
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DetailTab>('execution');
   const [query, setQuery] = useState('');
@@ -164,7 +166,7 @@ export function ContractsPage() {
     if (requestedTab && ['execution', 'versions', 'milestones', 'variations', 'retentions'].includes(requestedTab)) {
       setActiveTab(requestedTab as DetailTab);
     }
-    if (!selectedId && contracts.data?.length) {
+    if (!sourceLink.active && !selectedId && contracts.data?.length) {
       const preferred = contracts.data.find((contract) => contract.contract_type === 'main_client' && contract.direction === 'receivable') ?? contracts.data[0];
       setSelectedId(preferred.id);
       if (searchParams.get('action') === 'new-variation' && preferred.status === 'active' && permissions.canCreate) {
@@ -177,7 +179,7 @@ export function ContractsPage() {
         }, { replace: true });
       }
     }
-  }, [contracts.data, permissions.canCreate, searchParams, selectedId, setSearchParams]);
+  }, [contracts.data, permissions.canCreate, searchParams, selectedId, setSearchParams, sourceLink.active]);
 
   const invalidate = async (contractId?: string) => {
     await queryClient.invalidateQueries({ queryKey: ['contracts', id] });
@@ -332,6 +334,7 @@ export function ContractsPage() {
 
   return (
     <>
+      {sourceLink.feedback}
       <PageHeader
         title="Hợp đồng"
         description="Theo dõi giá trị, ký duyệt, thanh toán, phụ lục và khoản giữ lại của công trình."
