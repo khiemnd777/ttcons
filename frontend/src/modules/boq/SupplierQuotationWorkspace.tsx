@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ClipboardCheck, Eye, FilePlus2, Loader2, Pencil, Send } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 import { CurrencyText } from '../../components/CurrencyText';
+import { RecordSummary, RecordSection, RecordMetrics, RecordMetric, RecordTable } from '../../components/RecordDetailLayout';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { useToast } from '../../components/ToastProvider';
 import { get, post, put } from '../../lib/api/client';
@@ -354,12 +355,28 @@ function SelectionDialog({ value, error, pending, onChange, onClose, onSubmit }:
 }
 
 function QuotationDetailDialog({ quotation, onClose }: { quotation: SupplierQuotation | null; onClose: () => void }) {
-  return <Dialog open={Boolean(quotation)} title="Chi tiết báo giá" description={quotation ? `${quotation.quotation_code} · ${quotation.supplier_name}` : undefined} onClose={onClose} size="xl">
-    {quotation ? <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Summary label="Ngày báo giá" value={dateText(quotation.quotation_date)} /><Summary label="Hiệu lực đến" value={quotation.valid_until ? dateText(quotation.valid_until) : 'Không giới hạn'} /><Summary label="Tổng giá trị" value={<CurrencyText value={quotation.total_amount ?? 0} />} /><Summary label="Trạng thái" value={<QuotationStatus status={quotation.status} />} /></div>
-      <div className="grid gap-3 rounded-md border border-line bg-slate-50 p-3 sm:grid-cols-3"><Summary label="Đánh giá kỹ thuật" value={qualificationLabel(quotation.technical_status)} /><Summary label="Đánh giá thương mại" value={qualificationLabel(quotation.commercial_status)} /><Summary label="Thời gian cung ứng" value={`${quotation.lead_time_days ?? 0} ngày`} /></div>
-      {quotation.items?.length ? <div className="overflow-x-auto rounded-md border border-line"><table className="min-w-[850px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Dòng dự toán</th><th className="px-3 py-2 text-right">Khối lượng</th><th className="px-3 py-2 text-right">Đơn giá</th><th className="px-3 py-2 text-right">Thành tiền</th><th className="px-3 py-2">Đáp ứng</th></tr></thead><tbody className="divide-y divide-line">{quotation.items.map((item) => <tr key={item.id}><td className="px-3 py-2 font-semibold">{item.work_item_name || item.description}</td><td className="px-3 py-2 text-right">{item.quantity.toLocaleString('vi-VN')} {item.unit}</td><td className="px-3 py-2 text-right"><CurrencyText value={item.unit_price} /></td><td className="px-3 py-2 text-right"><CurrencyText value={item.total_amount} /></td><td className="px-3 py-2">{qualificationLabel(item.compliance_status)}</td></tr>)}</tbody></table></div> : <EmptyText text="Báo giá chưa có dòng hàng." />}
-      {quotation.notes ? <div className="rounded-md border border-line p-3 text-sm text-slate-700"><span className="font-semibold">Ghi chú: </span>{quotation.notes}</div> : null}
+  return <Dialog open={Boolean(quotation)} title="Chi tiết báo giá" onClose={onClose} size="xl">
+    {quotation ? <div className="space-y-6">
+      <RecordSummary eyebrow={quotation.quotation_code} title={quotation.supplier_name || 'Báo giá nhà cung cấp'} status={<QuotationStatus status={quotation.status} />} value={<CurrencyText value={quotation.total_amount ?? 0} />} valueLabel="Tổng giá trị báo giá" />
+      <RecordSection title="Hiệu lực & cung ứng"><RecordMetrics>
+        <RecordMetric label="Ngày báo giá">{dateText(quotation.quotation_date)}</RecordMetric>
+        <RecordMetric label="Hiệu lực đến">{quotation.valid_until ? dateText(quotation.valid_until) : 'Không giới hạn'}</RecordMetric>
+        <RecordMetric label="Thời gian cung ứng">{quotation.lead_time_days ?? 0} ngày</RecordMetric>
+      </RecordMetrics></RecordSection>
+      <RecordSection title="Đánh giá báo giá"><RecordMetrics>
+        <RecordMetric label="Kỹ thuật">{qualificationLabel(quotation.technical_status)}</RecordMetric>
+        <RecordMetric label="Thương mại">{qualificationLabel(quotation.commercial_status)}</RecordMetric>
+      </RecordMetrics></RecordSection>
+      <RecordSection title="Các dòng báo giá" aside={`${quotation.items?.length ?? 0} dòng`}>
+        <RecordTable rows={quotation.items ?? []} rowKey={(item, index) => String(item.id ?? index)} empty="Báo giá chưa có dòng hàng." columns={[
+          { key: 'item', label: 'Dòng dự toán', render: item => <div className="break-words font-semibold text-slate-900">{item.work_item_name || item.description}</div> },
+          { key: 'quantity', label: 'Khối lượng', align: 'right', render: item => <span className="whitespace-nowrap">{Number(item.quantity).toLocaleString('vi-VN')} {item.unit}</span> },
+          { key: 'price', label: 'Đơn giá', align: 'right', render: item => <CurrencyText value={item.unit_price} /> },
+          { key: 'total', label: 'Thành tiền', align: 'right', render: item => <strong className="text-slate-900"><CurrencyText value={item.total_amount} /></strong> },
+          { key: 'compliance', label: 'Đáp ứng', render: item => qualificationLabel(item.compliance_status) },
+        ]} />
+      </RecordSection>
+      {quotation.notes ? <RecordSection title="Ghi chú"><p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">{quotation.notes}</p></RecordSection> : null}
     </div> : null}
   </Dialog>;
 }

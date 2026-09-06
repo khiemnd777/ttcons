@@ -2,6 +2,8 @@
 
 ## Discussion Quality Source Topics
 
+- Quality discussion previews use a record summary followed by named source/date/party/note sections. Acceptance/Handover checklist rows are numbered disclosures with the first expanded; status/decision stays in each summary and all prior allowlisted fields remain readable. Rework/Replanning standalone details share purpose-specific summaries and grouped reasons/impact. This changes only read-only presentation; primary Acceptance/Handover workspaces and all quality transitions are untouched.
+
 - Shared `ActivityTopicDetails.tsx` reads exact Acceptance/Handover detail APIs and the project-scoped Rework list, then verifies source ID/project and non-cancelled/non-deleted state. The dialog displays allowlisted record fields and Acceptance/Handover checklist contents through shared `RecordDetailFields`; it never submits, concludes, verifies, creates rework or completes handover. First searches: `ActivityTopicDetails|activityTopicRecord|activityTopicPath`. Existing domain workspaces remain the action owners.
 
 ## Owners

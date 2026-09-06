@@ -1,5 +1,9 @@
 # Accounting Finance Domain Map
 
+## Legacy Discussion Detail Presentation
+
+- `ActivityTopicDetails.tsx` groups legacy Payable/Receivable previews into counterpart/deadline and source-value sections, emphasizing the existing remaining balance. Payment preview emphasizes its existing amount and preserves method/type/dates/status. These use shared `RecordSummary`/`RecordDetailFields`; they neither calculate new balances nor add menus, routes, posting/payment actions or Accounting Handoff behavior. Existing exact record/project checks remain authoritative. First searches: `TopicRecordSummary|topicSections|remaining_amount`.
+
 ## Discussion Legacy Finance Topics
 
 - `ActivityTopicDetails.tsx` opens legacy payable/receivable/payment references read-only via existing authorized lists. AP/AR use project_id filters; legacy `/payments` has no project filter, so `activityTopicRecord` must select the exact ID and project from the authorized response. No ID/title substitution, payment action, accounting posting, handoff transition or widened observer permission. Missing access produces a local unavailable state. First searches: `activityTopicPath|activityTopicRecord|ActivityTopicDetails`.

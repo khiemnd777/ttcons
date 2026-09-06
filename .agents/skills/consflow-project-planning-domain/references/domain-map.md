@@ -1,5 +1,10 @@
 # Project Planning Domain Map
 
+## Read-Only Record Detail Hierarchy
+
+- `ActivityTopicDetails.tsx` groups the existing Work Item preview into identity/status, owner/deadlines and work/stage context. Source queries, actor/project checks and mounted discussion state remain unchanged; `ActivityTopic.tsx` omits repeated header descriptions and preserves the BOQ acronym.
+- `PlanningDailyReportsPage`, `MeetingMinutesPage` and `PlanningChecklistsPage` use shared `RecordSummary`/labelled metrics, promote their authored content and preserve all prior source-navigation callbacks. Daily report detail localizes its previously English field labels; meeting attendee details are collapsed; checklist needs-action/done/evidence counts move above the rows without client-side recomputation. `_shared/PlanningRecordContext.tsx` owns collapsed stage/step/update/generated-work/artifact counts. First searches: `RecordSummary|PlanningRecordContext|PlanningDailyReportDetailDialog|MeetingMinutesDetailDialog|PlanningChecklistDetailDialog`.
+
 ## Discussion Topic Navigation
 
 - Mục đích chính: recognize the exact source under discussion and inspect it without losing the conversation. `ActivityTopic`/`ActivityTopicDetails`/`activityTopicDomain` share a type/title/open card and an actor/project-bound, focus-managed dialog in full activity, Dock and both composer densities. Project-wide messages omit repeated project context and `Thành viên công trình`; internal/client history remains distinguished. Existing Work Item execution links remain separate.

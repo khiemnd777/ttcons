@@ -2,6 +2,8 @@
 
 ## Discussion Stock Movement Topics
 
+- `StockDocumentDetail` leads with document code/type/status, a distinct warehouse direction, recording/source metadata and shared responsive `RecordTable` lines. Correction/replacement notices remain visible and empty documents have an explicit empty state. Discussion movement previews use `TopicRecordSummary` plus grouped source/target/document fields; their IDs and source checks remain movement-specific. Shared styling never posts, corrects or recalculates warehouse data.
+
 - `ActivityTopicDetails.tsx` inspects an exact stock movement from authorized `GET /stock/movements?project_id=` using persisted activity scope/id plus a project check. Display fields come from the movement ledger (material, quantity/unit, source/destination warehouse, document code, reason and timestamp). A movement ID is never passed to the stock-document detail route. Viewing performs no stock/document mutation. First searches: `activityTopicPath|activityTopicRecord|stock_movement` in the shared activity topic owners.
 
 ## Owners

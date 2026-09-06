@@ -1,5 +1,9 @@
 # Admin Governance Domain Map
 
+## Partner, Role And Audit Detail Presentation
+
+- `CoreDataPage`, `RolesPage`, and `AuditPage` configure shared `RecordDetailDialog` summaries and named sections. Partner details prioritize identity/contact/transaction data and localize their status text; role detail shows display name/scope/permission count and localized system-role wording. Audit promotes recorded event/time/actor/content, keeping full target/event IDs and JSON under collapsed `Thông tin đối chiếu`. All prior displayed values remain available; permissions, catalog mutations, role assignment and audit attribution are unchanged. First searches: `RecordSummary|sections=|Thông tin đối chiếu` in these owners.
+
 ## Accounting Reconciliation Observer Boundary (V133)
 
 - Permission marker: `project.reconciliation.view`, granted additively only to the system `accounting` role by `backend/migrations/V133__accounting_company_reconciliation_visibility.sql` and mirrored in `backend/seed/seed.sql`. Production RBAC validation and Admin bootstrap treat it as an explicit Accounting-only exception rather than requiring or allowing it on Admin/Developer.

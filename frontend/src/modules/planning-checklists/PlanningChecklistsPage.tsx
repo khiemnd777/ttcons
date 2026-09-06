@@ -6,6 +6,8 @@ import { get } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
+import { RecordSummary, RecordSection, RecordMetrics, RecordMetric } from '../../components/RecordDetailLayout';
+import { PlanningRecordContext } from '../_shared/PlanningRecordContext';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSection } from '../../components/ListSection';
 import { RowActions } from '../../components/RowActions';
@@ -306,79 +308,32 @@ function MetricCard({ icon, label, value, sub }: { icon: ReactNode; label: strin
   );
 }
 
-function PlanningChecklistDetailDialog({
-  checklist,
-  onClose,
-  onOpenWorkItem,
-}: {
-  checklist: PlanningChecklistItem | null;
-  onClose: () => void;
-  onOpenWorkItem: (checklist: PlanningChecklistItem) => void;
+function PlanningChecklistDetailDialog({ checklist, onClose, onOpenWorkItem }: {
+  checklist: PlanningChecklistItem | null; onClose: () => void; onOpenWorkItem: (checklist: PlanningChecklistItem) => void;
 }) {
-  return (
-    <Dialog
-      open={Boolean(checklist)}
-      title="Chi tiết checklist kế hoạch"
-      description={checklist ? `${checklist.project_name} · ${dateText(checklist.check_date)} · ${planningScopeLabel(checklist.planning_scope)}` : undefined}
-      size="xl"
-      onClose={onClose}
-      footer={checklist ? (
-        <div className="flex flex-wrap justify-end gap-2">
-          <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose} type="button">Đóng</button>
-          <button
-            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-            disabled={!checklist.work_item_id}
-            onClick={() => onOpenWorkItem(checklist)}
-            type="button"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Mở đầu việc/biểu mẫu
-          </button>
-        </div>
-      ) : null}
-    >
-      {checklist ? (
-        <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <DetailPill label="Trạng thái" value={<StatusBadge status={checklist.status} />} />
-            <DetailPill label="Ngày kiểm tra" value={dateText(checklist.check_date)} />
-            <DetailPill label="Người kiểm tra" value={checklist.checked_by || identityReferenceText(checklist.submitted_by_name, checklist.submitted_by_account_deleted)} />
-            <DetailPill label="Cập nhật" value={compactDateTime(checklist.updated_at)} />
-          </div>
-          <section className="rounded-md border border-line bg-slate-50 p-3">
-            <p className="text-sm font-semibold text-ink">{checklistTitle(checklist)}</p>
-            <div className="mt-2 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
-              <p>Phạm vi: <span className="font-semibold text-ink">{planningScopeLabel(checklist.planning_scope)}</span></p>
-              <p>Người gửi: <span className="font-semibold text-ink">{identityReferenceText(checklist.submitted_by_name, checklist.submitted_by_account_deleted)}</span></p>
-              <p>Node: <span className="font-semibold text-ink">{checklist.run_node_name ?? '-'}</span></p>
-              <p>Bước: <span className="font-semibold text-ink">{checklist.run_step_name ?? '-'}</span></p>
-            </div>
-          </section>
-          <ChecklistItems checklist={checklist} />
-          {checklist.overall_comment || checklist.items_done_text || checklist.exceptions_text ? (
-            <section className="grid gap-3 xl:grid-cols-3">
-              <LegacyText title="Hạng mục đã hoàn tất" text={checklist.items_done_text} empty="Không có dữ liệu hạng mục đã hoàn tất cũ." />
-              <LegacyText title="Ngoại lệ" text={checklist.exceptions_text} empty="Không có ngoại lệ." />
-              <LegacyText title="Ghi chú tổng quan" text={checklist.overall_comment} empty="Không có ghi chú tổng quan." />
-            </section>
-          ) : null}
-          <div className="grid gap-2 rounded-md border border-line bg-slate-50 p-3 text-xs text-slate-600 md:grid-cols-2">
-            <p>Tóm tắt: <span className="font-semibold text-ink">{numberValue(checklist.done_count)} hoàn tất/không áp dụng · {numberValue(checklist.needs_action_count)} cần xử lý · {numberValue(checklist.evidence_linked_count)} minh chứng đã liên kết</span></p>
-            <p>Tài liệu: <span className="font-semibold text-ink">{numberValue(checklist.signature_count)} chữ ký · {numberValue(checklist.pdf_export_count)} PDF · {numberValue(checklist.evidence_count)} minh chứng</span></p>
-          </div>
-        </div>
-      ) : <EmptyState title="Chưa chọn checklist kế hoạch." />}
-    </Dialog>
-  );
-}
-
-function DetailPill({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-md border border-line bg-slate-50 px-3 py-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="mt-1 text-sm font-semibold text-ink">{value}</div>
-    </div>
-  );
+  return <Dialog open={Boolean(checklist)} title="Chi tiết checklist kế hoạch" size="xl" onClose={onClose}
+    footer={checklist ? <div className="flex flex-wrap justify-end gap-2">
+      <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose} type="button">Đóng</button>
+      <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500" disabled={!checklist.work_item_id} onClick={() => onOpenWorkItem(checklist)} type="button"><ExternalLink className="h-4 w-4" />Mở đầu việc/biểu mẫu</button>
+    </div> : null}>
+    {checklist ? <div className="space-y-6">
+      <RecordSummary eyebrow={checklist.project_name} title={checklistTitle(checklist)} subtitle={planningScopeLabel(checklist.planning_scope)} status={<StatusBadge status={checklist.status} />} value={numberValue(checklist.needs_action_count)} valueLabel="Mục cần xử lý" />
+      <RecordMetrics>
+        <RecordMetric label="Ngày kiểm tra">{dateText(checklist.check_date)}</RecordMetric>
+        <RecordMetric label="Người kiểm tra">{checklist.checked_by || identityReferenceText(checklist.submitted_by_name, checklist.submitted_by_account_deleted)}</RecordMetric>
+        <RecordMetric label="Hoàn tất / không áp dụng">{numberValue(checklist.done_count)} mục</RecordMetric>
+        <RecordMetric label="Minh chứng đã liên kết">{numberValue(checklist.evidence_linked_count)}</RecordMetric>
+      </RecordMetrics>
+      <ChecklistItems checklist={checklist} />
+      {checklist.overall_comment || checklist.items_done_text || checklist.exceptions_text ? <RecordSection title="Ghi chú & ngoại lệ"><div className="space-y-4">
+        {checklist.overall_comment ? <LegacyText title="Ghi chú tổng quan" text={checklist.overall_comment} empty="" /> : null}
+        {checklist.exceptions_text ? <LegacyText title="Ngoại lệ" text={checklist.exceptions_text} empty="" /> : null}
+        {checklist.items_done_text ? <LegacyText title="Hạng mục đã hoàn tất" text={checklist.items_done_text} empty="" /> : null}
+      </div></RecordSection> : null}
+      <RecordSection title="Người gửi"><p className="text-sm text-slate-700">{identityReferenceText(checklist.submitted_by_name, checklist.submitted_by_account_deleted)}</p></RecordSection>
+      <PlanningRecordContext record={checklist} />
+    </div> : <EmptyState title="Chưa chọn hồ sơ." />}
+  </Dialog>;
 }
 
 function ChecklistItems({ checklist }: { checklist: PlanningChecklistItem }) {

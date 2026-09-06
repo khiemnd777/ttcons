@@ -7,6 +7,7 @@ import type { BOQItem } from '../../lib/types/domain';
 import { CurrencyText } from '../../components/CurrencyText';
 import { StatusBadge } from '../../components/StatusBadge';
 import { RecordDetailFields, type DetailField } from '../../components/RecordDetailDialog';
+import { RecordSummary, RecordSection, RecordEmpty } from '../../components/RecordDetailLayout';
 import { dateText, dateTimeText } from '../../lib/utils/format';
 import { enumLabel } from '../../lib/utils/status';
 import { activityTopicPath, activityTopicRecord, ActivityTopicUnavailable, type ActivityTopic, type ActivityTopicScope } from './activityTopicDomain';
@@ -40,9 +41,12 @@ export default function ActivityTopicDetails({ topic }: { topic: ActivityTopic }
   if (!detail.data) return <Unavailable message="Không tìm thấy hồ sơ." />;
   const { record, boq: BOQDetail, procurement: ProcurementDetail } = detail.data;
   if (BOQDetail) return <BOQDetail item={record as BOQItem} tab={tab} onTabChange={setTab} projectId={topic.projectId} canViewProcurement={false} />;
-  if (ProcurementDetail) return <div className="space-y-4"><RecordDetailFields record={record} fields={[status, money('total_estimated_amount', 'Giá trị yêu cầu')]} /><ProcurementDetail record={record} /></div>;
-  return <div className="space-y-4">
-    <RecordDetailFields record={record} fields={topicFields[topic.scope] ?? []} />
+  if (ProcurementDetail) return <ProcurementDetail record={record} />;
+  return <div className="space-y-6">
+    <TopicRecordSummary topic={topic} record={record} />
+    {(topicSections[topic.scope] ?? []).map(section => <RecordSection key={section.title} title={section.title}>
+      <RecordDetailFields record={record} fields={(topicFields[topic.scope] ?? []).filter(field => section.keys.includes(field.key))} />
+    </RecordSection>)}
     {topic.scope === 'acceptance' ? <Checklist rows={record.checklist} fields={acceptanceFields} /> : null}
     {topic.scope === 'handover' ? <Checklist rows={record.checklist_items} fields={handoverFields} /> : null}
   </div>;
@@ -56,7 +60,7 @@ function Unavailable({ message, onRetry }: { message: string; onRetry?: () => vo
 }
 
 type Field = DetailField<Record<string, any>>;
-const text = (key: string, label: string): Field => ({ key, label });
+const text = (key: string, label: string): Field => ({ key, label, wide: ['description', 'notes', 'reason', 'scope_summary', 'required_action', 'note'].includes(key) });
 const date = (key: string, label: string): Field => ({ key, label, render: row => dateText(row[key]) });
 const timestamp = (key: string, label: string): Field => ({ key, label, render: row => dateTimeText(row[key]) });
 const money = (key: string, label: string): Field => ({ key, label, render: row => row[key] == null ? '—' : <CurrencyText value={row[key]} /> });
@@ -75,9 +79,35 @@ const topicFields: Partial<Record<ActivityTopicScope, Field[]>> = {
 const acceptanceFields: Field[] = [text('title', 'Tiêu chí'), text('description', 'Mô tả'), { key: 'decision', label: 'Kết luận', render: row => row.decision ? <StatusBadge status={row.decision} /> : '—' }, text('required_action', 'Yêu cầu xử lý'), date('due_date', 'Hạn xử lý'), text('note', 'Ghi chú')];
 const handoverFields: Field[] = [text('title', 'Nội dung'), status, text('notes', 'Ghi chú'), timestamp('verified_at', 'Đã xác minh')];
 
+const topicSections: Partial<Record<ActivityTopicScope, { title: string; keys: string[] }[]>> = {
+  work_item: [{ title: 'Phụ trách & thời hạn', keys: ['assignee_name', 'due_at', 'completed_at'] }, { title: 'Nội dung công việc', keys: ['description', 'run_node_name', 'run_step_name'] }],
+  stock_movement: [{ title: 'Luồng vật tư', keys: ['warehouse_name', 'target_warehouse_name', 'document_code', 'created_at', 'reason'] }],
+  acceptance: [{ title: 'Phạm vi nghiệm thu', keys: ['location', 'acceptance_date', 'scope_summary'] }, { title: 'Các bên tham gia', keys: ['client_representative', 'contractor_representative'] }, { title: 'Ghi chú', keys: ['notes'] }],
+  rework: [{ title: 'Nội dung cần xử lý', keys: ['description', 'due_date'] }],
+  handover: [{ title: 'Nguồn & thời hạn bàn giao', keys: ['final_acceptance_title', 'handover_date', 'completed_at'] }, { title: 'Các bên tham gia', keys: ['client_representative', 'company_representative'] }, { title: 'Ghi chú', keys: ['notes'] }],
+  payable: [{ title: 'Đối tác & thời hạn', keys: ['vendor_name', 'due_date'] }, { title: 'Giá trị đối chiếu', keys: ['gross_amount', 'paid_amount', 'remaining_amount'] }, { title: 'Ghi chú', keys: ['notes'] }],
+  receivable: [{ title: 'Khách hàng & kỳ thu', keys: ['client_name', 'milestone_name', 'due_date'] }, { title: 'Giá trị đối chiếu', keys: ['gross_amount', 'received_amount', 'remaining_amount'] }],
+  payment: [{ title: 'Thông tin phiếu', keys: ['payment_type', 'payment_method', 'paid_at', 'created_at'] }],
+};
+
+function TopicRecordSummary({ topic, record }: { topic: ActivityTopic; record: Record<string, any> }) {
+  const amountKey = topic.scope === 'payable' || topic.scope === 'receivable' ? 'remaining_amount' : topic.scope === 'payment' ? 'amount' : '';
+  const amountLabel = topic.scope === 'payable' ? 'Còn phải trả' : topic.scope === 'receivable' ? 'Còn phải thu' : 'Số tiền';
+  const code = record.acceptance_code || record.movement_code || record.payable_code || record.receivable_code || record.payment_code;
+  const movement = topic.scope === 'stock_movement';
+  return <RecordSummary eyebrow={code} title={movement ? record.material_name || topic.label : record.title || topic.label}
+    subtitle={movement ? enumLabel('movement_type', record.movement_type) : undefined}
+    status={record.status || (topic.scope === 'acceptance' && record.result) ? <div className="flex flex-wrap gap-2">{record.status ? <StatusBadge status={record.status} /> : null}{topic.scope === 'acceptance' && record.result ? <StatusBadge status={record.result} /> : null}</div> : undefined}
+    value={movement ? `${record.quantity ?? '—'} ${record.unit ?? ''}` : amountKey ? record[amountKey] == null ? '—' : <CurrencyText value={record[amountKey]} /> : undefined}
+    valueLabel={movement ? 'Số lượng luân chuyển' : amountLabel} />;
+}
+
 function Checklist({ rows, fields }: { rows: unknown; fields: Field[] }) {
   const items = Array.isArray(rows) ? rows.filter(row => row && typeof row === 'object') : [];
-  return <section className="space-y-3"><h3 className="text-sm font-semibold text-ink">Checklist hồ sơ</h3>
-    {items.length ? items.map((row, index) => <RecordDetailFields key={row.id ?? index} record={row} fields={fields} />) : <p className="text-sm text-slate-500">Chưa có mục checklist.</p>}
-  </section>;
+  return <RecordSection title="Checklist hồ sơ" aside={`${items.length} mục`}>
+    {items.length ? <div className="divide-y divide-slate-200">{items.map((row, index) => <details key={row.id ?? index} open={index === 0} className="group py-3">
+      <summary className="cursor-pointer text-sm font-semibold text-slate-800"><span className="ml-1 mr-3 text-slate-400">{String(index + 1).padStart(2, '0')}</span>{row.title || 'Nội dung checklist'}<span className="ml-3 inline-flex">{row.decision || row.status ? <StatusBadge status={row.decision || row.status} /> : null}</span></summary>
+      <div className="pl-6 pt-2"><RecordDetailFields record={row} fields={fields.filter(field => !['title', 'decision', 'status'].includes(field.key))} /></div>
+    </details>)}</div> : <RecordEmpty>Chưa có mục checklist.</RecordEmpty>}
+  </RecordSection>;
 }

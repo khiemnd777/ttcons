@@ -6,6 +6,8 @@ import { get } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
+import { RecordSummary, RecordSection, RecordMetrics, RecordMetric } from '../../components/RecordDetailLayout';
+import { PlanningRecordContext } from '../_shared/PlanningRecordContext';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSection } from '../../components/ListSection';
 import { RowActions } from '../../components/RowActions';
@@ -268,80 +270,30 @@ function MetricCard({ icon, label, value, sub }: { icon: ReactNode; label: strin
   );
 }
 
-function MeetingMinutesDetailDialog({
-  meeting,
-  onClose,
-  onOpenWorkItem,
-}: {
-  meeting: MeetingMinutesItem | null;
-  onClose: () => void;
-  onOpenWorkItem: (meeting: MeetingMinutesItem) => void;
+function MeetingMinutesDetailDialog({ meeting, onClose, onOpenWorkItem }: {
+  meeting: MeetingMinutesItem | null; onClose: () => void; onOpenWorkItem: (meeting: MeetingMinutesItem) => void;
 }) {
-  return (
-    <Dialog
-      open={Boolean(meeting)}
-      title="Chi tiết biên bản họp"
-      description={meeting ? `${meeting.project_name} · ${dateText(meeting.meeting_date)} · ${meeting.chair || '-'}` : undefined}
-      size="xl"
-      onClose={onClose}
-      footer={meeting ? (
-        <div className="flex flex-wrap justify-end gap-2">
-          <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose} type="button">Đóng</button>
-          <button
-            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-            disabled={!meeting.work_item_id}
-            onClick={() => onOpenWorkItem(meeting)}
-            type="button"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Mở đầu việc/biểu mẫu
-          </button>
-        </div>
-      ) : null}
-    >
-      {meeting ? (
-        <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <DetailPill label="Trạng thái" value={<StatusBadge status={meeting.status} />} />
-            <DetailPill label="Ngày họp" value={dateText(meeting.meeting_date)} />
-            <DetailPill label="Chủ trì" value={meeting.chair || '-'} />
-            <DetailPill label="Cập nhật" value={compactDateTime(meeting.updated_at)} />
-          </div>
-          <section className="rounded-md border border-line bg-slate-50 p-3">
-            <p className="text-sm font-semibold text-ink">{meetingTitle(meeting)}</p>
-            <div className="mt-2 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
-              <p>Địa điểm: <span className="font-semibold text-ink">{meeting.location || '-'}</span></p>
-              <p>Người gửi: <span className="font-semibold text-ink">{identityReferenceText(meeting.submitted_by_name, meeting.submitted_by_account_deleted)}</span></p>
-              <p>Node: <span className="font-semibold text-ink">{meeting.run_node_name ?? '-'}</span></p>
-              <p>Bước: <span className="font-semibold text-ink">{meeting.run_step_name ?? '-'}</span></p>
-            </div>
-          </section>
-          <div className="grid gap-4 xl:grid-cols-3">
-            <AttendeesList meeting={meeting} />
-            <StructuredItems title="Quyết định" items={arrayValue(meeting.decisions)} fallbackText={meeting.decisions_text} empty="Chưa có quyết định." renderMeta={decisionMeta} />
-            <StructuredItems title="Đầu việc" items={arrayValue(meeting.action_items)} fallbackText={meeting.action_items_text} empty="Chưa có đầu việc." renderMeta={actionItemMeta} />
-          </div>
-          <section className="rounded-md border border-line bg-white p-3">
-            <h3 className="text-sm font-semibold text-ink">Nội dung họp</h3>
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{meeting.agenda || '-'}</p>
-          </section>
-          <div className="grid gap-2 rounded-md border border-line bg-slate-50 p-3 text-xs text-slate-600 md:grid-cols-2">
-            <p>Đầu việc đã sinh: <span className="font-semibold text-ink">{numberValue(meeting.generated_work_item_count)}</span></p>
-            <p>Tài liệu: <span className="font-semibold text-ink">{numberValue(meeting.signature_count)} chữ ký · {numberValue(meeting.pdf_export_count)} PDF · {numberValue(meeting.evidence_count)} minh chứng</span></p>
-          </div>
-        </div>
-      ) : <EmptyState title="Chưa chọn biên bản họp." />}
-    </Dialog>
-  );
-}
-
-function DetailPill({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-md border border-line bg-slate-50 px-3 py-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="mt-1 text-sm font-semibold text-ink">{value}</div>
-    </div>
-  );
+  return <Dialog open={Boolean(meeting)} title="Chi tiết biên bản họp" size="xl" onClose={onClose}
+    footer={meeting ? <div className="flex flex-wrap justify-end gap-2">
+      <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose} type="button">Đóng</button>
+      <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500" disabled={!meeting.work_item_id} onClick={() => onOpenWorkItem(meeting)} type="button"><ExternalLink className="h-4 w-4" />Mở đầu việc/biểu mẫu</button>
+    </div> : null}>
+    {meeting ? <div className="space-y-6">
+      <RecordSummary eyebrow={meeting.project_name} title={meetingTitle(meeting)} subtitle={dateText(meeting.meeting_date)} status={<StatusBadge status={meeting.status} />} />
+      <RecordMetrics>
+        <RecordMetric label="Chủ trì">{meeting.chair || '—'}</RecordMetric>
+        <RecordMetric label="Địa điểm">{meeting.location || '—'}</RecordMetric>
+        <RecordMetric label="Người gửi">{identityReferenceText(meeting.submitted_by_name, meeting.submitted_by_account_deleted)}</RecordMetric>
+      </RecordMetrics>
+      <RecordSection title="Nội dung họp"><p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">{meeting.agenda || 'Chưa có nội dung họp.'}</p></RecordSection>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <StructuredItems title="Quyết định" items={arrayValue(meeting.decisions)} fallbackText={meeting.decisions_text} empty="Chưa có quyết định." renderMeta={decisionMeta} />
+        <StructuredItems title="Đầu việc sau họp" items={arrayValue(meeting.action_items)} fallbackText={meeting.action_items_text} empty="Chưa có đầu việc." renderMeta={actionItemMeta} />
+      </div>
+      <details className="rounded-lg border border-slate-200 p-4"><summary className="cursor-pointer text-sm font-semibold text-slate-600">Thành phần tham dự · {numberValue(meeting.attendee_count)}</summary><div className="pt-4"><AttendeesList meeting={meeting} /></div></details>
+      <PlanningRecordContext record={meeting} />
+    </div> : <EmptyState title="Chưa chọn hồ sơ." />}
+  </Dialog>;
 }
 
 function AttendeesList({ meeting }: { meeting: MeetingMinutesItem }) {

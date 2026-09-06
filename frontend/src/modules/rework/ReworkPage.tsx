@@ -10,6 +10,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { CurrencyText } from '../../components/CurrencyText';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
+import { RecordSummary } from '../../components/RecordDetailLayout';
 import { RowActions } from '../../components/RowActions';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { FilterBar, type FilterOption } from '../../components/FilterBar';
@@ -170,11 +171,13 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
       <RecordDetailDialog
         open={dialog?.type === 'rework'}
         title="Chi tiết sửa lỗi"
+        summary={row => <RecordSummary title={row.title} status={<StatusBadge status={row.status} />} subtitle={`Hạn xử lý: ${dateText(row.due_date)}`} />}
+        sections={[{ title: 'Nội dung cần xử lý', keys: ['description'] }]}
         record={dialog?.record ?? null}
         onClose={() => setDialog(null)}
         fields={[
           { key: 'title', label: 'Sửa lỗi' },
-          { key: 'description', label: 'Mô tả' },
+          { key: 'description', label: 'Mô tả', wide: true },
             { key: 'due_date', label: 'Hạn xử lý', render: (row) => dateText(row.due_date) },
           { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
         ]}
@@ -182,13 +185,15 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
       <RecordDetailDialog
         open={dialog?.type === 'replanning'}
         title="Chi tiết lập kế hoạch lại"
+        summary={row => <RecordSummary title="Yêu cầu lập kế hoạch lại" subtitle={<EnumChip group="impact_scope" value={row.impact_scope} />} status={<StatusBadge status={row.status} />} value={<CurrencyText value={row.budget_impact} />} valueLabel="Ảnh hưởng ngân sách" />}
+        sections={[{ title: 'Nguyên nhân', keys: ['reason'] }, { title: 'Ảnh hưởng tiến độ', keys: ['timeline_impact'] }]}
         record={dialog?.record ?? null}
         onClose={() => setDialog(null)}
         fields={[
-          { key: 'reason', label: 'Lý do' },
+          { key: 'reason', label: 'Lý do', wide: true },
           { key: 'impact_scope', label: 'Phạm vi ảnh hưởng', render: (row) => <EnumChip group="impact_scope" value={row.impact_scope} /> },
           { key: 'budget_impact', label: 'Ngân sách', render: (row) => <CurrencyText value={row.budget_impact} /> },
-          { key: 'timeline_impact', label: 'Tiến độ' },
+          { key: 'timeline_impact', label: 'Thay đổi tiến độ', render: row => row.timeline_impact == null ? '—' : `${row.timeline_impact} ngày` },
           { key: 'status', label: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
         ]}
       />

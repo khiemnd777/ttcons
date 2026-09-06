@@ -2,6 +2,8 @@
 
 ## Discussion Source Detail Reuse
 
+- Detail presentation uses shared `RecordSummary`/`RecordSection`; BOQ preserves all four tabs and optional caller-owned actions, Procurement owns its source status/value summary in both entry points, and supplier quotation detail adopts the same hierarchy. Procurement and quotation use container-responsive `RecordTable` cards below 48rem. Requested/accepted/stocked/awaiting quantities remain separate; `pending` item labels become `Chờ tiếp nhận`, waiver reasons remain accessible in a disclosure. Numeric BOQ/quotation quantity display normalizes number-shaped API values without changing quantity/price data. No new actions, source queries, approvals or stock/finance effects.
+
 - `ActivityTopicDetails.tsx` reuses exported `BOQPage::BOQDetail` (four read-only tabs, optional price-management callback omitted) and `ProcurementPage::ProcurementDetail` after exact source/project/status checks on the existing authenticated detail API. The ordinary BOQ page retains its price-management callback; chat never changes prices, approvals, procurement or warehouse quantities. The topic dialog does not navigate away from the draft. First searches: `ActivityTopicDetails|BOQDetail|ProcurementDetail|activityTopicRecord`.
 
 ## Owners

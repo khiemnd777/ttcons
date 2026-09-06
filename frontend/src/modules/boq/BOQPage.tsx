@@ -9,6 +9,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { CurrencyText } from '../../components/CurrencyText';
+import { RecordSummary, RecordSection, RecordMetrics, RecordMetric, RecordEmpty } from '../../components/RecordDetailLayout';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { useToast } from '../../components/ToastProvider';
 import { RowActions } from '../../components/RowActions';
@@ -335,7 +336,7 @@ export function BOQPage() {
         />
       </Dialog>
 
-      <Dialog open={dialog?.mode === 'view'} title="Chi tiết dòng dự toán" description={dialog?.record.work_item_name} onClose={() => setDialog(null)} size="xl">
+      <Dialog open={dialog?.mode === 'view'} title="Chi tiết dòng dự toán" onClose={() => setDialog(null)} size="xl">
         {detail.isLoading ? <LoadingState /> : detail.error ? <ErrorState onRetry={() => detail.refetch()} /> : detail.data ? <BOQDetail item={detail.data} tab={detailTab} onTabChange={setDetailTab} onOpenPrices={() => setPriceDialog(detail.data)} projectId={id} canViewProcurement={hasPermission('procurement.view')} /> : null}
       </Dialog>
 
@@ -385,24 +386,47 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
 }
 
 export function BOQDetail({ item, tab, onTabChange, onOpenPrices, projectId, canViewProcurement }: { item: BOQItem; tab: 'overview' | 'prices' | 'quotes' | 'procurement'; onTabChange: (tab: 'overview' | 'prices' | 'quotes' | 'procurement') => void; onOpenPrices?: () => void; projectId: string; canViewProcurement: boolean }) {
-  return <div className="space-y-4">
+  return <div className="space-y-6">
+    <RecordSummary eyebrow={item.category || 'Dòng dự toán'} title={item.work_item_name} subtitle={`${Number(item.quantity).toLocaleString('vi-VN')} ${item.unit}`} status={<StatusBadge status={item.status} />} value={<CurrencyText value={item.effective_total_amount ?? item.total_amount} />} valueLabel="Thành tiền" />
     {Number(item.active_procurement_count ?? 0) > 1 ? <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>Dòng dự toán đang liên kết với {item.active_procurement_count} yêu cầu mua sắm hoạt động. Mã hiển thị bên dưới là liên kết gần nhất; cần kiểm tra toàn bộ tại màn hình mua sắm.</span></div> : null}
-    <div className="flex gap-1 overflow-x-auto border-b border-line pb-2">
+    <div className="flex gap-5 overflow-x-auto border-b border-slate-200" aria-label="Nội dung dòng dự toán">
       <DetailTab active={tab === 'overview'} onClick={() => onTabChange('overview')}>Tổng quan</DetailTab>
       <DetailTab active={tab === 'prices'} onClick={() => onTabChange('prices')}>Đơn giá & lịch sử</DetailTab>
       <DetailTab active={tab === 'quotes'} onClick={() => onTabChange('quotes')}>Báo giá</DetailTab>
       <DetailTab active={tab === 'procurement'} onClick={() => onTabChange('procurement')}>Mua sắm</DetailTab>
     </div>
-    {tab === 'overview' ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><DetailMetric label="Hạng mục" value={item.category} /><DetailMetric label="Khối lượng" value={`${item.quantity.toLocaleString('vi-VN')} ${item.unit}`} /><DetailMetric label="Thành tiền" value={<CurrencyText value={item.effective_total_amount ?? item.total_amount} />} /><DetailMetric label="Trạng thái" value={<StatusBadge status={item.status} />} /><div className="sm:col-span-2 lg:col-span-4 rounded-md border border-line p-3"><p className="text-xs font-semibold uppercase text-slate-500">Mô tả</p><p className="mt-1 text-sm text-slate-700">{item.description || 'Chưa có mô tả.'}</p></div></div> : null}
-    {tab === 'prices' ? <div className="grid gap-4 lg:grid-cols-[1fr_1fr]"><div className="space-y-3"><PriceLifecycleCell item={item} />{onOpenPrices ? <button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={onOpenPrices}>Mở quản lý đơn giá</button> : null}</div><div>{item.price_events_truncated ? <PriceHistoryNotice count={item.price_event_count} /> : null}{item.price_events?.length ? <div className="space-y-2">{item.price_events.map((event) => <PriceEventRow key={event.id} event={event} />)}</div> : <div className="rounded-md border border-dashed border-line p-4 text-sm text-slate-500">Chưa có lịch sử đơn giá.</div>}</div></div> : null}
-    {tab === 'quotes' ? <div className="grid gap-3 sm:grid-cols-2"><DetailMetric label="Báo giá đã chọn" value={item.selected_quotation_code || 'Chưa chọn'} /><DetailMetric label="Nhà cung cấp" value={item.selected_supplier_name || 'Chưa chọn'} /><DetailMetric label="Đơn giá báo giá" value={item.quoted_unit_price ? <CurrencyText value={item.quoted_unit_price} /> : '-'} /><DetailMetric label="Căn cứ miễn báo giá" value={item.price_waiver_reason || 'Không có'} /></div> : null}
-    {tab === 'procurement' ? item.procurement_request_id || item.has_active_procurement || Number(item.active_procurement_count ?? 0) > 0 ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4"><p className="font-semibold text-emerald-800">Đã liên kết yêu cầu mua {item.procurement_request_code || item.procurement_request_id || ''}</p><div className="mt-3 flex items-center gap-3"><StatusBadge status={item.procurement_request_status || 'draft'} />{canViewProcurement ? <Link className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:underline" to={`/projects/${projectId}/procurement`}><Eye className="h-4 w-4" />Mở mua sắm</Link> : null}</div></div> : <div className="rounded-md border border-dashed border-line p-4 text-sm text-slate-500">Dòng này chưa được liên kết với yêu cầu mua sắm đang hoạt động.</div> : null}
+    {tab === 'overview' ? <div className="space-y-6">
+      <RecordSection title="Mô tả">{item.description ? <p className="max-w-prose whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">{item.description}</p> : <RecordEmpty>Chưa có mô tả cho dòng dự toán này.</RecordEmpty>}</RecordSection>
+      <RecordSection title="Thông tin dự toán"><RecordMetrics>
+        <RecordMetric label="Khối lượng">{Number(item.quantity).toLocaleString('vi-VN')} {item.unit}</RecordMetric>
+        <RecordMetric label="Giá định mức">{item.norm_price_locked ? 'Đã khóa' : 'Chưa khóa'}</RecordMetric>
+        <RecordMetric label="Giá cuối">{item.final_price_locked ? 'Đã chốt' : 'Chưa chốt'}</RecordMetric>
+      </RecordMetrics></RecordSection>
+    </div> : null}
+    {tab === 'prices' ? <div className="grid gap-6 lg:grid-cols-2">
+      <RecordSection title="Đơn giá hiện tại"><PriceLifecycleCell item={item} />{onOpenPrices ? <button className="mt-4 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={onOpenPrices}>Mở quản lý đơn giá</button> : null}</RecordSection>
+      <RecordSection title="Lịch sử đơn giá">{item.price_events_truncated ? <PriceHistoryNotice count={item.price_event_count} /> : null}{item.price_events?.length ? <div className="space-y-2">{item.price_events.map(event => <PriceEventRow key={event.id} event={event} />)}</div> : <RecordEmpty>Chưa có lịch sử đơn giá.</RecordEmpty>}</RecordSection>
+    </div> : null}
+    {tab === 'quotes' ? <div className="space-y-6">
+      <RecordSection title="Báo giá được chọn"><RecordMetrics>
+        <RecordMetric label="Mã báo giá">{item.selected_quotation_code || 'Chưa chọn'}</RecordMetric>
+        <RecordMetric label="Nhà cung cấp">{item.selected_supplier_name || 'Chưa chọn'}</RecordMetric>
+        <RecordMetric label="Đơn giá báo giá">{item.quoted_unit_price != null ? <CurrencyText value={item.quoted_unit_price} /> : '—'}</RecordMetric>
+      </RecordMetrics></RecordSection>
+      <RecordSection title="Căn cứ miễn báo giá"><p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">{item.price_waiver_reason || 'Không có căn cứ miễn báo giá.'}</p></RecordSection>
+    </div> : null}
+    {tab === 'procurement' ? <RecordSection title="Yêu cầu mua sắm liên quan">
+      {item.procurement_request_id || item.has_active_procurement || Number(item.active_procurement_count ?? 0) > 0 ? <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+        <div><p className="mb-2 font-semibold text-emerald-900">Đã liên kết yêu cầu mua {item.procurement_request_code || item.procurement_request_id || ''}</p><StatusBadge status={item.procurement_request_status || 'draft'} /></div>
+        {canViewProcurement ? <Link className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:underline" to={`/projects/${projectId}/procurement`}><Eye className="h-4 w-4" />Mở mua sắm</Link> : null}
+      </div> : <RecordEmpty>Dòng này chưa được liên kết với yêu cầu mua sắm đang hoạt động.</RecordEmpty>}
+    </RecordSection> : null}
   </div>;
 }
 
-function DetailTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) { return <button className={clsx('whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold', active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100')} onClick={onClick}>{children}</button>; }
-function DetailMetric({ label, value }: { label: string; value: React.ReactNode }) { return <div className="rounded-md border border-line bg-slate-50 p-3"><p className="text-xs font-semibold uppercase text-slate-500">{label}</p><div className="mt-1 font-semibold text-ink">{value}</div></div>; }
-
+function DetailTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button type="button" aria-pressed={active} className={clsx('whitespace-nowrap border-b-2 px-1 pb-3 pt-1 text-sm font-semibold transition-colors focus-visible:outline-blue-600', active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900')} onClick={onClick}>{children}</button>;
+}
 function ReviseDialog({ item, pending, onClose, onSubmit }: { item: BOQItem | null; pending: boolean; onClose: () => void; onSubmit: (reason: string) => void }) {
   const [reason, setReason] = useState('');
   useEffect(() => setReason(''), [item]);

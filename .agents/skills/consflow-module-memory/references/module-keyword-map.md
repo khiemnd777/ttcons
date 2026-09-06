@@ -1,5 +1,12 @@
 # Consflow Module Keyword Map
 
+## Record Detail Presentation
+
+- Keywords: giao diện sơ sài, dialog demo, detail redesign, phân cấp hồ sơ, `Chi tiết dòng BOQ`, chi tiết yêu cầu mua. Shared owners: `components/RecordDetailLayout.tsx`, `recordDetail.css`, `RecordDetailDialog.tsx`; primary consumers: `BOQPage::BOQDetail`, `ProcurementPage::ProcurementDetail`, `ActivityTopicDetails.tsx`. First searches: `RecordSummary|RecordSection|RecordTable|topicSections|RecordDetailFields`.
+- Read-only detail surfaces lead with record identity, persisted status and a source-backed primary value. Metadata uses labelled rows/groups rather than equal boxed cards. Procurement, quotation and stock document detail share `RecordTable`: actual container widths below 48rem show labelled row cards; wider containers show a table. No new query, permission, workflow transition or financial/stock calculation is introduced.
+- BOQ retains four tabs and caller-owned price/navigation capabilities. Topic viewers retain actor/project/source checks and their mounted discussion. Quality checklists use numbered disclosures; legacy AP/AR/payment remain discussion previews. Partner, role, rework/replanning and Audit use explicit summary/section configuration; Audit IDs/JSON default collapsed. Planning daily reports, meeting minutes and checklists lead with their content and share `_shared/PlanningRecordContext` for collapsed process/artifact metadata.
+- Tests: `recordDetailPresentation.test.ts` executes React server renders with fixed fixtures, not browser acceptance. Pair frontend detail map and Commercial, Materials, Quality, Project Planning, Accounting and Admin maps when modifying these viewers.
+
 ## Project Discussion Record Topics
 
 - Keywords: `Gắn vào`, topic/chủ đề, `Sơn nội thất`, hồ sơ không có liên kết, bỏ `Thành viên công trình`. Owners: `modules/work-items/{ActivityTopic,ActivityTopicDetails,ActivityComposer,ActivityThread}.tsx`, `activityTopicDomain.ts`, `modules/utilities/UtilityDock.tsx`; reused `BOQPage::BOQDetail`, `ProcurementPage::ProcurementDetail`, `components/RecordDetailDialog::RecordDetailFields`.
