@@ -468,6 +468,7 @@ function ChecklistItemDialog({ selected, record, onClose }: { selected: Selected
     if (!evidenceId) return;
     setViewerReference({
       id: evidenceId,
+      record: evidence,
       name: evidence?.name || evidence?.title || item.evidence_name || 'Minh chứng nghiệm thu',
       mimeType: evidence?.mime_type,
       evidenceType: evidence?.evidence_type,

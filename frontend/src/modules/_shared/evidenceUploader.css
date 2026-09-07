@@ -1,0 +1,18 @@
+.evidence-uploader { container-type: inline-size; }
+.evidence-upload-header,
+.evidence-upload-index { display: none; }
+.evidence-upload-row { display: grid; gap: 8px; }
+.evidence-upload-row > * { min-width: 0; }
+
+/* The same table is embedded in full pages, dialogs and narrow checklist panels. */
+@container (min-width: 56rem) {
+  .evidence-upload-header,
+  .evidence-upload-row {
+    display: grid;
+    grid-template-columns: 2rem minmax(14rem, 1.4fr) 7rem minmax(9rem, 1fr) minmax(9rem, 1fr) 10rem;
+    gap: 8px;
+    align-items: start;
+  }
+  .evidence-upload-index { display: block; }
+  .evidence-upload-field-label { display: none; }
+}

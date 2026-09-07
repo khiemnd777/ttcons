@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Camera, ClipboardCheck, Eye, FileText, Image as ImageIcon, Loader2, Package, Plus, RefreshCw, Send, Trash2, Users, Wrench } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, Eye, FileText, Image as ImageIcon, Loader2, Package, Plus, RefreshCw, Send, Trash2, Users, Wrench } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog } from '../../components/Dialog';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -12,7 +12,6 @@ import { openProtectedBlob } from '../../lib/utils/openProtectedBlob';
 import { isProtectedStorageProvider } from '../../lib/utils/protectedStorage';
 import { statusLabel } from '../../lib/utils/status';
 import {
-  EvidenceDraftViewerDialog,
   EvidenceRecordViewerDialog,
   isImageEvidence,
   isInlinePdfEvidence,
@@ -21,17 +20,16 @@ import {
 } from '../_shared/EvidenceRecordViewerDialog';
 import { useEvidencePreviewUrls } from '../work-items/EvidenceGallery';
 import { ConstructionEvidenceCapture, type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
-import { ConstructionReportLinkedComposer, createReportLinkedDraft, reportLinkedSubmitLabel, validateReportLinkedDrafts, type ReportLinkedDraft } from './ConstructionReportLinkedComposer';
+import { ConstructionReportLinkedComposer, createReportLinkedDraft, validateReportLinkedDrafts, type ReportLinkedDraft } from './ConstructionReportLinkedComposer';
 import { constructionReportEditModel } from './constructionReportViewModel';
 import { useWorkReportRecipients } from './useWorkReportRecipients';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
+import './constructionReport.css';
 
 type CrewDraft = { crew_name: string; worker_count: string; work_hours: string; note: string };
 type MaterialDraft = { material_name: string; quantity: string; unit: string; note: string };
 type BlockerDraft = { id: string; content: string };
-type ReportEvidenceViewer =
-  | { source: 'stored'; record: EvidenceRecord }
-  | { source: 'draft'; draft: ConstructionEvidenceUploadDraft; previewURL: string };
+type ReportEvidenceViewer = { source: 'stored'; record: EvidenceRecord };
 export type ConstructionDailyReportCreatePayload = {
   report_date: string;
   weather: string;
@@ -58,6 +56,7 @@ export type ConstructionDailyReportCreatePayload = {
 type ConstructionReportFormDialogProps = {
   open: boolean;
   projectId: string;
+  projectName?: string;
   mode?: 'create' | 'edit';
   record?: Record<string, any> | null;
   suggestion?: Record<string, any> | null;
@@ -69,7 +68,7 @@ type ConstructionReportFormDialogProps = {
   onSubmit: (payload: ConstructionDailyReportCreatePayload, uploads: ConstructionEvidenceUploadDraft[], linkedDrafts: ReportLinkedDraft[]) => Promise<unknown>;
 };
 
-export function ConstructionReportFormDialog({ open, projectId, mode = 'create', record = null, suggestion = null, workspace, canCreateCheck = false, canCreateAction = false, canSubmitWorkReport = false, onClose, onSubmit }: ConstructionReportFormDialogProps) {
+export function ConstructionReportFormDialog({ open, projectId, projectName = '', mode = 'create', record = null, suggestion = null, workspace, canCreateCheck = false, canCreateAction = false, canSubmitWorkReport = false, onClose, onSubmit }: ConstructionReportFormDialogProps) {
   const toast = useToast();
   const [reportDate, setReportDate] = useState(todayText());
   const [weather, setWeather] = useState('Nắng');
@@ -96,11 +95,21 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   const [evidenceViewer, setEvidenceViewer] = useState<ReportEvidenceViewer | null>(null);
   const [recipientId, setRecipientId] = useState('');
   const [deliveryComment, setDeliveryComment] = useState('');
+  const [dirty, setDirty] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [recipientEditing, setRecipientEditing] = useState(false);
+  const [validationAttempt, setValidationAttempt] = useState(0);
+  const [formSession, setFormSession] = useState(0);
+  const initialized = useRef('');
   const formRef = useRef<HTMLFormElement | null>(null);
   const navigateToValidation = useValidationNavigation(formRef);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { initialized.current = ''; return; }
+    const identity = `${projectId}:${mode}:${record?.id ?? 'new'}`;
+    if (initialized.current === identity) return;
+    initialized.current = identity;
+    setFormSession((session) => session + 1);
     const initial = mode === 'edit' && record ? constructionReportEditModel(record) : null;
     const suggested = mode === 'create' && suggestion ? constructionReportEditModel(suggestion) : null;
     setReportDate(initial?.reportDate || todayText());
@@ -128,7 +137,18 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
     setEvidenceViewer(null);
     setRecipientId(String(record?.delivery_recipient_id ?? ''));
     setDeliveryComment('');
-  }, [mode, open, record, suggestion]);
+    setDirty(false);
+    setDiscardOpen(false);
+    setRecipientEditing(false);
+    setValidationAttempt(0);
+  }, [mode, open, projectId, record, suggestion]);
+
+  useEffect(() => {
+    if (!open || !dirty) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => window.removeEventListener('beforeunload', beforeUnload);
+  }, [open, dirty]);
 
   const operations = useQuery({
     queryKey: ['project-operations', projectId, 'full'],
@@ -186,6 +206,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   }
 
   function toggleEvidence(id: string) {
+	    setDirty(true);
 	    clearError('evidence_ids');
     setSelectedEvidenceIds((current) => {
       if (current.includes(id)) {
@@ -205,6 +226,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   }
 
   function setBlockerRelation(blocker: BlockerDraft, kind: ReportLinkedDraft['kind'] | null) {
+    setDirty(true);
     setLinkedDrafts((current) => {
       const withoutCurrent = current.filter((draft) => draft.source_blocker_key !== blocker.id);
       if (!kind) return withoutCurrent;
@@ -213,6 +235,7 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   }
 
   function removeBlocker(id: string) {
+    setDirty(true);
     setBlockers((current) => current.length === 1 ? [emptyBlocker()] : current.filter((item) => item.id !== id));
     setLinkedDrafts((current) => current.filter((draft) => draft.source_blocker_key !== id));
   }
@@ -235,16 +258,19 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const deliveryMode: 'draft' | 'submit' = mayDeliver && submitter?.value === 'submit' ? 'submit' : 'draft';
     const nextErrors = validateReport({ reportDate, weather, progressPercent, doneItems, crewItems, materialItems });
 	    if (!workItemId) nextErrors.work_item_id = 'Hạng mục thi công đang thực hiện';
 	    if (!hasPhotoEvidence) nextErrors.evidence_ids = 'Ít nhất một ảnh hiện trường';
+    if (selectedEvidenceIds.length + uploads.length > 50) nextErrors.evidence_ids = 'Tối đa 50 ảnh/tệp cho mỗi báo cáo';
     if (deliveryMode === 'submit' && !recipientId) nextErrors.delivery_recipient_id = 'Người nhận báo cáo';
     const linkedErrors = mode === 'create' ? validateReportLinkedDrafts(linkedDrafts, workItemId, selectedEvidenceIds.length + uploads.length > 0) : [];
     if (linkedErrors.length) setShowLinkedErrors(true);
     if (Object.keys(nextErrors).length || linkedErrors.length) {
       setErrors(nextErrors);
+      setValidationAttempt((attempt) => attempt + 1);
       const linkedSummary = linkedErrors.length ? `${linkedErrors.length} kiểm tra/việc xử lý chưa đủ thông tin` : '';
       toast.warn({ title: 'Kiểm tra báo cáo', description: `Thiếu hoặc sai: ${[...Object.values(nextErrors), linkedSummary].filter(Boolean).join(', ')}` });
       navigateToValidation({ prepare: () => {
@@ -303,18 +329,17 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
   }
 
   function closeReportDialog() {
+    if (saving) return;
     if (evidenceViewer) {
       setEvidenceViewer(null);
       return;
     }
+    if (dirty) { setDiscardOpen(true); return; }
     onClose();
   }
 
   const viewerRecord = evidenceViewer?.source === 'stored' ? evidenceViewer.record : null;
-  const viewerDraft = evidenceViewer?.source === 'draft' ? evidenceViewer.draft : null;
-  const viewerPreviewURL = evidenceViewer?.source === 'draft'
-    ? evidenceViewer.previewURL
-    : viewerRecord
+  const viewerPreviewURL = viewerRecord
       ? selectedEvidencePreviews.urls[viewerRecord.id] || (!viewerRecord.storage_key ? viewerRecord.file_url : undefined)
       : undefined;
   const viewerLoading = Boolean(viewerRecord && selectedEvidencePreviews.loadingIds.has(viewerRecord.id));
@@ -325,119 +350,118 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
       <Dialog
         open={open}
         title={mode === 'edit' ? 'Chỉnh sửa báo cáo thi công' : 'Báo cáo thi công hôm nay'}
-        description={mode === 'edit' ? 'Cập nhật nội dung báo cáo; các liên kết đã tạo vẫn giữ nguyên lịch sử.' : 'Ghi hiện trường và tạo ngay kiểm tra hoặc việc xử lý trong một lần lưu.'}
+        description={projectName || undefined}
         size="report"
+        mobileFullscreen
+        manageFocus
         onClose={closeReportDialog}
         footer={(
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button type="button" disabled={saving} className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60" onClick={closeReportDialog}>Hủy</button>
-            {mayDeliver ? <button type="submit" form="construction-report-form" name="delivery_mode" value="draft" disabled={saving} className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60">{saving ? 'Đang lưu...' : 'Lưu nháp'}</button> : null}
-            <button type="submit" form="construction-report-form" name="delivery_mode" value={mayDeliver ? 'submit' : 'draft'} disabled={saving || (mayDeliver && (recipients.isLoading || !selectedRecipient))} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : mayDeliver ? <Send className="h-4 w-4" /> : null}{saving ? 'Đang lưu...' : mayDeliver ? deliverySubmitLabel : mode === 'edit' ? 'Lưu thay đổi' : reportLinkedSubmitLabel(linkedDrafts)}
+          <div className={clsx('report-actions', !mayDeliver && 'report-actions-single')}>
+            <button type="button" disabled={saving} className="report-cancel rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60" onClick={closeReportDialog}>Hủy</button>
+            {mayDeliver ? <button type="submit" form="construction-report-form" name="delivery_mode" value="draft" disabled={saving} className="inline-flex items-center justify-center rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60">Lưu nháp</button> : null}
+            <button type="submit" form="construction-report-form" name="delivery_mode" value={mayDeliver ? 'submit' : 'draft'} disabled={saving || (mayDeliver && (recipients.isLoading || !selectedRecipient))} aria-label={mayDeliver ? deliverySubmitLabel : undefined} className="report-primary inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+              {saving ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : mayDeliver ? <Send className="h-4 w-4 shrink-0" /> : null}
+              <span>{saving ? 'Đang lưu...' : mayDeliver ? (deliveryStatus === 'needs_changes' ? 'Lưu & gửi lại' : 'Lưu & gửi') : mode === 'edit' ? 'Lưu thay đổi' : 'Lưu báo cáo'}</span>
             </button>
           </div>
         )}
       >
-      <form ref={formRef} id="construction-report-form" className="space-y-5" noValidate onSubmit={handleSubmit}>
-        <section className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <form key={formSession} ref={formRef} id="construction-report-form" className="construction-report-form min-w-0 space-y-5" noValidate onChangeCapture={() => setDirty(true)} onSubmit={handleSubmit}>
+          <fieldset disabled={saving} className="min-w-0 space-y-5">
+          <section className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <Field label="Hạng mục thi công" required error={errors.work_item_id} helper={willAutoStartWorkItem ? 'Khi lưu báo cáo, hạng mục sẽ chuyển sang “Đang làm”.' : undefined}>
+              <select disabled={operations.isLoading || operations.isError || saving} className={inputClass(Boolean(errors.work_item_id))} value={workItemId} onChange={(event) => selectWorkItem(event.target.value)}>
+                <option value="">{operations.isLoading ? 'Đang tải hạng mục...' : operations.isError ? 'Không tải được hạng mục' : workItems.length ? 'Chọn hạng mục' : 'Chưa có hạng mục Thi công khả dụng'}</option>
+                {workItems.map((item) => <option key={item.id} value={item.id}>{item.title} · {statusLabel(item.status)}</option>)}
+              </select>
+            </Field>
             <Field label="Ngày báo cáo" required error={errors.report_date}>
               <input type="date" className={inputClass(Boolean(errors.report_date))} value={reportDate} onChange={(event) => { setReportDate(event.target.value); clearError('report_date'); }} />
             </Field>
+            {operations.isError ? <InlineError message="Không tải được danh sách công việc." onRetry={() => operations.refetch()} /> : null}
+            {operations.isSuccess && !workItems.length ? <p className="text-sm text-amber-800 md:col-span-2">Chưa có hạng mục Thi công khả dụng. Cần hạng mục đang hoạt động để lưu báo cáo.</p> : null}
+          </section>
+
+          <section data-validation-error={errors.evidence_ids ? 'true' : undefined} className="min-w-0 scroll-mt-4 rounded-md">
+            <SectionTitle title={'Ảnh hiện trường · ' + (selectedEvidenceIds.length + uploads.length)} description="Cần ít nhất một ảnh hiện trường." />
+            <div className="mt-3 min-w-0 space-y-3">
+              {!workItemId && workItems.length > 1 ? <p className="text-xs text-slate-600">Có thể chụp trước; chọn hạng mục trước khi lưu báo cáo.</p> : null}
+              <ConstructionEvidenceCapture uploadScope={`/work-items/${workItemId}/evidence/upload`} drafts={uploads} onChange={(next) => { setUploads(next); setDirty(true); clearError('evidence_ids'); }} hasSource={Boolean(workItemId)} disabled={saving} maxFiles={Math.max(0, 50 - selectedEvidenceIds.length)} hint="Ảnh/tệp sẽ được tải lên khi lưu báo cáo." />
+              {workItemId && evidence.isLoading ? <LoadingSpinner label="Đang tải ảnh đã có..." /> : null}
+              {workItemId && evidence.isError ? <InlineError message="Không tải được ảnh đã có." onRetry={() => evidence.refetch()} /> : null}
+              {workItemId && evidence.isSuccess && evidenceOptions.length ? <details className="min-w-0 rounded-lg border border-line p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Ảnh/tệp đã có · {selectedEvidenceIds.length} đã chọn</summary><div className="mt-3 grid min-w-0 gap-2 md:grid-cols-2">{evidenceOptions.map((record) => <ExistingEvidenceOption key={record.id} record={record} selected={selectedEvidenceIds.includes(record.id)} primary={primaryEvidenceId === record.id} previewURL={selectedEvidencePreviews.urls[record.id]} previewPending={selectedEvidencePreviews.loadingIds.has(record.id)} previewFailed={selectedEvidencePreviews.errorIds.has(record.id)} onToggle={() => toggleEvidence(record.id)} onPrimary={() => { setPrimaryEvidenceId(record.id); setDirty(true); }} onOpen={() => isImageEvidence(record) || isInlinePdfEvidence(record) || isInlineWordEvidence(record) || isInlineSpreadsheetEvidence(record) ? setEvidenceViewer({ source: 'stored', record }) : void openEvidenceFile(record)} onRetry={() => setEvidencePreviewRetryKey((current) => current + 1)} />)}</div></details> : null}
+              {errors.evidence_ids ? <p role="alert" className="text-sm font-medium text-rose-700">{errors.evidence_ids}</p> : null}
+            </div>
+          </section>
+
+          <section data-validation-error={errors.done_items ? 'true' : undefined} className="min-w-0 scroll-mt-4 rounded-md">
+            <SectionTitle title="Công việc trong ngày" />
+            <div className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-line bg-slate-50 p-1" aria-label="Nhóm công việc">
+              {([
+                ['done', 'Đã làm', doneItems],
+                ['current', 'Đang làm', currentItems],
+                ['next', 'Sẽ làm', nextItems],
+              ] as const).map(([key, label, values]) => <button key={key} type="button" aria-pressed={workGroup === key} className={clsx('min-w-0 rounded-md px-1 py-2 text-sm font-semibold', workGroup === key ? 'bg-white text-blue-700 shadow-sm ring-1 ring-inset ring-line' : 'text-slate-500 hover:text-slate-700')} onClick={() => setWorkGroup(key)}>{label}{key === 'done' ? <span className="text-rose-600"> *</span> : null} <span className="text-xs">{values.filter((item) => item.trim()).length}</span></button>)}
+            </div>
+            <div className="mt-3">
+              {workGroup === 'done' ? <TextListEditor title="Đã làm" required values={doneItems} onChange={(values) => { setDoneItems(values); setDirty(true); clearError('done_items'); }} tone="green" error={errors.done_items} addLabel="Thêm công việc" /> : null}
+              {workGroup === 'current' ? <TextListEditor title="Đang làm" values={currentItems} onChange={(values) => { setCurrentItems(values); setDirty(true); }} tone="blue" addLabel="Thêm công việc" /> : null}
+              {workGroup === 'next' ? <TextListEditor title="Sẽ làm" values={nextItems} onChange={(values) => { setNextItems(values); setDirty(true); }} tone="slate" addLabel="Thêm kế hoạch" /> : null}
+            </div>
+          </section>
+
+          <section className="grid min-w-0 grid-cols-2 gap-3">
             <Field label="Thời tiết" required error={errors.weather}>
               <select className={inputClass(Boolean(errors.weather))} value={weather} onChange={(event) => { setWeather(event.target.value); clearError('weather'); }}>
                 {['Nắng', 'Ít mây', 'Nhiều mây', 'Mưa', 'Gió mạnh', 'Hạn chế mặt bằng'].map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </Field>
-            <Field label="Tiến độ báo cáo (%)" required error={errors.progress_percent}>
-              <input type="number" min={0} max={100} className={inputClass(Boolean(errors.progress_percent))} value={progressPercent} onChange={(event) => { setProgressPercent(event.target.value); clearError('progress_percent'); }} />
+            <Field label="Tiến độ (%)" required error={errors.progress_percent}>
+              <input type="number" inputMode="decimal" min={0} max={100} className={inputClass(Boolean(errors.progress_percent))} value={progressPercent} onChange={(event) => { setProgressPercent(event.target.value); clearError('progress_percent'); }} />
             </Field>
-            <Field label="Hạng mục thi công" required error={errors.work_item_id} helper={willAutoStartWorkItem ? 'Khi lưu báo cáo, hạng mục sẽ chuyển sang “Đang làm”.' : 'Chỉ hiển thị hạng mục thuộc Node Thi công đang hoạt động.'}>
-              <select disabled={operations.isLoading || operations.isError} className={inputClass(Boolean(errors.work_item_id))} value={workItemId} onChange={(event) => selectWorkItem(event.target.value)}>
-                <option value="">{operations.isLoading ? 'Đang tải hạng mục...' : operations.isError ? 'Không tải được hạng mục' : workItems.length ? 'Chọn hạng mục' : 'Chưa có hạng mục Thi công khả dụng'}</option>
-                {workItems.map((item) => <option key={item.id} value={item.id}>{item.title} · {statusLabel(item.status)}</option>)}
-              </select>
-            </Field>
-          </div>
-          {operations.isError ? <div className="mt-3"><InlineError message="Không tải được danh sách công việc." onRetry={() => operations.refetch()} /></div> : null}
-        </section>
-
-        <div className={clsx('grid gap-5', mode === 'create' && (canCreateCheck || canCreateAction) && 'xl:grid-cols-[minmax(0,1fr)_22rem]')}>
-          <div className="space-y-5">
-            <section data-validation-error={errors.done_items ? 'true' : undefined} className="scroll-mt-24 rounded-md">
-	              <SectionTitle title="Công việc trong ngày" description="Ghi các hạng mục đã làm, đang làm và kế hoạch tiếp theo trong ngày." />
-              <div className="mt-3 flex gap-1 overflow-x-auto rounded-lg border border-line bg-slate-50 p-1">
-                {([
-                  ['done', 'Đã làm', doneItems],
-                  ['current', 'Đang làm', currentItems],
-                  ['next', 'Sẽ làm', nextItems],
-                ] as const).map(([key, label, values]) => <button key={key} type="button" className={clsx('shrink-0 rounded-md px-3 py-2 text-sm font-semibold', workGroup === key ? 'bg-white text-blue-700 shadow-sm ring-1 ring-inset ring-line' : 'text-slate-500 hover:text-slate-700')} onClick={() => setWorkGroup(key)}>{label} <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px]">{values.filter((item) => item.trim()).length}</span></button>)}
-              </div>
-              <div className="mt-3">
-                {workGroup === 'done' ? <TextListEditor title="Đã làm" required values={doneItems} onChange={(values) => { setDoneItems(values); clearError('done_items'); }} tone="green" error={errors.done_items} addLabel="Thêm hạng mục" /> : null}
-                {workGroup === 'current' ? <TextListEditor title="Đang làm" values={currentItems} onChange={setCurrentItems} tone="blue" addLabel="Thêm hạng mục" /> : null}
-                {workGroup === 'next' ? <TextListEditor title="Sẽ làm" values={nextItems} onChange={setNextItems} tone="slate" addLabel="Thêm kế hoạch" /> : null}
-              </div>
-            </section>
-
-            <section>
-              <SectionTitle title="Vấn đề phát sinh" description="Ghi nhận blocker và chọn ngay bước tiếp theo nếu cần." />
-              <BlockerEditor rows={blockers} drafts={linkedDrafts} canCreateCheck={mode === 'create' && canCreateCheck} canCreateAction={mode === 'create' && canCreateAction} disabled={!workspace} onChange={setBlockerContent} onRelation={setBlockerRelation} onRemove={removeBlocker} onAdd={() => setBlockers((current) => [...current, emptyBlocker()])} />
-            </section>
-
-            <section data-validation-error={errors.evidence_ids ? 'true' : undefined} className="scroll-mt-24 rounded-md">
-	              <SectionTitle title={`Minh chứng · ${selectedEvidenceIds.length + uploads.length}`} description="Bắt buộc ít nhất một ảnh hiện trường; kiểm tra và việc xử lý sẽ dùng lại minh chứng này." />
-              <div className="mt-3 space-y-3">
-	                {!workItemId ? <InfoState title="Chưa chọn hạng mục thi công" description="Chọn hạng mục đang thực hiện trước khi chụp hoặc tải ảnh hiện trường." /> : null}
-                {workItemId && evidence.isLoading ? <LoadingSpinner label="Đang tải minh chứng của công việc..." /> : null}
-                {workItemId && evidence.isError ? <InlineError message="Không tải được minh chứng của công việc." onRetry={() => evidence.refetch()} /> : null}
-	                {workItemId && evidence.isSuccess && evidenceOptions.length ? <details className="rounded-lg border border-line bg-slate-50 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Chọn từ minh chứng đã có · {selectedEvidenceIds.length} đã chọn</summary><div className="mt-3 grid gap-2 sm:grid-cols-2">{evidenceOptions.map((record) => <ExistingEvidenceOption key={record.id} record={record} selected={selectedEvidenceIds.includes(record.id)} primary={primaryEvidenceId === record.id} previewURL={selectedEvidencePreviews.urls[record.id]} previewPending={selectedEvidencePreviews.loadingIds.has(record.id)} previewFailed={selectedEvidencePreviews.errorIds.has(record.id)} onToggle={() => toggleEvidence(record.id)} onPrimary={() => setPrimaryEvidenceId(record.id)} onOpen={() => isImageEvidence(record) || isInlinePdfEvidence(record) || isInlineWordEvidence(record) || isInlineSpreadsheetEvidence(record) ? setEvidenceViewer({ source: 'stored', record }) : void openEvidenceFile(record)} onRetry={() => setEvidencePreviewRetryKey((current) => current + 1)} />)}</div></details> : null}
-	                <ConstructionEvidenceCapture drafts={uploads} onChange={(next) => { setUploads(next); clearError('evidence_ids'); }} hasSource={Boolean(workItemId)} disabled={saving} hint="Ảnh được tải lên theo hạng mục trước khi lưu báo cáo; nếu lưu thất bại, ảnh vẫn được giữ trong hồ sơ hạng mục." onPreviewPhoto={(draft, previewURL) => setEvidenceViewer({ source: 'draft', draft, previewURL })} />
-	                {errors.evidence_ids ? <p className="text-xs font-medium text-rose-700">{errors.evidence_ids}</p> : null}
-              </div>
-            </section>
-
-            <details className="rounded-lg border border-line bg-white p-4" open={mode === 'edit' || Boolean(errors.crew_items || errors.material_items)}>
-              <summary className="cursor-pointer font-semibold text-ink">Thông tin bổ sung <span className="ml-2 text-xs font-normal text-slate-500">Nhân công, vật tư và ghi chú</span></summary>
-              <div className="mt-4 space-y-5">
-	                <section><SectionTitle title="Nguồn lực sử dụng" description="Nhân công và vật tư được lưu thành danh sách có cấu trúc." /><div className="mt-3 space-y-4"><CrewEditor rows={crewItems} onChange={(rows) => { setCrewItems(rows); clearError('crew_items'); }} error={errors.crew_items} /><MaterialEditor rows={materialItems} onChange={(rows) => { setMaterialItems(rows); clearError('material_items'); }} error={errors.material_items} /></div>{manpowerSummary || materialSummary ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800"><strong>Dữ liệu tóm tắt cũ được giữ nguyên:</strong>{manpowerSummary ? ` Nhân công: ${manpowerSummary}.` : ''}{materialSummary ? ` Vật tư: ${materialSummary}.` : ''}</div> : null}</section>
-                <section><SectionTitle title="Ghi chú hiện trường" description="Thông tin bổ sung, không tự động tính là blocker." /><textarea className={clsx(inputClass(false), 'mt-3 min-h-24')} value={fieldNotes} onChange={(event) => setFieldNotes(event.target.value)} placeholder="Ví dụ: Không có sự cố an toàn; khu vực đã được vệ sinh cuối ca." /></section>
-              </div>
-            </details>
-          </div>
-
-          {mode === 'create' && (canCreateCheck || canCreateAction) ? <ConstructionReportLinkedComposer mode="batch" drafts={linkedDrafts} onChange={setLinkedDrafts} workspace={workspace} sourceWorkItemId={workItemId} reportEvidence={selectedEvidence} reportEvidencePending={uploads.length > 0} primaryEvidenceId={primaryEvidenceId} canCreateCheck={canCreateCheck} canCreateAction={canCreateAction} showValidation={showLinkedErrors} /> : null}
-        </div>
-        {mayDeliver ? (
-          <section data-validation-error={errors.delivery_recipient_id ? 'true' : undefined} className={clsx('scroll-mt-24 rounded-lg border bg-blue-50/50 p-4', errors.delivery_recipient_id ? 'border-rose-300' : 'border-blue-200')} aria-labelledby="construction-report-delivery-heading">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-              <div>
-                <h3 id="construction-report-delivery-heading" className="font-semibold text-ink">Gửi báo cáo</h3>
-                <p className="mt-0.5 text-xs leading-5 text-slate-600">Gửi ngay trong Thi công; sổ Báo cáo sẽ lưu bản gửi và lịch sử phản hồi bất biến.</p>
-              </div>
-              {deliveryStatus === 'needs_changes' ? <span className="self-start rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">Gửi lại sau yêu cầu bổ sung</span> : null}
-            </div>
-            {deliveryStatus === 'needs_changes' && record?.delivery_review_comment ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"><strong>Nội dung cần bổ sung:</strong> {String(record.delivery_review_comment)}</div> : null}
-            {recipients.isLoading ? <div className="mt-3"><LoadingSpinner label="Đang xác định người nhận báo cáo..." /></div> : null}
-            {recipients.isError ? <div className="mt-3"><InlineError message="Không tải được người nhận báo cáo. Bạn vẫn có thể lưu nháp." onRetry={() => recipients.refetch()} /></div> : null}
-            {recipients.isSuccess && recipients.data.length === 0 ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">Chưa có người quản lý đủ quyền nhận báo cáo. Báo cáo chỉ có thể lưu nháp.</div> : null}
-            {recipients.isSuccess && recipients.data.length > 0 ? (
-              <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-                <Field label="Gửi đến" required error={errors.delivery_recipient_id} helper={selectedRecipient?.recommendation_reason === 'project_pm' ? 'PM chính của công trình được đề xuất tự động.' : selectedRecipient?.recommendation_reason === 'only_eligible_recipient' ? 'Người nhận hợp lệ duy nhất được đề xuất tự động.' : undefined}>
-                  <select className={inputClass(Boolean(errors.delivery_recipient_id))} value={recipientId} onChange={(event) => { setRecipientId(event.target.value); clearError('delivery_recipient_id'); }}>
-                    <option value="">Chọn người nhận báo cáo</option>
-                    {recipients.data.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.full_name}{recipient.position ? ` · ${recipient.position}` : ''}{recipient.is_recommended ? ' · Đề xuất' : ''}</option>)}
-                  </select>
-                </Field>
-                <details className="rounded-md border border-blue-100 bg-white px-3 py-2">
-                  <summary className="cursor-pointer text-sm font-semibold text-blue-700">Thêm ghi chú khi gửi <span className="font-normal text-slate-500">(tùy chọn)</span></summary>
-                  <textarea className={clsx(inputClass(false), 'mt-3 min-h-20')} maxLength={2000} value={deliveryComment} onChange={(event) => setDeliveryComment(event.target.value)} placeholder="Nội dung cần người nhận lưu ý..." />
-                </details>
-              </div>
-            ) : null}
           </section>
-        ) : null}
+
+          <ReportDisclosure title="Vấn đề & xử lý" summary={blockers.filter((item) => item.content.trim()).length + ' vấn đề · ' + linkedDrafts.length + ' việc'} reveal={validationAttempt} forceOpen={showLinkedErrors || blockers.some((item) => Boolean(item.content.trim())) || linkedDrafts.length > 0}>
+            <BlockerEditor rows={blockers} drafts={linkedDrafts} canCreateCheck={mode === 'create' && canCreateCheck} canCreateAction={mode === 'create' && canCreateAction} disabled={!workspace || saving} onChange={setBlockerContent} onRelation={setBlockerRelation} onRemove={removeBlocker} onAdd={() => { setBlockers((current) => [...current, emptyBlocker()]); setDirty(true); }} />
+            {mode === 'create' && (canCreateCheck || canCreateAction) ? <ConstructionReportLinkedComposer embedded mode="batch" drafts={linkedDrafts} onChange={(next) => { setLinkedDrafts(next); setDirty(true); }} workspace={workspace} sourceWorkItemId={workItemId} reportEvidence={selectedEvidence} reportEvidencePending={uploads.length > 0} primaryEvidenceId={primaryEvidenceId} canCreateCheck={canCreateCheck} canCreateAction={canCreateAction} showValidation={showLinkedErrors} /> : null}
+          </ReportDisclosure>
+
+          <div className="min-w-0 space-y-3">
+            <CrewEditor rows={crewItems} onChange={(rows) => { setCrewItems(rows); setDirty(true); clearError('crew_items'); }} error={errors.crew_items} reveal={validationAttempt} />
+            <MaterialEditor rows={materialItems} onChange={(rows) => { setMaterialItems(rows); setDirty(true); clearError('material_items'); }} error={errors.material_items} reveal={validationAttempt} />
+            {manpowerSummary || materialSummary ? <p className="text-xs leading-5 text-slate-600"><strong>Tóm tắt đã ghi:</strong>{manpowerSummary ? ' Nhân công: ' + manpowerSummary + '.' : ''}{materialSummary ? ' Vật tư: ' + materialSummary + '.' : ''}</p> : null}
+          </div>
+          <ReportDisclosure title="Ghi chú" forceOpen={Boolean(fieldNotes.trim())}>
+            <textarea aria-label="Ghi chú hiện trường" className={clsx(inputClass(false), 'min-h-24')} value={fieldNotes} onChange={(event) => setFieldNotes(event.target.value)} placeholder="Thông tin khác cần lưu ý tại hiện trường..." />
+          </ReportDisclosure>
+
+          {mayDeliver ? (
+            <section data-validation-error={errors.delivery_recipient_id ? 'true' : undefined} className={clsx('min-w-0 scroll-mt-4 border-t pt-4', errors.delivery_recipient_id ? 'border-rose-300' : 'border-line')} aria-label="Gửi báo cáo">
+              {deliveryStatus === 'needs_changes' ? <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"><strong>Gửi lại sau yêu cầu bổ sung</strong>{record?.delivery_review_comment ? ': ' + String(record.delivery_review_comment) : ''}</p> : null}
+              {recipients.isLoading ? <LoadingSpinner label="Đang xác định người nhận báo cáo..." /> : null}
+              {recipients.isError ? <InlineError message="Không tải được người nhận báo cáo. Bạn vẫn có thể lưu nháp." onRetry={() => recipients.refetch()} /> : null}
+              {recipients.isSuccess && recipients.data.length === 0 ? <p className="text-sm text-amber-800">Chưa có người quản lý đủ quyền nhận báo cáo. Báo cáo chỉ có thể lưu nháp.</p> : null}
+              {recipients.isSuccess && recipients.data.length > 0 ? (
+                <>
+                  {selectedRecipient && !recipientEditing && !errors.delivery_recipient_id ? <div className="flex min-w-0 items-center justify-between gap-3"><p className="min-w-0 break-words text-sm text-slate-700">Gửi đến: <strong>{selectedRecipient.full_name}</strong>{selectedRecipient.position ? ' · ' + selectedRecipient.position : ''}</p><button type="button" className="shrink-0 px-3 py-2 text-sm font-semibold text-blue-700" onClick={() => setRecipientEditing(true)}>Đổi</button></div> : <Field label="Gửi đến" required error={errors.delivery_recipient_id}>
+                    <select className={inputClass(Boolean(errors.delivery_recipient_id))} value={recipientId} onChange={(event) => { setRecipientId(event.target.value); clearError('delivery_recipient_id'); }}>
+                      <option value="">Chọn người nhận báo cáo</option>
+                      {recipients.data.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.full_name}{recipient.position ? ' · ' + recipient.position : ''}{recipient.is_recommended ? ' · Đề xuất' : ''}</option>)}
+                    </select>
+                  </Field>}
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-sm text-slate-600">Ghi chú khi gửi (tùy chọn)</summary>
+                    <textarea aria-label="Ghi chú khi gửi" className={clsx(inputClass(false), 'min-h-20')} maxLength={2000} value={deliveryComment} onChange={(event) => setDeliveryComment(event.target.value)} placeholder="Nội dung cần người nhận lưu ý..." />
+                  </details>
+                </>
+              ) : null}
+            </section>
+          ) : null}
+          </fieldset>
         </form>
+      </Dialog>
+      <Dialog open={open && discardOpen} title="Bỏ thay đổi chưa lưu?" description="Nội dung vừa nhập và ảnh chưa tải lên sẽ bị bỏ." size="sm" manageFocus onClose={() => setDiscardOpen(false)} footer={<div className="grid grid-cols-2 gap-2"><button type="button" className="min-h-11 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold" onClick={() => setDiscardOpen(false)}>Tiếp tục nhập</button><button type="button" className="min-h-11 rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => { setDiscardOpen(false); setDirty(false); onClose(); }}>Bỏ thay đổi</button></div>}>
+        <p className="text-sm text-slate-600">Chọn “Tiếp tục nhập” để quay lại báo cáo.</p>
       </Dialog>
       <EvidenceRecordViewerDialog
         record={viewerRecord}
@@ -447,16 +471,6 @@ export function ConstructionReportFormDialog({ open, projectId, mode = 'create',
         showWorkItem
         onOpenFile={viewerRecord ? () => void openEvidenceFile(viewerRecord) : undefined}
         onRetry={viewerRecord ? () => setEvidencePreviewRetryKey((current) => current + 1) : undefined}
-        onClose={() => setEvidenceViewer(null)}
-      />
-      <EvidenceDraftViewerDialog
-        open={Boolean(viewerDraft)}
-        name={viewerDraft?.name ?? 'Minh chứng'}
-        originalName={viewerDraft?.file.name ?? ''}
-        previewUrl={viewerDraft ? viewerPreviewURL : undefined}
-        mimeType={viewerDraft?.file.type}
-        fileSize={viewerDraft?.file.size ?? 0}
-        caption={viewerDraft?.caption}
         onClose={() => setEvidenceViewer(null)}
       />
     </>
@@ -507,20 +521,20 @@ function ExistingEvidenceOption({ record, selected, primary, previewURL, preview
 function BlockerEditor({ rows, drafts, canCreateCheck, canCreateAction, disabled, onChange, onRelation, onRemove, onAdd }: { rows: BlockerDraft[]; drafts: ReportLinkedDraft[]; canCreateCheck: boolean; canCreateAction: boolean; disabled: boolean; onChange: (id: string, content: string) => void; onRelation: (row: BlockerDraft, kind: ReportLinkedDraft['kind'] | null) => void; onRemove: (id: string) => void; onAdd: () => void }) {
   return <div className="mt-3 space-y-3">{rows.map((row, index) => {
     const linked = drafts.find((draft) => draft.source_blocker_key === row.id);
-    return <article key={row.id} className="rounded-lg border border-red-200 bg-red-50/30 p-3"><div className="flex items-start gap-2"><textarea rows={2} className={clsx(inputClass(false), 'mt-0 min-h-16 flex-1 resize-y')} value={row.content} placeholder={`Vấn đề ${index + 1}`} onChange={(event) => onChange(row.id, event.target.value)} /><button type="button" aria-label={`Xóa vấn đề ${index + 1}`} className="rounded-md p-2 text-slate-400 hover:bg-white hover:text-rose-600" onClick={() => onRemove(row.id)}><Trash2 className="h-4 w-4" /></button></div>{canCreateCheck || canCreateAction ? <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Bước tiếp theo</span><button type="button" className={clsx('rounded-md border px-2 py-1 text-[11px] font-semibold', !linked ? 'border-slate-300 bg-white text-slate-700' : 'border-transparent text-slate-500')} onClick={() => onRelation(row, null)}>Chỉ ghi nhận</button>{canCreateCheck ? <button type="button" disabled={disabled} className={clsx('inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40', linked?.kind === 'check' ? 'border-blue-500 bg-blue-600 text-white' : 'border-blue-200 bg-white text-blue-700')} onClick={() => onRelation(row, 'check')}><ClipboardCheck className="h-3 w-3" /> Tạo kiểm tra</button> : null}{canCreateAction ? <button type="button" disabled={disabled} className={clsx('inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40', linked?.kind === 'action' ? 'border-amber-700 bg-amber-700 text-white' : 'border-amber-300 bg-white text-amber-800')} onClick={() => onRelation(row, 'action')}><Wrench className="h-3 w-3" /> Giao xử lý</button> : null}</div> : null}</article>;
+    return <article key={row.id} className="rounded-lg border border-red-200 bg-red-50/30 p-3"><div className="flex items-start gap-2"><textarea rows={2} className={clsx(inputClass(false), 'mt-0 min-h-16 flex-1 resize-y')} value={row.content} aria-label={`Vấn đề ${index + 1}`} placeholder={`Vấn đề ${index + 1}`} onChange={(event) => onChange(row.id, event.target.value)} /><button type="button" aria-label={`Xóa vấn đề ${index + 1}`} className="rounded-md p-2 text-slate-400 hover:bg-white hover:text-rose-600" onClick={() => onRemove(row.id)}><Trash2 className="h-4 w-4" /></button></div>{canCreateCheck || canCreateAction ? <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Bước tiếp theo</span><button type="button" className={clsx('rounded-md border px-2 py-1 text-[11px] font-semibold', !linked ? 'border-slate-300 bg-white text-slate-700' : 'border-transparent text-slate-500')} onClick={() => onRelation(row, null)}>Chỉ ghi nhận</button>{canCreateCheck ? <button type="button" disabled={disabled} className={clsx('inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40', linked?.kind === 'check' ? 'border-blue-500 bg-blue-600 text-white' : 'border-blue-200 bg-white text-blue-700')} onClick={() => onRelation(row, 'check')}><ClipboardCheck className="h-3 w-3" /> Tạo kiểm tra</button> : null}{canCreateAction ? <button type="button" disabled={disabled} className={clsx('inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40', linked?.kind === 'action' ? 'border-amber-700 bg-amber-700 text-white' : 'border-amber-300 bg-white text-amber-800')} onClick={() => onRelation(row, 'action')}><Wrench className="h-3 w-3" /> Giao xử lý</button> : null}</div> : null}</article>;
   })}<button type="button" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700" onClick={onAdd}><Plus className="h-3.5 w-3.5" /> Thêm vấn đề</button></div>;
 }
 
 function TextListEditor({ title, required = false, values, onChange, tone, error, addLabel }: { title: string; required?: boolean; values: string[]; onChange: (values: string[]) => void; tone: 'green' | 'blue' | 'slate' | 'red'; error?: string; addLabel: string }) {
   const tones = { green: 'border-emerald-200 bg-emerald-50/30', blue: 'border-blue-200 bg-blue-50/30', slate: 'border-line bg-slate-50/40', red: 'border-red-200 bg-red-50/30' };
-  return <article className={clsx('rounded-lg border p-4', tones[tone], error && 'ring-1 ring-rose-300')}><div className="flex items-center justify-between gap-3"><h4 className="text-sm font-semibold text-ink">{title}{required ? <span className="ml-1 text-rose-600">*</span> : null}</h4><span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{values.filter((item) => item.trim()).length}</span></div><div className="mt-3 space-y-2">{values.map((value, index) => <div key={index} className="flex items-start gap-2"><textarea rows={2} className={clsx(inputClass(Boolean(error)), 'mt-0 min-h-16 flex-1 resize-y')} value={value} placeholder={`${title} ${index + 1}`} onChange={(event) => onChange(values.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} /><button type="button" aria-label={`Xóa ${title} ${index + 1}`} disabled={values.length === 1} className="rounded-md p-2 text-slate-400 hover:bg-white hover:text-rose-600 disabled:opacity-30" onClick={() => onChange(values.filter((_item, itemIndex) => itemIndex !== index))}><Trash2 className="h-4 w-4" /></button></div>)}</div>{error ? <p className="mt-2 text-xs font-medium text-rose-700">{error}</p> : null}<button type="button" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700" onClick={() => onChange([...values, ''])}><Plus className="h-3.5 w-3.5" /> {addLabel}</button></article>;
+  return <article className={clsx('rounded-lg border p-4', tones[tone], error && 'ring-1 ring-rose-300')}><div className="flex items-center justify-between gap-3"><h4 className="text-sm font-semibold text-ink">{title}{required ? <span className="ml-1 text-rose-600">*</span> : null}</h4><span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{values.filter((item) => item.trim()).length}</span></div><div className="mt-3 space-y-2">{values.map((value, index) => <div key={index} className="flex items-start gap-2"><textarea rows={2} className={clsx(inputClass(Boolean(error)), 'mt-0 min-h-16 flex-1 resize-y')} value={value} aria-label={`${title} ${index + 1}`} placeholder={`${title} ${index + 1}`} onChange={(event) => onChange(values.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} /><button type="button" aria-label={`Xóa ${title} ${index + 1}`} disabled={values.length === 1} className="rounded-md p-2 text-slate-400 hover:bg-white hover:text-rose-600 disabled:opacity-30" onClick={() => onChange(values.filter((_item, itemIndex) => itemIndex !== index))}><Trash2 className="h-4 w-4" /></button></div>)}</div>{error ? <p className="mt-2 text-xs font-medium text-rose-700">{error}</p> : null}<button type="button" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700" onClick={() => onChange([...values, ''])}><Plus className="h-3.5 w-3.5" /> {addLabel}</button></article>;
 }
 
-function CrewEditor({ rows, onChange, error }: { rows: CrewDraft[]; onChange: (rows: CrewDraft[]) => void; error?: string }) {
+function CrewEditor({ rows, onChange, error, reveal }: { rows: CrewDraft[]; onChange: (rows: CrewDraft[]) => void; error?: string; reveal: number }) {
   return (
-    <ResourceEditorFrame icon={<Users className="h-4 w-4" />} title="Nhân công / tổ đội" count={rows.filter(hasCrewValue).length} error={error} onAdd={() => onChange([...rows, emptyCrew()])}>
-      <div className="w-full overflow-x-auto rounded-md border border-line">
-        <table className="w-full min-w-[760px] border-collapse text-sm">
+    <ResourceEditorFrame icon={<Users className="h-4 w-4" />} title="Nhân công / tổ đội" count={rows.filter(hasCrewValue).length} error={error} reveal={reveal} onAdd={() => onChange([...rows, emptyCrew()])}>
+      <div className="report-resource-scroll min-w-0 max-w-full overflow-x-auto rounded-md border border-line">
+        <table role="table" className="report-resource-table w-full min-w-[760px] border-collapse text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
             <tr>
               <th className="w-12 border-b border-line px-2 py-2"><span className="sr-only">Thao tác</span></th>
@@ -531,30 +545,29 @@ function CrewEditor({ rows, onChange, error }: { rows: CrewDraft[]; onChange: (r
               <th className="min-w-60 border-b border-line px-2 py-2">Ghi chú</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line bg-white">
+          <tbody role="rowgroup" className="divide-y divide-line bg-white">
             {rows.map((row, index) => (
-              <tr key={index}>
-                <td className="px-2 py-2 align-top"><button type="button" disabled={rows.length === 1} className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30" onClick={() => onChange(rows.filter((_item, itemIndex) => itemIndex !== index))} aria-label={`Xóa dòng nhân công ${index + 1}`}><Trash2 className="h-4 w-4" /></button></td>
-                <td className="px-2 py-3 align-top text-xs font-semibold text-slate-500">{index + 1}</td>
-                <td className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.crew_name} placeholder="Tên tổ / đội" onChange={(event) => onChange(updateRow(rows, index, { crew_name: event.target.value }))} aria-label={`Tên tổ đội dòng ${index + 1}`} /></td>
-                <td className="px-2 py-2 align-top"><input type="number" min={1} className={tableInputClass(Boolean(error))} value={row.worker_count} placeholder="Số người" onChange={(event) => onChange(updateRow(rows, index, { worker_count: event.target.value }))} aria-label={`Số người dòng ${index + 1}`} /></td>
-                <td className="px-2 py-2 align-top"><input type="number" min={0} step="0.5" className={tableInputClass(Boolean(error))} value={row.work_hours} placeholder="Giờ công" onChange={(event) => onChange(updateRow(rows, index, { work_hours: event.target.value }))} aria-label={`Giờ công dòng ${index + 1}`} /></td>
-                <td className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.note} placeholder="Ghi chú" onChange={(event) => onChange(updateRow(rows, index, { note: event.target.value }))} aria-label={`Ghi chú nhân công dòng ${index + 1}`} /></td>
+              <tr role="row" key={index}>
+                <td role="cell" className="px-2 py-2 align-top"><button type="button" disabled={rows.length === 1} className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30" onClick={() => onChange(rows.filter((_item, itemIndex) => itemIndex !== index))} aria-label={`Xóa dòng nhân công ${index + 1}`}><Trash2 className="h-4 w-4" /></button></td>
+                <td role="cell" className="px-2 py-3 align-top text-xs font-semibold text-slate-500"><span className="md:hidden">Dòng </span>{index + 1}</td>
+                <td role="cell" data-label="Tên tổ / đội *" className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.crew_name} placeholder="Tên tổ / đội" onChange={(event) => onChange(updateRow(rows, index, { crew_name: event.target.value }))} aria-label={`Tên tổ đội dòng ${index + 1}`} /></td>
+                <td role="cell" data-label="Số người *" className="px-2 py-2 align-top"><input type="number" inputMode="numeric" min={1} className={tableInputClass(Boolean(error))} value={row.worker_count} placeholder="Số người" onChange={(event) => onChange(updateRow(rows, index, { worker_count: event.target.value }))} aria-label={`Số người dòng ${index + 1}`} /></td>
+                <td role="cell" data-label="Giờ công" className="px-2 py-2 align-top"><input type="number" inputMode="decimal" min={0} step="0.5" className={tableInputClass(Boolean(error))} value={row.work_hours} placeholder="Giờ công" onChange={(event) => onChange(updateRow(rows, index, { work_hours: event.target.value }))} aria-label={`Giờ công dòng ${index + 1}`} /></td>
+                <td role="cell" data-label="Ghi chú" className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.note} placeholder="Ghi chú" onChange={(event) => onChange(updateRow(rows, index, { note: event.target.value }))} aria-label={`Ghi chú nhân công dòng ${index + 1}`} /></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[11px] text-slate-500 md:hidden">Kéo ngang trong bảng để xem và chỉnh sửa đủ các cột.</p>
     </ResourceEditorFrame>
   );
 }
 
-function MaterialEditor({ rows, onChange, error }: { rows: MaterialDraft[]; onChange: (rows: MaterialDraft[]) => void; error?: string }) {
+function MaterialEditor({ rows, onChange, error, reveal }: { rows: MaterialDraft[]; onChange: (rows: MaterialDraft[]) => void; error?: string; reveal: number }) {
   return (
-    <ResourceEditorFrame icon={<Package className="h-4 w-4" />} title="Vật tư sử dụng" count={rows.filter(hasMaterialValue).length} error={error} onAdd={() => onChange([...rows, emptyMaterial()])}>
-      <div className="w-full overflow-x-auto rounded-md border border-line">
-        <table className="w-full min-w-[760px] border-collapse text-sm">
+    <ResourceEditorFrame icon={<Package className="h-4 w-4" />} title="Vật tư sử dụng" count={rows.filter(hasMaterialValue).length} error={error} reveal={reveal} onAdd={() => onChange([...rows, emptyMaterial()])}>
+      <div className="report-resource-scroll min-w-0 max-w-full overflow-x-auto rounded-md border border-line">
+        <table role="table" className="report-resource-table w-full min-w-[760px] border-collapse text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
             <tr>
               <th className="w-12 border-b border-line px-2 py-2"><span className="sr-only">Thao tác</span></th>
@@ -565,39 +578,57 @@ function MaterialEditor({ rows, onChange, error }: { rows: MaterialDraft[]; onCh
               <th className="min-w-60 border-b border-line px-2 py-2">Ghi chú</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line bg-white">
+          <tbody role="rowgroup" className="divide-y divide-line bg-white">
             {rows.map((row, index) => (
-              <tr key={index}>
-                <td className="px-2 py-2 align-top"><button type="button" disabled={rows.length === 1} className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30" onClick={() => onChange(rows.filter((_item, itemIndex) => itemIndex !== index))} aria-label={`Xóa dòng vật tư ${index + 1}`}><Trash2 className="h-4 w-4" /></button></td>
-                <td className="px-2 py-3 align-top text-xs font-semibold text-slate-500">{index + 1}</td>
-                <td className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.material_name} placeholder="Tên vật tư" onChange={(event) => onChange(updateRow(rows, index, { material_name: event.target.value }))} aria-label={`Tên vật tư dòng ${index + 1}`} /></td>
-                <td className="px-2 py-2 align-top"><input type="number" min={0} step="any" className={tableInputClass(Boolean(error))} value={row.quantity} placeholder="Số lượng" onChange={(event) => onChange(updateRow(rows, index, { quantity: event.target.value }))} aria-label={`Số lượng vật tư dòng ${index + 1}`} /></td>
-                <td className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.unit} placeholder="ĐVT" onChange={(event) => onChange(updateRow(rows, index, { unit: event.target.value }))} aria-label={`Đơn vị tính dòng ${index + 1}`} /></td>
-                <td className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.note} placeholder="Ghi chú vật tư" onChange={(event) => onChange(updateRow(rows, index, { note: event.target.value }))} aria-label={`Ghi chú vật tư dòng ${index + 1}`} /></td>
+              <tr role="row" key={index}>
+                <td role="cell" className="px-2 py-2 align-top"><button type="button" disabled={rows.length === 1} className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30" onClick={() => onChange(rows.filter((_item, itemIndex) => itemIndex !== index))} aria-label={`Xóa dòng vật tư ${index + 1}`}><Trash2 className="h-4 w-4" /></button></td>
+                <td role="cell" className="px-2 py-3 align-top text-xs font-semibold text-slate-500"><span className="md:hidden">Dòng </span>{index + 1}</td>
+                <td role="cell" data-label="Tên vật tư *" className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.material_name} placeholder="Tên vật tư" onChange={(event) => onChange(updateRow(rows, index, { material_name: event.target.value }))} aria-label={`Tên vật tư dòng ${index + 1}`} /></td>
+                <td role="cell" data-label="Số lượng *" className="px-2 py-2 align-top"><input type="number" inputMode="decimal" min={0} step="any" className={tableInputClass(Boolean(error))} value={row.quantity} placeholder="Số lượng" onChange={(event) => onChange(updateRow(rows, index, { quantity: event.target.value }))} aria-label={`Số lượng vật tư dòng ${index + 1}`} /></td>
+                <td role="cell" data-label="ĐVT *" className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.unit} placeholder="ĐVT" onChange={(event) => onChange(updateRow(rows, index, { unit: event.target.value }))} aria-label={`Đơn vị tính dòng ${index + 1}`} /></td>
+                <td role="cell" data-label="Ghi chú" className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.note} placeholder="Ghi chú vật tư" onChange={(event) => onChange(updateRow(rows, index, { note: event.target.value }))} aria-label={`Ghi chú vật tư dòng ${index + 1}`} /></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[11px] text-slate-500 md:hidden">Kéo ngang trong bảng để xem và chỉnh sửa đủ các cột.</p>
     </ResourceEditorFrame>
   );
 }
 
-function ResourceEditorFrame({ icon, title, count, error, onAdd, children }: { icon: ReactNode; title: string; count: number; error?: string; onAdd: () => void; children: ReactNode }) {
-  return <article data-validation-error={error ? 'true' : undefined} className={clsx('scroll-mt-24 rounded-lg border border-line bg-white p-4', error && 'border-rose-300')}><div className="flex items-center justify-between gap-3"><h4 className="flex items-center gap-2 text-sm font-semibold text-ink"><span className="text-blue-600">{icon}</span>{title}</h4><span className="text-xs font-semibold text-slate-500">{count} dòng</span></div><div className="mt-3">{children}</div>{error ? <p role="alert" className="mt-2 text-xs font-medium text-rose-700">{error}</p> : null}<button type="button" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700" onClick={onAdd}><Plus className="h-3.5 w-3.5" /> Thêm dòng</button></article>;
+function ResourceEditorFrame({ icon, title, count, error, reveal, onAdd, children }: { icon: ReactNode; title: string; count: number; error?: string; reveal: number; onAdd: () => void; children: ReactNode }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  function addRow() {
+    onAdd();
+    requestAnimationFrame(() => {
+      const rows = contentRef.current?.querySelectorAll('tbody tr');
+      rows?.[rows.length - 1]?.querySelector<HTMLInputElement>('input')?.focus();
+    });
+  }
+  return <ReportDisclosure title={title} icon={icon} summary={count + ' dòng'} forceOpen={count > 0 || Boolean(error)} reveal={reveal}>
+    <div ref={contentRef} data-validation-error={error ? 'true' : undefined} className="min-w-0 scroll-mt-4">
+      {children}
+      {error ? <p role="alert" className="mt-2 text-sm font-medium text-rose-700">{error}</p> : null}
+      <button type="button" className="mt-3 inline-flex items-center gap-1.5 rounded-md px-2 py-2 text-sm font-semibold text-blue-700" onClick={addRow}><Plus className="h-4 w-4" /> Thêm dòng</button>
+    </div>
+  </ReportDisclosure>;
+}
+
+function ReportDisclosure({ title, icon, summary, forceOpen = false, reveal = 0, children }: { title: string; icon?: ReactNode; summary?: string; forceOpen?: boolean; reveal?: number; children: ReactNode }) {
+  const [expanded, setExpanded] = useState(forceOpen);
+  useEffect(() => { if (forceOpen) setExpanded(true); }, [forceOpen, reveal]);
+  return <details className="report-disclosure min-w-0 rounded-lg border border-line" open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}>
+    <summary className="cursor-pointer px-3 py-2 font-semibold text-ink">{icon ? <span className="mr-2 inline-block align-middle text-blue-600">{icon}</span> : null}{title}{summary ? <span className="ml-2 text-xs font-normal text-slate-500">{summary}</span> : null}</summary>
+    <div className="min-w-0 space-y-4 border-t border-line p-3">{children}</div>
+  </details>;
 }
 
 function Field({ label, required = false, error, helper, children }: { label: string; required?: boolean; error?: string; helper?: string; children: ReactNode }) {
-  return <label data-validation-error={error ? 'true' : undefined} className="block scroll-mt-24 rounded-md"><span className="text-sm font-semibold text-slate-700">{label}{required ? <span className="ml-1 text-rose-600">*</span> : null}</span>{children}{helper ? <p className="mt-1 text-xs text-slate-500">{helper}</p> : null}{error ? <p role="alert" className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}</label>;
+  return <label data-validation-error={error ? 'true' : undefined} className="block min-w-0 scroll-mt-4 rounded-md"><span className="text-sm font-semibold text-slate-700">{label}{required ? <span className="ml-1 text-rose-600">*</span> : null}</span>{children}{helper ? <p className="mt-1 text-xs text-slate-500">{helper}</p> : null}{error ? <p role="alert" className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}</label>;
 }
 
-function SectionTitle({ title, description }: { title: string; description: string }) {
-  return <div><h3 className="font-semibold text-ink">{title}</h3><p className="mt-0.5 text-xs leading-5 text-slate-500">{description}</p></div>;
-}
-
-function InfoState({ title, description }: { title: string; description: string }) {
-  return <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center"><Camera className="mx-auto h-5 w-5 text-slate-400" /><p className="mt-2 text-sm font-semibold text-slate-700">{title}</p><p className="mt-1 text-xs text-slate-500">{description}</p></div>;
+function SectionTitle({ title, description }: { title: string; description?: string }) {
+  return <div><h3 className="font-semibold text-ink">{title}</h3>{description ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{description}</p> : null}</div>;
 }
 
 function InlineError({ message, onRetry }: { message: string; onRetry: () => void }) {
@@ -631,5 +662,5 @@ function hasCrewValue(item: CrewDraft) { return Boolean(item.crew_name.trim() ||
 function hasMaterialValue(item: MaterialDraft) { return Boolean(item.material_name.trim() || item.quantity || item.unit.trim() || item.note.trim()); }
 function todayText() { return new Date().toISOString().slice(0, 10); }
 function workItemRank(item: WorkItem) { return ['ready', 'in_progress', 'needs_changes', 'blocked'].includes(item.status) ? 0 : ['waiting_review', 'waiting_approval'].includes(item.status) ? 1 : 2; }
-function inputClass(error: boolean) { return clsx('mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100', error ? 'border-rose-300 bg-rose-50' : 'border-line'); }
-function tableInputClass(error: boolean) { return clsx('w-full rounded-md border bg-white px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100', error ? 'border-rose-300 bg-rose-50' : 'border-line'); }
+function inputClass(error: boolean) { return clsx('mt-1 min-w-0 max-w-full w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100', error ? 'border-rose-300 bg-rose-50' : 'border-line'); }
+function tableInputClass(error: boolean) { return clsx('min-w-0 max-w-full w-full rounded-md border bg-white px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100', error ? 'border-rose-300 bg-rose-50' : 'border-line'); }

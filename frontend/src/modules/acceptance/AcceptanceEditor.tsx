@@ -5,12 +5,11 @@ import { EmptyState } from '../../components/EmptyState';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
-import { postForm } from '../../lib/api/client';
+import { uploadWorkItemEvidenceDraft } from '../_shared/evidenceUploadApi';
 import type { AcceptanceChecklistItem, AcceptanceRecord, EvidenceRecord, WorkflowFormPDFExport, WorkItem } from '../../lib/types/domain';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import {
   EvidenceCapture,
-  evidenceUploadFormData,
   type EvidenceCaptureIntent,
   type EvidenceUploadDraft,
 } from '../_shared/EvidenceCapture';
@@ -323,12 +322,12 @@ export function AcceptanceEditor({
                   </div>
 
                   <EvidenceCapture
+                    uploadScope={`/work-items/${draft.work_item_id}/evidence/upload`}
                     drafts={selectedLine.uploads}
                     onChange={(uploads) => updateLine(selectedLine.key, { uploads })}
                     hasSource={Boolean(draft.work_item_id)}
                     onSourceRequired={(_intent: EvidenceCaptureIntent, resume) => openWorkItemPicker('capture', resume)}
                     disabled={disabled || selectedLine.evidence_ids.length >= 10}
-                    compact
                     maxFiles={Math.max(0, 10 - selectedLine.evidence_ids.length)}
                     hint="Ảnh/tệp mới được giữ tạm tại đây và chỉ tải lên khi lưu biên bản. Mỗi tiêu chí tối đa 10 minh chứng."
                   />
@@ -400,6 +399,7 @@ export function AcceptanceEditor({
       />
       <EvidenceReferenceViewer
         reference={viewerRecord ? {
+          record: viewerRecord,
           id: String(viewerRecord.id),
           name: viewerRecord.name || viewerRecord.title || String(viewerRecord.id),
           mimeType: viewerRecord.mime_type,
@@ -520,7 +520,7 @@ export async function uploadAcceptanceDraftEvidence(draft: AcceptanceDraft, onPr
   let next = draft;
   for (const sourceLine of draft.checklist) {
     for (const upload of sourceLine.uploads) {
-      const record = await postForm<EvidenceRecord>(`/work-items/${draft.work_item_id}/evidence/upload`, evidenceUploadFormData(upload, draft.work_item_id));
+      const record = await uploadWorkItemEvidenceDraft(draft.work_item_id, upload);
       next = {
         ...next,
         checklist: next.checklist.map((line) => line.key === sourceLine.key ? {

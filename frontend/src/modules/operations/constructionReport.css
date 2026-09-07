@@ -1,0 +1,123 @@
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.construction-report-form fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.construction-report-form textarea {
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .report-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  }
+
+  .report-actions .report-cancel {
+    display: none;
+  }
+
+  .report-actions-single .report-primary {
+    grid-column: 1 / -1;
+  }
+
+  .report-actions button,
+  .construction-report-form button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .construction-report-form summary {
+    min-height: 44px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    overflow-wrap: anywhere;
+  }
+
+  .construction-report-form input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  .construction-report-form select,
+  .construction-report-form textarea {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .construction-report-form .report-resource-scroll {
+    overflow: visible;
+    border: 0;
+  }
+
+  .construction-report-form .report-resource-table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .report-resource-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .report-resource-table tbody {
+    display: grid;
+    gap: 12px;
+    border: 0;
+  }
+
+  .report-resource-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 12px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #dbe3ed;
+    border-radius: 8px;
+  }
+
+  .report-resource-table td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .report-resource-table td:first-child {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .report-resource-table td:nth-child(2) {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    color: #334155;
+    font-size: 14px;
+  }
+
+  .report-resource-table td:nth-child(3),
+  .report-resource-table td:nth-child(6) {
+    grid-column: 1 / -1;
+  }
+
+  .report-resource-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: #334155;
+    font-size: 14px;
+    font-weight: 600;
+  }
+}

@@ -124,6 +124,7 @@ func registerWorkflowRoutes(protected fiber.Router, h *Handler) {
 	protected.Post("/activities/:id/reactions", h.SetActivityReaction)
 	protected.Put("/activities/:id/message", h.UpdateActivityMessage)
 	protected.Post("/activities/:id/withdraw", h.WithdrawActivityMessage)
+	protected.Get("/evidence/:id", h.GetEvidenceDetail)
 	protected.Get("/evidence/:id/file", h.GetEvidenceFile)
 	protected.Get("/workflow-form-signatures/:id/visual", h.GetWorkflowFormSignatureVisual)
 	protected.Get("/workflow-form-seal-applications/:id/visual", h.GetWorkflowFormSealApplicationVisual)

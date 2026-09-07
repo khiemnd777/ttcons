@@ -56,17 +56,14 @@ test('construction variation stays contextual and distinguishes unavailable read
   assert.match(proposal, /Báo cáo, kiểm tra và xử lý hiện trường vẫn hoạt động bình thường/);
 });
 
-test('construction evidence draft preview recreates object URLs inside an effect for StrictMode', async () => {
+test('construction draft previews delegate file lifecycle and readers to the shared draft viewer', async () => {
   const source = await readFile(new URL('../src/modules/_shared/EvidenceCapture.tsx', import.meta.url), 'utf8');
-
-  assert.doesNotMatch(source, /useMemo\([^)]*URL\.createObjectURL/);
-  assert.match(source, /useEffect\(\(\) => \{[\s\S]*const objectURL = URL\.createObjectURL\(draft\.file\)/);
-  assert.match(source, /return \(\) => URL\.revokeObjectURL\(objectURL\)/);
-  assert.match(source, /aria-label=\{`Xem ảnh \$\{draft\.name\}`\}/);
-  assert.match(source, /Không đọc được ảnh xem trước/);
+  const viewer = await readFile(new URL('../src/modules/_shared/EvidenceRecordViewerDialog.tsx', import.meta.url), 'utf8');
   assert.match(source, /<EvidenceDraftViewerDialog/);
-  assert.match(source, /onPreviewPhoto\?: \(draft: ConstructionEvidenceUploadDraft, previewURL: string\)/);
-  assert.doesNotMatch(source, /<a href=\{previewURL\}[^>]+Xem ảnh/);
+  assert.match(source, /file=\{preview\?\.file\}/);
+  assert.match(viewer, /useEffect\(\(\) => \{[\s\S]*URL\.createObjectURL\(file\)/);
+  assert.match(viewer, /return \(\) => URL\.revokeObjectURL\(url\)/);
+  assert.doesNotMatch(source, /onPreviewPhoto|EvidenceDraftCard|ReportEvidenceDraftEditor/);
 });
 
 test('construction report exposes protected saved evidence preview and the approved daily-work title', async () => {
@@ -84,10 +81,10 @@ test('construction report exposes protected saved evidence preview and the appro
   assert.match(source, /pdf \? 'Xem PDF'/);
   assert.match(source, /word \? 'Xem Word'/);
   assert.match(source, /spreadsheet \? 'Xem Excel'/);
-  assert.match(source, /<EvidenceDraftViewerDialog/);
+  assert.doesNotMatch(source, /<EvidenceDraftViewerDialog/);
   assert.match(source, /showWorkItem/);
   assert.match(source, /onOpenFile=\{viewerRecord \? \(\) => void openEvidenceFile\(viewerRecord\)/);
-  assert.match(source, /onPreviewPhoto=\{\(draft, previewURL\) => setEvidenceViewer/);
+  assert.match(source, /<ConstructionEvidenceCapture uploadScope=/);
   assert.match(source, /onRetry=\{viewerRecord \? \(\) => setEvidencePreviewRetryKey/);
   assert.doesNotMatch(source, /import \{ EvidenceViewerDialog \}/);
   assert.doesNotMatch(source, /window\.open\(previewURL/);
@@ -182,17 +179,19 @@ test('shared evidence viewer keeps images in-app with loading, retry, decode fai
   assert.doesNotMatch(persistedFooter, /Mở tệp/);
 });
 
-test('construction report resources stay in one column and edit through inline tables', async () => {
+test('construction report resources share one input tree for desktop tables and mobile row cards', async () => {
   const source = await readFile(new URL('../src/modules/operations/ConstructionReportFormDialog.tsx', import.meta.url), 'utf8');
   const resourceStart = source.indexOf('function CrewEditor(');
   const resourceEnd = source.indexOf('function ResourceEditorFrame(', resourceStart);
   const resources = source.slice(resourceStart, resourceEnd);
 
-  assert.match(source, /<div className="mt-3 space-y-4"><CrewEditor/);
+  assert.match(source, /<div className="min-w-0 space-y-3">\s*<CrewEditor/);
   assert.doesNotMatch(source, /lg:grid-cols-2"><CrewEditor/);
-  assert.equal((resources.match(/<table className=/g) ?? []).length, 2);
+  assert.equal((resources.match(/<table role="table" className=/g) ?? []).length, 2);
   assert.equal((resources.match(/<span className="sr-only">Thao tác<\/span>/g) ?? []).length, 2);
   assert.match(resources, /Tên tổ \/ đội/);
   assert.match(resources, /Tên vật tư/);
-  assert.match(resources, /Kéo ngang trong bảng để xem và chỉnh sửa đủ các cột/);
+  assert.match(resources, /data-label="Số người \*"/);
+  assert.match(resources, /data-label="Số lượng \*"/);
+  assert.doesNotMatch(resources, /Kéo ngang trong bảng/);
 });

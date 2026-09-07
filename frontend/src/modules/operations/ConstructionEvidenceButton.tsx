@@ -1,18 +1,39 @@
-import { Eye, FileImage } from 'lucide-react';
 import { useState } from 'react';
-import { EvidenceReferenceViewer } from '../_shared/EvidenceReferenceViewer';
+import { EmptyState } from '../../components/EmptyState';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
+import type { EvidenceRecord } from '../../lib/types/domain';
+import { isProtectedStorageProvider } from '../../lib/utils/protectedStorage';
+import { EvidenceReferenceViewer, useEvidenceReferenceRecord } from '../_shared/EvidenceReferenceViewer';
+import { isImageEvidence, useProtectedEvidencePreview } from '../_shared/EvidenceRecordViewerDialog';
+import { safeEvidenceFileUrl } from '../_shared/evidenceReferenceMedia';
+import { EvidenceCard, canPreviewEvidenceInApp, useEvidenceFileOpener } from '../work-items/EvidenceGallery';
 
-export function ConstructionEvidenceButton({ evidenceId, name, label }: { evidenceId?: string; name?: string; label: string }) {
-  const [viewerOpen, setViewerOpen] = useState(false);
+// Compatibility adapter for construction references; the gallery owns the card UI.
+export function ConstructionEvidenceButton({ evidenceId, name, label, record: supplied }: { evidenceId?: string; name?: string; label: string; record?: EvidenceRecord }) {
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const reference = { id: evidenceId, record: supplied, name: name || label };
+  const { id, record, loading, error, retry } = useEvidenceReferenceRecord(reference);
+  const protectedPhoto = record && isImageEvidence(record) && isProtectedStorageProvider(record.storage_provider) && record.storage_key;
+  const preview = useProtectedEvidencePreview(record ?? null, protectedPhoto ? 'photo' : undefined);
+  const openEvidenceFile = useEvidenceFileOpener();
 
-  if (!evidenceId) return <div className="rounded-md border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">Chưa có {label.toLocaleLowerCase('vi-VN')}</div>;
+  if (!id) return <EmptyState title={`Chưa có ${label.toLocaleLowerCase('vi-VN')}`} />;
 
-  return <>
-    <button type="button" className="flex w-full items-center gap-3 rounded-md border border-line bg-slate-50 px-3 py-3 text-left hover:border-blue-200 hover:bg-blue-50" onClick={() => setViewerOpen(true)}>
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-white text-blue-600 ring-1 ring-inset ring-line"><FileImage className="h-5 w-5" /></span>
-      <span className="min-w-0 flex-1"><span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span><span className="mt-0.5 block truncate text-sm font-medium text-ink">{name || 'Minh chứng'}</span></span>
-      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-700"><Eye className="h-4 w-4" /> Xem</span>
-    </button>
-    <EvidenceReferenceViewer reference={viewerOpen ? { id: evidenceId, name: name || label } : null} onClose={() => setViewerOpen(false)} />
-  </>;
+  return <div className="min-w-0 space-y-2">
+    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+    {record ? <EvidenceCard
+      record={record}
+      previewUrl={protectedPhoto ? preview.previewUrl : isImageEvidence(record) ? safeEvidenceFileUrl(record.file_url) : undefined}
+      previewLoading={preview.loading}
+      previewError={preview.error}
+      onRetry={preview.retry}
+      showWorkItem={false}
+      onSelect={() => setViewerId(id)}
+      onOpen={() => canPreviewEvidenceInApp(record) ? setViewerId(id) : void openEvidenceFile(record)}
+    /> : loading ? <LoadingSpinner label="Đang tải thông tin minh chứng…" /> : <EmptyState
+      title={error || 'Không tải được thông tin minh chứng.'}
+      action={<button type="button" className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50" onClick={retry}>Thử lại</button>}
+    />}
+    {viewerId === id ? <EvidenceReferenceViewer reference={{ ...reference, record }} onClose={() => setViewerId(null)} /> : null}
+  </div>;
 }

@@ -4,19 +4,15 @@ import test from 'node:test';
 
 const source = (path: string) => readFile(new URL(path, import.meta.url), 'utf8');
 
-test('minimal evidence references load protected files inside the shared viewer and clean blob URLs', async () => {
+test('ID references resolve metadata and delegate rendering to the full record viewer', async () => {
   const adapter = await source('../src/modules/_shared/EvidenceReferenceViewer.tsx');
+  const record = await source('../src/modules/_shared/EvidenceRecordViewerDialog.tsx');
   const viewer = await source('../src/modules/_shared/EvidenceViewerDialog.tsx');
-
-  assert.match(adapter, /downloadBlob\(filePath\)/);
-  assert.match(adapter, /reference\?\.id \? `\/evidence\/\$\{reference\.id\}\/file`/);
-  assert.match(adapter, /URL\.createObjectURL\(blob\)/);
-  assert.match(adapter, /URL\.revokeObjectURL\(objectUrl\)/);
-  assert.match(adapter, /<EvidenceViewerDialog/);
-  assert.match(adapter, /Không tải được minh chứng/);
-  assert.match(adapter, /Mở tệp gốc/);
-  assert.match(adapter, /parsed\.protocol === 'http:'/);
-  assert.match(adapter, /data:image\//);
+  assert.match(adapter, /get<EvidenceRecord>\(`/);
+  assert.match(adapter, /<EvidenceRecordViewerDialog/);
+  assert.doesNotMatch(adapter, /<EvidenceViewerDialog|downloadBlob|URL\.createObjectURL/);
+  assert.match(record, /Nguồn hồ sơ/);
+  assert.match(record, /Gửi và rà soát/);
   assert.match(viewer, /event\.key !== 'Tab'/);
   assert.match(viewer, /data-viewer-autofocus/);
   assert.match(viewer, /previousFocus\?\.isConnected/);

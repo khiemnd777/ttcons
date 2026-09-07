@@ -76,9 +76,11 @@ test('work-item evidence UI exposes row add, retry and progress states', async (
   assert.match(panel, /evidenceUploadBatchLimit/);
   assert.match(panel, /evidenceUploadConcurrency/);
   assert.match(panel, /runEvidenceUploadQueue\(rows/);
-  assert.match(panel, />\s*Thêm\s*</);
-  assert.match(panel, /Thử lại tệp/);
-  assert.match(panel, /Tổng tiến độ \{overallProgress\}%/);
+  const uploader = await readFile(new URL('../src/modules/_shared/EvidenceUploader.tsx', import.meta.url), 'utf8');
+  assert.match(panel, /<EvidenceUploader/);
+  assert.match(uploader, />\s*Thêm\s*</);
+  assert.match(uploader, /Thử lại tệp/);
+  assert.match(uploader, /Tổng tiến độ \{overallProgress\}%/);
   assert.match(panel, /status: percent >= 100 \? 'processing' : 'uploading'/);
   assert.match(panel, /status: 'success', progress: 100/);
   assert.match(panel, /status: 'error', progress: 0/);

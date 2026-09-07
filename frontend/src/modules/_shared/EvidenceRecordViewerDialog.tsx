@@ -17,6 +17,8 @@ import {
   originalFilename,
   type EvidenceMediaType,
 } from './evidenceMedia';
+import { classifyEvidenceFile } from './evidenceFileTypes';
+import { evidenceReferenceMediaType, safeEvidenceFileUrl } from './evidenceReferenceMedia';
 import { EvidenceViewerDialog } from './EvidenceViewerDialog';
 
 export {
@@ -53,7 +55,7 @@ type EvidenceRecordViewerDialogProps = {
 export function EvidenceRecordViewerDialog({
   record,
   previewUrl,
-  previewLoading = false,
+  previewLoading,
   previewError,
   protectedFilePath,
   protectedAccessDescription,
@@ -70,7 +72,11 @@ export function EvidenceRecordViewerDialog({
   onReview,
 }: EvidenceRecordViewerDialogProps) {
   const inlineMediaType = record ? inlineEvidenceMediaType(record) : undefined;
-  const protectedPreview = useProtectedEvidencePreview(record, inlineMediaType, protectedFilePath);
+  const ownsPhotoPreview = previewUrl === undefined && previewLoading === undefined && previewError === undefined;
+  const protectedMediaType = record && isProtectedStorageProvider(record.storage_provider) && record.storage_key
+    ? inlineMediaType ?? (ownsPhotoPreview ? evidenceMediaType(record) : undefined)
+    : undefined;
+  const protectedPreview = useProtectedEvidencePreview(record, protectedMediaType, protectedFilePath);
   if (!record) return null;
   const reviewable = canReview
     && Boolean(onReview)
@@ -83,7 +89,7 @@ export function EvidenceRecordViewerDialog({
   const protectedFile = isProtectedStorageProvider(record.storage_provider) && Boolean(record.storage_key);
   const openableDocument = !imageEvidence && Boolean(onOpenFile) && (protectedFile || Boolean(record.file_url));
   const openActionLabel = inlinePdf ? 'Mở tab' : inlineOffice ? 'Mở tệp gốc' : 'Mở tệp';
-  const mediaAction = inlineMediaType && protectedPreview.previewUrl ? (
+  const mediaAction = protectedMediaType && protectedPreview.previewUrl ? (
     <a
       href={protectedPreview.previewUrl}
       target="_blank"
@@ -93,7 +99,7 @@ export function EvidenceRecordViewerDialog({
       <ExternalLink className="h-4 w-4" />
       {openActionLabel}
     </a>
-  ) : openableDocument ? (
+  ) : !protectedFile && safeEvidenceFileUrl(record.file_url) ? <a href={safeEvidenceFileUrl(record.file_url)} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-blue-700">Mở tệp gốc</a> : openableDocument ? (
     <button
       type="button"
       className={inlineMediaType
@@ -115,17 +121,17 @@ export function EvidenceRecordViewerDialog({
     <EvidenceViewerDialog
       open
       name={evidenceRecordTitle(record)}
-      previewUrl={inlinePdf ? protectedPreview.previewUrl : previewUrl}
+      previewUrl={protectedMediaType ? protectedPreview.previewUrl : previewUrl ?? (imageEvidence ? safeEvidenceFileUrl(record.file_url) : undefined)}
       fileBlob={inlineOffice ? protectedPreview.blob : undefined}
-      mediaType={inlineMediaType ?? (imageEvidence ? 'photo' : 'document')}
-      loading={inlineMediaType ? protectedPreview.loading : previewLoading}
-      error={inlineMediaType ? protectedPreview.error : previewError}
+      mediaType={protectedMediaType ?? inlineMediaType ?? (imageEvidence ? 'photo' : 'document')}
+      loading={protectedMediaType ? protectedPreview.loading : previewLoading}
+      error={protectedMediaType ? protectedPreview.error : previewError}
       caption={record.caption}
       metadata={[evidenceMediaLabel(record, detectedMediaType), record.mime_type ?? '', record.file_size ? formatEvidenceFileSize(record.file_size) : ''].filter(Boolean)}
       headerStatus={<StatusBadge status={record.status} />}
       mediaAction={mediaAction}
       documentUnavailableText={legacyOfficeMessage}
-      onRetry={inlineMediaType ? protectedPreview.retry : onRetry}
+      onRetry={protectedMediaType ? protectedPreview.retry : onRetry}
       onClose={onClose}
       footer={(
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -231,6 +237,7 @@ type EvidenceDraftViewerDialogProps = {
   name: string;
   originalName: string;
   previewUrl?: string;
+  file?: File;
   mimeType?: string;
   fileSize: number;
   caption?: string;
@@ -241,21 +248,35 @@ export function EvidenceDraftViewerDialog({
   open,
   name,
   originalName,
+  file,
   previewUrl,
   mimeType,
   fileSize,
   caption,
   onClose,
 }: EvidenceDraftViewerDialogProps) {
+  const [localPreview, setLocalPreview] = useState<{ file: File; url: string } | null>(null);
+  useEffect(() => {
+    if (!open || !file) { setLocalPreview(null); return; }
+    const url = URL.createObjectURL(file);
+    setLocalPreview({ file, url });
+    return () => URL.revokeObjectURL(url);
+  }, [open, file]);
+  const mediaType = evidenceReferenceMediaType(originalName, file?.type || mimeType);
+  const label = classifyEvidenceFile({ name: originalName, type: file?.type || mimeType || '' })?.label ?? 'Tài liệu';
+  const url = localPreview?.file === file ? localPreview?.url : undefined;
   return (
     <EvidenceViewerDialog
       open={open}
       name={name}
       description="Thông tin tệp đang chờ upload."
-      previewUrl={previewUrl}
-      mediaType="photo"
+      previewUrl={url ?? previewUrl}
+      fileBlob={file}
+      mediaType={mediaType}
+      mediaAction={url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-blue-700">Mở tệp gốc</a> : undefined}
+      documentUnavailableText="Định dạng Office đời cũ chưa hỗ trợ đọc trực tiếp. Mở tệp gốc bằng ứng dụng tương thích."
       caption={caption}
-      metadata={['Ảnh', mimeType ?? '', formatEvidenceFileSize(fileSize)].filter(Boolean)}
+      metadata={[label, mimeType ?? '', formatEvidenceFileSize(fileSize)].filter(Boolean)}
       headerStatus={<span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Chưa upload</span>}
       onClose={onClose}
       footer={(
@@ -269,7 +290,7 @@ export function EvidenceDraftViewerDialog({
           <section aria-labelledby="draft-evidence-heading">
             <h3 id="draft-evidence-heading" className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Thông tin tệp</h3>
             <div className="mt-3 grid grid-cols-2 gap-4 border-y border-line py-3">
-              <EvidenceInfoItem label="Loại" value="Ảnh" />
+              <EvidenceInfoItem label="Loại" value={label} />
               <EvidenceInfoItem label="Trạng thái tệp" value="Chưa upload" />
               <EvidenceInfoItem label="MIME / Dung lượng" value={[mimeType, formatEvidenceFileSize(fileSize)].filter(Boolean).join(' · ')} />
               <EvidenceInfoItem label="Tên tệp gốc" value={originalName} />
@@ -282,6 +303,18 @@ export function EvidenceDraftViewerDialog({
       )}
     />
   );
+}
+
+// Missing metadata and legacy external references use the same dialog layout,
+// without inventing persisted IDs, status, people or timestamps.
+export function EvidenceReferenceStateDialog({ name, fileUrl, mimeType, evidenceType, loading, error, onRetry, onClose }: { name: string; fileUrl?: string; mimeType?: string; evidenceType?: string; loading: boolean; error?: string; onRetry?: () => void; onClose: () => void }) {
+  const url = safeEvidenceFileUrl(fileUrl);
+  const mediaType = evidenceReferenceMediaType(name, mimeType, evidenceType);
+  return <EvidenceViewerDialog open name={name} loading={loading} error={error} onRetry={onRetry} onClose={onClose}
+    mediaType={mediaType === 'photo' && url ? 'photo' : 'document'} previewUrl={mediaType === 'photo' ? url : undefined}
+    mediaAction={url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-blue-700">Mở tệp gốc</a> : undefined}
+    details={<section className="space-y-3"><h3 className="text-xs font-semibold uppercase text-slate-500">Nguồn hồ sơ</h3><p role={error ? 'alert' : 'status'} className="text-sm text-slate-600">{loading ? 'Đang tải thông tin minh chứng…' : error || (url ? 'Liên kết ngoài được lưu trong dữ liệu lịch sử. Không có hồ sơ tải lên để hiển thị người gửi và rà soát.' : 'Không có tệp hoặc thông tin minh chứng.')}</p>{error && onRetry ? <button type="button" onClick={onRetry} className="text-sm font-semibold text-blue-700">Thử lại</button> : null}</section>}
+  />;
 }
 
 function CloseButton({ onClose }: { onClose: () => void }) {
@@ -317,11 +350,12 @@ export function formatEvidenceFileSize(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: 'pdf' | 'word' | 'spreadsheet', protectedFilePath?: string) {
+export function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: EvidenceMediaType, protectedFilePath?: string) {
   const [retryKey, setRetryKey] = useState(0);
   const [state, setState] = useState<{
+    requestKey?: string;
     recordId?: string;
-    mediaType?: 'pdf' | 'word' | 'spreadsheet';
+    mediaType?: EvidenceMediaType;
     blob?: Blob;
     previewUrl?: string;
     loading: boolean;
@@ -332,6 +366,8 @@ function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: 
   const storageKey = eligible ? record?.storage_key : undefined;
   const updatedAt = eligible ? record?.updated_at : undefined;
 
+  const requestKey = JSON.stringify([recordId, mediaType, protectedFilePath, storageKey, updatedAt]);
+
   useEffect(() => {
     if (!recordId || !storageKey) {
       setState({ loading: false });
@@ -340,7 +376,7 @@ function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: 
 
     let cancelled = false;
     let objectUrl = '';
-    setState({ recordId, mediaType, loading: true });
+    setState({ requestKey, recordId, mediaType, loading: true });
 
     async function loadEvidenceFile() {
       try {
@@ -348,12 +384,12 @@ function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: 
         if (cancelled) return;
         const normalizedBlob = normalizeEvidenceBlob(blob, mediaType);
         objectUrl = URL.createObjectURL(normalizedBlob);
-        setState({ recordId, mediaType, blob: normalizedBlob, previewUrl: objectUrl, loading: false });
+        setState({ requestKey, recordId, mediaType, blob: normalizedBlob, previewUrl: objectUrl, loading: false });
       } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : 'Vui lòng thử lại.';
-        const label = mediaType === 'pdf' ? 'PDF' : mediaType === 'word' ? 'Word' : 'Excel';
-        setState({ recordId, mediaType, loading: false, error: `Không tải được ${label}. ${message}` });
+        const label = mediaType === 'pdf' ? 'PDF' : mediaType === 'word' ? 'Word' : mediaType === 'spreadsheet' ? 'Excel' : 'minh chứng';
+        setState({ requestKey, recordId, mediaType, loading: false, error: `Không tải được ${label}. ${message}` });
       }
     }
 
@@ -362,9 +398,9 @@ function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: 
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [mediaType, protectedFilePath, recordId, retryKey, storageKey, updatedAt]);
+  }, [requestKey, retryKey]);
 
-  const currentState = state.recordId === recordId && state.mediaType === mediaType ? state : { loading: Boolean(recordId) };
+  const currentState = state.requestKey === requestKey ? state : { loading: Boolean(recordId) };
   return {
     ...currentState,
     retry: () => setRetryKey((current) => current + 1),
@@ -385,7 +421,7 @@ function evidenceMediaLabel(record: EvidenceRecord, mediaType: EvidenceMediaType
   return evidenceLabel(record.evidence_type);
 }
 
-function normalizeEvidenceBlob(blob: Blob, mediaType?: 'pdf' | 'word' | 'spreadsheet') {
+function normalizeEvidenceBlob(blob: Blob, mediaType?: EvidenceMediaType) {
   const expectedMimeType = mediaType === 'pdf'
     ? 'application/pdf'
     : mediaType === 'word'

@@ -23,6 +23,7 @@ import {
   type EvidenceReviewAction,
 } from '../_shared/EvidenceRecordViewerDialog';
 import { compactDateTime, evidenceLabel, visibilityLabel } from './workItemPresentation';
+import { safeEvidenceFileUrl } from '../_shared/evidenceReferenceMedia';
 
 export { formatEvidenceFileSize, isImageEvidence };
 export type { EvidenceReviewAction };
@@ -85,6 +86,7 @@ export function EvidenceGallery({
   const hiddenCount = rows.length - visibleRows.length;
   const previews = useEvidencePreviewUrls(visibleRows, previewRetryKey, filePath);
   const previewUrls = previews.urls;
+  const openEvidenceFile = useEvidenceFileOpener(filePath);
 
   useEffect(() => {
     setShowAll(false);
@@ -92,24 +94,7 @@ export function EvidenceGallery({
   }, [evidence]);
 
   async function openEvidence(record: EvidenceRecord) {
-    const previewUrl = previewUrls[record.id];
-    if (previewUrl) {
-      window.open(previewUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    if (isProtectedStorageProvider(record.storage_provider) && record.storage_key) {
-      try {
-        await openProtectedBlob(() => downloadBlob(resolveEvidenceFilePath(record, filePath)));
-      } catch (error) {
-        toast.error('Không mở được tệp minh chứng', error);
-      }
-      return;
-    }
-    if (record.file_url) {
-      window.open(record.file_url, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    toast.warn({ title: 'Minh chứng chưa có tệp', description: 'Bản ghi này không có tệp nội bộ hoặc URL để mở.' });
+    await openEvidenceFile(record, previewUrls[record.id]);
   }
 
   async function submitReview(action: EvidenceReviewAction) {
@@ -229,6 +214,9 @@ export function EvidenceGallery({
               key={record.id}
               record={record}
               previewUrl={previewUrls[record.id]}
+              previewLoading={previews.loadingIds.has(record.id)}
+              previewError={previews.errorIds.has(record.id) ? 'Không tải được ảnh minh chứng.' : undefined}
+              onRetry={() => setPreviewRetryKey((current) => current + 1)}
               showWorkItem={showWorkItem}
               featured={variant === 'review' && index === 0}
               onOpen={() => canPreviewEvidenceInApp(record) ? setSelected(record) : void openEvidence(record)}
@@ -399,11 +387,14 @@ function ProjectEvidenceTextCell({ label, value }: { label: string; value?: stri
   );
 }
 
-function EvidenceCard({
+export function EvidenceCard({
   record,
   previewUrl,
   showWorkItem,
   featured,
+  previewLoading = false,
+  previewError,
+  onRetry,
   onOpen,
   onSelect,
 }: {
@@ -411,15 +402,22 @@ function EvidenceCard({
   previewUrl?: string;
   showWorkItem: boolean;
   featured?: boolean;
+  previewLoading?: boolean;
+  previewError?: string;
+  onRetry?: () => void;
   onOpen: () => void;
   onSelect: () => void;
 }) {
   const title = evidenceTitle(record);
   return (
-    <article className={clsx('min-w-0 rounded-md border border-line bg-white p-3', featured && 'sm:col-span-2')}>
-      <button type="button" className="block w-full text-left" onClick={onSelect}>
+    <article data-component="evidence-card" className={clsx('min-w-0 rounded-md border border-line bg-white p-3', featured && 'sm:col-span-2')}>
+      <button type="button" className="block w-full text-left" onClick={onSelect} aria-label={`Xem chi tiết hồ sơ ${title}`}>
         <div className={clsx('overflow-hidden rounded-md border border-line bg-slate-100', featured ? 'aspect-video' : 'aspect-[4/3]')}>
-          {previewUrl ? (
+          {previewError || previewLoading ? (
+            <div className="flex h-full w-full items-center justify-center p-3 text-center text-xs text-slate-500" role="status">
+              {previewError ? 'Không tải được ảnh xem trước.' : 'Đang tải ảnh xem trước…'}
+            </div>
+          ) : previewUrl ? (
             <img className="h-full w-full object-cover" src={previewUrl} alt={title} />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-slate-400">
@@ -447,7 +445,8 @@ function EvidenceCard({
         <span className={clsx('rounded-md px-2 py-0.5 text-xs font-semibold', isProtectedStorageProvider(record.storage_provider) ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>
           {isProtectedStorageProvider(record.storage_provider) ? 'Tệp được bảo vệ' : 'Liên kết ngoài'}
         </span>
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          {previewError && onRetry ? <button type="button" className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50" onClick={onRetry}>Thử lại ảnh</button> : null}
           <button
             type="button"
             className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
@@ -556,11 +555,36 @@ function isDocumentEvidence(record: EvidenceRecord) {
   return record.evidence_type === 'document' || isPdfEvidence(record);
 }
 
-function canPreviewEvidenceInApp(record: EvidenceRecord) {
+export function canPreviewEvidenceInApp(record: EvidenceRecord) {
   return isImageEvidence(record)
     || isInlinePdfEvidence(record)
     || isInlineWordEvidence(record)
     || isInlineSpreadsheetEvidence(record);
+}
+
+// Shared by the gallery and reference adapters, including legacy Office files.
+export function useEvidenceFileOpener(filePath?: (record: EvidenceRecord) => string) {
+  const toast = useToast();
+  return async (record: EvidenceRecord, previewUrl?: string) => {
+    if (previewUrl) {
+      window.open(previewUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (isProtectedStorageProvider(record.storage_provider) && record.storage_key) {
+      try {
+        await openProtectedBlob(() => downloadBlob(resolveEvidenceFilePath(record, filePath)));
+      } catch (error) {
+        toast.error('Không mở được tệp minh chứng', error);
+      }
+      return;
+    }
+    const externalUrl = safeEvidenceFileUrl(record.file_url);
+    if (externalUrl) {
+      window.open(externalUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    toast.warn({ title: 'Minh chứng chưa có tệp', description: 'Bản ghi này không có tệp nội bộ hoặc URL để mở.' });
+  };
 }
 
 function evidenceOpenLabel(record: EvidenceRecord) {

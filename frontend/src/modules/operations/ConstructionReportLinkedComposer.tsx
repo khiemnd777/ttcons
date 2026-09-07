@@ -31,6 +31,7 @@ export type ReportLinkedDraft = {
 export type ReportLinkedComposerMode = 'batch' | 'immediate';
 
 type Props = {
+  embedded?: boolean;
   mode: ReportLinkedComposerMode;
   drafts: ReportLinkedDraft[];
   onChange: Dispatch<SetStateAction<ReportLinkedDraft[]>>;
@@ -93,7 +94,7 @@ export function reportLinkedSubmitLabel(drafts: ReportLinkedDraft[]) {
   return `Lưu báo cáo & tạo ${parts.join(', ')}`;
 }
 
-export function ConstructionReportLinkedComposer({ mode, drafts, onChange, workspace, sourceWorkItemId = '', reportEvidence = [], reportEvidencePending = false, primaryEvidenceId = '', canCreateCheck, canCreateAction, blockers = [], showValidation = false, notice, onSubmitDraft }: Props) {
+export function ConstructionReportLinkedComposer({ embedded = false, mode, drafts, onChange, workspace, sourceWorkItemId = '', reportEvidence = [], reportEvidencePending = false, primaryEvidenceId = '', canCreateCheck, canCreateAction, blockers = [], showValidation = false, notice, onSubmitDraft }: Props) {
   const toast = useToast();
   const [attempted, setAttempted] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
@@ -137,12 +138,12 @@ export function ConstructionReportLinkedComposer({ mode, drafts, onChange, works
   }
 
   const canAdd = Boolean(workspace);
-  return <aside ref={composerRef} className={clsx('rounded-lg border border-line bg-slate-50/70 p-4', mode === 'batch' && 'xl:sticky xl:top-4 xl:self-start')}>
+  return <aside ref={composerRef} className={clsx('min-w-0', !embedded && 'rounded-lg border border-line bg-slate-50/70 p-4', !embedded && mode === 'batch' && 'xl:sticky xl:top-4 xl:self-start')}>
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between xl:flex-col">
-      <div>
+      {!embedded ? <div>
         <h3 className="font-semibold text-ink">Kiểm tra & xử lý</h3>
         <p className="mt-1 text-xs leading-5 text-slate-500">Chuẩn bị việc phát sinh ngay tại báo cáo, không cần đổi màn hình.</p>
-      </div>
+      </div> : null}
       <div className="flex flex-wrap gap-2">
         {canCreateCheck ? <button type="button" disabled={!canAdd} className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-white px-2.5 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50" onClick={() => add('check')}><ClipboardCheck className="h-3.5 w-3.5" /> Kiểm tra</button> : null}
         {canCreateAction ? <button type="button" disabled={!canAdd} className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={() => add('action')}><Plus className="h-3.5 w-3.5" /> Việc xử lý</button> : null}
@@ -159,7 +160,7 @@ export function ConstructionReportLinkedComposer({ mode, drafts, onChange, works
     })}</div> : null}
 
     <div className="mt-4 space-y-3">
-      {!drafts.length ? <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-center"><CheckCircle2 className="mx-auto h-5 w-5 text-emerald-500" /><p className="mt-2 text-sm font-semibold text-slate-700">Chưa có phát sinh cần tạo</p><p className="mt-1 text-xs text-slate-500">Có thể chỉ lưu báo cáo hoặc thêm nhanh khi cần.</p></div> : null}
+      {!drafts.length && !embedded ? <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-center"><CheckCircle2 className="mx-auto h-5 w-5 text-emerald-500" /><p className="mt-2 text-sm font-semibold text-slate-700">Chưa có phát sinh cần tạo</p><p className="mt-1 text-xs text-slate-500">Có thể chỉ lưu báo cáo hoặc thêm nhanh khi cần.</p></div> : null}
       {drafts.map((draft, index) => {
         const errors = showValidation || attempted[draft.id] ? validateReportLinkedDraft(draft, sourceWorkItemId, hasReportEvidence) : {};
         const selectedEvidenceId = draft.evidence_id || primaryEvidenceId || reportEvidence[0]?.id || '';
@@ -178,7 +179,7 @@ export function ConstructionReportLinkedComposer({ mode, drafts, onChange, works
               <FieldBlock label="Hạn xử lý" required error={errors.due_at}><input type="datetime-local" className={controlClass(errors.due_at)} value={draft.due_at} onChange={(event) => patch(draft.id, { due_at: event.target.value })} /></FieldBlock>
             </div>}
 
-            {hasReportEvidence ? <FieldBlock label="Minh chứng báo cáo" required={draft.kind === 'action'}>{reportEvidence.length > 1 && mode === 'immediate' ? <select className={controlClass()} value={selectedEvidenceId} onChange={(event) => patch(draft.id, { evidence_id: event.target.value })}>{reportEvidence.map((item) => <option key={item.id} value={item.id}>{item.name || item.title || 'Minh chứng báo cáo'}</option>)}</select> : <div className="mt-1 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700"><CheckCircle2 className="h-4 w-4" /> Tự động dùng minh chứng của báo cáo</div>}</FieldBlock> : mode === 'batch' ? <div className={clsx('rounded-md border px-3 py-2 text-xs leading-5', errors.evidence ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-dashed border-slate-300 bg-slate-50 text-slate-500')}><AlertTriangle className="mr-1 inline h-3.5 w-3.5" /> {draft.kind === 'action' ? 'Thêm ảnh ở phần Minh chứng báo cáo để tạo việc xử lý.' : 'Chưa có ảnh hiện trạng; kiểm tra vẫn có thể được tạo.'}</div> : <FieldBlock label={draft.kind === 'action' ? 'Minh chứng hiện trạng' : 'Hình ảnh hiện trạng'} required={draft.kind === 'action'} error={errors.evidence}><ConstructionEvidenceCapture drafts={draft.uploads} onChange={(uploads) => patch(draft.id, { uploads })} hasSource={Boolean(sourceWorkItemId || draft.work_item_id)} disabled={saving[draft.id]} compact maxFiles={draft.kind === 'check' ? 10 : 1} hint={draft.kind === 'check' ? 'Không bắt buộc; ảnh sẽ được gắn làm bối cảnh kiểm tra.' : 'Chụp hoặc chọn một ảnh/tệp hiện trạng.'} /></FieldBlock>}
+            {hasReportEvidence ? <FieldBlock label="Minh chứng báo cáo" required={draft.kind === 'action'}>{reportEvidence.length > 1 && mode === 'immediate' ? <select className={controlClass()} value={selectedEvidenceId} onChange={(event) => patch(draft.id, { evidence_id: event.target.value })}>{reportEvidence.map((item) => <option key={item.id} value={item.id}>{item.name || item.title || 'Minh chứng báo cáo'}</option>)}</select> : <div className="mt-1 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700"><CheckCircle2 className="h-4 w-4" /> Tự động dùng minh chứng của báo cáo</div>}</FieldBlock> : mode === 'batch' ? <div className={clsx('rounded-md border px-3 py-2 text-xs leading-5', errors.evidence ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-dashed border-slate-300 bg-slate-50 text-slate-500')}><AlertTriangle className="mr-1 inline h-3.5 w-3.5" /> {draft.kind === 'action' ? 'Thêm ảnh ở phần Minh chứng báo cáo để tạo việc xử lý.' : 'Chưa có ảnh hiện trạng; kiểm tra vẫn có thể được tạo.'}</div> : <FieldBlock label={draft.kind === 'action' ? 'Minh chứng hiện trạng' : 'Hình ảnh hiện trạng'} required={draft.kind === 'action'} error={errors.evidence}><ConstructionEvidenceCapture uploadScope={`/work-items/${sourceWorkItemId || draft.work_item_id}/evidence/upload`} drafts={draft.uploads} onChange={(uploads) => patch(draft.id, { uploads })} hasSource={Boolean(sourceWorkItemId || draft.work_item_id)} disabled={saving[draft.id]} maxFiles={draft.kind === 'check' ? 10 : 1} hint={draft.kind === 'check' ? 'Không bắt buộc; ảnh sẽ được gắn làm bối cảnh kiểm tra.' : 'Chụp hoặc chọn một ảnh/tệp hiện trạng.'} /></FieldBlock>}
 
             <details className="rounded-md border border-line bg-slate-50 px-3 py-2">
               <summary className="cursor-pointer text-xs font-semibold text-slate-600">Thêm thông tin</summary>

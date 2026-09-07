@@ -51,7 +51,8 @@ test('all work-item evidence upload surfaces derive the immutable business type 
 
   assert.match(workItemPanel, /const classification = classifyEvidenceFile\(file\)/);
   assert.match(workItemPanel, /formData\.append\('evidence_type', row\.classification\.evidenceType\)/);
-  assert.match(workItemPanel, /accept=\{evidenceFileAccept\}/);
+  const uploader = await readFile(new URL('../src/modules/_shared/EvidenceUploader.tsx', import.meta.url), 'utf8');
+  assert.match(uploader, /accept=\{evidenceFileAccept\}/);
   assert.doesNotMatch(workItemPanel, /<option value="photo">/);
   assert.match(sharedCapture, /fileKind: classification\.kind/);
   assert.match(sharedCapture, /accept=\{evidenceFileAccept\}/);

@@ -74,7 +74,7 @@ export function ConstructionReportEvidenceDialog({ open, projectId, record, onCl
     title="Thêm minh chứng báo cáo"
     description={`Báo cáo hiện có ${report.evidenceIds.length} minh chứng. Tệp mới được lưu theo công việc liên quan và liên kết với báo cáo.`}
     size="lg"
-    onClose={onClose}
+    onClose={() => { if (!saving) onClose(); }}
     footer={<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" disabled={saving} className="rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60" onClick={onClose}>Hủy</button><button type="button" disabled={saving || !uploads.length} className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" onClick={save}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{saving ? 'Đang tải...' : `Tải ${uploads.length || ''} minh chứng`}</button></div>}
   >
     <div ref={contentRef} className="space-y-4">
@@ -82,11 +82,11 @@ export function ConstructionReportEvidenceDialog({ open, projectId, record, onCl
         <label data-validation-key="work_item_id" className="block scroll-mt-24 rounded-md"><span className="text-sm font-semibold text-slate-700">Công việc liên quan <span className="text-rose-600">*</span></span>
           {operations.isLoading ? <div className="mt-2"><LoadingSpinner label="Đang tải danh sách công việc..." /></div> : null}
           {operations.isError ? <p className="mt-2 text-sm text-rose-700">Không tải được danh sách công việc. Vui lòng thử lại.</p> : null}
-          {operations.isSuccess ? <select name="work_item_id" className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100" value={workItemId} disabled={Boolean(report.workItemId)} onChange={(event) => setWorkItemId(event.target.value)}><option value="">Chọn công việc</option>{workItems.map((item) => <option key={item.id} value={item.id}>{item.title} · {statusLabel(item.status)}</option>)}</select> : null}
+          {operations.isSuccess ? <select name="work_item_id" className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100" value={workItemId} disabled={saving || Boolean(report.workItemId)} onChange={(event) => setWorkItemId(event.target.value)}><option value="">Chọn công việc</option>{workItems.map((item) => <option key={item.id} value={item.id}>{item.title} · {statusLabel(item.status)}</option>)}</select> : null}
           <p className="mt-1 text-xs text-slate-500">{report.workItemId ? 'Báo cáo đã liên kết với công việc này nên không thể đổi tại bước thêm minh chứng.' : 'Công việc được liên kết với báo cáo sau lần tải đầu tiên.'}</p>
         </label>
       </section>
-      <div data-validation-key="evidence" className="scroll-mt-24 rounded-md"><ConstructionEvidenceCapture drafts={uploads} onChange={setUploads} hasSource={Boolean(workItemId)} disabled={saving} compact /></div>
+      <div data-validation-key="evidence" className="scroll-mt-24 rounded-md"><ConstructionEvidenceCapture linkOnUpload uploadScope={`/daily-reports/${record?.id}/evidence/upload:${workItemId}`} maxFiles={Math.max(0, 50 - report.evidenceIds.length)} drafts={uploads} onChange={setUploads} hasSource={Boolean(workItemId)} disabled={saving} /></div>
     </div>
   </Dialog>;
 }

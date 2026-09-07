@@ -84,21 +84,29 @@ func (s *Service) AddWorkItemEvidenceUpload(ctx context.Context, workItemID stri
 	return evidence, nil
 }
 
-func (s *Service) EvidenceFile(ctx context.Context, evidenceID, actorID string) (EvidenceFileResult, error) {
+func (s *Service) EvidenceDetail(ctx context.Context, evidenceID, actorID string) (Record, error) {
 	evidenceID = cleanID(evidenceID)
 	if !validActivityUUID(evidenceID) {
-		return EvidenceFileResult{}, validationError("Mã minh chứng không hợp lệ", Record{"evidence_id": evidenceID})
+		return nil, validationError("Mã minh chứng không hợp lệ", Record{"evidence_id": evidenceID})
 	}
 	evidence, err := s.repo.GetEvidenceDetail(ctx, evidenceID)
 	if err != nil {
-		return EvidenceFileResult{}, err
+		return nil, err
 	}
 	allowed, err := s.repo.CanViewWorkItem(ctx, cleanID(evidence["work_item_id"]), actorID)
 	if err != nil {
-		return EvidenceFileResult{}, err
+		return nil, err
 	}
 	if !allowed {
-		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem tệp minh chứng này")
+		return nil, forbiddenError("Bạn không có quyền xem tệp minh chứng này")
+	}
+	return evidence, nil
+}
+
+func (s *Service) EvidenceFile(ctx context.Context, evidenceID, actorID string) (EvidenceFileResult, error) {
+	evidence, err := s.EvidenceDetail(ctx, evidenceID, actorID)
+	if err != nil {
+		return EvidenceFileResult{}, err
 	}
 	provider := strings.TrimSpace(fmt.Sprint(evidence["storage_provider"]))
 	storageKey := strings.TrimSpace(fmt.Sprint(evidence["storage_key"]))

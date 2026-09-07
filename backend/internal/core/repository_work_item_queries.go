@@ -613,12 +613,13 @@ func (r *Repository) GetEvidenceDetail(ctx context.Context, evidenceID string) (
 
 func getEvidenceDetail(ctx context.Context, db queryContext, evidenceID string) (Record, error) {
 	return queryOneRecord(ctx, db, `
-		SELECT er.*, wi.title AS work_item_title, wi.status AS work_item_status,
+		SELECT er.*, wi.title AS work_item_title, wi.status AS work_item_status, rn.name AS run_node_name,
 			u.full_name AS submitted_by_name,COALESCE(u.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
 			reviewer.full_name AS reviewed_by_name,COALESCE(reviewer.deleted_at IS NOT NULL,false) AS reviewed_by_account_deleted,
 			d.name AS document_name
 		FROM evidence_records er
 		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
+		LEFT JOIN pipeline_run_nodes rn ON rn.id=wi.run_node_id
 		LEFT JOIN users u ON u.id=er.submitted_by
 		LEFT JOIN users reviewer ON reviewer.id=er.reviewed_by
 		LEFT JOIN documents d ON d.id=er.document_id

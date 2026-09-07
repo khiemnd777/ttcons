@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye, GitPullRequestArrow, Plus } from 'lucide-react';
-import { get, post, postForm, put } from '../../lib/api/client';
+import { get, post, postFormWithProgress, put } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { useToast } from '../../components/ToastProvider';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
@@ -16,6 +16,7 @@ import { ConstructionReportDetailDialog } from './ConstructionReportDetailDialog
 import { ConstructionReportFormDialog, type ConstructionDailyReportCreatePayload } from './ConstructionReportFormDialog';
 import { ConstructionReportEvidenceDialog } from './ConstructionReportEvidenceDialog';
 import { constructionEvidenceFormData, type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
+import { latestEvidenceUploadResult, uploadEvidenceDraftBatch } from '../_shared/evidenceUploadSession';
 import { type ReportLinkedDraft } from './ConstructionReportLinkedComposer';
 import { constructionReportViewModel } from './constructionReportViewModel';
 import { createConstructionAction, createConstructionCheck, uploadConstructionEvidenceItems } from './constructionWorkspaceApi';
@@ -200,23 +201,15 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   });
   const addReportEvidence = useMutation({
     mutationFn: ({ reportId, workItemId, uploads }: { reportId: string; workItemId: string; uploads: ConstructionEvidenceUploadDraft[]; record: Record<string, any> }) => uploadReportEvidence(reportId, workItemId, uploads),
-    onSuccess: ({ failed, latest }, variables) => { invalidateReports(); if (failed.length) { if (latest) setDialog({ type: 'report', mode: 'view', record: latest }); toast.warn({ title: 'Chưa tải đủ minh chứng', description: `Không tải được ${failed.length} tệp: ${failed.join(', ')}` }); return; } setDialog({ type: 'report', mode: 'view', record: latest ?? variables.record }); toast.success('Đã thêm minh chứng vào báo cáo'); },
+    onSuccess: (latest, variables) => { invalidateReports(); setDialog({ type: 'report', mode: 'view', record: latest ?? variables.record }); toast.success('Đã thêm minh chứng vào báo cáo'); },
     onError: (error) => toast.error('Không thêm được minh chứng', error),
   });
 
   async function uploadReportEvidence(reportId: string, workItemId: string, uploads: ConstructionEvidenceUploadDraft[]) {
-    const failed: string[] = [];
-    const failedDrafts: ConstructionEvidenceUploadDraft[] = [];
-    let latest: Record<string, any> | null = null;
-    for (const draft of uploads) {
-      try {
-        latest = await postForm<Record<string, any>>(`/daily-reports/${reportId}/evidence/upload`, constructionEvidenceFormData(draft, workItemId));
-      } catch (error) {
-        failed.push(`${draft.name || draft.file.name} (${error instanceof Error ? error.message : 'không xác định'})`);
-        failedDrafts.push(draft);
-      }
-    }
-    return { failed, failedDrafts, latest };
+    const path = `/daily-reports/${reportId}/evidence/upload`;
+    const scope = `${path}:${workItemId}`;
+    await uploadEvidenceDraftBatch(uploads, scope, (draft, progress) => postFormWithProgress<Record<string, any>>(path, constructionEvidenceFormData(draft, workItemId), ({ percent }) => progress(percent)), 1);
+    return latestEvidenceUploadResult<Record<string, any>>(uploads, scope) ?? null;
   }
 
   function changeTab(tab: OperationsTab) {
@@ -267,9 +260,9 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
     {activeTab === 'timeline' && canViewOperations ? <DailyTimeline rows={timelineRows} workspace={canViewFieldWorkspace ? construction.data : undefined} loading={reports.isLoading} error={reports.error} createEnabled={constructionActive} onRetry={() => reports.refetch()} onCreate={() => constructionActive && setOpenReport(true)} onView={(record) => setDialog({ type: 'report', mode: 'view', record })} /> : null}
     {activeTab === 'checks' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="checks" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} /> : null}
     {activeTab === 'actions' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="actions" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} variationContext={variationContext.data} variationContextLoading={variationContext.isLoading} variationContextError={variationContext.isError} canViewContracts={canViewContracts} onRetryVariationContext={() => { void variationContext.refetch(); }} onProposeVariation={canProposeVariation ? setVariationSource : undefined} /> : null}
-    <ConstructionReportFormDialog open={openReport} projectId={projectId} suggestion={timelineRows[0] ?? null} workspace={construction.data} canCreateCheck={canRequestCheck} canCreateAction={canCreateAction} canSubmitWorkReport={canSubmitWorkReport} onSubmit={(values, uploads, linkedDrafts) => createReport.mutateAsync({ values, uploads, linkedDrafts })} onClose={() => setOpenReport(false)} />
+    <ConstructionReportFormDialog open={openReport} projectId={projectId} projectName={projects.data?.find((project) => project.id === projectId)?.name ?? ''} suggestion={timelineRows[0] ?? null} workspace={construction.data} canCreateCheck={canRequestCheck} canCreateAction={canCreateAction} canSubmitWorkReport={canSubmitWorkReport} onSubmit={(values, uploads, linkedDrafts) => createReport.mutateAsync({ values, uploads, linkedDrafts })} onClose={() => setOpenReport(false)} />
     <ConstructionReportDetailDialog open={dialog?.type === 'report' && dialog.mode === 'view'} projectId={projectId} record={dialog?.record ?? null} initialLinkedDrafts={dialog?.pendingLinkedDrafts} linkedNotice={dialog?.linkedNotice} canManage={canReport && constructionActive && !selectedReportLocked && Boolean(dialog?.record?.runtime_compliant)} canViewLinked={canViewFieldWorkspace} canCreateCheck={canRequestCheck && constructionActive} canCreateAction={canCreateAction && constructionActive} canDeliver={canDeliverSelectedReport} deliveryPending={quickSubmitReport.isPending} onDeliver={(recipientId, recipientName) => dialog?.record ? quickSubmitReport.mutateAsync({ reportId: String(dialog.record.id), recipientId, recipientName }) : Promise.resolve()} onEdit={() => dialog?.record && setDialog({ type: 'report', mode: 'edit', record: dialog.record })} onAddEvidence={() => dialog?.record && setDialog({ type: 'report-evidence', mode: 'edit', record: dialog.record })} onOpenCheck={openLinkedCheck} onOpenAction={openLinkedAction} onClose={() => setDialog(null)} />
-    <ConstructionReportFormDialog open={dialog?.type === 'report' && dialog.mode === 'edit'} projectId={projectId} mode="edit" record={dialog?.record ?? null} canSubmitWorkReport={canDeliverSelectedReport} onSubmit={(values, uploads) => dialog?.record ? updateReport.mutateAsync({ reportId: dialog.record.id, values, uploads }) : Promise.resolve()} onClose={() => setDialog(null)} />
+    <ConstructionReportFormDialog open={dialog?.type === 'report' && dialog.mode === 'edit'} projectId={projectId} projectName={projects.data?.find((project) => project.id === projectId)?.name ?? ''} mode="edit" record={dialog?.record ?? null} canSubmitWorkReport={canDeliverSelectedReport} onSubmit={(values, uploads) => dialog?.record ? updateReport.mutateAsync({ reportId: dialog.record.id, values, uploads }) : Promise.resolve()} onClose={() => setDialog(null)} />
     <ConstructionReportEvidenceDialog open={dialog?.type === 'report-evidence'} projectId={projectId} record={dialog?.record ?? null} onSubmit={(workItemId, uploads) => dialog?.record ? addReportEvidence.mutateAsync({ reportId: dialog.record.id, workItemId, uploads, record: dialog.record }) : Promise.resolve()} onClose={() => setDialog(null)} />
     <ConstructionVariationProposalDialog open={Boolean(variationSource)} projectId={projectId} context={variationContext.data} contextLoading={variationContext.isLoading} contextError={variationContext.isError} canViewContracts={canViewContracts} workspace={construction.data} sourceWorkItemId={variationSource?.workItemId} sourceAction={variationSource?.action} onRetryContext={() => { void variationContext.refetch(); }} onClose={() => setVariationSource(null)} onSaved={variationSaved} />
   </>;

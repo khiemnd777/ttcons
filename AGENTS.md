@@ -155,6 +155,8 @@ When the user says `tiếp tục triển khai`, agents must treat it as a reques
 - Add route entries in `frontend/src/app/router.tsx`.
 - Put feature pages under `frontend/src/modules/<feature>`.
 - Reuse `frontend/src/components` before adding new UI primitives.
+- Evidence upload presentation has one owner: `frontend/src/modules/_shared/EvidenceUploader.tsx`, extracted from the existing WorkItem uploader. `EvidencePanel` owns immediate WorkItem upload; `EvidenceCapture` adapts parent-save queues and the shared camera. Preserve caller source, capacity and persistence timing. Do not add module-specific uploader markup or a presentation flag such as `reportMode`.
+- Evidence preview composition belongs to `frontend/src/modules/_shared/EvidenceRecordViewerDialog.tsx` and its draft/external states, using the existing photo/PDF/Word/Excel readers. Pass complete records when available; ID-only references resolve protected metadata through `EvidenceReferenceViewer`. Do not call the low-level `EvidenceViewerDialog` directly from feature modules. Update the entrypoint inventory and behavior/render tests when adopting or changing these components.
 - Create, view-detail, and edit interactions must open a shared dialog/modal component. Avoid one-off drawer or full-page implementations unless the feature is a specialized canvas/editor with explicit UX needs.
 - Save/edit flows must show toast feedback for success, warning, and error states. Toasts must include an immediate close `(x)` button.
 - Required and invalid fields must be highlighted inline, and the warning toast must summarize required/invalid fields.

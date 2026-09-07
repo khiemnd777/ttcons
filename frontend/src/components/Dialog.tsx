@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
+import './dialog.css';
 
 export type DialogSize = 'sm' | 'md' | 'lg' | 'xl' | 'report' | 'workspace';
 
@@ -22,6 +23,7 @@ export function Dialog({
   onClose,
   size = 'md',
   manageFocus = false,
+  mobileFullscreen = false,
 }: {
   open: boolean;
   title: string;
@@ -31,9 +33,11 @@ export function Dialog({
   onClose: () => void;
   size?: DialogSize;
   manageFocus?: boolean;
+  mobileFullscreen?: boolean;
 }) {
   const titleId = useId();
   const dialogRef = useRef<HTMLElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
@@ -82,10 +86,28 @@ export function Dialog({
     };
   }, [open, manageFocus]);
 
+  useEffect(() => {
+    if (!open || !mobileFullscreen) return;
+    const viewport = window.visualViewport;
+    const updateViewport = () => {
+      viewportRef.current?.style.setProperty('--dialog-viewport-height', `${viewport?.height ?? window.innerHeight}px`);
+      viewportRef.current?.style.setProperty('--dialog-viewport-top', `${viewport?.offsetTop ?? 0}px`);
+    };
+    updateViewport();
+    viewport?.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('scroll', updateViewport);
+    window.addEventListener('resize', updateViewport);
+    return () => {
+      viewport?.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('scroll', updateViewport);
+      window.removeEventListener('resize', updateViewport);
+    };
+  }, [open, mobileFullscreen]);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center p-4">
+    <div ref={viewportRef} className={clsx('fixed inset-0 z-40 grid place-items-center p-4', mobileFullscreen && 'dialog-mobile-fullscreen')}>
       <button type="button" className="absolute inset-0 bg-ink/35" aria-label="Đóng dialog" onClick={onClose} />
       <section
         ref={dialogRef}
@@ -93,9 +115,9 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={clsx('relative flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-lg border border-line bg-white shadow-2xl', sizeClass[size])}
+        className={clsx('dialog-surface relative flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-lg border border-line bg-white shadow-2xl', sizeClass[size])}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
+        <div className="dialog-header flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div className="min-w-0">
             <h2 id={titleId} className="text-lg font-semibold text-ink">{title}</h2>
             {description ? <p className="mt-1 text-sm leading-5 text-slate-600">{description}</p> : null}
@@ -104,8 +126,8 @@ export function Dialog({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="min-h-0 overflow-y-auto p-5">{children}</div>
-        {footer ? <div className="border-t border-line bg-slate-50 px-5 py-3">{footer}</div> : null}
+        <div className="dialog-body min-h-0 overflow-y-auto p-5">{children}</div>
+        {footer ? <div className="dialog-footer border-t border-line bg-slate-50 px-5 py-3">{footer}</div> : null}
       </section>
     </div>
   );

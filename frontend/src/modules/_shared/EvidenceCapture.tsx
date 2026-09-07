@@ -1,124 +1,108 @@
-import { useEffect, useRef, useState } from 'react';
-import { Camera, CameraIcon, ExternalLink, Eye, FileText, Image, Loader2, RefreshCw, SwitchCamera, Trash2, Upload, X } from 'lucide-react';
+import { useRef, useState, useSyncExternalStore } from 'react';
+import { Camera, CameraIcon, Loader2, SwitchCamera } from 'lucide-react';
 import { useToast } from '../../components/ToastProvider';
+import { Dialog } from '../../components/Dialog';
+import './evidenceCapture.css';
+import { createCameraCaptureSession } from './cameraCaptureSession';
 import { EvidenceDraftViewerDialog, formatEvidenceFileSize } from './EvidenceRecordViewerDialog';
-import {
-  classifyEvidenceFile,
-  evidenceFileAccept,
-  evidenceFileKindLabel,
-  evidenceSupportedFileHint,
-  type EvidenceFileKind,
-} from './evidenceFileTypes';
+import { EvidenceUploader, type EvidenceUploadRow } from './EvidenceUploader';
+import { evidenceUploadSnapshot, retryEvidenceUpload, subscribeEvidenceUpload } from './evidenceUploadSession';
+import { classifyEvidenceFile, evidenceFileAccept, evidenceSupportedFileHint, type EvidenceFileKind } from './evidenceFileTypes';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
+import { useEffect } from 'react';
 
 export const constructionEvidenceMaxBytes = 10 * 1024 * 1024;
-
 export type ConstructionEvidenceUploadDraft = {
-  id: string;
-  file: File;
-  evidenceType: 'photo' | 'document';
-  fileKind: EvidenceFileKind;
-  name: string;
-  caption: string;
+  id: string; file: File; evidenceType: 'photo' | 'document';
+  fileKind: EvidenceFileKind; name: string; caption: string;
 };
-
 export type EvidenceCaptureIntent = 'file' | 'camera';
-
 type ConstructionEvidenceCaptureProps = {
   drafts: ConstructionEvidenceUploadDraft[];
   onChange: (drafts: ConstructionEvidenceUploadDraft[]) => void;
   hasSource: boolean;
+  uploadScope: string;
+  linkOnUpload?: boolean;
   disabled?: boolean;
-  compact?: boolean;
   hint?: string;
   maxFiles?: number;
   onSourceRequired?: (intent: EvidenceCaptureIntent, resume: () => void) => void;
-  onPreviewPhoto?: (draft: ConstructionEvidenceUploadDraft, previewURL: string) => void;
 };
 
-export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, disabled = false, compact = false, hint, maxFiles, onSourceRequired, onPreviewPhoto }: ConstructionEvidenceCaptureProps) {
+export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, uploadScope, linkOnUpload = false, disabled = false, hint, maxFiles = 10, onSourceRequired }: ConstructionEvidenceCaptureProps) {
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fallbackCameraInputRef = useRef<HTMLInputElement | null>(null);
   const captureRef = useRef<HTMLDivElement | null>(null);
   const navigateValidation = useValidationNavigation(captureRef);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [localPreview, setLocalPreview] = useState<{ draft: ConstructionEvidenceUploadDraft; previewURL: string } | null>(null);
+  const [preview, setPreview] = useState<ConstructionEvidenceUploadDraft | null>(null);
+  const [fileIssue, setFileIssue] = useState('');
+  const draftsRef = useRef(drafts);
+  draftsRef.current = drafts;
+  useSyncExternalStore(
+    (listener) => { const removers = drafts.map((draft) => subscribeEvidenceUpload(draft, uploadScope, listener)); return () => removers.forEach((remove) => remove()); },
+    () => JSON.stringify(drafts.map((draft) => evidenceUploadSnapshot(draft, uploadScope))),
+    () => '',
+  );
+  const uploadRows: EvidenceUploadRow[] = drafts.map((draft) => ({ ...draft, classification: classifyEvidenceFile(draft.file), fileIssue: '', ...evidenceUploadSnapshot(draft, uploadScope) }));
+  const uploading = disabled || uploadRows.some((row) => row.status === 'uploading' || row.status === 'processing');
 
-  function addFiles(files: File[]) {
+  function addFiles(files: File[], replaceId?: string) {
+    if (uploading) return false;
+    let issue = '';
     const valid: ConstructionEvidenceUploadDraft[] = [];
     files.forEach((file) => {
       const classification = classifyEvidenceFile(file);
-      if (!classification) {
-        toast.warn({ title: 'Tệp không được hỗ trợ', description: `${file.name}: chỉ nhận ${evidenceSupportedFileHint}.` });
-        navigateValidation('evidence_files');
-        return;
-      }
-      if (file.size <= 0 || file.size > constructionEvidenceMaxBytes) {
-        toast.warn({ title: 'Dung lượng tệp không hợp lệ', description: `${file.name}: tối đa ${formatEvidenceFileSize(constructionEvidenceMaxBytes)}.` });
-        navigateValidation('evidence_files');
-        return;
-      }
+      if (!classification) { issue = `${file.name}: chỉ nhận ${evidenceSupportedFileHint}.`; return; }
+      if (file.size <= 0 || file.size > constructionEvidenceMaxBytes) { issue = `${file.name}: tệp phải có nội dung, tối đa ${formatEvidenceFileSize(constructionEvidenceMaxBytes)}.`; return; }
       valid.push({ id: newDraftID(), file, evidenceType: classification.evidenceType, fileKind: classification.kind, name: file.name, caption: '' });
     });
-    const available = maxFiles === undefined ? valid.length : Math.max(0, maxFiles - drafts.length);
-    if (valid.length > available) {
-      toast.warn({ title: 'Đã đạt giới hạn minh chứng', description: `Mỗi nhóm được đính kèm tối đa ${maxFiles} ảnh hoặc tệp.` });
-      navigateValidation('evidence_files');
-    }
-    if (available > 0) onChange([...drafts, ...valid.slice(0, available)]);
+    const previous = draftsRef.current;
+    const replacing = previous.some((draft) => draft.id === replaceId);
+    const available = Math.max(0, maxFiles - previous.length + Number(replacing));
+    if (valid.length > available) issue = `Mỗi nhóm được đính kèm tối đa ${maxFiles} ảnh hoặc tệp.`;
+    setFileIssue(issue);
+    if (issue) { toast.warn({ title: 'Kiểm tra tệp minh chứng', description: issue }); navigateValidation('evidence_files'); }
+    const accepted = valid.slice(0, available);
+    if (!accepted.length) return false;
+    const next = replacing ? previous.map((draft) => draft.id === replaceId ? { ...accepted[0], caption: draft.caption } : draft) : [...previous, ...accepted];
+    draftsRef.current = next;
+    onChange(next);
+    return true;
   }
-
-  function updateDraft(id: string, patch: Partial<ConstructionEvidenceUploadDraft>) {
-    onChange(drafts.map((draft) => draft.id === id ? { ...draft, ...patch } : draft));
-  }
-
   function requestCapture(intent: EvidenceCaptureIntent, resume: () => void) {
-    if (!hasSource && onSourceRequired) {
-      onSourceRequired(intent, resume);
-      return;
-    }
+    if (uploading) return;
+    if (!hasSource && onSourceRequired) { onSourceRequired(intent, resume); return; }
     resume();
   }
-
-  return (
-    <div ref={captureRef} className="rounded-lg border border-dashed border-blue-300 bg-blue-50/40 p-4" data-validation-key="evidence_files">
-      <input ref={fileInputRef} type="file" multiple accept={evidenceFileAccept} className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
-      <input ref={fallbackCameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2"><Upload className="h-4 w-4 text-blue-600" /><h4 className="text-sm font-semibold text-ink">Tệp và ảnh hiện trường</h4></div>
-          <p className="mt-1 text-xs leading-5 text-slate-500">{hint ?? 'Tệp chỉ được tải lên sau khi lưu báo cáo và được lưu theo công việc liên quan đã chọn.'}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={disabled} className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" onClick={() => requestCapture('file', () => fileInputRef.current?.click())}><Upload className="h-4 w-4" /> Chọn tệp</button>
-          <button type="button" disabled={disabled} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" onClick={() => requestCapture('camera', () => setCameraOpen(true))}><Camera className="h-4 w-4" /> Mở camera</button>
-        </div>
-      </div>
-
-      {!hasSource && drafts.length ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Đã giữ {drafts.length} tệp trong hàng đợi. Chọn công việc liên quan trước khi lưu để tải minh chứng.</p> : null}
-      {!drafts.length ? <div className="mt-3 rounded-md border border-line bg-white px-3 py-4 text-center text-xs text-slate-500">Chưa chọn tệp. {evidenceSupportedFileHint}, tối đa 10 MB mỗi tệp.</div> : null}
-      {drafts.length ? <div className={`mt-3 grid gap-3 ${compact ? 'sm:grid-cols-2' : 'md:grid-cols-2'}`}>{drafts.map((draft) => <EvidenceDraftCard key={draft.id} draft={draft} onChange={(patch) => updateDraft(draft.id, patch)} onRemove={() => onChange(drafts.filter((item) => item.id !== draft.id))} onPreview={(previewURL) => onPreviewPhoto ? onPreviewPhoto(draft, previewURL) : setLocalPreview({ draft, previewURL })} />)}</div> : null}
-
-      <CameraCaptureModal
-        open={cameraOpen}
-        onClose={() => setCameraOpen(false)}
-        onUse={(file) => { addFiles([file]); setCameraOpen(false); }}
-        onFallback={() => { setCameraOpen(false); fallbackCameraInputRef.current?.click(); }}
-      />
-
-      <EvidenceDraftViewerDialog
-        open={Boolean(localPreview)}
-        name={localPreview?.draft.name ?? 'Minh chứng'}
-        originalName={localPreview?.draft.file.name ?? ''}
-        previewUrl={localPreview?.previewURL}
-        mimeType={localPreview?.draft.file.type}
-        fileSize={localPreview?.draft.file.size ?? 0}
-        caption={localPreview?.draft.caption}
-        onClose={() => setLocalPreview(null)}
-      />
-    </div>
-  );
+  function updateUploadRow(id: string, update: (row: EvidenceUploadRow) => EvidenceUploadRow) {
+    const row = uploadRows.find((item) => item.id === id);
+    if (!row || uploading || row.status === 'success') return;
+    const next = update(row);
+    onChange(drafts.map((draft) => draft.id === id ? { ...draft, name: next.name, caption: next.caption } : draft));
+  }
+  const rows = uploadRows.length ? uploadRows : [{ id: 'evidence_files', file: null, classification: null, name: '', caption: '', fileIssue, status: 'queued' as const, progress: 0, error: '' }];
+  return <div ref={captureRef} className="min-w-0 rounded-md border border-blue-100 bg-blue-50/40 p-3" data-validation-key="evidence_files" data-validation-error={fileIssue ? 'true' : undefined}>
+    <input ref={fileInputRef} type="file" multiple accept={evidenceFileAccept} className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
+    <input ref={fallbackCameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
+    <EvidenceUploader uploadRows={rows} batchUploading={uploading} maxFiles={maxFiles}
+      updateUploadRow={updateUploadRow}
+      onFileChange={(id, file, input) => { if (file) requestCapture('file', () => addFiles([file], id)); input.value = ''; }}
+      addUploadRow={() => requestCapture('file', () => fileInputRef.current?.click())}
+      removeUploadRow={(id) => { if (!uploading) onChange(drafts.filter((draft) => draft.id !== id)); }}
+      canRemoveRow={(row) => !linkOnUpload || row.status !== 'success'}
+      retryUploadRow={(id) => { const draft = drafts.find((item) => item.id === id); if (draft) void retryEvidenceUpload(draft, uploadScope)?.catch((error: unknown) => toast.error('Không tải được minh chứng', error)); }}
+      onPreview={(row) => setPreview(drafts.find((draft) => draft.id === row.id) ?? null)}
+      actions={<button type="button" disabled={uploading || drafts.length >= maxFiles} className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" onClick={() => requestCapture('camera', () => setCameraOpen(true))}><Camera className="h-4 w-4" /> Mở camera</button>}
+    />
+    {fileIssue && drafts.length ? <p role="alert" className="mt-2 text-xs text-rose-700">{fileIssue}</p> : null}
+    <p className="mt-2 text-xs text-slate-500">{hint ?? 'Tệp được tải lên khi lưu cùng công việc liên quan đã chọn.'}</p>
+    {!hasSource && drafts.length ? <p className="mt-2 text-xs text-amber-800">Đã giữ {drafts.length} tệp trong hàng đợi. Chọn công việc liên quan trước khi lưu.</p> : null}
+    {uploadRows.some((row) => row.status === 'success') ? <p className="mt-2 text-xs text-emerald-700">{linkOnUpload ? 'Tệp tải thành công đã được đính kèm vào báo cáo.' : 'Đã giữ tệp tải thành công. Lưu để hoàn tất đính kèm.'}</p> : null}
+    <CameraCaptureModal open={cameraOpen && !uploading} selectedCount={drafts.filter((draft) => draft.evidenceType === 'photo').length} atCapacity={drafts.length >= maxFiles} onClose={() => setCameraOpen(false)} onUse={(file) => addFiles([file])} onFallback={() => { setCameraOpen(false); fallbackCameraInputRef.current?.click(); }} />
+    <EvidenceDraftViewerDialog open={Boolean(preview)} name={preview?.name ?? 'Minh chứng'} originalName={preview?.file.name ?? ''} file={preview?.file} mimeType={preview?.file.type} fileSize={preview?.file.size ?? 0} caption={preview?.caption} onClose={() => setPreview(null)} />
+  </div>;
 }
 
 export function constructionEvidenceFormData(draft: ConstructionEvidenceUploadDraft, workItemId: string) {
@@ -133,42 +117,22 @@ export function constructionEvidenceFormData(draft: ConstructionEvidenceUploadDr
   return formData;
 }
 
-function EvidenceDraftCard({ draft, onChange, onRemove, onPreview }: { draft: ConstructionEvidenceUploadDraft; onChange: (patch: Partial<ConstructionEvidenceUploadDraft>) => void; onRemove: () => void; onPreview: (previewURL: string) => void }) {
-  const [previewURL, setPreviewURL] = useState('');
-  const [previewFailed, setPreviewFailed] = useState(false);
-
-  useEffect(() => {
-    const objectURL = URL.createObjectURL(draft.file);
-    setPreviewURL(objectURL);
-    setPreviewFailed(false);
-    return () => URL.revokeObjectURL(objectURL);
-  }, [draft.file]);
-
-  return <article className="overflow-hidden rounded-lg border border-line bg-white">
-    <div className="flex min-h-28 items-center justify-center bg-slate-100">
-      {draft.evidenceType === 'photo' && previewURL && !previewFailed ? <button type="button" className="group relative block h-32 w-full" aria-label={`Xem ảnh ${draft.name}`} onClick={() => onPreview(previewURL)}><img src={previewURL} alt={draft.name} className="h-full w-full object-cover" onError={() => setPreviewFailed(true)} /><span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-ink/65 px-2 py-1.5 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"><Eye className="h-3.5 w-3.5" /> Xem ảnh</span></button> : draft.evidenceType === 'photo' && previewFailed ? <div className="px-4 py-5 text-center"><Image className="mx-auto h-9 w-9 text-rose-400" /><p className="mt-2 text-xs font-semibold text-rose-700">Không đọc được ảnh xem trước</p></div> : <FileText className="h-9 w-9 text-slate-400" />}
-    </div>
-    <div className="space-y-2 p-3">
-      <div className="flex items-start gap-2"><span className="mt-2 text-blue-600">{draft.evidenceType === 'photo' ? <Image className="h-4 w-4" /> : <FileText className="h-4 w-4" />}</span><div className="min-w-0 flex-1"><input className="w-full rounded-md border border-line px-2.5 py-1.5 text-sm font-semibold text-ink outline-none focus:border-blue-300" value={draft.name} onChange={(event) => onChange({ name: event.target.value })} aria-label="Tên minh chứng" /><p className="mt-1 text-xs text-slate-500">{evidenceFileKindLabel(draft.fileKind)} · {formatEvidenceFileSize(draft.file.size)}</p></div><button type="button" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={onRemove} aria-label={`Xóa ${draft.name}`}><Trash2 className="h-4 w-4" /></button></div>
-      <input className="w-full rounded-md border border-line px-2.5 py-1.5 text-sm outline-none focus:border-blue-300" value={draft.caption} onChange={(event) => onChange({ caption: event.target.value })} placeholder="Ghi chú vị trí / hạng mục" />
-      {previewURL && draft.evidenceType === 'photo' ? <button type="button" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline" onClick={() => onPreview(previewURL)}><Eye className="h-3.5 w-3.5" /> Xem ảnh</button> : null}
-      {previewURL && draft.evidenceType === 'document' ? <a href={previewURL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Mở tệp</a> : null}
-      {!previewURL ? <span className="inline-flex items-center gap-1.5 text-xs text-slate-400"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Đang chuẩn bị tệp xem trước</span> : null}
-    </div>
-  </article>;
-}
-
-function CameraCaptureModal({ open, onClose, onUse, onFallback }: { open: boolean; onClose: () => void; onUse: (file: File) => void; onFallback: () => void }) {
+function CameraCaptureModal({ open, selectedCount = 0, atCapacity = false, onClose, onUse, onFallback }: { open: boolean; selectedCount?: number; atCapacity?: boolean; onClose: () => void; onUse: (file: File) => boolean; onFallback: () => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState('');
   const [captured, setCaptured] = useState<{ file: File; url: string } | null>(null);
+  const [captureBusy, setCaptureBusy] = useState(false);
+  const captureSession = useRef(createCameraCaptureSession());
+  const usedFile = useRef<File | null>(null);
 
   useEffect(() => {
     if (!open) return undefined;
     let disposed = false;
+    captureSession.current.invalidate();
+    setCaptureBusy(false);
     setCaptured((current) => { if (current) URL.revokeObjectURL(current.url); return null; });
     setStatus('loading');
     setError('');
@@ -196,6 +160,7 @@ function CameraCaptureModal({ open, onClose, onUse, onFallback }: { open: boolea
       });
     return () => {
       disposed = true;
+      captureSession.current.invalidate();
       stopCamera(streamRef);
     };
   }, [facingMode, open]);
@@ -205,6 +170,7 @@ function CameraCaptureModal({ open, onClose, onUse, onFallback }: { open: boolea
   if (!open) return null;
 
   function close() {
+    captureSession.current.invalidate();
     stopCamera(streamRef);
     onClose();
   }
@@ -217,37 +183,53 @@ function CameraCaptureModal({ open, onClose, onUse, onFallback }: { open: boolea
     canvas.height = video.videoHeight;
     const context = canvas.getContext('2d');
     if (!context) return;
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const file = new File([blob], `hien-truong-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`, { type: 'image/jpeg' });
-      setCaptured((current) => { if (current) URL.revokeObjectURL(current.url); return { file, url: URL.createObjectURL(file) }; });
-    }, 'image/jpeg', 0.9);
+    const ticket = captureSession.current.begin();
+    if (ticket === null) return;
+    setCaptureBusy(true);
+    setError('');
+    try {
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!captureSession.current.finish(ticket)) return;
+        setCaptureBusy(false);
+        if (!blob) { setError('Không tạo được ảnh. Vui lòng chụp lại.'); return; }
+        const file = new File([blob], `hien-truong-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`, { type: 'image/jpeg' });
+        setCaptured((current) => { if (current) URL.revokeObjectURL(current.url); return { file, url: URL.createObjectURL(file) }; });
+      }, 'image/jpeg', 0.9);
+    } catch {
+      if (captureSession.current.finish(ticket)) {
+        setCaptureBusy(false);
+        setError('Không tạo được ảnh. Vui lòng chụp lại.');
+      }
+    }
   }
 
-  return <div className="fixed inset-0 z-[70] grid place-items-center p-4">
-    <button type="button" className="absolute inset-0 bg-ink/60" aria-label="Đóng camera" onClick={close} />
-    <section role="dialog" aria-modal="true" aria-labelledby="camera-title" className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-line bg-white shadow-2xl">
-      <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4"><div><h2 id="camera-title" className="text-lg font-semibold text-ink">Chụp ảnh hiện trường</h2><p className="mt-1 text-sm text-slate-600">Kiểm tra khung hình trước khi dùng làm minh chứng.</p></div><button type="button" className="rounded-md p-2 text-slate-500 hover:bg-slate-100" onClick={close} aria-label="Đóng"><X className="h-5 w-5" /></button></div>
-      <div className="min-h-0 overflow-y-auto bg-slate-950 p-4">
-        <div className="relative mx-auto aspect-video max-h-[60vh] overflow-hidden rounded-lg bg-black">
-          <video ref={videoRef} playsInline muted className={`h-full w-full object-contain ${captured ? 'hidden' : ''}`} />
-          {captured ? <img src={captured.url} alt="Ảnh vừa chụp" className="h-full w-full object-contain" /> : null}
-          {status === 'loading' && !captured ? <div className="absolute inset-0 grid place-items-center text-sm text-white"><span className="inline-flex items-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Đang mở camera...</span></div> : null}
-          {status === 'error' && !captured ? <div className="absolute inset-0 grid place-items-center p-6 text-center"><div><CameraIcon className="mx-auto h-9 w-9 text-slate-400" /><p className="mt-3 text-sm font-semibold text-white">Không dùng được camera trực tiếp</p><p className="mt-1 max-w-lg text-sm text-slate-300">{error}</p></div></div> : null}
-        </div>
+  function useCaptured(keepOpen = false) {
+    if (!captured || usedFile.current === captured.file) return;
+    if (!onUse(captured.file)) return;
+    usedFile.current = captured.file;
+    if (keepOpen) setCaptured(null);
+    else close();
+  }
+
+  return <Dialog open title="Chụp ảnh hiện trường" description={'Đã chọn: ' + selectedCount + ' ảnh'} size="lg" mobileFullscreen manageFocus onClose={close} footer={<div className="evidence-camera-actions space-y-2">
+    {atCapacity ? <p role="status" className="text-sm text-amber-800">Đã đạt giới hạn ảnh/tệp đã chọn.</p> : null}
+    <div className="grid grid-cols-2 gap-2">
+      {captured ? <><button type="button" className="min-h-11 rounded-md border border-line px-3 py-2 text-sm font-semibold" onClick={() => setCaptured(null)}>Chụp lại</button><button type="button" disabled={atCapacity} className="min-h-11 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={() => useCaptured(true)}>Dùng & chụp tiếp</button></> : <><button type="button" disabled={status !== 'ready' || captureBusy} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => setFacingMode((current) => current === 'environment' ? 'user' : 'environment')}><SwitchCamera className="h-4 w-4" /> Đổi camera</button><button type="button" disabled={status !== 'ready' || captureBusy || atCapacity} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={capture}>{captureBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />} Chụp ảnh</button></>}
+    </div>
+    <div className="flex items-center justify-between gap-2"><button type="button" disabled={captureBusy || atCapacity} className="min-h-11 px-2 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" onClick={onFallback}>Camera hệ thống</button><button type="button" disabled={captureBusy} className="min-h-11 rounded-md border border-line px-5 py-2 text-sm font-semibold disabled:opacity-50" onClick={() => captured ? useCaptured() : close()}>Xong</button></div>
+  </div>}>
+    <div className="evidence-camera-content">
+      <div className="evidence-camera-frame relative mx-auto aspect-[4/3] overflow-hidden rounded-lg bg-black">
+        <video ref={videoRef} playsInline muted className={'h-full w-full object-contain ' + (captured ? 'hidden' : '')} />
+        {captured ? <img src={captured.url} alt="Ảnh vừa chụp" className="h-full w-full object-contain" /> : null}
+        {status === 'loading' ? <div className="absolute inset-0 grid place-items-center text-white"><span className="inline-flex items-center gap-2 text-sm"><Loader2 className="h-5 w-5 animate-spin" /> Đang mở camera...</span></div> : null}
+        {status === 'error' ? <div role="alert" className="absolute inset-0 grid place-items-center p-5 text-center text-sm text-white"><div><CameraIcon className="mx-auto mb-3 h-8 w-8" /><p>{error}</p><p className="mt-3">Chọn “Camera hệ thống” để thử cách khác.</p></div></div> : null}
       </div>
-      <div className="flex flex-col-reverse gap-2 border-t border-line bg-white px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={onFallback}><Camera className="h-4 w-4" /> Dùng camera hệ thống</button>
-        <div className="flex flex-wrap justify-end gap-2">
-          {!captured ? <button type="button" disabled={status !== 'ready'} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" onClick={() => setFacingMode((current) => current === 'environment' ? 'user' : 'environment')}><SwitchCamera className="h-4 w-4" /> Đổi camera</button> : null}
-          {!captured ? <button type="button" disabled={status !== 'ready'} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={capture}><Camera className="h-4 w-4" /> Chụp ảnh</button> : null}
-          {captured ? <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setCaptured((current) => { if (current) URL.revokeObjectURL(current.url); return null; })}><RefreshCw className="h-4 w-4" /> Chụp lại</button> : null}
-          {captured ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => onUse(captured.file)}><Upload className="h-4 w-4" /> Dùng ảnh</button> : null}
-        </div>
-      </div>
-    </section>
-  </div>;
+      {error && status !== 'error' ? <p role="alert" className="mt-2 text-sm text-rose-700">{error}</p> : null}
+    </div>
+  </Dialog>;
+
 }
 
 function stopCamera(ref: React.MutableRefObject<MediaStream | null>) {

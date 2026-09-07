@@ -719,6 +719,15 @@ func (h *Handler) WithdrawActivityMessage(c *fiber.Ctx) error {
 	return response.OK(c, item)
 }
 
+func (h *Handler) GetEvidenceDetail(c *fiber.Ctx) error {
+	evidence, err := h.service.EvidenceDetail(c.Context(), c.Params("id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "private, no-store")
+	return response.OK(c, evidence)
+}
+
 func (h *Handler) GetEvidenceFile(c *fiber.Ctx) error {
 	file, err := h.service.EvidenceFile(c.Context(), c.Params("id"), actorID(c))
 	if err != nil {

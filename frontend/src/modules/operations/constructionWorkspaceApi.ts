@@ -1,6 +1,8 @@
-import { post, postForm } from '../../lib/api/client';
+import { post } from '../../lib/api/client';
 import type { ConstructionActionItem, ConstructionCheck, ConstructionCheckCriterion } from '../../lib/types/domain';
-import { constructionEvidenceFormData, type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
+import { type ConstructionEvidenceUploadDraft } from './ConstructionEvidenceCapture';
+
+import { uploadWorkItemEvidenceDrafts } from '../_shared/evidenceUploadApi';
 
 export type ConstructionCheckCreateInput = {
 	work_item_id: string;
@@ -40,11 +42,6 @@ export async function uploadConstructionEvidence(workItemId: string, drafts: Con
 }
 
 export async function uploadConstructionEvidenceItems(workItemId: string, drafts: ConstructionEvidenceUploadDraft[]) {
-	const ids: string[] = [];
-	for (const draft of drafts) {
-		const evidence = await postForm<Record<string, unknown>>(`/work-items/${workItemId}/evidence/upload`, constructionEvidenceFormData(draft, workItemId));
-		const evidenceId = String(evidence.id ?? '');
-		if (evidenceId) ids.push(evidenceId);
-	}
-	return ids;
+	const records = await uploadWorkItemEvidenceDrafts(workItemId, drafts);
+	return records.map((record) => String(record.id));
 }

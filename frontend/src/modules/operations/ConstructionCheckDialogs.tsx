@@ -78,12 +78,12 @@ function TemplateDialog({ projectId, onClose, onSaved }: Props) {
     }
   }
 
-  return <Dialog open title="Tạo mẫu kiểm tra" description="Mỗi dòng là một điều đội hiện trường cần nhìn và xác nhận." size="lg" onClose={onClose} footer={<FormFooter saving={saving} submitLabel="Tạo mẫu" onClose={onClose} onSave={save} />}>
-    <div ref={formRef} className="grid gap-4 sm:grid-cols-2">
+  return <Dialog open title="Tạo mẫu kiểm tra" description="Mỗi dòng là một điều đội hiện trường cần nhìn và xác nhận." size="lg" onClose={() => { if (!saving) onClose(); }} footer={<FormFooter saving={saving} submitLabel="Tạo mẫu" onClose={onClose} onSave={save} />}>
+    <fieldset disabled={saving} className="min-w-0"><div ref={formRef} className="grid gap-4 sm:grid-cols-2">
       <FieldBlock label="Tên mẫu" required error={errors.name}><input className={controlClass(errors.name)} value={values.name} onChange={(event) => change(setValues, setErrors, 'name', event.target.value)} autoFocus /></FieldBlock>
       <FieldBlock label="Mô tả ngắn"><input className={controlClass()} value={values.description} onChange={(event) => change(setValues, setErrors, 'description', event.target.value)} /></FieldBlock>
       <FieldBlock className="sm:col-span-2" label="Các tiêu chí" required error={errors.criteria} helper="Mỗi dòng tương ứng một tiêu chí; hệ thống sẽ lưu kèm yêu cầu minh chứng."><textarea rows={8} className={controlClass(errors.criteria)} value={values.criteria} onChange={(event) => change(setValues, setErrors, 'criteria', event.target.value)} placeholder={'Cao độ và độ phẳng — Sai số không quá 3mm\nBề mặt hoàn thiện — Không cong vênh, nứt hoặc hở mối nối'} /></FieldBlock>
-    </div>
+    </div></fieldset>
   </Dialog>;
 }
 
@@ -179,8 +179,8 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
     }
   }
 
-  return <Dialog open title={check ? 'Chỉnh sửa kiểm tra' : 'Tạo kiểm tra'} description={check ? 'Chỉ kiểm tra đang chờ và được tạo tại màn hình này mới có thể chỉnh sửa.' : sourceReport ? 'Kiểm tra này sẽ được truy vết trực tiếp về báo cáo hiện trường nguồn.' : 'Đặt nội dung, công việc và thời điểm để đội hiện trường có thể thực hiện ngay.'} size="xl" onClose={onClose} footer={<FormFooter saving={saving} submitLabel={check ? 'Lưu thay đổi' : 'Tạo kiểm tra'} onClose={onClose} onSave={save} />}>
-    <div ref={formRef} className="space-y-5">
+  return <Dialog open title={check ? 'Chỉnh sửa kiểm tra' : 'Tạo kiểm tra'} description={check ? 'Chỉ kiểm tra đang chờ và được tạo tại màn hình này mới có thể chỉnh sửa.' : sourceReport ? 'Kiểm tra này sẽ được truy vết trực tiếp về báo cáo hiện trường nguồn.' : 'Đặt nội dung, công việc và thời điểm để đội hiện trường có thể thực hiện ngay.'} size="xl" onClose={() => { if (!saving) onClose(); }} footer={<FormFooter saving={saving} submitLabel={check ? 'Lưu thay đổi' : 'Tạo kiểm tra'} onClose={onClose} onSave={save} />}>
+    <fieldset disabled={saving} className="min-w-0"><div ref={formRef} className="space-y-5">
       {sourceReport ? <SourceReportBanner report={sourceReport} /> : null}
       <div><SectionTitle>Thông tin kiểm tra</SectionTitle><div className="mt-3 grid gap-4 sm:grid-cols-2">
 	        <FieldBlock label="Công việc liên quan" required error={errors.work_item_id} helper={sourceReport?.work_item_id ? 'Được khóa theo báo cáo nguồn.' : 'Chỉ hiển thị hạng mục thuộc Node Thi công đang hoạt động.'}><select disabled={Boolean(sourceReport?.work_item_id)} className={controlClass(errors.work_item_id, Boolean(sourceReport?.work_item_id))} value={values.work_item_id} onChange={(event) => changeWorkItem(event.target.value)}><option value="">Chọn công việc</option>{availableWorkItems.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></FieldBlock>
@@ -193,8 +193,8 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
         <div className="mt-3 space-y-2">{criteria.map((item, index) => <div key={item.id} className="flex items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">{index + 1}</span><input className={controlClass()} value={item.text} onChange={(event) => setCriteria((current) => current.map((row) => row.id === item.id ? { ...row, text: event.target.value } : row))} placeholder="Ví dụ: Cao độ và độ phẳng, sai số không quá 3mm" /><button type="button" className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setCriteria((current) => current.filter((row) => row.id !== item.id))} aria-label={`Xóa tiêu chí ${index + 1}`}><Trash2 className="h-4 w-4" /></button></div>)}</div>
         <button type="button" className="mt-3 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={addCriterion}><Plus className="h-4 w-4" /> Thêm tiêu chí</button>
       </div>
-      <div><SectionTitle>Hình ảnh hiện trạng</SectionTitle><p className="mt-1 text-xs text-slate-500">Không bắt buộc. Ảnh được lưu theo công việc và giúp người kiểm tra hiểu đúng bối cảnh.</p>{existingContext.length ? <ExistingContextEvidence evidence={existingContext} onRemove={(id) => setExistingContext((current) => current.filter((item) => item.id !== id))} /> : null}{fallbackSourceEvidenceIDs.length ? <div className="mt-3 flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700"><span>Đã dùng minh chứng chính từ báo cáo nguồn.</span><button type="button" className="font-semibold hover:underline" onClick={() => setFallbackSourceEvidenceIDs([])}>Gỡ</button></div> : null}<div className="mt-3"><ConstructionEvidenceCapture drafts={uploads} onChange={setUploads} hasSource={Boolean(values.work_item_id)} disabled={saving || existingContext.length + fallbackSourceEvidenceIDs.length >= 10} compact maxFiles={10 - existingContext.length - fallbackSourceEvidenceIDs.length} hint="Chụp hoặc chọn tối đa 10 ảnh/tệp hiện trạng; có thể bổ sung hoặc gỡ trước khi lưu." /></div></div>
-    </div>
+      <div><SectionTitle>Hình ảnh hiện trạng</SectionTitle><p className="mt-1 text-xs text-slate-500">Không bắt buộc. Ảnh được lưu theo công việc và giúp người kiểm tra hiểu đúng bối cảnh.</p>{existingContext.length ? <ExistingContextEvidence evidence={existingContext} onRemove={(id) => setExistingContext((current) => current.filter((item) => item.id !== id))} /> : null}{fallbackSourceEvidenceIDs.length ? <div className="mt-3 flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700"><span>Đã dùng minh chứng chính từ báo cáo nguồn.</span><button type="button" className="font-semibold hover:underline" onClick={() => setFallbackSourceEvidenceIDs([])}>Gỡ</button></div> : null}<div className="mt-3"><ConstructionEvidenceCapture uploadScope={`/work-items/${values.work_item_id}/evidence/upload`} drafts={uploads} onChange={setUploads} hasSource={Boolean(values.work_item_id)} disabled={saving || existingContext.length + fallbackSourceEvidenceIDs.length >= 10} maxFiles={10 - existingContext.length - fallbackSourceEvidenceIDs.length} hint="Chụp hoặc chọn tối đa 10 ảnh/tệp hiện trạng; có thể bổ sung hoặc gỡ trước khi lưu." /></div></div>
+    </div></fieldset>
   </Dialog>;
 }
 
@@ -270,8 +270,8 @@ function CompleteCheckDialog({ check, workspace, onClose, onSaved }: Props & { c
     }
   }
 
-  return <Dialog open title="Ghi kết quả kiểm tra" description={`${check.title} · ${check.work_item_title || 'Công việc liên quan'}`} size="xl" onClose={onClose} footer={<FormFooter saving={saving} submitLabel="Lưu kết quả" onClose={onClose} onSave={save} />}>
-    <div ref={formRef} className="space-y-5">
+  return <Dialog open title="Ghi kết quả kiểm tra" description={`${check.title} · ${check.work_item_title || 'Công việc liên quan'}`} size="xl" onClose={() => { if (!saving) onClose(); }} footer={<FormFooter saving={saving} submitLabel="Lưu kết quả" onClose={onClose} onSave={save} />}>
+    <fieldset disabled={saving} className="min-w-0"><div ref={formRef} className="space-y-5">
       <ResultChoice value={values.result} onChange={(result) => change(setValues, setErrors, 'result', result)} />
       <FieldBlock label="Ghi chú kết quả"><textarea rows={3} className={controlClass()} value={values.note} onChange={(event) => change(setValues, setErrors, 'note', event.target.value)} placeholder="Mô tả quan sát hoặc điểm cần lưu ý" /></FieldBlock>
       {failed ? <div><SectionTitle>Việc cần xử lý được tạo tự động</SectionTitle><div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -281,8 +281,8 @@ function CompleteCheckDialog({ check, workspace, onClose, onSaved }: Props & { c
         <FieldBlock label="Mức ưu tiên"><select className={controlClass()} value={values.priority} onChange={(event) => change(setValues, setErrors, 'priority', event.target.value)}><option value="normal">Bình thường</option><option value="urgent">Gấp</option></select></FieldBlock>
         <FieldBlock label="Ảnh hưởng"><select className={controlClass()} value={values.impact_scope} onChange={(event) => change(setValues, setErrors, 'impact_scope', event.target.value)}><option value="none">Không ảnh hưởng</option><option value="timeline">Tiến độ</option><option value="budget">Chi phí</option><option value="design_scope">Thiết kế / phạm vi</option></select></FieldBlock>
       </div></div> : null}
-      <FieldBlock label="Minh chứng kết quả" required error={errors.evidence}><ConstructionEvidenceCapture drafts={uploads} onChange={(next) => { setUploads(next); setErrors((current) => ({ ...current, evidence: '' })); }} hasSource disabled={saving} compact maxFiles={10} hint="Chọn từ 1 đến 10 ảnh hoặc tệp; tất cả sẽ được lưu theo công việc và gắn vào kết quả kiểm tra." /></FieldBlock>
-    </div>
+      <FieldBlock label="Minh chứng kết quả" required error={errors.evidence}><ConstructionEvidenceCapture uploadScope={`/work-items/${check.work_item_id}/evidence/upload`} drafts={uploads} onChange={(next) => { setUploads(next); setErrors((current) => ({ ...current, evidence: '' })); }} hasSource disabled={saving} maxFiles={10} hint="Chọn từ 1 đến 10 ảnh hoặc tệp; tất cả sẽ được lưu theo công việc và gắn vào kết quả kiểm tra." /></FieldBlock>
+    </div></fieldset>
   </Dialog>;
 }
 
@@ -291,7 +291,7 @@ function ResultChoice({ value, onChange }: { value: string; onChange: (value: st
 }
 
 function ExistingContextEvidence({ evidence, onRemove }: { evidence: ConstructionCheck['context_evidence']; onRemove: (id: string) => void }) {
-  return <div className="mt-3 grid gap-2 sm:grid-cols-2">{evidence.map((item, index) => <div key={item.id} className="relative pr-10"><ConstructionEvidenceButton evidenceId={item.id} name={item.name} label={`Ảnh hiện trạng ${index + 1}`} /><button type="button" className="absolute right-2 top-2 rounded-md bg-white p-1.5 text-slate-400 shadow-sm ring-1 ring-inset ring-line hover:bg-rose-50 hover:text-rose-600" onClick={() => onRemove(item.id)} aria-label={`Gỡ ${item.name || `ảnh hiện trạng ${index + 1}`}`}><Trash2 className="h-4 w-4" /></button></div>)}</div>;
+  return <div className="mt-3 grid gap-2 sm:grid-cols-2">{evidence.map((item, index) => <div key={item.id} className="relative pr-10"><ConstructionEvidenceButton record={item} evidenceId={item.id} name={item.name} label={`Ảnh hiện trạng ${index + 1}`} /><button type="button" className="absolute right-2 top-2 rounded-md bg-white p-1.5 text-slate-400 shadow-sm ring-1 ring-inset ring-line hover:bg-rose-50 hover:text-rose-600" onClick={() => onRemove(item.id)} aria-label={`Gỡ ${item.name || `ảnh hiện trạng ${index + 1}`}`}><Trash2 className="h-4 w-4" /></button></div>)}</div>;
 }
 
 function criteriaRows(items: ConstructionCheck['criteria_jsonb'], includeEmpty: boolean) {
