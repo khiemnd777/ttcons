@@ -1,5 +1,11 @@
 # Reporting Analytics Domain Map
 
+## Work Report Revision PDF Presentation
+
+- `work_report_pdf.go` renders selected immutable snapshots as A4 daily-report content with a normalized date, readable typography, wrapped metadata, recorded progress, warning-styled blockers and full SHA-256. Footers identify report day, revision and page/total. Missing progress/time remains missing; no live status or identity substitution is introduced.
+- `WorkReportReviewDialog.tsx::exportRevision` reuses shared `dateText` for matching filenames. Export permission, actor scope and audit remain in `ExportWorkReportPDF`. Re-export uses current layout over original content; existing downloaded PDFs stay unchanged. Tests/searches: `work_report_pdf_test.go`, `generateWorkReportPDF|workReportPDFDate|exportRevision`; offline fixtures are not browser/live-DB acceptance.
+- Daily work is a three-column table (`workReportPDFRenderer.workTable`) with independent done/current/next lists, wrapped cells and repeated page headers. Empty groups show a placeholder; continuation pages leave exhausted columns blank. This grouping does not create cross-column row relationships, progress calculations or new source data. Legacy unclassified summaries retain their textual fallback.
+
 ## Dashboard Activity Replaces Portfolio
 
 - Activity presentation uses four aligned desktop columns (project, content, actor, time/action) and stacked mobile rows. Shared `format.ts` supplies `dd-mm-yyyy` day headers, `HH:mm` row times and `HH:mm dd-mm-yyyy` detail timestamps in Vietnam time. Cashflow date/range labels also use the shared date helper; this changes no report period, grouping query, totals, visibility or source event semantics.

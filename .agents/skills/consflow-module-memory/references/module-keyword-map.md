@@ -1,5 +1,12 @@
 # Consflow Module Keyword Map
 
+## Construction Daily Report PDF Presentation
+
+- Keywords: thiết kế PDF báo cáo thi công, ngày có T00:00:00Z, PDF lần gửi, tràn chữ PDF. Owners: `backend/internal/core/work_report_pdf.go`, `work_report_pdf_test.go`, `frontend/src/modules/work-reports/WorkReportReviewDialog.tsx`. First searches: `generateWorkReportPDF|workReportPDFRenderer|workReportPDFDate|exportRevision`.
+- Revision PDFs use A4 portrait with a separate date/title, wrapping metadata, recorded progress/weather, numbered work/blocker/resource/note sections, full SHA-256 and repeated page footers. Explicit line pagination protects headings and shaded blockers. Missing data stays `Chưa ghi nhận`; PDF-only date normalization and frontend shared `dateText` produce `dd-mm-yyyy` and matching `bao-cao-thi-cong-<date>-lan-<n>.pdf` filenames.
+- `workReportPDFRenderer.workTable` renders Đã làm / Đang làm / Sẽ làm as three equal-width independent list columns with top-aligned content, light-blue headers and thin borders. Page breaks repeat the table headers and resume each list in its own column; exhausted columns remain blank, genuinely empty groups show `Chưa ghi nhận` once. All-empty reports still show the table; legacy unclassified nonempty summaries keep the free-text fallback. Tests include uneven multi-page column content and legacy fallback.
+- Only the selected immutable revision is rendered; snapshots/hashes, access checks, lifecycle and schema remain unchanged. Existing downloaded bytes stay unchanged; new exports use the current renderer. Load backend/frontend/triage and Construction Operations/Reporting Analytics maps. `WORK_REPORT_PDF_ARTIFACT_DIR` with focused PDF tests emits synthetic fixtures for offline visual QA, not live-environment acceptance.
+
 ## Exact Record Source Links
 
 - Keywords: mở hồ sơ gốc, hồ sơ liên quan, tất cả dạng chi tiết, source link, deep link. Owners: `modules/_shared/{recordNavigation.ts,RecordLinks.tsx,useRecordDeepLink.tsx,RecordSourcePage.tsx}`, canonical source pages and `ActivityTopicDetails`. First searches: `recordPath|recordRead|selectSourceRecord|relatedRecordTargets|useRecordDeepLink`.

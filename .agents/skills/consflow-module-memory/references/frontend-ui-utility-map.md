@@ -1,5 +1,10 @@
 # Consflow Frontend UI And Utility Map
 
+## Construction Revision PDF Download Filename
+
+- `modules/work-reports/WorkReportReviewDialog.tsx::exportRevision` uses shared `dateText(detail.report_date, 'khong-ro-ngay')` for `bao-cao-thi-cong-<dd-mm-yyyy>-lan-<revision>.pdf`. First searches: `exportRevision|bao-cao-thi-cong|dateText`.
+- Authenticated revision download, busy state and success/error toast remain unchanged. Document layout belongs to backend `work_report_pdf.go`; the review dialog does not recreate or mutate revision content.
+
 ## Exact Source Navigation
 
 - Source/detail dialogs opt into `Dialog.manageFocus` (initial close-button focus, Tab/Shift+Tab containment, Escape and trigger restoration). Shared Dialog keyboard/initial-focus handling ignores covered modals so a nested source/evidence viewer owns input. Handover exact links reveal/focus the existing workspace once the matching detail has finished loading, with `scroll-mt-20` for the sticky header; immediate scrolling during selection can leave the detail below the fold. `revealedSource` prevents refetches from stealing focus again.

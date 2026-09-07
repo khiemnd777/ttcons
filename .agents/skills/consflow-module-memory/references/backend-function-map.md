@@ -1,5 +1,11 @@
 # Consflow Backend Function Map
 
+## Construction Report Revision PDF Renderer
+
+- `GET /work-reports/:id/pdf?revision=` retains `ExportWorkReportPDF` authorization and immutable revision lookup. `work_report_pdf.go::generateWorkReportPDF` owns presentation only; `workReportPDFRenderer` draws A4 metadata, progress/weather, numbered content, blockers, resources, notes and full SHA-256 with explicit line pagination. Missing/invalid progress is not zero; absent timestamps do not fabricate a submission time.
+- `workReportPDFDate` normalizes date-only and RFC3339 timestamps into Vietnam `dd-mm-yyyy`; shared notification formatter `workReportDisplayDate` is unchanged. Filename: `bao-cao-thi-cong-<date>-lan-<revision>.pdf`. Tests: `work_report_pdf_test.go` covers dates, immutable input, short/long/empty/overflow fixtures and heading/summary/hash page boundaries. First searches: `generateWorkReportPDF|workReportPDFRenderer|workReportPDFDate`.
+- `workReportPDFRenderer.workTable` replaces stacked work groups with equal-width done/partial/next columns. It wraps each independent list to its column width, repeats headers per page and sizes each page segment to its longest remaining column. Section title/header/first line stay together. Empty groups have one placeholder; exhausted continuation columns stay blank. A nonempty legacy unclassified `work_summary` remains outside the table. `TestWorkReportPDFFixtures` adds `columns` and `legacy` fixtures; first search for table layout: `workTable`.
+
 ## Exact Source Read Contracts
 
 - `repository.go::safeTable` must include `supplier_quotations`: `GetSupplierQuotation` uses `requireRecordProjectPermission` → `RecordProjectID` before detail. Missing allowlist membership returns HTTP 500 even when listing and detail SQL succeed. The allowlist remains exact; project and permission guards still run. Regression: `TestSafeTableAllowsSupplierQuotationProjectScope`.

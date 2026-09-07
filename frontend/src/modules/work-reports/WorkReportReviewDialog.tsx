@@ -124,7 +124,7 @@ export function WorkReportReviewDialog({
     setBusyAction(`pdf-${revisionNo}`);
     try {
       const blob = await downloadBlob(`/work-reports/${detail.work_report_id}/pdf?revision=${revisionNo}`);
-      saveBlob(blob, `bao-cao-thi-cong-${detail.report_date ?? 'khong-ro-ngay'}-lan-${revisionNo}.pdf`);
+      saveBlob(blob, `bao-cao-thi-cong-${dateText(detail.report_date, 'khong-ro-ngay')}-lan-${revisionNo}.pdf`);
       toast.success(`Đã xuất PDF lần gửi ${revisionNo}`);
     } catch (requestError) {
       toast.error('Không xuất được PDF báo cáo', requestError);
