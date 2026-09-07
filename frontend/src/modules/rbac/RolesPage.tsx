@@ -8,6 +8,8 @@ import { DataTable } from '../../components/DataTable';
 import { FormDrawer } from '../../components/FormDrawer';
 import { useToast } from '../../components/ToastProvider';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
+import { RecordSummary } from '../../components/RecordDetailLayout';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { RowActions } from '../../components/RowActions';
 import { Dialog } from '../../components/Dialog';
 import { appRoleScopeLabel } from '../../lib/utils/roles';
@@ -32,6 +34,7 @@ type RoleRow = Record<string, any> & {
 export function RolesPage() {
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<{ mode: 'view' | 'edit'; record: RoleRow } | null>(null);
+  const sourceLink = useRecordDeepLink({ kind: 'role', onOpen: record => setDialog({ mode: 'view', record }) });
   const [permissionRole, setPermissionRole] = useState<RoleRow | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -116,18 +119,24 @@ export function RolesPage() {
       <FormDrawer open={open} title="Tạo role" onClose={() => setOpen(false)}>
         <SimpleForm fields={roleFields()} onSubmit={(values) => create.mutateAsync(values)} />
       </FormDrawer>
+      {sourceLink.feedback}
       <RecordDetailDialog
         open={dialog?.mode === 'view'}
-        title="Chi tiết role"
+        title="Chi tiết vai trò"
+        summary={row => <RecordSummary eyebrow={row.name} title={row.display_name} subtitle={appRoleScopeLabel(row)} value={row.permission_count ?? '—'} valueLabel="Quyền được gán" />}
+        sections={[
+          { title: 'Mô tả vai trò', keys: ['description'] },
+          { title: 'Phân loại', keys: ['scope', 'system_role'] },
+        ]}
         record={dialog?.record ?? null}
-        onClose={() => setDialog(null)}
+        onClose={() => { setDialog(null); if (sourceLink.active) sourceLink.dismiss(); }}
         fields={[
           { key: 'display_name', label: 'Tên hiển thị' },
           { key: 'name', label: 'Key' },
-          { key: 'description', label: 'Mô tả' },
+          { key: 'description', label: 'Mô tả', wide: true },
           { key: 'scope', label: 'Phạm vi', render: (row) => appRoleScopeLabel(row) },
           { key: 'permission_count', label: 'Số quyền' },
-          { key: 'system_role', label: 'System role' },
+          { key: 'system_role', label: 'Vai trò hệ thống' },
         ]}
       />
       <FormDrawer open={dialog?.mode === 'edit'} title="Chỉnh sửa role" onClose={() => setDialog(null)}>

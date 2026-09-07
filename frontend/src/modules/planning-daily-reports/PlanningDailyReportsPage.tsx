@@ -6,6 +6,8 @@ import { get } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
+import { RecordSummary, RecordSection, RecordMetrics, RecordMetric } from '../../components/RecordDetailLayout';
+import { PlanningRecordContext } from '../_shared/PlanningRecordContext';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSection } from '../../components/ListSection';
 import { RowActions } from '../../components/RowActions';
@@ -15,6 +17,7 @@ import { ProjectSelector } from '../_shared/ProjectSelector';
 import { dateText, percent } from '../../lib/utils/format';
 import type { PlanningDailyReportItem } from '../../lib/types/domain';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
+import { RecordLink } from '../_shared/RecordLinks';
 import { compactDateTime, numberValue } from '../work-items/workItemPresentation';
 
 type Filters = {
@@ -273,69 +276,28 @@ function MetricCard({ icon, label, value, sub }: { icon: ReactNode; label: strin
   );
 }
 
-function PlanningDailyReportDetailDialog({
-  report,
-  onClose,
-  onOpenWorkItem,
-}: {
-  report: PlanningDailyReportItem | null;
-  onClose: () => void;
-  onOpenWorkItem: (report: PlanningDailyReportItem) => void;
+function PlanningDailyReportDetailDialog({ report, onClose, onOpenWorkItem }: {
+  report: PlanningDailyReportItem | null; onClose: () => void; onOpenWorkItem: (report: PlanningDailyReportItem) => void;
 }) {
-  return (
-    <Dialog
-      open={Boolean(report)}
-      title="Chi tiết daily report kế hoạch"
-      description={report ? `${report.project_name} · ${dateText(report.report_date)} · ${report.reported_by || identityReferenceText(report.submitted_by_name, report.submitted_by_account_deleted)}` : undefined}
-      size="xl"
-      onClose={onClose}
-      footer={report ? (
-        <div className="flex flex-wrap justify-end gap-2">
-          <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose} type="button">Đóng</button>
-          <button
-            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-            disabled={!report.work_item_id}
-            onClick={() => onOpenWorkItem(report)}
-            type="button"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Mở work item/form
-          </button>
-        </div>
-      ) : null}
-    >
-      {report ? (
-        <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <DetailPill label="Status" value={<StatusBadge status={report.status} />} />
-            <DetailPill label="Scope" value={planningScopeLabel(report.planning_scope)} />
-            <DetailPill label="Progress" value={report.progress_percent === null || report.progress_percent === undefined ? '-' : percent(report.progress_percent)} />
-            <DetailPill label="Updated" value={compactDateTime(report.updated_at)} />
-          </div>
-          <div className="grid gap-4 xl:grid-cols-3">
-            <StructuredItems title="Đã làm" items={arrayValue(report.completed_items)} empty="Chưa có hạng mục đã làm." renderMeta={completedMeta} />
-            <StructuredItems title="Sẽ làm" items={arrayValue(report.next_plan_items)} empty="Chưa có việc sẽ làm." renderMeta={nextPlanMeta} />
-            <StructuredItems title="Blocker / Risk" items={arrayValue(report.blockers)} empty="Chưa có blocker." renderMeta={blockerMeta} />
-          </div>
-          <div className="grid gap-2 rounded-md border border-line bg-slate-50 p-3 text-xs text-slate-600 md:grid-cols-2">
-            <p>Node: <span className="font-semibold text-ink">{report.run_node_name ?? '-'}</span></p>
-            <p>Step: <span className="font-semibold text-ink">{report.run_step_name ?? '-'}</span></p>
-            <p>Generated work items: <span className="font-semibold text-ink">{numberValue(report.generated_work_item_count)}</span></p>
-            <p>Artifacts: <span className="font-semibold text-ink">{numberValue(report.signature_count)} chữ ký · {numberValue(report.pdf_export_count)} PDF · {numberValue(report.evidence_count)} evidence</span></p>
-          </div>
-        </div>
-      ) : <EmptyState title="Chưa chọn daily report." />}
-    </Dialog>
-  );
-}
-
-function DetailPill({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-md border border-line bg-slate-50 px-3 py-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="mt-1 text-sm font-semibold text-ink">{value}</div>
-    </div>
-  );
+  return <Dialog manageFocus open={Boolean(report)} title="Chi tiết báo cáo ngày kế hoạch" size="xl" onClose={onClose}
+    footer={report ? <div className="flex flex-wrap justify-end gap-2">
+      <button className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose} type="button">Đóng</button>
+      {report.work_item_id ? <RecordLink primary target={{ kind: 'work_item', id: report.work_item_id, projectId: report.project_id }}>Mở đầu việc/biểu mẫu</RecordLink> : <span className="text-sm text-slate-500">Chưa có đầu việc nguồn</span>}
+    </div> : null}>
+    {report ? <div className="space-y-6">
+      <RecordSummary eyebrow={report.project_name} title={report.title || 'Báo cáo ngày kế hoạch'} subtitle={dateText(report.report_date)} status={<StatusBadge status={report.status} />} value={report.progress_percent == null ? '—' : percent(report.progress_percent)} valueLabel="Tiến độ báo cáo" />
+      <RecordMetrics>
+        <RecordMetric label="Người báo cáo">{report.reported_by || identityReferenceText(report.submitted_by_name, report.submitted_by_account_deleted)}</RecordMetric>
+        <RecordMetric label="Phạm vi">{planningScopeLabel(report.planning_scope)}</RecordMetric>
+      </RecordMetrics>
+      <div className="space-y-6">
+        <StructuredItems title="Đã làm" items={arrayValue(report.completed_items)} empty="Chưa có hạng mục đã làm." renderMeta={completedMeta} />
+        <StructuredItems title="Kế hoạch tiếp theo" items={arrayValue(report.next_plan_items)} empty="Chưa có việc sẽ làm." renderMeta={nextPlanMeta} />
+        <StructuredItems title="Vướng mắc & rủi ro" items={arrayValue(report.blockers)} empty="Chưa ghi nhận vướng mắc." renderMeta={blockerMeta} />
+      </div>
+      <PlanningRecordContext record={report} />
+    </div> : <EmptyState title="Chưa chọn hồ sơ." />}
+  </Dialog>;
 }
 
 function StructuredItems({

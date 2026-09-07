@@ -16,6 +16,7 @@ import (
 func (r *Repository) ListProjectBOQ(ctx context.Context, projectID string) ([]Record, error) {
 	return r.Query(ctx, `
 		SELECT b.*, m.name AS material_name, selected_quote.quotation_code AS selected_quotation_code,
+			selected_quote.quotation_id AS selected_quotation_id,
 			selected_quote.supplier_partner_id AS selected_supplier_partner_id,
 			selected_quote.supplier_name AS selected_supplier_name,
 			selected_quote.quoted_unit_price,
@@ -49,7 +50,7 @@ func (r *Repository) ListProjectBOQ(ctx context.Context, projectID string) ([]Re
 		FROM boq_items b
 		LEFT JOIN materials m ON m.id=b.material_id
 		LEFT JOIN LATERAL (
-			SELECT q.quotation_code, q.supplier_partner_id, q.supplier_name, qi.unit_price AS quoted_unit_price
+			SELECT q.id AS quotation_id, q.quotation_code, q.supplier_partner_id, q.supplier_name, qi.unit_price AS quoted_unit_price
 			FROM supplier_quotation_items qi
 			JOIN supplier_quotations q ON q.id=qi.quotation_id
 			WHERE qi.id=b.selected_quotation_item_id
@@ -73,6 +74,7 @@ func (r *Repository) ListProjectBOQ(ctx context.Context, projectID string) ([]Re
 func (r *Repository) GetBOQItemDetail(ctx context.Context, itemID string) (Record, error) {
 	return r.QueryOne(ctx, `
 		SELECT b.*, m.name AS material_name, selected_quote.quotation_code AS selected_quotation_code,
+			selected_quote.quotation_id AS selected_quotation_id,
 			selected_quote.supplier_partner_id AS selected_supplier_partner_id,
 			selected_quote.supplier_name AS selected_supplier_name,
 			selected_quote.quoted_unit_price,
@@ -106,7 +108,7 @@ func (r *Repository) GetBOQItemDetail(ctx context.Context, itemID string) (Recor
 		FROM boq_items b
 		LEFT JOIN materials m ON m.id=b.material_id
 		LEFT JOIN LATERAL (
-			SELECT q.quotation_code, q.supplier_partner_id, q.supplier_name, qi.unit_price AS quoted_unit_price
+			SELECT q.id AS quotation_id, q.quotation_code, q.supplier_partner_id, q.supplier_name, qi.unit_price AS quoted_unit_price
 			FROM supplier_quotation_items qi
 			JOIN supplier_quotations q ON q.id=qi.quotation_id
 			WHERE qi.id=b.selected_quotation_item_id
@@ -597,9 +599,16 @@ func (r *Repository) ListProjectSupplierQuotations(ctx context.Context, projectI
 
 func (r *Repository) GetSupplierQuotationDetail(ctx context.Context, quotationID string) (Record, error) {
 	quotation, err := r.QueryOne(ctx, `
-		SELECT q.*, p.tax_code AS supplier_tax_code
+		SELECT q.*, p.tax_code AS supplier_tax_code,
+			COALESCE(summary.item_count, 0) AS item_count,
+			COALESCE(summary.amount_before_tax, 0) AS amount_before_tax,
+			COALESCE(summary.total_amount, 0) AS total_amount
 		FROM supplier_quotations q
 		JOIN partners p ON p.id=q.supplier_partner_id
+		LEFT JOIN (
+			SELECT quotation_id, COUNT(*) AS item_count, SUM(amount_before_tax) AS amount_before_tax, SUM(total_amount) AS total_amount
+			FROM supplier_quotation_items WHERE quotation_id=$1 GROUP BY quotation_id
+		) summary ON summary.quotation_id=q.id
 		WHERE q.id=$1 AND q.status <> 'cancelled'
 	`, quotationID)
 	if err != nil {
@@ -1041,7 +1050,7 @@ func (r *Repository) GetProcurementDetail(ctx context.Context, requestID string)
 	}
 	items, _ := r.Query(ctx, `
 		SELECT pri.*, m.name AS material_name, b.work_item_name, b.price_waiver_reason,
-			q.quotation_code, q.quotation_date, q.valid_until, q.currency,
+			q.id AS quotation_id, q.quotation_code, q.quotation_date, q.valid_until, q.currency,
 			COALESCE(received.accepted_quantity,0) AS accepted_quantity,
 			LEAST(COALESCE(received.accepted_quantity,0), COALESCE(received.stock_received_quantity,0)+COALESCE(legacy_stock.received_quantity,0)) AS stock_received_quantity,
 			GREATEST(pri.quantity_requested - COALESCE(received.accepted_quantity,0),0) AS remaining_quantity,

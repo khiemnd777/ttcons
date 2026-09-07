@@ -6,6 +6,8 @@ import { DataTable, type DataTableRowKey } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
 import { PageHeader } from '../../components/PageHeader';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
+import { RecordSummary } from '../../components/RecordDetailLayout';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { RowActions } from '../../components/RowActions';
 import { useToast } from '../../components/ToastProvider';
 import { get, post, put } from '../../lib/api/client';
@@ -54,6 +56,7 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
   const [status, setStatus] = useState<'active' | 'inactive' | 'all'>('active');
   const [type, setType] = useState('');
   const [dialog, setDialog] = useState<PartnerDialog>(null);
+  const sourceLink = useRecordDeepLink({ kind: 'partner', onOpen: record => setDialog({ mode: 'view', record }) });
   const [selectedKeys, setSelectedKeys] = useState<Set<DataTableRowKey>>(new Set());
   const [deleteOpen, setDeleteOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -201,11 +204,17 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
         onError={(title, error) => toast.error(title, error)}
       />
 
+      {sourceLink.feedback}
       <RecordDetailDialog
         open={dialog?.mode === 'view'}
         title="Chi tiết đối tác"
+        summary={row => <RecordSummary eyebrow={row.partner_code} title={row.name} subtitle={partnerTypesText(row as Partner)} status={<span className={`rounded-md px-2 py-1 text-xs font-semibold ${row.active === false ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-800'}`}>{row.active === false ? 'Ngừng hoạt động' : 'Đang hoạt động'}</span>} />}
+        sections={[
+          { title: 'Thông tin liên hệ', keys: ['contact_name', 'phone', 'email', 'address'] },
+          { title: 'Thông tin giao dịch', keys: ['tax_code', 'payment_terms_days'] },
+        ]}
         record={dialog?.mode === 'view' ? dialog.record : null}
-        onClose={() => setDialog(null)}
+        onClose={() => { setDialog(null); if (sourceLink.active) sourceLink.dismiss(); }}
         fields={[
           { key: 'partner_code', label: 'Mã' },
           { key: 'name', label: 'Tên' },
@@ -214,8 +223,8 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
           { key: 'contact_name', label: 'Liên hệ' },
           { key: 'phone', label: 'Điện thoại' },
           { key: 'email', label: 'Email' },
-          { key: 'address', label: 'Địa chỉ' },
-          { key: 'payment_terms_days', label: 'Điều khoản TT' },
+          { key: 'address', label: 'Địa chỉ', wide: true },
+          { key: 'payment_terms_days', label: 'Thời hạn thanh toán', render: row => row.payment_terms_days == null ? '—' : `${row.payment_terms_days} ngày` },
           { key: 'active', label: 'Trạng thái', render: (row) => (row.active === false ? 'Inactive' : 'Active') },
         ]}
       />

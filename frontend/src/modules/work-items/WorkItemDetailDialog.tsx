@@ -113,6 +113,7 @@ export function WorkItemDetailDialog({
 
   return (
     <Dialog
+      manageFocus
       open={open}
       title={item?.title ?? 'Chi tiết đầu việc'}
       description={item ? `${workContextLabel} · ${departmentLabel(item.department)}` : undefined}

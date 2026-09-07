@@ -1,5 +1,19 @@
 # Consflow Backend Function Map
 
+## Construction Report Revision PDF Renderer
+
+- `GET /work-reports/:id/pdf?revision=` retains `ExportWorkReportPDF` authorization and immutable revision lookup. `work_report_pdf.go::generateWorkReportPDF` owns presentation only; `workReportPDFRenderer` draws A4 metadata, progress/weather, numbered content, blockers, resources, notes and full SHA-256 with explicit line pagination. Missing/invalid progress is not zero; absent timestamps do not fabricate a submission time.
+- `workReportPDFDate` normalizes date-only and RFC3339 timestamps into Vietnam `dd-mm-yyyy`; shared notification formatter `workReportDisplayDate` is unchanged. Filename: `bao-cao-thi-cong-<date>-lan-<revision>.pdf`. Tests: `work_report_pdf_test.go` covers dates, immutable input, short/long/empty/overflow fixtures and heading/summary/hash page boundaries. First searches: `generateWorkReportPDF|workReportPDFRenderer|workReportPDFDate`.
+- `workReportPDFRenderer.workTable` replaces stacked work groups with equal-width done/partial/next columns. It wraps each independent list to its column width, repeats headers per page and sizes each page segment to its longest remaining column. Section title/header/first line stay together. Empty groups have one placeholder; exhausted continuation columns stay blank. A nonempty legacy unclassified `work_summary` remains outside the table. `TestWorkReportPDFFixtures` adds `columns` and `legacy` fixtures; first search for table layout: `workTable`.
+
+## Exact Source Read Contracts
+
+- `repository.go::safeTable` must include `supplier_quotations`: `GetSupplierQuotation` uses `requireRecordProjectPermission` → `RecordProjectID` before detail. Missing allowlist membership returns HTTP 500 even when listing and detail SQL succeed. The allowlist remains exact; project and permission guards still run. Regression: `TestSafeTableAllowsSupplierQuotationProjectScope`.
+- `repository_commercial.go::GetSupplierQuotationDetail` returns `item_count`, `amount_before_tax` and `total_amount` aggregated from its exact quotation items, matching the list summary. Omitting these fields made the detail display a false zero total. `TestSupplierQuotationSelectionLocksBOQAndSnapshotsProcurement` checks exact project lookup plus the persisted 10 × 102 = 1,020 detail total; no stored financial values are rewritten.
+- `repository_commercial.go::{ListProjectBOQ,GetBOQItemDetail}` projects `selected_quote.quotation_id AS selected_quotation_id`, obtained from `supplier_quotations.id` via the persisted selected item. `GetProcurementDetail` projects each item's `quotation_id` from the same parent join. Existing handler record/project permission checks remain authoritative; no migration or quantity/price update.
+- `AuditLogFilter.RecordID`, `handlers_admin.go::auditLogFilterFromQuery`, `service_audit.go::{normalizeAuditLogFilter,AuditLogs}` accept optional `record_id`, validate UUID and add `al.id` equality before counting/pagination. This condition is ANDed with existing project access and filters, not a replacement for them. Exact missing IDs return zero items. Tests extend `audit_test.go` and `commercial_procurement_integration_test.go`.
+- First searches: `selected_quotation_id|q.id AS quotation_id|RecordID|record_id`. Frontend owners are `_shared/recordNavigation.ts`, `useRecordDeepLink.tsx` and canonical source dialogs. Opening source links does not mutate audit, workflow, stock or finance state.
+
 ## Project Activity All-Member Mentions
 
 - `service_activity.go::normalizeActivityMentions` accepts the additive `{type:"all",id:"all"}` request marker, canonicalizes casing and deduplicates it; arbitrary IDs are rejected. Existing project/work-item activity endpoints and actor authorization remain in place. First searches: `normalizeActivityMentions|insertActivityAttentionTx|ActivityMentionRequest`.

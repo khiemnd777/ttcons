@@ -11,6 +11,9 @@ import { RowActions } from '../../components/RowActions';
 import { useToast } from '../../components/ToastProvider';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { Dialog } from '../../components/Dialog';
+import { RecordSummary, RecordSection, RecordMetrics, RecordMetric, RecordTable } from '../../components/RecordDetailLayout';
+import { RelatedRecords } from '../_shared/RecordLinks';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { StatCard } from '../../components/StatCard';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { RecordFormDialog } from '../_shared/RecordFormDialog';
@@ -45,6 +48,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const [editingMaterial, setEditingMaterial] = useState<RecordRow | null>(null);
   const [openDocument, setOpenDocument] = useState(false);
   const [documentId, setDocumentId] = useState('');
+  const sourceLink = useRecordDeepLink({ kind: 'stock_document', projectId: scoped ? id : undefined, onOpen: record => { setProjectId(record.project_id ?? ''); setTab('documents'); setDocumentId(record.id); } });
   const [editingDocumentId, setEditingDocumentId] = useState('');
   const [stockAdjustment, setStockAdjustment] = useState<StockPosition | null>(null);
   const [siteUsageAdjustment, setSiteUsageAdjustment] = useState<RecordRow | null>(null);
@@ -198,7 +202,8 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
     <StockDocumentDialog open={Boolean(editingDocumentId)} mode="edit" projectId={editingDocumentDetail.data?.project_id ?? projectId} receiptId="" record={editingDocumentDetail.data} loading={editingDocumentDetail.isLoading} error={editingDocumentDetail.error} materials={materials.data ?? []} warehouses={warehouses.data ?? []} receiptOptions={receiptOptions.data ?? []} hasPermission={hasPermission} pending={updateDocument.isPending} onClose={() => setEditingDocumentId('')} onSubmit={(values) => updateDocument.mutateAsync({ id: editingDocumentId, values })} />
     <StockAdjustmentDialog record={stockAdjustment} pending={adjustStock.isPending} onClose={() => setStockAdjustment(null)} onSubmit={(values) => adjustStock.mutateAsync(values)} />
     <SiteUsageAdjustmentDialog record={siteUsageAdjustment} pending={adjustSiteUsage.isPending} onClose={() => setSiteUsageAdjustment(null)} onSubmit={(values) => siteUsageAdjustment ? adjustSiteUsage.mutateAsync({ materialId: siteUsageAdjustment.material_id, values }) : Promise.resolve()} />
-    <Dialog open={Boolean(documentId)} title="Chi tiết phiếu kho" description={documentDetail.data ? `${documentDetail.data.document_code} · ${movementLabel(documentDetail.data.movement_type)}` : undefined} onClose={() => setDocumentId('')} size="xl">
+    {sourceLink.feedback}
+    <Dialog manageFocus open={Boolean(documentId)} title="Chi tiết phiếu kho" onClose={() => { setDocumentId(''); if (sourceLink.active) sourceLink.dismiss(); }} size="xl">
       {documentDetail.isLoading ? <p className="py-6 text-sm text-slate-500">Đang tải phiếu kho...</p> : documentDetail.error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Không tải được phiếu kho.</p> : documentDetail.data ? <StockDocumentDetail record={documentDetail.data} /> : null}
     </Dialog>
   </>;
@@ -402,7 +407,29 @@ function SiteUsageAdjustmentDialog({ record, pending, onClose, onSubmit }: { rec
   </Dialog>;
 }
 
-function StockDocumentDetail({ record }: { record: StockDocument }) { return <div className="space-y-4">{record.status === 'corrected' ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">Phiếu này đã được điều chỉnh{record.corrected_by_document_id ? ` bởi phiếu ${shortId(record.corrected_by_document_id)}` : ''}. Lịch sử cũ được giữ nguyên.</div> : record.correction_of_document_id ? <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm font-medium text-blue-800">Phiếu thay thế cho phiếu {shortId(record.correction_of_document_id)}.</div> : null}<div className="grid gap-3 rounded-lg border border-line bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4"><DetailMetric label="Loại phiếu" value={movementLabel(record.movement_type)} /><DetailMetric label="Luồng kho" value={warehouseDirection(record)} /><DetailMetric label="Công trình" value={record.project_name || 'Không gắn công trình'} /><DetailMetric label="Ngày phiếu" value={formatDate(record.document_date)} /><DetailMetric label="Trạng thái" value={record.status === 'corrected' ? 'Đã điều chỉnh' : 'Đã ghi sổ'} /><DetailMetric label="Chứng từ nguồn" value={record.reference_type ? `${sourceLabel(record.reference_type)} · ${shortId(record.reference_id)}` : 'Nhập thủ công'} /><DetailMetric label="Người ghi nhận" value={identityReferenceText(record.created_by_name, record.created_by_account_deleted)} /><DetailMetric label="Ghi chú" value={record.note || '—'} /></div><div className="overflow-x-auto rounded-lg border border-line"><table className="min-w-[720px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Vật tư</th><th className="px-3 py-2 text-right">Số lượng</th><th className="px-3 py-2">ĐVT</th><th className="px-3 py-2">Mã biến động</th><th className="px-3 py-2">Ghi chú</th></tr></thead><tbody className="divide-y divide-line">{(record.items ?? []).map((item: StockDocumentItem) => <tr key={item.id}><td className="px-3 py-2"><span className="font-semibold text-ink">{item.material_name}</span><div className="text-xs text-slate-500">{item.material_code}</div></td><td className="px-3 py-2 text-right font-semibold">{formatQuantity(item.quantity)}</td><td className="px-3 py-2">{item.unit}</td><td className="px-3 py-2">{item.movement_code || '—'}</td><td className="px-3 py-2">{item.reason || '—'}</td></tr>)}</tbody></table></div></div>; }
+function StockDocumentDetail({ record }: { record: StockDocument }) {
+  return <div className="space-y-6">
+    <RecordSummary eyebrow={record.document_code} title={movementLabel(record.movement_type)} subtitle={record.project_name || 'Không gắn công trình'} icon={<Boxes className="h-5 w-5" />}
+      status={<span className={`rounded-md px-2 py-1 text-xs font-semibold ${record.status === 'corrected' ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}>{record.status === 'corrected' ? 'Đã điều chỉnh' : 'Đã ghi sổ'}</span>} />
+    {record.status === 'corrected' ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">Phiếu này đã được điều chỉnh{record.corrected_by_document_id ? ` bởi phiếu ${shortId(record.corrected_by_document_id)}` : ''}. Lịch sử cũ được giữ nguyên.</div> : record.correction_of_document_id ? <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm font-medium text-blue-800">Phiếu thay thế cho phiếu {shortId(record.correction_of_document_id)}.</div> : null}
+    <RecordSection title="Luồng kho"><p className="break-words text-base font-semibold text-slate-900">{warehouseDirection(record)}</p></RecordSection>
+    <RecordSection title="Thông tin ghi nhận"><RecordMetrics>
+      <RecordMetric label="Ngày phiếu">{formatDate(record.document_date)}</RecordMetric>
+      <RecordMetric label="Chứng từ nguồn">{record.reference_type ? `${sourceLabel(record.reference_type)} · ${shortId(record.reference_id)}` : 'Nhập thủ công'}</RecordMetric>
+      <RecordMetric label="Người ghi nhận">{identityReferenceText(record.created_by_name, record.created_by_account_deleted)}</RecordMetric>
+    </RecordMetrics></RecordSection>
+    <RecordSection title="Vật tư trên phiếu" aside={`${record.items?.length ?? 0} dòng`}>
+      <RecordTable<StockDocumentItem> rows={record.items ?? []} rowKey={(item, index) => String(item.id ?? index)} empty="Phiếu chưa có dòng vật tư." columns={[
+        { key: 'material', label: 'Vật tư', render: item => <div><p className="break-words font-semibold text-slate-900">{item.material_name}</p><p className="mt-1 text-xs text-slate-500">{item.material_code}</p></div> },
+        { key: 'quantity', label: 'Số lượng', align: 'right', render: item => <strong className="whitespace-nowrap">{formatQuantity(item.quantity)} {item.unit}</strong> },
+        { key: 'movement', label: 'Mã biến động', render: item => <span className="break-words">{item.movement_code || '—'}</span> },
+        { key: 'note', label: 'Ghi chú', render: item => <p className="whitespace-pre-wrap break-words text-slate-600">{item.reason || '—'}</p> },
+      ]} />
+    </RecordSection>
+    {record.note ? <RecordSection title="Ghi chú phiếu"><p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">{record.note}</p></RecordSection> : null}
+    <RelatedRecords kind="stock_document" record={record} />
+  </div>;
+}
 
 const controlClass = 'w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50';
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>{children}</label>; }

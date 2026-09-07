@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { ArrowRight, CheckCircle2, Eye, FileCheck2, RefreshCw, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { RecordLink } from '../_shared/RecordLinks';
 import { StatusBadge } from '../../components/StatusBadge';
 import { dateText } from '../../lib/utils/format';
 import { checklistItemCodeLabel, checklistItemCodeTooltip, checklistSourceLabel, checklistSourceMode } from './handoverSourcePresentation';
@@ -99,7 +100,7 @@ function ChecklistAction({ item, handoverStatus, canVerify, onChecklist, onViewS
 
 function PackageInfo({ detail }: { detail: HandoverDetail }) {
   return <div className="grid gap-5 lg:grid-cols-2">
-    <section className="rounded-lg border border-line p-4"><h3 className="font-semibold text-ink">Nguồn và đại diện</h3><dl className="mt-4 space-y-3 text-sm"><InfoRow label="Nghiệm thu cuối" value={detail.final_acceptance_title || '-'} /><InfoRow label="Kết quả" value={resultLabel(detail.final_acceptance_result)} /><InfoRow label="Đại diện chủ đầu tư" value={detail.client_representative || '-'} /><InfoRow label="Đại diện nhà thầu" value={detail.company_representative || '-'} /></dl></section>
+    <section className="rounded-lg border border-line p-4"><h3 className="font-semibold text-ink">Nguồn và đại diện</h3><dl className="mt-4 space-y-3 text-sm"><InfoRow label="Nghiệm thu cuối" value={<RecordLink target={detail.final_acceptance_id ? { kind: 'acceptance', id: detail.final_acceptance_id, projectId: detail.project_id } : null}>{detail.final_acceptance_title || '-'}</RecordLink>} /><InfoRow label="Kết quả" value={resultLabel(detail.final_acceptance_result)} /><InfoRow label="Đại diện chủ đầu tư" value={detail.client_representative || '-'} /><InfoRow label="Đại diện nhà thầu" value={detail.company_representative || '-'} /></dl></section>
     <section className="rounded-lg border border-line bg-slate-50 p-4"><h3 className="font-semibold text-ink">Thời gian và ghi chú</h3><dl className="mt-4 space-y-3 text-sm"><InfoRow label="Ngày dự kiến" value={dateText(detail.handover_date)} /><InfoRow label="Hoàn tất" value={dateText(detail.completed_at)} /><InfoRow label="Cập nhật" value={dateText(detail.updated_at)} /></dl><div className="mt-4 rounded-md border border-line bg-white p-3 text-sm leading-6 text-slate-600">{detail.notes || 'Không có ghi chú.'}</div></section>
   </div>;
 }
@@ -142,7 +143,7 @@ function Metric({ label, value, tone = 'slate' }: { label: string; value: ReactN
   return <div className={`rounded-md border px-3 py-2 ${color}`}><div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div><div className="mt-1 text-lg font-semibold text-ink">{value}</div></div>;
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">{label}</dt><dd className="max-w-[65%] text-right font-medium text-ink">{value}</dd></div>;
 }
 

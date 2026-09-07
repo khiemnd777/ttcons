@@ -246,6 +246,7 @@ func (h *Handler) ProjectAuditLogs(c *fiber.Ctx) error {
 
 func auditLogFilterFromQuery(c *fiber.Ctx) AuditLogFilter {
 	return AuditLogFilter{
+		RecordID:   c.Query("record_id"),
 		ProjectID:  c.Query("project_id"),
 		EventType:  c.Query("event_type"),
 		TargetType: c.Query("target_type"),

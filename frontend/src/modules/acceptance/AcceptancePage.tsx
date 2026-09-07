@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
+import { RelatedRecords } from '../_shared/RecordLinks';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ClipboardCheck, Eye, FileText, Loader2, Plus, Search, Send, Wrench } from 'lucide-react';
@@ -42,9 +44,9 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
   const [searchParams] = useSearchParams();
   const requestedRecordId = searchParams.get('record')?.trim() ?? '';
   const requestedTaskId = searchParams.get('task')?.trim() ?? '';
-  const appliedRecordId = useRef('');
   const [projectId, setProjectId] = useState(id ?? '');
   const [selectedId, setSelectedId] = useState('');
+  const sourceLink = useRecordDeepLink({ kind: 'acceptance', projectId: id, onOpen: record => { setProjectId(record.project_id); setSelectedId(record.id); } });
   const [search, setSearch] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
   const [draft, setDraft] = useState<AcceptanceDraft>(() => createAcceptanceDraft());
@@ -84,16 +86,10 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
   );
   const rows = acceptances.data ?? [];
   useEffect(() => {
+    if (requestedRecordId) return;
     if (!rows.length) {
       setSelectedId('');
       return;
-    }
-    if (requestedRecordId && appliedRecordId.current !== requestedRecordId) {
-      appliedRecordId.current = requestedRecordId;
-      if (rows.some((row) => String(row.id) === requestedRecordId)) {
-        setSelectedId(requestedRecordId);
-        return;
-      }
     }
     if (!selectedId || !rows.some((row) => row.id === selectedId)) setSelectedId(String(rows[0].id));
   }, [requestedRecordId, rows, selectedId]);
@@ -207,6 +203,7 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
 
   return (
     <>
+      {sourceLink.feedback}
       <div className="mx-auto w-full max-w-[1180px]">
         <PageHeader
           title="Nghiệm thu"
@@ -369,6 +366,7 @@ function AcceptanceDetail({ record, canCreate, canConclude, canCreateRework, bus
           <Info label="Hồ sơ / PDF" value={record.pdf_file_name || record.workflow_form_title || record.document_status} />
         </div>
         {record.scope_summary ? <div className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700"><span className="font-semibold">Phạm vi: </span>{record.scope_summary}</div> : null}
+        <div className="mt-4"><RelatedRecords kind="acceptance" record={record} /></div>
       </section>
 
       <section className="overflow-hidden rounded-lg border border-line bg-white">

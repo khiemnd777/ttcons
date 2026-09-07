@@ -1,6 +1,14 @@
 # Materials Warehouse Domain Map
 
+## Exact Record Source Navigation
+
+- Movement summary formats PostgreSQL numeric strings in Vietnamese: `800.000` displays as `800`, preserving fractional quantities with commas. Do not print SQL decimal strings as Vietnamese thousands or change stored quantities to repair display.
+- Stock document detail accepts exact record links and exposes typed source, prior-document and replacement-document references. Movement previews open `/source-records/stock_movement/:id` using authorized ledger reads; only the persisted stock_document_id links to a stock document. Incoming acceptance references use a separate read-only `/source-records/incoming_acceptance/:id` viewer with the existing source permission/Work Item checks. New links never use the Warehouse `receipt` create intent and never post stock or change quantities.
+- Shared owners: `modules/_shared/{recordNavigation,RecordLinks,useRecordDeepLink,RecordSourcePage}`. First searches: `recordPath|relatedRecordTargets|useRecordDeepLink`; see frontend/backend detail maps and `recordNavigation.test.ts` for the navigation contract.
+
 ## Discussion Stock Movement Topics
+
+- `StockDocumentDetail` leads with document code/type/status, a distinct warehouse direction, recording/source metadata and shared responsive `RecordTable` lines. Correction/replacement notices remain visible and empty documents have an explicit empty state. Discussion movement previews use `TopicRecordSummary` plus grouped source/target/document fields; their IDs and source checks remain movement-specific. Shared styling never posts, corrects or recalculates warehouse data.
 
 - `ActivityTopicDetails.tsx` inspects an exact stock movement from authorized `GET /stock/movements?project_id=` using persisted activity scope/id plus a project check. Display fields come from the movement ledger (material, quantity/unit, source/destination warehouse, document code, reason and timestamp). A movement ID is never passed to the stock-document detail route. Viewing performs no stock/document mutation. First searches: `activityTopicPath|activityTopicRecord|stock_movement` in the shared activity topic owners.
 

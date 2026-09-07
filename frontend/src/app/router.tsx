@@ -46,6 +46,7 @@ const ReportsPage = lazy(() => import('../modules/reports/ReportsPage').then(({ 
 const WorkReportsPage = lazy(() => import('../modules/work-reports/WorkReportsPage').then(({ WorkReportsPage }) => ({ default: WorkReportsPage })));
 const NotificationsPage = lazy(() => import('../modules/notifications/NotificationsPage').then(({ NotificationsPage }) => ({ default: NotificationsPage })));
 const SettingsPage = lazy(() => import('../modules/settings/SettingsPage').then(({ SettingsPage }) => ({ default: SettingsPage })));
+const RecordSourcePage = lazy(() => import('../modules/_shared/RecordSourcePage'));
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -103,6 +104,7 @@ export const router = createBrowserRouter([
       { path: '/progress', element: guarded(<ProjectProgressPage />, ['project.view']) },
       { path: '/my-work', element: guarded(<MyWorkPage />) },
       { path: '/profile', element: guarded(<ProfilePage />) },
+      { path: '/source-records/:kind/:recordId', element: guarded(<RecordSourcePage />) },
       { path: '/notifications', element: guarded(<NotificationsPage />) },
       { path: '/work-items/:id', element: guarded(<WorkItemDetailPage />) },
       { path: '/projects', element: guarded(<ProjectsPage />, ['project.view']) },
@@ -138,7 +140,7 @@ export const router = createBrowserRouter([
       { path: '/warehouse', element: guarded(<WarehousePage />, ['warehouse.view', 'material.view']) },
       { path: '/operations', element: guarded(<OperationsPage global />, ['operation.view', 'quality.view', 'rework.view', 'replanning.view']) },
       { path: '/acceptance', element: guarded(<AcceptancePage global />, ['acceptance.view']) },
-      { path: '/rework', element: guarded(<ReworkPage />, ['rework.view']) },
+      { path: '/rework', element: guarded(<ReworkPage />, ['rework.view', 'replanning.view']) },
       { path: '/handover', element: guarded(<HandoverPage />, ['handover.view']) },
       { path: '/accounting', element: guarded(<ProjectFinancePage global />, ['accounting_handoff.view', 'project_finance.view']) },
       { path: '/debt/payables', element: guarded(<DebtPage kind="payables" />, ['accounting.payable_view']) },

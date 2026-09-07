@@ -243,7 +243,7 @@ func TestAccountingHandoffUsesSourceReadinessAndAuditedLifecycle(t *testing.T) {
 	handoffID := cleanID(created["id"])
 	assertQueue := func(bucket string) {
 		t.Helper()
-		page, err := service.MyWorkItems(ctx, MyWorkItemsFilter{Unified: true, ProjectID: fixture.projectID, EntryKind: "accounting_handoff", Bucket: bucket}, fixture.userID)
+		page, err := service.MyWorkItems(ctx, MyWorkItemsFilter{Unified: true, Queue: "all", ProjectID: fixture.projectID, EntryKind: "accounting_handoff", Bucket: bucket}, fixture.userID)
 		if err != nil {
 			t.Fatal(err)
 		}

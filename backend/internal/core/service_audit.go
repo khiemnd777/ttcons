@@ -38,6 +38,9 @@ func (s *Service) AuditLogs(ctx context.Context, projectID, actorID string, filt
 	if projectID == "" && filter.ProjectID != "" {
 		addCondition("p.id=$%d", filter.ProjectID)
 	}
+	if filter.RecordID != "" {
+		addCondition("al.id=$%d", filter.RecordID)
+	}
 	if filter.EventType != "" {
 		addCondition("al.event_type=$%d", filter.EventType)
 	}
@@ -138,6 +141,10 @@ func (s *Service) auditLogOptions(ctx context.Context, fromSQL string, condition
 }
 
 func normalizeAuditLogFilter(filter AuditLogFilter) (AuditLogFilter, error) {
+	filter.RecordID = cleanID(filter.RecordID)
+	if filter.RecordID != "" && !validActivityUUID(filter.RecordID) {
+		return filter, validationError("ID sự kiện không hợp lệ", Record{"record_id": filter.RecordID})
+	}
 	filter.ProjectID = cleanID(filter.ProjectID)
 	if filter.ProjectID != "" && !validActivityUUID(filter.ProjectID) {
 		return filter, validationError("Công trình lọc không hợp lệ", Record{"project_id": filter.ProjectID})

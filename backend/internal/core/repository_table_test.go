@@ -14,6 +14,15 @@ func TestSafeTableAllowsContractsForProjectRecordPermission(t *testing.T) {
 	}
 }
 
+func TestSafeTableAllowsSupplierQuotationProjectScope(t *testing.T) {
+	if got := safeTable("supplier_quotations"); got != "supplier_quotations" {
+		t.Fatalf("quotation detail project scope rejects its persisted table: %q", got)
+	}
+	if got := safeTable("supplier_quotations; DROP TABLE projects"); got != "" {
+		t.Fatalf("accepted unsafe quotation table name: %q", got)
+	}
+}
+
 func TestSafeTableAllowsSimplifiedConstructionRecords(t *testing.T) {
 	for _, table := range []string{"construction_checks", "construction_action_items", "accounting_handoffs"} {
 		if got := safeTable(table); got != table {

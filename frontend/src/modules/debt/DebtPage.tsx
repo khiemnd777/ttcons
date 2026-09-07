@@ -16,6 +16,7 @@ import type { Partner, PayableRecord, ReceivableRecord } from '../../lib/types/d
 import { dateText } from '../../lib/utils/format';
 import { DebtCreateDialog, type DebtCreateMode } from './DebtCreateDialog';
 import { DebtDetailDialog, type DebtDetail, type DebtDetailTab } from './DebtDetailDialog';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { agingBadgeClass, debtAgingLabel, reconciliationClass, reconciliationLabel } from './payableDebtUtils';
 
 type DebtKind = 'payables' | 'receivables';
@@ -35,6 +36,7 @@ export function DebtPage({ kind }: { kind: DebtKind | 'both' }) {
   const [open, setOpen] = useState<DebtCreateMode | null>(null);
   const [detail, setDetail] = useState<DebtDetail | null>(null);
   const [detailTab, setDetailTab] = useState<DebtDetailTab>('overview');
+  const sourceLink = useRecordDeepLink({ kind: kind === 'receivables' ? 'receivable' : 'payable', projectId: id, onOpen: record => { setActiveKind(kind === 'receivables' ? 'receivables' : 'payables'); setDetail({ type: kind === 'receivables' ? 'receivable' : 'payable', record }); setDetailTab('overview'); } });
   const queryClient = useQueryClient();
   const toast = useToast();
   const requestedKind = debtKindFromQuery(searchParams.get('kind'));
@@ -110,6 +112,7 @@ export function DebtPage({ kind }: { kind: DebtKind | 'both' }) {
 
   return (
     <>
+      {sourceLink.feedback}
       <PageHeader
         title="Công nợ"
         description="Xử lý phải trả, phải thu, lịch đến hạn, hóa đơn và đối soát theo từng nghĩa vụ."
@@ -163,7 +166,7 @@ export function DebtPage({ kind }: { kind: DebtKind | 'both' }) {
         canApprove={detail?.type === 'payable' ? canCreatePayable : canCreateReceivable}
         approving={approveDebt.isPending}
         onTab={setDetailTab}
-        onClose={() => setDetail(null)}
+        onClose={() => { setDetail(null); if (sourceLink.active) sourceLink.dismiss(); }}
         onChanged={() => detail?.type === 'payable' ? invalidatePayables(detail.record.id) : detail ? invalidateReceivables(detail.record.id) : undefined}
         onApprove={() => { if (detail) approveDebt.mutate(detail); }}
       />

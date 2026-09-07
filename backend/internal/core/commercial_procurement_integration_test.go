@@ -524,6 +524,12 @@ func TestSupplierQuotationSelectionLocksBOQAndSnapshotsProcurement(t *testing.T)
 		t.Fatal(err)
 	}
 	quotationID := cleanID(quotation["id"])
+	if number(quotation["total_amount"]) != 1020 || number(quotation["amount_before_tax"]) != 1020 || number(quotation["item_count"]) != 1 {
+		t.Fatalf("quotation detail totals must match its persisted lines: %#v", quotation)
+	}
+	if gotProject, scopeErr := repo.RecordProjectID(ctx, "supplier_quotations", quotationID); scopeErr != nil || gotProject != projectID {
+		t.Fatalf("quotation project scope = %q, %v; want %q", gotProject, scopeErr, projectID)
+	}
 	quotation, err = service.SubmitSupplierQuotation(ctx, quotationID, WorkItemMutationContext{}, actorID, "commercial@test.local")
 	if err != nil {
 		t.Fatal(err)
@@ -554,6 +560,22 @@ func TestSupplierQuotationSelectionLocksBOQAndSnapshotsProcurement(t *testing.T)
 	requestID := cleanID(procurement["id"])
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_requests WHERE id=$1 AND supplier_partner_id=$2 AND status='waiting_approval'`, 1, requestID, partnerID)
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE request_id=$1 AND supplier_quotation_item_id=$2 AND quoted_unit_price=102 AND supplier_partner_id=$3`, 1, requestID, quotationItemID, partnerID)
+	boqDetail, err := repo.GetBOQItemDetail(ctx, boqID)
+	if err != nil || cleanID(boqDetail["selected_quotation_id"]) != quotationID {
+		t.Fatalf("BOQ must expose the parent quotation ID: %v, %#v", err, boqDetail)
+	}
+	boqRows, err := repo.ListProjectBOQ(ctx, projectID)
+	if err != nil || len(boqRows) != 1 || cleanID(boqRows[0]["selected_quotation_id"]) != quotationID {
+		t.Fatalf("BOQ list must expose the parent quotation ID: %v, %#v", err, boqRows)
+	}
+	requestDetail, err := repo.GetProcurementDetail(ctx, requestID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestItems, ok := requestDetail["items"].([]Record)
+	if !ok || len(requestItems) != 1 || cleanID(requestItems[0]["quotation_id"]) != quotationID {
+		t.Fatalf("procurement must expose the parent quotation ID: %#v", requestDetail["items"])
+	}
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='supplier_quote_selected' AND target_id=$2`, 1, projectID, boqID)
 }
 

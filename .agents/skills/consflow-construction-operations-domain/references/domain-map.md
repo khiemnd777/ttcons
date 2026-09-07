@@ -1,5 +1,11 @@
 # Construction Operations Domain Map
 
+## Daily Report PDF Presentation
+
+- Formal delivery PDFs belong to `backend/internal/core/work_report_pdf.go`, separate from Operations editing and the workflow-form PDF engine. A4 output leads with daily work, recorded progress and blockers; resources/notes expand as text, empty data is explicit, and each page carries report date/revision/page count. Grouping remains done/partial/next/blocked from the selected snapshot, with legacy work-summary fallback.
+- Full snapshot SHA-256 stays visible. Presentation never changes source content, revisions, evidence, stock, acceptance or work-item state. `work_report_pdf_test.go` provides offline fixture/boundary checks; first searches: `generateWorkReportPDF|workReportPDFRenderer`. Pair Reporting Analytics and backend/frontend maps.
+- Work content uses three independent Đã làm / Đang làm / Sẽ làm table columns, repeating headers when continued across pages. Entries across columns do not imply matching work items or a shared row identity. Empty groups stay explicit; legacy unclassified summaries are never relabelled as completed work. Owner: `workReportPDFRenderer.workTable`.
+
 ## Owners
 
 - Frontend modules: `frontend/src/modules/operations`, shared `frontend/src/modules/_shared/EvidenceCapture.tsx`, `frontend/src/modules/quality`, `frontend/src/modules/acceptance`, `frontend/src/modules/work-items`, `frontend/src/modules/my-work`, `frontend/src/modules/projects`

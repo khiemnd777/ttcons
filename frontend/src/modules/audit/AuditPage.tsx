@@ -13,6 +13,9 @@ import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { RecordDetailDialog } from '../../components/RecordDetailDialog';
+import { RecordSummary } from '../../components/RecordDetailLayout';
+import { RelatedRecords } from '../_shared/RecordLinks';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 import type { AuditLogPage, AuditLogRecord } from '../../lib/types/domain';
 import { enumLabel } from '../../lib/utils/status';
@@ -37,6 +40,7 @@ export function AuditPage({ scoped = false }: { scoped?: boolean }) {
   const [pageSize, setPageSize] = useState(25);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selected, setSelected] = useState<AuditLogRecord | null>(null);
+  const sourceLink = useRecordDeepLink({ kind: 'audit', projectId: scoped ? id : undefined, onOpen: setSelected });
   const deferredSearch = useDeferredValue(search.trim());
 
   const dateRange = useMemo(
@@ -212,11 +216,18 @@ export function AuditPage({ scoped = false }: { scoped?: boolean }) {
         ) : null}
       </section>
 
+      {sourceLink.feedback}
       <RecordDetailDialog
         open={Boolean(selected)}
         title={selected ? enumLabel('event_type', selected.event_type) : 'Chi tiết sự kiện'}
+        summary={row => <RecordSummary eyebrow={auditDateTime(row.created_at)} title={enumLabel('event_type', row.event_type)} subtitle={<IdentityReferenceLabel name={row.actor_name} deleted={row.actor_account_deleted} />} />}
+        sections={[
+          { title: 'Nội dung sự kiện', keys: ['description', 'project_name', 'target_type'] },
+          { title: 'Thông tin đối chiếu', keys: ['target_id', 'id', 'metadata_json'], collapsed: true },
+        ]}
         record={selected}
-        onClose={() => setSelected(null)}
+        related={selected ? <RelatedRecords kind="audit" record={selected} /> : null}
+        onClose={() => { setSelected(null); if (sourceLink.active) sourceLink.dismiss(); }}
         fields={[
           { key: 'created_at', label: 'Thời gian', render: (row) => auditDateTime(row.created_at) },
           { key: 'project_name', label: 'Công trình', hidden: () => scoped, render: (row) => `${row.project_code ?? '-'} · ${row.project_name ?? '-'}` },
@@ -224,8 +235,8 @@ export function AuditPage({ scoped = false }: { scoped?: boolean }) {
           { key: 'event_type', label: 'Sự kiện', render: (row) => <EnumChip group="event_type" value={row.event_type} /> },
           { key: 'target_type', label: 'Đối tượng', render: (row) => <EnumChip group="target_type" value={row.target_type} /> },
           { key: 'target_id', label: 'ID đối tượng', render: (row) => <code className="select-all break-all text-xs">{row.target_id ?? '-'}</code> },
-          { key: 'description', label: 'Mô tả' },
-          { key: 'metadata_json', label: 'Dữ liệu kèm theo' },
+          { key: 'description', label: 'Mô tả', wide: true },
+          { key: 'metadata_json', label: 'Dữ liệu kèm theo', wide: true },
           { key: 'id', label: 'ID sự kiện', render: (row) => <code className="select-all break-all text-xs">{row.id}</code> },
         ]}
       />

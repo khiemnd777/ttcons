@@ -19,8 +19,8 @@ function TopicSession({ projectId, children }: { projectId: string; children: Re
     {children}
     {selected ? createPortal(
       <div className="relative z-[100]">
-        <Dialog open title={`Chi tiết ${activityTopicTypes[selected.scope].label.toLocaleLowerCase('vi')}`} description={selected.label} size="xl" manageFocus onClose={() => setSelected(null)}>
-          <ActivityTopicDetails key={`${selected.scope}:${selected.id}`} topic={selected} />
+        <Dialog open title={selected.scope === 'boq_item' ? 'Chi tiết dòng BOQ' : `Chi tiết ${activityTopicTypes[selected.scope].label.toLocaleLowerCase('vi')}`} size="xl" manageFocus onClose={() => setSelected(null)}>
+          <ActivityTopicDetails key={`${selected.scope}:${selected.id}`} topic={selected} onClose={() => setSelected(null)} />
         </Dialog>
       </div>, document.body,
     ) : null}

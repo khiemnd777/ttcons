@@ -1,6 +1,15 @@
 # Commercial Procurement Domain Map
 
+## Exact Record Source Navigation
+
+- Quotation detail project authorization depends on `repository.go::safeTable("supplier_quotations")`; a missing exact table entry caused HTTP 500 before the existing project/permission check. Keep the bounded allowlist and handler permission checks intact.
+- `GetSupplierQuotationDetail` includes item count, pre-tax sum and total sum from the exact quotation's persisted items, consistent with listing. The detail total must not silently fall back to zero because the API omitted its aggregate fields. The procurement integration test covers this read contract without changing selection, price approval or stored amounts.
+- BOQ, supplier quotation and procurement details now use typed new-tab source links. BOQ purchase tabs open the exact procurement ID; quote links use the parent `selected_quotation_id`/line `quotation_id` projected from supplier_quotations, never supplier_quotation_item IDs. Canonical pages accept exact record links independently of table filters. Supplier catalog links use partner IDs; free-text PO remains plain text. Contract sources also resolve exact IDs before first-row selection. Navigation never auto-starts, approves, locks prices, creates procurement or posts stock.
+- Shared owners: `modules/_shared/{recordNavigation,RecordLinks,useRecordDeepLink,RecordSourcePage}`. First searches: `recordPath|relatedRecordTargets|useRecordDeepLink`; see frontend/backend detail maps and `recordNavigation.test.ts` for the navigation contract.
+
 ## Discussion Source Detail Reuse
+
+- Detail presentation uses shared `RecordSummary`/`RecordSection`; BOQ preserves all four tabs and optional caller-owned actions, Procurement owns its source status/value summary in both entry points, and supplier quotation detail adopts the same hierarchy. Procurement and quotation use container-responsive `RecordTable` cards below 48rem. Requested/accepted/stocked/awaiting quantities remain separate; `pending` item labels become `Chờ tiếp nhận`, waiver reasons remain accessible in a disclosure. Numeric BOQ/quotation quantity display normalizes number-shaped API values without changing quantity/price data. No new actions, source queries, approvals or stock/finance effects.
 
 - `ActivityTopicDetails.tsx` reuses exported `BOQPage::BOQDetail` (four read-only tabs, optional price-management callback omitted) and `ProcurementPage::ProcurementDetail` after exact source/project/status checks on the existing authenticated detail API. The ordinary BOQ page retains its price-management callback; chat never changes prices, approvals, procurement or warehouse quantities. The topic dialog does not navigate away from the draft. First searches: `ActivityTopicDetails|BOQDetail|ProcurementDetail|activityTopicRecord`.
 

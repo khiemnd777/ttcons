@@ -1,5 +1,15 @@
 # Project Planning Domain Map
 
+## Exact Record Source Navigation
+
+- All discussion source types now offer authorized `Mở hồ sơ gốc` new-tab links after successful source validation. The original discussion and draft stay mounted. Planning daily report, meeting minutes and planning checklist detail footers reuse shared RecordLink to their persisted Work Item/form route; missing Work Item IDs have an explicit unavailable-source label. Existing list-row navigation callbacks remain. No source-open operation starts work, submits a form or changes read cursors.
+- Shared owners: `modules/_shared/{recordNavigation,RecordLinks,useRecordDeepLink,RecordSourcePage}`. First searches: `recordPath|relatedRecordTargets|useRecordDeepLink`; see frontend/backend detail maps and `recordNavigation.test.ts` for the navigation contract.
+
+## Read-Only Record Detail Hierarchy
+
+- `ActivityTopicDetails.tsx` groups the existing Work Item preview into identity/status, owner/deadlines and work/stage context. Source queries, actor/project checks and mounted discussion state remain unchanged; `ActivityTopic.tsx` omits repeated header descriptions and preserves the BOQ acronym.
+- `PlanningDailyReportsPage`, `MeetingMinutesPage` and `PlanningChecklistsPage` use shared `RecordSummary`/labelled metrics, promote their authored content and preserve all prior source-navigation callbacks. Daily report detail localizes its previously English field labels; meeting attendee details are collapsed; checklist needs-action/done/evidence counts move above the rows without client-side recomputation. `_shared/PlanningRecordContext.tsx` owns collapsed stage/step/update/generated-work/artifact counts. First searches: `RecordSummary|PlanningRecordContext|PlanningDailyReportDetailDialog|MeetingMinutesDetailDialog|PlanningChecklistDetailDialog`.
+
 ## Discussion Topic Navigation
 
 - Mục đích chính: recognize the exact source under discussion and inspect it without losing the conversation. `ActivityTopic`/`ActivityTopicDetails`/`activityTopicDomain` share a type/title/open card and an actor/project-bound, focus-managed dialog in full activity, Dock and both composer densities. Project-wide messages omit repeated project context and `Thành viên công trình`; internal/client history remains distinguished. Existing Work Item execution links remain separate.
