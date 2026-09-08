@@ -712,7 +712,7 @@ function ProjectExplorerHeader({
 }) {
   const gridClass = selectable ? PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS : PROJECT_EXPLORER_DESKTOP_GRID_CLASS;
   return (
-    <div className={`hidden ${gridClass} gap-3 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid`}>
+    <div className={`consflow-sticky-grid-header hidden ${gridClass} gap-3 border-b border-line bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid`}>
       {selectable ? <SelectionCheckbox checked={allSelected} indeterminate={someSelected} ariaLabel="Chọn tất cả công trình trên trang hiện tại" onChange={onToggleAll} /> : null}
       <span><span className="sr-only">Thao tác</span></span>
       <ProjectExplorerSortHeader label="Cây công trình" sortKey="project" sort={sort} onSort={onSort} />

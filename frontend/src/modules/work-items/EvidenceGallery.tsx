@@ -170,9 +170,9 @@ export function EvidenceGallery({
       </div> : null}
 
       {visibleRows.length && variant === 'list' ? (
-        <div className="overflow-hidden rounded-md border border-line bg-white">
+        <div className="overflow-clip rounded-md border border-line bg-white">
           {listContext === 'project' ? (
-            <div className={clsx('hidden gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:grid', PROJECT_EVIDENCE_LIST_GRID_CLASS)}>
+            <div className={clsx('consflow-sticky-grid-header hidden gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:grid', PROJECT_EVIDENCE_LIST_GRID_CLASS)}>
               <span><span className="sr-only">Thao tác</span></span>
               <span>Hồ sơ</span>
               <span>Giai đoạn</span>
@@ -182,7 +182,7 @@ export function EvidenceGallery({
               <span>Trạng thái</span>
             </div>
           ) : (
-            <div className={clsx('hidden gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid', DEFAULT_EVIDENCE_LIST_GRID_CLASS)}>
+            <div className={clsx('consflow-sticky-grid-header hidden gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid', DEFAULT_EVIDENCE_LIST_GRID_CLASS)}>
               <span><span className="sr-only">Thao tác</span></span>
               <span>Minh chứng</span>
               <span>Loại</span>

@@ -239,7 +239,7 @@ function StructuredListTable({
         <>
           <div
             ref={scrollViewportRef}
-            className="structured-list-scroll hidden min-w-0 w-full max-w-full overflow-x-auto rounded-md border border-line md:block"
+            className="structured-list-scroll consflow-table-viewport hidden min-w-0 w-full max-w-full rounded-md border border-line md:block"
             role="region"
             aria-label={`${label}: bảng có thể cuộn ngang`}
             tabIndex={hasHorizontalOverflow ? 0 : undefined}

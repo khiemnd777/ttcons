@@ -533,7 +533,7 @@ function TextListEditor({ title, required = false, values, onChange, tone, error
 function CrewEditor({ rows, onChange, error, reveal }: { rows: CrewDraft[]; onChange: (rows: CrewDraft[]) => void; error?: string; reveal: number }) {
   return (
     <ResourceEditorFrame icon={<Users className="h-4 w-4" />} title="Nhân công / tổ đội" count={rows.filter(hasCrewValue).length} error={error} reveal={reveal} onAdd={() => onChange([...rows, emptyCrew()])}>
-      <div className="report-resource-scroll min-w-0 max-w-full overflow-x-auto rounded-md border border-line">
+      <div className="report-resource-scroll consflow-table-viewport min-w-0 max-w-full rounded-md border border-line">
         <table role="table" className="report-resource-table w-full min-w-[760px] border-collapse text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
             <tr>
@@ -566,7 +566,7 @@ function CrewEditor({ rows, onChange, error, reveal }: { rows: CrewDraft[]; onCh
 function MaterialEditor({ rows, onChange, error, reveal }: { rows: MaterialDraft[]; onChange: (rows: MaterialDraft[]) => void; error?: string; reveal: number }) {
   return (
     <ResourceEditorFrame icon={<Package className="h-4 w-4" />} title="Vật tư sử dụng" count={rows.filter(hasMaterialValue).length} error={error} reveal={reveal} onAdd={() => onChange([...rows, emptyMaterial()])}>
-      <div className="report-resource-scroll min-w-0 max-w-full overflow-x-auto rounded-md border border-line">
+      <div className="report-resource-scroll consflow-table-viewport min-w-0 max-w-full rounded-md border border-line">
         <table role="table" className="report-resource-table w-full min-w-[760px] border-collapse text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
             <tr>

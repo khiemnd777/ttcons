@@ -163,9 +163,9 @@ export function BulkDeleteDialog({
           ) : null}
 
           <div className="overflow-hidden rounded-lg border border-line">
-            <div className="max-h-[42vh] overflow-auto">
+            <div className="consflow-table-viewport max-h-[42vh]">
               <table className="min-w-full divide-y divide-line">
-                <thead className="sticky top-0 bg-slate-50">
+                <thead className="bg-slate-50">
                   <tr>
                     <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{kind === 'partner' ? 'Đối tác' : 'Công trình'}</th>
                     <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Phạm vi</th>

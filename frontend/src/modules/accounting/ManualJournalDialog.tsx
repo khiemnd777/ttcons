@@ -119,7 +119,7 @@ export function ManualJournalDialog({
         <div data-validation-key="totals" tabIndex={-1} className="scroll-mt-24 grid grid-cols-2 gap-2 rounded-lg border border-line bg-white p-3 text-sm font-semibold outline-none"><span>Tổng Nợ<br /><CurrencyText value={totals.debit} /></span><span className="text-right">Tổng Có<br /><CurrencyText value={totals.credit} /></span></div>
       </div>
 
-      <div className="hidden overflow-x-auto rounded-lg border border-line md:block">
+      <div className="consflow-table-viewport hidden rounded-lg border border-line md:block">
         <table className="min-w-[920px] w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="w-12 px-2 py-2"><span className="sr-only">Thao tác</span></th><th className="px-3 py-2">Tài khoản *</th><th className="px-3 py-2">Diễn giải dòng</th><th className="px-3 py-2 text-right">Phát sinh Nợ</th><th className="px-3 py-2 text-right">Phát sinh Có</th></tr></thead>
           <tbody>

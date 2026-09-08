@@ -55,7 +55,7 @@ export function RecordTable<T>({ rows, columns, rowKey, empty }: {
 }) {
   if (!rows.length) return <RecordEmpty>{empty}</RecordEmpty>;
   return <div className="record-table-container">
-    <div className="record-table-desktop overflow-x-auto rounded-lg border border-slate-200">
+    <div className="record-table-desktop consflow-table-viewport rounded-lg border border-slate-200">
       <table className="w-full text-sm">
         <thead className="bg-slate-50 text-left text-xs text-slate-500"><tr>{columns.map(column => <th key={column.key} scope="col" className={`px-4 py-3 font-semibold ${column.align === 'right' ? 'text-right' : ''}`}>{column.label}</th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">{rows.map((row, index) => <tr key={rowKey(row, index)} className="align-top">{columns.map(column => <td key={column.key} className={`px-4 py-4 ${column.align === 'right' ? 'text-right tabular-nums' : ''}`}>{column.render(row)}</td>)}</tr>)}</tbody>

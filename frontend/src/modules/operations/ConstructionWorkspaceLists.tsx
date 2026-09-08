@@ -52,7 +52,7 @@ export function ConstructionCheckList({ workspace, canCreate, canEdit, canPerfor
       <FilterSelect value={timeFilter} onChange={setTimeFilter} ariaLabel="Lọc theo thời gian"><option value="all">Mọi thời điểm</option><option value="overdue">Đã quá lịch</option><option value="today">Hôm nay</option><option value="upcoming">Sắp tới</option><option value="unscheduled">Chưa đặt lịch</option></FilterSelect>
     </FilterToolbar>
     {rows.length ? <>
-      <div className="hidden overflow-x-auto rounded-lg border border-line bg-white lg:block">
+      <div className="consflow-table-viewport hidden rounded-lg border border-line bg-white lg:block">
         <table className="min-w-full divide-y divide-line">
           <thead className="bg-slate-50"><tr><Th><span className="sr-only">Thao tác</span></Th><Th>Nội dung / vị trí</Th><Th>Công việc</Th><Th>Lịch kiểm tra</Th><Th>Kết quả</Th></tr></thead>
           <tbody className="divide-y divide-line">{rows.map((row) => <tr key={row.id} className="hover:bg-slate-50">
@@ -102,7 +102,7 @@ export function ConstructionActionList({ workspace, canCreate, canEdit, canResol
       <FilterSelect value={impact} onChange={setImpact} ariaLabel="Lọc ảnh hưởng"><option value="">Mọi ảnh hưởng</option><option value="none">Không ảnh hưởng</option><option value="timeline">Tiến độ</option><option value="budget">Chi phí</option><option value="design_scope">Thiết kế / phạm vi</option></FilterSelect>
     </FilterToolbar>
     {rows.length ? <>
-      <div className="hidden overflow-x-auto rounded-lg border border-line bg-white lg:block"><table className="min-w-full divide-y divide-line">
+      <div className="consflow-table-viewport hidden rounded-lg border border-line bg-white lg:block"><table className="min-w-full divide-y divide-line">
         <thead className="bg-slate-50"><tr><Th><span className="sr-only">Thao tác</span></Th><Th>Việc / nguồn</Th><Th>Người xử lý</Th><Th>Hạn xử lý</Th><Th>Ảnh hưởng</Th><Th>Trạng thái</Th></tr></thead>
         <tbody className="divide-y divide-line">{rows.map((row) => <tr key={row.id} className={clsx('hover:bg-slate-50', row.priority === 'urgent' && row.status !== 'done' && 'bg-rose-50/30')}>
           <Td><div className="flex gap-2"><RowActions onView={() => onView(row)} onEdit={canEdit && isConstructionActionEditable(row) ? () => onEdit(row) : undefined} />{row.status === 'open' && canResolve ? <PrimaryButton onClick={() => onResolve(row)} icon={<Wrench className="h-4 w-4" />}>Gửi khắc phục</PrimaryButton> : row.status === 'waiting_confirmation' && canVerify ? <PrimaryButton tone="green" onClick={() => onVerify(row)} icon={<ShieldCheck className="h-4 w-4" />}>Xác nhận</PrimaryButton> : null}</div></Td>

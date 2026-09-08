@@ -183,9 +183,9 @@ function EntityMappings({ entities }: { entities: WorkflowDefinitionImportPrevie
   const labels: Record<string, string> = { create_template: 'Tạo Form template + draft v1', create_version: 'Tạo draft version kế tiếp', create_family: 'Tạo Pipeline family mới', create_revision: 'Tạo draft revision kế tiếp' };
   return (
     <div className="overflow-hidden rounded-lg border border-line">
-      <div className="max-h-64 overflow-auto">
+      <div className="consflow-table-viewport consflow-table-viewport--compact max-h-64">
         <table className="min-w-full divide-y divide-line text-sm">
-          <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Loại</th><th className="px-3 py-2">Định nghĩa</th><th className="px-3 py-2">Hành động</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Loại</th><th className="px-3 py-2">Định nghĩa</th><th className="px-3 py-2">Hành động</th></tr></thead>
           <tbody className="divide-y divide-line bg-white">{entities.map((entity) => <tr key={`${entity.kind}-${entity.key}`}><td className="px-3 py-3 font-semibold text-slate-600">{entity.kind === 'form' ? 'Form' : 'Pipeline'}</td><td className="px-3 py-3"><p className="font-semibold text-ink">{entity.name}</p><p className="font-mono text-xs text-slate-500">{entity.key}</p></td><td className="px-3 py-3 text-slate-700">{labels[entity.action] ?? entity.action}</td></tr>)}</tbody>
         </table>
       </div>

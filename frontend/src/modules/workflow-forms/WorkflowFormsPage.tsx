@@ -961,7 +961,7 @@ function PublishedFieldList({ fields }: { fields: WorkflowFormField[] }) {
           </div>
         ))}
       </div>
-      <div className="hidden overflow-hidden rounded-md border border-line md:block">
+      <div className="consflow-table-viewport hidden rounded-md border border-line md:block">
       <table className="min-w-full divide-y divide-line text-sm">
         <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <tr>

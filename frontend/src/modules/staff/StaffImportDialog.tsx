@@ -183,9 +183,9 @@ function PreviewRows({ rows }: { rows: StaffImportPreview['rows'] }) {
         ))}
       </div>
       <div className="hidden overflow-hidden rounded-lg border border-line md:block">
-        <div className="max-h-[42vh] overflow-auto">
+        <div className="consflow-table-viewport max-h-[42vh]">
         <table className="min-w-full divide-y divide-line text-sm">
-          <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr><th className="px-3 py-2">Dòng</th><th className="px-3 py-2">Nhân sự / tài khoản</th><th className="px-3 py-2">Vai trò</th><th className="px-3 py-2">Mật khẩu</th><th className="px-3 py-2">Kết quả</th></tr>
           </thead>
           <tbody className="divide-y divide-line bg-white">

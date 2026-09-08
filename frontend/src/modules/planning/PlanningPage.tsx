@@ -790,9 +790,9 @@ function PlanningMetric({ label, value, tone }: { label: string; value: string |
 function PlanningWorkList({ rows, onOpen }: { rows: PlanningWorkRow[]; onOpen: (row: PlanningWorkRow) => void }) {
   return (
     <>
-      <div className="hidden overflow-x-auto lg:block">
+      <div className="consflow-table-viewport hidden lg:block">
         <table className="w-full min-w-[840px] border-collapse text-left text-sm">
-          <thead>
+          <thead className="bg-slate-50">
             <tr className="border-b border-line text-xs font-semibold uppercase tracking-wide text-slate-500">
               <th className="px-3 py-2"><span className="sr-only">Thao tác</span></th>
               <th className="px-3 py-2">Công việc</th>

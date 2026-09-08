@@ -640,9 +640,9 @@ function StaffRoleDialog({
           </div>
 
           <div className={`mt-3 overflow-hidden rounded-lg border ${rolesMissing ? 'border-rose-400 ring-1 ring-rose-100' : 'border-line'}`} data-validation-key="role_ids" data-validation-error={rolesMissing ? 'true' : undefined}>
-            <div className="max-h-[42vh] overflow-auto">
+            <div className="consflow-table-viewport max-h-[42vh]">
               <table className="min-w-full border-separate border-spacing-0">
-                <thead className="sticky top-0 z-10 bg-slate-50">
+                <thead className="bg-slate-50">
                   <tr>
                     <th className="w-20 border-b border-line px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Chọn</th>
                     <th className="border-b border-line px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Vai trò</th>

@@ -190,7 +190,7 @@ export function SupplierQuotationWorkspace({ projectId, workItemId, boqItems, mo
   }
 
   return (
-    <section className="mb-4 overflow-hidden rounded-lg border border-line bg-white">
+    <section className="mb-4 overflow-clip rounded-lg border border-line bg-white">
       <div className="flex flex-col gap-3 border-b border-line px-4 py-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-base font-semibold text-ink">{mode === 'quotes' ? 'Báo giá nhà cung cấp' : 'So sánh & chốt giá'}</h2>
@@ -213,7 +213,7 @@ export function SupplierQuotationWorkspace({ projectId, workItemId, boqItems, mo
         {quotations.isLoading ? <LoadingText /> : quotations.error ? <ErrorText onRetry={() => quotations.refetch()} /> : !(quotations.data?.length) ? (
           <EmptyText text="Chưa có báo giá. Tạo báo giá đầu tiên để bắt đầu so sánh." />
         ) : (
-          <div className="overflow-x-auto rounded-md border border-line">
+          <div className="consflow-table-viewport rounded-md border border-line">
             <table className="min-w-[900px] w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr><th className="px-3 py-2"><span className="sr-only">Thao tác</span></th><th className="px-3 py-2">Mã</th><th className="px-3 py-2">Nhà cung cấp</th><th className="px-3 py-2">Hiệu lực</th><th className="px-3 py-2 text-right">Giá trị</th><th className="px-3 py-2">Đánh giá</th><th className="px-3 py-2">Trạng thái</th></tr>
@@ -243,7 +243,7 @@ export function SupplierQuotationWorkspace({ projectId, workItemId, boqItems, mo
         {mode === 'compare' ? <>
         <h3 className="mb-2 mt-5 text-sm font-semibold text-ink">So sánh theo dòng BOQ</h3>
         {comparison.isLoading ? <LoadingText /> : comparison.error ? <ErrorText onRetry={() => comparison.refetch()} /> : !(comparison.data?.length) ? <EmptyText text="Chưa có dòng BOQ để so sánh." /> : (
-          <div className="overflow-x-auto rounded-md border border-line">
+          <div className="consflow-table-viewport rounded-md border border-line">
             <table className="min-w-[980px] w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr><th className="px-3 py-2">Công việc</th><th className="px-3 py-2 text-right">Giá định mức</th><th className="px-3 py-2">Các báo giá đủ điều kiện</th><th className="px-3 py-2">Quyết định</th></tr>
@@ -313,7 +313,7 @@ function QuotationEditor({ draft, errors, supplierOptions, pending, onChange, on
       <Field label="Bảo hành" value={draft.warranty_terms} onChange={(value) => set('warranty_terms', value)} />
       <label className="md:col-span-3"><span className="text-sm font-semibold text-slate-700">Ghi chú</span><textarea className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm" rows={2} value={draft.notes} onChange={(event) => set('notes', event.target.value)} /></label>
     </div>
-    <div className="mt-5 overflow-x-auto rounded-md border border-line" data-validation-key="items" data-validation-error={errors.items ? 'true' : undefined}>
+    <div className="consflow-table-viewport mt-5 rounded-md border border-line" data-validation-key="items" data-validation-error={errors.items ? 'true' : undefined}>
       {errors.items ? <p role="alert" className="border-b border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{errors.items}</p> : null}
       <table className="min-w-[1100px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-2 py-2">Chọn</th><th className="px-2 py-2">Dòng BOQ</th><th className="px-2 py-2">Khối lượng</th><th className="px-2 py-2">Đơn giá</th><th className="px-2 py-2">Chiết khấu</th><th className="px-2 py-2">Thuế GTGT %</th><th className="px-2 py-2">Thời gian cung ứng</th><th className="px-2 py-2">Đáp ứng</th><th className="px-2 py-2">Sai khác</th></tr></thead>
         <tbody className="divide-y divide-line">{draft.items.map((item, index) => <tr key={item.boq_item_id} className={!item.enabled ? 'opacity-50' : ''}>

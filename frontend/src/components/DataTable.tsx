@@ -153,7 +153,7 @@ export function DataTable<T extends Record<string, any>>({
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
+    <div className="overflow-clip rounded-lg border border-line bg-white shadow-panel">
       {hasControls ? (
         <div className="flex flex-col gap-3 border-b border-line bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           {searchPlaceholder ? (
@@ -246,7 +246,7 @@ export function DataTable<T extends Record<string, any>>({
         </div>
       ) : visibleRows.length ? (
       <>
-      <div className={clsx('overflow-x-auto', renderMobileCard && 'hidden md:block')}>
+      <div className={clsx('consflow-table-viewport', renderMobileCard && 'hidden md:block')}>
         <table className="min-w-full divide-y divide-line">
           <thead className="bg-slate-50">
             <tr>

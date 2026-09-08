@@ -21,7 +21,7 @@ export function HandoverWorkspace({ detail, canVerify, canApprove, pending, onCh
     setTab(detail.status === 'draft' ? 'checklist' : detail.status === 'handed_over' ? 'info' : 'tasks');
   }, [detail.id, detail.status]);
 
-  return <div className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
+  return <div className="overflow-clip rounded-lg border border-line bg-white shadow-panel">
     <div className={`border-b p-4 ${detail.status === 'blocked' ? 'border-amber-200 bg-amber-50' : detail.status === 'ready' || detail.status === 'handed_over' ? 'border-emerald-200 bg-emerald-50' : 'border-line bg-slate-50'}`}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
@@ -72,7 +72,7 @@ function ChecklistGroup({ category, items, projectId, handoverStatus, canVerify,
   const verified = items.filter((item) => item.status === 'verified').length;
   return <section>
     <div className="mb-2 flex items-center justify-between gap-3"><h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{categoryLabel(category)}</h4><span className="text-xs font-semibold text-slate-600">{verified}/{items.length}</span></div>
-    <div className="hidden overflow-x-auto rounded-lg border border-line md:block"><table className="min-w-[760px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2"><span className="sr-only">Thao tác</span></th><th className="px-3 py-2">Nội dung</th><th className="px-3 py-2">Nguồn xác minh</th><th className="px-3 py-2">Trạng thái</th></tr></thead><tbody className="divide-y divide-line">{items.map((item) => <ChecklistRow key={item.id} item={item} projectId={projectId} handoverStatus={handoverStatus} canVerify={canVerify} onChecklist={onChecklist} onViewSource={onViewSource} />)}</tbody></table></div>
+    <div className="consflow-table-viewport hidden rounded-lg border border-line md:block"><table className="min-w-[760px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2"><span className="sr-only">Thao tác</span></th><th className="px-3 py-2">Nội dung</th><th className="px-3 py-2">Nguồn xác minh</th><th className="px-3 py-2">Trạng thái</th></tr></thead><tbody className="divide-y divide-line">{items.map((item) => <ChecklistRow key={item.id} item={item} projectId={projectId} handoverStatus={handoverStatus} canVerify={canVerify} onChecklist={onChecklist} onViewSource={onViewSource} />)}</tbody></table></div>
     <div className="space-y-2 md:hidden">{items.map((item) => <ChecklistMobileCard key={item.id} item={item} projectId={projectId} handoverStatus={handoverStatus} canVerify={canVerify} onChecklist={onChecklist} onViewSource={onViewSource} />)}</div>
   </section>;
 }

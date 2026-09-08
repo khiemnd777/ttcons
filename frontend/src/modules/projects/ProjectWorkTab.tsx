@@ -188,7 +188,7 @@ export function ProjectWorkTab({ rows, onOpenWork }: { rows: WorkItem[]; onOpenW
           </div>
         ) : (
           <>
-            <div className="hidden overflow-x-auto lg:block">
+            <div className="consflow-table-viewport hidden lg:block">
               <table className="min-w-full divide-y divide-line">
                 <thead className="bg-slate-50">
                   <tr>

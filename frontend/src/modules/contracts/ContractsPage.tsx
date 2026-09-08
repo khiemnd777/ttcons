@@ -1154,7 +1154,7 @@ function RetentionTable({ contract, canRelease, onRelease }: {
 function ResponsiveRecords({ headers, rows, cards }: { headers: string[]; rows: ReactNode[][]; cards: ReactNode[] }) {
   return (
     <>
-      <div className="hidden overflow-x-auto rounded-md border border-line 2xl:block">
+      <div className="consflow-table-viewport hidden rounded-md border border-line 2xl:block">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>{headers.map((header, index) => <th key={index} className="px-3 py-2">{header || <span className="sr-only">Thao tác</span>}</th>)}</tr>

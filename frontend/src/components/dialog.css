@@ -1,3 +1,7 @@
+.dialog-body {
+  --consflow-table-sticky-top: 0px;
+}
+
 /* Fullscreen is an explicit consumer choice; ordinary dialogs keep their layout. */
 @media (max-width: 767px) {
   .dialog-mobile-fullscreen.fixed {

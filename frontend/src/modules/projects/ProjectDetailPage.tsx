@@ -628,7 +628,7 @@ function WorkspaceWorkTable({ rows, onOpenWork }: { rows: WorkItem[]; onOpenWork
 
   return (
     <>
-      <div className="hidden overflow-x-auto md:block">
+      <div className="consflow-table-viewport hidden md:block">
         <table className="min-w-full divide-y divide-line text-sm">
           <thead className="bg-white">
             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -1038,7 +1038,7 @@ function WorkflowWorkPanel({
             <>
               <div className="hidden overflow-x-auto rounded-md border border-line md:block">
                 <div className="min-w-[920px]">
-                  <div className="grid grid-cols-[72px_minmax(260px,1.6fr)_120px_minmax(140px,0.8fr)_110px_minmax(170px,1fr)] gap-3 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  <div className="consflow-sticky-grid-header grid grid-cols-[72px_minmax(260px,1.6fr)_120px_minmax(140px,0.8fr)_110px_minmax(170px,1fr)] gap-3 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     <span><span className="sr-only">Thao tác</span></span>
                     <span>Công việc</span>
                     <span>Trạng thái</span>
@@ -1311,8 +1311,8 @@ function ProjectAuditPanel({ projectId, initialRows }: { projectId: string; init
 
       {!logs.isLoading && !rows.length ? <EmptyState title="Chưa có sự kiện hệ thống" /> : null}
       {rows.length ? (
-        <div className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
-          <div className="hidden grid-cols-[32px_120px_180px_minmax(140px,1fr)_150px] gap-3 border-b border-line bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
+        <div className="overflow-clip rounded-lg border border-line bg-white shadow-panel">
+          <div className="consflow-sticky-grid-header hidden grid-cols-[32px_120px_180px_minmax(140px,1fr)_150px] gap-3 border-b border-line bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
             <span><span className="sr-only">Thao tác</span></span><span>Thời gian</span><span>Sự kiện</span><span>Người thực hiện</span><span>Đối tượng</span>
           </div>
           <div className="divide-y divide-line">
