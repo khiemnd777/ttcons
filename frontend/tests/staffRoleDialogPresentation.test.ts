@@ -24,8 +24,8 @@ test('staff role dialog renders a local responsive selection table', async () =>
 
   assert.match(dialog, /title="Gán vai trò"/);
   assert.match(dialog, /<table className="min-w-full border-separate border-spacing-0">/);
-  assert.match(dialog, /max-h-\[42vh\] overflow-auto/);
-  assert.match(dialog, /sticky top-0 z-10 bg-slate-50/);
+  assert.match(dialog, /consflow-table-viewport max-h-\[42vh\]/);
+  assert.match(dialog, /<thead className="bg-slate-50">/);
   assert.match(dialog, />Chọn<\/th>/);
   assert.match(dialog, />Vai trò<\/th>/);
   assert.match(dialog, />Mã kỹ thuật<\/th>/);

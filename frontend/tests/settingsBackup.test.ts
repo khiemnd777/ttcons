@@ -26,6 +26,6 @@ test('settings restore always previews the same bounded JSON before an optimisti
   assert.match(backup, /body\.append\('expected_versions', JSON\.stringify\(checked\.expected_versions\)\)/);
   assert.match(backup, /postForm<RestoreResult>\('\/settings\/backup\/restore'/);
   assert.match(backup, /File không chứa giá trị secret/);
-  assert.match(backup, /hidden overflow-x-auto.*md:block/s);
+  assert.match(backup, /consflow-table-viewport mt-2 hidden.*md:block/s);
   assert.match(backup, /space-y-2 md:hidden/);
 });

@@ -9,7 +9,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 // Server render the real card/provider. No browser, requests, DOM or simulated source data reads.
 const bundle = await build({
   entryPoints: [fileURLToPath(new URL('../src/modules/work-items/ActivityTopic.tsx', import.meta.url))],
-  bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic',
+  bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic', logLevel: 'silent',
+  loader: { '.css': 'text' },
   plugins: [{ name: 'topic-render-environment', setup(build) {
     build.onResolve({ filter: /\/auth\/AuthContext$/ }, () => ({ path: 'auth', namespace: 'topic-test' }));
     build.onResolve({ filter: /\.\/ActivityTopicDetails$/ }, () => ({ path: 'details', namespace: 'topic-test' }));
