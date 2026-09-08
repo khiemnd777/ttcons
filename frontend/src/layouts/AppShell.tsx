@@ -44,6 +44,8 @@ type NavItem = {
 type NavGroup = { title: string; items: NavItem[] };
 type NavBadge = { value: number | '…' | '—'; error?: boolean };
 
+const UTILITY_DOCK_CONTENT_CLEARANCE_CLASS = 'pb-[calc(8rem+env(safe-area-inset-bottom))] sm:pb-16';
+
 const navGroups: NavGroup[] = [
   {
     title: 'Công việc',
@@ -151,7 +153,7 @@ export function AppShell() {
 
   if (location.pathname.startsWith('/pipeline-builder') || projectFocusMode) {
     return (
-      <div className="min-h-screen bg-surface">
+      <div className={clsx('min-h-screen bg-surface', projectFocusMode && UTILITY_DOCK_CONTENT_CLEARANCE_CLASS)}>
         <Outlet />
         <UtilityDock key="global-utility-dock" />
       </div>
@@ -279,7 +281,7 @@ export function AppShell() {
             </div>
           </div>
         </header>
-        <main className="flex-1 px-4 py-5 md:px-6">
+        <main className={clsx('flex-1 px-4 pt-5 md:px-6', UTILITY_DOCK_CONTENT_CLEARANCE_CLASS)}>
           <Outlet />
         </main>
         <footer className="border-t border-line bg-white px-4 py-3 lg:hidden">

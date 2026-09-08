@@ -83,7 +83,7 @@ func normalizeProjectExplorerRequest(input ProjectExplorerRequest) (ProjectExplo
 		return input, validationError("Trạng thái không hợp lệ", Record{"status": input.Status})
 	}
 	switch input.Sort {
-	case "project", "status", "owner", "created_at":
+	case "project", "status", "owner", "created_at", "updated_at":
 	default:
 		return input, validationError("Trường sắp xếp không hợp lệ", Record{"sort": input.Sort})
 	}
@@ -350,6 +350,8 @@ func projectExplorerOrderSQL(request ProjectExplorerRequest) string {
 		return fmt.Sprintf("LOWER(%s) %s, %s", projectStatusLabelSQL("p.status"), direction, tieBreak)
 	case "owner":
 		return fmt.Sprintf("(NULLIF(BTRIM(s.full_name), '') IS NULL) ASC, LOWER(s.full_name) %s, %s", direction, tieBreak)
+	case "updated_at":
+		return fmt.Sprintf("p.updated_at %s, %s", direction, tieBreak)
 	default:
 		return fmt.Sprintf("p.created_at %s, %s", direction, tieBreak)
 	}

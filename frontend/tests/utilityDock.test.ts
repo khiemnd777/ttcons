@@ -14,6 +14,9 @@ test('global Utility Dock persists across standard and focus AppShell branches',
 
   assert.match(shell, /import \{ UtilityDock \} from '\.\.\/modules\/utilities\/UtilityDock'/);
   assert.ok((shell.match(/<UtilityDock key="global-utility-dock" \/>/g) ?? []).length === 2, 'standard and focus shells must share one keyed utility identity');
+  assert.match(shell, /const UTILITY_DOCK_CONTENT_CLEARANCE_CLASS = 'pb-\[calc\(8rem\+env\(safe-area-inset-bottom\)\)\] sm:pb-16';/);
+  assert.match(shell, /className=\{clsx\('min-h-screen bg-surface', projectFocusMode && UTILITY_DOCK_CONTENT_CLEARANCE_CLASS\)\}/);
+  assert.match(shell, /<main className=\{clsx\('flex-1 px-4 pt-5 md:px-6', UTILITY_DOCK_CONTENT_CLEARANCE_CLASS\)}>\n\s*<Outlet \/>/);
   assert.match(dock, /type DesktopDockKey = 'work' \| `project:\$\{string\}`/);
   assert.match(dock, /const maxDiscussionTabs = 5/);
   assert.match(dock, /event\.key !== 'Escape'/);

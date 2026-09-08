@@ -25,6 +25,20 @@ func TestNormalizeProjectExplorerRequest(t *testing.T) {
 			t.Fatalf("invalid request accepted: %+v", invalid)
 		}
 	}
+	request, err = normalizeProjectExplorerRequest(ProjectExplorerRequest{Sort: "updated_at", Direction: "asc", Page: 1, PageSize: 25})
+	if err != nil || request.Sort != "updated_at" || request.Direction != "asc" {
+		t.Fatalf("updated_at sort was not accepted: request=%+v err=%v", request, err)
+	}
+}
+
+func TestProjectExplorerOrderSQLUsesUpdatedAt(t *testing.T) {
+	request := ProjectExplorerRequest{Sort: "updated_at", Direction: "desc"}
+	if order := projectExplorerOrderSQL(request); !strings.Contains(order, "p.updated_at DESC") {
+		t.Fatalf("project explorer order=%q", order)
+	}
+	if order := projectExplorerOrderSQLForAlias(request, "project", "staff"); !strings.Contains(order, "project.updated_at DESC") {
+		t.Fatalf("project export order=%q", order)
+	}
 }
 
 func TestProjectExplorerCacheHashDoesNotExposeSearch(t *testing.T) {

@@ -1,6 +1,6 @@
 import type { Project } from '../../lib/types/domain';
 
-export type ProjectExplorerSortKey = 'project' | 'status' | 'owner' | 'created_at';
+export type ProjectExplorerSortKey = 'project' | 'status' | 'owner' | 'created_at' | 'updated_at';
 export type ProjectExplorerSortDirection = 'asc' | 'desc';
 export type ProjectExplorerSort = {
   key: ProjectExplorerSortKey;
@@ -16,6 +16,8 @@ export const projectExplorerSortOptions: Array<{ value: string; label: string }>
   { value: 'owner:desc', label: 'Phụ trách: giảm dần' },
   { value: 'created_at:asc', label: 'Ngày tạo: cũ nhất trước' },
   { value: 'created_at:desc', label: 'Ngày tạo: mới nhất trước' },
+  { value: 'updated_at:asc', label: 'Ngày cập nhật: cũ nhất trước' },
+  { value: 'updated_at:desc', label: 'Ngày cập nhật: mới nhất trước' },
 ];
 
 const vietnameseCollator = new Intl.Collator('vi', {
@@ -79,16 +81,20 @@ function compareProjectField(
   if (sort.key === 'owner') {
     return compareLocalizedText(left.pm_name, right.pm_name, sort.direction);
   }
-  return compareCreationDates(left.created_at, right.created_at, sort.direction);
+  return compareDateValues(
+    sort.key === 'created_at' ? left.created_at : left.updated_at,
+    sort.key === 'created_at' ? right.created_at : right.updated_at,
+    sort.direction,
+  );
 }
 
-function compareCreationDates(
+function compareDateValues(
   left: unknown,
   right: unknown,
   direction: ProjectExplorerSortDirection,
 ) {
-  const leftTimestamp = creationTimestamp(left);
-  const rightTimestamp = creationTimestamp(right);
+  const leftTimestamp = timestamp(left);
+  const rightTimestamp = timestamp(right);
   if (leftTimestamp === null && rightTimestamp === null) return 0;
   if (leftTimestamp === null) return 1;
   if (rightTimestamp === null) return -1;
@@ -96,7 +102,7 @@ function compareCreationDates(
   return direction === 'asc' ? result : -result;
 }
 
-function creationTimestamp(value: unknown) {
+function timestamp(value: unknown) {
   if (typeof value !== 'string' || !value.trim()) return null;
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : null;
@@ -117,5 +123,5 @@ function compareLocalizedText(
 }
 
 function isProjectExplorerSortKey(value: string): value is ProjectExplorerSortKey {
-  return value === 'project' || value === 'status' || value === 'owner' || value === 'created_at';
+  return value === 'project' || value === 'status' || value === 'owner' || value === 'created_at' || value === 'updated_at';
 }

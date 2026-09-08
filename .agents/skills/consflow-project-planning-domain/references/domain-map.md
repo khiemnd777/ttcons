@@ -28,6 +28,7 @@
 - Progress retains its stage classifier, server filters, pagination, progress and operational issue/approval/blocked/overdue badges. Those badges describe work state, not unread content. Project-title links and update buttons remain separate; the shared actor-bound dialog lives outside virtual cards. Reading updates refreshes indicators across both routes without resetting stage pages or changing project/runtime status. Only the current mobile/desktop layout requests card data; horizontal and vertical viewport bounds constrain update loading.
 - V136 starts system unread awareness at migration activation, using a dedicated per-user/project monotonic cursor. Older system history remains viewable. Existing V135 discussion cursors and notification read/archive semantics remain separate; no read action resolves workflow, attention or source decisions. Only recorded activity is projected; no invented transitions from `updated_at`, no new producer catalog and no changed project/runtime state.
 - The shared dialog exposes paginated group/unread/transition filters and explicit read actions. Read-through cannot run while unseen older pages or hidden transition types remain. Latest/count queries retain current project/Work Item permissions and cancelled/withdrawn exclusions. No actor-specific values enter shared Explorer Redis rows.
+- Project Explorer and Project Workspace inherit the responsive Utility Dock end clearance from `AppShell`: `8rem + safe-area` on mobile and `4rem` from `sm`. This is presentation-only; explorer pagination, update read state, project permissions and project/runtime status stay unchanged.
 
 ## Accounting Company Observation (V133)
 
@@ -99,6 +100,8 @@
 - Soft-deleting a Staff project manager never clears `projects.pm_staff_id`. Project list/explorer/workspace/detail/progress responses keep `pm_name`, add `pm_account_deleted`, display the deleted-account suffix and mark live ownership `Cần phân công lại`. The deletion transaction touches the project revision so Explorer cache/SSE cannot retain an active-looking PM. Deleted memberships are inactive history and remain visible only through the authorized inactive-member view; active member/PM selectors exclude them.
 
 - Project metadata review/edit on `/projects` has one pencil entry point. Its unified dialog presents the current status, progress and partner snapshot/tax as read-only context above the editable metadata/template form; no separate eye/detail action or additional detail request exists, and the project-workspace folder action remains separate. The selector is labelled `Chọn chủ đầu tư có sẵn`, the read-only summary is `Chủ đầu tư đã chọn`, and the helper describes storing the current name in plain language.
+
+- Explorer sort accepts `project|status|owner|created_at|updated_at`. `updated_at` is the persisted project-master timestamp rendered as `Ngày cập nhật`, never a replacement for project activity's actor-scoped latest-update preview; the same server order applies to project data-package export. This is a read-only presentation/query extension: project visibility, cancelled exclusion, runtime, activity, audit and workflow state remain unchanged.
 
 ## Developer Sample Data
 

@@ -463,6 +463,8 @@ func projectExplorerOrderSQLForAlias(request ProjectExplorerRequest, projectAlia
 		return fmt.Sprintf("LOWER(%s) %s,%s", projectStatusLabelSQL(projectAlias+".status"), direction, tieBreak)
 	case "owner":
 		return fmt.Sprintf("(NULLIF(BTRIM(%s.full_name),'') IS NULL) ASC,LOWER(%s.full_name) %s,%s", staffAlias, staffAlias, direction, tieBreak)
+	case "updated_at":
+		return fmt.Sprintf("%s.updated_at %s,%s", projectAlias, direction, tieBreak)
 	default:
 		return fmt.Sprintf("%s.created_at %s,%s", projectAlias, direction, tieBreak)
 	}

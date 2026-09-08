@@ -55,8 +55,8 @@ import { useProjectUpdates } from './useProjectUpdates';
 import { ProjectUpdateIndicators } from './ProjectUpdateIndicators';
 import { ProjectUpdatesDialog } from './ProjectUpdatesDialog';
 
-const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-[112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
-const PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS = 'lg:grid-cols-[32px_112px_minmax(0,1.6fr)_135px_100px_112px_100px]';
+const PROJECT_EXPLORER_DESKTOP_GRID_CLASS = 'lg:grid-cols-[112px_minmax(0,1.6fr)_135px_100px_112px_100px_100px]';
+const PROJECT_EXPLORER_SELECTABLE_DESKTOP_GRID_CLASS = 'lg:grid-cols-[32px_112px_minmax(0,1.6fr)_135px_100px_112px_100px_100px]';
 
 export function ProjectsPage() {
   const [open, setOpen] = useState(false);
@@ -720,6 +720,7 @@ function ProjectExplorerHeader({
       <ProjectExplorerSortHeader label="Phụ trách" sortKey="owner" sort={sort} onSort={onSort} />
       <span>Tiến độ</span>
       <ProjectExplorerSortHeader label="Ngày tạo" sortKey="created_at" sort={sort} onSort={onSort} />
+      <ProjectExplorerSortHeader label="Ngày cập nhật" sortKey="updated_at" sort={sort} onSort={onSort} />
     </div>
   );
 }
@@ -736,7 +737,7 @@ function ProjectExplorerSortHeader({
   onSort: (key: ProjectExplorerSortKey) => void;
 }) {
   const activeDirection = sort?.key === sortKey ? sort.direction : null;
-  const nextDirection = sortKey === 'created_at'
+  const nextDirection = sortKey === 'created_at' || sortKey === 'updated_at'
     ? activeDirection === 'asc' ? 'mới nhất trước' : 'cũ nhất trước'
     : activeDirection === 'asc' ? 'giảm dần' : 'tăng dần';
 
@@ -844,6 +845,10 @@ function ProjectExplorerRow({
       <div className="whitespace-nowrap text-sm tabular-nums text-slate-600">
         <span className="font-medium text-slate-500 lg:hidden">Ngày tạo: </span>
         {dateText(project.created_at)}
+      </div>
+      <div className="whitespace-nowrap text-sm tabular-nums text-slate-600">
+        <span className="font-medium text-slate-500 lg:hidden">Ngày cập nhật: </span>
+        {dateText(project.updated_at)}
       </div>
     </div>
   );

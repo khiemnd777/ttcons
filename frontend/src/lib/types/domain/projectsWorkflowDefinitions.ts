@@ -34,6 +34,7 @@ export type Project = AnyRecord & {
   planned_start_date?: string | null;
   planned_end_date?: string | null;
   created_at?: string;
+  updated_at?: string;
   open_issues?: number;
   pending_approvals?: number;
 };

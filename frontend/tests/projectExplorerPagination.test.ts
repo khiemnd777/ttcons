@@ -27,3 +27,7 @@ test('project explorer stays collapsed until the user explicitly expands a visib
   assert.match(source, /return retained;/);
   assert.doesNotMatch(source, /new Set\(\[rows\[0\]\.id\]\)/);
 });
+
+test('project explorer leaves fixed Utility Dock clearance to the global AppShell', () => {
+  assert.doesNotMatch(source, /pb-\[calc\(8rem\+env\(safe-area-inset-bottom\)\)\] .*sm:pb-16/);
+});

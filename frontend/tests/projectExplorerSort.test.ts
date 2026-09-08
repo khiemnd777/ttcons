@@ -93,15 +93,33 @@ test('project explorer sorts creation timestamps chronologically and keeps unusa
   assert.deepEqual(new Set(descending.slice(2)), new Set(['invalid', 'missing']));
 });
 
+test('project explorer sorts update timestamps chronologically and keeps unusable dates last', () => {
+  const rows = [
+    project('missing', { updated_at: undefined }),
+    project('newer', { updated_at: '2026-08-10T09:30:00Z' }),
+    project('invalid', { updated_at: 'not-a-date' }),
+    project('older', { updated_at: '2026-08-08T14:00:00Z' }),
+  ];
+
+  const ascending = sortProjectExplorerRows(rows, { key: 'updated_at', direction: 'asc' }).map((row) => row.id);
+  const descending = sortProjectExplorerRows(rows, { key: 'updated_at', direction: 'desc' }).map((row) => row.id);
+
+  assert.deepEqual(ascending.slice(0, 2), ['older', 'newer']);
+  assert.deepEqual(descending.slice(0, 2), ['newer', 'older']);
+  assert.deepEqual(new Set(ascending.slice(2)), new Set(['invalid', 'missing']));
+  assert.deepEqual(new Set(descending.slice(2)), new Set(['invalid', 'missing']));
+});
+
 test('project explorer sort controls start ascending, toggle direction, and reject invalid values', () => {
   const ascending = nextProjectExplorerSort('status', null);
   assert.deepEqual(ascending, { key: 'status', direction: 'asc' });
   assert.deepEqual(nextProjectExplorerSort('status', ascending), { key: 'status', direction: 'desc' });
   assert.deepEqual(projectExplorerSortFromValue('owner:desc'), { key: 'owner', direction: 'desc' });
   assert.deepEqual(projectExplorerSortFromValue('created_at:desc'), { key: 'created_at', direction: 'desc' });
+  assert.deepEqual(projectExplorerSortFromValue('updated_at:desc'), { key: 'updated_at', direction: 'desc' });
   assert.deepEqual(projectExplorerSortOptions.slice(-2), [
-    { value: 'created_at:asc', label: 'Ngày tạo: cũ nhất trước' },
-    { value: 'created_at:desc', label: 'Ngày tạo: mới nhất trước' },
+    { value: 'updated_at:asc', label: 'Ngày cập nhật: cũ nhất trước' },
+    { value: 'updated_at:desc', label: 'Ngày cập nhật: mới nhất trước' },
   ]);
   assert.equal(projectExplorerSortFromValue('progress:asc'), null);
   assert.equal(projectExplorerSortFromValue('owner:sideways'), null);
