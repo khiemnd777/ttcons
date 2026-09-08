@@ -22,6 +22,8 @@ test('standard shell exposes profile entry on desktop and mobile user surfaces',
   assert.match(appShell, /navigate\('\/profile'\)/);
   assert.match(appShell, />\s*Hồ sơ cá nhân\s*</);
   assert.ok((appShell.match(/navigate\('\/profile'\)/g) ?? []).length >= 2, 'desktop and mobile must both open Profile');
+  assert.match(appShell, /<UserAvatar user=\{user\} size="sm" decorative \/>/);
+  assert.match(appShell, /<UserAvatar user=\{user\} size="md" decorative \/>/);
 });
 
 test('profile page keeps personal and password edits in shared dialogs', async () => {
@@ -42,6 +44,10 @@ test('profile page keeps personal and password edits in shared dialogs', async (
   assert.match(profile, /toast\.error/);
   assert.match(profile, /passwordValueSchema/);
   assert.match(profile, /<PasswordInput/);
+  assert.match(profile, /title="Cập nhật ảnh đại diện"/);
+  assert.match(profile, /postFormWithProgress<User>\('\/auth\/avatar\/upload'/);
+  assert.match(profile, /accept=\{avatarAccept\}/);
+  assert.match(profile, /<UserAvatar user=\{user\} size="lg" decorative \/>/);
 });
 
 test('auth context can refresh the user summary after a non-sensitive profile update', async () => {
@@ -54,4 +60,6 @@ test('auth context can refresh the user summary after a non-sensitive profile up
   assert.match(types, /phone\?: string/);
   assert.match(types, /department\?: string/);
   assert.match(types, /position\?: string/);
+  assert.match(types, /has_avatar\?: boolean/);
+  assert.match(types, /avatar_updated_at\?: string/);
 });

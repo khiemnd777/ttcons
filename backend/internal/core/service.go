@@ -56,14 +56,17 @@ func NewService(repo *Repository, jwtSecret string) *Service {
 }
 
 const (
-	defaultMaxUploadBytes        = int64(10 * 1024 * 1024)
-	defaultAccessTokenTTL        = 15 * time.Minute
-	defaultRefreshTokenTTL       = 7 * 24 * time.Hour
-	defaultRefreshCookieSameSite = "Lax"
-	activityMessageEditWindow    = 15 * time.Minute
-	maxSealUploadBytes           = int64(10 * 1024 * 1024)
-	maxSealImageDimension        = 4096
-	maxSealImagePixels           = 16 * 1024 * 1024
+	defaultMaxUploadBytes          = int64(10 * 1024 * 1024)
+	defaultAccessTokenTTL          = 15 * time.Minute
+	defaultRefreshTokenTTL         = 7 * 24 * time.Hour
+	defaultRefreshCookieSameSite   = "Lax"
+	activityMessageEditWindow      = 15 * time.Minute
+	maxSealUploadBytes             = int64(10 * 1024 * 1024)
+	maxSealImageDimension          = 4096
+	maxSealImagePixels             = 16 * 1024 * 1024
+	maxProfileAvatarUploadBytes    = int64(2 * 1024 * 1024)
+	maxProfileAvatarImageDimension = 2048
+	maxProfileAvatarImagePixels    = 4 * 1024 * 1024
 )
 
 func (s *Service) ConfigureUploads(uploadDir string, maxUploadBytes int64) {

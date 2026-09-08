@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+async function source(path: string) {
+  return readFile(new URL(path, import.meta.url), 'utf8');
+}
+
+test('project activity exposes only three activity kinds, opens discussion first, and keeps one page composer', async () => {
+  const [thread, workItemDetail] = await Promise.all([
+    source('../src/modules/work-items/ActivityThread.tsx'),
+    source('../src/modules/work-items/WorkItemDetailDialog.tsx'),
+  ]);
+  const tabs = thread.slice(thread.indexOf('const kindTabs'), thread.indexOf('const attentionItems'));
+
+  assert.match(thread, /type ActivityKind = 'discussion' \| 'decision' \| 'system';/);
+  assert.match(thread, /const \[kind, setKind\] = useState<ActivityKind>\('discussion'\);/);
+  assert.match(thread, /params\.set\('kind', kind\);/);
+  assert.doesNotMatch(thread, /if \(kind\) params\.set\('kind', kind\);/);
+  assert.doesNotMatch(tabs, /Tất cả/);
+  assert.match(tabs, /label: 'Thảo luận'/);
+  assert.match(tabs, /label: 'Quyết định'/);
+  assert.match(tabs, /label: 'Nhật ký hệ thống'/);
+  assert.equal((thread.match(/<ActivityComposer/g) ?? []).length, 1);
+  assert.match(thread, /kind === 'discussion'[\s\S]*variant="chat"/);
+  assert.doesNotMatch(thread, /kind !== 'discussion'/);
+  assert.match(workItemDetail, /<ActivityComposer[\s\S]*mode="work_item"[\s\S]*defaultExpanded/);
+});

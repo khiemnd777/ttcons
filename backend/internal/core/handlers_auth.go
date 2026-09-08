@@ -66,6 +66,27 @@ func (h *Handler) UpdateOwnProfile(c *fiber.Ctx) error {
 	return response.OK(c, result, "Đã cập nhật hồ sơ cá nhân")
 }
 
+func (h *Handler) UploadOwnAvatar(c *fiber.Ctx) error {
+	fileHeader, err := c.FormFile("file")
+	if err != nil || fileHeader == nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Ảnh đại diện là bắt buộc")
+	}
+	user, err := h.service.UpdateOwnAvatar(c.Context(), actorID(c), actorName(c), fileHeader)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, user, "Đã cập nhật ảnh đại diện")
+}
+
+func (h *Handler) GetOwnAvatar(c *fiber.Ctx) error {
+	file, err := h.service.OwnAvatarFile(c.Context(), actorID(c))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderCacheControl, "private, no-store")
+	return sendProtectedFile(c, file, "anh-dai-dien.png")
+}
+
 func (h *Handler) ChangeOwnPassword(c *fiber.Ctx) error {
 	var req ChangeOwnPasswordRequest
 	if err := json.Unmarshal(c.Body(), &req); err != nil {

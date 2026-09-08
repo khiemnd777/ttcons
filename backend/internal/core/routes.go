@@ -75,6 +75,8 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	protected.Put("/auth/password", h.ChangeOwnPassword)
 	protected.Use(middleware.InitialPasswordChanged(repo))
 	protected.Put("/auth/profile", h.UpdateOwnProfile)
+	protected.Post("/auth/avatar/upload", h.UploadOwnAvatar)
+	protected.Get("/auth/avatar", h.GetOwnAvatar)
 	protected.Put("/auth/recovery-email", h.UpdateRecoveryEmail)
 	protected.Delete("/auth/recovery-email", h.RemoveRecoveryEmail)
 

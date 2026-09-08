@@ -1,3 +1,3 @@
 # Current States
 
-_No active plans._
+Không có plan đang mở.

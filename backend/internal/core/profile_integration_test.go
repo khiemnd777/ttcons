@@ -1,9 +1,17 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
+	"image/png"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -48,6 +56,111 @@ func TestProfileInputNormalization(t *testing.T) {
 	if !passwordMatches("demo:secret", "secret") || passwordMatches("demo:secret", "wrong") {
 		t.Fatal("demo password compatibility mismatch")
 	}
+}
+
+func TestOwnAvatarUploadNormalizesProtectsAndReplacesImage(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	storageRoot := t.TempDir()
+	service.ConfigureUploads(storageRoot, defaultMaxUploadBytes)
+	userID := newID()
+	email := "avatar-" + userID[:8] + "@test.local"
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE actor_id=$1`, userID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, userID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:avatar-secret','Avatar User','active')`, userID, email)
+
+	first := testMultipartFileHeader(t, "file", "avatar.jpg", avatarImageBytes(t, color.RGBA{R: 12, G: 86, B: 212, A: 255}))
+	profile, err := service.UpdateOwnAvatar(ctx, userID, "Avatar User", first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !boolValue(profile["has_avatar"]) || profile["avatar_updated_at"] == nil {
+		t.Fatalf("avatar fields missing from own profile: %#v", profile)
+	}
+	if _, exposed := profile["avatar_storage_key"]; exposed {
+		t.Fatalf("own profile must not expose avatar storage metadata: %#v", profile)
+	}
+	var firstProvider, firstKey, firstMIME string
+	if err := db.QueryRowContext(ctx, `SELECT avatar_storage_provider,avatar_storage_key,avatar_mime_type FROM users WHERE id=$1`, userID).Scan(&firstProvider, &firstKey, &firstMIME); err != nil {
+		t.Fatal(err)
+	}
+	if firstProvider != "local" || firstMIME != "image/png" || firstKey == "" {
+		t.Fatalf("stored avatar metadata = provider=%q key=%q mime=%q", firstProvider, firstKey, firstMIME)
+	}
+	file, err := service.OwnAvatarFile(ctx, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, readErr := io.ReadAll(file.Reader)
+	closeErr := file.Reader.Close()
+	if readErr != nil || closeErr != nil {
+		t.Fatalf("read avatar file: read=%v close=%v", readErr, closeErr)
+	}
+	if file.MIMEType != "image/png" {
+		t.Fatalf("avatar MIME = %q, want image/png", file.MIMEType)
+	}
+	if _, _, err := image.DecodeConfig(bytes.NewReader(content)); err != nil {
+		t.Fatalf("stored avatar is not decodable: %v", err)
+	}
+
+	firstPath := filepath.Join(storageRoot, filepath.FromSlash(firstKey))
+	second := testMultipartFileHeader(t, "file", "replacement.jpg", avatarJPEGBytes(t, color.RGBA{R: 42, G: 161, B: 152, A: 255}))
+	if _, err := service.UpdateOwnAvatar(ctx, userID, "Avatar User", second); err != nil {
+		t.Fatal(err)
+	}
+	var secondKey string
+	if err := db.QueryRowContext(ctx, `SELECT avatar_storage_key FROM users WHERE id=$1`, userID).Scan(&secondKey); err != nil {
+		t.Fatal(err)
+	}
+	if secondKey == firstKey {
+		t.Fatal("replacement avatar must receive a new storage key")
+	}
+	if _, err := os.Stat(firstPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("previous avatar object stat error = %v, want not exist", err)
+	}
+	if _, err := os.Stat(filepath.Join(storageRoot, filepath.FromSlash(secondKey))); err != nil {
+		t.Fatalf("replacement avatar object stat error = %v", err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE actor_id=$1 AND event_type='user_avatar_updated'`, 2, userID)
+
+	invalid := testMultipartFileHeader(t, "file", "avatar.txt", []byte("not an image"))
+	if _, err := service.UpdateOwnAvatar(ctx, userID, "Avatar User", invalid); err == nil {
+		t.Fatal("expected invalid avatar type to be rejected")
+	}
+}
+
+func avatarImageBytes(t *testing.T, fill color.RGBA) []byte {
+	t.Helper()
+	canvas := image.NewRGBA(image.Rect(0, 0, 8, 8))
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			canvas.SetRGBA(x, y, fill)
+		}
+	}
+	var output bytes.Buffer
+	if err := png.Encode(&output, canvas); err != nil {
+		t.Fatal(err)
+	}
+	return output.Bytes()
+}
+
+func avatarJPEGBytes(t *testing.T, fill color.RGBA) []byte {
+	t.Helper()
+	canvas := image.NewRGBA(image.Rect(0, 0, 8, 8))
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 8; x++ {
+			canvas.SetRGBA(x, y, fill)
+		}
+	}
+	var output bytes.Buffer
+	if err := jpeg.Encode(&output, canvas, nil); err != nil {
+		t.Fatal(err)
+	}
+	return output.Bytes()
 }
 
 func TestOwnProfileUpdateAndPasswordChange(t *testing.T) {

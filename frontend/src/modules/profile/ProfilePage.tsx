@@ -1,15 +1,16 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type FieldErrors, type UseFormRegisterReturn } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { BriefcaseBusiness, Building2, KeyRound, Mail, Pencil, Phone, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import { BriefcaseBusiness, Building2, ImagePlus, KeyRound, Loader2, Mail, Pencil, Phone, ShieldCheck, Trash2, Upload, UserRound } from 'lucide-react';
 import { z } from 'zod';
 import { Dialog } from '../../components/Dialog';
 import { PageHeader } from '../../components/PageHeader';
 import { PasswordInput } from '../../components/PasswordInput';
+import { UserAvatar } from '../../components/UserAvatar';
 import { useToast } from '../../components/ToastProvider';
-import { api, put } from '../../lib/api/client';
+import { api, postFormWithProgress, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { PASSWORD_RULE_HELPER, passwordConfirmationMessage, passwordValueSchema } from '../../lib/security/password';
 import type { User } from '../../lib/types/domain';
@@ -42,6 +43,9 @@ type ProfileUpdateResponse = {
   user: User;
   reauth_required: boolean;
 };
+
+const avatarAccept = 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp';
+const maxAvatarBytes = 2 * 1024 * 1024;
 
 const passwordSchema = z.object({
   current_password: z.string().min(1, 'Nhập mật khẩu hiện tại'),
@@ -88,6 +92,11 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const toast = useToast();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [avatarError, setAvatarError] = useState('');
+  const [avatarProgress, setAvatarProgress] = useState(0);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [removeRecoveryOpen, setRemoveRecoveryOpen] = useState(false);
@@ -102,6 +111,16 @@ export function ProfilePage() {
   const navigateRemoveRecoveryValidation = useValidationNavigation(removeRecoveryFormRef);
   const currentEmail = user?.email ?? '';
   const currentProfileSchema = useMemo(() => profileSchema(currentEmail), [currentEmail]);
+
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreview('');
+      return undefined;
+    }
+    const preview = URL.createObjectURL(avatarFile);
+    setAvatarPreview(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [avatarFile]);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(currentProfileSchema),
@@ -143,6 +162,31 @@ export function ProfilePage() {
       }
     },
     onError: (error) => toast.error('Không cập nhật được hồ sơ cá nhân', error),
+  });
+
+  const updateAvatar = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return postFormWithProgress<User>('/auth/avatar/upload', formData, ({ percent }) => setAvatarProgress(percent));
+    },
+    onSuccess: async () => {
+      setAvatarOpen(false);
+      setAvatarFile(null);
+      setAvatarError('');
+      setAvatarProgress(0);
+      try {
+        await refreshUser();
+        toast.success('Đã cập nhật ảnh đại diện');
+      } catch (error) {
+        toast.error('Đã lưu ảnh nhưng chưa tải lại được hồ sơ', error);
+      }
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'Không tải được ảnh đại diện';
+      setAvatarError(message);
+      toast.error('Không tải được ảnh đại diện', error);
+    },
   });
 
   const changePassword = useMutation({
@@ -194,12 +238,6 @@ export function ProfilePage() {
     return <div className="rounded-lg border border-line bg-white p-6 text-sm text-slate-600">Không tải được hồ sơ người dùng.</div>;
   }
 
-  const initials = user.full_name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(-2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || 'U';
   const roles = uniqueRoleNames(user.roles);
   const emailChanged = profileForm.watch('email').trim().toLowerCase() !== user.email.toLowerCase();
 
@@ -211,6 +249,32 @@ export function ProfilePage() {
       current_password: '',
     });
     setProfileOpen(true);
+  };
+  const resetAvatarDialog = () => {
+    setAvatarFile(null);
+    setAvatarError('');
+    setAvatarProgress(0);
+  };
+  const openAvatar = () => {
+    resetAvatarDialog();
+    setAvatarOpen(true);
+  };
+  const selectAvatar = (file: File | null) => {
+    if (!file) return;
+    const type = file.type.toLowerCase();
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(type)) {
+      setAvatarFile(null);
+      setAvatarError('Chỉ hỗ trợ ảnh PNG, JPG hoặc WebP.');
+      return;
+    }
+    if (file.size > maxAvatarBytes) {
+      setAvatarFile(null);
+      setAvatarError('Ảnh đại diện không được vượt quá 2 MB.');
+      return;
+    }
+    setAvatarError('');
+    setAvatarProgress(0);
+    setAvatarFile(file);
   };
   const openPassword = () => {
     passwordForm.reset({ current_password: '', new_password: '', new_password_confirmation: '' });
@@ -233,14 +297,18 @@ export function ProfilePage() {
       <PageHeader title="Hồ sơ cá nhân" description="Quản lý thông tin tài khoản và bảo mật của chính bạn." />
 
       <section className="mb-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-5 sm:flex-row sm:items-center">
-        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-blue-100 text-lg font-bold text-blue-700" aria-hidden="true">
-          {initials}
-        </div>
+        <UserAvatar user={user} size="lg" decorative />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-xl font-semibold text-ink">{user.full_name}</h2>
           <p className="mt-1 truncate text-sm text-slate-500">{user.email}{roles.length ? ` · ${roles.join(', ')}` : ''}</p>
         </div>
-        <span className="inline-flex w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Đang hoạt động</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={openAvatar}>
+            <ImagePlus className="h-4 w-4" />
+            Thay ảnh đại diện
+          </button>
+          <span className="inline-flex w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Đang hoạt động</span>
+        </div>
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -360,6 +428,58 @@ export function ProfilePage() {
           ) : null}
           {emailChanged ? <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">Sau khi đổi email, hệ thống sẽ đăng xuất tài khoản khỏi tất cả thiết bị.</p> : null}
         </form>
+      </Dialog>
+
+      <Dialog
+        open={avatarOpen}
+        title="Cập nhật ảnh đại diện"
+        description="Chọn ảnh PNG, JPG hoặc WebP. Hệ thống chuẩn hóa và lưu ảnh trong kho bảo vệ."
+        size="sm"
+        onClose={() => {
+          if (updateAvatar.isPending) return;
+          setAvatarOpen(false);
+          resetAvatarDialog();
+        }}
+        footer={(
+          <div className="flex justify-end gap-2">
+            <button type="button" className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white disabled:opacity-50" disabled={updateAvatar.isPending} onClick={() => {
+              setAvatarOpen(false);
+              resetAvatarDialog();
+            }}>Hủy</button>
+            <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={updateAvatar.isPending} onClick={() => {
+              if (!avatarFile) {
+                const message = 'Chọn một ảnh đại diện trước khi lưu.';
+                setAvatarError(message);
+                toast.warn({ title: 'Thiếu ảnh đại diện', description: message });
+                return;
+              }
+              updateAvatar.mutate(avatarFile);
+            }}>
+              {updateAvatar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {updateAvatar.isPending ? 'Đang tải...' : 'Lưu ảnh'}
+            </button>
+          </div>
+        )}
+      >
+        <div className="space-y-4">
+          <div className="flex justify-center">
+            {avatarPreview ? <img className="h-24 w-24 rounded-full border border-line object-cover" src={avatarPreview} alt="Xem trước ảnh đại diện mới" /> : <UserAvatar user={user} size="xl" decorative />}
+          </div>
+          <div className={`rounded-lg border-2 border-dashed p-4 text-center ${avatarError ? 'border-rose-300 bg-rose-50' : 'border-slate-300 bg-slate-50'}`}>
+            <p className="text-sm font-semibold text-ink">Chọn ảnh đại diện</p>
+            <p className="mt-1 text-xs text-slate-500">PNG, JPG hoặc WebP · tối đa 2 MB · ảnh được hiển thị dạng tròn.</p>
+            <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+              <Upload className="h-4 w-4" /> Chọn ảnh
+              <input className="sr-only" type="file" accept={avatarAccept} disabled={updateAvatar.isPending} onChange={(event) => {
+                selectAvatar(event.target.files?.[0] ?? null);
+                event.currentTarget.value = '';
+              }} />
+            </label>
+            {avatarFile ? <p className="mt-3 break-all text-xs text-slate-600">{avatarFile.name} · {formatFileSize(avatarFile.size)}</p> : null}
+            {avatarError ? <p role="alert" className="mt-3 text-xs font-medium text-rose-700">{avatarError}</p> : null}
+            {updateAvatar.isPending ? <p role="status" className="mt-3 text-xs font-medium text-blue-700">Đang tải ảnh {avatarProgress > 0 ? `${avatarProgress}%` : ''}</p> : null}
+          </div>
+        </div>
       </Dialog>
 
       <Dialog
@@ -528,6 +648,10 @@ function PasswordField({ id, label, required, autoComplete, visible, onToggle, r
 
 function inputClass(invalid: boolean) {
   return `w-full rounded-md border px-3 py-2 text-sm text-ink outline-none focus:ring-2 ${invalid ? 'border-rose-400 bg-rose-50 focus:border-rose-500 focus:ring-rose-100' : 'border-line bg-white focus:border-blue-500 focus:ring-blue-100'}`;
+}
+
+function formatFileSize(value: number) {
+  return `${Math.max(1, Math.ceil(value / 1024))} KB`;
 }
 
 const profileFieldLabels: Record<keyof ProfileFormValues, string> = {

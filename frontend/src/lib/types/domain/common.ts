@@ -86,6 +86,8 @@ export type User = {
   department?: string;
   position?: string;
   status?: string;
+  has_avatar?: boolean;
+  avatar_updated_at?: string;
   must_change_password?: boolean;
   recovery_email_available?: boolean;
   recovery_email_verified?: boolean;

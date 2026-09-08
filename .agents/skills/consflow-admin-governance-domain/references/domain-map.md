@@ -134,3 +134,8 @@
 - V134 adds `material.view` and grants it to Design plus Admin/Developer catalog owners. It is deliberately separate from `warehouse.view`: Design may call only the active material catalog read and receives no stock, warehouse, partner, receipt/issue/transfer/adjustment or Procurement authority.
 - Design revision reads require project-scoped `project.view`. Draft creation/update/file upload/release additionally require project-scoped `planning.edit` and the actual Design role label; PM handoff additionally requires `planning.edit`, PM role identity and project-manager scope. Admin retains the established intervention override. QS receives no mutation capability. Frontend capability display mirrors these server checks and never replaces them.
 - Every create/update/upload/release/handoff writes actor-aware audit in the same transaction as its database state. Released/superseded package headers are immutable; handoffs are append-only events. New releases and handoffs do not grant downstream BOQ/Procurement authority.
+
+## Personal Avatar Governance
+
+- Avatar is an actor-owned, permission-free self-service profile asset. V137 stores only nullable protected provider/key/MIME/update-time metadata on `users`; it does not mirror to `staff`, alter roles, revoke sessions or broaden staff/profile visibility.
+- `POST /auth/avatar/upload` derives the target exclusively from the authenticated actor and writes one atomic `user_avatar_updated` audit without a filename, storage key or image bytes. `GET /auth/avatar` opens only the current actor's active object and responds `Cache-Control: private, no-store`; `/auth/me` exposes only `has_avatar` and `avatar_updated_at`.

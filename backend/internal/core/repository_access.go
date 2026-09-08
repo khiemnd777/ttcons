@@ -30,6 +30,8 @@ func (r *Repository) GetOwnProfile(ctx context.Context, userID string) (Record, 
 	return r.QueryOne(ctx, `
 		SELECT account.id::text,account.email,account.full_name,account.status,account.must_change_password,
 			account.created_at,account.updated_at,
+			(account.avatar_storage_key IS NOT NULL) AS has_avatar,
+			account.avatar_updated_at,
 			COALESCE(CASE WHEN account.recovery_email_verified_at IS NOT NULL THEN account.recovery_email END,'') AS recovery_email_private,
 			COALESCE(pending.target_email,'') AS pending_recovery_email_private,
 			COALESCE(profile.phone,'') AS phone,
@@ -57,6 +59,54 @@ func (r *Repository) GetOwnProfile(ctx context.Context, userID string) (Record, 
 		) pending ON true
 		WHERE account.id=$1
 		  AND account.status='active'
+	`, userID)
+}
+
+func (r *Repository) ReplaceOwnAvatar(ctx context.Context, userID, actorName string, avatar StoredFileMetadata) (storedObjectRef, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return storedObjectRef{}, err
+	}
+	defer tx.Rollback()
+
+	var previousProvider, previousKey sql.NullString
+	if err := tx.QueryRowContext(ctx, `
+		SELECT avatar_storage_provider,avatar_storage_key
+		FROM users
+		WHERE id=$1 AND status='active'
+		FOR UPDATE
+	`, userID).Scan(&previousProvider, &previousKey); err != nil {
+		return storedObjectRef{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE users
+		SET avatar_storage_provider=$2,
+			avatar_storage_key=$3,
+			avatar_mime_type=$4,
+			avatar_updated_at=now(),
+			updated_at=now()
+		WHERE id=$1 AND status='active'
+	`, userID, avatar.StorageProvider, avatar.StorageKey, avatar.MIMEType); err != nil {
+		return storedObjectRef{}, err
+	}
+	if err := addAuditTx(ctx, tx, "", userID, actorName, "user_avatar_updated", "user_account", userID, "Người dùng cập nhật ảnh đại diện", Record{
+		"avatar_replaced": previousKey.Valid && strings.TrimSpace(previousKey.String) != "",
+	}); err != nil {
+		return storedObjectRef{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return storedObjectRef{}, err
+	}
+	return storedObjectRef{Provider: previousProvider.String, Key: previousKey.String}, nil
+}
+
+func (r *Repository) GetOwnAvatarStorage(ctx context.Context, userID string) (Record, error) {
+	return r.QueryOne(ctx, `
+		SELECT avatar_storage_provider,avatar_storage_key,avatar_mime_type
+		FROM users
+		WHERE id=$1
+		  AND status='active'
+		  AND avatar_storage_key IS NOT NULL
 	`, userID)
 }
 

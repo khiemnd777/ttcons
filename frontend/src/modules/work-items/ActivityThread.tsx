@@ -60,7 +60,7 @@ import {
   updateActivityReactionFeed,
 } from './activityThreadDomain';
 
-type ActivityKind = '' | 'discussion' | 'decision' | 'system';
+type ActivityKind = 'discussion' | 'decision' | 'system';
 type AttentionFilter = '' | 'unread' | 'mentions' | 'questions' | 'blockers' | 'reminders';
 
 const emptySummary: ProjectActivitySummary = {
@@ -78,7 +78,6 @@ const emptySummary: ProjectActivitySummary = {
 };
 
 const kindTabs: Array<{ value: ActivityKind; label: string; countKey: keyof ProjectActivitySummary }> = [
-  { value: '', label: 'Tất cả', countKey: 'total' },
   { value: 'discussion', label: 'Thảo luận', countKey: 'discussion' },
   { value: 'decision', label: 'Quyết định', countKey: 'decisions' },
   { value: 'system', label: 'Nhật ký hệ thống', countKey: 'system' },
@@ -132,7 +131,7 @@ function ActivityThreadContent({
   const toast = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [kind, setKind] = useState<ActivityKind>('');
+  const [kind, setKind] = useState<ActivityKind>('discussion');
   const [attention, setAttention] = useState<AttentionFilter>('');
   const [scopeFilter, setScopeFilter] = useState('');
   const [scopeIdFilter, setScopeIdFilter] = useState('');
@@ -173,7 +172,7 @@ function ActivityThreadContent({
     initialPageParam: '',
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams();
-      if (kind) params.set('kind', kind);
+      params.set('kind', kind);
       if (attention) params.set('attention', attention);
       if (scopeFilter) params.set('scope_type', scopeFilter);
       if (scopeIdFilter) params.set('scope_id', scopeIdFilter);
@@ -346,18 +345,6 @@ function ActivityThreadContent({
 
   return (
     <div className="space-y-3">
-      {kind !== 'discussion' ? (
-        <ActivityComposer
-          mode="project"
-          allowTarget
-          targetOptions={mergedTargets}
-          attachmentOptions={mergedAttachments}
-          mentionOptions={mentionOptions}
-          submitting={addActivity.isPending}
-          onSubmit={(payload) => addActivity.mutateAsync(payload).then(() => undefined)}
-        />
-      ) : null}
-
       <div className="flex gap-2 overflow-x-auto pb-1 xl:hidden">
         {attentionItems.map((item) => {
           const Icon = item.icon;
@@ -386,7 +373,7 @@ function ActivityThreadContent({
               <div className="flex gap-1 overflow-x-auto">
                 {kindTabs.map((tab) => (
                   <button
-                    key={tab.value || 'all'}
+                    key={tab.value}
                     type="button"
                     className={clsx(
                       'inline-flex min-w-fit items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold',

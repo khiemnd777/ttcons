@@ -27,6 +27,7 @@ import {
 import clsx from 'clsx';
 import { BrandHomeLink } from '../components/BrandLogo';
 import { PoweredBySignature } from '../components/PoweredBySignature';
+import { UserAvatar } from '../components/UserAvatar';
 import { useAuth } from '../lib/auth/AuthContext';
 import { roleSummary } from '../lib/utils/roles';
 import { NotificationPanel } from '../modules/notifications/NotificationPanel';
@@ -207,8 +208,13 @@ export function AppShell() {
             </div>
             <AppNavigation groups={visibleNavGroups} badges={navigationBadges} className="min-h-0 flex-1 overflow-auto" onNavigate={() => setMobileNavOpen(false)} />
             <div className="border-t border-line px-4 py-3">
-              <p className="truncate text-sm font-semibold text-ink">{user?.full_name}</p>
-              <p className="truncate text-xs text-slate-500">{userRoleSummary}</p>
+              <div className="flex min-w-0 items-center gap-3">
+                {user ? <UserAvatar user={user} size="md" decorative /> : null}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink">{user?.full_name}</p>
+                  <p className="truncate text-xs text-slate-500">{userRoleSummary}</p>
+                </div>
+              </div>
               <button
                 type="button"
                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
@@ -262,12 +268,15 @@ export function AppShell() {
               <NotificationPanel summary={indicators.notifications.data} />
               <button
                 type="button"
-                className="hidden rounded-md px-2 py-1 text-right hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:block"
+                className="hidden items-center gap-2 rounded-md px-2 py-1 text-right hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex"
                 onClick={() => navigate('/profile')}
                 aria-label="Mở hồ sơ cá nhân"
               >
-                <p className="text-sm font-semibold text-ink">{user?.full_name}</p>
-                <p className="text-xs text-slate-500">{userRoleSummary}</p>
+                {user ? <UserAvatar user={user} size="sm" decorative /> : null}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-ink">{user?.full_name}</span>
+                  <span className="block truncate text-xs text-slate-500">{userRoleSummary}</span>
+                </span>
               </button>
               <button
                 className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
