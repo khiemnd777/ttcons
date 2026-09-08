@@ -147,6 +147,10 @@
 - In `Kế hoạch công việc`, the first successful form save/submit visibly includes `Bắt đầu` and atomically starts the active Work Item, so a submitted form must never fall back to the generic `Bắt đầu` CTA. For `construction.activate_handoff`, submitted/source-blocked detail opens the existing Planning handoff review/activation dialog through a project-scoped one-time navigation intent; after activation, the separate backend-gated `Kiểm tra điều kiện & chốt bước` remains required. Activation never auto-completes the Work Item.
 - Planning construction-handoff activation accepts explicit `work_item_context` from the canonical task route and atomically starts the matching `construction.activate_handoff` Work Item only after the handoff snapshot is successfully created. Replay/open/read paths do not start it; project/current-Node/permission/source-revision validation remains authoritative, and activation still does not complete the Work Item or advance the pipeline.
 
+## Current Actor Avatar In Discussion
+
+- `ActivityThread.tsx` and `UtilityDock.tsx` render the authenticated actor's uploaded avatar through the actor-owned protected `UserAvatar` fetch. Other message authors retain initials because no peer-avatar endpoint exists. This is presentation-only: it does not change activity rows, project scope, posting authority, attention, audit or read-cursor semantics.
+
 ## Notification Platform Boundary
 
 - V127 enables `activity.mentioned`: resolved user/role mentions first persist in `activity_mentions` and read-state rows, then the same activity transaction emits one explicit-user notification event. The projector rechecks active internal account and current project scope; role resolution never broadcasts to same-named roles outside the project. Activity attention/read state and notification read/archive state remain independent source projections. `activity.replied` and other planning catalog candidates stay disabled until their producer and audience policy are reviewed.

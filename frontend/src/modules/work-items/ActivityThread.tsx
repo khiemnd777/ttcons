@@ -26,6 +26,7 @@ import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
 import { Dialog } from '../../components/Dialog';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
+import { UserAvatar } from '../../components/UserAvatar';
 import { ApiError, get, post, put, streamSSE, type StreamStatus } from '../../lib/api/client';
 import { useToast } from '../../components/ToastProvider';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -35,6 +36,7 @@ import type {
   ProjectActivityFeed,
   ProjectActivityOptions,
   ProjectActivitySummary,
+  User,
   WorkItemActivity,
 } from '../../lib/types/domain';
 import { activityLabel, compactDateTime, scopeTypeLabel, workflowFormActivityComment } from './workItemPresentation';
@@ -469,6 +471,7 @@ function ActivityThreadContent({
                   key={[attention, scopeFilter, scopeIdFilter, activityTypeFilter, visibilityFilter, actorFilter, deferredSearch].join(':')}
                   rows={rows}
                   currentUserId={user?.id}
+                  currentUser={user ?? undefined}
                   projectId={projectId}
                   hasOlder={Boolean(activity.hasNextPage)}
                   loadingOlder={activity.isFetchingNextPage}
@@ -645,6 +648,7 @@ function ActivityError({ onRetry }: { onRetry: () => void }) {
 function ChatDiscussion({
   rows,
   currentUserId,
+  currentUser,
   projectId,
   hasOlder,
   loadingOlder,
@@ -662,6 +666,7 @@ function ChatDiscussion({
 }: {
   rows: WorkItemActivity[];
   currentUserId?: string;
+  currentUser?: User;
   projectId: string;
   hasOlder: boolean;
   loadingOlder: boolean;
@@ -765,6 +770,7 @@ function ChatDiscussion({
                     item={item}
                     projectId={projectId}
                     own={Boolean(currentUserId && item.actor_id === currentUserId)}
+                    currentUser={currentUser}
                     compact={sameChatAuthor(group.items[index - 1], item)}
                     marking={markingId === item.id}
                     resolving={resolvingId === item.id}
@@ -801,6 +807,7 @@ function ChatMessage({
   item,
   projectId,
   own,
+  currentUser,
   compact,
   marking,
   resolving,
@@ -816,6 +823,7 @@ function ChatMessage({
   item: WorkItemActivity;
   projectId: string;
   own: boolean;
+  currentUser?: User;
   compact: boolean;
   marking: boolean;
   resolving: boolean;
@@ -864,12 +872,14 @@ function ChatMessage({
   const ownBlueBubble = own && !['blocker', 'question', 'decision', 'reminder'].includes(item.activity_type) && !withdrawn;
   const metadata = item.metadata_json ?? {};
   return (
-    <article className={clsx('flex items-end gap-2', own ? 'justify-end' : 'justify-start', compact ? 'pt-0' : 'pt-2')}>
-      {!own ? (
+    <article className={clsx('flex items-end gap-2', own ? 'flex-row-reverse justify-start' : 'justify-start', compact ? 'pt-0' : 'pt-2')}>
+      {own && currentUser ? (
+        <UserAvatar user={currentUser} size="sm" decorative className={compact ? 'invisible' : undefined} />
+      ) : (
         <div className={clsx('flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-600', compact && 'invisible')}>
           {actorInitials(item.actor_name)}
         </div>
-      ) : null}
+      )}
       <div className={clsx('max-w-[82%] sm:max-w-[72%]', own && 'text-right')}>
         {!compact ? (
           <div className={clsx('mb-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500', own && 'justify-end')}>

@@ -185,3 +185,10 @@ For bugfixes and unclear behavior changes, include:
 - Missing full metadata: inspect passed `reference.record`, the protected `GET /evidence/:id` response and `Service.EvidenceDetail` / `GetEvidenceDetail` / `CanViewWorkItem`. Never synthesize submitted/reviewed identities or statuses from a partial reference. Snapshot callers retain their own record and protected revision URL.
 - Missing retry files/duplicate uploads: inspect File + draft ID + uploadScope identity and `evidenceUploadSession` receipts; shared queue preserves successful IDs when a later upload or parent save fails. Report append links at upload time, uses serial requests and prevents local removal of successful appended rows.
 - Stale preview: the protected hook key includes storage/record/updated_at/revision path; effects cancel stale writes and revoke object URLs. Draft files use canonical readers. Run evidenceComponentReuse, evidenceLifecycle and evidenceUploadSession plus existing media/queue tests; controlled effects/server renders do not establish DOM/device acceptance.
+
+## Current Avatar Remains Initials In Project Discussion
+
+- Symptom: after the account uploads a new avatar, its own messages in Project Activity or Utility Dock still show initials.
+- Owners: `frontend/src/components/UserAvatar.tsx`, `frontend/src/modules/work-items/ActivityThread.tsx`, `frontend/src/modules/utilities/UtilityDock.tsx`, `frontend/tests/activityAvatarPresentation.test.ts`.
+- First search: `rg -n "UserAvatar|actorInitials|currentUser|own && user" frontend/src/modules/work-items/ActivityThread.tsx frontend/src/modules/utilities/UtilityDock.tsx frontend/src/components/UserAvatar.tsx`.
+- The protected `/auth/avatar` endpoint serves only the current actor. Discussion renderers must pass the authenticated `User` to `UserAvatar` for own messages; loading/error/no image and every peer retain initials. Do not add a peer-avatar route, leak storage metadata, or change Project Activity visibility, read cursors, posting authority or audit behavior for this presentation repair.

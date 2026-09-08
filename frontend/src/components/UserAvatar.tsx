@@ -4,9 +4,10 @@ import clsx from 'clsx';
 import { downloadBlob } from '../lib/api/client';
 import type { User } from '../lib/types/domain';
 
-type UserAvatarSize = 'sm' | 'md' | 'lg' | 'xl';
+type UserAvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 const sizeClass: Record<UserAvatarSize, string> = {
+  xs: 'h-7 w-7 text-[10px]',
   sm: 'h-8 w-8 text-xs',
   md: 'h-10 w-10 text-sm',
   lg: 'h-14 w-14 text-lg',
