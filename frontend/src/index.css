@@ -21,7 +21,8 @@ button, input, select, textarea {
   --consflow-table-sticky-top: 4rem;
 }
 
-.consflow-table-viewport {
+.consflow-table-viewport,
+.consflow-grid-viewport {
   max-height: min(64dvh, 42rem);
   overflow: auto;
   overscroll-behavior: contain;
@@ -59,6 +60,11 @@ button, input, select, textarea {
   position: sticky;
   top: var(--consflow-table-sticky-top);
   z-index: 10;
+}
+
+/* A grid inside its own scrollport must stick to that scrollport, not the app header. */
+.consflow-grid-viewport .consflow-sticky-grid-header {
+  top: 0;
 }
 
 .focus-ring {

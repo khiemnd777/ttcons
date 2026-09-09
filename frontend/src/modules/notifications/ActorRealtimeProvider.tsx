@@ -42,6 +42,7 @@ export function ActorRealtimeProvider({ children }: { children: ReactNode }) {
       onStatus: (status) => {
         setStatus(status);
         if (status !== 'connected') return;
+        for (const key of [['project-discussions'], ['utility-project-activity'], ['activity-attention'], ['my-work-items'], ['procurement'], ['procurement-detail']]) void queryClient.invalidateQueries({ queryKey: key });
         invalidateProjectUpdates();
         void reconcileNotifications();
       },
@@ -70,6 +71,8 @@ export function ActorRealtimeProvider({ children }: { children: ReactNode }) {
           void queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
           void queryClient.invalidateQueries({ queryKey: ['project-discussions'] });
           void queryClient.invalidateQueries({ queryKey: ['utility-project-activity'] });
+          void queryClient.invalidateQueries({ queryKey: ['procurement'] });
+          void queryClient.invalidateQueries({ queryKey: ['procurement-detail'] });
         }
       },
     });

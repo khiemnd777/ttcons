@@ -128,7 +128,7 @@ func (s *Service) markProjectActivityReadThrough(ctx context.Context, projectID 
 		return nil, validationError("Hoạt động không thuộc công trình đã chọn", Record{"activity_id": activityID})
 	}
 	activityType := strings.TrimSpace(fmt.Sprint(activity["activity_type"]))
-	isDiscussion := statusIn(activityType, "comment", "status", "blocker", "question", "decision", "reminder", "file_note")
+	isDiscussion := statusIn(activityType, "comment", "status", "blocker", "question", "decision", "reminder", "file_note", "work_update")
 	if isDiscussion == system || activity["withdrawn_at"] != nil {
 		return nil, validationError("Hoạt động không thuộc nhóm đã chọn hoặc đã được thu hồi", Record{"activity_id": activityID})
 	}

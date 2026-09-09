@@ -26,7 +26,7 @@ export default function ActivityTopicDetails({ topic, showSource = true, onClose
       const record = activityTopicRecord(topic, await get<unknown>(activityTopicPath(topic)));
       // Import source viewers only after the authorized read. Chunk failures use the same retry UI.
       const boq = topic.scope === 'boq_item' ? (await import('../boq/BOQPage')).BOQDetail : null;
-      const procurement = topic.scope === 'procurement_request' ? (await import('../procurement/ProcurementPage')).ProcurementDetail : null;
+      const procurement = topic.scope === 'procurement_request' ? (await import('../procurement/ProcurementDetail')).ProcurementDetail : null;
       return { record, boq, procurement };
     },
     enabled: Boolean(user?.id),

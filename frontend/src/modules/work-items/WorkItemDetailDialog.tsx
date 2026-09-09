@@ -360,7 +360,7 @@ export function WorkItemDetailWorkspace({
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
             <main className="min-w-0 space-y-4">
               <WorkItemStartRequirementPanel item={detailItem} />
-              {detailItem.project_id && isDesignReleaseWorkItem(detailItem) ? <DesignReleasePanel projectId={detailItem.project_id} workItems={[detailItem]} /> : null}
+              {detailItem.project_id && isDesignReleaseWorkItem(detailItem) ? <DesignReleasePanel projectId={detailItem.project_id} workItems={[detailItem]} readOnly={futureReadOnly || skippedHistory} /> : null}
               {skippedHistory ? (
                 <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-panel">
                   <p className="font-semibold text-ink">Hồ sơ lịch sử chỉ đọc</p>

@@ -158,7 +158,7 @@ func (r *Repository) CreateDesignRelease(ctx context.Context, projectID, workIte
 	return r.DesignReleaseByID(ctx, releaseID)
 }
 
-func (r *Repository) UpdateDesignReleaseDraft(ctx context.Context, releaseID, revisionLabel, changeReason, notes, actorID, actorName string) (Record, error) {
+func (r *Repository) UpdateDesignReleaseDraft(ctx context.Context, releaseID, revisionLabel, changeReason, notes, actorID, actorName string, expectedValues ...Record) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -172,6 +172,13 @@ func (r *Repository) UpdateDesignReleaseDraft(ctx context.Context, releaseID, re
 		return nil, sql.ErrNoRows
 	}
 	current := rows[0]
+	if len(expectedValues) > 0 && len(expectedValues[0]) > 0 {
+		for _, key := range []string{"revision_label", "change_reason", "notes"} {
+			if cleanID(expectedValues[0][key]) != cleanID(current[key]) {
+				return nil, conflictError("Bản nháp thiết kế đã được cập nhật. Nội dung đang nhập vẫn được giữ; hãy mở lại bản mới trước khi lưu.")
+			}
+		}
+	}
 	if fmt.Sprint(current["status"]) != "draft" {
 		return nil, validationError("Revision đã phát hành không thể chỉnh sửa", Record{"status": current["status"]})
 	}
@@ -234,6 +241,9 @@ func (r *Repository) AddDesignReleaseFile(ctx context.Context, releaseID, docume
 		return nil, err
 	}
 	documentID := cleanID(rows[0]["id"])
+	if err := insertDesignDiscussionUpdateTx(ctx, tx, release, "", "file:"+documentID, actorID, rows[0]); err != nil {
+		return nil, err
+	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "design_release_file_uploaded", "document", documentID, "Thêm tệp vào revision hồ sơ thiết kế", Record{
 		"design_release_id": releaseID, "revision_label": release["revision_label"], "document_type": documentType,
 		"name": name, "original_filename": originalName, "checksum_sha256": file.ChecksumSHA256,
@@ -304,6 +314,9 @@ func (r *Repository) ReleaseDesignRelease(ctx context.Context, releaseID, actorI
 	`, releaseID, actorID); err != nil {
 		return nil, err
 	}
+	if err := insertDesignDiscussionUpdateTx(ctx, tx, release, "", "released", actorID, nil); err != nil {
+		return nil, err
+	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "design_release_released", "design_release", releaseID, "Phát hành revision hồ sơ thiết kế", Record{
 		"revision_no": release["revision_no"], "revision_label": release["revision_label"], "file_count": fileCount,
 	}); err != nil {
@@ -344,6 +357,9 @@ func (r *Repository) HandoffDesignRelease(ctx context.Context, releaseID, workIt
 		return nil, err
 	}
 	handoffID := cleanID(rows[0]["id"])
+	if err := insertDesignDiscussionUpdateTx(ctx, tx, release, workItemID, "handoff:"+handoffID, actorID, nil); err != nil {
+		return nil, err
+	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "design_release_handed_off", "design_release_handoff", handoffID, "PM bàn giao revision hồ sơ thiết kế cho QS", Record{
 		"design_release_id": releaseID, "revision_no": release["revision_no"], "revision_label": release["revision_label"], "work_item_id": workItemID,
 	}); err != nil {

@@ -119,6 +119,7 @@ func registerWorkflowRoutes(protected fiber.Router, h *Handler) {
 	protected.Post("/projects/:id/documents/upload", h.UploadProjectDocument)
 	protected.Get("/documents/:id/file", h.GetProjectDocumentFile)
 	protected.Post("/workflow-form-instances/:id/pdf-exports", h.GenerateWorkflowFormPDFExport)
+	protected.Get("/activities/:id/work-update", h.DiscussionWorkUpdate)
 	protected.Post("/activities/:id/read", h.MarkActivityRead)
 	protected.Post("/activities/:id/resolve", h.ResolveActivity)
 	protected.Post("/activities/:id/reactions", h.SetActivityReaction)

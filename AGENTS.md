@@ -165,6 +165,17 @@ When the user says `tiếp tục triển khai`, agents must treat it as a reques
 - Keep UI operational and dense. This is an admin tool, not a marketing page.
 - After frontend changes, run `cd frontend && npm run build` when feasible.
 
+## Mandatory Standard Component Reuse
+
+User instruction reinforced on 2026-09-08 after design attachments in discussion bypassed the existing previewers. Treat this as a required implementation and review check for future UI work, not an optional preference.
+
+- Before editing UI, identify the standard components that own each affected interaction in this guide and the frontend mapping. Read each relevant owner and an existing consumer. Include a concise `interaction -> standard component -> target entrypoints` checklist in the existing review package; do not create a separate approval round for this checklist.
+- Reuse the complete standard experience at every affected entrypoint. An import, a shared modal shell, or reuse in one conditional branch does not prove reuse in another branch. Check canonical pages, discussion, historical snapshots, pending files and responsive variants when they are in scope.
+- Photo, PDF and supported document viewing must use the shared viewer compositions in `frontend/src/modules/_shared/EvidenceRecordViewerDialog.tsx`. Do not replace their primary preview with a filename-only button, raw link, `window.open`, or `openProtectedBlob`. Explicit original-file/download actions and existing fallbacks for unsupported formats remain valid secondary behavior.
+- Different source records require a narrow data/access adapter, not a separate viewer experience. Preserve the actual source endpoint, authorization, metadata and exact historical file/revision. Never pass a document ID as an evidence ID or fabricate evidence metadata to force reuse. If the standard composition has a proven capability gap, show the source evidence and proposed shared adaptation in the existing review package; do not silently bypass it. Existing nonstandard code is not permission to copy that deviation.
+- Before reporting implementation results, trace each affected user action to the standard component and verify meaningful entrypoint behavior. For preview changes, cover supported media, loading/error/retry and source/revision identity as applicable. Tests that only find an import or pass a build do not prove the integration. Keep entrypoint inventories and relevant behavior/render tests synchronized. Browser checks still require explicit authorization in that turn; skipped browser checks remain `NOT UX ACCEPTED`.
+- State which standard components were reused and any remaining gaps in the implementation handoff. A test-tool restriction is a verification limitation, never evidence that bypassing a standard component was justified. Record unfinished integrations in `docs/current-states.md` instead of declaring the affected scope complete.
+
 ## Domain Rules
 
 - Pipeline templates define reusable workflows. Pipeline runs are project-specific runtime copies.

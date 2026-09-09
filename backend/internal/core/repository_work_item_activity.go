@@ -414,6 +414,12 @@ func (r *Repository) AddWorkItemEvidence(ctx context.Context, item Record, req W
 		return nil, sql.ErrNoRows
 	}
 	evidence := rows[0]
+	if err := insertDiscussionWorkUpdateTx(ctx, tx, projectID, workItemID, actorID, "evidence", cleanID(evidence["id"]), "uploaded", "Đã thêm minh chứng · "+req.Name, Record{
+		"title": req.Name, "status": "submitted", "evidence_id": evidence["id"],
+		"caption": comment, "revision_label": req.RevisionNo,
+	}); err != nil {
+		return nil, err
+	}
 	if _, err := tx.ExecContext(ctx, `UPDATE work_items SET updated_by=NULLIF($2,'')::uuid, updated_at=now() WHERE id=$1`, workItemID, actorID); err != nil {
 		return nil, err
 	}
@@ -1354,8 +1360,8 @@ func (r *Repository) ProjectActivitySummary(ctx context.Context, projectID strin
 	return r.QueryOne(ctx, fmt.Sprintf(`
 		SELECT
 			COUNT(*) AS total,
-			COUNT(*) FILTER (WHERE wia.activity_type IN ('comment','status','blocker','question','decision','reminder','file_note')) AS discussion,
-			COUNT(*) FILTER (WHERE wia.activity_type NOT IN ('comment','status','blocker','question','decision','reminder','file_note')) AS system,
+			COUNT(*) FILTER (WHERE wia.activity_type IN ('comment','status','blocker','question','decision','reminder','file_note','work_update')) AS discussion,
+			COUNT(*) FILTER (WHERE wia.activity_type NOT IN ('comment','status','blocker','question','decision','reminder','file_note','work_update')) AS system,
 			COUNT(*) FILTER (WHERE wia.activity_type='decision') AS decisions,
 			COUNT(*) FILTER (WHERE %s) AS unread,
 			COUNT(*) FILTER (WHERE %s) AS discussion_unread,
@@ -1519,9 +1525,9 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 	}
 	switch filter.Kind {
 	case "discussion":
-		conditions = append(conditions, "wia.activity_type IN ('comment','status','blocker','question','decision','reminder','file_note')")
+		conditions = append(conditions, "wia.activity_type IN ("+projectDiscussionActivityTypesSQL+")")
 	case "system":
-		conditions = append(conditions, "wia.activity_type NOT IN ('comment','status','blocker','question','decision','reminder','file_note')")
+		conditions = append(conditions, "wia.activity_type NOT IN ("+projectDiscussionActivityTypesSQL+")")
 	case "decision":
 		conditions = append(conditions, "wia.activity_type='decision'")
 	}

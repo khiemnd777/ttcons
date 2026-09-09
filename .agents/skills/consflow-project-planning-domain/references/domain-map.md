@@ -1,5 +1,15 @@
 # Project Planning Domain Map
 
+## Discussion-Centered Source Updates
+
+- Design file preview: historical activity snapshots and canonical current/uploaded-draft file lists share `DocumentReferenceViewButton` and `EvidenceRecordViewerDialog.tsx::ProtectedDocumentViewerDialog`. They reuse existing photo/PDF/Office readers with the actual `/documents/:id/file` source and supplied metadata. Historical file IDs/revision labels remain pinned; viewing never substitutes the current design revision, starts work or changes design release/handoff state. First searches: `DocumentReferenceViewButton|ProtectedDocumentViewerDialog|DesignReleaseFiles|snapshot.files`.
+- V139 extends this entrypoint to procurement: canonical page/topic/supported task picker reuse `ProcurementDialog`. BOQ generation and purchase submit/approve/order create immutable, replyable source cards; ordinary header saves remain quiet. Procurement price snapshots require current `procurement.view` in addition to discussion/source-project access. `ProcurementSnapshot` never resolves current purchase values over an older event. First searches: `ProcurementDialog|insertProcurementDiscussionUpdateTx|ProcurementSnapshot`.
+
+- Purpose: members update their responsible project Work Items and discuss persisted source changes in the same project discussion. Owners: ActivityThread/DiscussionWorkRail/DiscussionWorkDialog/DiscussionWorkUpdateCard and canonical WorkflowFormPanel/EvidencePanel/DesignReleasePanel. First searches: `DiscussionWork|insertDiscussionWorkUpdateTx|expected_answers|expected_values`.
+- V138 adds replyable internal work_update cards for successful file uploads, form submit/amend, design release and PM handoff. Draft fields stay quiet. Exact historical answers, field definitions and source file IDs are snapshot in the source transaction. Snapshot reads recheck project/Work Item visibility; chat cannot forge this type. Read/reaction/reply never changes business status.
+- My Work rail uses the existing responsible Work Item queue and project filter, including its capability/readiness rules. BOQ/contracts/warehouse/finance remain canonical source workspaces. Current source gates and explicit PM re-handoff remain required; a new design release does not rebind BOQ or Procurement. Open design draft sessions retain local edits during refetch, keep successful uploads after partial failure, and reject stale metadata saves.
+
+
 ## Exact Record Source Navigation
 
 - All discussion source types now offer authorized `Mở hồ sơ gốc` new-tab links after successful source validation. The original discussion and draft stay mounted. Planning daily report, meeting minutes and planning checklist detail footers reuse shared RecordLink to their persisted Work Item/form route; missing Work Item IDs have an explicit unavailable-source label. Existing list-row navigation callbacks remain. No source-open operation starts work, submits a form or changes read cursors.

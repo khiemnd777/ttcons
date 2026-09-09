@@ -13,7 +13,7 @@ test('semantic table headers use one page- and dialog-aware sticky convention', 
     source('../src/components/DataTable.tsx'),
   ]);
 
-  assert.match(styles, /\.consflow-table-viewport\s*\{\s*max-height: min\(64dvh, 42rem\);\s*overflow: auto;/s);
+  assert.match(styles, /\.consflow-table-viewport,\s*\.consflow-grid-viewport\s*\{\s*max-height: min\(64dvh, 42rem\);\s*overflow: auto;/s);
   assert.match(styles, /\.consflow-table-viewport > table > thead\s*\{\s*--consflow-table-header-background: #f8fafc;/s);
   assert.match(styles, /thead\.bg-slate-100\s*\{\s*--consflow-table-header-background: #f1f5f9;/s);
   assert.match(styles, /thead\.bg-white\s*\{\s*--consflow-table-header-background: #ffffff;/s);
@@ -60,14 +60,18 @@ test('every current semantic table has the shared local scroll viewport', async 
   assert.equal(ownerSources.some((owner) => /<thead[^>]*\bsticky\b/.test(owner)), false);
 });
 
-test('verified CSS-grid tables use the shared sticky header class', async () => {
-  const [projects, evidence, projectDetail] = await Promise.all([
+test('CSS-grid headers use the matching page or local-scroll sticky convention', async () => {
+  const [styles, projects, evidence, projectDetail] = await Promise.all([
+    source('../src/index.css'),
     source('../src/modules/projects/ProjectsPage.tsx'),
     source('../src/modules/work-items/EvidenceGallery.tsx'),
     source('../src/modules/projects/ProjectDetailPage.tsx'),
   ]);
 
+  assert.match(styles, /\.consflow-table-viewport,\s*\.consflow-grid-viewport\s*\{\s*max-height: min\(64dvh, 42rem\);\s*overflow: auto;/s);
+  assert.match(styles, /\.consflow-grid-viewport \.consflow-sticky-grid-header\s*\{\s*top: 0;/s);
   assert.match(projects, /consflow-sticky-grid-header hidden \$\{gridClass\}/);
   assert.equal((evidence.match(/consflow-sticky-grid-header/g) ?? []).length, 2);
   assert.equal((projectDetail.match(/consflow-sticky-grid-header/g) ?? []).length, 2);
+  assert.match(projectDetail, /consflow-grid-viewport hidden rounded-md border border-line md:block/);
 });

@@ -52,7 +52,11 @@ func (s *Service) AddWorkItemEvidence(ctx context.Context, workItemID string, re
 	if normalized.StorageKey != "" {
 		return nil, validationError("Storage minh chứng nội bộ chỉ được tạo qua endpoint tải tệp")
 	}
-	return s.repo.AddWorkItemEvidence(ctx, item, normalized, actorID, actorName)
+	evidence, err := s.repo.AddWorkItemEvidence(ctx, item, normalized, actorID, actorName)
+	if err == nil {
+		s.publishDiscussionWorkUpdate(cleanID(item["project_id"]), workItemID, actorID)
+	}
+	return evidence, err
 }
 
 func (s *Service) AddWorkItemEvidenceUpload(ctx context.Context, workItemID string, req WorkItemEvidenceRequest, fileHeader *multipart.FileHeader, actorID, actorName string) (Record, error) {
@@ -81,6 +85,7 @@ func (s *Service) AddWorkItemEvidenceUpload(ctx context.Context, workItemID stri
 	if err != nil {
 		return nil, s.cleanupStoredObjectAfterError(storedObject, err)
 	}
+	s.publishDiscussionWorkUpdate(cleanID(item["project_id"]), workItemID, actorID)
 	return evidence, nil
 }
 

@@ -30,6 +30,7 @@ test('official module workspaces share the context bridge and domain items do no
     '../src/modules/boq/SupplierQuotationWorkspace.tsx',
     '../src/modules/contracts/ContractsPage.tsx',
     '../src/modules/procurement/ProcurementPage.tsx',
+    '../src/modules/procurement/ProcurementDialog.tsx',
     '../src/modules/warehouse/WarehousePage.tsx',
     '../src/modules/planning/ConstructionHandoffPanel.tsx',
     '../src/modules/handover/HandoverPage.tsx',

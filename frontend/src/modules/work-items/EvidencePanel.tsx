@@ -26,6 +26,8 @@ import { revealWorkItemRequirementTarget } from './workItemRequirementNavigation
 const maxEvidenceUploadBytes = 10 * 1024 * 1024;
 
 type EvidencePanelProps = {
+  onDirtyChange?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
   workItemId: string;
   projectId?: string;
   evidence: EvidenceRecord[];
@@ -43,6 +45,8 @@ export function EvidencePanel({
   readOnly = false,
   navigationRequest,
   variant = 'embedded',
+  onDirtyChange,
+  onBusyChange,
 }: EvidencePanelProps) {
   const [previewRow, setPreviewRow] = useState<EvidenceUploadRow | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -58,6 +62,9 @@ export function EvidencePanel({
   const stats = useMemo(() => evidenceStats(evidence), [evidence]);
   const queryClient = useQueryClient();
   const toast = useToast();
+
+  useEffect(() => { onDirtyChange?.(uploadRows.some(row => Boolean(row.file))); }, [uploadRows, onDirtyChange]);
+  useEffect(() => { onBusyChange?.(batchUploading); }, [batchUploading, onBusyChange]);
 
   useEffect(() => {
     if (navigationRequest?.target.kind !== 'evidence') return undefined;

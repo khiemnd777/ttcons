@@ -321,6 +321,40 @@ function CloseButton({ onClose }: { onClose: () => void }) {
   return <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={onClose}>Đóng</button>;
 }
 
+// Document sources share the existing readers/layout without inventing evidence
+// IDs, review state or upload metadata. The caller pins the protected source path.
+export function ProtectedDocumentViewerDialog({ name, protectedFilePath, mimeType, fileSize, sourceLabel, uploadedBy, createdAt, onClose }: {
+  name: string;
+  protectedFilePath: string;
+  mimeType?: string;
+  fileSize?: number;
+  sourceLabel?: string;
+  uploadedBy?: string;
+  createdAt?: string;
+  onClose: () => void;
+}) {
+  const mediaType = evidenceReferenceMediaType(name, mimeType);
+  const preview = useProtectedFilePreview(protectedFilePath, mediaType);
+  const label = classifyEvidenceFile({ name, type: mimeType ?? '' })?.label ?? 'Tài liệu';
+  return <EvidenceViewerDialog open title="Xem tệp" name={name} description={sourceLabel}
+    mediaType={mediaType} previewUrl={preview.previewUrl} fileBlob={preview.blob}
+    loading={preview.loading} error={preview.error} onRetry={preview.retry} onClose={onClose}
+    metadata={[label, mimeType ?? '', fileSize ? formatEvidenceFileSize(fileSize) : ''].filter(Boolean)}
+    mediaAction={preview.previewUrl ? <a href={preview.previewUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-blue-700">Mở tệp gốc</a> : undefined}
+    documentUnavailableText="Định dạng này chưa hỗ trợ đọc trực tiếp. Mở tệp gốc bằng ứng dụng tương thích."
+    details={<section className="min-w-0 space-y-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Thông tin tệp</h3>
+      <EvidenceInfoItem label="Tên tệp" value={name} />
+      {sourceLabel ? <EvidenceInfoItem label="Nguồn hồ sơ" value={sourceLabel} /> : null}
+      <EvidenceInfoItem label="Loại" value={label} />
+      {fileSize ? <EvidenceInfoItem label="Dung lượng" value={formatEvidenceFileSize(fileSize)} /> : null}
+      {uploadedBy ? <EvidenceInfoItem label="Người tải lên" value={uploadedBy} /> : null}
+      {createdAt ? <EvidenceInfoItem label="Thời điểm tải lên" value={compactDateTime(createdAt)} /> : null}
+    </section>}
+    footer={<div className="flex justify-end"><CloseButton onClose={onClose} /></div>}
+  />;
+}
+
 function EvidenceInfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid gap-1 py-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-3">
@@ -351,45 +385,45 @@ export function formatEvidenceFileSize(value: number) {
 }
 
 export function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: EvidenceMediaType, protectedFilePath?: string) {
+  const eligible = Boolean(record?.id && record.storage_key && mediaType);
+  const path = eligible ? protectedFilePath || `/evidence/${record!.id}/file` : undefined;
+  return useProtectedFilePreview(path, mediaType, JSON.stringify([record?.id, record?.storage_key, record?.updated_at]));
+}
+
+function useProtectedFilePreview(filePath?: string, mediaType?: EvidenceMediaType, identity?: string) {
   const [retryKey, setRetryKey] = useState(0);
   const [state, setState] = useState<{
     requestKey?: string;
-    recordId?: string;
     mediaType?: EvidenceMediaType;
     blob?: Blob;
     previewUrl?: string;
     loading: boolean;
     error?: string;
   }>({ loading: false });
-  const eligible = Boolean(record && mediaType);
-  const recordId = eligible ? record?.id : undefined;
-  const storageKey = eligible ? record?.storage_key : undefined;
-  const updatedAt = eligible ? record?.updated_at : undefined;
-
-  const requestKey = JSON.stringify([recordId, mediaType, protectedFilePath, storageKey, updatedAt]);
+  const requestKey = JSON.stringify([filePath, mediaType, identity]);
 
   useEffect(() => {
-    if (!recordId || !storageKey) {
+    if (!filePath || !mediaType) {
       setState({ loading: false });
       return undefined;
     }
 
     let cancelled = false;
     let objectUrl = '';
-    setState({ requestKey, recordId, mediaType, loading: true });
+    setState({ requestKey, mediaType, loading: true });
 
     async function loadEvidenceFile() {
       try {
-        const blob = await downloadBlob(protectedFilePath || `/evidence/${recordId}/file`);
+        const blob = await downloadBlob(filePath!);
         if (cancelled) return;
         const normalizedBlob = normalizeEvidenceBlob(blob, mediaType);
         objectUrl = URL.createObjectURL(normalizedBlob);
-        setState({ requestKey, recordId, mediaType, blob: normalizedBlob, previewUrl: objectUrl, loading: false });
+        setState({ requestKey, mediaType, blob: normalizedBlob, previewUrl: objectUrl, loading: false });
       } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : 'Vui lòng thử lại.';
         const label = mediaType === 'pdf' ? 'PDF' : mediaType === 'word' ? 'Word' : mediaType === 'spreadsheet' ? 'Excel' : 'minh chứng';
-        setState({ requestKey, recordId, mediaType, loading: false, error: `Không tải được ${label}. ${message}` });
+        setState({ requestKey, mediaType, loading: false, error: `Không tải được ${label}. ${message}` });
       }
     }
 
@@ -400,7 +434,7 @@ export function useProtectedEvidencePreview(record: EvidenceRecord | null, media
     };
   }, [requestKey, retryKey]);
 
-  const currentState = state.requestKey === requestKey ? state : { loading: Boolean(recordId) };
+  const currentState = state.requestKey === requestKey ? state : { loading: Boolean(filePath && mediaType) };
   return {
     ...currentState,
     retry: () => setRetryKey((current) => current + 1),

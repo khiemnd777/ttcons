@@ -194,11 +194,12 @@ test('upload table locks persisted metadata and exposes bounded progress, retry 
   assert.match(failed, /value="Tên đã lưu"/);
 });
 
-test('inventory locks eight capture and fourteen reference entrypoints to the shared owners', async () => {
+test('inventory locks eight capture, sixteen evidence references and two document entrypoints to the shared owners', async () => {
   const root = new URL('../src/modules/', import.meta.url);
   const files = (await readdir(root, { recursive: true })).filter((path) => path.endsWith('.tsx'));
   const captureCounts: Record<string, number> = {};
   const referenceCounts: Record<string, number> = {};
+  const documentCounts: Record<string, number> = {};
   const storedCardAdapter = await readFile(new URL('operations/ConstructionEvidenceButton.tsx', root), 'utf8');
   assert.match(storedCardAdapter, /<EvidenceCard\b/);
   assert.doesNotMatch(storedCardAdapter, /FileImage|<img\b|aspect-\[/, 'reference adapter must not own another card presentation');
@@ -209,8 +210,10 @@ test('inventory locks eight capture and fourteen reference entrypoints to the sh
     if (path.startsWith('_shared/')) continue;
     const captures = (source.match(/<(?:ConstructionEvidenceCapture|EvidenceCapture)\b/g) ?? []).length;
     const references = (source.match(/<(?:ConstructionEvidenceButton|SelectedEvidenceViewButton|EvidenceReferenceViewButton|EvidenceReferenceViewer)\b/g) ?? []).length;
+    const documents = (source.match(/<DocumentReferenceViewButton\b/g) ?? []).length;
     if (captures) captureCounts[path] = captures;
     if (references && path !== 'operations/ConstructionEvidenceButton.tsx') referenceCounts[path] = references;
+    if (documents) documentCounts[path] = documents;
   }
   assert.deepEqual(captureCounts, {
     'acceptance/AcceptanceEditor.tsx': 1, 'operations/ConstructionActionDialogs.tsx': 2, 'operations/ConstructionCheckDialogs.tsx': 2,
@@ -221,5 +224,15 @@ test('inventory locks eight capture and fourteen reference entrypoints to the sh
     'operations/ConstructionActionDialogs.tsx': 3, 'operations/ConstructionCheckDialogs.tsx': 2,
     'work-items/IncomingAcceptancePanel.tsx': 1, 'work-items/MaterialSnapshotPanel.tsx': 2, 'work-items/OwnerClientReconciliationPanel.tsx': 1,
     'work-items/SubcontractorReconciliationPanel.tsx': 1, 'work-items/SurplusHandlingPanel.tsx': 1,
+    'work-items/DiscussionWorkUpdateCard.tsx': 1, 'work-items/WorkflowFormPanel.tsx': 1,
   });
+  assert.deepEqual(documentCounts, { 'work-items/DesignReleasePanel.tsx': 1, 'work-items/DiscussionWorkUpdateCard.tsx': 1 });
+});
+
+test('both design file entrypoints use the shared document viewer instead of raw tabs', async () => {
+  for (const path of ['work-items/DiscussionWorkUpdateCard.tsx', 'work-items/DesignReleasePanel.tsx']) {
+    const source = await readFile(new URL('../src/modules/' + path, import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /openProtectedBlob|window\.open/, path);
+    assert.match(source, /<DocumentReferenceViewButton\b/, path);
+  }
 });

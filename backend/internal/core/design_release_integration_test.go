@@ -23,6 +23,9 @@ func TestDesignReleaseRequiresExplicitPMRehandoffForEveryPublishedRevision(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := repo.UpdateDesignReleaseDraft(ctx, cleanID(first["id"]), "R01", "Overwrite", "", actorID, "Actor", Record{"revision_label": "R01", "change_reason": "stale", "notes": ""}); err == nil {
+		t.Fatal("stale design draft overwrote the current package")
+	}
 	if _, err := repo.AddDesignReleaseFile(ctx, cleanID(first["id"]), "layout", "Layout R01", "layout-r01.pdf", StoredFileMetadata{
 		StorageProvider: "local", StorageKey: "tests/design/layout-r01.pdf", MIMEType: "application/pdf", FileSize: 100, ChecksumSHA256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}, actorID, "Design Release Actor"); err != nil {
@@ -88,6 +91,8 @@ func TestDesignReleaseRequiresExplicitPMRehandoffForEveryPublishedRevision(t *te
 		t.Fatal("released design revision allowed a content mutation")
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('design_release_created','design_release_file_uploaded','design_release_released','design_release_handed_off')`, 8, projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_work_updates WHERE source_id IN ($1,$2)`, 6, first["id"], second["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_work_updates WHERE source_id=$1 AND source_snapshot_json->>'status'='released' AND source_snapshot_json->>'revision_label'='R01' AND source_snapshot_json->'files'->0->>'name'='Layout R01'`, 2, first["id"])
 }
 
 func TestValidateDesignReleaseDraftRequiresReason(t *testing.T) {

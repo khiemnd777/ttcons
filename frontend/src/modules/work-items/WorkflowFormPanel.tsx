@@ -48,6 +48,7 @@ import {
   structuredRows,
 } from './WorkflowFormStructuredList';
 import { evidenceOptionLabel, textValue } from './workflowFormValueUtils';
+import { EvidenceReferenceViewButton } from '../_shared/EvidenceReferenceViewer';
 
 type FormErrors = Record<string, string>;
 
@@ -108,6 +109,8 @@ export function WorkflowFormPanel({
   externalActions = false,
   actionRef,
   onActionStateChange,
+  onDirtyChange,
+  onBusyChange,
 }: {
   workItemId: string;
   projectId?: string;
@@ -119,11 +122,21 @@ export function WorkflowFormPanel({
   externalActions?: boolean;
   actionRef?: Ref<WorkflowFormActionHandle>;
   onActionStateChange?: (state: WorkflowFormActionState | null) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const { user, hasPermission } = useAuth();
   const [values, setValues] = useState<AnyRecord>({});
+  const dirtyRef = useRef(false);
+  const loadedInstanceRef = useRef<string>();
+  const baseAnswersRef = useRef<AnyRecord>({});
+  const baseRevisionRef = useRef(0);
+  function markDirty(dirty: boolean) {
+    dirtyRef.current = dirty;
+    onDirtyChange?.(dirty);
+  }
   const [errors, setErrors] = useState<FormErrors>({});
   const [confirmationDialogOpen, setConfirmationDialogOpen] = useState(false);
   const [signatureViewer, setSignatureViewer] = useState<{ signature: WorkflowFormSignature; mode: WorkflowSignatureViewMode; actorId?: string } | null>(null);
@@ -218,11 +231,16 @@ export function WorkflowFormPanel({
   );
 
   useEffect(() => {
-    if (amending) return;
+    if (!instance?.id) return;
+    if (loadedInstanceRef.current === instance.id && (amending || dirtyRef.current)) return;
+    loadedInstanceRef.current = instance.id;
+    baseAnswersRef.current = form.data?.answers ?? {};
+    baseRevisionRef.current = currentRevision;
     setValues(submitted
       ? (form.data?.answers ?? {})
       : { ...(form.data?.suggested_answers ?? {}), ...(form.data?.answers ?? {}) });
     setErrors({});
+    markDirty(false);
   }, [amending, form.data?.answers, form.data?.suggested_answers, instance?.id, submitted]);
 
   useEffect(() => {
@@ -330,8 +348,10 @@ export function WorkflowFormPanel({
   }
 
   const saveDraft = useMutation({
-    mutationFn: () => put<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/draft`, { answers: values }),
-    onSuccess: () => {
+    mutationFn: () => put<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/draft`, { answers: values, expected_answers: baseAnswersRef.current }),
+    onSuccess: (result) => {
+      baseAnswersRef.current = result.answers ?? values;
+      markDirty(false);
       invalidate();
       toast.success(startsWorkItem ? 'Đã bắt đầu đầu việc và lưu nháp hồ sơ nghiệp vụ' : 'Đã lưu nháp hồ sơ nghiệp vụ');
     },
@@ -339,8 +359,10 @@ export function WorkflowFormPanel({
   });
 
   const submitForm = useMutation({
-    mutationFn: () => post<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/submit`, { answers: values }),
+    mutationFn: () => post<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/submit`, { answers: values, expected_answers: baseAnswersRef.current }),
     onSuccess: (result) => {
+      baseAnswersRef.current = result.answers ?? values;
+      markDirty(false);
       invalidate();
       if (result.auto_transition?.status === 'advanced') {
         toast.success(startsWorkItem ? 'Đã bắt đầu, xác nhận và chuyển sang bước tiếp theo' : 'Đã xác nhận và chuyển sang bước tiếp theo');
@@ -357,9 +379,10 @@ export function WorkflowFormPanel({
     mutationFn: () => post<WorkflowFormDetail>(`/workflow-form-instances/${instance?.id}/amend`, {
       answers: values,
       reason: amendmentReason,
-      expected_revision: currentRevision,
+      expected_revision: baseRevisionRef.current,
     }),
     onSuccess: (result) => {
+      markDirty(false);
       queryClient.setQueryData<WorkflowFormDetail>(['work-item-form', workItemId], (current) => ({
         ...result,
         available: true,
@@ -460,6 +483,7 @@ export function WorkflowFormPanel({
   }
 
   function setFieldValue(field: WorkflowFormField, value: unknown) {
+    markDirty(true);
     setValues((current) => ({ ...current, [field.field_key]: value }));
     setErrors((current) => {
       const clearedKeys = new Set([
@@ -499,6 +523,9 @@ export function WorkflowFormPanel({
     const normalizedReason = reason.trim();
     if (!canAmend || !normalizedReason) return;
     setValues(form.data?.answers ?? {});
+    baseAnswersRef.current = form.data?.answers ?? {};
+    baseRevisionRef.current = currentRevision;
+    markDirty(true);
     setErrors({});
     setAmendmentReason(normalizedReason);
     setAmending(true);
@@ -509,6 +536,7 @@ export function WorkflowFormPanel({
   function cancelAmendment() {
     if (amendForm.isPending) return;
     setValues(form.data?.answers ?? {});
+    markDirty(false);
     setErrors({});
     setAmending(false);
     setAmendmentReason('');
@@ -565,6 +593,10 @@ export function WorkflowFormPanel({
   useEffect(() => {
     if (externalActions) onActionStateChange?.(actionState);
   }, [actionState, externalActions, onActionStateChange]);
+
+  useEffect(() => {
+    onBusyChange?.(saveDraft.isPending || submitForm.isPending || amendForm.isPending);
+  }, [saveDraft.isPending, submitForm.isPending, amendForm.isPending, onBusyChange]);
 
   useEffect(() => () => {
     if (externalActions) onActionStateChange?.(null);
@@ -2038,6 +2070,11 @@ function shortHash(hash?: string) {
   return hash ? hash.slice(0, 8) : '-';
 }
 
+export function WorkflowFormSnapshot({ fields, answers, templateCode }: { fields: WorkflowFormField[]; answers: AnyRecord; templateCode?: string }) {
+  const visibleFields = effectiveWorkflowFormFields(effectiveWorkflowStructuredListFields(effectiveWorkflowCurrencyFields(fields, templateCode), templateCode), answers);
+  return <div className="space-y-4">{visibleFields.map(field => <WorkflowFieldControl key={field.field_key} templateCode={templateCode} field={field} value={answers[field.field_key]} formValues={answers} evidence={[]} disabled displayOnly onChange={() => {}} />)}</div>;
+}
+
 function workflowPDFExportConfirmationSummary(record: WorkflowFormPDFExport) {
   const selection = record.metadata_json?.confirmation_selection;
   if (!selection) return '';
@@ -2166,6 +2203,7 @@ function renderFieldControl(
     );
   }
   if (field.field_type === 'evidence_reference') {
+    if (displayOnly) return value ? <div className="mt-2"><EvidenceReferenceViewButton reference={{ id: textValue(value), name: field.label }} /></div> : <p className="mt-1 text-sm text-slate-500">Chưa có minh chứng</p>;
     const selectableEvidence = evidence.filter((record) => record.status !== 'rejected');
     return (
       <select className={controlClassName} value={textValue(value)} disabled={disabled || selectableEvidence.length === 0} onChange={(event) => onChange(event.target.value)}>

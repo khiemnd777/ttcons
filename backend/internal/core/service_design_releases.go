@@ -87,7 +87,7 @@ func (s *Service) UpdateDesignReleaseDraft(ctx context.Context, releaseID string
 	if revisionLabel == "" {
 		revisionLabel = strings.TrimSpace(fmt.Sprint(release["revision_label"]))
 	}
-	return s.repo.UpdateDesignReleaseDraft(ctx, cleanID(releaseID), revisionLabel, changeReason, notes, actorID, actorName)
+	return s.repo.UpdateDesignReleaseDraft(ctx, cleanID(releaseID), revisionLabel, changeReason, notes, actorID, actorName, recordFromAny(body["expected_values"]))
 }
 
 func (s *Service) UploadDesignReleaseFile(ctx context.Context, releaseID, documentType, name string, fileHeader *multipart.FileHeader, actorID, actorName string) (Record, error) {
@@ -119,6 +119,7 @@ func (s *Service) UploadDesignReleaseFile(ctx context.Context, releaseID, docume
 	if err != nil {
 		return nil, s.cleanupStoredObjectAfterError(storedObject, err)
 	}
+	s.publishDiscussionWorkUpdate(projectID, cleanID(release["work_item_id"]), actorID)
 	return document, nil
 }
 
@@ -130,7 +131,11 @@ func (s *Service) ReleaseDesignRelease(ctx context.Context, releaseID, actorID, 
 	if err := s.requireDesignReleaseManager(ctx, cleanID(release["project_id"]), actorID); err != nil {
 		return nil, err
 	}
-	return s.repo.ReleaseDesignRelease(ctx, cleanID(releaseID), actorID, actorName)
+	result, err := s.repo.ReleaseDesignRelease(ctx, cleanID(releaseID), actorID, actorName)
+	if err == nil {
+		s.publishDiscussionWorkUpdate(cleanID(release["project_id"]), cleanID(release["work_item_id"]), actorID)
+	}
+	return result, err
 }
 
 func (s *Service) HandoffDesignRelease(ctx context.Context, releaseID string, body Record, actorID, actorName string) (Record, error) {
@@ -157,7 +162,11 @@ func (s *Service) HandoffDesignRelease(ctx context.Context, releaseID string, bo
 	if len([]rune(comment)) > 1000 {
 		return nil, validationError("Ghi chú bàn giao không được vượt quá 1000 ký tự")
 	}
-	return s.repo.HandoffDesignRelease(ctx, cleanID(releaseID), workItemID, comment, actorID, actorName)
+	result, err := s.repo.HandoffDesignRelease(ctx, cleanID(releaseID), workItemID, comment, actorID, actorName)
+	if err == nil {
+		s.publishDiscussionWorkUpdate(cleanID(release["project_id"]), workItemID, actorID)
+	}
+	return result, err
 }
 
 func (s *Service) designReleaseCapabilities(ctx context.Context, projectID, actorID string) (designReleaseCapabilities, error) {

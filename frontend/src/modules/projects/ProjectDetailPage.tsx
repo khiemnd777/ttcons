@@ -1036,7 +1036,7 @@ function WorkflowWorkPanel({
 
           {visibleRows.length ? (
             <>
-              <div className="hidden overflow-x-auto rounded-md border border-line md:block">
+              <div className="consflow-grid-viewport hidden rounded-md border border-line md:block">
                 <div className="min-w-[920px]">
                   <div className="consflow-sticky-grid-header grid grid-cols-[72px_minmax(260px,1.6fr)_120px_minmax(140px,0.8fr)_110px_minmax(170px,1fr)] gap-3 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     <span><span className="sr-only">Thao tác</span></span>

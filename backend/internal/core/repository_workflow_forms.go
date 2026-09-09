@@ -976,7 +976,7 @@ func templatePublishFormIssuesSQL() string {
 	`
 }
 
-func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, answers Record, comment string, submit bool, actorID, actorName string) (Record, error) {
+func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, answers Record, comment string, submit bool, actorID, actorName string, expectedAnswers ...Record) (Record, error) {
 	if answers == nil {
 		answers = Record{}
 	}
@@ -1009,6 +1009,19 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 	}
 	instance := rows[0]
 	fromStatus := fmt.Sprint(instance["status"])
+	if len(expectedAnswers) > 0 && expectedAnswers[0] != nil {
+		expected, err := json.Marshal(expectedAnswers[0])
+		if err != nil {
+			return nil, err
+		}
+		var unchanged bool
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(answers_snapshot_json,'{}'::jsonb)=$2::jsonb FROM workflow_form_instances WHERE id=$1`, instanceID, string(expected)).Scan(&unchanged); err != nil {
+			return nil, err
+		}
+		if !unchanged {
+			return nil, conflictError("Hồ sơ đã được người khác cập nhật. Nội dung đang nhập vẫn được giữ; hãy tải lại trước khi lưu.")
+		}
+	}
 	if statusIn(fromStatus, "cancelled") || (!submit && fromStatus == "submitted") || (submit && fromStatus == "submitted") {
 		return nil, validationError("Trạng thái biểu mẫu quy trình đã thay đổi, vui lòng tải lại", Record{"status": fromStatus})
 	}
@@ -1073,6 +1086,11 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 	})
 	workItemID := cleanID(instance["work_item_id"])
 	projectID := cleanID(instance["project_id"])
+	if submit {
+		if err := insertWorkflowDiscussionUpdateTx(ctx, tx, instance, answers, revisionNo, "submitted", actorID); err != nil {
+			return nil, err
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, from_status, to_status, comment, metadata_json)
 		VALUES ($1, $2, NULLIF($3,'')::uuid, NULLIF($4,'')::uuid, $5, $6, $7, NULLIF($8,''), $9::jsonb)
@@ -1427,6 +1445,9 @@ func (r *Repository) AmendWorkflowForm(ctx context.Context, instanceID string, a
 		`, workItemID, projectID, actorID, activityComment, string(rawMetadata)); err != nil {
 			return nil, err
 		}
+	}
+	if err := insertWorkflowDiscussionUpdateTx(ctx, tx, instance, answers, nextRevision, "amended", actorID); err != nil {
+		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "workflow_form_amended", "workflow_form_instance", instanceID, "Chỉnh sửa hồ sơ nghiệp vụ đã chốt", metadata); err != nil {
 		return nil, err

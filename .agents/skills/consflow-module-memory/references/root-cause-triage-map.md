@@ -1,5 +1,11 @@
 # Consflow Root-Cause Triage Map
 
+## Design Files Bypass The Standard Viewer
+
+- Symptoms: a design file in discussion or its canonical panel opens a blob tab instead of the existing in-app preview. First searches: `DocumentReferenceViewButton|ProtectedDocumentViewerDialog|snapshot.files|DesignReleaseFiles|openProtectedBlob` in `modules/work-items/{DiscussionWorkUpdateCard,DesignReleasePanel}.tsx` and `modules/_shared/{DocumentReferenceViewer,EvidenceRecordViewerDialog}.tsx`. Load central/frontend maps and `AGENTS.md` standard-component gate.
+- The corrected entrypoints adapt document metadata and `/documents/:id/file` to the shared composition/readers. Compare each actual file action, not just imports or the neighboring evidence branch. Preserve snapshot file IDs and actor scope; never resolve design document IDs through `/evidence/:id`. A browser tool blocking a blob tab is a test limitation, not justification for bypassing an existing viewer.
+- Verify with `evidenceComponentReuse`, `evidenceLifecycle`, PDF/Office/reference/file-type tests and frontend build. Controlled click/hook/render checks prove their own scope only; nested focus, stacking and physical mobile behavior require separately authorized browser acceptance.
+
 ## Construction Report Mobile Width And Continuous Camera
 
 - Symptoms: clipped report on mobile, oversized footer, horizontally scrolling resource inputs, camera reopening after each photo, or query refresh erasing a draft. Owners: `ConstructionReportFormDialog.tsx/constructionReport.css`, `Dialog.tsx/dialog.css`, `EvidenceCapture.tsx/evidenceCapture.css`, `cameraCaptureSession.ts`. Load central/frontend/Construction Operations maps. First searches: `mobileFullscreen|EvidenceUploader|ReportDisclosure|min-w-0|report-resource-table|captureSession|initialized|discardOpen`.

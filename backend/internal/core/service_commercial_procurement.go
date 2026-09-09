@@ -337,7 +337,11 @@ func (s *Service) GenerateProcurementFromBOQ(ctx context.Context, projectID stri
 	if !canGenerate {
 		return nil, forbiddenError("Bạn không có quyền sinh yêu cầu mua từ BOQ", Record{"permissions": []string{"procurement.create", "procurement.approve", "boq.approve"}})
 	}
-	return s.repo.GenerateProcurementFromBOQ(ctx, projectID, mutationContext, actorID, actorName)
+	result, err := s.repo.GenerateProcurementFromBOQ(ctx, projectID, mutationContext, actorID, actorName)
+	if err == nil {
+		s.publishDiscussionWorkUpdate(projectID, cleanID(mutationContext.WorkItemID), actorID)
+	}
+	return result, err
 }
 
 func (s *Service) CreateProcurement(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
@@ -363,19 +367,30 @@ func (s *Service) UpdateProcurement(ctx context.Context, id string, body Record,
 	if statusIn(fmt.Sprint(current["status"]), "ordered", "partially_received", "received", "cancelled") {
 		return nil, validationError("Yêu cầu mua đã đặt/nhận hàng, không thể sửa thông tin thương mại", Record{"status": current["status"]})
 	}
-	body["project_id"] = current["project_id"]
-	body["request_code"] = current["request_code"]
-	body["status"] = current["status"]
-	body["requested_by"] = current["requested_by"]
-	normalized, err := s.normalizeProcurementHeader(ctx, body, false)
+	version := int(number(current["edit_version"]))
+	if expected, present := body["expected_version"]; present && number(expected) != float64(version) {
+		return nil, procurementVersionConflict()
+	}
+	// Only header fields are editable. Lifecycle, approvals and amounts remain
+	// the source record's values, even for older callers.
+	merged := Record{}
+	for key, value := range current {
+		merged[key] = value
+	}
+	for _, key := range []string{"title", "supplier_partner_id", "order_reference", "expected_delivery_date"} {
+		if value, present := body[key]; present {
+			merged[key] = value
+		}
+	}
+	normalized, err := s.normalizeProcurementHeader(ctx, merged, false)
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.repo.Update(ctx, "procurement_requests", procurementColumns(), id, normalized)
+	row, err := s.repo.UpdateProcurementHeader(ctx, id, normalized, version, actorID, actorName)
 	if err != nil {
 		return nil, err
 	}
-	s.repo.AddAuditBestEffort(ctx, cleanID(row["project_id"]), actorID, actorName, "procurement_updated", "procurement_request", cleanID(row["id"]), "Cập nhật yêu cầu mua", Record{"request_code": row["request_code"]})
+	s.publishDiscussionWorkUpdate(cleanID(row["project_id"]), "", actorID)
 	return row, nil
 }
 
@@ -428,9 +443,9 @@ func (s *Service) normalizeProcurementHeader(ctx context.Context, body Record, c
 		out["supplier_name"] = cleanOptionalText(partner["name"])
 	} else {
 		out["supplier_partner_id"] = ""
-		out["supplier_name"] = strings.TrimSpace(fmt.Sprint(body["supplier_name"]))
+		out["supplier_name"] = cleanOptionalText(body["supplier_name"])
 	}
-	out["order_reference"] = strings.TrimSpace(fmt.Sprint(body["order_reference"]))
+	out["order_reference"] = cleanOptionalText(body["order_reference"])
 	expectedDeliveryDate := dateOnly(body["expected_delivery_date"])
 	if expectedDeliveryDate != "" {
 		if _, err := time.Parse("2006-01-02", expectedDeliveryDate); err != nil {
@@ -442,7 +457,11 @@ func (s *Service) normalizeProcurementHeader(ctx context.Context, body Record, c
 }
 
 func (s *Service) ProcurementAction(ctx context.Context, id, action string, req ActionRequest, actorID, actorName string) (Record, error) {
-	return s.repo.ProcurementAction(ctx, id, action, req, actorID, actorName)
+	result, err := s.repo.ProcurementAction(ctx, id, action, req, actorID, actorName)
+	if err == nil {
+		s.publishDiscussionWorkUpdate(cleanID(result["project_id"]), cleanID(req.WorkItemContext.WorkItemID), actorID)
+	}
+	return result, err
 }
 
 func (s *Service) ProjectContracts(ctx context.Context, projectID string) ([]Record, error) {

@@ -8,6 +8,7 @@ import type { EvidenceMediaType } from './evidenceMedia';
 export type EvidenceViewerDialogProps = {
   open: boolean;
   name: string;
+  title?: string;
   previewUrl?: string;
   fileBlob?: Blob;
   mediaType: EvidenceMediaType;
@@ -28,6 +29,7 @@ export type EvidenceViewerDialogProps = {
 export function EvidenceViewerDialog({
   open,
   name,
+  title = 'Xem minh chứng',
   previewUrl,
   fileBlob,
   mediaType,
@@ -94,11 +96,11 @@ export function EvidenceViewerDialog({
   const visibleError = error || (decodeFailed ? 'Không thể hiển thị định dạng ảnh này.' : '');
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center p-0 sm:p-4">
-      <button type="button" className="absolute inset-0 bg-ink/60" aria-label="Đóng trình xem minh chứng" onClick={onClose} />
+      <button type="button" className="absolute inset-0 bg-ink/60" aria-label={title === 'Xem minh chứng' ? 'Đóng trình xem minh chứng' : 'Đóng trình xem tệp'} onClick={onClose} />
       <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="evidence-viewer-title" className="relative flex h-full max-h-none w-full max-w-[min(1180px,calc(100vw-2rem))] flex-col overflow-hidden bg-white shadow-2xl outline-none sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:rounded-xl sm:border sm:border-line">
         <header className="flex items-start justify-between gap-4 border-b border-line px-4 py-3 sm:px-5 sm:py-4">
           <div className="min-w-0 flex-1">
-            <h2 id="evidence-viewer-title" className="text-lg font-semibold text-ink">Xem minh chứng</h2>
+            <h2 id="evidence-viewer-title" className="text-lg font-semibold text-ink">{title}</h2>
             <p className="mt-1 line-clamp-2 break-words text-sm font-semibold leading-5 text-slate-700">{name}</p>
             {metadata.length ? <div className="mt-2 flex flex-wrap gap-1.5">{metadata.filter(Boolean).map((item) => <span key={item} className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">{item}</span>)}</div> : null}
             {description ? <p className="mt-1.5 text-xs leading-5 text-slate-500">{description}</p> : null}

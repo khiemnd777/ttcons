@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, lazy, Suspense, useContext, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -41,6 +41,10 @@ import type {
 } from '../../lib/types/domain';
 import { activityLabel, compactDateTime, scopeTypeLabel, workflowFormActivityComment } from './workItemPresentation';
 import { ActivityAttachments } from './ActivityAttachments';
+import { DiscussionWorkRail } from './DiscussionWorkRail';
+import { DiscussionWorkUpdateCard } from './DiscussionWorkUpdateCard';
+const DiscussionWorkDialog = lazy(() => import('./DiscussionWorkDialog').then(module => ({ default: module.DiscussionWorkDialog })));
+const OpenDiscussionWork = createContext<((id: string) => void) | null>(null);
 import { ActivityTopicCard, ActivityTopicProvider } from './ActivityTopic';
 import { activityVisibilityLabel } from './activityTopicDomain';
 import { ActivityReactionBar, ActivityReplyQuote } from './ActivityConversationMeta';
@@ -107,6 +111,7 @@ const activityTypeFilters = [
   'decision',
   'reminder',
   'file_note',
+  'work_update',
 ];
 
 const visibilityLabels: Record<string, string> = {
@@ -134,6 +139,8 @@ function ActivityThreadContent({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [kind, setKind] = useState<ActivityKind>('discussion');
+  const [openWorkItemId, setOpenWorkItemId] = useState<string | null>(null);
+  const [workScopeTitle, setWorkScopeTitle] = useState('');
   const [attention, setAttention] = useState<AttentionFilter>('');
   const [scopeFilter, setScopeFilter] = useState('');
   const [scopeIdFilter, setScopeIdFilter] = useState('');
@@ -317,12 +324,21 @@ function ActivityThreadContent({
   useEffect(() => {
     if (!projectId) return undefined;
     return streamSSE(`/projects/${projectId}/activity/stream`, {
-      onStatus: setStreamStatus,
+      onStatus: (status) => {
+        setStreamStatus(status);
+        if (status === 'connected') {
+          void queryClient.invalidateQueries({ queryKey: ['project-activity', projectId] });
+          void queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
+        }
+      },
       onEvent: (message) => {
         if (message.event === 'activity_changed' || message.event === 'activity_read') {
           queryClient.invalidateQueries({ queryKey: ['project-activity', projectId] });
           queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
           queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
+          if (message.event === 'activity_changed') {
+            for (const key of [['my-work-items'], ['design-releases', projectId], ['work-item-form'], ['work-item'], ['procurement'], ['procurement-detail']]) void queryClient.invalidateQueries({ queryKey: key });
+          }
           onChangedRef.current?.();
         }
       },
@@ -346,6 +362,7 @@ function ActivityThreadContent({
   const hasFilters = Boolean(attention || scopeFilter || activityTypeFilter || visibilityFilter || actorFilter || deferredSearch);
 
   return (
+    <OpenDiscussionWork.Provider value={setOpenWorkItemId}>
     <div className="space-y-3">
       <div className="flex gap-2 overflow-x-auto pb-1 xl:hidden">
         {attentionItems.map((item) => {
@@ -369,7 +386,9 @@ function ActivityThreadContent({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <section className="min-w-0 rounded-lg border border-line bg-white shadow-panel">
+        <div className="xl:col-start-2 xl:row-start-1"><DiscussionWorkRail projectId={projectId} onOpen={item => setOpenWorkItemId(item.id)} onDiscuss={item => { clearFilters(); setKind('discussion'); setScopeFilter('work_item'); setScopeIdFilter(item.id); setWorkScopeTitle(item.title); }} /></div>
+        <section className="min-w-0 rounded-lg border border-line bg-white shadow-panel xl:col-start-1 xl:row-start-1 xl:row-span-2">
+          {scopeFilter === 'work_item' && scopeIdFilter && workScopeTitle ? <div className="flex items-center gap-2 border-b border-blue-100 bg-blue-50 p-3 text-sm text-blue-800"><span className="flex-1">Trao đổi: {workScopeTitle}</span><button className="font-semibold underline" onClick={() => { setScopeFilter(''); setScopeIdFilter(''); setWorkScopeTitle(''); }}>Xem toàn công trình</button></div> : null}
           <div className="border-b border-line p-3">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex gap-1 overflow-x-auto">
@@ -559,7 +578,7 @@ function ActivityThreadContent({
           )}
         </section>
 
-        <aside className="hidden space-y-3 xl:block">
+        <aside className="hidden space-y-3 xl:col-start-2 xl:row-start-2 xl:block">
           <section className="rounded-lg border border-line bg-white p-3 shadow-panel">
             <div className="flex items-center justify-between gap-2">
               <div>
@@ -627,7 +646,9 @@ function ActivityThreadContent({
       >
         <p className="text-sm leading-6 text-slate-600">Tin nhắn đã thu hồi không thể khôi phục hoặc tiếp tục nhận phản hồi và reaction.</p>
       </Dialog>
+      {openWorkItemId ? <Suspense fallback={<p role="status">Đang mở công việc…</p>}><DiscussionWorkDialog key={`${projectId}:${openWorkItemId}`} projectId={projectId} workItemId={openWorkItemId} onClose={() => setOpenWorkItemId(null)} /></Suspense> : null}
     </div>
+    </OpenDiscussionWork.Provider>
   );
 }
 
@@ -837,6 +858,7 @@ function ChatMessage({
   onReaction: (reaction: ActivityReactionSummary['reaction'], active: boolean) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const openWork = useContext(OpenDiscussionWork);
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -854,7 +876,7 @@ function ChatMessage({
     };
   }, [menuOpen]);
 
-  const system = !['comment', 'status', 'blocker', 'question', 'decision', 'reminder', 'file_note'].includes(item.activity_type);
+  const system = !['comment', 'status', 'blocker', 'question', 'decision', 'reminder', 'file_note', 'work_update'].includes(item.activity_type);
   const comment = workflowFormActivityComment(item);
   if (system) {
     return (
@@ -910,7 +932,8 @@ function ChatMessage({
               </div>
             ) : null}
           </div>
-          {!withdrawn ? <ActivityTopicCard source={item} /> : null}
+          {!withdrawn && item.activity_type !== 'work_update' ? <ActivityTopicCard source={item} /> : null}
+          {!withdrawn && item.activity_type === 'work_update' ? <DiscussionWorkUpdateCard item={item} /> : null}
           {withdrawn ? <p className="text-sm italic leading-6">Tin nhắn đã được thu hồi</p> : comment ? <p className={clsx('whitespace-pre-wrap break-words text-sm leading-6', item.activity_type === 'comment' ? '' : 'mt-1.5')}>{comment}</p> : null}
           {!withdrawn && metadata.due_at ? <p className="mt-2 text-xs font-semibold">Hạn: {compactDateTime(metadata.due_at)}</p> : null}
           {!withdrawn ? <ActivityAttachments attachments={item.attachments} /> : null}
@@ -935,7 +958,7 @@ function ChatMessage({
                 {resolveLabel}
               </button>
             ) : null}
-            {item.work_item_id ? <Link className={clsx('text-xs font-semibold hover:underline', ownBlueBubble ? 'text-white' : 'text-blue-700')} to={`/projects/${projectId}/work-items/${item.work_item_id}`}>Mở đầu việc ↗</Link> : null}
+            {item.work_item_id && openWork ? <button type="button" className={clsx('text-xs font-semibold hover:underline', ownBlueBubble ? 'text-white' : 'text-blue-700')} onClick={() => openWork(item.work_item_id!)}>Mở công việc</button> : item.work_item_id ? <Link className="text-xs font-semibold underline" to={`/projects/${projectId}/work-items/${item.work_item_id}`}>Mở đầu việc ↗</Link> : null}
           </div>
           {!withdrawn ? <div className="mt-2">
             <ActivityReactionBar reactions={item.reactions} pendingReaction={pendingReaction} onToggle={onReaction} />

@@ -43,6 +43,7 @@ import { orderedWorkListEntries, type WorkListEntry, type WorkQueueEntry } from 
 import { ActivityAttachments } from '../work-items/ActivityAttachments';
 import { ActivityComposer, type ActivityAttachmentOption, type ActivityMentionOption, type ActivityTargetOption } from '../work-items/ActivityComposer';
 import { ActivityTopicCard, ActivityTopicProvider } from '../work-items/ActivityTopic';
+import { DiscussionWorkUpdateCard } from '../work-items/DiscussionWorkUpdateCard';
 import { activityVisibilityLabel } from '../work-items/activityTopicDomain';
 import { ActivityReplyQuote } from '../work-items/ActivityConversationMeta';
 import { actorInitials, chatBubbleTone } from '../work-items/activityThreadDomain';
@@ -766,7 +767,8 @@ function ProjectConversationContent({ project }: { project: ProjectDiscussionPro
                     <div className={clsx('rounded-xl border px-3 py-2 text-left text-sm shadow-sm', chatBubbleTone(item.activity_type, own))}>
                       <ActivityReplyQuote replyTo={item.reply_to} />
                       <p className={clsx('mb-1 text-[10px] font-semibold uppercase tracking-wide', own ? 'text-blue-100' : 'text-slate-400')}>{activityLabel(item.activity_type)}</p>
-                      {!item.withdrawn_at ? <ActivityTopicCard source={item} /> : null}
+                      {!item.withdrawn_at && item.activity_type !== 'work_update' ? <ActivityTopicCard source={item} /> : null}
+                      {!item.withdrawn_at && item.activity_type === 'work_update' ? <DiscussionWorkUpdateCard item={item} /> : null}
                       <p className="whitespace-pre-wrap break-words leading-5">{item.withdrawn_at ? 'Tin nhắn đã được thu hồi' : item.comment || 'Không có nội dung'}</p>
                       {activityVisibilityLabel(item.visibility) ? <p className={clsx('mt-1 text-[11px]', own ? 'text-blue-100' : 'text-slate-500')}>{activityVisibilityLabel(item.visibility)}</p> : null}
                       <ActivityAttachments attachments={item.attachments} compact />

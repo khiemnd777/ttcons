@@ -24,7 +24,8 @@ test('amendment saves a new optimistic revision and keeps confirmation artifacts
   const types = await domainTypesSource();
 
   assert.match(panel, /\/workflow-form-instances\/\$\{instance\?\.id\}\/amend/);
-  assert.match(panel, /expected_revision: currentRevision/);
+  assert.match(panel, /expected_revision: baseRevisionRef.current/);
+  assert.match(panel, /baseRevisionRef.current = currentRevision/);
   assert.match(panel, /Đã lưu phiên bản chỉnh sửa và ghi lịch sử thay đổi/);
   assert.match(panel, /is_current_revision \?\? signature\.form_revision_no === currentRevision/);
   assert.match(panel, /Xác nhận phiên bản trước/);

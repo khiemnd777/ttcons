@@ -115,6 +115,7 @@ func (s *Service) AmendWorkflowForm(ctx context.Context, instanceID string, req 
 		return nil, err
 	}
 	s.publishWorkItemChanged(Record{"id": instance["work_item_id"], "project_id": instance["project_id"]}, actorID)
+	s.publishDiscussionWorkUpdate(cleanID(instance["project_id"]), cleanID(instance["work_item_id"]), actorID)
 	return updated, nil
 }
 
@@ -751,7 +752,7 @@ func (s *Service) saveWorkflowForm(ctx context.Context, instanceID string, req W
 	if err != nil {
 		return nil, err
 	}
-	saved, err := s.repo.SaveWorkflowForm(ctx, instanceID, normalized, strings.TrimSpace(req.Comment), submit, actorID, actorName)
+	saved, err := s.repo.SaveWorkflowForm(ctx, instanceID, normalized, strings.TrimSpace(req.Comment), submit, actorID, actorName, req.ExpectedAnswers)
 	if err != nil {
 		return saved, err
 	}
@@ -763,6 +764,7 @@ func (s *Service) saveWorkflowForm(ctx context.Context, instanceID string, req W
 	if !submit {
 		return saved, err
 	}
+	s.publishDiscussionWorkUpdate(cleanID(instance["project_id"]), workItemID, actorID)
 	saved["auto_transition"] = s.autoAdvanceSubmittedWorkflowForm(ctx, instance, actorID, actorName)
 	return saved, nil
 }

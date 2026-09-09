@@ -1,5 +1,15 @@
 # Workflow Orchestration Domain Map
 
+## Discussion Source Editing And Historical Snapshots
+
+- Procurement actions now share the source modal across discussion and the purchase page. The responsible Work Item picker supports `procurement.require_approved` and `procurement.generate_from_boq`; only the exact canonical `inputContractProcurementWorkItemPolicy` family may attach mutation context to submit/approve/order. BOQ generation, supplier sourcing and contract operations retain their own mutation policies. Source approval/order does not imply Work Item completion. V139 snapshots and `edit_version` are commercial source contracts, not new workflow states; header saves preserve structured approval references. First searches: `procurementMutationWorkItemId|inputContractProcurementWorkItemPolicy|ExpectedVersion`.
+
+- Matched feature: project discussion work updates. Owners: `discussion_work_updates.go`, repositories/services for workflow forms, evidence and design, V138, and frontend `DiscussionWork*` components. First searches: `insertWorkflowDiscussionUpdateTx|ExpectedAnswers|WorkflowFormSnapshot|discussionWorkReadOnly`.
+- Discussion is another canonical form entrypoint. Existing permissions, active node checks, first-write work start, required-field validation, source gates, approval actions and configured auto_advance_when_ready are unchanged. Form submit does not imply Work Item completion except where the existing configured transition explicitly advances it.
+- Form draft writes do not create discussion messages. Submit/amend append a server-owned work_update and immutable fields/answers snapshot in the same transaction. History never follows current form answers; amendments keep their own revision and confirmation artifacts remain revision scoped. Optional expected_answers protects canonical draft/submit writes under lock; the frontend captures amendment expected_revision at edit start instead of refreshing it underneath unsaved answers.
+- User comments, read-through and reactions cannot author work_update or trigger workflow transitions. Future/read-only Work Items remain noneditable in focused discussion editors; full Work Item design panel also respects future/skipped-history presentation.
+
+
 ## Accounting Observer Runtime Rule (V133)
 
 - `project.reconciliation.view` permits Accounting to inspect company project runs, Work Items, forms/evidence/activity and source workspaces for reconciliation.
