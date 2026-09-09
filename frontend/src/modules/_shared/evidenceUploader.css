@@ -15,4 +15,9 @@
   }
   .evidence-upload-index { display: block; }
   .evidence-upload-field-label { display: none; }
+
+  .evidence-uploader--extra-column .evidence-upload-header,
+  .evidence-uploader--extra-column .evidence-upload-row {
+    grid-template-columns: 2rem minmax(12rem, 1.35fr) 6rem minmax(9rem, .8fr) minmax(9rem, 1fr) minmax(8rem, .9fr) 9rem;
+  }
 }

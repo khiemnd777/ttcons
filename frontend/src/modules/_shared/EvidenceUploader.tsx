@@ -36,11 +36,15 @@ type EvidenceUploaderProps = {
   requirementEvidenceType?: EvidenceUploadBusinessType | null;
   fileInputRef?: MutableRefObject<HTMLInputElement | null>;
   fileInputRefs?: MutableRefObject<Map<string, HTMLInputElement>>;
+  extraColumn?: {
+    label: string;
+    render: (row: EvidenceUploadRow, index: number) => ReactNode;
+  };
 };
 
 // The WorkItem upload table is the single upload presentation owner. Adapters
 // control persistence timing; this component never submits its enclosing form.
-export function EvidenceUploader({ uploadRows, batchUploading, updateUploadRow, onFileChange, addUploadRow, removeUploadRow, canRemoveRow, uploadEvidenceRows, retryUploadRow, onPreview, actions, maxFiles = evidenceUploadBatchLimit, addDisabled = false, requirementEvidenceType, fileInputRef: suppliedInputRef, fileInputRefs: suppliedInputRefs }: EvidenceUploaderProps) {
+export function EvidenceUploader({ uploadRows, batchUploading, updateUploadRow, onFileChange, addUploadRow, removeUploadRow, canRemoveRow, uploadEvidenceRows, retryUploadRow, onPreview, actions, maxFiles = evidenceUploadBatchLimit, addDisabled = false, requirementEvidenceType, fileInputRef: suppliedInputRef, fileInputRefs: suppliedInputRefs, extraColumn }: EvidenceUploaderProps) {
   const localInputRef = useRef<HTMLInputElement | null>(null);
   const localInputRefs = useRef(new Map<string, HTMLInputElement>());
   const fileInputRef = suppliedInputRef ?? localInputRef;
@@ -48,11 +52,12 @@ export function EvidenceUploader({ uploadRows, batchUploading, updateUploadRow, 
   const selectedRows = uploadRows.filter((row) => row.file);
   const overallProgress = evidenceUploadOverallProgress(selectedRows.map((row) => ({ fileSize: row.file?.size ?? 0, progress: row.progress })));
   const pendingUploadCount = uploadRows.filter((row) => row.file && row.classification && !row.fileIssue && (row.status === 'queued' || row.status === 'error')).length;
-  return <div className="evidence-uploader min-w-0" data-component="evidence-uploader">
+  return <div className={clsx('evidence-uploader min-w-0', extraColumn && 'evidence-uploader--extra-column')} data-component="evidence-uploader">
           <div className="evidence-upload-header px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             <span>#</span>
             <span>Tệp</span>
             <span>Loại</span>
+            {extraColumn ? <span>{extraColumn.label}</span> : null}
             <span>Tên minh chứng</span>
             <span>Ghi chú</span>
             <span>Tiến độ</span>
@@ -93,6 +98,7 @@ export function EvidenceUploader({ uploadRows, batchUploading, updateUploadRow, 
                         {row.classification?.label ?? '—'}
                       </div>
                     </div>
+                    {extraColumn ? extraColumn.render(row, index) : null}
                     <label>
                       <span className="evidence-upload-field-label text-xs font-semibold text-slate-600">Tên minh chứng</span>
                       <input

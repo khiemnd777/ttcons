@@ -194,7 +194,7 @@ test('upload table locks persisted metadata and exposes bounded progress, retry 
   assert.match(failed, /value="Tên đã lưu"/);
 });
 
-test('inventory locks eight capture, sixteen evidence references and two document entrypoints to the shared owners', async () => {
+test('inventory locks capture, evidence references and the one legacy document entrypoint to shared owners', async () => {
   const root = new URL('../src/modules/', import.meta.url);
   const files = (await readdir(root, { recursive: true })).filter((path) => path.endsWith('.tsx'));
   const captureCounts: Record<string, number> = {};
@@ -224,15 +224,18 @@ test('inventory locks eight capture, sixteen evidence references and two documen
     'operations/ConstructionActionDialogs.tsx': 3, 'operations/ConstructionCheckDialogs.tsx': 2,
     'work-items/IncomingAcceptancePanel.tsx': 1, 'work-items/MaterialSnapshotPanel.tsx': 2, 'work-items/OwnerClientReconciliationPanel.tsx': 1,
     'work-items/SubcontractorReconciliationPanel.tsx': 1, 'work-items/SurplusHandlingPanel.tsx': 1,
-    'work-items/DiscussionWorkUpdateCard.tsx': 1, 'work-items/WorkflowFormPanel.tsx': 1,
+    'work-items/DesignReleasePanel.tsx': 1, 'work-items/DiscussionWorkUpdateCard.tsx': 2, 'work-items/WorkflowFormPanel.tsx': 1,
   });
-  assert.deepEqual(documentCounts, { 'work-items/DesignReleasePanel.tsx': 1, 'work-items/DiscussionWorkUpdateCard.tsx': 1 });
+  assert.deepEqual(documentCounts, { 'work-items/DiscussionWorkUpdateCard.tsx': 1 });
 });
 
-test('both design file entrypoints use the shared document viewer instead of raw tabs', async () => {
-  for (const path of ['work-items/DiscussionWorkUpdateCard.tsx', 'work-items/DesignReleasePanel.tsx']) {
-    const source = await readFile(new URL('../src/modules/' + path, import.meta.url), 'utf8');
+test('new design evidence uses the evidence viewer while historical snapshots retain the document adapter', async () => {
+  const discussion = await readFile(new URL('../src/modules/work-items/DiscussionWorkUpdateCard.tsx', import.meta.url), 'utf8');
+  const design = await readFile(new URL('../src/modules/work-items/DesignReleasePanel.tsx', import.meta.url), 'utf8');
+  for (const [path, source] of [['DiscussionWorkUpdateCard.tsx', discussion], ['DesignReleasePanel.tsx', design]]) {
     assert.doesNotMatch(source, /openProtectedBlob|window\.open/, path);
-    assert.match(source, /<DocumentReferenceViewButton\b/, path);
+    assert.match(source, /<EvidenceReferenceViewButton\b/, path);
   }
+  assert.match(discussion, /<DocumentReferenceViewButton\b/, 'legacy document snapshots remain readable');
+  assert.doesNotMatch(design, /<DocumentReferenceViewButton\b/, 'canonical design files are evidence records');
 });

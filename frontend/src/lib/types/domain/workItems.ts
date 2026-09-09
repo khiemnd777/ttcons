@@ -168,17 +168,14 @@ export type WorkItem = ProjectOperationsRecord & {
   assignments?: ProjectOperationsRecord[];
 };
 
-export type DesignReleaseFile = {
-  id: string;
-  name: string;
+export type DesignReleaseFile = EvidenceRecord & {
+  evidence_id?: string;
+  reference_type?: 'evidence' | 'document' | string;
   document_type: 'layout' | 'render_3d' | 'construction_drawing' | 'other' | string;
-  mime_type?: string;
-  file_size?: number;
-  revision_no?: number;
-  release_status?: string;
-  uploaded_by?: string;
   uploaded_by_name?: string;
-  created_at?: string;
+  design_release_id?: string;
+  design_revision_label?: string;
+  design_release_status?: string;
 };
 
 export type DesignRelease = {

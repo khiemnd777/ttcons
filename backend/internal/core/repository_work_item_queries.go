@@ -616,13 +616,21 @@ func getEvidenceDetail(ctx context.Context, db queryContext, evidenceID string) 
 		SELECT er.*, wi.title AS work_item_title, wi.status AS work_item_status, rn.name AS run_node_name,
 			u.full_name AS submitted_by_name,COALESCE(u.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,
 			reviewer.full_name AS reviewed_by_name,COALESCE(reviewer.deleted_at IS NOT NULL,false) AS reviewed_by_account_deleted,
-			d.name AS document_name
+			d.name AS document_name,
+			item.design_release_id,
+			CASE WHEN item.evidence_id IS NULL THEN NULL ELSE 'evidence' END AS reference_type,
+			COALESCE(item.document_type, er.document_type) AS design_document_type,
+			release.revision_label AS design_revision_label,
+			release.status AS design_release_status,
+			release.change_reason AS design_change_reason
 		FROM evidence_records er
 		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
 		LEFT JOIN pipeline_run_nodes rn ON rn.id=wi.run_node_id
 		LEFT JOIN users u ON u.id=er.submitted_by
 		LEFT JOIN users reviewer ON reviewer.id=er.reviewed_by
 		LEFT JOIN documents d ON d.id=er.document_id
+		LEFT JOIN design_release_items item ON item.evidence_id=er.id AND item.project_id=er.project_id
+		LEFT JOIN design_releases release ON release.id=item.design_release_id AND release.project_id=item.project_id
 		WHERE er.id=$1 AND wi.status <> 'cancelled'
 	`, evidenceID)
 }

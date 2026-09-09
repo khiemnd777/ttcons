@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ChevronDown, FilePlus2, FileText, History, Send, Upload, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, FilePlus2, FileText, History, Send } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { dateTimeText } from '../../lib/utils/format';
 import { useToast } from '../../components/ToastProvider';
-import { get, post, postForm, put } from '../../lib/api/client';
+import { get, post, postFormWithProgress, put } from '../../lib/api/client';
 import type { DesignRelease, DesignReleaseFile, DesignReleaseWorkspace, WorkItem } from '../../lib/types/domain';
-import { DocumentReferenceViewButton } from '../_shared/DocumentReferenceViewer';
+import { EvidenceReferenceViewButton } from '../_shared/EvidenceReferenceViewer';
+import { EvidenceDraftViewerDialog, formatEvidenceFileSize } from '../_shared/EvidenceRecordViewerDialog';
+import { EvidenceUploader, type EvidenceUploadRow } from '../_shared/EvidenceUploader';
+import { classifyEvidenceFile, evidenceSupportedFileHint } from '../_shared/evidenceFileTypes';
+import { runEvidenceUploadQueue } from './evidenceUploadQueue';
 
-type PendingDesignFile = {
-  key: string;
-  file: File;
+type PendingDesignFile = EvidenceUploadRow & {
   documentType: 'layout' | 'render_3d' | 'construction_drawing' | 'other';
 };
 
@@ -22,6 +24,24 @@ const documentTypeOptions: Array<{ value: PendingDesignFile['documentType']; lab
   { value: 'construction_drawing', label: 'Bản vẽ thi công' },
   { value: 'other', label: 'Tài liệu khác' },
 ];
+
+let pendingDesignFileSequence = 0;
+
+function createPendingDesignFile(): PendingDesignFile {
+  pendingDesignFileSequence += 1;
+  return {
+    id: `design-evidence-${pendingDesignFileSequence}`,
+    file: null,
+    classification: null,
+    name: '',
+    caption: '',
+    fileIssue: '',
+    status: 'queued',
+    progress: 0,
+    error: '',
+    documentType: 'other',
+  };
+}
 
 export function DesignReleasePanel({ projectId, workItems = [], readOnly = false, onDirtyChange, onBusyChange }: { projectId: string; workItems?: WorkItem[]; readOnly?: boolean; onDirtyChange?: (dirty: boolean) => void; onBusyChange?: (busy: boolean) => void }) {
   const toast = useToast();
@@ -52,6 +72,7 @@ export function DesignReleasePanel({ projectId, workItems = [], readOnly = false
         queryClient.invalidateQueries({ queryKey: ['design-releases', projectId] }),
         queryClient.invalidateQueries({ queryKey: ['work-item'] }),
         queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['project-evidence', projectId] }),
       ]);
       toast.success(`Đã bàn giao ${current?.revision_label ?? 'revision thiết kế'} cho QS`);
     },
@@ -159,7 +180,7 @@ export function DesignReleasePanel({ projectId, workItems = [], readOnly = false
         onBusyChange={onBusyChange}
         onClose={() => setEditorOpen(false)}
         onChanged={async () => {
-          for (const key of [['project-activity', projectId], ['utility-project-activity', projectId], ['project-discussions'], ['my-work-items'], ['work-item']]) void queryClient.invalidateQueries({ queryKey: key });
+          for (const key of [['project-activity', projectId], ['utility-project-activity', projectId], ['project-discussions'], ['my-work-items'], ['work-item'], ['project-evidence', projectId], ['project-operations', projectId]]) void queryClient.invalidateQueries({ queryKey: key });
           await queryClient.invalidateQueries({ queryKey: ['design-releases', projectId] });
           await workspace.refetch();
         }}
@@ -189,7 +210,7 @@ function DesignReleaseFiles({ files, revisionLabel }: { files: DesignReleaseFile
               <p className="text-xs text-slate-500">{documentTypeLabel(file.document_type)} · {fileSizeText(file.file_size)}</p>
             </div>
           </div>
-          <DocumentReferenceViewButton file={file} sourceLabel={`Hồ sơ thiết kế · ${revisionLabel}`} />
+          <EvidenceReferenceViewButton reference={{ id: file.evidence_id || file.id, record: file, name: file.name }} label="Xem" />
         </div>
       ))}
     </div>
@@ -228,6 +249,7 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
   const [changeReason, setChangeReason] = useState('');
   const [notes, setNotes] = useState('');
   const [pendingFiles, setPendingFiles] = useState<PendingDesignFile[]>([]);
+  const [preview, setPreview] = useState<PendingDesignFile | null>(null);
   const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const sessionOpen = useRef(false);
@@ -247,14 +269,90 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
     setChangeReason(draft?.change_reason ?? '');
     setNotes(draft?.notes ?? '');
     setPendingFiles([]);
+    setPreview(null);
     setAttempted(false);
   }, [draft, open]);
 
   function requestClose() {
     if (submitting) return;
     const initial = openedDraft.current;
-    if (pendingFiles.length || revisionLabel !== (initial?.revision_label ?? '') || changeReason !== (initial?.change_reason ?? '') || notes !== (initial?.notes ?? '')) setDiscardOpen(true);
+    if (pendingFiles.some((row) => row.status !== 'success' && row.file) || revisionLabel !== (initial?.revision_label ?? '') || changeReason !== (initial?.change_reason ?? '') || notes !== (initial?.notes ?? '')) setDiscardOpen(true);
     else onClose();
+  }
+
+  function updatePendingFile(id: string, update: (row: EvidenceUploadRow) => EvidenceUploadRow) {
+    setPendingFiles((current) => current.map((row) => row.id === id ? { ...row, ...update(row), documentType: row.documentType } : row));
+  }
+
+  function setPendingFile(id: string, values: Partial<PendingDesignFile>) {
+    setPendingFiles((current) => current.map((row) => row.id === id ? { ...row, ...values } : row));
+  }
+
+  function selectPendingFile(id: string, file: File | null, input: HTMLInputElement) {
+    const classification = file ? classifyEvidenceFile(file) : null;
+    const fileIssue = !file
+      ? ''
+      : !classification
+        ? `Chỉ nhận ${evidenceSupportedFileHint}.`
+        : file.size <= 0 || file.size > 10 * 1024 * 1024
+          ? `Tệp phải có nội dung, tối đa ${formatEvidenceFileSize(10 * 1024 * 1024)}.`
+          : '';
+    setPendingFile(id, {
+      file,
+      classification,
+      fileIssue,
+      name: file?.name ?? '',
+      status: 'queued',
+      progress: 0,
+      error: '',
+    });
+    input.value = '';
+  }
+
+  function addPendingFile() {
+    setPendingFiles((current) => [...current, createPendingDesignFile()]);
+  }
+
+  async function uploadDesignFiles(release: DesignRelease, candidates: PendingDesignFile[]) {
+    const results = await runEvidenceUploadQueue(candidates, async (candidate) => {
+      if (!candidate.file || !candidate.classification || candidate.fileIssue) throw new Error(candidate.fileIssue || 'Chưa chọn tệp hợp lệ.');
+      setPendingFile(candidate.id, { status: 'uploading', progress: 0, error: '' });
+      const form = new FormData();
+      form.append('file', candidate.file);
+      form.append('name', candidate.name.trim() || candidate.file.name);
+      form.append('document_type', candidate.documentType);
+      try {
+        const record = await postFormWithProgress<DesignReleaseFile>(`/design-releases/${release.id}/files`, form, ({ percent }) => {
+          setPendingFile(candidate.id, { status: percent >= 100 ? 'processing' : 'uploading', progress: percent });
+        });
+        setPendingFile(candidate.id, { status: 'success', progress: 100, error: '' });
+        return record;
+      } catch (error) {
+        setPendingFile(candidate.id, { status: 'error', progress: 0, error: error instanceof Error ? error.message : 'Không tải được tệp.' });
+        throw error;
+      }
+    }, 3);
+    const failed = results.filter((result) => result.status === 'rejected');
+    if (failed.length) {
+      const first = (failed[0] as PromiseRejectedResult).reason;
+      throw new Error(`${failed.length} tệp chưa tải được. Tệp đã tải thành công được giữ lại. ${first instanceof Error ? first.message : ''}`.trim());
+    }
+  }
+
+  async function retryPendingFile(id: string) {
+    const release = savedRelease.current;
+    const candidate = pendingFiles.find((row) => row.id === id);
+    if (!release || !candidate) return;
+    setSubmitting(true);
+    try {
+      await uploadDesignFiles(release, [candidate]);
+      await onChanged();
+      toast.success(`Đã tải ${candidate.name || candidate.file?.name || 'hồ sơ'} vào ${release.revision_label}`);
+    } catch (error) {
+      toast.error('Không tải được hồ sơ thiết kế', error);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function save(releaseNow: boolean) {
@@ -263,7 +361,18 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
       toast.warn({ title: 'Thiếu lý do cập nhật', description: 'Nhập lý do để revision có lịch sử thay đổi rõ ràng.' });
       return;
     }
-    if (releaseNow && !(savedRelease.current?.files?.length || draft?.files?.length || pendingFiles.length)) {
+    if (!workItemId && !savedRelease.current?.work_item_id) {
+      toast.warn({ title: 'Thiếu đầu việc Thiết kế', description: 'Revision phải gắn với đúng đầu việc Thiết kế để hồ sơ được quản lý trong sổ minh chứng.' });
+      return;
+    }
+    const invalidFile = pendingFiles.find((row) => row.file && (row.fileIssue || !row.classification));
+    if (invalidFile) {
+      toast.warn({ title: 'Tệp chưa hợp lệ', description: invalidFile.fileIssue || 'Kiểm tra lại định dạng tệp đã chọn.' });
+      return;
+    }
+    const uploadable = pendingFiles.filter((row) => row.file && row.classification && !row.fileIssue && row.status !== 'success');
+    const successful = pendingFiles.filter((row) => row.status === 'success').length;
+    if (releaseNow && !(savedRelease.current?.files?.length || draft?.files?.length || uploadable.length || successful)) {
       toast.warn({ title: 'Thiếu tệp thiết kế', description: 'Cần ít nhất một tệp trước khi phát hành revision.' });
       return;
     }
@@ -282,14 +391,7 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
         : await post<DesignRelease>(`/projects/${projectId}/design-releases`, payload);
       savedRelease.current = release;
 
-      for (const candidate of [...pendingFiles]) {
-        const form = new FormData();
-        form.append('file', candidate.file);
-        form.append('name', candidate.file.name);
-        form.append('document_type', candidate.documentType);
-        await postForm(`/design-releases/${release.id}/files`, form);
-        setPendingFiles((current) => current.filter((item) => item.key !== candidate.key));
-      }
+      await uploadDesignFiles(release, uploadable);
 
       if (releaseNow) {
         await post(`/design-releases/${release.id}/release`, {});
@@ -339,19 +441,9 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
         </label>
 
         <div className="rounded-lg border border-line p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-ink">Tệp trong gói revision</p>
-              <p className="mt-1 text-xs text-slate-500">Hỗ trợ PDF, PNG, JPG và WebP theo giới hạn tải tệp của hệ thống.</p>
-            </div>
-            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
-              <Upload className="h-4 w-4" />Chọn nhiều tệp
-              <input className="sr-only" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" onChange={(event) => {
-                const selected = Array.from(event.target.files ?? []).map((file) => ({ key: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`, file, documentType: 'other' as const }));
-                setPendingFiles((current) => [...current, ...selected]);
-                event.target.value = '';
-              }} />
-            </label>
+          <div>
+            <p className="text-sm font-semibold text-ink">Hồ sơ trong revision</p>
+            <p className="mt-1 text-xs text-slate-500">Mỗi tệp là một bản ghi trong Hồ sơ/Minh chứng; revision chỉ nhóm và khóa đúng phiên bản đã phát hành.</p>
           </div>
 
           {draft?.files?.length ? (
@@ -361,25 +453,53 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
             </div>
           ) : null}
 
-          {pendingFiles.length ? (
-            <div className="mt-3 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Chờ tải lên</p>
-              {pendingFiles.map((candidate) => (
-                <div key={candidate.key} className="grid gap-2 rounded-md border border-line p-3 sm:grid-cols-[minmax(0,1fr)_13rem_auto] sm:items-center">
-                  <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{candidate.file.name}</p><p className="text-xs text-slate-500">{fileSizeText(candidate.file.size)}</p></div>
-                  <select className="rounded-md border border-line bg-white px-3 py-2 text-sm" value={candidate.documentType} onChange={(event) => setPendingFiles((current) => current.map((item) => item.key === candidate.key ? { ...item, documentType: event.target.value as PendingDesignFile['documentType'] } : item))}>
-                    {documentTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                  </select>
-                  <button type="button" className="grid h-9 w-9 place-items-center rounded-md text-slate-500 hover:bg-slate-100" aria-label={`Bỏ tệp ${candidate.file.name}`} onClick={() => setPendingFiles((current) => current.filter((item) => item.key !== candidate.key))}><X className="h-4 w-4" /></button>
-                </div>
-              ))}
-            </div>
-          ) : !(draft?.files?.length) ? (
-            <p className="mt-3 rounded-md border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">Chưa chọn tệp. Có thể lưu nháp trước, nhưng cần ít nhất một tệp để phát hành.</p>
-          ) : null}
+          <div className="mt-3">
+            <EvidenceUploader
+              uploadRows={pendingFiles}
+              batchUploading={submitting}
+              updateUploadRow={updatePendingFile}
+              onFileChange={selectPendingFile}
+              addUploadRow={addPendingFile}
+              removeUploadRow={(id) => setPendingFiles((current) => current.filter((row) => row.id !== id))}
+              canRemoveRow={(row) => row.status !== 'success'}
+              retryUploadRow={(id) => { void retryPendingFile(id); }}
+              onPreview={(row) => setPreview(pendingFiles.find((candidate) => candidate.id === row.id) ?? null)}
+              maxFiles={10}
+              addDisabled={pendingFiles.length >= 10}
+              extraColumn={{
+                label: 'Nhóm hồ sơ',
+                render: (row, index) => {
+                  const candidate = pendingFiles.find((item) => item.id === row.id);
+                  return <label>
+                    <span className="evidence-upload-field-label text-xs font-semibold text-slate-600">Nhóm hồ sơ</span>
+                    <select
+                      aria-label={`Nhóm hồ sơ ${index + 1}`}
+                      className="w-full rounded-md border border-line bg-white px-2 py-1.5 text-sm disabled:bg-slate-100"
+                      value={candidate?.documentType ?? 'other'}
+                      disabled={submitting || row.status === 'success'}
+                      onChange={(event) => setPendingFile(row.id, { documentType: event.target.value as PendingDesignFile['documentType'] })}
+                    >
+                      {documentTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>;
+                },
+              }}
+            />
+            {!pendingFiles.length && !draft?.files?.length ? <p className="mt-3 rounded-md border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">Chưa có hồ sơ. Có thể lưu nháp trước, nhưng cần ít nhất một tệp để phát hành.</p> : null}
+          </div>
         </div>
       </fieldset>
     </Dialog>
+    <EvidenceDraftViewerDialog
+      open={Boolean(preview?.file)}
+      name={preview?.name || preview?.file?.name || 'Hồ sơ thiết kế'}
+      originalName={preview?.file?.name ?? ''}
+      file={preview?.file ?? undefined}
+      mimeType={preview?.file?.type}
+      fileSize={preview?.file?.size ?? 0}
+      caption={preview?.caption}
+      onClose={() => setPreview(null)}
+    />
     <Dialog open={open && discardOpen} manageFocus size="sm" title="Bỏ nội dung chưa lưu?" onClose={() => setDiscardOpen(false)} footer={<div className="flex justify-end gap-2"><button className="rounded border px-3 py-2" onClick={() => setDiscardOpen(false)}>Tiếp tục nhập</button><button className="rounded bg-rose-600 px-3 py-2 text-white" onClick={onClose}>Bỏ nội dung chưa lưu</button></div>}><p className="text-sm">Các tệp đã tải thành công được giữ lại. Nội dung đang nhập và tệp chưa tải sẽ không được lưu.</p></Dialog>
     </>
   );

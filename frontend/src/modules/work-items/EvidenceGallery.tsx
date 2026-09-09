@@ -175,7 +175,7 @@ export function EvidenceGallery({
             <div className={clsx('consflow-sticky-grid-header hidden gap-3 border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:grid', PROJECT_EVIDENCE_LIST_GRID_CLASS)}>
               <span><span className="sr-only">Thao tác</span></span>
               <span>Hồ sơ</span>
-              <span>Giai đoạn</span>
+              <span>Nguồn / Giai đoạn</span>
               <span>Đầu việc</span>
               <span>Người gửi</span>
               <span>Thời gian</span>
@@ -285,6 +285,7 @@ function EvidenceListRow({
 }) {
   const title = evidenceTitle(record);
   const fileMeta = [
+    record.design_release_id ? `Revision ${record.design_revision_label || record.revision_no || 'thiết kế'}` : undefined,
     evidenceLabel(record.evidence_type),
     visibilityLabel(record.visibility ?? 'project'),
     record.mime_type,
@@ -343,7 +344,7 @@ function EvidenceListRow({
       {fileCell}
       {listContext === 'project' ? (
         <>
-          <ProjectEvidenceTextCell label="Giai đoạn" value={record.run_node_name} />
+          <ProjectEvidenceTextCell label="Nguồn / Giai đoạn" value={record.design_release_id ? `Thiết kế · ${record.design_revision_label || record.revision_no || 'Revision'} · ${designReleaseEvidenceStatus(record.design_release_status)}` : record.run_node_name} />
           <ProjectEvidenceTextCell label="Đầu việc" value={record.work_item_title} />
           <ProjectEvidenceTextCell label="Người gửi" value={identityReferenceText(record.submitted_by_name ?? record.uploaded_by, record.submitted_by_account_deleted)} />
           <div className="grid min-w-0 grid-cols-[6rem_minmax(0,1fr)] items-start gap-2 text-xs text-slate-600 xl:block xl:text-sm">
@@ -368,6 +369,13 @@ function EvidenceListRow({
       </div>
     </article>
   );
+}
+
+function designReleaseEvidenceStatus(status?: string) {
+  if (status === 'draft') return 'Nháp';
+  if (status === 'released') return 'Hiện hành';
+  if (status === 'superseded') return 'Đã thay thế';
+  return 'Revision';
 }
 
 function ProjectEvidenceTextCell({ label, value }: { label: string; value?: string }) {

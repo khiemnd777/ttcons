@@ -66,6 +66,9 @@ func (s *Service) CreateDesignRelease(ctx context.Context, projectID string, bod
 		return nil, err
 	}
 	workItemID := cleanID(body["work_item_id"])
+	if workItemID == "" {
+		return nil, validationError("Revision thiết kế phải liên kết với đầu việc Thiết kế")
+	}
 	if err := s.validateDesignReleaseWorkItem(ctx, projectID, workItemID, false); err != nil {
 		return nil, err
 	}
@@ -104,23 +107,34 @@ func (s *Service) UploadDesignReleaseFile(ctx context.Context, releaseID, docume
 	if !designReleaseDocumentTypes[documentType] {
 		return nil, validationError("Nhóm tệp thiết kế không hợp lệ", Record{"document_type": documentType})
 	}
-	file, storedObject, originalName, err := s.storeProjectDocumentUpload(ctx, projectID, "design_release", releaseID, fileHeader)
+	workItemID := cleanID(release["work_item_id"])
+	if workItemID == "" {
+		return nil, validationError("Revision thiết kế phải liên kết với đầu việc Thiết kế trước khi tải hồ sơ")
+	}
+	request := WorkItemEvidenceRequest{
+		DocumentType: documentType,
+		Name:         strings.TrimSpace(name),
+		RevisionNo:   strings.TrimSpace(fmt.Sprint(release["revision_label"])),
+		Visibility:   "internal",
+		Payload: Record{
+			"source_type":       "design_release",
+			"design_release_id": releaseID,
+		},
+	}
+	storedObject, request, err := s.storeEvidenceUpload(ctx, Record{"project_id": projectID, "id": releaseID}, request, fileHeader)
 	if err != nil {
 		return nil, err
 	}
-	name = strings.TrimSpace(name)
-	if name == "" {
-		name = originalName
-	}
-	if len([]rune(name)) > 240 {
+	originalName := strings.TrimSpace(fmt.Sprint(request.Payload["original_filename"]))
+	if len([]rune(request.Name)) > 240 {
 		return nil, s.cleanupStoredObjectAfterError(storedObject, validationError("Tên tệp thiết kế không được vượt quá 240 ký tự"))
 	}
-	document, err := s.repo.AddDesignReleaseFile(ctx, releaseID, documentType, name, originalName, file, actorID, actorName)
+	evidence, err := s.repo.AddDesignReleaseFile(ctx, releaseID, documentType, originalName, request, actorID, actorName)
 	if err != nil {
 		return nil, s.cleanupStoredObjectAfterError(storedObject, err)
 	}
 	s.publishDiscussionWorkUpdate(projectID, cleanID(release["work_item_id"]), actorID)
-	return document, nil
+	return evidence, nil
 }
 
 func (s *Service) ReleaseDesignRelease(ctx context.Context, releaseID, actorID, actorName string) (Record, error) {

@@ -119,7 +119,7 @@ export function ProjectEvidencePanel({ projectId }: { projectId: string }) {
             <FileText className="h-5 w-5 text-blue-700" />
             <h2 className="font-semibold text-ink">Hồ sơ công trình</h2>
           </div>
-          <p className="mt-1 text-sm text-slate-500">Tra cứu và rà soát minh chứng phát sinh từ công việc và workflow.</p>
+          <p className="mt-1 text-sm text-slate-500">Một sổ chung cho ảnh, tài liệu, minh chứng công việc và hồ sơ theo revision thiết kế.</p>
         </div>
         <span className="w-fit rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-600">
           Tổng {summary.total}
@@ -171,7 +171,7 @@ export function ProjectEvidencePanel({ projectId }: { projectId: string }) {
               className="w-full rounded-md border border-line bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-100"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm tên hồ sơ, đầu việc, người gửi, mã SHA-256..."
+              placeholder="Tìm tên hồ sơ, revision, đầu việc, người gửi, mã SHA-256..."
             />
           </label>
           <div className="flex flex-wrap items-center gap-2">

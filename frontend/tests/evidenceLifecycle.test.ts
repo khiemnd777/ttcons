@@ -12,6 +12,7 @@ const code = await build({
   stdin: { resolveDir: fileURLToPath(new URL('../src/', import.meta.url)), contents: `
     export { useProtectedEvidencePreview, EvidenceDraftViewerDialog, ProtectedDocumentViewerDialog } from './modules/_shared/EvidenceRecordViewerDialog';
     export { DocumentReferenceViewButton } from './modules/_shared/DocumentReferenceViewer';
+    export { EvidenceReferenceViewButton, EvidenceReferenceViewer } from './modules/_shared/EvidenceReferenceViewer';
     export { DesignReleaseFiles } from './modules/work-items/DesignReleasePanel';
     export { DiscussionWorkUpdateCard } from './modules/work-items/DiscussionWorkUpdateCard';
     export { ConstructionEvidenceCapture } from './modules/_shared/EvidenceCapture';` },
@@ -175,7 +176,7 @@ function findElement(node: any, predicate: (element: any) => boolean): any {
   }
 }
 
-test('clicking historical and canonical design files opens the standard viewer with the exact document and closes back', (t) => {
+test('historical design snapshots keep exact documents while canonical design files open exact evidence records', (t) => {
   const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
   Object.defineProperty(globalThis, 'document', { configurable: true, value: { body: {} } });
   t.after(() => {
@@ -184,36 +185,39 @@ test('clicking historical and canonical design files opens the standard viewer w
     delete (globalThis as any).__previewActor;
   });
   const historical = { id: 'document-r01', name: 'old.pdf', mime_type: 'application/pdf', file_size: 1024 };
-  const current = { ...historical, id: 'document-r02', name: 'new.pdf' };
+  const current = {
+    id: 'evidence-r02', evidence_id: 'evidence-r02', reference_type: 'evidence', name: 'new.pdf',
+    mime_type: 'application/pdf', file_size: 1024, evidence_type: 'document', status: 'submitted',
+    work_item_id: 'design-work', project_id: 'project', storage_provider: 'local', storage_key: 'evidence/project/release/new.pdf',
+    submitted_by_name: 'Design', reviewed_by_name: '', work_item_title: 'Nộp hồ sơ thiết kế', run_node_name: 'Thiết kế',
+  };
   (globalThis as any).__previewQuery = { data: { source_type: 'design_release', snapshot: { revision_label: 'R01', files: [historical] } } };
   const cardHooks = fixture();
   const props = { item: { id: 'activity', activity_type: 'work_update', metadata_json: { work_update: { source_type: 'design_release', revision_label: 'R01' } } } };
   findElement(cardHooks.render('DiscussionWorkUpdateCard', props), node => node.type === 'button').props.onClick();
   const oldEntry = findElement(cardHooks.render('DiscussionWorkUpdateCard', props), node => node.type?.name === 'DocumentReferenceViewButton');
   const fileHooks = fixture();
-  const newEntry = findElement(fileHooks.render('DesignReleaseFiles', { files: [current], revisionLabel: 'R02' }), node => node.type?.name === 'DocumentReferenceViewButton');
-  for (const [entry, file, revision] of [[oldEntry, historical, 'R01'], [newEntry, current, 'R02']] as const) {
-    assert.ok(entry, 'actual consumer must render the shared document entrypoint');
-    assert.deepEqual(entry.props.file, file);
-    const hooks = fixture();
-    let tree = hooks.render('DocumentReferenceViewButton', entry.props);
-    assert.equal(findElement(tree, node => node.type?.name === 'ProtectedDocumentViewerDialog'), undefined);
-    findElement(tree, node => node.type === 'button').props.onClick();
-    tree = hooks.render('DocumentReferenceViewButton', entry.props);
-    const viewer = findElement(tree, node => node.type?.name === 'ProtectedDocumentViewerDialog');
-    assert.equal(viewer.props.protectedFilePath, `/documents/${file.id}/file`);
-    assert.equal(viewer.props.mimeType, file.mime_type);
-    assert.match(viewer.props.sourceLabel, new RegExp(revision));
-    (globalThis as any).__previewActor = { id: 'another-actor' };
-    const changed = findElement(hooks.render('DocumentReferenceViewButton', entry.props), node => node.type?.name === 'ProtectedDocumentViewerDialog');
-    assert.equal(changed.key, `another-actor:${file.id}`, 'actor changes remount and reauthorize the protected preview');
-    delete (globalThis as any).__previewActor;
-    viewer.props.onClose();
-    assert.equal(findElement(hooks.render('DocumentReferenceViewButton', entry.props), node => node.type?.name === 'ProtectedDocumentViewerDialog'), undefined);
-    hooks.close();
-  }
+  const newEntry = findElement(fileHooks.render('DesignReleaseFiles', { files: [current], revisionLabel: 'R02' }), node => node.type?.name === 'EvidenceReferenceViewButton');
+  assert.ok(oldEntry, 'historical snapshot must render the shared document adapter');
+  assert.deepEqual(oldEntry.props.file, historical);
+  const historicalHooks = fixture();
+  let historicalTree = historicalHooks.render('DocumentReferenceViewButton', oldEntry.props);
+  findElement(historicalTree, node => node.type === 'button').props.onClick();
+  historicalTree = historicalHooks.render('DocumentReferenceViewButton', oldEntry.props);
+  const historicalViewer = findElement(historicalTree, node => node.type?.name === 'ProtectedDocumentViewerDialog');
+  assert.equal(historicalViewer.props.protectedFilePath, `/documents/${historical.id}/file`);
+  assert.match(historicalViewer.props.sourceLabel, /R01/);
+
+  assert.ok(newEntry, 'canonical design file must render the shared evidence entrypoint');
+  assert.equal(newEntry.props.reference.id, current.id);
+  assert.equal(newEntry.props.reference.record, current);
+  const evidenceHooks = fixture();
+  const evidenceViewer = findElement(evidenceHooks.render('EvidenceReferenceViewer', { reference: newEntry.props.reference, onClose() {} }), node => node.type?.name === 'EvidenceRecordViewerDialog');
+  assert.equal(evidenceViewer.props.record.id, current.id);
+  assert.equal(evidenceViewer.props.record.storage_key, current.storage_key);
+
   assert.equal(findElement(cardHooks.render('DiscussionWorkUpdateCard', props), node => node.type?.name === 'DocumentReferenceViewButton').props.file.id, historical.id);
-  cardHooks.close(); fileHooks.close();
+  cardHooks.close(); fileHooks.close(); historicalHooks.close(); evidenceHooks.close();
 });
 
 test('protected documents render through existing photo/PDF/Office readers without fabricated evidence metadata', async () => {

@@ -98,7 +98,12 @@ func (s *Service) EvidenceDetail(ctx context.Context, evidenceID, actorID string
 	if err != nil {
 		return nil, err
 	}
-	allowed, err := s.repo.CanViewWorkItem(ctx, cleanID(evidence["work_item_id"]), actorID)
+	var allowed bool
+	if cleanID(evidence["design_release_id"]) != "" {
+		allowed, err = s.repo.CanAccessProjectPermission(ctx, actorID, cleanID(evidence["project_id"]), []string{"project.view"})
+	} else {
+		allowed, err = s.repo.CanViewWorkItem(ctx, cleanID(evidence["work_item_id"]), actorID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -219,6 +224,12 @@ func (s *Service) EvidenceAction(ctx context.Context, evidenceID, action string,
 	evidence, err := s.repo.GetEvidenceDetail(ctx, evidenceID)
 	if err != nil {
 		return nil, err
+	}
+	if cleanID(evidence["design_release_id"]) != "" {
+		return nil, validationError("Hồ sơ thuộc revision thiết kế được rà soát theo thao tác bàn giao của PM", Record{
+			"design_release_id": evidence["design_release_id"],
+			"revision_label":    evidence["design_revision_label"],
+		})
 	}
 	item, err := s.repo.GetWorkItemDetail(ctx, fmt.Sprint(evidence["work_item_id"]))
 	if err != nil {

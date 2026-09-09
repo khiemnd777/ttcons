@@ -78,14 +78,29 @@ func insertDesignDiscussionUpdateTx(ctx context.Context, tx *sql.Tx, release Rec
 	if workItemID == "" {
 		workItemID = cleanID(release["work_item_id"])
 	}
-	files, err := queryTx(ctx, tx, `SELECT id,name,document_type,mime_type,file_size FROM documents WHERE project_id=$1 AND target_type='design_release' AND target_id=$2 AND status='active' ORDER BY created_at,id`, projectID, releaseID)
+	files, err := queryTx(ctx, tx, `
+		SELECT evidence.id,evidence.id AS evidence_id,'evidence' AS reference_type,
+			item.document_type,evidence.name,evidence.mime_type,evidence.file_size,
+			evidence.evidence_type,evidence.status,evidence.revision_no,evidence.created_at
+		FROM design_release_items item
+		JOIN evidence_records evidence
+		  ON evidence.id=item.evidence_id
+		 AND evidence.project_id=item.project_id
+		WHERE item.project_id=$1 AND item.design_release_id=$2
+		ORDER BY item.position,item.created_at,item.id
+	`, projectID, releaseID)
 	if err != nil {
 		return err
 	}
 	status, comment := fmt.Sprint(release["status"]), "Đã phát hành hồ sơ thiết kế"
 	if document != nil {
 		comment = "Đã thêm tệp thiết kế · " + fmt.Sprint(document["name"])
-		files = []Record{{"id": document["id"], "name": document["name"], "document_type": document["document_type"], "mime_type": document["mime_type"], "file_size": document["file_size"]}}
+		files = []Record{{
+			"id": document["id"], "evidence_id": document["id"], "reference_type": "evidence",
+			"name": document["name"], "document_type": document["document_type"],
+			"mime_type": document["mime_type"], "file_size": document["file_size"],
+			"evidence_type": document["evidence_type"], "status": document["status"],
+		}}
 	} else if event == "released" {
 		status = "released"
 	} else {

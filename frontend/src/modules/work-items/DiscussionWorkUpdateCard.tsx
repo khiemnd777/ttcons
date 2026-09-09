@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Dialog } from '../../components/Dialog';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { get } from '../../lib/api/client';
-import type { AnyRecord, WorkItemActivity, WorkflowFormField } from '../../lib/types/domain';
+import type { AnyRecord, EvidenceRecord, WorkItemActivity, WorkflowFormField } from '../../lib/types/domain';
 import { EvidenceReferenceViewButton } from '../_shared/EvidenceReferenceViewer';
 import { DocumentReferenceViewButton, type DocumentFileReference } from '../_shared/DocumentReferenceViewer';
 import { procurementStatusLabels } from '../procurement/procurementWorkspace';
@@ -22,7 +22,7 @@ type WorkUpdate = {
     title?: string; revision_label?: string; status?: string; form_code?: string;
     fields?: WorkflowFormField[]; answers?: AnyRecord; evidence_id?: string; caption?: string;
     change_reason?: string; notes?: string;
-    files?: DocumentFileReference[];
+    files?: Array<DocumentFileReference & Partial<EvidenceRecord> & { evidence_id?: string; reference_type?: 'evidence' | 'document' | string }>;
   };
 };
 
@@ -58,7 +58,9 @@ export function DiscussionWorkUpdateCard({ item }: { item: WorkItemActivity }) {
         {snapshot.caption ? <p className="whitespace-pre-wrap text-sm">{snapshot.caption}</p> : null}
         {snapshot.change_reason ? <p className="whitespace-pre-wrap text-sm"><strong>Lý do cập nhật:</strong> {snapshot.change_reason}</p> : null}
         {snapshot.notes ? <p className="whitespace-pre-wrap text-sm">{snapshot.notes}</p> : null}
-        {snapshot.files?.map(file => <DocumentReferenceViewButton key={file.id} file={file} label={file.name} sourceLabel={`Hồ sơ thiết kế${snapshot.revision_label ? ` · ${snapshot.revision_label}` : ''} · Bản tại thời điểm cập nhật`} className="block max-w-full break-words rounded border border-line p-3 text-left text-sm text-blue-700" />)}
+        {snapshot.files?.map(file => file.reference_type === 'evidence' || file.evidence_id
+          ? <div key={file.evidence_id || file.id} className="rounded border border-line p-3"><span className="mr-3 text-sm text-slate-700">{file.name}</span><EvidenceReferenceViewButton reference={{ id: file.evidence_id || file.id, name: file.name }} label="Xem hồ sơ" /></div>
+          : <DocumentReferenceViewButton key={file.id} file={file} label={file.name} sourceLabel={`Hồ sơ thiết kế${snapshot.revision_label ? ` · ${snapshot.revision_label}` : ''} · Bản tại thời điểm cập nhật`} className="block max-w-full break-words rounded border border-line p-3 text-left text-sm text-blue-700" />)}
       </div> : null}
     </Dialog>{currentOpen && detail.data?.source_type === 'procurement_request' ? <Suspense fallback={<Dialog open title="Yêu cầu mua" onClose={() => setCurrentOpen(false)}><p>Đang tải yêu cầu mua…</p></Dialog>}><ProcurementDialog projectId={detail.data.project_id} requestId={detail.data.source_id} onClose={() => setCurrentOpen(false)} /></Suspense> : null}</div>, document.body) : null}
   </>;

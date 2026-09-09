@@ -171,6 +171,8 @@ export function EvidenceRecordViewerDialog({
             <section aria-labelledby="evidence-source-heading">
               <h3 id="evidence-source-heading" className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Nguồn hồ sơ</h3>
               <div className="mt-3 divide-y divide-line border-y border-line">
+                {record.design_release_id ? <EvidenceInfoRow label="Revision thiết kế" value={`${record.design_revision_label || record.revision_no || '-'} · ${designReleaseStatusText(record.design_release_status)}`} /> : null}
+                {record.design_change_reason ? <EvidenceInfoRow label="Lý do revision" value={record.design_change_reason} /> : null}
                 <EvidenceInfoRow label="Giai đoạn" value={record.run_node_name ?? '-'} />
                 <EvidenceInfoRow label="Đầu việc" value={record.work_item_title ?? '-'} />
               </div>
@@ -230,6 +232,13 @@ export function EvidenceRecordViewerDialog({
       )}
     />
   );
+}
+
+function designReleaseStatusText(status?: string) {
+  if (status === 'draft') return 'Nháp';
+  if (status === 'released') return 'Hiện hành';
+  if (status === 'superseded') return 'Đã thay thế';
+  return status || '-';
 }
 
 type EvidenceDraftViewerDialogProps = {

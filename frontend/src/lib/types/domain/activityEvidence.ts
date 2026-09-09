@@ -222,6 +222,12 @@ export type EvidenceRecord = ProjectOperationsRecord & {
   run_node_name?: string;
   can_review?: boolean;
   payload_json?: AnyRecord;
+  design_release_id?: string;
+  design_document_type?: string;
+  design_revision_label?: string;
+  design_release_status?: 'draft' | 'released' | 'superseded' | string;
+  design_change_reason?: string;
+  reference_type?: 'evidence' | string;
 };
 
 export type ProjectEvidenceSummary = {

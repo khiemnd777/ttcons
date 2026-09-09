@@ -379,9 +379,13 @@ func (s *Service) ProjectEvidencePage(ctx context.Context, projectID string, fil
 	if err != nil {
 		return nil, err
 	}
+	canViewDesign, err := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"project.view"})
+	if err != nil {
+		return nil, err
+	}
 	queryFilter := filter
 	queryFilter.Limit = filter.Limit + 1
-	rows, err := s.repo.ListProjectEvidence(ctx, projectID, profile, queryFilter)
+	rows, err := s.repo.ListProjectEvidence(ctx, projectID, profile, canViewDesign, queryFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +399,7 @@ func (s *Service) ProjectEvidencePage(ctx context.Context, projectID string, fil
 	}
 	for _, row := range rows {
 		row["can_review"] = false
-		if statusIn(fmt.Sprint(row["status"]), "draft", "submitted") {
+		if cleanID(row["design_release_id"]) == "" && statusIn(fmt.Sprint(row["status"]), "draft", "submitted") {
 			canReview, err := s.repo.CanDecideWorkItem(ctx, Record{
 				"id":                  row["work_item_id"],
 				"project_id":          projectID,
@@ -412,15 +416,15 @@ func (s *Service) ProjectEvidencePage(ctx context.Context, projectID string, fil
 		delete(row, "work_item_role_ids")
 		delete(row, "work_item_approval_request_id")
 	}
-	filteredTotal, err := s.repo.ProjectEvidenceCount(ctx, projectID, profile, filter)
+	filteredTotal, err := s.repo.ProjectEvidenceCount(ctx, projectID, profile, canViewDesign, filter)
 	if err != nil {
 		return nil, err
 	}
-	summary, err := s.repo.ProjectEvidenceSummary(ctx, projectID, profile)
+	summary, err := s.repo.ProjectEvidenceSummary(ctx, projectID, profile, canViewDesign)
 	if err != nil {
 		return nil, err
 	}
-	options, err := s.repo.ProjectEvidenceOptions(ctx, projectID, profile)
+	options, err := s.repo.ProjectEvidenceOptions(ctx, projectID, profile, canViewDesign)
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -17,24 +18,29 @@ func (r *Repository) ListDesignReleases(ctx context.Context, projectID string) (
 		LEFT JOIN users creator ON creator.id=dr.created_by
 		LEFT JOIN users releaser ON releaser.id=dr.released_by
 		LEFT JOIN LATERAL (
-			SELECT jsonb_agg(jsonb_build_object(
-				'id', document.id,
-				'name', document.name,
-				'document_type', document.document_type,
-				'mime_type', document.mime_type,
-				'file_size', document.file_size,
-				'revision_no', document.revision_no,
-				'release_status', document.release_status,
-				'uploaded_by', document.uploaded_by,
-				'uploaded_by_name', COALESCE(uploader.full_name, uploader.email, ''),
-				'created_at', document.created_at
-			) ORDER BY document.created_at, document.id) AS files
-			FROM documents document
-			LEFT JOIN users uploader ON uploader.id=document.uploaded_by
-			WHERE document.project_id=dr.project_id
-			  AND document.target_type='design_release'
-			  AND document.target_id=dr.id
-			  AND document.status='active'
+			SELECT jsonb_agg(
+				to_jsonb(evidence) || jsonb_build_object(
+					'evidence_id', evidence.id,
+					'reference_type', 'evidence',
+					'document_type', item.document_type,
+					'design_release_id', item.design_release_id,
+					'design_revision_label', dr.revision_label,
+					'design_release_status', dr.status,
+					'uploaded_by_name', COALESCE(uploader.full_name, uploader.email, ''),
+					'submitted_by_name', COALESCE(submitter.full_name, submitter.email, ''),
+					'reviewed_by_name', COALESCE(reviewer.full_name, reviewer.email, '')
+				)
+				ORDER BY item.position, item.created_at, item.id
+			) AS files
+			FROM design_release_items item
+			JOIN evidence_records evidence
+			  ON evidence.id=item.evidence_id
+			 AND evidence.project_id=item.project_id
+			LEFT JOIN users uploader ON uploader.id=evidence.uploaded_by
+			LEFT JOIN users submitter ON submitter.id=evidence.submitted_by
+			LEFT JOIN users reviewer ON reviewer.id=evidence.reviewed_by
+			WHERE item.project_id=dr.project_id
+			  AND item.design_release_id=dr.id
 		) files ON TRUE
 		WHERE dr.project_id=$1
 		ORDER BY dr.revision_no DESC
@@ -51,24 +57,29 @@ func (r *Repository) DesignReleaseByID(ctx context.Context, releaseID string) (R
 		LEFT JOIN users creator ON creator.id=dr.created_by
 		LEFT JOIN users releaser ON releaser.id=dr.released_by
 		LEFT JOIN LATERAL (
-			SELECT jsonb_agg(jsonb_build_object(
-				'id', document.id,
-				'name', document.name,
-				'document_type', document.document_type,
-				'mime_type', document.mime_type,
-				'file_size', document.file_size,
-				'revision_no', document.revision_no,
-				'release_status', document.release_status,
-				'uploaded_by', document.uploaded_by,
-				'uploaded_by_name', COALESCE(uploader.full_name, uploader.email, ''),
-				'created_at', document.created_at
-			) ORDER BY document.created_at, document.id) AS files
-			FROM documents document
-			LEFT JOIN users uploader ON uploader.id=document.uploaded_by
-			WHERE document.project_id=dr.project_id
-			  AND document.target_type='design_release'
-			  AND document.target_id=dr.id
-			  AND document.status='active'
+			SELECT jsonb_agg(
+				to_jsonb(evidence) || jsonb_build_object(
+					'evidence_id', evidence.id,
+					'reference_type', 'evidence',
+					'document_type', item.document_type,
+					'design_release_id', item.design_release_id,
+					'design_revision_label', dr.revision_label,
+					'design_release_status', dr.status,
+					'uploaded_by_name', COALESCE(uploader.full_name, uploader.email, ''),
+					'submitted_by_name', COALESCE(submitter.full_name, submitter.email, ''),
+					'reviewed_by_name', COALESCE(reviewer.full_name, reviewer.email, '')
+				)
+				ORDER BY item.position, item.created_at, item.id
+			) AS files
+			FROM design_release_items item
+			JOIN evidence_records evidence
+			  ON evidence.id=item.evidence_id
+			 AND evidence.project_id=item.project_id
+			LEFT JOIN users uploader ON uploader.id=evidence.uploaded_by
+			LEFT JOIN users submitter ON submitter.id=evidence.submitted_by
+			LEFT JOIN users reviewer ON reviewer.id=evidence.reviewed_by
+			WHERE item.project_id=dr.project_id
+			  AND item.design_release_id=dr.id
 		) files ON TRUE
 		WHERE dr.id=$1
 	`, releaseID)
@@ -208,7 +219,7 @@ func (r *Repository) UpdateDesignReleaseDraft(ctx context.Context, releaseID, re
 	return r.DesignReleaseByID(ctx, releaseID)
 }
 
-func (r *Repository) AddDesignReleaseFile(ctx context.Context, releaseID, documentType, name, originalName string, file StoredFileMetadata, actorID, actorName string) (result Record, err error) {
+func (r *Repository) AddDesignReleaseFile(ctx context.Context, releaseID, documentType, originalName string, req WorkItemEvidenceRequest, actorID, actorName string) (result Record, err error) {
 	tracker := storedMutationTracker{}
 	defer tracker.wrap(&err)
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -228,32 +239,70 @@ func (r *Repository) AddDesignReleaseFile(ctx context.Context, releaseID, docume
 		return nil, validationError("Chỉ revision nháp mới được thêm tệp", Record{"status": release["status"]})
 	}
 	projectID := cleanID(release["project_id"])
-	rows, err := queryTx(ctx, tx, `
-		INSERT INTO documents (
-			project_id,target_type,target_id,name,document_type,status,uploaded_by,
-			mime_type,file_size,storage_provider,storage_key,checksum_sha256,
-			revision_no,release_status
-		)
-		VALUES ($1,'design_release',$2,$3,$4,'active',NULLIF($5,'')::uuid,$6,$7,$8,$9,$10,$11,'draft')
-		RETURNING *
-	`, projectID, releaseID, name, documentType, actorID, file.MIMEType, file.FileSize, file.StorageProvider, file.StorageKey, file.ChecksumSHA256, release["revision_no"])
+	workItemID := cleanID(release["work_item_id"])
+	if workItemID == "" {
+		return nil, validationError("Revision thiết kế cần liên kết đầu việc trước khi tải hồ sơ")
+	}
+	payload := req.Payload
+	if payload == nil {
+		payload = Record{}
+	}
+	payload["source_type"] = "design_release"
+	payload["design_release_id"] = releaseID
+	rawPayload, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
-	documentID := cleanID(rows[0]["id"])
-	if err := insertDesignDiscussionUpdateTx(ctx, tx, release, "", "file:"+documentID, actorID, rows[0]); err != nil {
+	rows, err := queryTx(ctx, tx, `
+		INSERT INTO evidence_records (
+			work_item_id,project_id,target_type,target_id,evidence_type,document_type,
+			name,title,description,file_url,mime_type,file_size,storage_provider,storage_key,
+			checksum_sha256,caption,revision_no,visibility,payload_json,status,uploaded_by,submitted_by
+		)
+		VALUES (
+			$1,$2,'work_item',$1,$3,$4,$5,NULLIF($6,''),NULLIF($7,''),NULLIF($8,''),
+			NULLIF($9,''),NULLIF($10,0),$11,NULLIF($12,''),NULLIF($13,''),NULLIF($14,''),
+			$15,'internal',$16::jsonb,'draft',NULLIF($17,'')::uuid,NULLIF($17,'')::uuid
+		)
+		RETURNING *
+	`, workItemID, projectID, req.EvidenceType, documentType, req.Name, req.Title, req.Description, req.FileURL,
+		req.MIMEType, req.FileSize, req.StorageProvider, req.StorageKey, req.ChecksumSHA256, req.Caption,
+		fmt.Sprint(release["revision_label"]), string(rawPayload), actorID)
+	if err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "design_release_file_uploaded", "document", documentID, "Thêm tệp vào revision hồ sơ thiết kế", Record{
+	evidenceID := cleanID(rows[0]["id"])
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO design_release_items (project_id,design_release_id,evidence_id,document_type,position)
+		SELECT $1,$2,$3,$4,COALESCE(MAX(position),-1)+1
+		FROM design_release_items
+		WHERE design_release_id=$2
+	`, projectID, releaseID, evidenceID, documentType); err != nil {
+		return nil, err
+	}
+	if err := insertDesignDiscussionUpdateTx(ctx, tx, release, "", "file:"+evidenceID, actorID, rows[0]); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE work_items SET updated_by=NULLIF($2,'')::uuid,updated_at=now() WHERE id=$1
+	`, workItemID, actorID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO work_item_activities (work_item_id,project_id,scope_type,scope_id,actor_id,activity_type,comment,metadata_json)
+		VALUES ($1,$2,'work_item',$1,NULLIF($3,'')::uuid,'evidence_added',$4,$5::jsonb)
+	`, workItemID, projectID, actorID, req.Name, fmt.Sprintf(`{"evidence_type":%q,"source_type":"design_release"}`, req.EvidenceType)); err != nil {
+		return nil, err
+	}
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "design_release_file_uploaded", "evidence_record", evidenceID, "Thêm hồ sơ vào revision thiết kế", Record{
 		"design_release_id": releaseID, "revision_label": release["revision_label"], "document_type": documentType,
-		"name": name, "original_filename": originalName, "checksum_sha256": file.ChecksumSHA256,
+		"name": req.Name, "original_filename": originalName, "checksum_sha256": req.ChecksumSHA256,
 	}); err != nil {
 		return nil, err
 	}
-	if err := tracker.commit(tx.Commit); err != nil {
-		return nil, err
-	}
-	return rows[0], nil
+	return finalizeStoredMutation(&tracker, func() (Record, error) {
+		return getEvidenceDetail(ctx, tx, evidenceID)
+	}, tx.Commit)
 }
 
 func (r *Repository) ReleaseDesignRelease(ctx context.Context, releaseID, actorID, actorName string) (Record, error) {
@@ -279,8 +328,8 @@ func (r *Repository) ReleaseDesignRelease(ctx context.Context, releaseID, actorI
 	}
 	var fileCount int
 	if err := tx.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM documents
-		WHERE project_id=$1 AND target_type='design_release' AND target_id=$2 AND status='active'
+		SELECT COUNT(*) FROM design_release_items
+		WHERE project_id=$1 AND design_release_id=$2
 	`, projectID, releaseID).Scan(&fileCount); err != nil {
 		return nil, err
 	}
@@ -296,9 +345,6 @@ func (r *Repository) ReleaseDesignRelease(ctx context.Context, releaseID, actorI
 		if _, err := tx.ExecContext(ctx, `UPDATE design_releases SET status='superseded',updated_at=now() WHERE id=$1`, previousID); err != nil {
 			return nil, err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE documents SET release_status='superseded' WHERE target_type='design_release' AND target_id=$1 AND status='active'`, previousID); err != nil {
-			return nil, err
-		}
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE design_releases
@@ -308,10 +354,14 @@ func (r *Repository) ReleaseDesignRelease(ctx context.Context, releaseID, actorI
 		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx, `
-		UPDATE documents
-		SET release_status='released',released_by=NULLIF($2,'')::uuid,released_at=now()
-		WHERE target_type='design_release' AND target_id=$1 AND status='active'
-	`, releaseID, actorID); err != nil {
+		UPDATE evidence_records evidence
+		SET status='submitted',updated_at=now()
+		FROM design_release_items item
+		WHERE item.design_release_id=$1
+		  AND item.evidence_id=evidence.id
+		  AND item.project_id=evidence.project_id
+		  AND evidence.status='draft'
+	`, releaseID); err != nil {
 		return nil, err
 	}
 	if err := insertDesignDiscussionUpdateTx(ctx, tx, release, "", "released", actorID, nil); err != nil {
@@ -357,6 +407,17 @@ func (r *Repository) HandoffDesignRelease(ctx context.Context, releaseID, workIt
 		return nil, err
 	}
 	handoffID := cleanID(rows[0]["id"])
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE evidence_records evidence
+		SET status='accepted',reviewed_by=NULLIF($2,'')::uuid,reviewed_at=now(),updated_at=now()
+		FROM design_release_items item
+		WHERE item.design_release_id=$1
+		  AND item.evidence_id=evidence.id
+		  AND item.project_id=evidence.project_id
+		  AND evidence.status IN ('draft','submitted','accepted')
+	`, releaseID, actorID); err != nil {
+		return nil, err
+	}
 	if err := insertDesignDiscussionUpdateTx(ctx, tx, release, workItemID, "handoff:"+handoffID, actorID, nil); err != nil {
 		return nil, err
 	}
