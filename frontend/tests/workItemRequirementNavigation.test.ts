@@ -7,11 +7,12 @@ async function source(path: string) {
 }
 
 async function workItemDetailSource() {
-  const [page, domain] = await Promise.all([
+  const [page, domain, requirementPanel] = await Promise.all([
     source('../src/modules/work-items/WorkItemDetailDialog.tsx'),
     source('../src/modules/work-items/workItemDetailDomain.ts'),
+    source('../src/modules/work-items/WorkItemRequirementPanel.tsx'),
   ]);
-  return `${page}\n${domain}`;
+  return `${page}\n${domain}\n${requirementPanel}`;
 }
 
 test('completion requirement rows expose keyboard actions and explicit instructions', async () => {

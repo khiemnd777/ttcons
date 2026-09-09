@@ -48,6 +48,7 @@ import {
   structuredRows,
 } from './WorkflowFormStructuredList';
 import { evidenceOptionLabel, textValue } from './workflowFormValueUtils';
+import { workflowFormArtifactAccess, workflowFormNextAction, type WorkflowFormArtifactAccess } from './workflowFormArtifactAccess';
 import { EvidenceReferenceViewButton } from '../_shared/EvidenceReferenceViewer';
 
 type FormErrors = Record<string, string>;
@@ -181,6 +182,10 @@ export function WorkflowFormPanel({
   const startsWorkItem = !submitted && !readOnly && ['ready', 'needs_changes'].includes(String(workItemStatus ?? ''));
   const currentRevision = Number(instance?.current_revision ?? 0);
   const canAmend = Boolean(form.data?.capabilities?.can_amend) && submitted && !readOnly;
+  const artifactAccess = workflowFormArtifactAccess(form.data);
+  const canAddConfirmation = artifactAccess.canAddConfirmation && !amending;
+  const canGeneratePDF = artifactAccess.canGeneratePDF && !amending;
+  const canDeletePDF = artifactAccess.canDeletePDF && !amending;
   const businessFormTitle = workflowFormPanelTitle(
     instance?.title,
     form.data?.template?.code,
@@ -667,6 +672,13 @@ export function WorkflowFormPanel({
         />
       </div>
 
+      {submitted && readOnly && (artifactAccess.canAddConfirmation || artifactAccess.canGeneratePDF) ? (
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <p className="font-semibold">Nội dung đã chốt; quy trình đã chuyển sang bước tiếp theo.</p>
+          <p className="mt-1 text-xs leading-5">Bạn vẫn có thể thêm xác nhận và tạo PDF cho đúng phiên bản hồ sơ này.</p>
+        </div>
+      ) : null}
+
       {amending ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           <p className="font-semibold">Đang chỉnh sửa · dự kiến phiên bản {currentRevision + 1}</p>
@@ -683,6 +695,7 @@ export function WorkflowFormPanel({
           signatures={signatures}
           sealApplications={sealApplications}
           pdfExports={pdfExports}
+          artifactAccess={artifactAccess}
         /> : null}
         {isPlanningDailyReport ? <PlanningDailyReportSummary values={values} submitted={submitted} /> : null}
         {isMeetingMinutes ? <MeetingMinutesSummary values={values} submitted={submitted} /> : null}
@@ -839,16 +852,17 @@ export function WorkflowFormPanel({
                   signedByCurrentUser={signedByCurrentUser}
                   saving={signForm.isPending || applySeal.isPending}
                   canUseSeals={canUseSeals}
-                  readOnly={readOnly}
+                  readOnly={!canAddConfirmation}
+                  pdfPreferenceReadOnly={!canGeneratePDF}
                   preferenceSavingPurpose={savePDFConfirmationPreference.isPending ? savePDFConfirmationPreference.variables?.purpose : undefined}
                   onPreferenceChange={(payload) => {
                     if (!payload.include_signatures && !payload.include_seals) {
                       toast.warn({ title: 'Cần ít nhất một loại xác nhận', description: 'Giữ lại chữ ký cá nhân, con dấu công ty hoặc cả hai trong PDF.' });
                       return;
                     }
-                    if (!readOnly) savePDFConfirmationPreference.mutate(payload);
+                    if (canGeneratePDF) savePDFConfirmationPreference.mutate(payload);
                   }}
-                  onOpenConfirmation={() => { if (!readOnly) setConfirmationDialogOpen(true); }}
+                  onOpenConfirmation={() => { if (canAddConfirmation) setConfirmationDialogOpen(true); }}
                   onViewSignatureDetail={(signature) => setSignatureViewer({ signature, mode: 'detail', actorId: user?.id })}
                   onOpenSignatureVisual={(signature) => setSignatureViewer({ signature, mode: 'visual', actorId: user?.id })}
                   onViewSealDetail={(application) => setSealApplicationDetail(application)}
@@ -862,10 +876,11 @@ export function WorkflowFormPanel({
                   selectedSignatureCount={pdfConfirmationCounts.signatureCount}
                   selectedSealCount={pdfConfirmationCounts.sealCount}
                   deletingId={deletePDF.isPending ? pdfDeleteCandidate?.id : undefined}
-                  readOnly={readOnly}
-                  onGenerate={() => { if (!readOnly) generatePDF.mutate(); }}
+                  readOnly={!canGeneratePDF}
+                  canDelete={canDeletePDF}
+                  onGenerate={() => { if (canGeneratePDF) generatePDF.mutate(); }}
                   onOpen={(record) => void openWorkflowBlob(`/workflow-form-pdf-exports/${record.id}/file`, 'Không mở được PDF hồ sơ nghiệp vụ')}
-                  onRequestDelete={(record) => { if (!readOnly && record.can_delete) setPDFDeleteCandidate(record); }}
+                  onRequestDelete={(record) => { if (canDeletePDF && record.can_delete) setPDFDeleteCandidate(record); }}
                 />
                 <WorkflowHistoricalConfirmations
                   signatures={historicalSignatures}
@@ -882,7 +897,7 @@ export function WorkflowFormPanel({
 
       </div>
       <SignatureCaptureDialog
-        open={!readOnly && confirmationDialogOpen}
+        open={canAddConfirmation && confirmationDialogOpen}
         signerName={user?.full_name}
         submitting={signForm.isPending || applySeal.isPending}
         signedPurposes={signedPurposesByCurrentUser}
@@ -1062,10 +1077,10 @@ function WorkflowFormActionCenter({
             </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-ink">
-                {readOnly ? 'Hồ sơ xem trước của bước sắp tới' : blocked ? 'Cần hoàn tất thông tin trước khi chốt' : submitted ? 'Hồ sơ đã được chốt' : 'Sẵn sàng lưu nháp hoặc chốt hồ sơ'}
+                {readOnly && submitted ? 'Hồ sơ đã được chốt' : readOnly ? 'Hồ sơ xem trước của bước sắp tới' : blocked ? 'Cần hoàn tất thông tin trước khi chốt' : submitted ? 'Hồ sơ đã được chốt' : 'Sẵn sàng lưu nháp hoặc chốt hồ sơ'}
               </p>
               <p className="mt-1 text-xs leading-5 text-slate-600">
-                {readOnly ? 'Chỉ có thể cập nhật khi workflow chuyển đến node này.' : blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung đã khóa và được lưu vào đầu việc; chưa gửi cho người duyệt. Xác nhận và PDF dùng phiên bản đã chốt.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
+                {readOnly && submitted ? 'Nội dung đã khóa và được lưu vào đầu việc. Quyền xác nhận và tạo PDF được kiểm tra riêng theo trạng thái workflow.' : readOnly ? 'Chỉ có thể cập nhật khi workflow chuyển đến node này.' : blocked ? `Thiếu: ${issuePreview}${extraIssues}` : submitted ? 'Nội dung đã khóa và được lưu vào đầu việc; chưa gửi cho người duyệt. Xác nhận và PDF dùng phiên bản đã chốt.' : 'Không còn lỗi bắt buộc ở trạng thái hiện tại.'}
               </p>
             </div>
           </div> : null}
@@ -1104,6 +1119,7 @@ function WorkflowFormOperationsSummary({
   signatures,
   sealApplications,
   pdfExports,
+  artifactAccess,
 }: {
   submitted: boolean;
   validationIssueCount: number;
@@ -1112,9 +1128,16 @@ function WorkflowFormOperationsSummary({
   signatures: WorkflowFormSignature[];
   sealApplications: WorkflowFormSealApplication[];
   pdfExports: WorkflowFormPDFExport[];
+  artifactAccess: WorkflowFormArtifactAccess;
 }) {
   const confirmationCount = signatures.length + sealApplications.length;
-  const nextAction = workflowNextAction(submitted, validationIssueCount, confirmationCount, pdfExports.length);
+  const nextAction = workflowFormNextAction({
+    submitted,
+    validationIssueCount,
+    confirmationCount,
+    pdfCount: pdfExports.length,
+    access: artifactAccess,
+  });
   return (
     <section className="rounded-md border border-line bg-white p-3">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -1125,8 +1148,8 @@ function WorkflowFormOperationsSummary({
         <div className="grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-4 xl:w-[36rem]">
           {checklistStats ? <WorkflowStepPill label="Checklist" value={`${checklistStats.complete}/${checklistStats.total} hoàn tất`} active={!submitted && Boolean(checklistStats.needsAction)} /> : null}
           <WorkflowStepPill label="Minh chứng" value={`${evidenceCount} đang hiệu lực`} active={!submitted && evidenceCount === 0} />
-          <WorkflowStepPill label="Xác nhận" value={`${signatures.length} ký · ${sealApplications.length} dấu`} active={submitted && confirmationCount === 0} />
-          <WorkflowStepPill label="PDF" value={`${pdfExports.length} tệp`} active={submitted && confirmationCount > 0 && pdfExports.length === 0} />
+          <WorkflowStepPill label="Xác nhận" value={`${signatures.length} ký · ${sealApplications.length} dấu`} active={submitted && confirmationCount === 0 && artifactAccess.canAddConfirmation} />
+          <WorkflowStepPill label="PDF" value={`${pdfExports.length} tệp`} active={submitted && confirmationCount > 0 && pdfExports.length === 0 && artifactAccess.canGeneratePDF} />
         </div>
       </div>
     </section>
@@ -1459,14 +1482,6 @@ function WorkflowStepPill({ label, value, active }: { label: string; value: stri
   );
 }
 
-function workflowNextAction(submitted: boolean, validationIssueCount: number, confirmationCount: number, pdfCount: number) {
-  if (!submitted && validationIssueCount > 0) return 'Hoàn tất checklist/hồ sơ';
-  if (!submitted) return 'Chốt hồ sơ nghiệp vụ';
-  if (confirmationCount === 0) return 'Thêm xác nhận hồ sơ';
-  if (pdfCount === 0) return 'Tạo PDF';
-  return 'Mở tài liệu hoặc hoàn tất đầu việc';
-}
-
 function dailyItemTitle(item: AnyRecord, fallback: string) {
   const title = String(item.title ?? item.content ?? '').trim();
   return title || fallback;
@@ -1644,6 +1659,7 @@ function WorkflowConfirmationPanel({
   saving,
   canUseSeals,
   readOnly,
+  pdfPreferenceReadOnly,
   preferenceSavingPurpose,
   onPreferenceChange,
   onOpenConfirmation,
@@ -1660,6 +1676,7 @@ function WorkflowConfirmationPanel({
   saving: boolean;
   canUseSeals: boolean;
   readOnly: boolean;
+  pdfPreferenceReadOnly: boolean;
   preferenceSavingPurpose?: string;
   onPreferenceChange: (payload: PDFConfirmationPreferenceInput) => void;
   onOpenConfirmation: () => void;
@@ -1710,7 +1727,7 @@ function WorkflowConfirmationPanel({
                               type="checkbox"
                               className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                               checked={group.includeSignatures}
-                              disabled={readOnly || anyPreferenceSaving}
+                              disabled={pdfPreferenceReadOnly || anyPreferenceSaving}
                               onChange={() => onPreferenceChange({
                                 purpose: group.purpose,
                                 include_signatures: !group.includeSignatures,
@@ -1742,7 +1759,7 @@ function WorkflowConfirmationPanel({
                               type="checkbox"
                               className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                               checked={group.includeSeals}
-                              disabled={readOnly || anyPreferenceSaving}
+                              disabled={pdfPreferenceReadOnly || anyPreferenceSaving}
                               onChange={() => onPreferenceChange({
                                 purpose: group.purpose,
                                 include_signatures: group.includeSignatures,
@@ -1981,6 +1998,7 @@ function WorkflowPDFExportPanel({
   selectedSealCount,
   deletingId,
   readOnly,
+  canDelete,
   onGenerate,
   onOpen,
   onRequestDelete,
@@ -1993,6 +2011,7 @@ function WorkflowPDFExportPanel({
   selectedSealCount: number;
   deletingId?: string;
   readOnly: boolean;
+  canDelete: boolean;
   onGenerate: () => void;
   onOpen: (record: WorkflowFormPDFExport) => void;
   onRequestDelete: (record: WorkflowFormPDFExport) => void;
@@ -2045,8 +2064,8 @@ function WorkflowPDFExportPanel({
                   <button
                     type="button"
                     className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={readOnly || deletingId === record.id || !record.can_delete}
-                    title={record.can_delete ? 'Xoá tệp PDF' : 'PDF đã được liên kết với hồ sơ nghiệm thu đầu ra'}
+                    disabled={!canDelete || deletingId === record.id || !record.can_delete}
+                    title={!canDelete ? 'Chỉ có thể xoá PDF khi đầu việc còn thuộc node đang thực hiện' : record.can_delete ? 'Xoá tệp PDF' : 'PDF đã được liên kết với hồ sơ nghiệm thu đầu ra'}
                     onClick={() => onRequestDelete(record)}
                   >
                     {deletingId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}

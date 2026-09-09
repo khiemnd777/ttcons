@@ -49,11 +49,11 @@ func (s *Service) WorkItemForm(ctx context.Context, workItemID, actorID string) 
 	if !statusIn(fmt.Sprint(instance["status"]), "submitted", "cancelled") {
 		form["suggested_answers"] = workflowFormSuggestedAnswers(instance, fields, actorName, time.Now())
 	}
-	canAmend, err := s.canAmendWorkflowForm(ctx, form, actorID)
+	capabilities, err := s.workflowFormCapabilities(ctx, form, actorID)
 	if err != nil {
 		return nil, err
 	}
-	form["capabilities"] = Record{"can_amend": canAmend}
+	form["capabilities"] = capabilities
 	if len(instance) > 0 {
 		runNodeID := cleanID(instance["run_node_id"])
 		if runNodeID != "" {
@@ -64,6 +64,63 @@ func (s *Service) WorkItemForm(ctx context.Context, workItemID, actorID string) 
 		}
 	}
 	return form, nil
+}
+
+func (s *Service) workflowFormCapabilities(ctx context.Context, form Record, actorID string) (Record, error) {
+	capabilities := Record{
+		"can_amend":            false,
+		"can_add_confirmation": false,
+		"can_generate_pdf":     false,
+		"can_delete_pdf":       false,
+	}
+	canAmend, err := s.canAmendWorkflowForm(ctx, form, actorID)
+	if err != nil {
+		return nil, err
+	}
+	capabilities["can_amend"] = canAmend
+
+	instance := recordFromAny(form["instance"])
+	if fmt.Sprint(instance["status"]) != "submitted" {
+		return capabilities, nil
+	}
+	workItemID := cleanID(instance["work_item_id"])
+	if workItemID == "" {
+		return capabilities, nil
+	}
+	allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return capabilities, nil
+	}
+	item, err := s.repo.GetWorkItemDetail(ctx, workItemID)
+	if err != nil {
+		return nil, err
+	}
+	canManageArtifacts, err := workflowFormCapabilityAllowed(s.requireWorkflowFormArtifactScope(ctx, item, instance, actorID))
+	if err != nil {
+		return nil, err
+	}
+	capabilities["can_add_confirmation"] = canManageArtifacts
+	capabilities["can_generate_pdf"] = canManageArtifacts
+	canDeletePDF, err := workflowFormCapabilityAllowed(s.requireWorkflowFormPDFDeletionScope(ctx, item, actorID))
+	if err != nil {
+		return nil, err
+	}
+	capabilities["can_delete_pdf"] = canDeletePDF
+	return capabilities, nil
+}
+
+func workflowFormCapabilityAllowed(err error) (bool, error) {
+	if err == nil {
+		return true, nil
+	}
+	var statusErr StatusError
+	if errors.As(err, &statusErr) {
+		return false, nil
+	}
+	return false, err
 }
 
 func (s *Service) SaveWorkflowFormDraft(ctx context.Context, instanceID string, req WorkflowFormSaveRequest, actorID, actorName string) (Record, error) {
@@ -667,10 +724,7 @@ func (s *Service) DeleteWorkflowFormPDFExport(ctx context.Context, exportID, act
 	if err != nil {
 		return nil, err
 	}
-	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
-		return nil, err
-	}
-	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+	if err := s.requireWorkflowFormPDFDeletionScope(ctx, item, actorID); err != nil {
 		return nil, err
 	}
 

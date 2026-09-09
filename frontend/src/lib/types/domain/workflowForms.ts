@@ -147,6 +147,9 @@ export type WorkflowFormDetail = {
   available: boolean;
   capabilities?: {
     can_amend?: boolean;
+    can_add_confirmation?: boolean;
+    can_generate_pdf?: boolean;
+    can_delete_pdf?: boolean;
   };
   auto_advance_when_ready?: boolean;
   auto_transition?: AnyRecord & { status?: 'advanced' | 'blocked' | 'not_configured' | string; message?: string };

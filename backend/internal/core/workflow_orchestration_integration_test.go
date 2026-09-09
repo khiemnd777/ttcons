@@ -2981,6 +2981,129 @@ func TestWorkflowFormAmendmentCreatesAuditedRevisionWithoutChangingWorkItemState
 	assertValidationError(t, err)
 }
 
+func TestAutoAdvancedWorkflowFormKeepsConfirmationAndPDFCapabilities(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	service.ConfigureUploads(t.TempDir(), 1024*1024)
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	bindWorkItemDomainExecutionContext(t, db, fixture, "form", "test.auto_advance_form", "form", "")
+
+	var runID, nodeID, stepID string
+	if err := db.QueryRowContext(ctx, `
+		SELECT pipeline_run_id::text, run_node_id::text, run_step_id::text
+		FROM work_items
+		WHERE id=$1
+	`, fixture.itemID).Scan(&runID, &nodeID, &stepID); err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, `UPDATE pipeline_run_nodes SET exit_conditions='{"auto_advance_when_ready":true}'::jsonb WHERE id=$1`, nodeID)
+
+	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "task", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (
+			project_id, work_item_id, pipeline_run_id, run_node_id, run_step_id,
+			form_template_id, form_version_id, form_type, title, created_by
+		)
+		SELECT $1,$2,$3,$4,$5,v.template_id,v.id,t.form_type,'Auto-advance form',$6
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$7
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, runID, nodeID, stepID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := cleanID(instanceRows[0]["id"])
+	submitted, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{
+		Answers: Record{"summary": "Hồ sơ tự chuyển bước"},
+	}, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(recordFromAny(submitted["auto_transition"])["status"]) != "advanced" {
+		t.Fatalf("auto transition = %#v, want advanced", submitted["auto_transition"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE id=$1 AND status='completed'`, 1, fixture.itemID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_run_nodes WHERE id=$1 AND status='completed'`, 1, nodeID)
+
+	form, err := service.WorkItemForm(ctx, fixture.itemID, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	capabilities := recordFromAny(form["capabilities"])
+	if !boolValue(capabilities["can_add_confirmation"]) || !boolValue(capabilities["can_generate_pdf"]) || boolValue(capabilities["can_delete_pdf"]) {
+		t.Fatalf("auto-advanced artifact capabilities = %#v", capabilities)
+	}
+	if _, err := service.SignWorkflowForm(ctx, instanceID, testSignatureRequest("Ký sau tự chuyển bước"), fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.GenerateWorkflowFormPDFExport(ctx, instanceID, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOrdinaryCompletedWorkflowFormKeepsRevisionOneArtifactsLocked(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	service.ConfigureUploads(t.TempDir(), 1024*1024)
+	fixture := setupWorkItemFlowFixture(t, db, false)
+
+	formVersionID, err := repo.DefaultWorkflowFormVersionID(ctx, "task", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceRows, err := repo.Query(ctx, `
+		INSERT INTO workflow_form_instances (project_id, work_item_id, form_template_id, form_version_id, form_type, title, created_by)
+		SELECT $1,$2,v.template_id,v.id,t.form_type,'Completed form',$3
+		FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.id=$4
+		RETURNING id
+	`, fixture.projectID, fixture.itemID, fixture.workerID, formVersionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instanceID := cleanID(instanceRows[0]["id"])
+	if _, err := service.SubmitWorkflowForm(ctx, instanceID, WorkflowFormSaveRequest{
+		Answers: Record{"summary": "Hồ sơ hoàn tất thông thường"},
+	}, fixture.workerID, "Worker"); err != nil {
+		t.Fatal(err)
+	}
+	pdfForm, err := service.GenerateWorkflowFormPDFExport(ctx, instanceID, fixture.workerID, "Worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pdfID := cleanID(workflowAnswerRecordList(pdfForm["pdf_exports"])[0]["id"])
+	mustExec(t, db, `UPDATE work_items SET status='completed',completed_at=now() WHERE id=$1`, fixture.itemID)
+
+	form, err := service.WorkItemForm(ctx, fixture.itemID, fixture.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	capabilities := recordFromAny(form["capabilities"])
+	if boolValue(capabilities["can_add_confirmation"]) || boolValue(capabilities["can_generate_pdf"]) || boolValue(capabilities["can_delete_pdf"]) {
+		t.Fatalf("ordinary completed artifact capabilities = %#v, want all false", capabilities)
+	}
+	signatureRequest := testSignatureRequest("Không được ký lịch sử")
+	signatureRequest.Purpose = "reviewed_by"
+	if _, err := service.SignWorkflowForm(ctx, instanceID, signatureRequest, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("expected ordinary completed form signature to be rejected")
+	}
+	if _, err := service.GenerateWorkflowFormPDFExport(ctx, instanceID, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("expected ordinary completed form PDF generation to be rejected")
+	}
+	if _, err := service.DeleteWorkflowFormPDFExport(ctx, pdfID, fixture.workerID, "Worker"); err == nil {
+		t.Fatal("expected ordinary completed form PDF deletion to be rejected")
+	}
+}
+
 func TestWorkflowFormSignatureRequiresSubmittedFormAndIsImmutable(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

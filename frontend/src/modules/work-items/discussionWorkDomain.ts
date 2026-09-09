@@ -1,5 +1,22 @@
 import type { WorkItem } from '../../lib/types/domain';
 
+export type DiscussionWorkDetailLoadState = 'loading' | 'ready' | 'error';
+
+export function discussionWorkDetailLoadState(
+  query: {
+    isFetchedAfterMount: boolean;
+    isFetching: boolean;
+    isError: boolean;
+    projectId?: string;
+  },
+  expectedProjectId: string,
+): DiscussionWorkDetailLoadState {
+  if (query.isFetching) return 'loading';
+  if (query.isError) return 'error';
+  if (!query.isFetchedAfterMount) return 'loading';
+  return query.projectId === expectedProjectId ? 'ready' : 'error';
+}
+
 export function discussionWorkSurface(item: WorkItem): 'design' | 'form' | 'evidence' | 'procurement' | 'external' {
   const target = item.execution_target;
   // Canonical domain workspaces remain authoritative until their editor is integrated.
@@ -21,6 +38,14 @@ export function discussionWorkActionLabel(item: WorkItem) {
     case 'procurement': return 'Xử lý yêu cầu mua';
     default: return item.execution_target?.action_label || 'Xem công việc';
   }
+}
+
+export function discussionWorkflowActionLabel(item: WorkItem) {
+  const canDecide = (item.capabilities?.can_decide ?? item.can_decide) === true;
+  if (canDecide && ['waiting_review', 'waiting_approval'].includes(item.status)) return 'Mở yêu cầu duyệt';
+  if (discussionWorkReadOnly(item)) return 'Xem công việc';
+  if (item.status === 'blocked') return 'Xử lý vướng mắc';
+  return 'Xử lý việc ưu tiên';
 }
 
 export function discussionWorkReadOnly(item: WorkItem) {

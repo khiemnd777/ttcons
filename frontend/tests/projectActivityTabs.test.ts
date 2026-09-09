@@ -26,3 +26,25 @@ test('project activity exposes only three activity kinds, opens discussion first
   assert.doesNotMatch(thread, /kind !== 'discussion'/);
   assert.match(workItemDetail, /<ActivityComposer[\s\S]*mode="work_item"[\s\S]*defaultExpanded/);
 });
+
+test('project discussion leads with the lifecycle action while preserving the personal work queue', async () => {
+  const [thread, actionCard, projectDetail] = await Promise.all([
+    source('../src/modules/work-items/ActivityThread.tsx'),
+    source('../src/modules/work-items/DiscussionWorkflowActionCard.tsx'),
+    source('../src/modules/projects/ProjectDetailPage.tsx'),
+  ]);
+
+  assert.match(thread, /<DiscussionWorkflowActionCard/);
+  assert.ok(thread.indexOf('<DiscussionWorkflowActionCard') < thread.indexOf('<DiscussionWorkRail'));
+  assert.match(thread, /onDiscuss=\{discussWork\}/);
+  assert.match(actionCard, /queryKey: \['work-item', primaryWorkId\]/);
+  assert.match(actionCard, /Hoàn tất thiết lập công trình/);
+  assert.match(actionCard, /Trao đổi về việc này/);
+  assert.match(actionCard, /discussionWorkflowActionLabel\(currentWork\)/);
+  assert.doesNotMatch(actionCard, /\bpost\(|\bput\(/);
+
+  assert.match(projectDetail, /<ProjectStartupWizard/);
+  assert.match(projectDetail, /workflowAction=\{\{ hasPipeline, pipelineStatus, currentNode, primaryWork, onOpenStartup \}\}/);
+  assert.doesNotMatch(projectDetail, /post\(`\/projects\/\$\{id\}\/start-pipeline`/);
+  assert.match(projectDetail, /showLifecycleAction=\{activeTab !== 'activity'\}/);
+});

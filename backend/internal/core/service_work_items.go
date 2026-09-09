@@ -350,6 +350,55 @@ func (s *Service) requireWorkflowFormArtifactScope(ctx context.Context, item, in
 	if int(number(instance["current_revision"])) > 1 {
 		return nil
 	}
+	if statusIn(fmt.Sprint(item["status"]), "completed", "done") {
+		allowed, err := s.autoAdvancedWorkflowFormArtifactScope(ctx, item, instance)
+		if err != nil {
+			return err
+		}
+		if allowed {
+			return nil
+		}
+		return validationError("Đầu việc đã hoàn tất, hồ sơ không còn cho phép thêm xác nhận hoặc tạo PDF", Record{
+			"work_item_id": item["id"],
+			"status":       item["status"],
+		})
+	}
+	return s.requireActivePipelineWorkItem(ctx, item)
+}
+
+func (s *Service) autoAdvancedWorkflowFormArtifactScope(ctx context.Context, item, instance Record) (bool, error) {
+	if fmt.Sprint(instance["status"]) != "submitted" || !statusIn(fmt.Sprint(item["status"]), "completed", "done") {
+		return false, nil
+	}
+	if int(number(item["pipeline_engine_version"])) < 2 {
+		return false, nil
+	}
+	runID := cleanID(item["pipeline_run_id"])
+	runNodeID := cleanID(item["run_node_id"])
+	if runID == "" || runNodeID == "" || runID != cleanID(instance["pipeline_run_id"]) || runNodeID != cleanID(instance["run_node_id"]) {
+		return false, nil
+	}
+	node, err := s.repo.GetByID(ctx, "pipeline_run_nodes", runNodeID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	exitConditions := recordFromAny(node["exit_conditions"])
+	return fmt.Sprint(node["status"]) == "completed" && boolValue(exitConditions["auto_advance_when_ready"]), nil
+}
+
+func (s *Service) requireWorkflowFormPDFDeletionScope(ctx context.Context, item Record, actorID string) error {
+	if err := s.requireWorkItemPermission(ctx, item, actorID); err != nil {
+		return err
+	}
+	if statusIn(fmt.Sprint(item["status"]), "completed", "done") {
+		return validationError("Đầu việc đã hoàn tất, PDF hồ sơ chỉ còn được phép xem", Record{
+			"work_item_id": item["id"],
+			"status":       item["status"],
+		})
+	}
 	return s.requireActivePipelineWorkItem(ctx, item)
 }
 

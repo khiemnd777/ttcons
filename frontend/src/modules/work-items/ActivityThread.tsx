@@ -37,11 +37,13 @@ import type {
   ProjectActivityOptions,
   ProjectActivitySummary,
   User,
+  WorkItem,
   WorkItemActivity,
 } from '../../lib/types/domain';
 import { activityLabel, compactDateTime, scopeTypeLabel, workflowFormActivityComment } from './workItemPresentation';
 import { ActivityAttachments } from './ActivityAttachments';
 import { DiscussionWorkRail } from './DiscussionWorkRail';
+import { DiscussionWorkflowActionCard, type DiscussionWorkflowAction } from './DiscussionWorkflowActionCard';
 import { DiscussionWorkUpdateCard } from './DiscussionWorkUpdateCard';
 const DiscussionWorkDialog = lazy(() => import('./DiscussionWorkDialog').then(module => ({ default: module.DiscussionWorkDialog })));
 const OpenDiscussionWork = createContext<((id: string) => void) | null>(null);
@@ -128,11 +130,13 @@ function ActivityThreadContent({
   projectId,
   targetOptions,
   attachmentOptions = [],
+  workflowAction,
   onChanged,
 }: {
   projectId: string;
   targetOptions: ActivityTargetOption[];
   attachmentOptions?: ActivityAttachmentOption[];
+  workflowAction?: DiscussionWorkflowAction;
   onChanged?: () => void;
 }) {
   const toast = useToast();
@@ -359,34 +363,51 @@ function ActivityThreadContent({
     setSearch('');
   }
 
+  function discussWork(item: WorkItem) {
+    clearFilters();
+    setKind('discussion');
+    setScopeFilter('work_item');
+    setScopeIdFilter(item.id);
+    setWorkScopeTitle(item.title);
+  }
+
   const hasFilters = Boolean(attention || scopeFilter || activityTypeFilter || visibilityFilter || actorFilter || deferredSearch);
 
   return (
     <OpenDiscussionWork.Provider value={setOpenWorkItemId}>
     <div className="space-y-3">
-      <div className="flex gap-2 overflow-x-auto pb-1 xl:hidden">
-        {attentionItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.value}
-              type="button"
-              className={clsx(
-                'inline-flex min-w-fit items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold',
-                attention === item.value ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-line bg-white text-slate-600',
-              )}
-              onClick={() => selectAttention(item.value)}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {item.label}
-              <span className="rounded bg-white px-1.5 py-0.5 text-[11px] text-slate-600">{summary[item.countKey] ?? 0}</span>
-            </button>
-          );
-        })}
-      </div>
-
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="xl:col-start-2 xl:row-start-1"><DiscussionWorkRail projectId={projectId} onOpen={item => setOpenWorkItemId(item.id)} onDiscuss={item => { clearFilters(); setKind('discussion'); setScopeFilter('work_item'); setScopeIdFilter(item.id); setWorkScopeTitle(item.title); }} /></div>
+        <div className="space-y-3 xl:col-start-2 xl:row-start-1">
+          {workflowAction ? (
+            <DiscussionWorkflowActionCard
+              projectId={projectId}
+              workflow={workflowAction}
+              onOpenWork={(item) => setOpenWorkItemId(item.id)}
+              onDiscuss={discussWork}
+            />
+          ) : null}
+          <DiscussionWorkRail projectId={projectId} onOpen={item => setOpenWorkItemId(item.id)} onDiscuss={discussWork} />
+          <div className="flex gap-2 overflow-x-auto pb-1 xl:hidden">
+            {attentionItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  className={clsx(
+                    'inline-flex min-w-fit items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold',
+                    attention === item.value ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-line bg-white text-slate-600',
+                  )}
+                  onClick={() => selectAttention(item.value)}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                  <span className="rounded bg-white px-1.5 py-0.5 text-[11px] text-slate-600">{summary[item.countKey] ?? 0}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <section className="min-w-0 rounded-lg border border-line bg-white shadow-panel xl:col-start-1 xl:row-start-1 xl:row-span-2">
           {scopeFilter === 'work_item' && scopeIdFilter && workScopeTitle ? <div className="flex items-center gap-2 border-b border-blue-100 bg-blue-50 p-3 text-sm text-blue-800"><span className="flex-1">Trao đổi: {workScopeTitle}</span><button className="font-semibold underline" onClick={() => { setScopeFilter(''); setScopeIdFilter(''); setWorkScopeTitle(''); }}>Xem toàn công trình</button></div> : null}
           <div className="border-b border-line p-3">

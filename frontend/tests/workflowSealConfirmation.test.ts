@@ -28,6 +28,11 @@ test('workflow confirmation UI separates personal signatures from company seals'
   assert.match(signatureRecord, /Đã ký/);
   assert.match(panel, /statusLabel="Đã đóng dấu"/);
   assert.match(panel, /Cần ít nhất một loại xác nhận/);
+  assert.match(panel, /workflowFormArtifactAccess\(form\.data\)/);
+  assert.match(panel, /readOnly=\{!canAddConfirmation\}/);
+  assert.match(panel, /pdfPreferenceReadOnly=\{!canGeneratePDF\}/);
+  assert.match(panel, /canDelete=\{canDeletePDF\}/);
+  assert.match(panel, /Nội dung đã chốt; quy trình đã chuyển sang bước tiếp theo/);
   assert.match(panel, /post<WorkflowFormDetail>\(`\/workflow-form-instances\/\$\{instance\?\.id\}\/pdf-exports`, \{\}\)/);
   assert.doesNotMatch(panel, /Chọn xác nhận để tạo PDF/);
   assert.doesNotMatch(panel, /Ký \/ Đóng dấu PDF/);

@@ -27,11 +27,13 @@ test('work-item form actions are owned by the sticky right action rail', async (
 
 test('work-item secondary content uses progressive disclosure', async () => {
   const detail = await source('../src/modules/work-items/WorkItemDetailDialog.tsx');
+  const requirementPanel = await source('../src/modules/work-items/WorkItemRequirementPanel.tsx');
   const formPanel = await source('../src/modules/work-items/WorkflowFormPanel.tsx');
   const projectWorkspace = await source('../src/modules/projects/ProjectWorkspaceLayout.tsx');
   const detailPage = await source('../src/modules/work-items/WorkItemDetailPage.tsx');
 
-  assert.match(detail, /<details className=\{clsx\('group rounded-md border bg-white shadow-panel'/);
+  assert.match(detail, /<WorkItemRequirementPanel rows=\{requirementRows\}/);
+  assert.match(requirementPanel, /<details[\s\S]*className=\{clsx\('group rounded-md border bg-white shadow-panel'/);
   assert.match(detail, /Trao đổi & lịch sử/);
   assert.doesNotMatch(detailPage, /<PageHeader/);
   assert.doesNotMatch(detailPage, /Quay lại/);

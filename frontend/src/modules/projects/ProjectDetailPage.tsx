@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   AlertTriangle,
@@ -21,7 +21,7 @@ import {
   TimerReset,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { get, post, ApiError } from '../../lib/api/client';
+import { get, ApiError } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -30,7 +30,6 @@ import { EmptyState } from '../../components/EmptyState';
 import { DataTable } from '../../components/DataTable';
 import { EnumChip } from '../../components/EnumChip';
 import { IdentityReferenceLabel, identityReferenceText } from '../../components/IdentityReferenceLabel';
-import { useToast } from '../../components/ToastProvider';
 import { dateText, percent } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import type {
@@ -49,6 +48,7 @@ import { currentReturnTo } from '../work-items/workItemNavigation';
 import { executionTargetPath } from '../work-items/workItemExecutionTarget';
 import { ProjectEvidencePanel } from './ProjectEvidencePanel';
 import { ProjectMembersPanel } from './ProjectMembersPanel';
+import { ProjectStartupWizard } from './ProjectStartupWizard';
 import { ProjectWorkTab } from './ProjectWorkTab';
 import {
   asArray,
@@ -95,11 +95,11 @@ export function ProjectDetailPage() {
   const { id = '' } = useParams();
   const [selectedTimelineNodeId, setSelectedTimelineNodeId] = useState('');
   const [activeTab, setActiveTab] = useState<ProjectDetailTab>('overview');
+  const [startupWizardOpen, setStartupWizardOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const toast = useToast();
 
   const operations = useQuery({
     queryKey: ['project-operations', id],
@@ -113,15 +113,6 @@ export function ProjectDetailPage() {
     enabled: Boolean(id),
     retry: false,
   });
-  const startPipeline = useMutation({
-    mutationFn: () => post(`/projects/${id}/start-pipeline`, {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
-      toast.success('Đã khởi động quy trình');
-    },
-    onError: (error) => toast.error('Không khởi động được quy trình', error),
-  });
-
   const data = operations.data;
   const allWorkItems = useMemo(() => asArray<WorkItem>(data?.work_items), [data?.work_items]);
   const openWorkItems = useMemo(() => allWorkItems.filter(isOpenWorkItem), [allWorkItems]);
@@ -202,9 +193,9 @@ export function ProjectDetailPage() {
         actions={activeTab === 'workflow' ? undefined : (
           <HeaderActions
             hasPipeline={hasPipeline}
-            startPending={startPipeline.isPending}
+            showLifecycleAction={activeTab !== 'activity'}
             primaryWork={primaryWork}
-            onStartPipeline={() => startPipeline.mutate()}
+            onStartPipeline={() => setStartupWizardOpen(true)}
             onOpenWork={openWorkItem}
             projectId={id}
           />
@@ -218,10 +209,9 @@ export function ProjectDetailPage() {
           <div className="space-y-4">
             <ProjectOverviewActionBand
               hasPipeline={hasPipeline}
-              startPending={startPipeline.isPending}
               currentNode={currentNode}
               primaryWork={primaryWork}
-              onStartPipeline={() => startPipeline.mutate()}
+              onStartPipeline={() => setStartupWizardOpen(true)}
               onOpenWork={openWorkItem}
               onShowWorkflow={() => setActiveTab('workflow')}
             />
@@ -246,9 +236,9 @@ export function ProjectDetailPage() {
             workItems={allWorkItems}
             selectedNodeId={selectedTimelineNodeId}
             hasPipeline={hasPipeline}
-            startPending={startPipeline.isPending}
+            startPending={false}
             onSelectNode={setSelectedTimelineNodeId}
-            onStartPipeline={() => startPipeline.mutate()}
+            onStartPipeline={() => setStartupWizardOpen(true)}
             onOpenWork={openWorkItem}
           />
         ) : null}
@@ -262,6 +252,11 @@ export function ProjectDetailPage() {
             projectId={id}
             activityTargets={activityTargets}
             attachmentOptions={attachmentOptions}
+            hasPipeline={hasPipeline}
+            pipelineStatus={String(data.pipeline_run?.status ?? '')}
+            currentNode={currentNode}
+            primaryWork={primaryWork}
+            onOpenStartup={() => setStartupWizardOpen(true)}
             onChanged={() => {
               queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
             }}
@@ -284,20 +279,30 @@ export function ProjectDetailPage() {
           />
         ) : null}
       </div>
+      <ProjectStartupWizard
+        open={startupWizardOpen}
+        projectId={id}
+        onClose={() => setStartupWizardOpen(false)}
+        onChanged={() => {
+          void queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
+          void queryClient.invalidateQueries({ queryKey: ['project-members', id] });
+          void queryClient.invalidateQueries({ queryKey: ['project', id] });
+        }}
+      />
     </>
   );
 }
 
 function HeaderActions({
   hasPipeline,
-  startPending,
+  showLifecycleAction,
   primaryWork,
   onStartPipeline,
   onOpenWork,
   projectId,
 }: {
   hasPipeline: boolean;
-  startPending: boolean;
+  showLifecycleAction: boolean;
   primaryWork?: WorkItem;
   onStartPipeline: () => void;
   onOpenWork: (item: WorkItem) => void;
@@ -305,16 +310,15 @@ function HeaderActions({
 }) {
   return (
     <>
-      {!hasPipeline ? (
+      {showLifecycleAction && !hasPipeline ? (
         <button
           className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={startPending}
           onClick={onStartPipeline}
         >
-          {startPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-          Khởi động quy trình
+          <Play className="h-4 w-4" />
+          Hoàn tất thiết lập
         </button>
-      ) : primaryWork ? (
+      ) : showLifecycleAction && primaryWork ? (
         <button
           className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
           onClick={() => onOpenWork(primaryWork)}
@@ -379,7 +383,6 @@ function ProjectDetailTabs({
 
 function ProjectOverviewActionBand({
   hasPipeline,
-  startPending,
   currentNode,
   primaryWork,
   onStartPipeline,
@@ -387,7 +390,6 @@ function ProjectOverviewActionBand({
   onShowWorkflow,
 }: {
   hasPipeline: boolean;
-  startPending: boolean;
   currentNode?: ProjectOperationsTimelineNode;
   primaryWork?: WorkItem;
   onStartPipeline: () => void;
@@ -408,11 +410,10 @@ function ProjectOverviewActionBand({
               <button
                 type="button"
                 className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                disabled={startPending}
                 onClick={onStartPipeline}
               >
-                {startPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                Khởi động quy trình
+                <Play className="h-4 w-4" />
+                Hoàn tất thiết lập
               </button>
             </div>
           ) : primaryWork ? (
@@ -1256,11 +1257,21 @@ function ProjectActivityPanel({
   projectId,
   activityTargets,
   attachmentOptions,
+  hasPipeline,
+  pipelineStatus,
+  currentNode,
+  primaryWork,
+  onOpenStartup,
   onChanged,
 }: {
   projectId: string;
   activityTargets: Array<{ scope_type: string; scope_id: string; label: string; work_item_id?: string }>;
   attachmentOptions: ActivityAttachmentOption[];
+  hasPipeline: boolean;
+  pipelineStatus?: string;
+  currentNode?: ProjectOperationsTimelineNode;
+  primaryWork?: WorkItem;
+  onOpenStartup: () => void;
   onChanged: () => void;
 }) {
   return (
@@ -1272,7 +1283,13 @@ function ProjectActivityPanel({
           <p className="mt-0.5 text-sm text-slate-500">Phối hợp, quyết định và theo dõi các vấn đề của công trình.</p>
         </div>
       </div>
-      <ActivityThread projectId={projectId} targetOptions={activityTargets} attachmentOptions={attachmentOptions} onChanged={onChanged} />
+      <ActivityThread
+        projectId={projectId}
+        targetOptions={activityTargets}
+        attachmentOptions={attachmentOptions}
+        workflowAction={{ hasPipeline, pipelineStatus, currentNode, primaryWork, onOpenStartup }}
+        onChanged={onChanged}
+      />
     </div>
   );
 }
