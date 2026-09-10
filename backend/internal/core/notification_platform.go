@@ -579,6 +579,12 @@ func notificationApprovalCandidates(ctx context.Context, tx *sql.Tx, projectID s
 				  AND privileged_role.name IN ('admin','director')
 			)
 			OR EXISTS (
+				SELECT 1 FROM projects candidate_project
+				WHERE candidate_project.id=NULLIF($1,'')::uuid
+				  AND candidate_project.status <> 'cancelled'
+				  AND candidate_project.created_by=account.id
+			)
+			OR EXISTS (
 				SELECT 1 FROM user_roles project_assignment
 				WHERE project_assignment.user_id=account.id
 				  AND project_assignment.project_id=NULLIF($1,'')::uuid

@@ -147,32 +147,33 @@ func (r *Repository) approvalActorLabels(ctx context.Context, actorID, projectID
 	return normalizedRoleList(labels), nil
 }
 
-func (r *Repository) ApplyApprovalPolicyAction(ctx context.Context, request Record, action, comment, actorID, actorName string) (Record, error) {
+func approvalActionPolicy(request Record) (ApprovalPolicy, bool) {
 	policy := approvalPolicyFromValue(request["policy_json"])
-	if !policy.enabled() {
+	if policy.enabled() {
+		return policy, true
+	}
+	if fmt.Sprint(request["target_type"]) != "pipeline_run_node" {
+		return ApprovalPolicy{}, false
+	}
+	return ApprovalPolicy{
+		Mode:                   "any",
+		Roles:                  normalizedRoleList(stringSlice(request["required_roles"])),
+		Quorum:                 1,
+		RequesterCannotApprove: true,
+	}, true
+}
+
+func (r *Repository) ApplyApprovalPolicyAction(ctx context.Context, request Record, action, comment, actorID, actorName string) (Record, error) {
+	policy, policyManaged := approvalActionPolicy(request)
+	isPipelineNode := fmt.Sprint(request["target_type"]) == "pipeline_run_node"
+	if !policyManaged {
 		return r.ApprovalAction(ctx, cleanID(request["id"]), action, comment, actorID, actorName)
 	}
 	if fmt.Sprint(request["status"]) != "pending" {
 		return nil, validationError("Yêu cầu phê duyệt không còn ở trạng thái chờ", Record{"status": request["status"]})
 	}
 	comment = strings.TrimSpace(comment)
-	if policy.CommentRequired && comment == "" {
-		return nil, validationError("Ý kiến phê duyệt là bắt buộc")
-	}
-	if policy.RequesterCannotApprove && cleanID(request["requested_by"]) == actorID {
-		return nil, forbiddenError("Người gửi yêu cầu không được tự phê duyệt")
-	}
-	projectID := cleanID(request["project_id"])
-	actorLabels, err := r.approvalActorLabels(ctx, actorID, projectID)
-	if err != nil {
-		return nil, err
-	}
 	currentStage := int(number(request["current_stage"]))
-	allowedRoles := policy.rolesForStage(currentStage)
-	roleLabel := matchingApprovalRole(actorLabels, allowedRoles)
-	if roleLabel == "" {
-		return nil, forbiddenError("Vai trò hiện tại không thuộc stage phê duyệt", Record{"required_roles": allowedRoles, "current_stage": currentStage})
-	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -186,8 +187,46 @@ func (r *Repository) ApplyApprovalPolicyAction(ctx context.Context, request Reco
 	if len(locked) == 0 {
 		return nil, sql.ErrNoRows
 	}
-	if fmt.Sprint(locked[0]["status"]) != "pending" || int(number(locked[0]["current_stage"])) != currentStage {
+	lockedRequest := locked[0]
+	if fmt.Sprint(lockedRequest["status"]) != "pending" || int(number(lockedRequest["current_stage"])) != currentStage {
 		return nil, validationError("Stage phê duyệt đã thay đổi, vui lòng tải lại")
+	}
+	policy, policyManaged = approvalActionPolicy(lockedRequest)
+	if !policyManaged {
+		return nil, validationError("Chính sách phê duyệt đã thay đổi, vui lòng tải lại")
+	}
+	if policy.CommentRequired && comment == "" {
+		return nil, validationError("Ý kiến phê duyệt là bắt buộc")
+	}
+	projectID := cleanID(lockedRequest["project_id"])
+	allowedRoles := policy.rolesForStage(currentStage)
+	roleLabel := ""
+	if isPipelineNode {
+		eligibility, err := r.pipelineNodeApprovalDecisionEligibility(ctx, lockedRequest, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if !eligibility.Allowed {
+			return nil, forbiddenError("Vai trò hiện tại không thuộc stage phê duyệt", Record{
+				"required_roles": eligibility.RequiredRoles,
+				"current_stage":  eligibility.CurrentStage,
+				"reason":         eligibility.Reason,
+			})
+		}
+		allowedRoles = eligibility.RequiredRoles
+		roleLabel = eligibility.RoleLabel
+	} else {
+		if policy.RequesterCannotApprove && cleanID(lockedRequest["requested_by"]) == actorID {
+			return nil, forbiddenError("Người gửi yêu cầu không được tự phê duyệt")
+		}
+		actorLabels, err := r.approvalActorLabels(ctx, actorID, projectID)
+		if err != nil {
+			return nil, err
+		}
+		roleLabel = matchingApprovalRole(actorLabels, allowedRoles)
+		if roleLabel == "" {
+			return nil, forbiddenError("Vai trò hiện tại không thuộc stage phê duyệt", Record{"required_roles": allowedRoles, "current_stage": currentStage})
+		}
 	}
 	duplicate, err := queryTx(ctx, tx, `
 		SELECT id FROM approval_actions
@@ -263,7 +302,7 @@ func (r *Repository) ApplyApprovalPolicyAction(ctx context.Context, request Reco
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "approval_"+strings.ReplaceAll(action, "-", "_"), fmt.Sprint(request["target_type"]), cleanID(request["target_id"]), fmt.Sprintf("%s phê duyệt stage %d", action, currentStage+1), Record{"approval_request_id": request["id"], "action": action, "role_label": roleLabel, "stage": currentStage, "next_stage": nextStage, "status": status}); err != nil {
 		return nil, err
 	}
-	if err := emitPipelineNodeApprovalActionTx(ctx, tx, locked[0], approvalActionID, action, comment, actorID, actorName, currentStage, nextStage, status); err != nil {
+	if err := emitPipelineNodeApprovalActionTx(ctx, tx, lockedRequest, approvalActionID, action, comment, actorID, actorName, currentStage, nextStage, status); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

@@ -1226,7 +1226,97 @@ func (r *Repository) workItemDecisionContext(ctx context.Context, item Record) (
 	return requiredRoles, requestedBy, nil
 }
 
+type approvalRequestDecisionEligibility struct {
+	Allowed       bool
+	RoleLabel     string
+	RequiredRoles []string
+	CurrentStage  int
+	Reason        string
+}
+
+func (r *Repository) pipelineNodeApprovalDecisionEligibility(ctx context.Context, request Record, userID string) (approvalRequestDecisionEligibility, error) {
+	policy := approvalPolicyFromValue(request["policy_json"])
+	eligibility := approvalRequestDecisionEligibility{
+		RequiredRoles: normalizedRoleList(stringSlice(request["required_roles"])),
+		CurrentStage:  int(number(request["current_stage"])),
+	}
+	if policy.enabled() {
+		eligibility.RequiredRoles = policy.rolesForStage(eligibility.CurrentStage)
+	}
+	if fmt.Sprint(request["status"]) != "pending" {
+		eligibility.Reason = "request_not_pending"
+		return eligibility, nil
+	}
+	profile, err := r.WorkItemAccessProfile(ctx, userID)
+	if err != nil {
+		return eligibility, err
+	}
+	requesterCannotApprove := !policy.enabled() || policy.RequesterCannotApprove
+	if requestedBy := cleanID(request["requested_by"]); requesterCannotApprove && requestedBy != "" && requestedBy == userID {
+		eligibility.Reason = "requester_cannot_approve"
+		return eligibility, nil
+	}
+	if approvalRequestID := cleanID(request["id"]); validActivityUUID(approvalRequestID) {
+		priorApprovals, err := r.Query(ctx, `
+			SELECT COUNT(*) AS total
+			FROM approval_actions
+			WHERE approval_request_id=$1::uuid AND user_id=$2::uuid AND action='approve'
+		`, approvalRequestID, userID)
+		if err != nil {
+			return eligibility, err
+		}
+		if len(priorApprovals) > 0 && number(priorApprovals[0]["total"]) > 0 {
+			eligibility.Reason = "already_approved"
+			return eligibility, nil
+		}
+	}
+	projectID := cleanID(request["project_id"])
+	if projectID == "" {
+		eligibility.Reason = "project_missing"
+		return eligibility, nil
+	}
+	activeProject, err := r.Query(ctx, `SELECT COUNT(*) AS total FROM projects WHERE id=$1 AND status <> 'cancelled'`, projectID)
+	if err != nil {
+		return eligibility, err
+	}
+	if len(activeProject) == 0 || number(activeProject[0]["total"]) == 0 {
+		eligibility.Reason = "project_inactive"
+		return eligibility, nil
+	}
+	if !profile.IsAdmin && !profile.IsDirector {
+		inScope, err := r.UserHasProjectScope(ctx, userID, projectID)
+		if err != nil {
+			return eligibility, err
+		}
+		if !inScope {
+			eligibility.Reason = "outside_project_scope"
+			return eligibility, nil
+		}
+	}
+	if len(eligibility.RequiredRoles) == 0 {
+		eligibility.Reason = "stage_roles_missing"
+		return eligibility, nil
+	}
+	projectLabels, err := r.UserProjectRoleLabels(ctx, userID, projectID)
+	if err != nil {
+		return eligibility, err
+	}
+	labels := append([]string{}, profile.RoleLabels...)
+	labels = append(labels, projectLabels...)
+	eligibility.RoleLabel = matchingApprovalRole(labels, eligibility.RequiredRoles)
+	if eligibility.RoleLabel == "" {
+		eligibility.Reason = "stage_role_mismatch"
+		return eligibility, nil
+	}
+	eligibility.Allowed = true
+	return eligibility, nil
+}
+
 func (r *Repository) CanDecideApprovalRequest(ctx context.Context, request Record, userID string) (bool, error) {
+	if fmt.Sprint(request["target_type"]) == "pipeline_run_node" {
+		eligibility, err := r.pipelineNodeApprovalDecisionEligibility(ctx, request, userID)
+		return eligibility.Allowed, err
+	}
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
 	if err != nil {
 		return false, err

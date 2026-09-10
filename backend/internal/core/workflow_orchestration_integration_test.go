@@ -3466,6 +3466,154 @@ func TestPipelineNodeApprovalNotificationLifecycle(t *testing.T) {
 	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NOT NULL`, 1, fixture.pmID, nodeID)
 }
 
+func TestPipelineNodeApprovalExcludesAdminOutsideStageAcrossInboxMutationAndNotification(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	adminID := addGlobalAdminApprovalObserver(t, db)
+	qaID := addProjectApprovalReviewer(t, db, fixture.projectID, "QA")
+	runID := newID()
+	nodeID := newID()
+	t.Cleanup(func() {
+		_, _ = db.Exec(`DELETE FROM approval_requests WHERE target_type='pipeline_run_node' AND target_id=$1`, nodeID)
+		_, _ = db.Exec(`DELETE FROM pipeline_runs WHERE id=$1`, runID)
+	})
+
+	mustExec(t, db, `
+		INSERT INTO pipeline_runs (id,project_id,template_id,status,engine_version)
+		VALUES ($1,$2,'40000000-0000-0000-0000-000000000021','in_progress',2)
+	`, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (
+			id,run_id,project_id,name,type,business_code,order_index,responsible_role_ids,
+			approval_policy_json,status,started_at
+		) VALUES (
+			$1,$2,$3,'QA stage authorization','survey_review','test.node_qa_authorization',1,'["QA"]'::jsonb,
+			'{"mode":"any","roles":["QA"],"quorum":1,"requester_cannot_approve":true,"comment_required":true}'::jsonb,
+			'in_progress',now()
+		)
+	`, nodeID, runID, fixture.projectID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$1 WHERE id=$2`, nodeID, runID)
+
+	request, err := service.RequestNodeApproval(ctx, nodeID, fixture.workerID, "Worker", "QA duyệt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := cleanID(request["id"])
+
+	decidable, err := service.PendingApprovals(ctx, PendingApprovalFilter{
+		ProjectID: fixture.projectID, DecidableOnly: true,
+	}, adminID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decidable) != 0 {
+		t.Fatalf("Admin outside QA stage decidable approvals = %#v, want none", decidable)
+	}
+	visible, err := service.PendingApprovals(ctx, PendingApprovalFilter{ProjectID: fixture.projectID}, adminID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(visible) != 1 || cleanID(visible[0]["id"]) != approvalID {
+		t.Fatalf("Admin oversight approvals = %#v, want visible request %s", visible, approvalID)
+	}
+	capabilities, _ := visible[0]["capabilities"].(Record)
+	if boolValue(capabilities["can_decide"]) || len(stringSlice(visible[0]["available_actions"])) != 0 {
+		t.Fatalf("Admin outside QA stage decision contract = %#v", visible[0])
+	}
+
+	mustDispatchNotifications(t, service)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2`, 0, adminID, nodeID)
+	assertCount(t, db, `SELECT COUNT(*) FROM user_notifications WHERE recipient_user_id=$1 AND event_key='workflow.node_approval_requested' AND source_id=$2 AND resolved_at IS NULL`, 1, qaID, nodeID)
+
+	_, err = service.ApprovalAction(ctx, approvalID, "approve", "Admin duyệt", adminID, "Admin")
+	if err == nil {
+		t.Fatal("expected Admin outside QA stage approval to be forbidden")
+	}
+	var statusErr StatusError
+	if !errors.As(err, &statusErr) || statusErr.Code != "FORBIDDEN" {
+		t.Fatalf("Admin outside QA stage error = %#v, want FORBIDDEN", err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM approval_actions WHERE approval_request_id=$1 AND user_id=$2`, 0, approvalID, adminID)
+
+	adminQARoleID := ensureRole(t, db, "approval_admin_qa_"+newID()[:8], "QA")
+	t.Cleanup(func() {
+		_, _ = db.Exec(`DELETE FROM roles WHERE id=$1`, adminQARoleID)
+	})
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id,project_id) VALUES ($1,$2,$3)`, adminID, adminQARoleID, fixture.projectID)
+	decidable, err = service.PendingApprovals(ctx, PendingApprovalFilter{
+		ProjectID: fixture.projectID, DecidableOnly: true,
+	}, adminID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decidable) != 1 || cleanID(decidable[0]["id"]) != approvalID {
+		t.Fatalf("Admin with explicit QA role decidable approvals = %#v, want request %s", decidable, approvalID)
+	}
+	if _, err := service.ApprovalAction(ctx, approvalID, "approve", "QA đồng ý", adminID, "Admin kiêm QA"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM approval_actions WHERE approval_request_id=$1 AND user_id=$2 AND role_label='QA'`, 1, approvalID, adminID)
+}
+
+func TestLegacyPipelineNodeApprovalUsesRequiredStageRoles(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupWorkItemFlowFixture(t, db, false)
+	adminID := addGlobalAdminApprovalObserver(t, db)
+	runID := newID()
+	nodeID := newID()
+	t.Cleanup(func() {
+		_, _ = db.Exec(`DELETE FROM approval_requests WHERE target_type='pipeline_run_node' AND target_id=$1`, nodeID)
+		_, _ = db.Exec(`DELETE FROM pipeline_runs WHERE id=$1`, runID)
+	})
+
+	mustExec(t, db, `
+		INSERT INTO pipeline_runs (id,project_id,template_id,status,engine_version)
+		VALUES ($1,$2,'40000000-0000-0000-0000-000000000021','in_progress',1)
+	`, runID, fixture.projectID)
+	mustExec(t, db, `
+		INSERT INTO pipeline_run_nodes (
+			id,run_id,project_id,name,type,business_code,order_index,responsible_role_ids,status,started_at
+		) VALUES ($1,$2,$3,'Legacy PM approval','planning','test.legacy_node_approval',1,'["PM"]'::jsonb,'in_progress',now())
+	`, nodeID, runID, fixture.projectID)
+	mustExec(t, db, `UPDATE pipeline_runs SET current_node_id=$1 WHERE id=$2`, nodeID, runID)
+
+	request, err := service.RequestNodeApproval(ctx, nodeID, fixture.workerID, "Worker", "PM duyệt legacy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalID := cleanID(request["id"])
+	if policy := approvalPolicyFromValue(request["policy_json"]); policy.enabled() {
+		t.Fatalf("legacy request policy = %#v, want disabled compatibility policy", request["policy_json"])
+	}
+
+	adminRows, err := service.PendingApprovals(ctx, PendingApprovalFilter{
+		ProjectID: fixture.projectID, DecidableOnly: true,
+	}, adminID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(adminRows) != 0 {
+		t.Fatalf("Admin legacy node approvals = %#v, want none", adminRows)
+	}
+	if _, err := service.ApprovalAction(ctx, approvalID, "approve", "Admin duyệt", adminID, "Admin"); err == nil {
+		t.Fatal("expected Admin legacy node approval to be forbidden")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM approval_actions WHERE approval_request_id=$1 AND user_id=$2`, 0, approvalID, adminID)
+
+	approved, err := service.ApprovalAction(ctx, approvalID, "approve", "PM đồng ý", fixture.pmID, "PM")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(approved["status"]) != "approved" {
+		t.Fatalf("legacy node approval status = %v, want approved", approved["status"])
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM approval_actions WHERE approval_request_id=$1 AND user_id=$2 AND role_label='PM'`, 1, approvalID, fixture.pmID)
+}
+
 func TestPipelineNodeOrderedApprovalNotificationMovesToCurrentStage(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
@@ -3581,6 +3729,19 @@ func addProjectApprovalReviewer(t *testing.T, db *sql.DB, projectID, roleLabel s
 	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,position,status) VALUES ($1,$2,$3,$4,'Dự án',$3,'active')`, staffID, userID, roleLabel, "approval-reviewer-staff-"+suffix+"@test.local")
 	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,jsonb_build_array($3::text),true)`, projectID, staffID, roleLabel)
 	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2)`, userID, roleID)
+	return userID
+}
+
+func addGlobalAdminApprovalObserver(t *testing.T, db *sql.DB) string {
+	t.Helper()
+	suffix := newID()
+	userID := newID()
+	adminRoleID := ensureRole(t, db, "admin", "Quản trị")
+	t.Cleanup(func() {
+		_, _ = db.Exec(`DELETE FROM users WHERE id=$1`, userID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Approval Admin','active')`, userID, "approval-admin-"+suffix+"@test.local")
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2)`, userID, adminRoleID)
 	return userID
 }
 
