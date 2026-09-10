@@ -148,6 +148,52 @@ func TestProcurementWorkspaceRoutesAndSourceCapabilities(t *testing.T) {
 	request(http.MethodGet, "/procurement-requests/"+id, "", 404)
 }
 
+func TestProcurementWorkspaceListsOnlyActiveProjectScopedApprovers(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	s := NewService(NewRepository(db), "test-secret")
+	f, id, _ := procurementDiscussionFixture(t, db, []string{"procurement.view", "procurement.approve"})
+	mustExec(t, db, `UPDATE procurement_requests SET status='waiting_approval' WHERE id=$1`, id)
+
+	outsiderID, outsiderStaffID := newID(), newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, outsiderStaffID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, outsiderID)
+	})
+	mustExec(t, db, `INSERT INTO users(id,email,password_hash,full_name,status) VALUES($1,$2,'demo:pw','Outside Approver','active')`, outsiderID, "outside-approver-"+outsiderID+"@test.local")
+	mustExec(t, db, `INSERT INTO staff(id,user_id,full_name,email,status) VALUES($1,$2,'Outside Approver',$3,'active')`, outsiderStaffID, outsiderID, "outside-approver-staff-"+outsiderID+"@test.local")
+	mustExec(t, db, `INSERT INTO user_roles(user_id,role_id) VALUES($1,$2)`, outsiderID, f.roleID)
+
+	workspace, err := s.ProcurementWorkspace(ctx, id, f.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalContext := recordFromAny(workspace["approval_context"])
+	if approvalContext["permission"] != "procurement.approve" || int(number(approvalContext["candidate_count"])) != 1 {
+		t.Fatalf("wrong approval context: %#v", approvalContext)
+	}
+	candidates, ok := approvalContext["candidates"].([]Record)
+	if !ok || len(candidates) != 1 {
+		t.Fatalf("wrong approval candidates: %#v", approvalContext["candidates"])
+	}
+	if cleanID(candidates[0]["user_id"]) != f.userID || fmt.Sprint(candidates[0]["full_name"]) != "Scoped User" {
+		t.Fatalf("wrong approval candidate: %#v", candidates[0])
+	}
+	if roles := stringSlice(candidates[0]["role_names"]); len(roles) != 1 || roles[0] != "Batch4 Scope" {
+		t.Fatalf("wrong candidate roles: %#v", candidates[0]["role_names"])
+	}
+
+	mustExec(t, db, `UPDATE users SET status='inactive' WHERE id=$1`, f.userID)
+	workspace, err = s.ProcurementWorkspace(ctx, id, f.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalContext = recordFromAny(workspace["approval_context"])
+	if int(number(approvalContext["candidate_count"])) != 0 {
+		t.Fatalf("inactive approver remained visible: %#v", approvalContext)
+	}
+}
+
 func TestProcurementConcurrentSavesAndContextRollback(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

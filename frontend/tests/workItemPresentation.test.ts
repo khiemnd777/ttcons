@@ -3,10 +3,13 @@ import test from 'node:test';
 import type { WorkItem } from '../src/lib/types/domain.ts';
 import { workItemIsUpcoming, workItemWorkflowContext } from '../src/modules/work-items/workItemContext.ts';
 import {
+  businessSourceNavigationPath,
   completionRequirementNavigationFromError,
   completionRequirementPresentation,
   missingCompletionRequirementLabels,
   permissionRequirementPresentation,
+  requiredAutomationPresentation,
+  workItemActionErrorReason,
 } from '../src/modules/work-items/workItemRequirements.ts';
 
 function workItem(values: Partial<WorkItem> = {}): WorkItem {
@@ -124,6 +127,70 @@ test('keeps unrelated work-item errors on the ordinary toast path', () => {
   });
 
   assert.equal(target, undefined);
+});
+
+test('shows an exact procurement blocker and opens its canonical source instead of looping to complete', () => {
+  const route = '/projects/project-1/procurement?record=request-2&record_type=procurement_request&task=work-1';
+  const item = workItem({
+    status: 'in_progress',
+    domain_action_key: 'procurement.require_approved',
+    available_actions: ['complete'],
+    business_source: {
+      ready: false,
+      status: 'blocked',
+      message: 'Còn 1 yêu cầu mua/đầu vào chưa được duyệt: REQ-02 · Yêu cầu đang chờ duyệt',
+      target_type: 'procurement_request',
+      target_id: 'request-2',
+      route: '/projects/project-1/procurement?record=request-2&record_type=procurement_request',
+    },
+    execution_target: {
+      kind: 'domain',
+      workspace: 'procurement',
+      route,
+      action_label: 'Mở mua sắm',
+      completion_mode: 'domain_gate',
+    },
+  });
+
+  const row = requiredAutomationPresentation(item, ['complete']);
+
+  assert.equal(row.state, 'blocked');
+  assert.match(row.description, /REQ-02/);
+  assert.equal(row.actionLabel, 'Mở yêu cầu cần duyệt');
+  assert.deepEqual(row.target, { kind: 'business_source', route });
+});
+
+test('prefers the current business source result over a stale blocked automation event', () => {
+  const item = workItem({
+    status: 'in_progress',
+    domain_action_key: 'procurement.require_approved',
+    automation_events: [{ id: 'event-1', action_key: 'procurement.require_approved', status: 'blocked', blocker_reason: 'Cũ' }],
+    business_source: { ready: true, status: 'succeeded', message: 'Tất cả yêu cầu mua đã được duyệt.' },
+  });
+
+  const row = requiredAutomationPresentation(item, ['complete']);
+
+  assert.equal(row.state, 'done');
+  assert.equal(row.description, 'Tất cả yêu cầu mua đã được duyệt.');
+  assert.equal(row.target, undefined);
+});
+
+test('uses the backend automation reason in work-item action feedback', () => {
+  assert.equal(
+    workItemActionErrorReason({ details: { reason: 'Còn yêu cầu mua chưa được duyệt' } }),
+    'Còn yêu cầu mua chưa được duyệt',
+  );
+  assert.equal(workItemActionErrorReason({ details: { field: 'status' } }), undefined);
+});
+
+test('preserves the work return path when opening an exact business source', () => {
+  assert.equal(
+    businessSourceNavigationPath(
+      '/projects/project-1/procurement?record=request-2&record_type=procurement_request&task=work-1',
+      '?task=work-1&returnTo=%2Fmy-work',
+    ),
+    '/projects/project-1/procurement?record=request-2&record_type=procurement_request&task=work-1&returnTo=%2Fmy-work',
+  );
 });
 
 test('keeps read-only evidence navigation view-only', () => {

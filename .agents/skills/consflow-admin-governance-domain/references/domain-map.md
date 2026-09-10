@@ -1,5 +1,10 @@
 # Admin Governance Domain Map
 
+## Project Permission Actor Presentation
+
+- `Repository.ProjectPermissionActors` is a read-only presentation helper for source workspaces that must name current eligible actors. It begins with active, non-deleted, non-external App accounts whose global or exact-project role grants the requested permission, then rechecks each result through the canonical `CanAccessProjectPermission` so Admin/Director and project-scope rules stay aligned. Returned role display labels explain the grant only; callers and frontend must never use the list to authorize a mutation.
+- Procurement currently consumes this helper only for `procurement.approve` in ready waiting-approval detail. It does not add a permission, role assignment, designated approver, notification audience, schema change or audit event. First searches: `ProjectPermissionActors|approval_context|CanAccessProjectPermission`; regression: `TestProcurementWorkspaceListsOnlyActiveProjectScopedApprovers`.
+
 ## Exact Record Source Navigation
 
 - Partner and Role canonical dialogs accept exact record links through shared `useRecordDeepLink`. Partner reads use the authorized catalog list with explicit `status=all`; Role/Audit links preserve router exclusions for accounting observers. Audit opens the exact event via `record_id` server filtering before pagination and can link its allowlisted typed target. No identity is inferred from actor names; no role/permission assignment or audit write occurs on open.

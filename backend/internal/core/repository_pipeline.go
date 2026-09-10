@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -873,11 +874,15 @@ func (r *Repository) WorkflowBusinessSourceForWorkItem(ctx context.Context, work
 	if err != nil {
 		return nil, err
 	}
-	if !isClientOfficialWorkflowContext(contextRow) || int(number(contextRow["template_revision_no"])) < 7 {
+	if !isClientOfficialWorkflowContext(contextRow) {
 		return nil, nil
 	}
 	actionKey := clientWorkflowAutomationAction(contextRow)
 	if actionKey == "" {
+		return nil, nil
+	}
+	if int(number(contextRow["template_revision_no"])) < 7 &&
+		(int(number(contextRow["engine_version"])) < 2 || actionKey != "procurement.require_approved") {
 		return nil, nil
 	}
 	inspectionKey := actionKey
@@ -1406,7 +1411,18 @@ func (r *Repository) automateClientInputProcurementGate(ctx context.Context, con
 	summary, err := r.QueryOne(ctx, `
 		SELECT
 			COUNT(*) AS total,
-			COUNT(*) FILTER (WHERE status NOT IN ('approved','ordered','partially_received','received')) AS not_approved
+			COUNT(*) FILTER (WHERE status NOT IN ('approved','ordered','partially_received','received')) AS not_approved,
+			COALESCE((ARRAY_AGG(id::text ORDER BY created_at,id) FILTER (WHERE status NOT IN ('approved','ordered','partially_received','received')))[1], '') AS blocking_request_id,
+			COALESCE((ARRAY_AGG(request_code ORDER BY created_at,id) FILTER (WHERE status NOT IN ('approved','ordered','partially_received','received')))[1], '') AS blocking_request_code,
+			COALESCE((ARRAY_AGG(title ORDER BY created_at,id) FILTER (WHERE status NOT IN ('approved','ordered','partially_received','received')))[1], '') AS blocking_request_title,
+			COALESCE((ARRAY_AGG(status ORDER BY created_at,id) FILTER (WHERE status NOT IN ('approved','ordered','partially_received','received')))[1], '') AS blocking_request_status,
+			COALESCE(
+				JSONB_AGG(
+					JSONB_BUILD_OBJECT('id',id,'request_code',request_code,'title',title,'status',status)
+					ORDER BY created_at,id
+				) FILTER (WHERE status NOT IN ('approved','ordered','partially_received','received')),
+				'[]'::jsonb
+			) AS blocking_requests
 		FROM procurement_requests
 		WHERE project_id=$1 AND status <> 'cancelled'
 	`, projectID)
@@ -1415,14 +1431,58 @@ func (r *Repository) automateClientInputProcurementGate(ctx context.Context, con
 	}
 	metadata := Record{
 		"node":                     contextRow["run_node_name"],
+		"label":                    "Yêu cầu mua cần duyệt",
+		"route":                    fmt.Sprintf("/projects/%s/procurement", projectID),
 		"procurement_total":        number(summary["total"]),
 		"procurement_not_approved": number(summary["not_approved"]),
 	}
 	if number(summary["total"]) == 0 {
-		return automationBlocked("input_procurement_gate", "Chưa có yêu cầu mua/đầu vào bắt buộc", metadata), nil
+		return automationBlockedWithTarget("input_procurement_gate", "Chưa có yêu cầu mua/đầu vào bắt buộc", "project", projectID, metadata), nil
 	}
 	if number(summary["not_approved"]) > 0 {
-		return automationBlocked("input_procurement_gate", "Còn yêu cầu mua/đầu vào chưa được duyệt", metadata), nil
+		blockingID := cleanID(summary["blocking_request_id"])
+		blockingCode := strings.TrimSpace(fmt.Sprint(summary["blocking_request_code"]))
+		blockingTitle := strings.TrimSpace(fmt.Sprint(summary["blocking_request_title"]))
+		blockingStatus := cleanID(summary["blocking_request_status"])
+		blockingLabel := strings.Trim(strings.Join([]string{blockingCode, blockingTitle}, " · "), " ·")
+		reason := fmt.Sprintf("Còn %d yêu cầu mua/đầu vào chưa được duyệt", int(number(summary["not_approved"])))
+		if blockingLabel != "" {
+			reason += ": " + blockingLabel
+		}
+		if blockingID != "" {
+			query := url.Values{}
+			query.Set("record", blockingID)
+			query.Set("record_type", "procurement_request")
+			metadata["route"] = fmt.Sprintf("/projects/%s/procurement?%s", projectID, query.Encode())
+			metadata["blocking_request"] = Record{
+				"id":           blockingID,
+				"request_code": blockingCode,
+				"title":        blockingTitle,
+				"status":       blockingStatus,
+			}
+			metadata["blocking_requests"] = summary["blocking_requests"]
+			checks := make([]Record, 0, int(number(summary["not_approved"])))
+			for _, raw := range anySlice(summary["blocking_requests"]) {
+				request := recordFromAny(raw)
+				requestID := cleanID(request["id"])
+				requestCode := strings.TrimSpace(fmt.Sprint(request["request_code"]))
+				requestTitle := strings.TrimSpace(fmt.Sprint(request["title"]))
+				requestLabel := strings.Trim(strings.Join([]string{requestCode, requestTitle}, " · "), " ·")
+				requestQuery := url.Values{}
+				requestQuery.Set("record", requestID)
+				requestQuery.Set("record_type", "procurement_request")
+				checks = append(checks, Record{
+					"key":     "procurement_request:" + requestID,
+					"label":   requestLabel,
+					"ready":   false,
+					"status":  cleanID(request["status"]),
+					"message": "Yêu cầu mua này cần được duyệt trước khi hoàn tất bước.",
+					"route":   fmt.Sprintf("/projects/%s/procurement?%s", projectID, requestQuery.Encode()),
+				})
+			}
+			metadata["checks"] = checks
+		}
+		return automationBlockedWithTarget("input_procurement_gate", reason, "procurement_request", blockingID, metadata), nil
 	}
 	procurement, err := r.firstProjectProcurement(ctx, projectID)
 	if err != nil {

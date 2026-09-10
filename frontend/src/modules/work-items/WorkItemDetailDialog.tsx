@@ -49,10 +49,12 @@ import {
   type WorkflowFormActionState,
 } from './WorkflowFormPanel';
 import {
+  businessSourceNavigationPath,
   completionRequirementNavigationFromError,
   completionRequirementPresentation,
   missingCompletionRequirementLabels,
   permissionRequirementPresentation,
+  workItemActionErrorReason,
   type WorkItemRequirementNavigationRequest,
   type WorkItemRequirementNavigationTarget,
 } from './workItemRequirements';
@@ -209,10 +211,12 @@ export function WorkItemDetailWorkspace({
       toast.success(`Đã ${actionLabels[variables.action].toLowerCase()}`);
     },
     onError: (error, variables) => {
-      if (variables.bypassStartRequirements) {
-        queryClient.invalidateQueries({ queryKey: ['work-item', variables.workItemId] });
+      if (variables.bypassStartRequirements || variables.action === 'complete') {
+        void queryClient.invalidateQueries({ queryKey: ['work-item', variables.workItemId] });
       }
-      toast.error('Không thao tác được đầu việc', error);
+      const reason = variables.action === 'complete' ? workItemActionErrorReason(error) : undefined;
+      if (reason) toast.error({ title: 'Không thao tác được đầu việc', description: reason });
+      else toast.error('Không thao tác được đầu việc', error);
       if (variables.action === 'complete' && detailItem) {
         const target = completionRequirementNavigationFromError(detailItem, error);
         if (target) navigateToRequirement(target);
@@ -289,6 +293,12 @@ export function WorkItemDetailWorkspace({
   }
 
   function navigateToRequirement(target: WorkItemRequirementNavigationTarget) {
+    if (target.kind === 'business_source') {
+      const route = businessSourceNavigationPath(target.route, location.search);
+      closeDialog();
+      navigate(route);
+      return;
+    }
     navigationSequence.current += 1;
     setNavigationRequest({ requestId: navigationSequence.current, target });
   }

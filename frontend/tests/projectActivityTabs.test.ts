@@ -28,7 +28,7 @@ test('project activity exposes only three activity kinds, opens discussion first
   assert.doesNotMatch(thread, /kind !== 'discussion'/);
   assert.match(workItemDetail, /<ActivityComposer[\s\S]*mode="work_item"[\s\S]*defaultExpanded/);
   assert.match(projectDetail, /const activityDiscussionCount = numberValue\(data\.activity_summary\?\.discussion_unread\);/);
-  assert.match(projectDetail, /\{ id: 'activity', label: 'Trao đổi', count: activityDiscussionCount \}/);
+  assert.match(projectDetail, /\{ id: 'activity', label: 'Trao đổi', icon: MessageSquare, count: activityDiscussionCount \}/);
   assert.doesNotMatch(projectDetail, /activity_summary\?\.discussion\) - numberValue\(data\.activity_summary\?\.decisions/);
   assert.doesNotMatch(projectDetail, /activity_summary\?\.total/);
 });

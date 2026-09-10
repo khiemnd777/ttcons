@@ -11,14 +11,18 @@ import {
   Clock3,
   FileText,
   GitBranch,
+  LayoutDashboard,
+  ListTodo,
   Loader2,
   MessageSquare,
   PackageCheck,
   Play,
   RefreshCw,
+  ScrollText,
   Search,
   ShieldAlert,
   TimerReset,
+  Users,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { get, ApiError } from '../../lib/api/client';
@@ -169,14 +173,14 @@ export function ProjectDetailPage() {
   // cursor used by the full activity thread and Utility Dock.
   const activityDiscussionCount = numberValue(data.activity_summary?.discussion_unread);
   const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
-  const tabs: Array<{ id: ProjectDetailTab; label: string; count?: number }> = [
-    { id: 'overview', label: 'Tổng quan' },
-    { id: 'workflow', label: 'Quy trình', count: timeline.length },
-    { id: 'work', label: 'Danh sách công việc', count: allWorkItems.length },
-    { id: 'activity', label: 'Trao đổi', count: activityDiscussionCount },
-    { id: 'files', label: 'Hồ sơ', count: numberValue(data.evidence_summary?.total ?? latestEvidence.length) },
-    { id: 'audit', label: 'Nhật ký' },
-    { id: 'members', label: 'Thành viên', count: members.data?.summary.active ?? 0 },
+  const tabs: ProjectDetailTabDefinition[] = [
+    { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
+    { id: 'workflow', label: 'Quy trình', icon: GitBranch, count: timeline.length },
+    { id: 'work', label: 'Danh sách công việc', icon: ListTodo, count: allWorkItems.length },
+    { id: 'activity', label: 'Trao đổi', icon: MessageSquare, count: activityDiscussionCount },
+    { id: 'files', label: 'Hồ sơ', icon: FileText, count: numberValue(data.evidence_summary?.total ?? latestEvidence.length) },
+    { id: 'audit', label: 'Nhật ký', icon: ScrollText },
+    { id: 'members', label: 'Thành viên', icon: Users, count: members.data?.summary.active ?? 0 },
   ];
 
   return (
@@ -340,12 +344,19 @@ function HeaderActions({
   );
 }
 
+type ProjectDetailTabDefinition = {
+  id: ProjectDetailTab;
+  label: string;
+  icon: typeof LayoutDashboard;
+  count?: number;
+};
+
 function ProjectDetailTabs({
   tabs,
   activeTab,
   onChange,
 }: {
-  tabs: Array<{ id: ProjectDetailTab; label: string; count?: number }>;
+  tabs: ProjectDetailTabDefinition[];
   activeTab: ProjectDetailTab;
   onChange: (tab: ProjectDetailTab) => void;
 }) {
@@ -354,6 +365,7 @@ function ProjectDetailTabs({
       <div className="flex min-w-max gap-1">
         {tabs.map((tab) => {
           const active = tab.id === activeTab;
+          const Icon = tab.icon;
           return (
             <button
               key={tab.id}
@@ -365,6 +377,7 @@ function ProjectDetailTabs({
               aria-pressed={active}
               onClick={() => onChange(tab.id)}
             >
+              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
               {tab.label}
               {typeof tab.count === 'number' ? (
                 <span className={clsx(

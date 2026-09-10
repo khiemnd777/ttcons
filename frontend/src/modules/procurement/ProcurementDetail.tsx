@@ -1,8 +1,9 @@
-import { ShoppingCart } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ShoppingCart } from 'lucide-react';
 import { CurrencyText } from '../../components/CurrencyText';
+import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 import { RecordSummary, RecordSection, RecordMetrics, RecordMetric, RecordTable } from '../../components/RecordDetailLayout';
 import { RecordLink, RelatedRecords } from '../_shared/RecordLinks';
-import { procurementStatusLabels, numeric, formatQuantity, formatDate, type ProcurementRow } from './procurementWorkspace';
+import { procurementStatusLabels, numeric, formatQuantity, formatDate, type ProcurementApprovalContext, type ProcurementRow } from './procurementWorkspace';
 
 export function ProcurementStatus({ status }: { status: string }) { return <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700">{procurementStatusLabels[status] ?? status}</span>; }
 
@@ -33,6 +34,28 @@ export function ProcurementDetail({ record }: { record: Record<string, any> }) {
     </RecordSection>
     <RelatedRecords kind="procurement_request" record={{ ...record, supplier_partner_id: undefined }} />
   </div>;
+}
+
+export function ProcurementApprovalPanel({ context, canApprove, approvalMessage }: {
+  context?: ProcurementApprovalContext;
+  canApprove: boolean;
+  approvalMessage?: string;
+}) {
+  if (!context && !approvalMessage) return null;
+  const candidates = context?.candidates ?? [];
+  const count = Number(context?.candidate_count ?? candidates.length);
+  return <RecordSection title={context ? 'Người có thể duyệt' : 'Điều kiện phê duyệt'} aside={context ? `${count} người` : undefined}>
+    {approvalMessage ? <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">{approvalMessage}</p> : null}
+    {context ? <div className="space-y-3">
+      {candidates.length ? <ul className="grid gap-2 sm:grid-cols-2" aria-label="Danh sách người có thể duyệt">{candidates.map(candidate => <li key={candidate.user_id} className="min-w-0 rounded-md border border-slate-200 px-3 py-2">
+        <p className="break-words text-sm font-semibold text-slate-900"><IdentityReferenceLabel name={candidate.full_name} /></p>
+        <p className="mt-1 break-words text-xs text-slate-500">Vai trò: {candidate.role_names?.length ? candidate.role_names.join(', ') : 'Chưa xác định'}</p>
+      </li>)}</ul> : <p role="alert" className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />Chưa có người đủ quyền duyệt yêu cầu này.</p>}
+      {candidates.length ? canApprove
+        ? <p className="flex items-center gap-2 text-sm font-medium text-emerald-700"><CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />Bạn có quyền duyệt yêu cầu này.</p>
+        : <p className="text-sm text-slate-600">Bạn không có quyền duyệt yêu cầu này.</p> : null}
+    </div> : null}
+  </RecordSection>;
 }
 
 function DeliveryStatus({ status }: { status: string }) {

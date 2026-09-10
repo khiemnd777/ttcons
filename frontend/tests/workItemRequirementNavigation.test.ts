@@ -7,12 +7,13 @@ async function source(path: string) {
 }
 
 async function workItemDetailSource() {
-  const [page, domain, requirementPanel] = await Promise.all([
+  const [page, domain, requirements, requirementPanel] = await Promise.all([
     source('../src/modules/work-items/WorkItemDetailDialog.tsx'),
     source('../src/modules/work-items/workItemDetailDomain.ts'),
+    source('../src/modules/work-items/workItemRequirements.ts'),
     source('../src/modules/work-items/WorkItemRequirementPanel.tsx'),
   ]);
-  return `${page}\n${domain}\n${requirementPanel}`;
+  return `${page}\n${domain}\n${requirements}\n${requirementPanel}`;
 }
 
 test('completion requirement rows expose keyboard actions and explicit instructions', async () => {
@@ -45,6 +46,18 @@ test('completion errors dispatch the backend-owned missing requirement target', 
     detail,
     /variables\.action === 'complete'[\s\S]*completionRequirementNavigationFromError\(detailItem, error\)[\s\S]*navigateToRequirement\(target\)/,
   );
+  assert.match(detail, /variables\.bypassStartRequirements \|\| variables\.action === 'complete'/);
+  assert.match(detail, /workItemActionErrorReason\(error\)/);
+});
+
+test('blocked business automation leaves the action panel and opens the exact canonical source', async () => {
+  const detail = await workItemDetailSource();
+
+  assert.match(detail, /kind: 'business_source'/);
+  assert.match(detail, /Mở yêu cầu cần duyệt/);
+  assert.match(detail, /target\.kind === 'business_source'/);
+  assert.match(detail, /businessSourceNavigationPath\(target\.route, location\.search\)/);
+  assert.match(detail, /closeDialog\(\);[\s\S]*navigate\(route\)/);
 });
 
 test('workflow-form navigation targets the first issue, checklist field, or submit action', async () => {

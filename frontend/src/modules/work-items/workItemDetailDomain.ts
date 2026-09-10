@@ -5,6 +5,7 @@ import {
   completionRequirementPresentation,
   missingCompletionRequirementLabels,
   permissionRequirementPresentation,
+  requiredAutomationPresentation,
   type WorkItemRequirementNavigationTarget,
 } from './workItemRequirements';
 import { isDomainExecutionTarget } from './workItemExecutionTarget';
@@ -106,33 +107,10 @@ export function buildRequirementRows(
   }
 
   if (item.domain_action_key) {
-    const latestAutomation = (item.automation_events ?? []).find((event) => event.action_key === item.domain_action_key);
-    const automationStatus = latestAutomation?.status;
-    const reason = latestAutomation?.blocker_reason || latestAutomation?.error_message;
     rows.push({
       id: 'required-automation',
       label: 'Tự động hóa nghiệp vụ bắt buộc',
-      description: automationStatus === 'succeeded'
-        ? `${item.domain_action_key} đã hoàn tất thành công.`
-        : automationStatus === 'blocked' || automationStatus === 'failed'
-          ? `${item.domain_action_key}: ${reason || 'Đang bị chặn; dùng lại thao tác hoàn tất sau khi khắc phục.'}`
-          : `${item.domain_action_key} sẽ được kiểm tra trước khi đầu việc hoàn tất.`,
-      guidance: automationStatus === 'succeeded' || automationStatus === 'skipped'
-        ? 'Không còn thao tác bổ sung cho điều kiện này.'
-        : actions.includes('complete')
-          ? 'Khắc phục lý do chặn nếu có, sau đó chọn Hoàn tất để hệ thống chạy lại kiểm tra.'
-          : 'Tự động hóa sẽ được hệ thống kiểm tra khi đầu việc có thể Hoàn tất; liên hệ người quản lý workflow nếu trạng thái không thay đổi.',
-      actionLabel: actions.includes('complete') && automationStatus !== 'succeeded' && automationStatus !== 'skipped'
-        ? 'Đến thao tác Hoàn tất'
-        : undefined,
-      target: actions.includes('complete') && automationStatus !== 'succeeded' && automationStatus !== 'skipped'
-        ? { kind: 'action_panel' }
-        : undefined,
-      state: automationStatus === 'succeeded' || automationStatus === 'skipped'
-        ? 'done'
-        : automationStatus === 'blocked' || automationStatus === 'failed'
-          ? 'blocked'
-          : 'neutral',
+      ...requiredAutomationPresentation(item, actions),
     });
   }
 

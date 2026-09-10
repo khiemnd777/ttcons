@@ -50,6 +50,18 @@ func (s *Service) ProcurementWorkspace(ctx context.Context, id, actorID string) 
 		capabilities[action] = allowed
 	}
 	row["capabilities"] = capabilities
+	status := fmt.Sprint(row["status"])
+	if approvalReady && statusIn(status, "waiting_approval", "submitted") {
+		candidates, err := s.repo.ProjectPermissionActors(ctx, cleanID(row["project_id"]), "procurement.approve")
+		if err != nil {
+			return nil, err
+		}
+		row["approval_context"] = Record{
+			"permission":      "procurement.approve",
+			"candidate_count": len(candidates),
+			"candidates":      candidates,
+		}
+	}
 	return row, nil
 }
 

@@ -1,9 +1,21 @@
 import { dateText } from '../../lib/utils/format';
 
 export type ProcurementAction = 'submit' | 'approve' | 'order';
+export type ProcurementApprovalCandidate = {
+  user_id: string;
+  staff_id?: string;
+  full_name: string;
+  role_names: string[];
+};
+export type ProcurementApprovalContext = {
+  permission: 'procurement.approve' | string;
+  candidate_count: number;
+  candidates: ProcurementApprovalCandidate[];
+};
 export type ProcurementRow = Record<string, any> & {
   id: string; project_id: string; status: string; edit_version: number;
   capabilities?: Partial<Record<'edit' | ProcurementAction, boolean>>;
+  approval_context?: ProcurementApprovalContext;
 };
 export type ProcurementHeader = { title: string; supplier_partner_id: string; order_reference: string; expected_delivery_date: string };
 export const procurementStatusLabels: Record<string, string> = {
@@ -12,6 +24,12 @@ export const procurementStatusLabels: Record<string, string> = {
 };
 export const procurementActionLabels = { submit: 'Gửi duyệt', approve: 'Duyệt yêu cầu', order: 'Ghi nhận đặt hàng' };
 export const procurementActionSuccess = { submit: 'Đã gửi yêu cầu mua để duyệt', approve: 'Đã duyệt yêu cầu mua', order: 'Đã ghi nhận đặt hàng' };
+export const procurementTaskVerificationQueryOptions = {
+  retry: false,
+  staleTime: 0,
+  refetchOnMount: 'always' as const,
+  refetchOnWindowFocus: false,
+};
 
 export function procurementHeader(row: ProcurementRow): ProcurementHeader {
   return { title: row.title ?? '', supplier_partner_id: row.supplier_partner_id ?? '', order_reference: row.order_reference ?? '', expected_delivery_date: String(row.expected_delivery_date ?? '').slice(0, 10) };

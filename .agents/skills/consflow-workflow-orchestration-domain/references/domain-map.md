@@ -1,5 +1,11 @@
 # Workflow Orchestration Domain Map
 
+## Required Procurement Automation Recovery
+
+- Runtime Work Item completion still invokes `RunRequiredWorkflowAutomationForWorkItem` before any terminal state write. For `procurement.require_approved`, official engine-2 legacy runtime steps now receive the same read-only `business_source` recovery contract needed to explain that hard gate; this does not rebind, republish or mutate their template/run snapshots.
+- A blocked outcome identifies the exact purchase source, while Work Item UI prefers current source inspection over stale event history, refreshes after a rejected Complete, displays `details.reason` and opens the canonical source dialog instead of the Complete action panel. Source approval is a separate commercial transition and never marks the Work Item/Run Step complete or advances the Node.
+- First searches: `RunRequiredWorkflowAutomationForWorkItem|WorkflowBusinessSourceForWorkItem|automateClientInputProcurementGate|requiredAutomationPresentation|businessSourceNavigationPath`. Tests cover legacy runtime exposure, exact target/error details, all-blockers-resolved success and frontend navigation. No migration, approval policy, role, evidence/form gate or activity history rule changed.
+
 ## Discussion Source Editing And Historical Snapshots
 
 - Supported direct Discussion Work editors render the same `WorkItemRequirementPanel` and `buildRequirementRows` output as full Work Item detail. The backend `completion_requirements` and actor-aware capabilities remain authoritative; blocker rows expand by default, form/checklist and evidence actions target the already-mounted `WorkflowFormPanel`/`EvidencePanel`, and action-panel/unsupported targets use dirty-safe full-detail fallback. `Xem toàn bộ & lịch sử` remains optional and never creates or advances a workflow transition. First searches: `WorkItemRequirementPanel|buildRequirementRows|navigateToRequirement|navigationRequest|Xem toàn bộ & lịch sử`.

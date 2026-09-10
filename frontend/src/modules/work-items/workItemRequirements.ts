@@ -3,6 +3,7 @@ import type { WorkItem, WorkItemCompletionRequirement } from '../../lib/types/do
 export type WorkItemRequirementNavigationTarget =
   | { kind: 'workflow_form'; focus: 'first_issue' | 'checklist' | 'source' }
   | { kind: 'evidence'; evidenceType?: 'photo' | 'document'; openUpload: boolean }
+  | { kind: 'business_source'; route: string }
   | { kind: 'action_panel' };
 
 export type WorkItemRequirementNavigationRequest = {
@@ -22,8 +23,80 @@ export type PermissionRequirementPresentation = {
   guidance: string;
 };
 
+export type RequiredAutomationPresentation = CompletionRequirementPresentation & {
+  state: 'done' | 'blocked' | 'neutral';
+};
+
 function cleanPresentationText(value: unknown) {
   return typeof value === 'string' ? value.trim().replace(/[.!?]+$/u, '') : '';
+}
+
+export function workItemActionErrorReason(error: unknown) {
+  if (!error || typeof error !== 'object') return undefined;
+  const details = (error as { details?: unknown }).details;
+  if (!details || typeof details !== 'object' || Array.isArray(details)) return undefined;
+  const reason = (details as Record<string, unknown>).reason;
+  return typeof reason === 'string' && reason.trim() ? reason.trim() : undefined;
+}
+
+export function businessSourceNavigationPath(route: string, currentSearch: string) {
+  if (!route) return route;
+  const returnTo = new URLSearchParams(currentSearch).get('returnTo');
+  if (!returnTo) return route;
+
+  const hashIndex = route.indexOf('#');
+  const hash = hashIndex >= 0 ? route.slice(hashIndex) : '';
+  const withoutHash = hashIndex >= 0 ? route.slice(0, hashIndex) : route;
+  const queryIndex = withoutHash.indexOf('?');
+  const path = queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash;
+  const params = new URLSearchParams(queryIndex >= 0 ? withoutHash.slice(queryIndex + 1) : '');
+  if (!params.has('returnTo')) params.set('returnTo', returnTo);
+  const query = params.toString();
+  return `${path}${query ? `?${query}` : ''}${hash}`;
+}
+
+export function requiredAutomationPresentation(item: WorkItem, actions: readonly string[]): RequiredAutomationPresentation {
+  const latestAutomation = (item.automation_events ?? []).find((event) => event.action_key === item.domain_action_key);
+  const automationStatus = item.business_source?.status || latestAutomation?.status;
+  const reason = item.business_source?.message || latestAutomation?.blocker_reason || latestAutomation?.error_message;
+  const sourceBlocked = item.domain_action_key === 'procurement.require_approved'
+    && automationStatus === 'blocked'
+    && Boolean(item.execution_target?.route);
+  const sourceTarget: WorkItemRequirementNavigationTarget | undefined = sourceBlocked
+    ? { kind: 'business_source', route: item.execution_target!.route }
+    : undefined;
+  const retryAtActionPanel = !sourceBlocked
+    && automationStatus !== 'succeeded'
+    && automationStatus !== 'skipped'
+    && actions.includes('complete');
+
+  return {
+    description: automationStatus === 'succeeded'
+      ? reason || `${item.domain_action_key} đã hoàn tất thành công.`
+      : automationStatus === 'blocked' || automationStatus === 'failed'
+        ? reason || `${item.domain_action_key} đang bị chặn.`
+        : `${item.domain_action_key} sẽ được kiểm tra trước khi đầu việc hoàn tất.`,
+    guidance: automationStatus === 'succeeded' || automationStatus === 'skipped'
+      ? 'Không còn thao tác bổ sung cho điều kiện này.'
+      : sourceBlocked
+        ? item.business_source?.target_type === 'procurement_request'
+          ? 'Mở yêu cầu mua đang chặn và thực hiện bước duyệt; trạng thái đầu việc sẽ được tải lại sau khi hồ sơ nguồn thay đổi.'
+          : 'Mở Mua sắm để bổ sung yêu cầu mua bắt buộc; trạng thái đầu việc sẽ được tải lại sau khi hồ sơ nguồn thay đổi.'
+        : retryAtActionPanel
+          ? 'Khắc phục lý do chặn nếu có, sau đó chọn Hoàn tất để hệ thống chạy lại kiểm tra.'
+          : automationStatus === 'failed'
+            ? 'Liên hệ người quản lý workflow và cung cấp thông báo lỗi để kiểm tra tự động hóa.'
+            : 'Tự động hóa sẽ được hệ thống kiểm tra khi đầu việc có thể Hoàn tất; liên hệ người quản lý workflow nếu trạng thái không thay đổi.',
+    actionLabel: sourceTarget
+      ? item.business_source?.target_type === 'procurement_request' ? 'Mở yêu cầu cần duyệt' : item.execution_target?.action_label || 'Mở hồ sơ nguồn'
+      : retryAtActionPanel ? 'Đến thao tác Hoàn tất' : undefined,
+    target: sourceTarget ?? (retryAtActionPanel ? { kind: 'action_panel' } : undefined),
+    state: automationStatus === 'succeeded' || automationStatus === 'skipped'
+      ? 'done'
+      : automationStatus === 'blocked' || automationStatus === 'failed'
+        ? 'blocked'
+        : 'neutral',
+  };
 }
 
 export function permissionRequirementPresentation(item: WorkItem): PermissionRequirementPresentation {

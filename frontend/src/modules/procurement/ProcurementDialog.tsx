@@ -9,8 +9,9 @@ import type { Partner, WorkItem } from '../../lib/types/domain';
 import { partnerOptions } from '../core-data/partnerUtils';
 import { syncWorkItemMutationTransition, withWorkItemMutationContext, workItemAutoStartedNotice } from '../work-items/workItemMutationContext';
 import { workItemDetailPath } from '../work-items/workItemNavigation';
-import { ProcurementDetail } from './ProcurementDetail';
-import { procurementActionFor, procurementActionLabels, procurementActionSuccess, procurementHeader, procurementMutationWorkItemId, procurementStatusLabels, validateProcurementHeader, type ProcurementAction, type ProcurementHeader, type ProcurementRow } from './procurementWorkspace';
+import { discussionWorkDetailLoadState } from '../work-items/discussionWorkDomain';
+import { ProcurementApprovalPanel, ProcurementDetail } from './ProcurementDetail';
+import { procurementActionFor, procurementActionLabels, procurementActionSuccess, procurementHeader, procurementMutationWorkItemId, procurementStatusLabels, procurementTaskVerificationQueryOptions, validateProcurementHeader, type ProcurementAction, type ProcurementHeader, type ProcurementRow } from './procurementWorkspace';
 
 type Props = { projectId: string; requestId?: string; workItem?: WorkItem; taskId?: string; readOnly?: boolean; onClose: () => void; onShowWorkDetails?: () => void };
 const secondary = 'rounded-md border border-line px-3 py-2 text-sm font-semibold disabled:opacity-40';
@@ -39,7 +40,7 @@ function ProcurementSession({ projectId, requestId, workItem, taskId = '', readO
     const row = await get<WorkItem>(`/work-items/${taskId}`);
     if (row.id !== taskId || row.project_id !== projectId) throw new Error('Công việc không thuộc công trình này');
     return row;
-  }, enabled: Boolean(user?.id && taskId && !workItem), retry: false });
+  }, enabled: Boolean(user?.id && taskId && !workItem), ...procurementTaskVerificationQueryOptions });
   const list = useQuery({ queryKey: ['procurement', 'discussion', user?.id, projectId], queryFn: () => get<ProcurementRow[]>(`/procurement-requests?project_id=${encodeURIComponent(projectId)}`), enabled: Boolean(user?.id && !requestId), retry: false });
   const detail = useQuery({ queryKey: ['procurement-detail', user?.id, projectId, selectedId], queryFn: async () => {
     const row = await get<ProcurementRow>(`/procurement-requests/${selectedId}`);
@@ -51,8 +52,8 @@ function ProcurementSession({ projectId, requestId, workItem, taskId = '', readO
   const partners = useQuery({ queryKey: ['partners', 'supplier', 'active'], queryFn: () => get<Partner[]>('/partners?status=active'), enabled: canEdit, retry: false });
   const dirty = Boolean(base && values && JSON.stringify(procurementHeader(base)) !== JSON.stringify(values));
   const stale = Boolean(base && current && base.edit_version !== current.edit_version);
-  const taskUnavailable = Boolean(taskId && !workItem && (!task.isFetchedAfterMount || task.isError));
-  const action = current ? procurementActionFor(current, readOnly || taskUnavailable) : null;
+  const taskLoadState = taskId && !workItem ? discussionWorkDetailLoadState({ isFetchedAfterMount: task.isFetchedAfterMount, isFetching: task.isFetching, isError: task.isError, projectId: task.data?.project_id }, projectId) : 'ready';
+  const action = current ? procurementActionFor(current, readOnly || taskLoadState !== 'ready') : null;
   const needsEditor = Boolean(action === 'order' && !canEdit && values && Object.keys(validateProcurementHeader(values, 'order')).length);
   const editableRows = (list.data ?? []).filter(row => row.project_id === projectId && !['cancelled', 'deleted'].includes(row.status));
   const filteredRows = editableRows.filter(row => `${row.request_code} ${row.title} ${row.supplier_name ?? ''}`.toLocaleLowerCase('vi').includes(search.trim().toLocaleLowerCase('vi')));
@@ -139,7 +140,8 @@ function ProcurementSession({ projectId, requestId, workItem, taskId = '', readO
       {!detail.isFetchedAfterMount ? <p role="status">Đang tải yêu cầu mua…</p> : null}
       {detail.isError ? <p role="alert" className="rounded bg-rose-50 p-3 text-sm text-rose-800">Không tải được yêu cầu mua hoặc quyền truy cập đã thay đổi. <button className="underline" onClick={() => void detail.refetch()}>Thử lại</button></p> : null}
       {failure ? <p role="alert" className="rounded bg-rose-50 p-3 text-sm text-rose-800">{failure}</p> : null}
-      {taskId && !workItem && task.isError ? <p role="alert" className="text-sm text-rose-700">Không xác minh được công việc liên quan. <button className="underline" onClick={() => void task.refetch()}>Thử lại</button></p> : null}
+      {taskId && !workItem && taskLoadState === 'loading' ? <p role="status" className="rounded bg-blue-50 p-3 text-sm text-blue-800">Đang xác minh công việc liên quan trước khi mở thao tác…</p> : null}
+      {taskId && !workItem && taskLoadState === 'error' ? <p role="alert" className="rounded bg-rose-50 p-3 text-sm text-rose-800">Không xác minh được công việc liên quan. <button className="underline" onClick={() => void task.refetch()}>Thử lại</button></p> : null}
       {visible ? <>
         {stale ? <p role="alert" className="rounded bg-amber-50 p-3 text-sm text-amber-900">Hồ sơ đã được người khác cập nhật. <button className="font-semibold underline" onClick={() => dirty ? setReloadOpen(true) : void loadLatest()}>Xem bản mới</button></p> : null}
         {readOnly ? <p className="text-sm text-amber-800">Chỉ xem theo trạng thái và quyền công việc hiện tại.</p> : null}
@@ -157,8 +159,10 @@ function ProcurementSession({ projectId, requestId, workItem, taskId = '', readO
           </label>;
         })}{partners.isError ? <p className="text-xs text-amber-800">Không tải được danh sách nhà cung cấp. <button className="underline" onClick={() => void partners.refetch()}>Thử lại</button></p> : null}</div> : null}
         <ProcurementDetail record={base!} />
+        {['waiting_approval', 'submitted'].includes(current!.status) || current!.approval_message ? <ProcurementApprovalPanel context={current!.approval_context} canApprove={current!.capabilities?.approve === true} approvalMessage={current!.approval_message} /> : null}
         {['ordered', 'partially_received'].includes(current!.status) ? <Link target="_blank" rel="noreferrer" className="inline-block text-sm font-semibold text-blue-700 underline" to={current!.incoming_acceptance_work_item_id ? workItemDetailPath(current!.incoming_acceptance_work_item_id, `/projects/${projectId}?tab=activity`, projectId) : `/projects/${projectId}/procurement`}>{current!.incoming_acceptance_work_item_id ? 'Mở nghiệm thu liên quan' : 'Mở Mua sắm để theo dõi nghiệm thu'}</Link> : null}
-        {!action && !readOnly && !['ordered', 'partially_received', 'received'].includes(current!.status) ? <p className="text-sm text-slate-600">{current!.approval_message || 'Chờ người có quyền thực hiện bước tiếp theo.'}</p> : null}
+        {!action && !readOnly && taskLoadState === 'ready' && ['draft', 'changes_requested'].includes(current!.status) ? <p className="text-sm text-slate-600">Bạn không có quyền gửi duyệt yêu cầu này.</p> : null}
+        {!action && !readOnly && taskLoadState === 'ready' && current!.status === 'approved' ? <p className="text-sm text-slate-600">Bạn không có quyền ghi nhận đặt hàng cho yêu cầu này.</p> : null}
       </> : null}
     </div>}
   </Dialog>

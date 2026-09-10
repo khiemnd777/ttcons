@@ -807,6 +807,61 @@ func (r *Repository) CanAccessProjectPermission(ctx context.Context, userID, pro
 	return r.UserHasProjectScope(ctx, userID, projectID)
 }
 
+// ProjectPermissionActors returns active App accounts whose applicable roles
+// grant the requested permission and whose current project scope passes the
+// same authoritative check used by mutations. Role labels are presentation
+// context only; callers must never use this list as an authorization decision.
+func (r *Repository) ProjectPermissionActors(ctx context.Context, projectID, permissionKey string) ([]Record, error) {
+	projectID = cleanID(projectID)
+	permissionKey = strings.TrimSpace(permissionKey)
+	if projectID == "" || permissionKey == "" {
+		return []Record{}, nil
+	}
+	rows, err := r.Query(ctx, `
+		SELECT account.id::text AS user_id,account.full_name,
+			COALESCE(profile.id::text,'') AS staff_id,
+			COALESCE(jsonb_agg(DISTINCT role.display_name ORDER BY role.display_name),'[]'::jsonb) AS role_names
+		FROM users account
+		JOIN user_roles assignment ON assignment.user_id=account.id
+			AND (assignment.project_id IS NULL OR assignment.project_id=NULLIF($1,'')::uuid)
+		JOIN roles role ON role.id=assignment.role_id
+		JOIN role_permissions grant_row ON grant_row.role_id=role.id
+		JOIN permissions permission ON permission.id=grant_row.permission_id AND permission.key=$2
+		LEFT JOIN LATERAL (
+			SELECT person.id
+			FROM staff person
+			WHERE person.user_id=account.id AND person.status='active'
+			ORDER BY person.updated_at DESC,person.id
+			LIMIT 1
+		) profile ON true
+		WHERE account.status='active' AND account.deleted_at IS NULL
+			AND NOT EXISTS (
+				SELECT 1
+				FROM user_roles external_assignment
+				JOIN roles external_role ON external_role.id=external_assignment.role_id
+				WHERE external_assignment.user_id=account.id AND external_role.external_only
+			)
+		GROUP BY account.id,account.full_name,profile.id
+		ORDER BY lower(account.full_name),account.id
+	`, projectID, permissionKey)
+	if err != nil {
+		return nil, err
+	}
+	actors := make([]Record, 0, len(rows))
+	for _, row := range rows {
+		allowed, err := r.CanAccessProjectPermission(ctx, cleanID(row["user_id"]), projectID, []string{permissionKey})
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			continue
+		}
+		row["role_names"] = stringSlice(row["role_names"])
+		actors = append(actors, row)
+	}
+	return actors, nil
+}
+
 func (r *Repository) CanMutateProjectActivity(ctx context.Context, userID, projectID string) (bool, error) {
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
 	if err != nil {

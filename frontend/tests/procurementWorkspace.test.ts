@@ -7,12 +7,12 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 const bundle = await build({
-  stdin: { resolveDir: fileURLToPath(new URL('../src', import.meta.url)), contents: `export * from './modules/procurement/procurementWorkspace'; export { ProcurementSnapshot } from './modules/procurement/ProcurementSnapshot'; export { discussionWorkSurface } from './modules/work-items/discussionWorkDomain';` },
+  stdin: { resolveDir: fileURLToPath(new URL('../src', import.meta.url)), contents: `export * from './modules/procurement/procurementWorkspace'; export { ProcurementApprovalPanel } from './modules/procurement/ProcurementDetail'; export { ProcurementSnapshot } from './modules/procurement/ProcurementSnapshot'; export { discussionWorkSurface } from './modules/work-items/discussionWorkDomain';` },
   bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic', loader: { '.css': 'empty' }, define: { 'import.meta.env': '{}' },
 });
 const module = { exports: {} as Record<string, any> };
 new Function('require', 'module', 'exports', bundle.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
-const { procurementActionFor, procurementHeader, procurementMutationWorkItemId, validateProcurementHeader, ProcurementSnapshot, discussionWorkSurface } = module.exports;
+const { procurementActionFor, procurementHeader, procurementMutationWorkItemId, procurementTaskVerificationQueryOptions, validateProcurementHeader, ProcurementApprovalPanel, ProcurementSnapshot, discussionWorkSurface } = module.exports;
 
 test('the next action requires both source state and its explicit server capability', () => {
   const capabilities = { edit: true, submit: true, approve: true, order: true };
@@ -44,6 +44,35 @@ test('only supported procurement tasks open the editor and explicitly start matc
   assert.equal(procurementMutationWorkItemId({ id: 'work', domain_action_key: 'procurement.require_approved' }), 'work');
   assert.equal(procurementMutationWorkItemId({ id: 'work', domain_action_key: 'procurement.generate_from_boq' }), '');
   assert.equal(procurementMutationWorkItemId(), '');
+});
+
+test('procurement task verification always refetches a warm shared Work Item cache', () => {
+  assert.deepEqual(procurementTaskVerificationQueryOptions, {
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+  });
+});
+
+test('approval context names every eligible approver and explains the current actor capability', () => {
+  const context = {
+    permission: 'procurement.approve',
+    candidate_count: 2,
+    candidates: [
+      { user_id: 'procurement', full_name: 'Ngô Lan Mua hàng', role_names: ['Mua hàng'] },
+      { user_id: 'pm', full_name: 'Nguyễn Minh PM', role_names: ['PM'] },
+    ],
+  };
+  const allowed = renderToStaticMarkup(createElement(ProcurementApprovalPanel, { context, canApprove: true }));
+  for (const text of ['Người có thể duyệt', '2 người', 'Ngô Lan Mua hàng', 'Vai trò: Mua hàng', 'Nguyễn Minh PM', 'Bạn có quyền duyệt yêu cầu này.']) assert.ok(allowed.includes(text), text);
+  assert.doesNotMatch(allowed, /Chờ người có quyền/);
+
+  const denied = renderToStaticMarkup(createElement(ProcurementApprovalPanel, { context, canApprove: false }));
+  assert.match(denied, /Bạn không có quyền duyệt yêu cầu này\./);
+
+  const empty = renderToStaticMarkup(createElement(ProcurementApprovalPanel, { context: { ...context, candidate_count: 0, candidates: [] }, canApprove: false }));
+  assert.match(empty, /Chưa có người đủ quyền duyệt yêu cầu này\./);
 });
 
 test('purchase snapshots render persisted prices and PO without current source actions or stock claims', () => {
